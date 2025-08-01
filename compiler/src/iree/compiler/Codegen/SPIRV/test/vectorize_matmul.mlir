@@ -23,16 +23,16 @@ func.func @matmul_1x4x4(%lhs: tensor<1x4xf32>, %rhs: tensor<4x4xf32>, %init: ten
 //       CHECK:   %[[RHS_3_VECTOR:.+]] = vector.transfer_read %[[RHS]][%[[C3]], %[[C0]]], %[[PAD]]
 //       CHECK:   %[[INIT_VECTOR:.+]] = vector.transfer_read %[[INIT]][%[[C0]], %[[C0]]], %[[PAD]]
 //       CHECK:   %[[LHS_0_SCALAR:.+]] = vector.extract %[[LHS_VECTOR]][0]
-//       CHECK:   %[[LHS_0_VECTOR:.+]] = vector.splat %[[LHS_0_SCALAR]] : vector<4xf32>
+//       CHECK:   %[[LHS_0_VECTOR:.+]] = vector.broadcast %[[LHS_0_SCALAR]] : f32 to vector<4xf32>
 //       CHECK:   %[[FMA_0:.+]] = vector.fma %[[LHS_0_VECTOR]], %[[RHS_0_VECTOR]], %[[INIT_VECTOR]] : vector<4xf32>
 //       CHECK:   %[[LHS_1_SCALAR:.+]] = vector.extract %[[LHS_VECTOR]][1]
-//       CHECK:   %[[LHS_1_VECTOR:.+]] = vector.splat %[[LHS_1_SCALAR]] : vector<4xf32>
+//       CHECK:   %[[LHS_1_VECTOR:.+]] = vector.broadcast %[[LHS_1_SCALAR]] : f32 to vector<4xf32>
 //       CHECK:   %[[FMA_1:.+]] = vector.fma %[[LHS_1_VECTOR]], %[[RHS_1_VECTOR]], %[[FMA_0]] : vector<4xf32>
 //       CHECK:   %[[LHS_2_SCALAR:.+]] = vector.extract %[[LHS_VECTOR]][2]
-//       CHECK:   %[[LHS_2_VECTOR:.+]] = vector.splat %[[LHS_2_SCALAR]] : vector<4xf32>
+//       CHECK:   %[[LHS_2_VECTOR:.+]] = vector.broadcast %[[LHS_2_SCALAR]] : f32 to vector<4xf32>
 //       CHECK:   %[[FMA_2:.+]] = vector.fma %[[LHS_2_VECTOR]], %[[RHS_2_VECTOR]], %[[FMA_1]] : vector<4xf32>
 //       CHECK:   %[[LHS_3_SCALAR:.+]] = vector.extract %[[LHS_VECTOR]][3]
-//       CHECK:   %[[LHS_3_VECTOR:.+]] = vector.splat %[[LHS_3_SCALAR]] : vector<4xf32>
+//       CHECK:   %[[LHS_3_VECTOR:.+]] = vector.broadcast %[[LHS_3_SCALAR]] : f32 to vector<4xf32>
 //       CHECK:   %[[FMA_3:.+]] = vector.fma %[[LHS_3_VECTOR]], %[[RHS_3_VECTOR]], %[[FMA_2]] : vector<4xf32>
 //       CHECK:   vector.transfer_write %[[FMA_3]], %[[INIT]][%[[C0]], %[[C0]]]
 
@@ -137,7 +137,7 @@ func.func @matmul_broadcast_add(%init: tensor<1x8xf32>, %a: tensor<1x8xf32>, %b:
 
 //          CHECK:   %[[READ:.+]] = vector.transfer_read %[[BIAS]]
 //          CHECK:   %[[EXT0:.+]] = vector.extract %[[READ]][0] : f32 from vector<1xf32>
-//          CHECK:   %[[BCST0:.+]] = vector.splat %[[EXT0]] : vector<4xf32>
+//          CHECK:   %[[BCST0:.+]] = vector.broadcast %[[EXT0]] : f32 to vector<4xf32>
 //          CHECK:   %[[ADD0:.+]] = arith.addf %{{.+}}, %[[BCST0]] : vector<4xf32>
 //          CHECK:   %[[ADD1:.+]] = arith.addf %{{.+}}, %[[BCST0]] : vector<4xf32>
 //          CHECK:   %[[WRITE0:.+]] = vector.transfer_write %[[ADD0]], %[[INIT]][%[[C0]], %[[C0]]]
@@ -247,11 +247,11 @@ func.func @matmul_4x4x4_i8_to_i32(%lhs: tensor<4x4xi8>, %rhs : tensor<4x4xi8>) -
 // CHECK-NEXT:    %[[RHS2E:.+]]  = arith.extsi %[[RHS2]] : vector<4xi8> to vector<4xi32>
 // CHECK-NEXT:    %[[RHS3E:.+]]  = arith.extsi %[[RHS3]] : vector<4xi8> to vector<4xi32>
 // CHECK:         %[[EXT0:.+]]   = vector.extract %[[LHS0E]][0]
-// CHECK-NEXT:    %[[SPLT:.+]]   = vector.splat %[[EXT0]] : vector<4xi32>
-// CHECK-NEXT:    %[[MUL0:.+]]   = arith.muli %[[SPLT]], %[[RHS0E]]
+// CHECK-NEXT:    %[[BROADCAST:.+]]   = vector.broadcast %[[EXT0]] : i32 to vector<4xi32>
+// CHECK-NEXT:    %[[MUL0:.+]]   = arith.muli %[[BROADCAST]], %[[RHS0E]]
 // CHECK:         %[[EXT1:.+]]   = vector.extract %[[LHS0E]][1]
-// CHECK-NEXT:    %[[SPLT:.+]]   = vector.splat %[[EXT1]] : vector<4xi32>
-// CHECK-NEXT:    %[[MUL1:.+]]   = arith.muli %[[SPLT]], %[[RHS1E]]
+// CHECK-NEXT:    %[[BROADCAST:.+]]   = vector.broadcast %[[EXT1]] : i32 to vector<4xi32>
+// CHECK-NEXT:    %[[MUL1:.+]]   = arith.muli %[[BROADCAST]], %[[RHS1E]]
 // CHECK-NEXT:    %[[ADD0:.+]]   = arith.addi %[[MUL1]], %[[MUL0]]
 //
 // CHECK:         %[[W0:.+]]     = vector.transfer_write %{{.+}}, %{{.+}}[%[[IDX0]], %[[IDX0]]]
