@@ -210,13 +210,14 @@ collapseForAllOpDimensions(RewriterBase &rewriter, scf::ForallOp forallOp,
         getInvertedMappingPermutation<IREE::Codegen::WorkgroupMappingAttr>(
             collapsedAttrs);
     applyPermutationToVector(nIters, invertPermutation);
-    SmallVector<OpFoldResult> basis = llvm::to_vector(llvm::reverse(nIters));
+    SmallVector<OpFoldResult> basis = llvm::to_vector(nIters);
 
     std::optional<SmallVector<Value>> ivs = newForOp.getLoopInductionVars();
     auto delinearizeOp = affine::AffineDelinearizeIndexOp::create(
         rewriter, loc, ivs.value()[delinearizedFromIndex.value()], basis);
-    auto replacementIvs =
-        llvm::to_vector(llvm::reverse(delinearizeOp.getResults()));
+    auto replacementIvs = llvm::to_vector(delinearizeOp.getResults());
+    applyPermutationToVector(replacementIvs,
+                             invertPermutationVector(invertPermutation));
     int replacementIvIndex = 0;
     SmallVector<Value> remappedIvs;
     AffineExpr d0, s0, s1;
@@ -295,7 +296,7 @@ resolveWorkgroupForAll(RewriterBase &rewriter, scf::ForallOp forallOp,
                                   loc, static_cast<unsigned>(mappingID))
                               .getResult();
     OpFoldResult nprocs = rewriter
-                              .create<IREE::HAL::InterfaceWorkgroupIDOp>(
+                              .create<IREE::HAL::InterfaceWorkgroupCountOp>(
                                   loc, static_cast<unsigned>(mappingID))
                               .getResult();
 
@@ -324,13 +325,16 @@ resolveWorkgroupForAll(RewriterBase &rewriter, scf::ForallOp forallOp,
       }
     }
 
-    OpFoldResult boundedNumWorkgourps = affine::makeComposedFoldedAffineMin(
-        rewriter, loc,
-        AffineMap::get(
-            0, 1, {s0, getAffineConstantExpr(maxCount, rewriter.getContext())},
-            rewriter.getContext()),
-        numWorkgroups);
-    numWorkgroups = boundedNumWorkgourps;
+    if (!ShapedType::isDynamic(maxCount)) {
+      OpFoldResult boundedNumWorkgroups = affine::makeComposedFoldedAffineMin(
+          rewriter, loc,
+          AffineMap::get(
+              0, 1,
+              {s0, getAffineConstantExpr(maxCount, rewriter.getContext())},
+              rewriter.getContext()),
+          numWorkgroups);
+      numWorkgroups = boundedNumWorkgroups;
+    }
   }
   if (failed(resolveForAll(rewriter, forallOp, mappedProcIds, mappedNProcs,
                            generateLoopNest))) {
@@ -445,6 +449,8 @@ resolveWorkgroupForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
   if (multiForall) {
     deLinearizeFrom = IREE::Codegen::WorkgroupId::IdX;
   }
+  SmallVector<SmallVector<OpFoldResult>> numWorkgroupsLists;
+  rewriter.setInsertionPointAfter(workgroupForAllOps.back());
   for (auto [idx, forallOp] : llvm::enumerate(workgroupForAllOps)) {
     // Generate a loop nest when there are multiple foralls, because the
     // workgroup counts might not match between foralls.
@@ -455,14 +461,28 @@ resolveWorkgroupForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
     if (failed(numWorkgroups)) {
       return failure();
     }
-    // For the first loop resolve the number of workgroups/
-    if (idx == 0) {
-      if (failed(lowerWorkgroupCountFromSliceOp(
-              rewriter, funcOp, numWorkgroups.value(),
-              llvm::to_underlying(deLinearizeFrom) + 1))) {
-        return failure();
-      }
+    numWorkgroupsLists.push_back(numWorkgroups.value());
+  }
+  // For the first loop resolve the number of workgroups
+  SmallVector<OpFoldResult> maxNumWorkgroups =
+      numWorkgroupsLists.pop_back_val();
+  Location loc = funcOp.getLoc();
+  auto asValue = [&](OpFoldResult ofr) {
+    return getValueOrCreateConstantIndexOp(rewriter, loc, ofr);
+  };
+  for (SmallVector<OpFoldResult> numWorkgroupsList : numWorkgroupsLists) {
+    for (auto [idx, numWorkgroups] : llvm::enumerate(numWorkgroupsList)) {
+      maxNumWorkgroups[idx] =
+          rewriter
+              .create<arith::MaxUIOp>(loc, asValue(numWorkgroups),
+                                      asValue(maxNumWorkgroups[idx]))
+              .getResult();
     }
+  }
+  if (failed(lowerWorkgroupCountFromSliceOp(
+          rewriter, funcOp, maxNumWorkgroups,
+          llvm::to_underlying(deLinearizeFrom) + 1))) {
+    return failure();
   }
   return success();
 }
