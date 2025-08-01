@@ -29,12 +29,11 @@ void fuseProducersOfSlices(RewriterBase &rewriter,
 void collectTiledAndFusedOps(Operation *rootOp,
                              llvm::SmallDenseSet<Operation *> &result);
 
-/// Fuse all consumers of the given `tiledOp` into the surrounding `scf.forall`.
-/// Returns a list of new `tensor.extract_slice` ops with new fusion
-/// opportunities, as well as the new surrounding `scf.forall` (because consumer
-/// fusion replaces the loop).
+/// Fuse all consumers of the given `tiledOps` into the surrounding `scf.forall`
+/// unless specified otherwise by `filterFn`. Returns a list of new
+/// `tensor.extract_slice` ops with new fusion opportunities.
 FailureOr<std::queue<Operation *>> fuseConsumersIntoForall(
-    RewriterBase &rewriter, Operation *tiledOp,
+    RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
     MutableArrayRef<LoopLikeOpInterface> loops,
     std::function<bool(Operation *)> filterFn = [](Operation *) {
       return true;
