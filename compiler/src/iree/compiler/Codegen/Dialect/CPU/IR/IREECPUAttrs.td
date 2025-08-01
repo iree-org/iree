@@ -65,6 +65,9 @@ def IREECPU_LoweringConfigAttr :
     static Attribute getTilingLevelAttr(MLIRContext *ctx,
                                    ArrayRef<int64_t> tileSizes,
                                    ArrayRef<bool> scalableFlags);
+
+    /// Returns a vector that contains all the tiling information in the config.
+    SmallVector<LoweringConfigLevelInfo> getAvailableTilingInfo();
   }];
   let hasCustomAssemblyFormat = 1;
   let genVerifyDecl = 1;

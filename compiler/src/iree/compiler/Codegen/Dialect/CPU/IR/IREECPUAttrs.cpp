@@ -158,6 +158,24 @@ Attribute LoweringConfigAttr::getTilingLevelAttr(MLIRContext *ctx,
       ctx, tileSizes, /*interchange=*/{}, scalableFlags);
 }
 
+SmallVector<LoweringConfigLevelInfo>
+LoweringConfigAttr::getAvailableTilingInfo() {
+  SmallVector<LoweringConfigLevelInfo> result;
+  for (int i = 0, e = TilingLevel::MaxNumTileLevels; i < e; ++i) {
+    if (!hasTilingLevel(i)) {
+      continue;
+    }
+    auto attr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
+        getTilingLevelAttr(i));
+    LoweringConfigLevelInfo item;
+    item.level = static_cast<TilingLevel>(i);
+    llvm::append_range(item.sizes, attr.getSizes());
+    llvm::append_range(item.scalableFlags, attr.getScalableFlags());
+    result.push_back(item);
+  }
+  return result;
+}
+
 SmallVector<int64_t> LoweringConfigAttr::getWorkgroupTileSizes() const {
   return getTileSizes(getConfig(), DistributionTiles);
 }
