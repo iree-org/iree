@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
@@ -266,12 +267,12 @@ bool isRISCV64(Attribute attr) {
 
 std::array<int64_t, 3> getMaxWorkgroupCount(Attribute attr) {
   std::array<int64_t, 3> maxWorkgroupCount = {ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
-  std::optional<DenseI32ArrayAttr> workgroupCount =
-      getConfigTypedAttr<DenseI32ArrayAttr>(attr, "max_workgroup_count");
-  if (!workgroupCount) {
+  auto gpuTarget = dyn_cast_or_null<IREE::GPU::TargetAttr>(attr);
+  if (!gpuTarget) {
     return maxWorkgroupCount;
   }
-  for (auto [index, value] : llvm::enumerate(workgroupCount->asArrayRef())) {
+  for (auto [index, value] : llvm::enumerate(
+           gpuTarget.getWgp().getMaxWorkgroupCounts().asArrayRef())) {
     maxWorkgroupCount[index] = value;
   }
   return maxWorkgroupCount;
