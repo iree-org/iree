@@ -17,6 +17,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/Analysis/CallGraph.h"
@@ -276,8 +277,10 @@ resolveWorkgroupForAll(RewriterBase &rewriter, scf::ForallOp forallOp,
   rewriter.setInsertionPoint(forallOp);
   Location loc = forallOp.getLoc();
 
+  auto gpuTarget =
+      getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr::lookup(forallOp));
   std::array<int64_t, 3> maxWorkgroupCountArray =
-      getMaxWorkgroupCount(IREE::HAL::ExecutableTargetAttr::lookup(forallOp));
+      getMaxWorkgroupCount(gpuTarget);
   SmallVector<int64_t> maxWorkgroupCount =
       llvm::to_vector(maxWorkgroupCountArray);
   maxWorkgroupCount.resize(forallOp.getRank(), ShapedType::kDynamic);
