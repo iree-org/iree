@@ -176,13 +176,6 @@ public:
   /// and reduction dimensions.
   SizesAndScalableFlags getVectorTileSizes();
 
-  /// Returns a new `LoweringConfigAttr`, with the tile sizes of vector
-  /// dimensions, set to `sizes`, and the corresponding scalability set to
-  /// `scalableFlags`.
-  IREE::CPU::LoweringConfigAttr
-  getLoweringConfigWithNewVectorSizes(ArrayRef<int64_t> sizes,
-                                      ArrayRef<bool> scalableFlags = {});
-
   /// Returns the `level`-th valid tiling attribute. Returns an empty vector if
   /// it does not exist.
   IREE::Codegen::LoweringConfigTilingLevelAttr
