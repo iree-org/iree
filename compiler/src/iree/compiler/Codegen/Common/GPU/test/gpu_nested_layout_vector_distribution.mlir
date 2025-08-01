@@ -1360,11 +1360,9 @@ builtin.module attributes { transform.with_named_sequence } {
   thread_strides          = [1, 1]
 >
 
-func.func @distribute_map_scatter_row_major(%root: vector<16x16xf16>) {
-  %c0 = arith.constant 0 : index
-  %alloc = memref.alloc() : memref<64x64xf16>
+func.func @distribute_map_scatter_row_major(%root: vector<16x16xf16>, %output: memref<64x64xf16>) {
   %rootl = iree_vector_ext.to_layout %root to layout(#layout_row_major) : vector<16x16xf16>
-  iree_linalg_ext.map_scatter %rootl into %alloc {
+  iree_linalg_ext.map_scatter %rootl into %output {
     ^bb0(%idx0: index, %idx1: index):
       %mask = arith.constant true
       iree_linalg_ext.yield %idx0, %idx1, %mask : index, index, i1
