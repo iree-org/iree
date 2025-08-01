@@ -575,6 +575,67 @@ Value rankExpandValue(RewriterBase &rewriter, Location loc, Value destVal,
   }
 }
 
+struct DropMapScatterUnitDims final : public OpRewritePattern<MapScatterOp> {
+  using OpRewritePattern<MapScatterOp>::OpRewritePattern;
+  DropMapScatterUnitDims(MLIRContext *context,
+                         linalg::ControlDropUnitDims options,
+                         PatternBenefit benefit = 1)
+      : OpRewritePattern<MapScatterOp>(context, benefit),
+        options(std::move(options)) {}
+
+  LogicalResult matchAndRewrite(MapScatterOp mapScatterOp,
+                                PatternRewriter &rewriter) const override {
+    auto inputType = dyn_cast<RankedTensorType>(mapScatterOp.getInputType());
+    if (!inputType) {
+      return failure();
+    }
+    if (llvm::none_of(inputType.getShape(),
+                      [](int64_t size) { return size == 1; })) {
+      return failure();
+    }
+    Location loc = mapScatterOp.getLoc();
+    FailureOr<Value> newInput = rankReduceOperand(
+        rewriter, loc, /*startDim=*/0, /*numDims=*/mapScatterOp.getInputRank(),
+        mapScatterOp.getInput(), mapScatterOp.getInputType(), options);
+    if (failed(newInput)) {
+      return failure();
+    }
+
+    auto newInputType = cast<ShapedType>(newInput->getType());
+    auto unitFoldingBuilder = [&](ArrayRef<BlockArgument> nonUnitIndices) {
+      Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+      int nonUnitArgIdx = 0;
+      SmallVector<Value> replacementValues;
+      for (int64_t dim = 0; dim < inputType.getRank(); ++dim) {
+        if (inputType.getDimSize(dim) == 1) {
+          replacementValues.push_back(zero);
+          continue;
+        }
+        replacementValues.push_back(nonUnitIndices[nonUnitArgIdx++]);
+      }
+      // Special case for map_scatter with all unit dims. `rankReduceOperand`
+      // will not generate a 0D tensor, so the last dimension will be retained.
+      if (newInputType.getRank() == 1 && newInputType.getDimSize(0) == 1) {
+        replacementValues.back() = nonUnitIndices[0];
+      }
+      return replacementValues;
+    };
+    int numNonUnitDims = newInputType.getRank();
+    // The map_scatter op is generally only used in Codegen, where it is the
+    // last op in the dispatch, so for now, we don't bother collapsing the
+    // result shape and inserting an expansion after the op.
+    rewriter.modifyOpInPlace(mapScatterOp, [&]() {
+      mapScatterOp.getInputMutable().assign(newInput.value());
+      mapScatterOp.insertTransformationAtStart(rewriter, unitFoldingBuilder,
+                                               numNonUnitDims);
+    });
+    return success();
+  }
+
+private:
+  linalg::ControlDropUnitDims options;
+};
+
 struct DropGatherUnitDims final : public OpRewritePattern<GatherOp> {
   DropGatherUnitDims(MLIRContext *context, linalg::ControlDropUnitDims options,
                      PatternBenefit benefit = 1)
@@ -1059,8 +1120,8 @@ private:
 void populateFoldUnitExtentDimsPatterns(
     RewritePatternSet &patterns, const linalg::ControlDropUnitDims &options) {
   patterns.add<DropScatterUnitIndexDepth>(patterns.getContext());
-  patterns.add<DropGatherUnitDims, DropScatterUnitDims, DropAttentionUnitDims>(
-      patterns.getContext(), options);
+  patterns.add<DropGatherUnitDims, DropScatterUnitDims, DropAttentionUnitDims,
+               DropMapScatterUnitDims>(patterns.getContext(), options);
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
