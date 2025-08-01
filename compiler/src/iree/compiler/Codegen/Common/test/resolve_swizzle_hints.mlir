@@ -243,3 +243,37 @@ func.func @swizzle_gather_to_lds_scalar(%src: memref<?xf32>, %offset: index) {
 //       CHECK:   %[[IELEM:.+]] = arith.muli %[[I]], %[[ROW_WIDTH]] : index
 //       CHECK:   %[[SWOFF:.+]] = arith.addi %[[ROTATEJ]], %[[IELEM]] : index
 //       CHECK:   amdgpu.gather_to_lds %[[SRC]][%[[SWOFF]]], %[[LDS]][%[[DSTOFFSET]]]
+
+
+func.func @swizzle_load_xor(%src: memref<?xi8>) -> vector<16xi8> {
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.xor_shuffle<128, 16, 1>] : memref<?xi8>
+
+  //((int(1952/128) % 8 )^(int(1952/16) %8))*16+ int(1952/128)*128 -> 2000
+  %offset = arith.constant 1952 : index
+  %1 = vector.load %0[%offset] : memref<?xi8>, vector<16xi8>
+  return %1: vector<16xi8>
+}
+
+// CHECK-LABEL: func @swizzle_load
+//  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: memref<?xi8>
+//       CHECK:   %[[SWOFF:.+]] = arith.constant 2000 : index
+//       CHECK:   %[[VECTOR:.+]] = vector.load %[[SRC]][%[[SWOFF]]]
+//       CHECK:   return %[[VECTOR]]
+
+// -----
+
+func.func @swizzle_load_xor_phase2(%src: memref<?xi8>) -> vector<16xi8> {
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.xor_shuffle<128, 16, 2>] : memref<?xi8>
+
+  %offset = arith.constant 1056 : index
+  %1 = vector.load %0[%offset] : memref<?xi8>, vector<16xi8>
+  return %1: vector<16xi8>
+}
+
+// CHECK-LABEL: func @swizzle_load
+//  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: memref<?xi8>
+//       CHECK:   %[[SWOFF:.+]] = arith.constant 1120 : index
+//       CHECK:   %[[VECTOR:.+]] = vector.load %[[SRC]][%[[SWOFF]]]
+//       CHECK:   return %[[VECTOR]]
+
+// -----
