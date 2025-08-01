@@ -9,6 +9,7 @@
 #include <optional>
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "mlir/IR/Attributes.h"
@@ -61,6 +62,24 @@ struct WgpDetails {
 struct ChipDetails {
   uint32_t wgpCount;
   std::optional<StringRef> sku;
+  // Aggregate chip-level bandwidth in TB/s
+  float peakMemoryBandwidthTBs = 0.0f;
+  // Per-data-type compute performance (TFLOPs/s)
+  llvm::SmallDenseMap<mlir::TypeID, float> peakPerfTFLOPs;
+
+  ChipDetails(uint32_t wgpCount, llvm::StringRef sku, float peakBW,
+              llvm::SmallDenseMap<mlir::TypeID, float> peakPerfTFLOPs)
+      : wgpCount(wgpCount), sku(sku), peakMemoryBandwidthTBs(peakBW),
+        peakPerfTFLOPs(peakPerfTFLOPs) {}
+
+  std::optional<float> getPeakPerfTFLOPs(const ChipDetails &chip,
+                                         mlir::Type type) {
+    auto it = chip.peakPerfTFLOPs.find(type.getTypeID());
+    if (it != chip.peakPerfTFLOPs.end()) {
+      return it->second;
+    }
+    return std::nullopt;
+  }
 };
 
 // Full target details
@@ -410,6 +429,16 @@ const WgpDetails *getRDNA1WgpDetails() {
   return &rdna1Wgp;
 }
 
+#define ADD_FP8_VARIANTS(value)                                                \
+  {mlir::TypeID::get<mlir::Float8E5M2Type>(), value},                          \
+      {mlir::TypeID::get<mlir::Float8E4M3Type>(), value},                      \
+      {mlir::TypeID::get<mlir::Float8E4M3FNType>(), value},                    \
+      {mlir::TypeID::get<mlir::Float8E5M2FNUZType>(), value},                  \
+      {mlir::TypeID::get<mlir::Float8E4M3FNUZType>(), value},                  \
+      {mlir::TypeID::get<mlir::Float8E4M3B11FNUZType>(), value}, {             \
+    mlir::TypeID::get<mlir::Float8E3M4Type>(), value                           \
+  }
+
 std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   const WgpDetails *cdna4Wgp = getCDNA4WgpDetails();
   const WgpDetails *cdna3Wgp = getCDNA3WgpDetails();
@@ -425,7 +454,17 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   // "AMD Instinct MI300 Series Product Offerings" in Page 23 of
   // https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/white-papers/amd-cdna-3-white-paper.pdf
   static const ChipDetails mi300xChip = {304, "mi300x"};
-  static const ChipDetails mi300aChip = {228, "mi300a"};
+  static const ChipDetails mi300aChip = {
+      228,
+      "mi300a",
+      5.3f,
+      {
+          {mlir::TypeID::get<mlir::Float32Type>(), 163.4f},
+          {mlir::TypeID::get<mlir::Float16Type>(), 1307.4f},
+          {mlir::TypeID::get<mlir::BFloat16Type>(), 1307.4f},
+          ADD_FP8_VARIANTS(2614.9f),
+          {mlir::TypeID::get<mlir::IntegerType>(), 1307.4f},
+      }};
   static const ChipDetails mi308xChip = {80, "mi308x"};
   static const ChipDetails mi325xChip = {304, "mi325x"};
 
