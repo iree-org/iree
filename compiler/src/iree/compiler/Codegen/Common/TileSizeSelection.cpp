@@ -95,24 +95,6 @@ void TilingConfig::initFromCPULoweringConfig(IREE::CPU::LoweringConfigAttr lc) {
   }
 }
 
-SmallVector<IREE::CPU::LoweringConfigLevelInfo>
-TilingConfig::getTilingLevelInfo() {
-  SmallVector<IREE::CPU::LoweringConfigLevelInfo> result;
-  TileSizesListType tileSizesList = getTileSizes();
-  ScalableTileFlagsListType scalableFlagsList = getScalableTileFlags();
-  int64_t mappedIdx = 0;
-  for (auto [idx, actualLevel] : llvm::enumerate(tilingLevelToActualLevelMap)) {
-    if (actualLevel == IREE::CPU::TilingLevel::InvalidLevel) {
-      continue;
-    }
-    result.push_back(IREE::CPU::LoweringConfigLevelInfo{
-        static_cast<IREE::CPU::TilingLevel>(idx), tileSizesList[mappedIdx],
-        scalableFlagsList[mappedIdx]});
-    mappedIdx++;
-  }
-  return result;
-}
-
 bool TilingConfig::isValidLevel(IREE::CPU::TilingLevel level) {
   return tilingLevelToActualLevelMap[static_cast<int64_t>(level)] !=
          IREE::CPU::TilingLevel::InvalidLevel;
