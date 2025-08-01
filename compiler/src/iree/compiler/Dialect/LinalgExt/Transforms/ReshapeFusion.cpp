@@ -589,10 +589,6 @@ struct DropMapScatterUnitDims final : public OpRewritePattern<MapScatterOp> {
     if (!inputType) {
       return failure();
     }
-    if (llvm::none_of(inputType.getShape(),
-                      [](int64_t size) { return size == 1; })) {
-      return failure();
-    }
     Location loc = mapScatterOp.getLoc();
     FailureOr<Value> newInput = rankReduceOperand(
         rewriter, loc, /*startDim=*/0, /*numDims=*/mapScatterOp.getInputRank(),
@@ -605,29 +601,21 @@ struct DropMapScatterUnitDims final : public OpRewritePattern<MapScatterOp> {
     auto unitFoldingBuilder = [&](ArrayRef<BlockArgument> nonUnitIndices) {
       Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
       int nonUnitArgIdx = 0;
-      SmallVector<Value> replacementValues;
-      for (int64_t dim = 0; dim < inputType.getRank(); ++dim) {
-        if (inputType.getDimSize(dim) == 1) {
-          replacementValues.push_back(zero);
-          continue;
-        }
-        replacementValues.push_back(nonUnitIndices[nonUnitArgIdx++]);
-      }
-      // Special case for map_scatter with all unit dims. `rankReduceOperand`
-      // will not generate a 0D tensor, so the last dimension will be retained.
-      if (newInputType.getRank() == 1 && newInputType.getDimSize(0) == 1) {
-        replacementValues.back() = nonUnitIndices[0];
-      }
-      return replacementValues;
+      return llvm::map_to_vector(
+          llvm::seq<int64_t>(inputType.getRank()), [&](int64_t dim) -> Value {
+            return inputType.getDimSize(dim) == 1
+                       ? zero
+                       : cast<Value>(nonUnitIndices[nonUnitArgIdx++]);
+          });
     };
-    int numNonUnitDims = newInputType.getRank();
     // The map_scatter op is generally only used in Codegen, where it is the
     // last op in the dispatch, so for now, we don't bother collapsing the
     // result shape and inserting an expansion after the op.
     rewriter.modifyOpInPlace(mapScatterOp, [&]() {
       mapScatterOp.getInputMutable().assign(newInput.value());
-      mapScatterOp.insertTransformationAtStart(rewriter, unitFoldingBuilder,
-                                               numNonUnitDims);
+      mapScatterOp.insertTransformationAtStart(
+          rewriter, unitFoldingBuilder,
+          /*numSourceIndices=*/newInputType.getRank());
     });
     return success();
   }

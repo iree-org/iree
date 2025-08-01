@@ -182,8 +182,7 @@ util.func public @map_scatter_all_unit(%input: tensor<1x1xf16>) -> tensor<2x2xf1
 //   RESHAPE-DAG:   %[[INPUT_COLLAPSE:.+]] = tensor.collapse_shape %[[INPUT]]
 //  RESHAPE-SAME:     tensor<1x1xf16> into tensor<1xf16>
 //       RESHAPE:   iree_linalg_ext.map_scatter %[[INPUT_COLLAPSE]] into %[[DEST]]
-//       RESHAPE:     ^bb0(%[[IDX:.+]]: index):
-//       RESHAPE:       iree_linalg_ext.yield  %[[C0]], %[[IDX]]
+//       RESHAPE:       iree_linalg_ext.yield  %[[C0]], %[[C0]]
 
 // SLICE-LABEL: util.func public @map_scatter_all_unit
 //  SLICE-SAME:   %[[INPUT:[a-zA-Z0-9]+]]: tensor<1x1xf16>
@@ -191,6 +190,5 @@ util.func public @map_scatter_all_unit(%input: tensor<1x1xf16>) -> tensor<2x2xf1
 //   SLICE-DAG:   %[[INPUT_SLICE:.+]] = tensor.extract_slice %[[INPUT]]
 //  SLICE-SAME:     tensor<1x1xf16> to tensor<1xf16>
 //       SLICE:   iree_linalg_ext.map_scatter %[[INPUT_SLICE]] into %[[DEST]]
-//       SLICE:     ^bb0(%[[IDX:.+]]: index):
 //       SLICE:       %[[C0:.+]] = arith.constant 0 : index
-//       SLICE:       iree_linalg_ext.yield  %[[C0]], %[[IDX]]
+//       SLICE:       iree_linalg_ext.yield  %[[C0]], %[[C0]]
