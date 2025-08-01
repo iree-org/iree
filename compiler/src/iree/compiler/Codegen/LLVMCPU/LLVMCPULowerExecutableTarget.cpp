@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
@@ -25,7 +26,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
 
-using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr;
+using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttrInterface;
 
 namespace mlir::iree_compiler {
 
@@ -65,15 +66,16 @@ public:
 };
 } // namespace
 
-static std::unique_ptr<TilingConfig>
-getTilingConfigForPipeline(FunctionOpInterface funcOp) {
+static LoweringConfigAttrInterface
+getRootLoweringConfig(FunctionOpInterface funcOp) {
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-  FailureOr<Operation *> rootOp = getRootOperation(computeOps);
-  if (failed(rootOp) || !rootOp.value()) {
-    return nullptr;
+  for (Operation *op : computeOps) {
+    LoweringConfigAttrInterface loweringConfig = getLoweringConfig(op);
+    if (loweringConfig && loweringConfig.hasWorkgroupTilingLevel()) {
+      return loweringConfig;
+    }
   }
-  auto config = iree_compiler::getLoweringConfig(rootOp.value());
-  return TilingConfig::create(config);
+  return nullptr;
 }
 
 void LLVMCPULowerExecutableTargetPass::runOnOperation() {
@@ -90,16 +92,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     return;
   }
 
-  auto maybeTilingConfig = getTilingConfigForPipeline(funcOp);
+  LoweringConfigAttrInterface loweringConfig = getRootLoweringConfig(funcOp);
   auto pipeline = translationInfo.getDispatchLoweringPassPipeline();
-  if (!maybeTilingConfig &&
-      pipeline != IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault &&
-      pipeline != IREE::Codegen::DispatchLoweringPassPipeline::None) {
-    funcOp.emitOpError("Tiling Config is necessary for ")
-        << stringifyEnum(pipeline) << " pipeline.";
-    return signalPassFailure();
-  }
-
   LLVMCPUPipelineOptions pipelineOpts;
   if (isX86(target) || isRISCV(target)) {
     pipelineOpts.useConfiguredVectorSizes = false;
@@ -114,8 +108,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
       isAArch64(target) && hasAnySVEFeature(target) && hasSMEFeature(target);
   pipelineOpts.enableAArch64I8mm = isAArch64(target) && hasI8mmFeature(target);
   pipelineOpts.enablePeeling = isOptEnabled(funcOp, getEnableLoopPeelingStr());
-  if (maybeTilingConfig &&
-      llvm::all_of(maybeTilingConfig->getDistributionTileSizes(),
+  if (loweringConfig &&
+      llvm::all_of(loweringConfig.getWorkgroupTileSizes(),
                    [](int64_t tileSize) { return tileSize == 0; })) {
     pipelineOpts.disableDistribution = true;
   }
@@ -126,39 +120,35 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   case IREE::Codegen::DispatchLoweringPassPipeline::None:
     return;
   case IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault: {
-    addCPUDefaultPassPipeline(passManager, maybeTilingConfig, pipelineOpts);
+    addCPUDefaultPassPipeline(passManager, pipelineOpts);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::
       CPUBufferOpsTileAndVectorize: {
-    addCPUBufferOpsTileAndVectorizePipeline(passManager, *maybeTilingConfig,
-                                            pipelineOpts);
+    addCPUBufferOpsTileAndVectorizePipeline(passManager, pipelineOpts);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert: {
-    addMultiTilingExpertPassPipeline(passManager, *maybeTilingConfig,
-                                     pipelineOpts);
+    assert(loweringConfig && "expected a valid lowering config");
+    addMultiTilingExpertPassPipeline(passManager, loweringConfig, pipelineOpts);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::
       CPUConvTileAndDecomposeExpert: {
-    addConvTileAndDecomposeExpertPassPipeline(passManager, *maybeTilingConfig,
-                                              pipelineOpts);
+    addConvTileAndDecomposeExpertPassPipeline(passManager, pipelineOpts);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert: {
-    addMmt4dTilingExpertPassPipeline(passManager, *maybeTilingConfig,
-                                     pipelineOpts);
+    addMmt4dTilingExpertPassPipeline(passManager, pipelineOpts);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::CPUDataTiling: {
-    addCPUDataTilingPipeline(passManager, *maybeTilingConfig, pipelineOpts);
+    addCPUDataTilingPipeline(passManager, pipelineOpts);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::
       CPULinalgExtTileAndVectorize: {
-    addCPULinalgExtTileAndVectorizePipeline(passManager, *maybeTilingConfig,
-                                            pipelineOpts);
+    addCPULinalgExtTileAndVectorizePipeline(passManager, pipelineOpts);
     break;
   }
   default:
