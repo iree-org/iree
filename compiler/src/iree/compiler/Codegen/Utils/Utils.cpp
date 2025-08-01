@@ -1854,11 +1854,11 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
   std::optional<VectorizationTileSizes> result;
   LDBG() << "Inferring sizes for: " << val;
   TypeSwitch<Operation *, void>(val.getDefiningOp())
-      .Case<scf::ForOp>(
-          [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
       .Case<linalg::LinalgOp>(
           [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
       .Case<linalg::PackOp>([&](auto op) { result = inferSizesFromIR(op); })
+      .Case<scf::ForOp>(
+          [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
       .Case<tensor::ExtractSliceOp, tensor::EmptyOp>([&](auto op) {
         // tensor::ExtractSliceOp is not vectorizable, so only `destShape` has
         // the values.
