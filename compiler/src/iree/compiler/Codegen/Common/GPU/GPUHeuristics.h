@@ -9,6 +9,9 @@
 
 namespace mlir::iree_compiler {
 
+// The upperbound for the number of WGPs in a GPU target.
+extern const int64_t kWgpCountLowerBound;
+
 /// Struct containing information about a matmul's shape and type.
 struct GPUMatmulShapeType {
   SmallVector<int64_t, 2> mSizes;
@@ -103,7 +106,7 @@ struct GPUMMASchedule {
 FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMatmulShapeType &problem, ArrayRef<GPUIntrinsicType> intrinsics,
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
-    int64_t subgroupSize, bool transposedLhs = false,
+    int64_t subgroupSize, int64_t cuCount, bool transposedLhs = false,
     bool transposedRhs = false, bool canUpcastAcc = false,
     bool mustBeAligned = true, bool doCPromotion = false);
 
