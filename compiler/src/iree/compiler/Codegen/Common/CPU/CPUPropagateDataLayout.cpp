@@ -23,14 +23,18 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-// Sinks down tensor.collapse_shape across linalg.unpack op, if the collapsing
-// dims are two unit dims where one is outer dimension and the other is inner
-// dimension. It implies that we swap two operations by adjusting the packing
-// metadata in linalg.unpack op.
-// Note that the pattern only supports the case where the destination tensor of
-// linalg.unpack op is a tensor.empty op. The constraint can be removed by
-// introducing tensor.expand_shape op on the destination tensor. However, it is
-// not common in practice, so it is not supported now.
+/// Sinks down tensor.collapse_shape across linalg.unpack op, if the collapsing
+/// dims are two unit dims where one is outer dimension and the other is inner
+/// dimension. It implies that we swap two operations by adjusting the packing
+/// metadata in linalg.unpack op.
+/// The pattern is mainly implemented based on mmt4d layout constraints. I.e.,
+/// CPU backends always materialize matvec/vecmat into a mmt4d op followed by a
+/// collapse_shape op. We may not need the pattern, or we'll need to reimplement
+/// the pattern, if CPU backends switch from mmt4d ops to other approach.
+/// Note that the pattern only supports the case where the destination tensor of
+/// linalg.unpack op is a tensor.empty op. The constraint can be removed by
+/// introducing tensor.expand_shape op on the destination tensor. However, it is
+/// not common in practice, so it is not supported now.
 struct SinkDownCollapsingUnitDimsAcrossUnpack final
     : public OpRewritePattern<linalg::UnPackOp> {
   using OpRewritePattern<linalg::UnPackOp>::OpRewritePattern;
@@ -52,7 +56,7 @@ struct SinkDownCollapsingUnitDimsAcrossUnpack final
     auto collapseOp = op.getSource().getDefiningOp<tensor::CollapseShapeOp>();
     if (!collapseOp) {
       return rewriter.notifyMatchFailure(
-          op, "expected the source to be a tensor.collpase_shape op");
+          op, "expected the source to be a tensor.collapse_shape op");
     }
 
     int64_t srcRank = collapseOp.getSrcType().getRank();
@@ -87,19 +91,21 @@ struct SinkDownCollapsingUnitDimsAcrossUnpack final
                         mmt4dSrcType.getDimSize(innerRi[1]) == 1;
     if (!missUnitDimM && !missUnitDimN) {
       return rewriter.notifyMatchFailure(
-          op, "expected collapsing either M dimensions or N dimensions");
+          op,
+          "expected collapsing either {0, 2} dimensions or {1, 3} "
+          "dimensions, either {1, 3} or {2, 4} if batch dimension is present");
     }
 
     SmallVector<int64_t> innerDimPos(op.getInnerDimsPos());
     if (hasBatch && innerDimPos[0] == 0) {
       return rewriter.notifyMatchFailure(
-          op, "expected unpacking either M or N dimension");
+          op, "expected unpacking collapsed dimension");
     }
 
     SmallVector<OpFoldResult> innerTiles(op.getMixedTiles());
     SmallVector<OpFoldResult> destShape = emptyOp.getMixedSizes();
     if (missUnitDimM) {
-      for (auto &pos : innerDimPos) {
+      for (int64_t &pos : innerDimPos) {
         pos++;
       }
       innerDimPos.insert(innerDimPos.begin(), hasBatch + 0);
@@ -149,9 +155,9 @@ void CPUPropagateDataLayoutPass::runOnOperation() {
   linalg::populateFoldReshapeOpsByExpansionPatterns(
       patterns, [](OpOperand *fusedOperand) -> bool {
         Operation *producer = fusedOperand->get().getDefiningOp();
-        auto consumerGenercOp =
+        auto consumerGenericOp =
             dyn_cast_if_present<linalg::GenericOp>(fusedOperand->getOwner());
-        if (!isa<tensor::CollapseShapeOp>(producer) || !consumerGenercOp) {
+        if (!isa<tensor::CollapseShapeOp>(producer) || !consumerGenericOp) {
           return false;
         }
         return true;
