@@ -69,7 +69,7 @@ public:
 static LoweringConfigAttrInterface
 getRootLoweringConfig(FunctionOpInterface funcOp) {
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-  for (auto op : computeOps) {
+  for (Operation *op : computeOps) {
     LoweringConfigAttrInterface loweringConfig = getLoweringConfig(op);
     if (loweringConfig && loweringConfig.hasWorkgroupTilingLevel()) {
       return loweringConfig;
