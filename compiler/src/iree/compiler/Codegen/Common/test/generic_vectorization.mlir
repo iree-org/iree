@@ -392,6 +392,30 @@ func.func @generic_unpack_infer_vector_size(%arg0: tensor<?x?x16x16xf32>, %arg1:
 
 // -----
 
+// CHECK-MASK-LABEL: @val_defined_by_scf_for
+func.func @val_defined_by_scf_for(%arg0: index, %arg1: index) -> tensor<?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %0 = tensor.empty() : tensor<1x1x16x16xf32>
+  %1 = tensor.empty(%arg0, %arg1) : tensor<?x?xf32>
+  %c0_0 = arith.constant 0 : index
+  %c16 = arith.constant 16 : index
+  %c2 = arith.constant 2 : index
+  %2 = scf.for %arg2 = %c0_0 to %c16 step %c2 iter_args(%arg3 = %0) -> (tensor<1x1x16x16xf32>) {
+    scf.yield %arg3 : tensor<1x1x16x16xf32>
+  }
+  %unpack = linalg.unpack %2 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %1 : tensor<1x1x16x16xf32> -> tensor<?x?xf32>
+  return %unpack : tensor<?x?xf32>
+}
+// CHECK-MASK: %[[EMPTY:.*]] = tensor.empty{{.*}}: tensor<?x?xf32>
+// CHECK-MASK: %[[FOR:.*]] = scf.for
+// CHECK-MASK: %[[READ:.*]] = vector.transfer_read %[[FOR]]{{.*}} vector<1x1x16x16xf32>
+// CHECK-MASK: %[[CAST:.*]] = vector.shape_cast %[[READ]]{{.*}} vector<16x16xf32>
+// CHECK-MASK: %[[MASK:.*]] = vector.create_mask
+// CHECK-MASK: %[[WRITE:.*]] = vector.transfer_write %[[CAST]], %[[EMPTY]]{{.*}}, %[[MASK]]
+// CHECK-MASK: return %[[WRITE]]
+
+// -----
+
 #aarch64_sve = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", target_triple = "aarch64-none-elf"}>
 #map = affine_map<()[s0] -> (-(176 mod s0) + 176)>
 
