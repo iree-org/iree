@@ -80,106 +80,6 @@ getInvertedMappingPermutation(ArrayRef<MappingAttrType> mapping) {
       getMappingPermutation<MappingAttrType>(mapping));
 }
 
-/// Return the procId and nprocs to use for each of the distributed loops,
-/// derived from `hal.interface.workgroup.id/count`s.
-static std::pair<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>>
-getProcIdsAndNprocs(
-    scf::ForallOp forallOp, RewriterBase &builder, Location loc,
-    SmallVector<IREE::Codegen::WorkgroupMappingAttr> workgroupMappings,
-    SmallVector<OpFoldResult> lowerBounds,
-    SmallVector<OpFoldResult> upperBounds, SmallVector<OpFoldResult> steps,
-    IREE::Codegen::WorkgroupId deLinearizeFrom) {
-  assert(workgroupMappings.size() == lowerBounds.size() &&
-         "expected as many workgroup mapping attributes as number of loops");
-
-  auto permutation =
-      getInvertedMappingPermutation<IREE::Codegen::WorkgroupMappingAttr>(
-          workgroupMappings);
-  applyPermutationToVector(workgroupMappings, permutation);
-  applyPermutationToVector(lowerBounds, permutation);
-  applyPermutationToVector(upperBounds, permutation);
-  applyPermutationToVector(steps, permutation);
-
-  SmallVector<OpFoldResult> procId(workgroupMappings.size(),
-                                   builder.getIndexAttr(0));
-  SmallVector<OpFoldResult> nprocs(workgroupMappings.size(),
-                                   builder.getIndexAttr(1));
-
-  AffineExpr s0, s1, s2;
-  bindSymbols(builder.getContext(), s0, s1, s2);
-  AffineExpr extentExpr = (s1 - s0).ceilDiv(s2);
-  SmallVector<OpFoldResult> loopExtents;
-  if (workgroupMappings.size() > static_cast<size_t>(deLinearizeFrom)) {
-    loopExtents.resize(workgroupMappings.size() -
-                       static_cast<size_t>(deLinearizeFrom));
-  }
-  for (int index = workgroupMappings.size() - 1; index >= 0; --index) {
-    auto workgroupMapping = workgroupMappings[index];
-    auto lowerBound = lowerBounds[index];
-    auto upperBound = upperBounds[index];
-    auto step = steps[index];
-    if (workgroupMapping.getId() < deLinearizeFrom) {
-      procId[index] =
-          builder
-              .create<IREE::HAL::InterfaceWorkgroupIDOp>(
-                  loc, static_cast<unsigned>(workgroupMapping.getId()))
-              .getResult();
-      nprocs[index] =
-          builder
-              .create<IREE::HAL::InterfaceWorkgroupCountOp>(
-                  loc, static_cast<unsigned>(workgroupMapping.getId()))
-              .getResult();
-      continue;
-    }
-    OpFoldResult extent = affine::makeComposedFoldedAffineApply(
-        builder, loc, extentExpr, {lowerBound, upperBound, step});
-    loopExtents[index] = extent;
-  }
-
-  // Delinearize the z-dim based on the loop extents.
-  if (!loopExtents.empty()) {
-    Value deLinearizedDimId =
-        builder
-            .create<IREE::HAL::InterfaceWorkgroupIDOp>(
-                loc, static_cast<unsigned>(deLinearizeFrom))
-            .getResult();
-    OpFoldResult deLinearizedNprocs =
-        builder
-            .create<IREE::HAL::InterfaceWorkgroupCountOp>(
-                loc, static_cast<unsigned>(deLinearizeFrom))
-            .getResult();
-
-    if (loopExtents.size() != 1) {
-      auto deLinearizeOp = builder.create<affine::AffineDelinearizeIndexOp>(
-          loc, deLinearizedDimId, loopExtents);
-      SmallVector<OpFoldResult> orderedDelinearizedDimIds =
-          llvm::map_to_vector(deLinearizeOp.getResults(),
-                              [](Value v) -> OpFoldResult { return v; });
-      SmallVector<OpFoldResult> orderedDelinearizedNprocs;
-      AffineMap minMap = AffineMap::get(0, 2, {s0, s1}, builder.getContext());
-      AffineExpr ceilDivExpr = s0.ceilDiv(s1);
-      for (int index = loopExtents.size() - 1; index >= 0; --index) {
-        auto extent = loopExtents[index];
-        procId[index] = deLinearizeOp->getResult(index);
-        OpFoldResult currNprocs = affine::makeComposedFoldedAffineMin(
-            builder, loc, minMap, {extent, deLinearizedNprocs});
-        nprocs[index] = currNprocs;
-        deLinearizedNprocs = affine::makeComposedFoldedAffineApply(
-            builder, loc, ceilDivExpr, {deLinearizedNprocs, currNprocs});
-      }
-    } else {
-      // If there is only one z-dim mapping, just use the ID directly.
-      procId[0] = deLinearizedDimId;
-      nprocs[0] = deLinearizedNprocs;
-    }
-  }
-
-  auto inversePermutation = invertPermutationVector(permutation);
-  applyPermutationToVector(procId, inversePermutation);
-  applyPermutationToVector(nprocs, inversePermutation);
-  return std::make_pair(procId, nprocs);
-}
-
 /// Resolve the `forallOp` by mapping the loop induction variables to
 /// processor IDs. Expected `procIds` and `nProcs` to match the number
 /// of induction variables of the loop.
@@ -187,58 +87,177 @@ static LogicalResult resolveForAll(RewriterBase &rewriter,
                                    scf::ForallOp forallOp,
                                    ArrayRef<OpFoldResult> procIds,
                                    ArrayRef<OpFoldResult> nProcs,
-                                   bool generateLoopNest) {
-  SmallVector<OpFoldResult> mixedUpperBound = forallOp.getMixedUpperBound();
-  SmallVector<OpFoldResult> mixedStep = forallOp.getMixedStep();
+                                   ArrayRef<bool> generateLoopNest) {
+  assert(generateLoopNest.size() == forallOp.getRank());
+
+  SmallVector<Value> loopNestIvs;
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(forallOp);
+
+  SmallVector<OpFoldResult> mixedLbs = forallOp.getMixedLowerBound();
+  SmallVector<OpFoldResult> mixedUbs = forallOp.getMixedUpperBound();
+  SmallVector<OpFoldResult> mixedSteps = forallOp.getMixedStep();
+  assert(mixedLbs.size() == procIds.size());
+  assert(mixedLbs.size() == nProcs.size());
   Location loc = forallOp.getLoc();
-  // Scale the process IDs and counts to account for the forall op steps. These
-  // are the forall offsets for each process, and the bounds of these offsets.
-  SmallVector<Value> procOffsets, procOffsetBounds;
-  for (auto [id, count, step] : llvm::zip_equal(procIds, nProcs, mixedStep)) {
-    Value procOffset = getValueOrCreateConstantIndexOp(
-        rewriter, loc, IREE::LinalgExt::mulOfrs(rewriter, loc, id, step));
-    Value procOffsetBound = getValueOrCreateConstantIndexOp(
-        rewriter, loc, IREE::LinalgExt::mulOfrs(rewriter, loc, count, step));
-    procOffsets.push_back(procOffset);
-    procOffsetBounds.push_back(procOffsetBound);
-  }
+  Operation *bodyInsertionPoint = forallOp;
+  for (auto [index, lb] : llvm::enumerate(mixedLbs)) {
+    OpFoldResult ub = mixedUbs[index], step = mixedSteps[index],
+                 numProc = nProcs[index], procId = procIds[index];
+    Value forLb = getValueOrCreateConstantIndexOp(
+        rewriter, loc, IREE::LinalgExt::mulOfrs(rewriter, loc, procId, step));
+    if (!generateLoopNest[index]) {
+      loopNestIvs.push_back(forLb);
+      continue;
+    }
 
-  // If a loop nest is not necessary, then just inline the body of the forall.
-  if (!generateLoopNest) {
-    rewriter.eraseOp(forallOp.getBody()->getTerminator());
-    rewriter.inlineBlockBefore(forallOp.getBody(), forallOp,
-                               /*argValues=*/procOffsets);
-    rewriter.eraseOp(forallOp);
-    return success();
+    Value forUb = getValueOrCreateConstantIndexOp(rewriter, loc, ub);
+    Value forStep = getValueOrCreateConstantIndexOp(
+        rewriter, loc, IREE::LinalgExt::mulOfrs(rewriter, loc, numProc, step));
+    auto loop = scf::ForOp::create(rewriter, loc, forLb, forUb, forStep);
+    loopNestIvs.push_back(loop.getInductionVar());
+    bodyInsertionPoint = loop.getBody()->getTerminator();
+    rewriter.setInsertionPointToStart(loop.getBody());
   }
-
-  // The bounds of process offsets may not match the bounds of the forall op, so
-  // form a loop nest iterating from the process offsets to the loop bounds, and
-  // stepping by the process offset bounds. Inline the body of the forall op
-  // into the loop nest.
-  SmallVector<Value> forallUbs =
-      getValueOrCreateConstantIndexOp(rewriter, loc, mixedUpperBound);
-  scf::LoopNest loopNest = scf::buildLoopNest(rewriter, loc, procOffsets,
-                                              forallUbs, procOffsetBounds);
-  SmallVector<Value> loopNestIvs = llvm::map_to_vector(
-      loopNest.loops, [](scf::ForOp loop) { return loop.getInductionVar(); });
-  Block *loopNestBody = loopNest.loops.back().getBody();
-  rewriter.eraseOp(forallOp.getBody()->getTerminator());
-  rewriter.inlineBlockBefore(forallOp.getBody(), loopNestBody->getTerminator(),
-                             /*argValues=*/loopNestIvs);
+  Block *forAllBody = forallOp.getBody();
+  rewriter.eraseOp(forAllBody->getTerminator());
+  rewriter.inlineBlockBefore(forAllBody, bodyInsertionPoint, loopNestIvs);
   rewriter.eraseOp(forallOp);
   return success();
 }
 
+/// Collapse all the dimensions of the `scf.forall` that have mapping ID
+/// "greater" than `delinearizeFrom` into a single dimension. This dimension
+/// is placed at the same place as the position of `delinearizeFrom` in the
+/// original loop.
+scf::ForallOp
+collapseForAllOpDimensions(RewriterBase &rewriter, scf::ForallOp forallOp,
+                           IREE::Codegen::WorkgroupId delinearizeFrom) {
+  SmallVector<OpFoldResult> mixedLbs = forallOp.getMixedLowerBound();
+  SmallVector<OpFoldResult> mixedUbs = forallOp.getMixedUpperBound();
+  SmallVector<OpFoldResult> mixedSteps = forallOp.getMixedStep();
+  auto mapping = llvm::map_to_vector(
+      forallOp.getMapping()->getValue(), [](Attribute attr) {
+        return cast<IREE::Codegen::WorkgroupMappingAttr>(attr);
+      });
+
+  // Collect all dimensions that are to be collapsed.
+  auto delinearizeFromAttr = IREE::Codegen::WorkgroupMappingAttr::get(
+      rewriter.getContext(), delinearizeFrom);
+  SmallVector<int64_t> collapsedDims;
+  SmallVector<IREE::Codegen::WorkgroupMappingAttr> collapsedAttrs;
+  for (auto [index, mappingAttr] : llvm::enumerate(mapping)) {
+    if (mappingAttr < delinearizeFromAttr) {
+      continue;
+    }
+    collapsedDims.push_back(index);
+    collapsedAttrs.push_back(mappingAttr);
+  }
+
+  AffineExpr s0, s1, s2;
+  bindSymbols(rewriter.getContext(), s0, s1, s2);
+  AffineExpr nIterExpr = (s1 - s0).ceilDiv(s2);
+  Location loc = forallOp.getLoc();
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(forallOp);
+
+  SmallVector<OpFoldResult> nIters =
+      llvm::map_to_vector(collapsedDims, [&](int64_t index) {
+        return affine::makeComposedFoldedAffineApply(
+            rewriter, loc, nIterExpr,
+            {mixedLbs[index], mixedUbs[index], mixedSteps[index]});
+      });
+
+  OpFoldResult one = rewriter.getIndexAttr(1);
+  OpFoldResult combinedNIters = one;
+  // The reverse below is just to preserve some lit-test behavior.
+  for (auto nIter : llvm::reverse(nIters)) {
+    combinedNIters =
+        IREE::LinalgExt::mulOfrs(rewriter, loc, combinedNIters, nIter);
+  }
+
+  // Create the collapsed forall op.
+  SmallVector<OpFoldResult> newLbs, newUbs, newSteps;
+  SmallVector<Attribute> newMapping;
+  OpFoldResult zero = rewriter.getIndexAttr(0);
+  std::optional<int> delinearizedFromIndex;
+  for (auto [index, mappingAttr] : llvm::enumerate(mapping)) {
+    if (mappingAttr < delinearizeFromAttr) {
+      newLbs.push_back(mixedLbs[index]);
+      newUbs.push_back(mixedUbs[index]);
+      newSteps.push_back(mixedSteps[index]);
+      newMapping.push_back(mappingAttr);
+      continue;
+    }
+    if (mappingAttr == delinearizeFromAttr) {
+      newLbs.push_back(zero);
+      newUbs.push_back(combinedNIters);
+      newSteps.push_back(one);
+      newMapping.push_back(mappingAttr);
+      delinearizedFromIndex = newMapping.size() - 1;
+    }
+  }
+
+  scf::ForallOp newForOp = scf::ForallOp::create(
+      rewriter, loc, newLbs, newUbs, newSteps,
+      /*outputs = */ ValueRange{}, rewriter.getArrayAttr(newMapping));
+
+  Block *newForallBody = newForOp.getBody();
+  {
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(newForallBody->getTerminator());
+    SmallVector<int64_t> invertPermutation =
+        getInvertedMappingPermutation<IREE::Codegen::WorkgroupMappingAttr>(
+            collapsedAttrs);
+    applyPermutationToVector(nIters, invertPermutation);
+    SmallVector<OpFoldResult> basis = llvm::to_vector(llvm::reverse(nIters));
+
+    std::optional<SmallVector<Value>> ivs = newForOp.getLoopInductionVars();
+    auto delinearizeOp = affine::AffineDelinearizeIndexOp::create(
+        rewriter, loc, ivs.value()[delinearizedFromIndex.value()], basis);
+    auto replacementIvs =
+        llvm::to_vector(llvm::reverse(delinearizeOp.getResults()));
+    int replacementIvIndex = 0;
+    SmallVector<Value> remappedIvs;
+    AffineExpr d0, s0, s1;
+    bindDims(rewriter.getContext(), d0);
+    bindSymbols(rewriter.getContext(), s0, s1);
+    AffineExpr ivExpr = s0 + d0 * s1;
+    for (auto [index, origIV, mappingAttr] :
+         llvm::enumerate(forallOp.getInductionVars(), mapping)) {
+      if (mappingAttr < delinearizeFromAttr) {
+        remappedIvs.push_back(origIV);
+        continue;
+      }
+      OpFoldResult remappedIv = affine::makeComposedFoldedAffineApply(
+          rewriter, loc, ivExpr,
+          ArrayRef<OpFoldResult>{replacementIvs[replacementIvIndex++],
+                                 mixedLbs[index], mixedSteps[index]});
+      remappedIvs.push_back(
+          getValueOrCreateConstantIndexOp(rewriter, loc, remappedIv));
+    }
+    Block *forallBody = forallOp.getBody();
+    rewriter.eraseOp(forallBody->getTerminator());
+    rewriter.inlineBlockBefore(forallBody, newForallBody->getTerminator(),
+                               remappedIvs);
+  }
+  rewriter.eraseOp(forallOp);
+  return newForOp;
+}
+
 /// Resolve scf.forall operation by using the workgroup ID and counts.
-static LogicalResult
+static FailureOr<SmallVector<OpFoldResult>>
 resolveWorkgroupForAll(RewriterBase &rewriter, scf::ForallOp forallOp,
-                       IREE::Codegen::WorkgroupId deLinearizeFrom,
-                       bool generateLoopNest) {
+                       IREE::Codegen::WorkgroupId delinearizeFrom,
+                       bool multiForall) {
   if (forallOp->getNumResults() != 0) {
     return forallOp.emitOpError(
         "cannot resolve for all ops with return values");
   }
+  if (forallOp.getRank() > llvm::to_underlying(delinearizeFrom) + 1) {
+    forallOp = collapseForAllOpDimensions(rewriter, forallOp, delinearizeFrom);
+  }
+  assert(forallOp.getRank() <= llvm::to_underlying(delinearizeFrom) + 1);
   SmallVector<OpFoldResult> mixedLowerBound = forallOp.getMixedLowerBound();
   SmallVector<OpFoldResult> mixedUpperBound = forallOp.getMixedUpperBound();
   SmallVector<OpFoldResult> mixedStep = forallOp.getMixedStep();
@@ -256,14 +275,68 @@ resolveWorkgroupForAll(RewriterBase &rewriter, scf::ForallOp forallOp,
   rewriter.setInsertionPoint(forallOp);
   Location loc = forallOp.getLoc();
 
-  // Get process IDs and counts by querying hal.interface.workgroup.id/count ops
-  // and delinearizing any dimensions of the forall beyond `deLinearizeFrom`.
-  SmallVector<OpFoldResult> procIds, nProcs;
-  std::tie(procIds, nProcs) = getProcIdsAndNprocs(
-      forallOp, rewriter, loc, workgroupMapping.value(), mixedLowerBound,
-      mixedUpperBound, mixedStep, deLinearizeFrom);
+  std::array<int64_t, 3> maxWorkgroupCountArray =
+      getMaxWorkgroupCount(IREE::HAL::ExecutableTargetAttr::lookup(forallOp));
+  SmallVector<int64_t> maxWorkgroupCount =
+      llvm::to_vector(maxWorkgroupCountArray);
+  maxWorkgroupCount.resize(forallOp.getRank(), ShapedType::kDynamic);
 
-  return resolveForAll(rewriter, forallOp, procIds, nProcs, generateLoopNest);
+  AffineExpr s0, s1, s2;
+  bindSymbols(rewriter.getContext(), s0, s1, s2);
+  AffineExpr nItersExpr = (s1 - s0).ceilDiv(s2);
+
+  SmallVector<OpFoldResult> numWorkgroupsList, mappedProcIds, mappedNProcs;
+  SmallVector<bool> generateLoopNest(forallOp.getRank(), true);
+  numWorkgroupsList.resize(forallOp.getRank());
+  for (auto [index, mapping] : llvm::enumerate(workgroupMapping.value())) {
+    int64_t mappingID = mapping.getMappingId();
+    OpFoldResult procId = rewriter
+                              .create<IREE::HAL::InterfaceWorkgroupIDOp>(
+                                  loc, static_cast<unsigned>(mappingID))
+                              .getResult();
+    OpFoldResult nprocs = rewriter
+                              .create<IREE::HAL::InterfaceWorkgroupIDOp>(
+                                  loc, static_cast<unsigned>(mappingID))
+                              .getResult();
+
+    mappedProcIds.push_back(procId);
+    mappedNProcs.push_back(nprocs);
+
+    OpFoldResult &numWorkgroups =
+        numWorkgroupsList[numWorkgroupsList.size() - 1 - mappingID];
+    numWorkgroups = affine::makeComposedFoldedAffineApply(
+        rewriter, loc, nItersExpr,
+        {mixedLowerBound[index], mixedUpperBound[index], mixedStep[index]});
+
+    int64_t maxCount = maxWorkgroupCount[mappingID];
+    if (!multiForall) {
+      if (ShapedType::isDynamic(maxCount)) {
+        // Dynamic value indicates there is no limit.
+        generateLoopNest[index] = false;
+        continue;
+      }
+      if (std::optional<int64_t> numWorkgroupsStatic =
+              getConstantIntValue(numWorkgroups)) {
+        if (numWorkgroupsStatic.value() <= maxCount) {
+          generateLoopNest[index] = false;
+        }
+        continue;
+      }
+    }
+
+    OpFoldResult boundedNumWorkgourps = affine::makeComposedFoldedAffineMin(
+        rewriter, loc,
+        AffineMap::get(
+            0, 1, {s0, getAffineConstantExpr(maxCount, rewriter.getContext())},
+            rewriter.getContext()),
+        numWorkgroups);
+    numWorkgroups = boundedNumWorkgourps;
+  }
+  if (failed(resolveForAll(rewriter, forallOp, mappedProcIds, mappedNProcs,
+                           generateLoopNest))) {
+    return forallOp.emitOpError("failed to resolve scf.forall op");
+  }
+  return numWorkgroupsList;
 }
 
 /// Resolve the workgroup counts for the function based on the extents of the
@@ -366,10 +439,6 @@ resolveWorkgroupForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
     return funcOp.emitOpError("unhandled function with multiple blocks");
   }
 
-  if (failed(resolveWorkgroupCounts(rewriter, funcOp, workgroupForAllOps,
-                                    deLinearizeFrom))) {
-    return failure();
-  }
   // If there are multiple forall ops, then the workgroup counts will be
   // flattened into the workgroup X dim.
   bool multiForall = workgroupForAllOps.size() > 1;
@@ -379,9 +448,20 @@ resolveWorkgroupForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
   for (auto [idx, forallOp] : llvm::enumerate(workgroupForAllOps)) {
     // Generate a loop nest when there are multiple foralls, because the
     // workgroup counts might not match between foralls.
-    if (failed(resolveWorkgroupForAll(rewriter, forallOp, deLinearizeFrom,
-                                      /*generateLoopNest=*/multiForall))) {
+    FailureOr<SmallVector<OpFoldResult>> numWorkgroups =
+        resolveWorkgroupForAll(rewriter, forallOp, deLinearizeFrom,
+                               /*multiForall =*/multiForall);
+
+    if (failed(numWorkgroups)) {
       return failure();
+    }
+    // For the first loop resolve the number of workgroups/
+    if (idx == 0) {
+      if (failed(lowerWorkgroupCountFromSliceOp(
+              rewriter, funcOp, numWorkgroups.value(),
+              llvm::to_underlying(deLinearizeFrom) + 1))) {
+        return failure();
+      }
     }
   }
   return success();
@@ -596,8 +676,9 @@ resolveSplitReduceForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
           splitReduceMapping);
   applyPermutationToVector(splitReduceOpProcIds, mappingPermutation);
   applyPermutationToVector(numIters, mappingPermutation);
+  SmallVector<bool> generateLoopNests(forallOp.getRank(), false);
   return resolveForAll(rewriter, forallOp, splitReduceOpProcIds, numIters,
-                       /*generateLoopNest = */ false);
+                       generateLoopNests);
 }
 
 //===---------------------------------------------------------------------===//
