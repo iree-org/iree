@@ -414,6 +414,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
                                    const GPUPipelineOptions &pipelineOptions,
                                    bool forROCDL) {
   if (pipelineOptions.useIgemmConvolution) {
+    funcPassManager.addPass(createGPUPadConvsPass());
     funcPassManager.addPass(createConvolutionToIGEMMPass());
   }
   // TODO (nirvedhmeshram) : Can remove this pass after
@@ -455,6 +456,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   {
     GPUApplyTilingLevelPassOptions options;
     options.tilingLevel = IREE::GPU::TilingLevel::Reduction;
+    options.normalizeLoops = pipelineOptions.useIgemmConvolution;
     funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
     funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
@@ -484,6 +486,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   {
     GPUApplyTilingLevelPassOptions options;
     options.tilingLevel = IREE::GPU::TilingLevel::Thread;
+    options.normalizeLoops = pipelineOptions.useIgemmConvolution;
     funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
     funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
@@ -567,9 +570,9 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     options.paddingBits = 64;
     funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
   }
+  funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
   if (forROCDL && pipelineOptions.prefetchSharedMemory) {
     funcPassManager.addPass(createFissionTransferOpsInControlFlowPass());
-    funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
     funcPassManager.addPass(createRemoveSingleIterationLoopPass());
     funcPassManager.addPass(createROCDLPrefetchSharedMemoryPass());
   }

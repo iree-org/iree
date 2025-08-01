@@ -41,6 +41,7 @@ iree_lit_test_suite(
     "gpu_nested_layout_vector_distribution_multi_reduce.mlir"
     "gpu_nested_layout_vector_distribution_step.mlir"
     "gpu_pack_to_instrinsics.mlir"
+    "gpu_pad_convs.mlir"
     "gpu_pad_operands.mlir"
     "gpu_pipeline.mlir"
     "gpu_promote_matmul_operands.mlir"
