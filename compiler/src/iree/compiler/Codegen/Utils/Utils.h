@@ -324,6 +324,11 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::PackOp op);
 std::optional<VectorizationTileSizes>
 inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult);
 
+/// Tries to infer the vector sizes from an IR using ValueBounds analysis.
+/// Returns std::nullopt if vector sizes can't be inferred.
+std::optional<VectorizationTileSizes> inferSizesFromIR(scf::ForOp forOp,
+                                                       OpResult opResult);
+
 /// Returns the underlying index if the given value is a constant index.
 std::optional<int64_t> getConstantIndex(Value value);
 
