@@ -201,7 +201,6 @@ static void resolveHintOp(RewriterBase &rewriter,
       if (accessBitWidth != transferBitWidth) {
         return;
       }
-
       gatherToLDSOps.push_back(gatherToLDSOp);
       continue;
     }

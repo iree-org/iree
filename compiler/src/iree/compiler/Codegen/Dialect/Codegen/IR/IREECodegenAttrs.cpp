@@ -613,7 +613,6 @@ SymbolicUKernelProviderAttr::getMLIRUKernel(StringRef name, DictionaryAttr,
   return symbolTable.lookup(name);
 }
 
-
 //===---------------------------------------------------------------------===//
 // iree_codegen.xor_shuffle
 //===---------------------------------------------------------------------===//
@@ -643,14 +642,17 @@ OpFoldResult XORShuffleAttr::swizzleOffset(OpBuilder &b, Location loc,
   auto col = b.create<arith::RemUIOp>(loc, idVal, rowAlignmentVal);
   auto row = b.create<arith::DivUIOp>(loc, idVal, rowAlignmentVal);
   auto rowPhase = b.create<arith::DivUIOp>(loc, row, perPhase);
-  auto rowModPhase = b.create<arith::RemUIOp>(loc, rowPhase, rowAccessAlignmentVal);
-  auto colElements = b.create<arith::DivUIOp>(loc,col,accessWidthVal);
+  auto rowModPhase =
+      b.create<arith::RemUIOp>(loc, rowPhase, rowAccessAlignmentVal);
+  auto colElements = b.create<arith::DivUIOp>(loc, col, accessWidthVal);
 
-  auto colSwizzled  = b.create<arith::XOrIOp>(loc,rowModPhase,colElements);
-  auto colSwizzledBytes  = b.create<arith::MulIOp>(loc,colSwizzled,accessWidthVal);
+  auto colSwizzled = b.create<arith::XOrIOp>(loc, rowModPhase, colElements);
+  auto colSwizzledBytes =
+      b.create<arith::MulIOp>(loc, colSwizzled, accessWidthVal);
 
-  auto swizzledBase  = b.create<arith::MulIOp>(loc,row,rowAlignmentVal);
-  auto swizzledId  = b.create<arith::AddIOp>(loc,swizzledBase,colSwizzledBytes);
+  auto swizzledBase = b.create<arith::MulIOp>(loc, row, rowAlignmentVal);
+  auto swizzledId =
+      b.create<arith::AddIOp>(loc, swizzledBase, colSwizzledBytes);
 
   Value diff = b.create<arith::SubIOp>(loc, swizzledId, idVal);
   return b
@@ -665,20 +667,19 @@ int64_t XORShuffleAttr::getAccessElementCount() const {
 
 LogicalResult
 XORShuffleAttr::verify(function_ref<InFlightDiagnostic()> emitError,
-                       int64_t rowWidth, int64_t accessWidth, int64_t perPhase) {
+                       int64_t rowWidth, int64_t accessWidth,
+                       int64_t perPhase) {
 
-  
   if (rowWidth % accessWidth != 0) {
     return emitError() << "expected access width to divide row width";
   }
-  auto maxPhase = rowWidth/accessWidth;
+  auto maxPhase = rowWidth / accessWidth;
   if (perPhase > maxPhase) {
     return emitError() << "per_phase must be smaller than max_phase";
   }
-  
+
   return success();
 }
-
 
 //===----------------------------------------------------------------------===//
 // Initialize attributes

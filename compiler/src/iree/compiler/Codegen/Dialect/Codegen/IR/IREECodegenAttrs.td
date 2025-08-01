@@ -609,7 +609,7 @@ def IREECodegen_XORShuffleAttr  :
   let parameters = (ins
     AttrParameter<"int64_t", "">:$row_width,
     AttrParameter<"int64_t", "">:$access_width,
-    AttrParameter<"int64_t", "">:$per_phase    
+    AttrParameter<"int64_t", "">:$per_phase
   );
   let assemblyFormat = [{
     `<` $row_width `,` $access_width `,` $per_phase `>`
