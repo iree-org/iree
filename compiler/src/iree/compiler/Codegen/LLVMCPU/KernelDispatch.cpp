@@ -1063,30 +1063,12 @@ private:
 };
 
 /// Returns the same lowering_config attribute with the updated tile sizes and
-/// scalable tile flags. The `setDistrubtionConfig` flag is only available when
-/// `origLoweringConfig is a IREE::CPU::LoweringConfigAttr. The distribution
-/// tiling sizes is not set if it is false.
-/// See `Codegen/Common/TileSizeSelection.h` for the convention of mapping
-/// between tiling levels.
-static IREE::Codegen::LoweringConfigAttrInterface getNewLoweringConfig(
-    IREE::Codegen::LoweringConfigAttrInterface origLoweringConfig,
-    ArrayRef<IREE::CPU::LoweringConfigLevelInfo> tilingInfo,
-    bool setDistributionConfig) {
-  assert((isa<IREE::Codegen::LoweringConfigAttr, IREE::CPU::LoweringConfigAttr>(
-      origLoweringConfig)));
-  MLIRContext *ctx = origLoweringConfig.getContext();
-  if (isa<IREE::Codegen::LoweringConfigAttr>(origLoweringConfig)) {
-    TileSizesListType tileSizesList;
-    ScalableTileFlagsListType scalableTileFlagsList;
-    for (auto [level, tileSizes, scalableFlags] : tilingInfo) {
-      (void)level;
-      tileSizesList.push_back(tileSizes);
-      scalableTileFlagsList.push_back(scalableFlags);
-    }
-    return IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizesList,
-                                                  scalableTileFlagsList);
-  }
-
+/// scalable tile flags. The distribution tiling sizes is not set if it is
+/// false.
+static IREE::Codegen::LoweringConfigAttrInterface
+getNewLoweringConfig(MLIRContext *ctx,
+                     ArrayRef<IREE::CPU::LoweringConfigLevelInfo> tilingInfo,
+                     bool setDistributionConfig) {
   SmallVector<NamedAttribute> newItems;
   for (auto [level, tileSizes, scalableFlags] : tilingInfo) {
     if (!setDistributionConfig && level == TilingLevel::DistributionTiles) {
@@ -2827,7 +2809,7 @@ adjustTileSizesForUnPackOp(mlir::FunctionOpInterface entryPointFn,
   }
 
   IREE::Codegen::LoweringConfigAttrInterface newLoweringConfig =
-      getNewLoweringConfig(loweringConfig, tilingInfo,
+      getNewLoweringConfig(rootOp->getContext(), tilingInfo,
                            /*setDistributionConfig=*/true);
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, rootOp, newLoweringConfig, pipeline, /*workgroupSize=*/{},
@@ -3217,7 +3199,7 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
                 return lhs.level < rhs.level;
               });
     IREE::Codegen::LoweringConfigAttrInterface config =
-        getNewLoweringConfig(rootLoweringConfig, newTilingInfo,
+        getNewLoweringConfig(rootOperation->getContext(), newTilingInfo,
                              /*setDistributionConfig=*/op == rootOperation);
     setLoweringConfig(op, config);
   }
