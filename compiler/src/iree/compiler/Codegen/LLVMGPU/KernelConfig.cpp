@@ -828,7 +828,7 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   ArrayRef<int32_t> maxWgSizes = wgp.getMaxWorkgroupSizes();
   int32_t maxWorkgroupSize = *llvm::max_element(maxWgSizes);
   IREE::GPU::TargetChipAttr chip = target.getChip();
-  const int numWGPs = chip ? chip.getWgpCount() : 256;
+  const int numWGPs = chip ? chip.getWgpCount() : 512;
   const int numSIMDs = wgp.getSimdsPerWgp().value_or(4);
 
   // If there is more than enough work to saturate all WGPs, use single subgroup
