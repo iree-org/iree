@@ -7,6 +7,8 @@
 #ifndef IREE_COMPILER_CODEGEN_COMMON_TILEANDFUSEUTILS_H_
 #define IREE_COMPILER_CODEGEN_COMMON_TILEANDFUSEUTILS_H_
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
@@ -39,6 +41,15 @@ FailureOr<std::queue<Operation *>> fuseConsumersIntoForall(
     std::function<bool(Operation *)> filterFn = [](Operation *) {
       return true;
     });
+
+/// Apply a tile and fuse transformation to all payload ops and store both the
+/// tiled operation as well as the created tile loops.
+LogicalResult applyTileAndFuseToEachRoot(
+    RewriterBase &rewriter, llvm::SmallDenseSet<TilingInterface> &payloadOps,
+    IREE::GPU::TilingLevel tilingLevel, bool allowZeroSlices,
+    std::optional<
+        llvm::SmallDenseMap<TilingInterface, SmallVector<OpFoldResult>>>
+        targetTileMap = std::nullopt);
 
 } // namespace mlir::iree_compiler
 

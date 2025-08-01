@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/TileAndFuseUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
@@ -32,9 +33,23 @@ struct GPUPackToIntrinsicsPass final
 };
 } // namespace
 
-FailureOr<SmallVector<OpFoldResult>>
-getPackedSizes(linalg::LinalgOp linalgOp, RewriterBase &rewriter,
-               IREE::Codegen::InnerTileDescAttrInterface kind) {
+// TODO : Upstream utility that does this pruning is broken for LinalgOp. Drop
+// this if that gets fixed.
+static SmallVector<NamedAttribute> getPrunedAttributeList(linalg::LinalgOp op) {
+  const StringLiteral memoAttr =
+      linalg::LinalgDialect::kMemoizedIndexingMapsAttrName;
+  SmallVector<NamedAttribute> prunedAttributeList;
+  for (auto attr : op->getDiscardableAttrs()) {
+    if (attr.getName() != memoAttr) {
+      prunedAttributeList.push_back(attr);
+    }
+  }
+  return prunedAttributeList;
+}
+
+FailureOr<SmallVector<OpFoldResult>> static getPackedSizes(
+    linalg::LinalgOp linalgOp, RewriterBase &rewriter,
+    IREE::Codegen::InnerTileDescAttrInterface kind) {
   auto createPackedSizes =
       [&rewriter, &linalgOp](SmallVector<int64_t> dims,
                              SmallVector<SmallVector<unsigned, 2>> indices)
@@ -80,6 +95,66 @@ getPackedSizes(linalg::LinalgOp linalgOp, RewriterBase &rewriter,
                                        "failed to infer contraction dims");
   }
   return createPackedSizes(dims, indices);
+}
+
+linalg::LinalgOp static removeUnitExtentDimsfromMaps(
+    linalg::LinalgOp linalgOp, RewriterBase &rewriter) {
+  SmallVector<AffineMap> indexingMaps = linalgOp.getIndexingMapsArray();
+  if (indexingMaps.empty())
+    return linalgOp;
+
+  // 1. Check if any of the iteration dimensions are unit-trip count. They will
+  //    end up being unit-trip count if they are used to index into a unit-dim
+  //    tensor/memref.
+  AffineMap invertedMap =
+      inversePermutation(concatAffineMaps(indexingMaps, rewriter.getContext()));
+  auto iteratorTypes = linalgOp.getIteratorTypesArray();
+  if (!invertedMap) {
+    return linalgOp;
+  }
+
+  SmallVector<int64_t> allShapesSizes;
+  for (OpOperand &opOperand : linalgOp->getOpOperands())
+    llvm::append_range(allShapesSizes, linalgOp.getShape(&opOperand));
+
+  llvm::SmallDenseSet<unsigned> unitDims;
+  for (const auto &expr : enumerate(invertedMap.getResults())) {
+    if (AffineDimExpr dimExpr = dyn_cast<AffineDimExpr>(expr.value())) {
+      if (allShapesSizes[dimExpr.getPosition()] == 1 &&
+          iteratorTypes[expr.index()] == utils::IteratorType::reduction)
+        unitDims.insert(expr.index());
+    }
+  }
+
+  SmallVector<AffineMap> newIndexingMaps;
+  for (auto indexingMap : indexingMaps) {
+    SmallVector<AffineExpr> newExprs;
+    for (auto [idx, e] : llvm::enumerate(indexingMap.getResults())) {
+      AffineExpr newExpr = e;
+      if (auto binaryExpr = llvm::dyn_cast<AffineBinaryOpExpr>(e)) {
+        for (auto s : unitDims) {
+          if (binaryExpr.getLHS().isFunctionOfDim(s)) {
+            newExpr = binaryExpr.getRHS();
+          }
+          if (binaryExpr.getRHS().isFunctionOfDim(s)) {
+            newExpr = binaryExpr.getLHS();
+          }
+        }
+      }
+      newExprs.push_back(newExpr);
+    }
+    newIndexingMaps.push_back(AffineMap::get(indexingMap.getNumDims(), 0,
+                                             newExprs, rewriter.getContext()));
+  }
+  auto newOp = rewriter.create<linalg::GenericOp>(
+      linalgOp.getLoc(), linalgOp.getDpsInits().getType(),
+      linalgOp.getDpsInputs(), linalgOp.getDpsInits(), newIndexingMaps,
+      iteratorTypes, /*bodyBuild=*/nullptr,
+      getPrunedAttributeList(linalgOp));
+  rewriter.inlineRegionBefore(linalgOp->getRegion(0), newOp.getRegion(),
+                              newOp.getRegion().begin());
+  rewriter.replaceOp(linalgOp, newOp.getResults());
+  return newOp;
 }
 
 LogicalResult packToIntrinsic(linalg::LinalgOp linalgOp,
@@ -237,7 +312,6 @@ struct PackDestinationForOp final : OpRewritePattern<scf::YieldOp> {
 void GPUPackToIntrinsicsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
-
   // Step 1. Pack candidate linalg ops to specified shapes.
   IRRewriter rewriter(funcOp);
   SmallVector<linalg::LinalgOp> packingCandidates;
@@ -252,10 +326,52 @@ void GPUPackToIntrinsicsPass::runOnOperation() {
     }
     packingCandidates.push_back(linalgOp);
   });
-
+  bool didTileConvolutions = false;
+  llvm::SmallDenseSet<TilingInterface> targets;
+  llvm::SmallDenseMap<TilingInterface, SmallVector<OpFoldResult>> targetTileMap;
+  for (auto candidate : packingCandidates) {
+    auto convDimsOrFailure = linalg::inferConvolutionDims(candidate);
+    if (succeeded(convDimsOrFailure)) {
+      didTileConvolutions = true;
+      auto zero = rewriter.getIndexAttr(0);
+      auto one = rewriter.getIndexAttr(1);
+      SmallVector<OpFoldResult> directTileSizes(candidate.getNumLoops(), zero);
+      for (auto loopDim : convDimsOrFailure->filterLoop) {
+        directTileSizes[loopDim] = one;
+      }
+      auto tilingOp = dyn_cast<TilingInterface>(*candidate);
+      targets.insert(tilingOp);
+      targetTileMap[tilingOp] = directTileSizes;
+    }
+  }
+  if (didTileConvolutions) {
+    IREE::GPU::TilingLevel reductionLevel = IREE::GPU::TilingLevel::Reduction;
+    if (failed(applyTileAndFuseToEachRoot(rewriter, targets, reductionLevel,
+                                          /*allowZeroSlices=*/true,
+                                          targetTileMap))) {
+      funcOp.emitError() << "tiling of level  convolution failed\n";
+    }
+  }
+  // Collect packing candiates again since the old candidates are not valid
+  // after convolution tiling.
+  packingCandidates = {};
+  funcOp->walk([&](linalg::LinalgOp linalgOp) {
+    auto loweringConfig =
+        getLoweringConfig<IREE::GPU::LoweringConfigAttr>(linalgOp);
+    if (!loweringConfig) {
+      return;
+    }
+    if (!getMmaKind(loweringConfig)) {
+      return;
+    }
+    packingCandidates.push_back(linalgOp);
+  });
   for (auto candidate : packingCandidates) {
     rewriter.setInsertionPoint(candidate);
-    if (failed(packToIntrinsic(candidate, rewriter))) {
+    linalg::LinalgOp lianlgOp =
+        removeUnitExtentDimsfromMaps(candidate, rewriter);
+    rewriter.setInsertionPoint(lianlgOp);
+    if (failed(packToIntrinsic(lianlgOp, rewriter))) {
       funcOp.emitError() << "failed to pack operation marked with intrinsic\n";
       return signalPassFailure();
     }
@@ -283,6 +399,11 @@ void GPUPackToIntrinsicsPass::runOnOperation() {
 
   linalg::populateDataLayoutPropagationPatterns(patterns, control);
   patterns.add<PackDestinationForOp>(context);
+  tensor::populateFoldTensorEmptyPatterns(patterns);
+  tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
+  tensor::InsertSliceOp::getCanonicalizationPatterns(patterns, context);
+  tensor::ExtractSliceOp::getCanonicalizationPatterns(patterns, context);
+  scf::ForOp::getCanonicalizationPatterns(patterns, context);
   linalg::UnPackOp::getCanonicalizationPatterns(patterns, context);
   if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
