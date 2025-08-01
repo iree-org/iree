@@ -68,7 +68,7 @@ func.func @warp_reduction_dispatch_0() attributes {hal.executable.target = #exec
 //         CHECK:    %[[R8:.+]] = arith.addf %[[R7]], %[[S6]] : f32
 //         CHECK:    %[[S7:.+]], %{{.*}} = gpu.shuffle  idx %[[R8]], %[[C0I]], %[[C32]] : f32
 //         CHECK:    %[[R12:.+]] = arith.addf %[[S7]], %[[CF]] : f32
-//         CHECK:    %[[R13:.+]] = vector.splat %[[R12]] : vector<1xf32>
+//         CHECK:    %[[R13:.+]] = vector.broadcast %[[R12]] : f32 to vector<1xf32>
 //         CHECK:    %[[TID0:.+]] = arith.cmpi eq, %[[TID]], %[[C0]] : index
 //         CHECK:    scf.if %[[TID0]] {
 //         CHECK:      vector.transfer_write %[[R13]], %{{.*}}[%{{.*}}] {in_bounds = [true]} : vector<1xf32>, memref<512xf32, #hal.descriptor_type<storage_buffer>>
@@ -144,15 +144,15 @@ func.func @warp_reduction_dispatch_1() attributes {hal.executable.target = #exec
 //         CHECK:    %[[TRUNC:.+]] = arith.trunci %{{.+}} : i32 to i16
 //         CHECK:    %[[BCAST:.+]] = arith.bitcast %[[TRUNC]] : i16 to f16
 //         CHECK:    %[[ADD1:.+]] = arith.addf %[[BCAST]], %[[F0]] : f16
-//         CHECK:    %[[SPLAT:.+]] = vector.splat %[[ADD1]] : vector<4xf16>
+//         CHECK:    %[[BROADCAST:.+]] = vector.broadcast %[[ADD1]] : f16 to vector<4xf16>
 //         CHECK:    scf.for %[[IV:.+]] = %[[C0]] to %[[C9216]] step %[[C1024]] {
 //         CHECK:      %[[OFFSET:.+]] = affine.apply {{.*}}(%[[IV]])[%[[TIDX]]]
 //         CHECK:      %[[READ:.+]] = vector.transfer_read %[[SPAN0]][%[[WGIDY]], %[[WGIDX]], %[[OFFSET]]], %[[PV]] {in_bounds = [true]} : memref<10x9216x9216xf16{{.*}}>, vector<8xf16>
 //         CHECK:      %[[SLICE0:.+]] = vector.extract_strided_slice %[[READ]] {offsets = [0], sizes = [4], strides = [1]}
-//         CHECK:      %[[DIV0:.+]] = arith.divf %[[SLICE0]], %[[SPLAT]] : vector<4xf16>
+//         CHECK:      %[[DIV0:.+]] = arith.divf %[[SLICE0]], %[[BROADCAST]] : vector<4xf16>
 //         CHECK:      %[[SLICE1:.+]] = vector.insert_strided_slice %[[DIV0]], %cst {offsets = [0], strides = [1]}
 //         CHECK:      %[[SLICE2:.+]] = vector.extract_strided_slice %[[READ]] {offsets = [4], sizes = [4], strides = [1]}
-//         CHECK:      %[[DIV1:.+]] = arith.divf %[[SLICE2]], %[[SPLAT]] : vector<4xf16>
+//         CHECK:      %[[DIV1:.+]] = arith.divf %[[SLICE2]], %[[BROADCAST]] : vector<4xf16>
 //         CHECK:      %[[SLICE3:.+]] = vector.insert_strided_slice %[[DIV1]], %[[SLICE1]] {offsets = [4], strides = [1]}
 //         CHECK:      vector.transfer_write %[[SLICE3]], %[[SPAN1]][%[[WGIDY]], %[[WGIDX]], %{{.*}}] {in_bounds = [true]} : vector<8xf16>, memref<10x9216x9216xf16{{.*}}>
 //         CHECK:    }
@@ -210,7 +210,7 @@ func.func @softmax() attributes {hal.executable.target = #executable_target_vulk
 //         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
 //         CHECK:    arith.maxnumf
-//         CHECK:    vector.splat %{{.*}} : vector<4xf32>
+//         CHECK:    vector.broadcast %{{.*}} : f32 to vector<4xf32>
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
 //         CHECK:      vector.transfer_read
 //         CHECK:      arith.subf
@@ -236,8 +236,8 @@ func.func @softmax() attributes {hal.executable.target = #executable_target_vulk
 //         CHECK:    gpu.shuffle  xor
 //         CHECK:    arith.addf
 //         CHECK:    arith.addf
-//         CHECK:    vector.splat
-//         CHECK:    vector.splat
+//         CHECK:    vector.broadcast
+//         CHECK:    vector.broadcast
 //         CHECK:    scf.for
 //         CHECK:      vector.transfer_read
 //         CHECK:      arith.subf
@@ -327,8 +327,8 @@ func.func @dynamic_softmax() attributes {hal.executable.target = #executable_tar
 // CHECK:         gpu.subgroup_reduce  add {{.*}} : (f16) -> f16
 // CHECK:         arith.addf {{.*}} : f16
 // CHECK:         gpu.subgroup_reduce  maxnumf {{.*}} : (f16) -> f16
-// CHECK:         vector.splat {{.*}} : vector<1xf16>
-// CHECK:         vector.splat {{.*}} : vector<1xf16>
+// CHECK:         vector.broadcast {{.*}} : f16 to vector<1xf16>
+// CHECK:         vector.broadcast {{.*}} : f16 to vector<1xf16>
 
 // Store the result back to global memory in a loop, recomputing the
 // elementwise part.

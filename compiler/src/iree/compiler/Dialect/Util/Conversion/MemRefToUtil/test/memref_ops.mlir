@@ -4,7 +4,7 @@
 
 // -----
 // Must be rank-0 or rank-1.
-// expected-error @-3 {{conversion to util failed}}
+// expected-error @-2 {{conversion to util failed}}
 util.func @verify_invalid_rank_2(%buffer: memref<4x2xf32>, %idx: index) -> f32{
   // expected-error @below {{failed to legalize operation 'memref.load'}}
   %0 = memref.load %buffer[%idx, %idx] : memref<4x2xf32>
@@ -13,7 +13,7 @@ util.func @verify_invalid_rank_2(%buffer: memref<4x2xf32>, %idx: index) -> f32{
 
 // -----
 // Must have an identity map.
-// expected-error @-3 {{conversion to util failed}}
+// expected-error @-2 {{conversion to util failed}}
 #map = affine_map<(d0)[s0] -> (d0 * s0)>
 util.func @verify_invalid_non_identity_map(%buffer: memref<4xf32, #map>, %idx: index) -> f32 {
   // expected-error @below {{failed to legalize operation 'memref.load'}}

@@ -163,7 +163,7 @@ util.func public @main(%dynamic_arg: i32) -> !stream.timepoint attributes {
 }
 
 // -----
-// expected-warning@-2 {{multiple devices in the module}}
+// expected-warning@-1 {{multiple devices in the module}}
 
 // Tests that multiple devices fail today.
 // We should be creating one benchmark per executable with only the dispatches
