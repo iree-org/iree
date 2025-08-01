@@ -107,12 +107,13 @@ static void transposeInPlace(MaterializeEncodingInfo &info) {
   // Not a vector case, so all three arrays in `info` have size at least 2,
   // outerDimsPerm may have size 3 if there is a batch dimension, but in all
   // cases, the last 2 entries of each array are M and N, not batch.
-  auto transpose = [](SmallVector<int64_t> &a) {
-    std::swap(a[a.size() - 2], a[a.size() - 1]);
-  };
+  auto transpose = [](auto &a) { std::swap(a[a.size() - 2], a[a.size() - 1]); };
   transpose(info.innerDimsPos);
   transpose(info.innerTileSizes);
   transpose(info.outerDimsPerm);
+  if (info.scalableTiles) {
+    transpose(info.scalableTiles.value());
+  }
 }
 
 static RankedTensorType
@@ -324,6 +325,10 @@ Operation *lowerContractionOpWithEncoding(
   }
 
   bool transpose = isNarrowNResult(resultEncoding);
+  // Do not transpose in case we have scalable tiles.
+  transpose &= llvm::none_of(
+      encodingInfo.scalableTiles.value_or(IREE::Codegen::ScalableTileFlags{}),
+      [](bool flag) { return flag; });
   SmallVector<Type> elemTypes = lhsEncoding.getElementTypesArray();
   SmallVector<ReassociationIndices> ri;
   Value newLhs = getMmt4dOperand(operands[0], linalgOp, transpose, builder, ri,
@@ -717,13 +722,15 @@ struct CPUEncodingPackedLayoutMaterializerAttr
       return info;
     }
     info = std::move(maybeEncodingInfo.value());
-    if (IREE::Encoding::isNarrowNResult(encoding)) {
-      transposeInPlace(info);
-    }
     FailureOr<IREE::Codegen::ScalableTileFlags> scalableFlags =
         getScalableTileFlags(*cDims, encoding, layoutAttr.getConfiguration());
     if (succeeded(scalableFlags)) {
       info.scalableTiles = std::move(scalableFlags);
+    }
+    if (IREE::Encoding::isNarrowNResult(encoding) &&
+        llvm::none_of(info.scalableTiles.value_or(Codegen::ScalableTileFlags{}),
+                      [](bool flag) { return flag; })) {
+      transposeInPlace(info);
     }
     return info;
   }

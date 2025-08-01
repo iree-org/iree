@@ -97,6 +97,89 @@ func.func @matmul_with_fill(%15: tensor<1024x256xi8>, %16: tensor<256x256xi8>, %
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {cpu = "", cpu_features = "+v9a,+sve", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", link_embedded = false, native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android34"}>
+#map = affine_map<()[s0] -> (s0 ceildiv 8)>
+#map1 = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
+module {
+  func.func @mmt4d_tensors() attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
+    %c8 = arith.constant 8 : index
+    %c0 = arith.constant 0 : index
+    %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+    %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
+    %2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
+    %3 = affine.apply #map()[%0]
+    %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf32>>{%3, %2}
+    %vscale = vector.vscale
+    %c8_vscale = arith.muli %vscale, %c8 : index
+    %5 = affine.apply #map1()[%1, %c8_vscale]
+    %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x1xf32>>{%5, %2, %c8_vscale}
+    %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x?xf32>>{%3, %5, %c8_vscale}
+    %8 = iree_tensor_ext.dispatch.tensor.load %4, offsets = [0, 0, 0, 0], sizes = [%3, %2, 8, 1], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf32>>{%3, %2} -> tensor<?x?x8x1xf32>
+    %9 = iree_tensor_ext.dispatch.tensor.load %6, offsets = [0, 0, 0, 0], sizes = [%5, %2, %c8_vscale, 1], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x1xf32>>{%5, %2, %c8_vscale} -> tensor<?x?x?x1xf32>
+    %10 = iree_tensor_ext.dispatch.tensor.load %7, offsets = [0, 0, 0, 0], sizes = [%3, %5, 8, %c8_vscale], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x?xf32>>{%3, %5, %c8_vscale} -> tensor<?x?x8x?xf32>
+    %11 = linalg.mmt4d ins(%8, %9 : tensor<?x?x8x1xf32>, tensor<?x?x?x1xf32>) outs(%10 : tensor<?x?x8x?xf32>) -> tensor<?x?x8x?xf32>
+    iree_tensor_ext.dispatch.tensor.store %11, %7, offsets = [0, 0, 0, 0], sizes = [%3, %5, 8, %c8_vscale], strides = [1, 1, 1, 1] : tensor<?x?x8x?xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x8x?xf32>>{%3, %5, %c8_vscale}
+    return
+  }
+}
+// CHECK-DAG:  #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [2, 1, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 8, [8], 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
+// CHECK:      #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = Mmt4dTilingExpert>
+// CHECK:      func.func @mmt4d_tensors()
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK: linalg.mmt4d
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {cpu = "", cpu_features = "+v9a,+sve", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", link_embedded = false, native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android34"}>
+#map = affine_map<()[s0] -> (s0 ceildiv 8)>
+#map1 = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
+module {
+  func.func @mmtd4_with_fill() attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
+    %cst = arith.constant 0.000000e+00 : f32
+    %c8 = arith.constant 8 : index
+    %c0 = arith.constant 0 : index
+    %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+    %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
+    %2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
+    %3 = affine.apply #map()[%0]
+    %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf32>>{%3, %2}
+    %vscale = vector.vscale
+    %c8_vscale = arith.muli %vscale, %c8 : index
+    %5 = affine.apply #map1()[%1, %c8_vscale]
+    %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x1xf32>>{%5, %2, %c8_vscale}
+    %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?x8x?xf32>>{%3, %5, %c8_vscale}
+    %8 = iree_tensor_ext.dispatch.tensor.load %4, offsets = [0, 0, 0, 0], sizes = [%3, %2, 8, 1], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x1xf32>>{%3, %2} -> tensor<?x?x8x1xf32>
+    %9 = iree_tensor_ext.dispatch.tensor.load %6, offsets = [0, 0, 0, 0], sizes = [%5, %2, %c8_vscale, 1], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x1xf32>>{%5, %2, %c8_vscale} -> tensor<?x?x?x1xf32>
+    %10 = tensor.empty(%3, %5, %c8_vscale) : tensor<?x?x8x?xf32>
+    %11 = linalg.fill ins(%cst : f32) outs(%10 : tensor<?x?x8x?xf32>) -> tensor<?x?x8x?xf32>
+    %12 = linalg.mmt4d ins(%8, %9 : tensor<?x?x8x1xf32>, tensor<?x?x?x1xf32>) outs(%11 : tensor<?x?x8x?xf32>) -> tensor<?x?x8x?xf32>
+    iree_tensor_ext.dispatch.tensor.store %12, %7, offsets = [0, 0, 0, 0], sizes = [%3, %5, 8, %c8_vscale], strides = [1, 1, 1, 1] : tensor<?x?x8x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?x8x?xf32>>{%3, %5, %c8_vscale}
+    return
+  }
+}
+// CHECK-DAG:  #[[CONFIG1:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 0, 8]>
+// CHECK-DAG:  #[[CONFIG2:.+]] = #iree_cpu.lowering_config<distribution = [2, 1, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 8, [8], 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
+// CHECK:      #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = Mmt4dTilingExpert>
+// CHECK:      func.func @mmtd4_with_fill()
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK: linalg.fill
+// CHECK-SAME:     lowering_config = #[[CONFIG1]]
+//      CHECK: linalg.mmt4d
+// CHECK-SAME:     lowering_config = #[[CONFIG2]]
+
+// -----
+
 #executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {cpu = "", cpu_features = "+v9a,+sve", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", link_embedded = false, native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android34"}>
 func.func @depthwise_conv(%3: tensor<1x57x57x72xf32>, %4: tensor<3x3x72xf32>) -> tensor<1x28x28x72xf32> attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
   %cst = arith.constant 0.000000e+00 : f32

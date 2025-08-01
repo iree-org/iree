@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenEnums.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
@@ -20,6 +21,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVectorExtras.h"
@@ -1873,8 +1875,104 @@ setContractionRootConfig(mlir::FunctionOpInterface entryPointFn,
                              vecPreProcStrategy);
 }
 
+// Utility function to return the result inner tile sizes associated with the
+// mmt4d op. I.e. returns the M1 and N1 dimensions of the result shape
+// BxM0xN0xM1xN1. In case of scalable vectors, walks the IR and returns
+// the static inner tile size and the appropriate scalable flag.
+// TODO: By using the IterationDimTracker, extend the logic to
+// infer all inner tile sizes - including the inner K dimension, if possible.
+static FailureOr<SizesAndScalableFlags>
+getMmt4dInnerTileSizes(linalg::LinalgOp op) {
+  Value destValue = op.getDpsInitOperand(0)->get();
+  ArrayRef<int64_t> destShape =
+      cast<ShapedType>(destValue.getType()).getShape();
+  // In case of static tiles, we just return the last two dim sizes.
+  if (ShapedType::isStaticShape(destShape)) {
+    return SizesAndScalableFlags{destShape.take_back(2),
+                                 IREE::Codegen::ScalableTileFlags(2, false)};
+  }
+  Operation *destOp = destValue.getDefiningOp();
+  SmallVector<OpFoldResult> innerDims;
+  // Currently, the only init tensor of the mmt4d seems to be linalg.fill ops
+  // or the bindings. Otherwise, bail out.
+  if (auto fillOp = dyn_cast<linalg::FillOp>(destOp)) {
+    auto emptyOp =
+        dyn_cast<tensor::EmptyOp>(fillOp.getDpsInitOperand(0)->getOwner());
+    if (!emptyOp) {
+      LDBG() << "Could not infer inner tile sizes of a scalable mmt4d op!";
+      return failure();
+    }
+    innerDims = emptyOp.getMixedSizes();
+  }
+  if (auto loadOp = dyn_cast<IREE::TensorExt::DispatchTensorLoadOp>(destOp)) {
+    innerDims = loadOp.getMixedSizes();
+  }
+  if (innerDims.empty()) {
+    LDBG() << "Could not infer inner tile sizes of a scalable mmt4d op!";
+    return failure();
+  }
+  // We only need the innermost M1 and N1 dims.
+  innerDims.erase(innerDims.begin(), innerDims.end() - 2);
+  return getScalableTileSizesAndFlags(innerDims);
+}
+
+// Adjusts the tile sizes and scalable flags for SVE and SME in-place.
+// Returns failure if it cannot adjust tile sizes.
+static LogicalResult adjustVectorSizesForScalableVectorization(
+    linalg::LinalgOp op, DictionaryAttr targetConfig, int64_t M0, int64_t N0,
+    SmallVector<int64_t> &vecTileSizes,
+    IREE::Codegen::ScalableTileFlags &vecScalableTileFlags) {
+  int64_t mmt4dDimBase = isa<linalg::BatchMmt4DOp>(op) ? 1 : 0;
+  ShapedType rhsType = cast<ShapedType>(op.getDpsInputs()[1].getType());
+  FailureOr<SizesAndScalableFlags> scalableInnerTilesAndFlags =
+      getMmt4dInnerTileSizes(op);
+  if (hasSMEFeature(targetConfig) && !clDisableArmSMETiling &&
+      ShapedType::isDynamic(M0)) {
+    int64_t innerTileSize;
+    bool scalableFlag;
+    if (failed(scalableInnerTilesAndFlags)) {
+      // Use the current upper bound on the inner M dimension as a fallback
+      // option for SME.
+      LDBG() << "Using default vector parallel tile sizes for the inner M dim!";
+      innerTileSize = 8;
+      scalableFlag = true;
+    } else {
+      innerTileSize = scalableInnerTilesAndFlags.value().first[0];
+      scalableFlag = scalableInnerTilesAndFlags.value().second[0];
+    }
+    vecTileSizes[mmt4dDimBase + 3] = innerTileSize;
+    vecScalableTileFlags[mmt4dDimBase + 3] = scalableFlag;
+  }
+  if ((hasAnySVEFeature(targetConfig) ||
+       (hasSMEFeature(targetConfig) && !clDisableArmSMETiling)) &&
+      ShapedType::isDynamic(N0)) {
+    int64_t innerTileSize;
+    bool scalableFlag;
+    if (failed(scalableInnerTilesAndFlags)) {
+      // For SVE, the N dimension is currently chosen as 8 - unless we have RHS
+      // with i4 type and target does not have "+dotprod" or "+i8mm" features.
+      // Currently, we hard-code that over here as a fallback option.
+      LDBG() << "Using default vector parallel tile sizes for the inner M dim!";
+      auto rhsElemType = rhsType.getElementType();
+      innerTileSize = rhsElemType.isSignlessInteger(4) &&
+                              !(hasFeature(targetConfig, "+i8mm") ||
+                                hasFeature(targetConfig, "+dotprod"))
+                          ? 16
+                          : 8;
+      scalableFlag = true;
+    } else {
+      innerTileSize = scalableInnerTilesAndFlags.value().first[1];
+      scalableFlag = scalableInnerTilesAndFlags.value().second[1];
+    }
+    vecTileSizes[mmt4dDimBase + 4] = innerTileSize;
+    vecScalableTileFlags[mmt4dDimBase + 4] = scalableFlag;
+    return success();
+  }
+  return failure();
+}
+
 static IREE::Codegen::LoweringConfigAttrInterface
-getMmt4dLoweringConfig(linalg::LinalgOp op) {
+getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
   DistributionHeuristicConfig distConfig;
   distConfig.allowIncompleteTile = true;
   distConfig.minTileSizes.resize(op.getNumLoops(), 0);
@@ -1934,11 +2032,17 @@ getMmt4dLoweringConfig(linalg::LinalgOp op) {
   vecTileSizes[mmt4dDimBase + 3] = M0;
   vecTileSizes[mmt4dDimBase + 4] = N0;
   vecTileSizes[mmt4dDimBase + 5] = K0;
-  limitVectorTileSizes(op, vecTileSizes);
-
+  IREE::Codegen::ScalableTileFlags vecScalableTileFlags(mmt4dDimBase + 6,
+                                                        false);
+  if (!(targetConfig && isAArch64(targetConfig) &&
+        isScalableVectorizationEnabled() &&
+        succeeded(adjustVectorSizesForScalableVectorization(
+            op, targetConfig, M0, N0, vecTileSizes, vecScalableTileFlags)))) {
+    limitVectorTileSizes(op, vecTileSizes);
+  }
   LoweringConfigGenerator generator(op);
   generator.setDistributionTileSizes(distTileSizes);
-  generator.setVectorTileSizes(vecTileSizes);
+  generator.setVectorTileSizes(vecTileSizes, vecScalableTileFlags);
   return generator.generateCPULoweringConfig();
 }
 
@@ -1947,8 +2051,12 @@ getMmt4dLoweringConfig(linalg::LinalgOp op) {
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                                    linalg::Mmt4DOp mmt4dOp) {
   assert(!getLoweringConfig(mmt4dOp) && "expected lowering_config is not set");
+  IREE::HAL::ExecutableTargetAttr targetAttr =
+      IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  DictionaryAttr targetConfig =
+      targetAttr ? targetAttr.getConfiguration() : nullptr;
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, mmt4dOp, getMmt4dLoweringConfig(mmt4dOp),
+      entryPointFn, mmt4dOp, getMmt4dLoweringConfig(mmt4dOp, targetConfig),
       DispatchLoweringPassPipeline::Mmt4dTilingExpert);
 }
 
@@ -1958,8 +2066,13 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                                    linalg::BatchMmt4DOp batchMmt4dOp) {
   assert(!getLoweringConfig(batchMmt4dOp) &&
          "expected lowering_config is not set");
+  IREE::HAL::ExecutableTargetAttr targetAttr =
+      IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  DictionaryAttr targetConfig =
+      targetAttr ? targetAttr.getConfiguration() : nullptr;
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, batchMmt4dOp, getMmt4dLoweringConfig(batchMmt4dOp),
+      entryPointFn, batchMmt4dOp,
+      getMmt4dLoweringConfig(batchMmt4dOp, targetConfig),
       DispatchLoweringPassPipeline::Mmt4dTilingExpert);
 }
 
