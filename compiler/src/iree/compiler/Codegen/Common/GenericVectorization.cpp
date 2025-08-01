@@ -49,7 +49,7 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
       if (maybeInputVectorSizes) {
         std::tie(vectorSizes, scalableFlags) = maybeInputVectorSizes.value();
       } else {
-        LDBG("Failed to get input vector sizes for unpack op");
+        LDBG() << "Failed to get input vector sizes for unpack op";
         return std::nullopt;
       }
     }

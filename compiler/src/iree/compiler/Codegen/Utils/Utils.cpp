@@ -1790,9 +1790,9 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::PackOp op) {
 
 std::optional<SizesAndScalableFlags>
 getVectorInputSizesFromDestTiles(linalg::UnPackOp op,
-                                 ArrayRef<int64_t> vectorSizes,
+                                 ArrayRef<int64_t> writeVectorSizes,
                                  ArrayRef<bool> scalableFlags) {
-  assert(vectorSizes.size() == op.getDestRank());
+  assert(writeVectorSizes.size() == op.getDestRank());
   if (llvm::any_of(scalableFlags, [](bool val) { return val == true; })) {
     return std::nullopt;
   }
@@ -1820,26 +1820,19 @@ getVectorInputSizesFromDestTiles(linalg::UnPackOp op,
   //                                           = [16, 8]
   //   After applying outer_dims_perm: [8, 16]
   //   After appending the rest of the sourceShape: [8, 16, 32, 16]
-  SmallVector<int64_t> readVectorSizes(vectorSizes.begin(), vectorSizes.end());
+  SmallVector<int64_t> vectorSizes(writeVectorSizes);
   for (auto [index, size] : enumerate(innerTiles)) {
-    readVectorSizes[innerDimPos[index]] =
-        llvm::divideCeil(readVectorSizes[innerDimPos[index]], size);
+    vectorSizes[innerDimPos[index]] =
+        llvm::divideCeil(vectorSizes[innerDimPos[index]], size);
   }
   if (!outerDimsPerm.empty()) {
-    applyPermutationToVector(readVectorSizes, outerDimsPerm);
+    applyPermutationToVector(vectorSizes, outerDimsPerm);
   }
-  readVectorSizes.append(sourceShape.begin() + vectorSizes.size(),
-                         sourceShape.end());
+  vectorSizes.append(sourceShape.begin() + vectorSizes.size(),
+                     sourceShape.end());
 
-  // The input-vector-sizes, that used in vectorization, specify both the read
-  // and the write vector sizes and are passed as one array covering both
-  // operations, i.e.:
-  //   input-vector-sizes = [8, 16, 32, 16, 512, 128]
-  //                         \          /   \      /
-  //                          read-sizes   write-sizes
   SizesAndScalableFlags result;
-  result.first.assign(readVectorSizes.begin(), readVectorSizes.end());
-  result.first.append(vectorSizes.begin(), vectorSizes.end());
+  result.first.assign(vectorSizes.begin(), vectorSizes.end());
   result.second.resize(result.first.size(), false);
 
   return result;
@@ -1890,9 +1883,9 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::UnPackOp op) {
   std::tie(result.vectorSizes, result.vectorScalableFlags) =
       maybeInputVectorSizes.value();
   LLVM_DEBUG({
-    LDBG("After infer read vector sizes from dest shape:");
+    LDBG() << "After infer read vector sizes from dest shape:";
     for (auto [idx, val] : llvm::enumerate(result.vectorSizes)) {
-      LDBG("Dim #" << idx << ": " << val);
+      LDBG() << "Dim #" << idx << ": " << val;
     }
   });
   result.destShape = result.vectorSizes;
