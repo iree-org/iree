@@ -254,7 +254,7 @@ func.func @swizzle_load_xor(%src: memref<?xi8>) -> vector<16xi8> {
   return %1: vector<16xi8>
 }
 
-// CHECK-LABEL: func @swizzle_load
+// CHECK-LABEL: func @swizzle_load_xor
 //  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: memref<?xi8>
 //       CHECK:   %[[SWOFF:.+]] = arith.constant 2000 : index
 //       CHECK:   %[[VECTOR:.+]] = vector.load %[[SRC]][%[[SWOFF]]]
@@ -270,7 +270,7 @@ func.func @swizzle_load_xor_phase2(%src: memref<?xi8>) -> vector<16xi8> {
   return %1: vector<16xi8>
 }
 
-// CHECK-LABEL: func @swizzle_load
+// CHECK-LABEL: func @swizzle_load_xor_phase2
 //  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: memref<?xi8>
 //       CHECK:   %[[SWOFF:.+]] = arith.constant 1120 : index
 //       CHECK:   %[[VECTOR:.+]] = vector.load %[[SRC]][%[[SWOFF]]]
