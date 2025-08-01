@@ -178,9 +178,12 @@ setPromotedOperandsList(MLIRContext *context,
 }
 
 constexpr StringLiteral kPaddingName = "padding";
+constexpr StringLiteral kPaddingConvName = "padding_conv";
 
-std::optional<SmallVector<int64_t>> getPaddingList(LoweringConfigAttr config) {
-  auto array = config.getAttributes().getAs<ArrayAttr>(kPaddingName);
+std::optional<SmallVector<int64_t>> getPaddingList(LoweringConfigAttr config,
+                                                   bool paddingConv) {
+  auto attrName = paddingConv ? kPaddingConvName : kPaddingName;
+  auto array = config.getAttributes().getAs<ArrayAttr>(attrName);
   if (!array) {
     return std::nullopt;
   }

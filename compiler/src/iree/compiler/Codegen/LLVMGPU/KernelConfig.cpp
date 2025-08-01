@@ -123,6 +123,11 @@ static llvm::cl::opt<bool>
                       llvm::cl::desc("Enable implicit gemm for convolutions."),
                       llvm::cl::init(true));
 
+llvm::cl::opt<bool> clGPUPadConvolution(
+    "iree-codegen-llvmgpu-igemm-pad-convolution",
+    llvm::cl::desc("enable pre-padding for convolutions in igemm path"),
+    llvm::cl::init(true));
+
 static llvm::cl::opt<bool>
     clUseDirectLoad("iree-llvmgpu-use-direct-load",
                     llvm::cl::desc("Use global load DMA for direct load ops."),
@@ -3091,7 +3096,8 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
   }
   if (clLLVMGPUUseIgemm) {
     if (succeeded(IREE::GPU::setIGEMMConvolutionLoweringConfig(
-            target, entryPointFn, computeOp, clUseDirectLoad))) {
+            target, entryPointFn, computeOp, clUseDirectLoad,
+            clGPUPadConvolution))) {
       LDBG() << "Tile and fuse IGEMM config";
       return success();
     }
