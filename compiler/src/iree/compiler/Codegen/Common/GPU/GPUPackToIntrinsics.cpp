@@ -149,8 +149,11 @@ struct PackDestinationForOp final : OpRewritePattern<scf::YieldOp> {
       // Apply the pattern only if packOp & unpackOp are the only 2 users of the
       // regionIterArg.
       auto iterArg = forOp.getRegionIterArgs()[idx];
-      if (iterArg.getNumUses() != 2) {
-        continue;
+      for (auto [index, user] : llvm::enumerate(iterArg.getUsers())) {
+        if ((index > 2) || (!dyn_cast<linalg::PackOp>(user) &&
+                            !dyn_cast<linalg::UnPackOp>(user))) {
+          return failure();
+        }
       }
 
       // Get the corresponding packOp.
