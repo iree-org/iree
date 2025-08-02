@@ -4,13 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/VMVX/KernelDispatch.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"
-#include "mlir/Pass/PassRegistry.h"
 
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr;
 
@@ -26,7 +25,8 @@ class VMVXSelectLoweringStrategyPass
           VMVXSelectLoweringStrategyPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Codegen::IREECodegenDialect>();
+    registry
+        .insert<IREE::Codegen::IREECodegenDialect, IREE::CPU::IREECPUDialect>();
   }
 
   void runOnOperation() override;
