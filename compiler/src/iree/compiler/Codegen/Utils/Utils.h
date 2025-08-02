@@ -297,6 +297,9 @@ bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
 // Utility functions for vector size inference for dynamic shapes
 //===----------------------------------------------------------------------===//
 
+using SizesAndScalableFlags =
+    std::pair<SmallVector<int64_t>, SmallVector<bool>>;
+
 struct VectorizationTileSizes {
   SmallVector<int64_t> destShape;
   SmallVector<int64_t> vectorSizes;

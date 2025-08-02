@@ -523,7 +523,7 @@ func.func @dynamic_fill_with_scalable_tiling_infer_remainder_vector_size(%arg0: 
 // -----
 
 #aarch64_sve = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", target_triple = "aarch64-none-elf"}>
-#config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0, 0], [1, 4, [4], 0], [0, 0, 0, 3], [0, 0, 0, 0]]>
+#config = #iree_cpu.lowering_config<vector_common_parallel = [1, 4, [4], 0], vector_reduction = [0, 0, 0, 3]>
 #map = affine_map<()[s0] -> (-(96 mod s0) + 96)>
 #map1 = affine_map<(d0) -> (d0 * 2)>
 
