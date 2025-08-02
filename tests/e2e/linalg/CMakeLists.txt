@@ -35,6 +35,23 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
+    check_llvm-cpu_dt_fusion_local-task
+  SRCS
+    "narrow_n_matmuls.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-dispatch-creation-experimental-data-tiling"
+    "--iree-llvmcpu-target-cpu=generic"
+    "--iree-opt-data-tiling=false"
+  LABELS
+    "nowasm"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     check_vmvx_local-task
   SRCS
     "conv2d.mlir"
