@@ -42,6 +42,17 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
   if (useConfiguredVectorSizes && tilingConfig) {
     LDBG() << "Use configured vector sizes from lowering config";
     auto [vectorSizes, scalableFlags] = tilingConfig->getVectorTileSizes();
+    if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
+      std::optional<SizesAndScalableFlags> maybeInputVectorSizes =
+          getVectorInputSizesFromDestTiles(unpackOp, vectorSizes,
+                                           scalableFlags);
+      if (maybeInputVectorSizes) {
+        std::tie(vectorSizes, scalableFlags) = maybeInputVectorSizes.value();
+      } else {
+        LDBG() << "Failed to get input vector sizes for unpack op";
+        return std::nullopt;
+      }
+    }
     // Replace zeros in canonical vector shape to turn it into a valid shape.
     std::replace(vectorSizes.begin(), vectorSizes.end(), 0, 1);
     return std::make_pair(vectorSizes, scalableFlags);
