@@ -575,6 +575,55 @@ Value rankExpandValue(RewriterBase &rewriter, Location loc, Value destVal,
   }
 }
 
+struct DropMapScatterUnitDims final : public OpRewritePattern<MapScatterOp> {
+  using OpRewritePattern<MapScatterOp>::OpRewritePattern;
+  DropMapScatterUnitDims(MLIRContext *context,
+                         linalg::ControlDropUnitDims options,
+                         PatternBenefit benefit = 1)
+      : OpRewritePattern<MapScatterOp>(context, benefit),
+        options(std::move(options)) {}
+
+  LogicalResult matchAndRewrite(MapScatterOp mapScatterOp,
+                                PatternRewriter &rewriter) const override {
+    auto inputType = dyn_cast<RankedTensorType>(mapScatterOp.getInputType());
+    if (!inputType) {
+      return failure();
+    }
+    Location loc = mapScatterOp.getLoc();
+    FailureOr<Value> newInput = rankReduceOperand(
+        rewriter, loc, /*startDim=*/0, /*numDims=*/mapScatterOp.getInputRank(),
+        mapScatterOp.getInput(), mapScatterOp.getInputType(), options);
+    if (failed(newInput)) {
+      return failure();
+    }
+
+    auto newInputType = cast<ShapedType>(newInput->getType());
+    auto unitFoldingBuilder = [&](ArrayRef<BlockArgument> nonUnitIndices) {
+      Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+      int nonUnitArgIdx = 0;
+      return llvm::map_to_vector(
+          llvm::seq<int64_t>(inputType.getRank()), [&](int64_t dim) -> Value {
+            return inputType.getDimSize(dim) == 1
+                       ? zero
+                       : cast<Value>(nonUnitIndices[nonUnitArgIdx++]);
+          });
+    };
+    // The map_scatter op is generally only used in Codegen, where it is the
+    // last op in the dispatch, so for now, we don't bother collapsing the
+    // result shape and inserting an expansion after the op.
+    rewriter.modifyOpInPlace(mapScatterOp, [&]() {
+      mapScatterOp.getInputMutable().assign(newInput.value());
+      mapScatterOp.insertTransformationAtStart(
+          rewriter, unitFoldingBuilder,
+          /*numSourceIndices=*/newInputType.getRank());
+    });
+    return success();
+  }
+
+private:
+  linalg::ControlDropUnitDims options;
+};
+
 struct DropGatherUnitDims final : public OpRewritePattern<GatherOp> {
   DropGatherUnitDims(MLIRContext *context, linalg::ControlDropUnitDims options,
                      PatternBenefit benefit = 1)
@@ -1059,8 +1108,8 @@ private:
 void populateFoldUnitExtentDimsPatterns(
     RewritePatternSet &patterns, const linalg::ControlDropUnitDims &options) {
   patterns.add<DropScatterUnitIndexDepth>(patterns.getContext());
-  patterns.add<DropGatherUnitDims, DropScatterUnitDims, DropAttentionUnitDims>(
-      patterns.getContext(), options);
+  patterns.add<DropGatherUnitDims, DropScatterUnitDims, DropAttentionUnitDims,
+               DropMapScatterUnitDims>(patterns.getContext(), options);
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
