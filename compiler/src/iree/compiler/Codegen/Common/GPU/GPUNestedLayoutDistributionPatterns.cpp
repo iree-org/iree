@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Utils/Permutation.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
@@ -282,6 +283,17 @@ static VectorValue projectVector(RewriterBase &rewriter, Location loc,
   return cast<VectorValue>(sliced.getResult());
 }
 
+static VectorValue extractSliceAsVector(RewriterBase &rewriter, Location loc,
+                                        Value src, ArrayRef<int64_t> offsets) {
+  Value slice = rewriter.create<vector::ExtractOp>(loc, src, offsets);
+  // Promote the slicedVector to 0-d vector if it is a scalar.
+  if (!isa<VectorType>(slice.getType())) {
+    auto promotedType = VectorType::get({}, getElementTypeOrSelf(slice));
+    slice = rewriter.create<vector::BroadcastOp>(loc, promotedType, slice);
+  }
+  return cast<VectorValue>(slice);
+}
+
 namespace {
 
 /// Pattern to distribute `vector.transfer_read` ops with nested layouts.
@@ -476,16 +488,9 @@ struct DistributeTransferWrite final
       // dimensions are either unrolled or distributed such that this is a
       // contiguous slice.
       ArrayRef<int64_t> offsetArray(offsets);
-      Value slicedVector = rewriter.create<vector::ExtractOp>(
-          writeOp.getLoc(), distributedVector,
-          offsetArray.take_front(rank * 2));
-      // Promote the slicedVector to 0-d vector if it is a scalar.
-      if (!isa<VectorType>(slicedVector.getType())) {
-        auto promotedType =
-            VectorType::get({}, getElementTypeOrSelf(slicedVector));
-        slicedVector = rewriter.create<vector::BroadcastOp>(
-            writeOp.getLoc(), promotedType, slicedVector);
-      }
+      VectorValue slicedVector =
+          extractSliceAsVector(rewriter, writeOp.getLoc(), distributedVector,
+                               offsetArray.take_front(rank * 2));
 
       VectorValue slicedMask = nullptr;
       if (mask) {
@@ -669,6 +674,104 @@ struct DistributeTransferGather final
     }
 
     replaceOpWithDistributedValues(rewriter, gatherOp, acc);
+    return success();
+  }
+
+  Value threadId;
+  int64_t subgroupSize;
+};
+
+/// Pattern to distribute `iree_linalg_ext.map_scatter` ops with nested layouts.
+/// Only the input is distributed, since the output is never a vector. The
+/// distribution of the input is similar to that of a vector.transfer_write.
+struct DistributeMapScatter final
+    : OpDistributionPattern<IREE::LinalgExt::MapScatterOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  DistributeMapScatter(MLIRContext *context, Value threadId,
+                       int64_t subgroupSize)
+      : OpDistributionPattern(context), threadId(threadId),
+        subgroupSize(subgroupSize) {}
+
+  LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    auto input = dyn_cast<VectorValue>(mapScatterOp.getInput());
+    if (!input) {
+      return rewriter.notifyMatchFailure(mapScatterOp, "input is not a vector");
+    }
+    NestedLayoutAttr vectorLayout =
+        dyn_cast<NestedLayoutAttr>(signature[input]);
+    if (!vectorLayout) {
+      return rewriter.notifyMatchFailure(mapScatterOp,
+                                         "non-nested map_scatter layout");
+    }
+    if (!isa<MemRefType>(mapScatterOp.getOutput().getType())) {
+      return rewriter.notifyMatchFailure(mapScatterOp,
+                                         "distribution expects memrefs");
+    }
+    SmallVector<Value> warpIndices, threadIndices;
+    if (failed(populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
+                                            vectorLayout, warpIndices,
+                                            threadIndices))) {
+      return rewriter.notifyMatchFailure(
+          mapScatterOp, "warp or thread tiles have overlapping strides");
+    }
+
+    Value distributedVector = getDistributed(rewriter, input, vectorLayout);
+
+    Location loc = mapScatterOp.getLoc();
+    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
+    SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
+    for (auto [idx, offsets] :
+         llvm::enumerate(StaticTileOffsetRange(distShape, tileShape))) {
+      // Extract the "element vector" from the inner most dimensions. All outer
+      // dimensions are either unrolled or distributed such that this is a
+      // contiguous slice.
+      ArrayRef<int64_t> offsetArray(offsets);
+      VectorValue distributedInput = extractSliceAsVector(
+          rewriter, loc, distributedVector,
+          offsetArray.take_front(vectorLayout.getRank() * 2));
+
+      // Clone the map_scatter op with the "element vector" as the input, and
+      // adjust the transformation region to account for the distributed
+      // offsets.
+      AffineMap permutationMap =
+          rewriter.getMultiDimIdentityMap(input.getType().getRank());
+      SmallVector<Value> indices(input.getType().getRank(), zero);
+      SmallVector<Value> distributedOffsets =
+          getTransferIndicesFromNestedLayout(rewriter, indices, offsets,
+                                             vectorLayout, permutationMap,
+                                             warpIndices, threadIndices);
+      IREE::LinalgExt::MapScatterOp distributedMapScatter =
+          clone(rewriter, mapScatterOp, mapScatterOp.getResultTypes(),
+                {distributedInput, mapScatterOp.getOutput()});
+      int64_t sliceRank = distributedInput.getType().getRank();
+      int64_t rankDiff = input.getType().getRank() - sliceRank;
+      // Add the distributed offsets in the map_scatter transformation body.
+      auto transformationBuilder = [&](ArrayRef<BlockArgument> newIndices) {
+        SmallVector<Value> replacementIndices(distributedOffsets);
+        for (auto [i, replacementIdx] : llvm::enumerate(replacementIndices)) {
+          // Rank-reduced dimensions can be directly replaced by the distributed
+          // index, since their size is 1 in the new map_scatter input.
+          if (i < rankDiff) {
+            continue;
+          }
+          // Otherwise, the dimension is a contiguous element dimension, so
+          // the mapping is achieved by adding the corresponding block argument
+          // to the sliced index.
+          BlockArgument newTransformationIdx = newIndices[i - rankDiff];
+          replacementIdx = rewriter.create<arith::AddIOp>(
+              loc, newTransformationIdx, replacementIdx);
+        }
+        return replacementIndices;
+      };
+      distributedMapScatter.insertTransformationAtStart(
+          rewriter, transformationBuilder, sliceRank);
+    }
+
+    rewriter.eraseOp(mapScatterOp);
     return success();
   }
 
@@ -2030,8 +2133,8 @@ void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
                                                    int64_t subgroupSize,
                                                    int64_t maxBitsPerShuffle) {
   patterns.add<DistributeTransferRead, DistributeTransferWrite,
-               DistributeTransferGather>(patterns.getContext(), threadId,
-                                         subgroupSize);
+               DistributeTransferGather, DistributeMapScatter>(
+      patterns.getContext(), threadId, subgroupSize);
   patterns.add<DistributeBroadcast, DistributeTranspose>(patterns.getContext());
   patterns.add<DistributeMultiReduction>(patterns.getContext(), subgroupSize,
                                          maxBitsPerShuffle);
