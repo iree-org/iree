@@ -19,11 +19,10 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/LogicalResult.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -878,6 +877,27 @@ public:
   }
 };
 
+struct MaterializeFuncReturnOp final
+    : public OpConversionPattern<func::ReturnOp> {
+  using OpConversionPattern<func::ReturnOp>::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(func::ReturnOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto isRankedTensorTypeWithEncoding = [](Type type) {
+      auto rankedTensorType = dyn_cast<RankedTensorType>(type);
+      if (!rankedTensorType) {
+        return false;
+      }
+      return rankedTensorType.getEncoding() ? true : false;
+    };
+    if (!llvm::any_of(op.getOperandTypes(), isRankedTensorTypeWithEncoding)) {
+      return rewriter.notifyMatchFailure(op, "does not have encodings");
+    }
+    rewriter.replaceOpWithNewOp<func::ReturnOp>(op, adaptor.getOperands());
+    return success();
+  }
+};
+
 } // namespace
 
 void populateMaterializeEncodingPatterns(
@@ -922,7 +942,8 @@ void populateMaterializeEncodingPatterns(
                   MaterializeOptimizationBarrierOp,
                   MaterializeTensorExtDispatchTensorLoadOp,
                   MaterializeTensorExtDispatchTensorStoreOp,
-                  MaterializeInterfaceBindingEncoding>(typeConverter, context);
+                  MaterializeInterfaceBindingEncoding, MaterializeFuncReturnOp>(
+      typeConverter, context);
 };
 
 } // namespace mlir::iree_compiler
