@@ -4,21 +4,17 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/TileSizeSelection.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "llvm/Support/DebugLog.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-llvmcpu-split-reduction"
 
@@ -194,15 +190,16 @@ void LLVMCPUSplitReductionPass::runOnOperation() {
       LDBG() << "can't find lowering_config, skip SplitReduction";
       continue;
     }
-    std::unique_ptr<TilingConfig> tilingConfig =
-        TilingConfig::create(maybeLoweringConfig);
-    auto [reductionSizes, scalableDims] =
-        tilingConfig->getVectorReductionSizes();
+    auto attr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
+        maybeLoweringConfig.getTilingLevelAttr(
+            IREE::CPU::TilingLevel::VectorReductionTiles));
+    ArrayRef<bool> scalableDims = attr.getScalableFlags();
     if (scalableDims.back()) {
       LDBG() << "scalable reduction dimensions not yet supported, skip "
                 "SplitReduction";
       continue;
     }
+    ArrayRef<int64_t> reductionSizes = attr.getSizes();
     if (reductionSizes.empty()) {
       LDBG()
           << "the list of reduction tiling sizes is empty, skip SplitReduction";
