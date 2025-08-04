@@ -47,6 +47,20 @@ static Value createOrFoldNewStaticAdd(RewriterBase &rewriter, Value v,
   return rewriter.create<arith::AddIOp>(v.getLoc(), v, offsetVal);
 }
 
+/// Checks whether `op` is a dst operand of gatherToLds
+template <typename T>
+static bool isGatherToLDSDstOperand(T op) {
+  bool allUsersSatisfy = true;
+  for (auto memRefUser : op->getUsers()) {
+    auto gather = dyn_cast<amdgpu::GatherToLDSOp>(memRefUser);
+    if (!gather || gather.getDst() != op) {
+      allUsersSatisfy = false;
+      break;
+    }
+  }
+  return allUsersSatisfy;
+}
+
 /// Swizzles vector.load(iree_codegen.swizzle_hint, offset). The
 /// SwizzleInterfaceAttr exposes two methods:
 ///   1. getAccessElementCount -> int64_t
@@ -204,7 +218,18 @@ static void resolveHintOp(RewriterBase &rewriter,
       gatherToLDSOps.push_back(gatherToLDSOp);
       continue;
     }
-    // Bail out if we can't rewrite all users.
+    // Swizzling is ignored on dst operand for gatherToLds
+    if (auto memRefExpandOp = dyn_cast<memref::ExpandShapeOp>(user)) {
+      if (isGatherToLDSDstOperand(memRefExpandOp))
+        continue;
+    }
+    if (auto memRefSubviewOp = dyn_cast<memref::SubViewOp>(user)) {
+      if (isGatherToLDSDstOperand(memRefSubviewOp))
+        continue;
+    }
+    // Warning if we can't rewrite all users.
+    hintOp.emitError()
+        << "At least one of the SwizzleHintOp users is not supported. ";
     return;
   }
 
