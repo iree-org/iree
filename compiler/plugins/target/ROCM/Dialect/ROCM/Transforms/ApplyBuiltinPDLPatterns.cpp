@@ -116,18 +116,36 @@ public:
     // Populate the specialization patterns from the list of targets.
     auto rocmDialect = context->getOrLoadDialect<IREE::ROCM::ROCMDialect>();
     RewritePatternSet tmpPatterns(context);
-    for (std::string target : targets) {
-      std::string builtinName =
-          llvm::formatv("specialization_patterns_{}.mlir", target);
-      std::optional<StringRef> maybeBuiltin =
-          rocmDialect->getBuiltin(builtinName);
-      if (!maybeBuiltin) {
-        // Skip when no patterns are present.
-        continue;
+    if (enableSpecialization) {
+      for (std::string target : targets) {
+        std::string builtinName =
+            llvm::formatv("specialization_patterns_{}.mlir", target);
+        std::optional<StringRef> maybeBuiltin =
+            rocmDialect->getBuiltin(builtinName);
+        if (!maybeBuiltin) {
+          // Skip when no patterns are present.
+          continue;
+        }
+        if (failed(populatePDLModuleFromBuiltin(context, tmpPatterns,
+                                                maybeBuiltin.value()))) {
+          return failure();
+        }
       }
-      if (failed(populatePDLModuleFromBuiltin(context, tmpPatterns,
-                                              maybeBuiltin.value()))) {
-        return failure();
+    }
+    if (enableTensorUKernels) {
+      for (std::string target : targets) {
+        std::string builtinName =
+            llvm::formatv("ukernel_patterns_{}.mlir", target);
+        std::optional<StringRef> maybeBuiltin =
+            rocmDialect->getBuiltin(builtinName);
+        if (!maybeBuiltin) {
+          // Skip when no patterns are present.
+          continue;
+        }
+        if (failed(populatePDLModuleFromBuiltin(context, tmpPatterns,
+                                                maybeBuiltin.value()))) {
+          return failure();
+        }
       }
     }
     patterns = std::move(tmpPatterns);

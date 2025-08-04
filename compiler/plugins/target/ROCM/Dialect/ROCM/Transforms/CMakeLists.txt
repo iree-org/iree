@@ -39,6 +39,7 @@ iree_cc_library(
     MLIRPass
     MLIRTransformUtils
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Dialect::Util::IR
     iree::compiler::plugins::target::ROCM::Dialect::ROCM::IR::ROCMDialect
     iree::compiler::plugins::target::ROCM::builtins::specialization::iree_specialization_patterns_amdgpu
