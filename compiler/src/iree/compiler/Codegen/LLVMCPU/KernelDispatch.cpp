@@ -3119,15 +3119,10 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
       bool setUpOK =
           TypeSwitch<Operation *, bool>(op)
               .Case<linalg::PackOp>([&](auto packOp) {
-                std::optional<SmallVector<bool>> scalableFlags =
-                    rootLoweringConfig.getVectorScalableFlags();
-                if (!scalableFlags) {
+                // TODO: Handle scalable flags
+                if (llvm::any_of(rootLoweringConfig.getVectorScalableFlags(),
+                                 [&](bool flag) { return flag; })) {
                   return false;
-                }
-                for (ArrayRef<bool> flags : scalableFlags.value()) {
-                  // TODO: Handle scalable flags
-                  if (llvm::any_of(flags, [&](bool flag) { return flag; }))
-                    return false;
                 }
                 updateOrAddTilingLevelInfo(newTilingInfo,
                                            IREE::CPU::VectorReductionTiles,
