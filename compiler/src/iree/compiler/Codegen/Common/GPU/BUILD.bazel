@@ -48,6 +48,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:UBDialect",
     ],
 )
 
