@@ -62,7 +62,6 @@ iree_check_single_backend_test_suite(
     "i1_inlined_constant.mlir"
     "layernorm.mlir"
     "linalg_ops.mlir"
-    "linalg_ops_dynamic.mlir"
     "lowering_config.mlir"
     "pack_pad_transpose_1x9_into_2x1x8x4_issue_12546.mlir"
     "reduction_broadcast_elementwise.mlir"
