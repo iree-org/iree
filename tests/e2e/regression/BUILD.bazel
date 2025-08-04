@@ -141,6 +141,7 @@ iree_check_single_backend_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_regression_hip",
     srcs = [
+        "linalg_ops_dynamic.mlir",
         "split_reduction_using_tiling.mlir",
     ],
     compiler_flags = [
