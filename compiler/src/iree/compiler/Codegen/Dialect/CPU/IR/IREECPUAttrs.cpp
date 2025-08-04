@@ -235,8 +235,7 @@ std::optional<SmallVector<int64_t>> LoweringConfigAttr::getVectorSizes() const {
   return result;
 }
 
-std::optional<SmallVector<bool>>
-LoweringConfigAttr::getVectorScalableFlags() const {
+SmallVector<bool> LoweringConfigAttr::getVectorScalableFlags() const {
   SmallVector<bool> result;
   for (auto level : vectorTilingLevels) {
     if (!hasTilingLevel(level)) {

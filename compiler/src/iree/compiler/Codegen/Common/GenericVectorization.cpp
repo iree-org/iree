@@ -44,15 +44,14 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
     LDBG() << "Use configured vector sizes from lowering config";
     std::optional<SmallVector<int64_t>> vectorSizes =
         loweringConfig.getVectorSizes();
-    std::optional<SmallVector<bool>> scalableFlags =
-        loweringConfig.getVectorScalableFlags();
+    SmallVector<bool> scalableFlags = loweringConfig.getVectorScalableFlags();
     if (vectorSizes) {
-      if (!scalableFlags || scalableFlags->empty()) {
-        scalableFlags->assign(vectorSizes->size(), false);
+      if (scalableFlags.empty()) {
+        scalableFlags.assign(vectorSizes->size(), false);
       }
       // Replace zeros in canonical vector shape to turn it into a valid shape.
       std::replace(vectorSizes->begin(), vectorSizes->end(), 0, 1);
-      return std::make_pair(*vectorSizes, *scalableFlags);
+      return std::make_pair(*vectorSizes, scalableFlags);
     }
     LDBG() << "Failed to get configured vector sizes, fall back to inference";
   }

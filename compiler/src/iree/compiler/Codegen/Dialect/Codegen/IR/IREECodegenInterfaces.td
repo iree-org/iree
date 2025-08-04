@@ -392,14 +392,15 @@ def IREECodegen_LoweringConfigAttrInterface :
         Returns the vector scalable flags sizes for all the vector dimensions.
         Similar to the `getVectorSizes` method, but it is for scalable flags.
 
-        Returns std::nullopt if it fails to construct vector tile sizes.
+        The default implementation returns an empty list, which means that there
+        are no scalable flags at all.
       }],
-      /*retTy=*/"::std::optional<::llvm::SmallVector<bool>>",
+      /*retTy=*/"::llvm::SmallVector<bool>",
       /*methodName=*/"getVectorScalableFlags",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        return ::std::nullopt;
+        return {};
       }]
     >,
     InterfaceMethod<
