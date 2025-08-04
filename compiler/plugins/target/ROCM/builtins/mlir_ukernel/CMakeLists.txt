@@ -40,6 +40,8 @@ iree_c_embed_data(
   NAME
     iree_mlir_ukernels_amdgpu
   SRCS
+    "iree_uk_amdgpu_matmul_bf16.mlir"
+    "iree_uk_amdgpu_matmul_f16.mlir"
     "iree_uk_amdgpu_matmul_f8.mlir"
   C_FILE_OUTPUT
     "iree_mlir_ukernels_amdgpu.c"
@@ -53,6 +55,8 @@ iree_lit_test_suite(
   NAME
     verify_mlir_ukernels_amdgpu
   SRCS
+    "iree_uk_amdgpu_matmul_bf16.mlir"
+    "iree_uk_amdgpu_matmul_f16.mlir"
     "iree_uk_amdgpu_matmul_f8.mlir"
   TOOLS
     iree-opt

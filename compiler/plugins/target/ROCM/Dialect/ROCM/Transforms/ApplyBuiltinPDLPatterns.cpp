@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Utils/ShapeUtils.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
@@ -61,7 +62,8 @@ static LogicalResult annotateOperation(PatternRewriter &rewriter,
     return rewriter.notifyMatchFailure(rootOp,
                                        "expected StringAttr for attr name.");
   }
-  rootOp->setAttr(strName.strref(), annotation);
+  rewriter.modifyOpInPlace(
+      rootOp, [&]() { rootOp->setAttr(strName.strref(), annotation); });
   return success();
 }
 
@@ -75,7 +77,6 @@ static LogicalResult matchContraction(PatternRewriter &rewriter,
     return rewriter.notifyMatchFailure(rootOp,
                                        "not a contraction like linalg op");
   }
-
   if (linalgOp.getIndexingMaps() != indexingMaps) {
     return rewriter.notifyMatchFailure(rootOp, "indexing maps mismatch");
   }
@@ -100,6 +101,9 @@ static LogicalResult dimIsMultipleOf(PatternRewriter &rewriter, Value value,
   }
   auto dimInt = dyn_cast<IntegerAttr>(dim);
   if (!dim) {
+    return failure();
+  }
+  if (dimInt.getInt() >= shapedType.getRank()) {
     return failure();
   }
   auto divisorInt = dyn_cast<IntegerAttr>(divisor);
@@ -138,6 +142,9 @@ static LogicalResult dimIsBound(PatternRewriter &rewriter, Value value,
   }
   auto dimInt = dyn_cast<IntegerAttr>(dim);
   if (!dimInt) {
+    return failure();
+  }
+  if (dimInt.getInt() >= shapedType.getRank()) {
     return failure();
   }
   if (auto lowerBoundInt = dyn_cast<IntegerAttr>(lowerBound)) {
