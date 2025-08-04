@@ -246,7 +246,7 @@ func.func @swizzle_gather_to_lds_scalar(%src: memref<?xf32>, %offset: index) {
 
 
 func.func @swizzle_load_xor(%src: memref<?xi8>) -> vector<16xi8> {
-  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.xor_shuffle<128, 16, 1>] : memref<?xi8>
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.xor_shuffle<128, 16>] : memref<?xi8>
 
   //((int(1952/128) % 8 )^(int(1952/16) %8))*16+ int(1952/128)*128 -> 2000
   %offset = arith.constant 1952 : index
@@ -263,7 +263,7 @@ func.func @swizzle_load_xor(%src: memref<?xi8>) -> vector<16xi8> {
 // -----
 
 func.func @swizzle_load_xor_phase2(%src: memref<?xi8>) -> vector<16xi8> {
-  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.xor_shuffle<128, 16, 2>] : memref<?xi8>
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.xor_shuffle<128, 16, 128, 2>] : memref<?xi8>
 
   %offset = arith.constant 1056 : index
   %1 = vector.load %0[%offset] : memref<?xi8>, vector<16xi8>
@@ -275,5 +275,28 @@ func.func @swizzle_load_xor_phase2(%src: memref<?xi8>) -> vector<16xi8> {
 //       CHECK:   %[[SWOFF:.+]] = arith.constant 1120 : index
 //       CHECK:   %[[VECTOR:.+]] = vector.load %[[SRC]][%[[SWOFF]]]
 //       CHECK:   return %[[VECTOR]]
+
+// -----
+
+
+func.func @swizzle_raw_buffer_to_lds(%global : memref<32768xi8, #amdgpu.address_space<fat_raw_buffer>>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  //1 row, 3rd tile : 1*8192+2*128 = 8448 -> (0 XOR 1)*16+8448 = 8464
+  %offset = arith.constant 8448 : index
+  %lds = memref.alloc() : memref<32768xi8, #gpu.address_space<workgroup>>
+  %globalSwizzle = iree_codegen.swizzle_hint %global[#iree_codegen.xor_shuffle<128, 16, 8192>] : memref<32768xi8, #amdgpu.address_space<fat_raw_buffer>>
+  amdgpu.gather_to_lds %globalSwizzle[%offset], %lds[%c0]
+    : vector<16xi8>, memref<32768xi8, #amdgpu.address_space<fat_raw_buffer>>, memref<32768xi8, #gpu.address_space<workgroup>>
+
+  func.return
+}
+
+// CHECK-LABEL: func @swizzle_raw_buffer_to_lds
+//  CHECK-SAME:   %[[SRC:.+]]: memref<32768xi8, #amdgpu.address_space<fat_raw_buffer>>
+//   CHECK:   %[[SWOFF:.+]] = arith.constant 8464 : index
+//   CHECK:   %[[LDSOFFSET:.+]] = arith.constant 0 : index
+//       CHECK:   %[[LDS:.+]] = memref.alloc() : memref<32768xi8, #gpu.address_space<workgroup>>
+//       CHECK:   amdgpu.gather_to_lds %[[SRC]][%[[SWOFF]]], %[[LDS]][%[[LDSOFFSET]]]
 
 // -----

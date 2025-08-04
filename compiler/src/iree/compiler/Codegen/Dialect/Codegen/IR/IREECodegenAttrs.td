@@ -609,11 +609,11 @@ def IREECodegen_XORShuffleAttr  :
   let parameters = (ins
     AttrParameter<"int64_t", "">:$row_width,
     AttrParameter<"int64_t", "">:$access_width,
-    AttrParameter<"int64_t", "">:$per_phase,
-    OptionalParameter<"int64_t", "row stride. Default to row_width">:$row_stride
+    OptionalParameter<"int64_t", "row stride. Default to row_width">:$row_stride,
+    OptionalParameter<"int64_t", "Default to 1">:$per_phase
   );
   let assemblyFormat = [{
-    `<` $row_width `,` $access_width `,` $per_phase (`,` $row_stride^)? `>`
+    `<` $row_width `,` $access_width  (`,` $row_stride^)? (`,` $per_phase^)? `>`
   }];
   let genVerifyDecl = 1;
 }

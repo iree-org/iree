@@ -625,6 +625,7 @@ OpFoldResult XORShuffleAttr::swizzleOffset(OpBuilder &b, Location loc,
       getRowWidth() * (getRowWidth() / getAccessWidth());
   int64_t rowStride =
       getRowStride() != int64_t() ? getRowStride() : getRowWidth();
+  int64_t perPhase = getPerPhase() != int64_t() ? getPerPhase() : 1;
 
   OpFoldResult id =
       getMinimumConstantOffsetValue(b, loc, offset, rotationInvariant);
@@ -639,7 +640,7 @@ OpFoldResult XORShuffleAttr::swizzleOffset(OpBuilder &b, Location loc,
   Value accessWidthVal =
       b.create<arith::ConstantIndexOp>(loc, getAccessWidth());
   // Number of rows per phase
-  Value perPhase = b.create<arith::ConstantIndexOp>(loc, getPerPhase());
+  Value perPhaseVal = b.create<arith::ConstantIndexOp>(loc, perPhase);
 
   Value idVal = getValueOrCreateConstantIndexOp(b, loc, id);
 
@@ -650,7 +651,7 @@ OpFoldResult XORShuffleAttr::swizzleOffset(OpBuilder &b, Location loc,
   auto swizzledBase = b.create<arith::SubIOp>(loc, idVal, col);
   auto colElements = b.create<arith::DivUIOp>(loc, col, accessWidthVal);
 
-  auto rowPhase = b.create<arith::DivUIOp>(loc, row, perPhase);
+  auto rowPhase = b.create<arith::DivUIOp>(loc, row, perPhaseVal);
   auto rowModPhase =
       b.create<arith::RemUIOp>(loc, rowPhase, rowAccessAlignmentVal);
 
@@ -675,8 +676,8 @@ int64_t XORShuffleAttr::getAccessElementCount() const {
 
 LogicalResult
 XORShuffleAttr::verify(function_ref<InFlightDiagnostic()> emitError,
-                       int64_t rowWidth, int64_t accessWidth, int64_t perPhase,
-                       int64_t rowStride) {
+                       int64_t rowWidth, int64_t accessWidth, int64_t rowStride,
+                       int64_t perPhase) {
 
   if (rowWidth % accessWidth != 0) {
     return emitError() << "expected access width to divide row width";
