@@ -785,3 +785,42 @@ func.func @fuse_warp_and_lane_foralls_multi_result(%2: tensor<2x2x64xf32>) -> (t
 //       CHECK:     }
 //       CHECK:   } {mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
 //       CHECK:   return %[[THREAD_FORALL]]#0, %[[THREAD_FORALL]]#1
+
+// -----
+
+func.func @fusion_through_non_dominating_loop_user(%arg0: tensor<1xf32>, %arg1: tensor<1xf32>, %arg2: f32) -> (tensor<64xf32>, tensor<64xf32>) {
+  %empty = tensor.empty() : tensor<64xf32>
+  %result:2 = scf.forall (%arg3) in (64) shared_outs(%out0 = %empty, %out1 = %empty) -> (tensor<64xf32>, tensor<64xf32>) {
+    %out0_slice = tensor.extract_slice %out0[%arg3] [1] [1] : tensor<64xf32> to tensor<1xf32>
+    %out1_slice = tensor.extract_slice %out1[%arg3] [1] [1] : tensor<64xf32> to tensor<1xf32>
+    %copied = linalg.copy ins(%arg0 : tensor<1xf32>) outs(%out0_slice : tensor<1xf32>) -> tensor<1xf32>
+    %add = linalg.add ins(%copied, %arg1 : tensor<1xf32>, tensor<1xf32>) outs(%out1_slice : tensor<1xf32>) -> tensor<1xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %copied into %out0[%arg3] [1] [1] : tensor<1xf32> into tensor<64xf32>
+      tensor.parallel_insert_slice %add into %out1[%arg3] [1] [1] : tensor<1xf32> into tensor<64xf32>
+    }
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+  %unfusable_consumer = util.optimization_barrier %result#0 : tensor<64xf32>
+  %implicit_capture = math.exp %arg2 : f32
+  %fusable_consumer = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]}
+      ins(%result#1 : tensor<64xf32>) outs(%empty : tensor<64xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %add = arith.addf %in, %implicit_capture : f32
+    linalg.yield %add : f32
+  } -> tensor<64xf32>
+  return %unfusable_consumer, %fusable_consumer : tensor<64xf32>, tensor<64xf32>
+}
+
+// CHECK-LABEL: func @fusion_through_non_dominating_loop_user
+//  CHECK-SAME:   %[[ARG0:.[a-zA-Z0-9]]]
+//  CHECK-SAME:   %[[ARG1:.[a-zA-Z0-9]]]
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<64xf32>
+//       CHECK:   %[[FORALL:.+]]:2 = scf.forall (%[[TID:.+]]) in (64)
+//  CHECK-SAME:       shared_outs(%[[OUT0:.+]] = %[[EMPTY]], %[[OUT1:.+]] = %[[EMPTY]])
+//       CHECK:     %[[COPY:.+]] = linalg.copy ins(%[[ARG0]]
+//       CHECK:     %[[ADD:.+]] = linalg.add ins(%[[COPY]], %[[ARG1]]
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic{{.*}} ins(%[[ADD]]
+//   CHECK-DAG:     tensor.parallel_insert_slice %[[COPY]] into %[[OUT0]]
+//   CHECK-DAG:     tensor.parallel_insert_slice %[[GENERIC]] into %[[OUT1]]
+//       CHECK:   %[[BARRIER:.+]] = util.optimization_barrier %[[FORALL]]#0
+//       CHECK:   return %[[BARRIER]], %[[FORALL]]#1

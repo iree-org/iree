@@ -89,54 +89,46 @@ struct LLVMCPUPipelineOptions {
 /// pipeline is only used for dispatches that just copy data from input
 /// interfaces to output interface.
 void addCPUBufferOpsTileAndVectorizePipeline(
-    OpPassManager &funcPassManager, TilingConfig &tilingConfig,
-    LLVMCPUPipelineOptions &pipelineOpt);
+    OpPassManager &funcPassManager, LLVMCPUPipelineOptions &pipelineOpt);
 
 /// Populates the passes to lower ops through data tiling transformations.
 void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
-                              TilingConfig &tilingConfig,
                               LLVMCPUPipelineOptions &pipelineOpt);
 
 void addCPULinalgExtTileAndVectorizePipeline(
-    OpPassManager &funcPassManager, TilingConfig &tilingConfig,
-    LLVMCPUPipelineOptions &pipelineOpt);
+    OpPassManager &funcPassManager, LLVMCPUPipelineOptions &pipelineOpt);
 
 /// Populates the passes to lower scalars and unknown tensor op (i.e. linalg op
 /// that is not specialized by any pipeline). Adds an additional level of tiling
 /// and converts to memrefs.
 void addCPUDefaultPassPipeline(OpPassManager &funcPassManager,
-                               std::unique_ptr<TilingConfig> &tilingConfig,
                                LLVMCPUPipelineOptions &pipelineOpt);
 
 void addConvTileAndDecomposeExpertPassPipeline(
-    OpPassManager &funcPassManager, TilingConfig &tilingConfig,
-    LLVMCPUPipelineOptions &pipelineOpt);
+    OpPassManager &funcPassManager, LLVMCPUPipelineOptions &pipelineOpt);
 
 /// Populates the passes needed to multi level tile, fuse and vectorize
 /// lowering of linalg ops on tensors to vectors operations.
 void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
-                                      TilingConfig &tilingConfig,
                                       LLVMCPUPipelineOptions &pipelineOpt);
 
-void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
-                                      TilingConfig &tilingConfig,
-                                      LLVMCPUPipelineOptions &pipelineOpt);
+void addMultiTilingExpertPassPipeline(
+    OpPassManager &funcPassManager,
+    IREE::Codegen::LoweringConfigAttrInterface loweringConfig,
+    LLVMCPUPipelineOptions &pipelineOpt);
 
 void addTensorToVectorsPassPipeline(OpPassManager &funcPassManager,
                                     bool lowerToVectors = true);
 
-// Populates the passes needed to do tiling, decomposing, and vectorizing the
-// convolution ops.
+/// Verifies that the given `loweringConfig` can decompose convolution ops to
+/// lower dim ops. It requires {Distribution, VectorCommonParallel,
+/// VectorReduction} tiling levels.
 LogicalResult verifyConvTileAndDecomposeExpertConfig(
-    Operation *op, TilingConfig &tilingConfig,
-    IREE::Codegen::TranslationInfoAttr translationInfo,
-    ArrayRef<int64_t> workgroupSize = {});
+    Operation *op, IREE::CPU::LoweringConfigAttr loweringConfig);
 
-/// Populates the passes needed to do two-level tile + vectorize of linalg ops.
-LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
-    Operation *op, TilingConfig &tilingConfig,
-    IREE::Codegen::TranslationInfoAttr translationInfo,
-    ArrayRef<int64_t> workgroupSize = {});
+/// Verifies if the tile sizes from `loweringConfig` are valid for each level.
+LogicalResult verifyMultiTilingExpertPassPipelineConfig(
+    Operation *op, IREE::CPU::LoweringConfigAttr loweringConfig);
 
 /// Populates the passes needed to multi level tile and lowering of linalg ops
 /// on tensors to vectors operations.

@@ -20,7 +20,7 @@ func.func @matmul_static() attributes {hal.executable.target = #executable_targe
   return
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] =  #iree_cpu.lowering_config<distribution = [64, 64, 0]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = VMVXDefault>
 //      CHECK: func.func @matmul_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -52,7 +52,7 @@ func.func @copy_op_dynamic() attributes {hal.executable.target = #executable_tar
   return
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = VMVXDefault>
 //      CHECK: func.func @copy_op_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -81,7 +81,7 @@ func.func @static_1d_fft_stage2() attributes {hal.executable.target = #executabl
   return
 }
 
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64]{{\]}}>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = VMVXDefault>
 //       CHECK: func.func @static_1d_fft_stage2
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -140,7 +140,7 @@ func.func @fusion_quant_matmul_generic() attributes {hal.executable.target = #ex
   return
 }
 
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0]]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64, 0]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = VMVXDefault>
 //       CHECK: func.func @fusion_quant_matmul_generic
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -174,7 +174,7 @@ func.func @unpack_outer_dynamic() attributes {hal.executable.target = #executabl
   return
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = VMVXDefault>
 //      CHECK: func.func @unpack_outer_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -218,7 +218,7 @@ func.func @elem_pack_ukernels() attributes {hal.executable.target = #executable_
   return
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = VMVXDefault>
 //      CHECK: func.func @elem_pack_ukernels
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]

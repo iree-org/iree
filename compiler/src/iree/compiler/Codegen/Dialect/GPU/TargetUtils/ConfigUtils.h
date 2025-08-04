@@ -24,10 +24,9 @@ LogicalResult setDataTiledMultiMmaLoweringConfig(
 /// specified target.
 /// TODO: Currently this only succeeds if the target supports an mma
 /// kind. Add support for a fallback direct lowering path.
-LogicalResult
-setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
-                                  mlir::FunctionOpInterface entryPoint,
-                                  Operation *op, bool useDirectLoad = false);
+LogicalResult setIGEMMConvolutionLoweringConfig(
+    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
+    Operation *op, bool useDirectLoad = false, bool padConv = false);
 
 /// Helper for setting up a matmul config based on the specified target.
 /// TODO: Currently this only succeeds if the target supports an mma

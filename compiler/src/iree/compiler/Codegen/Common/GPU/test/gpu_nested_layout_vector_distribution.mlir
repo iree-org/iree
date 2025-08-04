@@ -1346,3 +1346,66 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: @paged_transfer_gather_multi_index
 // CHECK-COUNT-4: vector_ext.transfer_gather
+
+// -----
+
+#layout_row_major = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile    = [2, 2],
+  outer_tile        = [1, 1],
+  thread_tile       = [8, 1],
+  element_tile     = [1, 8],
+
+  subgroup_strides        = [1, 1],
+  thread_strides          = [1, 1]
+>
+
+func.func @distribute_map_scatter_row_major(%root: vector<16x16xf16>, %output: memref<64x64xf16>) {
+  %rootl = iree_vector_ext.to_layout %root to layout(#layout_row_major) : vector<16x16xf16>
+  iree_linalg_ext.map_scatter %rootl into %output {
+    ^bb0(%idx0: index, %idx1: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %idx1, %mask : index, index, i1
+  } : vector<16x16xf16> into memref<64x64xf16>
+  func.return
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: @distribute_map_scatter_row_major
+//   CHECK-DAG:   %[[IDX:.+]] = gpu.thread_id  x
+//   CHECK-DAG:   %[[C8:.+]] = arith.constant 8 : index
+//   CHECK-DAG:   %[[LANEX:.+]]:2 = affine.delinearize_index %[[IDX]] into (8)
+//   CHECK-DAG:   %[[SLICE0:.+]] = vector.extract %{{.*}}[0, 0, 0, 0]
+//       CHECK:   iree_linalg_ext.map_scatter %[[SLICE0]]
+//       CHECK:     ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index):
+//       CHECK:       %[[DISTRIBUTED_IDX0:.+]] = arith.addi %[[IDX0]], %[[LANEX]]#1
+//       CHECK:       iree_linalg_ext.yield %[[DISTRIBUTED_IDX0]], %[[IDX1]]
+//       CHECK:     : vector<1x8xf16> into memref<64x64xf16>
+//       CHECK:   %[[SLICE1:.+]] = vector.extract %{{.*}}[0, 1, 0, 0]
+//       CHECK:   iree_linalg_ext.map_scatter %[[SLICE1]]
+//       CHECK:     ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index):
+//   CHECK-DAG:       %[[DISTRIBUTED_IDX0:.+]] = arith.addi %[[IDX0]], %[[LANEX]]#1
+//   CHECK-DAG:       %[[DISTRIBUTED_IDX1:.+]] = arith.addi %[[IDX1]], %[[C8]]
+//       CHECK:       iree_linalg_ext.yield %[[DISTRIBUTED_IDX0]], %[[DISTRIBUTED_IDX1]]
+//       CHECK:     : vector<1x8xf16> into memref<64x64xf16>
+//   CHECK-DAG:   %[[LANEX_PLUS_VECDIMX:.+]] = affine.linearize_index disjoint [%c1, %[[LANEX]]#1] by (2, 8)
+//   CHECK-DAG:   %[[SLICE2:.+]] = vector.extract %{{.*}}[1, 0, 0, 0]
+//       CHECK:   iree_linalg_ext.map_scatter %[[SLICE2]]
+//       CHECK:     ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index):
+//       CHECK:       %[[DISTRIBUTED_IDX0:.+]] = arith.addi %[[IDX0]], %[[LANEX_PLUS_VECDIMX]]
+//       CHECK:       iree_linalg_ext.yield %[[DISTRIBUTED_IDX0]], %[[IDX1]]
+//       CHECK:     : vector<1x8xf16> into memref<64x64xf16>
+//       CHECK:   %[[SLICE3:.+]] = vector.extract %{{.*}}[1, 1, 0, 0]
+//       CHECK:   iree_linalg_ext.map_scatter %[[SLICE3]]
+//       CHECK:     ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index):
+//   CHECK-DAG:       %[[DISTRIBUTED_IDX0:.+]] = arith.addi %[[IDX0]], %[[LANEX_PLUS_VECDIMX]]
+//   CHECK-DAG:       %[[DISTRIBUTED_IDX1:.+]] = arith.addi %[[IDX1]], %[[C8]]
+//       CHECK:       iree_linalg_ext.yield %[[DISTRIBUTED_IDX0]], %[[DISTRIBUTED_IDX1]]
+//       CHECK:     : vector<1x8xf16> into memref<64x64xf16>

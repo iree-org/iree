@@ -297,6 +297,9 @@ bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
 // Utility functions for vector size inference for dynamic shapes
 //===----------------------------------------------------------------------===//
 
+using SizesAndScalableFlags =
+    std::pair<SmallVector<int64_t>, SmallVector<bool>>;
+
 struct VectorizationTileSizes {
   SmallVector<int64_t> destShape;
   SmallVector<int64_t> vectorSizes;
@@ -323,6 +326,11 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::PackOp op);
 /// Returns std::nullopt if vector sizes can't be inferred.
 std::optional<VectorizationTileSizes>
 inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult);
+
+/// Tries to infer the vector sizes from an IR using ValueBounds analysis.
+/// Returns std::nullopt if vector sizes can't be inferred.
+std::optional<VectorizationTileSizes> inferSizesFromIR(scf::ForOp forOp,
+                                                       OpResult opResult);
 
 /// Returns the underlying index if the given value is a constant index.
 std::optional<int64_t> getConstantIndex(Value value);

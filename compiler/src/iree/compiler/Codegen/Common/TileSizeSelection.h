@@ -10,11 +10,9 @@
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 
 namespace mlir::iree_compiler {
-
-using SizesAndScalableFlags =
-    std::pair<SmallVector<int64_t>, SmallVector<bool>>;
 
 /// Provides unified API to get access to all the tile size needed during the
 /// CPU lowering process, while abstracting the representation and verification
@@ -70,12 +68,6 @@ public:
                               parallelLevel, /*target=*/nullptr),
                           [](int64_t tileSize) { return tileSize != 0; });
   }
-
-  /// Returns a list of tiling information for each level. Each value is a valid
-  /// level in the TilingConfig.
-  /// Different from attribute variant, the method materialize the attribute
-  /// content to the `IREE::CPU::LoweringConfigLevelInfo` contrainer.
-  SmallVector<IREE::CPU::LoweringConfigLevelInfo> getTilingLevelInfo();
 
   /// Returns all the tile sizes of all the levels of the configuration.
   TileSizesListType getTileSizes() const {
@@ -177,13 +169,6 @@ public:
   /// Returns the tile sizes of all the vector dimensions, including parallel
   /// and reduction dimensions.
   SizesAndScalableFlags getVectorTileSizes();
-
-  /// Returns a new `LoweringConfigAttr`, with the tile sizes of vector
-  /// dimensions, set to `sizes`, and the corresponding scalability set to
-  /// `scalableFlags`.
-  IREE::CPU::LoweringConfigAttr
-  getLoweringConfigWithNewVectorSizes(ArrayRef<int64_t> sizes,
-                                      ArrayRef<bool> scalableFlags = {});
 
   /// Returns the `level`-th valid tiling attribute. Returns an empty vector if
   /// it does not exist.
