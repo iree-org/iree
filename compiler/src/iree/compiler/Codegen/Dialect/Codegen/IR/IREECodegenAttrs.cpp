@@ -9,10 +9,12 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
@@ -571,6 +573,65 @@ RotateRowsAttr::verify(function_ref<InFlightDiagnostic()> emitError,
                        int64_t rowWidth, int64_t accessWidth) {
   if (rowWidth % accessWidth != 0) {
     return emitError() << "expected access width to divide row width";
+  }
+  return success();
+}
+
+//===---------------------------------------------------------------------===//
+// iree_codegen.swizzle_impl
+//===---------------------------------------------------------------------===//
+
+OpFoldResult SwizzleImplAttr::swizzleOffset(OpBuilder &b, Location loc,
+                                            OpFoldResult offset,
+                                            Value src) const {
+  // If |src| is defined by a symbol table, that symbol table won't be the
+  // nearest to the swizzle hint so we can safely look at the parent. If it is
+  // from a block argument, parent region is what we want.
+  Operation *symbolTableOp =
+      SymbolTable::getNearestSymbolTable(src.getParentRegion()->getParentOp());
+  assert(symbolTableOp && "Could not find nearest symbol table");
+
+  SymbolTable symbolTable(symbolTableOp);
+  Operation *callee =
+      symbolTable.lookupNearestSymbolFrom(symbolTableOp, getSymbol());
+  assert(callee && "Could not find swizzling definition");
+
+  if (auto funcOp = dyn_cast<IREE::Util::FuncOp>(callee)) {
+    return IREE::Util::CallOp::create(
+               b, loc, funcOp, getValueOrCreateConstantIndexOp(b, loc, offset))
+        .getResult(0);
+  } else if (auto funcOp = dyn_cast<func::FuncOp>(callee)) {
+    return func::CallOp::create(b, loc, funcOp,
+                                getValueOrCreateConstantIndexOp(b, loc, offset))
+        .getResult(0);
+  }
+
+  // Should have been caught by the verifier.
+  assert(false && "Unsupported function type");
+  return OpFoldResult();
+}
+
+int64_t SwizzleImplAttr::getAccessElementCount() const {
+  return getAccessWidth();
+}
+
+LogicalResult
+SwizzleImplAttr::verifySymbolUses(SymbolTableCollection &symbolTable,
+                                  Operation *owner) const {
+  Operation *callee = symbolTable.lookupNearestSymbolFrom(owner, getSymbol());
+  if (!callee || !isa<IREE::Util::FuncOp, func::FuncOp>(callee)) {
+    return owner->emitOpError(
+        "Symbolic swizzle attr could not find defining function");
+  }
+  auto funcOpInterface = cast<FunctionOpInterface>(callee);
+  auto funcType = cast<mlir::FunctionType>(funcOpInterface.getFunctionType());
+  if (funcType.getNumInputs() != 1 || !funcType.getInput(0).isIndex()) {
+    return owner->emitOpError(
+        "Symbolic swizzle attr defining function requires single index input");
+  }
+  if (funcType.getNumResults() != 1 || !funcType.getResult(0).isIndex()) {
+    return owner->emitOpError(
+        "Symbolic swizzle attr defining function requires single index result");
   }
   return success();
 }
