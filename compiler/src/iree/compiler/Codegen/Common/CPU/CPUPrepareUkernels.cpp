@@ -151,11 +151,10 @@ static LogicalResult reduceDefiningOp(PatternRewriter &rewriter, Value input) {
 
 /// Drops the first element from all the tile sizes list. The first element is
 /// for the batch dimension.
-static IREE::Codegen::LoweringConfigAttrInterface
-dropBatchTileSize(IREE::Codegen::LoweringConfigAttrInterface config) {
-  std::unique_ptr<TilingConfig> tilingConfig = TilingConfig::create(config);
+static IREE::CPU::LoweringConfigAttr
+dropBatchTileSize(IREE::CPU::LoweringConfigAttr config) {
   SmallVector<IREE::CPU::LoweringConfigLevelInfo> tilingInfo =
-      tilingConfig->getTilingLevelInfo();
+      config.getAvailableTilingInfo();
   SmallVector<NamedAttribute> newItems;
   for (auto [level, tileSizes, scalableTileFlags] : tilingInfo) {
     tileSizes.erase(tileSizes.begin());
@@ -204,8 +203,7 @@ struct ConvertBatchMmt4DtoMmt4DPattern
               .result();
 
       auto loweringConfig =
-          getLoweringConfig<IREE::Codegen::LoweringConfigAttrInterface>(
-              oldFillOp);
+          getLoweringConfig<IREE::CPU::LoweringConfigAttr>(oldFillOp);
       if (loweringConfig) {
         auto config = dropBatchTileSize(loweringConfig);
         setLoweringConfig(reducedOut.getDefiningOp(), config);
@@ -240,8 +238,7 @@ struct ConvertBatchMmt4DtoMmt4DPattern
         loc, reducedOut.getType(), ValueRange{reducedLhs, reducedRhs},
         ValueRange{reducedOut});
 
-    auto loweringConfig =
-        getLoweringConfig<IREE::Codegen::LoweringConfigAttrInterface>(op);
+    auto loweringConfig = getLoweringConfig<IREE::CPU::LoweringConfigAttr>(op);
     if (loweringConfig) {
       auto config = dropBatchTileSize(loweringConfig);
       setLoweringConfig(mmt4DOp, config);
