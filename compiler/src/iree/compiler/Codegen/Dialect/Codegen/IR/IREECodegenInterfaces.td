@@ -369,6 +369,42 @@ def IREECodegen_LoweringConfigAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
+        Returns the tile sizes of all the vector level tiling, including
+        parallel and reduction dimensions.
+
+        Usually, the tile sizes for parallel dimensions and reduction dimensions
+        are split for different tiling and fusion purposes. The interface method
+        returns the tile sizes for vector level, as only lowering config knows
+        how to compose the list.
+
+        Returns std::nullopt if it fails to construct vector tile sizes.
+      }],
+      /*retTy=*/"::std::optional<::llvm::SmallVector<int64_t>>",
+      /*methodName=*/"getVectorSizes",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return ::std::nullopt;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the vector scalable flags sizes for all the vector dimensions.
+        Similar to the `getVectorSizes` method, but it is for scalable flags.
+
+        The default implementation returns an empty list, which means that there
+        are no scalable flags at all.
+      }],
+      /*retTy=*/"::llvm::SmallVector<bool>",
+      /*methodName=*/"getVectorScalableFlags",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return {};
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Gets the name of the custom lowering strategy to apply to the annotated
         operation.
       }],
