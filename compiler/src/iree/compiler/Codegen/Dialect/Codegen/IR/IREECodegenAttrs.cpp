@@ -659,7 +659,6 @@ OpFoldResult XORShuffleAttr::swizzleOffset(OpBuilder &b, Location loc,
   auto colSwizzledBytes =
       b.create<arith::MulIOp>(loc, colSwizzled, accessWidthVal);
 
-  // auto swizzledBase = b.create<arith::MulIOp>(loc, row, rowStrideVal);
   auto swizzledId =
       b.create<arith::AddIOp>(loc, swizzledBase, colSwizzledBytes);
 
