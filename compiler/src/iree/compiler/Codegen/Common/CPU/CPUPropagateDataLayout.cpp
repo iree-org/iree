@@ -27,10 +27,6 @@ namespace {
 /// dims are two unit dims where one is outer dimension and the other is inner
 /// dimension. It implies that we swap two operations by adjusting the packing
 /// metadata in linalg.unpack op.
-/// The pattern is mainly implemented based on mmt4d layout constraints. I.e.,
-/// CPU backends always materialize matvec/vecmat into a mmt4d op followed by a
-/// collapse_shape op. We may not need the pattern, or we'll need to reimplement
-/// the pattern, if CPU backends switch from mmt4d ops to other approach.
 /// Note that the pattern only supports the case where the destination tensor of
 /// linalg.unpack op is a tensor.empty op. The constraint can be removed by
 /// introducing tensor.expand_shape op on the destination tensor. However, it is
@@ -59,60 +55,64 @@ struct SinkDownCollapsingUnitDimsAcrossUnpack final
           op, "expected the source to be a tensor.collapse_shape op");
     }
 
-    int64_t srcRank = collapseOp.getSrcType().getRank();
-    if (srcRank != 4 && srcRank != 5) {
-      return rewriter.notifyMatchFailure(
-          op, "expected the rank of collapseOp's source is either 4 or 5");
-    }
-    bool hasBatch = collapseOp.getSrcType().getRank() == 5;
     SmallVector<ReassociationIndices, 4> ri =
         collapseOp.getReassociationIndices();
-    if (hasBatch && ri[0].size() != 1) {
+    ReassociationIndices outerRi, innerRi;
+    for (ArrayRef<int64_t> indices : ri) {
+      if (indices.size() == 1) {
+        continue;
+      }
+      if (indices.size() > 2) {
+        return rewriter.notifyMatchFailure(
+            op, "expected re-association map to have two dimensions");
+      }
+      if (outerRi.empty()) {
+        outerRi.assign(indices.begin(), indices.end());
+        continue;
+      }
+      if (innerRi.empty()) {
+        innerRi.assign(indices.begin(), indices.end());
+        continue;
+      }
       return rewriter.notifyMatchFailure(
-          op, "expected batch dimension to be not collapsed");
+          op, "expected only two re-association map to have two dimensions");
     }
-    if (hasBatch + 2 != ri.size()) {
+    if (outerRi.empty() || innerRi.empty()) {
       return rewriter.notifyMatchFailure(
-          op, "expected 2 reassociation indices for linalg.mmt4d source (3 for "
-              "linalg.batch_mmt4d)");
-    }
-    ReassociationIndices outerRi = ri[hasBatch + 0];
-    ReassociationIndices innerRi = ri[hasBatch + 1];
-    if (outerRi.size() != 2 || innerRi.size() != 2) {
-      return rewriter.notifyMatchFailure(
-          op,
-          "expected collapsing one outer dimension and one inner dimension");
-    }
-
-    RankedTensorType mmt4dSrcType = collapseOp.getSrcType();
-    bool missUnitDimM = mmt4dSrcType.getDimSize(outerRi[0]) == 1 &&
-                        mmt4dSrcType.getDimSize(innerRi[0]) == 1;
-    bool missUnitDimN = mmt4dSrcType.getDimSize(outerRi[1]) == 1 &&
-                        mmt4dSrcType.getDimSize(innerRi[1]) == 1;
-    if (!missUnitDimM && !missUnitDimN) {
-      return rewriter.notifyMatchFailure(
-          op,
-          "expected collapsing either {0, 2} dimensions or {1, 3} "
-          "dimensions, either {1, 3} or {2, 4} if batch dimension is present");
+          op, "expected only two re-association map to have two dimensions");
     }
 
+    RankedTensorType srcType = collapseOp.getSrcType();
+    if (innerRi.back() != srcType.getRank() - 1) {
+      return rewriter.notifyMatchFailure(
+          op, "expected two innermost dimensions are collapsed");
+    }
     SmallVector<int64_t> innerDimPos(op.getInnerDimsPos());
-    if (hasBatch && innerDimPos[0] == 0) {
+    if (innerDimPos[0] != outerRi[0] && outerRi[1] != innerDimPos[0]) {
       return rewriter.notifyMatchFailure(
-          op, "expected unpacking collapsed dimension");
+          op, "expected the packed dimension is collapsed");
+    }
+
+    bool missLeadingUnitDim = srcType.getDimSize(outerRi[0]) == 1 &&
+                              srcType.getDimSize(innerRi[0]) == 1;
+    bool missTrailingUnitDim = srcType.getDimSize(outerRi[1]) == 1 &&
+                               srcType.getDimSize(innerRi[1]) == 1;
+    if (!missLeadingUnitDim && !missTrailingUnitDim) {
+      return rewriter.notifyMatchFailure(op,
+                                         "expected collapsing either leading "
+                                         "unit dims or trailing outer dims");
     }
 
     SmallVector<OpFoldResult> innerTiles(op.getMixedTiles());
     SmallVector<OpFoldResult> destShape = emptyOp.getMixedSizes();
-    if (missUnitDimM) {
-      for (int64_t &pos : innerDimPos) {
-        pos++;
-      }
-      innerDimPos.insert(innerDimPos.begin(), hasBatch + 0);
+    if (missLeadingUnitDim) {
+      innerDimPos[0]++;
+      innerDimPos.insert(innerDimPos.begin(), outerRi[0]);
       innerTiles.insert(innerTiles.begin(), rewriter.getIndexAttr(1));
-      destShape.insert(destShape.begin() + hasBatch, rewriter.getIndexAttr(1));
+      destShape.insert(destShape.begin() + outerRi[0],
+                       rewriter.getIndexAttr(1));
     } else {
-      innerDimPos.insert(innerDimPos.end(), hasBatch + 1);
+      innerDimPos.insert(innerDimPos.end(), outerRi[1]);
       innerTiles.insert(innerTiles.end(), rewriter.getIndexAttr(1));
       destShape.insert(destShape.end(), rewriter.getIndexAttr(1));
     }
@@ -123,10 +123,14 @@ struct SinkDownCollapsingUnitDimsAcrossUnpack final
     auto newUnpackOp = rewriter.create<linalg::UnPackOp>(
         loc, collapseOp.getSrc(), newDestOp, innerDimPos, innerTiles);
     SmallVector<ReassociationIndices> newRi;
-    if (hasBatch) {
-      newRi.push_back({0});
+    for (int64_t i = 0, e = op.getDestRank(); i < e; ++i) {
+      if (i == outerRi[0]) {
+        newRi.push_back(outerRi);
+        ++i;
+      } else {
+        newRi.push_back({i});
+      }
     }
-    newRi.push_back({hasBatch, hasBatch + 1});
     rewriter.replaceOpWithNewOp<tensor::CollapseShapeOp>(
         op, newUnpackOp.getResult(), newRi);
 

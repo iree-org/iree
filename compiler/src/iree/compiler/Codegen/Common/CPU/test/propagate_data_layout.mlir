@@ -1,15 +1,12 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-cpu-propagate-data-layout))" --split-input-file %s | FileCheck %s
 
-// M dimension is unit dim. Note that both matvec and vecmat result in this form
-// because CPU backends transpose narrow-N into narrow-M during materialization.
-
-func.func @collapsing_unit_m_dim_elem_unpack(%mmt4d: tensor<1x2x1x16xi32>) -> tensor<20xi32> {
-  %collapsed = tensor.collapse_shape %mmt4d [[0, 1], [2, 3]] : tensor<1x2x1x16xi32> into tensor<2x16xi32>
+func.func @collapsing_unit_dim_0(%src: tensor<1x2x1x16xi32>) -> tensor<20xi32> {
+  %collapsed = tensor.collapse_shape %src [[0, 1], [2, 3]] : tensor<1x2x1x16xi32> into tensor<2x16xi32>
   %1 = tensor.empty() : tensor<20xi32>
   %unpack = linalg.unpack %collapsed inner_dims_pos = [0] inner_tiles = [16] into %1 : tensor<2x16xi32> -> tensor<20xi32>
   return %unpack : tensor<20xi32>
 }
-// CHECK-LABEL: func.func @collapsing_unit_m_dim_elem_unpack(
+// CHECK-LABEL: func.func @collapsing_unit_dim_0(
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
 // CHECK:         %[[UNPACK:.+]] = linalg.unpack %[[SRC]]
 // CHECK-SAME:      inner_dims_pos = [0, 1] inner_tiles = [1, 16]
@@ -20,13 +17,13 @@ func.func @collapsing_unit_m_dim_elem_unpack(%mmt4d: tensor<1x2x1x16xi32>) -> te
 
 // -----
 
-func.func @collapsing_unit_m_dim_elem_unpack_with_batch_dim(%batch_mmt4d: tensor<?x1x1x1x16xi32>, %batch_size: index) -> tensor<?x3xi32> {
-  %collapsed = tensor.collapse_shape %batch_mmt4d [[0], [1, 2], [3, 4]] : tensor<?x1x1x1x16xi32> into tensor<?x1x16xi32>
+func.func @collapsing_unit_dim_1(%src: tensor<?x1x1x1x16xi32>, %batch_size: index) -> tensor<?x3xi32> {
+  %collapsed = tensor.collapse_shape %src [[0], [1, 2], [3, 4]] : tensor<?x1x1x1x16xi32> into tensor<?x1x16xi32>
   %0 = tensor.empty(%batch_size) : tensor<?x3xi32>
   %unpack = linalg.unpack %collapsed inner_dims_pos = [1] inner_tiles = [16] into %0 : tensor<?x1x16xi32> -> tensor<?x3xi32>
   return %unpack : tensor<?x3xi32>
 }
-// CHECK-LABEL: func.func @collapsing_unit_m_dim_elem_unpack_with_batch_dim(
+// CHECK-LABEL: func.func @collapsing_unit_dim_1(
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
 // CHECK:         %[[UNPACK:.+]] = linalg.unpack %[[SRC]]
 // CHECK-SAME:      inner_dims_pos = [1, 2] inner_tiles = [1, 16]
@@ -38,9 +35,9 @@ func.func @collapsing_unit_m_dim_elem_unpack_with_batch_dim(%batch_mmt4d: tensor
 // -----
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
-func.func @collapsing_unit_m_dim_elem_unpack(%mmt4d: tensor<1x1x1x16xi32>) -> tensor<3xi32> {
+func.func @collapsing_unit_dim_0_elem_unpack(%src: tensor<1x1x1x16xi32>) -> tensor<3xi32> {
   %0 = tensor.empty() : tensor<1x16xi32>
-  %collapsed = tensor.collapse_shape %mmt4d [[0, 1], [2, 3]] : tensor<1x1x1x16xi32> into tensor<1x16xi32>
+  %collapsed = tensor.collapse_shape %src [[0, 1], [2, 3]] : tensor<1x1x1x16xi32> into tensor<1x16xi32>
   %1 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%collapsed : tensor<1x16xi32>) outs(%0 : tensor<1x16xi32>) {
   ^bb0(%in: i32, %out: i32):
     %3 = arith.addi %in, %in : i32
@@ -50,7 +47,7 @@ func.func @collapsing_unit_m_dim_elem_unpack(%mmt4d: tensor<1x1x1x16xi32>) -> te
   %unpack = linalg.unpack %1 outer_dims_perm = [0] inner_dims_pos = [0] inner_tiles = [16] into %2 : tensor<1x16xi32> -> tensor<3xi32>
   return %unpack : tensor<3xi32>
 }
-// CHECK-LABEL: func.func @collapsing_unit_m_dim_elem_unpack(
+// CHECK-LABEL: func.func @collapsing_unit_dim_0_elem_unpack(
 // CHECK:         %[[ELEM:.+]] = linalg.generic
 // CHECK:         %[[UNPACK:.+]] = linalg.unpack %[[ELEM]]
 // CHECK-SAME:      inner_dims_pos = [0, 1] inner_tiles = [1, 16]
@@ -85,13 +82,13 @@ func.func @negative_unpack_multiple_dims(%src: tensor<?x1x1x1x16x8xi32>, %d0: in
 
 // -----
 
-func.func @negative_unpack_batch_dim(%src: tensor<?x1x1x1x16xi32>, %d0: index) -> tensor<?x1xi32> {
+func.func @negative_unpack_non_collapsed_dim(%src: tensor<?x1x1x1x16xi32>, %d0: index) -> tensor<?x1xi32> {
   %collapsed = tensor.collapse_shape %src [[0], [1, 2], [3, 4]] : tensor<?x1x1x1x16xi32> into tensor<?x1x16xi32>
   %0 = tensor.empty(%d0) : tensor<?x1xi32>
   %unpack = linalg.unpack %collapsed inner_dims_pos = [0] inner_tiles = [16] into %0 : tensor<?x1x16xi32> -> tensor<?x1xi32>
   return %unpack : tensor<?x1xi32>
 }
-// CHECK-LABEL: func.func @negative_unpack_batch_dim(
+// CHECK-LABEL: func.func @negative_unpack_non_collapsed_dim(
 // CHECK:         tensor.collapse_shape
 // CHECK:         linalg.unpack
 
