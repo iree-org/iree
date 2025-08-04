@@ -133,6 +133,7 @@ iree_compiler_cc_library(
         ":PassesIncGen",
         ":ROCDLPassHeaders",
         ":ROCDLPassesIncGen",
+        "//compiler/plugins/target/ROCM/Dialect/ROCM/Transforms",
         "//compiler/src/iree/compiler/Codegen/Common",
         "//compiler/src/iree/compiler/Codegen/Common:TransformDialectInterpreterPass",
         "//compiler/src/iree/compiler/Codegen/Common:VectorLayoutAnalysis",
