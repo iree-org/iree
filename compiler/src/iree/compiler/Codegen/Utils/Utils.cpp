@@ -7,7 +7,6 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
@@ -265,17 +264,17 @@ bool isRISCV64(Attribute attr) {
   return triple && triple.value().isRISCV64();
 }
 
-std::array<int64_t, 3> getMaxWorkgroupCount(Attribute attr) {
-  std::array<int64_t, 3> maxWorkgroupCount = {ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
-  auto gpuTarget = dyn_cast_or_null<IREE::GPU::TargetAttr>(attr);
-  if (!gpuTarget) {
-    return maxWorkgroupCount;
+std::array<int64_t, 3> getMaxWorkgroupCount(Attribute targetAttr) {
+  // TODO(MaheshRavishankar): For now the target info is only available for
+  // GPUs, and is recorded in the configuration with the name `iree.gpu.target`.
+  // Fix this to be `iree.codegen.target`.
+  std::optional<IREE::Codegen::TargetInfoAttrInterface> targetInfo =
+      getConfigTypedAttr<IREE::Codegen::TargetInfoAttrInterface>(
+          targetAttr, "iree.gpu.target");
+  if (!targetInfo) {
+    return {ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
   }
-  for (auto [index, value] : llvm::enumerate(
-           gpuTarget.getWgp().getMaxWorkgroupCounts().asArrayRef())) {
-    maxWorkgroupCount[index] = value;
-  }
-  return maxWorkgroupCount;
+  return targetInfo->getMaximumWorkgroupCount();
 }
 
 bool isReadOnly(Value v) {
