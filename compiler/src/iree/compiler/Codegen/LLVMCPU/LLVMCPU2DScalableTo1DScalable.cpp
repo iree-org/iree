@@ -177,16 +177,16 @@ dropScalabilityFromUnsupportedOperations(mlir::FunctionOpInterface funcOp,
 
     std::optional<SmallVector<int64_t>> vectorSizes =
         loweringConfigAttr.getVectorSizes();
-    std::optional<SmallVector<bool>> scalableFlags =
+    SmallVector<bool> scalableFlags =
         loweringConfigAttr.getVectorScalableFlags();
-    int64_t numScalableDims = llvm::count(*scalableFlags, true);
+    int64_t numScalableDims = llvm::count(scalableFlags, true);
     if (numScalableDims <= 1) {
       continue;
     }
 
     SmallVector<int64_t> loopTileSizes;
     SmallVector<bool> newScalableFlags;
-    for (auto [flag, size] : llvm::zip_equal(*scalableFlags, *vectorSizes)) {
+    for (auto [flag, size] : llvm::zip_equal(scalableFlags, *vectorSizes)) {
       if (flag && numScalableDims >= 2) {
         --numScalableDims;
         loopTileSizes.push_back(size);
