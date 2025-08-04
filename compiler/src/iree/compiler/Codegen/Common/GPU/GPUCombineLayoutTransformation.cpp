@@ -64,8 +64,15 @@ struct GPUCombineLayoutTransformationPass final
       GPUCombineLayoutTransformationPassBase;
 
   void runOnOperation() override {
+    // The GPUCombineLayoutTransformationPass provides a distribution
+    // implementation for tensor.pad ops, but pad ops can't be combined in
+    // Workgroup scope anyway, so there is no point in using the pass with
+    // Workgroup scope.
+    CombineRelayoutOpsControlFn controlFn = getCombineRelayoutOpsControlFn(
+        IREE::Codegen::RelayoutCombinationScope::Dispatch);
     if (failed(combineLayoutTransformation(&getContext(), getOperation(),
-                                           gpuPadDistributionConfigFn))) {
+                                           gpuPadDistributionConfigFn,
+                                           controlFn))) {
       return signalPassFailure();
     }
   }
