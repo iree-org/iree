@@ -14,6 +14,7 @@
 // up. In case of inconsistencies, this pass will throw an error.
 //===---------------------------------------------------------------------===//
 
+#include <algorithm>
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -67,13 +68,36 @@ verifyWorkgroupMappingAttrArray(scf::ForallOp forallOp) {
 }
 
 /// Get the permutation that represents the mapping of loop dimensions to
-/// process dimensions.
+/// process dimensions. The mapping list is expected to contain a set of
+/// mappings with consecutive mapping IDs (i.e., all mapping IDs between the
+/// highest and lowest mapping ID in the set must be present in the list). So,
+/// the mapping `[x, z]` would not be legal, but the mappings `[x, z, y]` or
+/// `[y, z]` would both be legal. The resulting permutation will permute the
+/// list of mapping IDs into descending order by mapping ID. For example:
+///
+/// [#iree_codegen.workgroup_mapping<z>,
+///  #iree_codegen.workgroup_mapping<x>,
+///  #iree_codegen.workgroup_mapping<y>]
+///
+/// Would result in a permutation of [0, 2, 1], and:
+///
+/// [#iree_codegen.workgroup_mapping<x>,
+///  #iree_codegen.workgroup_mapping<y>]
+///
+/// Would result in a permutation of [1, 0].
 template <typename MappingAttrType>
 SmallVector<int64_t> getMappingPermutation(ArrayRef<MappingAttrType> mapping) {
+  int64_t mappingBase =
+      std::min_element(mapping.begin(), mapping.end(), [](auto a, auto b) {
+        return a.getMappingId() < b.getMappingId();
+      })->getMappingId();
   return llvm::map_to_vector(mapping, [&](auto a) {
-    return static_cast<int64_t>(mapping.size() - 1) - a.getMappingId();
+    int64_t normalizedMappingId = a.getMappingId() - mappingBase;
+    return static_cast<int64_t>(mapping.size() - 1) - normalizedMappingId;
   });
 }
+
+/// Returns the inverse of `getMappingPermutation`.
 template <typename MappingAttrType>
 SmallVector<int64_t>
 getInvertedMappingPermutation(ArrayRef<MappingAttrType> mapping) {
@@ -106,7 +130,8 @@ static LogicalResult resolveForAll(RewriterBase &rewriter,
     OpFoldResult ub = mixedUbs[index], step = mixedSteps[index],
                  numProc = nProcs[index], procId = procIds[index];
     Value forLb = getValueOrCreateConstantIndexOp(
-        rewriter, loc, IREE::LinalgExt::mulOfrs(rewriter, loc, procId, step));
+        rewriter, loc,
+        IREE::LinalgExt::mulAddOfrs(rewriter, loc, procId, step, lb));
     if (!generateLoopNest[index]) {
       loopNestIvs.push_back(forLb);
       continue;
@@ -221,20 +246,18 @@ collapseForAllOpDimensions(RewriterBase &rewriter, scf::ForallOp forallOp,
                              invertPermutationVector(invertPermutation));
     int replacementIvIndex = 0;
     SmallVector<Value> remappedIvs;
-    AffineExpr d0, s0, s1;
-    bindDims(rewriter.getContext(), d0);
-    bindSymbols(rewriter.getContext(), s0, s1);
-    AffineExpr ivExpr = s0 + d0 * s1;
-    for (auto [index, origIV, mappingAttr] :
-         llvm::enumerate(forallOp.getInductionVars(), mapping)) {
+    unsigned nonLinearizedIVIdx = 0;
+    for (auto [index, mappingAttr] : llvm::enumerate(mapping)) {
       if (mappingAttr < delinearizeFromAttr) {
-        remappedIvs.push_back(origIV);
+        remappedIvs.push_back((*ivs)[nonLinearizedIVIdx++]);
         continue;
       }
-      OpFoldResult remappedIv = affine::makeComposedFoldedAffineApply(
-          rewriter, loc, ivExpr,
-          ArrayRef<OpFoldResult>{replacementIvs[replacementIvIndex++],
-                                 mixedLbs[index], mixedSteps[index]});
+      if (mappingAttr == delinearizeFromAttr) {
+        nonLinearizedIVIdx++;
+      }
+      OpFoldResult remappedIv = IREE::LinalgExt::mulAddOfrs(
+          rewriter, loc, replacementIvs[replacementIvIndex++],
+          mixedSteps[index], mixedLbs[index]);
       remappedIvs.push_back(
           getValueOrCreateConstantIndexOp(rewriter, loc, remappedIv));
     }

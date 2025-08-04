@@ -333,7 +333,7 @@ hal.executable private @scf_forall_4D {
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11] -> (((-s9 + s10) ceildiv s11) * (((-s6 + s7) ceildiv s8) * (((-s3 + s4) ceildiv s5) * ((-s0 + s1) ceildiv s2))))>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1, s2] -> ((-s0 + s1) ceildiv s2)>
-//  CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0, s1, s2] -> (s0 + s1 * s2)>
+//  CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0, s1, s2] -> (s0 * s2 + s1)>
 //      CHECK: hal.executable.export public @scf_forall_4D layout
 // CHECK-SAME:     %[[ARG1:[a-zA-z0-9]+]]: index
 // CHECK-SAME:     %[[ARG2:[a-zA-z0-9]+]]: index
@@ -371,10 +371,10 @@ hal.executable private @scf_forall_4D {
 //  CHECK-NOT:   scf.forall
 //      CHECK:   %[[WG_IDS:.+]]:4 = affine.delinearize_index %[[WG_ID_X]]
 // CHECK-SAME:     into (%[[NITERS0]], %[[NITERS1]], %[[NITERS2]], %[[NITERS3]])
-//  CHECK-DAG:   %[[I:.+]] = affine.apply #[[MAP2]]()[%[[LB0]], %[[STEP0]], %[[WG_IDS]]#0]
-//  CHECK-DAG:   %[[J:.+]] = affine.apply #[[MAP2]]()[%[[LB1]], %[[STEP1]], %[[WG_IDS]]#1]
-//  CHECK-DAG:   %[[K:.+]] = affine.apply #[[MAP2]]()[%[[LB2]], %[[STEP2]], %[[WG_IDS]]#2]
-//  CHECK-DAG:   %[[L:.+]] = affine.apply #[[MAP2]]()[%[[LB3]], %[[STEP3]], %[[WG_IDS]]#3]
+//  CHECK-DAG:   %[[I:.+]] = affine.apply #[[MAP2]]()[%[[STEP0]], %[[LB0]], %[[WG_IDS]]#0]
+//  CHECK-DAG:   %[[J:.+]] = affine.apply #[[MAP2]]()[%[[STEP1]], %[[LB1]], %[[WG_IDS]]#1]
+//  CHECK-DAG:   %[[K:.+]] = affine.apply #[[MAP2]]()[%[[STEP2]], %[[LB2]], %[[WG_IDS]]#2]
+//  CHECK-DAG:   %[[L:.+]] = affine.apply #[[MAP2]]()[%[[STEP3]], %[[LB3]], %[[WG_IDS]]#3]
 //      CHECK:   "use"(%[[I]], %[[J]], %[[K]], %[[L]])
 
 // -----
@@ -700,7 +700,7 @@ hal.executable private @split_reduction_executable {
 }
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2, s3, s4, s5] -> (((-s3 + s4) ceildiv s5) * (s2 * (s0 * s1)))>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1, s2] -> ((-s0 + s1) ceildiv s2)>
-//   CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0, s1, s2] -> (s0 + s1 * s2)>
+//   CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0, s1, s2] -> (s0 * s2 + s1)>
 //       CHECK: @split_reduction_variant
 //       CHECK:   hal.executable.export
 //  CHECK-SAME:       %[[ARG1:[a-zA-Z0-9_]+]]: index
@@ -722,7 +722,7 @@ hal.executable private @split_reduction_executable {
 //   CHECK-DAG:     %[[SPLIT_NPROCS:.+]] = affine.apply #[[MAP1]]()[%[[SPLIT_LB]], %[[SPLIT_UB]], %[[SPLIT_STEP]]]
 //   CHECK-DAG:     %[[IDX:.+]] = hal.interface.workgroup.id[0]
 //       CHECK:     %[[DELINEARIZE:.+]]:4 = affine.delinearize_index %[[IDX]] into (%[[SPLIT_NPROCS]], %[[ORIG_UB0]], %[[ORIG_UB1]], %[[ORIG_UB2]])
-//       CHECK:     %[[SPLITIVREPLACEMENT:.+]] = affine.apply #[[MAP2]]()[%[[SPLIT_LB]], %[[SPLIT_STEP]], %[[DELINEARIZE]]#0]
+//       CHECK:     %[[SPLITIVREPLACEMENT:.+]] = affine.apply #[[MAP2]]()[%[[SPLIT_STEP]], %[[SPLIT_LB]], %[[DELINEARIZE]]#0]
 //       CHECK:     "use1"(%[[SPLITIVREPLACEMENT]])
 //       CHECK:     "use2"(%[[DELINEARIZE]]#1, %[[DELINEARIZE]]#2, %[[DELINEARIZE]]#3)
 
@@ -760,7 +760,7 @@ hal.executable private @only_split_reduction_executable {
 }
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2] -> ((-s0 + s1) ceildiv s2)>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 floordiv ((-s1 + s2) ceildiv s3))>
-//   CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
+//   CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0, s1, s2] -> (s0 * s1 + s2)>
 //       CHECK: @only_split_reduction_variant
 //       CHECK:   hal.executable.export
 //  CHECK-SAME:       %[[ARG1:[a-zA-Z0-9_]+]]: index
@@ -778,7 +778,7 @@ hal.executable private @only_split_reduction_executable {
 //   CHECK-DAG:     %[[COUNTX:.+]] = hal.interface.workgroup.count[0]
 //   CHECK-DAG:     %[[ORIGCOUNTX:.+]] = affine.apply #[[MAP1]]()[%[[COUNTX]], %[[SPLIT_LB]], %[[SPLIT_UB]], %[[SPLIT_STEP]]]
 //       CHECK:     %[[DELINEARIZE:.+]]:2 = affine.delinearize_index %[[IDX]] into (%[[SPLIT_NPROCS]], %[[ORIGCOUNTX]])
-//       CHECK:     %[[SPLITIVREPLACEMENT:.+]] = affine.apply #[[MAP2]]()[%[[DELINEARIZE]]#0, %[[SPLIT_STEP]]]
+//       CHECK:     %[[SPLITIVREPLACEMENT:.+]] = affine.apply #[[MAP2]]()[%[[DELINEARIZE]]#0, %[[SPLIT_STEP]], %[[SPLIT_LB]]]
 //       CHECK:     "use1"(%[[SPLITIVREPLACEMENT]])
 
 // -----
