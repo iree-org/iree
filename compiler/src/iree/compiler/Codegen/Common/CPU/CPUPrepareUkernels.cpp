@@ -153,22 +153,6 @@ static LogicalResult reduceDefiningOp(PatternRewriter &rewriter, Value input) {
 /// for the batch dimension.
 static IREE::Codegen::LoweringConfigAttrInterface
 dropBatchTileSize(IREE::Codegen::LoweringConfigAttrInterface config) {
-  if (auto loweringConfig =
-          dyn_cast<IREE::Codegen::LoweringConfigAttr>(config)) {
-    TileSizesListType tileSizesList = loweringConfig.getTileSizeVals();
-    ScalableTileFlagsListType scalableTileFlagsList =
-        loweringConfig.getScalableTileFlagVals();
-    for (auto &tileSizes : tileSizesList) {
-      tileSizes.erase(tileSizes.begin());
-    }
-    for (auto &scalableTileFlags : scalableTileFlagsList) {
-      if (!scalableTileFlags.empty()) {
-        scalableTileFlags.erase(scalableTileFlags.begin());
-      }
-    }
-    return IREE::Codegen::LoweringConfigAttr::get(
-        config.getContext(), tileSizesList, scalableTileFlagsList);
-  }
   std::unique_ptr<TilingConfig> tilingConfig = TilingConfig::create(config);
   SmallVector<IREE::CPU::LoweringConfigLevelInfo> tilingInfo =
       tilingConfig->getTilingLevelInfo();
