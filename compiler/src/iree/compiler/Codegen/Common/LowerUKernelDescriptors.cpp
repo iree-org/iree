@@ -126,7 +126,8 @@ static LogicalResult convertToUKernelGeneric(RewriterBase &rewriter,
 /// operands/results and the function's arguments/return types.
 static LogicalResult castAndInline(RewriterBase &rewriter, Operation *op,
                                    FunctionOpInterface targetFunction) {
-  ValueRange inputs = op->getOperands();
+  OpBuilder::InsertionGuard guard(rewriter);
+  SmallVector<Value> inputs(op->getOperands());
   ValueRange outputs = op->getResults();
 
   // Verify that the function argument and result lengths match the inputs and
@@ -148,7 +149,8 @@ static LogicalResult castAndInline(RewriterBase &rewriter, Operation *op,
   populateCastConversions<tensor::CastOp, RankedTensorType>(converter);
   populateCastConversions<memref::CastOp, MemRefType>(converter);
 
-  for (auto [input, type] :
+  rewriter.setInsertionPoint(op);
+  for (auto &&[input, type] :
        llvm::zip_equal(inputs, targetFunction.getArgumentTypes())) {
     if (input.getType() != type) {
       Value newInput = converter.materializeSourceConversion(
