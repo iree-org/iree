@@ -144,14 +144,7 @@ hal.executable @mma_fused_f32 {
 //          CHECK:   nvvm.cp.async.wait.group 2
 //          CHECK:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<3>) -> !llvm.struct<(i32, i32, i32, i32)>
 //  CHECK-COUNT-4:   llvm.extractvalue{{.*}} : !llvm.struct<(i32, i32, i32, i32)>
-//          CHECK:   llvm.load{{.*}} : !llvm.ptr<3> -> f32
-//          CHECK:   llvm.insertvalue{{.*}} : !llvm.array<2 x vector<1xf32>>
-//          CHECK:   llvm.load{{.*}} : !llvm.ptr<3> -> f32
-//          CHECK:   llvm.insertvalue{{.*}} : !llvm.array<2 x vector<1xf32>>
-//          CHECK:   llvm.load{{.*}} : !llvm.ptr<3> -> f32
-//          CHECK:   llvm.insertvalue{{.*}} : !llvm.array<2 x vector<1xf32>>
-//          CHECK:   llvm.load{{.*}} : !llvm.ptr<3> -> f32
-//          CHECK:   llvm.insertvalue{{.*}} : !llvm.array<2 x vector<1xf32>>
+//  CHECK-COUNT-4:   llvm.load{{.*}} : !llvm.ptr<3> -> f32
 //          CHECK:   llvm.br
 //          CHECK:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<3>) -> !llvm.struct<(i32, i32, i32, i32)>
 //  CHECK-COUNT-4:   llvm.extractvalue{{.*}} : !llvm.struct<(i32, i32, i32, i32)>
@@ -161,14 +154,7 @@ hal.executable @mma_fused_f32 {
 //          CHECK:   nvvm.cp.async.wait.group 2
 //          CHECK:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<3>) -> !llvm.struct<(i32, i32, i32, i32)>
 //  CHECK-COUNT-4:   llvm.extractvalue{{.*}} : !llvm.struct<(i32, i32, i32, i32)>
-//          CHECK:   llvm.load{{.*}} : !llvm.ptr<3> -> f32
-//          CHECK:   llvm.insertvalue{{.*}} : !llvm.array<2 x vector<1xf32>>
-//          CHECK:   llvm.load{{.*}} : !llvm.ptr<3> -> f32
-//          CHECK:   llvm.insertvalue{{.*}} : !llvm.array<2 x vector<1xf32>>
-//          CHECK:   llvm.load{{.*}} : !llvm.ptr<3> -> f32
-//          CHECK:   llvm.insertvalue{{.*}} : !llvm.array<2 x vector<1xf32>>
-//          CHECK:   llvm.load{{.*}} : !llvm.ptr<3> -> f32
-//          CHECK:   llvm.insertvalue{{.*}} : !llvm.array<2 x vector<1xf32>>
+//  CHECK-COUNT-4:   llvm.load{{.*}} : !llvm.ptr<3> -> f32
 //  CHECK-COUNT-2:   nvvm.mma.sync {{.*}} {layoutA = #nvvm.mma_layout<row>, layoutB = #nvvm.mma_layout<col>, multiplicandAPtxType = #nvvm.mma_type<tf32>, multiplicandBPtxType = #nvvm.mma_type<tf32>, shape = #nvvm.shape<m = 16, n = 8, k = 8>} : (i32, i32, f32) -> !llvm.struct<(f32, f32, f32, f32)>
 //          CHECK:   llvm.br
 //      CHECK-NOT:   nvvm.mma.sync

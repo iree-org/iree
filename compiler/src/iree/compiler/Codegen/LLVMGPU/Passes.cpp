@@ -1189,7 +1189,13 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   modulePassManager.addPass(createIREEBufferizeConstantsPass());
 
   FunctionLikeNest funcPassManager(modulePassManager);
-  funcPassManager.addPass(createFoldTensorExtractOpPass)
+  funcPassManager
+      .addPass(createFoldTensorExtractOpPass)
+      // This goes before LLVMGPUVectorLowering to ensure
+      // that broadcasts of vector<1 x T> to vector<N x 1 xT> or
+      // vector<1 x N x T> become splats to vector<N x T>, or else
+      // scaling_truncf isn't lowered efficiently.
+      .addPass(createDropVectorUnitDimsPass)
       .addPass(createLLVMGPUVectorLoweringPass)
       .addPass(createExpandGPUOpsPass)
       // Barrier elimination before we reach unstructured control flow.
