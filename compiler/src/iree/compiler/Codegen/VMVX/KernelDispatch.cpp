@@ -6,10 +6,12 @@
 
 #include "iree/compiler/Codegen/VMVX/KernelDispatch.h"
 
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "mlir/IR/Attributes.h"
 
 #define DEBUG_TYPE "vmvx-kernel-dispatch"
 
@@ -33,6 +35,16 @@ getDefaultDistributionTileSizes(TilingInterface op) {
   return distTileSizes;
 }
 
+static IREE::CPU::LoweringConfigAttr
+getLoweringConfigWithDistributionTiles(MLIRContext *ctx,
+                                       ArrayRef<int64_t> tileSizes) {
+  SmallVector<NamedAttribute> items;
+  items.emplace_back(
+      IREE::CPU::getTilingLevelName(IREE::CPU::TilingLevel::DistributionTiles),
+      IREE::CPU::LoweringConfigAttr::getTilingLevelAttr(ctx, tileSizes));
+  return IREE::CPU::LoweringConfigAttr::get(ctx, items);
+}
+
 /// Sets the lowering configuration for dispatch region for linalg_ext.fft
 /// root op.
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
@@ -50,9 +62,10 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       return fftOp.emitOpError("non-constant stage might not work for fft op");
     }
   }
-  TileSizesListType tileSizes = {distTileSizes};
+  IREE::CPU::LoweringConfigAttr loweringConfig =
+      getLoweringConfigWithDistributionTiles(fftOp.getContext(), distTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, fftOp, tileSizes,
+      entryPointFn, fftOp, loweringConfig,
       IREE::Codegen::DispatchLoweringPassPipeline::VMVXDefault);
 }
 
@@ -63,9 +76,11 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributionTileSizes(tilingInterfaceOp);
-  TileSizesListType tileSizes = {distTileSizes};
+  IREE::CPU::LoweringConfigAttr loweringConfig =
+      getLoweringConfigWithDistributionTiles(tilingInterfaceOp.getContext(),
+                                             distTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, tilingInterfaceOp, tileSizes,
+      entryPointFn, tilingInterfaceOp, loweringConfig,
       IREE::Codegen::DispatchLoweringPassPipeline::VMVXDefault);
 }
 
