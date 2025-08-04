@@ -169,59 +169,6 @@ SizesAndScalableFlags TilingConfig::getVectorTileSizes() {
   return std::make_pair(vectorSizes, scalableFlags);
 }
 
-IREE::CPU::LoweringConfigAttr TilingConfig::getLoweringConfigWithNewVectorSizes(
-    ArrayRef<int64_t> sizes, ArrayRef<bool> scalableFlags) {
-  unsigned numDims = getNumDimensions();
-  (void)numDims;
-  assert(sizes.size() == numDims &&
-         "expected `sizes` to match number of dimensions");
-  assert((scalableFlags.empty() || scalableFlags.size() == numDims) &&
-         "expected `scalableFlags` to match "
-         "number of dimensions (or be empty)");
-
-  MLIRContext *ctx = loweringConfig.getContext();
-  SmallVector<NamedAttribute> items;
-  for (unsigned i = 0, e = TilingLevel::MaxNumTileLevels; i < e; ++i) {
-    auto level = static_cast<TilingLevel>(i);
-    if (!isValidLevel(level)) {
-      continue;
-    }
-    switch (level) {
-    case TilingLevel::DistributionTiles:
-    case TilingLevel::CacheParallelTiles:
-    case TilingLevel::CacheReductionTiles: {
-      items.emplace_back(IREE::CPU::getTilingLevelName(level),
-                         getTilingLevelAttr(i));
-      break;
-    }
-    case TilingLevel::VectorCommonParallelTiles:
-    case TilingLevel::VectorReductionTiles:
-    case TilingLevel::VectorInnerParallelTiles: {
-      auto attr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-          loweringConfig.getTilingLevelAttr(i));
-      SmallVector<int64_t> newSizes(attr.getSizes());
-      SmallVector<bool> newScalableFlags(attr.getScalableFlags());
-      newScalableFlags.resize(newSizes.size(), false);
-      for (auto [idx, size] : llvm::enumerate(newSizes)) {
-        if (size == 0) {
-          continue;
-        }
-        newSizes[idx] = sizes[idx];
-        newScalableFlags[idx] = scalableFlags[idx];
-      }
-      auto newLevel = IREE::Codegen::LoweringConfigTilingLevelAttr::get(
-          ctx, newSizes, attr.getInterchange(), newScalableFlags);
-      items.emplace_back(IREE::CPU::getTilingLevelName(level), newLevel);
-      break;
-    }
-    case TilingLevel::MaxNumTileLevels:
-    case TilingLevel::InvalidLevel:
-      break;
-    };
-  }
-  return IREE::CPU::LoweringConfigAttr::get(ctx, items);
-}
-
 /// Returns the actual level in the configuration for this level of tiling.
 unsigned TilingConfig::getActualLevel(TilingLevel level) {
   assert(level < TilingLevel::InvalidLevel &&
