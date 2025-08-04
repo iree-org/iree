@@ -5,7 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/Common/TileSizeSelection.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -37,14 +38,22 @@ namespace {
 static std::optional<SizesAndScalableFlags>
 getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
   // Get vector sizes from the lowering config, if available in the op itself.
-  std::unique_ptr<TilingConfig> tilingConfig =
-      TilingConfig::create(getLoweringConfig(op));
-  if (useConfiguredVectorSizes && tilingConfig) {
+  IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
+      getLoweringConfig(op);
+  if (useConfiguredVectorSizes && loweringConfig) {
     LDBG() << "Use configured vector sizes from lowering config";
-    auto [vectorSizes, scalableFlags] = tilingConfig->getVectorTileSizes();
-    // Replace zeros in canonical vector shape to turn it into a valid shape.
-    std::replace(vectorSizes.begin(), vectorSizes.end(), 0, 1);
-    return std::make_pair(vectorSizes, scalableFlags);
+    std::optional<SmallVector<int64_t>> vectorSizes =
+        loweringConfig.getVectorSizes();
+    SmallVector<bool> scalableFlags = loweringConfig.getVectorScalableFlags();
+    if (vectorSizes) {
+      if (scalableFlags.empty()) {
+        scalableFlags.assign(vectorSizes->size(), false);
+      }
+      // Replace zeros in canonical vector shape to turn it into a valid shape.
+      std::replace(vectorSizes->begin(), vectorSizes->end(), 0, 1);
+      return std::make_pair(*vectorSizes, scalableFlags);
+    }
+    LDBG() << "Failed to get configured vector sizes, fall back to inference";
   }
 
   // Try to infer the vector sizes from the IR.

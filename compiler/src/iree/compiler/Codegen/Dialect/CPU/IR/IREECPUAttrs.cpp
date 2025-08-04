@@ -207,6 +207,53 @@ Attribute LoweringConfigAttr::getTilingLevelAttr(unsigned level) const {
   return config.get(key);
 }
 
+constexpr std::array vectorTilingLevels{TilingLevel::VectorCommonParallelTiles,
+                                        TilingLevel::VectorReductionTiles,
+                                        TilingLevel::VectorInnerParallelTiles};
+
+std::optional<SmallVector<int64_t>> LoweringConfigAttr::getVectorSizes() const {
+  SmallVector<int64_t> result;
+  for (auto level : vectorTilingLevels) {
+    if (!hasTilingLevel(level)) {
+      continue;
+    }
+    auto attr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
+        getTilingLevelAttr(level));
+    if (result.empty()) {
+      result.resize(attr.getSizes().size(), 0);
+    }
+    for (auto [idx, size] : llvm::enumerate(attr.getSizes())) {
+      if (size == 0) {
+        continue;
+      }
+      if (result[idx] != 0) {
+        return std::nullopt;
+      }
+      result[idx] = size;
+    }
+  }
+  return result;
+}
+
+SmallVector<bool> LoweringConfigAttr::getVectorScalableFlags() const {
+  SmallVector<bool> result;
+  for (auto level : vectorTilingLevels) {
+    if (!hasTilingLevel(level)) {
+      continue;
+    }
+    auto attr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
+        getTilingLevelAttr(level));
+    ArrayRef<bool> scalableFlags = attr.getScalableFlags();
+    if (result.empty() && !scalableFlags.empty()) {
+      result.resize(attr.getSizes().size(), false);
+    }
+    for (auto [idx, flag] : llvm::enumerate(scalableFlags)) {
+      result[idx] |= flag;
+    }
+  }
+  return result;
+}
+
 //===----------------------------------------------------------------------===//
 // Attribute Registration
 //===----------------------------------------------------------------------===//

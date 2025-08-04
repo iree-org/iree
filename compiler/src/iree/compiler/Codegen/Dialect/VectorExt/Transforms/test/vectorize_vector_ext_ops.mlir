@@ -58,7 +58,7 @@ func.func @vectorize_matmul_dyn_parallel(%A: tensor<?x64xf32>,
   %BL = iree_vector_ext.to_layout %B to layout(#layout) : tensor<64x?xf32>
   %CL = iree_vector_ext.to_layout %C to layout(#layout) : tensor<?x?xf32>
   %matmul = linalg.matmul ins(%AL, %BL : tensor<?x64xf32>, tensor<64x?xf32>)
-                          outs(%CL: tensor<?x?xf32>) {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0], [64, 64, 0], [0, 0, 64]]>}
+                          outs(%CL: tensor<?x?xf32>) {lowering_config = #iree_cpu.lowering_config<vector_common_parallel = [64, 64, 0], vector_reduction = [0, 0, 64]>}
                           -> tensor<?x?xf32>
   return %matmul : tensor<?x?xf32>
 }
