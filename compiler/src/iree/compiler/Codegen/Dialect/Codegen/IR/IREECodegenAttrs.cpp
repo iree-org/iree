@@ -623,9 +623,13 @@ OpFoldResult XORShuffleAttr::swizzleOffset(OpBuilder &b, Location loc,
 
   int64_t rotationInvariant =
       getRowWidth() * (getRowWidth() / getAccessWidth());
+  int64_t rowStride =
+      getRowStride() != int64_t() ? getRowStride() : getRowWidth();
+
   OpFoldResult id =
       getMinimumConstantOffsetValue(b, loc, offset, rotationInvariant);
 
+  Value rowStrideVal = b.create<arith::ConstantIndexOp>(loc, rowStride);
   // Number of elements per row.
   Value rowAlignmentVal = b.create<arith::ConstantIndexOp>(loc, getRowWidth());
   // Number of contiguous groups of elements per row (swizzled together).
@@ -639,18 +643,22 @@ OpFoldResult XORShuffleAttr::swizzleOffset(OpBuilder &b, Location loc,
 
   Value idVal = getValueOrCreateConstantIndexOp(b, loc, id);
 
+  // Col and row indexes in overall memref
   auto col = b.create<arith::RemUIOp>(loc, idVal, rowAlignmentVal);
-  auto row = b.create<arith::DivUIOp>(loc, idVal, rowAlignmentVal);
+  auto row = b.create<arith::DivUIOp>(loc, idVal, rowStrideVal);
+  // Futur base id. We swizzle only within accessWidth
+  auto swizzledBase = b.create<arith::SubIOp>(loc, idVal, col);
+  auto colElements = b.create<arith::DivUIOp>(loc, col, accessWidthVal);
+
   auto rowPhase = b.create<arith::DivUIOp>(loc, row, perPhase);
   auto rowModPhase =
       b.create<arith::RemUIOp>(loc, rowPhase, rowAccessAlignmentVal);
-  auto colElements = b.create<arith::DivUIOp>(loc, col, accessWidthVal);
 
   auto colSwizzled = b.create<arith::XOrIOp>(loc, rowModPhase, colElements);
   auto colSwizzledBytes =
       b.create<arith::MulIOp>(loc, colSwizzled, accessWidthVal);
 
-  auto swizzledBase = b.create<arith::MulIOp>(loc, row, rowAlignmentVal);
+  // auto swizzledBase = b.create<arith::MulIOp>(loc, row, rowStrideVal);
   auto swizzledId =
       b.create<arith::AddIOp>(loc, swizzledBase, colSwizzledBytes);
 
@@ -667,8 +675,8 @@ int64_t XORShuffleAttr::getAccessElementCount() const {
 
 LogicalResult
 XORShuffleAttr::verify(function_ref<InFlightDiagnostic()> emitError,
-                       int64_t rowWidth, int64_t accessWidth,
-                       int64_t perPhase) {
+                       int64_t rowWidth, int64_t accessWidth, int64_t perPhase,
+                       int64_t rowStride) {
 
   if (rowWidth % accessWidth != 0) {
     return emitError() << "expected access width to divide row width";
@@ -676,6 +684,9 @@ XORShuffleAttr::verify(function_ref<InFlightDiagnostic()> emitError,
   auto maxPhase = rowWidth / accessWidth;
   if (perPhase > maxPhase) {
     return emitError() << "per_phase must be smaller than max_phase";
+  }
+  if (rowStride % rowWidth != 0) {
+    return emitError() << "expected row width to divide row stride";
   }
 
   return success();

@@ -567,10 +567,10 @@ def IREECodegen_XORShuffleAttr  :
     This attribute shuffle accesses of |access_width| within rows of size
     |row_width|. For any given access into logical memref of shape
     `memref<...xNx|access_width|x!eltype>` where `N = row_width / access_width`
-    at position `(i, j, 0)` is shuffled to `(i, ((i/per_hase) %N) XOR j , 0)`. For example,
+    at position `(i, j, 0)` is shuffled to `(i, ((i/per_phase) %N) XOR j , 0)`. For example,
 
     ```
-    row_width = 16, access_width = 4, per_hase = 1
+    row_width = 16, access_width = 4, per_phase = 1
 
     0000 1111 2222 3333 /// 0 1 2 3
     4444 5555 6666 7777 /// 0 1 2 3
@@ -588,7 +588,7 @@ def IREECodegen_XORShuffleAttr  :
     |access_width| allows to keep the same shuffling accross multiple rows. For example,
 
     ```
-    row_width = 16, access_width = 4, per_hase = 2
+    row_width = 16, access_width = 4, per_phase = 2
 
     0000 1111 2222 3333 /// 0 1 2 3
     4444 5555 6666 7777 /// 0 1 2 3
@@ -609,10 +609,11 @@ def IREECodegen_XORShuffleAttr  :
   let parameters = (ins
     AttrParameter<"int64_t", "">:$row_width,
     AttrParameter<"int64_t", "">:$access_width,
-    AttrParameter<"int64_t", "">:$per_phase
+    AttrParameter<"int64_t", "">:$per_phase,
+    OptionalParameter<"int64_t", "row stride. Default to row_width">:$row_stride
   );
   let assemblyFormat = [{
-    `<` $row_width `,` $access_width `,` $per_phase `>`
+    `<` $row_width `,` $access_width `,` $per_phase (`,` $row_stride^)? `>`
   }];
   let genVerifyDecl = 1;
 }
