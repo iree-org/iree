@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -75,20 +76,20 @@ struct SinkDownCollapsingUnitDimsAcrossUnpack final
         continue;
       }
       return rewriter.notifyMatchFailure(
-          op, "expected only two re-association map to have two dimensions");
+          op, "expected only two re-association maps to have two dimensions");
     }
     if (outerRi.empty() || innerRi.empty()) {
       return rewriter.notifyMatchFailure(
-          op, "expected only two re-association map to have two dimensions");
+          op, "expected only two re-association maps to have two dimensions");
     }
 
     RankedTensorType srcType = collapseOp.getSrcType();
     if (innerRi.back() != srcType.getRank() - 1) {
       return rewriter.notifyMatchFailure(
-          op, "expected two innermost dimensions are collapsed");
+          op, "expected that the two innermost dimensions are collapsed");
     }
     SmallVector<int64_t> innerDimPos(op.getInnerDimsPos());
-    if (innerDimPos[0] != outerRi[0] && outerRi[1] != innerDimPos[0]) {
+    if (!llvm::is_contained(outerRi, innerDimPos[0])) {
       return rewriter.notifyMatchFailure(
           op, "expected the packed dimension is collapsed");
     }
@@ -103,9 +104,16 @@ struct SinkDownCollapsingUnitDimsAcrossUnpack final
                                          "unit dims or trailing outer dims");
     }
 
+    // We either add unit dims right before or after the packed dimensions.
+    // E.g., AxBxNxCxDxn becomes AxBx1xNxCxDx1xn if `missLeadingUnitDim` is
+    // true. It becomes AxBxNx1xCxDxnx1 if `missingTrailingUnitDim` is true.
+    // If both are true, the former is prioritized because it does not matter in
+    // practice.
     SmallVector<OpFoldResult> innerTiles(op.getMixedTiles());
     SmallVector<OpFoldResult> destShape = emptyOp.getMixedSizes();
     if (missLeadingUnitDim) {
+      // The unit dim is inserted before the packed dimension, so we advance one
+      // for innerDimPos[0].
       innerDimPos[0]++;
       innerDimPos.insert(innerDimPos.begin(), outerRi[0]);
       innerTiles.insert(innerTiles.begin(), rewriter.getIndexAttr(1));

@@ -103,3 +103,15 @@ func.func @negative_both_m_n_non_unit_dim(%src: tensor<3x4x2x8xi32>) -> tensor<1
 // CHECK-LABEL: func.func @negative_both_m_n_non_unit_dim(
 // CHECK:         tensor.collapse_shape
 // CHECK:         linalg.unpack
+
+// -----
+
+func.func @negative_innermost_dim_is_not_collapsed(%src: tensor<1x3x1x8x16xi32>) -> tensor<48x8xi32> {
+  %collapsed = tensor.collapse_shape %src [[0, 1], [2, 3], [4]] : tensor<1x3x1x8x16xi32> into tensor<3x8x16xi32>
+  %1 = tensor.empty() : tensor<48x8xi32>
+  %unpack = linalg.unpack %collapsed inner_dims_pos = [0] inner_tiles = [16] into %1 : tensor<3x8x16xi32> -> tensor<48x8xi32>
+  return %unpack : tensor<48x8xi32>
+}
+// CHECK-LABEL: func.func @negative_innermost_dim_is_not_collapsed(
+// CHECK:         tensor.collapse_shape
+// CHECK:         linalg.unpack
