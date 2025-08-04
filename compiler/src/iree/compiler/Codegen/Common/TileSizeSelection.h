@@ -69,12 +69,6 @@ public:
                           [](int64_t tileSize) { return tileSize != 0; });
   }
 
-  /// Returns a list of tiling information for each level. Each value is a valid
-  /// level in the TilingConfig.
-  /// Different from attribute variant, the method materialize the attribute
-  /// content to the `IREE::CPU::LoweringConfigLevelInfo` contrainer.
-  SmallVector<IREE::CPU::LoweringConfigLevelInfo> getTilingLevelInfo();
-
   /// Returns all the tile sizes of all the levels of the configuration.
   TileSizesListType getTileSizes() const {
     TileSizesListType result;

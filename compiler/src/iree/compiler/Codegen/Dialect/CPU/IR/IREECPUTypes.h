@@ -11,12 +11,6 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 
-// clang-format off
-#define GET_ATTRDEF_CLASSES
-#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUAttrs.h.inc"
-#undef GET_ATTRDEF_CLASSES
-// clang-format on
-
 namespace mlir::iree_compiler::IREE::CPU {
 
 /// Representation for all the supported tiling levels. All or just a subset of
@@ -43,4 +37,8 @@ StringRef getTilingLevelName(TilingLevel level);
 
 } // namespace mlir::iree_compiler::IREE::CPU
 
+// clang-format off
+#define GET_ATTRDEF_CLASSES
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUAttrs.h.inc"
+// clang-format on
 #endif // IREE_COMPILER_CODEGEN_DIALECT_CPU_IREECPUTYPES_H_

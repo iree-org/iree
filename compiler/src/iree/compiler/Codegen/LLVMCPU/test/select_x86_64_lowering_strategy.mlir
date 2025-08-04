@@ -1917,7 +1917,7 @@ func.func @custom_op(%arg0 : tensor<384x512xf32>, %arg1 : tensor<512x128xf32>,
   } -> tensor<384x128xf32>
   return %1 : tensor<384x128xf32>
 }
-//  CHECK-DAG: #[[CONFIG0:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[48, 64]]>
+//  CHECK-DAG: #[[CONFIG0:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[48, 64, 0]]>
 //  CHECK-DAG: #[[CONFIG1:.+]] = #iree_cpu.lowering_config<cache_parallel = [48, 64], vector_common_parallel = [8, 32]>
 //  CHECK-DAG: #[[CONFIG2:.+]] = #iree_cpu.lowering_config<cache_parallel = [48, 64, 0], distribution = [48, 64, 0], vector_common_parallel = [8, 32, 0], vector_reduction = [0, 0, 16]>
 //  CHECK-DAG: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {enable_loop_peeling}>
