@@ -25,6 +25,8 @@ def IREECPU_LoweringConfigAttr :
         "getNumTilingLevels",
         "getStaticTilingLevelSizes",
         "getTilingLevelAttr",
+        "getVectorSizes",
+        "getVectorScalableFlags",
       ]>
     ]> {
   let mnemonic = "lowering_config";
@@ -48,6 +50,12 @@ def IREECPU_LoweringConfigAttr :
       >
 
     For more details, see the implementation in IREECPUAttrs.cpp.
+
+    Note that it is undefined if more than one of vector tiling levels set a
+    value on a dimension. They are expected to be disjoint. It is not enforced
+    in the verifier, because we want to keep the flexibility when something is
+    wrong in a lowering config. E.g., some transformations still work even if
+    they are not disjoint.
   }];
   let parameters = (ins
     AttrParameter<"DictionaryAttr",
