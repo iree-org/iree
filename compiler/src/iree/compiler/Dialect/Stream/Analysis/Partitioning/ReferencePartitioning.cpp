@@ -213,8 +213,7 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
         // Force this transfer into its own partition on the consumer device.
         auto &opInfo = opInfos[&op];
         opInfo.hazards.reserve(builders.size() + 1);
-        opInfo.hazards.resize(
-            builders.size(), true);
+        opInfo.hazards.resize(builders.size(), true);
 
         LLVM_DEBUG({
           llvm::dbgs() << "====\nPartitioning op:\n";
@@ -229,8 +228,7 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
 
         auto newBuilder = std::make_unique<PartitionBuilder>();
         newBuilder->ordinal = newOrdinal;
-        newBuilder->affinity =
-            *consumerAffinity;
+        newBuilder->affinity = *consumerAffinity;
 
         LLVM_DEBUG(llvm::dbgs() << "Created partition " << newOrdinal
                                 << " for transfer on consumer device "

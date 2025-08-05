@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Stream/Analysis/Partitioning.h"
 #include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
+#include "iree/compiler/Dialect/Stream/Analysis/Partitioning.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
@@ -231,7 +231,8 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
   for (auto *block : sortBlocksInDominanceOrder(region)) {
     // Compute a set of partitions covering all of the streamable ops in the
     // block.
-    auto partitionSet = partitionStreamableOps(configAttr, block, affinityAnalysis);
+    auto partitionSet =
+        partitionStreamableOps(configAttr, block, affinityAnalysis);
     if (partitionSet.empty())
       continue;
     if (failed(partitionSet.verify(loc))) {
@@ -310,7 +311,8 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
     for (auto &op : *block) {
       if (isa<scf::SCFDialect>(op.getDialect())) {
         for (auto &subregion : op.getRegions()) {
-          if (failed(processRegion(loc, context, subregion, configAttr, affinityAnalysis)))
+          if (failed(processRegion(loc, context, subregion, configAttr,
+                                   affinityAnalysis)))
             return failure();
         }
       }
@@ -353,15 +355,17 @@ struct ScheduleExecutionPass
       }
 
       // Lookup the optional config used to control partitioning.
-      auto configAttr = IREE::Stream::PartitioningConfigAttr::lookup(callableOp);
+      auto configAttr =
+          IREE::Stream::PartitioningConfigAttr::lookup(callableOp);
 
       // Partition each block on its own. We could try to partition with the CFG
       // however that's much more complex - it's easier to handle partitioning
       // structured control flow (scf) ops. Note that we do this in dominance
-      // order so that we are sure if we replace values that dominate other blocks
-      // they see the correct values.
+      // order so that we are sure if we replace values that dominate other
+      // blocks they see the correct values.
       auto &region = *callableOp.getCallableRegion();
-      if (failed(processRegion(callableOp.getLoc(), context, region, configAttr, affinityAnalysis))) {
+      if (failed(processRegion(callableOp.getLoc(), context, region, configAttr,
+                               affinityAnalysis))) {
         signalPassFailure();
         return;
       }

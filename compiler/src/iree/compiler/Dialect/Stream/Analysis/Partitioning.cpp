@@ -167,7 +167,8 @@ void PartitionSet::topologicalSort() {
 }
 
 PartitionSet partitionStreamableOps(IREE::Stream::PartitioningConfigAttr config,
-                                    Block *block, AffinityAnalysis &affinityAnalysis) {
+                                    Block *block,
+                                    AffinityAnalysis &affinityAnalysis) {
   // Only one algorithm today.
   return partitionStreamableOpsReference(config, block, affinityAnalysis);
 }
