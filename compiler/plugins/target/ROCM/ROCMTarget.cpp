@@ -352,6 +352,7 @@ public:
     if (options.specializeDispatches) {
       if (auto attr = getGPUTargetAttr(targetAttr)) {
         ROCM::ApplyBuiltinPDLPatternsPassOptions options;
+        options.enableSpecialization = true;
         if (IREE::GPU::TargetChipAttr chip = attr.getChip()) {
           if (StringAttr sku = chip.getSku()) {
             options.targets.push_back(sku.str());

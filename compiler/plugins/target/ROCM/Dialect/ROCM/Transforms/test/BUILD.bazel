@@ -17,6 +17,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "apply_builtin_pdl_patterns.mlir",
+            "apply_builtin_ukernel_pdl_patterns.mlir",
         ],
         include = ["*.mlir"],
     ),

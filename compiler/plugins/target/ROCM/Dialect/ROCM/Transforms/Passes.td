@@ -14,9 +14,15 @@ def ApplyBuiltinPDLPatternsPass : Pass<"iree-rocm-apply-builtin-pdl-patterns", "
   let options = [
     ListOption<"targets", "targets", "std::string",
       "Name of the target(s) to use patterns from">,
+    Option<"enableSpecialization", "enable-specialization", "bool",
+           /*defaultValue=*/"false",
+           "Enable runtime specialization of dynamically shaped dispatches">,
+    Option<"enableTensorUKernels", "enable-tensor-ukernels", "bool",
+           /*defaultValue=*/"false", "Enable MLIR tensor-based ukernels">,
   ];
   let dependentDialects = [
     "iree_compiler::IREE::Codegen::IREECodegenDialect",
+    "iree_compiler::IREE::GPU::IREEGPUDialect",
     "iree_compiler::IREE::ROCM::ROCMDialect",
     "iree_compiler::IREE::Util::UtilDialect",
     "mlir::pdl::PDLDialect",
