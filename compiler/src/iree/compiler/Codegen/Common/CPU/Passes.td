@@ -30,4 +30,10 @@ def CPUPrepareUkernelsPass :
                 "For example, batch_mmt4d ops are decomposed to mmt4d ops";
 }
 
+def CPUPropagateDataLayoutPass :
+    InterfacePass<"iree-codegen-cpu-propagate-data-layout", "mlir::FunctionOpInterface"> {
+  let summary = "Propagates pack/unpack/reshape ops to make the whole dispatch "
+                "use the same layout.";
+}
+
 #endif  // IREE_CODEGEN_COMMON_CPU_PASSES

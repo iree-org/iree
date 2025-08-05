@@ -51,6 +51,23 @@ iree_check_single_backend_test_suite(
     target_backend = "llvm-cpu",
 )
 
+# TODO(#19378): Delete the test suite once data-tiling fusion is default on.
+iree_check_single_backend_test_suite(
+    name = "check_llvm-cpu_dt_fusion_local-task",
+    srcs = ["narrow_n_matmuls.mlir"],
+    compiler_flags = [
+        "--iree-dispatch-creation-experimental-data-tiling",
+        "--iree-llvmcpu-target-cpu=generic",
+        "--iree-opt-data-tiling=false",
+    ],
+    driver = "local-task",
+    tags = [
+        # subbyte support for wasm is not on priorities.
+        "nowasm",
+    ],
+    target_backend = "llvm-cpu",
+)
+
 VMVX_SRCS = enforce_glob(
     # keep sorted
     [
