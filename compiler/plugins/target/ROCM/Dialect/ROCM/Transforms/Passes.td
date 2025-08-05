@@ -9,7 +9,7 @@
 
 include "mlir/Pass/PassBase.td"
 
-def ApplyBuiltinPDLPatternsPass : Pass<"iree-rocm-apply-builtin-pdl-patterns", ""> {
+def ApplyBuiltinPDLPatternsPass : InterfacePass<"iree-rocm-apply-builtin-pdl-patterns", "mlir::FunctionOpInterface"> {
   let summary = "Parse a builtin file based on the target arch containing PDL patterns and apply them as patterns";
   let options = [
     ListOption<"targets", "targets", "std::string",

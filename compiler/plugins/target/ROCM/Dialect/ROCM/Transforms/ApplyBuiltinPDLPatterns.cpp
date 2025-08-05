@@ -7,6 +7,8 @@
 #include "compiler/plugins/target/ROCM/Dialect/ROCM/Transforms/Passes.h"
 
 #include "compiler/plugins/target/ROCM/Dialect/ROCM/IR/ROCMDialect.h"
+#include "iree/compiler/Codegen/Common/UserConfig.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/ADT/SmallVectorExtras.h"
@@ -240,9 +242,23 @@ public:
     }
 
     // Apply the patterns.
-    auto operation = getOperation();
-    if (failed(applyPatternsGreedily(operation, patterns))) {
-      operation->emitOpError("failed to apply builtin specialization patterns");
+    FunctionOpInterface funcOp = getOperation();
+    if (failed(applyPatternsGreedily(funcOp, patterns))) {
+      funcOp->emitOpError("failed to apply builtin specialization patterns");
+      return signalPassFailure();
+    }
+
+    /// Apply all inserted compilation info user configs.
+    WalkResult res = funcOp.walk([&](Operation *op) {
+      if (auto compilationInfo = getCompilationInfo(op)) {
+        if (failed(setUserConfig(funcOp, op, compilationInfo))) {
+          return WalkResult::interrupt();
+        }
+      }
+      return WalkResult::advance();
+    });
+    if (res.wasInterrupted()) {
+      funcOp.emitOpError("error in setting user compilation configuration");
       return signalPassFailure();
     }
   }

@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-rocm-apply-builtin-pdl-patterns{targets=gfx942 enable-tensor-ukernels=true})' \
+// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-rocm-apply-builtin-pdl-patterns{targets=gfx942 enable-tensor-ukernels=true}))' \
 // RUN:   --mlir-print-local-scope --split-input-file %s | FileCheck %s
 
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
@@ -19,11 +19,10 @@ func.func @matmul_f8(%arg0: tensor<1x128x4096xf8E4M3FNUZ>, %arg1: tensor<1024x40
   return %2 : tensor<1x128x1024xf32>
 }
 // CHECK-LABEL: @matmul_f8
+// CHECK-SAME:  translation_info =
 // CHECK:         linalg.generic
-// CHECK-SAME:      compilation_info = #iree_codegen.compilation_info
-// CHECK-SAME:      lowering_config =
-// CHECK-SAME:      translation_info =
 // CHECK-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8_expanded", tensor>
+// CHECK-SAME:      lowering_config =
 
 // -----
 
@@ -73,11 +72,10 @@ func.func @matmul_f8_dynamic(%arg0: index) -> tensor<1x128x1024xf32> {
   return %5 : tensor<1x128x1024xf32>
 }
 // CHECK-LABEL: @matmul_f8_dynamic
+// CHECK-SAME:  translation_info =
 // CHECK:         linalg.generic
-// CHECK-SAME:      compilation_info = #iree_codegen.compilation_info
-// CHECK-SAME:      lowering_config =
-// CHECK-SAME:      translation_info =
 // CHECK-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8_expanded", tensor>
+// CHECK-SAME:      lowering_config =
 
 // -----
 
