@@ -227,7 +227,7 @@ static void resolveHintOp(RewriterBase &rewriter,
       if (isGatherToLDSDstOperand(memRefSubviewOp))
         continue;
     }
-    // Warning if we can't rewrite all users.
+    // Throw if we can't rewrite all users.
     hintOp.emitError()
         << "At least one of the SwizzleHintOp users is not supported. ";
     return;
