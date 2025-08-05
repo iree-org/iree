@@ -191,6 +191,19 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
              DBGS() << "--with padToMultipleOf: " << options.padToMultipleOf
                     << "\n");
 
+  // For linalg ops, we will rewrite the basic block in a way that means padded
+  // parts of tensors are never read. This is useful to avoid inferring what
+  // padding values should be for non-trivial basic blocks.
+  FailureOr<SmallVector<std::tuple<unsigned, Value, unsigned>>> reductionDims;
+  if (auto linalgOp =
+          dyn_cast<linalg::LinalgOp>(tilingInterfaceOp.getOperation())) {
+    reductionDims = findReductionDims(linalgOp);
+    if (failed(reductionDims)) {
+      tilingInterfaceOp.emitWarning("failed to map reduction dimensions");
+      return failure();
+    }
+  }
+
   // 4. Pad.
   SmallVector<tensor::PadOp> padOps;
   FailureOr<TilingInterface> maybePaddedOp =
@@ -203,13 +216,10 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
 
   TilingInterface paddedOp = *maybePaddedOp;
 
-  // For linalg ops, we rewrite the basic block in a way that means padded parts
-  // of tensors are never read. This is useful to avoid inferring what
-  // padding values should be for non-trivial basic blocks.
-  if (auto linalgOp =
-          dyn_cast<linalg::LinalgOp>(tilingInterfaceOp.getOperation())) {
+  if (auto paddedLinalgOp =
+          dyn_cast<linalg::LinalgOp>(paddedOp.getOperation())) {
 
-    auto *block = cast<linalg::LinalgOp>(paddedOp.getOperation()).getBlock();
+    auto *block = paddedLinalgOp.getBlock();
     Operation *yield = block->getTerminator();
     if (yield->getNumOperands() != 1) {
       paddedOp.emitWarning("expected a single yield operand");
@@ -230,14 +240,8 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
     // Get the sizes of the reduction dimensions before padding:
     rewriter.setInsertionPoint(paddedOp.getOperation());
     SmallVector<std::pair<unsigned, Value>> reductionDimSizes;
-    auto maybeReductionDims = findReductionDims(linalgOp);
-    if (failed(maybeReductionDims)) {
-      tilingInterfaceOp.emitWarning("failed to map reduction dimensions");
-      return failure();
-    }
-    SmallVector<std::tuple<unsigned, Value, unsigned>> reductionDims =
-        std::move(*maybeReductionDims);
-    for (auto &&dims : reductionDims) {
+    assert(succeeded(reductionDims) && "obtained with confirmation earlier");
+    for (auto &&dims : reductionDims.value()) {
       auto [redDim, operand, redDimPos] = dims;
       Value redDimSize =
           rewriter.create<tensor::DimOp>(paddedOp.getLoc(), operand, redDimPos);
