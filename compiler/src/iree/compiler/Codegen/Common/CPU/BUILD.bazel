@@ -51,6 +51,7 @@ iree_compiler_cc_library(
     srcs = [
         "CPULowerToUKernels.cpp",
         "CPUPrepareUkernels.cpp",
+        "CPUPropagateDataLayout.cpp",
         "Passes.cpp",
     ],
     hdrs = [
@@ -78,6 +79,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:BufferizationInterfaces",
         "@llvm-project//mlir:DestinationStyleOpInterface",
+        "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:FunctionInterfaces",
         "@llvm-project//mlir:IR",
