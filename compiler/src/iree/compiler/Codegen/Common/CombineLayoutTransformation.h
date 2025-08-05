@@ -31,6 +31,26 @@ struct DistributionConfig {
 using PadDistributionConfigFn = function_ref<SmallVector<DistributionConfig>(
     ArrayRef<int64_t> iterationBounds, MLIRContext *)>;
 
+/// Control function type for layout transformation combination. The control
+/// function takes a leaf of a relayout op chain, and returns a bool indicating
+/// whether to combine the relayout op chain, starting from the leaf.
+using CombineRelayoutOpsControlFn = function_ref<bool(OpResult leaf)>;
+
+namespace IREE::Codegen {
+/// Enum defining the scope of the CombineLayoutTransformationPass.
+///  - The `Dispatch` scope will combine layout transformation chains that are
+///    consumed by an `iree_codegen.store_to_buffer` op.
+///  - The `Workgroup` scope will combine layout transformation chains that are
+///    consumed by a `tensor.parallel_insert_slice` op at the end of an
+///    scf.forall with an `iree_codegen.workgroup_mapping` attribute.
+enum class RelayoutCombinationScope { Dispatch, Workgroup };
+} // namespace IREE::Codegen
+
+/// Get the corresponding control function for the given scope. The control
+/// functions implement the filtering described in the enum definitions.
+CombineRelayoutOpsControlFn
+getCombineRelayoutOpsControlFn(IREE::Codegen::RelayoutCombinationScope scope);
+
 /// Combines any layout/indexing transformation ops at the ends of a dispatch.
 /// Finds `iree_codegen.store_to_buffer` ops in the `funcOp`, and combines any
 /// layout transformation ops (like expand_shape, transpose, pack, etc.) that
@@ -45,7 +65,8 @@ using PadDistributionConfigFn = function_ref<SmallVector<DistributionConfig>(
 /// the inner distributed tile will be tiled to a loop nest of memref.store ops.
 LogicalResult
 combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
-                            PadDistributionConfigFn padDistributionConfigFn);
+                            PadDistributionConfigFn padDistributionConfigFn,
+                            CombineRelayoutOpsControlFn controlFn = nullptr);
 
 } // namespace mlir::iree_compiler
 #endif // IREE_COMPILER_CODEGEN_COMMON_COMBINELAYOUTTRANSFORMATION_H_
