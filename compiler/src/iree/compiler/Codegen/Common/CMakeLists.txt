@@ -80,7 +80,6 @@ iree_cc_library(
     "TensorDynamicDimAnalysis.h"
     "TileAndFuseUtils.h"
     "TileInferenceUtils.h"
-    "TileSizeSelection.h"
     "Transforms.h"
     "UserConfig.h"
   SRCS
@@ -172,7 +171,6 @@ iree_cc_library(
     "TileDispatchUsingInterface.cpp"
     "TileInferenceUtils.cpp"
     "TileLargeTensors.cpp"
-    "TileSizeSelection.cpp"
     "Transforms.cpp"
     "TypePropagationPass.cpp"
     "UnrollAnnotatedLoops.cpp"
