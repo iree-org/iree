@@ -995,7 +995,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
-  int64_t wgpCount = kWgpCountLowerBound;
+  std::optional<int64_t> wgpCount = std::nullopt;
   if (IREE::GPU::TargetChipAttr chip = target.getChip()) {
     wgpCount = chip.getWgpCount();
   }
@@ -1246,7 +1246,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
       nDim !=
       llvm::cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
 
-  int64_t wgpCount = kWgpCountLowerBound;
+  std::optional<int64_t> wgpCount = std::nullopt;
   if (IREE::GPU::TargetChipAttr chip = target.getChip()) {
     wgpCount = chip.getWgpCount();
   }

@@ -25,11 +25,6 @@ namespace mlir::iree_compiler {
 
 using IREE::GPU::getSingleSubgroupLayout;
 
-// The lower bound for WGP count is taken from the wgpCount of mi308x
-// from CDNA targets. adjustSeedForWgpCount() will attempt to decrease the
-// tile size to make sure number of workgroups is at least this value.
-const int64_t kWgpCountLowerBound = 80;
-
 // Threshold used to determine whether a matmul dimension is 'very skinny'.
 constexpr int64_t kVerySkinnyDimThreshold = 4;
 
@@ -487,9 +482,15 @@ sortMMAIntrinsics(GPUMatmulShapeType problem,
 
 static int64_t adjustSeedsForWgpCount(const GPUMatmulShapeType &problem,
                                       const GPUIntrinsicType &intrinsic,
-                                      int64_t wgpCount,
+                                      std::optional<int64_t> wgpCount,
                                       int64_t bestSubgroupCountPerWorkgroup,
                                       int64_t bestMNTileCountPerSubgroup) {
+  if (!wgpCount.has_value()) {
+    LDBG() << "WGP count is not available,"
+           << "Skipping adjustment of seeds for workgroup count.";
+    return bestMNTileCountPerSubgroup;
+  }
+
   int64_t mSize = ShapedType::getNumElements(problem.mSizes);
   int64_t nSize = ShapedType::getNumElements(problem.nSizes);
   int64_t kSize = ShapedType::getNumElements(problem.kSizes);
@@ -504,7 +505,7 @@ static int64_t adjustSeedsForWgpCount(const GPUMatmulShapeType &problem,
            << ", skipping adjustment of seeds for workgroup count.";
     return bestMNTileCountPerSubgroup;
   }
-  auto computeWorkgroupCount = [&]() {
+  auto computeWorkgroupCount = [&] {
     // Compute the number of workgroups needed to cover the problem size.
     // This number tends to be lower than actual workgroup count, since:
     // 1) It assumes tile and subgroup seeds are all allocated.
@@ -517,7 +518,7 @@ static int64_t adjustSeedsForWgpCount(const GPUMatmulShapeType &problem,
   };
   int64_t numWorkgroups = computeWorkgroupCount();
   LDBG() << "Estimated number of workgroups: " << numWorkgroups
-         << ", CU count: " << wgpCount;
+         << ", WGP count: " << wgpCount;
 
   while (numWorkgroups < wgpCount) {
     if (bestMNTileCountPerSubgroup <= 1) {
@@ -533,13 +534,15 @@ static int64_t adjustSeedsForWgpCount(const GPUMatmulShapeType &problem,
   return bestMNTileCountPerSubgroup;
 }
 
-FailureOr<GPUMMASchedule>
-deduceMMASchedule(const GPUMatmulShapeType &problem,
-                  ArrayRef<GPUIntrinsicType> intrinsics,
-                  const GPUMMAHeuristicSeeds &seeds,
-                  int64_t sharedMemLimitInBytes, int64_t subgroupSize,
-                  int64_t wgpCount, bool transposedLhs, bool transposedRhs,
-                  bool canUpcastAcc, bool mustBeAligned, bool doCPromotion) {
+FailureOr<GPUMMASchedule> deduceMMASchedule(
+    const GPUMatmulShapeType &problem, ArrayRef<GPUIntrinsicType> intrinsics,
+    const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
+    int64_t subgroupSize, std::optional<int64_t> wgpCount, bool transposedLhs,
+    bool transposedRhs, bool canUpcastAcc, bool mustBeAligned,
+    bool doCPromotion) {
+
+  sortMMAIntrinsics(problem, intrinsics);
+
   for (const GPUIntrinsicType &intrinsic : intrinsics) {
     if (failed(canTargetIntrinsic(problem, intrinsic, subgroupSize,
                                   canUpcastAcc, mustBeAligned))) {

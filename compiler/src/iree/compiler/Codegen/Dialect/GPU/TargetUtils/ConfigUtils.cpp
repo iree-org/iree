@@ -191,7 +191,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   }
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
-  int64_t wgpCount = kWgpCountLowerBound;
+  std::optional<int64_t> wgpCount = std::nullopt;
   if (TargetChipAttr chip = target.getChip()) {
     wgpCount = chip.getWgpCount();
   }

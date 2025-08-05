@@ -40,9 +40,9 @@ func.func @expanded_matmul_transpose_b() {
 // CHECK: linalg.generic {{.*}}lowering_config =  #iree_gpu.lowering_config
 // CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
 // CHECK-SAME:                           reduction =  [0, 0, 0, 0, 256]
-// CHECK-SAME:                           subgroup_m_count = 2
-// CHECK-SAME:                           subgroup_n_count = 2
-// CHECK-SAME:                           workgroup =  [1, 1, 32, 32, 0]
+// CHECK-SAME:                           subgroup_m_count = 1
+// CHECK-SAME:                           subgroup_n_count = 4
+// CHECK-SAME:                           workgroup =  [1, 1, 64, 64, 0]
 
 // -----
 
@@ -74,7 +74,7 @@ func.func @conv_nhwc() {
 // CHECK-SAME:                           reduction =  [0, 0, 0, 0, 1, 1, 64]
 // CHECK-SAME:                           subgroup_m_count = 2
 // CHECK-SAME:                           subgroup_n_count = 2
-// CHECK-SAME:                           workgroup =  [1, 1, 32, 32, 0, 0, 0]
+// CHECK-SAME:                           workgroup =  [1, 1, 64, 128, 0, 0, 0]
 
 // -----
 
