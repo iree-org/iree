@@ -131,7 +131,7 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
       return funcOp.emitOpError("materialization failed");
     }
 
-    // The update is required by testing purposes, which results in fewer IRs.
+    // The update is required for testing purposes, which results in fewer IRs.
     // We do not expect inputs and outputs from `funcOp` in practice.
     updateFuncSignature(funcOp, typeConverter);
   }

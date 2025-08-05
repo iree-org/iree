@@ -877,19 +877,20 @@ public:
   }
 };
 
+static bool isRankedTensorTypeWithEncoding(Type type) {
+  auto rankedTensorType = dyn_cast<RankedTensorType>(type);
+  if (!rankedTensorType) {
+    return false;
+  }
+  return rankedTensorType.getEncoding() ? true : false;
+}
+
 struct MaterializeFuncReturnOp final
     : public OpConversionPattern<func::ReturnOp> {
   using OpConversionPattern<func::ReturnOp>::OpConversionPattern;
   LogicalResult
   matchAndRewrite(func::ReturnOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto isRankedTensorTypeWithEncoding = [](Type type) {
-      auto rankedTensorType = dyn_cast<RankedTensorType>(type);
-      if (!rankedTensorType) {
-        return false;
-      }
-      return rankedTensorType.getEncoding() ? true : false;
-    };
     if (!llvm::any_of(op.getOperandTypes(), isRankedTensorTypeWithEncoding)) {
       return rewriter.notifyMatchFailure(op, "does not have encodings");
     }
@@ -933,6 +934,10 @@ void populateMaterializeEncodingPatterns(
           return true;
         return resultType == typeConverter.convertType(resultType);
       });
+  target.addDynamicallyLegalOp<func::ReturnOp>([](func::ReturnOp returnOp) {
+    return !llvm::any_of(returnOp.getOperandTypes(),
+                         isRankedTensorTypeWithEncoding);
+  });
 
   patterns.insert<MaterializeContractionOp, SetEncodingOpLoweringConversion,
                   UnsetEncodingOpLoweringConversion,
