@@ -11,7 +11,7 @@
 
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Sequence.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
@@ -176,11 +176,8 @@ static FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
     llvm::function_ref<bool(const GPUMMASchedule &schedule)> isScheduleValid) {
 
   while (!isScheduleValid(schedule)) {
-    LLVM_DEBUG({
-      llvm::dbgs() << "Chosen schedule is invalid:\n";
-      llvm::dbgs() << schedule << "\n";
-      llvm::dbgs() << "Shrinking schedule...\n";
-    });
+    LDBG() << "Chosen schedule is invalid:\n"
+           << schedule << "\nShrinking schedule...";
 
     auto decrementIfPossible =
         [](SmallVector<int64_t> &sizes) -> LogicalResult {
@@ -218,10 +215,7 @@ static FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
     return failure();
   }
 
-  LLVM_DEBUG({
-    llvm::dbgs() << "Chosen schedule is valid:\n";
-    llvm::dbgs() << schedule << "\n";
-  });
+  LDBG() << "Chosen schedule is valid:\n" << schedule;
 
   return schedule;
 }
@@ -351,7 +345,12 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
       nSubgroupCounts(problem.nSizes.size(), 0);
   // Start at the innermost nDim and mDim, and try to distribute evenly to M and
   // N for each pair of M and N dims. Otherwise, distribute to N and then M.
+  LDBG() << "Starting MMA schedule distribution";
   while (mDim >= 0 || nDim >= 0) {
+    LDBG() << "Current iteration: mDim: " << mDim << ", nDim: " << nDim
+           << ", remainingSubgroups: " << remainingSubgroups
+           << ", remainingTiles: " << remainingTiles
+           << ", mTileSizes: " << mTileSizes << ", nTileSizes: " << nTileSizes;
     int64_t subgroupSqrt =
         1ull << (llvm::divideCeil(llvm::Log2_64(remainingSubgroups), 2));
     int64_t tileSqrt = 1ull << (llvm::Log2_64(remainingTiles) / 2);
@@ -362,6 +361,7 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
     if (mDim >= 0 && nDim >= 0 &&
         mTotalTileCounts[mDim] > (subgroupSqrt * tileSqrt) &&
         mTotalTileCounts[mDim] % (subgroupSqrt * tileSqrt) == 0) {
+      LDBG() << "Distributing evenly to M and N dimensions.";
       mSubgroupCounts[mDim] = subgroupSqrt;
       mTileSizes[mDim] = tileSqrt;
 
@@ -380,6 +380,7 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
       remainingTiles /= nTileSizes[nDim];
     } else {
       if (nDim >= 0) {
+        LDBG() << "Distributing to N dimension first.";
         APInt nGCD = GreatestCommonDivisor(APInt(64, nTotalTileCounts[nDim]),
                                            APInt(64, remainingSubgroups));
         nSubgroupCounts[nDim] = nGCD.getSExtValue();
@@ -393,6 +394,7 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
       }
 
       if (mDim >= 0) {
+        LDBG() << "Distributing to M dimension next.";
         APInt mGCD = GreatestCommonDivisor(APInt(64, mTotalTileCounts[mDim]),
                                            APInt(64, remainingSubgroups));
         mSubgroupCounts[mDim] = mGCD.getSExtValue();
@@ -478,11 +480,66 @@ sortMMAIntrinsics(GPUMatmulShapeType problem,
   return sortedIntrinsics;
 }
 
+static int64_t adjustSeedsForWgpCount(const GPUMatmulShapeType &problem,
+                                      const GPUIntrinsicType &intrinsic,
+                                      std::optional<int64_t> wgpCount,
+                                      int64_t bestSubgroupCountPerWorkgroup,
+                                      int64_t bestMNTileCountPerSubgroup) {
+  if (!wgpCount.has_value()) {
+    LDBG() << "WGP count is not available,"
+           << "Skipping adjustment of seeds for workgroup count.";
+    return bestMNTileCountPerSubgroup;
+  }
+
+  int64_t mSize = ShapedType::getNumElements(problem.mSizes);
+  int64_t nSize = ShapedType::getNumElements(problem.nSizes);
+  int64_t kSize = ShapedType::getNumElements(problem.kSizes);
+  float arithmeticIntensity =
+      (2.0f * mSize * nSize * kSize) /
+      static_cast<float>(mSize * nSize + nSize * kSize + mSize * kSize);
+
+  // TODO(jerryyin): compute arithmetic intensity bound based on the information
+  // from the target chip.
+  if (arithmeticIntensity <= 10.0f) {
+    LDBG() << "Arithmetic intensity is too low, " << arithmeticIntensity
+           << ", skipping adjustment of seeds for workgroup count.";
+    return bestMNTileCountPerSubgroup;
+  }
+  auto computeWorkgroupCount = [&] {
+    // Compute the number of workgroups needed to cover the problem size.
+    // This number tends to be lower than actual workgroup count, since:
+    // 1) It assumes tile and subgroup seeds are all allocated.
+    // 2) It assumes shared memory usage does not exceed hardware limits.
+    int64_t mnTileSizePerSubgroup =
+        bestMNTileCountPerSubgroup * intrinsic.mSizes[0] * intrinsic.nSizes[0];
+    int64_t workgroupSize =
+        mnTileSizePerSubgroup * bestSubgroupCountPerWorkgroup;
+    return mSize * nSize / workgroupSize;
+  };
+  int64_t numWorkgroups = computeWorkgroupCount();
+  LDBG() << "Estimated number of workgroups: " << numWorkgroups
+         << ", WGP count: " << wgpCount;
+
+  while (numWorkgroups < wgpCount) {
+    if (bestMNTileCountPerSubgroup <= 1) {
+      LDBG() << "Cannot decrease tile size further, "
+                "bestMNTileCountPerSubgroup is already 1.";
+      break;
+    }
+    bestMNTileCountPerSubgroup /= 2;
+    LDBG() << "Decreasing bestMNTileCountPerSubgroup to "
+           << bestMNTileCountPerSubgroup;
+    numWorkgroups = computeWorkgroupCount();
+  }
+  return bestMNTileCountPerSubgroup;
+}
+
 FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMatmulShapeType &problem, ArrayRef<GPUIntrinsicType> intrinsics,
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
-    int64_t subgroupSize, bool transposedLhs, bool transposedRhs,
-    bool canUpcastAcc, bool mustBeAligned, bool doCPromotion) {
+    int64_t subgroupSize, std::optional<int64_t> wgpCount, bool transposedLhs,
+    bool transposedRhs, bool canUpcastAcc, bool mustBeAligned,
+    bool doCPromotion) {
 
   sortMMAIntrinsics(problem, intrinsics);
 
@@ -492,12 +549,17 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
       continue;
     }
 
-    GPUMMASchedule schedule = getOptimalMMASchedule(problem, intrinsic, seeds);
+    // Note: don't amend the original seeds, as deduceMMASchedule can be called
+    // more than once in a row, and we want to keep the original seeds intact
+    // for the next call.
+    GPUMMAHeuristicSeeds localSeeds = seeds;
+    localSeeds.bestMNTileCountPerSubgroup = adjustSeedsForWgpCount(
+        problem, intrinsic, wgpCount, seeds.bestSubgroupCountPerWorkgroup,
+        seeds.bestMNTileCountPerSubgroup);
+    GPUMMASchedule schedule =
+        getOptimalMMASchedule(problem, intrinsic, localSeeds);
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "chosen MMA schedule:\n";
-      llvm::dbgs() << "  " << schedule << "\n";
-    });
+    LDBG() << "Chosen MMA schedule:\n" << schedule;
 
     auto isValidSchedule = [&](const GPUMMASchedule &schedule) -> bool {
       int64_t lhsBitwidth = intrinsic.aType.getIntOrFloatBitWidth();
@@ -513,13 +575,9 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
             calculateResultSharedMemoryUsedInBytes(schedule, resultBitwidth);
       }
 
-      LLVM_DEBUG({
-        llvm::dbgs() << "Available Shared Memory: ";
-        llvm::dbgs() << sharedMemLimitInBytes << " bytes\n";
-        llvm::dbgs() << "Predicted Shared Memory Used by Schedule: ";
-        llvm::dbgs() << sharedMemoryUsed << " bytes\n";
-      });
-
+      LDBG() << "Available Shared Memory: " << sharedMemLimitInBytes << " bytes"
+             << "Predicted Shared Memory Used by Schedule: " << sharedMemoryUsed
+             << " bytes";
       return isAligned && sharedMemoryUsed <= sharedMemLimitInBytes;
     };
     return fitScheduleInSharedMemory(schedule, isValidSchedule);
@@ -680,10 +738,7 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
     GPUMMASchedule schedule =
         getOptimalAttentionPVSchedule(pvMatmul, intrinsicB, pvMatmulSeeds);
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "chosen MMA schedule:\n";
-      llvm::dbgs() << "  " << schedule << "\n";
-    });
+    LDBG() << "Chosen MMA schedule:\n" << schedule;
     int64_t intrinsicAK = intrinsicA.kSizes[0];
     auto isValidSchedule = [&](const GPUMMASchedule &schedule) -> bool {
       // Create a mma schedule for qkMatmul in attention.
@@ -722,12 +777,9 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
                                  calculateOperandsSharedMemoryUsedInBytes(
                                      schedule, lhsBBitwidth, rhsBBitwidth);
 
-      LLVM_DEBUG({
-        llvm::dbgs() << "Available Shared Memory: ";
-        llvm::dbgs() << sharedMemLimitInBytes << " bytes\n";
-        llvm::dbgs() << "Predicted Shared Memory Used by Schedule: ";
-        llvm::dbgs() << sharedMemoryUsed << " bytes\n";
-      });
+      LDBG() << "Available Shared Memory: " << sharedMemLimitInBytes << " bytes"
+             << "Predicted Shared Memory Used by Schedule: " << sharedMemoryUsed
+             << " bytes";
 
       return isQKAligned && isPVAligned &&
              sharedMemoryUsed <= sharedMemLimitInBytes;
