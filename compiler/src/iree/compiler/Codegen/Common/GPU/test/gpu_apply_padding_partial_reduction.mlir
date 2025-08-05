@@ -1,8 +1,8 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-padding-level{tiling-level=partial_reduction}),canonicalize,cse)" --split-input-file %s | FileCheck  %s
 
 
-// This reduction corresponds to the step in softmax
-// where sum_{i} exp(x_i - MAX) is computed. The options for padding here are:
+// This reduction corresponds to the sum-reduction step in (stable) softmax
+// where sum_{i} exp(x_i - max_{j} exp(x_j)) is computed. Two options for padding here are:
 
 // 1) pad the input with -infinity. This'd work because e^(-infinity) = 0,
 //    and 0 is the additive identity.
@@ -11,8 +11,8 @@
 //    value based on the index, yielding 0 for indices corresponding
 //    to the padded region.
 //
-// The current implementation (in applyPaddingLevel) uses option 2, because
-// it is more general purpose.
+// The current implementation (see applyPaddingLevel) uses option 2, because
+// it is a more general purpose solution.
 
 //  CHECK: #[[MAP:.+]]     = affine_map<()[s0, s1] -> (-s1 + (s0 ceildiv 4096) * 4096)>
 //  CHECK:                   sum_exp_sub_reduction
@@ -51,7 +51,9 @@ func.func @sum_exp_sub_reduction(%arg0: tensor<1x?xf32>, %arg1: tensor<1xf32>, %
 // -----
 
 
-// Note from arith.minnumf and arith.maxnumf docs:
+// Tests of max and min reductions.
+//
+// Note from arith.minnumf and arith.maxnumf documentation:
 // "if one of the arguments is NaN, then the result is the other argument"
 // So we check that the selected value in the padded region is one of the
 // NaN values.
@@ -144,6 +146,8 @@ func.func @standard_inner_product(%arg0 : tensor<1x?xf16>, %arg1 : tensor<1x?xf1
 
 // -----
 
+// Inner product where the accumulation (add) is in f16 but the multiplication is in f32
+// Check for an f16 zero as the reduction identity.
 
 // CHECK-LABEL: standard_inner_product_with_trunc
 //   CHECK-DAG: %[[ZERO:.+]]    = arith.constant 0.000000e+00 : f16
@@ -181,8 +185,8 @@ func.func @standard_inner_product_with_trunc(%arg0 : tensor<1x?xf32>, %arg1 : te
 
 // -----
 
-// In the example, the reduction type is multiplicative, so
-// we check that that the selected value in the padded region is 1.
+// In this example, the reduction type is multiplicative, so we check that
+// the value selected in the padded part of the iteration space is 1, the multiplicative identity.
 
 // CHECK-LABEL: product_of_sum_reduction
 //       CHECK: %[[ONE:.+]] = arith.constant 1.000000e+00 : f16

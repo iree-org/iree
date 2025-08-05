@@ -3,9 +3,6 @@
 // RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmgpu-lower-executable-target)))))" \
 // RUN:   %s | FileCheck %s
 
-
-
-
 #config = #iree_gpu.lowering_config< {workgroup = [0, 4, 0],
                                       reduction = [0, 0, 128],
                                       thread = [0, 0, 8],
