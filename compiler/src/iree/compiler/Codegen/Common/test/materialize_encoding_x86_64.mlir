@@ -1,37 +1,28 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-materialize-device-encoding))" --split-input-file %s | FileCheck %s
 
-#pipeline_layout = #hal.pipeline.layout<bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
-#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [bf16, bf16, bf16], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iteration_sizes = [1, 1000, ?]>
-func.func @set_encoding_with_padding_semantics_bf16_x86_64_avx512f() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
-}{
-  %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x1000xbf16>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x1000xbf16, #encoding>>
-  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 1000], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x1000xbf16>> -> tensor<1x1000xbf16>
-  %3 = iree_encoding.set_encoding %2 : tensor<1x1000xbf16> -> tensor<1x1000xbf16, #encoding>
-  iree_tensor_ext.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [1, 1000], strides = [1, 1] : tensor<1x1000xbf16, #encoding> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x1000xbf16,  #encoding>>
-  return
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [1, 1000, ?]>
+#executable_target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features = "+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>, target_triple = "x86_64-xyz-xyz"}>
+func.func @set_encoding_with_padding_semantics_bf16_x86_64_avx512f(%arg0: tensor<1x1000xbf16>)
+    -> tensor<1x1000xbf16, #encoding> attributes { hal.executable.target = #executable_target } {
+  %0 = iree_encoding.set_encoding %arg0 : tensor<1x1000xbf16> -> tensor<1x1000xbf16, #encoding>
+  return %0 : tensor<1x1000xbf16, #encoding>
 }
 // This tests that
 //   1. The padding value is created for linalg.pack ops.
 //   2. The inner tile sizes are less than or equal to values in iteration_sizes.
 //      We could choose 128 when it is a narrow matrix.
 // CHECK-LABEL: func.func @set_encoding_with_padding_semantics_bf16_x86_64_avx512f
-// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG:     %[[IN_BINDING:.+]] = hal.interface.binding.subspan {{.+}} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x1000xbf16>>
-// CHECK-DAG:     %[[OUT_BINDING:.+]] = hal.interface.binding.subspan {{.+}} : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x1000x1x1xbf16>>
-// CHECK:         %[[SRC:.+]] = iree_tensor_ext.dispatch.tensor.load %[[IN_BINDING]]
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[INIT:.+]] = tensor.empty() : tensor<1x1000x1x1xbf16>
 // CHECK:         %[[PACK:.+]] = linalg.pack %[[SRC]]
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
 // CHECK-SAME:      inner_tiles = [1, 1]
 // CHECK-SAME:      into %[[INIT]] : tensor<1x1000xbf16> -> tensor<1x1000x1x1xbf16>
-// CHECK:         iree_tensor_ext.dispatch.tensor.store %[[PACK]], %[[OUT_BINDING]]
+// CHECK:         return %[[PACK]]
 
 // -----
 
