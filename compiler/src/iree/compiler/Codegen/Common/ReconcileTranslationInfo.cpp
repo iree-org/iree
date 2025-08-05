@@ -300,10 +300,8 @@ resolveWorkgroupForAll(RewriterBase &rewriter, scf::ForallOp forallOp,
   rewriter.setInsertionPoint(forallOp);
   Location loc = forallOp.getLoc();
 
-  auto gpuTarget =
-      getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr::lookup(forallOp));
-  std::array<int64_t, 3> maxWorkgroupCountArray =
-      getMaxWorkgroupCount(gpuTarget);
+  auto target = IREE::HAL::ExecutableTargetAttr::lookup(forallOp);
+  std::array<int64_t, 3> maxWorkgroupCountArray = getMaxWorkgroupCount(target);
   SmallVector<int64_t> maxWorkgroupCount =
       llvm::to_vector(maxWorkgroupCountArray);
   maxWorkgroupCount.resize(forallOp.getRank(), ShapedType::kDynamic);
@@ -369,71 +367,8 @@ resolveWorkgroupForAll(RewriterBase &rewriter, scf::ForallOp forallOp,
   return numWorkgroupsList;
 }
 
-/// Resolve the workgroup counts for the function based on the extents of the
-/// `forAllOps`. When there are multiple foralls, the worker counts of the
-/// foralls are linearized, and the maximum count is chosen as the workgroup X
-/// count for the dispatch.
-static LogicalResult
-resolveWorkgroupCounts(RewriterBase &rewriter, mlir::FunctionOpInterface funcOp,
-                       ArrayRef<scf::ForallOp> forAllOps,
-                       IREE::Codegen::WorkgroupId deLinearizeFrom) {
-  OpBuilder::InsertionGuard g(rewriter);
-  OpFoldResult maxWorkgroupCount;
-  AffineExpr s0, s1, s2;
-  bindSymbols(rewriter.getContext(), s0, s1, s2);
-  AffineExpr countExpr = (s1 - s0).ceilDiv(s2);
-  for (scf::ForallOp forAllOp : forAllOps) {
-    rewriter.setInsertionPoint(forAllOp);
-    SmallVector<OpFoldResult> workgroupCounts;
-    Location loc = forAllOp.getLoc();
-    for (auto [lb, ub, step] : llvm::zip_equal(forAllOp.getMixedLowerBound(),
-                                               forAllOp.getMixedUpperBound(),
-                                               forAllOp.getMixedStep())) {
-      workgroupCounts.push_back(affine::makeComposedFoldedAffineApply(
-          rewriter, loc, countExpr, {lb, ub, step}));
-    }
-    // If there is only a single forall op, then there is no need to linearize
-    // the workgroup counts, since the x, y, and z counts will match the ranges
-    // of the single forall.
-    if (forAllOps.size() == 1) {
-      SmallVector<IREE::Codegen::WorkgroupMappingAttr> mappingAttr =
-          llvm::map_to_vector(forAllOp.getMapping().value(), [](auto a) {
-            return cast<IREE::Codegen::WorkgroupMappingAttr>(a);
-          });
-      auto permutation =
-          getInvertedMappingPermutation<IREE::Codegen::WorkgroupMappingAttr>(
-              mappingAttr);
-      workgroupCounts = applyPermutation(workgroupCounts, permutation);
-      return lowerWorkgroupCountFromSliceOp(rewriter, funcOp, workgroupCounts,
-                                            static_cast<int>(deLinearizeFrom) +
-                                                1);
-    }
-    // If there are multiple foralls, then the workgroup counts will be
-    // linearized, and then the workgroup_count_from_slice op will be lowered
-    // with the maximum workgroup count.
-    OpFoldResult flatWorkgroupCount = rewriter.getIndexAttr(1);
-    for (OpFoldResult count : workgroupCounts) {
-      flatWorkgroupCount =
-          IREE::LinalgExt::mulOfrs(rewriter, loc, flatWorkgroupCount, count);
-    }
-    auto asValue = [&](OpFoldResult ofr) {
-      return getValueOrCreateConstantIndexOp(rewriter, loc, ofr);
-    };
-    maxWorkgroupCount =
-        !maxWorkgroupCount
-            ? flatWorkgroupCount
-            : rewriter
-                  .create<arith::MaxUIOp>(loc, asValue(maxWorkgroupCount),
-                                          asValue(flatWorkgroupCount))
-                  .getResult();
-  }
-  OpFoldResult one = rewriter.getIndexAttr(1);
-  // The order of dimensions expected by `lowerWorkgroupCountFromSliceOp`
-  // is {z, y, x}.
-  SmallVector<OpFoldResult> workgroupCounts = {one, one, maxWorkgroupCount};
-  return lowerWorkgroupCountFromSliceOp(rewriter, funcOp, workgroupCounts);
-}
-
+/// Resolve all `scf.forall`s within a given `funcOp`. If there are multiple
+/// `scf.forall`s they all are resolved to use the same number of workgroups.
 static LogicalResult
 resolveWorkgroupForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
                        IREE::Codegen::WorkgroupId deLinearizeFrom) {

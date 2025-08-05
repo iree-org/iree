@@ -906,3 +906,125 @@ hal.executable private @split_reduction_2d_permuted_mapping_executable {
 //       CHECK:     %[[DELINEARIZE:.+]]:6 = affine.delinearize_index %[[IDX]] into (%[[SPLIT_UB1]], %[[SPLIT_UB2]], %[[SPLIT_UB0]], %[[WG_UB1]], %[[WG_UB2]], %[[WG_UB0]])
 //       CHECK:     "use1"(%[[DELINEARIZE]]#2, %[[DELINEARIZE]]#0, %[[DELINEARIZE]]#1)
 //       CHECK:     "use2"(%[[DELINEARIZE]]#5, %[[DELINEARIZE]]#3, %[[DELINEARIZE]]#4)
+
+// -----
+
+// Check for case where the max workgroup count is specified.
+
+#pipeline_layout = #hal.pipeline.layout<constants = 6, bindings = [
+    #hal.pipeline.binding<storage_buffer>]>
+hal.executable private @bounded_scf_forall_2D {
+  hal.executable.variant public @bounded_scf_forall_2D target(#hal.executable.target<"", "", {
+      iree.gpu.target = #iree_codegen.simple_target<max_workgroup_count = [1024, 512]>}>) {
+    hal.executable.export public @bounded_scf_forall_2D layout(#pipeline_layout)
+    count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index,
+        %arg4: index, %arg5: index, %arg6: index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+          %arg1, %arg2, %arg3, %arg4, %arg5, %arg6
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @bounded_scf_forall_2D() {
+        %cst0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+        %cst1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
+        %cst2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
+        %cst3 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : index
+        %cst4 = hal.interface.constant.load layout(#pipeline_layout) ordinal(4) : index
+        %cst5 = hal.interface.constant.load layout(#pipeline_layout) ordinal(5) : index
+        %0 = iree_tensor_ext.dispatch.workload.ordinal %cst0, 0 : index
+        %1 = iree_tensor_ext.dispatch.workload.ordinal %cst1, 1 : index
+        %2 = iree_tensor_ext.dispatch.workload.ordinal %cst2, 2 : index
+        %3 = iree_tensor_ext.dispatch.workload.ordinal %cst3, 3 : index
+        %4 = iree_tensor_ext.dispatch.workload.ordinal %cst4, 4 : index
+        %5 = iree_tensor_ext.dispatch.workload.ordinal %cst5, 5 : index
+        scf.forall (%arg0, %arg1) = (%0, %3) to (%1, %4) step(%2, %5) {
+          "use"(%arg0, %arg1) : (index, index) -> ()
+          scf.forall.in_parallel {}
+        } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2, s3, s4, s5] -> (((-s3 + s4) ceildiv s5) * ((-s0 + s1) ceildiv s2), 1024)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1, s2] -> ((-s0 + s1) ceildiv s2)
+//  CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0, s1, s2, s3, s4, s5] -> (((-s3 + s4) ceildiv s5) * ((-s0 + s1) ceildiv s2))>
+//  CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0)[s0, s1] -> (d0 * s0 + s1)>
+//      CHECK: hal.executable.export public @bounded_scf_forall_2D
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[ARG4:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[ARG5:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[ARG6:[a-zA-Z0-9]+]]: index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[NWGX:.+]] = affine.min #[[MAP0]]()[%[[ARG4]], %[[ARG5]], %[[ARG6]], %[[ARG1]], %[[ARG2]], %[[ARG3]]]
+//      CHECK:   hal.return %[[NWGX]], %[[C1]], %[[C1]]
+//      CHECK: func.func @bounded_scf_forall_2D()
+//  CHECK-DAG:   %[[LB0:.+]] = hal.interface.constant.load {{.+}} ordinal(0)
+//  CHECK-DAG:   %[[UB0:.+]] = hal.interface.constant.load {{.+}} ordinal(1)
+//  CHECK-DAG:   %[[STEP0:.+]] = hal.interface.constant.load {{.+}} ordinal(2)
+//  CHECK-DAG:   %[[LB1:.+]] = hal.interface.constant.load {{.+}} ordinal(3)
+//  CHECK-DAG:   %[[UB1:.+]] = hal.interface.constant.load {{.+}} ordinal(4)
+//  CHECK-DAG:   %[[STEP1:.+]] = hal.interface.constant.load {{.+}} ordinal(5)
+//  CHECK-DAG:   %[[NITERS0:.+]] = affine.apply #[[MAP1]]()[%[[LB0]], %[[UB0]], %[[STEP0]]]
+//  CHECK-DAG:   %[[NITERS1:.+]] = affine.apply #[[MAP1]]()[%[[LB1]], %[[UB1]], %[[STEP1]]]
+//  CHECK-DAG:   %[[NITERS:.+]] = affine.apply #[[MAP2]]()[%[[LB1]], %[[UB1]], %[[STEP1]], %[[LB0]], %[[UB0]], %[[STEP0]]]
+//  CHECK-DAG:   %[[IDX:.+]] = hal.interface.workgroup.id[0] : index
+//  CHECK-DAG:   %[[COUNTX:.+]] = hal.interface.workgroup.count[0] : index
+//      CHECK:   scf.for %[[IV:.+]] = %[[IDX]] to %[[NITERS]] step %[[COUNTX]]
+//      CHECK:     %[[DELINEARIZE:.+]]:2 = affine.delinearize_index %[[IV]] into (%[[NITERS0]], %[[NITERS1]])
+//  CHECK-DAG:     %[[IV0:.+]] = affine.apply #[[MAP3]](%[[DELINEARIZE]]#0)[%[[STEP0]], %[[LB0]]]
+//  CHECK-DAG:     %[[IV1:.+]] = affine.apply #[[MAP3]](%[[DELINEARIZE]]#1)[%[[STEP1]], %[[LB1]]]
+//      CHECK:     "use"(%[[IV0]], %[[IV1]])
+
+// -----
+
+// Interchange with max workgroup count specified
+
+#pipeline_layout = #hal.pipeline.layout<constants = 6, bindings = [
+    #hal.pipeline.binding<storage_buffer>]>
+hal.executable private @bounded_scf_forall_3D_interchange {
+  hal.executable.variant public @bounded_scf_forall_3D_interchange target(#hal.executable.target<"", "", {
+      iree.gpu.target = #iree_codegen.simple_target<max_workgroup_count = [1024, 512, 256]>}>) {
+    hal.executable.export public @bounded_scf_forall_3D_interchange layout(#pipeline_layout)
+    count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @bounded_scf_forall_3D_interchange() {
+        %cst0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+        %cst1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
+        %cst2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
+        %0 = iree_tensor_ext.dispatch.workload.ordinal %cst0, 0 : index
+        %1 = iree_tensor_ext.dispatch.workload.ordinal %cst1, 1 : index
+        %2 = iree_tensor_ext.dispatch.workload.ordinal %cst2, 2 : index
+        scf.forall (%arg0, %arg1, %arg2) in (%0, %1, %2) {
+          "use"(%arg0, %arg1, %arg2) : (index, index, index) -> ()
+          scf.forall.in_parallel {}
+        } {mapping = [#iree_codegen.workgroup_mapping<x>, #iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>]}
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2] -> (s2 * (s0 * s1), 1024)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1, s2] -> (s2 * (s0 * s1))>
+//      CHECK: hal.executable.export public @bounded_scf_forall_3D_interchange
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[NWGX:.+]] = affine.min #[[MAP0]]()[%[[ARG3]], %[[ARG2]], %[[ARG1]]]
+//      CHECK:   hal.return %[[NWGX]], %[[C1]], %[[C1]]
+//      CHECK: func.func @bounded_scf_forall_3D_interchange()
+//  CHECK-DAG:   %[[UB0:.+]] = hal.interface.constant.load {{.+}} ordinal(0)
+//  CHECK-DAG:   %[[UB1:.+]] = hal.interface.constant.load {{.+}} ordinal(1)
+//  CHECK-DAG:   %[[UB2:.+]] = hal.interface.constant.load {{.+}} ordinal(2)
+//  CHECK-DAG:   %[[NITERS:.+]] = affine.apply #[[MAP1]]()[%[[UB2]], %[[UB1]], %[[UB0]]]
+//  CHECK-DAG:   %[[IDX:.+]] = hal.interface.workgroup.id[0] : index
+//  CHECK-DAG:   %[[COUNTX:.+]] = hal.interface.workgroup.count[0] : index
+//      CHECK:   scf.for %[[IV:.+]] = %[[IDX]] to %[[NITERS]] step %[[COUNTX]]
+//      CHECK:     %[[DELINEARIZE:.+]]:3 = affine.delinearize_index %[[IV]] into (%[[UB1]], %[[UB2]], %[[UB0]])
+//      CHECK:     "use"(%[[DELINEARIZE]]#2, %[[DELINEARIZE]]#0, %[[DELINEARIZE]]#1)

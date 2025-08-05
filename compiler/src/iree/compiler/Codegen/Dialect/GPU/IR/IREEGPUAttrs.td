@@ -581,7 +581,7 @@ def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
 //===----------------------------------------------------------------------===//
 
 def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target", [
-  DeclareAttrInterfaceMethods<IREECodegen_TargetInfoAttrInterface,[
+  DeclareAttrInterfaceMethods<IREECodegen_TargetInfoAttrInterface, [
     "getMaximumWorkgroupCount"]>]> {
   let summary = [{Full GPU target attribute.}];
   let description = [{
