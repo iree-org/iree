@@ -85,7 +85,7 @@ getTiledOps(Operation *funcOp, IREE::GPU::TilingLevel tilingLevel) {
 /// d1 corresponds to operand dimension 0 of %arg0.
 ///
 /// So [{0, %arg0, 1}, {1, %arg0, 0}] is returned.
-static SmallVector<std::tuple<unsigned, Value, unsigned>>
+static FailureOr<SmallVector<std::tuple<unsigned, Value, unsigned>>>
 findReductionDims(linalg::LinalgOp op) {
 
   SmallVector<AffineMap> indexingMaps = op.getIndexingMapsArray();
@@ -110,7 +110,8 @@ findReductionDims(linalg::LinalgOp op) {
       }
     }
 
-    assert(found && "failed to find operand with reduction dimension");
+    if (!found)
+      return failure();
   }
 
   return triplets;
@@ -188,7 +189,12 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
   SmallVector<std::tuple<unsigned, Value, unsigned>> reductionDims;
   auto linalgOp = dyn_cast<linalg::LinalgOp>(tilingInterfaceOp.getOperation());
   if (linalgOp) {
-    reductionDims = findReductionDims(linalgOp);
+    auto maybeReductionDims = findReductionDims(linalgOp);
+    if (failed(maybeReductionDims)) {
+      tilingInterfaceOp.emitWarning("failed to map reduction dimensions");
+      return failure();
+    }
+    reductionDims = std::move(*maybeReductionDims);
   }
 
   // 4. Pad.
