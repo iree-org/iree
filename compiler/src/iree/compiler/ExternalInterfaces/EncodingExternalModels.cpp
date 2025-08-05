@@ -221,8 +221,8 @@ struct GenericOpPropagationInterface
                 auto operandType =
                     dyn_cast<RankedTensorType>(operand->get().getType());
                 if (!operandType) {
-                  encodedOperands.push_back(operand->get());
                   // Scalar types do not need encodings.
+                  encodedOperands.push_back(operand->get());
                   continue;
                 }
                 auto resType = RankedTensorType::get(
