@@ -38,24 +38,13 @@ bool isEntryPoint(mlir::FunctionOpInterface func);
 std::optional<IREE::HAL::ExecutableExportOp>
 getEntryPoint(mlir::FunctionOpInterface funcOp);
 
-/// Returns the StringAttr with the name `stringAttr` in the `srcAttr`, if
-/// found. The `srcAttr` can be either IREE::HAL::ExecutableTargetAttr or
-/// DictionaryAttr.
-std::optional<StringAttr> getConfigStringAttr(Attribute srcAttr,
-                                              StringRef stringAttr);
-
-/// Returns the IntegerAttr with the name `integerAttr` in the `srcAttr`, if
-/// found.
-std::optional<IntegerAttr> getConfigIntegerAttr(Attribute srcAttr,
-                                                StringRef integerAttr);
-
-/// Returns the BoolAttr with the name `boolAttr` in the `srcAttr`, if
-/// found.
-std::optional<BoolAttr> getConfigBoolAttr(Attribute srcAttr,
-                                          StringRef boolAttr);
+/// Methods to retrieve information association with `configuration` field
+/// of `hal.executable.target` attribute used commonly in codegen pipelines.
+std::optional<StringRef> getConfigDataLayout(DictionaryAttr targetConfig);
+std::optional<StringRef> getConfigTargetTriple(DictionaryAttr targetConfig);
 
 /// Returns the LLVM Target triple associated with the `attr`, if set.
-std::optional<llvm::Triple> getTargetTriple(Attribute attr);
+std::optional<llvm::Triple> getTargetTriple(DictionaryAttr targetConfig);
 
 /// Returns the target architecture name, in IREE_ARCH convention, from the
 /// given target triple.
@@ -70,21 +59,21 @@ bool isWebGPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 // Returns true if the ukernel with given `ukernelName` is enabled.
 // If `ukernelName` is empty (the default), returns true if any ukernel
 // is enabled at all.
-bool hasUkernel(Attribute attr, StringRef ukernelName = "");
+bool hasUkernel(DictionaryAttr attr, StringRef ukernelName = "");
 
 /// Returns the CPU target features associated with the `attr`, if found.
-std::optional<StringRef> getCpuFeatures(Attribute attr);
+std::optional<StringRef> getCpuFeatures(DictionaryAttr targetConfig);
 
 /// Returns true if `attr` has `feature` in its CPU features.
-bool hasFeature(Attribute attr, StringRef feature);
+bool hasFeature(DictionaryAttr targetConfig, StringRef feature);
 
 /// Architecture identification.
-bool isX86(Attribute attr);
-bool isX86_64(Attribute attr);
-bool isAArch64(Attribute attr);
-bool isRISCV(Attribute attr);
-bool isRISCV32(Attribute attr);
-bool isRISCV64(Attribute attr);
+bool isX86(DictionaryAttr targetConfig);
+bool isX86_64(DictionaryAttr targetConfig);
+bool isAArch64(DictionaryAttr targetConfig);
+bool isRISCV(DictionaryAttr targetConfig);
+bool isRISCV32(DictionaryAttr targetConfig);
+bool isRISCV64(DictionaryAttr targetConfig);
 
 /// Get maximum workgroup count in [x, y, z] for target attribute if it is
 /// available. Returns ShapedType::kDynamic if it is unknown.

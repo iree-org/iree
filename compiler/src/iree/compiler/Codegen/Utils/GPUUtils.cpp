@@ -996,32 +996,33 @@ IREE::GPU::TargetAttr getCLGPUTarget(MLIRContext *context) {
   return IREE::GPU::getFullTarget(backend, arch, features, context);
 }
 
-IREE::GPU::TargetAttr getGPUTargetAttr(Attribute attr) {
-  if (!attr) {
-    return {};
+IREE::GPU::TargetAttr getGPUTargetAttr(DictionaryAttr attr) {
+  return attr.getAs<IREE::GPU::TargetAttr>("iree.gpu.target");
+}
+
+IREE::GPU::TargetAttr getGPUTargetAttr(MLIRContext *context,
+                                       IREE::HAL::ExecutableTargetAttr target) {
+  IREE::GPU::TargetAttr gpuTargetAttr;
+  if (target) {
+    gpuTargetAttr = getGPUTargetAttr(target.getConfiguration());
   }
-  DictionaryAttr config;
-  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(attr);
-  if (targetAttr) {
-    config = targetAttr.getConfiguration();
-  } else {
-    config = dyn_cast<DictionaryAttr>(attr);
+  if (!gpuTargetAttr) {
+    gpuTargetAttr = getCLGPUTarget(context);
   }
-  if (!config) {
-    return getCLGPUTarget(attr.getContext());
-  }
-  auto gpuAttr = config.getAs<IREE::GPU::TargetAttr>(kGPUTargetAttrName);
-  if (!gpuAttr) {
-    return getCLGPUTarget(attr.getContext());
-  }
-  return gpuAttr;
+  return gpuTargetAttr;
 }
 
 IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op) {
-  if (auto target = IREE::HAL::ExecutableTargetAttr::lookup(op)) {
-    return getGPUTargetAttr(target);
-  }
-  return getCLGPUTarget(op->getContext());
+  return getGPUTargetAttr(op->getContext(),
+                          IREE::HAL::ExecutableTargetAttr::lookup(op));
+}
+
+IntegerAttr getConfigWavesPerEuAttr(DictionaryAttr targetConfig) {
+  return targetConfig.getAs<IntegerAttr>("waves_per_eu");
+}
+std::optional<int64_t> getConfigWavesPerEu(DictionaryAttr targetConfig) {
+  auto attr = getConfigWavesPerEuAttr(targetConfig);
+  return attr ? std::optional<int64_t>(attr.getInt()) : std::nullopt;
 }
 
 std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func) {

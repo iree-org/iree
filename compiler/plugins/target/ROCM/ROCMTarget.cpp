@@ -350,7 +350,7 @@ public:
   buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                  OpPassManager &passManager) override {
     if (options.specializeDispatches) {
-      if (auto attr = getGPUTargetAttr(targetAttr)) {
+      if (auto attr = getGPUTargetAttr(targetAttr.getContext(), targetAttr)) {
         ROCM::ApplyBuiltinPDLPatternsPassOptions options;
         options.enableSpecialization = true;
         if (IREE::GPU::TargetChipAttr chip = attr.getChip()) {
@@ -443,7 +443,7 @@ public:
     auto targetAttr = variantOp.getTargetAttr();
     StringRef targetArch = options.target;
     StringRef targetFeatures = options.targetFeatures;
-    if (auto attr = getGPUTargetAttr(targetAttr)) {
+    if (auto attr = getGPUTargetAttr(variantOp.getContext(), targetAttr)) {
       targetArch = attr.getArch();
       targetFeatures = attr.getFeatures();
     }

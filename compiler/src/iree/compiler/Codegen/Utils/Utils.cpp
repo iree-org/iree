@@ -67,45 +67,18 @@ bool isEntryPoint(mlir::FunctionOpInterface func) {
   return func.isPublic() && getEntryPoint(func);
 }
 
-template <typename AttrType>
-std::optional<AttrType> getConfigTypedAttr(Attribute attr, StringRef attrName) {
-  if (!attr) {
-    return std::nullopt;
-  }
-  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(attr);
-  DictionaryAttr config;
-  if (targetAttr) {
-    config = targetAttr.getConfiguration();
-  } else {
-    config = dyn_cast<DictionaryAttr>(attr);
-  }
-  if (!config) {
-    return std::nullopt;
-  }
-  auto configAttr = config.getAs<AttrType>(attrName);
-  if (!configAttr) {
-    return std::nullopt;
-  }
-  return configAttr;
+std::optional<StringRef> getConfigDataLayout(DictionaryAttr targetConfig) {
+  auto attr = targetConfig.getAs<StringAttr>("data_layout");
+  return attr ? std::optional<StringRef>(attr.getValue()) : std::nullopt;
 }
 
-std::optional<StringAttr> getConfigStringAttr(Attribute srcAttr,
-                                              StringRef stringAttr) {
-  return getConfigTypedAttr<StringAttr>(srcAttr, stringAttr);
+std::optional<StringRef> getConfigTargetTriple(DictionaryAttr targetConfig) {
+  auto attr = targetConfig.getAs<StringAttr>("target_triple");
+  return attr ? std::optional<StringRef>(attr.getValue()) : std::nullopt;
 }
 
-std::optional<IntegerAttr> getConfigIntegerAttr(Attribute srcAttr,
-                                                StringRef integerAttr) {
-  return getConfigTypedAttr<IntegerAttr>(srcAttr, integerAttr);
-}
-
-std::optional<BoolAttr> getConfigBoolAttr(Attribute srcAttr,
-                                          StringRef boolAttr) {
-  return getConfigTypedAttr<BoolAttr>(srcAttr, boolAttr);
-}
-
-std::optional<llvm::Triple> getTargetTriple(Attribute attr) {
-  auto triple = getConfigStringAttr(attr, "target_triple");
+std::optional<llvm::Triple> getTargetTriple(DictionaryAttr attr) {
+  auto triple = getConfigTargetTriple(attr);
   if (!triple) {
     return std::nullopt;
   }
@@ -150,35 +123,29 @@ bool isWebGPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return targetAttr && targetAttr.getBackend().getValue().starts_with("webgpu");
 }
 
-static const char *getDefaultEnabledUkernels(Attribute attr) {
+static const char *getDefaultEnabledUkernels(DictionaryAttr targetConfig) {
   const char *kNone = "none";
-  if (!attr) {
-    return kNone;
-  }
-  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(attr);
-  if (!targetAttr) {
-    return kNone;
-  }
-  if (isX86_64(targetAttr)) {
+  if (isX86_64(targetConfig)) {
     return "mmt4d";
   }
-  if (isAArch64(targetAttr)) {
+  if (isAArch64(targetConfig)) {
     return "mmt4d";
   }
   return kNone;
 }
 
-bool hasUkernel(Attribute attr, StringRef ukernelName) {
-  auto enabledUkernels = getConfigStringAttr(attr, "ukernels");
+bool hasUkernel(DictionaryAttr targetConfig, StringRef ukernelName) {
+  auto enabledUkernels = targetConfig.getAs<StringAttr>("ukernels");
+
   StringRef enabledUkernelsStr;
   if (enabledUkernels) {
-    enabledUkernelsStr = enabledUkernels->getValue();
+    enabledUkernelsStr = enabledUkernels.getValue();
   } else {
     enabledUkernelsStr = "default";
   }
   // Resolve `default`.
   if (enabledUkernelsStr == "default") {
-    enabledUkernelsStr = getDefaultEnabledUkernels(attr);
+    enabledUkernelsStr = getDefaultEnabledUkernels(targetConfig);
   }
   // Resolve `none`.
   if (enabledUkernelsStr == "none") {
@@ -203,20 +170,17 @@ bool hasUkernel(Attribute attr, StringRef ukernelName) {
   return false;
 }
 
-std::optional<StringRef> getCpuFeatures(Attribute attr) {
-  auto cpuFeatures = getConfigStringAttr(attr, "cpu_features");
-  if (!cpuFeatures) {
-    return std::nullopt;
-  }
-  return cpuFeatures->getValue();
+std::optional<StringRef> getCpuFeatures(DictionaryAttr targetConfig) {
+  auto attr = targetConfig.getAs<StringAttr>("cpu_features");
+  return attr ? std::optional<StringRef>(attr.getValue()) : std::nullopt;
 }
 
 // TODO(dcaballe): If we have to check for a significantly large number of
 // features in the future, we may want to consider a persistent state to carry
 // over processed HAL information or keeping the TTI instance alive and query
 // subtarget features data structure.
-bool hasFeature(Attribute attr, StringRef feature) {
-  std::optional<StringRef> features = getCpuFeatures(attr);
+bool hasFeature(DictionaryAttr targetConfig, StringRef feature) {
+  std::optional<StringRef> features = getCpuFeatures(targetConfig);
   if (!features) {
     return false;
   }
@@ -234,33 +198,33 @@ bool hasFeature(Attribute attr, StringRef feature) {
   return false;
 }
 
-bool isX86(Attribute attr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(attr);
+bool isX86(DictionaryAttr targetConfig) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
   return triple && triple.value().isX86();
 }
 
-bool isX86_64(Attribute attr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(attr);
+bool isX86_64(DictionaryAttr targetConfig) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
   return triple && triple.value().getArch() == llvm::Triple::x86_64;
 }
 
-bool isAArch64(Attribute attr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(attr);
+bool isAArch64(DictionaryAttr targetConfig) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
   return triple && triple.value().isAArch64();
 }
 
-bool isRISCV(Attribute attr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(attr);
+bool isRISCV(DictionaryAttr targetConfig) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
   return triple && triple.value().isRISCV();
 }
 
-bool isRISCV32(Attribute attr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(attr);
+bool isRISCV32(DictionaryAttr targetConfig) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
   return triple && triple.value().isRISCV32();
 }
 
-bool isRISCV64(Attribute attr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(attr);
+bool isRISCV64(DictionaryAttr targetConfig) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
   return triple && triple.value().isRISCV64();
 }
 
@@ -1572,7 +1536,7 @@ bool hasFusedLeadingOp(linalg::LinalgOp rootOp) {
 
 std::optional<vector::VscaleRange>
 getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  if (isAArch64(targetAttr)) {
+  if (targetAttr && isAArch64(targetAttr.getConfiguration())) {
     // On AArch64 the scalable vector length will always be between 128-bit and
     // 2048-bit. This works out as a vscale range of 1 to 16. See:
     // https://developer.arm.com/Architectures/Scalable%20Vector%20Extensions

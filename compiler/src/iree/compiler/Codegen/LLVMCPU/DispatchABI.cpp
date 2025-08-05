@@ -879,10 +879,11 @@ Value HALDispatchABI::updateProcessorDataFromTargetAttr(
   if (!targetAttr) {
     return processorDataPtrValue;
   }
+  DictionaryAttr targetConfig = targetAttr.getConfiguration();
 
   // Lookup CPU features.
   std::optional<NamedAttribute> cpuFeatures =
-      targetAttr.getConfiguration().getNamed("cpu_features");
+      targetConfig.getNamed("cpu_features");
   if (!cpuFeatures) {
     return processorDataPtrValue;
   }
@@ -897,7 +898,7 @@ Value HALDispatchABI::updateProcessorDataFromTargetAttr(
     // Instead we should use a reflection callback to resolve arch guarded
     // features directly in the compiler.
     llvm::StringMap<uint64_t> featureToBitPattern;
-    auto targetTriple = getTargetTriple(targetAttr);
+    auto targetTriple = getTargetTriple(targetConfig);
     if (!targetTriple) {
       return processorDataPtrValue;
     }

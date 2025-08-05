@@ -467,7 +467,8 @@ public:
     auto targetAttr = variantOp.getTargetAttr();
     StringRef targetArch = options.clTarget;
     StringRef targetFeatures = options.clTargetFeatures;
-    if (auto attr = getGPUTargetAttr(targetAttr)) {
+    if (auto attr =
+            getGPUTargetAttr(executableBuilder.getContext(), targetAttr)) {
       targetArch = attr.getArch();
       targetFeatures = attr.getFeatures();
     }

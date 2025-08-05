@@ -195,13 +195,18 @@ FailureOr<ArrayAttr> getSupportedMmaTypes(mlir::FunctionOpInterface entryPoint);
 /// Returns null TargetAttr otherwise.
 IREE::GPU::TargetAttr getCLGPUTarget(MLIRContext *context);
 
-/// Returns the GPU target attribute from attribute `attr` if found. The `attr`
-/// can be either IREE::HAL::ExecutableTargetAttr or DictionaryAttr.
-/// Returns null TargetAttr otherwise.
-IREE::GPU::TargetAttr getGPUTargetAttr(Attribute attr);
+/// Returns the GPU target attribute from attribute `attr`.
+IREE::GPU::TargetAttr getGPUTargetAttr(DictionaryAttr attr);
 /// Returns the GPU target attribute from the executable target wrapping |op|
 /// if found. Returns null TargetAttr otherwise.
+IREE::GPU::TargetAttr getGPUTargetAttr(MLIRContext *context,
+                                       IREE::HAL::ExecutableTargetAttr attr);
 IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op);
+
+// Methods to retrieve information association with `configuration` field
+// of `hal.executable.target` attribute used commonly in GPU codegen pipelines.
+std::optional<int64_t> getConfigWavesPerEu(DictionaryAttr targetAttr);
+IntegerAttr getConfigWavesPerEuAttr(DictionaryAttr targetAttr);
 
 /// Returns the GPU subgroup size chosen for the current CodeGen pipeline if
 /// exists; otherwise returns the subgroup size from the GPU target description.
