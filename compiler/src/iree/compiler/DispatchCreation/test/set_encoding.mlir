@@ -808,7 +808,13 @@ util.func public @batch_matmul_f32f32f32_narrow_MN(%arg0 : tensor<64x4x250xf32>,
 
 util.func public @matmul_transpose_a_f32f32f32(%arg0 : tensor<250x100xf32>, %arg1 : tensor<250x500xf32>,
     %arg2 : tensor<100x500xf32>) -> tensor<100x500xf32> {
-  %0 = linalg.matmul_transpose_a ins(%arg0, %arg1 : tensor<250x100xf32>, tensor<250x500xf32>)
+  %0 = linalg.matmul
+      indexing_maps = [
+        affine_map<(d0, d1, d2) -> (d2, d0)>,
+        affine_map<(d0, d1, d2) -> (d2, d1)>,
+        affine_map<(d0, d1, d2) -> (d0, d1)>
+      ]
+      ins(%arg0, %arg1 : tensor<250x100xf32>, tensor<250x500xf32>)
       outs(%arg2 : tensor<100x500xf32>) -> tensor<100x500xf32>
   util.return %0 : tensor<100x500xf32>
 }
@@ -829,7 +835,8 @@ util.func public @matmul_transpose_a_f32f32f32(%arg0 : tensor<250x100xf32>, %arg
 // CHECK-SAME:       tensor<250x500xf32, #[[RHS_ENCODING]]>
 //      CHECK:   %[[OUTS:.+]] = iree_encoding.set_encoding %[[ARG2]]
 // CHECK-SAME:       tensor<100x500xf32, #[[OUT_ENCODING]]>
-//      CHECK:   %[[MATMUL:.+]] = linalg.matmul_transpose_a
+//      CHECK:   %[[MATMUL:.+]] = linalg.matmul
+// CHECK-SAME:       indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]]
 // CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
 // CHECK-SAME:       outs(%[[OUTS]] :
 //      CHECK:   %[[RESULT:.+]] = iree_encoding.unset_encoding %[[MATMUL]]
@@ -839,7 +846,13 @@ util.func public @matmul_transpose_a_f32f32f32(%arg0 : tensor<250x100xf32>, %arg
 
 util.func public @matmul_transpose_b_f32f32f32(%arg0 : tensor<100x250xf32>, %arg1 : tensor<500x250xf32>,
     %arg2 : tensor<100x500xf32>) -> tensor<100x500xf32> {
-  %0 = linalg.matmul_transpose_b ins(%arg0, %arg1 : tensor<100x250xf32>, tensor<500x250xf32>)
+  %0 = linalg.matmul
+      indexing_maps = [
+        affine_map<(d0, d1, d2) -> (d0, d2)>,
+        affine_map<(d0, d1, d2) -> (d1, d2)>,
+        affine_map<(d0, d1, d2) -> (d0, d1)>
+      ]
+      ins(%arg0, %arg1 : tensor<100x250xf32>, tensor<500x250xf32>)
       outs(%arg2 : tensor<100x500xf32>) -> tensor<100x500xf32>
   util.return %0 : tensor<100x500xf32>
 }
@@ -859,7 +872,8 @@ util.func public @matmul_transpose_b_f32f32f32(%arg0 : tensor<100x250xf32>, %arg
 // CHECK-SAME:       tensor<500x250xf32, #[[RHS_ENCODING]]>
 //      CHECK:   %[[OUTS:.+]] = iree_encoding.set_encoding %[[ARG2]]
 // CHECK-SAME:       tensor<100x500xf32, #[[OUT_ENCODING]]>
-//      CHECK:   %[[MATMUL:.+]] = linalg.matmul_transpose_b
+//      CHECK:   %[[MATMUL:.+]] = linalg.matmul
+// CHECK-SAME:       indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]]
 // CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
 // CHECK-SAME:       outs(%[[OUTS]] :
 //      CHECK:   %[[RESULT:.+]] = iree_encoding.unset_encoding %[[MATMUL]]
@@ -869,7 +883,13 @@ util.func public @matmul_transpose_b_f32f32f32(%arg0 : tensor<100x250xf32>, %arg
 
 util.func public @batch_matmul_transpose_a_f32f32f32(%arg0 : tensor<2x250x100xf32>, %arg1 : tensor<2x250x500xf32>,
     %arg2 : tensor<2x100x500xf32>) -> tensor<2x100x500xf32> {
-  %0 = linalg.batch_matmul_transpose_a ins(%arg0, %arg1 : tensor<2x250x100xf32>, tensor<2x250x500xf32>)
+  %0 = linalg.batch_matmul
+      indexing_maps = [
+        affine_map<(d0, d1, d2, d3) -> (d0, d3, d1)>,
+        affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>,
+        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+      ]
+      ins(%arg0, %arg1 : tensor<2x250x100xf32>, tensor<2x250x500xf32>)
       outs(%arg2 : tensor<2x100x500xf32>) -> tensor<2x100x500xf32>
   util.return %0 : tensor<2x100x500xf32>
 }
@@ -889,7 +909,8 @@ util.func public @batch_matmul_transpose_a_f32f32f32(%arg0 : tensor<2x250x100xf3
 // CHECK-SAME:       tensor<2x250x500xf32, #[[RHS_ENCODING]]>
 //      CHECK:   %[[OUTS:.+]] = iree_encoding.set_encoding %[[ARG2]]
 // CHECK-SAME:       tensor<2x100x500xf32, #[[OUT_ENCODING]]>
-//      CHECK:   %[[BATCH_MATMUL:.+]] = linalg.batch_matmul_transpose_a
+//      CHECK:   %[[BATCH_MATMUL:.+]] = linalg.batch_matmul
+// CHECK-SAME:       indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]]
 // CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
 // CHECK-SAME:       outs(%[[OUTS]] :
 //      CHECK:   %[[RESULT:.+]] = iree_encoding.unset_encoding %[[BATCH_MATMUL]]
@@ -899,7 +920,13 @@ util.func public @batch_matmul_transpose_a_f32f32f32(%arg0 : tensor<2x250x100xf3
 
 util.func public @batch_matmul_transpose_b_f32f32f32(%arg0 : tensor<2x100x250xf32>, %arg1 : tensor<2x500x250xf32>,
     %arg2 : tensor<2x100x500xf32>) -> tensor<2x100x500xf32> {
-  %0 = linalg.batch_matmul_transpose_b ins(%arg0, %arg1 : tensor<2x100x250xf32>, tensor<2x500x250xf32>)
+  %0 = linalg.batch_matmul
+      indexing_maps = [
+        affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+        affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+      ]
+      ins(%arg0, %arg1 : tensor<2x100x250xf32>, tensor<2x500x250xf32>)
       outs(%arg2 : tensor<2x100x500xf32>) -> tensor<2x100x500xf32>
   util.return %0 : tensor<2x100x500xf32>
 }
@@ -919,7 +946,8 @@ util.func public @batch_matmul_transpose_b_f32f32f32(%arg0 : tensor<2x100x250xf3
 // CHECK-SAME:       tensor<2x500x250xf32, #[[RHS_ENCODING]]>
 //      CHECK:   %[[OUTS:.+]] = iree_encoding.set_encoding %[[ARG2]]
 // CHECK-SAME:       tensor<2x100x500xf32, #[[OUT_ENCODING]]>
-//      CHECK:   %[[BATCH_MATMUL:.+]] = linalg.batch_matmul_transpose_b
+//      CHECK:   %[[BATCH_MATMUL:.+]] = linalg.batch_matmul
+// CHECK-SAME:       indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]]
 // CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
 // CHECK-SAME:       outs(%[[OUTS]] :
 //      CHECK:   %[[RESULT:.+]] = iree_encoding.unset_encoding %[[BATCH_MATMUL]]
@@ -1089,7 +1117,13 @@ util.func public @broadcasting_dequant_op(%arg0: !hal.buffer_view, %arg1: !hal.b
       linalg.yield %14 : i32
     } -> tensor<?x?x?xi32>
     %12 = linalg.fill ins(%c0_i32_0 : i32) outs(%9 : tensor<?x?x?xi32>) -> tensor<?x?x?xi32>
-    %13 = linalg.batch_matmul_transpose_b ins(%11, %6 : tensor<?x?x?xi32>, tensor<?x?x?xi32>) outs(%12 : tensor<?x?x?xi32>) -> tensor<?x?x?xi32>
+    %13 = linalg.batch_matmul
+      indexing_maps = [
+        affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+        affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+      ]
+      ins(%11, %6 : tensor<?x?x?xi32>, tensor<?x?x?xi32>) outs(%12 : tensor<?x?x?xi32>) -> tensor<?x?x?xi32>
     flow.return %13 : tensor<?x?x?xi32>
   }
   util.return %7 : tensor<?x?x?xi32>
@@ -1118,7 +1152,8 @@ util.func public @broadcasting_dequant_op(%arg0: !hal.buffer_view, %arg1: !hal.b
 // CHECK-SAME:     -> tensor<?x?x?xi32, #[[RHS_ENCODING]]>
 // CHECK:        %[[INIT:.+]] = tensor.empty({{.+}}) :  tensor<?x?x?xi32, #[[OUT_ENCODING]]>
 // CHECK:        %[[FILL:.+]] = linalg.fill ins({{.+}}) outs(%[[INIT]]
-// CHECK:        %[[GEMM:.+]] = linalg.batch_matmul_transpose_b
+// CHECK:        %[[GEMM:.+]] = linalg.batch_matmul
+// CHECK-SAME:     indexing_maps = [#[[MAP2]], #[[MAP3]], #[[MAP4]]]
 // CHECK-SAME:     ins(%[[LHS]], %[[RHS]]
 // CHECK-SAME:    outs(%[[FILL]]
 // CHECK:        %[[UNSET:.+]] = iree_encoding.unset_encoding %[[GEMM]]{{.+}} -> tensor<?x?x?xi32>{%[[ARG1_D0]], %[[ARG0_D0]], %[[ARG1_D1]]}
