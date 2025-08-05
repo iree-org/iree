@@ -891,9 +891,6 @@ struct MaterializeFuncReturnOp final
   LogicalResult
   matchAndRewrite(func::ReturnOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    if (!llvm::any_of(op.getOperandTypes(), isRankedTensorTypeWithEncoding)) {
-      return rewriter.notifyMatchFailure(op, "does not have encodings");
-    }
     rewriter.replaceOpWithNewOp<func::ReturnOp>(op, adaptor.getOperands());
     return success();
   }
