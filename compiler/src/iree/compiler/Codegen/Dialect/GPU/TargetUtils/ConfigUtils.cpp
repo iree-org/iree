@@ -204,13 +204,15 @@ static std::optional<ArrayAttr> getPaddingConvSizes(
     Builder &b, int64_t kSize, int64_t kPaddingSize,
     const SmallVector<int64_t> &workgroupTileSizes,
     const SmallVector<int64_t> &mDims, const SmallVector<int64_t> &nDims,
+    const SmallVector<int64_t> &batchDims,
     std::optional<mlir::linalg::ConvolutionDimensions> &padConvDims) {
   if (!padConvDims.has_value())
     return std::nullopt;
 
   SmallVector<unsigned> batchAndImageDims;
   mlir::linalg::ConvolutionDimensions convDims = padConvDims.value();
-  bool isBatchLast = convDims.outputImage.back() < convDims.batch.front();
+  bool isBatchLast = !convDims.batch.empty() &&
+                     convDims.outputImage.back() < convDims.batch.front();
   if (isBatchLast) {
     batchAndImageDims.append(convDims.outputImage.begin(),
                              convDims.outputImage.end());
@@ -237,7 +239,8 @@ static std::optional<ArrayAttr> getPaddingConvSizes(
   // Verify that the number of M, N dimensions from IGEMM match the
   // corresponding number of convolution dimensions.
   if (concatMDims.size() != mDims.size() ||
-      concatNDims.size() != nDims.size()) {
+      concatNDims.size() != nDims.size() ||
+      convDims.depth.size() != batchDims.size()) {
     return std::nullopt;
   }
 
@@ -246,8 +249,13 @@ static std::optional<ArrayAttr> getPaddingConvSizes(
   int64_t totalNumDims = convDims.batch.size() + convDims.outputImage.size() +
                          convDims.outputChannel.size() +
                          convDims.filterLoop.size() +
-                         convDims.inputChannel.size();
+                         convDims.inputChannel.size() + convDims.depth.size();
   SmallVector<int64_t> paddingConvSizes(totalNumDims, 0);
+  if (batchDims.size() != 0) {
+    for (auto [dim, bDim] : llvm::zip(convDims.depth, batchDims)) {
+      paddingConvSizes[dim] = workgroupTileSizes[bDim];
+    }
+  }
   for (auto [dim, mDim] : llvm::zip(concatMDims, mDims))
     paddingConvSizes[dim] = workgroupTileSizes[mDim];
   for (auto [dim, nDim] : llvm::zip(concatNDims, nDims))
@@ -526,7 +534,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     // possible, otherwise fallback to pad IGEMM.
     if (auto attr = getPaddingConvSizes(
             b, bounds[innerKDim], paddingTileSizes[innerKDim],
-            workgroupTileSizes, mDims, nDims, padConvDims)) {
+            workgroupTileSizes, mDims, nDims, batchDims, padConvDims)) {
       attrs.emplace_back(StringAttr::get(context, "padding_conv"), *attr);
     } else {
       attrs.emplace_back(StringAttr::get(context, "padding"),
