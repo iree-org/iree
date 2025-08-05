@@ -7,6 +7,7 @@
 #ifndef COMPILER_PLUGINS_TARGET_ROCM_DIALECT_TRANSFORMS_PASSES_H_
 #define COMPILER_PLUGINS_TARGET_ROCM_DIALECT_TRANSFORMS_PASSES_H_
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
