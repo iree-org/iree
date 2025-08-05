@@ -1,6 +1,225 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-materialize-device-encoding))" --split-input-file %s | FileCheck %s --check-prefixes=CHECK,NO-SVE
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-materialize-device-encoding))" --iree-llvmcpu-enable-scalable-vectorization=true --split-input-file %s | FileCheck %s --check-prefixes=CHECK,WITH-SVE
 
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [bf16, bf16, bf16], user_indexing_maps = [affine_map<(m, n, k) -> (m, k)>, affine_map<(m, n, k) -> (k, n)>, affine_map<(m, n, k) -> (m, n)>], iteration_sizes = [?, ?, ?]>
+func.func @matmul_LHS() attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="aarch64-xyz-xyz", cpu_features="+sve", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+}{
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x16xbf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8x16xbf16, #encoding>>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [8, 16], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x16xbf16>> -> tensor<8x16xbf16>
+  %3 = iree_encoding.set_encoding %2 : tensor<8x16xbf16> -> tensor<8x16xbf16, #encoding>
+  iree_tensor_ext.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [8, 16], strides = [1, 1] : tensor<8x16xbf16, #encoding> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8x16xbf16,  #encoding>>
+  return
+}
+/// NOTE: No scalable tiles for LHS, hence no difference between NO-SVE and WITH-SVE
+
+// CHECK-LABEL: func.func @matmul_LHS
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[IN_BINDING:.+]] = hal.interface.binding.subspan {{.+}} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x16xbf16>>
+// CHECK-DAG:     %[[OUT_BINDING:.+]] = hal.interface.binding.subspan {{.+}} : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x16x8x1xbf16>>
+// CHECK:         %[[SRC:.+]] = iree_tensor_ext.dispatch.tensor.load %[[IN_BINDING]]
+// CHECK-DAG:     %[[INIT:.+]] = tensor.empty() : tensor<1x16x8x1xbf16>
+// CHECK:         %[[PACK:.+]] = linalg.pack %[[SRC]]
+// CHECK-SAME:      outer_dims_perm = [0, 1]
+// CHECK-SAME:      inner_dims_pos = [0, 1]
+// CHECK-SAME:      inner_tiles = [8, 1]
+// CHECK-SAME:      into %[[INIT]] : tensor<8x16xbf16> -> tensor<1x16x8x1xbf16>
+// CHECK:         iree_tensor_ext.dispatch.tensor.store %[[PACK]], %[[OUT_BINDING]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#encoding = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [bf16, bf16, bf16], user_indexing_maps = [affine_map<(m, n, k) -> (m, k)>, affine_map<(m, n, k) -> (k, n)>, affine_map<(m, n, k) -> (m, n)>], iteration_sizes = [?, ?, ?]>
+func.func @matmul_RHS() attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="aarch64-xyz-xyz", cpu_features="+sve", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+}{
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x16xbf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8x16xbf16, #encoding>>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [8, 16], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x16xbf16>> -> tensor<8x16xbf16>
+  %3 = iree_encoding.set_encoding %2 : tensor<8x16xbf16> -> tensor<8x16xbf16, #encoding>
+  iree_tensor_ext.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [8, 16], strides = [1, 1] : tensor<8x16xbf16, #encoding> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8x16xbf16,  #encoding>>
+  return
+}
+/// NOTE: For RHS, the inner tile correspondong to the "N" dimension is
+/// scalable, hence NO-SVE and WITH-SVE differ!
+
+// WITH-SVE: #[[$MAP:.+]] = affine_map<()[s0] -> (16 ceildiv s0)>
+
+// CHECK-LABEL: func.func @matmul_RHS
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// WITH-SVE-DAG:  %[[C8:.*]] = arith.constant 8 : index
+// WITH-SVE-DAG:  %[[PAD:.+]] = arith.constant 0.000000e+00 : bf16
+
+/// Input binding
+// CHECK-DAG:     %[[IN_BINDING:.+]] = hal.interface.binding.subspan {{.+}} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x16xbf16>>
+
+/// SVE: the number of outer tiles corresponding to the inner scalable tile
+// WITH-SVE:      %[[VSCALE:.*]] = vector.vscale
+// WITH-SVE:      %[[C8_VSCALE:.*]] = arith.muli %[[VSCALE]], %[[C8]] : index
+// WITH-SVE:      %[[OUTER_DIM:.*]] = affine.apply #[[$MAP]]()[%[[C8_VSCALE]]]
+
+/// Output binding
+// NO-SVE-DAG:     %[[OUT_BINDING:.+]] = hal.interface.binding.subspan {{.+}} : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x8x8x1xbf16>>
+// WITH-SVE-DAG:   %[[OUT_BINDING:.+]] = hal.interface.binding.subspan {{.+}} : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x8x?x1xbf16>>
+
+/// Input
+// CHECK:         %[[SRC:.+]] = iree_tensor_ext.dispatch.tensor.load %[[IN_BINDING]]
+
+/// Init the output tensor
+// NO-SVE-DAG:     %[[INIT:.+]] = tensor.empty() : tensor<2x8x8x1xbf16>
+// WITH-SVE-DAG:   %[[INIT:.*]] = tensor.empty(%[[OUTER_DIM]], %[[C8_VSCALE]]) : tensor<?x8x?x1xbf16>
+
+/// The newly materialised Pack Op (SVE includes padding)
+// CHECK:         %[[PACK:.+]] = linalg.pack %[[SRC]]
+// WITH-SVE-SAME:    padding_value(%[[PAD]] : bf16)
+// NO-SVE-NOT:        padding_value
+
+// CHECK-SAME:      outer_dims_perm = [1, 0]
+// CHECK-SAME:      inner_dims_pos = [1, 0]
+
+// NO-SVE-SAME:      inner_tiles = [8, 1]
+// NO-SVE-SAME:      into %[[INIT]] : tensor<8x16xbf16> -> tensor<2x8x8x1xbf16>
+
+// WITH-SVE-SAME:    inner_tiles = [%[[C8_VSCALE]], 1]
+// WITH-SVE-SAME:    into %[[INIT]] : tensor<8x16xbf16> -> tensor<?x8x?x1xbf16>
+
+// CHECK:         iree_tensor_ext.dispatch.tensor.store %[[PACK]], %[[OUT_BINDING]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#map = affine_map<(b, m, n, k) -> (b, m, k)>
+#map1 = affine_map<(b, m, n, k) -> (b, k, n)>
+#map2 = affine_map<(b, m, n, k) -> (b, m, n)>
+#encoding = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [128, 32, 320, ?]>
+func.func @batch_matmul_RHS() attributes {
+   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="aarch64-xyz-xyz", cpu_features="+sve", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
+  %1 = arith.index_castui %0 {stream.alignment = 64 : index} : i32 to index
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x32x320xf32>>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%1) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x32x320xf32, #encoding>>
+  %4 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [128, 32, 320], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x32x320xf32>> -> tensor<128x32x320xf32>
+  %5 = iree_encoding.set_encoding %4 : tensor<128x32x320xf32> -> tensor<128x32x320xf32, #encoding>
+  iree_tensor_ext.dispatch.tensor.store %5, %3, offsets = [0, 0, 0], sizes = [128, 32, 320], strides = [1, 1, 1]
+    : tensor<128x32x320xf32, #encoding>
+    -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x32x320xf32, #encoding>>
+  return
+}
+/// NOTE: For RHS, the inner tile correspondong to the "N" dimension is
+/// scalable, hence NO-SVE and WITH-SVE differ!
+
+// WITH-SVE: #[[$MAP:.+]] = affine_map<()[s0] -> (320 ceildiv s0)>
+
+// CHECK-LABEL:   func.func @batch_matmul_RHS()
+// WITH-SVE-DAG:    %[[PAD:.+]] = arith.constant 0.000000e+00 : f32
+// WITH-SVE-DAG:    %[[C8:.+]] = arith.constant 8 : index
+// CHECK-DAG:       %[[C0:.+]] = arith.constant 0 : index
+
+/// Input binding
+// CHECK:           %[[IN_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(0) {{.+}} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x32x320xf32>>
+
+/// SVE: the number of outer tiles corresponding to the inner scalable tile
+// WITH-SVE:        %[[VSCALE:.+]] = vector.vscale
+// WITH-SVE:        %[[C8_VSCALE:.+]] = arith.muli %[[VSCALE]], %[[C8]] : index
+// WITH-SVE:        %[[OUTER_DIM:.+]] = affine.apply #[[$MAP]]()[%[[C8_VSCALE]]]
+
+/// Output binding
+// WITH-SVE:        %[[OUT_BINDING:.+]] = hal.interface.binding.subspan {{.+}} : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x?x32x?x1xf32>>
+// NO-SVE:          %[[OUT_BINDING:.+]] = hal.interface.binding.subspan {{.+}} : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x40x32x8x1xf32>>
+
+/// Input
+// CHECK:           %[[SRC:.+]] = iree_tensor_ext.dispatch.tensor.load %[[IN_BINDING]]
+
+/// Init the output tensor
+// NO-SVE:          %[[INIT:.+]] = tensor.empty() : tensor<128x40x32x8x1xf32>
+// WITH-SVE:        %[[INIT:.+]] = tensor.empty(%[[OUTER_DIM]], %[[C8_VSCALE]]) : tensor<128x?x32x?x1xf32>
+
+/// The newly materialised Pack Op (SVE includes padding!)
+// CHECK:           %[[PACK:.+]] = linalg.pack %[[SRC]]
+// WITH-SVE-SAME:     padding_value(%[[PAD]] : f32)
+// NO-SVE-NOT:        padding_value
+
+// CHECK-SAME:        outer_dims_perm = [0, 2, 1]
+// CHECK-SAME:        inner_dims_pos = [2, 1]
+
+// NO-SVE-SAME:       inner_tiles = [8, 1] into %[[INIT]] : tensor<128x32x320xf32> -> tensor<128x40x32x8x1xf32>
+
+// WITH-SVE-SAME:     inner_tiles = [%[[C8_VSCALE]], 1] into %[[INIT]] : tensor<128x32x320xf32> -> tensor<128x?x32x?x1xf32>
+
+// CHECK:           iree_tensor_ext.dispatch.tensor.store %[[PACK]], %[[OUT_BINDING]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#map = affine_map<(b, m, n, k) -> (b, m, k)>
+#map1 = affine_map<(b, m, n, k) -> (b, k, n)>
+#map2 = affine_map<(b, m, n, k) -> (b, m, n)>
+#encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [128, 80, 320, ?]>
+func.func @batch_matmul_RETURN_unset() attributes {
+   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="aarch64-xyz-xyz", cpu_features="+sve", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
+  %1 = arith.index_castui %0 {stream.alignment = 64 : index} : i32 to index
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x80x320xf32, #encoding>>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%1) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x80x320xf32>>
+  %4 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [128, 80, 320], strides = [1, 1, 1]
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x80x320xf32, #encoding>>
+    -> tensor<128x80x320xf32, #encoding>
+  %5 = iree_encoding.unset_encoding %4 : tensor<128x80x320xf32, #encoding> -> tensor<128x80x320xf32>
+  iree_tensor_ext.dispatch.tensor.store %5, %3, offsets = [0, 0, 0], sizes = [128, 80, 320], strides = [1, 1, 1]
+    : tensor<128x80x320xf32>
+    -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x80x320xf32>>
+  return
+}
+
+/// NOTE: For RETURN, the inner tile correspondong to the "N" dimension is
+/// scalable, hence NO-SVE and WITH-SVE differ!
+
+// CHECK-LABEL: func @batch_matmul_RETURN_unset
+// WITH-SVE-DAG:  %[[C8:.+]] = arith.constant 8 : index
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+
+/// SVE: the number of outer tiles corresponding to the inner scalable tile
+// WITH-SVE:      %[[VSCALE:.+]] = vector.vscale
+// WITH-SVE:      %[[C8_VSCALE:.+]] = arith.muli %[[VSCALE]], %[[C8]] : index
+// WITH-SVE:      %[[OUTER_DIM:.+]] = affine.apply #[[$MAP]]()[%[[C8_VSCALE]]]
+
+/// The in and out bindings
+// NO-SVE:        %[[IN_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(0) {{.+}} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x10x40x8x8xf32>>
+// WITH-SVE:      %[[IN_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(0) {{.+}} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x10x?x8x?xf32>>
+// CHECK:         %[[OUT_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(1) {{.+}} : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x80x320xf32>>
+
+// CHECK:         %[[INPUT:.+]] = iree_tensor_ext.dispatch.tensor.load %[[IN_BINDING]]
+// CHECK:         %[[EMPTY:.+]] = tensor.empty()
+
+/// The newly materialised UnPack Op
+// CHECK:         %[[UNPACK:.+]] = linalg.unpack %[[INPUT]]
+// NO-SVE-SAME:       outer_dims_perm = [0, 1, 2] inner_dims_pos = [1, 2] inner_tiles = [8, 8] into %[[EMPTY]]
+// WITH-SVE-SAME:     outer_dims_perm = [0, 1, 2] inner_dims_pos = [1, 2] inner_tiles = [8, %[[C8_VSCALE]]] into %[[EMPTY]]
+
+// CHECK:        iree_tensor_ext.dispatch.tensor.store %[[UNPACK]], %[[OUT_BINDING]]
+
+// -----
+
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
