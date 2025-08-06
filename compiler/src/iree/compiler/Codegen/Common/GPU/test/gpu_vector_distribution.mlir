@@ -120,3 +120,50 @@ builtin.module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [8],
+  batch_tile = [1],
+  outer_tile = [1],
+  thread_tile = [64],
+  element_tile = [4],
+  subgroup_strides = [1],
+  thread_strides = [1]
+>
+
+// CHECK-LABEL: @reduction
+func.func @reduction(%in: memref<2048xf32>, %out: memref<f32>) {
+  // CHECK: %[[ZERO:.*]] = arith.constant 0 : index
+  %cst = arith.constant dense<0.000000e+00> : vector<2048xf32>
+  %0 = ub.poison : f32
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %assume_align = memref.assume_alignment %in, 64 : memref<2048xf32>
+  %2 = amdgpu.fat_raw_buffer_cast %assume_align resetOffset : memref<2048xf32> to memref<2048xf32, #amdgpu.address_space<fat_raw_buffer>>
+  %assume_align_1 = memref.assume_alignment %out, 64 : memref<f32>
+  %4 = amdgpu.fat_raw_buffer_cast %assume_align_1 resetOffset : memref<f32> to memref<f32, #amdgpu.address_space<fat_raw_buffer>>
+  %5 = vector.transfer_read %2[%c0], %0 {in_bounds = [true]} : memref<2048xf32, #amdgpu.address_space<fat_raw_buffer>>, vector<2048xf32>
+  %6 = iree_vector_ext.to_layout %5 to layout(#layout) : vector<2048xf32>
+  %7 = iree_vector_ext.to_layout %cst to layout(#layout) : vector<2048xf32>
+  %8 = arith.addf %6, %7 : vector<2048xf32>
+  %9 = iree_vector_ext.to_layout %8 to layout(#layout) : vector<2048xf32>
+  %10 = vector.multi_reduction <add>, %9, %cst_0 [0] : vector<2048xf32> to f32
+  %11 = vector.broadcast %10 : f32 to vector<f32>
+  // CHECK: %[[COND:.*]] = arith.cmpi eq, %{{.*}}, %[[ZERO]] : index
+  // CHECK-NEXT: scf.if %[[COND]] {
+  // CHECK-NEXT: vector.broadcast
+  // CHECK-NEXT: vector.transfer_write
+  // CHECK-NEXT: }
+  vector.transfer_write %11, %4[] : vector<f32>, memref<f32, #amdgpu.address_space<fat_raw_buffer>>
+  return
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
