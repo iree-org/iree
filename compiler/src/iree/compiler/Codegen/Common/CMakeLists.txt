@@ -60,6 +60,7 @@ iree_cc_library(
     MLIRAnalysis
     MLIRIR
     MLIRSCFDialect
+    MLIRUBDialect
     MLIRVectorDialect
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
   PUBLIC
