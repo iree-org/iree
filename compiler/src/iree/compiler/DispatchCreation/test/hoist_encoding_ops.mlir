@@ -332,6 +332,41 @@ util.func public @propagate_unset_encoding_through_generic(%arg0: tensor<?x4096x
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #map3 = affine_map<(d0, d1) -> (d0, d1)>
 #map4 = affine_map<(d0, d1) -> ()>
+#encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>
+util.func public @propagate_unset_encoding_through_generic_with_scalar(%arg0: tensor<4096x?xf32, #encoding>, %arg1: f32, %arg2: index) -> tensor<4096x?xf32> {
+  %0 = flow.dispatch.region -> (tensor<4096x?xf32>{%arg2}) {
+    %1 = iree_encoding.unset_encoding %arg0 : tensor<4096x?xf32, #encoding> -> tensor<4096x?xf32>{%arg2}
+    %2 = tensor.empty(%arg2) : tensor<4096x?xf32>
+    %3 = linalg.generic {indexing_maps = [#map3, #map4, #map3], iterator_types = ["parallel", "parallel"]} ins(%1, %arg1 : tensor<4096x?xf32>, f32) outs(%2 : tensor<4096x?xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %4 = arith.mulf %in, %in_0 : f32
+      linalg.yield %4 : f32
+    } -> tensor<4096x?xf32>
+    flow.return %3 : tensor<4096x?xf32>
+  }
+  util.return %0 : tensor<4096x?xf32>
+}
+// CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+// CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+// CHECK-DAG:   #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]]>
+// CHECK-LABEL: @propagate_unset_encoding_through_generic_with_scalar(
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK:         %{{.+}} = flow.dispatch.region -> (tensor<4096x?xf32>{%[[ARG2]]}
+// CHECK:           %[[GENERIC:.+]] = linalg.generic
+// CHECK-SAME:        ins(%[[ARG0]], %[[ARG1]]
+// CHECK:           %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[GENERIC]] : tensor<4096x?xf32, #[[$ENCODING]]> -> tensor<4096x?xf32>{%[[ARG2]]}
+// CHECK:           return %[[UNSET_ENCODING]]
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map3 = affine_map<(d0, d1) -> (d0, d1)>
+#map4 = affine_map<(d0, d1) -> ()>
 #encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>]>
 util.func public @dont_propagate_unset_encoding_outside_region(%arg0: tensor<?x4096xf32, #encoding>, %arg1: tensor<f32>, %arg2: index) -> tensor<?x4096xbf16> {
   %0 = iree_encoding.unset_encoding %arg0 : tensor<?x4096xf32, #encoding> -> tensor<?x4096xf32>{%arg2}
