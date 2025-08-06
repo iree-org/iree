@@ -1197,3 +1197,60 @@ hal.executable private @matvec_dispatch_0 {
 //          CHECK:   scf.forall ({{.*}}) = (0, 0) to (32000, 2) step (16, 1)
 // CHECK-COUNT-16:     gpu.subgroup_reduce  add {{.*}} cluster(size = 64) : (f32) -> f32
 // CHECK-COUNT-16:     gpu.subgroup_reduce  add {{.*}} cluster(size = 2) : (f32) -> f32
+
+// -----
+
+#config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 128], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_m_count = 2, subgroup_n_count = 2}>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false>}>
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+hal.executable public @matmul_map_scatter {
+hal.executable.variant public @rocm target(<"rocm", "rocm-hsaco-fb">) {
+  hal.executable.export public @matmul_map_scatter layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index) -> (index, index, index) {
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+    hal.return %x, %y, %z : index, index, index
+  }
+  builtin.module {
+    func.func @matmul_map_scatter() attributes {translation_info = #translation} {
+      %true = arith.constant true
+      %cst = arith.constant 0.000000e+00 : f32
+      %c0 = arith.constant 0 : index
+      %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<256x256xf16, #hal.descriptor_type<storage_buffer>>
+      %1 = amdgpu.fat_raw_buffer_cast %0 resetOffset : memref<256x256xf16, #hal.descriptor_type<storage_buffer>> to memref<256x256xf16, #amdgpu.address_space<fat_raw_buffer>>
+      %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<256x256xf16, #hal.descriptor_type<storage_buffer>>
+      %3 = amdgpu.fat_raw_buffer_cast %2 resetOffset : memref<256x256xf16, #hal.descriptor_type<storage_buffer>> to memref<256x256xf16, #amdgpu.address_space<fat_raw_buffer>>
+      %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : memref<2x16x8x4x4x4x4xf32, #hal.descriptor_type<storage_buffer>>
+      %5 = amdgpu.fat_raw_buffer_cast %4 resetOffset : memref<2x16x8x4x4x4x4xf32, #hal.descriptor_type<storage_buffer>> to memref<2x16x8x4x4x4x4xf32, #amdgpu.address_space<fat_raw_buffer>>
+      %6 = iree_codegen.load_from_buffer %1 : memref<256x256xf16, #amdgpu.address_space<fat_raw_buffer>> -> tensor<256x256xf16>
+      %7 = iree_codegen.load_from_buffer %3 : memref<256x256xf16, #amdgpu.address_space<fat_raw_buffer>> -> tensor<256x256xf16>
+      %8 = tensor.empty() : tensor<256x256xf32>
+      %9 = linalg.fill ins(%cst : f32) outs(%8 : tensor<256x256xf32>) -> tensor<256x256xf32>
+      %10 = linalg.matmul {lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, promote_operands = [0, 1], reduction = [0, 0, 128], subgroup_m_count = 2 : i64, subgroup_n_count = 2 : i64, workgroup = [64, 64, 0]}>} ins(%6, %7 : tensor<256x256xf16>, tensor<256x256xf16>) outs(%9 : tensor<256x256xf32>) -> tensor<256x256xf32>
+      %11 = tensor.empty() : tensor<2x16x8x4x4x4x4xf32>
+      %12 = iree_linalg_ext.map_scatter %10 into %11 {
+      ^bb0(%arg0: index, %arg1: index):
+        %13:2 = affine.delinearize_index %arg0 into (2, 128) : index, index
+        %14:2 = affine.delinearize_index %arg1 into (16, 16) : index, index
+        %15:3 = affine.delinearize_index %13#1 into (4, 8, 4) : index, index, index
+        %16:2 = affine.delinearize_index %14#1 into (4, 4) : index, index
+        iree_linalg_ext.yield %13#0, %14#0, %15#1, %16#1, %15#0, %15#2, %16#0, %true : index, index, index, index, index, index, index, i1
+      } : tensor<256x256xf32> into tensor<2x16x8x4x4x4x4xf32> -> tensor<2x16x8x4x4x4x4xf32>
+      iree_codegen.store_to_buffer %12, %5 : tensor<2x16x8x4x4x4x4xf32> into memref<2x16x8x4x4x4x4xf32, #amdgpu.address_space<fat_raw_buffer>>
+      return
+    }
+  }
+}
+}
+//    CHECK-LABEL: func.func @matmul_map_scatter()
+//          CHECK:   %[[OUTPUT_BINDING:.+]] = hal.interface.binding.subspan{{.*}} binding(2)
+//          CHECK:   %[[OUTPUT_BINDING_ALIGNED:.+]] = memref.assume_alignment %[[OUTPUT_BINDING]]
+//          CHECK:   %[[OUTPUT_BUFFER:.+]] = amdgpu.fat_raw_buffer_cast %[[OUTPUT_BINDING_ALIGNED]]
+//          CHECK:   %[[FOR_RESULT:.+]] = scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<2x2x1x1x4x1xf32>)
+// CHECK-COUNT-32:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
+//          CHECK:     scf.yield %{{.+}} : vector<2x2x1x1x4x1xf32>
+//          CHECK:   %[[FLAT_OUTPUT_BUFFER:.+]] = memref.collapse_shape %[[OUTPUT_BUFFER]]
+//  CHECK-COUNT-4:   vector.scatter %[[FLAT_OUTPUT_BUFFER]]{{.*}} : memref<65536xf32, #amdgpu.address_space<fat_raw_buffer>>, vector<4xindex>, vector<4xi1>, vector<4xf32>
