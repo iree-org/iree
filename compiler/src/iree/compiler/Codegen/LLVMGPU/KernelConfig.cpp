@@ -140,6 +140,10 @@ namespace {
 
 using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
 
+// If the size of the reduction dimension is not a dispatch compile-time
+// constant, choose a default size that the config should optimize for.
+constexpr unsigned kVectorDistributeReductionSizeToTargetIfDynamic = (1 << 31);
+
 // Threshold used to determine whether a matmul dimension is 'very skinny'.
 constexpr int64_t kVerySkinnyDimThreshold = 4;
 
@@ -527,8 +531,9 @@ getVectorDistributeReductionConfig(
   }
 
   int64_t lastReductionDimSize = bounds[reductionDims.back()];
+
   if (ShapedType::isDynamic(lastReductionDimSize)) {
-    return failure();
+    lastReductionDimSize = kVectorDistributeReductionSizeToTargetIfDynamic;
   }
   if (lastReductionDimSize % threadLoads != 0) {
     return failure();
@@ -834,20 +839,21 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<int64_t> bounds = op.getStaticLoopRanges();
   IREE::GPU::TargetWgpAttr wgp = target.getWgp();
   int64_t reductionSize = bounds[reductionDims.back()];
+
   if (ShapedType::isDynamic(reductionSize)) {
-    return failure();
+    reductionSize = kVectorDistributeReductionSizeToTargetIfDynamic;
   }
 
-  int64_t numDynamicReductionDims = 0;
+  bool hasDynamicReductionDim = false;
   for (unsigned dim : reductionDims) {
     if (ShapedType::isDynamic(bounds[dim])) {
-      ++numDynamicReductionDims;
+      hasDynamicReductionDim = true;
     }
   }
 
   int64_t subgroupSize = 0;
   for (int s : wgp.getSubgroupSizeChoices().asArrayRef()) {
-    if (reductionSize % s == 0 || numDynamicReductionDims > 0) {
+    if (reductionSize % s == 0 || hasDynamicReductionDim) {
       subgroupSize = s;
       break;
     }
@@ -870,7 +876,7 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   const unsigned largestLoadSizeInBits = maxLoadBits.value_or(128);
 
   unsigned threadLoads = largestLoadSizeInBits / *bitWidth;
-  if (numDynamicReductionDims == 0) {
+  if (!hasDynamicReductionDim) {
     while ((reductionSize / threadLoads) % subgroupSize != 0) {
       threadLoads /= 2;
     }
@@ -2881,7 +2887,6 @@ static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
   // moving dimension so each thread can execute a vectorized copy of 4
   // contiguous elements at a time from the 32 block.
   std::array<int64_t, 3> workgroupSize = {8, 32, 1};
-
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, linalgOp, tileSizes,
       CodeGenPipeline::LLVMGPUTransposeSharedMem, workgroupSize);
