@@ -587,6 +587,85 @@ SymbolicUKernelProviderAttr::getMLIRUKernel(StringRef name, DictionaryAttr,
   return symbolTable.lookup(name);
 }
 
+//===---------------------------------------------------------------------===//
+// iree_codegen.xor_shuffle
+//===---------------------------------------------------------------------===//
+
+OpFoldResult XORShuffleAttr::swizzleOffset(OpBuilder &b, Location loc,
+                                           OpFoldResult offset,
+                                           Value src) const {
+
+  int64_t rotationInvariant =
+      getRowWidth() * (getRowWidth() / getAccessWidth());
+  int64_t rowStride =
+      getRowStride() != int64_t() ? getRowStride() : getRowWidth();
+  int64_t perPhase = getPerPhase() != int64_t() ? getPerPhase() : 1;
+
+  OpFoldResult id =
+      getMinimumConstantOffsetValue(b, loc, offset, rotationInvariant);
+
+  Value rowStrideVal = b.create<arith::ConstantIndexOp>(loc, rowStride);
+  // Number of elements per row.
+  Value rowAlignmentVal = b.create<arith::ConstantIndexOp>(loc, getRowWidth());
+  // Number of contiguous groups of elements per row (swizzled together).
+  Value rowAccessAlignmentVal =
+      b.create<arith::ConstantIndexOp>(loc, getRowWidth() / getAccessWidth());
+  // Number of elements per group.
+  Value accessWidthVal =
+      b.create<arith::ConstantIndexOp>(loc, getAccessWidth());
+  // Number of rows per phase
+  Value perPhaseVal = b.create<arith::ConstantIndexOp>(loc, perPhase);
+
+  Value idVal = getValueOrCreateConstantIndexOp(b, loc, id);
+
+  // Col and row indexes in overall memref
+  auto col = b.create<arith::RemUIOp>(loc, idVal, rowAlignmentVal);
+  auto row = b.create<arith::DivUIOp>(loc, idVal, rowStrideVal);
+  // Futur base id. We swizzle only within accessWidth
+  auto swizzledBase = b.create<arith::SubIOp>(loc, idVal, col);
+  auto colElements = b.create<arith::DivUIOp>(loc, col, accessWidthVal);
+
+  auto rowPhase = b.create<arith::DivUIOp>(loc, row, perPhaseVal);
+  auto rowModPhase =
+      b.create<arith::RemUIOp>(loc, rowPhase, rowAccessAlignmentVal);
+
+  auto colSwizzled = b.create<arith::XOrIOp>(loc, rowModPhase, colElements);
+  auto colSwizzledBytes =
+      b.create<arith::MulIOp>(loc, colSwizzled, accessWidthVal);
+
+  auto swizzledId =
+      b.create<arith::AddIOp>(loc, swizzledBase, colSwizzledBytes);
+
+  Value diff = b.create<arith::SubIOp>(loc, swizzledId, idVal);
+  return b
+      .create<arith::AddIOp>(
+          loc, getValueOrCreateConstantIndexOp(b, loc, offset), diff)
+      .getResult();
+}
+
+int64_t XORShuffleAttr::getAccessElementCount() const {
+  return getAccessWidth();
+}
+
+LogicalResult
+XORShuffleAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                       int64_t rowWidth, int64_t accessWidth, int64_t rowStride,
+                       int64_t perPhase) {
+
+  if (rowWidth % accessWidth != 0) {
+    return emitError() << "expected access width to divide row width";
+  }
+  auto maxPhase = rowWidth / accessWidth;
+  if (perPhase > maxPhase) {
+    return emitError() << "per_phase must be smaller than max_phase";
+  }
+  if (rowStride % rowWidth != 0) {
+    return emitError() << "expected row width to divide row stride";
+  }
+
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // Initialize attributes
 //===----------------------------------------------------------------------===//
