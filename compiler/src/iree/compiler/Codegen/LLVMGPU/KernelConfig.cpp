@@ -371,8 +371,8 @@ static FailureOr<int64_t> getBitWidth(linalg::LinalgOp op) {
     }
   }
 
-  LDBG("Largest input: " << largestInput.value);
-  LDBG("Largest input bitwidth: " << largestInput.elementBitwidth);
+  LDBG() << "Largest input: " << largestInput.value;
+  LDBG() << "Largest input bitwidth: " << largestInput.elementBitwidth;
   return largestInput.elementBitwidth;
 }
 
