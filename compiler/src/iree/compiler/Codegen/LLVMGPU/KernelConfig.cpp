@@ -31,9 +31,11 @@
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
+#include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
+#include "llvm/Support/LogicalResult.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -41,6 +43,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/OperationSupport.h"
@@ -297,34 +300,80 @@ static bool hasReductionIterator(linalg::LinalgOp &op) {
          llvm::any_of(op.getIteratorTypesArray(), linalg::isReductionIterator);
 }
 
-/// The bitwidth of the init and src operands is used to determine the
-/// bitwidth of the operation. The bitwidth is minimum of the init and src
-/// operands.
-static FailureOr<int64_t> getBitWidth(linalg::LinalgOp op) {
-  Value init = op.getDpsInitOperand(0)->get();
-  Type initElemType = getElementTypeOrSelf(init);
-  Value src = op.getDpsInputOperand(0)->get();
-  Type srcElemType = getElementTypeOrSelf(src);
+struct TensorSizeEstimate {
+  int64_t elementBitwidth;
+  int64_t staticSize;
+  int64_t numDynamicDims;
+  Value value; // This field is to simplify debugging / printing, not for
+               // calculation.
+};
 
-  if (auto initOp = init.getDefiningOp<linalg::GenericOp>()) {
-    if (IREE::LinalgExt::isBitExtendOp(initOp)) {
-      initElemType = getElementTypeOrSelf(initOp.getDpsInputs()[0]);
+/// Calculates the estimated tensor value size. Looks through known bit
+/// extension ops.
+static FailureOr<TensorSizeEstimate> calculateTensorSize(Value val) {
+  if (auto genericOp = val.getDefiningOp<linalg::GenericOp>()) {
+    if (IREE::LinalgExt::isBitExtendOp(genericOp) &&
+        genericOp.getNumDpsInputs() > 0) {
+      val = genericOp.getDpsInputs()[0];
     }
   }
-
-  if (auto srcOp = src.getDefiningOp<linalg::GenericOp>()) {
-    if (IREE::LinalgExt::isBitExtendOp(srcOp)) {
-      srcElemType = getElementTypeOrSelf(srcOp.getDpsInputs()[0]);
-    }
-  }
-
-  if (!initElemType.isIntOrFloat() || !srcElemType.isIntOrFloat()) {
+  auto tensorType = dyn_cast<RankedTensorType>(val.getType());
+  if (!tensorType) {
     return failure();
   }
 
-  int64_t bitWidth = std::max(initElemType.getIntOrFloatBitWidth(),
-                              srcElemType.getIntOrFloatBitWidth());
-  return bitWidth;
+  auto elemType = getElementTypeOrSelf(tensorType);
+  if (!elemType.isIntOrIndexOrFloat()) {
+    return failure();
+  }
+
+  if (isa<IndexType>(elemType)) {
+    // On LLVMGPU, we can conservatively assume 64-bit index types.
+    elemType = IntegerType::get(val.getContext(), 64);
+  }
+
+  TensorSizeEstimate result = {};
+  result.elementBitwidth = elemType.getIntOrFloatBitWidth();
+  result.numDynamicDims = tensorType.getNumDynamicDims();
+  result.staticSize = 1;
+  result.value = val;
+  for (int64_t dim :
+       llvm::make_filter_range(tensorType.getShape(), ShapedType::isStatic)) {
+    result.staticSize *= dim;
+  }
+
+  return result;
+}
+
+/// Returns the bitwidth of the largest operand or init. We estimate this based
+/// on the known static size and the number of dynamic dimensions. This is meant
+/// to cater towards the memory bandwidth required to load the largest of the
+/// inputs.
+static FailureOr<int64_t> getBitWidth(linalg::LinalgOp op) {
+  SmallVector<FailureOr<TensorSizeEstimate>> inputSizes =
+      llvm::filter_to_vector(
+          llvm::map_range(
+              llvm::concat<Value>(op.getDpsInits(), op.getDpsInputs()),
+              calculateTensorSize),
+          succeeded);
+  if (inputSizes.empty()) {
+    return failure();
+  }
+
+  TensorSizeEstimate largestInput = *inputSizes.front();
+  for (FailureOr<TensorSizeEstimate> candidateSize :
+       llvm::drop_begin(inputSizes)) {
+    if (std::tie(candidateSize->numDynamicDims, candidateSize->staticSize,
+                 candidateSize->elementBitwidth) >
+        std::tie(largestInput.numDynamicDims, largestInput.staticSize,
+                 largestInput.elementBitwidth)) {
+      largestInput = *candidateSize;
+    }
+  }
+
+  LDBG("Largest input: " << largestInput.value);
+  LDBG("Largest input bitwidth: " << largestInput.elementBitwidth);
+  return largestInput.elementBitwidth;
 }
 
 /// Check if the reduction op has a single combiner operation.
@@ -807,19 +856,18 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   if (subgroupSize == 0)
     return failure();
 
-  auto bitWidth = getBitWidth(op);
+  FailureOr<int64_t> bitWidth = getBitWidth(op);
   if (failed(bitWidth)) {
     return failure();
   }
 
-  // Reduction distribution only supports 8/16/32 bit types now.
-  if (!llvm::is_contained({8, 16, 32}, *bitWidth)) {
+  // Reduction distribution only supports 4/8/16/32 bit types now.
+  if (!llvm::is_contained({4, 8, 16, 32}, *bitWidth)) {
     return failure();
   }
 
   const std::optional<int64_t> maxLoadBits = wgp.getMaxLoadInstructionBits();
-  const unsigned largestLoadSizeInBits =
-      maxLoadBits.has_value() ? *maxLoadBits : 128;
+  const unsigned largestLoadSizeInBits = maxLoadBits.value_or(128);
 
   unsigned threadLoads = largestLoadSizeInBits / *bitWidth;
   if (numDynamicReductionDims == 0) {
