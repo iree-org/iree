@@ -1409,3 +1409,25 @@ builtin.module attributes { transform.with_named_sequence } {
 //   CHECK-DAG:       %[[DISTRIBUTED_IDX1:.+]] = arith.addi %[[IDX1]], %[[C8]]
 //       CHECK:       iree_linalg_ext.yield %[[DISTRIBUTED_IDX0]], %[[DISTRIBUTED_IDX1]]
 //       CHECK:     : vector<1x8xf16> into memref<64x64xf16>
+
+// -----
+
+// CHECK-LABEL: @undistributed_write
+func.func @undistributed_write(%out: memref<f32, #amdgpu.address_space<fat_raw_buffer>>, %v: vector<f32>) {
+  // CHECK-DAG: %[[ZERO:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[TID:.*]] = gpu.thread_id  x
+  // CHECK: %[[COND:.*]] = arith.cmpi eq, %[[TID]], %[[ZERO]] : index
+  // CHECK-NEXT: scf.if %[[COND]] {
+  // CHECK: vector.transfer_write
+  // CHECK-NEXT: }
+  vector.transfer_write %v, %out[] : vector<f32>, memref<f32, #amdgpu.address_space<fat_raw_buffer>>
+  return
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
