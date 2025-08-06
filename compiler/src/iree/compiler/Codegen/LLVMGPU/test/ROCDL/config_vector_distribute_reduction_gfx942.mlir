@@ -89,8 +89,8 @@ func.func @reduction_with_no_consumer() {
 // CHECK:           lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME:      lane_basis = {{\[}}[1, 1, 1, 64], [0, 1, 2, 3]
 // CHECK-SAME:      partial_reduction = [0, 0, 1, 4096]
-// CHECK-SAME:      subgroup_basis = {{\[}}[1, 1, 1, 16], [0, 1, 2, 3]
-// CHECK-SAME:      thread = [0, 0, 1, 4],
+// CHECK-SAME:      subgroup_basis = {{\[}}[1, 1, 1, 8], [0, 1, 2, 3]
+// CHECK-SAME:      thread = [0, 0, 1, 8],
 // CHECK-SAME:      workgroup = [1, 1, 0, 0]
 
 // -----
@@ -154,9 +154,9 @@ func.func @test_multiple_reduction() {
 // CHECK-SAME:    outs({{.*}}: tensor<2x32xf32>)
 // CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
 // CHECK-SAME:               lane_basis = {{\[}}[1, 1, 1, 64], [0, 1, 2, 3]],
-// CHECK-SAME:               partial_reduction = [0, 0, 1, 4096],
+// CHECK-SAME:               partial_reduction = [0, 0, 1, 8192],
 // CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1, 16], [0, 1, 2, 3]],
-// CHECK-SAME:               thread = [0, 0, 1, 4],
+// CHECK-SAME:               thread = [0, 0, 1, 8],
 // CHECK-SAME:               workgroup = [1, 1, 0, 0]
 // CHECK:       %{{.*}} = linalg.generic {indexing_maps = [#map, #map1, #map1],
 // CHECK-SAME:    iterator_types = ["parallel", "parallel", "reduction", "reduction"]}
@@ -164,18 +164,18 @@ func.func @test_multiple_reduction() {
 // CHECK-SAME:    outs(%{{.*}} : tensor<2x32xf32>)
 // CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
 // CHECK-SAME:              lane_basis = {{\[}}[1, 1, 1, 64], [0, 1, 2, 3]],
-// CHECK-SAME:              partial_reduction = [0, 0, 1, 4096],
+// CHECK-SAME:              partial_reduction = [0, 0, 1, 8192],
 // CHECK-SAME:              subgroup_basis = {{\[}}[1, 1, 1, 16], [0, 1, 2, 3]],
-// CHECK-SAME:              thread = [0, 0, 1, 4],
+// CHECK-SAME:              thread = [0, 0, 1, 8],
 // CHECK:       %{{.*}} = linalg.generic {indexing_maps = [#map, #map1, #map1, #map],
 // CHECK-SAME:    iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
 // CHECK-SAME:    ins({{.*}}, %{{.*}}, {{.*}} : tensor<2x32x10x16384xf16>, tensor<2x32xf32>, tensor<2x32xf32>)
 // CHECK-SAME:    outs(%{{.*}} : tensor<2x32x10x16384xf32>)
 // CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
 // CHECK-SAME:              lane_basis = {{\[}}[1, 1, 1, 64], [0, 1, 2, 3]]
-// CHECK-SAME:              reduction = [0, 0, 1, 4096],
+// CHECK-SAME:              reduction = [0, 0, 1, 8192],
 // CHECK-SAME:              subgroup_basis = {{\[}}[1, 1, 1, 16], [0, 1, 2, 3]],
-// CHECK-SAME:              thread = [0, 0, 0, 4],
+// CHECK-SAME:              thread = [0, 0, 0, 8],
 
 // -----
 
@@ -201,15 +201,15 @@ func.func @test_dyn_reduction(%arg0: !iree_tensor_ext.dispatch.tensor<readwrite:
   iree_tensor_ext.dispatch.tensor.store %5, %arg0, offsets = [0, 0], sizes = [128, 128], strides = [1, 1] : tensor<128x128xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<128x128xf32>>
   return
 }
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [8, 1, 1] subgroup_size = 64
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [2, 1, 1] subgroup_size = 64
 //       CHECK: func.func @test_dyn_reduction
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:      attrs =  {lowering_config = #iree_gpu.lowering_config<{
-//  CHECK-SAME:               lane_basis = {{\[}}[1, 1, 1, 8], [0, 1, 2, 3]],
+//  CHECK-SAME:               lane_basis = {{\[}}[1, 1, 1, 2], [0, 1, 2, 3]],
 //  CHECK-SAME:               partial_reduction = [0, 0, 1, 32],
 //  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1, 1], [0, 1, 2, 3]],
-//  CHECK-SAME:               thread = [0, 0, 1, 4],
+//  CHECK-SAME:               thread = [0, 0, 1, 16],
 //  CHECK-SAME:               workgroup = [1, 1, 0, 0]
 
 // -----
@@ -376,7 +376,7 @@ func.func @test_store_to_buffer(%arg0: index, %arg1: index) {
   iree_codegen.store_to_buffer %12, %expand_shape : tensor<?x4xf32> into memref<?x4xf32, #hal.descriptor_type<storage_buffer>>
   return
 }
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [1024, 1, 1] subgroup_size = 64
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [512, 1, 1] subgroup_size = 64
 // CHECK-LABEL: @test_store_to_buffer
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
@@ -385,6 +385,58 @@ func.func @test_store_to_buffer(%arg0: index, %arg1: index) {
 //  CHECK-SAME:      attrs =  {lowering_config = #iree_gpu.lowering_config<{
 //  CHECK-SAME:               lane_basis = {{\[}}[1, 1, 64], [0, 1, 2]],
 //  CHECK-SAME:               partial_reduction = [0, 0, 4096],
-//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 16], [0, 1, 2]],
-//  CHECK-SAME:               thread = [0, 0, 4],
+//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 8], [0, 1, 2]],
+//  CHECK-SAME:               thread = [0, 0, 8],
 //  CHECK-SAME:               workgroup = [1, 1, 0]
+
+
+// -----
+
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+// Test that the thread vector size maximizes memory bandwidth of the largest tensor
+// operand (tensor<6656x16384xf16>). We want to emit dwordx4 load, so the vector size
+// should be 8xf16 ==> 16 bytes.
+func.func @batch_matvec_f16_f32() {
+  %cst = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x16384xf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<6656x16384xf16>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x6656xf32>>
+  %4 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [4, 16384], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x16384xf16>> -> tensor<4x16384xf16>
+  %5 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [6656, 16384], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<6656x16384xf16>> -> tensor<6656x16384xf16>
+  %6 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0], sizes = [4, 6656], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x6656xf32>> -> tensor<4x6656xf32>
+  %7 = tensor.empty() : tensor<4x6656xf32>
+  %8 = linalg.fill ins(%cst : f32) outs(%7 : tensor<4x6656xf32>) -> tensor<4x6656xf32>
+  %mv = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d2)>,
+      affine_map<(d0, d1, d2) -> (d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ], iterator_types = ["parallel", "parallel", "reduction"]
+  } ins(%4, %5 : tensor<4x16384xf16>, tensor<6656x16384xf16>)
+  outs(%8 : tensor<4x6656xf32>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f32):
+    %10 = arith.extf %in : f16 to f32
+    %11 = arith.extf %in_0 : f16 to f32
+    %12 = arith.mulf %10, %11 : f32
+    %13 = arith.addf %out, %12 : f32
+    linalg.yield %13 : f32
+  } -> tensor<4x6656xf32>
+  iree_tensor_ext.dispatch.tensor.store %mv, %2, offsets = [0, 0], sizes = [4, 6656], strides = [1, 1] : tensor<4x6656xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x6656xf32>>
+  return
+}
+
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64
+// CHECK-LABEL: @batch_matvec_f16_f32
+//       CHECK:   linalg.generic
+//  CHECK-SAME:      attrs = {lowering_config = #iree_gpu.lowering_config<{
+//  CHECK-SAME:                 lane_basis = {{\[}}[1, 1, 64], [0, 1, 2]],
+//  CHECK-SAME:                 partial_reduction = [0, 0, 2048],
+//  CHECK-SAME:                 subgroup_basis = {{\[}}[1, 1, 4], [0, 1, 2]],
+//  CHECK-SAME:                 thread = [0, 0, 8],
+//  CHECK-SAME:                 workgroup = [2, 1, 0]
