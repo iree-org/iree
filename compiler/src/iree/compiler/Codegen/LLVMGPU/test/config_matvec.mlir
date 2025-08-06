@@ -1,13 +1,45 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --pass-pipeline='builtin.module(iree-llvmgpu-select-lowering-strategy)' %s | FileCheck %s
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 --pass-pipeline='builtin.module(iree-llvmgpu-select-lowering-strategy)' %s | FileCheck %s --check-prefix=CDNA3
 
+
+#pipeline_layout = #hal.pipeline.layout<constants = 5, bindings = [#hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>]>
+func.func @static_batch_matvec() {
+  %cst = arith.constant 0.000000e+00 : f16
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
+  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
+  %2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : i32
+  %3 = arith.index_castui %0 : i32 to index
+  %4 = arith.index_castui %1 : i32 to index
+  %5 = arith.index_castui %2 : i32 to index
+  %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%5) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x1x128xf16>>
+  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%3) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1x1024xf16>>
+  %8 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%4) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1024x128xf16>>
+  %9 = iree_tensor_ext.dispatch.tensor.load %7, offsets = [0, 0, 0], sizes = [32, 1, 1024], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1x1024xf16>> -> tensor<32x1x1024xf16>
+  %10 = iree_tensor_ext.dispatch.tensor.load %8, offsets = [0, 0, 0], sizes = [32, 1024, 128], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1024x128xf16>> -> tensor<32x1024x128xf16>
+  %11 = tensor.empty() : tensor<32x1x128xf16>
+  %12 = linalg.fill ins(%cst : f16) outs(%11 : tensor<32x1x128xf16>) -> tensor<32x1x128xf16>
+  %13 = linalg.batch_matmul ins(%9, %10 : tensor<32x1x1024xf16>, tensor<32x1024x128xf16>) outs(%12 : tensor<32x1x128xf16>) -> tensor<32x1x128xf16>
+  iree_tensor_ext.dispatch.tensor.store %13, %6, offsets = [0, 0, 0], sizes = [32, 1, 128], strides = [1, 1, 1] : tensor<32x1x128xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x1x128xf16>>
+  return
+}
+
+
+// CHECK:     LLVMGPUWarpReduction
+// CDNA3:     LLVMGPUTileAndFuse
+
+// We want to deprecate LLVMGPUWarpReduction. Currently LLVMGPUVectorDistribution is not chosen in setReductionVectorDistributionConfig because it fails in 'hasReductionIterator' (which doesn't check specialized ops). This might be an easy whitelisting fix, but I will return to this later (TODO(newling)).
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #pipeline_layout = #hal.pipeline.layout<constants = 5, bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-func.func @dynamic_batch_matvec() {
-  %c32_i64 = arith.constant 32 : i64
+func.func @dynamic_batch_generic_matvec() {
   %cst = arith.constant 0.000000e+00 : f16
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
   %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
@@ -28,17 +60,28 @@ func.func @dynamic_batch_matvec() {
   %16 = iree_tensor_ext.dispatch.tensor.load %14, offsets = [0, 0, 0], sizes = [32, %12, 128], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x?x128xf16>>{%12} -> tensor<32x?x128xf16>
   %17 = tensor.empty() : tensor<32x1x128xf16>
   %18 = linalg.fill ins(%cst : f16) outs(%17 : tensor<32x1x128xf16>) -> tensor<32x1x128xf16>
-  %19 = linalg.batch_matmul ins(%15, %16 : tensor<32x1x?xf16>, tensor<32x?x128xf16>) outs(%18 : tensor<32x1x128xf16>) -> tensor<32x1x128xf16>
+  %19 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%15, %16 : tensor<32x1x?xf16>, tensor<32x?x128xf16>) outs(%18 : tensor<32x1x128xf16>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f16):
+    %20 = arith.mulf %in, %in_0 : f16
+    %21 = arith.addf %out, %20 : f16
+    linalg.yield %21 : f16
+  } -> tensor<32x1x128xf16>
   iree_tensor_ext.dispatch.tensor.store %19, %10, offsets = [0, 0, 0], sizes = [32, 1, 128], strides = [1, 1, 1] : tensor<32x1x128xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x1x128xf16>>
   return
 }
 
-//   CDNA3-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 1], [0, 0, 0, 32]{{\]}}>
-//   CDNA3-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [32, 1, 1] subgroup_size = 32>
-// CDNA3-LABEL: func.func @dynamic_batch_matvec()
-//  CDNA3-SAME:     translation_info = #[[$TRANSLATION]]
-//       CDNA3:   linalg.batch_matmul
-//  CDNA3-SAME:       lowering_config = #[[$CONFIG]]
+
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [1024, 1, 1] subgroup_size = 64
+// CHECK-LABEL: func.func @dynamic_batch_generic_matvec()
+//  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
+//  CHECK-SAME:               partial_reduction = [0, 0, 0, 8192],
+//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1, 16], [0, 1, 2, 3]],
+//  CHECK-SAME:               thread = [0, 0, 0, 8],
+//  CHECK-SAME:               workgroup = [1, 1, 1, 0]
+
+// CDNA3: LLVMGPUVectorDistribute
 
 // -----
 
