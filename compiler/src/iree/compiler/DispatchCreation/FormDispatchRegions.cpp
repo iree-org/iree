@@ -768,8 +768,9 @@ static bool isFusableWithProducer(
     return false;
   }
 
+  auto linalgConsumer = dyn_cast<linalg::LinalgOp>(consumer);
   if (options.fusePadWithConsumers && isa<tensor::PadOp>(producer) &&
-      isa<linalg::ConvolutionOpInterface>(consumer)) {
+      linalgConsumer && linalg::isaConvolutionOpInterface(linalgConsumer)) {
     return true;
   }
 
