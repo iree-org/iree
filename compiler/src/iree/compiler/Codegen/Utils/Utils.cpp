@@ -1788,6 +1788,56 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::PackOp op) {
   return result;
 }
 
+std::optional<SizesAndScalableFlags>
+getVectorInputSizesFromDestTiles(linalg::UnPackOp op,
+                                 ArrayRef<int64_t> writeVectorSizes,
+                                 ArrayRef<bool> scalableFlags) {
+  assert(writeVectorSizes.size() == op.getDestRank());
+  if (llvm::any_of(scalableFlags, [](bool val) { return val == true; })) {
+    return std::nullopt;
+  }
+
+  ArrayRef<int64_t> innerDimPos = op.getInnerDimsPos();
+  ArrayRef<int64_t> innerTiles = op.getStaticInnerTiles();
+  ArrayRef<int64_t> sourceShape = op.getSourceType().getShape();
+  ArrayRef<int64_t> outerDimsPerm = op.getOuterDimsPerm();
+
+  // readVectorSizes is the size of tensor used to read and apply mask. It is
+  // set like this: Let's say the vectorSize (VS) array is size 'N' and
+  // the sourceShape(SS) is 'M' where M >= N and InnerTileSizes (IT) of
+  // size M-N
+  // Thus:
+  // - initially: readVectorSizes = vectorInputSizes
+  // - Divide all the readMaskShape locations pointed by innerDimPos
+  //   by the innerTileSize attribute value.
+  // - if outer_dims_perms is present: do that permutation on readVectorSizes.
+  // - Append the remaining shape from SS
+  // E.g. let's say let's say unpackTensorType.getShape() = <8x8x32x16>
+  // inner Dim Pos = [0, 1] and Inner Tiles = [32, 16], vector_sizes are [512,
+  // 128] and outer_dims_perm is [1, 0] then read shape is:
+  //   ReadVectorSizes(initial): [512, 128]
+  //   Final Value(after innerDim Adjustment): [512/32, 128/16]
+  //                                           = [16, 8]
+  //   After applying outer_dims_perm: [8, 16]
+  //   After appending the rest of the sourceShape: [8, 16, 32, 16]
+  SmallVector<int64_t> vectorSizes(writeVectorSizes);
+  for (auto [index, size] : enumerate(innerTiles)) {
+    vectorSizes[innerDimPos[index]] =
+        llvm::divideCeil(vectorSizes[innerDimPos[index]], size);
+  }
+  if (!outerDimsPerm.empty()) {
+    applyPermutationToVector(vectorSizes, outerDimsPerm);
+  }
+  vectorSizes.append(sourceShape.begin() + vectorSizes.size(),
+                     sourceShape.end());
+
+  SizesAndScalableFlags result;
+  result.first.assign(vectorSizes.begin(), vectorSizes.end());
+  result.second.resize(result.first.size(), false);
+
+  return result;
+}
+
 std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::UnPackOp op) {
   LDBG() << "Inferring dest sizes for: " << op;
 
@@ -1819,6 +1869,21 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::UnPackOp op) {
 
   LLVM_DEBUG({
     LDBG() << "After adjustment with inner tiles and outer_dims_perm:";
+    for (auto [idx, val] : llvm::enumerate(result.vectorSizes)) {
+      LDBG() << "Dim #" << idx << ": " << val;
+    }
+  });
+
+  std::optional<SizesAndScalableFlags> maybeInputVectorSizes =
+      getVectorInputSizesFromDestTiles(op, result.vectorSizes,
+                                       result.vectorScalableFlags);
+  if (!maybeInputVectorSizes) {
+    return std::nullopt;
+  }
+  std::tie(result.vectorSizes, result.vectorScalableFlags) =
+      maybeInputVectorSizes.value();
+  LLVM_DEBUG({
+    LDBG() << "After infer read vector sizes from dest shape:";
     for (auto [idx, val] : llvm::enumerate(result.vectorSizes)) {
       LDBG() << "Dim #" << idx << ": " << val;
     }
