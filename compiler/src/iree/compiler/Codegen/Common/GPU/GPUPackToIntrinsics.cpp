@@ -146,14 +146,8 @@ struct PackDestinationForOp final : OpRewritePattern<scf::YieldOp> {
         continue;
       }
 
-      // Apply the pattern only if packOp & unpackOp are the only 2 users of the
-      // regionIterArg.
-      auto iterArg = forOp.getRegionIterArgs()[idx];
-      if (iterArg.getNumUses() != 2) {
-        continue;
-      }
-
       // Get the corresponding packOp.
+      auto iterArg = forOp.getRegionIterArgs()[idx];
       for (auto user : iterArg.getUsers()) {
         packOp = dyn_cast<linalg::PackOp>(user);
         if (packOp &&
@@ -165,11 +159,25 @@ struct PackDestinationForOp final : OpRewritePattern<scf::YieldOp> {
           packOp = nullptr;
         }
       }
-      // Set the operand index value on finding a valid pack-unpack pair to
-      // hoist.
+
       if (packOp && unpackOp) {
-        tiedResultIdx = idx;
-        break;
+        // Apply the pattern only if packOp & unpackOp are the only 2 users of
+        // the regionIterArg.
+        bool hasOtherUsers = false;
+        for (auto user : iterArg.getUsers()) {
+          if (user != packOp && user != unpackOp) {
+            hasOtherUsers = true;
+            packOp = nullptr;
+            unpackOp = nullptr;
+            break;
+          }
+        }
+        // Set the operand index value on finding a valid pack-unpack pair to
+        // hoist.
+        if (!hasOtherUsers) {
+          tiedResultIdx = idx;
+          break;
+        }
       }
     }
     if (!packOp || !unpackOp) {
