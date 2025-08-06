@@ -844,7 +844,7 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     reductionSize = kVectorDistributeReductionSizeToTargetIfDynamic;
   }
 
-  bool hasDynamicReductionDim{false};
+  bool hasDynamicReductionDim = false;
   for (unsigned dim : reductionDims) {
     if (ShapedType::isDynamic(bounds[dim])) {
       hasDynamicReductionDim = true;

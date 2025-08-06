@@ -3,27 +3,26 @@
 
 
 #pipeline_layout = #hal.pipeline.layout<constants = 5, bindings = [#hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>]>
-module {
-  func.func @static_batch_matvec() {
-    %cst = arith.constant 0.000000e+00 : f16
-    %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
-    %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
-    %2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : i32
-    %3 = arith.index_castui %0 : i32 to index
-    %4 = arith.index_castui %1 : i32 to index
-    %5 = arith.index_castui %2 : i32 to index
-    %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%5) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x1x128xf16>>
-    %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%3) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1x1024xf16>>
-    %8 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%4) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1024x128xf16>>
-    %9 = iree_tensor_ext.dispatch.tensor.load %7, offsets = [0, 0, 0], sizes = [32, 1, 1024], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1x1024xf16>> -> tensor<32x1x1024xf16>
-    %10 = iree_tensor_ext.dispatch.tensor.load %8, offsets = [0, 0, 0], sizes = [32, 1024, 128], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1024x128xf16>> -> tensor<32x1024x128xf16>
-    %11 = tensor.empty() : tensor<32x1x128xf16>
-    %12 = linalg.fill ins(%cst : f16) outs(%11 : tensor<32x1x128xf16>) -> tensor<32x1x128xf16>
-    %13 = linalg.batch_matmul ins(%9, %10 : tensor<32x1x1024xf16>, tensor<32x1024x128xf16>) outs(%12 : tensor<32x1x128xf16>) -> tensor<32x1x128xf16>
-    iree_tensor_ext.dispatch.tensor.store %13, %6, offsets = [0, 0, 0], sizes = [32, 1, 128], strides = [1, 1, 1] : tensor<32x1x128xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x1x128xf16>>
-    return
-  }
+func.func @static_batch_matvec() {
+  %cst = arith.constant 0.000000e+00 : f16
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
+  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
+  %2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : i32
+  %3 = arith.index_castui %0 : i32 to index
+  %4 = arith.index_castui %1 : i32 to index
+  %5 = arith.index_castui %2 : i32 to index
+  %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%5) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x1x128xf16>>
+  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%3) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1x1024xf16>>
+  %8 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%4) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1024x128xf16>>
+  %9 = iree_tensor_ext.dispatch.tensor.load %7, offsets = [0, 0, 0], sizes = [32, 1, 1024], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1x1024xf16>> -> tensor<32x1x1024xf16>
+  %10 = iree_tensor_ext.dispatch.tensor.load %8, offsets = [0, 0, 0], sizes = [32, 1024, 128], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1024x128xf16>> -> tensor<32x1024x128xf16>
+  %11 = tensor.empty() : tensor<32x1x128xf16>
+  %12 = linalg.fill ins(%cst : f16) outs(%11 : tensor<32x1x128xf16>) -> tensor<32x1x128xf16>
+  %13 = linalg.batch_matmul ins(%9, %10 : tensor<32x1x1024xf16>, tensor<32x1024x128xf16>) outs(%12 : tensor<32x1x128xf16>) -> tensor<32x1x128xf16>
+  iree_tensor_ext.dispatch.tensor.store %13, %6, offsets = [0, 0, 0], sizes = [32, 1, 128], strides = [1, 1, 1] : tensor<32x1x128xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x1x128xf16>>
+  return
 }
+
 
 // CHECK:     LLVMGPUWarpReduction
 // CDNA3:     LLVMGPUTileAndFuse
@@ -40,37 +39,35 @@ module {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-module {
-  func.func @dynamic_batch_generic_matvec() {
-    %cst = arith.constant 0.000000e+00 : f16
-    %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
-    %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
-    %2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : i32
-    %3 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : i32
-    %4 = hal.interface.constant.load layout(#pipeline_layout) ordinal(4) : i32
-    %5 = arith.index_castui %0 : i32 to index
-    %6 = arith.index_castui %1 : i32 to index
-    %7 = arith.index_castui %2 : i32 to index
-    %8 = arith.index_castui %3 : i32 to index
-    %9 = arith.index_castui %4 : i32 to index
-    %10 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%7) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x1x128xf16>>
-    %11 = iree_tensor_ext.dispatch.workload.ordinal %8, 0 : index
-    %12 = iree_tensor_ext.dispatch.workload.ordinal %9, 1 : index
-    %13 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%5) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1x?xf16>>{%11}
-    %14 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%6) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x?x128xf16>>{%12}
-    %15 = iree_tensor_ext.dispatch.tensor.load %13, offsets = [0, 0, 0], sizes = [32, 1, %11], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1x?xf16>>{%11} -> tensor<32x1x?xf16>
-    %16 = iree_tensor_ext.dispatch.tensor.load %14, offsets = [0, 0, 0], sizes = [32, %12, 128], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x?x128xf16>>{%12} -> tensor<32x?x128xf16>
-    %17 = tensor.empty() : tensor<32x1x128xf16>
-    %18 = linalg.fill ins(%cst : f16) outs(%17 : tensor<32x1x128xf16>) -> tensor<32x1x128xf16>
-    %19 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%15, %16 : tensor<32x1x?xf16>, tensor<32x?x128xf16>) outs(%18 : tensor<32x1x128xf16>) {
-    ^bb0(%in: f16, %in_0: f16, %out: f16):
-      %20 = arith.mulf %in, %in_0 : f16
-      %21 = arith.addf %out, %20 : f16
-      linalg.yield %21 : f16
-    } -> tensor<32x1x128xf16>
-    iree_tensor_ext.dispatch.tensor.store %19, %10, offsets = [0, 0, 0], sizes = [32, 1, 128], strides = [1, 1, 1] : tensor<32x1x128xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x1x128xf16>>
-    return
-  }
+func.func @dynamic_batch_generic_matvec() {
+  %cst = arith.constant 0.000000e+00 : f16
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
+  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
+  %2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : i32
+  %3 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : i32
+  %4 = hal.interface.constant.load layout(#pipeline_layout) ordinal(4) : i32
+  %5 = arith.index_castui %0 : i32 to index
+  %6 = arith.index_castui %1 : i32 to index
+  %7 = arith.index_castui %2 : i32 to index
+  %8 = arith.index_castui %3 : i32 to index
+  %9 = arith.index_castui %4 : i32 to index
+  %10 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%7) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x1x128xf16>>
+  %11 = iree_tensor_ext.dispatch.workload.ordinal %8, 0 : index
+  %12 = iree_tensor_ext.dispatch.workload.ordinal %9, 1 : index
+  %13 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%5) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1x?xf16>>{%11}
+  %14 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%6) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x?x128xf16>>{%12}
+  %15 = iree_tensor_ext.dispatch.tensor.load %13, offsets = [0, 0, 0], sizes = [32, 1, %11], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1x?xf16>>{%11} -> tensor<32x1x?xf16>
+  %16 = iree_tensor_ext.dispatch.tensor.load %14, offsets = [0, 0, 0], sizes = [32, %12, 128], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x?x128xf16>>{%12} -> tensor<32x?x128xf16>
+  %17 = tensor.empty() : tensor<32x1x128xf16>
+  %18 = linalg.fill ins(%cst : f16) outs(%17 : tensor<32x1x128xf16>) -> tensor<32x1x128xf16>
+  %19 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%15, %16 : tensor<32x1x?xf16>, tensor<32x?x128xf16>) outs(%18 : tensor<32x1x128xf16>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f16):
+    %20 = arith.mulf %in, %in_0 : f16
+    %21 = arith.addf %out, %20 : f16
+    linalg.yield %21 : f16
+  } -> tensor<32x1x128xf16>
+  iree_tensor_ext.dispatch.tensor.store %19, %10, offsets = [0, 0, 0], sizes = [32, 1, 128], strides = [1, 1, 1] : tensor<32x1x128xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x1x128xf16>>
+  return
 }
 
 
