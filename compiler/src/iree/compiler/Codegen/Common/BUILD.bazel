@@ -85,6 +85,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:UBDialect",
         "@llvm-project//mlir:VectorDialect",
     ],
 )
