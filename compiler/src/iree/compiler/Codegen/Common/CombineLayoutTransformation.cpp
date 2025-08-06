@@ -420,30 +420,44 @@ bool isSupportedRelayoutOp(Operation *op) {
              linalg::TransposeOp>(op);
 }
 
-/// Returns the leaves of all relayout op chains in the funcOp. A relayout op
-/// chain is a sequence of relayout ops (defined by `isSupportedRelayoutOp`)
-/// for which the only users of the ops in the chain are relayout ops, except
-/// for the leaves of the chain. The leaves are simply relayout ops that have
-/// non relayout op users.
-static SmallVector<OpResult> getRelayoutLeaves(FunctionOpInterface funcOp) {
-  SmallVector<OpResult> relayoutChainRoots;
-  funcOp->walk([&relayoutChainRoots](Operation *op) {
+/// Insert identity map_scatter ops after the given operation if it is a valid
+/// leaf op of a relayout op chain. A relayout op chain is a sequence of
+/// relayout ops (defined by `isSupportedRelayoutOp`) for which the only users
+/// of the ops in the chain are relayout ops, except for the leaves of the
+/// chain. The leaves are simply relayout ops that have non relayout op users.
+/// The `controlFn` is a callback on the leaf OpResult that provides control
+/// over whether or not to insert a map_scatter op.
+struct InsertMapScatterOpPattern : public RewritePattern {
+  InsertMapScatterOpPattern(MLIRContext *context,
+                            CombineRelayoutOpsControlFn controlFn = nullptr,
+                            PatternBenefit benefit = 1)
+      : RewritePattern(MatchAnyOpTypeTag(), benefit, context),
+        controlFn(controlFn) {}
+
+  LogicalResult matchAndRewrite(Operation *op,
+                                PatternRewriter &rewriter) const override {
     if (!isSupportedRelayoutOp(op)) {
-      return WalkResult::advance();
+      return failure();
     }
     // Relayout ops with only relayout op users are not leaves.
     auto isDimOrSupportedRelayoutOp = [](Operation *op) {
       return isSupportedRelayoutOp(op) || isa<tensor::DimOp>(op);
     };
     if (llvm::all_of(op->getUsers(), isDimOrSupportedRelayoutOp)) {
-      return WalkResult::advance();
+      return failure();
     }
     // All relayout ops have a single result.
-    relayoutChainRoots.push_back(op->getResult(0));
-    return WalkResult::advance();
-  });
-  return relayoutChainRoots;
-}
+    OpResult leaf = op->getResult(0);
+    if (controlFn && !controlFn(leaf)) {
+      return failure();
+    }
+    (void)insertIdentityMapScatter(rewriter, leaf);
+    return success();
+  }
+
+private:
+  CombineRelayoutOpsControlFn controlFn;
+};
 
 LogicalResult
 combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
@@ -507,20 +521,9 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
   IRRewriter rewriter(ctx);
   simplifyComplexRelayoutOps(rewriter, funcOp);
 
-  // Insert identity root map_scatter ops after each leaf. Relayout combination
-  // patterns will then fold the chains into these new root ops.
-  SetVector<OpResult> filteredRelayoutLeaves;
-  SmallVector<OpResult> relayoutLeaves = getRelayoutLeaves(funcOp);
-  for (OpResult leaf : relayoutLeaves) {
-    if (controlFn && !controlFn(leaf)) {
-      continue;
-    }
-    filteredRelayoutLeaves.insert(leaf);
-    (void)insertIdentityMapScatter(rewriter, leaf);
-  }
-
   // Combine relayout operations into new the map_scatter ops.
   RewritePatternSet relayoutCombinationPatterns(ctx);
+  relayoutCombinationPatterns.add<InsertMapScatterOpPattern>(ctx, controlFn);
   populateCombineRelayoutOpPatterns(relayoutCombinationPatterns,
                                     padDistributionConfigFn);
   memref::populateResolveRankedShapedTypeResultDimsPatterns(
