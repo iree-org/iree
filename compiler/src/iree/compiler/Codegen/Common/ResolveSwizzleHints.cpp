@@ -47,20 +47,6 @@ static Value createOrFoldNewStaticAdd(RewriterBase &rewriter, Value v,
   return rewriter.create<arith::AddIOp>(v.getLoc(), v, offsetVal);
 }
 
-/// Checks whether `op` is a dst operand of gatherToLds
-template <typename T>
-static bool isGatherToLDSDstOperand(T op) {
-  bool allUsersSatisfy = true;
-  for (auto memRefUser : op->getUsers()) {
-    auto gather = dyn_cast<amdgpu::GatherToLDSOp>(memRefUser);
-    if (!gather || gather.getDst() != op) {
-      allUsersSatisfy = false;
-      break;
-    }
-  }
-  return allUsersSatisfy;
-}
-
 /// Swizzles vector.load(iree_codegen.swizzle_hint, offset). The
 /// SwizzleInterfaceAttr exposes two methods:
 ///   1. getAccessElementCount -> int64_t
@@ -201,35 +187,33 @@ static void resolveHintOp(RewriterBase &rewriter,
       continue;
     }
     if (auto gatherToLDSOp = dyn_cast<amdgpu::GatherToLDSOp>(user)) {
-      int64_t accessBitWidth = cast<MemRefType>(hintOp.getOperand().getType())
-                                   .getElementTypeBitWidth() *
-                               accessWidth;
-      auto transferBitWidth = [&]() -> int64_t {
-        if (auto vectorType =
-                dyn_cast<VectorType>(gatherToLDSOp.getTransferType())) {
-          return vectorType.getElementTypeBitWidth() *
-                 vectorType.getNumElements();
+      // Ignore swizzleHint on Dst Operand. Gather_to_lds writes elements of a
+      // subgroup contiguously in order of lane ID
+      if (gatherToLDSOp.getDst() == hintOp) {
+        continue;
+      } else {
+        int64_t accessBitWidth = cast<MemRefType>(hintOp.getOperand().getType())
+                                     .getElementTypeBitWidth() *
+                                 accessWidth;
+        auto transferBitWidth = [&]() -> int64_t {
+          if (auto vectorType =
+                  dyn_cast<VectorType>(gatherToLDSOp.getTransferType())) {
+            return vectorType.getElementTypeBitWidth() *
+                   vectorType.getNumElements();
+          }
+          return gatherToLDSOp.getTransferType().getIntOrFloatBitWidth();
+        }();
+        if (accessBitWidth != transferBitWidth) {
+          return;
         }
-        return gatherToLDSOp.getTransferType().getIntOrFloatBitWidth();
-      }();
-      if (accessBitWidth != transferBitWidth) {
-        return;
+        gatherToLDSOps.push_back(gatherToLDSOp);
+
+        continue;
       }
-      gatherToLDSOps.push_back(gatherToLDSOp);
-      continue;
-    }
-    // Swizzling is ignored on dst operand for gatherToLds
-    if (auto memRefExpandOp = dyn_cast<memref::ExpandShapeOp>(user)) {
-      if (isGatherToLDSDstOperand(memRefExpandOp))
-        continue;
-    }
-    if (auto memRefSubviewOp = dyn_cast<memref::SubViewOp>(user)) {
-      if (isGatherToLDSDstOperand(memRefSubviewOp))
-        continue;
     }
     // Throw if we can't rewrite all users.
-    hintOp.emitError()
-        << "At least one of the SwizzleHintOp users is not supported. ";
+    hintOp.emitError() << "The following SwizzleHintOp user is not supported : "
+                       << user->getName().getStringRef();
     return;
   }
 
