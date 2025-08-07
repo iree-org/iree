@@ -882,8 +882,7 @@ Value HALDispatchABI::updateProcessorDataFromTargetAttr(
   DictionaryAttr targetConfig = targetAttr.getConfiguration();
 
   // Lookup CPU features.
-  std::optional<NamedAttribute> cpuFeatures =
-      targetConfig.getNamed("cpu_features");
+  std::optional<StringRef> cpuFeatures = getConfigCpuFeatures(targetConfig);
   if (!cpuFeatures) {
     return processorDataPtrValue;
   }
@@ -914,9 +913,8 @@ Value HALDispatchABI::updateProcessorDataFromTargetAttr(
 
     // Find CPU features in featureToBitPattern
     SmallVector<StringRef> cpuFeatureStrings;
-    llvm::cast<StringAttr>(cpuFeatures->getValue())
-        .getValue()
-        .split(cpuFeatureStrings, ',', /*MakeSplit=*/-1, /*KeepEmpty=*/false);
+    cpuFeatures.value().split(cpuFeatureStrings, ',', /*MakeSplit=*/-1,
+                              /*KeepEmpty=*/false);
     for (auto featureString : cpuFeatureStrings) {
       // CPU features are typically prefixed with a +, e.g. +avx,+avx2,+fma.
       featureString.consume_front("+");

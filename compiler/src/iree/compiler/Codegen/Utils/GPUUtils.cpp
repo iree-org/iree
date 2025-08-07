@@ -35,6 +35,8 @@
 #define DBGSNL() (llvm::dbgs() << "\n")
 
 static constexpr unsigned kShuffleBitWidth = 32;
+static const char kGPUTargetAttrName[] = "iree.gpu.target";
+static const char kWavesPerEuAttrName[] = "waves_per_eu";
 
 static llvm::cl::opt<std::string> clTestTarget(
     "iree-gpu-test-target",
@@ -997,7 +999,7 @@ IREE::GPU::TargetAttr getCLGPUTarget(MLIRContext *context) {
 }
 
 IREE::GPU::TargetAttr getGPUTargetAttr(DictionaryAttr attr) {
-  return attr.getAs<IREE::GPU::TargetAttr>("iree.gpu.target");
+  return attr.getAs<IREE::GPU::TargetAttr>(kGPUTargetAttrName);
 }
 
 IREE::GPU::TargetAttr getGPUTargetAttr(MLIRContext *context,
@@ -1016,13 +1018,25 @@ IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op) {
   return getGPUTargetAttr(op->getContext(),
                           IREE::HAL::ExecutableTargetAttr::lookup(op));
 }
+void addConfigGPUTarget(MLIRContext *context,
+                        IREE::GPU::TargetAttr gpuTargetAttr,
+                        SmallVectorImpl<NamedAttribute> &config) {
+  config.emplace_back(StringAttr::get(context, kGPUTargetAttrName),
+                      gpuTargetAttr);
+}
 
 IntegerAttr getConfigWavesPerEuAttr(DictionaryAttr targetConfig) {
-  return targetConfig.getAs<IntegerAttr>("waves_per_eu");
+  return targetConfig.getAs<IntegerAttr>(kWavesPerEuAttrName);
 }
 std::optional<int64_t> getConfigWavesPerEu(DictionaryAttr targetConfig) {
   auto attr = getConfigWavesPerEuAttr(targetConfig);
   return attr ? std::optional<int64_t>(attr.getInt()) : std::nullopt;
+}
+void addConfigWavesPerEu(MLIRContext *context, int64_t wavesPerEu,
+                         SmallVectorImpl<NamedAttribute> &config) {
+  config.emplace_back(
+      StringAttr::get(context, kWavesPerEuAttrName),
+      IntegerAttr::get(IntegerType::get(context, 64), wavesPerEu));
 }
 
 std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func) {

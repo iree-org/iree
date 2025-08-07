@@ -285,7 +285,7 @@ public:
 
     if (auto target = GPU::getHIPTargetDetails(
             options.target, options.targetFeatures, context)) {
-      addConfig(kGPUTargetAttrName, target);
+      addConfigGPUTarget(context, target, configItems);
       if (options.encodingLayoutResolver !=
           GPU::kNoEncodingLayoutResolverName) {
         if (Attribute encoding = GPU::getHIPTargetEncodingLayoutAttr(
@@ -326,7 +326,7 @@ public:
 
     addConfig("ukernels", b.getStringAttr(options.enableROCMUkernels));
     if (options.wavesPerEu > 0) {
-      addConfig("waves_per_eu", b.getI64IntegerAttr(options.wavesPerEu));
+      addConfigWavesPerEu(b.getContext(), options.wavesPerEu, configItems);
     }
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(

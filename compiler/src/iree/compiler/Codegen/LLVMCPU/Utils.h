@@ -16,8 +16,14 @@ namespace mlir::iree_compiler {
 /// of `hal.executable.target` attribute used commonly in CPU codegen pipelines.
 std::optional<int64_t>
 getConfigMaxStackAllocationSize(DictionaryAttr targetConfig);
-
 std::optional<int64_t> getConfigNativeVectorSize(DictionaryAttr targetConfig);
+
+/// Methods to add attributes to the `config` list.
+void addConfigMaxStackAllocationSize(MLIRContext *context,
+                                     int64_t maxStackAllocationSize,
+                                     SmallVectorImpl<NamedAttribute> &config);
+void addConfigNativeVectorSize(MLIRContext *context, int64_t nativeVectorSize,
+                               SmallVectorImpl<NamedAttribute> &config);
 
 bool preferIntrinsicsOverAsm(DictionaryAttr targetConfig);
 

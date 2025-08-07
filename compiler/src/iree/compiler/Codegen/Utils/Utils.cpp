@@ -42,6 +42,10 @@
 
 #define DEBUG_TYPE "iree-codegen-utils"
 
+static const char kCpuFeaturesAttrName[] = "cpu_features";
+static const char kDataLayoutAttrName[] = "data_layout";
+static const char kTargetTripleAttrName[] = "target_triple";
+
 namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
@@ -67,14 +71,34 @@ bool isEntryPoint(mlir::FunctionOpInterface func) {
   return func.isPublic() && getEntryPoint(func);
 }
 
-std::optional<StringRef> getConfigDataLayout(DictionaryAttr targetConfig) {
-  auto attr = targetConfig.getAs<StringAttr>("data_layout");
+std::optional<StringRef> getConfigCpuFeatures(DictionaryAttr targetConfig) {
+  auto attr = targetConfig.getAs<StringAttr>(kCpuFeaturesAttrName);
   return attr ? std::optional<StringRef>(attr.getValue()) : std::nullopt;
+}
+void addConfigCpuFeatures(MLIRContext *context, StringRef cpuFeaturesStr,
+                          SmallVectorImpl<NamedAttribute> &config) {
+  config.emplace_back(StringAttr::get(context, kCpuFeaturesAttrName),
+                      StringAttr::get(context, cpuFeaturesStr));
+}
+
+std::optional<StringRef> getConfigDataLayout(DictionaryAttr targetConfig) {
+  auto attr = targetConfig.getAs<StringAttr>(kDataLayoutAttrName);
+  return attr ? std::optional<StringRef>(attr.getValue()) : std::nullopt;
+}
+void addConfigDataLayout(MLIRContext *context, StringRef dataLayoutStr,
+                         SmallVectorImpl<NamedAttribute> &config) {
+  config.emplace_back(StringAttr::get(context, kDataLayoutAttrName),
+                      StringAttr::get(context, dataLayoutStr));
 }
 
 std::optional<StringRef> getConfigTargetTriple(DictionaryAttr targetConfig) {
-  auto attr = targetConfig.getAs<StringAttr>("target_triple");
+  auto attr = targetConfig.getAs<StringAttr>(kTargetTripleAttrName);
   return attr ? std::optional<StringRef>(attr.getValue()) : std::nullopt;
+}
+void addConfigTargetTriple(MLIRContext *context, StringRef targetTripleStr,
+                           SmallVectorImpl<NamedAttribute> &config) {
+  config.emplace_back(StringAttr::get(context, kTargetTripleAttrName),
+                      StringAttr::get(context, targetTripleStr));
 }
 
 std::optional<llvm::Triple> getTargetTriple(DictionaryAttr attr) {
@@ -170,17 +194,12 @@ bool hasUkernel(DictionaryAttr targetConfig, StringRef ukernelName) {
   return false;
 }
 
-std::optional<StringRef> getCpuFeatures(DictionaryAttr targetConfig) {
-  auto attr = targetConfig.getAs<StringAttr>("cpu_features");
-  return attr ? std::optional<StringRef>(attr.getValue()) : std::nullopt;
-}
-
 // TODO(dcaballe): If we have to check for a significantly large number of
 // features in the future, we may want to consider a persistent state to carry
 // over processed HAL information or keeping the TTI instance alive and query
 // subtarget features data structure.
 bool hasFeature(DictionaryAttr targetConfig, StringRef feature) {
-  std::optional<StringRef> features = getCpuFeatures(targetConfig);
+  std::optional<StringRef> features = getConfigCpuFeatures(targetConfig);
   if (!features) {
     return false;
   }

@@ -198,7 +198,7 @@ public:
     Builder b(context);
     SmallVector<NamedAttribute, 1> configItems;
     if (auto target = GPU::getVulkanTargetDetails(options_.target, context)) {
-      configItems.emplace_back(kGPUTargetAttrName, target);
+      addConfigGPUTarget(context, target, configItems);
     } else {
       emitError(b.getUnknownLoc(), "Unknown Vulkan target '")
           << options_.target << "'";

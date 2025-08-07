@@ -42,6 +42,15 @@ getEntryPoint(mlir::FunctionOpInterface funcOp);
 /// of `hal.executable.target` attribute used commonly in codegen pipelines.
 std::optional<StringRef> getConfigDataLayout(DictionaryAttr targetConfig);
 std::optional<StringRef> getConfigTargetTriple(DictionaryAttr targetConfig);
+std::optional<StringRef> getConfigCpuFeatures(DictionaryAttr targetConfig);
+
+/// Methods to add attributes to the `config` list.
+void addConfigCpuFeatures(MLIRContext *context, StringRef cpuFeatures,
+                          SmallVectorImpl<NamedAttribute> &config);
+void addConfigDataLayout(MLIRContext *context, StringRef dataLayoutStr,
+                         SmallVectorImpl<NamedAttribute> &config);
+void addConfigTargetTriple(MLIRContext *context, StringRef targetTripleStr,
+                           SmallVectorImpl<NamedAttribute> &config);
 
 /// Returns the LLVM Target triple associated with the `attr`, if set.
 std::optional<llvm::Triple> getTargetTriple(DictionaryAttr targetConfig);
@@ -60,9 +69,6 @@ bool isWebGPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 // If `ukernelName` is empty (the default), returns true if any ukernel
 // is enabled at all.
 bool hasUkernel(DictionaryAttr attr, StringRef ukernelName = "");
-
-/// Returns the CPU target features associated with the `attr`, if found.
-std::optional<StringRef> getCpuFeatures(DictionaryAttr targetConfig);
 
 /// Returns true if `attr` has `feature` in its CPU features.
 bool hasFeature(DictionaryAttr targetConfig, StringRef feature);
