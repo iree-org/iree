@@ -149,7 +149,6 @@ static IREEOneShotBufferizationOptions getBufferizationOptions() {
   // it's own logic to handle constants. We'd like to leave the arith.constant
   // as is and insert bufferization.to_buffer to convert the tensor to memref.
   options.opFilter.denyOperation<arith::ConstantOp>();
-  options.opFilter.denyOperation<bufferization::ToBufferOp>();
 
   // This type converter converts tensor types to memref types when no exact
   // memref type can be inferred from the context.
@@ -249,6 +248,18 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   if (failed(runIREEOneShotBufferize(funcOp, options, bufferizationState))) {
     return signalPassFailure();
   }
+
+  // All to_buffer ops on single use constants will have already had any
+  // write conflicts resolved by the analysis, so we can safely mark them as
+  // read only.
+  funcOp->walk([](bufferization::ToBufferOp toBuffer) {
+    if (auto constant =
+            toBuffer.getTensor().getDefiningOp<arith::ConstantOp>()) {
+      if (constant->hasOneUse()) {
+        toBuffer.setReadOnly(true);
+      }
+    }
+  });
 
   // Remove redundant args and unused results.
   {

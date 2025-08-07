@@ -196,7 +196,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //   CHECK-LABEL: hal.executable public @conv2d_dispatch_0
 //         CHECK:   hal.executable.variant public @cuda
 // CHECK-COUNT-3:   llvm.load %{{.*}} : !llvm.ptr<1> -> f32
-//         CHECK:   lvm.fmul %{{.*}}, %{{.*}}  : f32
+//         CHECK:   llvm.fmul %{{.*}}, %{{.*}}  : f32
 //         CHECK:   llvm.fadd %{{.*}}, %{{.*}}  : f32
 //         CHECK:   llvm.store {{.*}} : f32, !llvm.ptr<1>
 

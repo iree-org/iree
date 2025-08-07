@@ -36,6 +36,7 @@ iree_lit_test_suite(
     "fuse_encoding_ops_into_dispatch_regions.mlir"
     "fuse_horizontal_contractions.mlir"
     "fuse_multiuse_elementwise_producer.mlir"
+    "fuse_multiuse_intra_dispatch.mlir"
     "fusion_preprocessing.mlir"
     "hoist_encoding_ops.mlir"
     "hoist_uniform_scalar_compute.mlir"

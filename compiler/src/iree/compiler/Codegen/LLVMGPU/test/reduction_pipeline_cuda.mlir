@@ -114,7 +114,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //         CHECK:    gpu.subgroup_reduce
 //         CHECK:    vector.transfer_write {{.*}} : vector<1xf32
 //         CHECK:    gpu.subgroup_reduce
-//         CHECK:    arith.divf {{.*}} : vector<1x1x4xf32>
+//         CHECK:    arith.divf {{.*}} : vector<f32>
 //         CHECK:    vector.transfer_write {{.*}} : vector<4xf32>, {{.*}}
 //         CHECK:    return
 

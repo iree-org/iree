@@ -106,7 +106,7 @@ outlineDispatchExternOp(std::string name,
 
     // Add an export pointing at the entry point function.
     auto exportOp = variantBuilder.create<IREE::HAL::ExecutableExportOp>(
-        dispatchExternOp.getLoc(), dispatchExternOp.getExportAttr(),
+        dispatchExternOp.getLoc(), dispatchExternOp.getExportNameAttr(),
         targetOrdinalAttr, dispatchExternOp.getLayoutAttr(),
         dispatchExternOp.getWorkgroupSizeAttr(),
         dispatchExternOp.getSubgroupSizeAttr(),

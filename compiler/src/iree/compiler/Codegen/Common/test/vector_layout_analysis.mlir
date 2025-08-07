@@ -809,7 +809,7 @@ builtin.module attributes { transform.with_named_sequence } {
       %root = vector.transfer_read %arr[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<16x16xf16>, vector<16x16xf16>
       // expected-remark @above {{element_tile = [16, 8]}}
       %rootl = iree_vector_ext.to_layout %root to layout(#layout) : vector<16x16xf16>
-      %init = vector.extractelement %arg1[] : vector<f16>
+      %init = vector.extract %arg1[] : f16 from vector<f16>
       %root_red = vector.multi_reduction<add>, %rootl, %init [0, 1]  : vector<16x16xf16> to f16
       %c = vector.broadcast %root_red : f16 to vector<f16>
       scf.yield %c : vector<f16>

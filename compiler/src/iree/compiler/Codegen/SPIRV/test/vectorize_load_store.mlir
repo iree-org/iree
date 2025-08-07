@@ -349,7 +349,7 @@ func.func @scalarize_0d_transfer_write(%val: vector<f32>, %memory: memref<4xf32>
   return
 }
 
-// CHECK: %[[S:.+]] = vector.extractelement %[[V]][] : vector<f32>
+// CHECK: %[[S:.+]] = vector.extract %[[V]][] : f32 from vector<f32>
 // CHECK: memref.store %[[S]], %[[MEM]][%[[I]]] : memref<4xf32>
 
 // -----

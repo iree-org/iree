@@ -715,14 +715,19 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
       SmallVector<OpOperand *> fusableUses =
           getFusableUses(context, currRoot, dominanceInfo,
                          /*aggressiveFusion=*/options.aggressiveFusion);
-      if (fusableUses.empty())
+      if (fusableUses.empty()) {
         continue;
+      }
 
-      // For now disable the fusing with multiple consumers for all
-      // operations other than horizontally fused gemms. This should
-      // work in general but is causing time-outs on some CI examples.
-      if (!IREE::LinalgExt::isaHorizontallyFusedContraction(root)) {
-        fusableUses = {fusableUses.front()};
+      // For now prune the fusable uses due to codegen failures. Ideally we
+      // should just be taking the whole set of fusable uses.
+      if (IREE::LinalgExt::isBitTruncateOp(fusableUses.front()->getOwner())) {
+        fusableUses =
+            llvm::filter_to_vector(fusableUses, [](OpOperand *operand) {
+              return IREE::LinalgExt::isBitTruncateOp(operand->getOwner());
+            });
+      } else {
+        fusableUses.resize(1);
       }
 
       // Analyse the use to see if it is fusable.

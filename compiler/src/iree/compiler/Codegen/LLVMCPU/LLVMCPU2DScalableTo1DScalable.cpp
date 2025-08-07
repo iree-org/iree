@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
@@ -117,8 +118,8 @@ dropScalabilityFromUnsupportedOperations(mlir::FunctionOpInterface funcOp,
   });
 
   for (TilingInterface tilingOp : computeOps) {
-    auto loweringConfigAttr =
-        getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(tilingOp);
+    IREE::Codegen::LoweringConfigAttrInterface loweringConfigAttr =
+        getLoweringConfig(tilingOp);
     if (!loweringConfigAttr)
       continue;
 

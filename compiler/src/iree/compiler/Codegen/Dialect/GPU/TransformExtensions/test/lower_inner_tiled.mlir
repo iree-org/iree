@@ -103,6 +103,47 @@ module attributes { transform.with_named_sequence } {
 // -----
 
 #contraction_accesses = [
+  affine_map<() -> ()>,
+  affine_map<() -> ()>,
+  affine_map<() -> ()>
+]
+
+func.func @lower_col_major_inner_tiled_virtual_16x16x32(%lhs: vector<8xf16>, %rhs: vector<8xf16>, %acc: vector<4xf32>) -> vector<4xf32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [],
+    kind = #iree_gpu.virtual_mma_layout<VMFMA_F32_16x16x32_F16, col_major = true>
+  } : vector<8xf16>, vector<8xf16> into vector<4xf32>
+  return %0 : vector<4xf32>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %root : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func {
+      transform.apply_patterns.iree.lower_inner_tiled
+    } : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @lower_col_major_inner_tiled_virtual_16x16x32
+//  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: vector<8xf16>
+//  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: vector<8xf16>
+//  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<4xf32>
+//  CHECK: %[[LHS0:.*]] = vector.extract_strided_slice %[[LHS]] {offsets = [0], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
+//  CHECK: %[[RHS0:.*]] = vector.extract_strided_slice %[[RHS]] {offsets = [0], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
+//  CHECK: %[[ACC0:.*]] = amdgpu.mfma %[[RHS0]] * %[[LHS0]] + %[[ACC]]
+//  CHECK-SAME: {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32}
+//  CHECK: %[[LHS1:.*]] = vector.extract_strided_slice %[[LHS]] {offsets = [4], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
+//  CHECK: %[[RHS1:.*]] = vector.extract_strided_slice %[[RHS]] {offsets = [4], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
+//  CHECK: %[[ACC1:.*]] = amdgpu.mfma %[[RHS1]] * %[[LHS1]] + %[[ACC0]]
+//  CHECK-SAME: {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32}
+//  CHECK: return %[[ACC1]] : vector<4xf32>
+
+// -----
+
+#contraction_accesses = [
  affine_map<() -> ()>,
  affine_map<() -> ()>,
  affine_map<() -> ()>

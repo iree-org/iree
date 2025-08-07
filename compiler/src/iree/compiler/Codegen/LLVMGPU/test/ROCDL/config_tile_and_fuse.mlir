@@ -846,3 +846,58 @@ func.func @small_reduction(%arg0 : tensor<2x?xf32>, %arg1 : tensor<?xf32>, %arg2
 }
 // DEFAULT-LABEL: @small_reduction
 //  DEFAULT-SAME:     #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @fully_dyn_elementwise(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %dim = tensor.dim %arg0, %c0 : tensor<?x?xf32>
+  %dim_1 = tensor.dim %arg0, %c1 : tensor<?x?xf32>
+  %0 = tensor.empty(%dim, %dim_1) : tensor<?x?xf32>
+  %1 = linalg.generic {
+    indexing_maps = [#map, #map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0 : tensor<?x?xf32>) outs(%0 : tensor<?x?xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %2 = math.absf %in : f32
+    linalg.yield %2 : f32
+  } -> tensor<?x?xf32>
+  return %1 : tensor<?x?xf32>
+}
+
+// CHECK-LABEL: func.func @fully_dyn_elementwise
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1, 1]
+//  CHECK-SAME:     workgroup = [1, 64]
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+func.func @dyn_parallel_reduction(%arg0: tensor<?x32xf32>) -> tensor<?xf32> {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant -3.40282306E+38 : f32
+  %dim = tensor.dim %arg0, %c0 : tensor<?x32xf32>
+  %0 = tensor.empty(%dim) : tensor<?xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<?xf32>) -> tensor<?xf32>
+  %2 = linalg.generic {
+    indexing_maps = [#map, #map1],
+    iterator_types = ["parallel", "reduction"]}
+    ins(%arg0 : tensor<?x32xf32>) outs(%1 : tensor<?xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %3 = math.absf %in : f32
+    %4 = arith.maximumf %3, %out : f32
+    linalg.yield %4 : f32
+  } -> tensor<?xf32>
+  return %2 : tensor<?xf32>
+}
+
+// CHECK-LABEL: func.func @dyn_parallel_reduction
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     reduction = [0, 4]
+//  CHECK-SAME:     thread = [1, 0]
+//  CHECK-SAME:     workgroup = [64, 0]

@@ -19,7 +19,7 @@
 #include "llvm/ADT/STLForwardCompat.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
@@ -38,7 +38,6 @@
 
 #define DEBUG_TYPE "iree-gpu-attrs"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.cpp.inc"
 #define GET_ATTRDEF_CLASSES
@@ -451,6 +450,21 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
   return baseLayout;
 }
 
+MMASingleSubgroupLayout
+getSingleSubgroupLayout(VirtualMMAIntrinsic virtualIntrinsic,
+                        MMAFragment fragment, bool colMajor) {
+  MMASingleSubgroupLayout baseLayout =
+      getSingleSubgroupLayout(virtualIntrinsic, fragment);
+  assert(baseLayout.element.size() == 2 && "expected 2d layout");
+  if (colMajor) {
+    std::swap(baseLayout.element[0], baseLayout.element[1]);
+    std::swap(baseLayout.thread[0], baseLayout.thread[1]);
+    std::swap(baseLayout.outer[0], baseLayout.outer[1]);
+    std::swap(baseLayout.tstrides[0], baseLayout.tstrides[1]);
+  }
+  return baseLayout;
+}
+
 // Struct describing the shape of a MMA operation, but not the detailed layout.
 struct OpaqueMmaLayout {
   int64_t mSize = 0;
@@ -502,8 +516,9 @@ getSingleSubgroupLayout(IREE::Codegen::InnerTileDescAttrInterface mmaKind,
                                                   mmaAttr.getColMajor());
   }
   if (auto vmmaAttr = dyn_cast<VirtualMMAAttr>(mmaKind)) {
-    return IREE::GPU::getSingleSubgroupLayout(vmmaAttr.getIntrinsic(),
-                                              fragment);
+    return IREE::GPU::getSingleSubgroupLayout(vmmaAttr.getIntrinsic(), fragment,
+                                              fragment == MMAFragment::Acc &&
+                                                  vmmaAttr.getColMajor());
   }
   assert(false && "unhandled MMA Interface type.");
   return {};
@@ -977,7 +992,7 @@ distributeMmaFragmentToIntrinsics(OpBuilder &builder, Location loc, Value value,
       sliceSwizzledShape(swizzle, [](TileSwizzle::Dim dim) {
         return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
       });
-  LDBG("crossIntrinsicShape: " << llvm::interleaved(crossIntrinsicShape));
+  LDBG() << "crossIntrinsicShape: " << llvm::interleaved(crossIntrinsicShape);
   int rank = internalShape.size();
   SmallVector<int64_t> indices(rank, 0);
   SmallVector<int64_t> strides(rank, 1);
@@ -1009,20 +1024,20 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
 
   // Prepare Lhs/Rhs/Acc operand slices to feed the intrinsic.
   TileSwizzle lhsSwizzle = getSwizzle(*this, MMAFragment::Lhs);
-  LDBG("DataTiledMMAAttr::buildMmaOperation");
-  LDBG("    lhsSwizzle: " << lhsSwizzle);
+  LDBG() << "DataTiledMMAAttr::buildMmaOperation";
+  LDBG() << "    lhsSwizzle: " << lhsSwizzle;
   SmallVector<Value> intrinsicsLhs =
       distributeMmaFragmentToIntrinsics(builder, loc, inputs[0], lhsSwizzle);
 
   TileSwizzle rhsSwizzle = getSwizzle(*this, MMAFragment::Rhs);
-  LDBG("DataTiledMMAAttr::buildMmaOperation");
-  LDBG("    rhsSwizzle: " << rhsSwizzle);
+  LDBG() << "DataTiledMMAAttr::buildMmaOperation";
+  LDBG() << "    rhsSwizzle: " << rhsSwizzle;
   SmallVector<Value> intrinsicsRhs =
       distributeMmaFragmentToIntrinsics(builder, loc, inputs[1], rhsSwizzle);
 
   TileSwizzle accSwizzle = getSwizzle(*this, MMAFragment::Acc);
-  LDBG("DataTiledMMAAttr::buildMmaOperation");
-  LDBG("    accSwizzle: " << accSwizzle);
+  LDBG() << "DataTiledMMAAttr::buildMmaOperation";
+  LDBG() << "    accSwizzle: " << accSwizzle;
 
   SmallVector<Value> intrinsicsAcc =
       distributeMmaFragmentToIntrinsics(builder, loc, outputs[0], accSwizzle);
@@ -1053,8 +1068,9 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
         return dim.kind == TileSwizzle::Dim::Kind::Internal;
       });
 
-  LDBG("accCrossIntrinsicShape: " << llvm::interleaved(accCrossIntrinsicShape));
-  LDBG("accInternalShape: " << llvm::interleaved(accInternalShape));
+  LDBG() << "accCrossIntrinsicShape: "
+         << llvm::interleaved(accCrossIntrinsicShape);
+  LDBG() << "accInternalShape: " << llvm::interleaved(accInternalShape);
   int dstRank = accCrossIntrinsicShape.size();
   SmallVector<int64_t> strides(dstRank, 1);
   SmallVector<int64_t> indices(dstRank, 0);
@@ -1077,6 +1093,11 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
 //===----------------------------------------------------------------------===//
 // VirtualMMA Attributes
 //===----------------------------------------------------------------------===//
+
+VirtualMMAAttr VirtualMMAAttr::get(MLIRContext *context,
+                                   VirtualMMAIntrinsic type) {
+  return Base::get(context, type, /*colMajor=*/false);
+}
 
 static std::tuple<int64_t, int64_t, int64_t>
 getMNKShape(VirtualMMAIntrinsic type) {
@@ -1184,8 +1205,8 @@ LogicalResult VirtualMMAAttr::populateOperandOffsetsSizesStrides(
     SmallVectorImpl<OpFoldResult> &strides) const {
   assert(operandIndex <= 2 && "Must index valid MMA operand");
   auto fragment = static_cast<IREE::GPU::MMAFragment>(operandIndex);
-  MMASingleSubgroupLayout subgroupLayout =
-      getSingleSubgroupLayout(getIntrinsic(), fragment);
+  MMASingleSubgroupLayout subgroupLayout = getSingleSubgroupLayout(
+      getIntrinsic(), fragment, fragment == MMAFragment::Acc && getColMajor());
   SmallVector<OpFoldResult> canonicalOffsets;
   SmallVector<OpFoldResult> canonicalSizes;
   if (failed(populateCanonicalOffsetsSizesAndStrides(
@@ -1259,6 +1280,9 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
       Value sliced_rhs = builder.create<vector::ExtractStridedSliceOp>(
           loc, inputs[1], ArrayRef<int64_t>{offset},
           ArrayRef<int64_t>{vectorWidth}, ArrayRef<int64_t>{1});
+      if (getColMajor()) {
+        std::swap(sliced_lhs, sliced_rhs);
+      }
       acc = builder
                 .create<amdgpu::MFMAOp>(loc, outputs[0].getType(), m, n,
                                         nativeKSize, getBlockSize(), sliced_lhs,
