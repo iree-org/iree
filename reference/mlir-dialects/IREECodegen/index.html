@@ -2108,6 +2108,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#simpletargetattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      SimpleTargetAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#symbolicukernelproviderattr" class="md-nav__link">
     <span class="md-ellipsis">
       SymbolicUKernelProviderAttr
@@ -5262,6 +5271,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#simpletargetattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      SimpleTargetAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#symbolicukernelproviderattr" class="md-nav__link">
     <span class="md-ellipsis">
       SymbolicUKernelProviderAttr
@@ -5692,6 +5710,7 @@ within a backend.</p>
 <li><a href="#loweringconfigtilinglevelattr">LoweringConfigTilingLevelAttr</a></li>
 <li><a href="#loweringconfigtilinglevelsattr">LoweringConfigTilingLevelsAttr</a></li>
 <li><a href="#rotaterowsattr">RotateRowsAttr</a></li>
+<li><a href="#simpletargetattr">SimpleTargetAttr</a></li>
 <li><a href="#symbolicukernelproviderattr">SymbolicUKernelProviderAttr</a></li>
 <li><a href="#translationinfoattr">TranslationInfoAttr</a></li>
 <li><a href="#ukerneldescriptorattr">UKernelDescriptorAttr</a></li>
@@ -6444,6 +6463,32 @@ FFFF EEEE DDDD CCCC /// 1 2 3 0
 </tr>
 </tbody>
 </table>
+<h3 id="simpletargetattr">SimpleTargetAttr<a class="headerlink" href="#simpletargetattr" title="Permanent link">link</a></h3>
+<p><em>Default implementation of TargetInfoAttrInterface</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#iree_codegen.simple_target&lt;
+  ::llvm::ArrayRef&lt;int64_t&gt;   # max_workgroup_count
+&gt;
+</code></pre></div>
+<p>Implements the basic information needed to satisfy the
+<code>TargetInfoAttrInterface</code></p>
+<h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">max_workgroup_count</td>
+<td style="text-align: center;"><code>::llvm::ArrayRef&lt;int64_t&gt;</code></td>
+<td>Maximum allowed workgroup count in [x, y, z]</td>
+</tr>
+</tbody>
+</table>
 <h3 id="symbolicukernelproviderattr">SymbolicUKernelProviderAttr<a class="headerlink" href="#symbolicukernelproviderattr" title="Permanent link">link</a></h3>
 <p><em>An attribute that provides ukernel implementations by looking up the
     nearest symbol table from the annotation site.</em></p>
@@ -6469,7 +6514,7 @@ dispatch region (like <code>linalg.matmul</code>/<code>linalg.*conv*</code>), th
 attribute gets propagated to the entry point function.</p>
 <p>The fields are
 - <code>passPipeline</code> : The pass pipeline to use.</p>
-<h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
+<h5 id="parameters_8">Parameters:<a class="headerlink" href="#parameters_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6516,7 +6561,7 @@ attribute gets propagated to the entry point function.</p>
   ::mlir::iree_compiler::IREE::Codegen::UKernelArgumentKind   # kind
 &gt;
 </code></pre></div>
-<h5 id="parameters_8">Parameters:<a class="headerlink" href="#parameters_8" title="Permanent link">link</a></h5>
+<h5 id="parameters_9">Parameters:<a class="headerlink" href="#parameters_9" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6565,7 +6610,7 @@ if <code>a &gt; b</code>. In the same way it is illegal to for the list to
 - have <code>workgroup_mapping&lt;y&gt;</code> but not <code>workgroup_mapping&lt;x&gt;</code>
 - have <code>workgroup_mapping&lt;z:*&gt;</code>  but not have <code>workgroup_mapping&lt;x&gt;</code>
   and <code>workgroup_mapping&lt;y&gt;</code></p>
-<h5 id="parameters_9">Parameters:<a class="headerlink" href="#parameters_9" title="Permanent link">link</a></h5>
+<h5 id="parameters_10">Parameters:<a class="headerlink" href="#parameters_10" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
