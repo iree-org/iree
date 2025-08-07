@@ -1655,8 +1655,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_fence_create,  //
   // This should be reworked to just create the fence.
 
   iree_hal_semaphore_t* semaphore = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(
-      device, 0ull, IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &semaphore));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_semaphore_create(device, IREE_HAL_QUEUE_AFFINITY_ANY, 0ull,
+                                IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &semaphore));
 
   // Create fence with room for our single semaphore.
   iree_hal_fence_t* fence = NULL;

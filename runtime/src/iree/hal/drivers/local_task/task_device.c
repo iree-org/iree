@@ -352,8 +352,9 @@ static iree_status_t iree_hal_task_device_import_file(
 }
 
 static iree_status_t iree_hal_task_device_create_semaphore(
-    iree_hal_device_t* base_device, uint64_t initial_value,
-    iree_hal_semaphore_flags_t flags, iree_hal_semaphore_t** out_semaphore) {
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    uint64_t initial_value, iree_hal_semaphore_flags_t flags,
+    iree_hal_semaphore_t** out_semaphore) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   return iree_hal_task_semaphore_create(
       iree_hal_task_device_shared_event_pool(device), initial_value,

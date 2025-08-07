@@ -590,8 +590,9 @@ typedef struct iree_hal_device_vtable_t {
       iree_hal_external_file_flags_t flags, iree_hal_file_t** out_file);
 
   iree_status_t(IREE_API_PTR* create_semaphore)(
-      iree_hal_device_t* device, uint64_t initial_value,
-      iree_hal_semaphore_flags_t flags, iree_hal_semaphore_t** out_semaphore);
+      iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+      uint64_t initial_value, iree_hal_semaphore_flags_t flags,
+      iree_hal_semaphore_t** out_semaphore);
 
   iree_hal_semaphore_compatibility_t(
       IREE_API_PTR* query_semaphore_compatibility)(

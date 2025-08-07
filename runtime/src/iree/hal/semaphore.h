@@ -318,9 +318,15 @@ typedef struct iree_hal_semaphore_t iree_hal_semaphore_t;
 // Creates a semaphore that can be used with command queues owned by this
 // device. To use the semaphores with other devices or instances they must
 // first be exported.
+//
+// By default the |queue_affinity| is a hint to the implementation of which
+// queues on the |device| will signal or wait on the semaphore. If
+// IREE_HAL_SEMAPHORE_FLAG_DEVICE_LOCAL is specified the |queue_affinity| will
+// indicate the semaphore is _only_ signaled or waited on those specific queues.
 IREE_API_EXPORT iree_status_t iree_hal_semaphore_create(
-    iree_hal_device_t* device, uint64_t initial_value,
-    iree_hal_semaphore_flags_t flags, iree_hal_semaphore_t** out_semaphore);
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    uint64_t initial_value, iree_hal_semaphore_flags_t flags,
+    iree_hal_semaphore_t** out_semaphore);
 
 // Retains the given |semaphore| for the caller.
 IREE_API_EXPORT void iree_hal_semaphore_retain(iree_hal_semaphore_t* semaphore);
