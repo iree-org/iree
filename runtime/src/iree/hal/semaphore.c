@@ -52,8 +52,9 @@ IREE_API_EXPORT iree_string_view_t iree_hal_semaphore_compatibility_format(
 IREE_HAL_API_RETAIN_RELEASE(semaphore);
 
 IREE_API_EXPORT iree_status_t iree_hal_semaphore_create(
-    iree_hal_device_t* device, uint64_t initial_value,
-    iree_hal_semaphore_flags_t flags, iree_hal_semaphore_t** out_semaphore) {
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    uint64_t initial_value, iree_hal_semaphore_flags_t flags,
+    iree_hal_semaphore_t** out_semaphore) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_semaphore);
   *out_semaphore = NULL;
@@ -61,7 +62,7 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_create(
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, initial_value);
   iree_status_t status =
       IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device, create_semaphore)(
-          device, initial_value, flags, out_semaphore);
+          device, queue_affinity, initial_value, flags, out_semaphore);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

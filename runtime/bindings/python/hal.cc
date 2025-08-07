@@ -383,10 +383,10 @@ void HalDevice::EndProfiling() {
 
 HalSemaphore HalDevice::CreateSemaphore(uint64_t initial_value) {
   iree_hal_semaphore_t* out_sem;
-  CheckApiStatus(
-      iree_hal_semaphore_create(raw_ptr(), initial_value,
-                                IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &out_sem),
-      "creating semaphore");
+  CheckApiStatus(iree_hal_semaphore_create(
+                     raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY, initial_value,
+                     IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &out_sem),
+                 "creating semaphore");
   return HalSemaphore::StealFromRawPtr(out_sem);
 }
 

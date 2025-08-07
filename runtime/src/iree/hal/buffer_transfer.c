@@ -63,7 +63,8 @@ static iree_status_t iree_hal_device_transfer_and_wait(
   // idle.
   iree_hal_semaphore_t* fence_semaphore = NULL;
   iree_status_t status = iree_hal_semaphore_create(
-      device, 0ull, IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &fence_semaphore);
+      device, IREE_HAL_QUEUE_AFFINITY_ANY, 0ull,
+      IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &fence_semaphore);
   uint64_t signal_value = 1ull;
   if (iree_status_is_ok(status)) {
     iree_hal_semaphore_list_t wait_semaphores = {
