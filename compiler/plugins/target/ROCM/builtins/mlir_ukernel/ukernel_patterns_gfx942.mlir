@@ -27,6 +27,24 @@ pdl.pattern @annotate_expanded_matmul_like : benefit(1) {
   %attr_name = pdl.attribute = "iree_codegen.ukernel"
   pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) {isNegated = true}
 
+  // M % 128 == 0, K % 128 == 0, N % 256 == 0
+  %empty = pdl.attribute = {}
+  %c0 = pdl.attribute = 0
+  %c1 = pdl.attribute = 1
+  %c2 = pdl.attribute = 2
+  %c128 = pdl.attribute = 128
+  %c256 = pdl.attribute = 256
+  pdl.apply_native_constraint "dimIsMultipleOf"(%lhs, %c1, %c128 : !pdl.value, !pdl.attribute, !pdl.attribute)
+  pdl.apply_native_constraint "dimIsMultipleOf"(%lhs, %c2, %c128 : !pdl.value, !pdl.attribute, !pdl.attribute)
+  pdl.apply_native_constraint "dimIsMultipleOf"(%rhs, %c0, %c256 : !pdl.value, !pdl.attribute, !pdl.attribute)
+  pdl.apply_native_constraint "dimIsMultipleOf"(%rhs, %c1, %c128 : !pdl.value, !pdl.attribute, !pdl.attribute)
+
+  // N >= 1024, K >= 512
+  %c512 = pdl.attribute = 512
+  %c1024 = pdl.attribute = 1024
+  pdl.apply_native_constraint "dimIsBound"(%rhs, %c0, %c1024, %empty : !pdl.value, !pdl.attribute, !pdl.attribute, !pdl.attribute)
+  pdl.apply_native_constraint "dimIsBound"(%lhs, %c2, %c512, %empty : !pdl.value, !pdl.attribute, !pdl.attribute, !pdl.attribute)
+
   pdl.rewrite {
     // Call the C++ "annotateOperation" utility to add the attributes to the matched linalg.generic op.
     // This modifies the operation in-place.
