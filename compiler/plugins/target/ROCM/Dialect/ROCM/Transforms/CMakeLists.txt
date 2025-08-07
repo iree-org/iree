@@ -38,6 +38,7 @@ iree_cc_library(
     MLIRParser
     MLIRPass
     MLIRTransformUtils
+    MLIRValueBoundsOpInterface
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Dialect::Util::IR
