@@ -22,6 +22,7 @@ LLVM_SRCS = enforce_glob(
     # keep sorted
     [
         "conv2d.mlir",
+        "fp4_f32_conversion.mlir",
         "fp_to_subbyte.mlir",
         "narrow_n_matmuls.mlir",
         "pack.mlir",
@@ -82,6 +83,7 @@ VMVX_SRCS = enforce_glob(
     include = ["*.mlir"],
     exclude = [
         "fp_to_subbyte.mlir",
+        "fp4_f32_conversion.mlir",
         "large_linalg_matmul.mlir",
         "subbyte_to_fp.mlir",
         "index.mlir",
@@ -128,6 +130,7 @@ VULKAN_SRCS = enforce_glob(
     include = ["*.mlir"],
     exclude = [
         "fp_to_subbyte.mlir",
+        "fp4_f32_conversion.mlir",
         "index.mlir",
         "large_linalg_matmul.mlir",
         "pack.mlir",
@@ -185,6 +188,7 @@ CUDA_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
+        "fp4_f32_conversion.mlir",
         "index.mlir",
         # https://github.com/llvm/llvm-project/issues/131386 causes
         # See bug #20294
@@ -221,6 +225,7 @@ ROCM_SRCS = enforce_glob(
     exclude = [
         "conv2d.mlir",
         "fp_to_subbyte.mlir",
+        "fp4_f32_conversion.mlir",
         "index.mlir",
         "large_linalg_matmul.mlir",
         "narrow_n_matmuls.mlir",
