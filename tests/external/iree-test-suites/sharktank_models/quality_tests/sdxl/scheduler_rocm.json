@@ -3,7 +3,6 @@
     "compiler_flags": [
         "--iree-hal-target-device=hip",
         "--iree-opt-const-eval=false",
-        "--iree-global-opt-propagate-transposes=true",
         "--iree-llvmgpu-enable-prefetch=true",
         "--iree-execution-model=async-external",
         "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline,iree-preprocessing-pad-to-intrinsics)",
