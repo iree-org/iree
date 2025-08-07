@@ -21,13 +21,18 @@ struct Range;
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
-// Helper method to add 2 OpFoldResult inputs with affine.apply.
+/// Helper method to add 2 OpFoldResult inputs with affine.apply.
 OpFoldResult addOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
                      OpFoldResult b);
 
-// Helper method to multiply 2 OpFoldResult inputs with affine.apply.
+/// Helper method to multiply 2 OpFoldResult inputs with affine.apply.
 OpFoldResult mulOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
                      OpFoldResult b);
+
+/// Helper method to compute (a * b + c) with OpFoldResult inputs using
+/// affine.apply.
+OpFoldResult mulAddOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
+                        OpFoldResult b, OpFoldResult c);
 
 /// Returns a `memref.dim` or `tensor.dim` operation to get the shape of `v` at
 /// `dim`.

@@ -1683,6 +1683,17 @@ bool TargetAttr::supportsSyncMMAOps() const {
   return false;
 }
 
+std::array<int64_t, 3> TargetAttr::getMaximumWorkgroupCount() const {
+  DenseI32ArrayAttr maxWgpCount = getWgp().getMaxWorkgroupCounts();
+  assert(maxWgpCount.size() <= 3 && "expected only workgroup count for x,y,z");
+  std::array<int64_t, 3> maxWorkgroupCount = {
+      ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
+  for (auto [index, value] : llvm::enumerate(maxWgpCount.asArrayRef())) {
+    maxWorkgroupCount[index] = value;
+  }
+  return maxWorkgroupCount;
+}
+
 //===----------------------------------------------------------------------===//
 // Lowering Config Attributes
 //===----------------------------------------------------------------------===//

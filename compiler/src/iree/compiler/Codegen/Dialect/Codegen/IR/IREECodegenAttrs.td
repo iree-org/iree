@@ -195,6 +195,35 @@ def WorkgroupMappingAttr :
 }
 
 //===---------------------------------------------------------------------===//
+// iree_codegen.simple_target
+//===---------------------------------------------------------------------===//
+
+def IREECodegen_SimpleTargetAttr :
+  AttrDef<IREECodegen_Dialect, "SimpleTarget", [
+    DeclareAttrInterfaceMethods<IREECodegen_TargetInfoAttrInterface, [
+      "getMaximumWorkgroupCount"]>]> {
+  let summary = "Default implementation of TargetInfoAttrInterface";
+
+  let description = [{
+    Implements the basic information needed to satisfy the
+    `TargetInfoAttrInterface`
+  }];
+
+  let mnemonic = "simple_target";
+  let parameters = (ins
+    OptionalArrayRefParameter<"int64_t",
+      "Maximum allowed workgroup count in [x, y, z]">:$max_workgroup_count
+  );
+
+  let assemblyFormat = [{`<`
+    (`max_workgroup_count` `=` `[` $max_workgroup_count^ `]` )?
+  `>`}];
+
+  let genVerifyDecl = 1;
+}
+
+
+//===---------------------------------------------------------------------===//
 // iree_codegen.translation_info
 //===---------------------------------------------------------------------===//
 

@@ -39,10 +39,10 @@ hal.executable private @split_reduction_executable {
     }
   }
 }
-//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2, s3, s4, s5] -> (((-s3 + s4) ceildiv s5) * ((s1 * s2) * s0))>
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2, s3, s4, s5] -> (((-s3 + s4) ceildiv s5) * (s2 * (s0 * s1)))>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1, s2] -> ((-s0 + s1) ceildiv s2)>
 //   CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 floordiv ((-s1 + s2) ceildiv s3))>
-//   CHECK-DAG: #[[MAP3:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
+//   CHECK-DAG: #[[MAP3:.+]] = affine_map<()[s0, s1, s2] -> (s0 * s1 + s2)>
 //       CHECK: @split_reduction_variant
 //       CHECK:   hal.executable.export
 //  CHECK-SAME:       %[[ARG1:[a-zA-Z0-9_]+]]: index
@@ -52,7 +52,7 @@ hal.executable private @split_reduction_executable {
 //  CHECK-SAME:       %[[ARG5:[a-zA-Z0-9_]+]]: index
 //  CHECK-SAME:       %[[ARG6:[a-zA-Z0-9_]+]]: index
 //   CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
-//   CHECK-DAG:     %[[NUMWORKGROUPSX:.+]] = affine.apply #[[MAP0]]()[%[[ARG4]], %[[ARG6]], %[[ARG5]], %[[ARG1]], %[[ARG2]], %[[ARG3]]]
+//   CHECK-DAG:     %[[NUMWORKGROUPSX:.+]] = affine.apply #[[MAP0]]()[%[[ARG6]], %[[ARG5]], %[[ARG4]], %[[ARG1]], %[[ARG2]], %[[ARG3]]]
 //       CHECK:     hal.return %[[NUMWORKGROUPSX]], %[[C1]], %[[C1]]
 //       CHECK:   func @split_reduction()
 //   CHECK-DAG:     %[[SPLIT_LB:.+]] = hal.interface.constant.load {{.+}} ordinal(0)
@@ -66,7 +66,7 @@ hal.executable private @split_reduction_executable {
 //   CHECK-DAG:     %[[COUNTX:.+]] = hal.interface.workgroup.count[0]
 //   CHECK-DAG:     %[[ORIG_COUNTZ:.+]] = affine.apply #[[MAP2]]()[%[[COUNTX]], %[[SPLIT_LB]], %[[SPLIT_UB]], %[[SPLIT_STEP]]]
 //       CHECK:     %[[DELINEARIZE:.+]]:2 = affine.delinearize_index %[[IDX]] into (%[[SPLIT_NPROCS]], %[[ORIG_COUNTZ]]
-//       CHECK:     %[[SPLITIVREPLACEMENT:.+]] = affine.apply #[[MAP3]]()[%[[DELINEARIZE]]#0, %[[SPLIT_STEP]]]
+//       CHECK:     %[[SPLITIVREPLACEMENT:.+]] = affine.apply #[[MAP3]]()[%[[DELINEARIZE]]#0, %[[SPLIT_STEP]], %[[SPLIT_LB]]]
 //       CHECK:     "use1"(%[[SPLITIVREPLACEMENT]])
 //       CHECK:     %[[OTHERIVREPLACEMENTS:.+]]:3 = affine.delinearize_index %[[DELINEARIZE]]#1
 //  CHECK-SAME:       into (%[[ORIG_UB0]], %[[ORIG_UB1]], %[[ORIG_UB2]]
@@ -111,7 +111,7 @@ hal.executable private @split_reduction_2d_executable {
     }
   }
 }
-//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2, s3, s4] -> ((s3 * s4) * ((s1 * s2) * s0))>
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2, s3, s4] -> ((s3 * s4) * (s2 * (s0 * s1)))>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1, s2] -> (s0 floordiv (s1 * s2))>
 //       CHECK: @split_reduction_2d_variant
 //       CHECK:   hal.executable.export
@@ -121,7 +121,7 @@ hal.executable private @split_reduction_2d_executable {
 //  CHECK-SAME:       %[[ARG4:[a-zA-Z0-9_]+]]: index
 //  CHECK-SAME:       %[[ARG5:[a-zA-Z0-9_]+]]: index
 //   CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
-//   CHECK-DAG:     %[[NUMWORKGROUPSX:.+]] = affine.apply #[[MAP0]]()[%[[ARG3]], %[[ARG5]], %[[ARG4]], %[[ARG1]], %[[ARG2]]]
+//   CHECK-DAG:     %[[NUMWORKGROUPSX:.+]] = affine.apply #[[MAP0]]()[%[[ARG5]], %[[ARG4]], %[[ARG3]], %[[ARG1]], %[[ARG2]]]
 //       CHECK:     hal.return %[[NUMWORKGROUPSX]], %[[C1]], %[[C1]]
 //       CHECK:   func @split_reduction_2d()
 //   CHECK-DAG:     %[[SPLIT_UB0:.+]] = hal.interface.constant.load {{.+}} ordinal(0)
@@ -179,7 +179,7 @@ hal.executable private @split_reduction_2d_permuted_mapping_executable {
     }
   }
 }
-//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2, s3, s4, s5] -> (((s3 * s4) * s5) * ((s1 * s2) * s0))>
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2, s3, s4, s5] -> (((s3 * s4) * s5) * (s2 * (s0 * s1)))>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 floordiv ((s1 * s2) * s3))>
 //       CHECK: @split_reduction_2d_permuted_mapping_variant
 //       CHECK:   hal.executable.export
@@ -190,7 +190,7 @@ hal.executable private @split_reduction_2d_permuted_mapping_executable {
 //  CHECK-SAME:       %[[ARG5:[a-zA-Z0-9_]+]]: index
 //  CHECK-SAME:       %[[ARG6:[a-zA-Z0-9_]+]]: index
 //   CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
-//   CHECK-DAG:     %[[NUMWORKGROUPSX:.+]] = affine.apply #[[MAP0]]()[%[[ARG5]], %[[ARG4]], %[[ARG6]], %[[ARG1]], %[[ARG2]], %[[ARG3]]]
+//   CHECK-DAG:     %[[NUMWORKGROUPSX:.+]] = affine.apply #[[MAP0]]()[%[[ARG6]], %[[ARG5]], %[[ARG4]], %[[ARG1]], %[[ARG2]], %[[ARG3]]]
 //       CHECK:     hal.return %[[NUMWORKGROUPSX]], %[[C1]], %[[C1]]
 //       CHECK:   func @split_reduction_2d_permuted_mapping()
 //   CHECK-DAG:     %[[SPLIT_UB0:.+]] = hal.interface.constant.load {{.+}} ordinal(0)

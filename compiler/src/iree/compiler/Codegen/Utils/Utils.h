@@ -86,6 +86,10 @@ bool isRISCV(Attribute attr);
 bool isRISCV32(Attribute attr);
 bool isRISCV64(Attribute attr);
 
+/// Get maximum workgroup count in [x, y, z] for target attribute if it is
+/// available. Returns ShapedType::kDynamic if it is unknown.
+std::array<int64_t, 3> getMaxWorkgroupCount(Attribute attr);
+
 /// Checks if a tensor value is generated from a read-only object, like
 /// and interface binding with read-only attribute or from an `arith.constant`
 /// operation.
