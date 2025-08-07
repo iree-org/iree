@@ -59,14 +59,13 @@ getTiledOps(Operation *funcOp, IREE::GPU::TilingLevel tilingLevel) {
   return targets;
 }
 
-/// For each reduction dimension in the linalg operation `linalgOp`, get a tuple
-/// containing:
+/// For a reduction dimension of a linalg operation `linalgOp`,
 ///
-/// 1) loop index of `linalgOp` that is reduced,
-/// 2) an operand that is indexed by the reduction dimension,
-/// 3) dimension of operand that's reduced.
+/// 1) `loopIndex` is the index of the loop in `linalgOp` that is reduced,
+/// 2) `operand` is the first operand indexed by the reduction dimension,
+/// 3) `operandDim` is the dimension of the operand that's reduced.
 ///
-/// Example:
+/// Example. Consider the generic below with 2 reduction dimensions.
 ///
 /// ```mlir
 /// #map = affine_map<(d0, d1) -> (d1, d0)>
@@ -77,51 +76,56 @@ getTiledOps(Operation *funcOp, IREE::GPU::TilingLevel tilingLevel) {
 ///                      iterator_types = ["reduction", "reduction"]}
 ///                      ins(%arg0, %arg1 : tensor<?x?xf16>, tensor<?x?xf16>)
 ///                      outs(%arg2 : tensor<f16>)
+/// [...]
 /// ```
 ///
-/// The above operation has 2 reduction dimensions (d0 and d1).
-///
-/// d0 corresponds to operand dimension 1 of %arg0, and
-/// d1 corresponds to operand dimension 0 of %arg0.
-///
-/// So [{0, %arg0, 1}, {1, %arg0, 0}] is returned.
-static FailureOr<SmallVector<std::tuple<unsigned, Value, unsigned>>>
-findReductionDims(linalg::LinalgOp linalgOp) {
+/// d0 has reduction info (loopIndex = 0, operand = %arg0, operandDim = 1),
+/// d1 has reduction info (loopIndex = 1, operand = %arg0, operandDim = 0).
+namespace {
+struct ReductionDimInfo {
+public:
+  unsigned loopIndex;
+  unsigned operandDim;
+  Value operand;
+};
+} // namespace
 
+static FailureOr<SmallVector<ReductionDimInfo>>
+getReductionInfo(linalg::LinalgOp linalgOp) {
   SmallVector<AffineMap> indexingMaps = linalgOp.getIndexingMapsArray();
   SmallVector<utils::IteratorType> iteratorTypes =
       linalgOp.getIteratorTypesArray();
 
-  auto nReductionDims =
+  unsigned numReductionDims =
       llvm::count(iteratorTypes, utils::IteratorType::reduction);
-  SmallVector<std::tuple<unsigned, Value, unsigned>> triplets;
-  triplets.reserve(nReductionDims);
+  SmallVector<ReductionDimInfo> reductionDimInfos;
+  reductionDimInfos.reserve(numReductionDims);
 
-  for (unsigned loopIdx = 0; loopIdx < iteratorTypes.size(); ++loopIdx) {
+  for (unsigned loopIdx = 0, endIdx = iteratorTypes.size(); loopIdx < endIdx;
+       ++loopIdx) {
     if (!linalg::isReductionIterator(iteratorTypes[loopIdx]))
       continue;
 
     AffineExpr loopIdxExpr = getAffineDimExpr(loopIdx, linalgOp.getContext());
-    for (auto operandIter : llvm::enumerate(indexingMaps)) {
+    for (auto [operandIndex, indexingMap] : llvm::enumerate(indexingMaps)) {
       if (std::optional<unsigned> index =
-              operandIter.value().getResultPosition(loopIdxExpr)) {
-        Value operand = linalgOp->getOperand(operandIter.index());
-        triplets.push_back({loopIdx, operand, index.value()});
+              indexingMap.getResultPosition(loopIdxExpr)) {
+        Value operand = linalgOp->getOperand(operandIndex);
+        reductionDimInfos.push_back({loopIdx, index.value(), operand});
         break;
       }
     }
   }
 
-  if (triplets.size() != nReductionDims)
+  if (reductionDimInfos.size() != numReductionDims)
     return failure();
 
-  return triplets;
+  return reductionDimInfos;
 }
 
 static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
                                        TilingInterface tilingInterfaceOp,
                                        IREE::GPU::TilingLevel tilingLevel) {
-
   // 1.a. Get padding values. The default should be poison, instead of 0.
   //
   // TODO(newling) pad with poison. Requires
@@ -146,7 +150,6 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
   // 1.b. Special adjustment for OnlineAttention mask padding.
   if (auto onlineAttentionOp = dyn_cast<IREE::LinalgExt::OnlineAttentionOp>(
           tilingInterfaceOp.getOperation())) {
-
     TypedValue<ShapedType> mask = onlineAttentionOp.getMask();
     if (!mask) {
       tilingInterfaceOp.emitRemark(
@@ -178,10 +181,11 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
       getAsIndexOpFoldResult(rewriter.getContext(), tileSizes);
 
   // 3. Set options.
-  auto options = linalg::PadTilingInterfaceOptions()
-                     .setPaddingSizes(padSizes)
-                     .setPaddingValues(paddingValues)
-                     .setPadToMultipleOf(true);
+  linalg::PadTilingInterfaceOptions options =
+      linalg::PadTilingInterfaceOptions()
+          .setPaddingSizes(padSizes)
+          .setPaddingValues(paddingValues)
+          .setPadToMultipleOf(true);
 
   LLVM_DEBUG(DBGS() << "Start padding " << *tilingInterfaceOp << "\n";
              DBGS() << "--with tile sizes: "
@@ -194,11 +198,11 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
   // For linalg ops, we will rewrite the basic block in a way that means padded
   // parts of tensors are never read. This is useful to avoid inferring what
   // padding values should be for non-trivial basic blocks.
-  FailureOr<SmallVector<std::tuple<unsigned, Value, unsigned>>> reductionDims;
+  FailureOr<SmallVector<ReductionDimInfo>> reductionDimInfo;
   if (auto linalgOp =
           dyn_cast<linalg::LinalgOp>(tilingInterfaceOp.getOperation())) {
-    reductionDims = findReductionDims(linalgOp);
-    if (failed(reductionDims)) {
+    reductionDimInfo = getReductionInfo(linalgOp);
+    if (failed(reductionDimInfo)) {
       tilingInterfaceOp.emitWarning("failed to map reduction dimensions");
       return failure();
     }
@@ -208,7 +212,6 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
   SmallVector<tensor::PadOp> padOps;
   FailureOr<TilingInterface> maybePaddedOp =
       linalg::rewriteAsPaddedOp(rewriter, tilingInterfaceOp, options, padOps);
-
   if (failed(maybePaddedOp)) {
     tilingInterfaceOp.emitWarning("failed to pad op");
     return failure();
@@ -218,8 +221,7 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
 
   if (auto paddedLinalgOp =
           dyn_cast<linalg::LinalgOp>(paddedOp.getOperation())) {
-
-    auto *block = paddedLinalgOp.getBlock();
+    Block *block = paddedLinalgOp.getBlock();
     Operation *yield = block->getTerminator();
     if (yield->getNumOperands() != 1) {
       paddedOp.emitWarning("expected a single yield operand");
@@ -231,7 +233,8 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
       paddedOp.emitWarning("expected a reduction operation before yield");
       return failure();
     }
-    auto reductionIdentity = arith::getNeutralElement(reduction);
+    std::optional<TypedAttr> reductionIdentity =
+        arith::getNeutralElement(reduction);
     if (!reductionIdentity.has_value()) {
       paddedOp.emitWarning("failed to get neutral element for reduction");
       return failure();
@@ -240,12 +243,11 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
     // Get the sizes of the reduction dimensions before padding:
     rewriter.setInsertionPoint(paddedOp.getOperation());
     SmallVector<std::pair<unsigned, Value>> reductionDimSizes;
-    assert(succeeded(reductionDims) && "obtained with confirmation earlier");
-    for (auto &&dims : reductionDims.value()) {
-      auto [redDim, operand, redDimPos] = dims;
-      Value redDimSize =
-          rewriter.create<tensor::DimOp>(paddedOp.getLoc(), operand, redDimPos);
-      reductionDimSizes.push_back({redDim, redDimSize});
+    assert(succeeded(reductionDimInfo) && "obtained with confirmation earlier");
+    for (auto &&dimInfo : reductionDimInfo.value()) {
+      Value redDimSize = rewriter.create<tensor::DimOp>(
+          paddedOp.getLoc(), dimInfo.operand, dimInfo.operandDim);
+      reductionDimSizes.push_back({dimInfo.loopIndex, redDimSize});
     }
 
     // Add a check within the block to see if the current iteration over the
@@ -264,8 +266,8 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
         paddedOp.getLoc(), reductionIdentity.value());
     assert(conds.size() > 0);
     Value cond = conds[0];
-    for (unsigned i = 1; i < conds.size(); ++i) {
-      cond = arith::AndIOp::create(rewriter, paddedOp.getLoc(), cond, conds[i]);
+    for (Value nxtCond : llvm::drop_begin(conds, 1)) {
+      cond = rewriter.create<arith::AndIOp>(paddedOp.getLoc(), cond, nxtCond);
     }
 
     // Find the reduction op operand that is reduced with the carried output.
@@ -282,12 +284,12 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
                                              uncarried, reductionIdentityValue);
     IRMapping mapping;
     mapping.map(reduction->getOperand(uncarryIndex), selected);
-    auto redClone = rewriter.clone(*reduction, mapping);
+    Operation *redClone = rewriter.clone(*reduction, mapping);
     rewriter.replaceOp(reduction, redClone);
   }
 
   // 5. For each PadOp, create a linalg::CopyOp to allow dim propagations.
-  for (auto padOp : padOps) {
+  for (tensor::PadOp padOp : padOps) {
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPointAfter(padOp);
 
