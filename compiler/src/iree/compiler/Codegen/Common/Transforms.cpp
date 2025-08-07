@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Common/CombineLayoutTransformation.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -109,96 +110,65 @@ void populateFuseTilableForallConsumersPattern(RewritePatternSet &patterns) {
 // Combining Layout Transformation Ops
 //===----------------------------------------------------------------------===//
 
-/// Fold a tensor::ExpandShapeOp or tensor::CollapseShapeOp into a consumer
-/// `mapScatterOp`, by linearizing and then delinearizing the source indices
-/// of the `mapScatterOp`s index transformation.
-template <typename ReshapeOpTy>
-static IREE::LinalgExt::MapScatterOp
-foldReshapeIntoMapScatter(RewriterBase &rewriter, ReshapeOpTy reshapeOp,
-                          IREE::LinalgExt::MapScatterOp mapScatterOp) {
-  assert(mapScatterOp.getInput() == reshapeOp->getResult(0) &&
-         "expected reshapeOp to be the producer of mapScatterOp");
-  Location loc = reshapeOp->getLoc();
-  OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPointAfter(reshapeOp);
-  SmallVector<OpFoldResult> srcDims =
-      tensor::getMixedSizes(rewriter, loc, reshapeOp.getSrc());
-  // There can be leftover tensor.dim ops consuming the result of the reshape,
-  // but they are expected to be folded into some affine.apply ops on the source
-  // sizes by later cleanup patterns.
-  SmallVector<OpFoldResult> resultDims =
-      tensor::getMixedSizes(rewriter, loc, reshapeOp.getResult());
-
-  auto indexTransformBuilder =
-      [&](ArrayRef<BlockArgument> srcIndices) -> SmallVector<Value> {
-    auto linearizeIndexOp = rewriter.create<affine::AffineLinearizeIndexOp>(
-        mapScatterOp->getLoc(), srcIndices, srcDims, /*disjoint=*/true);
-    auto delinearizeIndexOp = rewriter.create<affine::AffineDelinearizeIndexOp>(
-        mapScatterOp->getLoc(), linearizeIndexOp.getResult(), resultDims,
-        /*hasOuterBound=*/true);
-    return delinearizeIndexOp->getResults();
-  };
-  rewriter.modifyOpInPlace(mapScatterOp, [&]() {
-    mapScatterOp.insertTransformationAtStart(rewriter, indexTransformBuilder,
-                                             srcDims.size());
-    mapScatterOp.getInputMutable().assign(reshapeOp->getOperand(0));
-  });
-  return mapScatterOp;
-}
-
-IREE::LinalgExt::MapScatterOp
-foldExpandShapeIntoMapScatter(RewriterBase &rewriter,
-                              tensor::ExpandShapeOp expandShapeOp,
-                              IREE::LinalgExt::MapScatterOp mapScatterOp) {
-  return foldReshapeIntoMapScatter(rewriter, expandShapeOp, mapScatterOp);
-}
-
-IREE::LinalgExt::MapScatterOp
-foldCollapseShapeIntoMapScatter(RewriterBase &rewriter,
-                                tensor::CollapseShapeOp collapseShapeOp,
-                                IREE::LinalgExt::MapScatterOp mapScatterOp) {
-  return foldReshapeIntoMapScatter(rewriter, collapseShapeOp, mapScatterOp);
-}
-
 namespace {
 
-struct FoldExpandShapeIntoMapScatterPattern
+struct FoldRelayoutOpIntoMapScatterPattern
     : public OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
   using OpRewritePattern<IREE::LinalgExt::MapScatterOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
                                 PatternRewriter &rewriter) const override {
-    auto expandOp =
-        mapScatterOp.getInput().getDefiningOp<tensor::ExpandShapeOp>();
-    if (!expandOp) {
+    Operation *op = mapScatterOp.getInput().getDefiningOp();
+    if (!op) {
       return failure();
     }
-    (void)foldExpandShapeIntoMapScatter(rewriter, expandOp, mapScatterOp);
+    // Folding tensor.pad is handled by a separate pattern.
+    if (!isSupportedRelayoutOp(op) || isa<tensor::PadOp>(op)) {
+      return failure();
+    }
+    if (failed(foldIntoMapScatter(rewriter, op, mapScatterOp))) {
+      return failure();
+    }
     return success();
   }
 };
 
-struct FoldCollapseShapeIntoMapScatterPattern
+struct FoldPadOpIntoMapScatterPattern
     : public OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
   using OpRewritePattern<IREE::LinalgExt::MapScatterOp>::OpRewritePattern;
+  FoldPadOpIntoMapScatterPattern(MLIRContext *context,
+                                 PadDistributionConfigFn configFn,
+                                 PatternBenefit benefit = 1)
+      : OpRewritePattern<IREE::LinalgExt::MapScatterOp>(context, benefit),
+        padDistributionConfigFn(std::move(configFn)) {}
 
   LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
                                 PatternRewriter &rewriter) const override {
-    auto collapseOp =
-        mapScatterOp.getInput().getDefiningOp<tensor::CollapseShapeOp>();
-    if (!collapseOp) {
+    auto padOp = mapScatterOp.getInput().getDefiningOp<tensor::PadOp>();
+    if (!padOp) {
       return failure();
     }
-    (void)foldCollapseShapeIntoMapScatter(rewriter, collapseOp, mapScatterOp);
+    if (failed(foldPadIntoMapScatter(rewriter, padOp, mapScatterOp,
+                                     padDistributionConfigFn))) {
+      return failure();
+    }
     return success();
   }
+
+private:
+  PadDistributionConfigFn padDistributionConfigFn;
 };
 
 } // namespace
 
-void populateCombineRelayoutOpPatterns(RewritePatternSet &patterns) {
-  patterns.add<FoldCollapseShapeIntoMapScatterPattern,
-               FoldExpandShapeIntoMapScatterPattern>(patterns.getContext());
+void populateCombineRelayoutOpPatterns(
+    RewritePatternSet &patterns,
+    PadDistributionConfigFn padDistributionConfigFn) {
+  patterns.add<FoldRelayoutOpIntoMapScatterPattern>(patterns.getContext());
+  if (padDistributionConfigFn) {
+    patterns.add<FoldPadOpIntoMapScatterPattern>(patterns.getContext(),
+                                                 padDistributionConfigFn);
+  }
 }
 
 /// Converts `tensor.extract_slice(tensor.expand_shape)` to
