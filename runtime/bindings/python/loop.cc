@@ -35,10 +35,10 @@ class HalDeviceLoopBridge {
       : device_(std::move(device)), loop_(std::move(loop)) {
     IREE_PY_TRACEF("new HalDeviceLoopBridge (%p)", this);
     iree_slim_mutex_initialize(&mu_);
-    CheckApiStatus(
-        iree_hal_semaphore_create(device_.raw_ptr(), 0,
-                                  IREE_HAL_SEMAPHORE_FLAG_NONE, &control_sem_),
-        "create semaphore");
+    CheckApiStatus(iree_hal_semaphore_create(device_.raw_ptr(), 0,
+                                             IREE_HAL_SEMAPHORE_FLAG_DEFAULT,
+                                             &control_sem_),
+                   "create semaphore");
 
     loop_call_soon_ = loop_.attr("call_soon_threadsafe");
 

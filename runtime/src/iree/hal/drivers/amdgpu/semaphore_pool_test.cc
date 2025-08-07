@@ -70,7 +70,7 @@ TEST_F(SemaphorePoolTest, Lifetime) {
   iree_hal_amdgpu_semaphore_pool_t semaphore_pool = {0};
   IREE_ASSERT_OK(iree_hal_amdgpu_semaphore_pool_initialize(
       &libhsa, &topology, IREE_HAL_AMDGPU_SEMAPHORE_POOL_DEFAULT_BLOCK_CAPACITY,
-      options, IREE_HAL_SEMAPHORE_FLAG_NONE, host_allocator, cpu_memory_pool,
+      options, IREE_HAL_SEMAPHORE_FLAG_DEFAULT, host_allocator, cpu_memory_pool,
       &semaphore_pool));
 
   // No-op since nothing has been allocated.
@@ -90,7 +90,7 @@ TEST_F(SemaphorePoolTest, LifetimePreallocate) {
   iree_hal_amdgpu_semaphore_pool_t semaphore_pool = {0};
   IREE_ASSERT_OK(iree_hal_amdgpu_semaphore_pool_initialize(
       &libhsa, &topology,
-      /*block_capacity=*/32, options, IREE_HAL_SEMAPHORE_FLAG_NONE,
+      /*block_capacity=*/32, options, IREE_HAL_SEMAPHORE_FLAG_DEFAULT,
       host_allocator, cpu_memory_pool, &semaphore_pool));
 
   // No-op since nothing has been allocated yet.
@@ -127,14 +127,14 @@ TEST_F(SemaphorePoolTest, AcquireRelease) {
   iree_hal_amdgpu_semaphore_pool_t semaphore_pool = {0};
   IREE_ASSERT_OK(iree_hal_amdgpu_semaphore_pool_initialize(
       &libhsa, &topology,
-      /*block_capacity=*/32, options, IREE_HAL_SEMAPHORE_FLAG_NONE,
+      /*block_capacity=*/32, options, IREE_HAL_SEMAPHORE_FLAG_DEFAULT,
       host_allocator, cpu_memory_pool, &semaphore_pool));
 
   // Acquire a semaphore.
   const uint64_t initial_value = 123ull;
   iree_hal_semaphore_t* semaphore = NULL;
   IREE_ASSERT_OK(iree_hal_amdgpu_semaphore_pool_acquire(
-      &semaphore_pool, initial_value, IREE_HAL_SEMAPHORE_FLAG_NONE,
+      &semaphore_pool, initial_value, IREE_HAL_SEMAPHORE_FLAG_DEFAULT,
       &semaphore));
   ASSERT_NE(semaphore, nullptr);
 
@@ -167,7 +167,7 @@ TEST_F(SemaphorePoolTest, Growth) {
   iree_hal_amdgpu_semaphore_pool_t semaphore_pool = {0};
   IREE_ASSERT_OK(iree_hal_amdgpu_semaphore_pool_initialize(
       &libhsa, &topology, /*block_capacity=*/32, options,
-      IREE_HAL_SEMAPHORE_FLAG_NONE, host_allocator, cpu_memory_pool,
+      IREE_HAL_SEMAPHORE_FLAG_DEFAULT, host_allocator, cpu_memory_pool,
       &semaphore_pool));
   // NOTE: the capacity may be larger than requested due to alignment.
   const iree_host_size_t block_capacity = semaphore_pool.block_capacity;
@@ -181,15 +181,15 @@ TEST_F(SemaphorePoolTest, Growth) {
   // Allocate enough to consume the entire first block.
   for (iree_host_size_t i = 0; i < block_capacity; ++i) {
     IREE_ASSERT_OK(iree_hal_amdgpu_semaphore_pool_acquire(
-        &semaphore_pool, /*initial_value=*/0ull, IREE_HAL_SEMAPHORE_FLAG_NONE,
-        &semaphores[i]));
+        &semaphore_pool, /*initial_value=*/0ull,
+        IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &semaphores[i]));
     ASSERT_NE(semaphores[i], nullptr);
   }
 
   // Allocate +1 to trigger growth and acquire the next block.
   iree_hal_semaphore_t* growth_semaphore = NULL;
   IREE_ASSERT_OK(iree_hal_amdgpu_semaphore_pool_acquire(
-      &semaphore_pool, /*initial_value=*/0ull, IREE_HAL_SEMAPHORE_FLAG_NONE,
+      &semaphore_pool, /*initial_value=*/0ull, IREE_HAL_SEMAPHORE_FLAG_DEFAULT,
       &growth_semaphore));
   ASSERT_NE(growth_semaphore, nullptr);
 

@@ -26,9 +26,38 @@ typedef struct iree_hal_device_t iree_hal_device_t;
 
 // A bitmask of flags controlling the behavior of a semaphore.
 enum iree_hal_semaphore_flag_bits_t {
-  IREE_HAL_SEMAPHORE_FLAG_NONE = 0u,
+  IREE_HAL_SEMAPHORE_FLAG_NONE = 0ull,
+
+  // Semaphore is only ever used on the same HAL device it was created on.
+  // Attempting to use the semaphore on another device even if provided by the
+  // same HAL driver will result in undefined behavior. If a specific queue
+  // affinity was provided during creation the semaphore may only be used on
+  // those queues.
+  IREE_HAL_SEMAPHORE_FLAG_DEVICE_LOCAL = 1ull << 0,
+
+  // Semaphore will be used as part of a blocking host wait operation and should
+  // support interrupts. Without this flag set host waits may spin instead of
+  // using platform waits and interrupts to reduce power consumption and CPU
+  // contention.
+  IREE_HAL_SEMAPHORE_FLAG_HOST_INTERRUPT = 1ull << 2,
+
+  // Semaphore object can be exported using iree_hal_semaphore_export. Only
+  // semaphore implementations that natively support timeline semantics can be
+  // exported like this. This is just a hint that export should be supported:
+  // export may still fail.
+  IREE_HAL_SEMAPHORE_FLAG_EXPORTABLE = 1ull << 3,
+
+  // Timepoints can be exported using iree_hal_semaphore_export_timepoint. This
+  // may require significant internal tracking and should only be used when
+  // interoperating with other APIs that do not natively support timeline
+  // semaphores.
+  IREE_HAL_SEMAPHORE_FLAG_EXPORTABLE_TIMEPOINTS = 1ull << 3,
+
+  // Default flags for semaphores.
+  IREE_HAL_SEMAPHORE_FLAG_DEFAULT = IREE_HAL_SEMAPHORE_FLAG_HOST_INTERRUPT |
+                                    IREE_HAL_SEMAPHORE_FLAG_EXPORTABLE,
 };
-typedef uint32_t iree_hal_semaphore_flags_t;
+typedef uint64_t iree_hal_semaphore_flags_t;
 
 // The maximum valid payload value of an iree_hal_semaphore_t.
 // Payload values larger than this indicate that the semaphore has failed.
