@@ -635,7 +635,7 @@ iree_status_t iree_hal_command_buffer_dispatch_indirect_validation(
 
   const iree_hal_buffer_binding_requirements_t workgroups_reqs = {
       .required_compatibility = IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH,
-      .usage = IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS,
+      .usage = IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMETERS,
       .access = IREE_HAL_MEMORY_ACCESS_READ,
       .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
       .max_byte_offset = workgroups_ref.offset + workgroups_ref.length,

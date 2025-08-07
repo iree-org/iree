@@ -797,10 +797,11 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
 // 3 uint32_t XYZ values immediately before performing the dispatch. This allows
 // prior dispatches within the command sequence to populate the workgroup
 // count or the workgroup count to change across submissions of the same
-// reusable command buffer.
+// reusable command buffer. Besides the workgroup count reference this has
+// identical behavior to iree_hal_command_buffer_dispatch.
 //
-// The buffer must have been allocated with
-// IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS and be of
+// The workgroup count buffer must have been allocated with
+// IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMETERS and be of
 // IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE.
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch_indirect(
     iree_hal_command_buffer_t* command_buffer,
