@@ -787,7 +787,7 @@ static iree_status_t process_call_outputs(
   iree_hal_semaphore_t* signal_semaphore = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_semaphore_create(
-        device, 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &signal_semaphore);
+        device, 0ull, IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &signal_semaphore);
   }
   uint64_t signal_value = 1ull;
   if (iree_status_is_ok(status)) {

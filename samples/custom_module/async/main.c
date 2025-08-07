@@ -106,7 +106,7 @@ int main(int argc, char** argv) {
   // allowed to execute anything until we give it the go-ahead.
   iree_hal_semaphore_t* semaphore = NULL;
   IREE_CHECK_OK(iree_hal_semaphore_create(
-      device, 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &semaphore));
+      device, 0ull, IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &semaphore));
   iree_hal_fence_t* fence_t1 = NULL;
   IREE_CHECK_OK(
       iree_hal_fence_create_at(semaphore, 1ull, host_allocator, &fence_t1));

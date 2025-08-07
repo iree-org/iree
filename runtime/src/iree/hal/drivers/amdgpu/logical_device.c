@@ -371,7 +371,7 @@ iree_status_t iree_hal_amdgpu_logical_device_create(
     status = iree_hal_amdgpu_semaphore_pool_initialize(
         &system->libhsa, &system->topology,
         IREE_HAL_AMDGPU_SEMAPHORE_POOL_DEFAULT_BLOCK_CAPACITY,
-        semaphore_options, IREE_HAL_SEMAPHORE_FLAG_NONE, host_allocator,
+        semaphore_options, IREE_HAL_SEMAPHORE_FLAG_DEFAULT, host_allocator,
         system->host_memory_pools[0].fine_pool,
         &logical_device->semaphore_pool);
   }

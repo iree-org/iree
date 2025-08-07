@@ -253,7 +253,7 @@ static void BenchmarkAsyncFunction(
     for (int32_t i = 0; i < batch_concurrency; ++i) {
       vm::ref<iree_hal_semaphore_t> timeline_semaphore;
       IREE_CHECK_OK(iree_hal_semaphore_create(
-          device, 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &timeline_semaphore));
+          device, 0ull, IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &timeline_semaphore));
       timeline_semaphores.push_back(std::move(timeline_semaphore));
     }
 
