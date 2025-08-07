@@ -392,6 +392,46 @@ func.func @generic_unpack_infer_vector_size(%arg0: tensor<?x?x16x16xf32>, %arg1:
 
 // -----
 
+// CHECK-MASK-LABEL: @val_defined_by_scf_for
+func.func @val_defined_by_scf_for(%arg0: index, %arg1: index) -> tensor<?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %0 = tensor.empty() : tensor<1x1x16x16xf32>
+  %1 = tensor.empty(%arg0, %arg1) : tensor<?x?xf32>
+  %c0_0 = arith.constant 0 : index
+  %c16 = arith.constant 16 : index
+  %c2 = arith.constant 2 : index
+  %2 = scf.for %arg2 = %c0_0 to %c16 step %c2 iter_args(%arg3 = %0) -> (tensor<1x1x16x16xf32>) {
+    scf.yield %arg3 : tensor<1x1x16x16xf32>
+  }
+  %unpack = linalg.unpack %2 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %1 : tensor<1x1x16x16xf32> -> tensor<?x?xf32>
+  return %unpack : tensor<?x?xf32>
+}
+// CHECK-MASK: %[[EMPTY:.*]] = tensor.empty{{.*}}: tensor<?x?xf32>
+// CHECK-MASK: %[[FOR:.*]] = scf.for
+// CHECK-MASK: %[[READ:.*]] = vector.transfer_read %[[FOR]]{{.*}} vector<1x1x16x16xf32>
+// CHECK-MASK: %[[CAST:.*]] = vector.shape_cast %[[READ]]{{.*}} vector<16x16xf32>
+// CHECK-MASK: %[[MASK:.*]] = vector.create_mask
+// CHECK-MASK: %[[WRITE:.*]] = vector.transfer_write %[[CAST]], %[[EMPTY]]{{.*}}, %[[MASK]]
+// CHECK-MASK: return %[[WRITE]]
+
+// -----
+
+// The pre-configured input vector size is not yet supported if there are
+// scalable flags.
+
+#config = #iree_cpu.lowering_config<vector_common_parallel = [4, [16]], vector_reduction = [0, 0]>
+func.func @vectorize_dynamic_shapes_unpack_scalable_vec_and_tile_size(%dest: tensor<?x?xf32>, %src: tensor<?x?x?x2xf32>) -> tensor<?x?xf32> {
+  %vs = vector.vscale
+  %c16 = arith.constant 16 : index
+  %tile_size = arith.muli %vs, %c16 : index
+  %ret = linalg.unpack %src inner_dims_pos = [1, 0] inner_tiles = [%tile_size, 2] into %dest {lowering_config = #config} : tensor<?x?x?x2xf32> -> tensor<?x?xf32>
+  return %ret : tensor<?x?xf32>
+}
+// CHECK-MASK-LABEL: func.func @vectorize_dynamic_shapes_unpack_scalable_vec_and_tile_size
+// CHECK-MASK:         linalg.unpack
+
+// -----
+
 #aarch64_sve = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", target_triple = "aarch64-none-elf"}>
 #map = affine_map<()[s0] -> (-(176 mod s0) + 176)>
 
@@ -499,7 +539,7 @@ func.func @dynamic_fill_with_scalable_tiling_infer_remainder_vector_size(%arg0: 
 // -----
 
 #aarch64_sve = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", target_triple = "aarch64-none-elf"}>
-#config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0, 0], [1, 4, [4], 0], [0, 0, 0, 3], [0, 0, 0, 0]]>
+#config = #iree_cpu.lowering_config<vector_common_parallel = [1, 4, [4], 0], vector_reduction = [0, 0, 0, 3]>
 #map = affine_map<()[s0] -> (-(96 mod s0) + 96)>
 #map1 = affine_map<(d0) -> (d0 * 2)>
 

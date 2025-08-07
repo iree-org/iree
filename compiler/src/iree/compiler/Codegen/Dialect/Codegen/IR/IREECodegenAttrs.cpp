@@ -466,6 +466,32 @@ int64_t WorkgroupMappingAttr::getRelativeIndex() const {
   return getMappingId();
 }
 
+//===----------------------------------------------------------------------===//
+// iree_codegen.simple_target
+//===----------------------------------------------------------------------===//
+
+LogicalResult
+SimpleTargetAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                         ArrayRef<int64_t> maxWorkgroupCount) {
+  if (maxWorkgroupCount.size() > 3) {
+    return emitError()
+           << "expected `max_workgroup_count` to have atmost 3 entries";
+  }
+  return success();
+}
+
+std::array<int64_t, 3> SimpleTargetAttr::getMaximumWorkgroupCount() const {
+  std::array<int64_t, 3> maxWorkgroupCount = {
+      ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
+  ArrayRef<int64_t> givenMaxWorkgroupCount = getMaxWorkgroupCount();
+  assert(givenMaxWorkgroupCount.size() <= 3 &&
+         "expected `max_workgroup_count` to have atmost 3 entries");
+  for (auto [index, value] : llvm::enumerate(givenMaxWorkgroupCount)) {
+    maxWorkgroupCount[index] = value;
+  }
+  return maxWorkgroupCount;
+}
+
 //===---------------------------------------------------------------------===//
 // iree_codegen.rotate_rows
 //===---------------------------------------------------------------------===//

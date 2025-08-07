@@ -7,6 +7,7 @@
 #include "compiler/plugins/target/ROCM/Dialect/ROCM/IR/ROCMDialect.h"
 
 #include "compiler/plugins/target/ROCM/Dialect/ROCM/IR/ROCMDialect.cpp.inc"
+#include "compiler/plugins/target/ROCM/builtins/mlir_ukernel/iree_mlir_ukernel_patterns_amdgpu.h"
 #include "compiler/plugins/target/ROCM/builtins/specialization/iree_specialization_patterns_amdgpu.h"
 #include "compiler/plugins/target/ROCM/builtins/tuning/iree_default_tuning_specs_amdgpu.h"
 
@@ -27,6 +28,14 @@ void ROCMDialect::initialize() {
   {
     const iree_file_toc_t *toc = iree_specialization_patterns_amdgpu_create();
     for (size_t i = 0, e = iree_specialization_patterns_amdgpu_size(); i != e;
+         ++i) {
+      builtins.addFile(toc[i].name, llvm::StringRef{toc[i].data, toc[i].size});
+    }
+  }
+
+  {
+    const iree_file_toc_t *toc = iree_mlir_ukernel_patterns_amdgpu_create();
+    for (size_t i = 0, e = iree_mlir_ukernel_patterns_amdgpu_size(); i != e;
          ++i) {
       builtins.addFile(toc[i].name, llvm::StringRef{toc[i].data, toc[i].size});
     }

@@ -5,7 +5,7 @@
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#config = #iree_cpu.lowering_config<distribution = [64, 64, 0], vector_common_parallel = [8, 32, 0], vector_reduction = [0, 0, 16], vector_inner_parallel = [0, 0, 0]>
+#config = #iree_cpu.lowering_config<distribution = [64, 64, 0], vector_common_parallel = [8, 32, 0], vector_reduction = [0, 0, 16]>
 #translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {enable_loop_peeling = true}>
 #executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64", {native_vector_size = 64}>
 func.func @no_peel_static_matmul() attributes {hal.executable.target = #executable_target_system_elf_x86_64_, translation_info = #translation} {
@@ -37,7 +37,7 @@ func.func @no_peel_static_matmul() attributes {hal.executable.target = #executab
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#config = #iree_cpu.lowering_config<distribution = [65, 65, 0], vector_common_parallel = [8, 32, 0], vector_reduction = [0, 0, 16], vector_inner_parallel = [0, 0, 0]>
+#config = #iree_cpu.lowering_config<distribution = [65, 65, 0], vector_common_parallel = [8, 32, 0], vector_reduction = [0, 0, 16]>
 #translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {enable_loop_peeling = true}>
 #executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64", {native_vector_size = 64}>
 func.func @peel_static_matmul() attributes {hal.executable.target = #executable_target_system_elf_x86_64_, translation_info = #translation} {
@@ -81,7 +81,7 @@ func.func @peel_static_matmul() attributes {hal.executable.target = #executable_
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#config = #iree_cpu.lowering_config<distribution = [64, 64, 0], vector_common_parallel = [8, 32, 0], vector_reduction = [0, 0, 16], vector_inner_parallel = [0, 0, 0]>
+#config = #iree_cpu.lowering_config<distribution = [64, 64, 0], vector_common_parallel = [8, 32, 0], vector_reduction = [0, 0, 16]>
 #translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {enable_loop_peeling = true}>
 #executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64", {native_vector_size = 64}>
 func.func @peel_dynamic_matmul() attributes {hal.executable.target = #executable_target_system_elf_x86_64_, translation_info = #translation} {
@@ -138,7 +138,7 @@ func.func @peel_dynamic_matmul() attributes {hal.executable.target = #executable
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#config = #iree_cpu.lowering_config<distribution = [0, 0, 0], vector_common_parallel = [8, [32], 0], vector_reduction = [0, 0, 1], vector_inner_parallel = [0, 0, 0]>
+#config = #iree_cpu.lowering_config<distribution = [0, 0, 0], vector_common_parallel = [8, [32], 0], vector_reduction = [0, 0, 1]>
 #translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {enable_loop_peeling = true}>
 #executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>
 module {

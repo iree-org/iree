@@ -44,8 +44,17 @@ OpFoldResult mulOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
                      OpFoldResult b) {
   AffineExpr d0, d1;
   bindDims(builder.getContext(), d0, d1);
-  auto addMap = AffineMap::get(2, 0, {d0 * d1});
-  return affine::makeComposedFoldedAffineApply(builder, loc, addMap, {a, b});
+  auto mulMap = AffineMap::get(2, 0, {d0 * d1});
+  return affine::makeComposedFoldedAffineApply(builder, loc, mulMap, {a, b});
+}
+
+OpFoldResult mulAddOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
+                        OpFoldResult b, OpFoldResult c) {
+  AffineExpr d0, d1, d2;
+  bindDims(builder.getContext(), d0, d1, d2);
+  auto mulAddMap = AffineMap::get(3, 0, {d0 * d1 + d2});
+  return affine::makeComposedFoldedAffineApply(builder, loc, mulAddMap,
+                                               {a, b, c});
 }
 
 Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim) {

@@ -9,6 +9,7 @@
 #include <cstdint>
 
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
+#include "iree/compiler/Codegen/Common/CombineLayoutTransformation.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
@@ -414,6 +415,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
                                    const GPUPipelineOptions &pipelineOptions,
                                    bool forROCDL) {
   if (pipelineOptions.useIgemmConvolution) {
+    funcPassManager.addPass(createGPUPadConvsPass());
     funcPassManager.addPass(createConvolutionToIGEMMPass());
   }
   // TODO (nirvedhmeshram) : Can remove this pass after
@@ -455,6 +457,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   {
     GPUApplyTilingLevelPassOptions options;
     options.tilingLevel = IREE::GPU::TilingLevel::Reduction;
+    options.normalizeLoops = pipelineOptions.useIgemmConvolution;
     funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
     funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
@@ -484,6 +487,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   {
     GPUApplyTilingLevelPassOptions options;
     options.tilingLevel = IREE::GPU::TilingLevel::Thread;
+    options.normalizeLoops = pipelineOptions.useIgemmConvolution;
     funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
     funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
@@ -522,7 +526,11 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
 
   // Step 5. Greedily fuse parallel loops and hoist from serial loops.
   funcPassManager.addPass(createGPUFuseAndHoistParallelLoopsPass());
-  funcPassManager.addPass(createCombineLayoutTransformationPass());
+  CombineLayoutTransformationPassOptions combineLayoutOptions;
+  combineLayoutOptions.scope =
+      IREE::Codegen::RelayoutCombinationScope::Workgroup;
+  funcPassManager.addPass(
+      createCombineLayoutTransformationPass(combineLayoutOptions));
   funcPassManager.addPass(createGPUGreedilyDistributeToThreadsPass());
   funcPassManager.addPass(createTileLargeTensorsPass());
   funcPassManager.addPass(createCanonicalizerPass());
@@ -567,9 +575,9 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
     options.paddingBits = 64;
     funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
   }
+  funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
   if (forROCDL && pipelineOptions.prefetchSharedMemory) {
     funcPassManager.addPass(createFissionTransferOpsInControlFlowPass());
-    funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
     funcPassManager.addPass(createRemoveSingleIterationLoopPass());
     funcPassManager.addPass(createROCDLPrefetchSharedMemoryPass());
   }
@@ -964,6 +972,8 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
 
   // Linalg -> Vector
+  funcPassManager.addPass(
+      IREE::LinalgExt::createVectorizeIREELinalgExtOpsPass());
   addGPUVectorizationPasses(funcPassManager, /*vectorizeCopies=*/true,
                             /*enableMasking=*/true);
 
@@ -984,6 +994,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
 
   // Vector SIMD -> Vector SIMT
   funcPassManager.addPass(createLLVMGPUVectorDistributePass());
+  funcPassManager.addPass(IREE::LinalgExt::createDecomposeMapScatterPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 

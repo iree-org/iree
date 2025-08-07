@@ -112,6 +112,63 @@ static MapScatterOp foldTransposeIntoMapScatter(RewriterBase &rewriter,
   return mapScatterOp;
 }
 
+/// Fold a tensor::ExpandShapeOp or tensor::CollapseShapeOp into a consumer
+/// `mapScatterOp`, by linearizing and then delinearizing the source indices
+/// of the `mapScatterOp`s index transformation.
+template <typename ReshapeOpTy>
+static IREE::LinalgExt::MapScatterOp
+foldReshapeIntoMapScatter(RewriterBase &rewriter, ReshapeOpTy reshapeOp,
+                          IREE::LinalgExt::MapScatterOp mapScatterOp) {
+  assert(mapScatterOp.getInput() == reshapeOp->getResult(0) &&
+         "expected reshapeOp to be the producer of mapScatterOp");
+  Location loc = reshapeOp->getLoc();
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPointAfter(reshapeOp);
+  SmallVector<OpFoldResult> srcDims =
+      tensor::getMixedSizes(rewriter, loc, reshapeOp.getSrc());
+  // There can be leftover tensor.dim ops consuming the result of the reshape,
+  // but they are expected to be folded into some affine.apply ops on the source
+  // sizes by later cleanup patterns.
+  SmallVector<OpFoldResult> resultDims =
+      tensor::getMixedSizes(rewriter, loc, reshapeOp.getResult());
+
+  auto indexTransformBuilder =
+      [&](ArrayRef<BlockArgument> srcIndices) -> SmallVector<Value> {
+    auto linearizeIndexOp = rewriter.create<affine::AffineLinearizeIndexOp>(
+        mapScatterOp->getLoc(), srcIndices, srcDims, /*disjoint=*/true);
+    auto delinearizeIndexOp = rewriter.create<affine::AffineDelinearizeIndexOp>(
+        mapScatterOp->getLoc(), linearizeIndexOp.getResult(), resultDims,
+        /*hasOuterBound=*/true);
+    return delinearizeIndexOp->getResults();
+  };
+  rewriter.modifyOpInPlace(mapScatterOp, [&]() {
+    mapScatterOp.insertTransformationAtStart(rewriter, indexTransformBuilder,
+                                             srcDims.size());
+    mapScatterOp.getInputMutable().assign(reshapeOp->getOperand(0));
+  });
+  return mapScatterOp;
+}
+
+/// Fold a tensor::ExpandShapeOp into a consumer `mapScatterOp`, by linearizing
+/// and then delinearizing the source indices of the `mapScatterOp`s index
+/// transformation.
+static MapScatterOp
+foldExpandShapeIntoMapScatter(RewriterBase &rewriter,
+                              tensor::ExpandShapeOp expandShapeOp,
+                              MapScatterOp mapScatterOp) {
+  return foldReshapeIntoMapScatter(rewriter, expandShapeOp, mapScatterOp);
+}
+
+/// Fold a tensor::CollapseShapeOp into a consumer `mapScatterOp`, by
+/// linearizing and then delinearizing the source indices of the
+/// `mapScatterOp`s index transformation.
+static MapScatterOp
+foldCollapseShapeIntoMapScatter(RewriterBase &rewriter,
+                                tensor::CollapseShapeOp collapseShapeOp,
+                                MapScatterOp mapScatterOp) {
+  return foldReshapeIntoMapScatter(rewriter, collapseShapeOp, mapScatterOp);
+}
+
 /// Fold an `extractSliceOp` into a consumer `mapScatterOp` by applying a mask
 /// based on the bounds of the extractSliceOp. Currently, only zero offsets and
 /// unit strides are supported.
@@ -219,13 +276,7 @@ static void buildNestedDistributionLoops(
       });
 }
 
-/// Fold a tensor.pad op into a iree_linalg_ext.map_scatter op, and separate
-/// the writing of padding values into a separate operation on the buffer that
-/// the map_scatter op is ultimately written into. The result buffer is taken
-/// from the direct consumer of the `mapScatterOp`, which is expected to be an
-/// `iree_codegen.store_to_buffer` op. Return failure if the result buffer is
-/// not found.
-static FailureOr<MapScatterOp>
+FailureOr<MapScatterOp>
 foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
                       MapScatterOp mapScatterOp,
                       PadDistributionConfigFn padDistributionConfigFn) {
@@ -316,14 +367,9 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
   return mapScatterOp;
 }
 
-/// Fold the `op` into the `mapScatterOp`, if possible. The resulting
-/// map_scatter op is returned, if the `op` was folded. Otherwise, return
-/// failure. For `PadOp`s, use the `padDistributionConfigFn` to distribute
-/// the writing of padding values to the corresponding output buffer.
-static FailureOr<MapScatterOp>
-foldIntoMapScatter(RewriterBase &rewriter, Operation *op,
-                   MapScatterOp mapScatterOp,
-                   PadDistributionConfigFn padDistributionConfigFn) {
+FailureOr<MapScatterOp> foldIntoMapScatter(RewriterBase &rewriter,
+                                           Operation *op,
+                                           MapScatterOp mapScatterOp) {
   return llvm::TypeSwitch<Operation *, FailureOr<MapScatterOp>>(op)
       .Case<linalg::CopyOp>([&](linalg::CopyOp copyOp) {
         return foldIdentityLikeOpIntoMapScatter(rewriter, copyOp, mapScatterOp);
@@ -342,74 +388,81 @@ foldIntoMapScatter(RewriterBase &rewriter, Operation *op,
         return foldExtractSliceIntoMapScatter(rewriter, extractSliceOp,
                                               mapScatterOp);
       })
-      .Case<tensor::PadOp>([&](tensor::PadOp padOp) {
-        return foldPadIntoMapScatter(rewriter, padOp, mapScatterOp,
-                                     padDistributionConfigFn);
-      })
       .Default([](Operation *) { return failure(); });
 }
 
-/// Starting from the `root`, iteratively combine any relayout op producers
-/// into a single iree_linalg_ext.map_scatter op. An identity map_scatter op
-/// is inserted before the root, and then the producers of the map_scatter op
-/// are folded into the map_scatter until an unsupported op is reached.
-static void
-combineRelayoutOpChain(RewriterBase &rewriter, MapScatterOp mapScatterOp,
-                       PadDistributionConfigFn padDistributionConfigFn) {
-  Operation *relayoutOp = mapScatterOp.getInput().getDefiningOp();
-  if (!relayoutOp) {
-    return;
-  }
-  MapScatterOp combinedRelayoutOp = mapScatterOp;
-  while (relayoutOp) {
-    LDBG() << "Attempting to fold " << relayoutOp->getName()
-           << " into map_scatter op:\n"
-           << *relayoutOp;
-    FailureOr<MapScatterOp> maybeCombinedRelayoutOp = foldIntoMapScatter(
-        rewriter, relayoutOp, combinedRelayoutOp, padDistributionConfigFn);
-    if (failed(maybeCombinedRelayoutOp)) {
-      LDBG() << "Failed to fold " << relayoutOp->getName()
-             << " into map_scatter op";
-      break;
-    }
-    combinedRelayoutOp = maybeCombinedRelayoutOp.value();
-    LDBG() << "Successfully folded " << relayoutOp->getName()
-           << " into map_scatter. New map_scatter op:\n"
-           << combinedRelayoutOp;
-    relayoutOp = combinedRelayoutOp.getInput().getDefiningOp();
-  }
-  if (combinedRelayoutOp.isIdentity()) {
-    rewriter.replaceOp(combinedRelayoutOp, combinedRelayoutOp.getInput());
-  }
-}
-
-// Insert identity map_scatter op for parallel_insert_slice op and store op.
+// Insert identity map_scatter op after the root and replace all uses.
 static MapScatterOp insertIdentityMapScatter(RewriterBase &rewriter,
-                                             Operation *op) {
-  Location loc = op->getLoc();
+                                             OpResult root) {
+  Location loc = root.getLoc();
+  SetVector<OpOperand *> originalUses;
+  for (OpOperand &use : root.getUses()) {
+    originalUses.insert(&use);
+  }
   OpBuilder::InsertionGuard g(rewriter);
-  assert((isa<IREE::Codegen::StoreToBufferOp, tensor::ParallelInsertSliceOp>(
-             op)) &&
-         "expected store_to_buffer or parallel_insert_slice op");
-  rewriter.setInsertionPointAfterValue(op->getOperand(0));
-  auto destType = cast<RankedTensorType>(op->getOperand(0).getType());
+  rewriter.setInsertionPointAfterValue(root);
+  Type elementType = cast<RankedTensorType>(root.getType()).getElementType();
+  SmallVector<OpFoldResult> sizes = tensor::getMixedSizes(rewriter, loc, root);
   Value mapScatterDest =
-      rewriter
-          .create<tensor::EmptyOp>(
-              loc, tensor::getMixedSizes(rewriter, loc, op->getOperand(0)),
-              destType.getElementType())
-          .getResult();
+      rewriter.create<tensor::EmptyOp>(loc, sizes, elementType);
   auto mapScatterOp = MapScatterOp::createIdentityMapScatter(
-      rewriter, loc, op->getOperand(0), mapScatterDest);
-  rewriter.modifyOpInPlace(
-      op, [&]() { op->setOperand(0, mapScatterOp.getResult(0)); });
+      rewriter, loc, root, mapScatterDest);
+  rewriter.replaceUsesWithIf(
+      root, mapScatterOp.getResult(0),
+      [&](OpOperand &use) { return originalUses.contains(&use); });
   LDBG() << "Created identity map_scatter:\n" << mapScatterOp;
   return mapScatterOp;
 }
 
+bool isSupportedRelayoutOp(Operation *op) {
+  return isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp,
+             tensor::ExtractSliceOp, tensor::PadOp, linalg::CopyOp,
+             linalg::TransposeOp>(op);
+}
+
+/// Insert identity map_scatter ops after the given operation if it is a valid
+/// leaf op of a relayout op chain. A relayout op chain is a sequence of
+/// relayout ops (defined by `isSupportedRelayoutOp`) for which the only users
+/// of the ops in the chain are relayout ops, except for the leaves of the
+/// chain. The leaves are simply relayout ops that have non relayout op users.
+/// The `controlFn` is a callback on the leaf OpResult that provides control
+/// over whether or not to insert a map_scatter op.
+struct InsertMapScatterOpPattern : public RewritePattern {
+  InsertMapScatterOpPattern(MLIRContext *context,
+                            CombineRelayoutOpsControlFn controlFn = nullptr,
+                            PatternBenefit benefit = 1)
+      : RewritePattern(MatchAnyOpTypeTag(), benefit, context),
+        controlFn(controlFn) {}
+
+  LogicalResult matchAndRewrite(Operation *op,
+                                PatternRewriter &rewriter) const override {
+    if (!isSupportedRelayoutOp(op)) {
+      return failure();
+    }
+    // Relayout ops with only relayout op users are not leaves.
+    auto isDimOrSupportedRelayoutOp = [](Operation *op) {
+      return isSupportedRelayoutOp(op) || isa<tensor::DimOp>(op);
+    };
+    if (llvm::all_of(op->getUsers(), isDimOrSupportedRelayoutOp)) {
+      return failure();
+    }
+    // All relayout ops have a single result.
+    OpResult leaf = op->getResult(0);
+    if (controlFn && !controlFn(leaf)) {
+      return failure();
+    }
+    (void)insertIdentityMapScatter(rewriter, leaf);
+    return success();
+  }
+
+private:
+  CombineRelayoutOpsControlFn controlFn;
+};
+
 LogicalResult
 combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
-                            PadDistributionConfigFn padDistributionConfigFn) {
+                            PadDistributionConfigFn padDistributionConfigFn,
+                            CombineRelayoutOpsControlFn controlFn) {
   // Sink relayout operations to the end of the funcOp.
   RewritePatternSet propagationPatterns(ctx);
   tensor::populateFoldTensorEmptyPatterns(propagationPatterns);
@@ -468,71 +521,24 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
   IRRewriter rewriter(ctx);
   simplifyComplexRelayoutOps(rewriter, funcOp);
 
-  // Start from iree_codegen.store_to_buffer ops, and combine producer
-  // relayout ops into a single map_scatter.
-  SmallVector<IREE::Codegen::StoreToBufferOp> dispatchResults(
-      funcOp.getFunctionBody().getOps<IREE::Codegen::StoreToBufferOp>());
-  for (IREE::Codegen::StoreToBufferOp dispatchResult : dispatchResults) {
-    MapScatterOp mapScatterOp =
-        insertIdentityMapScatter(rewriter, dispatchResult);
-    combineRelayoutOpChain(rewriter, mapScatterOp, padDistributionConfigFn);
-  }
-
-  // Insert identity map_scatter op for each region arg on finding a
-  // parallel_insert_slice op within a scf.forall op with workgroup mapping.
-  SmallVector<scf::ForallOp> forallOps(
-      funcOp.getFunctionBody().getOps<scf::ForallOp>());
-  for (scf::ForallOp forallOp : forallOps) {
-    bool hasWorkgroupMapping =
-        llvm::all_of(forallOp.getMapping().value(),
-                     llvm::IsaPred<IREE::Codegen::WorkgroupMappingAttr>);
-    if (!hasWorkgroupMapping) {
-      continue;
-    }
-    for (BlockArgument bbArg : forallOp.getRegionIterArgs()) {
-      SmallVector<Operation *> parallelInsertOps =
-          forallOp.getCombiningOps(bbArg);
-      if (parallelInsertOps.size() != 1) {
-        continue;
-      }
-      auto parallelInsertOp =
-          dyn_cast<tensor::ParallelInsertSliceOp>(parallelInsertOps.front());
-      if (!parallelInsertOp) {
-        continue;
-      }
-      // If there are only reshape ops, then bufferization can usually handle
-      // it, so don't introduce map_scatter.
-      llvm::SetVector<Operation *> slice;
-      BackwardSliceOptions options;
-      options.filter =
-          llvm::IsaPred<tensor::CollapseShapeOp, tensor::ExpandShapeOp,
-                        linalg::TransposeOp, linalg::CopyOp,
-                        tensor::ExtractSliceOp, tensor::PadOp>;
-      options.inclusive = true;
-      LogicalResult result =
-          getBackwardSlice(parallelInsertOp.getSource(), &slice, options);
-      if (failed(result)) {
-        continue;
-      }
-      if (llvm::all_of(
-              slice,
-              llvm::IsaPred<tensor::CollapseShapeOp, tensor::ExpandShapeOp>)) {
-        continue;
-      }
-      MapScatterOp mapScatterOp =
-          insertIdentityMapScatter(rewriter, parallelInsertOps.front());
-      if (mapScatterOp)
-        combineRelayoutOpChain(rewriter, mapScatterOp, padDistributionConfigFn);
-    }
-  }
-
-  // Cleanup any tensor.dim ops that may be present after relayout
-  // combination.
-  RewritePatternSet cleanupPatterns(ctx);
-  memref::populateResolveRankedShapedTypeResultDimsPatterns(cleanupPatterns);
-  if (failed(applyPatternsGreedily(funcOp, std::move(cleanupPatterns)))) {
+  // Combine relayout operations into new the map_scatter ops.
+  RewritePatternSet relayoutCombinationPatterns(ctx);
+  relayoutCombinationPatterns.add<InsertMapScatterOpPattern>(ctx, controlFn);
+  populateCombineRelayoutOpPatterns(relayoutCombinationPatterns,
+                                    padDistributionConfigFn);
+  memref::populateResolveRankedShapedTypeResultDimsPatterns(
+      relayoutCombinationPatterns);
+  if (failed(applyPatternsGreedily(funcOp,
+                                   std::move(relayoutCombinationPatterns)))) {
     return failure();
   }
+
+  // Clean up any identity map_scatter ops after combining.
+  funcOp->walk([&](MapScatterOp mapScatterOp) {
+    if (mapScatterOp.isIdentity()) {
+      rewriter.replaceOp(mapScatterOp, mapScatterOp.getInput());
+    }
+  });
   return success();
 }
 
@@ -562,6 +568,63 @@ defaultPadWorkgroupDistributionConfigFn(ArrayRef<int64_t> iterationBounds,
   return {workgroupDistributionConfig};
 }
 
+CombineRelayoutOpsControlFn
+getCombineRelayoutOpsControlFn(IREE::Codegen::RelayoutCombinationScope scope) {
+  CombineRelayoutOpsControlFn controlFn;
+  switch (scope) {
+  // Control function for Dispatch scope. Filters to only relayout ops with
+  // a single iree_codegen.store_to_buffer user.
+  case IREE::Codegen::RelayoutCombinationScope::Dispatch:
+    controlFn = [](OpResult leaf) {
+      if (leaf.getNumUses() != 1) {
+        return false;
+      }
+      return isa<IREE::Codegen::StoreToBufferOp>(*leaf.getUsers().begin());
+    };
+    break;
+  // Control function for Workgroup scope. Filters to only relayout ops with
+  // a single tensor.parallel_insert_slice user inside of a workgroup
+  // scf.forall op. Relayout chains of only reshapes are also filtered out,
+  // because these chains can usually be handled by bufferization.
+  case IREE::Codegen::RelayoutCombinationScope::Workgroup:
+    controlFn = [](OpResult leaf) {
+      if (leaf.getNumUses() != 1) {
+        return false;
+      }
+      auto parallelInsertOp =
+          dyn_cast<tensor::ParallelInsertSliceOp>(*leaf.getUsers().begin());
+      if (!parallelInsertOp) {
+        return false;
+      }
+      auto forallOp = parallelInsertOp->getParentOfType<scf::ForallOp>();
+      if (!forallOp ||
+          !llvm::all_of(forallOp.getMapping().value(),
+                        llvm::IsaPred<IREE::Codegen::WorkgroupMappingAttr>)) {
+        return false;
+      }
+      auto bbArg = dyn_cast<BlockArgument>(parallelInsertOp.getDest());
+      if (!bbArg || forallOp.getCombiningOps(bbArg).size() != 1) {
+        return false;
+      }
+      // If there are only reshape ops, then bufferization can usually handle
+      // it, so don't introduce map_scatter.
+      llvm::SetVector<Operation *> slice;
+      BackwardSliceOptions options;
+      options.filter = isSupportedRelayoutOp;
+      options.inclusive = true;
+      LogicalResult result =
+          getBackwardSlice(parallelInsertOp.getSource(), &slice, options);
+      if (failed(result)) {
+        return false;
+      }
+      return !llvm::all_of(
+          slice, llvm::IsaPred<tensor::CollapseShapeOp, tensor::ExpandShapeOp>);
+    };
+    break;
+  }
+  return controlFn;
+}
+
 namespace {
 
 struct CombineLayoutTransformationPass final
@@ -571,18 +634,18 @@ struct CombineLayoutTransformationPass final
       CombineLayoutTransformationPass>::CombineLayoutTransformationPassBase;
 
   void runOnOperation() override {
+    CombineRelayoutOpsControlFn controlFn =
+        getCombineRelayoutOpsControlFn(this->scope);
     if (failed(combineLayoutTransformation(
             &getContext(), getOperation(),
-            defaultPadWorkgroupDistributionConfigFn))) {
+            defaultPadWorkgroupDistributionConfigFn, controlFn))) {
       return signalPassFailure();
     }
 
     MLIRContext *context = &getContext();
-
     FunctionOpInterface funcOp = getOperation();
     {
       RewritePatternSet patterns(context);
-
       populateFuseTilableForallConsumersPattern(patterns);
       scf::ForallOp::getCanonicalizationPatterns(patterns, context);
       tensor::populateFoldTensorEmptyPatterns(patterns);

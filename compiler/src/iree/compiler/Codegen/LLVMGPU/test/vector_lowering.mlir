@@ -13,8 +13,7 @@ module {
 //  CHECK-SAME: (%[[ARG0:.+]]: memref<4096x32xf16>)
 //  CHECK: %[[LOAD:.+]] = vector.load %[[ARG0]]{{.*}} : memref<4096x32xf16>
 //  CHECK: %[[ELEM:.+]] = vector.extract %[[LOAD]][0] : f16 from vector<1xf16>
-//  CHECK: %[[SPLAT:.+]] = vector.splat %[[ELEM]] : vector<8xf16>
-//  CHECK: %[[INSERT:.+]] = vector.broadcast %[[SPLAT]] : vector<8xf16> to vector<1x8xf16>
+//  CHECK: %[[INSERT:.+]] = vector.broadcast %[[ELEM]] : f16 to vector<1x8xf16>
 //  CHECK: return %[[INSERT]]
 
 // -----
@@ -34,8 +33,8 @@ module {
 // CHECK: %[[RHS_CAST:.+]] = arith.extf %[[RHS_EXTRACT]] : vector<2xf16> to vector<2xf32>
 // CHECK: %[[LHS_CAST:.+]] = arith.extf %[[LHS_EXTRACT]] : f16 to f32
 // CHECK: %[[MASK_EXTRACT:.+]] = vector.extract %[[MASK]][0] : vector<2xi1> from vector<3x2xi1>
-// CHECK: %[[LHS_SPLAT:.+]] = vector.splat %[[LHS_CAST]] : vector<2xf32>
-// CHECK: %[[FMA:.+]] = vector.fma %[[RHS_CAST]], %[[LHS_SPLAT]], %[[ACC]] : vector<2xf32>
+// CHECK: %[[LHS_BROADCAST:.+]] = vector.broadcast %[[LHS_CAST]] : f32 to vector<2xf32>
+// CHECK: %[[FMA:.+]] = vector.fma %[[RHS_CAST]], %[[LHS_BROADCAST]], %[[ACC]] : vector<2xf32>
 // CHECK: arith.select %[[MASK_EXTRACT]], %[[FMA]], %[[ACC]] : vector<2xi1>, vector<2xf32>
 
 // -----

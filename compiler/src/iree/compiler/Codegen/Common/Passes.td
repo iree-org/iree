@@ -128,13 +128,26 @@ def CombineLayoutTransformationPass :
   let summary =
     "Combines layout transformation operations into a single map_scatter operation.";
   let description = [{
-    Starting from iree_codegen.store_to_buffer ops, iteratively combine producer
+    Starting from the specified leaf ops, iteratively combine producer
     layout/indexing transformation ops (linalg.transpose, tensor.collapse_shape,
     etc.) into a single iree_linalg_ext.map_scatter operation. For tensor.pad
     ops, the writing of pad values is distributed to workgroups, and then the
     padding values are written directly to the output buffer of the
     store_to_buffer op.
   }];
+  let options = [
+    Option<"scope", "scope",
+           "::mlir::iree_compiler::IREE::Codegen::RelayoutCombinationScope",
+           /*default=*/"IREE::Codegen::RelayoutCombinationScope::Dispatch",
+           "Specify the roots for layout transformation combination.",
+           [{
+           ::llvm::cl::values(
+             clEnumValN(IREE::Codegen::RelayoutCombinationScope::Dispatch, "dispatch",
+               "Combine relayout ops starting from iree_codegen.store_to_buffer"),
+             clEnumValN(IREE::Codegen::RelayoutCombinationScope::Workgroup, "workgroup",
+               "Combine relayout ops starting from workgroup forall terminator ops"))
+           }]>
+  ];
   let dependentDialects = [
     "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
     "scf::SCFDialect",

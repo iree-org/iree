@@ -580,7 +580,9 @@ def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
 // GPU Target Attributes
 //===----------------------------------------------------------------------===//
 
-def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
+def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target", [
+  DeclareAttrInterfaceMethods<IREECodegen_TargetInfoAttrInterface, [
+    "getMaximumWorkgroupCount"]>]> {
   let summary = [{Full GPU target attribute.}];
   let description = [{
     This attributes describes a full GPU target. It contains a few fields:

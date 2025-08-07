@@ -67,70 +67,41 @@ bool isEntryPoint(mlir::FunctionOpInterface func) {
   return func.isPublic() && getEntryPoint(func);
 }
 
-std::optional<StringAttr> getConfigStringAttr(Attribute srcAttr,
-                                              StringRef stringAttr) {
-  if (!srcAttr) {
+template <typename AttrType>
+std::optional<AttrType> getConfigTypedAttr(Attribute attr, StringRef attrName) {
+  if (!attr) {
     return std::nullopt;
   }
-  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(srcAttr);
+  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(attr);
   DictionaryAttr config;
   if (targetAttr) {
     config = targetAttr.getConfiguration();
   } else {
-    config = dyn_cast<DictionaryAttr>(srcAttr);
+    config = dyn_cast<DictionaryAttr>(attr);
   }
   if (!config) {
     return std::nullopt;
   }
-  auto attr = config.getAs<StringAttr>(stringAttr);
-  if (!attr) {
+  auto configAttr = config.getAs<AttrType>(attrName);
+  if (!configAttr) {
     return std::nullopt;
   }
-  return attr;
+  return configAttr;
+}
+
+std::optional<StringAttr> getConfigStringAttr(Attribute srcAttr,
+                                              StringRef stringAttr) {
+  return getConfigTypedAttr<StringAttr>(srcAttr, stringAttr);
 }
 
 std::optional<IntegerAttr> getConfigIntegerAttr(Attribute srcAttr,
                                                 StringRef integerAttr) {
-  if (!srcAttr) {
-    return std::nullopt;
-  }
-  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(srcAttr);
-  DictionaryAttr config;
-  if (targetAttr) {
-    config = targetAttr.getConfiguration();
-  } else {
-    config = dyn_cast<DictionaryAttr>(srcAttr);
-  }
-  if (!config) {
-    return std::nullopt;
-  }
-  auto attr = config.getAs<IntegerAttr>(integerAttr);
-  if (!attr) {
-    return std::nullopt;
-  }
-  return attr;
+  return getConfigTypedAttr<IntegerAttr>(srcAttr, integerAttr);
 }
 
 std::optional<BoolAttr> getConfigBoolAttr(Attribute srcAttr,
                                           StringRef boolAttr) {
-  if (!srcAttr) {
-    return std::nullopt;
-  }
-  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(srcAttr);
-  DictionaryAttr config;
-  if (targetAttr) {
-    config = targetAttr.getConfiguration();
-  } else {
-    config = dyn_cast<DictionaryAttr>(srcAttr);
-  }
-  if (!config) {
-    return std::nullopt;
-  }
-  auto attr = config.getAs<BoolAttr>(boolAttr);
-  if (!attr) {
-    return std::nullopt;
-  }
-  return attr;
+  return getConfigTypedAttr<BoolAttr>(srcAttr, boolAttr);
 }
 
 std::optional<llvm::Triple> getTargetTriple(Attribute attr) {
@@ -291,6 +262,19 @@ bool isRISCV32(Attribute attr) {
 bool isRISCV64(Attribute attr) {
   std::optional<llvm::Triple> triple = getTargetTriple(attr);
   return triple && triple.value().isRISCV64();
+}
+
+std::array<int64_t, 3> getMaxWorkgroupCount(Attribute targetAttr) {
+  // TODO(MaheshRavishankar): For now the target info is only available for
+  // GPUs, and is recorded in the configuration with the name `iree.gpu.target`.
+  // Fix this to be `iree.codegen.target`.
+  std::optional<IREE::Codegen::TargetInfoAttrInterface> targetInfo =
+      getConfigTypedAttr<IREE::Codegen::TargetInfoAttrInterface>(
+          targetAttr, "iree.gpu.target");
+  if (!targetInfo) {
+    return {ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
+  }
+  return targetInfo->getMaximumWorkgroupCount();
 }
 
 bool isReadOnly(Value v) {
@@ -1664,6 +1648,14 @@ bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
 // Utility functions for vector size inference for dynamic shapes
 //===----------------------------------------------------------------------===//
 
+std::optional<VectorizationTileSizes> inferSizesFromIR(scf::ForOp forOp,
+                                                       OpResult opResult) {
+  LDBG() << "Inferring sizes for: " << forOp;
+  unsigned resultNumber = opResult.getResultNumber();
+  LDBG() << " where OpResult.resultNumber = " << resultNumber;
+  return inferSizesFromIR(forOp.getInitsMutable()[resultNumber].get());
+}
+
 std::optional<VectorizationTileSizes>
 inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
   LDBG() << "Inferring sizes for: " << linalgOp;
@@ -1780,6 +1772,56 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::PackOp op) {
   return result;
 }
 
+std::optional<SizesAndScalableFlags>
+getVectorInputSizesFromDestTiles(linalg::UnPackOp op,
+                                 ArrayRef<int64_t> writeVectorSizes,
+                                 ArrayRef<bool> scalableFlags) {
+  assert(writeVectorSizes.size() == op.getDestRank());
+  if (llvm::any_of(scalableFlags, [](bool val) { return val == true; })) {
+    return std::nullopt;
+  }
+
+  ArrayRef<int64_t> innerDimPos = op.getInnerDimsPos();
+  ArrayRef<int64_t> innerTiles = op.getStaticInnerTiles();
+  ArrayRef<int64_t> sourceShape = op.getSourceType().getShape();
+  ArrayRef<int64_t> outerDimsPerm = op.getOuterDimsPerm();
+
+  // readVectorSizes is the size of tensor used to read and apply mask. It is
+  // set like this: Let's say the vectorSize (VS) array is size 'N' and
+  // the sourceShape(SS) is 'M' where M >= N and InnerTileSizes (IT) of
+  // size M-N
+  // Thus:
+  // - initially: readVectorSizes = vectorInputSizes
+  // - Divide all the readMaskShape locations pointed by innerDimPos
+  //   by the innerTileSize attribute value.
+  // - if outer_dims_perms is present: do that permutation on readVectorSizes.
+  // - Append the remaining shape from SS
+  // E.g. let's say let's say unpackTensorType.getShape() = <8x8x32x16>
+  // inner Dim Pos = [0, 1] and Inner Tiles = [32, 16], vector_sizes are [512,
+  // 128] and outer_dims_perm is [1, 0] then read shape is:
+  //   ReadVectorSizes(initial): [512, 128]
+  //   Final Value(after innerDim Adjustment): [512/32, 128/16]
+  //                                           = [16, 8]
+  //   After applying outer_dims_perm: [8, 16]
+  //   After appending the rest of the sourceShape: [8, 16, 32, 16]
+  SmallVector<int64_t> vectorSizes(writeVectorSizes);
+  for (auto [index, size] : enumerate(innerTiles)) {
+    vectorSizes[innerDimPos[index]] =
+        llvm::divideCeil(vectorSizes[innerDimPos[index]], size);
+  }
+  if (!outerDimsPerm.empty()) {
+    applyPermutationToVector(vectorSizes, outerDimsPerm);
+  }
+  vectorSizes.append(sourceShape.begin() + vectorSizes.size(),
+                     sourceShape.end());
+
+  SizesAndScalableFlags result;
+  result.first.assign(vectorSizes.begin(), vectorSizes.end());
+  result.second.resize(result.first.size(), false);
+
+  return result;
+}
+
 std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::UnPackOp op) {
   LDBG() << "Inferring dest sizes for: " << op;
 
@@ -1811,6 +1853,21 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::UnPackOp op) {
 
   LLVM_DEBUG({
     LDBG() << "After adjustment with inner tiles and outer_dims_perm:";
+    for (auto [idx, val] : llvm::enumerate(result.vectorSizes)) {
+      LDBG() << "Dim #" << idx << ": " << val;
+    }
+  });
+
+  std::optional<SizesAndScalableFlags> maybeInputVectorSizes =
+      getVectorInputSizesFromDestTiles(op, result.vectorSizes,
+                                       result.vectorScalableFlags);
+  if (!maybeInputVectorSizes) {
+    return std::nullopt;
+  }
+  std::tie(result.vectorSizes, result.vectorScalableFlags) =
+      maybeInputVectorSizes.value();
+  LLVM_DEBUG({
+    LDBG() << "After infer read vector sizes from dest shape:";
     for (auto [idx, val] : llvm::enumerate(result.vectorSizes)) {
       LDBG() << "Dim #" << idx << ": " << val;
     }
@@ -1849,6 +1906,8 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
       .Case<linalg::LinalgOp>(
           [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
       .Case<linalg::PackOp>([&](auto op) { result = inferSizesFromIR(op); })
+      .Case<scf::ForOp>(
+          [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
       .Case<tensor::ExtractSliceOp, tensor::EmptyOp>([&](auto op) {
         // tensor::ExtractSliceOp is not vectorizable, so only `destShape` has
         // the values.

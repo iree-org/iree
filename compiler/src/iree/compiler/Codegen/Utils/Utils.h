@@ -86,6 +86,10 @@ bool isRISCV(Attribute attr);
 bool isRISCV32(Attribute attr);
 bool isRISCV64(Attribute attr);
 
+/// Get maximum workgroup count in [x, y, z] for target attribute if it is
+/// available. Returns ShapedType::kDynamic if it is unknown.
+std::array<int64_t, 3> getMaxWorkgroupCount(Attribute attr);
+
 /// Checks if a tensor value is generated from a read-only object, like
 /// and interface binding with read-only attribute or from an `arith.constant`
 /// operation.
@@ -297,6 +301,9 @@ bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
 // Utility functions for vector size inference for dynamic shapes
 //===----------------------------------------------------------------------===//
 
+using SizesAndScalableFlags =
+    std::pair<SmallVector<int64_t>, SmallVector<bool>>;
+
 struct VectorizationTileSizes {
   SmallVector<int64_t> destShape;
   SmallVector<int64_t> vectorSizes;
@@ -308,8 +315,17 @@ struct VectorizationTileSizes {
 /// chain.
 std::optional<VectorizationTileSizes> inferSizesFromIR(Value val);
 
-/// Returns the result sizes and vector input sizes of the linalg.unpack op. The
-/// inferred bounding size is returned if it is dynamic shape. Returns
+/// Returns the inferred input-vector-sizes for the `op` (for read + write
+/// operations), given the provided vector sizes for the write operation.
+/// Returns std::nullopt, if it fails to compute the sizes.
+/// For now, it only supports non-scalable vectors.
+std::optional<SizesAndScalableFlags>
+getVectorInputSizesFromDestTiles(linalg::UnPackOp op,
+                                 ArrayRef<int64_t> writeVectorSizes,
+                                 ArrayRef<bool> scalableFlags);
+
+/// Returns the result sizes and vector input sizes of the linalg.unpack op.
+/// The inferred bounding size is returned if it is dynamic shape. Returns
 /// std::nullopt if the shape inference failed.
 std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::UnPackOp op);
 
@@ -323,6 +339,11 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::PackOp op);
 /// Returns std::nullopt if vector sizes can't be inferred.
 std::optional<VectorizationTileSizes>
 inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult);
+
+/// Tries to infer the vector sizes from an IR using ValueBounds analysis.
+/// Returns std::nullopt if vector sizes can't be inferred.
+std::optional<VectorizationTileSizes> inferSizesFromIR(scf::ForOp forOp,
+                                                       OpResult opResult);
 
 /// Returns the underlying index if the given value is a constant index.
 std::optional<int64_t> getConstantIndex(Value value);

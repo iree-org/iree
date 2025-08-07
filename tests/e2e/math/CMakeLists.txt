@@ -45,8 +45,6 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-llvmcpu-target-cpu=generic"
-  LABELS
-    "noriscv"
   DEPS
     "gen_math_ops_llvm-cpu.mlir"
 )
@@ -61,8 +59,6 @@ iree_check_single_backend_test_suite(
   DRIVER
     "hip"
   COMPILER_FLAGS
-
-  LABELS
 
   DEPS
     "gen_math_ops_rocm.mlir"

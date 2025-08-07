@@ -8,8 +8,9 @@
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
@@ -364,14 +365,13 @@ void buildLLVMCPUVectorLoweringPipeline(
 }
 
 void addCPUBufferOpsTileAndVectorizePipeline(
-    OpPassManager &funcPassManager, TilingConfig &tilingConfig,
-    LLVMCPUPipelineOptions &pipelineOpt) {
+    OpPassManager &funcPassManager, LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
 
   // Skip tiling reduction loops because this is expected to apply on copy ops
   // only.
   funcPassManager.addPass(createLLVMCPUTilePass(
-      tilingConfig.getVectorCommonParallelLevel(), /*skipRootOp=*/false));
+      IREE::CPU::TilingLevel::VectorCommonParallelTiles, /*skipRootOp=*/false));
   funcPassManager.addPass(createLLVMCPUPeelPass());
   {
     GenericVectorizationPassOptions options;
@@ -400,13 +400,14 @@ void addCPUBufferOpsTileAndVectorizePipeline(
   }
 }
 
-void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
-                                      TilingConfig &tilingConfig,
-                                      LLVMCPUPipelineOptions &pipelineOpt) {
+void addMultiTilingExpertPassPipeline(
+    OpPassManager &funcPassManager,
+    IREE::Codegen::LoweringConfigAttrInterface loweringConfig,
+    LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
   for (int i = 0, e = IREE::CPU::TilingLevel::MaxNumTileLevels; i < e; ++i) {
     auto level = static_cast<IREE::CPU::TilingLevel>(i);
-    if (!tilingConfig.isValidLevel(level)) {
+    if (!loweringConfig.hasTilingLevel(level)) {
       continue;
     }
 
@@ -434,17 +435,23 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
           static_cast<IREE::CPU::TilingLevel>(i), /*skipRootOp=*/true));
       break;
     case IREE::CPU::TilingLevel::VectorInnerParallelTiles:
-      funcPassManager.addPass(createLLVMCPUTileAndFusePass(
-          tilingConfig.getVectorInnerParallelLevel()));
-      break;
     case IREE::CPU::TilingLevel::DistributionTiles:
     case IREE::CPU::TilingLevel::MaxNumTileLevels:
     case IREE::CPU::TilingLevel::InvalidLevel:
-      break;
+      continue;
     };
     funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
     funcPassManager.addPass(createConcretizePadResultShapePass());
   }
+
+  // `VectorInnerParallelTiles` level models the tiling and fusion for the
+  // dimensions that are not captured in root op. I.e., root op may not have the
+  // config for the level. Thus, we run the LLVMCPUTileAndFuse pass for
+  // consumers.
+  funcPassManager.addPass(createLLVMCPUTileAndFusePass(
+      IREE::CPU::TilingLevel::VectorInnerParallelTiles));
+  funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
+  funcPassManager.addPass(createConcretizePadResultShapePass());
 
   funcPassManager.addPass(createForallToForPass());
   if (pipelineOpt.enablePeeling) {
@@ -494,8 +501,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
 }
 
 void addConvTileAndDecomposeExpertPassPipeline(
-    OpPassManager &funcPassManager, TilingConfig &tilingConfig,
-    LLVMCPUPipelineOptions &pipelineOpt) {
+    OpPassManager &funcPassManager, LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
 
   funcPassManager.addPass(createLLVMCPUTileRootAndFuseProducerConsumerPass(
@@ -553,7 +559,6 @@ void addConvTileAndDecomposeExpertPassPipeline(
 }
 
 void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
-                                      TilingConfig &tilingConfig,
                                       LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
 
@@ -603,7 +608,6 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
 }
 
 void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
-                              TilingConfig &tilingConfig,
                               LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
 
@@ -614,7 +618,7 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
       createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
 
   funcPassManager.addPass(createLLVMCPUTilePass(
-      tilingConfig.getVectorCommonParallelLevel(), /*skipRootOp=*/false));
+      IREE::CPU::TilingLevel::VectorCommonParallelTiles, /*skipRootOp=*/false));
   if (pipelineOpt.decomposePackUnPackOps) {
     funcPassManager.addPass(createDecomposePackUnPackOpsPass());
   }
@@ -646,8 +650,7 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
 }
 
 void addCPULinalgExtTileAndVectorizePipeline(
-    OpPassManager &funcPassManager, TilingConfig &tilingConfig,
-    LLVMCPUPipelineOptions &pipelineOpt) {
+    OpPassManager &funcPassManager, LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
   funcPassManager.addPass(createLLVMCPUTileRootAndFuseProducerConsumerPass(
       IREE::CPU::TilingLevel::VectorCommonParallelTiles));
@@ -688,13 +691,10 @@ void addCPULinalgExtTileAndVectorizePipeline(
 }
 
 void addCPUDefaultPassPipeline(OpPassManager &funcPassManager,
-                               std::unique_ptr<TilingConfig> &tilingConfig,
                                LLVMCPUPipelineOptions &pipelineOpt) {
-  if (tilingConfig && tilingConfig->getNumTilingLevels() > 1) {
-    addTileAndDistributePasses(funcPassManager, pipelineOpt);
-    funcPassManager.addPass(createLLVMCPUTileAndFusePass(
-        tilingConfig->getVectorCommonParallelLevel()));
-  }
+  addTileAndDistributePasses(funcPassManager, pipelineOpt);
+  funcPassManager.addPass(createLLVMCPUTileAndFusePass(
+      IREE::CPU::TilingLevel::VectorCommonParallelTiles));
   addCPUBufferizePasses(funcPassManager);
 }
 
@@ -843,6 +843,7 @@ void buildLLVMCPUCodegenConfigurationPassPipelineImpl(
       // way to late and should insted be be done during lowering to LLVM.
       .addPass(createExpandF16OpToF32Pass)
       .addPass(createMaterializeDeviceEncodingPass)
+      .addPass(createCPUPropagateDataLayoutPass)
       .addPass(createConvertAccGEMMToGEMMPass)
       // TODO: Remove the following pass the plumb support for
       // #hal.descriptor_type memory space through the stack.

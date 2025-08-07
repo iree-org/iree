@@ -150,6 +150,66 @@ static void iree_cpu_initialize_from_platform_arm_64(uint64_t* out_fields) {
           .out_field_index = 0,
           .out_field_bits = IREE_CPU_DATA0_ARM_64_BF16,
       },
+      {
+          .sysctl_key = "hw.optional.arm.FEAT_SVE",
+          .out_field_index = 0,
+          .out_field_bits = IREE_CPU_DATA0_ARM_64_SVE,
+      },
+      {
+          .sysctl_key = "hw.optional.arm.FEAT_SVE2",
+          .out_field_index = 0,
+          .out_field_bits = IREE_CPU_DATA0_ARM_64_SVE2,
+      },
+      {
+          .sysctl_key = "hw.optional.arm.FEAT_SVE2p1",
+          .out_field_index = 0,
+          .out_field_bits = IREE_CPU_DATA0_ARM_64_SVE2P1,
+      },
+      {
+          .sysctl_key = "hw.optional.arm.FEAT_SVE2BitPerm",
+          .out_field_index = 0,
+          .out_field_bits = IREE_CPU_DATA0_ARM_64_SVE2_BITPERM,
+      },
+      {
+          .sysctl_key = "hw.optional.arm.FEAT_F32MM",
+          .out_field_index = 0,
+          .out_field_bits = IREE_CPU_DATA0_ARM_64_F32MM,
+      },
+      {
+          .sysctl_key = "hw.optional.arm.FEAT_F64MM",
+          .out_field_index = 0,
+          .out_field_bits = IREE_CPU_DATA0_ARM_64_F64MM,
+      },
+      {
+          .sysctl_key = "hw.optional.arm.FEAT_SME",
+          .out_field_index = 0,
+          .out_field_bits = IREE_CPU_DATA0_ARM_64_SME,
+      },
+      {
+          .sysctl_key = "hw.optional.arm.FEAT_SME2",
+          .out_field_index = 0,
+          .out_field_bits = IREE_CPU_DATA0_ARM_64_SME2,
+      },
+      {
+          .sysctl_key = "hw.optional.arm.FEAT_SME2p1",
+          .out_field_index = 0,
+          .out_field_bits = IREE_CPU_DATA0_ARM_64_SME2P1,
+      },
+      {
+          .sysctl_key = "hw.optional.arm.FEAT_SME_F16F16",
+          .out_field_index = 0,
+          .out_field_bits = IREE_CPU_DATA0_ARM_64_SME_F16F16,
+      },
+      {
+          .sysctl_key = "hw.optional.arm.FEAT_SME_F64F64",
+          .out_field_index = 0,
+          .out_field_bits = IREE_CPU_DATA0_ARM_64_SME_F64F64,
+      },
+      {
+          .sysctl_key = "hw.optional.arm.FEAT_SME_I16I64",
+          .out_field_index = 0,
+          .out_field_bits = IREE_CPU_DATA0_ARM_64_SME_I16I64,
+      },
   };
   for (int i = 0; i < IREE_ARRAYSIZE(features); ++i) {
     const feature_t* f = &features[i];

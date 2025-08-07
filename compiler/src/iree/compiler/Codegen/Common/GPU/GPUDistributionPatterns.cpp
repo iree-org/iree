@@ -4,19 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <numeric>
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
-#include "iree/compiler/Codegen/Utils/GPUUtils.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
+#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Rewrite/PatternApplicator.h"
 
@@ -52,6 +49,30 @@ struct DistributeConstants final : OpDistributionPattern<arith::ConstantOp> {
         constantOp.getLoc(), vectorType,
         SplatElementsAttr::get(vectorType, attr.getSplatValue<Attribute>()));
     replaceOpWithDistributedValues(rewriter, constantOp,
+                                   distributedOp->getResult(0));
+    return success();
+  }
+};
+
+struct DistributePoison final : OpDistributionPattern<ub::PoisonOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  LogicalResult matchAndRewrite(ub::PoisonOp poisonOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+
+    auto poisonVal = dyn_cast<VectorValue>(poisonOp.getResult());
+    if (!poisonVal)
+      return failure();
+
+    SmallVector<int64_t> distributedShape =
+        signature[poisonVal].getDistributedShape();
+
+    Type elementType = poisonVal.getType().getElementType();
+    auto vectorType = VectorType::get(distributedShape, elementType);
+    auto distributedOp =
+        ub::PoisonOp::create(rewriter, poisonVal.getLoc(), vectorType);
+    replaceOpWithDistributedValues(rewriter, poisonOp,
                                    distributedOp->getResult(0));
     return success();
   }
@@ -336,8 +357,8 @@ struct DistributeTrivialExtract final
 } // namespace
 
 void populateGPUDistributionPatterns(RewritePatternSet &patterns) {
-  patterns.add<DistributeConstants, DistributeScfFor, DistributeTrivialExtract>(
-      patterns.getContext());
+  patterns.add<DistributeConstants, DistributePoison, DistributeScfFor,
+               DistributeTrivialExtract>(patterns.getContext());
   // Elementwise patterns.
   patterns.add<DistributeElementwise>(patterns.getContext());
   patterns.add<DistributeTrivialLayoutConversions>(patterns.getContext());

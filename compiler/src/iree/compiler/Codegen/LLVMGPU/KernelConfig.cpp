@@ -31,9 +31,11 @@
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
+#include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
+#include "llvm/Support/LogicalResult.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -41,6 +43,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/OperationSupport.h"
@@ -123,6 +126,11 @@ static llvm::cl::opt<bool>
                       llvm::cl::desc("Enable implicit gemm for convolutions."),
                       llvm::cl::init(true));
 
+llvm::cl::opt<bool> clGPUPadConvolution(
+    "iree-codegen-llvmgpu-igemm-pad-convolution",
+    llvm::cl::desc("enable pre-padding for convolutions in igemm path"),
+    llvm::cl::init(true));
+
 static llvm::cl::opt<bool>
     clUseDirectLoad("iree-llvmgpu-use-direct-load",
                     llvm::cl::desc("Use global load DMA for direct load ops."),
@@ -131,6 +139,10 @@ static llvm::cl::opt<bool>
 namespace {
 
 using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
+
+// If the size of the reduction dimension is not a dispatch compile-time
+// constant, choose a default size that the config should optimize for.
+constexpr unsigned kVectorDistributeReductionSizeToTargetIfDynamic = (1 << 31);
 
 // Threshold used to determine whether a matmul dimension is 'very skinny'.
 constexpr int64_t kVerySkinnyDimThreshold = 4;
@@ -292,34 +304,80 @@ static bool hasReductionIterator(linalg::LinalgOp &op) {
          llvm::any_of(op.getIteratorTypesArray(), linalg::isReductionIterator);
 }
 
-/// The bitwidth of the init and src operands is used to determine the
-/// bitwidth of the operation. The bitwidth is minimum of the init and src
-/// operands.
-static FailureOr<int64_t> getBitWidth(linalg::LinalgOp op) {
-  Value init = op.getDpsInitOperand(0)->get();
-  Type initElemType = getElementTypeOrSelf(init);
-  Value src = op.getDpsInputOperand(0)->get();
-  Type srcElemType = getElementTypeOrSelf(src);
+struct TensorSizeEstimate {
+  int64_t elementBitwidth;
+  int64_t staticSize;
+  int64_t numDynamicDims;
+  Value value; // This field is to simplify debugging / printing, not for
+               // calculation.
+};
 
-  if (auto initOp = init.getDefiningOp<linalg::GenericOp>()) {
-    if (IREE::LinalgExt::isBitExtendOp(initOp)) {
-      initElemType = getElementTypeOrSelf(initOp.getDpsInputs()[0]);
+/// Calculates the estimated tensor value size. Looks through known bit
+/// extension ops.
+static FailureOr<TensorSizeEstimate> calculateTensorSize(Value val) {
+  if (auto genericOp = val.getDefiningOp<linalg::GenericOp>()) {
+    if (IREE::LinalgExt::isBitExtendOp(genericOp) &&
+        genericOp.getNumDpsInputs() > 0) {
+      val = genericOp.getDpsInputs()[0];
     }
   }
-
-  if (auto srcOp = src.getDefiningOp<linalg::GenericOp>()) {
-    if (IREE::LinalgExt::isBitExtendOp(srcOp)) {
-      srcElemType = getElementTypeOrSelf(srcOp.getDpsInputs()[0]);
-    }
-  }
-
-  if (!initElemType.isIntOrFloat() || !srcElemType.isIntOrFloat()) {
+  auto tensorType = dyn_cast<RankedTensorType>(val.getType());
+  if (!tensorType) {
     return failure();
   }
 
-  int64_t bitWidth = std::max(initElemType.getIntOrFloatBitWidth(),
-                              srcElemType.getIntOrFloatBitWidth());
-  return bitWidth;
+  auto elemType = getElementTypeOrSelf(tensorType);
+  if (!elemType.isIntOrIndexOrFloat()) {
+    return failure();
+  }
+
+  if (isa<IndexType>(elemType)) {
+    // On LLVMGPU, we can conservatively assume 64-bit index types.
+    elemType = IntegerType::get(val.getContext(), 64);
+  }
+
+  TensorSizeEstimate result = {};
+  result.elementBitwidth = elemType.getIntOrFloatBitWidth();
+  result.numDynamicDims = tensorType.getNumDynamicDims();
+  result.staticSize = 1;
+  result.value = val;
+  for (int64_t dim :
+       llvm::make_filter_range(tensorType.getShape(), ShapedType::isStatic)) {
+    result.staticSize *= dim;
+  }
+
+  return result;
+}
+
+/// Returns the bitwidth of the largest operand or init. We estimate this based
+/// on the known static size and the number of dynamic dimensions. This is meant
+/// to cater towards the memory bandwidth required to load the largest of the
+/// inputs.
+static FailureOr<int64_t> getBitWidth(linalg::LinalgOp op) {
+  SmallVector<FailureOr<TensorSizeEstimate>> inputSizes =
+      llvm::filter_to_vector(
+          llvm::map_range(
+              llvm::concat<Value>(op.getDpsInits(), op.getDpsInputs()),
+              calculateTensorSize),
+          succeeded);
+  if (inputSizes.empty()) {
+    return failure();
+  }
+
+  TensorSizeEstimate largestInput = *inputSizes.front();
+  for (FailureOr<TensorSizeEstimate> candidateSize :
+       llvm::drop_begin(inputSizes)) {
+    if (std::tie(candidateSize->numDynamicDims, candidateSize->staticSize,
+                 candidateSize->elementBitwidth) >
+        std::tie(largestInput.numDynamicDims, largestInput.staticSize,
+                 largestInput.elementBitwidth)) {
+      largestInput = *candidateSize;
+    }
+  }
+
+  LDBG() << "Largest input: " << largestInput.value;
+  LDBG() << "Largest input bitwidth: " << largestInput.elementBitwidth;
+  return largestInput.elementBitwidth;
 }
 
 /// Check if the reduction op has a single combiner operation.
@@ -473,8 +531,9 @@ getVectorDistributeReductionConfig(
   }
 
   int64_t lastReductionDimSize = bounds[reductionDims.back()];
+
   if (ShapedType::isDynamic(lastReductionDimSize)) {
-    return failure();
+    lastReductionDimSize = kVectorDistributeReductionSizeToTargetIfDynamic;
   }
   if (lastReductionDimSize % threadLoads != 0) {
     return failure();
@@ -780,20 +839,21 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<int64_t> bounds = op.getStaticLoopRanges();
   IREE::GPU::TargetWgpAttr wgp = target.getWgp();
   int64_t reductionSize = bounds[reductionDims.back()];
+
   if (ShapedType::isDynamic(reductionSize)) {
-    return failure();
+    reductionSize = kVectorDistributeReductionSizeToTargetIfDynamic;
   }
 
-  int64_t numDynamicReductionDims = 0;
+  bool hasDynamicReductionDim = false;
   for (unsigned dim : reductionDims) {
     if (ShapedType::isDynamic(bounds[dim])) {
-      ++numDynamicReductionDims;
+      hasDynamicReductionDim = true;
     }
   }
 
   int64_t subgroupSize = 0;
   for (int s : wgp.getSubgroupSizeChoices().asArrayRef()) {
-    if (reductionSize % s == 0 || numDynamicReductionDims > 0) {
+    if (reductionSize % s == 0 || hasDynamicReductionDim) {
       subgroupSize = s;
       break;
     }
@@ -802,22 +862,21 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   if (subgroupSize == 0)
     return failure();
 
-  auto bitWidth = getBitWidth(op);
+  FailureOr<int64_t> bitWidth = getBitWidth(op);
   if (failed(bitWidth)) {
     return failure();
   }
 
-  // Reduction distribution only supports 8/16/32 bit types now.
-  if (!llvm::is_contained({8, 16, 32}, *bitWidth)) {
+  // Reduction distribution only supports 4/8/16/32 bit types now.
+  if (!llvm::is_contained({4, 8, 16, 32}, *bitWidth)) {
     return failure();
   }
 
   const std::optional<int64_t> maxLoadBits = wgp.getMaxLoadInstructionBits();
-  const unsigned largestLoadSizeInBits =
-      maxLoadBits.has_value() ? *maxLoadBits : 128;
+  const unsigned largestLoadSizeInBits = maxLoadBits.value_or(128);
 
   unsigned threadLoads = largestLoadSizeInBits / *bitWidth;
-  if (numDynamicReductionDims == 0) {
+  if (!hasDynamicReductionDim) {
     while ((reductionSize / threadLoads) % subgroupSize != 0) {
       threadLoads /= 2;
     }
@@ -1005,15 +1064,21 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
+  std::optional<int64_t> wgpCount = std::nullopt;
+  if (IREE::GPU::TargetChipAttr chip = target.getChip()) {
+    wgpCount = chip.getWgpCount();
+  }
   // First try to find a schedule with an exactly matching intrinsic.
-  FailureOr<GPUMMASchedule> schedule = deduceMMASchedule(
-      problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize);
+  FailureOr<GPUMMASchedule> schedule =
+      deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
+                        targetSubgroupSize, wgpCount);
   if (failed(schedule)) {
     // Then try again by allowing upcasting accumulator.
-    schedule = deduceMMASchedule(
-        problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
-        /*transposedLhs*/ false, /*transposedRhs*/ false,
-        /*canUpcastAcc=*/true);
+    schedule =
+        deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
+                          targetSubgroupSize, wgpCount,
+                          /*transposedLhs*/ false, /*transposedRhs*/ false,
+                          /*canUpcastAcc=*/true);
   }
   if (failed(schedule)) {
     return failure();
@@ -1250,15 +1315,21 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
       nDim !=
       llvm::cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
 
+  std::optional<int64_t> wgpCount = std::nullopt;
+  if (IREE::GPU::TargetChipAttr chip = target.getChip()) {
+    wgpCount = chip.getWgpCount();
+  }
+
   // First try to find a schedule with an exactly matching intrinsic.
-  std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
-      problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize);
+  std::optional<GPUMMASchedule> schedule =
+      deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
+                        targetSubgroupSize, wgpCount);
   if (!schedule) {
     // Then try again by allowing upcasting accumulator.
-    schedule =
-        deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                          targetSubgroupSize, transposedLhs, transposedRhs,
-                          /*canUpcastAcc=*/true);
+    schedule = deduceMMASchedule(problem, intrinsics, seeds,
+                                 maxSharedMemoryBytes, targetSubgroupSize,
+                                 wgpCount, transposedLhs, transposedRhs,
+                                 /*canUpcastAcc=*/true);
   }
 
   if (!schedule) {
@@ -2831,7 +2902,6 @@ static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
   // moving dimension so each thread can execute a vectorized copy of 4
   // contiguous elements at a time from the 32 block.
   std::array<int64_t, 3> workgroupSize = {8, 32, 1};
-
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, linalgOp, tileSizes,
       CodeGenPipeline::LLVMGPUTransposeSharedMem, workgroupSize);
@@ -3106,7 +3176,8 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
   }
   if (clLLVMGPUUseIgemm) {
     if (succeeded(IREE::GPU::setIGEMMConvolutionLoweringConfig(
-            target, entryPointFn, computeOp, clUseDirectLoad))) {
+            target, entryPointFn, computeOp, clUseDirectLoad,
+            clGPUPadConvolution))) {
       LDBG() << "Tile and fuse IGEMM config";
       return success();
     }
