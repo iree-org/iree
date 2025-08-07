@@ -7,7 +7,7 @@
   #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = shuffle|arithmetic, dot = none, mma = [], scaled_mma = [],
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 65536,
@@ -81,7 +81,7 @@ func.func @warp_reduction_dispatch_0() attributes {hal.executable.target = #exec
   #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = shuffle|arithmetic, dot = none, mma = [], scaled_mma = [],
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 65536,
@@ -164,7 +164,7 @@ func.func @warp_reduction_dispatch_1() attributes {hal.executable.target = #exec
   #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = shuffle|arithmetic, dot = none, mma = [], scaled_mma = [],
     subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 64],
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
@@ -254,7 +254,7 @@ func.func @softmax() attributes {hal.executable.target = #executable_target_vulk
   #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|fp16|int32, storage = b32|b16, subgroup = shuffle|arithmetic, dot = none, mma = [], scaled_mma = [],
     subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,

@@ -266,7 +266,7 @@ func.func @matmul_4x4x4_i8_to_i32(%lhs: tensor<4x4xi8>, %rhs : tensor<4x4xi8>) -
 // the target env. We expect the matmul to follow the inner product lowering.
 
 func.func @matmul_4x4x4_i8_to_i32_dot_prod(%lhs: tensor<4x4xi8>, %rhs : tensor<4x4xi8>) -> tensor<4x4xi32> attributes {
-  hal.executable.target = #hal.executable.target<"", "", {iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+  hal.executable.target = #hal.executable.target<"", "", {iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32|int16|int8, storage = b32|b16|b8, subgroup = none, dot = dp4xi8toi32, mma = [], scaled_mma = [],
     subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
@@ -326,7 +326,7 @@ func.func @matmul_4x4x4_i8_to_i32_dot_prod(%lhs: tensor<4x4xi8>, %rhs : tensor<4
 // the target env. We expect the matmul to follow the inner product lowering.
 
 func.func @matmul_4x16x4_i8_to_i32_dot_prod(%lhs: tensor<4x16xi8>, %rhs : tensor<16x4xi8>) -> tensor<4x4xi32> attributes {
-  hal.executable.target = #hal.executable.target<"", "", {iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+  hal.executable.target = #hal.executable.target<"", "", {iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32|int16|int8, storage = b32|b16|b8, subgroup = none, dot = dp4xi8toi32, mma = [], scaled_mma = [],
     subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,

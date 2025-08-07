@@ -634,7 +634,7 @@ func.func @matmul_lowering_MFMA_I32_16x16x32_I8() {
 // Custom {max_load_instruction_bits = 64} => implied default {intrinsics_k = 1} (omitted in output) instead of {intrinsics_k = 2}.
 
 #target_gfx942_except_max_load_instruction_bits_64 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
-  iree.gpu.target = #iree_gpu.target<
+  iree_codegen.target_info = #iree_gpu.target<
     arch = "gfx942", features = "", wgp = <
       compute =  fp64|fp32|fp16|int64|int32|int16|int8,
       storage =  b64|b32|b16|b8,
@@ -709,7 +709,7 @@ func.func @matmul_lowering_MFMA_I32_16x16x32_I8_custom_max_load_instruction_bits
 // Custom {max_load_instruction_bits = 256} => {intrinsics_k = 4} instead of {intrinsics_k = 2}.
 
 #target_gfx942_except_max_load_instruction_bits_256 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
-  iree.gpu.target = #iree_gpu.target<
+  iree_codegen.target_info = #iree_gpu.target<
     arch = "gfx942", features = "", wgp = <
       compute =  fp64|fp32|fp16|int64|int32|int16|int8,
       storage =  b64|b32|b16|b8,
@@ -784,7 +784,7 @@ func.func @matmul_lowering_MFMA_I32_16x16x32_I8_custom_max_load_instruction_bits
 // Custom {simds_per_wgp = 1} => implied default {subgroups_n = 1} (omitted in output) and {intrinsics_n = 8} instead of {subgroups_n = 4}.
 
 #target_gfx942_except_simds_per_wgp_1 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
-  iree.gpu.target = #iree_gpu.target<
+  iree_codegen.target_info = #iree_gpu.target<
     arch = "gfx942", features = "", wgp = <
       compute =  fp64|fp32|fp16|int64|int32|int16|int8,
       storage =  b64|b32|b16|b8,
@@ -859,7 +859,7 @@ func.func @matmul_lowering_MFMA_I32_16x16x32_I8_custom_simds_per_wgp_1() attribu
 // Custom 2x smaller {vgpr_space_bits = 8192} => smaller intrinsics_m and intrinsics_n
 
 #target_gfx942_except_vgpr_space_bits_8192 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
-  iree.gpu.target = #iree_gpu.target<
+  iree_codegen.target_info = #iree_gpu.target<
     arch = "gfx942", features = "", wgp = <
       compute =  fp64|fp32|fp16|int64|int32|int16|int8,
       storage =  b64|b32|b16|b8,
@@ -934,7 +934,7 @@ func.func @matmul_lowering_MFMA_I32_16x16x32_I8_custom_vgpr_space_bits_8192() at
 // Custom 4x smaller {vgpr_space_bits = 4096} => smaller intrinsics_m and intrinsics_n
 
 #target_gfx942_except_vgpr_space_bits_4096 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
-  iree.gpu.target = #iree_gpu.target<
+  iree_codegen.target_info = #iree_gpu.target<
     arch = "gfx942", features = "", wgp = <
       compute =  fp64|fp32|fp16|int64|int32|int16|int8,
       storage =  b64|b32|b16|b8,
@@ -1009,7 +1009,7 @@ func.func @matmul_lowering_MFMA_I32_16x16x32_I8_custom_vgpr_space_bits_4096() at
 // Custom smaller {vgpr_space_bits = 32768} => larger intrinsics_m and/or intrinsics_n
 
 #target_gfx942_except_vgpr_space_bits_32768 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
-  iree.gpu.target = #iree_gpu.target<
+  iree_codegen.target_info = #iree_gpu.target<
     arch = "gfx942", features = "", wgp = <
       compute =  fp64|fp32|fp16|int64|int32|int16|int8,
       storage =  b64|b32|b16|b8,

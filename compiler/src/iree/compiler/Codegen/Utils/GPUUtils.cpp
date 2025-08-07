@@ -35,7 +35,7 @@
 #define DBGSNL() (llvm::dbgs() << "\n")
 
 static constexpr unsigned kShuffleBitWidth = 32;
-static const char kGPUTargetAttrName[] = "iree.gpu.target";
+static const char kGPUTargetAttrName[] = "iree_codegen.target_info";
 static const char kWavesPerEuAttrName[] = "waves_per_eu";
 
 static llvm::cl::opt<std::string> clTestTarget(
