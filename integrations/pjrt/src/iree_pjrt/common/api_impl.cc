@@ -1717,8 +1717,8 @@ EventInstance::EventInstance(iree::vm::ref<iree_hal_fence_t> fence)
     signal_thread_ = std::make_unique<std::thread>(
         [](EventInstance* event_instance,
            iree::vm::ref<iree_hal_fence_t> fence) {
-          iree_status_t wait_status =
-              iree_hal_fence_wait(fence.get(), iree_infinite_timeout());
+          iree_status_t wait_status = iree_hal_fence_wait(
+              fence.get(), iree_infinite_timeout(), IREE_HAL_WAIT_FLAG_DEFAULT);
           event_instance->SignalReady(wait_status);
         },
         this, std::move(fence));

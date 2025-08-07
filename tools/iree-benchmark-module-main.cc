@@ -319,8 +319,9 @@ static void BenchmarkAsyncFunction(
                            /*policy=*/nullptr, invocation_inputs[i].get(),
                            invocation_outputs[i].get(), host_allocator));
       }
-      IREE_CHECK_OK(
-          iree_hal_fence_wait(completion_fence.get(), iree_infinite_timeout()));
+      IREE_CHECK_OK(iree_hal_fence_wait(completion_fence.get(),
+                                        iree_infinite_timeout(),
+                                        IREE_HAL_WAIT_FLAG_DEFAULT));
     }
     state.PauseTiming();
 

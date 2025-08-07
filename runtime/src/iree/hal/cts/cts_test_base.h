@@ -240,7 +240,8 @@ class CTSTestBase : public BaseType, public CTSTestResources {
         IREE_HAL_EXECUTE_FLAG_NONE);
     if (iree_status_is_ok(status)) {
       status = iree_hal_semaphore_wait(signal_semaphore, target_payload_value,
-                                       iree_infinite_timeout());
+                                       iree_infinite_timeout(),
+                                       IREE_HAL_WAIT_FLAG_DEFAULT);
     }
 
     iree_hal_semaphore_release(signal_semaphore);

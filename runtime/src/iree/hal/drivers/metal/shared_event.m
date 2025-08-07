@@ -135,7 +135,8 @@ static void iree_hal_metal_shared_event_fail(iree_hal_semaphore_t* base_semaphor
 }
 
 static iree_status_t iree_hal_metal_shared_event_wait(iree_hal_semaphore_t* base_semaphore,
-                                                      uint64_t value, iree_timeout_t timeout) {
+                                                      uint64_t value, iree_timeout_t timeout,
+                                                      iree_hal_wait_flags_t flags) {
   iree_hal_metal_shared_event_t* semaphore = iree_hal_metal_shared_event_cast(base_semaphore);
 
   iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
@@ -200,12 +201,12 @@ static iree_status_t iree_hal_metal_shared_event_wait(iree_hal_semaphore_t* base
 
 iree_status_t iree_hal_metal_shared_event_multi_wait(
     iree_hal_wait_mode_t wait_mode, const iree_hal_semaphore_list_t* semaphore_list,
-    iree_timeout_t timeout) {
+    iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
   if (semaphore_list->count == 0) return iree_ok_status();
   // If there is only one semaphore, just wait on it.
   if (semaphore_list->count == 1) {
     return iree_hal_metal_shared_event_wait(semaphore_list->semaphores[0],
-                                            semaphore_list->payload_values[0], timeout);
+                                            semaphore_list->payload_values[0], timeout, flags);
   }
 
   iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
