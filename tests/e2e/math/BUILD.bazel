@@ -45,10 +45,6 @@ testcases = [
     srcs = ["//tests/e2e/math:math_ops_%s.mlir" % backend],
     compiler_flags = ["--iree-llvmcpu-target-cpu=generic"] if backend == "llvm-cpu" else [],
     driver = driver,
-    tags = [
-        # TODO(#21512): Reenable tests for RISCV targets.
-        "noriscv",
-    ] if (backend == "llvm-cpu") else [],
     target_backend = backend,
     deps = [
         "gen_math_ops_%s.mlir" % backend,
