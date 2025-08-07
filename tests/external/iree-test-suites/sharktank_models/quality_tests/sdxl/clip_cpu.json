@@ -34,7 +34,7 @@
         "--iree-hal-local-target-device-backends=llvm-cpu",
         "--iree-hal-target-device=local",
         "--iree-llvmcpu-target-cpu-features=host",
-        "--iree-opt-level=O3",
+        "--iree-opt-level=O1",
         "--iree-llvmcpu-enable-ukernels=all",
         "--iree-scheduling-dump-statistics-format=json",
         "--iree-scheduling-dump-statistics-file=compilation_info.json"
