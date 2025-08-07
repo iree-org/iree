@@ -16,6 +16,7 @@
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -78,6 +79,83 @@ static LogicalResult matchContraction(PatternRewriter &rewriter,
   return success();
 }
 
+/// PDL utility that checks whether the size of the dimension of the provided
+/// value is a multiple of the divisor.
+static LogicalResult dimIsMultipleOf(PatternRewriter &rewriter, Value value,
+                                     Attribute dim, Attribute divisor) {
+  auto shapedType = dyn_cast<mlir::ShapedType>(value.getType());
+  if (!shapedType) {
+    return failure();
+  }
+  auto dimInt = dyn_cast<IntegerAttr>(dim);
+  if (!dim) {
+    return failure();
+  }
+  auto divisorInt = dyn_cast<IntegerAttr>(divisor);
+  if (!divisor) {
+    return failure();
+  }
+  ValueBoundsConstraintSet::Variable dimVar(value, dimInt.getInt());
+
+  // Check if value[dim] % size == 0. There are a couple of options for how
+  // to do this (e.g. mul(floordiv)). Affine map canonicalizations are good
+  // at dropping terms that statically divide the mod RHS so we go with this
+  // one.
+  MLIRContext *ctx = value.getContext();
+  AffineMap modMap =
+      AffineMap::get(/*dimCount=*/0, /*symbolCount=*/1,
+                     getAffineSymbolExpr(0, ctx) %
+                         getAffineConstantExpr(divisorInt.getInt(), ctx));
+  ValueBoundsConstraintSet::Variable modVar(modMap, {dimVar});
+  Builder b(ctx);
+  FailureOr<bool> maybeFailed = ValueBoundsConstraintSet::areEqual(
+      modVar, OpFoldResult{b.getIndexAttr(0)});
+  if (failed(maybeFailed) || !maybeFailed.value()) {
+    return failure();
+  }
+  return success();
+}
+
+/// PDL utility that checks whether the size of the dimension of the provided
+/// value is within the specified range.
+static LogicalResult dimIsBound(PatternRewriter &rewriter, Value value,
+                                Attribute dim, Attribute lowerBound,
+                                Attribute upperBound) {
+  auto shapedType = dyn_cast<mlir::ShapedType>(value.getType());
+  if (!shapedType) {
+    return failure();
+  }
+  auto dimInt = dyn_cast<IntegerAttr>(dim);
+  if (!dimInt) {
+    return failure();
+  }
+  if (auto lowerBoundInt = dyn_cast<IntegerAttr>(lowerBound)) {
+    FailureOr<int64_t> constantLb =
+        ValueBoundsConstraintSet::computeConstantBound(
+            presburger::BoundType::LB, {value, /*dim=*/dimInt.getInt()},
+            /*stopCondition=*/nullptr, /*closedLB=*/true);
+    if (failed(constantLb)) {
+      return failure();
+    }
+    if (lowerBoundInt.getInt() > constantLb.value()) {
+      return failure();
+    }
+  }
+  if (auto upperBoundInt = dyn_cast<IntegerAttr>(upperBound)) {
+    FailureOr<int64_t> constantUb =
+        ValueBoundsConstraintSet::computeConstantBound(
+            presburger::BoundType::UB, {value, /*dim=*/dimInt.getInt()},
+            /*stopCondition=*/nullptr, /*closedUB=*/true);
+    if (failed(constantUb)) {
+      return failure();
+    }
+    if (upperBoundInt.getInt() < constantUb.value()) {
+      return failure();
+    }
+  }
+  return success();
+}
+
 // Populate patterns from builtin.
 static LogicalResult
 populatePDLModuleFromBuiltin(MLIRContext *context, RewritePatternSet &patterns,
@@ -97,6 +175,8 @@ populatePDLModuleFromBuiltin(MLIRContext *context, RewritePatternSet &patterns,
   // Constraints are registered to the PDL module, and linking the modules
   // together is likely slower than just registering a few redundant functions.
   pdlModule.registerConstraintFunction("hasAttr", hasAttr);
+  pdlModule.registerConstraintFunction("dimIsBound", dimIsBound);
+  pdlModule.registerConstraintFunction("dimIsMultipleOf", dimIsMultipleOf);
   pdlModule.registerConstraintFunction("matchContraction", matchContraction);
   pdlModule.registerRewriteFunction("annotateOperation", annotateOperation);
   patterns.insert(std::move(pdlModule));
