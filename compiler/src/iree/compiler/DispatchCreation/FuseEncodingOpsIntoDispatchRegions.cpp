@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/DispatchCreation/FusionUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -29,12 +30,11 @@ namespace mlir::iree_compiler::DispatchCreation {
 
 namespace {
 
-// Return true if the op is fusable with a SetEncodingOp consumer. For now,
-// the op's containing dispatch region must not contain any ops other than
-// element-wise linalg ops and some tensor ops. This is quite conservative,
-// and could be extended to more ops when we are confident that the codegen
-// backends can support it.
-// TODO(#20179): It should be done by interface methods.
+/// Return true if the op is fusable with a SetEncodingOp consumer. The op's
+/// containing dispatch must contain only reshape ops, encoding ops, linalg ops,
+/// and attention ops. Non ShapedType ops (like arith ops, dim ops, etc.) are
+/// also allowed.
+/// TODO(#20179): It should be done by interface methods.
 static bool isFusableWithSetEncoding(Operation *op) {
   auto parentRegion = op->getParentOfType<IREE::Flow::DispatchRegionOp>();
   // Make sure the dispatch region has only one block.
@@ -48,15 +48,9 @@ static bool isFusableWithSetEncoding(Operation *op) {
     if (llvm::none_of(op.getResultTypes(), llvm::IsaPred<ShapedType>)) {
       continue;
     }
-    if (isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp, tensor::EmptyOp>(
-            op)) {
-      continue;
-    }
-    auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-    if (!linalgOp) {
-      return false;
-    }
-    if (linalgOp.getNumReductionLoops() != 0) {
+    if (!isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp, tensor::EmptyOp,
+             IREE::Encoding::SetEncodingOp, IREE::Encoding::UnsetEncodingOp,
+             linalg::LinalgOp, IREE::LinalgExt::AttentionOp>(op)) {
       return false;
     }
   }
