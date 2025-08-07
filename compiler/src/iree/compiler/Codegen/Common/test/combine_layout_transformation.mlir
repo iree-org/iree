@@ -323,3 +323,32 @@ func.func @no_insert_in_non_workgroup_forall(%2 : tensor<32xbf16>, %9 : tensor<1
 }
 // WORKGROUP-SCOPE-LABEL: @no_insert_in_non_workgroup_forall
 //   WORKGROUP-SCOPE-NOT:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter
+
+// -----
+
+func.func @workgroup_and_dispatch_scope(%arg0 : tensor<32xbf16>, %arg1 : tensor<10xbf16>, %arg2 : memref<20xbf16>) {
+  %0 = tensor.empty() : tensor<32xbf16>
+  %1 = scf.forall (%arg3) = (0) to (32) step (8) shared_outs(%arg4 = %0) -> tensor<32xbf16> {
+    %extract = tensor.extract_slice %arg1 [0] [8] [1] : tensor<10xbf16> to tensor<8xbf16>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %extract into %arg4[%arg3] [8] [1] : tensor<8xbf16> into tensor<32xbf16>
+    }
+  } {mapping = [#iree_codegen.workgroup_mapping<x>]}
+  %barrier = util.optimization_barrier %1 : tensor<32xbf16>
+  %extract = tensor.extract_slice %barrier [0] [20] [1] : tensor<32xbf16> to tensor<20xbf16>
+  iree_codegen.store_to_buffer %extract, %arg2 : tensor<20xbf16> into memref<20xbf16>
+  return
+}
+
+// DISPATCH-SCOPE-LABEL: @workgroup_and_dispatch_scope
+//       DISPATCH-SCOPE:   scf.forall
+//       DISPATCH-SCOPE:     tensor.extract_slice
+//       DISPATCH-SCOPE:   } {mapping = [#iree_codegen.workgroup_mapping<x>]}
+//       DISPATCH-SCOPE:   iree_linalg_ext.map_scatter
+
+// WORKGROUP-SCOPE-LABEL: @workgroup_and_dispatch_scope
+//       WORKGROUP-SCOPE:   scf.forall
+//       WORKGROUP-SCOPE:     iree_linalg_ext.map_scatter
+//       WORKGROUP-SCOPE:   } {mapping = [#iree_codegen.workgroup_mapping<x>]}
+//   WORKGROUP-SCOPE-NOT:   iree_linalg_ext.map_scatter
+//       WORKGROUP-SCOPE:   tensor.extract_slice
