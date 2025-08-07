@@ -36,7 +36,8 @@ using PadDistributionConfigFn = function_ref<SmallVector<DistributionConfig>(
 /// Control function type for layout transformation combination. The control
 /// function takes a leaf of a relayout op chain, and returns a bool indicating
 /// whether to combine the relayout op chain, starting from the leaf.
-using CombineRelayoutOpsControlFn = function_ref<bool(OpResult leaf)>;
+using CombineRelayoutOpsControlFnRef = function_ref<bool(OpResult leaf)>;
+using CombineRelayoutOpsControlFn = std::function<bool(OpResult leaf)>;
 
 namespace IREE::Codegen {
 /// Enum defining the scope of the CombineLayoutTransformationPass.
@@ -93,7 +94,7 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
 LogicalResult
 combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
                             PadDistributionConfigFn padDistributionConfigFn,
-                            CombineRelayoutOpsControlFn controlFn = nullptr);
+                            CombineRelayoutOpsControlFnRef controlFn = nullptr);
 
 } // namespace mlir::iree_compiler
 #endif // IREE_COMPILER_CODEGEN_COMMON_COMBINELAYOUTTRANSFORMATION_H_

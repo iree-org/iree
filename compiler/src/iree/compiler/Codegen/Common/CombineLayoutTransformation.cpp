@@ -429,7 +429,7 @@ bool isSupportedRelayoutOp(Operation *op) {
 /// over whether or not to insert a map_scatter op.
 struct InsertMapScatterOpPattern : public RewritePattern {
   InsertMapScatterOpPattern(MLIRContext *context,
-                            CombineRelayoutOpsControlFn controlFn = nullptr,
+                            CombineRelayoutOpsControlFnRef controlFn = nullptr,
                             PatternBenefit benefit = 1)
       : RewritePattern(MatchAnyOpTypeTag(), benefit, context),
         controlFn(controlFn) {}
@@ -456,13 +456,13 @@ struct InsertMapScatterOpPattern : public RewritePattern {
   }
 
 private:
-  CombineRelayoutOpsControlFn controlFn;
+  CombineRelayoutOpsControlFnRef controlFn;
 };
 
 LogicalResult
 combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
                             PadDistributionConfigFn padDistributionConfigFn,
-                            CombineRelayoutOpsControlFn controlFn) {
+                            CombineRelayoutOpsControlFnRef controlFn) {
   // Sink relayout operations to the end of the funcOp.
   RewritePatternSet propagationPatterns(ctx);
   tensor::populateFoldTensorEmptyPatterns(propagationPatterns);
