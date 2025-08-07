@@ -10,9 +10,6 @@
     "compilation_required": true,
     "compiled_file_name": "sdxl_full_pipeline_fp16_rocm",
     "compile_flags": [
-        "--iree-global-opt-propagate-transposes=true",
-        "--iree-codegen-llvmgpu-use-vector-distribution",
-        "--iree-codegen-gpu-native-math-precision=true",
         "--iree-hip-waves-per-eu=2",
         "--iree-opt-outer-dim-concat=true",
         "--iree-llvmgpu-enable-prefetch",
