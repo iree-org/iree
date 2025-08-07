@@ -147,7 +147,7 @@ static void iree_hal_null_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
 
 static iree_status_t iree_hal_null_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_timeout_t timeout) {
+    iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
   iree_hal_null_semaphore_t* semaphore =
       iree_hal_null_semaphore_cast(base_semaphore);
 

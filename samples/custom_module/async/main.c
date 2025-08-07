@@ -152,7 +152,8 @@ int main(int argc, char** argv) {
 
   // We could go do other things now while the async work progresses. Here we
   // just immediately wait.
-  IREE_CHECK_OK(iree_hal_fence_wait(fence_t2, iree_infinite_timeout()));
+  IREE_CHECK_OK(iree_hal_fence_wait(fence_t2, iree_infinite_timeout(),
+                                    IREE_HAL_WAIT_FLAG_DEFAULT));
   fprintf(stdout, "REACHED T=2\n");
   fflush(stdout);
 

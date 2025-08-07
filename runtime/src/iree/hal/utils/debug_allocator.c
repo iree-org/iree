@@ -177,7 +177,8 @@ static iree_status_t iree_hal_debug_allocator_fill_on_device(
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_semaphore_wait(semaphore, signal_value,
-                                     iree_infinite_timeout());
+                                     iree_infinite_timeout(),
+                                     IREE_HAL_WAIT_FLAG_DEFAULT);
   }
 
   iree_hal_semaphore_release(semaphore);

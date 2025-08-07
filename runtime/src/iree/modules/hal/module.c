@@ -1928,7 +1928,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_fence_await,  //
         // Block the native thread until the fence is reached or the deadline is
         // exceeded.
         for (iree_host_size_t i = 0; i < fence_count; ++i) {
-          wait_status = iree_hal_fence_wait(fences[i], timeout);
+          wait_status = iree_hal_fence_wait(fences[i], timeout,
+                                            IREE_HAL_WAIT_FLAG_DEFAULT);
           if (!iree_status_is_ok(wait_status)) break;
         }
       } else {

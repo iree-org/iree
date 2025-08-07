@@ -173,7 +173,7 @@ class HalDeviceLoopBridge {
           device_.raw_ptr(), IREE_HAL_WAIT_MODE_ANY,
           {wait_semaphores.size(), wait_semaphores.data(),
            wait_payloads.data()},
-          iree_infinite_timeout());
+          iree_infinite_timeout(), IREE_HAL_WAIT_FLAG_DEFAULT);
       if (!iree_status_is_ok(status)) {
         py::gil_scoped_acquire acquire_gil;
         CheckApiStatus(
@@ -183,8 +183,8 @@ class HalDeviceLoopBridge {
       status = iree_hal_semaphore_query(control_sem_, &next_control_wakeup);
       if (!iree_status_is_ok(status)) {
         py::gil_scoped_acquire acquire_gil;
-        CheckApiStatus(
-            status, "iree_hal_device_wait_semaphores from HalDeviceLoopBridge");
+        CheckApiStatus(status,
+                       "iree_hal_semaphore_query from HalDeviceLoopBridge");
       }
       next_control_wakeup += 1;
       IREE_PY_TRACEF("HalDeviceLoopBridge::Run(%p): Loop end", this);

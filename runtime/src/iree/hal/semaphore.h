@@ -59,6 +59,20 @@ enum iree_hal_semaphore_flag_bits_t {
 };
 typedef uint64_t iree_hal_semaphore_flags_t;
 
+// Hints how a wait operation should be performed.
+enum iree_hal_wait_flag_bits_e {
+  // Default blocking wait behavior (if able), possibly with an early query to
+  // avoid unneeded context switching. If waiting on the host and the
+  // IREE_HAL_SEMAPHORE_FLAG_HOST_INTERRUPT is not set the wait may fall back to
+  // an active wait.
+  IREE_HAL_WAIT_FLAG_DEFAULT = 0ull,
+
+  // Waiting thread will spin (possibly with backoff) until the wait condition
+  // has been satisfied or the deadline expires.
+  IREE_HAL_WAIT_FLAG_ACTIVE = 1ull << 0,
+};
+typedef uint64_t iree_hal_wait_flags_t;
+
 // The maximum valid payload value of an iree_hal_semaphore_t.
 // Payload values larger than this indicate that the semaphore has failed.
 //
@@ -373,8 +387,9 @@ IREE_API_EXPORT void iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore,
 // Returns IREE_STATUS_ABORTED if one or more semaphores has failed. Callers can
 // use iree_hal_semaphore_query on the semaphores to find the ones that have
 // failed and get the status.
-IREE_API_EXPORT iree_status_t iree_hal_semaphore_wait(
-    iree_hal_semaphore_t* semaphore, uint64_t value, iree_timeout_t timeout);
+IREE_API_EXPORT iree_status_t
+iree_hal_semaphore_wait(iree_hal_semaphore_t* semaphore, uint64_t value,
+                        iree_timeout_t timeout, iree_hal_wait_flags_t flags);
 
 // Returns a wait source reference to |semaphore| after it reaches or exceeds
 // the specified payload |value|.
@@ -457,7 +472,8 @@ IREE_API_EXPORT void iree_hal_semaphore_list_fail(
 // wait should be used to perform a join that will propagate failures from any
 // semaphore used in timepoints.
 IREE_API_EXPORT iree_status_t iree_hal_semaphore_list_wait(
-    iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout);
+    iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
+    iree_hal_wait_flags_t flags);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_semaphore_t implementation details
@@ -474,7 +490,8 @@ typedef struct iree_hal_semaphore_vtable_t {
                            iree_status_t status);
 
   iree_status_t(IREE_API_PTR* wait)(iree_hal_semaphore_t* semaphore,
-                                    uint64_t value, iree_timeout_t timeout);
+                                    uint64_t value, iree_timeout_t timeout,
+                                    iree_hal_wait_flags_t flags);
 
   iree_status_t(IREE_API_PTR* import_timepoint)(
       iree_hal_semaphore_t* semaphore, uint64_t value,

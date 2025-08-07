@@ -584,12 +584,13 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_flush(
 
 IREE_API_EXPORT iree_status_t iree_hal_device_wait_semaphores(
     iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout) {
+    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
+    iree_hal_wait_flags_t flags) {
   IREE_ASSERT_ARGUMENT(device);
   if (semaphore_list.count == 0) return iree_ok_status();
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = _VTABLE_DISPATCH(device, wait_semaphores)(
-      device, wait_mode, semaphore_list, timeout);
+      device, wait_mode, semaphore_list, timeout, flags);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

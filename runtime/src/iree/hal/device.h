@@ -472,7 +472,8 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_flush(
 // failed and get the status.
 IREE_API_EXPORT iree_status_t iree_hal_device_wait_semaphores(
     iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout);
+    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
+    iree_hal_wait_flags_t flags);
 
 // Begins a profile capture on |device| with the given |options|.
 // This will use an implementation-defined profiling API to capture all
@@ -674,7 +675,8 @@ typedef struct iree_hal_device_vtable_t {
 
   iree_status_t(IREE_API_PTR* wait_semaphores)(
       iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
-      const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout);
+      const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
+      iree_hal_wait_flags_t flags);
 
   iree_status_t(IREE_API_PTR* profiling_begin)(
       iree_hal_device_t* device,

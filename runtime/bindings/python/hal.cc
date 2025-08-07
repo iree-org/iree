@@ -1678,7 +1678,8 @@ void SetupHalBindings(nanobind::module_ m) {
             uint64_t unused_value;
             {
               py::gil_scoped_release release;
-              status = iree_hal_semaphore_wait(self.raw_ptr(), payload, t);
+              status = iree_hal_semaphore_wait(self.raw_ptr(), payload, t,
+                                               IREE_HAL_WAIT_FLAG_DEFAULT);
             }
             if (iree_status_is_deadline_exceeded(status)) {
               // Time out.
@@ -1821,7 +1822,8 @@ void SetupHalBindings(nanobind::module_ m) {
             iree_status_t status;
             {
               py::gil_scoped_release release;
-              status = iree_hal_fence_wait(self.raw_ptr(), t);
+              status = iree_hal_fence_wait(self.raw_ptr(), t,
+                                           IREE_HAL_WAIT_FLAG_DEFAULT);
             }
             if (iree_status_is_deadline_exceeded(status)) {
               // Time out.
