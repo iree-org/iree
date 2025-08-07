@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 #define IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
@@ -41,12 +42,17 @@ getEntryPoint(mlir::FunctionOpInterface funcOp);
 /// Methods to retrieve information association with `configuration` field
 /// of `hal.executable.target` attribute used commonly in codegen pipelines.
 std::optional<StringRef> getConfigDataLayout(DictionaryAttr targetConfig);
+IREE::Codegen::TargetInfoAttrInterface
+getConfigTargetInfo(DictionaryAttr targetConfig);
 std::optional<StringRef> getConfigTargetTriple(DictionaryAttr targetConfig);
 std::optional<StringRef> getConfigCpuFeatures(DictionaryAttr targetConfig);
 
 /// Methods to add attributes to the `config` list.
 void addConfigCpuFeatures(MLIRContext *context, StringRef cpuFeatures,
                           SmallVectorImpl<NamedAttribute> &config);
+void addConfigTargetInfo(MLIRContext *context,
+                         IREE::Codegen::TargetInfoAttrInterface targetAttr,
+                         SmallVectorImpl<NamedAttribute> &config);
 void addConfigDataLayout(MLIRContext *context, StringRef dataLayoutStr,
                          SmallVectorImpl<NamedAttribute> &config);
 void addConfigTargetTriple(MLIRContext *context, StringRef targetTripleStr,
@@ -83,7 +89,8 @@ bool isRISCV64(DictionaryAttr targetConfig);
 
 /// Get maximum workgroup count in [x, y, z] for target attribute if it is
 /// available. Returns ShapedType::kDynamic if it is unknown.
-std::array<int64_t, 3> getMaxWorkgroupCount(Attribute attr);
+std::array<int64_t, 3> getMaxWorkgroupCount(DictionaryAttr targetConfig);
+std::array<int64_t, 3> getMaxWorkgroupCount(Operation *op);
 
 /// Checks if a tensor value is generated from a read-only object, like
 /// and interface binding with read-only attribute or from an `arith.constant`

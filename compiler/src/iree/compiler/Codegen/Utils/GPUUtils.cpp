@@ -34,9 +34,9 @@
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define DBGSNL() (llvm::dbgs() << "\n")
 
-static constexpr unsigned kShuffleBitWidth = 32;
-static const char kGPUTargetAttrName[] = "iree_codegen.target_info";
-static const char kWavesPerEuAttrName[] = "waves_per_eu";
+constexpr unsigned kShuffleBitWidth = 32;
+// TODO: These are AMD GPU specific. These need to find a better home.
+constexpr char kWavesPerEuAttrName[] = "waves_per_eu";
 
 static llvm::cl::opt<std::string> clTestTarget(
     "iree-gpu-test-target",
@@ -999,7 +999,7 @@ IREE::GPU::TargetAttr getCLGPUTarget(MLIRContext *context) {
 }
 
 IREE::GPU::TargetAttr getGPUTargetAttr(DictionaryAttr attr) {
-  return attr.getAs<IREE::GPU::TargetAttr>(kGPUTargetAttrName);
+  return dyn_cast_or_null<IREE::GPU::TargetAttr>(getConfigTargetInfo(attr));
 }
 
 IREE::GPU::TargetAttr getGPUTargetAttr(MLIRContext *context,
@@ -1021,8 +1021,7 @@ IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op) {
 void addConfigGPUTarget(MLIRContext *context,
                         IREE::GPU::TargetAttr gpuTargetAttr,
                         SmallVectorImpl<NamedAttribute> &config) {
-  config.emplace_back(StringAttr::get(context, kGPUTargetAttrName),
-                      gpuTargetAttr);
+  addConfigTargetInfo(context, gpuTargetAttr, config);
 }
 
 IntegerAttr getConfigWavesPerEuAttr(DictionaryAttr targetConfig) {
@@ -1030,7 +1029,10 @@ IntegerAttr getConfigWavesPerEuAttr(DictionaryAttr targetConfig) {
 }
 std::optional<int64_t> getConfigWavesPerEu(DictionaryAttr targetConfig) {
   auto attr = getConfigWavesPerEuAttr(targetConfig);
-  return attr ? std::optional<int64_t>(attr.getInt()) : std::nullopt;
+  if (attr) {
+    return attr.getInt();
+  }
+  return std::nullopt;
 }
 void addConfigWavesPerEu(MLIRContext *context, int64_t wavesPerEu,
                          SmallVectorImpl<NamedAttribute> &config) {

@@ -12,9 +12,8 @@
 
 #define DEBUG_TYPE "iree-llvmcpu-utils"
 
-static const char kMaxStackAllocationSizeAttrName[] =
-    "max_stack_allocation_size";
-static const char kNativeVectorSizeAttrName[] = "native_vector_size";
+constexpr char kMaxStackAllocationSizeAttrName[] = "max_stack_allocation_size";
+constexpr char kNativeVectorSizeAttrName[] = "native_vector_size";
 
 namespace mlir::iree_compiler {
 
@@ -26,7 +25,10 @@ static llvm::cl::opt<int32_t> clMaxAllowedNumberOfNativeVectors(
 std::optional<int64_t>
 getConfigMaxStackAllocationSize(DictionaryAttr targetConfig) {
   auto attr = targetConfig.getAs<IntegerAttr>(kMaxStackAllocationSizeAttrName);
-  return attr ? std::optional<int64_t>(attr.getInt()) : std::nullopt;
+  if (attr) {
+    return attr.getInt();
+  }
+  return std::nullopt;
 }
 void addConfigMaxStackAllocationSize(MLIRContext *context,
                                      int64_t maxStackAllocationSize,
@@ -38,7 +40,10 @@ void addConfigMaxStackAllocationSize(MLIRContext *context,
 
 std::optional<int64_t> getConfigNativeVectorSize(DictionaryAttr targetConfig) {
   auto attr = targetConfig.getAs<IntegerAttr>(kNativeVectorSizeAttrName);
-  return attr ? std::optional<int64_t>(attr.getInt()) : std::nullopt;
+  if (attr) {
+    return attr.getInt();
+  }
+  return std::nullopt;
 }
 void addConfigNativeVectorSize(MLIRContext *context, int64_t nativeVectorSize,
                                SmallVectorImpl<NamedAttribute> &config) {

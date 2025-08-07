@@ -946,7 +946,8 @@ static std::string getDataLayoutString(ModuleOp module) {
   if (!targetAttr) {
     return "";
   }
-  auto stringAttr = getConfigDataLayout(targetAttr.getConfiguration());
+  std::optional<StringRef> stringAttr =
+      getConfigDataLayout(targetAttr.getConfiguration());
   return stringAttr ? stringAttr.value().str() : std::string("");
 }
 
@@ -955,7 +956,8 @@ static std::string getTargetTripleString(ModuleOp module) {
   if (!targetAttr) {
     return "";
   }
-  auto stringAttr = getConfigTargetTriple(targetAttr.getConfiguration());
+  std::optional<StringRef> stringAttr =
+      getConfigTargetTriple(targetAttr.getConfiguration());
   return stringAttr ? stringAttr.value().str() : std::string("");
 }
 

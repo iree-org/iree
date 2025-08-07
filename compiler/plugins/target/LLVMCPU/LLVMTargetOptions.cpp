@@ -7,7 +7,7 @@
 #include "compiler/plugins/target/LLVMCPU/LLVMTargetOptions.h"
 
 #include "compiler/plugins/target/LLVMCPU/ResolveCPUAndCPUFeatures.h"
-#include "compiler/src/iree/compiler/Codegen/LLVMCPU/Utils.h"
+#include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
@@ -266,17 +266,9 @@ LLVMTarget::loadFromConfigAttr(Location loc, DictionaryAttr config,
     target.copy(defaultTarget);
   }
 
-  if (std::optional<StringRef> configDataLayout = getConfigDataLayout(config)) {
-    target.dataLayout = configDataLayout.value();
-  } else {
-    target.dataLayout = DEFAULT_DATA_LAYOUT;
-  }
-  if (std::optional<int64_t> configNativeVectorSize =
-          getConfigNativeVectorSize(config)) {
-    target.vectorWidthInBytes = configNativeVectorSize.value();
-  } else {
-    target.vectorWidthInBytes = DEFAULT_VECTOR_WIDTH_IN_BYTES;
-  }
+  target.dataLayout = getConfigDataLayout(config).value_or(DEFAULT_DATA_LAYOUT);
+  target.vectorWidthInBytes =
+      getConfigNativeVectorSize(config).value_or(DEFAULT_VECTOR_WIDTH_IN_BYTES);
 
   target.debugSymbols = getBool("debug_symbols", DEFAULT_DEBUG_SYMBOLS);
   target.linkStatic = getBool("link_static", DEFAULT_LINK_STATIC);

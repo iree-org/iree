@@ -42,9 +42,10 @@
 
 #define DEBUG_TYPE "iree-codegen-utils"
 
-static const char kCpuFeaturesAttrName[] = "cpu_features";
-static const char kDataLayoutAttrName[] = "data_layout";
-static const char kTargetTripleAttrName[] = "target_triple";
+constexpr char kCpuFeaturesAttrName[] = "cpu_features";
+constexpr char kDataLayoutAttrName[] = "data_layout";
+constexpr char kTargetInfoAttrName[] = "iree_codegen.target_info";
+constexpr char kTargetTripleAttrName[] = "target_triple";
 
 namespace mlir::iree_compiler {
 
@@ -73,7 +74,10 @@ bool isEntryPoint(mlir::FunctionOpInterface func) {
 
 std::optional<StringRef> getConfigCpuFeatures(DictionaryAttr targetConfig) {
   auto attr = targetConfig.getAs<StringAttr>(kCpuFeaturesAttrName);
-  return attr ? std::optional<StringRef>(attr.getValue()) : std::nullopt;
+  if (attr) {
+    return attr.getValue();
+  }
+  return std::nullopt;
 }
 void addConfigCpuFeatures(MLIRContext *context, StringRef cpuFeaturesStr,
                           SmallVectorImpl<NamedAttribute> &config) {
@@ -83,7 +87,10 @@ void addConfigCpuFeatures(MLIRContext *context, StringRef cpuFeaturesStr,
 
 std::optional<StringRef> getConfigDataLayout(DictionaryAttr targetConfig) {
   auto attr = targetConfig.getAs<StringAttr>(kDataLayoutAttrName);
-  return attr ? std::optional<StringRef>(attr.getValue()) : std::nullopt;
+  if (attr) {
+    return attr.getValue();
+  }
+  return std::nullopt;
 }
 void addConfigDataLayout(MLIRContext *context, StringRef dataLayoutStr,
                          SmallVectorImpl<NamedAttribute> &config) {
@@ -91,9 +98,24 @@ void addConfigDataLayout(MLIRContext *context, StringRef dataLayoutStr,
                       StringAttr::get(context, dataLayoutStr));
 }
 
+IREE::Codegen::TargetInfoAttrInterface
+getConfigTargetInfo(DictionaryAttr targetConfig) {
+  return targetConfig.getAs<IREE::Codegen::TargetInfoAttrInterface>(
+      kTargetInfoAttrName);
+}
+void addConfigTargetInfo(MLIRContext *context,
+                         IREE::Codegen::TargetInfoAttrInterface targetAttr,
+                         SmallVectorImpl<NamedAttribute> &config) {
+  config.emplace_back(StringAttr::get(context, kTargetInfoAttrName),
+                      targetAttr);
+}
+
 std::optional<StringRef> getConfigTargetTriple(DictionaryAttr targetConfig) {
   auto attr = targetConfig.getAs<StringAttr>(kTargetTripleAttrName);
-  return attr ? std::optional<StringRef>(attr.getValue()) : std::nullopt;
+  if (attr) {
+    return attr.getValue();
+  }
+  return std::nullopt;
 }
 void addConfigTargetTriple(MLIRContext *context, StringRef targetTripleStr,
                            SmallVectorImpl<NamedAttribute> &config) {
@@ -247,17 +269,22 @@ bool isRISCV64(DictionaryAttr targetConfig) {
   return triple && triple.value().isRISCV64();
 }
 
-std::array<int64_t, 3> getMaxWorkgroupCount(Attribute targetAttr) {
+std::array<int64_t, 3> getMaxWorkgroupCount(DictionaryAttr targetConfig) {
   // TODO(MaheshRavishankar): For now the target info is only available for
   // GPUs, and is recorded in the configuration with the name `iree.gpu.target`.
   // Fix this to be `iree.codegen.target`.
-  std::optional<IREE::Codegen::TargetInfoAttrInterface> targetInfo =
-      getConfigTypedAttr<IREE::Codegen::TargetInfoAttrInterface>(
-          targetAttr, "iree.gpu.target");
+  IREE::Codegen::TargetInfoAttrInterface targetInfo =
+      getConfigTargetInfo(targetConfig);
   if (!targetInfo) {
     return {ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
   }
-  return targetInfo->getMaximumWorkgroupCount();
+  return targetInfo.getMaximumWorkgroupCount();
+}
+std::array<int64_t, 3> getMaxWorkgroupCount(Operation *op) {
+  if (auto target = IREE::HAL::ExecutableTargetAttr::lookup(op)) {
+    return getMaxWorkgroupCount(target.getConfiguration());
+  }
+  return {ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
 }
 
 bool isReadOnly(Value v) {
