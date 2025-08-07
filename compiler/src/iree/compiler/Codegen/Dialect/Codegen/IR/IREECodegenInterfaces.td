@@ -552,4 +552,30 @@ def IREECodegen_UKernelProviderInterface :
   ];
 }
 
+def IREECodegen_TargetInfoAttrInterface :
+    AttrInterface<"TargetInfoAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
+  let description = [{
+    An interface that allows extracting target specific information from target
+    attributes.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Get the maximum workgroup count allowed on the target, returned as [x, y, z].
+
+        If there is no limit, then it is expected to return ShapedType::kDynamic.
+      }],
+      /*retTy=*/"std::array<int64_t, 3>",
+      /*methodName=*/"getMaximumWorkgroupCount",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return {ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
+      }]
+    >
+  ];
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_IREECODEGENINTERFACES

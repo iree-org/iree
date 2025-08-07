@@ -67,70 +67,41 @@ bool isEntryPoint(mlir::FunctionOpInterface func) {
   return func.isPublic() && getEntryPoint(func);
 }
 
-std::optional<StringAttr> getConfigStringAttr(Attribute srcAttr,
-                                              StringRef stringAttr) {
-  if (!srcAttr) {
+template <typename AttrType>
+std::optional<AttrType> getConfigTypedAttr(Attribute attr, StringRef attrName) {
+  if (!attr) {
     return std::nullopt;
   }
-  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(srcAttr);
+  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(attr);
   DictionaryAttr config;
   if (targetAttr) {
     config = targetAttr.getConfiguration();
   } else {
-    config = dyn_cast<DictionaryAttr>(srcAttr);
+    config = dyn_cast<DictionaryAttr>(attr);
   }
   if (!config) {
     return std::nullopt;
   }
-  auto attr = config.getAs<StringAttr>(stringAttr);
-  if (!attr) {
+  auto configAttr = config.getAs<AttrType>(attrName);
+  if (!configAttr) {
     return std::nullopt;
   }
-  return attr;
+  return configAttr;
+}
+
+std::optional<StringAttr> getConfigStringAttr(Attribute srcAttr,
+                                              StringRef stringAttr) {
+  return getConfigTypedAttr<StringAttr>(srcAttr, stringAttr);
 }
 
 std::optional<IntegerAttr> getConfigIntegerAttr(Attribute srcAttr,
                                                 StringRef integerAttr) {
-  if (!srcAttr) {
-    return std::nullopt;
-  }
-  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(srcAttr);
-  DictionaryAttr config;
-  if (targetAttr) {
-    config = targetAttr.getConfiguration();
-  } else {
-    config = dyn_cast<DictionaryAttr>(srcAttr);
-  }
-  if (!config) {
-    return std::nullopt;
-  }
-  auto attr = config.getAs<IntegerAttr>(integerAttr);
-  if (!attr) {
-    return std::nullopt;
-  }
-  return attr;
+  return getConfigTypedAttr<IntegerAttr>(srcAttr, integerAttr);
 }
 
 std::optional<BoolAttr> getConfigBoolAttr(Attribute srcAttr,
                                           StringRef boolAttr) {
-  if (!srcAttr) {
-    return std::nullopt;
-  }
-  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(srcAttr);
-  DictionaryAttr config;
-  if (targetAttr) {
-    config = targetAttr.getConfiguration();
-  } else {
-    config = dyn_cast<DictionaryAttr>(srcAttr);
-  }
-  if (!config) {
-    return std::nullopt;
-  }
-  auto attr = config.getAs<BoolAttr>(boolAttr);
-  if (!attr) {
-    return std::nullopt;
-  }
-  return attr;
+  return getConfigTypedAttr<BoolAttr>(srcAttr, boolAttr);
 }
 
 std::optional<llvm::Triple> getTargetTriple(Attribute attr) {
@@ -291,6 +262,19 @@ bool isRISCV32(Attribute attr) {
 bool isRISCV64(Attribute attr) {
   std::optional<llvm::Triple> triple = getTargetTriple(attr);
   return triple && triple.value().isRISCV64();
+}
+
+std::array<int64_t, 3> getMaxWorkgroupCount(Attribute targetAttr) {
+  // TODO(MaheshRavishankar): For now the target info is only available for
+  // GPUs, and is recorded in the configuration with the name `iree.gpu.target`.
+  // Fix this to be `iree.codegen.target`.
+  std::optional<IREE::Codegen::TargetInfoAttrInterface> targetInfo =
+      getConfigTypedAttr<IREE::Codegen::TargetInfoAttrInterface>(
+          targetAttr, "iree.gpu.target");
+  if (!targetInfo) {
+    return {ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
+  }
+  return targetInfo->getMaximumWorkgroupCount();
 }
 
 bool isReadOnly(Value v) {
