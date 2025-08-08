@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/InterleavedRange.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -222,70 +223,72 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
   if (auto paddedLinalgOp =
           dyn_cast<linalg::LinalgOp>(paddedOp.getOperation())) {
     Block *block = paddedLinalgOp.getBlock();
-    Operation *yield = block->getTerminator();
-    if (yield->getNumOperands() != 1) {
-      paddedOp.emitWarning("expected a single yield operand");
-      return failure();
-    }
-    Value yielded = yield->getOperand(0);
-    Operation *reduction = yielded.getDefiningOp();
-    if (!reduction) {
-      paddedOp.emitWarning("expected a reduction operation before yield");
-      return failure();
-    }
-    std::optional<TypedAttr> reductionIdentity =
-        arith::getNeutralElement(reduction);
-    if (!reductionIdentity.has_value()) {
-      paddedOp.emitWarning("failed to get neutral element for reduction");
-      return failure();
+
+    SmallVector<Operation *> reductions;
+    for (auto [index, initOpOperand] :
+         llvm::enumerate(paddedLinalgOp.getDpsInitsMutable())) {
+      SmallVector<Operation *> combinerOps;
+      matchReduction(paddedLinalgOp.getRegionOutputArgs(), index, combinerOps);
+      reductions.insert(reductions.begin(), combinerOps.begin(),
+                        combinerOps.end());
     }
 
-    // Get the sizes of the reduction dimensions before padding:
-    rewriter.setInsertionPoint(paddedOp.getOperation());
-    SmallVector<std::pair<unsigned, Value>> reductionDimSizes;
-    assert(succeeded(reductionDimInfo) && "obtained with confirmation earlier");
-    for (auto &&dimInfo : reductionDimInfo.value()) {
-      Value redDimSize = rewriter.create<tensor::DimOp>(
-          paddedOp.getLoc(), dimInfo.operand, dimInfo.operandDim);
-      reductionDimSizes.push_back({dimInfo.loopIndex, redDimSize});
-    }
+    for (Operation *reduction : reductions) {
+      std::optional<TypedAttr> reductionIdentity =
+          arith::getNeutralElement(reduction);
+      if (!reductionIdentity.has_value()) {
+        paddedOp.emitWarning("failed to get neutral element for reduction");
+        return failure();
+      }
 
-    // Add a check within the block to see if the current iteration over the
-    // loops is inside or outside the padded part of the iteration space.
-    rewriter.setInsertionPoint(reduction);
-    SmallVector<Value> conds;
-    for (auto &&[redDim, redDimSize] : reductionDimSizes) {
-      Value redDimIndex =
-          linalg::IndexOp::create(rewriter, paddedOp.getLoc(), redDim);
-      Value cond = arith::CmpIOp::create(rewriter, paddedOp.getLoc(),
-                                         arith::CmpIPredicate::ult, redDimIndex,
-                                         redDimSize);
-      conds.push_back(cond);
-    }
-    Value reductionIdentityValue = rewriter.create<arith::ConstantOp>(
-        paddedOp.getLoc(), reductionIdentity.value());
-    assert(conds.size() > 0);
-    Value cond = conds[0];
-    for (Value nxtCond : llvm::drop_begin(conds, 1)) {
-      cond = rewriter.create<arith::AndIOp>(paddedOp.getLoc(), cond, nxtCond);
-    }
+      // Get the sizes of the reduction dimensions before padding:
+      rewriter.setInsertionPoint(paddedOp.getOperation());
+      SmallVector<std::pair<unsigned, Value>> reductionDimSizes;
+      assert(succeeded(reductionDimInfo) &&
+             "obtained with confirmation earlier");
+      for (auto &&dimInfo : reductionDimInfo.value()) {
+        Value redDimSize = rewriter.create<tensor::DimOp>(
+            paddedOp.getLoc(), dimInfo.operand, dimInfo.operandDim);
+        reductionDimSizes.push_back({dimInfo.loopIndex, redDimSize});
+      }
 
-    // Find the reduction op operand that is reduced with the carried output.
-    if (reduction->getNumOperands() != 2) {
-      paddedOp.emitWarning("expected a reduction operation with 2 operands");
-      return failure();
-    }
-    Value carry = block->getArguments().back();
-    unsigned uncarryIndex = reduction->getOperand(0) == carry ? 1 : 0;
-    Value uncarried = reduction->getOperand(uncarryIndex);
+      // Add a check within the block to see if the current iteration over the
+      // loops is inside or outside the padded part of the iteration space.
+      rewriter.setInsertionPoint(reduction);
+      SmallVector<Value> conds;
+      for (auto &&[redDim, redDimSize] : reductionDimSizes) {
+        Value redDimIndex =
+            linalg::IndexOp::create(rewriter, paddedOp.getLoc(), redDim);
+        Value cond = arith::CmpIOp::create(rewriter, paddedOp.getLoc(),
+                                           arith::CmpIPredicate::ult,
+                                           redDimIndex, redDimSize);
+        conds.push_back(cond);
+      }
+      Value reductionIdentityValue = rewriter.create<arith::ConstantOp>(
+          paddedOp.getLoc(), reductionIdentity.value());
+      assert(conds.size() > 0);
+      Value cond = conds[0];
+      for (Value nxtCond : llvm::drop_begin(conds, 1)) {
+        cond = rewriter.create<arith::AndIOp>(paddedOp.getLoc(), cond, nxtCond);
+      }
 
-    // Select the reduction identity value if in the padding region.
-    Value selected = arith::SelectOp::create(rewriter, paddedOp.getLoc(), cond,
-                                             uncarried, reductionIdentityValue);
-    IRMapping mapping;
-    mapping.map(reduction->getOperand(uncarryIndex), selected);
-    Operation *redClone = rewriter.clone(*reduction, mapping);
-    rewriter.replaceOp(reduction, redClone);
+      // Find the reduction op operand that is reduced with the carried output.
+      if (reduction->getNumOperands() != 2) {
+        paddedOp.emitWarning("expected a reduction operation with 2 operands");
+        return failure();
+      }
+      Value carry = block->getArguments().back();
+      unsigned uncarryIndex = reduction->getOperand(0) == carry ? 1 : 0;
+      Value uncarried = reduction->getOperand(uncarryIndex);
+
+      // Select the reduction identity value if in the padding region.
+      Value selected = arith::SelectOp::create(
+          rewriter, paddedOp.getLoc(), cond, uncarried, reductionIdentityValue);
+      IRMapping mapping;
+      mapping.map(reduction->getOperand(uncarryIndex), selected);
+      Operation *redClone = rewriter.clone(*reduction, mapping);
+      rewriter.replaceOp(reduction, redClone);
+    }
   }
 
   // 5. For each PadOp, create a linalg::CopyOp to allow dim propagations.

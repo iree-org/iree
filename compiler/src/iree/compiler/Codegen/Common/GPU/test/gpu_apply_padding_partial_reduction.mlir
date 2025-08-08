@@ -114,6 +114,7 @@ func.func @min_reduction(%arg0: tensor<1x?xf32>, %arg1: tensor<1xf32>) -> tensor
 
 // -----
 
+
 // This reduction corresponds to a standard inner product.
 
 // CHECK-LABEL: standard_inner_product
@@ -245,4 +246,30 @@ func.func @multi_dim_reduction(%arg0 : tensor<?x?xf16>, %arg1 : tensor<?x?xf16>,
       linalg.yield %2 : f16
     } -> tensor<f16>
   return %0 : tensor<f16>
+}
+
+// -----
+
+
+// Multiple reductions in parallel in a linalg.generic op.
+
+// CHECK-LABEL: minmax_reduction
+//   CHECK-DAG: %[[NAN0:.+]] = arith.constant 0xFFC00000 : f32
+//   CHECK-DAG: %[[NAN1:.+]] = arith.constant 0x7FC00000 : f32
+//   CHECK-DAG: %[[SELECT0:.+]] = arith.select {{.*}} %[[NAN0]] : f32
+//   CHECK-DAG: %[[SELECT0:.+]] = arith.select {{.*}} %[[NAN1]] : f32
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+func.func @minmax_reduction(%arg0: tensor<1x?xf32>, %arg1: tensor<1xf32>, %arg2 : tensor<1xf32>) -> (tensor<1xf32>, tensor<1xf32>) {
+  %0:2 = linalg.generic {indexing_maps = [#map, #map1, #map1],
+                       iterator_types = ["parallel", "reduction"]}
+                       ins(%arg0 : tensor<1x?xf32>) outs(%arg1, %arg2 : tensor<1xf32>, tensor<1xf32>)
+   attrs =  {lowering_config = #iree_gpu.lowering_config<{partial_reduction = [0, 4096]}>}
+   {
+   ^bb0(%in: f32, %out0: f32, %out1 : f32):
+     %1 = arith.minnumf %in, %out0 : f32
+     %2 = arith.maxnumf %in, %out1 : f32
+     linalg.yield %1, %2 : f32, f32
+   } -> (tensor<1xf32>, tensor<1xf32>)
+  return %0#0, %0#1: tensor<1xf32>, tensor<1xf32>
 }
