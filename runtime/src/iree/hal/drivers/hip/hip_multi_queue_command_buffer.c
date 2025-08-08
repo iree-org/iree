@@ -306,30 +306,15 @@ static iree_status_t iree_hal_hip_multi_queue_command_buffer_collective(
 static iree_status_t iree_hal_hip_multi_queue_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
-    const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
+    const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   iree_hal_hip_multi_queue_command_buffer_t* command_buffer =
       iree_hal_hip_multi_queue_command_buffer_cast(base_command_buffer);
   iree_status_t status = iree_ok_status();
-  CALL_COMMAND(status, iree_hal_command_buffer_dispatch(
-                           command_buffer->child_buffers[command_buffer_index],
-                           executable, entry_point, workgroup_count, constants,
-                           bindings, flags));
-  return status;
-}
-
-static iree_status_t iree_hal_hip_multi_queue_command_buffer_dispatch_indirect(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
-    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
-  iree_hal_hip_multi_queue_command_buffer_t* command_buffer =
-      iree_hal_hip_multi_queue_command_buffer_cast(base_command_buffer);
-  iree_status_t status = iree_ok_status();
-  CALL_COMMAND(status, iree_hal_command_buffer_dispatch_indirect(
-                           command_buffer->child_buffers[command_buffer_index],
-                           executable, entry_point, workgroups_ref, constants,
-                           bindings, flags));
+  CALL_COMMAND(
+      status, iree_hal_command_buffer_dispatch(
+                  command_buffer->child_buffers[command_buffer_index],
+                  executable, entry_point, config, constants, bindings, flags));
   return status;
 }
 
@@ -349,8 +334,6 @@ static const iree_hal_command_buffer_vtable_t
         .copy_buffer = iree_hal_hip_multi_queue_command_buffer_copy_buffer,
         .collective = iree_hal_hip_multi_queue_command_buffer_collective,
         .dispatch = iree_hal_hip_multi_queue_command_buffer_dispatch,
-        .dispatch_indirect =
-            iree_hal_hip_multi_queue_command_buffer_dispatch_indirect,
 };
 
 #undef CALL_COMMAND

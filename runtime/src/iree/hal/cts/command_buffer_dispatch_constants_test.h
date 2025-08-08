@@ -95,10 +95,10 @@ TEST_F(CommandBufferDispatchConstantsTest, DispatchWithDispatchConstants) {
   iree_const_byte_span_t constants = iree_make_const_byte_span(
       constant_data.data(), constant_data.size() * sizeof(constant_data[0]));
 
-  uint32_t workgroup_count[3] = {1, 1, 1};
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable_, /*entry_point=*/0, workgroup_count,
-      constants, bindings, IREE_HAL_DISPATCH_FLAG_NONE));
+      command_buffer, executable_, /*entry_point=*/0,
+      iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
+      IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(
       command_buffer,
       /*source_stage_mask=*/IREE_HAL_EXECUTION_STAGE_DISPATCH |

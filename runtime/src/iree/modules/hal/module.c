@@ -1052,6 +1052,7 @@ typedef struct {
   iree_vm_size_t binding_count;
   const iree_vm_abi_iirII_t* bindings;
 } iree_hal_module_command_buffer_dispatch_args_t;
+// TODO(benvanik): rework to support new iree_hal_dispatch_config_t.
 static iree_status_t iree_hal_module_command_buffer_dispatch(
     iree_vm_stack_t* IREE_RESTRICT stack, void* IREE_RESTRICT module,
     iree_hal_module_state_t* IREE_RESTRICT state,
@@ -1086,8 +1087,11 @@ static iree_status_t iree_hal_module_command_buffer_dispatch(
     binding->length = iree_hal_cast_device_size(args->bindings[i].i4);
   }
 
+  iree_hal_dispatch_config_t config = iree_hal_make_static_dispatch_config(
+      args->workgroup_count[0], args->workgroup_count[1],
+      args->workgroup_count[2]);
   return iree_hal_command_buffer_dispatch(
-      command_buffer, executable, args->entry_point, args->workgroup_count,
+      command_buffer, executable, args->entry_point, config,
       iree_make_const_byte_span(args->constants,
                                 args->constant_count * sizeof(uint32_t)),
       bindings, (iree_hal_dispatch_flags_t)args->flags);
@@ -1153,6 +1157,7 @@ typedef struct {
   iree_vm_size_t binding_count;
   const iree_vm_abi_iirII_t* bindings;
 } iree_hal_module_command_buffer_dispatch_indirect_args_t;
+// TODO(benvanik): rework to support new iree_hal_dispatch_config_t.
 static iree_status_t iree_hal_module_command_buffer_dispatch_indirect(
     iree_vm_stack_t* IREE_RESTRICT stack, void* IREE_RESTRICT module,
     iree_hal_module_state_t* IREE_RESTRICT state,
@@ -1164,11 +1169,11 @@ static iree_status_t iree_hal_module_command_buffer_dispatch_indirect(
   iree_hal_executable_t* executable = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_executable_check_deref(args->executable, &executable));
-  iree_hal_buffer_ref_t workgroups_ref = iree_hal_make_indirect_buffer_ref(
+  iree_hal_buffer_ref_t workgroup_count_ref = iree_hal_make_indirect_buffer_ref(
       args->workgroups_buffer_slot,
       iree_hal_cast_device_size(args->workgroups_offset), 3 * sizeof(uint32_t));
   IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref_or_null(
-      args->workgroups_buffer, &workgroups_ref.buffer));
+      args->workgroups_buffer, &workgroup_count_ref.buffer));
 
   if (IREE_UNLIKELY(args->binding_count >
                     IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT)) {
@@ -1192,11 +1197,21 @@ static iree_status_t iree_hal_module_command_buffer_dispatch_indirect(
     binding->length = iree_hal_cast_device_size(args->bindings[i].i4);
   }
 
-  return iree_hal_command_buffer_dispatch_indirect(
-      command_buffer, executable, args->entry_point, workgroups_ref,
+  iree_hal_dispatch_config_t config = {
+      .workgroup_count_ref = workgroup_count_ref,
+  };
+
+  iree_hal_dispatch_flags_t flags = (iree_hal_dispatch_flags_t)args->flags;
+  if (!iree_any_bit_set(flags,
+                        IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_PARAMETERS)) {
+    flags |= IREE_HAL_DISPATCH_FLAG_DYNAMIC_INDIRECT_PARAMETERS;
+  }
+
+  return iree_hal_command_buffer_dispatch(
+      command_buffer, executable, args->entry_point, config,
       iree_make_const_byte_span(args->constants,
                                 args->constant_count * sizeof(uint32_t)),
-      bindings, (iree_hal_dispatch_flags_t)args->flags);
+      bindings, flags);
 }
 static iree_status_t iree_hal_module_command_buffer_dispatch_indirect_shim(
     iree_vm_stack_t* IREE_RESTRICT stack, iree_vm_native_function_flags_t flags,

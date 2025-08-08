@@ -519,12 +519,17 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_collective(
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
-    const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
-    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
+    const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
+    const iree_hal_buffer_ref_list_t bindings,
+    iree_hal_dispatch_flags_t flags) {
   IREE_ASSERT_ARGUMENT(command_buffer);
   IREE_ASSERT_ARGUMENT(executable);
 
-  if ((workgroup_count[0] | workgroup_count[1] | workgroup_count[2]) == 0) {
+  const bool has_static_workgroup_count =
+      !iree_hal_dispatch_uses_indirect_parameters(flags);
+  if (has_static_workgroup_count &&
+      (config.workgroup_count[0] | config.workgroup_count[1] |
+       config.workgroup_count[2]) == 0) {
     // No-op dispatch. All implementations are expected to do this but we ensure
     // it happens here to avoid the overhead of going all the way down into the
     // device layer for something we know should have no (intentional)
@@ -543,11 +548,16 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
   // slice off a much larger allocation and then suballocate from that ourselves
   // so that we could avoid the tracy_malloc overheads per-dispatch.
   IREE_TRACE({
-    char xyz_string[32];
-    int xyz_string_length =
-        snprintf(xyz_string, IREE_ARRAYSIZE(xyz_string), "%ux%ux%u",
-                 workgroup_count[0], workgroup_count[1], workgroup_count[2]);
-    IREE_TRACE_ZONE_APPEND_TEXT(z0, xyz_string, xyz_string_length);
+    if (has_static_workgroup_count) {
+      char xyz_string[32];
+      int xyz_string_length =
+          snprintf(xyz_string, IREE_ARRAYSIZE(xyz_string), "%ux%ux%u",
+                   config.workgroup_count[0], config.workgroup_count[1],
+                   config.workgroup_count[2]);
+      IREE_TRACE_ZONE_APPEND_TEXT(z0, xyz_string, xyz_string_length);
+    } else {
+      IREE_TRACE_ZONE_APPEND_TEXT(z0, "(indirect)");
+    }
   });
 #endif  // IREE_HAL_VERBOSE_TRACING_ENABLE
 
@@ -555,34 +565,13 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_command_buffer_dispatch_validation(
                 command_buffer, VALIDATION_STATE(command_buffer), executable,
-                entry_point, workgroup_count, constants, bindings, flags));
+                entry_point, config, constants, bindings, flags));
   });
 
   iree_status_t status = _VTABLE_DISPATCH(command_buffer, dispatch)(
-      command_buffer, executable, entry_point, workgroup_count, constants,
-      bindings, flags);
+      command_buffer, executable, entry_point, config, constants, bindings,
+      flags);
 
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
-IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch_indirect(
-    iree_hal_command_buffer_t* command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
-    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
-  IREE_ASSERT_ARGUMENT(command_buffer);
-  IREE_ASSERT_ARGUMENT(executable);
-  IREE_TRACE_ZONE_BEGIN(z0);
-  IF_VALIDATING(command_buffer, {
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_hal_command_buffer_dispatch_indirect_validation(
-                command_buffer, VALIDATION_STATE(command_buffer), executable,
-                entry_point, workgroups_ref, constants, bindings, flags));
-  });
-  iree_status_t status = _VTABLE_DISPATCH(command_buffer, dispatch_indirect)(
-      command_buffer, executable, entry_point, workgroups_ref, constants,
-      bindings, flags);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

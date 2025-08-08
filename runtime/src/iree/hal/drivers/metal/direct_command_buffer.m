@@ -47,7 +47,7 @@
 // Command action kind of a command segment.
 typedef enum iree_hal_metal_command_segment_action_e {
   IREE_HAL_METAL_COMMAND_SEGMENT_ACTION_BARRIER,      // Execution/memory barrier command
-  IREE_HAL_METAL_COMMAND_SEGMENT_ACTION_DISPATCH2,    // Dispatch command
+  IREE_HAL_METAL_COMMAND_SEGMENT_ACTION_DISPATCH,     // Dispatch command
   IREE_HAL_METAL_COMMAND_SEGMENT_ACTION_FILL_BUFFER,  // Fill buffer command
   IREE_HAL_METAL_COMMAND_SEGMENT_ACTION_COPY_BUFFER,  // Copy buffer command
 } iree_hal_metal_command_segment_action_t;
@@ -72,6 +72,9 @@ typedef struct iree_hal_metal_descriptor_t {
 typedef struct iree_hal_metal_dispatch_segment_t {
   // Compute function pipeline with information required to dispatch it.
   const iree_hal_metal_pipeline_t* pipeline;
+
+  // Threadgroup size required during dispatch.
+  MTLSize threadgroup_size;
 
   // Workgroup count information--if |workgroups_buffer| is not nil, then indirect dispatch;
   // otherwise uses |workgroup_count| for direct dispatch.
@@ -837,16 +840,28 @@ static iree_status_t iree_hal_metal_command_buffer_collective(
 }
 
 // Prepares kernels and argument buffers needed for kernel dispatches.
-static iree_status_t iree_hal_metal_command_segment_create_dispatch(
+static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_executable_t* executable,
-    int32_t entry_point, iree_const_byte_span_t constants, iree_hal_buffer_ref_list_t bindings,
-    iree_hal_dispatch_flags_t flags, iree_hal_metal_dispatch_segment_t** out_segment) {
+    int32_t entry_point, const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
+    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   iree_hal_metal_command_buffer_t* command_buffer =
       iree_hal_metal_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // TODO: support custom args (should be easy) and indirect arguments (via
+  // setKernelBuffer:offset:atIndex:).
+  if (iree_hal_dispatch_uses_custom_arguments(flags)) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "direct/indirect arguments are not supported on Metal");
+  }
+
+  iree_host_size_t resource_count = 1;
+  const void* resources[2] = {executable, NULL};
+  if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
+    resources[resource_count++] = config.workgroup_count_ref.buffer;
+  }
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1, &executable));
+      z0, iree_hal_resource_set_insert(command_buffer->resource_set, resource_count, &executable));
 
   const iree_hal_metal_pipeline_t* pipeline = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -863,10 +878,14 @@ static iree_status_t iree_hal_metal_command_segment_create_dispatch(
   // Compose and push the dispatch segment.
   segment = (iree_hal_metal_command_segment_t*)storage_base;
   memset(segment, 0, sizeof(*segment));
-  segment->action = IREE_HAL_METAL_COMMAND_SEGMENT_ACTION_DISPATCH2;
+  segment->action = IREE_HAL_METAL_COMMAND_SEGMENT_ACTION_DISPATCH;
   iree_hal_metal_command_segment_list_push_back(&command_buffer->segments, segment);
 
   segment->dispatch.pipeline = pipeline;
+  segment->dispatch.threadgroup_size =
+      config.workgroup_size[0] ? MTLSizeMake(config.workgroup_size[0], config.workgroup_size[1],
+                                             config.workgroup_size[2])
+                               : pipeline->threadgroup_size;
 
   // Copy descriptors from all sets to the end of the current segment for later access.
   segment->dispatch.descriptor_count = bindings.count;
@@ -897,7 +916,15 @@ static iree_status_t iree_hal_metal_command_segment_create_dispatch(
   segment->dispatch.constants = (uint32_t*)constant_ptr;
   memcpy(constant_ptr, constants.data, constants.data_length);
 
-  *out_segment = &segment->dispatch;
+  if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
+    segment->dispatch.workgroups_buffer = iree_hal_metal_buffer_handle(
+        iree_hal_buffer_allocated_buffer(config.workgroup_count_ref.buffer));
+    segment->dispatch.workgroups_offset = config.workgroup_count_ref.offset;
+  } else {
+    segment->dispatch.workgroup_count = MTLSizeMake(
+        config.workgroup_count[0], config.workgroup_count[1], config.workgroup_count[2]);
+  }
+
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
@@ -959,48 +986,13 @@ static iree_status_t iree_hal_metal_command_segment_record_dispatch(
   if (segment->workgroups_buffer == nil) {
     // Direct dispatch of a fixed workgroup count.
     [compute_encoder dispatchThreadgroups:segment->workgroup_count
-                    threadsPerThreadgroup:segment->pipeline->threadgroup_size];
+                    threadsPerThreadgroup:segment->threadgroup_size];
   } else {
     // Indirect dispatch using a workgroup count from buffers.
     [compute_encoder dispatchThreadgroupsWithIndirectBuffer:segment->workgroups_buffer
                                        indirectBufferOffset:segment->workgroups_offset
-                                      threadsPerThreadgroup:segment->pipeline->threadgroup_size];
+                                      threadsPerThreadgroup:segment->threadgroup_size];
   }
-
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
-}
-
-static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch(
-    iree_hal_command_buffer_t* base_command_buffer, iree_hal_executable_t* executable,
-    int32_t entry_point, const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
-    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  iree_hal_metal_dispatch_segment_t* segment = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_metal_command_segment_create_dispatch(
-              base_command_buffer, executable, entry_point, constants, bindings, flags, &segment));
-  segment->workgroup_count =
-      MTLSizeMake(workgroup_count[0], workgroup_count[1], workgroup_count[2]);
-
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
-}
-
-static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch_indirect(
-    iree_hal_command_buffer_t* base_command_buffer, iree_hal_executable_t* executable,
-    int32_t entry_point, iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
-    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  iree_hal_metal_dispatch_segment_t* segment = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_metal_command_segment_create_dispatch(
-              base_command_buffer, executable, entry_point, constants, bindings, flags, &segment));
-  segment->workgroups_buffer =
-      iree_hal_metal_buffer_handle(iree_hal_buffer_allocated_buffer(workgroups_ref.buffer));
-  segment->workgroups_offset = workgroups_ref.offset;
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -1018,7 +1010,7 @@ static iree_status_t iree_hal_metal_command_segment_record(
         IREE_RETURN_AND_END_ZONE_IF_ERROR(
             z0, iree_hal_metal_command_segment_record_barrier(command_buffer, &segment->barrier));
       } break;
-      case IREE_HAL_METAL_COMMAND_SEGMENT_ACTION_DISPATCH2: {
+      case IREE_HAL_METAL_COMMAND_SEGMENT_ACTION_DISPATCH: {
         IREE_RETURN_AND_END_ZONE_IF_ERROR(
             z0, iree_hal_metal_command_segment_record_dispatch(command_buffer, &segment->dispatch));
       } break;
@@ -1078,5 +1070,4 @@ static const iree_hal_command_buffer_vtable_t iree_hal_metal_command_buffer_vtab
     .copy_buffer = iree_hal_metal_command_buffer_prepare_copy_buffer,
     .collective = iree_hal_metal_command_buffer_collective,
     .dispatch = iree_hal_metal_command_buffer_prepare_dispatch,
-    .dispatch_indirect = iree_hal_metal_command_buffer_prepare_dispatch_indirect,
 };

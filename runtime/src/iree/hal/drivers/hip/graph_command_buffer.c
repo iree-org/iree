@@ -730,10 +730,21 @@ static iree_status_t iree_hal_hip_graph_command_buffer_collective(
 static iree_status_t iree_hal_hip_graph_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
-    const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
+    const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   iree_hal_hip_graph_command_buffer_t* command_buffer =
       iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
+
+  if (iree_hal_dispatch_uses_custom_arguments(flags)) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "direct/indirect arguments are not supported in HIP graphs");
+  } else if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "indirect parameters are not supported in HIP graphs");
+  }
+
   IREE_TRACE_ZONE_BEGIN(z0);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -807,12 +818,15 @@ static iree_status_t iree_hal_hip_graph_command_buffer_dispatch(
   }
 
   hipKernelNodeParams params = {
-      .blockDim.x = kernel_params->block_dims[0],
-      .blockDim.y = kernel_params->block_dims[1],
-      .blockDim.z = kernel_params->block_dims[2],
-      .gridDim.x = workgroup_count[0],
-      .gridDim.y = workgroup_count[1],
-      .gridDim.z = workgroup_count[2],
+      .blockDim.x = config.workgroup_size[0] ? config.workgroup_size[0]
+                                             : kernel_params->block_dims[0],
+      .blockDim.y = config.workgroup_size[1] ? config.workgroup_size[1]
+                                             : kernel_params->block_dims[1],
+      .blockDim.z = config.workgroup_size[2] ? config.workgroup_size[2]
+                                             : kernel_params->block_dims[2],
+      .gridDim.x = config.workgroup_count[0],
+      .gridDim.y = config.workgroup_count[1],
+      .gridDim.z = config.workgroup_count[2],
       .func = kernel_params->function,
       .kernelParams = params_ptr,
   };
@@ -836,15 +850,6 @@ static iree_status_t iree_hal_hip_graph_command_buffer_dispatch(
       command_buffer, IREE_HAL_STREAM_TRACING_VERBOSITY_FINE);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
-}
-
-static iree_status_t iree_hal_hip_graph_command_buffer_dispatch_indirect(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
-    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "indirect dispatch not yet implemented");
 }
 
 iree_hal_stream_tracing_context_event_list_t
@@ -874,6 +879,4 @@ static const iree_hal_command_buffer_vtable_t
         .copy_buffer = iree_hal_hip_graph_command_buffer_copy_buffer,
         .collective = iree_hal_hip_graph_command_buffer_collective,
         .dispatch = iree_hal_hip_graph_command_buffer_dispatch,
-        .dispatch_indirect =
-            iree_hal_hip_graph_command_buffer_dispatch_indirect,
 };

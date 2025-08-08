@@ -318,41 +318,29 @@ static iree_status_t iree_hal_null_command_buffer_collective(
 static iree_status_t iree_hal_null_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
-    const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
+    const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   iree_hal_null_command_buffer_t* command_buffer =
       iree_hal_null_command_buffer_cast(base_command_buffer);
 
   // TODO(null): dispatch the specified executable entry point with the given
-  // workgroup count. The constants must be copied into the command buffer as
-  // they may be mutated or freed after this call returns.
-  // Note that any of the bindings may be references to binding table slots in
-  // which case they will be provided during submission to a queue.
+  // workgroup count directly or indirectly based on flags. The constants must
+  // be copied into the command buffer as they may be mutated or freed after
+  // this call returns. Note that any of the bindings may be references to
+  // binding table slots in which case they will be provided during submission
+  // to a queue.
+  //
+  // If an INDIRECT_PARAMETERS flag is set then the workgroup count is stored in
+  // the given workgroup count buffer as a uint32_t[3]. The workgroup count may
+  // change up until the barrier immediately prior to the dispatch.
+  //
+  // Arguments are are in the HAL ABI form with constants and bindings unless
+  // CUSTOM_ARGUMENTS or INDIRECT_ARGUMENTS are specified, in which case they
+  // are passed through directly either from the inlined constants provided to
+  // this call or a device visible buffer.
   (void)command_buffer;
   iree_status_t status =
       iree_make_status(IREE_STATUS_UNIMPLEMENTED, "dispatch not implemented");
-
-  return status;
-}
-
-static iree_status_t iree_hal_null_command_buffer_dispatch_indirect(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
-    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
-  iree_hal_null_command_buffer_t* command_buffer =
-      iree_hal_null_command_buffer_cast(base_command_buffer);
-
-  // TODO(null): dispatch the specified executable entry point with a workgroup
-  // count that is stored in the given workgroup count buffer as a uint32_t[3].
-  // The workgroup count may change up until immediately prior to the dispatch.
-  // The constants must be copied into the command buffer as they may be mutated
-  // or freed after this call returns. Note that any of the bindings may be
-  // references to binding table slots in which case they will be provided
-  // during submission to a queue.
-  (void)command_buffer;
-  iree_status_t status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                          "indirect dispatch not implemented");
 
   return status;
 }
@@ -374,5 +362,4 @@ static const iree_hal_command_buffer_vtable_t
         .copy_buffer = iree_hal_null_command_buffer_copy_buffer,
         .collective = iree_hal_null_command_buffer_collective,
         .dispatch = iree_hal_null_command_buffer_dispatch,
-        .dispatch_indirect = iree_hal_null_command_buffer_dispatch_indirect,
 };
