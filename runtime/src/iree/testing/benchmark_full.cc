@@ -153,6 +153,13 @@ const iree_benchmark_def_t* iree_benchmark_register(
     instance->Iterations(benchmark_def->iteration_count);
   }
 
+  // Apply range arguments if present.
+  if (benchmark_def->range_count > 0 && benchmark_def->range_args) {
+    for (iree_host_size_t i = 0; i < benchmark_def->range_count; ++i) {
+      instance->Arg(benchmark_def->range_args[i]);
+    }
+  }
+
   switch (benchmark_def->time_unit) {
     default:
     case IREE_BENCHMARK_UNIT_DEFAULT:
@@ -182,6 +189,27 @@ iree_benchmark_def_t* iree_make_function_benchmark(iree_benchmark_fn_t fn) {
   IREE_LEAK_CHECK_DISABLE_POP();
 
   def->run = fn;
+
+  // Return with no expectation of it ever being freed.
+  return def;
+}
+
+iree_benchmark_def_t* iree_make_parametric_benchmark(iree_benchmark_fn_t fn,
+                                                     int64_t arg) {
+  // Go straight to malloc for this implementation as benchmark does the same
+  // thing. This also has the benefit of hiding the startup allocation from
+  // our stats >_>
+  iree_benchmark_def_t* def = NULL;
+  int64_t* args = NULL;
+  IREE_LEAK_CHECK_DISABLE_PUSH();
+  def = (iree_benchmark_def_t*)calloc(1, sizeof(*def));
+  args = (int64_t*)calloc(1, sizeof(int64_t));
+  IREE_LEAK_CHECK_DISABLE_POP();
+
+  def->run = fn;
+  args[0] = arg;
+  def->range_args = args;
+  def->range_count = 1;
 
   // Return with no expectation of it ever being freed.
   return def;

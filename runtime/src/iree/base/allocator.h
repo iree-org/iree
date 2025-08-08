@@ -109,6 +109,14 @@ static inline void iree_memcpy_stream_dst(void* IREE_RESTRICT dst,
   memcpy(dst, src, size);
 }
 
+#if IREE_HAVE_BUILTIN(__builtin_prefetch) || defined(__GNUC__)
+#define IREE_PREFETCH_RO(ptr, hint) __builtin_prefetch((ptr), /*rw=*/0, hint)
+#define IREE_PREFETCH_RW(ptr, hint) __builtin_prefetch((ptr), /*rw=*/1, hint)
+#else
+#define IREE_PREFETCH_RO(ptr, hint)
+#define IREE_PREFETCH_RW(ptr, hint)
+#endif  // __builtin_prefetch || GCC
+
 //===----------------------------------------------------------------------===//
 // Totally shady stack allocation
 //===----------------------------------------------------------------------===//

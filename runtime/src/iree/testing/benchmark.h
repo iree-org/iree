@@ -215,7 +215,10 @@ struct iree_benchmark_def_t {
   // Optional iteration count the benchmark should run for.
   uint64_t iteration_count;  // 0 if unspecified to autodetect
 
-  // TODO(benvanik): add range arguments.
+  // Optional range arguments passed to the benchmark.
+  // These are accessible via iree_benchmark_get_range() during execution.
+  int64_t* range_args;
+  iree_host_size_t range_count;
 
   // Runs the benchmark to completion.
   // Implementations must call iree_benchmark_keep_running in a loop until it
@@ -249,6 +252,12 @@ const iree_benchmark_def_t* iree_benchmark_register(
 // TODO(benvanik): allow optionally passing flags with variadic macros.
 iree_benchmark_def_t* iree_make_function_benchmark(iree_benchmark_fn_t fn);
 
+// Allocates a parametric benchmark definition for the given function with a
+// single argument value. The returned pointer is safe to store in a static
+// variable.
+iree_benchmark_def_t* iree_make_parametric_benchmark(iree_benchmark_fn_t fn,
+                                                     int64_t arg);
+
 // TODO(benvanik): find a way to make this C-compatible.
 // Today this requires C++ in order to initialize the benchmark via the function
 // and C disallows this. We can probably use some tricky attributes to run
@@ -268,6 +277,24 @@ iree_benchmark_def_t* iree_make_function_benchmark(iree_benchmark_fn_t fn);
   static const iree_benchmark_def_t* IREE_BENCHMARK_IMPL_NAME_(name)          \
       IREE_ATTRIBUTE_UNUSED = (iree_benchmark_def_t*)iree_benchmark_register( \
           iree_make_cstring_view(#name), iree_make_function_benchmark(name))
+
+// Defines a parametric benchmark of a function with default parameters.
+//
+// Example:
+//  IREE_BENCHMARK_FN(my_benchmark) {
+//    int64_t count = iree_benchmark_get_range(benchmark_state, 0);
+//    while (iree_benchmark_keep_running(benchmark_state, count)) {
+//      // process 'count' elements
+//    }
+//    return iree_ok_status();
+//  }
+//  IREE_BENCHMARK_REGISTER_ARGS(my_benchmark, 10);
+//  IREE_BENCHMARK_REGISTER_ARGS(my_benchmark, 100);
+#define IREE_BENCHMARK_REGISTER_ARGS(name, arg_value)                         \
+  static const iree_benchmark_def_t* IREE_BENCHMARK_IMPL_NAME_(name)          \
+      IREE_ATTRIBUTE_UNUSED = (iree_benchmark_def_t*)iree_benchmark_register( \
+          iree_make_cstring_view(#name),                                      \
+          iree_make_parametric_benchmark(name, arg_value))
 
 //===----------------------------------------------------------------------===//
 // Benchmark infra management
