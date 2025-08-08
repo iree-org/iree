@@ -62,7 +62,8 @@ void static removeUnitExtentDimsfromMaps(linalg::LinalgOp linalgOp,
   AffineMap inputMap = indexingMaps[0];
   AffineMap filterMap = indexingMaps[1];
 
-  // Check that all filter loop dimensions are unit.
+  // Check that all filter loop dimensions are unit and then make them zero.
+  DenseMap<AffineExpr, AffineExpr> dimMap;
   Value filter = linalgOp.getDpsInputs()[1];
   auto filterType = llvm::cast<ShapedType>(filter.getType());
   ArrayRef<int64_t> filterShape = filterType.getShape();
@@ -72,25 +73,11 @@ void static removeUnitExtentDimsfromMaps(linalg::LinalgOp linalgOp,
     if (!maybeDim || filterShape[maybeDim.value()] != 1) {
       return;
     }
+    dimMap[rewriter.getAffineDimExpr(filterLoop)] =
+        getAffineConstantExpr(0, filterMap.getContext());
   }
-  // Remove the unit filter loop dims form input map.
   SmallVector<AffineMap> newIndexingMaps;
-  SmallVector<AffineExpr> newExprs;
-  for (AffineExpr expr : inputMap.getResults()) {
-    AffineExpr newExpr = expr;
-    if (auto binaryExpr = llvm::dyn_cast<AffineBinaryOpExpr>(expr)) {
-      for (auto filterLoop : convDims.filterLoop) {
-        if (binaryExpr.getLHS().isFunctionOfDim(filterLoop)) {
-          newExpr = binaryExpr.getRHS();
-        } else if (binaryExpr.getRHS().isFunctionOfDim(filterLoop)) {
-          newExpr = binaryExpr.getLHS();
-        }
-      }
-    }
-    newExprs.push_back(newExpr);
-  }
-  newIndexingMaps.push_back(AffineMap::get(inputMap.getNumDims(), 0, newExprs,
-                                           rewriter.getContext()));
+  newIndexingMaps.push_back(inputMap.replace(dimMap));
   // No changes to the filter and output map.
   newIndexingMaps.push_back(filterMap);
   newIndexingMaps.push_back(indexingMaps[2]);
@@ -157,6 +144,11 @@ void GPUTileAndConvertConvToMatmulPass::runOnOperation() {
     if (!loweringConfig) {
       return;
     }
+    // Currently we only convert convolutions that have a MMA attr
+    // in there configurations as this is meant to be used for
+    // lowering the convolutions to matmul intrinsic. If we
+    // want to do this for all convolutions we can drop this check
+    // and move this pass to the common directory.
     if (!getMmaKind(loweringConfig)) {
       return;
     }
