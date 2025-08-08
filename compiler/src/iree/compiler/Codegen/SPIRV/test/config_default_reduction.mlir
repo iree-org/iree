@@ -6,7 +6,7 @@
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = shuffle, dot = none, mma = [], scaled_mma = [],
+    compute = fp32|int32, storage = b32, subgroup = shuffle,
     subgroup_size_choices = [16], max_workgroup_sizes = [512, 512, 512],
     max_thread_count_per_workgroup = 512, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -45,7 +45,7 @@ func.func @subgroup_reduce_f32() attributes {hal.executable.target = #executable
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = shuffle, dot = none, mma = [], scaled_mma = [],
+    compute = fp32|int32, storage = b32, subgroup = shuffle,
     subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -91,7 +91,7 @@ func.func @subgroup_reduce_f16() attributes {hal.executable.target = #executable
 #config = #iree_codegen.lowering_config<tile_sizes = [[1], [0, 64]]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = shuffle, dot = none, mma = [], scaled_mma = [],
+    compute = fp32|int32, storage = b32, subgroup = shuffle,
     subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
