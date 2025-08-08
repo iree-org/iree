@@ -4,7 +4,7 @@
   iree_codegen.target_info = #iree_gpu.target<
     arch = "", features = "spirv:v1.3,cap:Shader", wgp = <
       compute = fp32|int32, storage = b32, subgroup = shuffle|arithmetic,
-      dot = none, mma = [], scaled_mma = [], subgroup_size_choices = [64],
+      subgroup_size_choices = [64],
       max_workgroup_sizes = [128, 128, 64], max_thread_count_per_workgroup = 128,
       max_workgroup_memory_bytes = 16384, max_workgroup_counts = [65535, 65535, 65535]>>}>
 
@@ -43,7 +43,7 @@ func.func @vulkan_client_api() attributes {hal.executable.target = #target} {
   iree_codegen.target_info = #iree_gpu.target<
     arch = "", features = "spirv:v1.3,cap:Kernel", wgp = <
       compute = fp32|int32, storage = b32, subgroup = shuffle|arithmetic,
-      dot = none, mma = [], scaled_mma = [], subgroup_size_choices = [64],
+      subgroup_size_choices = [64],
       max_workgroup_sizes = [128, 128, 64], max_thread_count_per_workgroup = 128,
       max_workgroup_memory_bytes = 16384, max_workgroup_counts = [65535, 65535, 65535]>>}>
 

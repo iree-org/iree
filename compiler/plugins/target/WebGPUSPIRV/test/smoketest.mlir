@@ -6,7 +6,7 @@ module attributes {
     #hal.device.target<"webgpu", [
       #hal.executable.target<"webgpu-spirv", "webgpu-wgsl-fb", {
         iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.0,cap:Shader,ext:SPV_KHR_storage_buffer_storage_class", wgp = <
-          compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [], scaled_mma = [], subgroup_size_choices = [32],
+          compute = fp32|int32, storage = b32, subgroup = none, subgroup_size_choices = [32],
           max_workgroup_sizes = [128, 128, 64], max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
           max_workgroup_counts = [65535, 65535, 65535]>>
       }>
