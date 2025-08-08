@@ -36,4 +36,26 @@ iree_lit_test_suite(
     iree-opt
 )
 
+iree_c_embed_data(
+  NAME
+    iree_mlir_ukernels_amdgpu
+  SRCS
+    "iree_uk_amdgpu_matmul_f8.mlir"
+  C_FILE_OUTPUT
+    "iree_mlir_ukernels_amdgpu.c"
+  H_FILE_OUTPUT
+    "iree_mlir_ukernels_amdgpu.h"
+  FLATTEN
+  PUBLIC
+)
+
+iree_lit_test_suite(
+  NAME
+    verify_mlir_ukernels_amdgpu
+  SRCS
+    "iree_uk_amdgpu_matmul_f8.mlir"
+  TOOLS
+    iree-opt
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

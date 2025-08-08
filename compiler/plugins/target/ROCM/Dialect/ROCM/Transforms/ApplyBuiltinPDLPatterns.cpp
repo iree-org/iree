@@ -7,10 +7,18 @@
 #include "compiler/plugins/target/ROCM/Dialect/ROCM/Transforms/Passes.h"
 
 #include "compiler/plugins/target/ROCM/Dialect/ROCM/IR/ROCMDialect.h"
+#include "iree/compiler/Codegen/Common/PassUtils.h"
+#include "iree/compiler/Codegen/Common/UserConfig.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
@@ -28,9 +36,12 @@ using namespace mlir::iree_compiler;
 namespace mlir::iree_compiler::IREE::ROCM {
 
 #define GEN_PASS_DEF_APPLYBUILTINPDLPATTERNSPASS
+#define GEN_PASS_DEF_APPLYBUILTINPDLPATTERNSDRIVERPASS
 #include "compiler/plugins/target/ROCM/Dialect/ROCM/Transforms/Passes.h.inc" // IWYU pragma: export
 
 } // namespace mlir::iree_compiler::IREE::ROCM
+
+static const char kBuiltinName[] = "rocm.builtin_name";
 
 static LogicalResult hasAttr(PatternRewriter &rewriter, Operation *rootOp,
                              Attribute attrName) {
@@ -239,9 +250,9 @@ public:
     }
 
     // Apply the patterns.
-    auto operation = getOperation();
-    if (failed(applyPatternsGreedily(operation, patterns))) {
-      operation->emitOpError("failed to apply builtin specialization patterns");
+    FunctionOpInterface funcOp = getOperation();
+    if (failed(applyPatternsGreedily(funcOp, patterns))) {
+      funcOp->emitOpError("failed to apply builtin specialization patterns");
       return signalPassFailure();
     }
   }
@@ -249,6 +260,87 @@ public:
 private:
   /// Loaded PDL patterns
   FrozenRewritePatternSet patterns;
+};
+
+class ApplyBuiltinPDLPatternsDriverPass final
+    : public mlir::iree_compiler::IREE::ROCM::impl::
+          ApplyBuiltinPDLPatternsDriverPassBase<
+              ApplyBuiltinPDLPatternsDriverPass> {
+public:
+  using Base::Base;
+
+  void runOnOperation() override {
+    ModuleOp moduleOp = getOperation();
+    IREE::GPU::TargetAttr targetAttr = getGPUTargetAttr(moduleOp);
+    if (!targetAttr) {
+      moduleOp->emitOpError() << "no executable target attribute found.";
+      return signalPassFailure();
+    }
+
+    IREE::ROCM::ApplyBuiltinPDLPatternsPassOptions options;
+    options.enableTensorUKernels = true;
+    options.targets.push_back(targetAttr.getArch().str());
+    OpPassManager passManager(moduleOp.getOperationName());
+    FunctionLikeNest(passManager).addPass([&]() {
+      return createApplyBuiltinPDLPatternsPass(options);
+    });
+    if (failed(runPipeline(passManager, moduleOp))) {
+      signalPassFailure();
+    }
+
+    // Parse the required builtin ukernels and embed them into the module.
+    MLIRContext *ctx = moduleOp.getContext();
+    auto rocmDialect = ctx->getOrLoadDialect<IREE::ROCM::ROCMDialect>();
+    SmallVector<FunctionOpInterface> ukernelFunctions;
+    auto res = moduleOp.walk([&](Operation *op) {
+      auto builtinName =
+          dyn_cast_or_null<StringAttr>(op->getAttr(kBuiltinName));
+      auto ukernelDesc = getUKernelDescriptor(op);
+      if (!builtinName || !ukernelDesc) {
+        return WalkResult::advance();
+      }
+      if (moduleOp->hasAttr(ukernelDesc.getUkernelName())) {
+        // Avoid parsing and serializing the same ukernel again and again.
+        return WalkResult::advance();
+      }
+      std::optional<StringRef> maybeBuiltin =
+          rocmDialect->getBuiltin(builtinName.str());
+      if (!maybeBuiltin) {
+        moduleOp.emitOpError()
+            << "could not find builtin with name " << builtinName.str();
+        return WalkResult::interrupt();
+      }
+      OwningOpRef<ModuleOp> builtinModule =
+          parseSourceString<ModuleOp>(*maybeBuiltin, ctx);
+      Operation *symbolTableOp =
+          SymbolTable::getNearestSymbolTable(builtinModule.get());
+      SymbolTable symbolTable(symbolTableOp);
+      auto funcOp = dyn_cast_if_present<FunctionOpInterface>(
+          symbolTable.lookup(ukernelDesc.getUkernelName()));
+      if (!funcOp) {
+        moduleOp.emitOpError()
+            << "could not find a `util.func` ukernel function with name "
+            << ukernelDesc.getUkernelName();
+        return WalkResult::interrupt();
+      }
+      // Remove the function from its parent module and add it to the set of
+      // ukernel functions to be attached to this module later.
+      funcOp->remove();
+      ukernelFunctions.push_back(funcOp);
+      op->removeAttr(kBuiltinName);
+      return WalkResult::advance();
+    });
+    if (res.wasInterrupted()) {
+      moduleOp.emitOpError() << "could not embed ukernel";
+      return signalPassFailure();
+    }
+    // Add the ukernel functions to the module.
+    for (FunctionOpInterface funcOp : ukernelFunctions) {
+      moduleOp.push_back(funcOp);
+      SymbolTable::setSymbolVisibility(funcOp,
+                                       SymbolTable::Visibility::Private);
+    }
+  }
 };
 
 } // namespace

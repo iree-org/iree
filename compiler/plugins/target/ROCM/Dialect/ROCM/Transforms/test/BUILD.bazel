@@ -18,6 +18,7 @@ iree_lit_test_suite(
         [
             "apply_builtin_pdl_patterns.mlir",
             "apply_builtin_ukernel_pdl_patterns.mlir",
+            "apply_builtin_ukernel_pdl_patterns_driver.mlir",
         ],
         include = ["*.mlir"],
     ),

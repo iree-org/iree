@@ -71,5 +71,9 @@ pdl.pattern @annotate_expanded_matmul_like : benefit(1) {
           llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>
     >
     pdl.apply_native_rewrite "annotateOperation"(%generic_op, %config_name, %config : !pdl.operation, !pdl.attribute, !pdl.attribute)
+
+    %builtin_attr = pdl.attribute = "rocm.builtin_name"
+    %builtin_annotation = pdl.attribute = "iree_uk_amdgpu_matmul_f8.mlir"
+    pdl.apply_native_rewrite "annotateOperation"(%generic_op, %builtin_attr, %builtin_annotation : !pdl.operation, !pdl.attribute, !pdl.attribute)
   }
 }
