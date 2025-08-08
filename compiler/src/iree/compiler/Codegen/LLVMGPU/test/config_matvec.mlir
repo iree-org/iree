@@ -71,13 +71,13 @@ func.func @dynamic_batch_generic_matvec() {
 }
 
 
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [1024, 1, 1] subgroup_size = 64
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
 // CHECK-LABEL: func.func @dynamic_batch_generic_matvec()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
-//  CHECK-SAME:               partial_reduction = [0, 0, 0, 8192],
-//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1, 16], [0, 1, 2, 3]],
+//  CHECK-SAME:               partial_reduction = [0, 0, 0, 512],
+//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1, 1], [0, 1, 2, 3]],
 //  CHECK-SAME:               thread = [0, 0, 0, 8],
 //  CHECK-SAME:               workgroup = [1, 1, 1, 0]
 

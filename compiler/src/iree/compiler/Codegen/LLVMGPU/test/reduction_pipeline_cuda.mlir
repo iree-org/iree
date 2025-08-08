@@ -148,7 +148,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 }
 }
 
-//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [32, 1, 1] subgroup_size = 32
+//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [1024, 1, 1] subgroup_size = 32
 //         CHECK:  func.func @softmax()
 //    CHECK-SAME:      translation_info = #[[TRANSLATION_INFO]]
 //         CHECK:    scf.for {{.*}} -> (vector<1x1x4xf32>) {
@@ -157,7 +157,9 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //         CHECK:      scf.yield
 //         CHECK:    vector.multi_reduction <maxnumf>
 //         CHECK:    gpu.subgroup_reduce  maxnumf
-//         CHECK:    vector.broadcast %{{.*}} : f32 to vector<1x1x4xf32>
+//         CHECK:    vector.transfer_write
+//         CHECK:    gpu.barrier
+//         CHECK:    gpu.subgroup_reduce  maxnumf
 //         CHECK:    scf.for {{.*}} -> (vector<1x1x4xf32>) {
 //         CHECK:      vector.transfer_read
 //         CHECK:      arith.subf
@@ -165,6 +167,10 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //         CHECK:      arith.addf
 //         CHECK:      scf.yield
 //         CHECK:    vector.multi_reduction <add>
+//         CHECK:    gpu.subgroup_reduce  add
+//         CHECK:    vector.transfer_write
+//         CHECK:    gpu.barrier
+//         CHECK:    vector.transfer_read
 //         CHECK:    gpu.subgroup_reduce  add
 //         CHECK:    vector.broadcast
 //         CHECK:    scf.for
