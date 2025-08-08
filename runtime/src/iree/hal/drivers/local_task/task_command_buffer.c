@@ -792,19 +792,19 @@ static iree_status_t iree_hal_task_command_buffer_dispatch(
   iree_hal_task_command_buffer_t* command_buffer =
       iree_hal_task_command_buffer_cast(base_command_buffer);
 
-  // TODO(benvanik): support custom arguments.
-  if (iree_hal_dispatch_uses_custom_arguments(flags)) {
+  // TODO(benvanik): support indirect arguments.
+  if (iree_any_bit_set(flags,
+                       IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_ARGUMENTS |
+                           IREE_HAL_DISPATCH_FLAG_DYNAMIC_INDIRECT_ARGUMENTS)) {
     return iree_make_status(
         IREE_STATUS_UNIMPLEMENTED,
-        "direct/indirect arguments are not supported in the task system");
+        "indirect arguments are not supported in the task system");
   }
 
   iree_hal_local_executable_t* local_executable =
       iree_hal_local_executable_cast(executable);
-  iree_hal_executable_dispatch_attrs_v0_t dispatch_attrs = {0};
-  if (local_executable->dispatch_attrs) {
-    dispatch_attrs = local_executable->dispatch_attrs[export_ordinal];
-  }
+  const iree_hal_executable_dispatch_attrs_v0_t dispatch_attrs =
+      local_executable->dispatch_attrs[export_ordinal];
 
   iree_hal_task_cmd_dispatch_t* cmd = NULL;
   iree_host_size_t total_cmd_size =

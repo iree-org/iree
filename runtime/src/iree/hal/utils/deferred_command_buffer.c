@@ -14,7 +14,9 @@
 //===----------------------------------------------------------------------===//
 
 typedef enum iree_hal_command_type_e {
-  IREE_HAL_CMD_EXECUTION_BARRIER = 0,
+  IREE_HAL_CMD_BEGIN_DEBUG_GROUP = 0,
+  IREE_HAL_CMD_END_DEBUG_GROUP,
+  IREE_HAL_CMD_EXECUTION_BARRIER,
   IREE_HAL_CMD_SIGNAL_EVENT,
   IREE_HAL_CMD_RESET_EVENT,
   IREE_HAL_CMD_WAIT_EVENTS,
@@ -234,6 +236,72 @@ static iree_status_t iree_hal_deferred_command_buffer_end(
       iree_hal_deferred_command_buffer_cast(base_command_buffer);
   iree_hal_resource_set_freeze(command_buffer->resource_set);
   return iree_ok_status();
+}
+
+//===----------------------------------------------------------------------===//
+// IREE_HAL_CMD_BEGIN_DEBUG_GROUP
+//===----------------------------------------------------------------------===//
+
+typedef struct iree_hal_cmd_begin_debug_group_t {
+  iree_hal_cmd_header_t header;
+  iree_string_view_t label;
+  iree_hal_label_color_t label_color;
+  // NOTE: we assume iree_hal_label_location_t stays valid - not great, though.
+  // It'd be better to copy but that can get expensive fast. Tracy currently
+  // requires that we don't ever deallocate these locations (which sucks), so
+  // we leak that requirement here.
+  const iree_hal_label_location_t* location;
+} iree_hal_cmd_begin_debug_group_t;
+
+static iree_status_t iree_hal_deferred_command_buffer_begin_debug_group(
+    iree_hal_command_buffer_t* base_command_buffer, iree_string_view_t label,
+    iree_hal_label_color_t label_color,
+    const iree_hal_label_location_t* location) {
+  iree_hal_cmd_list_t* cmd_list =
+      &iree_hal_deferred_command_buffer_cast(base_command_buffer)->cmd_list;
+  iree_hal_cmd_begin_debug_group_t* cmd = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_cmd_list_append_command(
+      cmd_list, IREE_HAL_CMD_BEGIN_DEBUG_GROUP, sizeof(*cmd) + label.size,
+      (void**)&cmd));
+  char* label_storage = (char*)cmd + sizeof(*cmd);
+  memcpy(label_storage, label.data, label.size);
+  cmd->label = iree_make_string_view(label_storage, label.size);
+  cmd->label_color = label_color;
+  cmd->location = location;
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_deferred_command_buffer_apply_begin_debug_group(
+    iree_hal_command_buffer_t* target_command_buffer,
+    iree_hal_buffer_binding_table_t binding_table,
+    const iree_hal_cmd_begin_debug_group_t* cmd) {
+  return iree_hal_command_buffer_begin_debug_group(
+      target_command_buffer, cmd->label, cmd->label_color, cmd->location);
+}
+
+//===----------------------------------------------------------------------===//
+// IREE_HAL_CMD_END_DEBUG_GROUP
+//===----------------------------------------------------------------------===//
+
+typedef struct iree_hal_cmd_end_debug_group_t {
+  iree_hal_cmd_header_t header;
+} iree_hal_cmd_end_debug_group_t;
+
+static iree_status_t iree_hal_deferred_command_buffer_end_debug_group(
+    iree_hal_command_buffer_t* base_command_buffer) {
+  iree_hal_cmd_list_t* cmd_list =
+      &iree_hal_deferred_command_buffer_cast(base_command_buffer)->cmd_list;
+  iree_hal_cmd_end_debug_group_t* cmd = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_cmd_list_append_command(
+      cmd_list, IREE_HAL_CMD_END_DEBUG_GROUP, sizeof(*cmd), (void**)&cmd));
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_deferred_command_buffer_apply_end_debug_group(
+    iree_hal_command_buffer_t* target_command_buffer,
+    iree_hal_buffer_binding_table_t binding_table,
+    const iree_hal_cmd_end_debug_group_t* cmd) {
+  return iree_hal_command_buffer_end_debug_group(target_command_buffer);
 }
 
 //===----------------------------------------------------------------------===//
@@ -770,6 +838,10 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_dispatch(
 //===----------------------------------------------------------------------===//
 
 static const iree_hal_cmd_apply_fn_t iree_hal_cmd_apply_table[] = {
+    [IREE_HAL_CMD_BEGIN_DEBUG_GROUP] = (iree_hal_cmd_apply_fn_t)
+        iree_hal_deferred_command_buffer_apply_begin_debug_group,
+    [IREE_HAL_CMD_END_DEBUG_GROUP] = (iree_hal_cmd_apply_fn_t)
+        iree_hal_deferred_command_buffer_apply_end_debug_group,
     [IREE_HAL_CMD_EXECUTION_BARRIER] = (iree_hal_cmd_apply_fn_t)
         iree_hal_deferred_command_buffer_apply_execution_barrier,
     [IREE_HAL_CMD_SIGNAL_EVENT] = (iree_hal_cmd_apply_fn_t)
@@ -834,6 +906,8 @@ static const iree_hal_command_buffer_vtable_t
         .destroy = iree_hal_deferred_command_buffer_destroy,
         .begin = iree_hal_deferred_command_buffer_begin,
         .end = iree_hal_deferred_command_buffer_end,
+        .begin_debug_group = iree_hal_deferred_command_buffer_begin_debug_group,
+        .end_debug_group = iree_hal_deferred_command_buffer_end_debug_group,
         .execution_barrier = iree_hal_deferred_command_buffer_execution_barrier,
         .signal_event = iree_hal_deferred_command_buffer_signal_event,
         .reset_event = iree_hal_deferred_command_buffer_reset_event,

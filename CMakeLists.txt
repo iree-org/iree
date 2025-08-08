@@ -225,6 +225,7 @@ endif()
 
 option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OFF)
 option(IREE_BUILD_EXPERIMENTAL_HAL_EXECUTABLE_LIBRARY_CALL_HOOKS "Build experimental hal_executable_library_call hook libraries that can be used with LD_PRELOAD against runtimes built with `-DCMAKE_C_FLAGS=-DIREE_HAL_EXECUTABLE_LIBRARY_CALL_HOOK`." OFF)
+option(IREE_BUILD_EXPERIMENTAL_HAL_STREAMING "Builds the experimental CUDA/HIP HAL layer." OFF)
 
 #-------------------------------------------------------------------------------
 # CUDA Toolkit.
@@ -1106,6 +1107,10 @@ endif()
 
 if(IREE_BUILD_EXPERIMENTAL_HAL_EXECUTABLE_LIBRARY_CALL_HOOKS)
   add_subdirectory(experimental/hal_executable_library_call_hooks)
+endif()
+
+if(IREE_BUILD_EXPERIMENTAL_HAL_STREAMING)
+  add_subdirectory(experimental/streaming)
 endif()
 
 set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"

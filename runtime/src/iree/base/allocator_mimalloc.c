@@ -123,7 +123,7 @@ static iree_status_t iree_allocator_mimalloc_free(void** inout_ptr) {
   void* ptr = *inout_ptr;
   if (IREE_LIKELY(ptr != NULL)) {
     IREE_TRACE_FREE(ptr);
-    mi_heap_free(mi_prim_get_default_heap(), ptr);
+    mi_free(ptr);
     *inout_ptr = NULL;
   }
   IREE_TRACE_ZONE_END(z0);
