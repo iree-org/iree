@@ -51,3 +51,26 @@ iree_lit_test_suite(
         "//tools:iree-opt",
     ],
 )
+
+iree_c_embed_data(
+    name = "iree_mlir_ukernels_amdgpu",
+    srcs = [
+        "iree_uk_amdgpu_matmul_f8.mlir",
+    ],
+    c_file_output = "iree_mlir_ukernels_amdgpu.c",
+    flatten = True,
+    h_file_output = "iree_mlir_ukernels_amdgpu.h",
+)
+
+# Verify that the ukernels are valid. We need this here because we do not
+# assemble the ukernel mlir and invalid specs do not lead to build errors.
+iree_lit_test_suite(
+    name = "verify_mlir_ukernels_amdgpu",
+    srcs = [
+        "iree_uk_amdgpu_matmul_f8.mlir",
+    ],
+    cfg = "//compiler:lit.cfg.py",
+    tools = [
+        "//tools:iree-opt",
+    ],
+)

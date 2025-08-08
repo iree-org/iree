@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-rocm-apply-builtin-pdl-patterns{targets=gfx942 enable-specialization=true})' \
+// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-rocm-apply-builtin-pdl-patterns{targets=gfx942 enable-specialization=true}))' \
 // RUN:   --mlir-print-local-scope --split-input-file %s | FileCheck %s
 
 func.func @transpose_matmul_f16(%lhs : tensor<10x20xf16>, %rhs : tensor<40x20xf16>,

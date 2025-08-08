@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-rocm-apply-builtin-pdl-patterns{targets=gfx942 enable-tensor-ukernels=true})' \
+// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-rocm-apply-builtin-pdl-patterns{targets=gfx942 enable-tensor-ukernels=true}))' \
 // RUN:   --mlir-print-local-scope --split-input-file %s | FileCheck %s
 
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
