@@ -313,6 +313,17 @@ def GPUTensorTilePass :
   ];
 }
 
+def GPUTileAndConvertConvToMatmulPass :
+    InterfacePass<"iree-codegen-gpu-tile-and-convert-conv-to-matmul", "mlir::FunctionOpInterface"> {
+  let summary = "Convert convolution to matmul using tiling.";
+  let dependentDialects = [
+    "::mlir::tensor::TensorDialect",
+    "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+    "::mlir::scf::SCFDialect",
+  ];
+}
+
 def GPUApplyTilingLevelPass :
     InterfacePass<"iree-codegen-gpu-apply-tiling-level", "mlir::FunctionOpInterface"> {
   let summary = "Pass to tile tensor ops based on tiling configs";
