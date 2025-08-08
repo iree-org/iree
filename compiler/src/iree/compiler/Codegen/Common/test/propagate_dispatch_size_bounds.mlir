@@ -3,7 +3,7 @@
 // RUN:  | FileCheck %s
 
 // Note: not the real target definition, missing types
-#executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.target<arch = "gfx1100", features = "",
+#executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<arch = "gfx1100", features = "",
   wgp = <compute =  fp32,
     storage =  b32,
     subgroup =  arithmetic,
@@ -73,7 +73,7 @@ hal.executable private @static {
 // -----
 
 // Note: not the real target definition, missing types
-#executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.target<arch = "gfx1100", features = "",
+#executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<arch = "gfx1100", features = "",
   wgp = <compute =  fp32,
     storage =  b32,
     subgroup =  arithmetic,
@@ -108,7 +108,7 @@ hal.executable private @manual_subgroup_size {
 // -----
 
 #executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-  {iree.gpu.target = #iree_gpu.target<arch = "gfx1100", features = "",
+  {iree_codegen.target_info = #iree_gpu.target<arch = "gfx1100", features = "",
   wgp = <compute =  fp32,
     storage =  b32,
     subgroup = arithmetic,

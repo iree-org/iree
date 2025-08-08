@@ -67,7 +67,7 @@ void VMVXLowerExecutableTargetPass::runOnOperation() {
   OpPassManager &pipeline = maybePipeline.value();
 
   auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
-  bool enableUKernels = target && hasUkernel(target);
+  bool enableUKernels = target && hasUkernel(target.getConfiguration());
   switch (translationInfo.getDispatchLoweringPassPipeline()) {
   // No pipleline specified, nothing to do.
   case IREE::Codegen::DispatchLoweringPassPipeline::None:

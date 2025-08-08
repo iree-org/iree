@@ -261,10 +261,7 @@ void populateVectorUnrollPatterns(RewritePatternSet &patterns,
 bool supportsIntegerDotProductOps(mlir::FunctionOpInterface fn) {
   // First check if the function op itself has a target env attribute. This may
   // be preferred in tests.
-  auto targetEnvAttr =
-      fn->getAttrOfType<IREE::GPU::TargetAttr>(kGPUTargetAttrName);
-  if (!targetEnvAttr)
-    targetEnvAttr = getGPUTargetAttr(fn);
+  auto targetEnvAttr = getGPUTargetAttr(fn);
   if (!targetEnvAttr)
     return false;
 

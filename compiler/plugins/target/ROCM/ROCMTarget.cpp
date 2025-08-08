@@ -285,7 +285,7 @@ public:
 
     if (auto target = GPU::getHIPTargetDetails(
             options.target, options.targetFeatures, context)) {
-      addConfig(kGPUTargetAttrName, target);
+      addConfigGPUTarget(context, target, configItems);
       if (options.encodingLayoutResolver !=
           GPU::kNoEncodingLayoutResolverName) {
         if (Attribute encoding = GPU::getHIPTargetEncodingLayoutAttr(
@@ -326,7 +326,7 @@ public:
 
     addConfig("ukernels", b.getStringAttr(options.enableROCMUkernels));
     if (options.wavesPerEu > 0) {
-      addConfig("waves_per_eu", b.getI64IntegerAttr(options.wavesPerEu));
+      addConfigWavesPerEu(b.getContext(), options.wavesPerEu, configItems);
     }
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
@@ -350,7 +350,7 @@ public:
   buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                  OpPassManager &passManager) override {
     if (options.specializeDispatches) {
-      if (auto attr = getGPUTargetAttr(targetAttr)) {
+      if (auto attr = getGPUTargetAttr(targetAttr.getContext(), targetAttr)) {
         ROCM::ApplyBuiltinPDLPatternsPassOptions options;
         options.enableSpecialization = true;
         if (IREE::GPU::TargetChipAttr chip = attr.getChip()) {
@@ -443,7 +443,7 @@ public:
     auto targetAttr = variantOp.getTargetAttr();
     StringRef targetArch = options.target;
     StringRef targetFeatures = options.targetFeatures;
-    if (auto attr = getGPUTargetAttr(targetAttr)) {
+    if (auto attr = getGPUTargetAttr(variantOp.getContext(), targetAttr)) {
       targetArch = attr.getArch();
       targetFeatures = attr.getFeatures();
     }

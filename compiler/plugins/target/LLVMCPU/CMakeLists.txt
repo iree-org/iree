@@ -123,6 +123,7 @@ iree_cc_library(
     LLVMTarget
     LLVMTargetParser
     MLIRIR
+    iree::compiler::Codegen::LLVMCPU
     iree::compiler::Utils
   PUBLIC
 )

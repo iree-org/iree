@@ -166,7 +166,7 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
                    bool skipIntermediateRoundings) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   const char ukernelName[] = "mmt4d";
-  if (!hasUkernel(targetAttr, ukernelName)) {
+  if (!targetAttr || !hasUkernel(targetAttr.getConfiguration(), ukernelName)) {
     return failure();
   }
   Value lhs = getInputForUKernel(op.getDpsInputOperand(0)->get());
@@ -270,7 +270,7 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::PackOp op,
                    bool /*skipIntermediateRoundings*/) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   const char ukernelName[] = "pack";
-  if (!hasUkernel(targetAttr, ukernelName)) {
+  if (!targetAttr || !hasUkernel(targetAttr.getConfiguration(), ukernelName)) {
     return failure();
   }
   Value in = op.getSource();
@@ -393,7 +393,7 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::UnPackOp op,
                    bool /*skipIntermediateRoundings*/) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   const char ukernelName[] = "unpack";
-  if (!hasUkernel(targetAttr, ukernelName)) {
+  if (!targetAttr || !hasUkernel(targetAttr.getConfiguration(), ukernelName)) {
     return failure();
   }
   Value in = op.getSource();
@@ -526,7 +526,7 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
                    bool /*skipIntermediateRoundings*/) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   const char ukernelName[] = "query_tile_sizes.2d";
-  if (!hasUkernel(targetAttr, ukernelName)) {
+  if (!targetAttr || !hasUkernel(targetAttr.getConfiguration(), ukernelName)) {
     return failure();
   }
   auto tensorType = dyn_cast<RankedTensorType>(op.getTensorType());

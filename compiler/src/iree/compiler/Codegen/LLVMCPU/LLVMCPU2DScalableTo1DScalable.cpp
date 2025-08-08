@@ -156,7 +156,8 @@ dropScalabilityFromUnsupportedOperations(mlir::FunctionOpInterface funcOp,
   // ArmSME. The rest of this rewrite could be generic (though currently
   // there's no other targets that support > 1D scalability).
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
-  bool isArmSME = assumeArmSME || hasSMEFeature(targetAttr);
+  bool isArmSME = assumeArmSME ||
+                  (targetAttr && hasSMEFeature(targetAttr.getConfiguration()));
   if (!isArmSME) {
     return success();
   }

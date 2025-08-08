@@ -424,7 +424,7 @@ public:
 
     if (auto target = GPU::getCUDATargetDetails(
             options.clTarget, options.clTargetFeatures, context)) {
-      configItems.emplace_back(kGPUTargetAttrName, target);
+      addConfigGPUTarget(context, target, configItems);
     }
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
@@ -467,7 +467,8 @@ public:
     auto targetAttr = variantOp.getTargetAttr();
     StringRef targetArch = options.clTarget;
     StringRef targetFeatures = options.clTargetFeatures;
-    if (auto attr = getGPUTargetAttr(targetAttr)) {
+    if (auto attr =
+            getGPUTargetAttr(executableBuilder.getContext(), targetAttr)) {
       targetArch = attr.getArch();
       targetFeatures = attr.getFeatures();
     }

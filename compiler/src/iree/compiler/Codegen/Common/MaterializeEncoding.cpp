@@ -86,11 +86,15 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
       if (testCLGPUTarget) {
         LDBG() << "Select GPUEncodingResolverAttr attribute as the layout "
                   "attribute. (testCLGPUTarget)";
+        SmallVector<NamedAttribute> configItems;
+        // Setting a nullptr to `target` below returns the target from command
+        // line.
+        IREE::GPU::TargetAttr targetAttr =
+            getGPUTargetAttr(ctx, /*target=*/nullptr);
+        addConfigGPUTarget(ctx, targetAttr, configItems);
         return cast<IREE::Encoding::LayoutMaterializerAttr>(
             IREE::GPU::GPUEncodingResolverAttr::get(
-                ctx,
-                DictionaryAttr::get(ctx, NamedAttribute(kGPUTargetAttrName,
-                                                        getCLGPUTarget(ctx)))));
+                ctx, DictionaryAttr::get(ctx, configItems)));
       }
       LDBG() << "Select EncodingNopLayoutAttr attribute as the layout "
                 "attribute (Encoding resolver unknown or unsupported).";

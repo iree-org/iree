@@ -300,8 +300,8 @@ resolveWorkgroupForAll(RewriterBase &rewriter, scf::ForallOp forallOp,
   rewriter.setInsertionPoint(forallOp);
   Location loc = forallOp.getLoc();
 
-  auto target = IREE::HAL::ExecutableTargetAttr::lookup(forallOp);
-  std::array<int64_t, 3> maxWorkgroupCountArray = getMaxWorkgroupCount(target);
+  std::array<int64_t, 3> maxWorkgroupCountArray =
+      getMaxWorkgroupCount(forallOp);
   SmallVector<int64_t> maxWorkgroupCount =
       llvm::to_vector(maxWorkgroupCountArray);
   maxWorkgroupCount.resize(forallOp.getRank(), ShapedType::kDynamic);

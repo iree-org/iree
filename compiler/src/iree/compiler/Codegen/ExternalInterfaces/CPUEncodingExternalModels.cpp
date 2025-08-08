@@ -740,8 +740,12 @@ struct CPULayoutResolverAttr final
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
     SmallVector<NamedAttribute> configItems;
-    storeNamedAttrIfPresent(configItems, config, "cpu_features");
-    storeNamedAttrIfPresent(configItems, config, "target_triple");
+    if (std::optional<StringRef> cpuFeatures = getConfigCpuFeatures(config)) {
+      addConfigCpuFeatures(ctx, cpuFeatures.value(), configItems);
+    }
+    if (std::optional<StringRef> targetTriple = getConfigTargetTriple(config)) {
+      addConfigTargetTriple(ctx, targetTriple.value(), configItems);
+    }
     storeNamedAttrIfPresent(configItems, config, "ukernels");
     return CPUEncodingResolverAttr::get(ctx,
                                         DictionaryAttr::get(ctx, configItems));

@@ -270,7 +270,7 @@ hal.executable private @split_reduction_executable {
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @bounded_scf_forall_4D {
   hal.executable.variant public @bounded_scf_forall_4D target(#hal.executable.target<"", "", {
-      iree.gpu.target = #iree_codegen.simple_target<max_workgroup_count = [1024, 512, 256]>}>) {
+      iree_codegen.target_info = #iree_codegen.simple_target<max_workgroup_count = [1024, 512, 256]>}>) {
     hal.executable.export public @bounded_scf_forall_4D layout(#pipeline_layout)
     count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4: index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4

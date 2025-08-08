@@ -1339,7 +1339,8 @@ getPipelineOptions(FunctionOpInterface funcOp,
     }
   }
 
-  pipelineOptions.enableUkernels = targetAttr && hasUkernel(targetAttr);
+  pipelineOptions.enableUkernels =
+      targetAttr && hasUkernel(targetAttr.getConfiguration());
 
   LLVM_DEBUG(llvm::dbgs() << "GPU Pipeline Options: " << pipelineOptions
                           << "\n");

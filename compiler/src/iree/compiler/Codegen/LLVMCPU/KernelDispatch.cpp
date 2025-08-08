@@ -242,7 +242,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
   bool isLinalgGeneric = isa<linalg::GenericOp>(linalgOp.getOperation());
 
   // Default X86 specific strategy.
-  if (isX86(targetAttr)) {
+  if (targetAttr && isX86(targetAttr.getConfiguration())) {
     if (isLinalgGeneric) {
       return VectorPreProcStrategy::Masking;
     }
@@ -253,7 +253,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
   }
 
   // Default RISC-V specific strategies.
-  if (isRISCV(targetAttr)) {
+  if (targetAttr && isRISCV(targetAttr.getConfiguration())) {
     if (isLinalgGeneric) {
       return VectorPreProcStrategy::Masking;
     }
@@ -264,8 +264,9 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
   }
 
   // Default AArch64 specific strategies.
-  if (isAArch64(targetAttr)) {
-    if (isScalableVectorizationEnabled() && hasAnySVEFeature(targetAttr)) {
+  if (targetAttr && isAArch64(targetAttr.getConfiguration())) {
+    if (isScalableVectorizationEnabled() &&
+        hasAnySVEFeature(targetAttr.getConfiguration())) {
       return VectorPreProcStrategy::Masking;
     }
 
@@ -298,10 +299,10 @@ getPipelineConfWithDecompositionAttr(MLIRContext *context) {
 static int64_t
 getNativeVectorSizeInBytes(mlir::FunctionOpInterface entryPointFn) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-  auto nativeVectorSizeAttr =
-      getConfigIntegerAttr(targetAttr, "native_vector_size");
-  if (nativeVectorSizeAttr) {
-    int64_t nativeVectorSizeVal = nativeVectorSizeAttr->getInt();
+  std::optional<int64_t> nativeVectorSize =
+      getConfigNativeVectorSize(targetAttr.getConfiguration());
+  if (nativeVectorSize) {
+    int64_t nativeVectorSizeVal = nativeVectorSize.value();
     if (nativeVectorSizeVal) {
       return nativeVectorSizeVal;
     }
@@ -813,15 +814,20 @@ static void limitVectorTileSizes(Operation *inputOp,
 // Returns the size in bits of SIMD register space, or 0 if it can't be
 // determined (e.g. Arm SVE).
 static int getRegisterSpaceBitsIfKnown(IREE::HAL::ExecutableTargetAttr target) {
-  if (isX86(target)) {
-    if (hasFeature(target, "+avx512f")) {
+  if (!target) {
+    return 0;
+  }
+  DictionaryAttr targetConfig = target.getConfiguration();
+  if (isX86(targetConfig)) {
+    if (hasFeature(targetConfig, "+avx512f")) {
       return 32 * 512;
-    } else if (hasFeature(target, "+avx") || hasFeature(target, "+avx2")) {
+    } else if (hasFeature(targetConfig, "+avx") ||
+               hasFeature(targetConfig, "+avx2")) {
       return 16 * 256;
     } else {
       return 16 * 128;
     }
-  } else if (isAArch64(target)) {
+  } else if (isAArch64(targetConfig)) {
     // 32 NEON/SVE registers (at least 128-bit each, returns the base size for
     // SVE).
     return 32 * 128;
@@ -1101,7 +1107,7 @@ static SmallVector<int64_t> getDefaultMatmulCacheSizes(linalg::LinalgOp op,
   }
 
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
-  if (isX86(targetAttr)) {
+  if (targetAttr && isX86(targetAttr.getConfiguration())) {
     if (isQuantized) {
       return noCacheLevelTiling;
     }
@@ -1210,8 +1216,8 @@ getDefaultMatmulVectorSizes(linalg::LinalgOp op, int64_t vectorSize,
                             SmallVectorImpl<int64_t> &sizes,
                             SmallVectorImpl<bool> &scalableSizeFlags) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
-  if (isX86(targetAttr)) {
-    if (hasAVX512fFeature(targetAttr)) {
+  if (targetAttr && isX86(targetAttr.getConfiguration())) {
+    if (hasAVX512fFeature(targetAttr.getConfiguration())) {
       sizes.append({8, 32, 16});
     } else {
       sizes.append({1, 1, vectorSize});
@@ -1219,18 +1225,19 @@ getDefaultMatmulVectorSizes(linalg::LinalgOp op, int64_t vectorSize,
     return;
   }
 
-  if (isAArch64(targetAttr)) {
+  if (targetAttr && isAArch64(targetAttr.getConfiguration())) {
     sizes.append({8, 16, 1});
 
     // Specialisation for scalable vectorization.
-    if (isScalableVectorizationEnabled() && hasAnySVEFeature(targetAttr)) {
+    if (isScalableVectorizationEnabled() &&
+        hasAnySVEFeature(targetAttr.getConfiguration())) {
       // Mark middle dimensions as scalable, so sizes are (8, [16], 1).
       scalableSizeFlags.append({false, true, false});
     }
     return;
   }
 
-  if (isRISCV(targetAttr)) {
+  if (targetAttr && isRISCV(targetAttr.getConfiguration())) {
     // RISC-V natively supports scalar x vector operations so we don't have to
     // vectorize dimension k. Vectorizing dimension k results in a vector load
     // and a sequence of vrgather ops to implemement the broadcast explicitly.
@@ -1412,9 +1419,9 @@ getMatmulVectorSizes(mlir::FunctionOpInterface entryPointFn,
 
   // TODO: Compute vector tile sizes using heuristics.
 
-  if (isAArch64(targetAttr)) {
+  if (targetAttr && isAArch64(targetAttr.getConfiguration())) {
     if (isScalableVectorizationEnabled() && !clDisableArmSMETiling &&
-        hasSMEFeature(targetAttr)) {
+        hasSMEFeature(targetAttr.getConfiguration())) {
       // Note: This may not pick any sizes (which will fallback to the scalable
       // vectorization heuristics below).
       getMatmulAArch64SMEVectorSizes(op, matmulTileSizes, matmulScalableFlags);
@@ -1428,7 +1435,8 @@ getMatmulVectorSizes(mlir::FunctionOpInterface entryPointFn,
     }
   }
 
-  if (isRISCV(targetAttr) && hasAnyVFeature(targetAttr)) {
+  if (targetAttr && isRISCV(targetAttr.getConfiguration()) &&
+      hasAnyVFeature(targetAttr.getConfiguration())) {
     // Use default tile size for matmul_transpose_b &
     // batch_matmul_transpose_b to avoid performance drop.
     if (!isa<linalg::MatmulTransposeBOp, linalg::BatchMatmulTransposeBOp>(op)) {
@@ -1578,7 +1586,8 @@ setRootConfig(mlir::FunctionOpInterface entryPointFn,
   }
   // FIXME: Apply maxTileSize modification for all targets.
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-  if (isRISCV(targetAttr) && hasAnyVFeature(targetAttr)) {
+  if (targetAttr && isRISCV(targetAttr.getConfiguration()) &&
+      hasAnyVFeature(targetAttr.getConfiguration())) {
     LDBG() << "RISC-V Aggressive Distribution: " << clEnableRiscvAggressiveDist;
     for (auto loopNum :
          llvm::seq<unsigned>(static_cast<unsigned>(isBM), numLoops)) {
@@ -1732,7 +1741,8 @@ getPackVectorTileSizes(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> tileSizes(op.getSourceRank(), 1);
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   int64_t vectorSize = getVectorSize(entryPointFn, op.getSourceType());
-  if (!hasAVX512fFeature(targetAttr) || !isPackMatmulLHS(op)) {
+  if (!targetAttr || !hasAVX512fFeature(targetAttr.getConfiguration()) ||
+      !isPackMatmulLHS(op)) {
     return tileSizes;
   }
   if (op.getSourceType().getElementType().isF32()) {
@@ -1781,9 +1791,11 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   // backends prefer to not decompose the ops.
   DictionaryAttr pipelineConfig;
   auto target = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  DictionaryAttr targetConfig = target ? target.getConfiguration() : nullptr;
   bool hasDynamicInnerTile =
       llvm::any_of(op.getMixedTiles(), llvm::IsaPred<Value>);
-  if (!hasDynamicInnerTile && !isX86(target) && !isRISCV(target)) {
+  if (!hasDynamicInnerTile && targetConfig && !isX86(targetConfig) &&
+      !isRISCV(targetConfig)) {
     pipelineConfig = getPipelineConfWithDecompositionAttr(op.getContext());
   }
 
@@ -1827,7 +1839,8 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   auto target = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   bool hasDynamicInnerTile =
       llvm::any_of(op.getMixedTiles(), llvm::IsaPred<Value>);
-  if (!hasDynamicInnerTile && !isX86(target) && !isRISCV(target)) {
+  if (!hasDynamicInnerTile && target && !isX86(target.getConfiguration()) &&
+      !isRISCV(target.getConfiguration())) {
     pipelineConfig = getPipelineConfWithDecompositionAttr(op.getContext());
   }
   LoweringConfigGenerator generator(op);
@@ -1930,7 +1943,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     }
 
     // Limit vector sizes based on large vector sizes check.
-    {
+    if (targetAttr) {
       int64_t maxVectorSizeBits =
           getMaxVectorSizeForLargeVectorCheck(targetAttr) * 8;
       SmallVector<Type> operandTypes;
@@ -2126,7 +2139,7 @@ setDefaultGenericOpRootConfig(mlir::FunctionOpInterface entryPointFn,
 static void getTransposeX86VectorSizes(
     linalg::GenericOp genericOp, IREE::HAL::ExecutableTargetAttr targetAttr,
     ArrayRef<int64_t> minTileSizes, SmallVectorImpl<int64_t> &sizes) {
-  if (!hasAVX2Feature(targetAttr) ||
+  if (!targetAttr || !hasAVX2Feature(targetAttr.getConfiguration()) ||
       !x86TransposeLoweringPrecondition(genericOp))
     return;
 
@@ -2148,7 +2161,7 @@ static void getTransposeX86VectorSizes(
 
   // Target 16x16 tile sizes if there are AVX512 features and all the tile sizes
   // are greater than or equal to 16.
-  if (hasAVX512fFeature(targetAttr) &&
+  if (hasAVX512fFeature(targetAttr.getConfiguration()) &&
       llvm::all_of(minTileSizes, [](int64_t tileSize) {
         return tileSize == 1 || tileSize >= 16;
       })) {
@@ -2168,15 +2181,15 @@ static void getTransposeX86VectorSizes(
 static void getTransposeAArch64VectorSizes(
     linalg::GenericOp genericOp, IREE::HAL::ExecutableTargetAttr targetAttr,
     SmallVectorImpl<int64_t> &sizes, SmallVectorImpl<bool> &scalableFlags) {
-  if (!isLinalgGeneric2DTranspose(genericOp))
+  if (!targetAttr || !isLinalgGeneric2DTranspose(genericOp))
     return;
 
   auto elementType = nonWideningLinalgElementType(genericOp);
   if (failed(elementType))
     return;
 
-  if (hasSMEFeature(targetAttr) && isScalableVectorizationEnabled() &&
-      !clDisableArmSMETiling) {
+  if (hasSMEFeature(targetAttr.getConfiguration()) &&
+      isScalableVectorizationEnabled() && !clDisableArmSMETiling) {
     if (elementType->isF32()) {
       sizes.append({4, 4});
     } else if (elementType->isF64()) {
@@ -2197,11 +2210,11 @@ getTransposeVectorSizes(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> tileSizes;
   SmallVector<bool> scalableFlags;
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-  if (isX86(targetAttr)) {
+  if (targetAttr && isX86(targetAttr.getConfiguration())) {
     SmallVector<int64_t> minTileSizes = getMinTilingSizesForEachDim(
         entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
     getTransposeX86VectorSizes(genericOp, targetAttr, minTileSizes, tileSizes);
-  } else if (isAArch64(targetAttr)) {
+  } else if (targetAttr && isAArch64(targetAttr.getConfiguration())) {
     getTransposeAArch64VectorSizes(genericOp, targetAttr, tileSizes,
                                    scalableFlags);
   }
@@ -2455,7 +2468,8 @@ setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
   int64_t numTilingDims = vecTileSizes.size();
   SmallVector<bool> vecScalableFlags(numTilingDims, false);
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-  if (isAArch64(targetAttr) && hasAnySVEFeature(targetAttr) &&
+  if (targetAttr && isAArch64(targetAttr.getConfiguration()) &&
+      hasAnySVEFeature(targetAttr.getConfiguration()) &&
       isScalableVectorizationEnabled() &&
       isa<linalg::DepthwiseConv2DNhwcHwcOp>(convOp)) {
     auto dims = linalg::inferConvolutionDims(convOp);
@@ -2492,32 +2506,35 @@ getNhwcConvVectorSizes(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> tileSizes;
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
 
-  if (isX86(targetAttr)) {
-    if (is2DConvOp(op))
-      return {1, 1, 8, vectorSize, 1, 1, 8};
-    if (is2DDepthConvOp(op))
-      return {1, 1, 8, vectorSize, 1, 3};
-    if (is2DPoolingOp(op))
-      return {1, 1, 8, vectorSize, 1, 8};
-    llvm_unreachable("unsupported conv");
-  }
-  if (isRISCV(targetAttr)) {
-    if (is2DConvOp(op))
-      return {1, 1, 8, vectorSize * 2, 1, 1, 8};
-    if (is2DDepthConvOp(op))
-      return {1, 1, 8, vectorSize, 1, 3};
-    if (is2DPoolingOp(op))
-      return {1, 1, 8, vectorSize * 2, 1, 8};
-    llvm_unreachable("unsupported conv");
-  }
-  if (isAArch64(targetAttr)) {
-    if (is2DConvOp(op))
-      return {1, 1, 32, 64, 1, 1, 16};
-    if (is2DDepthConvOp(op))
-      return {1, 1, 4, 4, 1, 4};
-    if (is2DPoolingOp(op))
-      return {1, 1, 32, 64, 1, 16};
-    llvm_unreachable("unsupported conv");
+  if (targetAttr) {
+    DictionaryAttr targetConfig = targetAttr.getConfiguration();
+    if (isX86(targetConfig)) {
+      if (is2DConvOp(op))
+        return {1, 1, 8, vectorSize, 1, 1, 8};
+      if (is2DDepthConvOp(op))
+        return {1, 1, 8, vectorSize, 1, 3};
+      if (is2DPoolingOp(op))
+        return {1, 1, 8, vectorSize, 1, 8};
+      llvm_unreachable("unsupported conv");
+    }
+    if (isRISCV(targetConfig)) {
+      if (is2DConvOp(op))
+        return {1, 1, 8, vectorSize * 2, 1, 1, 8};
+      if (is2DDepthConvOp(op))
+        return {1, 1, 8, vectorSize, 1, 3};
+      if (is2DPoolingOp(op))
+        return {1, 1, 8, vectorSize * 2, 1, 8};
+      llvm_unreachable("unsupported conv");
+    }
+    if (isAArch64(targetConfig)) {
+      if (is2DConvOp(op))
+        return {1, 1, 32, 64, 1, 1, 16};
+      if (is2DDepthConvOp(op))
+        return {1, 1, 4, 4, 1, 4};
+      if (is2DPoolingOp(op))
+        return {1, 1, 32, 64, 1, 16};
+      llvm_unreachable("unsupported conv");
+    }
   }
 
   // Get default hard-coded tile sizes if we couldn't compute anything

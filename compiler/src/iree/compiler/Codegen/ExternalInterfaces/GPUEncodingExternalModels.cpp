@@ -407,7 +407,9 @@ struct GPULayoutResolverAttr final
       configItems.append(existingConfig.getValue().begin(),
                          existingConfig.getValue().end());
     }
-    storeNamedAttrIfPresent(configItems, config, kGPUTargetAttrName);
+    if (IREE::GPU::TargetAttr targetAttr = getGPUTargetAttr(config)) {
+      addConfigGPUTarget(ctx, targetAttr, configItems);
+    }
     return GPUEncodingResolverAttr::get(ctx,
                                         DictionaryAttr::get(ctx, configItems));
   }

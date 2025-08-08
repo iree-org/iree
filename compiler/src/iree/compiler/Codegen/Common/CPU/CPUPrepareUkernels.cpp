@@ -416,15 +416,15 @@ void CPUPrepareUkernelsPass::runOnOperation() {
   IRRewriter rewriter(ctx);
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
 
-  if (hasUkernel(targetAttr, "mmt4d")) {
+  if (targetAttr && hasUkernel(targetAttr.getConfiguration(), "mmt4d")) {
     tileBatchDimsForBatchMmt4dOp(rewriter, funcOp);
     patterns.add<ConvertBatchMmt4DtoMmt4DPattern>(ctx);
   }
-  if (hasUkernel(targetAttr, "pack")) {
+  if (targetAttr && hasUkernel(targetAttr.getConfiguration(), "pack")) {
     tileNonPackedDimsFor3DPackOps(rewriter, funcOp);
     patterns.add<Convert3DPackto2DPackPattern>(ctx);
   }
-  if (hasUkernel(targetAttr, "unpack")) {
+  if (targetAttr && hasUkernel(targetAttr.getConfiguration(), "unpack")) {
     tileNonPackedDimsFor5DPUnpackOps(rewriter, funcOp);
     patterns.add<Convert5DUnPackto4DUnPackPattern>(ctx);
   }

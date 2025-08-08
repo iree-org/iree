@@ -941,10 +941,23 @@ public:
 
 } // namespace
 
-static std::string getStringAttrFromTargetAttr(ModuleOp module,
-                                               StringRef attrName) {
+static std::string getDataLayoutString(ModuleOp module) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(module);
-  auto stringAttr = getConfigStringAttr(targetAttr, attrName);
+  if (!targetAttr) {
+    return "";
+  }
+  std::optional<StringRef> stringAttr =
+      getConfigDataLayout(targetAttr.getConfiguration());
+  return stringAttr ? stringAttr.value().str() : std::string("");
+}
+
+static std::string getTargetTripleString(ModuleOp module) {
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(module);
+  if (!targetAttr) {
+    return "";
+  }
+  std::optional<StringRef> stringAttr =
+      getConfigTargetTriple(targetAttr.getConfiguration());
   return stringAttr ? stringAttr.value().str() : std::string("");
 }
 
@@ -952,11 +965,11 @@ void ConvertToLLVMPass::runOnOperation() {
   auto module = getOperation();
   std::string dataLayoutStr = targetDataLayout;
   if (targetDataLayout.empty()) {
-    dataLayoutStr = getStringAttrFromTargetAttr(module, "data_layout");
+    dataLayoutStr = getDataLayoutString(module);
   }
   std::string targetTripleStr = targetTriple;
   if (targetTripleStr.empty()) {
-    targetTripleStr = getStringAttrFromTargetAttr(module, "target_triple");
+    targetTripleStr = getTargetTripleString(module);
   }
   // Add required attributes to the module so that the lowering knows how to
   // handle structs and data layouts.
@@ -1019,13 +1032,15 @@ void ConvertToLLVMPass::runOnOperation() {
   // TODO(bjacob): Use a lowering that uses specific ARM/X86 intrinsics.
   bool use32BitImpl = false;
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(module);
-  if (isRISCV(targetAttr)) {
+  DictionaryAttr targetConfig =
+      targetAttr ? targetAttr.getConfiguration() : nullptr;
+  if (targetConfig && isRISCV(targetConfig)) {
     // Use the 32-bit lowering for RISC-V if 'zve32*' is specified and there is
     // no 64-bit integer vector support.
     // TODO(#9440) Simplify logic when 'cpu_features' is simplified.
     use32BitImpl =
-        (hasZve32xFeature(targetAttr) || hasZve32fFeature(targetAttr)) &&
-        !hasVFeature(targetAttr) && !hasZve64xFeature(targetAttr);
+        (hasZve32xFeature(targetConfig) || hasZve32fFeature(targetConfig)) &&
+        !hasVFeature(targetConfig) && !hasZve64xFeature(targetConfig);
   }
   tosa::populateTosaRescaleToArithConversionPatterns(&patterns, use32BitImpl);
 
@@ -1062,8 +1077,8 @@ void ConvertToLLVMPass::runOnOperation() {
   ub::populateUBToLLVMConversionPatterns(typeConverter, patterns);
   vector::populateVectorTransferLoweringPatterns(patterns,
                                                  /*maxTransferRank=*/1);
-  if (isAArch64(targetAttr) &&
-      (hasAnySVEFeature(targetAttr) || hasSMEFeature(targetAttr))) {
+  if (targetConfig && isAArch64(targetConfig) &&
+      (hasAnySVEFeature(targetConfig) || hasSMEFeature(targetConfig))) {
     populateArmSVELegalizeForLLVMExportPatterns(typeConverter, patterns);
     configureArmSVELegalizeForExportTarget(target);
   }

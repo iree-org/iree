@@ -232,9 +232,9 @@ spirv::ResourceLimitsAttr convertLimits(IREE::GPU::TargetAttr target) {
 //===----------------------------------------------------------------------===//
 
 FailureOr<spirv::TargetEnvAttr>
-convertGPUTarget(IREE::HAL::ExecutableVariantOp variant) {
+convertGPUTarget(MLIRContext *context, IREE::HAL::ExecutableVariantOp variant) {
   IREE::HAL::ExecutableTargetAttr target = variant.getTarget();
-  IREE::GPU::TargetAttr gpuTarget = getGPUTargetAttr(target);
+  IREE::GPU::TargetAttr gpuTarget = getGPUTargetAttr(context, target);
 
   SmallVector<StringRef> features;
   llvm::SplitString(gpuTarget.getFeatures(), features, ",");
@@ -276,8 +276,10 @@ struct SPIRVConvertGPUTargetPass final
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
     auto variant = moduleOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+    MLIRContext *context = &getContext();
 
-    FailureOr<spirv::TargetEnvAttr> spirvTarget = convertGPUTarget(variant);
+    FailureOr<spirv::TargetEnvAttr> spirvTarget =
+        convertGPUTarget(context, variant);
     if (failed(spirvTarget))
       return signalPassFailure();
 

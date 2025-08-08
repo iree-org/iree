@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
+#include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -47,10 +48,10 @@ checkStackAllocationSize(mlir::FunctionOpInterface funcOp) {
   unsigned maxAllocationSizeInBytes = 32 * 1024;
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
   if (targetAttr) {
-    auto nativeAllocationSizeAttr =
-        getConfigIntegerAttr(targetAttr, "max_stack_allocation_size");
-    if (nativeAllocationSizeAttr) {
-      maxAllocationSizeInBytes = nativeAllocationSizeAttr->getInt();
+    std::optional<int64_t> nativeAllocationSize =
+        getConfigMaxStackAllocationSize(targetAttr.getConfiguration());
+    if (nativeAllocationSize) {
+      maxAllocationSizeInBytes = nativeAllocationSize.value();
     }
   }
 
