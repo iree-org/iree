@@ -307,4 +307,20 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    queue_host_call_emulation
+  HDRS
+    "queue_host_call_emulation.h"
+  SRCS
+    "queue_host_call_emulation.c"
+  DEPS
+    iree::base
+    iree::base::internal
+    iree::base::internal::synchronization
+    iree::base::internal::threading
+    iree::hal
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
