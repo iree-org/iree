@@ -161,6 +161,17 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "queue_emulation",
+    srcs = ["queue_emulation.c"],
+    hdrs = ["queue_emulation.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "resource_set",
     srcs = ["resource_set.c"],
     hdrs = ["resource_set.h"],

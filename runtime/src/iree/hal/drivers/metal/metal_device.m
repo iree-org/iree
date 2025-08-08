@@ -19,6 +19,7 @@
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/file_registry.h"
 #include "iree/hal/utils/file_transfer.h"
+#include "iree/hal/utils/queue_emulation.h"
 #include "iree/hal/utils/resource_set.h"
 
 typedef struct iree_hal_metal_device_t {
