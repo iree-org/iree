@@ -29,6 +29,7 @@
 #include "iree/hal/utils/deferred_work_queue.h"
 #include "iree/hal/utils/file_registry.h"
 #include "iree/hal/utils/file_transfer.h"
+#include "iree/hal/utils/queue_emulation.h"
 #include "iree/hal/utils/stream_tracing.h"
 
 //===----------------------------------------------------------------------===//

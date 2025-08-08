@@ -187,6 +187,20 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    queue_emulation
+  HDRS
+    "queue_emulation.h"
+  SRCS
+    "queue_emulation.c"
+  DEPS
+    iree::base
+    iree::base::internal
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     resource_set
   HDRS
     "resource_set.h"
