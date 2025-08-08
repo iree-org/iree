@@ -153,7 +153,7 @@ getIntrinsics(linalg::LinalgOp linalgOp,
   IREE::GPU::TargetAttr target;
   if (executableTargets.size() == 1) {
     auto targetAttr = executableTargets.front();
-    target = getGPUTargetAttr(targetAttr);
+    target = getGPUTargetAttr(targetAttr.getConfiguration());
   } else {
     // For LIT testing, also directly search TargetAttr around the op.
     target = getGPUTargetAttr(linalgOp);

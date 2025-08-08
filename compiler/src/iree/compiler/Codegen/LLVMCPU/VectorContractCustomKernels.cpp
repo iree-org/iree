@@ -756,7 +756,7 @@ private:
   }
   // Helper for generateAsmCodeAndConstraints
   std::string getConstraintCode() const {
-    if (isAArch64(target)) {
+    if (isAArch64(target.getConfiguration())) {
       return "w";
     }
     assert(false && "what constraint code to use on this arch?");
@@ -1142,7 +1142,11 @@ public:
 void populateVectorContractCustomKernelsPatterns(
     IREE::HAL::ExecutableTargetAttr target, RewritePatternSet &patterns) {
   MLIRContext *context = patterns.getContext();
-  if (isAArch64(target)) {
+  if (!target) {
+    return;
+  }
+  DictionaryAttr targetConfig = target.getConfiguration();
+  if (isAArch64(targetConfig)) {
     // TODO: add a "kernel benefit" system whereby if two kernels are available
     // for the same shape and same data types, the fastest one (ie the one
     // using the most powerful available SIMD instructions) is selected.
@@ -1156,8 +1160,8 @@ void populateVectorContractCustomKernelsPatterns(
         context, MMTKernel_8x1x8_i8i8i32_Aarch64_Baseline_InlineAsm());
     patterns.add<MMTCustomKernelPattern>(
         context, MMTKernel_8x8x1_i8i8i32_Aarch64_Baseline_InlineAsm());
-    if (hasFeature(target, "+dotprod")) {
-      if (preferIntrinsicsOverAsm(target)) {
+    if (hasFeature(targetConfig, "+dotprod")) {
+      if (preferIntrinsicsOverAsm(targetConfig)) {
         patterns.add<MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics>(context);
       } else {
         patterns.add<MMTCustomKernelPattern>(
@@ -1166,7 +1170,7 @@ void populateVectorContractCustomKernelsPatterns(
             context, MMTKernel_8x4x1_i8i8i32_Aarch64Dotprod_InlineAsm());
       }
     }
-    if (hasFeature(target, "+i8mm")) {
+    if (hasFeature(targetConfig, "+i8mm")) {
       patterns.add<MMTCustomKernelPattern>(
           context, MMTKernel_8x8x8_i8i8i32_Aarch64I8mm_InlineAsm());
     }

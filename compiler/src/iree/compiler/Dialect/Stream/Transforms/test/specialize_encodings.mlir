@@ -52,7 +52,7 @@ util.func public @tensor_sizeof(%d0: index, %d1: index) -> (index, index, index)
   {
     abi = "hip",
     iree.encoding.resolver = #iree_gpu.gpu_encoding_resolver<>,
-    iree.gpu.target = #iree_gpu.target<arch = "gfx942",
+    iree_codegen.target_info = #iree_gpu.target<arch = "gfx942",
                                        features = "",
                                        wgp = <compute = fp32,
                                               storage =  b32,
@@ -93,7 +93,7 @@ util.func public @gpu_with_encoding_layout(%d0: index, %d1: index) -> index {
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip",
   iree.encoding.resolver = #iree_gpu.gpu_padding_resolver<>,
-  iree.gpu.target = #iree_gpu.target<arch = "gfx942",
+  iree_codegen.target_info = #iree_gpu.target<arch = "gfx942",
                                      features = "",
                                      wgp = <compute = fp32,
                                             storage =  b32,
@@ -134,7 +134,7 @@ util.func public @with_pad_encoding_using_pad_attr(%arg0: index, %arg1: index) {
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip",
   iree.encoding.resolver = #iree_gpu.gpu_padding_resolver<>,
-  iree.gpu.target = #iree_gpu.target<arch = "gfx942",
+  iree_codegen.target_info = #iree_gpu.target<arch = "gfx942",
                                      features = "",
                                      wgp = <compute = fp32,
                                             storage =  b32,
@@ -165,7 +165,7 @@ util.func public @error_with_pad_encoding_using_pad_attr(%arg0: index, %arg1: in
 
 // -----
 
-// Creates an nop encoding if no `iree.gpu.target` is provided.
+// Creates an nop encoding if no `iree_codegen.target_info` is provided.
 
 #executable_target_rocm_bytecode_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip", iree.encoding.resolver = #iree_gpu.gpu_padding_resolver<> }>
 #device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_rocm_bytecode_fb]> : !hal.device

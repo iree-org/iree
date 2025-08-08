@@ -915,7 +915,7 @@ hal.executable private @split_reduction_2d_permuted_mapping_executable {
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @bounded_scf_forall_2D {
   hal.executable.variant public @bounded_scf_forall_2D target(#hal.executable.target<"", "", {
-      iree.gpu.target = #iree_codegen.simple_target<max_workgroup_count = [1024, 512]>}>) {
+      iree_codegen.target_info = #iree_codegen.simple_target<max_workgroup_count = [1024, 512]>}>) {
     hal.executable.export public @bounded_scf_forall_2D layout(#pipeline_layout)
     count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index,
         %arg4: index, %arg5: index, %arg6: index) -> (index, index, index) {
@@ -986,7 +986,7 @@ hal.executable private @bounded_scf_forall_2D {
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @bounded_scf_forall_3D_interchange {
   hal.executable.variant public @bounded_scf_forall_3D_interchange target(#hal.executable.target<"", "", {
-      iree.gpu.target = #iree_codegen.simple_target<max_workgroup_count = [1024, 512, 256]>}>) {
+      iree_codegen.target_info = #iree_codegen.simple_target<max_workgroup_count = [1024, 512, 256]>}>) {
     hal.executable.export public @bounded_scf_forall_3D_interchange layout(#pipeline_layout)
     count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3

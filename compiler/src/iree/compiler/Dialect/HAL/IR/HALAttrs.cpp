@@ -126,6 +126,10 @@ Attribute ExecutableTargetAttr::parse(AsmParser &p, Type type) {
   if (failed(p.parseGreater())) {
     return {};
   }
+  // Make sure the configurationAttr is present.
+  if (!configurationAttr) {
+    configurationAttr = DictionaryAttr::get(p.getContext());
+  }
   return get(p.getContext(), backendAttr, formatAttr, configurationAttr);
 }
 
