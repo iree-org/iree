@@ -177,12 +177,11 @@ func.func @load_from_padded_and_mmt() {
   {
     abi = "hip",
     iree.encoding.resolver = #iree_gpu.gpu_padding_resolver<>,
-    iree.gpu.target = #iree_gpu.target<arch = "gfx1100",
+    iree_codegen.target_info = #iree_gpu.target<arch = "gfx1100",
                                        features = "",
                                        wgp = <compute =  fp32,
                                               storage =  b32,
                                               subgroup =  arithmetic,
-                                              dot =  none, mma = [], scaled_mma = [],
                                               subgroup_size_choices = [32, 64],
                                               max_workgroup_sizes = [1024, 1024, 1024],
                                               max_thread_count_per_workgroup = 1024,

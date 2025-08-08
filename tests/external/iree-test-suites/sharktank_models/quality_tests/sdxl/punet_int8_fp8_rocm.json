@@ -27,7 +27,7 @@
     ],
     "outputs": [
         {
-            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_output.bin",
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_output_v2.bin",
             "value": "1x4x128x128xf16"
         }
     ],
@@ -42,8 +42,6 @@
         "--iree-vm-target-truncate-unsupported-floats",
         "--iree-llvmgpu-enable-prefetch=true",
         "--iree-opt-data-tiling=false",
-        "--iree-codegen-gpu-native-math-precision=true",
-        "--iree-codegen-llvmgpu-use-vector-distribution",
         "--iree-hip-waves-per-eu=2",
         "--iree-execution-model=async-external",
         "--iree-scheduling-dump-statistics-format=json",

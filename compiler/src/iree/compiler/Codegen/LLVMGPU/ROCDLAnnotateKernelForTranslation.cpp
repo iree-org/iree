@@ -29,8 +29,9 @@ namespace {
 // Extracts the amdgpu chipset version from the chip architecture in the
 // executable target attribute.
 static FailureOr<amdgpu::Chipset>
-getChipsetVersion(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  IREE::GPU::TargetAttr gpuTarget = getGPUTargetAttr(targetAttr);
+getChipsetVersion(MLIRContext *context,
+                  IREE::HAL::ExecutableTargetAttr targetAttr) {
+  IREE::GPU::TargetAttr gpuTarget = getGPUTargetAttr(context, targetAttr);
   assert(gpuTarget);
   return amdgpu::Chipset::parse(gpuTarget.getArch());
 }
@@ -69,15 +70,16 @@ annotateKernelForTranslation(LLVM::LLVMFuncOp funcOp,
   }
 
   IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
-  if (std::optional<IntegerAttr> attr =
-          getConfigIntegerAttr(targetAttr, "waves_per_eu")) {
-    rocdlDialect->getWavesPerEuAttrHelper().setAttr(funcOp, *attr);
+  if (IntegerAttr attr =
+          getConfigWavesPerEuAttr(targetAttr.getConfiguration())) {
+    rocdlDialect->getWavesPerEuAttrHelper().setAttr(funcOp, attr);
   }
 
   // Kernel argument preloading is only supported on gfx942 and newer targets
   // from the CDNA family. This is enabled using the `inreg` function argument
   // attribute.
-  FailureOr<amdgpu::Chipset> chipset = getChipsetVersion(targetAttr);
+  FailureOr<amdgpu::Chipset> chipset =
+      getChipsetVersion(builder.getContext(), targetAttr);
   if (failed(chipset))
     return variantOp.emitError() << "failed to parse amdgpu chipset";
 

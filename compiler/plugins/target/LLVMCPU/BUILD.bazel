@@ -128,6 +128,7 @@ iree_compiler_cc_library(
     ],
     deps = [
         ":ResolveCPUAndCPUFeatures",
+        "//compiler/src/iree/compiler/Codegen/LLVMCPU",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Analysis",
         "@llvm-project//llvm:Core",

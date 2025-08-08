@@ -84,7 +84,7 @@ static IREE::GPU::UKernelConfigAttr getInitialUKernelConfig(Operation *op) {
     return {};
   }
   auto execTarget = IREE::HAL::ExecutableTargetAttr::lookup(op);
-  if (!hasUkernel(execTarget, name)) {
+  if (!execTarget || !hasUkernel(execTarget.getConfiguration(), name)) {
     return {};
   }
   if (isROCMBackend(execTarget)) {
@@ -363,7 +363,7 @@ static IREE::GPU::UKernelConfigAttr ensureUKernelBitcodeAndFinalizeConfig(
     return {};
   }
   auto target = IREE::HAL::ExecutableTargetAttr::lookup(op);
-  IREE::GPU::TargetAttr gpuTarget = getGPUTargetAttr(target);
+  IREE::GPU::TargetAttr gpuTarget = getGPUTargetAttr(op->getContext(), target);
   if (!gpuTarget) {
     return {};
   }

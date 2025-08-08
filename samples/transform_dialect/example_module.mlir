@@ -26,7 +26,7 @@
 // }
 
 #target = #iree_gpu.target<arch = "", features = "spirv:v1.3,cap:Shader", wgp = <
-  compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [], scaled_mma = [], subgroup_size_choices = [64, 64],
+  compute = fp32|int32, storage = b32, subgroup = none, subgroup_size_choices = [64, 64],
   max_workgroup_sizes = [128, 128, 64], max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384, max_workgroup_counts = [65535, 65535, 65535]>>
 
 #pipeline_layout_0 = #hal.pipeline.layout<bindings = [
@@ -47,13 +47,13 @@ module attributes {
   hal.device.targets = [
     #hal.device.target<"vulkan", [
       #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-        iree.gpu.target = #target
+        iree_codegen.target_info = #target
       }>
     ]> : !hal.device
   ]
 } {
   hal.executable private @example_module_dispatch_0 {
-    hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {iree.gpu.target = #target}>) {
+    hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {iree_codegen.target_info = #target}>) {
       hal.executable.export public @example_module_dispatch_0_generic_80_f32 ordinal(0) layout(#pipeline_layout_0) count(%arg0: !hal.device) -> (index, index, index) {
         %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
         hal.return %x, %y, %z : index, index, index
@@ -77,7 +77,7 @@ module attributes {
     }
   }
   hal.executable private @example_module_dispatch_1 {
-    hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {iree.gpu.target = #target}>) {
+    hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {iree_codegen.target_info = #target}>) {
       hal.executable.export public @example_module_dispatch_1_matmul_16x16x5_f32 ordinal(0) layout(#pipeline_layout_1) count(%arg0: !hal.device) -> (index, index, index) {
         %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
         hal.return %x, %y, %z : index, index, index
@@ -99,7 +99,7 @@ module attributes {
     }
   }
   hal.executable private @example_module_dispatch_2 {
-    hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {iree.gpu.target = #target}>) {
+    hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {iree_codegen.target_info = #target}>) {
       hal.executable.export public @example_module_dispatch_2_generic_16x16_f32 ordinal(0) layout(#pipeline_layout_2) count(%arg0: !hal.device) -> (index, index, index) {
         %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
         hal.return %x, %y, %z : index, index, index
