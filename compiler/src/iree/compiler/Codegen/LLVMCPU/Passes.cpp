@@ -270,9 +270,9 @@ void addMultiTilingExpertPassPipeline(
 
   // `VectorInnerParallelTiles` level models the tiling and fusion for the
   // dimensions that are not captured in root op. I.e., root op may not have the
-  // config for the level. Thus, we run the LLVMCPUTileAndFuse pass for
-  // consumers.
-  funcPassManager.addPass(createLLVMCPUTileAndFusePass(
+  // config for the level. Thus, we use the last operation that has the tiling
+  // level as anchor.
+  funcPassManager.addPass(createLLVMCPUTileLastOpAndFuseProducerConsumerPass(
       IREE::CPU::TilingLevel::VectorInnerParallelTiles));
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
   funcPassManager.addPass(createConcretizePadResultShapePass());
@@ -517,8 +517,8 @@ void addCPULinalgExtTileAndVectorizePipeline(
 void addCPUDefaultPassPipeline(OpPassManager &funcPassManager,
                                const LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
-  funcPassManager.addPass(createLLVMCPUTileAndFusePass(
-      IREE::CPU::TilingLevel::VectorCommonParallelTiles));
+  funcPassManager.addPass(createLLVMCPUTileLastOpAndFuseProducerConsumerPass(
+      IREE::CPU::TilingLevel::VectorInnerParallelTiles));
   addCPUBufferizePasses(funcPassManager);
 }
 

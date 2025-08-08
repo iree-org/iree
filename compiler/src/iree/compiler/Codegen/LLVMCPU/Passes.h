@@ -50,6 +50,10 @@ createLLVMCPUTileRootAndFuseInputOperandsPass(
     IREE::CPU::TilingLevel tilingLevel);
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMCPUTileLastOpAndFuseProducerConsumerPass(
+    IREE::CPU::TilingLevel tilingLevel);
+
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUVerifyVectorSizeLegalityPass(
     int64_t maxAllowedNumberOfNativeVectors);
 
