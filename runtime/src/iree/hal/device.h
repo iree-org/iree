@@ -385,6 +385,27 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_write(
     iree_hal_file_t* target_file, uint64_t target_offset,
     iree_device_size_t length, iree_hal_write_flags_t flags);
 
+// Enqueues a dispatch over a 3D grid of workgroups.
+// The request may execute overlapped with any other queue operations. The
+// executable specified must be registered for use with the device driver owning
+// the queue it is scheduled on.
+//
+// The provided constant data and binding list will be recorded into the queue
+// and need not remain live beyond the call. Binding buffers will be retained by
+// the queue until it the operation has completed.
+//
+// All provided |bindings| must be directly specified and not reference binding
+// table slots.
+//
+// See iree_hal_command_buffer_dispatch for more information.
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_dispatch(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_executable_t* executable, int32_t entry_point,
+    const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
+    const iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
+
 // Executes a command buffer on a device queue.
 // No commands will execute until the wait fence has been reached and the signal
 // fence will be signaled when all commands have completed. If a command buffer
@@ -630,6 +651,15 @@ typedef struct iree_hal_device_vtable_t {
       iree_hal_file_t* target_file, uint64_t target_offset,
       iree_device_size_t length, iree_hal_write_flags_t flags);
 
+  iree_status_t(IREE_API_PTR* queue_dispatch)(
+      iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+      const iree_hal_semaphore_list_t wait_semaphore_list,
+      const iree_hal_semaphore_list_t signal_semaphore_list,
+      iree_hal_executable_t* executable, int32_t entry_point,
+      const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
+      const iree_hal_buffer_ref_list_t bindings,
+      iree_hal_dispatch_flags_t flags);
+
   iree_status_t(IREE_API_PTR* queue_execute)(
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
       const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -678,6 +708,14 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_emulated_copy(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length, iree_hal_copy_flags_t flags);
+
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_emulated_dispatch(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_executable_t* executable, int32_t entry_point,
+    const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
+    const iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
 
 #ifdef __cplusplus
 }  // extern "C"
