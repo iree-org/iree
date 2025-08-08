@@ -1,0 +1,113 @@
+# Copyright 2025 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_binary")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+# Build test kernels custom target
+# Note: This would typically be a genrule or custom rule in Bazel
+# but for now we keep it as a comment to match the CMake structure
+# genrule(
+#     name = "cuda_hal_test_kernels",
+#     cmd = "$(location kernels/compile_kernels.sh)",
+#     tools = ["kernels/compile_kernels.sh"],
+#     outs = ["kernels/vector_add.ptx", "kernels/matrix_multiply.ptx"],
+# )
+
+iree_runtime_cc_binary(
+    name = "cuda_api_demo",
+    srcs = ["cuda_api_demo.c"],
+    deps = [
+        # ":stream_hal_test_kernels",  # Would depend on generated kernels
+        "//experimental/streaming/binding/cuda",
+    ],
+)
+
+iree_runtime_cc_binary(
+    name = "hip_api_demo",
+    srcs = ["hip_api_demo.c"],
+    deps = [
+        # ":stream_hal_test_kernels",  # Would depend on generated kernels
+        "//experimental/streaming/binding/hip",
+    ],
+)
+
+iree_runtime_cc_binary(
+    name = "hip_graph_api_demo",
+    srcs = ["hip_graph_api_demo.c"],
+    deps = [
+        # ":stream_hal_test_kernels",  # Would depend on generated kernels
+        "//experimental/streaming/binding/hip",
+    ],
+)
+
+# Graph utility library for benchmarks
+cc_library(
+    name = "graph_util",
+    srcs = ["graph_util.c"],
+    hdrs = ["graph_util.h"],
+    deps = [
+        "//experimental/streaming",
+        "//runtime/src/iree/base",
+    ],
+)
+
+cc_test(
+    name = "graph_analysis_benchmark",
+    srcs = ["graph_analysis_benchmark.cc"],
+    tags = ["benchmark"],
+    deps = [
+        ":graph_util",
+        "//experimental/streaming",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:benchmark",
+        "//runtime/src/iree/testing:benchmark_main",
+    ],
+)
+
+cc_test(
+    name = "graph_record_benchmark",
+    srcs = ["graph_record_benchmark.cc"],
+    tags = ["benchmark"],
+    deps = [
+        ":graph_util",
+        "//experimental/streaming",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:benchmark",
+        "//runtime/src/iree/testing:benchmark_main",
+    ],
+)
+
+cc_test(
+    name = "graph_instantiate_benchmark",
+    srcs = ["graph_instantiate_benchmark.cc"],
+    tags = ["benchmark"],
+    deps = [
+        ":graph_util",
+        "//experimental/streaming",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:benchmark",
+        "//runtime/src/iree/testing:benchmark_main",
+    ],
+)
+
+cc_test(
+    name = "graph_exec_benchmark",
+    srcs = ["graph_exec_benchmark.cc"],
+    tags = ["benchmark"],
+    deps = [
+        ":graph_util",
+        "//experimental/streaming",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:benchmark",
+        "//runtime/src/iree/testing:benchmark_main",
+    ],
+)

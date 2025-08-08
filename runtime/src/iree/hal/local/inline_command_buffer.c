@@ -362,19 +362,20 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
   iree_hal_inline_command_buffer_t* command_buffer =
       iree_hal_inline_command_buffer_cast(base_command_buffer);
 
+  // DO NOT SUBMIT
   // TODO(benvanik): support here; should be easy as we just either pass in the
   // constants or dereference the indirect buffer.
-  if (iree_hal_dispatch_uses_custom_arguments(flags)) {
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "direct/indirect arguments are not supported on "
-                            "the inline CPU command buffer");
-  }
+  // if (iree_hal_dispatch_uses_custom_arguments(flags)) {
+  //   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+  //                           "direct/indirect arguments are not supported on "
+  //                           "the inline CPU command buffer");
+  // }
 
   iree_hal_local_executable_t* local_executable =
       iree_hal_local_executable_cast(executable);
 
   // Dispatch attrs are always present after validation.
-  iree_hal_executable_dispatch_attrs_v0_t dispatch_attrs =
+  const iree_hal_executable_dispatch_attrs_v0_t dispatch_attrs =
       local_executable->dispatch_attrs[export_ordinal];
   const iree_host_size_t local_memory_size =
       dispatch_attrs.local_memory_pages *
@@ -418,16 +419,19 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
 
   // Push constants are pulled directly from the args. Note that we require 4
   // byte alignment and if the input buffer is not aligned we have to fail.
-  if (IREE_UNLIKELY((constants.data_length % sizeof(uint32_t)) != 0)) {
-    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                            "constants must be 4-byte aligned");
-  } else if (IREE_UNLIKELY(constants.data_length !=
-                           dispatch_attrs.constant_count * sizeof(uint32_t))) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "constant count mismatch, expected %u but was provided %" PRIhsz,
-        (uint32_t)dispatch_attrs.constant_count,
-        constants.data_length / sizeof(uint32_t));
+  if (!iree_hal_dispatch_uses_custom_arguments(flags)) {
+    if (IREE_UNLIKELY((constants.data_length % sizeof(uint32_t)) != 0)) {
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                              "constants must be 4-byte aligned");
+    } else if (IREE_UNLIKELY(constants.data_length !=
+                             dispatch_attrs.constant_count *
+                                 sizeof(uint32_t))) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "constant count mismatch, expected %u but was provided %" PRIhsz,
+          (uint32_t)dispatch_attrs.constant_count,
+          constants.data_length / sizeof(uint32_t));
+    }
   }
   dispatch_state->constant_count = dispatch_attrs.constant_count;
   dispatch_state->constants = (const uint32_t*)constants.data;
@@ -437,31 +441,34 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
   // Note that we are just directly setting the binding data pointers here with
   // no ownership/retaining/etc - it's part of the HAL contract that buffers are
   // kept valid for the duration they may be in use.
-  if (IREE_UNLIKELY(bindings.count != dispatch_attrs.binding_count)) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "binding count mismatch, expected %u but was provided %" PRIhsz,
-        (uint32_t)dispatch_attrs.binding_count, bindings.count);
-  }
-  dispatch_state->binding_count = bindings.count;
-  for (iree_host_size_t i = 0; i < bindings.count; ++i) {
-    // TODO(benvanik): track mapping so we can properly map/unmap/flush/etc.
-    iree_hal_buffer_mapping_t buffer_mapping = {{0}};
-    if (IREE_LIKELY(bindings.values[i].buffer)) {
-      IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-          bindings.values[i].buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
-          IREE_HAL_MEMORY_ACCESS_ANY, bindings.values[i].offset,
-          bindings.values[i].length, &buffer_mapping));
-    } else {
+  if (!iree_hal_dispatch_uses_custom_arguments(flags)) {
+    if (IREE_UNLIKELY(bindings.count != dispatch_attrs.binding_count)) {
       return iree_make_status(
-          IREE_STATUS_FAILED_PRECONDITION,
-          "required binding %" PRIhsz
-          " is NULL; all bindings must have a valid pointer",
-          i);
+          IREE_STATUS_INVALID_ARGUMENT,
+          "binding count mismatch, expected %u but was provided %" PRIhsz,
+          (uint32_t)dispatch_attrs.binding_count, bindings.count);
     }
-    command_buffer->state.binding_ptr_storage[i] = buffer_mapping.contents.data;
-    command_buffer->state.binding_length_storage[i] =
-        buffer_mapping.contents.data_length;
+    dispatch_state->binding_count = bindings.count;
+    for (iree_host_size_t i = 0; i < bindings.count; ++i) {
+      // TODO(benvanik): track mapping so we can properly map/unmap/flush/etc.
+      iree_hal_buffer_mapping_t buffer_mapping = {{0}};
+      if (IREE_LIKELY(bindings.values[i].buffer)) {
+        IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
+            bindings.values[i].buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
+            IREE_HAL_MEMORY_ACCESS_ANY, bindings.values[i].offset,
+            bindings.values[i].length, &buffer_mapping));
+      } else {
+        return iree_make_status(
+            IREE_STATUS_FAILED_PRECONDITION,
+            "required binding %" PRIhsz
+            " is NULL; all bindings must have a valid pointer",
+            i);
+      }
+      command_buffer->state.binding_ptr_storage[i] =
+          buffer_mapping.contents.data;
+      command_buffer->state.binding_length_storage[i] =
+          buffer_mapping.contents.data_length;
+    }
   }
 
   // TODO(benvanik): plumb through an arena or fixed-size reservation to use.

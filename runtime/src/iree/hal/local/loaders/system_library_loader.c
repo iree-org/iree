@@ -444,6 +444,29 @@ static void iree_hal_system_library_loader_destroy(
 #define IREE_PLATFORM_DYLIB_TYPE "elf"
 #endif  // IREE_PLATFORM_*
 
+static iree_status_t iree_hal_system_library_loader_infer_format(
+    iree_hal_executable_loader_t* base_executable_loader,
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_const_byte_span_t executable_data,
+    iree_host_size_t executable_format_capacity, char* executable_format,
+    iree_host_size_t* out_inferred_size) {
+  iree_hal_system_library_loader_t* executable_loader =
+      (iree_hal_system_library_loader_t*)base_executable_loader;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // DO NOT SUBMIT
+  // iree_status_t status =
+  //     iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+  //                      "system library size inference not yet implemented");
+  iree_status_t status = iree_ok_status();
+  (void)executable_loader;
+  strncpy(executable_format, "system-elf-x86_64", executable_format_capacity);
+  *out_inferred_size = executable_data.data_length;
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 static bool iree_hal_system_library_loader_query_support(
     iree_hal_executable_loader_t* base_executable_loader,
     iree_hal_executable_caching_mode_t caching_mode,
@@ -474,6 +497,7 @@ static iree_status_t iree_hal_system_library_loader_try_load(
 static const iree_hal_executable_loader_vtable_t
     iree_hal_system_library_loader_vtable = {
         .destroy = iree_hal_system_library_loader_destroy,
+        .infer_format = iree_hal_system_library_loader_infer_format,
         .query_support = iree_hal_system_library_loader_query_support,
         .try_load = iree_hal_system_library_loader_try_load,
 };

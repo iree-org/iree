@@ -199,15 +199,27 @@ static inline int iree_math_count_trailing_zeros_u64(uint64_t n) {
 
 // Returns the number of 1 bits in a 32 bit value.
 static inline int iree_math_count_ones_u32(uint32_t n) {
+#if IREE_HAVE_BUILTIN(__builtin_popcount) || defined(__GNUC__)
+  return __builtin_popcount(n);
+#elif defined(IREE_COMPILER_MSVC_COMPAT)
+  return (int)__popcnt(n);
+#else
   n -= ((n >> 1) & 0x55555555u);
   n = ((n >> 2) & 0x33333333u) + (n & 0x33333333u);
   return (int)((((n + (n >> 4)) & 0x0F0F0F0Fu) * 0x01010101u) >> 24);
+#endif  // __builtin_popcount
 }
 
 // Returns the number of 1 bits in a 64 bit value.
 static inline int iree_math_count_ones_u64(uint64_t n) {
+#if IREE_HAVE_BUILTIN(__builtin_popcountll) || defined(__GNUC__)
+  return __builtin_popcountll(n);
+#elif defined(IREE_COMPILER_MSVC_COMPAT) && defined(IREE_ARCH_X86_64)
+  return (int)__popcnt64(n);
+#else
   return iree_math_count_ones_u32(n >> 32) +
          iree_math_count_ones_u32(n & 0xFFFFFFFFu);
+#endif  // __builtin_popcount
 }
 
 //==============================================================================
