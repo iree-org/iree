@@ -22,6 +22,7 @@
 #include "iree/base/internal/arena.h"
 #include "iree/hal/utils/file_registry.h"
 #include "iree/hal/utils/file_transfer.h"
+#include "iree/hal/utils/queue_emulation.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_webgpu_device_t
