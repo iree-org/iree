@@ -352,3 +352,39 @@ func.func @workgroup_and_dispatch_scope(%arg0 : tensor<32xbf16>, %arg1 : tensor<
 //       WORKGROUP-SCOPE:   } {mapping = [#iree_codegen.workgroup_mapping<x>]}
 //   WORKGROUP-SCOPE-NOT:   iree_linalg_ext.map_scatter
 //       WORKGROUP-SCOPE:   tensor.extract_slice
+
+// -----
+
+// Tests that the consumer fusion pattern stops after fusion fails, and the
+// consumer ops are not added back to the worklist (more context in #21622).
+
+#map = affine_map<(d0) -> (d0 * 8)>
+func.func @consumer_unfusable_due_to_init(%arg0: tensor<?xi32>, %arg1: tensor<?xi32>) -> tensor<?xi32> {
+  %c0 = arith.constant 0 : index
+  %1 = scf.forall (%arg2) in (64) shared_outs(%arg3 = %arg1) -> (tensor<?xi32>) {
+    %2 = affine.apply #map(%arg2)
+    %extracted_slice = tensor.extract_slice %arg0[%2] [8] [1] : tensor<?xi32> to tensor<8xi32>
+    %extracted_slice0 = tensor.extract_slice %arg3[%2] [8] [1] : tensor<?xi32> to tensor<8xi32>
+    %copied = linalg.copy ins(%extracted_slice : tensor<8xi32>) outs(%extracted_slice0 : tensor<8xi32>) -> tensor<8xi32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %copied into %arg3[%2] [8] [1] : tensor<8xi32> into tensor<?xi32>
+    }
+  }
+  %barrier = util.optimization_barrier %1 : tensor<?xi32>
+  %dim = tensor.dim %barrier, %c0 : tensor<?xi32>
+  %empty = tensor.empty(%dim) : tensor<?xi32>
+  %consumer = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]}
+      ins(%1 : tensor<?xi32>) outs(%empty : tensor<?xi32>) {
+  ^bb0(%in: i32, %out: i32):
+    %add = arith.addi %in, %in : i32
+    linalg.yield %add : i32
+  } -> tensor<?xi32>
+  return %consumer : tensor<?xi32>
+}
+
+// DISPATCH-SCOPE-LABEL: func @consumer_unfusable_due_to_init
+//       DISPATCH-SCOPE:   scf.forall
+//       DISPATCH-SCOPE:     linalg.copy
+//       DISPATCH-SCOPE:     scf.forall.in_parallel
+//       DISPATCH-SCOPE:       tensor.parallel_insert_slice
+//       DISPATCH-SCOPE:   linalg.generic
