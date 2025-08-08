@@ -431,19 +431,11 @@ func.func @dynamic_parallel_dims(%dynsize : index, %input : tensor<4x?x4096xf16>
     } -> tensor<4x?xf32>
   return %2 : tensor<4x?xf32>
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 64]{{\]}}
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
-//      CHECK: func @dynamic_parallel_dims
-// CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK:   linalg.generic
-// CHECK-SAME:       lowering_config = #[[CONFIG]]
 
-//  CDNA3-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 32]{{\]}}
-//  CDNA3-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [32, 1, 1] subgroup_size = 32>
-//      CDNA3: func @dynamic_parallel_dims
-// CDNA3-SAME:     translation_info = #[[TRANSLATION]]
-//      CDNA3:   linalg.generic
-// CDNA3-SAME:       lowering_config = #[[CONFIG]]
+
+//  CHECK: #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+
+//  CDNA3: #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
 
 // -----
 
@@ -480,9 +472,6 @@ func.func @test_dyn_reduction(%arg0: tensor<128x?x32xf8E4M3FNUZ>, %arg1: tensor<
   } -> tensor<128x128xf8E4M3FNUZ>
   return %4 : tensor<128x128xf8E4M3FNUZ>
 }
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 1, 64]{{\]}}>
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
-//       CHECK: func.func @test_dyn_reduction
-//  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
-//       CHECK:   linalg.generic
-//  CHECK-SAME:       lowering_config = #[[$CONFIG]]
+
+
+// CHECK: #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>

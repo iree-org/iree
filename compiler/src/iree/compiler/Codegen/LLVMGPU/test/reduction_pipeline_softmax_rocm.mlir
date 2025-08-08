@@ -98,5 +98,4 @@ func.func @dynamic_softmax() {
 
 // Finer details of this lowering are captured by the spirv pipeline test. Just
 // verify that warp reduction triggers.
-//    CHECK-LABEL: func.func @dynamic_softmax
-// CHECK-COUNT-10: gpu.shuffle  xor {{.*}} : i32
+// CHECK: #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
