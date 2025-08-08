@@ -40,7 +40,7 @@ hal.executable private @single_specialization_executable {
   }
 }
 
-// Note the `CHECK-NOT: tensor.dim` which checks than unused `tensor.dim` ops are eliminated.
+// Note the `CHECK-NOT: tensor.dim` which checks that unused `tensor.dim` ops are eliminated.
 
 // CHECK-LABEL: hal.executable private @single_specialization_executable
 
