@@ -16,15 +16,6 @@
 
 namespace mlir::iree_compiler {
 
-/// Deprecated! This flag had buggy/unintentional semantics.
-/// Its original comment said:
-/// ""use native hardware operations instead of polynomial approximation".
-static llvm::cl::opt<bool> clNativeMathPrecision(
-    "iree-codegen-gpu-native-math-precision",
-    llvm::cl::desc("Deprecated! This flag doesn't do anything anymore and will "
-                   "be removed soon."),
-    llvm::cl::init(false));
-
 #define GEN_PASS_DEF_MATHTRANSFORMPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
@@ -173,27 +164,12 @@ static bool predicateDeviceLibImpl(StringRef name,
 
 namespace {
 
-struct DeprecationWarningForNativeMathPrecision {
-  DeprecationWarningForNativeMathPrecision() {
-    if (clNativeMathPrecision) {
-      clNativeMathPrecision.error(
-          "This option is deprecated, does not do anything anymore, and will "
-          "be removed soon. It was mainly used on the ROCm target, but the "
-          "behavior that it once enabled is now default on ROCm. More "
-          "generally, MathTransformPass should do the right things for each "
-          "target.");
-    }
-  }
-};
-
 class MathTransformPass final
     : public impl::MathTransformPassBase<MathTransformPass> {
 public:
   using Base::Base;
 
   void runOnOperation() override {
-    static DeprecationWarningForNativeMathPrecision warning;
-
     RewritePatternSet patterns(&getContext());
     auto target = IREE::HAL::ExecutableTargetAttr::lookup(getOperation());
     if (!target) {
