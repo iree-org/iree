@@ -88,7 +88,7 @@ public:
     Builder b(context);
     SmallVector<NamedAttribute, 1> configItems;
     if (auto target = GPU::getWebGPUTargetDetails(context)) {
-      configItems.emplace_back(kGPUTargetAttrName, target);
+      addConfigGPUTarget(context, target, configItems);
     }
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(

@@ -84,6 +84,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     // Do nothing without target
     return;
   }
+  DictionaryAttr targetConfig = target.getConfiguration();
 
   IREE::Codegen::TranslationInfoAttr translationInfo =
       getTranslationInfo(funcOp);
@@ -94,18 +95,20 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   LoweringConfigAttrInterface loweringConfig = getRootLoweringConfig(funcOp);
   auto pipeline = translationInfo.getDispatchLoweringPassPipeline();
   LLVMCPUPipelineOptions pipelineOpts;
-  if (isX86(target) || isRISCV(target)) {
+  if (isX86(targetConfig) || isRISCV(targetConfig)) {
     pipelineOpts.useConfiguredVectorSizes = false;
   }
   pipelineOpts.decomposePackUnPackOps =
       isOptEnabled(funcOp, getEnableDecompositionStr());
-  pipelineOpts.lowerToAVX2 = hasAVX2Feature(target);
+  pipelineOpts.lowerToAVX2 = hasAVX2Feature(targetConfig);
   pipelineOpts.enableVectorMasking =
-      isX86(target) || isRISCV(target) ||
-      (isAArch64(target) && hasAnySVEFeature(target));
-  pipelineOpts.enableAArch64SME =
-      isAArch64(target) && hasAnySVEFeature(target) && hasSMEFeature(target);
-  pipelineOpts.enableAArch64I8mm = isAArch64(target) && hasI8mmFeature(target);
+      isX86(targetConfig) || isRISCV(targetConfig) ||
+      (isAArch64(targetConfig) && hasAnySVEFeature(targetConfig));
+  pipelineOpts.enableAArch64SME = isAArch64(targetConfig) &&
+                                  hasAnySVEFeature(targetConfig) &&
+                                  hasSMEFeature(targetConfig);
+  pipelineOpts.enableAArch64I8mm =
+      isAArch64(targetConfig) && hasI8mmFeature(targetConfig);
   pipelineOpts.enablePeeling = isOptEnabled(funcOp, getEnableLoopPeelingStr());
   if (loweringConfig &&
       llvm::all_of(loweringConfig.getWorkgroupTileSizes(),

@@ -245,7 +245,8 @@ public:
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) override {
-    bool enableAArch64SME = isAArch64(targetAttr) && hasSMEFeature(targetAttr);
+    bool enableAArch64SME = isAArch64(targetAttr.getConfiguration()) &&
+                            hasSMEFeature(targetAttr.getConfiguration());
     buildLLVMCPUCodegenPassPipeline(passManager, enableAArch64SME);
   }
 
@@ -556,7 +557,7 @@ public:
 
     if (target.linkUkernelBitcode) {
       // Link in ukernel bitcode.
-      if (hasUkernel(variantOp.getTarget())) {
+      if (hasUkernel(variantOp.getTarget().getConfiguration())) {
         llvm::Expected<std::unique_ptr<llvm::Module>> bitcode =
             loadUKernelBitcode(targetMachine.get(), context);
         if (!bitcode) {

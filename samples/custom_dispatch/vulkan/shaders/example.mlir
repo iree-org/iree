@@ -14,7 +14,7 @@
 // and compilation options (architectures, etc) can be embedded for runtime
 // selection.
 #spirv_target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<
+  iree_codegen.target_info = #iree_gpu.target<
     arch = "", features = "spirv:v1.3,cap:Shader", wgp = <
       compute = fp32|int32, storage = b32, subgroup = none,
       dot = none, mma = [], scaled_mma = [], subgroup_size_choices = [64, 64],
