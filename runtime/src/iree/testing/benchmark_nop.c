@@ -43,6 +43,11 @@ iree_benchmark_def_t* iree_make_function_benchmark(iree_benchmark_fn_t fn) {
   return NULL;
 }
 
+iree_benchmark_def_t* iree_make_parametric_benchmark(iree_benchmark_fn_t fn,
+                                                     int64_t arg) {
+  return NULL;
+}
+
 void iree_benchmark_initialize(int* argc, char** argv) {}
 
 void iree_benchmark_run_specified(void) {}
