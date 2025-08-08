@@ -26,7 +26,6 @@
 static const char kTranslationInfoAttrName[] = "translation_info";
 static const char kCompilationInfoAttrName[] = "compilation_info";
 static const char kRootOpInfoAttrName[] = "root_op";
-static const char kUKernelProviderName[] = "iree_codegen.ukernel_provider";
 static const char kUKernelDescriptorName[] = "iree_codegen.ukernel";
 
 namespace mlir::iree_compiler {
