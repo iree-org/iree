@@ -431,12 +431,12 @@ func.func @batch_matvec_f16_f32() {
   return
 }
 
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
 // CHECK-LABEL: @batch_matvec_f16_f32
 //       CHECK:   linalg.generic
 //  CHECK-SAME:      attrs = {lowering_config = #iree_gpu.lowering_config<{
 //  CHECK-SAME:                 lane_basis = {{\[}}[1, 1, 64], [0, 1, 2]],
-//  CHECK-SAME:                 partial_reduction = [0, 0, 2048],
-//  CHECK-SAME:                 subgroup_basis = {{\[}}[1, 1, 4], [0, 1, 2]],
+//  CHECK-SAME:                 partial_reduction = [0, 0, 512],
+//  CHECK-SAME:                 subgroup_basis = {{\[}}[1, 1, 1], [0, 1, 2]],
 //  CHECK-SAME:                 thread = [0, 0, 8],
 //  CHECK-SAME:                 workgroup = [2, 1, 0]
