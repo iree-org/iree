@@ -92,6 +92,13 @@ iree_status_t iree_hal_task_queue_submit_callback(
     iree_host_size_t resource_count, iree_hal_resource_t* const* resources,
     iree_task_call_closure_t callback);
 
+iree_status_t iree_hal_task_queue_submit_host_call(
+    iree_hal_task_queue_t* queue, iree_hal_device_t* device,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores, iree_hal_host_call_t call,
+    const uint64_t args[4], iree_hal_host_call_flags_t flags);
+
 iree_status_t iree_hal_task_queue_wait_idle(iree_hal_task_queue_t* queue,
                                             iree_timeout_t timeout);
 
