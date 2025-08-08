@@ -1,0 +1,59 @@
+# Copyright 2025 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_runtime_cc_library(
+    name = "streaming",
+    srcs = [
+        "context.c",
+        "device.c",
+        "event.c",
+        "graph.c",
+        "graph.h",
+        "graph_analysis.c",
+        "graph_exec.c",
+        "init.c",
+        "mem_pool.c",
+        "memory.c",
+        "module.c",
+        "peer.c",
+        "stream.c",
+    ],
+    hdrs = [
+        "internal.h",
+    ],
+    deps = [
+        ":internal",
+        "//experimental/streaming/util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/base/internal:synchronization",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal:drivers",
+        "//runtime/src/iree/hal/utils:resource_set",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "internal",
+    hdrs = [
+        "internal.h",
+    ],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/base/internal:synchronization",
+        "//runtime/src/iree/hal",
+    ],
+)

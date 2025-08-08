@@ -7,7 +7,14 @@
 import bazel_to_cmake_converter
 import bazel_to_cmake_targets
 
-DEFAULT_ROOT_DIRS = ["compiler", "runtime", "samples", "tests", "tools"]
+DEFAULT_ROOT_DIRS = [
+    "compiler",
+    "experimental/streaming",
+    "runtime",
+    "samples",
+    "tests",
+    "tools",
+]
 
 REPO_MAP = {
     # Since this is the @iree_core repo, map to empty since all internal
