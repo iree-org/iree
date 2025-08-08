@@ -160,6 +160,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //         CHECK:    vector.transfer_write
 //         CHECK:    gpu.barrier
 //         CHECK:    gpu.subgroup_reduce  maxnumf
+//         CHECK:    vector.broadcast %{{.*}} : f32 to vector<1x1x4xf32>
 //         CHECK:    scf.for {{.*}} -> (vector<1x1x4xf32>) {
 //         CHECK:      vector.transfer_read
 //         CHECK:      arith.subf
