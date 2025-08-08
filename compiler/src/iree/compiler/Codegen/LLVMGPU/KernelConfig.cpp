@@ -881,18 +881,6 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       threadLoads /= 2;
     }
   }
-  // Deduce the workgroup size we should use for reduction. Currently a
-  // workgroup processes all elements in reduction dimensions. Need to make sure
-  // the workgroup size we use can divide the total reduction size, and it's
-  // also within hardware limitations.
-  const int64_t maxWorkgroupSize = 1024;
-  int64_t workgroupSize = reductionSize / threadLoads;
-  if (workgroupSize > maxWorkgroupSize) {
-    workgroupSize = llvm::APIntOps::GreatestCommonDivisor(
-                        {64, static_cast<uint64_t>(workgroupSize)},
-                        {64, static_cast<uint64_t>(maxWorkgroupSize)})
-                        .getZExtValue();
-  }
 
   std::optional<int64_t> parallelSize = 1;
   for (int64_t dim : parallelDims) {
@@ -901,6 +889,33 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       break;
     }
     *parallelSize *= bounds[dim];
+  }
+
+  // Deduce the workgroup size we should use for reduction. Currently a
+  // workgroup processes all elements in reduction dimensions. Need to make sure
+  // the workgroup size we use can divide the total reduction size, and it's
+  // also within hardware limitations.
+
+  ArrayRef<int32_t> maxWgSizes = wgp.getMaxWorkgroupSizes();
+  int32_t maxWorkgroupSize = *llvm::max_element(maxWgSizes);
+  IREE::GPU::TargetChipAttr chip = target.getChip();
+  const int numWGPs = chip ? chip.getWgpCount() : 512;
+  const int numSIMDs = wgp.getSimdsPerWgp().value_or(4);
+
+  // If there is more than enough work to saturate all WGPs, use single subgroup
+  // per workgroup.
+  // TODO: Similarly decide on the local split k factor based on total number of
+  // SIMDs.
+  if (parallelSize && *parallelSize > numWGPs * numSIMDs) {
+    maxWorkgroupSize = target.getPreferredSubgroupSize();
+  }
+
+  int64_t workgroupSize = reductionSize / threadLoads;
+  if (workgroupSize > maxWorkgroupSize) {
+    workgroupSize = llvm::APIntOps::GreatestCommonDivisor(
+                        {64, static_cast<uint64_t>(workgroupSize)},
+                        {64, static_cast<uint64_t>(maxWorkgroupSize)})
+                        .getZExtValue();
   }
 
   // Total parallel size that can fill the GPU with enough workgorups.

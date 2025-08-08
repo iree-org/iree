@@ -71,13 +71,13 @@ func.func @dynamic_batch_generic_matvec() {
 }
 
 
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [1024, 1, 1] subgroup_size = 64
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
 // CHECK-LABEL: func.func @dynamic_batch_generic_matvec()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
-//  CHECK-SAME:               partial_reduction = [0, 0, 0, 8192],
-//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1, 16], [0, 1, 2, 3]],
+//  CHECK-SAME:               partial_reduction = [0, 0, 0, 512],
+//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1, 1], [0, 1, 2, 3]],
 //  CHECK-SAME:               thread = [0, 0, 0, 8],
 //  CHECK-SAME:               workgroup = [1, 1, 1, 0]
 
@@ -245,16 +245,16 @@ func.func @vmt2() attributes {hal.executable.target = #executable_target_rocm_hs
   return
 }
 
-//   CDNA3-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 32
+//   CDNA3-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [32, 1, 1] subgroup_size = 32
 // CDNA3-LABEL: func.func @vmt2()
 //  CDNA3-SAME:     translation_info = #[[$TRANSLATION]]
 //       CDNA3:   linalg.generic
 //  CDNA3-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
 //  CDNA3-SAME:               lane_basis = {{\[}}[1, 1, 32], [0, 1, 2]],
-//  CDNA3-SAME:               partial_reduction = [0, 0, 512],
-//  CDNA3-SAME:               subgroup_basis = {{\[}}[1, 1, 2], [0, 1, 2]],
+//  CDNA3-SAME:               partial_reduction = [0, 0, 256],
+//  CDNA3-SAME:               subgroup_basis = {{\[}}[1, 1, 1], [0, 1, 2]],
 //  CDNA3-SAME:               thread = [0, 0, 8],
-//  CDNA3-SAME:               workgroup = [1, 8, 0]
+//  CDNA3-SAME:               workgroup = [1, 4, 0]
 
 // -----
 

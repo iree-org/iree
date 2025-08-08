@@ -27,7 +27,7 @@
     ],
     "outputs": [
         {
-            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_fp16_out.0.bin",
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_fp16_out_v2.0.bin",
             "value": "1x4x128x128xf16"
         }
     ],
