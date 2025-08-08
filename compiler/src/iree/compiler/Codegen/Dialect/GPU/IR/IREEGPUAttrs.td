@@ -567,6 +567,10 @@ def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
 
     // An optional SKU identifier to distinguish different models.
     OptionalParameter<"StringAttr">:$sku,
+    // An optional memory bandwidth in TB/s.
+    OptionalParameter<"FloatAttr">:$memory_bandwidth_tbps,
+    // An optional performance dictionary in TFLOPS.
+    OptionalParameter<"DictionaryAttr">:$perf_tflops,
     // An optional extra dict
     // This field allows to inject more features/limits not supported in the
     // above list for better flexibility.
