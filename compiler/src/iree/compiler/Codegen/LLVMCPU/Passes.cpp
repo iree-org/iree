@@ -448,7 +448,7 @@ void addMultiTilingExpertPassPipeline(
   // dimensions that are not captured in root op. I.e., root op may not have the
   // config for the level. Thus, we run the LLVMCPUTileAndFuse pass for
   // consumers.
-  funcPassManager.addPass(createLLVMCPUTileAndFusePass(
+  funcPassManager.addPass(createLLVMCPUTileLastOpAndFuseProducerConsumerPass(
       IREE::CPU::TilingLevel::VectorInnerParallelTiles));
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
   funcPassManager.addPass(createConcretizePadResultShapePass());
@@ -463,6 +463,7 @@ void addMultiTilingExpertPassPipeline(
   }
 
   {
+    funcPassManager.addPass(createTileLargeTensorsPass());
     funcPassManager.addPass(createTensorToVectorVectorizePadPass());
     if (pipelineOpt.decomposePackUnPackOps) {
       funcPassManager.addPass(createDecomposePackUnPackOpsPass());

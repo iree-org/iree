@@ -3029,6 +3029,9 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
       continue;
 
     if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
+      if (llvm::any_of(computeOps, llvm::IsaPred<linalg::UnPackOp>)) {
+        continue;
+      }
       if (failed(adjustTileSizesForPackOp(entryPointFn, packOp, distTileSizes,
                                           parallelVecTileSizes))) {
         return failure();
