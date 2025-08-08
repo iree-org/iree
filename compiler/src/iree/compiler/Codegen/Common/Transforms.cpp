@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Common/CombineLayoutTransformation.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 
@@ -38,6 +39,9 @@ struct FuseTilableForallConsumers final
       if (!forallProducer) {
         continue;
       }
+      if (forallProducer->getBlock() != tilableOp->getBlock()) {
+        continue;
+      }
       Value iterArg = forallProducer.getTiedBlockArgument(
           forallProducer.getTiedOpOperand(cast<OpResult>(operand)));
 
@@ -65,6 +69,34 @@ struct FuseTilableForallConsumers final
         return rewriter.notifyMatchFailure(tilableOp,
                                            "unimplemented: Cannot fuse op with "
                                            "multiple uses of producer loop");
+      }
+    }
+
+    // The `tileAndFuseConsumerOfSlices` transform will fail if there are any
+    // users of the loop that do not dominate the `tilableOp`, so we move the
+    // `tilableOp` and any producers needed for dominance right after the loop.
+    // TODO(Max191): Refactor `tileAndFuseConsumerOfSlices` upstream to properly
+    // support forall ops with multiple results. The other results of the loop
+    // can block fusion because of the dominance issue. Once this is refactored,
+    // we should remove this workaround.
+    llvm::SetVector<Operation *> slice;
+    BackwardSliceOptions options;
+    DominanceInfo domInfo;
+    options.filter = [&](Operation *op) {
+      return domInfo.properlyDominates(sliceOwner, op);
+    };
+    options.inclusive = true;
+    options.omitUsesFromAbove = false;
+    options.omitBlockArguments = true;
+    if (succeeded(getBackwardSlice(tilableOp, &slice, options))) {
+      for (Operation *op : llvm::reverse(slice)) {
+        // Don't use the rewriter here because it will notify the Listener, and
+        // can add the operations back on the worklist. If the fusion fails
+        // after this, then the ops might get continuously added to the
+        // worklist.
+        Block *block = sliceOwner->getBlock();
+        Block::iterator iterator = std::next(sliceOwner->getIterator());
+        op->moveBefore(block, iterator);
       }
     }
 

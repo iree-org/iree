@@ -597,7 +597,7 @@ getCombineRelayoutOpsControlFn(IREE::Codegen::RelayoutCombinationScope scope) {
         return false;
       }
       auto forallOp = parallelInsertOp->getParentOfType<scf::ForallOp>();
-      if (!forallOp ||
+      if (!forallOp || !forallOp.getMapping() ||
           !llvm::all_of(forallOp.getMapping().value(),
                         llvm::IsaPred<IREE::Codegen::WorkgroupMappingAttr>)) {
         return false;
