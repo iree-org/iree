@@ -3210,10 +3210,6 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       LDBG() << "Vector Distribution Subgroup Reduction Config";
       return success();
     }
-    if (succeeded(setWarpReductionConfig(target, entryPointFn, linalgOp))) {
-      LDBG() << "Warp Reduction Config";
-      return success();
-    }
     if (succeeded(setConvolutionConfig(target, entryPointFn, linalgOp, 16))) {
       LDBG() << "Convolution Config";
       return success();
@@ -3233,6 +3229,15 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
         LDBG() << "Tile and Fuse Config";
         return success();
       }
+    }
+    if (succeeded(IREE::GPU::setMatmulLoweringConfig(
+            target, entryPointFn, computeOp, clUseDirectLoad))) {
+      LDBG() << "Tile and fuse matmul config";
+      return success();
+    }
+    if (succeeded(setWarpReductionConfig(target, entryPointFn, linalgOp))) {
+      LDBG() << "Warp Reduction Config";
+      return success();
     }
   }
   return TypeSwitch<Operation *, LogicalResult>(computeOp)
