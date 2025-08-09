@@ -28,9 +28,6 @@
     "onnx/node/generated/test_affine_grid_3d_align_corners",
     "onnx/node/generated/test_affine_grid_3d_align_corners_expanded",
     "onnx/node/generated/test_affine_grid_3d_expanded",
-    "onnx/node/generated/test_averagepool_2d_precomputed_same_upper",
-    "onnx/node/generated/test_averagepool_2d_same_lower",
-    "onnx/node/generated/test_averagepool_2d_same_upper",
     "onnx/node/generated/test_basic_deform_conv_with_padding",
     "onnx/node/generated/test_basic_deform_conv_without_padding",
     "onnx/node/generated/test_bernoulli_seed",
@@ -301,7 +298,6 @@
     "onnx/node/generated/test_wrap_pad"
   ],
   "expected_run_failures": [
-    "onnx/node/generated/test_averagepool_2d_ceil",
     "onnx/node/generated/test_averagepool_3d_dilations_large_count_include_pad_is_0_ceil_mode_is_True",
     "onnx/node/generated/test_bernoulli",
     "onnx/node/generated/test_bernoulli_double",
@@ -326,10 +322,6 @@
     "onnx/node/generated/test_nonmaxsuppression_single_box",
     "onnx/node/generated/test_nonmaxsuppression_suppress_by_IOU_and_scores",
     "onnx/node/generated/test_pow",
-    "onnx/node/generated/test_pow_types_int32_float32",
-    "onnx/node/generated/test_pow_types_int32_int32",
-    "onnx/node/generated/test_pow_types_int64_float32",
-    "onnx/node/generated/test_pow_types_int64_int64",
     "onnx/node/generated/test_qlinearmatmul_2D_int8_float16",
     "onnx/node/generated/test_qlinearmatmul_2D_int8_float32",
     "onnx/node/generated/test_qlinearmatmul_3D_int8_float16",
