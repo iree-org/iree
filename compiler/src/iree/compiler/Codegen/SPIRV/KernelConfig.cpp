@@ -14,6 +14,8 @@
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -762,6 +764,178 @@ LogicalResult setMatmulOpConfig(IREE::GPU::TargetAttr target,
       CodeGenPipeline::SPIRVBaseVectorize, workgroupSize);
 }
 
+LogicalResult setIGEMMConvolutionLoweringConfig(
+    IREE::GPU::TargetAttr target, linalg::LinalgOp op,
+    std::array<int64_t, 2> bestWorkgroupSizeXY,
+    std::array<int64_t, 3> bestThreadTileSizeMNK, int64_t memTransactionSize) {
+
+  if (!op || !linalg::isaConvolutionOpInterface(op)) {
+    return failure();
+  }
+
+  const bool isNHWC = isa<linalg::Conv2DNhwcHwcfOp>(*op);
+  // TODO: add support for NCHW
+  if (!isNHWC) {
+    LLVM_DEBUG(llvm::dbgs() << "NCHW not yet supported\n");
+    return failure();
+  }
+
+  int64_t subgroupSize = target.getPreferredSubgroupSize();
+
+  Type inputType = op.getDpsInputOperand(0)->get().getType();
+  int64_t elemSize = IREE::Util::getTypeBitWidth(
+                         llvm::cast<ShapedType>(inputType).getElementType()) /
+                     8;
+  ArrayRef<int64_t> inputShape = llvm::cast<ShapedType>(inputType).getShape();
+  Type filterType = op.getDpsInputOperand(1)->get().getType();
+  ArrayRef<int64_t> filterShape = llvm::cast<ShapedType>(filterType).getShape();
+  Type outputType = op.getDpsInitOperand(0)->get().getType();
+  ArrayRef<int64_t> outputShape = llvm::cast<ShapedType>(outputType).getShape();
+
+  // TODO: add (partial?) support for dynamic shapes
+  if (ShapedType::isDynamicShape(inputShape) ||
+      ShapedType::isDynamicShape(filterShape) ||
+      ShapedType::isDynamicShape(outputShape)) {
+    return failure();
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "IGEMM TileAndFuse Config\n");
+  FailureOr<IREE::LinalgExt::IGEMMGenericConvDetails> igemmGenericConvDetails =
+      IREE::LinalgExt::getIGEMMGenericConvDetails(op);
+  if (failed(igemmGenericConvDetails)) {
+    LLVM_DEBUG(llvm::dbgs() << "Unsupported convolution type\n");
+    return failure();
+  }
+  SmallVector<AffineMap> igemmContractionMaps =
+      igemmGenericConvDetails->igemmContractionMaps;
+  SmallVector<int64_t> igemmLoopBounds =
+      igemmGenericConvDetails->igemmLoopBounds;
+  SmallVector<Value> igemmOperands = igemmGenericConvDetails->igemmOperands;
+
+  SmallVector<int64_t> bounds = igemmLoopBounds;
+  // TODO: REMOVE!
+  llvm::outs() << "IGEMM loop bounds: ";
+  for (int64_t b : bounds)
+    llvm::outs() << (b) << ", ";
+  llvm::outs() << "\n";
+  llvm::outs() << "IGEMM contraction maps: \n";
+  for (AffineMap &m : igemmContractionMaps)
+    llvm::outs() << m << ", ";
+  llvm::outs() << "\n";
+
+  const unsigned numLoops = bounds.size();
+  assert(numLoops == 5);
+
+  // NOTE: only valid for NHWC!
+  const int64_t B = bounds[0];       // M
+  const int64_t Ho = bounds[1];      // M
+  const int64_t Wo = bounds[2];      // M
+  const int64_t Co = bounds[3];      // N
+  const int64_t K = bounds[4];       // K
+  const int64_t Hf = filterShape[0]; // K
+  const int64_t Wf = filterShape[1]; // K
+  const int64_t Ci = filterShape[2]; // K
+
+  assert(Hf * Wf * Ci == K);
+
+  const int64_t bestThreadM = bestThreadTileSizeMNK[0],
+                bestThreadN = bestThreadTileSizeMNK[1],
+                bestThreadK = bestThreadTileSizeMNK[2];
+
+  int64_t bestX = bestWorkgroupSizeXY[0], bestY = bestWorkgroupSizeXY[1];
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "best thread tile size (M, N, K) = (" << bestThreadM << ", "
+                 << bestThreadN << ", " << bestThreadK << ")\n";
+    llvm::dbgs() << "best workgroup size (X, Y) = (" << bestX << ", " << bestY
+                 << ")\n";
+  });
+
+  auto bit_ceil = [](int64_t val) {
+    return int64_t(llvm::bit_ceil(uint64_t(val)));
+  };
+
+  const int64_t elemsInTransaction = memTransactionSize / elemSize;
+  const int64_t elemsInTransactionPerThread = elemsInTransaction / subgroupSize;
+
+  int64_t Tk = std::min(bit_ceil(Ci * Hf * Wf), bestThreadK);
+  int64_t Tw = std::min(bestThreadM, bit_ceil(Wo));
+  int64_t Th = std::min(bestThreadM / Tw, bit_ceil(Ho));
+  int64_t Tb = std::min(bestThreadM / (Tw * Th), bit_ceil(B));
+  int64_t TCo = std::min(bestThreadN, bit_ceil(Co));
+
+  auto stealableTilesForK = [&]() { return Tb * Th * TCo * Tw; };
+  auto stealableTilesForW = [&]() { return Tb * Th * TCo; };
+  auto stealUpToCo = [&](int64_t factor) -> int64_t {
+    int64_t divisor = std::min(factor, Tb);
+    Tb /= divisor;
+    factor /= divisor;
+    divisor = std::min(factor, Th);
+    Th /= divisor;
+    factor /= divisor;
+    divisor = std::min(factor, TCo);
+    TCo /= divisor;
+    factor /= divisor;
+
+    return factor;
+  };
+  auto stealToW = [&](int64_t factor) {
+    Tw *= factor;
+    stealUpToCo(factor);
+  };
+  auto stealToK = [&](int64_t factor) {
+    Tk *= factor;
+    factor = stealUpToCo(factor);
+    int64_t divisor = std::min(factor, Tw);
+    Tw /= divisor;
+  };
+
+  // Try fix Tk if contiguous sector too small
+  int64_t contiguousSize = (Tk < Ci * Wf) ? (Tk) : (Ci * Wf + (Tw - 1) * Ci);
+  if (contiguousSize < elemsInTransactionPerThread) {
+    if (Tk < Ci * Wf) {
+      int64_t Tk_factor =
+          std::min((Ci * Wf + Tk - 1) / Tk, stealableTilesForK());
+      stealToK(Tk_factor);
+    }
+  }
+  // Try fix Tw if contiguous sector too small
+  contiguousSize = (Tk < Ci * Wf) ? (Tk) : (Ci * Wf + (Tw - 1) * Ci);
+  if (contiguousSize < elemsInTransactionPerThread) {
+    if (Tk >= Ci * Wf && stealableTilesForW() > 0) {
+      int64_t Tw_delta =
+          (elemsInTransactionPerThread - contiguousSize + Ci - 1) / Ci;
+      int64_t Tw_factor =
+          std::min((Tw + Tw_delta + Tw - 1) / Tw, stealableTilesForW());
+      stealToW(Tw_factor);
+    }
+  }
+
+  int64_t x = std::min(bestX, std::max(bit_ceil(Wo / Tw), (int64_t)1));
+  int64_t freeParallelismWg = bestX / x;
+  int64_t y = std::min(bestY * freeParallelismWg,
+                       std::max(bit_ceil(Co / TCo), (int64_t)1));
+
+  SmallVector<int64_t, 3> workgroupSize = {x, y, 1}; // (X, Y, Z)
+  SmallVector<int64_t> threadTileSizes = {Tb, Th, Tw, TCo};
+  SmallVector<int64_t> workgroupTileSizes = {Tb * 1, Th * 1, Tw * x, TCo * y};
+  SmallVector<int64_t> reductionTileSizes(numLoops, 0);
+  reductionTileSizes.back() = Tk;
+
+  auto pipeline =
+      IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseVectorize;
+  TileSizesListType tileSizes;
+  tileSizes.push_back(workgroupTileSizes);
+  tileSizes.push_back(threadTileSizes);
+  tileSizes.push_back(reductionTileSizes);
+
+  auto funcOp = op->getParentOfType<mlir::FunctionOpInterface>();
+  // TODO: need to add GPUPipelineOptions setting use_igemm_convolution=true,
+  // like in LLVMGPU (see LLVMGPU's KernelConfig.cpp)
+  return setOpConfigAndEntryPointFnTranslation(funcOp, op, tileSizes, pipeline,
+                                               workgroupSize, subgroupSize);
+}
+
 } // namespace detail
 
 //===----------------------------------------------------------------------===//
@@ -1505,6 +1679,28 @@ static LogicalResult setSPIRVOpConfig(IREE::GPU::TargetAttr target,
   if (target.isQualcomm() &&
       succeeded(detail::setAdrenoCodeGenConfig(target, rootOp)))
     return success();
+
+  // TODO: if (clLLVMGPUUseIgemm)
+  {
+    // Very generic configuration that should more or less work on every GPUs.
+    // TODO: specialize at least for each vendor
+    int64_t memTransactionSize = 128; // (depends on GPU!)
+    std::array<int64_t, 2> workgroupXY = {32, 2};
+    std::array<int64_t, 3> threadMNK;
+    auto inputType = llvm::cast<ShapedType>(
+        cast<linalg::LinalgOp>(*rootOp).getDpsInputOperand(0)->get().getType());
+    if (IREE::Util::getTypeBitWidth(inputType.getElementType()) == 16) {
+      threadMNK = {8, 8, 32};
+    } else {
+      threadMNK = {4, 4, 32};
+    }
+    if (succeeded(detail::setIGEMMConvolutionLoweringConfig(
+            target, cast<linalg::LinalgOp>(*rootOp), workgroupXY, threadMNK,
+            memTransactionSize))) {
+      LLVM_DEBUG(llvm::dbgs() << "IGEMM config\n");
+      return success();
+    }
+  }
 
   // Otherwise fallback to use a default configuration that tiles and
   // distributes/vectorizes.
