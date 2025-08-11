@@ -14,8 +14,6 @@ module @hoist_simple_const_expr {
   util.func public @main() -> (i32) {
     %0 = arith.constant 0 : i32
     %1 = arith.constant 1 : i32
-    // CHECK-NOT: arith.constant
-    // CHECK-NOT: iree_unregistered.const_expr
     // CHECK: %[[VAL:.*]] = util.global.load immutable @[[HOISTED_SYM]] : i32
     // CHECK: util.return %[[VAL]]
     %2 = "iree_unregistered.const_expr"(%0, %1) : (i32, i32) -> i32
@@ -252,8 +250,6 @@ module @hoist_implicit_capture {
   util.func public @main() -> (i32) {
     %0 = arith.constant 0 : i32
     %1 = arith.constant 1 : i32
-    // CHECK-NOT: arith.constant
-    // CHECK-NOT: iree_unregistered.const_expr
     // CHECK: %[[VAL:.*]] = util.global.load immutable @[[HOISTED_SYM]] : i32
     // CHECK: util.return %[[VAL]]
     %2 = "iree_unregistered.const_expr"(%0) ({
@@ -282,8 +278,6 @@ module @hoist_multi_nested_regions {
   // CHECK: util.func public @main
   util.func public @main() -> (i32) {
     %0 = arith.constant 0 : i32
-    // CHECK-NOT: arith.constant
-    // CHECK-NOT: iree_unregistered.const_expr
     // CHECK: %[[VAL:.*]] = util.global.load immutable @[[HOISTED_SYM]] : i32
     // CHECK: util.return %[[VAL]]
     %2 = "iree_unregistered.const_expr"(%0) ({

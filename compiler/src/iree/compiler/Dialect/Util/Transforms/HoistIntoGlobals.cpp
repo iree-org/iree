@@ -160,7 +160,6 @@ public:
       }
       originalValue.replaceAllUsesWith(loadedValue);
     }
-    cleanupDeadOps(constExprs);
   }
 
   Operation *getTopLevelOp(Operation *childOp) {
@@ -320,38 +319,6 @@ public:
 
     initializerBuilder.create<IREE::Util::ReturnOp>(loc);
     return success();
-  }
-
-  void cleanupDeadOps(const ConstExprAnalysis &constExprs) {
-    llvm::DenseSet<Operation *> allOps;
-    constExprs.populateConstExprOperations(allOps);
-
-    // Since we are mutating the const-expr ops, the ConstExprAnalysis will no
-    // longer be valid after this point.
-    SmallVector<Operation *> worklist;
-    worklist.reserve(allOps.size());
-    bool madeChanges = true;
-    while (madeChanges) {
-      madeChanges = false;
-
-      // Prepare worklist.
-      worklist.clear();
-      worklist.append(allOps.begin(), allOps.end());
-
-      for (Operation *checkOp : worklist) {
-        if (checkOp->use_empty()) {
-          // Bingo.
-          LLVM_DEBUG({
-            llvm::dbgs() << "[HoistIntoGlobals] erase dead op: ";
-            checkOp->print(llvm::dbgs(), constExprs.getAsmState());
-            llvm::dbgs() << "\n";
-          });
-          madeChanges = true;
-          allOps.erase(checkOp);
-          checkOp->erase();
-        }
-      }
-    }
   }
 
 private:
