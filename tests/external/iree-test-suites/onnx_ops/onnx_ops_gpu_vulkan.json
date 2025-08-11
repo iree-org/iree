@@ -12,7 +12,8 @@
     "onnx/node/generated/test_det_nd",
     "onnx/node/generated/test_einsum_inner_prod",
     "onnx/node/generated/test_group_normalization_epsilon_expanded",
-    "onnx/node/generated/test_group_normalization_example_expanded"
+    "onnx/node/generated/test_group_normalization_example_expanded",
+    "onnx/node/generated/test_nonmaxsuppression_two_batches"
   ],
   "skip_run_tests": [],
   "expected_compile_failures": [
@@ -141,7 +142,6 @@
     "onnx/node/generated/test_nonmaxsuppression_limit_output_size",
     "onnx/node/generated/test_nonmaxsuppression_suppress_by_IOU",
     "onnx/node/generated/test_nonmaxsuppression_suppress_by_IOU_and_scores",
-    "onnx/node/generated/test_nonmaxsuppression_two_batches",
     "onnx/node/generated/test_nonmaxsuppression_two_classes",
     "onnx/node/generated/test_nonzero_example",
     "onnx/node/generated/test_quantizelinear_axis",
