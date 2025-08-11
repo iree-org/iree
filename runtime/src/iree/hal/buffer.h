@@ -230,7 +230,7 @@ enum iree_hal_buffer_usage_bits_t {
   //  - GPUBufferUsage.INDIRECT
   //  - MTLResourceUsageRead
   //  - VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
-  IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS = 1u << 8,
+  IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMETERS = 1u << 8,
 
   // Buffer contents are uniformly read by dispatches.
   // These may occasionally be written as storage buffers in cases of
@@ -309,7 +309,7 @@ enum iree_hal_buffer_usage_bits_t {
 
   // Buffer contents are available for use by all dispatch-related operations.
   IREE_HAL_BUFFER_USAGE_DISPATCH =
-      IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS |
+      IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMETERS |
       IREE_HAL_BUFFER_USAGE_DISPATCH_UNIFORM_READ |
       IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
       IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE,

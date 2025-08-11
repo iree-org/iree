@@ -77,7 +77,7 @@ def HAL_BufferUsage_None                         : I32BitEnumAttrCase<"None",   
 def HAL_BufferUsage_TransferSource               : I32BitEnumAttrCase<"TransferSource",               0x00000001>;
 def HAL_BufferUsage_TransferTarget               : I32BitEnumAttrCase<"TransferTarget",               0x00000002>;
 def HAL_BufferUsage_Transfer                     : I32BitEnumAttrCase<"Transfer",                     0x00000003>;
-def HAL_BufferUsage_DispatchIndirectParams       : I32BitEnumAttrCase<"DispatchIndirectParams",       0x00000100>;
+def HAL_BufferUsage_DispatchIndirectParameters   : I32BitEnumAttrCase<"DispatchIndirectParameters",   0x00000100>;
 def HAL_BufferUsage_DispatchUniformRead          : I32BitEnumAttrCase<"DispatchUniformRead",          0x00000200>;
 def HAL_BufferUsage_DispatchStorageRead          : I32BitEnumAttrCase<"DispatchStorageRead",          0x00000400>;
 def HAL_BufferUsage_DispatchStorageWrite         : I32BitEnumAttrCase<"DispatchStorageWrite",         0x00000800>;
@@ -101,7 +101,7 @@ def HAL_BufferUsageBitfieldAttr :
       HAL_BufferUsage_TransferSource,
       HAL_BufferUsage_TransferTarget,
       HAL_BufferUsage_Transfer,
-      HAL_BufferUsage_DispatchIndirectParams,
+      HAL_BufferUsage_DispatchIndirectParameters,
       HAL_BufferUsage_DispatchUniformRead,
       HAL_BufferUsage_DispatchStorageRead,
       HAL_BufferUsage_DispatchStorageWrite,
