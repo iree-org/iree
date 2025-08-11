@@ -9,8 +9,11 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/InterleavedRange.h"
+#include "llvm/Support/ScopedPrinter.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -47,6 +50,21 @@ static SmallVector<unsigned> getReductionDims(TilingInterface op) {
     }
   }
   return dims;
+}
+
+static std::optional<SmallVector<int64_t>>
+getStaticReductionDimSizes(TilingInterface op) {
+  // We only want dimension sizes that are statically known, but
+  // `TilingInterface::getIterationDomain` will create unnecessary IR if any
+  // dimensions are dynamic. Special case to linalg ops for now since they have
+  // a method that doesn't create IR.
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op.getOperation());
+  if (!linalgOp) {
+    return std::nullopt;
+  }
+  SmallVector<int64_t> iterDomain = linalgOp.getStaticLoopRanges();
+  return llvm::map_to_vector(getReductionDims(op),
+                             [&](int64_t dim) { return iterDomain[dim]; });
 }
 
 static FailureOr<IREE::Flow::DispatchRegionOp>
@@ -136,21 +154,60 @@ FormSplitReductionDispatchesPass::getUserSpecifiedTileSize(
     }
   }
 
+  unsigned numReduction = llvm::count_if(
+      op.getLoopIteratorTypes(), [](utils::IteratorType iteratorType) {
+        return iteratorType == utils::IteratorType::reduction;
+      });
+  if (numReduction == 0) {
+    return std::nullopt;
+  }
+
   // Use the pass option as the next lever. This is mostly used for testing.
   if (!splitSize.empty()) {
-    unsigned numReduction = llvm::count_if(
-        op.getLoopIteratorTypes(), [](utils::IteratorType iteratorType) {
-          return iteratorType == utils::IteratorType::reduction;
-        });
-    if (numReduction == 0) {
-      return std::nullopt;
-    }
     SmallVector<int64_t> tileSizes(numReduction, 0);
     for (auto [index, tileSize] : llvm::enumerate(llvm::reverse(splitSize))) {
       tileSizes[numReduction - 1 - index] = tileSize;
     }
     MLIRContext *context = op->getContext();
     return getAsIndexOpFoldResult(context, tileSizes);
+  }
+
+  if (targetSplitReductionSize > 0) {
+    std::optional<SmallVector<int64_t>> opReductionSizes =
+        getStaticReductionDimSizes(op);
+    if (opReductionSizes.has_value()) {
+      auto findSmallestFactorWithLowerBound =
+          [](int64_t x, int64_t lowerBound) -> std::optional<int64_t> {
+        // We expect all numbers here to be relatively small, so just do trial
+        // division (with a limit just to be safe).
+        static constexpr int64_t kMaxIterations = 1 << 15;
+        for (int64_t i = lowerBound; i <= std::min(x, kMaxIterations); i++) {
+          if (x % i == 0) {
+            return i;
+          }
+        }
+        return std::nullopt;
+      };
+      int64_t currentSplitReductionSize = 1;
+      SmallVector<int64_t> tileSizes(opReductionSizes->size());
+      // Tile dimensions until we reach or exceed the target. Tile sizes must
+      // divide the dimension size evenly, and we start with inner dimensions as
+      // we prefer tiling those.
+      for (int64_t i = tileSizes.size() - 1; i >= 0; i--) {
+        int64_t remainingSize = llvm::divideCeil(targetSplitReductionSize,
+                                                 currentSplitReductionSize);
+        int64_t dimSize = (*opReductionSizes)[i];
+        if (dimSize == ShapedType::kDynamic) {
+          return std::nullopt;
+        }
+        int64_t tileSize =
+            findSmallestFactorWithLowerBound(dimSize, remainingSize)
+                .value_or(dimSize);
+        tileSizes[i] = tileSize;
+        currentSplitReductionSize *= tileSize;
+      }
+      return getAsIndexOpFoldResult(op->getContext(), tileSizes);
+    }
   }
 
   // Default.
@@ -170,6 +227,11 @@ void FormSplitReductionDispatchesPass::runOnOperation() {
     if (!tileSizes) {
       return;
     }
+    if (emitRemarks) {
+      tilingOp->emitRemark()
+          << "forming split reduction dispatch with tile sizes: "
+          << llvm::to_string(llvm::interleaved_array(tileSizes.value()));
+    }
     reductionOps.emplace_back(tilingOp, std::move(tileSizes.value()));
   });
 
@@ -178,7 +240,6 @@ void FormSplitReductionDispatchesPass::runOnOperation() {
     return;
   }
 
-  SmallVector<IREE::Flow::DispatchRegionOp> splitReductionDispatches;
   for (auto [op, tileSizes] : reductionOps) {
     FailureOr<IREE::Flow::DispatchRegionOp> formedDispatch =
         tileOpAndWrapInDispatch(rewriter, op, tileSizes);
@@ -186,7 +247,6 @@ void FormSplitReductionDispatchesPass::runOnOperation() {
       op->emitOpError("failed to form split reduction dispatch");
       return signalPassFailure();
     }
-    splitReductionDispatches.push_back(formedDispatch.value());
   }
 
   // Run some canonicalization patterns within dispatches.
