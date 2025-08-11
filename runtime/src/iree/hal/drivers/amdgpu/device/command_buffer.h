@@ -565,7 +565,6 @@ static_assert(
 //
 // Recorded by:
 //  iree_hal_command_buffer_dispatch
-//  iree_hal_command_buffer_dispatch_indirect
 typedef struct IREE_AMDGPU_ALIGNAS(64) iree_hal_amdgpu_device_cmd_dispatch_t {
   iree_hal_amdgpu_device_cmd_header_t header;
   // Block-relative kernel arguments address.

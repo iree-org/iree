@@ -349,13 +349,25 @@ static iree_status_t iree_hal_inline_command_buffer_collective(
                           "collectives not yet implemented on CPU");
 }
 
+//===----------------------------------------------------------------------===//
+// iree_hal_command_buffer_dispatch
+//===----------------------------------------------------------------------===//
+
 static iree_status_t iree_hal_inline_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
-    const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
+    const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   iree_hal_inline_command_buffer_t* command_buffer =
       iree_hal_inline_command_buffer_cast(base_command_buffer);
+
+  // TODO(benvanik): support here; should be easy as we just either pass in the
+  // constants or dereference the indirect buffer.
+  if (iree_hal_dispatch_uses_custom_arguments(flags)) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "direct/indirect arguments are not supported on "
+                            "the inline CPU command buffer");
+  }
 
   iree_hal_local_executable_t* local_executable =
       iree_hal_local_executable_cast(executable);
@@ -366,7 +378,8 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
   }
   const iree_host_size_t local_memory_size =
       dispatch_attrs.local_memory_pages *
-      IREE_HAL_EXECUTABLE_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE;
+          IREE_HAL_EXECUTABLE_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE +
+      config.dynamic_workgroup_local_memory;
 
   // Update the ID of the processor we are running on.
   // We don't know how much time has passed since we last updated as we are
@@ -379,12 +392,26 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
       &command_buffer->state.dispatch_state;
 
   // TODO(benvanik): expose on API or keep fixed on executable.
-  dispatch_state->workgroup_size_x = 1;
-  dispatch_state->workgroup_size_y = 1;
-  dispatch_state->workgroup_size_z = 1;
-  dispatch_state->workgroup_count_x = workgroup_count[0];
-  dispatch_state->workgroup_count_y = workgroup_count[1];
-  dispatch_state->workgroup_count_z = workgroup_count[2];
+  dispatch_state->workgroup_size_x =
+      config.workgroup_size[0] ? config.workgroup_size[0] : 1;
+  dispatch_state->workgroup_size_y =
+      config.workgroup_size[1] ? config.workgroup_size[1] : 1;
+  dispatch_state->workgroup_size_z =
+      config.workgroup_size[2] ? config.workgroup_size[2] : 1;
+  if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
+    // TODO(benvanik): track mapping so we can properly map/unmap/flush/etc.
+    iree_hal_buffer_mapping_t buffer_mapping = {{0}};
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
+        config.workgroup_count_ref.buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
+        IREE_HAL_MEMORY_ACCESS_READ, config.workgroup_count_ref.offset,
+        3 * sizeof(uint32_t), &buffer_mapping));
+    memcpy(&dispatch_state->workgroup_count_x, buffer_mapping.contents.data,
+           sizeof(uint32_t) * 3);
+  } else {
+    dispatch_state->workgroup_count_x = config.workgroup_count[0];
+    dispatch_state->workgroup_count_y = config.workgroup_count[1];
+    dispatch_state->workgroup_count_z = config.workgroup_count[2];
+  }
 
   // Single-threaded.
   dispatch_state->max_concurrency = 1;
@@ -466,33 +493,6 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
   return status;
 }
 
-typedef union iree_hal_vec3_t {
-  struct {
-    uint32_t x;
-    uint32_t y;
-    uint32_t z;
-  };
-  uint32_t value[3];
-} iree_hal_vec3_t;
-
-static iree_status_t iree_hal_inline_command_buffer_dispatch_indirect(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
-    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
-  // TODO(benvanik): track mapping so we can properly map/unmap/flush/etc.
-  iree_hal_buffer_mapping_t buffer_mapping = {{0}};
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-      workgroups_ref.buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
-      IREE_HAL_MEMORY_ACCESS_READ, workgroups_ref.offset, 3 * sizeof(uint32_t),
-      &buffer_mapping));
-  iree_hal_vec3_t workgroup_count =
-      *(const iree_hal_vec3_t*)buffer_mapping.contents.data;
-  return iree_hal_inline_command_buffer_dispatch(
-      base_command_buffer, executable, entry_point, workgroup_count.value,
-      constants, bindings, flags);
-}
-
 //===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_vtable_t
 //===----------------------------------------------------------------------===//
@@ -514,5 +514,4 @@ static const iree_hal_command_buffer_vtable_t
         .copy_buffer = iree_hal_inline_command_buffer_copy_buffer,
         .collective = iree_hal_inline_command_buffer_collective,
         .dispatch = iree_hal_inline_command_buffer_dispatch,
-        .dispatch_indirect = iree_hal_inline_command_buffer_dispatch_indirect,
 };

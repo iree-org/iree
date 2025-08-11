@@ -311,7 +311,7 @@ static void iree_hal_vulkan_map_memory_type_to_heap(
   if (iree_all_bits_set(flags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) {
     memory_type |= IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
     allowed_usage |= IREE_HAL_BUFFER_USAGE_TRANSFER |
-                     IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS |
+                     IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMETERS |
                      IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
                      IREE_HAL_BUFFER_USAGE_DISPATCH_UNIFORM_READ;
   }
