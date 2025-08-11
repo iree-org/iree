@@ -25,7 +25,7 @@ iree_lit_test_suite(
     "canonicalize_interface_load_store.mlir"
     "check_for_config.mlir"
     "combine_layout_transformation.mlir"
-    "convert_accgemm_to_gemm.mlir"
+    "convert_acc_reduction_to_reduction.mlir"
     "convert_bf16_arith_to_f32.mlir"
     "convert_bf16_to_uint16_buffers.mlir"
     "convert_hal_descriptor_type_to_gpu_address_space.mlir"
