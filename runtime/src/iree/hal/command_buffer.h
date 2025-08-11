@@ -430,16 +430,139 @@ IREE_API_EXPORT iree_string_view_t iree_hal_collective_op_format(
 IREE_API_EXPORT iree_device_size_t iree_hal_collective_element_byte_count(
     iree_hal_collective_element_type_t element_type);
 
+// Configuration defining how a dispatch is performed.
+typedef struct iree_hal_dispatch_config_t {
+  // Optional workgroup size for targets that have workgroup sizes specified by
+  // their exports. If all zeros the default workgroup size of the export is
+  // used and otherwise must be at least 1x1x1.
+  uint32_t workgroup_size[3];
+  // Static workgroup count, used when one of the _INDIRECT_PARAMETERS flags is
+  // not specified and otherwise ignored.
+  uint32_t workgroup_count[3];
+  // Indirect workgroup count fetched from a buffer when the appropriate flag is
+  // specified:
+  // - IREE_HAL_DISPATCH_FLAG_DYNAMIC_INDIRECT_PARAMETERS:
+  //   Device will fetch the workgroup count immediately before issuing the
+  //   dispatch. An execution barrier must have been inserted between any
+  //   operation producing the parameters and the dispatch to ensure the proper
+  //   values are observed.
+  // - IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_PARAMETERS:
+  //   Device _may_ fetch the workgroup count at any point after the command
+  //   buffer submission is issued (all wait conditions satisfied) as the
+  //   flag indicates the parameters will not change during the execution of
+  //   the command buffer.
+  // The workgroup count buffer must have been allocated with
+  // IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMETERS and be of
+  // IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE.
+  iree_hal_buffer_ref_t workgroup_count_ref;
+  // Size, in bytes, of any dynamically-sized workgroup local memory required.
+  // This is added on top of the static workgroup local memory declared by the
+  // export metadata.
+  uint32_t dynamic_workgroup_local_memory;
+} iree_hal_dispatch_config_t;
+
+// Creates a default dispatch config with the given static workgroup count.
+static inline iree_hal_dispatch_config_t iree_hal_make_static_dispatch_config(
+    uint32_t workgroup_count_x, uint32_t workgroup_count_y,
+    uint32_t workgroup_count_z) {
+  iree_hal_dispatch_config_t config = {0};
+  config.workgroup_count[0] = workgroup_count_x;
+  config.workgroup_count[1] = workgroup_count_y;
+  config.workgroup_count[2] = workgroup_count_z;
+  return config;
+}
+
 // Bitfield specifying flags controlling a dispatch operation.
 typedef uint64_t iree_hal_dispatch_flags_t;
 enum iree_hal_dispatch_flag_bits_t {
   IREE_HAL_DISPATCH_FLAG_NONE = 0,
 
+  // Workgroup count is loaded from a buffer binding specified as part of the
+  // dispatch configuration. The buffer must contain at least 12 bytes of data
+  // and have 4-byte alignment and represents a `uint32_t workgroup_count[3];`.
+  // Validation for maximum workgroup count on each dimension is not performed
+  // and may cause device failures or undefined behavior if out of range.
+  //
+  // The workgroup count buffer will be read immediately prior to the dispatch
+  // following the prior barrier in order to allow prior transfer or dispatch
+  // operations to produce the new parameters. If the parameters are known to be
+  // static at the time the command buffer is submitted using
+  // IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_PARAMETERS can significantly reduce
+  // the overhead of an indirect dispatch.
+  //
+  // When defined the static workgroup_count[] in the dispatch config is
+  // ignored.
+  IREE_HAL_DISPATCH_FLAG_DYNAMIC_INDIRECT_PARAMETERS = 1ull << 0,
+
   // Indirect parameters such as workgroup count are static at the time the
   // command buffer is issued. This is in contrast to dynamic parameters that
-  // may be changed by dispatches within the same command buffer.
-  IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_PARAMETERS = 1ull << 0,
+  // may be changed by dispatches within the same command buffer. Enabling when
+  // known can lead to lower dispatch overhead.
+  IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_PARAMETERS = 1ull << 1,
+
+  // Disables HAL ABI handling. The provided constants are passed through as
+  // the arguments to the dispatch with no additional processing. Any
+  // packing, padding, or alignment must be handled by the user, though aligning
+  // to 64 byte boundaries and ensuring padding to `sizeof(iree_device_size_t)`
+  // bytes is usually sufficient.
+  //
+  // Any buffer pointers referenced from within the arguments **WILL NOT BE
+  // RETAINED**. Users are responsible for ensuring the lifetime of any
+  // referenced buffers extends beyond the completion signals of the submitted
+  // operation and behavior is undefined otherwise.
+  IREE_HAL_DISPATCH_FLAG_CUSTOM_DIRECT_ARGUMENTS = 1ull << 2,
+
+  // Disables HAL ABI handling. Constants will be ignored and only one binding
+  // (`binding[0]`) is allowed that provides the dispatch function arguments.
+  // The length of the binding denotes the total size of the arguments. Any
+  // packing, padding, or alignment must be handled by the user, though aligning
+  // to 64 byte boundaries and ensuring padding to `sizeof(iree_device_size_t)`
+  // bytes is usually sufficient.
+  //
+  // The argument buffer will be retained for the lifetime of the command buffer
+  // (if directly specified) or any submission executing the command buffer (if
+  // specifying via binding table). Any buffer pointers referenced from within
+  // the arguments **WILL NOT BE RETAINED**. Users are responsible for ensuring
+  // the lifetime of any referenced buffers extends beyond the completion
+  // signals of the submitted operation and behavior is undefined otherwise.
+  //
+  // If a buffer is directly referenced the command buffer may lose the ability
+  // to be concurrently executed, as if each submission mutates arguments in the
+  // same location of the same buffer the contents will be undefined. Binding
+  // table references are strongly encouraged to allow reuse.
+  IREE_HAL_DISPATCH_FLAG_DYNAMIC_INDIRECT_ARGUMENTS = 1ull << 3,
+
+  // Indirect arguments are static at the time the command buffer is issued.
+  // The device is allowed to clone the arguments immediately upon submission.
+  // When omitted the arguments are allowed to change up to the barrier
+  // preceding the dispatch consuming them.
+  IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_ARGUMENTS = 1ull << 4,
 };
+
+// Returns true if the given dispatch uses indirect workgroup parameters.
+static inline bool iree_hal_dispatch_uses_indirect_parameters(
+    iree_hal_dispatch_flags_t flags) {
+  return iree_any_bit_set(
+      flags, IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_PARAMETERS |
+                 IREE_HAL_DISPATCH_FLAG_DYNAMIC_INDIRECT_PARAMETERS);
+}
+
+// Returns true if the given dispatch uses custom arguments (direct/indirect).
+static inline bool iree_hal_dispatch_uses_custom_arguments(
+    iree_hal_dispatch_flags_t flags) {
+  return iree_any_bit_set(
+      flags, IREE_HAL_DISPATCH_FLAG_CUSTOM_DIRECT_ARGUMENTS |
+                 IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_ARGUMENTS |
+                 IREE_HAL_DISPATCH_FLAG_DYNAMIC_INDIRECT_ARGUMENTS);
+}
+
+// Returns true if the given dispatch uses indirect custom arguments.
+static inline bool iree_hal_dispatch_uses_indirect_arguments(
+    iree_hal_dispatch_flags_t flags) {
+  return iree_any_bit_set(
+      flags, IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_ARGUMENTS |
+                 IREE_HAL_DISPATCH_FLAG_DYNAMIC_INDIRECT_ARGUMENTS);
+}
 
 // An RGBA color.
 typedef struct iree_hal_label_color_t {
@@ -774,39 +897,44 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_collective(
     iree_hal_collective_op_t op, uint32_t param, iree_hal_buffer_ref_t send_ref,
     iree_hal_buffer_ref_t recv_ref, iree_device_size_t element_count);
 
-// Dispatches an execution request.
+// Dispatches an execution request over a 3D grid of workgroups.
 // The request may execute overlapped with any other transfer operation or
 // dispatch made within the same barrier-defined sequence. The executable
-// specified must be registered for use with the device driver owning this
-// queue.
+// specified must be registered for use with the device driver owning the
+// queue it is scheduled on.
 //
 // The provided constant data and binding list will be recorded into the command
-// buffer and need not remain live beyond the call.
+// buffer and need not remain live beyond the call. If binding buffers are
+// specified directly they will be retained by the command buffer until it is
+// destroyed and otherwise substituted with binding table values provided during
+// submission.
+//
+// By default the IREE HAL ABI is used to pass |constants| and |bindings| to the
+// target function. If IREE_HAL_DISPATCH_FLAG_CUSTOM_DIRECT_ARGUMENTS is set
+// then the |bindings| are ignored and |constants| are passed directly to the
+// dispatch function without modification. When
+// IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_ARGUMENTS or
+// IREE_HAL_DISPATCH_FLAG_DYNAMIC_INDIRECT_ARGUMENTS are specified |constants|
+// are ignored and |bindings| must be a single binding referencing the argument
+// data that is fetched from device visible memory. Targets may have specific
+// requirements on alignment and padding. Only the argument buffer will be
+// retained and any buffer references inside the arguments are not tracked. The
+// argument buffer must have been allocated with
+// IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMETERS and be of
+// IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE.
 //
 // Fails if the queue does not support dispatch operations or
 // IREE_HAL_COMMAND_CATEGORY_DISPATCH was not set.
+//
+// May fail during recording if validation is enabled and the dispatch
+// configuration is not supported by the device or exported entry point. Some
+// implementations cannot verify statically and may fail asynchronously during
+// execution.
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
-    const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
-    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
-
-// Dispatches an execution request with a deferred workgroup count.
-// This is the same as iree_hal_command_buffer_dispatch but the workgroup count
-// is read from the given |workgroups_ref| buffer at the specified offset as
-// 3 uint32_t XYZ values immediately before performing the dispatch. This allows
-// prior dispatches within the command sequence to populate the workgroup
-// count or the workgroup count to change across submissions of the same
-// reusable command buffer.
-//
-// The buffer must have been allocated with
-// IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS and be of
-// IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE.
-IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch_indirect(
-    iree_hal_command_buffer_t* command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
-    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
+    const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
+    const iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
 
 //===----------------------------------------------------------------------===//
 // Validation support
@@ -956,13 +1084,7 @@ typedef struct iree_hal_command_buffer_vtable_t {
   iree_status_t(IREE_API_PTR* dispatch)(
       iree_hal_command_buffer_t* command_buffer,
       iree_hal_executable_t* executable, int32_t entry_point,
-      const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
-      iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
-
-  iree_status_t(IREE_API_PTR* dispatch_indirect)(
-      iree_hal_command_buffer_t* command_buffer,
-      iree_hal_executable_t* executable, int32_t entry_point,
-      iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
+      const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
       iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
 } iree_hal_command_buffer_vtable_t;
 IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_command_buffer_vtable_t);

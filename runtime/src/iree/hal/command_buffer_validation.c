@@ -567,86 +567,100 @@ iree_status_t iree_hal_command_buffer_collective_validation(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_command_buffer_dispatch_validation_base(
-    iree_hal_command_buffer_t* command_buffer,
-    iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_executable_t* executable, int32_t entry_point,
-    iree_const_byte_span_t constants, iree_hal_buffer_ref_list_t bindings,
-    iree_hal_dispatch_flags_t flags) {
-  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
-      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
-
-  if (IREE_UNLIKELY((constants.data_length % 4) != 0)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "invalid alignment %" PRIhsz
-                            ", must be 4-byte aligned",
-                            constants.data_length);
-  }
-
-  // For now we conservatively say _any_ access may be performed (read/write).
-  iree_hal_buffer_binding_requirements_t requirements = {
-      .required_compatibility = IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH,
-      .usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE,
-      .access = IREE_HAL_MEMORY_ACCESS_ANY,
-      .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-  };
-  for (iree_host_size_t i = 0; i < bindings.count; ++i) {
-    requirements.max_byte_offset =
-        bindings.values[i].offset + bindings.values[i].length;
-    IREE_RETURN_IF_ERROR(
-        iree_hal_command_buffer_validate_buffer_requirements(
-            command_buffer, validation_state, bindings.values[i], requirements),
-        "binding[%" PRIhsz "]", i);
-  }
-
-  return iree_ok_status();
-}
-
 iree_status_t iree_hal_command_buffer_dispatch_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_executable_t* executable, int32_t entry_point,
-    const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
+    const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
-  return iree_hal_command_buffer_dispatch_validation_base(
-      command_buffer, validation_state, executable, entry_point, constants,
-      bindings, flags);
-}
+  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
+      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
 
-iree_status_t iree_hal_command_buffer_dispatch_indirect_validation(
-    iree_hal_command_buffer_t* command_buffer,
-    iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
-    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
-  if ((workgroups_ref.offset % sizeof(uint32_t)) != 0) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "workgroup count offset does not match the required natural alignment "
-        "of uint32_t (offset=%" PRIdsz ", min_byte_alignment=%" PRIhsz ")",
-        workgroups_ref.offset, sizeof(uint32_t));
-  } else if (workgroups_ref.length < 3 * sizeof(uint32_t)) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "workgroup count buffer does not have the capacity "
-                            "to store the required 3 uint32_t values "
-                            "(length=%" PRIdsz ", min_length=%" PRIhsz ")",
-                            workgroups_ref.length, 3 * sizeof(uint32_t));
+  // Validate workgroup count buffers for indirect parameters.
+  if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
+    if ((config.workgroup_count_ref.offset % sizeof(uint32_t)) != 0) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "workgroup count offset does not match the "
+          "required natural alignment "
+          "of uint32_t (offset=%" PRIdsz ", min_byte_alignment=%" PRIhsz ")",
+          config.workgroup_count_ref.offset, sizeof(uint32_t));
+    } else if (config.workgroup_count_ref.length < 3 * sizeof(uint32_t)) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "workgroup count buffer does not have the capacity "
+          "to store the required 3 uint32_t values "
+          "(length=%" PRIdsz ", min_length=%" PRIhsz ")",
+          config.workgroup_count_ref.length, 3 * sizeof(uint32_t));
+    }
+
+    const iree_hal_buffer_binding_requirements_t workgroups_reqs = {
+        .required_compatibility = IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH,
+        .usage = IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMETERS,
+        .access = IREE_HAL_MEMORY_ACCESS_READ,
+        .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+        .max_byte_offset = config.workgroup_count_ref.offset +
+                           config.workgroup_count_ref.length,
+        .min_byte_alignment = sizeof(uint32_t),
+    };
+    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_requirements(
+        command_buffer, validation_state, config.workgroup_count_ref,
+        workgroups_reqs));
   }
 
-  const iree_hal_buffer_binding_requirements_t workgroups_reqs = {
-      .required_compatibility = IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH,
-      .usage = IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS,
-      .access = IREE_HAL_MEMORY_ACCESS_READ,
-      .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-      .max_byte_offset = workgroups_ref.offset + workgroups_ref.length,
-      .min_byte_alignment = sizeof(uint32_t),
-  };
-  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_requirements(
-      command_buffer, validation_state, workgroups_ref, workgroups_reqs));
+  // Validate constants unless they are custom arguments (which we can't
+  // validate generally).
+  if (!iree_any_bit_set(flags,
+                        IREE_HAL_DISPATCH_FLAG_CUSTOM_DIRECT_ARGUMENTS)) {
+    if (IREE_UNLIKELY((constants.data_length % 4) != 0)) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "invalid alignment %" PRIhsz
+                              ", must be 4-byte aligned",
+                              constants.data_length);
+    }
+  }
 
-  return iree_hal_command_buffer_dispatch_validation_base(
-      command_buffer, validation_state, executable, entry_point, constants,
-      bindings, flags);
+  // Validate indirect argument buffers.
+  if (iree_hal_dispatch_uses_indirect_arguments(flags)) {
+    // Expecting a single binding that can be read by the device.
+    // If we find common traits of targets we want to verify here (alignment
+    // being the most likely) we can try to check it here.
+    if (IREE_UNLIKELY(bindings.count != 1)) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "a single binding must be specified when using indirect arguments");
+    }
+    const iree_hal_buffer_binding_requirements_t arguments_reqs = {
+        .required_compatibility = IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH,
+        .usage = IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMETERS,
+        .access = IREE_HAL_MEMORY_ACCESS_READ,
+        .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+        .max_byte_offset =
+            bindings.values[0].offset + bindings.values[0].length,
+        .min_byte_alignment = sizeof(uint32_t),
+    };
+    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_requirements(
+        command_buffer, validation_state, bindings.values[0], arguments_reqs));
+  } else {
+    // For now we conservatively say _any_ access may be performed (read/write)
+    // for buffer bindings.
+    iree_hal_buffer_binding_requirements_t binding_requirements = {
+        .required_compatibility = IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH,
+        .usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE,
+        .access = IREE_HAL_MEMORY_ACCESS_ANY,
+        .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+    };
+    for (iree_host_size_t i = 0; i < bindings.count; ++i) {
+      binding_requirements.max_byte_offset =
+          bindings.values[i].offset + bindings.values[i].length;
+      IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_requirements(
+                               command_buffer, validation_state,
+                               bindings.values[i], binding_requirements),
+                           "binding[%" PRIhsz "]", i);
+    }
+  }
+
+  return iree_ok_status();
 }
 
 iree_status_t iree_hal_command_buffer_submission_validation(

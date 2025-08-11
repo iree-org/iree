@@ -1618,12 +1618,20 @@ static iree_status_t iree_hal_amdgpu_command_buffer_collective(
 // If |is_indirect| is true the |workgroup_count| must contain a valid workgroup
 // count buffer reference and otherwise the static workgroup count dimensions
 // will be used.
-static iree_status_t iree_hal_amdgpu_command_buffer_record_dispatch(
-    iree_hal_amdgpu_command_buffer_t* command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point, bool is_indirect,
-    iree_hal_amdgpu_device_workgroup_count_t workgroup_count,
-    iree_const_byte_span_t constants, iree_hal_buffer_ref_list_t bindings,
-    iree_hal_dispatch_flags_t flags) {
+static iree_status_t iree_hal_amdgpu_command_buffer_dispatch(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_executable_t* executable, int32_t entry_point,
+    const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
+    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
+  iree_hal_amdgpu_command_buffer_t* command_buffer =
+      iree_hal_amdgpu_command_buffer_cast(base_command_buffer);
+
+  if (iree_hal_dispatch_uses_custom_arguments(flags)) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "direct/indirect arguments are not supported in AMDGPU yet");
+  }
+
   // Configure dispatch flags controlling how the scheduler interprets the
   // command when issuing. We use one code path for static dispatches where
   // the workgroup count is available either directly in the recorded command or
@@ -1631,16 +1639,51 @@ static iree_status_t iree_hal_amdgpu_command_buffer_record_dispatch(
   // command buffer is issued. Dynamic indirect workgroup counts that may be
   // populated by a prior dispatch/transfer in the same command buffer require
   // some additional work.
-  const bool is_static =
-      !is_indirect ||
-      iree_all_bits_set(flags,
-                        IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_PARAMETERS);
   iree_hal_amdgpu_device_dispatch_flags_t cmd_flags =
       IREE_HAL_AMDGPU_DEVICE_DISPATCH_FLAG_NONE;
-  if (is_indirect) {
-    cmd_flags |= is_static
-                     ? IREE_HAL_AMDGPU_DEVICE_DISPATCH_FLAG_INDIRECT_STATIC
-                     : IREE_HAL_AMDGPU_DEVICE_DISPATCH_FLAG_INDIRECT_DYNAMIC;
+  if (iree_any_bit_set(flags,
+                       IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_PARAMETERS)) {
+    cmd_flags |= IREE_HAL_AMDGPU_DEVICE_DISPATCH_FLAG_INDIRECT_STATIC;
+  } else if (iree_any_bit_set(
+                 flags,
+                 IREE_HAL_AMDGPU_DEVICE_DISPATCH_FLAG_INDIRECT_DYNAMIC)) {
+    cmd_flags |= IREE_HAL_AMDGPU_DEVICE_DISPATCH_FLAG_INDIRECT_DYNAMIC;
+  }
+
+  // Resolve the workgroup count buffer to the thin buffer ref used by the
+  // device-side command buffer.
+  iree_hal_amdgpu_device_workgroup_count_t workgroup_count;
+  if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
+    iree_hal_amdgpu_device_buffer_ref_t resolved_workgroup_count_ref = {0};
+    IREE_RETURN_IF_ERROR(
+        iree_hal_amdgpu_translate_device_buffer_ref(
+            config.workgroup_count_ref, &resolved_workgroup_count_ref),
+        "resolving indirect workgroups_ref");
+    if (IREE_UNLIKELY(resolved_workgroup_count_ref.length <
+                      sizeof(uint32_t[3]))) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "indirect workgroup count buffer reference must be at least "
+          "uint32_t[3] (12B) but it resolved to %" PRIu64 "B",
+          (uint64_t)resolved_workgroup_count_ref.length);
+    }
+    workgroup_count = (iree_hal_amdgpu_device_workgroup_count_t){
+        .ref =
+            {
+                .type = resolved_workgroup_count_ref.type,
+                .offset = resolved_workgroup_count_ref.offset,
+                .value.bits = resolved_workgroup_count_ref.value.bits,
+            },
+    };
+  } else {
+    workgroup_count = (iree_hal_amdgpu_device_workgroup_count_t){
+        .dims =
+            {
+                config.workgroup_count[0],
+                config.workgroup_count[1],
+                config.workgroup_count[2],
+            },
+    };
   }
 
   // Lookup the kernel metadata in host memory so we don't risk crossing a bus.
@@ -1725,6 +1768,12 @@ static iree_status_t iree_hal_amdgpu_command_buffer_record_dispatch(
         "resolving binding[%" PRIhsz "]", i);
   }
 
+  // Insert indirect workgroup count buffers into the resource set.
+  if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
+    IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
+        command_buffer->resource_set, 1, &config.workgroup_count_ref.buffer));
+  }
+
   // Insert all bindings into the resource set.
   // We do this once regardless of how many devices we broadcast to.
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert_strided(
@@ -1754,8 +1803,10 @@ static iree_status_t iree_hal_amdgpu_command_buffer_record_dispatch(
   uint32_t kernarg_offset = 0;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_command_encoder_append_cmd(
       encoder,
-      is_static ? IREE_HAL_AMDGPU_DEVICE_CMD_DISPATCH
-                : IREE_HAL_AMDGPU_DEVICE_CMD_DISPATCH_INDIRECT_DYNAMIC,
+      iree_all_bits_set(cmd_flags,
+                        IREE_HAL_AMDGPU_DEVICE_DISPATCH_FLAG_INDIRECT_DYNAMIC)
+          ? IREE_HAL_AMDGPU_DEVICE_CMD_DISPATCH_INDIRECT_DYNAMIC
+          : IREE_HAL_AMDGPU_DEVICE_CMD_DISPATCH,
       IREE_HAL_AMDGPU_DEVICE_CMD_FLAG_NONE,
       IREE_HAL_AMDGPU_DEVICE_CMD_DISPATCH_AQL_PACKET_COUNT(cmd_flags),
       kernarg_size, host_kernel_args->kernarg_alignment, (void***)&device_cmds,
@@ -1799,61 +1850,6 @@ static iree_status_t iree_hal_amdgpu_command_buffer_record_dispatch(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_amdgpu_command_buffer_dispatch(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point,
-    const uint32_t workgroup_count_dims[3], iree_const_byte_span_t constants,
-    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
-  iree_hal_amdgpu_command_buffer_t* command_buffer =
-      iree_hal_amdgpu_command_buffer_cast(base_command_buffer);
-  iree_hal_amdgpu_device_workgroup_count_t workgroup_count = {
-      .dims =
-          {
-              workgroup_count_dims[0],
-              workgroup_count_dims[1],
-              workgroup_count_dims[2],
-          },
-  };
-  return iree_hal_amdgpu_command_buffer_record_dispatch(
-      command_buffer, executable, entry_point, /*is_indirect=*/false,
-      workgroup_count, constants, bindings, flags);
-}
-
-static iree_status_t iree_hal_amdgpu_command_buffer_dispatch_indirect(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
-    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
-  iree_hal_amdgpu_command_buffer_t* command_buffer =
-      iree_hal_amdgpu_command_buffer_cast(base_command_buffer);
-
-  // Resolve the workgroup count buffer to the thin buffer ref used by the
-  // device-side command buffer.
-  iree_hal_amdgpu_device_buffer_ref_t resolved_workgroups_ref = {0};
-  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_translate_device_buffer_ref(
-                           workgroups_ref, &resolved_workgroups_ref),
-                       "resolving indirect workgroups_ref");
-  if (IREE_UNLIKELY(resolved_workgroups_ref.length < sizeof(uint32_t[3]))) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "indirect workgroup count buffer reference must be at least "
-        "uint32_t[3] (12B) but it resolved to %" PRIu64 "B",
-        (uint64_t)resolved_workgroups_ref.length);
-  }
-  iree_hal_amdgpu_device_workgroup_count_t workgroup_count = {
-      .ref =
-          {
-              .type = resolved_workgroups_ref.type,
-              .offset = resolved_workgroups_ref.offset,
-              .value.bits = resolved_workgroups_ref.value.bits,
-          },
-  };
-
-  return iree_hal_amdgpu_command_buffer_record_dispatch(
-      command_buffer, executable, entry_point, /*is_indirect=*/true,
-      workgroup_count, constants, bindings, flags);
-}
-
 static const iree_hal_command_buffer_vtable_t
     iree_hal_amdgpu_command_buffer_vtable = {
         .destroy = iree_hal_amdgpu_command_buffer_destroy,
@@ -1871,5 +1867,4 @@ static const iree_hal_command_buffer_vtable_t
         .copy_buffer = iree_hal_amdgpu_command_buffer_copy_buffer,
         .collective = iree_hal_amdgpu_command_buffer_collective,
         .dispatch = iree_hal_amdgpu_command_buffer_dispatch,
-        .dispatch_indirect = iree_hal_amdgpu_command_buffer_dispatch_indirect,
 };
