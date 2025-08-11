@@ -82,8 +82,8 @@ def ConcretizePadResultShapePass :
       "implements OffsetSizeAndStrideOpInterface.";
 }
 
-def ConvertAccGEMMToGEMMPass :
-    InterfacePass<"iree-convert-accgemm-to-gemm", "mlir::FunctionOpInterface"> {
+def ConvertAccReductionToReductionPass :
+    InterfacePass<"iree-convert-acc-reduction-to-reduction", "mlir::FunctionOpInterface"> {
   let summary = "Convert accumulating GEMMs to GEMMs post dispatch creation.";
   let description = [{
     There are cases that a reduction op accumulates the result into a ReadOnly

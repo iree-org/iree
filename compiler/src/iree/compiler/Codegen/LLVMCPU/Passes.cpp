@@ -844,7 +844,7 @@ void buildLLVMCPUCodegenConfigurationPassPipelineImpl(
       .addPass(createExpandF16OpToF32Pass)
       .addPass(createMaterializeDeviceEncodingPass)
       .addPass(createCPUPropagateDataLayoutPass)
-      .addPass(createConvertAccGEMMToGEMMPass)
+      .addPass(createConvertAccReductionToReductionPass)
       // TODO: Remove the following pass the plumb support for
       // #hal.descriptor_type memory space through the stack.
       .addPass(createEraseHALDescriptorTypeFromMemRefPass);

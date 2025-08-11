@@ -420,7 +420,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   }
   // TODO (nirvedhmeshram) : Can remove this pass after
   // https://github.com/iree-org/iree/issues/19546 is fixed.
-  funcPassManager.addPass(createConvertAccGEMMToGEMMPass());
+  funcPassManager.addPass(createConvertAccReductionToReductionPass());
   tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true,
                                /*convertToDpsOptions=*/std::nullopt);
 

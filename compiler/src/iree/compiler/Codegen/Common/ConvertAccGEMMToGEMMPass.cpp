@@ -22,7 +22,7 @@
 
 namespace mlir::iree_compiler {
 
-#define GEN_PASS_DEF_CONVERTACCGEMMTOGEMMPASS
+#define GEN_PASS_DEF_CONVERTACCREDUCTIONTOREDUCTIONPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 /// Check whether `outputOperand` is a reduction with a single combiner
@@ -165,8 +165,9 @@ static void convertAccGemmToGemm(RewriterBase &rewriter,
 
 namespace {
 
-struct ConvertAccGEMMToGEMMPass final
-    : impl::ConvertAccGEMMToGEMMPassBase<ConvertAccGEMMToGEMMPass> {
+struct ConvertAccReductionToReductionPass final
+    : impl::ConvertAccReductionToReductionPassBase<
+          ConvertAccReductionToReductionPass> {
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
     SmallVector<Operation *> candidates = llvm::filter_to_vector(

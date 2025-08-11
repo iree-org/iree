@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-convert-accgemm-to-gemm,canonicalize))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-convert-acc-reduction-to-reduction,canonicalize))" %s | FileCheck %s
 // The test relies on canonicalizer to fold neutral constants away. It happens
 // when the filled value is as the same as the neutral constannt.
 
