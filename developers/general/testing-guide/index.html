@@ -4261,6 +4261,8 @@
       
         
       
+        
+      
     
     
       
@@ -4313,6 +4315,29 @@
   
   <span class="md-ellipsis">
     Usage best practices
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../update-sdxl-golden-outputs/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 6a6 6 0 0 1 6 6c0 2.22-1.21 4.16-3 5.2V19a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-1.8c-1.79-1.04-3-2.98-3-5.2a6 6 0 0 1 6-6m2 15v1a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-1zm6-10h3v2h-3zM1 11h3v2H1zM13 1v3h-2V1zM4.92 3.5l2.13 2.14-1.42 1.41L3.5 4.93zm12.03 2.13 2.12-2.13 1.43 1.43-2.13 2.12z"/></svg>
+  
+  <span class="md-ellipsis">
+    Updating SDXL Golden Outputs for IREE CI
   </span>
   
 
@@ -5447,12 +5472,12 @@ CPU:</p>
 <span class="w">    </span><span class="s2">&quot;onnx/node/generated/test_dequantizelinear&quot;</span><span class="p">,</span>
 <span class="w">    </span><span class="s2">&quot;onnx/node/generated/test_einsum_inner_prod&quot;</span><span class="p">,</span>
 <span class="w">    </span><span class="s2">&quot;onnx/node/generated/test_group_normalization_epsilon_expanded&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="s2">&quot;onnx/node/generated/test_group_normalization_example_expanded&quot;</span>
+<span class="w">    </span><span class="s2">&quot;onnx/node/generated/test_group_normalization_example_expanded&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;onnx/node/generated/test_nonmaxsuppression_two_batches&quot;</span>
 <span class="w">  </span><span class="p">],</span>
 <span class="w">  </span><span class="nt">&quot;skip_run_tests&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">    </span><span class="s2">&quot;onnx/node/generated/test_gridsample_zeros_padding&quot;</span>
 <span class="w">  </span><span class="p">],</span>
-<span class="w">  </span><span class="nt">&quot;expected_compile_failures&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 </code></pre></div></td></tr></table></div>
 <h5 id="updating-config-files">Updating config files<a class="headerlink" href="#updating-config-files" title="Permanent link">link</a></h5>
 <p>If the ONNX operator tests fail on a GitHub Actions workflow, check the logs
@@ -5532,6 +5557,7 @@ repository.</p>
 </ul>
 <p>The quality and benchmark test config files are stored in
 <a href="https://github.com/iree-org/iree/tree/main/tests/external/iree-test-suites/sharktank_models"><code>tests/external/iree-test-suites/sharktank_models</code></a>.</p>
+<p>Detailed steps on how to update the golden output in SDXL may be found <a href="../../update-sdxl-golden-outputs/">here</a>.</p>
 <!-- TODO(scotttodd): document how to coordinate changes across these projects -->
 
 <h3 id="shark-testsuite">SHARK-TestSuite<a class="headerlink" href="#shark-testsuite" title="Permanent link">link</a></h3>
