@@ -260,6 +260,7 @@ nav:
           - "developers/design-docs/vm.md"
       - "Other topics":
           - "developers/usage-best-practices.md"
+          - "developers/update-sdxl-golden-outputs.md"
           - "developers/vulkan-environment-setup.md"
   - "Community":
       - "community/index.md"
