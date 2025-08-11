@@ -438,12 +438,13 @@ getVectorDistributeReductionConfig(
     }
 
     int64_t parallelSize = bounds[parallelDims.back()];
-    if (ShapedType::isDynamic(parallelSize) ||
-        parallelSize % threadLoads != 0) {
-      return failure();
+    if (ShapedType::isDynamic(parallelSize)) {
+      parallelSize = kVectorDistributeReductionSizeToTargetIfDynamic;
     }
-    int64_t lastDimReductionTileSize = workgroupSize * threadLoads;
+    if (parallelSize % threadLoads != 0)
+      return failure();
 
+    int64_t lastDimReductionTileSize = workgroupSize * threadLoads;
     // Setting subgroupBasis to minimum i.e., 1 and threadBasis
     // to maximum i.e., subgroupSize.
     int64_t subgroupBasis = 1;
