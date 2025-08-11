@@ -55,10 +55,10 @@ util.func public @dedup_workgroup_count_from_slice_operands(
     flow.return
   } count(%b0 : index, %b1 : index, %b2 : index) -> (index, index, index) {
     //     CHECK: count(%[[B0:[a-zA-Z0-9]+]]: index, %[[B1:[a-zA-Z0-9]+]]: index, %[[B2:[a-zA-Z0-9]+]]: index)
-    //     CHECK: iree_tensor_ext.dispatch.workgroup_count_from_slice %[[B0]], %[[B1]], %[[B2]]
+    //     CHECK: iree_tensor_ext.dispatch.workgroup_count_from_slice(%[[B0]], %[[B1]], %[[B2]])
     // CHECK-NOT: %[[B2]]
     // CHECK-NOT: %[[B0]]
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %b0, %b1, %b2, %b2, %b0
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%b0, %b1, %b2, %b2, %b0)
     flow.return %x, %y, %z : index, index, index
   }
   util.return %result :tensor<?x?x?x?x?xf32>
@@ -95,10 +95,10 @@ util.func public @dedup_workload(
     flow.return
   } count(%b0 : index, %b1 : index, %b2 : index, %b3 : index, %b4 : index) -> (index, index, index) {
     //     CHECK: count(%[[B0:[a-zA-Z0-9]+]]: index, %[[B1:[a-zA-Z0-9]+]]: index, %[[B2:[a-zA-Z0-9]+]]: index)
-    //     CHECK: iree_tensor_ext.dispatch.workgroup_count_from_slice %[[B0]], %[[B1]], %[[B2]]
+    //     CHECK: iree_tensor_ext.dispatch.workgroup_count_from_slice(%[[B0]], %[[B1]], %[[B2]])
     // CHECK-NOT: %[[B2]]
     // CHECK-NOT: %[[B0]]
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %b0, %b1, %b2, %b3, %b4
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%b0, %b1, %b2, %b3, %b4)
     flow.return %x, %y, %z : index, index, index
   }
   util.return %result :tensor<?x?x?x?x?xf32>

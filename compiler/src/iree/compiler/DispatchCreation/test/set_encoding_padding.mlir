@@ -10,7 +10,7 @@ util.func @simple_test(%lhs : tensor<?x?xf32>, %rhs0 : tensor<?x2048xf32>,
         outs(%2 : tensor<?x2048xf32>) -> tensor<?x2048xf32>
     flow.return %3 : tensor<?x2048xf32>
   } count(%w0: index, %w1 : index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %w0, %w1
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%w0, %w1)
     flow.return %x, %y, %z : index, index, index
   }
   %1 = flow.dispatch.region[%M, %N] -> (tensor<?x?xf32>{%M, %N}) {
@@ -20,7 +20,7 @@ util.func @simple_test(%lhs : tensor<?x?xf32>, %rhs0 : tensor<?x2048xf32>,
         outs(%3 : tensor<?x?xf32>) -> tensor<?x?xf32>
     flow.return %4 : tensor<?x?xf32>
   } count(%w0: index, %w1 : index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %w0, %w1
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%w0, %w1)
     flow.return %x, %y, %z : index, index, index
   }
   util.return %1 : tensor<?x?xf32>
@@ -39,7 +39,7 @@ util.func @simple_test(%lhs : tensor<?x?xf32>, %rhs0 : tensor<?x2048xf32>,
 //       CHECK:     %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[OP0]]
 //       CHECK:     flow.return %[[SET_ENCODING]]
 //       CHECK:     count(%[[B0:[a-zA-Z0-9]+]]: index, %[[B1:[a-zA-Z0-9]+]]: index)
-//       CHECK:       %[[X:[a-zA-Z0-9_]+]], %[[Y:[a-zA-Z0-9_]+]], %[[Z:[a-zA-Z0-9_]+]] = iree_tensor_ext.dispatch.workgroup_count_from_slice %[[B0]], %[[B1]]
+//       CHECK:       %[[X:[a-zA-Z0-9_]+]], %[[Y:[a-zA-Z0-9_]+]], %[[Z:[a-zA-Z0-9_]+]] = iree_tensor_ext.dispatch.workgroup_count_from_slice(%[[B0]], %[[B1]])
 //       CHECK:       flow.return %[[X]], %[[Y]], %[[Z]]
 //       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.region
 //       CHECK:     %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[DISPATCH0]]
@@ -58,7 +58,7 @@ util.func @encoding_across_collapse(%lhs : tensor<?x2048xf32>, %rhs : tensor<204
     %1 = tensor.empty(%M) : tensor<?x128x16xf32>
     flow.return %1 : tensor<?x128x16xf32>
   } count(%w0: index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %w0
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%w0)
     flow.return %x, %y, %z : index, index, index
   }
   %1 = tensor.collapse_shape %0 [[0], [1, 2]] : tensor<?x128x16xf32> into tensor<?x2048xf32>
@@ -69,7 +69,7 @@ util.func @encoding_across_collapse(%lhs : tensor<?x2048xf32>, %rhs : tensor<204
         outs(%5 : tensor<?x?xf32>) -> tensor<?x?xf32>
     flow.return %6 : tensor<?x?xf32>
   } count(%w0: index, %w1 : index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %w0, %w1
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%w0, %w1)
     flow.return %x, %y, %z : index, index, index
   }
   util.return %3 : tensor<?x?xf32>
@@ -98,7 +98,7 @@ util.func @encoding_across_collapse_expand(%lhs : tensor<?x2048xf32>, %rhs : ten
     %1 = tensor.empty(%M) : tensor<?x2048xf32>
     flow.return %1 : tensor<?x2048xf32>
   } count(%w0: index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %w0
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%w0)
     flow.return %x, %y, %z : index, index, index
   }
   %2 = tensor.expand_shape %0 [[0], [1, 2]] output_shape[%M, 2, 1024] : tensor<?x2048xf32> into tensor<?x2x1024xf32>
@@ -111,7 +111,7 @@ util.func @encoding_across_collapse_expand(%lhs : tensor<?x2048xf32>, %rhs : ten
         outs(%7 : tensor<?x?xf32>) -> tensor<?x?xf32>
     flow.return %8 : tensor<?x?xf32>
   } count(%w0: index, %w1 : index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %w0, %w1
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%w0, %w1)
     flow.return %x, %y, %z : index, index, index
   }
   util.return %5 : tensor<?x?xf32>
@@ -143,7 +143,7 @@ util.func @no_pad_dynamic_reduction_dims(%lhs : tensor<?x?xf32>, %rhs0 : tensor<
         outs(%2 : tensor<?x?xf32>) -> tensor<?x?xf32>
     flow.return %3 : tensor<?x?xf32>
   } count(%w0: index, %w1 : index, %w2 : index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %w0, %w1, %w2
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%w0, %w1, %w2)
     flow.return %x, %y, %z : index, index, index
   }
   %1 = flow.dispatch.region[%M, %N] -> (tensor<?x?xf32>{%M, %N}) {
@@ -153,7 +153,7 @@ util.func @no_pad_dynamic_reduction_dims(%lhs : tensor<?x?xf32>, %rhs0 : tensor<
         outs(%3 : tensor<?x?xf32>) -> tensor<?x?xf32>
     flow.return %4 : tensor<?x?xf32>
   } count(%w0: index, %w1 : index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %w0, %w1
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%w0, %w1)
     flow.return %x, %y, %z : index, index, index
   }
   util.return %1 : tensor<?x?xf32>
@@ -175,7 +175,7 @@ util.func @no_pad_skinny_matmuls(%lhs : tensor<?x?xf32>, %rhs0 : tensor<?x2048xf
         outs(%2 : tensor<8x2048xf32>) -> tensor<8x2048xf32>
     flow.return %3 : tensor<8x2048xf32>
   } count(%w0: index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %w0
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%w0)
     flow.return %x, %y, %z : index, index, index
   }
   %1 = flow.dispatch.region -> (tensor<8x4xf32>) {
@@ -185,7 +185,7 @@ util.func @no_pad_skinny_matmuls(%lhs : tensor<?x?xf32>, %rhs0 : tensor<?x2048xf
         outs(%3 : tensor<8x4xf32>) -> tensor<8x4xf32>
     flow.return %4 : tensor<8x4xf32>
   } count() -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
     flow.return %x, %y, %z : index, index, index
   }
   util.return %1 : tensor<8x4xf32>
@@ -207,7 +207,7 @@ util.func @check_padding_threshold(%lhs : tensor<?x?xf32>, %rhs0 : tensor<?x2048
         outs(%2 : tensor<8x2048xf32>) -> tensor<8x2048xf32>
     flow.return %3 : tensor<8x2048xf32>
   } count(%w0: index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %w0
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%w0)
     flow.return %x, %y, %z : index, index, index
   }
   %1 = flow.dispatch.region -> (tensor<8x8xf32>) {
@@ -217,7 +217,7 @@ util.func @check_padding_threshold(%lhs : tensor<?x?xf32>, %rhs0 : tensor<?x2048
         outs(%3 : tensor<8x8xf32>) -> tensor<8x8xf32>
     flow.return %4 : tensor<8x8xf32>
   } count() -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
     flow.return %x, %y, %z : index, index, index
   }
   util.return %1 : tensor<8x8xf32>
