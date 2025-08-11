@@ -538,6 +538,8 @@ Types of Sharktank tests:
 The quality and benchmark test config files are stored in
 [`tests/external/iree-test-suites/sharktank_models`](https://github.com/iree-org/iree/tree/main/tests/external/iree-test-suites/sharktank_models).
 
+Detailed steps on how to update the golden output in SDXL may be found [here](../update-sdxl-golden-outputs.md).
+
 <!-- TODO(scotttodd): document how to coordinate changes across these projects -->
 
 ### SHARK-TestSuite
