@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Visitors.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-specialize-exports"
 
@@ -461,6 +462,17 @@ public:
       });
       specializeExportedFunctionByRangeAttribute(exportOp, exportedFunc, helper,
                                                  ordinalSet);
+    }
+
+    // TODO(#21623): We need DCE after this pass as it can leave around
+    // `tensor.dim` operations that can mess up the next passes (e.g.
+    // MaterializeDeviceEncoding). Ideally, we would avoid creating
+    // those ops altogether if not needed.
+    MLIRContext *ctx = &getContext();
+    RewritePatternSet patterns(ctx);
+    tensor::DimOp::getCanonicalizationPatterns(patterns, ctx);
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
+      signalPassFailure();
     }
   }
 };
