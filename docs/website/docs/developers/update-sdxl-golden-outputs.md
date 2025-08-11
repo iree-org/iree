@@ -2,12 +2,12 @@
 icon: material/lightbulb-on
 ---
 
-# Updating Golden Outputs for IREE CI
+# Updating SDXL Golden Outputs for IREE CI
 
 Golden outputs are reference results generated from a known-good version of the
 SDXL pipeline. They serve as the “ground truth” for CI quality tests in IREE,
 ensuring that future changes do not silently alter accuracy. When a change is
-made which affects the numerics (e.g modifying the order of floating-point
+made which affects the numerics (e.g, modifying the order of floating-point
 operations), differences in outputs can occur. In such cases, you must
 regenerate the golden outputs so that CI reflects the new expected results. This
 page describes the end-to-end process: verifying accuracy, generating new
@@ -20,7 +20,7 @@ Before updating golden outputs, first confirm your change maintains acceptable
 accuracy. Follow the steps
 [outlined](https://github.com/nod-ai/SHARK-MLPERF/blob/dev/code/stable-diffusion-xl/development.md#test-accuracy-only).
 
-An straightforward way to test your change is by editing
+A straightforward way to test your change is by editing
 `sdxl_harness_rocm_shortfin_from_source_iree.dockerfile` so that it builds your
 IREE and exposes the right tooling:
 
@@ -29,7 +29,7 @@ IREE and exposes the right tooling:
 - Remove the prebuilt wheels for `iree-base-compiler` and `iree-base-runtime` so
   you’re testing your own build.
 
-Run the accuracy script (e.g., `run_accuracy_mi325x.sh`) and be mindful of
+Run the accuracy script (`run_accuracy_mi325x.sh`) and be mindful of
 platform-specific settings. If you are running in SPX mode, update available
 device IDs accordingly. On MI300x, set `CPD=1` and use `BATCH_SIZE=32`. Accuracy
 is considered acceptable if FID and CLIP scores fall within the advertised
@@ -45,9 +45,10 @@ exact paths in the relevant json file in
 `tests/external/iree-test-suites/sharktank_models/quality_tests/sdxl/`.
 
 Next, compile the relevant model using your IREE build. The exact flags should
-mirror what CI uses for the target you’re validating. The example below shows a
-representative invocation; replace paths and flags with your local equivalents
-as needed.
+mirror what CI uses for the target you're validating. You can find this
+information from failing CI logs or from the same json file as mentioned above.
+The example below shows a representative invocation; replace paths and flags
+with your local equivalents as needed.
 
 ```bash
 iree-build/tools/iree-compile \
