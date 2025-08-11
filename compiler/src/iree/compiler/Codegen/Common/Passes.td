@@ -85,6 +85,15 @@ def ConcretizePadResultShapePass :
 def ConvertAccGEMMToGEMMPass :
     InterfacePass<"iree-convert-accgemm-to-gemm", "mlir::FunctionOpInterface"> {
   let summary = "Convert accumulating GEMMs to GEMMs post dispatch creation.";
+  let description = [{
+    There are cases that a reduction op accumulates the result into a ReadOnly
+    tensor. The pass converts such pattern into `reduction -> elementwise`,
+    where the destination tensor is initialized with the identity value, given
+    the combiner op in the reduction op.
+
+    It does not only take linalg ops into accout, but also
+    IREE::Codegen::InnerTiledOp ops.
+  }];
 }
 
 def ConvertBf16ArithToF32Pass : Pass<"iree-convert-bf16-arith-to-f32", ""> {
