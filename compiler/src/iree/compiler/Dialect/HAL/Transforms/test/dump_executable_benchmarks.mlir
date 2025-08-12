@@ -25,7 +25,7 @@ util.global private @device = #hal.device.target<"local", [
 hal.executable private @ex0 {
   hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64) {
     hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout_0) count(%device: !hal.device, %arg0: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg0
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
       hal.return %x, %y, %z : index, index, index
     } attributes {
       translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
@@ -185,7 +185,7 @@ util.global private @device_b = #hal.device.target<"local", [
 hal.executable private @ex_0 {
   hal.executable.variant public @variant_a target(#executable_target_embedded_elf_aarch64) {
     hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout) count(%device: !hal.device, %arg0: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg0
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
       hal.return %x, %y, %z : index, index, index
     } attributes {
       translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
@@ -196,7 +196,7 @@ hal.executable private @ex_0 {
       }
     }
     hal.executable.export public @dispatch1 ordinal(1) layout(#pipeline_layout) count(%device: !hal.device, %arg0: index, %arg1: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg0
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
       hal.return %x, %y, %z : index, index, index
     } attributes {
       translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
@@ -209,7 +209,7 @@ hal.executable private @ex_0 {
   }
   hal.executable.variant public @variant_b target(#executable_target_embedded_elf_x86_64) {
     hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout) count(%device: !hal.device, %arg0: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg0
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
       hal.return %x, %y, %z : index, index, index
     } attributes {
       translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
@@ -220,7 +220,7 @@ hal.executable private @ex_0 {
       }
     }
     hal.executable.export public @dispatch1 ordinal(1) layout(#pipeline_layout) count(%device: !hal.device, %arg0: index, %arg1: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg0
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
       hal.return %x, %y, %z : index, index, index
     } attributes {
       translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
@@ -235,7 +235,7 @@ hal.executable private @ex_0 {
 hal.executable private @ex_1 {
   hal.executable.variant public @variant_b target(#executable_target_embedded_elf_x86_64) {
     hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout) count(%device: !hal.device, %arg0: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg0
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
       hal.return %x, %y, %z : index, index, index
     } attributes {
       translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>

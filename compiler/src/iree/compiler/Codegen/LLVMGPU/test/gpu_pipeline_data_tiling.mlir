@@ -13,7 +13,7 @@ module attributes {stream.affinity.default = #hal.device.affinity<@__device_0>} 
   hal.executable private @executable {
     hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
       hal.executable.export public @export ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-        %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+        %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
         hal.return %x, %y, %z : index, index, index
       }
       builtin.module {
