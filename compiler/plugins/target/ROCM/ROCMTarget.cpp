@@ -391,9 +391,15 @@ public:
         });
       }
     }
-    GPUConfigurationOptions config;
-    config.enableTensorUkernels = options.enableTensorUKernels;
-    buildLLVMGPUCodegenConfigurationPassPipeline(passManager, config);
+    buildLLVMGPUCodegenCommonConfigurationPassPipeline(passManager);
+    OpPassManager &modulePassManager = passManager.nest<ModuleOp>();
+    if (options.enableTensorUKernels) {
+      modulePassManager.addPass(
+          IREE::ROCM::createApplyBuiltinPDLPatternsDriverPass());
+    }
+    modulePassManager.addPass(createMaterializeTuningSpecsPass());
+    modulePassManager.addPass(createMaterializeUserConfigsPass());
+    modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass());
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,

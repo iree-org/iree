@@ -11,7 +11,6 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
-#include "mlir/Pass/PassOptions.h"
 
 namespace mlir::iree_compiler::IREE::GPU {
 
@@ -51,16 +50,6 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
 LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
                             mlir::FunctionOpInterface entryPoint,
                             Operation *op);
-
-//===----------------------------------------------------------------------===//
-// Pass Configuration Options
-//===----------------------------------------------------------------------===//
-
-struct GPUConfigurationOptions final
-    : public PassPipelineOptions<GPUConfigurationOptions> {
-  /// Enables tensor-based MLIR ukernels through ukernel descriptors.
-  bool enableTensorUkernels = false;
-};
 
 //===----------------------------------------------------------------------===//
 // Pass Pipeline Options

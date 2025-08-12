@@ -448,8 +448,7 @@ public:
   void
   buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                  OpPassManager &passManager) override {
-    GPUConfigurationOptions options;
-    buildLLVMGPUCodegenConfigurationPassPipeline(passManager, options);
+    buildLLVMGPUCodegenConfigurationPassPipeline(passManager);
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,

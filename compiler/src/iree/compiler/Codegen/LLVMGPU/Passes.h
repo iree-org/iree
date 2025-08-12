@@ -22,7 +22,6 @@
 
 namespace mlir::iree_compiler {
 
-using IREE::GPU::GPUConfigurationOptions;
 using IREE::GPU::GPUPipelineOptions;
 
 //----------------------------------------------------------------------------//
@@ -82,9 +81,14 @@ void addGPUDefaultPassPipeline(OpPassManager &funcPassManager,
 /// Pass pipeline to lower IREE HAL executables without tiling and distribution.
 void addGPUBaseLoweringPassPipeline(OpPassManager &pm);
 
+/// Populates the common passes needed to preprocess and select the translation
+/// strategy.
+void buildLLVMGPUCodegenCommonConfigurationPassPipeline(
+    OpPassManager &variantPassManagery);
+
 /// Populates passes needed to preprocess and select the translation strategy.
 void buildLLVMGPUCodegenConfigurationPassPipeline(
-    OpPassManager &variantPassManagery, const GPUConfigurationOptions &options);
+    OpPassManager &variantPassManagery);
 
 /// Populates passes needed to lower a XLA HLO op to NVVM/ROCDL dialect via
 /// the structured ops path. The pass manager `pm` in here should operate on

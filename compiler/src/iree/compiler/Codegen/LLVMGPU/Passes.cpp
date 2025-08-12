@@ -8,7 +8,6 @@
 
 #include <cstdint>
 
-#include "compiler/plugins/target/ROCM/Dialect/ROCM/Transforms/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Common/CombineLayoutTransformation.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
@@ -1278,8 +1277,8 @@ void addGPUTransformDialectPasses(OpPassManager &funcPassManager,
 // Common Pass Pipelines
 //===----------------------------------------------------------------------===//
 
-static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
-    OpPassManager &modulePassManager, const GPUConfigurationOptions &options) {
+static void buildLLVMGPUCodegenCommonConfigurationPassPipelineImpl(
+    OpPassManager &modulePassManager) {
   {
     FunctionLikeNest funcPassManager(modulePassManager);
     funcPassManager.addPass(createMaterializeDeviceEncodingPass);
@@ -1304,20 +1303,27 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
     funcPassManager.addPass(createConfigTrackingCanonicalizerPass);
     funcPassManager.addPass(createCSEPass);
   }
-  if (options.enableTensorUkernels) {
-    modulePassManager.addPass(
-        IREE::ROCM::createApplyBuiltinPDLPatternsDriverPass());
-  }
+}
+
+void buildLLVMGPUCodegenCommonConfigurationPassPipeline(
+    OpPassManager &variantPassManager) {
+  buildLLVMGPUCodegenCommonConfigurationPassPipelineImpl(
+      variantPassManager.nest<ModuleOp>());
+}
+
+static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
+    OpPassManager &modulePassManager) {
+  buildLLVMGPUCodegenCommonConfigurationPassPipelineImpl(modulePassManager);
   modulePassManager.addPass(createMaterializeTuningSpecsPass());
   modulePassManager.addPass(createMaterializeUserConfigsPass());
   modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass());
 }
 
 void buildLLVMGPUCodegenConfigurationPassPipeline(
-    OpPassManager &variantPassManager, const GPUConfigurationOptions &options) {
+    OpPassManager &variantPassManager) {
   variantPassManager.addPass(createSpecializeExportsPass());
   buildLLVMGPUCodegenConfigurationPassPipelineImpl(
-      variantPassManager.nest<ModuleOp>(), options);
+      variantPassManager.nest<ModuleOp>());
 }
 
 void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
@@ -1441,16 +1447,13 @@ void registerCodegenLLVMGPUPasses() {
   // Generated.
   common::registerPasses();
 
-  static PassPipelineRegistration<GPUConfigurationOptions>
-      LLVMGPUConfigPipeline("iree-codegen-llvmgpu-configuration-pipeline",
-                            "Runs the translation strategy configuration "
-                            "pipeline on Linalg for GPU "
-                            "on all functions in a module",
-                            [](OpPassManager &modulePassManager,
-                               const GPUConfigurationOptions &options) {
-                              buildLLVMGPUCodegenConfigurationPassPipelineImpl(
-                                  modulePassManager, options);
-                            });
+  static PassPipelineRegistration<> LLVMGPUConfigPipeline(
+      "iree-codegen-llvmgpu-configuration-pipeline",
+      "Runs the translation strategy configuration pipeline on Linalg for GPU "
+      "on all functions in a module",
+      [](OpPassManager &modulePassManager) {
+        buildLLVMGPUCodegenConfigurationPassPipelineImpl(modulePassManager);
+      });
 
   static PassPipelineRegistration<> LinalgNVVMPipeline(
       "iree-codegen-linalg-to-nvvm-pipeline",
