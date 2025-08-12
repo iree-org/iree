@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Utils/ShapeUtils.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
@@ -61,7 +62,8 @@ static LogicalResult annotateOperation(PatternRewriter &rewriter,
     return rewriter.notifyMatchFailure(rootOp,
                                        "expected StringAttr for attr name.");
   }
-  rootOp->setAttr(strName.strref(), annotation);
+  rewriter.modifyOpInPlace(
+      rootOp, [&]() { rootOp->setAttr(strName.strref(), annotation); });
   return success();
 }
 
@@ -75,7 +77,6 @@ static LogicalResult matchContraction(PatternRewriter &rewriter,
     return rewriter.notifyMatchFailure(rootOp,
                                        "not a contraction like linalg op");
   }
-
   if (linalgOp.getIndexingMaps() != indexingMaps) {
     return rewriter.notifyMatchFailure(rootOp, "indexing maps mismatch");
   }
@@ -90,6 +91,50 @@ static LogicalResult matchContraction(PatternRewriter &rewriter,
   return success();
 }
 
+/// Helper to match ops with specific element types.
+static LogicalResult matchElementTypes(PatternRewriter &rewriter,
+                                       Operation *rootOp,
+                                       Attribute elementTypes) {
+  SmallVector<Attribute> opElemTypes =
+      llvm::map_to_vector(rootOp->getOperandTypes(), [](Type t) -> Attribute {
+        return TypeAttr::get(getElementTypeOrSelf(t));
+      });
+  if (rewriter.getArrayAttr(opElemTypes) != elementTypes) {
+    return rewriter.notifyMatchFailure(rootOp, "element types mismatch");
+  }
+  return success();
+}
+
+/// Helper to match linalg ops with specific indexing maps.
+static LogicalResult matchIndexingMaps(PatternRewriter &rewriter,
+                                       Operation *rootOp,
+                                       Attribute indexingMaps) {
+  auto indexingMapOp = dyn_cast<IndexingMapOpInterface>(rootOp);
+  if (!indexingMapOp) {
+    return rewriter.notifyMatchFailure(rootOp, "not an op with indexing maps");
+  }
+  if (indexingMapOp.getIndexingMaps() != indexingMaps) {
+    return rewriter.notifyMatchFailure(rootOp, "indexing maps mismatch");
+  }
+  return success();
+}
+
+/// Helper to check whether the given value is cast-compatible with the given
+/// type.
+static LogicalResult matchCastCompatibleType(PatternRewriter &rewriter,
+                                             Value value, Type type) {
+  if (auto targetTensorType = dyn_cast<RankedTensorType>(type)) {
+    if (!isCastableToTensorType(value.getType(), targetTensorType)) {
+      return failure();
+    }
+    return success();
+  }
+  if (value.getType() != type) {
+    return failure();
+  }
+  return success();
+}
+
 /// PDL utility that checks whether the size of the dimension of the provided
 /// value is a multiple of the divisor.
 static LogicalResult dimIsMultipleOf(PatternRewriter &rewriter, Value value,
@@ -100,6 +145,9 @@ static LogicalResult dimIsMultipleOf(PatternRewriter &rewriter, Value value,
   }
   auto dimInt = dyn_cast<IntegerAttr>(dim);
   if (!dim) {
+    return failure();
+  }
+  if (dimInt.getInt() >= shapedType.getRank()) {
     return failure();
   }
   auto divisorInt = dyn_cast<IntegerAttr>(divisor);
@@ -138,6 +186,9 @@ static LogicalResult dimIsBound(PatternRewriter &rewriter, Value value,
   }
   auto dimInt = dyn_cast<IntegerAttr>(dim);
   if (!dimInt) {
+    return failure();
+  }
+  if (dimInt.getInt() >= shapedType.getRank()) {
     return failure();
   }
   if (auto lowerBoundInt = dyn_cast<IntegerAttr>(lowerBound)) {
@@ -188,7 +239,11 @@ populatePDLModuleFromBuiltin(MLIRContext *context, RewritePatternSet &patterns,
   pdlModule.registerConstraintFunction("hasAttr", hasAttr);
   pdlModule.registerConstraintFunction("dimIsBound", dimIsBound);
   pdlModule.registerConstraintFunction("dimIsMultipleOf", dimIsMultipleOf);
+  pdlModule.registerConstraintFunction("matchCastCompatibleType",
+                                       matchCastCompatibleType);
   pdlModule.registerConstraintFunction("matchContraction", matchContraction);
+  pdlModule.registerConstraintFunction("matchElementTypes", matchElementTypes);
+  pdlModule.registerConstraintFunction("matchIndexingMaps", matchIndexingMaps);
   pdlModule.registerRewriteFunction("annotateOperation", annotateOperation);
   patterns.insert(std::move(pdlModule));
   return success();
