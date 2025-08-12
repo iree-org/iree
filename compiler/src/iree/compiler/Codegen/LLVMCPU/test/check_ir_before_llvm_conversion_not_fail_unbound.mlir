@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-check-ir-before-llvm-conversion{fail-on-out-of-bounds=false}))" %s --split-input-file | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-check-ir-before-llvm-conversion{fail-on-out-of-bounds=false}))" %s -split-input-file | FileCheck %s
 
 func.func @dynamic_allocas(%arg0: index) {
   %0 = memref.alloca(%arg0) : memref<?xf32>
@@ -34,3 +34,11 @@ func.func @scalable_alloca() {
   return
 }
 // CHECK-LABEL: func @scalable_alloca(
+
+// -----
+
+func.func @complex_alloca() {
+  %0 = memref.alloca() : memref<128xcomplex<f32>>
+  return
+}
+// CHECK-LABEL: func @complex_alloca(
