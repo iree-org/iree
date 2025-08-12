@@ -93,7 +93,7 @@ checkStackAllocationSize(mlir::FunctionOpInterface funcOp) {
       }
       return allocaOp.emitOpError("expected no unbounded stack allocations");
     }
-    allocaSize *= allocaType.getElementType().getIntOrFloatBitWidth();
+    allocaSize *= IREE::Util::getTypeBitWidth(allocaType.getElementType());
     if (allocaOp.getAlignment()) {
       int64_t alignmentInBits = *allocaOp.getAlignment() * 8;
       allocaSize =
