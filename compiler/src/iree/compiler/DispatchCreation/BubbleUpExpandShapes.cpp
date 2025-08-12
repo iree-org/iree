@@ -176,6 +176,8 @@ struct BubbleExpandThroughExtract final
       return failure();
     }
 
+    RankedTensorType expandedType = expandOp.getResultType();
+    ArrayRef<int64_t> expandedShape = expandedType.getShape();
     ArrayRef<int64_t> extractSrcShape = extractOp.getSourceType().getShape();
     ArrayRef<int64_t> extractDstShape = extractOp.getResultType().getShape();
     const uint64_t extractSrcRank = extractSrcShape.size();
@@ -194,10 +196,24 @@ struct BubbleExpandThroughExtract final
       if (reassoc[i - droppedDimCount].size() == 1) {
         continue;
       }
-      if (ShapedType::isDynamic(extractSrcShape[i]) ||
-          extractSrcShape[i] != extractDstShape[i - droppedDimCount]) {
-        return rewriter.notifyMatchFailure(
-            extractOp, "Extract modifies the expanded dimension");
+      if (ShapedType::isDynamic(extractSrcShape[i])) {
+        return rewriter.notifyMatchFailure(extractOp,
+                                           "Expanded dim is dynamic");
+      }
+
+      int64_t prod = 1;
+      for (int64_t expandedDim :
+           llvm::drop_begin(reassoc[i - droppedDimCount])) {
+        if (ShapedType::isDynamic(expandedShape[expandedDim])) {
+          return rewriter.notifyMatchFailure(extractOp,
+                                             "Expanded dim is dynamic");
+        }
+        prod *= expandedShape[expandedDim];
+      }
+
+      if (extractDstShape[i - droppedDimCount] % prod != 0) {
+        return rewriter.notifyMatchFailure(extractOp,
+                                           "Sliced dim cannot be expanded");
       }
     }
 
@@ -223,8 +239,6 @@ struct BubbleExpandThroughExtract final
     const SmallVector<OpFoldResult> oldSizes = extractOp.getMixedSizes();
     const SmallVector<OpFoldResult> oldStrides = extractOp.getMixedStrides();
 
-    RankedTensorType expandedType = expandOp.getResultType();
-    ArrayRef<int64_t> expandedShape = expandedType.getShape();
     auto zeroAttr = rewriter.getIndexAttr(0);
     auto oneAttr = rewriter.getIndexAttr(1);
 
@@ -244,7 +258,19 @@ struct BubbleExpandThroughExtract final
         newStrides.push_back(oldStrides[inDim]);
         continue;
       }
-      for (auto outDim : outDims) {
+
+      int64_t prod = 1;
+      for (auto outDim : llvm::drop_begin(outDims)) {
+        prod *= expandedShape[outDim - droppedDimCount];
+      }
+      int64_t outerSize = extractSrcShape[inDim] / prod;
+      newExpandShape.push_back(outerSize);
+      newOffsets.push_back(zeroAttr);
+      newSizes.push_back(
+          rewriter.getIndexAttr(expandedShape[outDims[0] - droppedDimCount]));
+      newStrides.push_back(oneAttr);
+
+      for (auto outDim : llvm::drop_begin(outDims)) {
         int64_t expandedDim = expandedShape[outDim - droppedDimCount];
         assert(ShapedType::isStatic(expandedDim));
         newExpandShape.push_back(expandedDim);
