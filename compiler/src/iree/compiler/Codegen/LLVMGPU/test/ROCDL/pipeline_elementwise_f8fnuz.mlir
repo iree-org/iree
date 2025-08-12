@@ -12,7 +12,7 @@
 hal.executable @ext_fp8_dispatch {
   hal.executable.variant @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export public @ext_fp8_dispatch layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2, %arg3)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {

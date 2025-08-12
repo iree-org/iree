@@ -14,7 +14,7 @@
 hal.executable @matmul_256x256x256_f16_f32 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
   hal.executable.export public @matmul_256x256x256_f16_f32 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2)
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -60,7 +60,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 hal.executable @matmul_256x256x256_f16_f16 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
   hal.executable.export public @matmul_256x256x256_f16_f16 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2)
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -98,7 +98,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 hal.executable private @matvec_dispatch_0 {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export public @matvec_dispatch_0_matmul_transpose_b_32000x2x4096_f16xf16xf32 ordinal(0) layout(#hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {

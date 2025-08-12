@@ -19,7 +19,7 @@
 hal.executable @matmul_f32_128x256x64 {
   hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb">) {
     hal.executable.export public @matmul_f32_128x256x64 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -104,7 +104,7 @@ hal.executable @matmul_f32_128x256x64 {
 hal.executable @matmul_f32_128x256x64 {
   hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb">) {
     hal.executable.export public @matmul_f32_128x256x64 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -201,7 +201,7 @@ hal.executable @matmul_f32_128x256x64 {
 hal.executable @matmul_f16_4096x512x512 {
   hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb">) {
     hal.executable.export public @matmul_f16_4096x512x512 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {

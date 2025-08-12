@@ -9,7 +9,7 @@
 
 stream.executable private @__builtin_splat_i32 {
   stream.executable.export public @__builtin_splat_i32 workgroups(%arg0: index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg0
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg0)
     stream.return %x, %y, %z : index, index, index
   }
   builtin.module {

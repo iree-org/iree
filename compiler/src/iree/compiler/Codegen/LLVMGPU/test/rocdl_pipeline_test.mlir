@@ -13,7 +13,7 @@
 hal.executable @simpleMath_ex_dispatch_0 {
   hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
   hal.executable.export public @add_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1)
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -54,7 +54,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
 hal.executable @dot_dispatch_0 {
   hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export public @dot_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2, %arg3)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -105,7 +105,7 @@ hal.executable @dot_dispatch_0 {
 hal.executable @ceildiv_expand_dispatch {
   hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
   hal.executable.export public @ceildiv_expand layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1)
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {

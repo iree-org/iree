@@ -9,7 +9,7 @@
 hal.executable @i4_dequant {
   hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb">) {
     hal.executable.export public @i4_dequant layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {

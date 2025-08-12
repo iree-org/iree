@@ -9,9 +9,9 @@ hal.executable private @split_reduction_executable {
   hal.executable.variant public @split_reduction_variant target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @split_reduction layout(#pipeline_layout) count(
         %arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4, %arg5, %arg6
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3, %arg4, %arg5, %arg6)
       %return_x, %return_y, %return_z =
-          iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier(%x, %y, %z), %arg1, %arg2, %arg3, %arg4, %arg5, %arg6
+          iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier workgroups(%x, %y, %z) workload(%arg1, %arg2, %arg3, %arg4, %arg5, %arg6)
       hal.return %return_x, %return_y, %return_z : index, index, index
     }
     builtin.module {
@@ -83,9 +83,9 @@ hal.executable private @split_reduction_2d_executable {
   hal.executable.variant public @split_reduction_2d_variant target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @split_reduction_2d layout(#pipeline_layout) count(
         %arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4, %arg5
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3, %arg4, %arg5)
       %return_x, %return_y, %return_z =
-          iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier(%x, %y, %z), %arg1, %arg2, %arg3, %arg4, %arg5
+          iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier workgroups(%x, %y, %z) workload(%arg1, %arg2, %arg3, %arg4, %arg5)
       hal.return %return_x, %return_y, %return_z : index, index, index
     }
     builtin.module {
@@ -149,9 +149,9 @@ hal.executable private @split_reduction_2d_permuted_mapping_executable {
   hal.executable.variant public @split_reduction_2d_permuted_mapping_variant target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @split_reduction_2d_permuted_mapping layout(#pipeline_layout) count(
         %arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4, %arg5, %arg6
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3, %arg4, %arg5, %arg6)
       %return_x, %return_y, %return_z =
-          iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier(%x, %y, %z), %arg1, %arg2, %arg3, %arg4, %arg5, %arg6
+          iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier workgroups(%x, %y, %z) workload(%arg1, %arg2, %arg3, %arg4, %arg5, %arg6)
       hal.return %return_x, %return_y, %return_z : index, index, index
     }
     builtin.module {

@@ -18,7 +18,7 @@ util.func public @fold_tensor_encode_op(%arg0: !stream.resource<*>, %arg1: index
 #encoding = #iree_encoding.testing<>
 // CHECK:      stream.executable private @[[$EX:.+]] {
 // CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups()
-// CHECK-NEXT:      iree_tensor_ext.dispatch.workgroup_count_from_slice
+// CHECK-NEXT:      iree_tensor_ext.dispatch.workgroup_count_from_slice()
 // CHECK:         func.func @[[$ENTRY]](
 // CHECK-SAME:      %[[SRC_ARG:[a-zA-Z0-9]+]]: !stream.binding
 // CHECK-SAME:      %[[DEST_ARG:[a-zA-Z0-9]+]]: !stream.binding
@@ -50,7 +50,7 @@ util.func public @encode_static_shape(%resource: !stream.resource<*>, %total_siz
 #encoding = #iree_encoding.testing<>
 // CHECK:      stream.executable private @[[$EX:.+]] {
 // CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index)
-// CHECK-NEXT:      iree_tensor_ext.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]]
+// CHECK-NEXT:      iree_tensor_ext.dispatch.workgroup_count_from_slice(%[[ARG0]], %[[ARG1]])
 // CHECK:         func.func @[[$ENTRY]](
 // CHECK-SAME:      %[[SRC_ARG:[a-zA-Z0-9]+]]: !stream.binding
 // CHECK-SAME:      %[[SRC_D1_ARG:[a-zA-Z0-9]+]]: index
@@ -88,7 +88,7 @@ util.func public @mixed_static_dynamic_encoding(%resource: !stream.resource<*>, 
 #encoding = #iree_encoding.testing<>
 // CHECK:      stream.executable private @[[$EX:.+]] {
 // CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index, %[[ARG3:.+]]: index)
-// CHECK-NEXT:      iree_tensor_ext.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]
+// CHECK-NEXT:      iree_tensor_ext.dispatch.workgroup_count_from_slice(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]])
 // CHECK:         func.func @[[$ENTRY]](
 // CHECK-SAME:      %[[SRC_ARG:[a-zA-Z0-9]+]]: !stream.binding
 // CHECK-SAME:      %[[SRC_D0_ARG:[a-zA-Z0-9]+]]: index
@@ -130,7 +130,7 @@ util.func public @encode_result_resource(%resource: !stream.resource<*>, %total_
 #encoding = #iree_encoding.testing<>
 // CHECK:      stream.executable private @[[$EX:.+]] {
 // CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index, %[[ARG3:.+]]: index)
-// CHECK-NEXT:      iree_tensor_ext.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]
+// CHECK-NEXT:      iree_tensor_ext.dispatch.workgroup_count_from_slice(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]])
 // CHECK:         func.func @[[$ENTRY]](
 // CHECK-SAME:      %[[SRC_ARG:[a-zA-Z0-9]+]]: !stream.binding
 // CHECK-SAME:      %[[SRC_D0_ARG:[a-zA-Z0-9]+]]: index
@@ -174,7 +174,7 @@ util.func public @decode_source_resource(%resource: !stream.resource<*>, %total_
 #encoding1 = #iree_encoding.testing<[#iree_encoding.specialized<456>]>
 // CHECK:      stream.executable private @[[$EX:.+]] {
 // CHECK:         stream.executable.export public @[[$ENTRY:.+]] workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index, %[[ARG3:.+]]: index)
-// CHECK-NEXT:      iree_tensor_ext.dispatch.workgroup_count_from_slice %[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]]
+// CHECK-NEXT:      iree_tensor_ext.dispatch.workgroup_count_from_slice(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[ARG3]])
 // CHECK:         func.func @[[$ENTRY]](
 // CHECK-SAME:      %[[SRC_ARG:[a-zA-Z0-9]+]]: !stream.binding
 // CHECK-SAME:      %[[SRC_D0_ARG:[a-zA-Z0-9]+]]: index

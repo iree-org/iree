@@ -31,7 +31,7 @@ module @e2e {
 // CHECK: vm.rodata private @executable_0_vmvx_bytecode_fb
 stream.executable private @executable_0 {
   stream.executable.export public @dispatch workgroups(%arg0: index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg0
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
     stream.return %x, %y, %z : index, index, index
   }
   builtin.module {
@@ -79,7 +79,7 @@ module @inplace {
 // CHECK: vm.rodata private @executable_1_vmvx_bytecode_fb
 stream.executable private @executable_1 {
   stream.executable.export public @dispatch workgroups(%arg0: index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg0
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
     stream.return %x, %y, %z : index, index, index
   }
   builtin.module {
@@ -128,7 +128,7 @@ module @dynamic {
 // CHECK: vm.rodata private @executable_2_vmvx_bytecode_fb
 stream.executable private @executable_2 {
   stream.executable.export public @dispatch workgroups(%arg0: index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg0
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
     stream.return %x, %y, %z : index, index, index
   }
   builtin.module {

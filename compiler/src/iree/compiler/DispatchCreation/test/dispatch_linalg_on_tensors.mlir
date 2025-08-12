@@ -47,7 +47,7 @@ util.func public @tile_matmul_alone(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?x
 //      CHECK:     iree_tensor_ext.dispatch.tensor.store %[[GEMM]], %[[ARG5]]
 // CHECK-SAME:         offsets = [0, 0], sizes = [%[[ARG10_W]], %[[ARG11_W]]], strides = [1, 1]
 //      CHECK:     count(%[[W0:.+]]: index, %[[W1:.+]]: index, %[[W2:.+]]: index, %[[W3:.+]]: index, %[[W4:.+]]: index, %[[W5:.+]]: index)
-//      CHECK:       %[[WX:.+]], %[[WY:.+]], %[[WZ:.+]] = iree_tensor_ext.dispatch.workgroup_count_from_slice %[[W0]], %[[W1]], %[[W2]], %[[W3]], %[[W4]], %[[W5]]
+//      CHECK:       %[[WX:.+]], %[[WY:.+]], %[[WZ:.+]] = iree_tensor_ext.dispatch.workgroup_count_from_slice(%[[W0]], %[[W1]], %[[W2]], %[[W3]], %[[W4]], %[[W5]])
 //      CHECK:       flow.return %[[WX]], %[[WY]], %[[WZ]]
 
 // -----
@@ -1875,7 +1875,7 @@ util.func public @pad_and_set_encoding_op(%arg0 : tensor<?x?xf32>)
 //      CHECK:     flow.return
 //      CHECK:   count(%[[WL0:[a-zA-Z0-9]+]]: index, %[[WL1:[a-zA-Z0-9]+]]: index,
 // CHECK-SAME:         %[[WL2:[a-zA-Z0-9]+]]: index, %[[WL3:[a-zA-Z0-9]+]]: index)
-//      CHECK:     %[[X:[a-zA-Z0-9]+]], %[[Y:[a-zA-Z0-9]+]], %[[Z:.+]] = iree_tensor_ext.dispatch.workgroup_count_from_slice %[[WL0]], %[[WL1]], %[[WL2]], %[[WL3]]
+//      CHECK:     %[[X:[a-zA-Z0-9]+]], %[[Y:[a-zA-Z0-9]+]], %[[Z:.+]] = iree_tensor_ext.dispatch.workgroup_count_from_slice(%[[WL0]], %[[WL1]], %[[WL2]], %[[WL3]])
 //      CHECK:     flow.return %[[X]], %[[Y]], %[[Z]]
 //      CHECK:   util.return %[[DISPATCH]]
 

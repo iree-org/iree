@@ -15,7 +15,7 @@ module attributes {
 
 stream.executable public @reduce_dispatch {
   stream.executable.export @reduce_dispatch workgroups(%arg0 : index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg0
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
     stream.return %x, %y, %z : index, index, index
   }
   builtin.module {
