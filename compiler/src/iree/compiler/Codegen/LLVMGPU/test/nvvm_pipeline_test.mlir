@@ -12,7 +12,7 @@
 hal.executable @simpleMath_ex_dispatch_0 {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export public @add_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1)
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -53,7 +53,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
 hal.executable @dot_dispatch_0 {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export public @dot_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2, %arg3)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -115,7 +115,7 @@ hal.executable @dot_dispatch_0 {
 hal.executable @dot_dispatch_0 {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export public @dot_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2, %arg3)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -164,7 +164,7 @@ hal.executable @dot_dispatch_0 {
 hal.executable @conv2d_dispatch_0 {
 hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export public @conv2d_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index, %arg5 : index, %arg6 : index, %arg7 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7)
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -209,7 +209,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 hal.executable @simpleMath_ex_dispatch_0 {
 hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export public @add_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1)
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -246,7 +246,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 hal.executable @reduction_dispatch {
 hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export public @reduction layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2, %arg3)
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -290,7 +290,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 hal.executable @vector_add_dispatch {
 hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export public @vector_add_dispatch layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1)
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -340,7 +340,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 hal.executable @vector_reduction_dispatch {
 hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export public @vector_reduction_dispatch layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2)
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -387,7 +387,7 @@ hal.executable @mma_fused {
     #hal.pipeline.binding<storage_buffer>,
     #hal.pipeline.binding<storage_buffer>
   ]>) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2)
     hal.return %x, %y, %z : index, index, index
   }
   builtin.module {
@@ -464,7 +464,7 @@ hal.executable @mma_fused_fp16 {
     #hal.pipeline.binding<storage_buffer>,
     #hal.pipeline.binding<storage_buffer>
   ]>) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2)
     hal.return %x, %y, %z : index, index, index
   }
   builtin.module {
@@ -543,7 +543,7 @@ hal.executable @mma_fused_fp16 {
   hal.executable @large_dot_general_dispatch_0 {
     hal.executable.variant public @cuda target(#executable_target_cuda_nvptx_fb) {
       hal.executable.export public @large_dot_general_dispatch_0 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 :index) -> (index, index, index) {
-        %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4
+        %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2, %arg3, %arg4)
         hal.return %x, %y, %z : index, index, index
       }
       builtin.module {
@@ -620,7 +620,7 @@ hal.executable @mma_fused_fp16 {
   hal.executable public @split_k_gemm {
     hal.executable.variant public @cuda_nvptx_fb target(#executable_target_cuda_nvptx_fb) {
       hal.executable.export public @split_k_gemm ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index) -> (index, index, index) {
-        %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4
+        %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2, %arg3, %arg4)
         hal.return %x, %y, %z : index, index, index
       }
       builtin.module {
@@ -680,7 +680,7 @@ hal.executable @mma_fused_fp16 {
   hal.executable public @pooling_dynamic {
     hal.executable.variant public @cuda_nvptx_fb target(#executable_target_cuda_nvptx_fb) {
       hal.executable.export public @pooling_dynamic ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 :index, %arg4 : index, %arg5 : index, %arg6 : index) -> (index, index, index) {
-        %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4, %arg5, %arg6
+        %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2, %arg3, %arg4, %arg5, %arg6)
         hal.return %x, %y, %z : index, index, index
       }
       builtin.module {
@@ -722,7 +722,7 @@ hal.executable @mma_fused_fp16 {
 hal.executable @vector_distribute_dispatch {
 hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export public @vector_distribute_dispatch layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2)
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -772,7 +772,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 hal.executable @vector_distribution_broadcast_dispatch {
 hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export public @vector_distribution_broadcast_dispatch layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2)
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -830,7 +830,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 hal.executable private @generalized_pool {
   hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export public @generalized_pool ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4, %arg5
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2, %arg3, %arg4, %arg5)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -875,7 +875,7 @@ hal.executable private @generalized_pool {
 hal.executable private @shared_mem_transpose  {
   hal.executable.variant @cuda target(#executable_target_cuda_nvptx_fb) {
     hal.executable.export public @shared_mem_transpose layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index) -> (index, index, index) {
-        %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+        %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2)
         hal.return %x, %y, %z : index, index, index
     }
     builtin.module {

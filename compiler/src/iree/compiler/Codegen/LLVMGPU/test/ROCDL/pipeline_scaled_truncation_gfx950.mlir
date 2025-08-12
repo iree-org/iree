@@ -15,7 +15,7 @@
 hal.executable @fp4_dynamic_quantt {
   hal.executable.variant @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export public @fp4_dynamic_quant layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {

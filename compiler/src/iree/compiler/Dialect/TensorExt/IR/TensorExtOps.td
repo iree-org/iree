@@ -332,7 +332,7 @@ class IREETensorExt_DispatchWorkgroupCountOp<string mnemonic, list<Trait> traits
   let results = (outs Index:$x, Index:$y, Index:$z);
 
   let assemblyFormat = [{
-    attr-dict ($operands^)?
+    attr-dict `(` $operands `)`
   }];
 }
 
@@ -399,7 +399,7 @@ def IREETensorExt_DispatchWorkgroupCountSplitReductionModifierOp :
   let results = (outs Index:$result_x, Index:$result_y, Index:$result_z);
 
   let assemblyFormat = [{
-    attr-dict `(` $workgroup_x `,` $workgroup_y `,` $workgroup_z `)` `,` ($workload^)?
+    attr-dict `workgroups` `(` $workgroup_x `,` $workgroup_y `,` $workgroup_z `)` `workload` `(` $workload `)`
   }];
 
   let builders = [
