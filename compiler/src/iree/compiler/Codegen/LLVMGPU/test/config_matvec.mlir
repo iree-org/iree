@@ -416,73 +416,116 @@ func.func @not_vmt() {
 
 // -----
 
-func.func @dynamic_parallel_dims(%dynsize : index, %input : tensor<4x?x4096xf16>) -> tensor<4x?xf32> {
-  %cst = arith.constant 0.0 : f32
-  %0 = tensor.empty(%dynsize) : tensor<4x?xf32>
-  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<4x?xf32>) -> tensor<4x?xf32>
-  %2 = linalg.generic {
-      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
-      iterator_types = ["parallel", "parallel", "reduction"]}
-      ins(%input : tensor<4x?x4096xf16>) outs(%1 : tensor<4x?xf32>) {
-    ^bb0(%in: f16, %out: f32):
-      %3 = arith.extf %in : f16 to f32
-      %4 = arith.addf %3, %out : f32
-      linalg.yield %4 : f32
-    } -> tensor<4x?xf32>
-  return %2 : tensor<4x?xf32>
-}
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 64]{{\]}}
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
-//      CHECK: func @dynamic_parallel_dims
-// CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK:   linalg.generic
-// CHECK-SAME:       lowering_config = #[[CONFIG]]
 
-//  CDNA3-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 32]{{\]}}
-//  CDNA3-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [32, 1, 1] subgroup_size = 32>
-//      CDNA3: func @dynamic_parallel_dims
-// CDNA3-SAME:     translation_info = #[[TRANSLATION]]
-//      CDNA3:   linalg.generic
-// CDNA3-SAME:       lowering_config = #[[CONFIG]]
+  func.func @dynamic_parallel_dims_dispatch_0_reduction_Dx4096_f16xf32() {
+    %c32_i64 = arith.constant 32 : i64
+    %cst = arith.constant 0.000000e+00 : f32
+    %c0 = arith.constant 0 : index
+    %0 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(0) : i32
+    %1 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(1) : i32
+    %2 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(2) : i32
+    %3 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(3) : i32
+    %4 = arith.extui %0 : i32 to i64
+    %5 = arith.extui %1 : i32 to i64
+    %6 = arith.shli %5, %c32_i64 : i64
+    %7 = arith.ori %4, %6 : i64
+    %8 = arith.index_castui %7 : i64 to index
+    %9 = arith.extui %2 : i32 to i64
+    %10 = arith.extui %3 : i32 to i64
+    %11 = arith.shli %10, %c32_i64 : i64
+    %12 = arith.ori %9, %11 : i64
+    %13 = arith.index_castui %12 : i64 to index
+    %14:2 = util.assume.int
+        %8<udiv = 4>,
+        %13<umin = 0, umax = 36028797018963964, udiv = 4>
+      : index, index
+    %15 = iree_tensor_ext.dispatch.workload.ordinal %14#0, 0 : index
+    %16 = iree_tensor_ext.dispatch.workload.ordinal %14#1, 1 : index
+    %17 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x4096xf16>>{%16}
+    %18 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?xf32>>{%15}
+    %19 = iree_tensor_ext.dispatch.tensor.load %17, offsets = [0, 0], sizes = [%16, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x4096xf16>>{%16} -> tensor<?x4096xf16>
+    %20 = tensor.empty(%15) : tensor<?xf32>
+    %21 = linalg.fill ins(%cst : f32) outs(%20 : tensor<?xf32>) -> tensor<?xf32>
+    %22 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%19 : tensor<?x4096xf16>) outs(%21 : tensor<?xf32>) {
+    ^bb0(%in: f16, %out: f32):
+      %23 = arith.extf %in : f16 to f32
+      %24 = arith.addf %23, %out : f32
+      linalg.yield %24 : f32
+    } -> tensor<?xf32>
+    iree_tensor_ext.dispatch.tensor.store %22, %18, offsets = [0], sizes = [%15], strides = [1] : tensor<?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?xf32>>{%15}
+    return
+  }
+
+//      CHECK:   #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK-SAME:   workgroup_size = [512, 1, 1] subgroup_size = 64
+
+//      CDNA:   #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CDNA-SAME:   workgroup_size = [512, 1, 1] subgroup_size = 64
+
 
 // -----
 
-#map = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3, d1)>
-#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
-#map3 = affine_map<(d0, d1) -> (d0, d1)>
-#map4 = affine_map<(d0, d1) -> ()>
-func.func @test_dyn_reduction(%arg0: tensor<128x?x32xf8E4M3FNUZ>, %arg1: tensor<128x?x32x128xf8E4M3FNUZ>, %arg2: tensor<f32>) -> tensor<128x128xf8E4M3FNUZ> {
+func.func @test_dyn_reduction() {
+  %c32 = arith.constant 32 : index
+  %c32_i64 = arith.constant 32 : i64
   %cst = arith.constant 0.000000e+00 : f32
   %cst_0 = arith.constant -2.400000e+02 : f8E4M3FNUZ
   %cst_1 = arith.constant 2.400000e+02 : f8E4M3FNUZ
-  %0 = tensor.empty() : tensor<128x128xf8E4M3FNUZ>
-  %1 = tensor.empty() : tensor<128x128xf32>
-  %2 = linalg.fill ins(%cst : f32) outs(%1 : tensor<128x128xf32>) -> tensor<128x128xf32>
-  %3 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<128x?x32xf8E4M3FNUZ>, tensor<128x?x32x128xf8E4M3FNUZ>) outs(%2 : tensor<128x128xf32>) {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(0) : i32
+  %1 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(1) : i32
+  %2 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(2) : i32
+  %3 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(3) : i32
+  %4 = arith.extui %0 : i32 to i64
+  %5 = arith.extui %1 : i32 to i64
+  %6 = arith.shli %5, %c32_i64 : i64
+  %7 = arith.ori %4, %6 : i64
+  %8 = arith.index_castui %7 : i64 to index
+  %9 = arith.extui %2 : i32 to i64
+  %10 = arith.extui %3 : i32 to i64
+  %11 = arith.shli %10, %c32_i64 : i64
+  %12 = arith.ori %9, %11 : i64
+  %13 = arith.index_castui %12 : i64 to index
+  %14:2 = util.assume.int
+      %8<umin = 0, umax = 288230376151711712, udiv = 32>,
+      %13<umin = 0, umax = 288230376151711712, udiv = 32>
+    : index, index
+  %15 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c0) flags("ReadOnly|Indirect") {iree_gpu.use_rocdl_buffer_instructions} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<f32>>
+  %16 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(3) alignment(64) offset(%c0) flags(Indirect) {iree_gpu.use_rocdl_buffer_instructions} : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x128xf8E4M3FNUZ>>
+  %17 = iree_tensor_ext.dispatch.workload.ordinal %14#0, 0 : index
+  %18 = iree_tensor_ext.dispatch.workload.ordinal %14#1, 1 : index
+  %19 = arith.divsi %17, %c32 : index
+  %20 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x?x32xf8E4M3FNUZ>>{%19}
+  %21 = arith.divsi %18, %c32 : index
+  %22 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x?x32x128xf8E4M3FNUZ>>{%21}
+  %23 = iree_tensor_ext.dispatch.tensor.load %15, offsets = [], sizes = [], strides = [] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<f32>> -> tensor<f32>
+  %24 = tensor.empty() : tensor<128x128xf8E4M3FNUZ>
+  %25 = tensor.empty() : tensor<128x128xf32>
+  %26 = linalg.fill ins(%cst : f32) outs(%25 : tensor<128x128xf32>) -> tensor<128x128xf32>
+  %27 = iree_tensor_ext.dispatch.tensor.load %20, offsets = [0, 0, 0], sizes = [128, %19, 32], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x?x32xf8E4M3FNUZ>>{%19} -> tensor<128x?x32xf8E4M3FNUZ>
+  %28 = iree_tensor_ext.dispatch.tensor.load %22, offsets = [0, 0, 0, 0], sizes = [128, %21, 32, 128], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x?x32x128xf8E4M3FNUZ>>{%21} -> tensor<128x?x32x128xf8E4M3FNUZ>
+  %29 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d2, d3, d1)>, affine_map<(d0, d1, d2, d3) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction", "reduction"]} ins(%27, %28 : tensor<128x?x32xf8E4M3FNUZ>, tensor<128x?x32x128xf8E4M3FNUZ>) outs(%26 : tensor<128x128xf32>) {
   ^bb0(%in: f8E4M3FNUZ, %in_2: f8E4M3FNUZ, %out: f32):
-    %5 = arith.extf %in : f8E4M3FNUZ to f32
-    %6 = arith.extf %in_2 : f8E4M3FNUZ to f32
-    %7 = arith.mulf %5, %6 : f32
-    %8 = arith.addf %out, %7 : f32
-    linalg.yield %8 : f32
+    %31 = arith.extf %in : f8E4M3FNUZ to f32
+    %32 = arith.extf %in_2 : f8E4M3FNUZ to f32
+    %33 = arith.mulf %31, %32 : f32
+    %34 = arith.addf %out, %33 : f32
+    linalg.yield %34 : f32
   } -> tensor<128x128xf32>
-  %4 = linalg.generic {indexing_maps = [#map3, #map4, #map3], iterator_types = ["parallel", "parallel"]} ins(%3, %arg2 : tensor<128x128xf32>, tensor<f32>) outs(%0 : tensor<128x128xf8E4M3FNUZ>) {
+  %30 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> ()>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%29, %23 : tensor<128x128xf32>, tensor<f32>) outs(%24 : tensor<128x128xf8E4M3FNUZ>) {
   ^bb0(%in: f32, %in_2: f32, %out: f8E4M3FNUZ):
-    %5 = arith.truncf %in : f32 to f8E4M3FNUZ
-    %6 = arith.truncf %in_2 : f32 to f8E4M3FNUZ
-    %7 = arith.divf %5, %6 : f8E4M3FNUZ
-    %8 = arith.cmpf ult, %7, %cst_0 : f8E4M3FNUZ
-    %9 = arith.select %8, %cst_0, %7 : f8E4M3FNUZ
-    %10 = arith.cmpf ugt, %9, %cst_1 : f8E4M3FNUZ
-    %11 = arith.select %10, %cst_1, %9 : f8E4M3FNUZ
-    linalg.yield %11 : f8E4M3FNUZ
+    %31 = arith.truncf %in : f32 to f8E4M3FNUZ
+    %32 = arith.truncf %in_2 : f32 to f8E4M3FNUZ
+    %33 = arith.divf %31, %32 : f8E4M3FNUZ
+    %34 = arith.cmpf ult, %33, %cst_0 : f8E4M3FNUZ
+    %35 = arith.select %34, %cst_0, %33 : f8E4M3FNUZ
+    %36 = arith.cmpf ugt, %35, %cst_1 : f8E4M3FNUZ
+    %37 = arith.select %36, %cst_1, %35 : f8E4M3FNUZ
+    linalg.yield %37 : f8E4M3FNUZ
   } -> tensor<128x128xf8E4M3FNUZ>
-  return %4 : tensor<128x128xf8E4M3FNUZ>
+  iree_tensor_ext.dispatch.tensor.store %30, %16, offsets = [0, 0], sizes = [128, 128], strides = [1, 1] : tensor<128x128xf8E4M3FNUZ> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x128xf8E4M3FNUZ>>
+  return
 }
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 1, 64]{{\]}}>
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
-//       CHECK: func.func @test_dyn_reduction
-//  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
-//       CHECK:   linalg.generic
-//  CHECK-SAME:       lowering_config = #[[$CONFIG]]
+
+//      CHECK: #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK-SAME: workgroup_size = [2, 1, 1] subgroup_size = 64,
