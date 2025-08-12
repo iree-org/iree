@@ -5057,7 +5057,7 @@ workgroup stores into overlapping regions of the full output tensor.</p>
 <p><em>Workgroup count computed based on iteration range of the root of the DAG
     for ops within the dispatch.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.dispatch.workgroup_count_from_dag_root` attr-dict ($operands^)?
+<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.dispatch.workgroup_count_from_dag_root` attr-dict `(` $operands `)`
 </code></pre></div>
 <p>When using tile + distribution of the root of the DAG (Directed Acyclic
 Graph) of ops within the dispatch to split the work amongst workgroups. The
@@ -5110,7 +5110,7 @@ and distribute the root of the DAG).</p>
 <h3 id="iree_tensor_extdispatchworkgroup_count_from_slice-tensorextdispatchworkgroupcountfromsliceop"><code>iree_tensor_ext.dispatch.workgroup_count_from_slice</code> (TensorExt::DispatchWorkgroupCountFromSliceOp)<a class="headerlink" href="#iree_tensor_extdispatchworkgroup_count_from_slice-tensorextdispatchworkgroupcountfromsliceop" title="Permanent link">link</a></h3>
 <p><em>Place holder to signify default workgroup count calculation.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.dispatch.workgroup_count_from_slice` attr-dict ($operands^)?
+<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.dispatch.workgroup_count_from_slice` attr-dict `(` $operands `)`
 </code></pre></div>
 <p>The default computation of the number of workgroups (or workgroup count)
 assumes that the dispatch + captured values is enough to compute the
@@ -5169,7 +5169,7 @@ workload could be more than just values of index types.</p>
 <h3 id="iree_tensor_extdispatchworkgroup_count_split_reduction_modifier-tensorextdispatchworkgroupcountsplitreductionmodifierop"><code>iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier</code> (TensorExt::DispatchWorkgroupCountSplitReductionModifierOp)<a class="headerlink" href="#iree_tensor_extdispatchworkgroup_count_split_reduction_modifier-tensorextdispatchworkgroupcountsplitreductionmodifierop" title="Permanent link">link</a></h3>
 <p><em>Modifies the workgroup count calculation to account for split reductions.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier` attr-dict `(` $workgroup_x `,` $workgroup_y `,` $workgroup_z `)` `,` ($workload^)?
+<div class="highlight"><pre><span></span><code>operation ::= `iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier` attr-dict `workgroups` `(` $workgroup_x `,` $workgroup_y `,` $workgroup_z `)` `workload` `(` $workload `)`
 </code></pre></div>
 <p>A split reduction dispatch contains an <code>scf.forall</code> within which the
 partial reduction computation is done. The <code>scf.forall</code> represents parallel
