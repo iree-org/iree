@@ -190,7 +190,8 @@ enum iree_benchmark_flag_bits_t {
 typedef uint32_t iree_benchmark_flags_t;
 
 typedef enum iree_benchmark_unit_e {
-  IREE_BENCHMARK_UNIT_MILLISECOND = 0,
+  IREE_BENCHMARK_UNIT_DEFAULT = 0,
+  IREE_BENCHMARK_UNIT_MILLISECOND,
   IREE_BENCHMARK_UNIT_MICROSECOND,
   IREE_BENCHMARK_UNIT_NANOSECOND,
 } iree_benchmark_unit_t;
@@ -207,7 +208,7 @@ struct iree_benchmark_def_t {
   iree_benchmark_flags_t flags;
 
   // Time unit used in display.
-  iree_benchmark_unit_t time_unit;  // MILLISECOND by default
+  iree_benchmark_unit_t time_unit;
 
   // Optional minimum duration the benchmark should run for in nanoseconds.
   iree_duration_t minimum_duration_ns;  // 0 if unspecified to autodetect
