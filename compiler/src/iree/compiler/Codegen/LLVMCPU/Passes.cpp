@@ -148,8 +148,6 @@ addTileAndDistributePasses(OpPassManager &funcPassManager,
   funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
 }
 
-
-
 //===---------------------------------------------------------------------===//
 // Codegen pipelines.
 //===---------------------------------------------------------------------===//
