@@ -2068,3 +2068,52 @@ func.func @complex_view_as_real() attributes {hal.executable.target = #executabl
 //      CHECK: func.func @complex_view_as_real()
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-linux-gnu"}>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map3 = affine_map<(d0, d1, d2) -> (d0)>
+#map4 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map5 = affine_map<(d0, d1, d2) -> (d2, d0, d1)>
+func.func @decode_reduction_f32(%arg0: tensor<32x262144xf16>, %arg1: tensor<32xf32>, %arg2: tensor<32x16x16384xf16>, %arg3: tensor<32x16xf16>, %arg4: tensor<32x16xf16>) -> tensor<16384x32x16xf16> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
+  %cst = arith.constant 0.000000e+00 : f32
+  %cst_0 = arith.constant 2.621440e+05 : f32
+  %cst_1 = arith.constant 9.99999997E-7 : f32
+  %0 = tensor.empty() : tensor<16384x32x16xf16>
+  %1 = tensor.empty() : tensor<32xf32>
+  %2 = linalg.fill ins(%cst : f32) outs(%1 : tensor<32xf32>) -> tensor<32xf32>
+  %3 = linalg.generic {indexing_maps = [#map, #map1, #map1], iterator_types = ["parallel", "reduction"]} ins(%arg0, %arg1 : tensor<32x262144xf16>, tensor<32xf32>) outs(%2 : tensor<32xf32>) {
+  ^bb0(%in: f16, %in_2: f32, %out: f32):
+    %5 = arith.extf %in : f16 to f32
+    %6 = arith.subf %5, %in_2 : f32
+    %7 = arith.mulf %6, %6 : f32
+    %8 = arith.addf %7, %out : f32
+    linalg.yield %8 : f32
+  } -> tensor<32xf32>
+  %4 = linalg.generic {indexing_maps = [#map2, #map3, #map3, #map4, #map4, #map5], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg2, %arg1, %3, %arg3, %arg4 : tensor<32x16x16384xf16>, tensor<32xf32>, tensor<32xf32>, tensor<32x16xf16>, tensor<32x16xf16>) outs(%0 : tensor<16384x32x16xf16>) {
+  ^bb0(%in: f16, %in_2: f32, %in_3: f32, %in_4: f16, %in_5: f16, %out: f16):
+    %5 = arith.divf %in_3, %cst_0 : f32
+    %6 = arith.addf %5, %cst_1 : f32
+    %7 = math.rsqrt %6 : f32
+    %8 = arith.extf %in : f16 to f32
+    %9 = arith.subf %8, %in_2 : f32
+    %10 = arith.mulf %9, %7 : f32
+    %11 = arith.extf %in_4 : f16 to f32
+    %12 = arith.mulf %10, %11 : f32
+    %13 = arith.extf %in_5 : f16 to f32
+    %14 = arith.addf %12, %13 : f32
+    %15 = arith.truncf %14 : f32 to f16
+    linalg.yield %15 : f16
+  } -> tensor<16384x32x16xf16>
+  return %4 : tensor<16384x32x16xf16>
+}
+//  CHECK-DAG: #[[CONFIG0:.+]] = #iree_cpu.lowering_config<distribution = [4, 0], vector_common_parallel = [4, 0], vector_reduction = [0, 8]>
+//  CHECK-DAG: #[[CONFIG1:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [4, 0, 0], vector_inner_parallel = [0, 1, 4]>
+//      CHECK: func.func @decode_reduction_f32
+//      CHECK:   linalg.generic
+// CHECK-SAME:       lowering_config = #[[CONFIG0]]
+//      CHECK:   linalg.generic
+// CHECK-SAME:       lowering_config = #[[CONFIG1]]

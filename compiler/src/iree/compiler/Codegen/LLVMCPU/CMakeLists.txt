@@ -114,6 +114,7 @@ iree_cc_library(
     MLIRFunctionInterfaces
     MLIRIR
     MLIRIndexToLLVM
+    MLIRIndexingMapOpInterface
     MLIRLLVMCommonConversion
     MLIRLLVMDialect
     MLIRLinalgDialect
