@@ -62,21 +62,17 @@ struct WgpDetails {
 struct ChipDetails {
   uint32_t wgpCount;
   std::optional<StringRef> sku;
-  // Aggregate chip-level bandwidth in TB/s
+  // Aggregate chip-level bandwidth in TB/s.
   std::optional<float> peakMemoryBandwidthTBs;
-  // Per-data-type compute performance (TFLOPs/s)
-  std::optional<llvm::SmallDenseMap<ComputeBitwidths, float>> peakPerfTFLOPs;
+  // Optional per-data-type compute performance (TFLOPs/s).
+  llvm::SmallDenseMap<ComputeBitwidths, float> peakPerfTFLOPs;
 
   ChipDetails(
       uint32_t wgp, std::optional<llvm::StringRef> s = std::nullopt,
       std::optional<float> bw = std::nullopt,
       std::initializer_list<std::pair<ComputeBitwidths, float>> perf = {})
-      : wgpCount(wgp), sku(s), peakMemoryBandwidthTBs(bw) {
-    if (!std::empty(perf)) {
-      peakPerfTFLOPs = llvm::SmallDenseMap<ComputeBitwidths, float>(
-          perf.begin(), perf.end());
-    }
-  }
+      : wgpCount(wgp), sku(s), peakMemoryBandwidthTBs(bw),
+        peakPerfTFLOPs(perf.begin(), perf.end()) {}
 };
 
 // Full target details
@@ -163,9 +159,9 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
             : FloatAttr{};
 
     DictionaryAttr peakPerfTFLOPsAttr = {};
-    if (details.chip->peakPerfTFLOPs) {
+    if (!details.chip->peakPerfTFLOPs.empty()) {
       SmallVector<NamedAttribute> attributes = llvm::map_to_vector(
-          *details.chip->peakPerfTFLOPs, [&](const auto &pair) {
+          details.chip->peakPerfTFLOPs, [&](const auto &pair) {
             return NamedAttribute(
                 stringifyComputeBitwidths(pair.first),
                 FloatAttr::get(Float32Type::get(context), pair.second));
