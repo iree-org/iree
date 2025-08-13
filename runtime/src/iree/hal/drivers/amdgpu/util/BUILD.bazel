@@ -91,7 +91,6 @@ iree_runtime_cc_test(
 iree_runtime_cc_library(
     name = "util",
     srcs = [
-        "bitmap.c",
         "block_pool.c",
         "device_library.c",
         "info.c",
@@ -100,7 +99,6 @@ iree_runtime_cc_library(
     ],
     hdrs = [
         "affinity.h",
-        "bitmap.h",
         "block_pool.h",
         "device_library.h",
         "error_callback.h",
@@ -113,22 +111,11 @@ iree_runtime_cc_library(
         ":topology",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:bitmap",
         "//runtime/src/iree/base/internal:synchronization",
         "//runtime/src/iree/base/internal:threading",
         "//runtime/src/iree/hal/drivers/amdgpu/device:binaries",
         "//runtime/src/iree/hal/drivers/amdgpu/device:headers",
-    ],
-)
-
-iree_runtime_cc_test(
-    name = "bitmap_test",
-    srcs = ["bitmap_test.cc"],
-    group = "iree-hal-drivers-amdgpu-tests",
-    deps = [
-        ":util",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
