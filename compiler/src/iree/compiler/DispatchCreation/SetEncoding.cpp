@@ -122,7 +122,7 @@ static bool hasMatmulLikeBody(linalg::LinalgOp linalgOp) {
 ///   4) All the operands do not have encodings.
 ///   5) linalgOp has contraction indexingMaps.
 ///   6) There are not more than one of each contraction dimension.
-///   7) There is and M or N dimension, and there is a K dimension.
+///   7) There is an M or N dimension, and there is a K dimension.
 ///   8) linalgOp has the same body as an ordinary int or float matmul.
 ///
 /// These restrictions are required because data tiling currently creates
