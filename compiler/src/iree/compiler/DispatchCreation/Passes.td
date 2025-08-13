@@ -329,6 +329,10 @@ def PropagateEncodingsPass :
 def SetEncodingPass : InterfacePass<"iree-dispatch-creation-set-encoding",
                                     "mlir::FunctionOpInterface"> {
   let summary = "Introduces tensor encoding for flow dispatch regions.";
+  let description = [{
+    Sets the encoding for compute operations to allow execution of the
+    operations in tiled/padded layouts.
+  }];
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
     "IREE::Flow::FlowDialect",
