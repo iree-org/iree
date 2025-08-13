@@ -911,3 +911,45 @@ util.func public @collapse_fill_of_arg(%arg0: tensor<224x32xf32>, %arg1: tensor<
 //  CHECK-SAME:     ins(%[[COLLAPSE2]], %[[ARG0]] : tensor<3748250x32xf32>, tensor<224x32xf32>)
 //  CHECK-SAME:     outs(%[[FILL]] : tensor<3748250x224xf32>)
 //       CHECK:   flow.return %[[GEN0]]
+
+// -----
+
+util.func public @collapse_inside_scf(%arg0: tensor<128x24x48x384xbf16>) -> tensor<384x128x1x1xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = flow.dispatch.region -> (tensor<384x128x1x1xf32>) {
+    %1 = tensor.empty() : tensor<128x24x48x384xf32>
+    %2 = tensor.empty() : tensor<384x128x1x1xf32>
+    %3 = scf.forall (%arg1, %arg2, %arg3) = (0, 0, 0) to (128, 24, 48) step (1, 24, 48) shared_outs(%arg4 = %2) -> (tensor<384x128x1x1xf32>) {
+      %extracted_slice = tensor.extract_slice %arg0[%arg1, 0, 0, 0] [1, 24, 48, 384] [1, 1, 1, 1] : tensor<128x24x48x384xbf16> to tensor<1x24x48x384xbf16>
+      %extracted_slice_0 = tensor.extract_slice %1[%arg1, 0, 0, 0] [1, 24, 48, 384] [1, 1, 1, 1] : tensor<128x24x48x384xf32> to tensor<1x24x48x384xf32>
+      %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%extracted_slice : tensor<1x24x48x384xbf16>) outs(%extracted_slice_0 : tensor<1x24x48x384xf32>) {
+      ^bb0(%in: bf16, %out: f32):
+        %7 = arith.extf %in : bf16 to f32
+        linalg.yield %7 : f32
+      } -> tensor<1x24x48x384xf32>
+      %extracted_slice_1 = tensor.extract_slice %arg4[0, %arg1, 0, 0] [384, 1, 1, 1] [1, 1, 1, 1] : tensor<384x128x1x1xf32> to tensor<384xf32>
+      %5 = linalg.fill ins(%cst : f32) outs(%extracted_slice_1 : tensor<384xf32>) -> tensor<384xf32>
+      %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d1, d2, d3, d0)>, affine_map<(d0, d1, d2, d3) -> (d0)>], iterator_types = ["parallel", "reduction", "reduction", "reduction"]} ins(%4 : tensor<1x24x48x384xf32>) outs(%5 : tensor<384xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        %7 = arith.addf %in, %out : f32
+        linalg.yield %7 : f32
+      } -> tensor<384xf32>
+      scf.forall.in_parallel {
+        tensor.parallel_insert_slice %6 into %arg4[0, %arg1, 0, 0] [384, 1, 1, 1] [1, 1, 1, 1] : tensor<384xf32> into tensor<384x128x1x1xf32>
+      }
+    } {mapping = [#iree_linalg_ext.split_reduction_mapping<2>, #iree_linalg_ext.split_reduction_mapping<1>, #iree_linalg_ext.split_reduction_mapping<0>]}
+    flow.return %3 : tensor<384x128x1x1xf32>
+  }
+  util.return %0 : tensor<384x128x1x1xf32>
+}
+// CHECK-LABEL: util.func public @collapse_inside_scf
+//  CHECK-SAME:   %[[ARG0:[0-9a-zA-Z]+]]
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[ARG0]]
+//  CHECK-SAME:     tensor<128x24x48x384xbf16> into tensor<147456x384xbf16>
+//       CHECK:   flow.dispatch.region
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract_slice %[[COLLAPSE]]
+//       CHECK:   %[[GEN0:.+]] = linalg.generic
+//  CHECK-SAME:     ins(%[[EXTRACT]]
+//       CHECK:   %[[GEN1:.+]] = linalg.generic
+//  CHECK-SAME:     ins(%[[GEN0]]
+//       CHECK:   tensor.parallel_insert_slice %[[GEN1]]
