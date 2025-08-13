@@ -210,9 +210,13 @@ struct UnrollElementwiseOps : public RewritePattern {
       // Extract from each operand.
       SmallVector<Value> operands;
       for (Value val : op->getOperands()) {
-        Value extracted =
-            vector::ExtractOp::create(rewriter, loc, val, offsets);
-        operands.push_back(extracted);
+        // Extract subvector if the operand is a vector. This is to handle
+        // things like arith.select which take a scalar conditional but are
+        // otherwise elementwise.
+        if (isa<VectorType>(val.getType())) {
+          val = vector::ExtractOp::create(rewriter, loc, val, offsets);
+        }
+        operands.push_back(val);
       }
 
       Operation *clonedOp = clone(rewriter, op, subVecTy, operands);
