@@ -144,15 +144,6 @@ def LLVMCPUTilePass :
   ];
 }
 
-def LLVMCPUTileAndFusePass :
-    InterfacePass<"iree-llvmcpu-tile-and-fuse", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to tile and fuse TilingInterface operations.";
-  let options = [
-    Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
-      "Use default tiling level used to retrieve the configuration from lowering_config">
-  ];
-}
-
 def LLVMCPUTileAndFuseProducerConsumerPass
     : InterfacePass<"iree-llvmcpu-tile-and-fuse-producer-consumer",
                     "mlir::FunctionOpInterface"> {
