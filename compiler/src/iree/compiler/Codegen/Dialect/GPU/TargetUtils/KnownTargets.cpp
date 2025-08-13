@@ -966,10 +966,10 @@ TargetAttr getWebGPUTargetDetails(MLIRContext *context) {
       {0xffff, 0xffff, 0xffff}};
   // clang-format on
 
-  return createTargetAttr(
-      {&wgp, nullptr}, /*arch=*/"",
-      "spirv:v1.0,cap:Shader,ext:SPV_KHR_storage_buffer_storage_class",
-      context);
+  return createTargetAttr({&wgp, nullptr}, /*arch=*/"",
+                          "spirv:v1.0,cap:Shader,ext:SPV_KHR_storage_buffer_"
+                          "storage_class,ext:SPV_KHR_non_semantic_info",
+                          context);
 }
 
 TargetAttr getFullTarget(StringRef targetAPI, StringRef aliasTarget,
