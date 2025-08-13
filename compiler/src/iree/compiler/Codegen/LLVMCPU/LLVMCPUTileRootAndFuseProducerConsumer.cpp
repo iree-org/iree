@@ -33,7 +33,7 @@
 
 namespace mlir::iree_compiler {
 
-#define GEN_PASS_DEF_LLVMCPUTILEROOTANDFUSEPRODUCERCONSUMERPASS
+#define GEN_PASS_DEF_LLVMCPUTILEANDFUSEPRODUCERCONSUMERPASS
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
 
 /// Returns the operation that has workgroup tiling level and `level` tiling
@@ -206,12 +206,12 @@ namespace {
 /// only fuses producer input operands and disables consumer fusion. The
 /// `tilingLevel` must be specified. It picks the `tilingLevel`-th list as
 /// tiling sizes from lowering_config.
-struct LLVMCPUTileRootAndFuseProducerConsumer
-    : impl::LLVMCPUTileRootAndFuseProducerConsumerPassBase<
-          LLVMCPUTileRootAndFuseProducerConsumer> {
-  using impl::LLVMCPUTileRootAndFuseProducerConsumerPassBase<
-      LLVMCPUTileRootAndFuseProducerConsumer>::
-      LLVMCPUTileRootAndFuseProducerConsumerPassBase;
+struct LLVMCPUTileAndFuseProducerConsumer
+    : impl::LLVMCPUTileAndFuseProducerConsumerPassBase<
+          LLVMCPUTileAndFuseProducerConsumer> {
+  using impl::LLVMCPUTileAndFuseProducerConsumerPassBase<
+      LLVMCPUTileAndFuseProducerConsumer>::
+      LLVMCPUTileAndFuseProducerConsumerPassBase;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, affine::AffineDialect,
                     linalg::LinalgDialect, scf::SCFDialect,
@@ -221,7 +221,7 @@ struct LLVMCPUTileRootAndFuseProducerConsumer
   void runOnOperation() override;
 };
 
-void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
+void LLVMCPUTileAndFuseProducerConsumer::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
   IRRewriter rewriter(funcOp);
@@ -266,27 +266,27 @@ void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
 } // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUTileRootAndFuseProducerConsumerPass(
+createLLVMCPUTileAndFuseProducerConsumerPass(
     IREE::CPU::TilingLevel tilingLevel) {
-  LLVMCPUTileRootAndFuseProducerConsumerPassOptions options;
+  LLVMCPUTileAndFuseProducerConsumerPassOptions options;
   options.tilingLevel = tilingLevel;
   options.onlyFuseProducerInputOperands = false;
-  return std::make_unique<LLVMCPUTileRootAndFuseProducerConsumer>(options);
+  return std::make_unique<LLVMCPUTileAndFuseProducerConsumer>(options);
 }
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUTileRootAndFuseInputOperandsPass(
     IREE::CPU::TilingLevel tilingLevel) {
-  LLVMCPUTileRootAndFuseProducerConsumerPassOptions options;
+  LLVMCPUTileAndFuseProducerConsumerPassOptions options;
   options.tilingLevel = tilingLevel;
   options.onlyFuseProducerInputOperands = true;
-  return std::make_unique<LLVMCPUTileRootAndFuseProducerConsumer>(options);
+  return std::make_unique<LLVMCPUTileAndFuseProducerConsumer>(options);
 }
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUTileLastOpAndFuseProducerConsumerPass(
     IREE::CPU::TilingLevel tilingLevel) {
-  LLVMCPUTileRootAndFuseProducerConsumerPassOptions options;
+  LLVMCPUTileAndFuseProducerConsumerPassOptions options;
   options.tilingLevel = tilingLevel;
   options.anchorOnRootOp = false;
-  return std::make_unique<LLVMCPUTileRootAndFuseProducerConsumer>(options);
+  return std::make_unique<LLVMCPUTileAndFuseProducerConsumer>(options);
 }
 } // namespace mlir::iree_compiler

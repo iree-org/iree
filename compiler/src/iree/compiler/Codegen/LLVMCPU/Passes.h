@@ -42,7 +42,7 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUTileAndFusePass(int64_t tilingLevel);
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUTileRootAndFuseProducerConsumerPass(
+createLLVMCPUTileAndFuseProducerConsumerPass(
     IREE::CPU::TilingLevel tilingLevel);
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>

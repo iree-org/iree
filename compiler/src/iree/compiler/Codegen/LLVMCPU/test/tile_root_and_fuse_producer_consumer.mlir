@@ -1,5 +1,5 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-root-and-fuse-producer-consumer{tiling-level=vector_common_parallel}), cse)"  --split-input-file %s | FileCheck %s
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-root-and-fuse-producer-consumer{tiling-level=vector_reduction only-fuse-producer-input-operands=true}), cse)"  --split-input-file %s | FileCheck %s --check-prefix=CHECK-REDUCTION
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-and-fuse-producer-consumer{tiling-level=vector_common_parallel}), cse)"  --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-and-fuse-producer-consumer{tiling-level=vector_reduction only-fuse-producer-input-operands=true}), cse)"  --split-input-file %s | FileCheck %s --check-prefix=CHECK-REDUCTION
 
 #config = #iree_cpu.lowering_config<distribution = [0, 0, 0, 0, 0, 0], vector_common_parallel = [1, 0, 0, 0, 0, 0]>
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
