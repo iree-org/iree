@@ -153,8 +153,8 @@ def LLVMCPUTileAndFusePass :
   ];
 }
 
-def LLVMCPUTileRootAndFuseProducerConsumerPass
-    : InterfacePass<"iree-llvmcpu-tile-root-and-fuse-producer-consumer",
+def LLVMCPUTileAndFuseProducerConsumerPass
+    : InterfacePass<"iree-llvmcpu-tile-and-fuse-producer-consumer",
                     "mlir::FunctionOpInterface"> {
   let summary = "Pass to tile root op and fuse with producer and consumer "
                 "TilingInterface ops.";

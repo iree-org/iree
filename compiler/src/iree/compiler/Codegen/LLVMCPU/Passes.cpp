@@ -239,7 +239,7 @@ void addMultiTilingExpertPassPipeline(
     case IREE::CPU::TilingLevel::CacheParallelTiles:
     case IREE::CPU::TilingLevel::VectorCommonParallelTiles:
       funcPassManager.addPass(
-          createLLVMCPUTileRootAndFuseProducerConsumerPass(level));
+          createLLVMCPUTileAndFuseProducerConsumerPass(level));
       break;
     case IREE::CPU::TilingLevel::CacheReductionTiles:
       funcPassManager.addPass(
@@ -328,7 +328,7 @@ void addConvTileAndDecomposeExpertPassPipeline(
     OpPassManager &funcPassManager, const LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
 
-  funcPassManager.addPass(createLLVMCPUTileRootAndFuseProducerConsumerPass(
+  funcPassManager.addPass(createLLVMCPUTileAndFuseProducerConsumerPass(
       IREE::CPU::TilingLevel::VectorCommonParallelTiles));
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
   funcPassManager.addPass(createConcretizePadResultShapePass());
@@ -386,7 +386,7 @@ void addMmt4dTilingExpertPassPipeline(
     OpPassManager &funcPassManager, const LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
 
-  funcPassManager.addPass(createLLVMCPUTileRootAndFuseProducerConsumerPass(
+  funcPassManager.addPass(createLLVMCPUTileAndFuseProducerConsumerPass(
       IREE::CPU::TilingLevel::VectorCommonParallelTiles));
   // The below two passes are nop if the "mmt4d" is explicitly excluded in the
   // ukernels attribute.
@@ -476,7 +476,7 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
 void addCPULinalgExtTileAndVectorizePipeline(
     OpPassManager &funcPassManager, const LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
-  funcPassManager.addPass(createLLVMCPUTileRootAndFuseProducerConsumerPass(
+  funcPassManager.addPass(createLLVMCPUTileAndFuseProducerConsumerPass(
       IREE::CPU::TilingLevel::VectorCommonParallelTiles));
   funcPassManager.addPass(
       IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass());
