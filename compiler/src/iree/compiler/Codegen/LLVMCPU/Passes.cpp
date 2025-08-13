@@ -518,7 +518,7 @@ void addCPUDefaultPassPipeline(OpPassManager &funcPassManager,
                                const LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
   funcPassManager.addPass(createLLVMCPUTileLastOpAndFuseProducerConsumerPass(
-      IREE::CPU::TilingLevel::VectorInnerParallelTiles));
+      IREE::CPU::TilingLevel::VectorCommonParallelTiles));
   addCPUBufferizePasses(funcPassManager);
 }
 
