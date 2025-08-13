@@ -9,6 +9,7 @@
 #include <optional>
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "mlir/IR/Attributes.h"
@@ -61,6 +62,21 @@ struct WgpDetails {
 struct ChipDetails {
   uint32_t wgpCount;
   std::optional<StringRef> sku;
+  // Aggregate chip-level bandwidth in TB/s
+  std::optional<float> peakMemoryBandwidthTBs;
+  // Per-data-type compute performance (TFLOPs/s)
+  std::optional<llvm::SmallDenseMap<ComputeBitwidths, float>> peakPerfTFLOPs;
+
+  ChipDetails(
+      uint32_t wgp, std::optional<llvm::StringRef> s = std::nullopt,
+      std::optional<float> bw = std::nullopt,
+      std::initializer_list<std::pair<ComputeBitwidths, float>> perf = {})
+      : wgpCount(wgp), sku(s), peakMemoryBandwidthTBs(bw) {
+    if (!std::empty(perf)) {
+      peakPerfTFLOPs = llvm::SmallDenseMap<ComputeBitwidths, float>(
+          perf.begin(), perf.end());
+    }
+  }
 };
 
 // Full target details
@@ -139,8 +155,26 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
     auto skuAttr = details.chip->sku
                        ? StringAttr::get(context, *details.chip->sku)
                        : StringAttr{};
+
+    FloatAttr peakMemoryBandwidthAttr =
+        details.chip->peakMemoryBandwidthTBs
+            ? FloatAttr::get(Float32Type::get(context),
+                             *details.chip->peakMemoryBandwidthTBs)
+            : FloatAttr{};
+
+    DictionaryAttr peakPerfTFLOPsAttr = {};
+    if (details.chip->peakPerfTFLOPs) {
+      SmallVector<NamedAttribute> attributes = llvm::map_to_vector(
+          *details.chip->peakPerfTFLOPs, [&](const auto &pair) {
+            return NamedAttribute(
+                stringifyComputeBitwidths(pair.first),
+                FloatAttr::get(Float32Type::get(context), pair.second));
+          });
+      peakPerfTFLOPsAttr = DictionaryAttr::get(context, attributes);
+    }
     targetChip = TargetChipAttr::get(context, details.chip->wgpCount, skuAttr,
-                                     DictionaryAttr{});
+                                     peakMemoryBandwidthAttr,
+                                     peakPerfTFLOPsAttr, DictionaryAttr{});
   }
 
   return TargetAttr::get(context, arch, features, targetWgp, targetChip);
@@ -424,20 +458,73 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
 
   // "AMD Instinct MI300 Series Product Offerings" in Page 23 of
   // https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/white-papers/amd-cdna-3-white-paper.pdf
-  static const ChipDetails mi300xChip = {304, "mi300x"};
-  static const ChipDetails mi300aChip = {228, "mi300a"};
-  static const ChipDetails mi308xChip = {80, "mi308x"};
-  static const ChipDetails mi325xChip = {304, "mi325x"};
+  static const ChipDetails mi300xChip = {304,
+                                         "mi300x",
+                                         5.3f,
+                                         {{ComputeBitwidths::FP32, 163.4f},
+                                          {ComputeBitwidths::FP16, 1307.4f},
+                                          {ComputeBitwidths::Int8, 2614.9f},
+                                          {ComputeBitwidths::FP8, 2614.9f}}};
+
+  static const ChipDetails mi300aChip = {228,
+                                         "mi300a",
+                                         5.3f,
+                                         {{ComputeBitwidths::FP32, 122.6f},
+                                          {ComputeBitwidths::FP16, 980.6f},
+                                          {ComputeBitwidths::Int8, 1961.2f},
+                                          {ComputeBitwidths::FP8, 1961.2f}}};
+
+  static const ChipDetails mi308xChip = {
+      80,
+      "mi308x",
+      5.3f,
+      // Peak fp32 perf estimated from:
+      // 80(CUs)*4(SIMDs)*1.42(Freq)*(16*16*4)(GEMM shape)*2(mul+add)/32(latency
+      // instruction)
+      {{ComputeBitwidths::FP32, 29.0f},
+       {ComputeBitwidths::FP16, 188.4f},
+       {ComputeBitwidths::FP8, 176.8f},
+       // Estimated int8 performance based on FP8
+       {ComputeBitwidths::Int8, 176.8f}}};
+
+  static const ChipDetails mi325xChip = {304,
+                                         "mi325x",
+                                         5.3f,
+                                         {{ComputeBitwidths::FP32, 163.4f},
+                                          {ComputeBitwidths::FP16, 1307.4f},
+                                          {ComputeBitwidths::Int8, 2614.9f},
+                                          {ComputeBitwidths::FP8, 2614.9f}}};
 
   // "AMD Instinct MI200 Series Accelerator Product Offerings" in Page 14 of
   // https://www.amd.com/content/dam/amd/en/documents/instinct-business-docs/white-papers/amd-cdna2-white-paper.pdf
-  static const ChipDetails mi250xChip = {220, "mi250x"};
-  static const ChipDetails mi250Chip = {208, "mi250"};
-  static const ChipDetails mi210Chip = {104, "mi210"};
+  static const ChipDetails mi250xChip = {220,
+                                         "mi250x",
+                                         3.2f,
+                                         {{ComputeBitwidths::FP32, 95.7f},
+                                          {ComputeBitwidths::FP16, 383.0f},
+                                          {ComputeBitwidths::Int8, 383.0f}}};
+
+  static const ChipDetails mi250Chip = {208,
+                                        "mi250",
+                                        3.2f,
+                                        {{ComputeBitwidths::FP32, 90.5f},
+                                         {ComputeBitwidths::FP16, 362.1f},
+                                         {ComputeBitwidths::Int8, 362.1f}}};
+  static const ChipDetails mi210Chip = {104,
+                                        "mi210",
+                                        1.6f,
+                                        {{ComputeBitwidths::FP32, 45.3f},
+                                         {ComputeBitwidths::FP16, 181.0f},
+                                         {ComputeBitwidths::Int8, 181.0f}}};
 
   // "AMD CDNA Architecture Compute Units" in Page 5 of
   // https://www.amd.com/content/dam/amd/en/documents/instinct-business-docs/white-papers/amd-cdna-white-paper.pdf
-  static const ChipDetails mi100Chip = {120, "mi100"};
+  static const ChipDetails mi100Chip = {120,
+                                        "mi100",
+                                        1.23f,
+                                        {{ComputeBitwidths::FP32, 46.1f},
+                                         {ComputeBitwidths::FP16, 184.6f},
+                                         {ComputeBitwidths::Int8, 184.6f}}};
 
   // --- RDNA --- //
 
@@ -450,10 +537,38 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
 
   // AMD RDNA4 architecture:
   // https://www.amd.com/en/newsroom/press-releases/2025-2-28-amd-unveils-next-generation-amd-rdna-4-architectu.html.
-  static const ChipDetails r9700Chip = {64 / 2, "r9700"};
-  static const ChipDetails rx9070xtChip = {64 / 2, "rx9070xt"};
-  static const ChipDetails rx9070Chip = {56 / 2, "rx9070"};
-  static const ChipDetails rx9060xtChip = {32 / 2, "rx9060xt"};
+  // https://www.amd.com/en/products/graphics/workstations/radeon-ai-pro/ai-9000-series/amd-radeon-ai-pro-r9700.html
+  static const ChipDetails r9700Chip = {64 / 2,
+                                        "r9700",
+                                        0.64f,
+                                        {{ComputeBitwidths::FP32, 47.8f},
+                                         {ComputeBitwidths::FP16, 191.0f},
+                                         {ComputeBitwidths::Int8, 383.0f},
+                                         {ComputeBitwidths::FP8, 383.0f}}};
+  // https://www.amd.com/en/products/graphics/desktops/radeon/9000-series/amd-radeon-rx-9070xt.html
+  static const ChipDetails rx9070xtChip = {64 / 2,
+                                           "rx9070xt",
+                                           0.64f,
+                                           {{ComputeBitwidths::FP32, 48.7f},
+                                            {ComputeBitwidths::FP16, 195.0f},
+                                            {ComputeBitwidths::Int8, 389.0f},
+                                            {ComputeBitwidths::FP8, 389.0f}}};
+  // https://www.amd.com/en/products/graphics/desktops/radeon/9000-series/amd-radeon-rx-9070.html
+  static const ChipDetails rx9070Chip = {56 / 2,
+                                         "rx9070",
+                                         0.64f,
+                                         {{ComputeBitwidths::FP32, 36.1f},
+                                          {ComputeBitwidths::FP16, 145.0f},
+                                          {ComputeBitwidths::Int8, 289.0f},
+                                          {ComputeBitwidths::FP8, 289.0f}}};
+  // https://www.amd.com/en/products/graphics/desktops/radeon/9000-series/amd-radeon-rx-9060xt.html
+  static const ChipDetails rx9060xtChip = {32 / 2,
+                                           "rx9060xt",
+                                           0.32f,
+                                           {{ComputeBitwidths::FP32, 25.6f},
+                                            {ComputeBitwidths::FP16, 103.0f},
+                                            {ComputeBitwidths::Int8, 205.0f},
+                                            {ComputeBitwidths::FP8, 205.0f}}};
 
   // AMD RDNA3.
   static const ChipDetails rx7900xtxChip = {96 / 2, "rx7900xtx"};
