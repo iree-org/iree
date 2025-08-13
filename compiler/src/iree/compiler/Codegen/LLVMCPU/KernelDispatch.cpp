@@ -3450,6 +3450,29 @@ lowerUsingDefaultPipeline(mlir::FunctionOpInterface entryPointFn) {
   return setTranslationInfo(entryPointFn, translationInfo);
 }
 
+/// Returns true if the given operation should have a lowering config set.
+///
+/// This predicate excludes:
+///   - Ops inside a `CustomOp` that already have a lowering config.
+///   - `linalg.pack` ops whose producer is a `tensor.collapse_shape`,
+///     as they will be lowered together into a `map_scatter` later in the
+///     pipeline.
+static bool shouldSetLoweringConfig(Operation *op) {
+  if (isa_and_nonnull<IREE::LinalgExt::CustomOp>(op->getParentOp()) &&
+      getLoweringConfig(op) != nullptr) {
+    return false;
+  }
+
+  if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
+    if (isa_and_nonnull<tensor::CollapseShapeOp>(
+            packOp.getSource().getDefiningOp())) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 /// Sets the translation information to use for a dispatch region.
 static LogicalResult
 setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
@@ -3488,14 +3511,8 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
       return failure();
     }
 
-    // Avoid this for ops within a custom_op since those ops have already their
-    // configuration set.
-    auto prunedComputeOps =
-        llvm::to_vector(llvm::make_filter_range(computeOps, [](Operation *op) {
-          return !isa_and_nonnull<IREE::LinalgExt::CustomOp>(
-                     op->getParentOp()) ||
-                 getLoweringConfig(op) == nullptr;
-        }));
+    auto prunedComputeOps = llvm::to_vector(
+        llvm::make_filter_range(computeOps, shouldSetLoweringConfig));
     if (failed(setLoweringConfigForComputeOps(entryPointFn, prunedComputeOps,
                                               rootOperation))) {
       return failure();
