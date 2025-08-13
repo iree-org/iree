@@ -26,6 +26,7 @@
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -122,6 +123,91 @@ LogicalResult setDataTiledMultiMmaLoweringConfig(
       workgroupSize, targetSubgroupSize, pipelineConfig);
 }
 
+static std::optional<ComputeBitwidths> getComputeBitwidthForType(Type type) {
+  if (type.isF64())
+    return ComputeBitwidths::FP64;
+  if (type.isF32())
+    return ComputeBitwidths::FP32;
+  if (type.isF16() || type.isBF16())
+    return ComputeBitwidths::FP16;
+  if (type.isFloat(8))
+    return ComputeBitwidths::FP8;
+  if (type.isInteger(64))
+    return ComputeBitwidths::Int64;
+  if (type.isInteger(32))
+    return ComputeBitwidths::Int32;
+  if (type.isInteger(16))
+    return ComputeBitwidths::Int16;
+  if (type.isInteger(8))
+    return ComputeBitwidths::Int8;
+
+  return std::nullopt;
+}
+
+/// Function to compute small and large gemm cutoffs based on the target's
+/// peak performance and memory bandwidth.
+static std::pair<float, float> computeGemmCutoffs(IREE::GPU::TargetAttr target,
+                                                  Type computeType) {
+  float smallGemmCutoff = 1.0f;
+  float largeGemmCutoff = 1000.0f;
+  if (target.getChip() == nullptr) {
+    LDBG() << "Target chip is not specified, using default gemm cutoffs: "
+           << smallGemmCutoff << ", " << largeGemmCutoff;
+    return {smallGemmCutoff, largeGemmCutoff};
+  }
+
+  TargetChipAttr chip = target.getChip();
+  DictionaryAttr peakPerfTlopsAttr = chip.getPerfTflops();
+  llvm::DenseMap<ComputeBitwidths, float> peakPerfTflops;
+  for (NamedAttribute namedAttr : peakPerfTlopsAttr) {
+    StringRef bitwidthStr = namedAttr.getName().strref();
+    FloatAttr floatAttr = llvm::dyn_cast<FloatAttr>(namedAttr.getValue());
+    if (!floatAttr) {
+      continue;
+    }
+
+    std::optional<ComputeBitwidths> bitwidth =
+        symbolizeComputeBitwidths(bitwidthStr);
+    if (!bitwidth) {
+      continue;
+    }
+
+    peakPerfTflops[*bitwidth] = floatAttr.getValue().convertToFloat();
+  }
+
+  bool peakPerfTflopsFound = false;
+  auto computeBitwidth = getComputeBitwidthForType(computeType);
+  if (computeBitwidth) {
+    peakPerfTflopsFound = peakPerfTflops.contains(computeBitwidth.value());
+  }
+  bool memoryBandwidthFound = chip.getMemoryBandwidthTbps() != nullptr;
+  if (!peakPerfTflopsFound || !memoryBandwidthFound) {
+    LDBG() << "Target chip does not have peak performance or memory bandwidth "
+              "information, using default gemm cutoffs: "
+           << smallGemmCutoff << ", " << largeGemmCutoff;
+    return {smallGemmCutoff, largeGemmCutoff};
+  }
+
+  FloatAttr memoryBandwidthTbpsAttr = chip.getMemoryBandwidthTbps();
+  float memoryBandwidthTbps =
+      memoryBandwidthTbpsAttr.getValue().convertToFloat();
+
+  float perfTflops = peakPerfTflops[computeBitwidth.value()];
+  float computeMemoryCutoff = perfTflops / memoryBandwidthTbps;
+  LDBG() << "Target chip peak performance: " << perfTflops << " TFlops for "
+         << stringifyComputeBitwidths(computeBitwidth.value())
+         << " bitwidth, memory bandwidth: " << memoryBandwidthTbps
+         << " Tbps, compute-memory cutoff: " << computeMemoryCutoff;
+
+  // The constants below are determined and generalized based on empirical data
+  // based on the approach in https://github.com/iree-org/iree/discussions/21506
+  smallGemmCutoff = 0.05f * computeMemoryCutoff;
+  largeGemmCutoff = 5.0f * computeMemoryCutoff;
+  LDBG() << "Target chip small gemm cutoff: " << smallGemmCutoff
+         << ", large gemm cutoff: " << largeGemmCutoff;
+  return {smallGemmCutoff, largeGemmCutoff};
+}
+
 /// Given a target and a matmul problem, try to find an MMA schedule for the
 /// problem based on the available mma intrinsics.
 static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
@@ -169,25 +255,45 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
          "expected the same aType and bType.");
   int64_t inBitWidth = problem.aType.getIntOrFloatBitWidth();
 
+  std::pair<float, float> gemmCutoffs =
+      computeGemmCutoffs(target, problem.aType);
+
   // Note that the following heuristic seeds are just placeholder values.
   // We need to clean it up and make it adjusting to different targets.
   // See https://github.com/iree-org/iree/issues/16341 for details.
   int64_t mSize = ShapedType::getNumElements(problem.mSizes);
   int64_t nSize = ShapedType::getNumElements(problem.nSizes);
-  if (mSize * nSize <= 512 * 512) {
-    // For matmuls with small M*N size, we want to distribute M*N onto more
-    // workgroups to fill the GPU. Use a smaller bestMNTileCountPerSubgroup
-    // and a larger bestKTileCountPerSubgroup.
-    seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
-             /*bestMNTileCountPerSubgroup=*/4,
-             /*bestKTileCountPerSubgroup=*/8,
-             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
-  } else {
-    seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
-             /*bestMNTileCountPerSubgroup=*/16,
+  int64_t kSize = ShapedType::getNumElements(problem.kSizes);
+  int64_t computeIntensity = (2 * mSize * nSize * kSize) /
+                             (mSize * nSize + nSize * kSize + mSize * kSize);
+
+  if (computeIntensity <= gemmCutoffs.first) {
+    // For matmuls with small compute intensity, use a smaller
+    // bestMNTileCountPerSubgroup and a larger bestKTileCountPerSubgroup.
+    problem.gemmSize = SmallGemm;
+    seeds = {/*bestSubgroupCountPerWorkgroup=*/2,
+             /*bestMNTileCountPerSubgroup=*/2,
              /*bestKTileCountPerSubgroup=*/4,
+             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
+  } else if (computeIntensity >= gemmCutoffs.second) {
+    // For matmuls with large compute intensity, use large
+    // bestMNTileCountPerSubgroup and bestKTileCountPerSubgroup  and small
+    // bestKTileCountPerSubgroup to amortize launch/memory costs and maximize
+    // throughput.
+    problem.gemmSize = LargeGemm;
+    seeds = {/*bestSubgroupCountPerWorkgroup=*/8,
+             /*bestMNTileCountPerSubgroup=*/8,
+             /*bestKTileCountPerSubgroup=*/2,
              /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / 2 /
                  inBitWidth};
+  } else {
+    // Choose balanced tile shapes. Empirically, medium-AI workloads can favor
+    // either smaller or larger tiles depending on kernel details.
+    problem.gemmSize = MediumGemm;
+    seeds = {/*bestSubgroupCountPerWorkgroup=*/8,
+             /*bestMNTileCountPerSubgroup=*/4,
+             /*bestKTileCountPerSubgroup=*/4,
+             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
   }
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 

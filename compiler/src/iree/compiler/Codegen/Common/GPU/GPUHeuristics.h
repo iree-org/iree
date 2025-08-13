@@ -9,6 +9,8 @@
 
 namespace mlir::iree_compiler {
 
+enum GemmSize { NotSet = 0, SmallGemm = 1, MediumGemm = 2, LargeGemm = 3 };
+
 /// Struct containing information about a matmul's shape and type.
 struct GPUMatmulShapeType {
   SmallVector<int64_t, 2> mSizes;
@@ -18,6 +20,7 @@ struct GPUMatmulShapeType {
   Type aType;
   Type bType;
   Type cType;
+  GemmSize gemmSize = NotSet;
 
   GPUMatmulShapeType(int64_t m, int64_t n, int64_t k, Type a, Type b, Type c)
       : mSizes({m}), nSizes({n}), kSizes({k}), batchSizes({}), aType(a),
