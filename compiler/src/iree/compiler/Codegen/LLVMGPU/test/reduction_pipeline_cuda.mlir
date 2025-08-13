@@ -41,10 +41,12 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 //    CHECK-SAME:      translation_info = #[[TRANSLATION_INFO]]
 //     CHECK-DAG:    %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x4xf32>
 //     CHECK-DAG:    %[[TID:.+]] = gpu.thread_id  x
+//     CHECK-DAG:    arith.constant dense<[0, 1, 2, 3]> : vector<4xindex>
 //         CHECK:    %[[R0:.+]] = scf.for %{{.*}} = %c0 to %c10240 step %c1024 iter_args(%[[A0:.+]] = %[[CST]]) -> (vector<1x1x4xf32>) {
 //         CHECK:      %[[V:.+]] = vector.transfer_read {{.*}} : memref<512x10240xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //         CHECK:      %[[STRIDED:.+]] = vector.insert_strided_slice %[[V]], {{.*}} : vector<4xf32> into vector<1x1x4xf32>
-//         CHECK:      %[[ADD:.+]] = arith.addf %[[STRIDED]], %[[A0]] : vector<1x1x4xf32>
+//         CHECK:      %[[PADSELECTION:.+]] = arith.select %{{.*}}, %[[STRIDED]], %[[CST]] : vector<1x1x4xi1>, vector<1x1x4xf32>
+//         CHECK:      %[[ADD:.+]] = arith.addf %[[PADSELECTION]], %[[A0]] : vector<1x1x4xf32>
 //         CHECK:      scf.yield %[[ADD]] : vector<1x1x4xf32>
 //         CHECK:    }
 //         CHECK:    gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f32) -> f32
