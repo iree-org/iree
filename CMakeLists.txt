@@ -839,13 +839,7 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   if(IREE_USE_SYSTEM_DEPS)
     find_package(nanobind REQUIRED)
   else()
-    include(FetchContent)
-    FetchContent_Declare(
-        nanobind
-        GIT_REPOSITORY https://github.com/wjakob/nanobind.git
-        GIT_TAG        0f9ce749b257fdfe701edb3cf6f7027ba029434a # v2.4.0
-    )
-    FetchContent_MakeAvailable(nanobind)
+    add_subdirectory(third_party/nanobind EXCLUDE_FROM_ALL)
   endif()
 endif()
 
