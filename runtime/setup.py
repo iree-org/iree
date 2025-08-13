@@ -672,5 +672,6 @@ setup(
     },
     install_requires=[
         "numpy",
+        "ml_dtypes",
     ],
 )

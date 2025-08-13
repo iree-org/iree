@@ -7,6 +7,7 @@
 
 from typing import Optional, Tuple
 import logging
+import ml_dtypes
 import numpy as np
 import numpy.lib.mixins
 
@@ -305,6 +306,12 @@ _DTYPE_TO_HAL_ELEMENT_TYPE = (
     (np.bool_, HalElementType.BOOL_8),
     (np.complex64, HalElementType.COMPLEX_64),
     (np.complex128, HalElementType.COMPLEX_128),
+    (ml_dtypes.bfloat16, HalElementType.BFLOAT_16),
+    (ml_dtypes.float8_e4m3fn, HalElementType.FLOAT_8_E4M3_FN),
+    (ml_dtypes.float8_e4m3fnuz, HalElementType.FLOAT_8_E4M3_FNUZ),
+    (ml_dtypes.float8_e5m2, HalElementType.FLOAT_8_E5M2),
+    (ml_dtypes.float8_e5m2fnuz, HalElementType.FLOAT_8_E5M2_FNUZ),
+    (ml_dtypes.float8_e8m0fnu, HalElementType.FLOAT_8_E8M0_FNU),
 )
 
 
