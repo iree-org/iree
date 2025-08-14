@@ -113,8 +113,9 @@ convertToUKernelGeneric(RewriterBase &rewriter, Operation *op, StringRef name,
   if (provider) {
     if (failed(provider.createAndReplaceWithUkernelOp(
             rewriter, name, targetConfiguration, op, tensorInputs,
-            tensorOutputs, otherOperands)))
+            tensorOutputs, otherOperands))) {
       return failure();
+    }
   } else {
     rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
         op, op->getResults().getTypes(), name, tensorInputs, tensorOutputs,

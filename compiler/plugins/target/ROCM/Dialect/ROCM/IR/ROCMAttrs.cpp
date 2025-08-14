@@ -34,18 +34,16 @@ BuiltinTuningModuleAttr::getModule(Operation * /*annotationSite*/) const {
 //===----------------------------------------------------------------------===//
 
 /// Utility function to help create and replace argmax linalg with a ukernel.
-static LogicalResult handleArgmaxUkernel(RewriterBase &rewriter, StringRef name,
-                                         DictionaryAttr targetConfiguration,
-                                         Operation *contextualOp,
-                                         SmallVector<Value> &inputs,
-                                         SmallVector<Value> &outputs,
-                                         SmallVector<Value> &otherOperands) {
+static LogicalResult handleArgmaxUkernel(
+    RewriterBase &rewriter, StringRef name, DictionaryAttr targetConfiguration,
+    Operation *contextualOp, SmallVectorImpl<Value> &inputs,
+    SmallVectorImpl<Value> &outputs, SmallVectorImpl<Value> &otherOperands) {
   auto genericOp = dyn_cast<linalg::GenericOp>(contextualOp);
   if (!genericOp) {
     return rewriter.notifyMatchFailure(
         genericOp, "expected a linalg.generic op for argmax");
   }
-  // Currently only support 1D reduction, where reduc is on fastest dim.
+  // Currently only support 1D reduction, where reduction is on fastest dim.
   // Tiling argmax ukernel is also set to enforce this structure.
   const int kReductionDim = genericOp.getNumLoops() - 1;
   Location loc = genericOp.getLoc();
@@ -58,8 +56,7 @@ static LogicalResult handleArgmaxUkernel(RewriterBase &rewriter, StringRef name,
   otherOperands.push_back(writeMaxValueFlag);
   MLIRContext *context = rewriter.getContext();
   auto fnDefAttrs = DictionaryAttr::get(
-      context, {{StringAttr::get(context, "vm.import.module"),
-                 StringAttr::get(context, "rocm")}});
+      context, {{"vm.import.module", StringAttr::get(context, "rocm")}});
   auto ukernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
       loc, contextualOp->getResults().getTypes(), name, inputs, outputs,
       otherOperands, fnDefAttrs,
@@ -67,32 +64,31 @@ static LogicalResult handleArgmaxUkernel(RewriterBase &rewriter, StringRef name,
   if (isPureArgmax) {
     rewriter.replaceAllUsesWith(genericOp.getResults()[1],
                                 ukernelOp.getResults()[1]);
-  } else {
-    auto origResults = genericOp.getResults();
-    auto newResults = ukernelOp.getResults();
-    if (origResults.size() != newResults.size()) {
-      return rewriter.notifyMatchFailure(genericOp, "result count mismatch");
-    }
-    rewriter.replaceAllUsesWith(genericOp.getResults()[0],
-                                ukernelOp.getResults()[0]);
-    rewriter.replaceAllUsesWith(genericOp.getResults()[1],
-                                ukernelOp.getResults()[1]);
+    return success();
   }
+  auto origResults = genericOp.getResults();
+  auto newResults = ukernelOp.getResults();
+  if (origResults.size() != newResults.size()) {
+    return rewriter.notifyMatchFailure(genericOp, "result count mismatch");
+  }
+  rewriter.replaceAllUsesWith(genericOp.getResults()[0],
+                              ukernelOp.getResults()[0]);
+  rewriter.replaceAllUsesWith(genericOp.getResults()[1],
+                              ukernelOp.getResults()[1]);
   return success();
 }
 
 LogicalResult UKernelProviderAttr::createAndReplaceWithUkernelOp(
     RewriterBase &rewriter, StringRef name, DictionaryAttr targetConfiguration,
-    Operation *contextualOp, SmallVector<Value> &inputs,
-    SmallVector<Value> &outputs, SmallVector<Value> &otherOperands) const {
+    Operation *contextualOp, SmallVectorImpl<Value> &inputs,
+    SmallVectorImpl<Value> &outputs,
+    SmallVectorImpl<Value> &otherOperands) const {
   if (name.contains("argmax")) {
     return handleArgmaxUkernel(rewriter, name, targetConfiguration,
                                contextualOp, inputs, outputs, otherOperands);
-  } else {
-    // TODO(avarma): Add multi_mfma ukernel support via descriptors.
-    return failure();
   }
-  return success();
+  // TODO(avarma): Add multi_mfma ukernel support via descriptors.
+  return failure();
 }
 
 //===----------------------------------------------------------------------===//
