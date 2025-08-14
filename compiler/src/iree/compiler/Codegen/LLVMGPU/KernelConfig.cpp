@@ -297,11 +297,34 @@ static bool isMatmulLike(linalg::LinalgOp &linalgOp) {
          linalgOp.getNumParallelLoops() >= 1;
 };
 
-/// Check if `op` is a linalg.reduce or a linalg.generic that has at least one
-/// reduction iterator.
-static bool hasReductionIterator(linalg::LinalgOp &op) {
-  return isa<linalg::ReduceOp, linalg::GenericOp>(op) &&
-         llvm::any_of(op.getIteratorTypesArray(), linalg::isReductionIterator);
+/// This utility is used to check if `op` is appropriate for the vector
+/// reduction pipeline.
+static bool isProjectingReduction(linalg::LinalgOp op) {
+  const auto loopRanges = op.getStaticLoopRanges();
+  const auto loopTypes = op.getIteratorTypesArray();
+  const auto indexingMaps = op.getIndexingMapsArray();
+
+  // Check that all maps are projection maps. I.e. if any of the operands have
+  // maps like:
+  //
+  // ```
+  // affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2 + d4, d3 + d5)>
+  // ```
+  //
+  // false is returned. These maps appear in convolution/pooling ops, which are
+  // not currently supported by the vector distribute pipeline.
+  for (const auto m : indexingMaps) {
+    if (!m.isProjectedPermutation(true))
+      return false;
+  }
+
+  // Check for non-unit reduction dim.
+  for (const auto [type, range] : llvm::zip(loopTypes, loopRanges)) {
+    if (linalg::isReductionIterator(type) && range != 1) {
+      return true;
+    }
+  }
+  return false;
 }
 
 struct TensorSizeEstimate {
@@ -609,9 +632,11 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
   // LinalgOp with only parallel dims. This is needed if the op cannot be fused
   // with a reduction or introduces new loop dimensions.
   auto shouldAttachLoweringConfig = [&](linalg::LinalgOp linalgOp) -> bool {
+    auto generic = dyn_cast<linalg::GenericOp>(linalgOp.getOperation());
+    assert(generic && "Expected generic with all parallel iterators here");
     // If the operation has a gather, we want to fuse it with the
     // reduction.
-    if (hasExternalCapture(cast<linalg::GenericOp>(linalgOp))) {
+    if (hasExternalCapture(generic)) {
       return false;
     }
     // If some of the users are in computeOps and some are outside of
@@ -643,7 +668,7 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
   };
 
   for (linalg::LinalgOp linalgOp : computeOps) {
-    if (hasReductionIterator(linalgOp) ||
+    if (isProjectingReduction(linalgOp) ||
         shouldAttachLoweringConfig(linalgOp)) {
       auto loweringConfig = getVectorDistributeReductionConfig(
           linalgOp, target, sharedWgpTiles, workgroupSize, subgroupSize,
@@ -727,7 +752,7 @@ checkDispatchForVectorDistribution(Operation *parentOp) {
       if (isa<linalg::FillOp>(op)) {
         continue;
       }
-      if (hasReductionIterator(linalgOp) &&
+      if (isProjectingReduction(linalgOp) &&
           failed(checkSingleCombiner(linalgOp))) {
         containsValidReductionOp = false;
         break;
@@ -772,7 +797,7 @@ checkDispatchForVectorDistribution(Operation *parentOp) {
           llvm::seq<int>(indexingMap.getNumResults()), [&](int val) {
             return reductionDims.contains(indexingMap.getDimPosition(val));
           });
-      if (isOperandReduced && hasReductionIterator(producerOp)) {
+      if (isOperandReduced && isProjectingReduction(producerOp)) {
         return failure();
       }
     }
@@ -818,7 +843,7 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   MLIRContext *context = op.getContext();
   OpBuilder b(context);
 
-  if (!hasReductionIterator(op)) {
+  if (!isProjectingReduction(op)) {
     return failure();
   }
 
