@@ -87,7 +87,7 @@ hal.executable @dot_dispatch_0 {
 //            CHECK:   llvm.br
 //            CHECK:    llvm.load {{.*}} : !llvm.ptr<1> -> vector<32xf32>
 //   CHECK-COUNT-32:    llvm.load {{.*}} : !llvm.ptr<1> -> vector<16xf32>
-//   CHECK-COUNT-32:    llvm.intr.fmuladd({{.*}}) : (vector<16xf32>, vector<16xf32>, vector<16xf32>) -> vector<16xf32>
+//   CHECK-COUNT-512:  llvm.call @__nv_fmaf({{.*}}) : (f32, f32, f32) -> f32
 //            CHECK:    llvm.store {{.*}} : vector<16xf32>, !llvm.ptr<1>
 
 // -----
@@ -151,7 +151,7 @@ hal.executable @dot_dispatch_0 {
 //   CHECK-LABEL: hal.executable public @dot_dispatch_0
 //            CHECK:   hal.executable.variant public @cuda
 //            CHECK:  llvm.br
-//   CHECK-COUNT-32:    llvm.intr.fmuladd({{.*}}) : (vector<16xf32>, vector<16xf32>, vector<16xf32>) -> vector<16xf32>
+//   CHECK-COUNT-512:  llvm.call @__nv_fmaf({{.*}}) : (f32, f32, f32) -> f32
 //            CHECK:    llvm.store {{.*}} : vector<16xf32>, !llvm.ptr<1>
 
 // -----
