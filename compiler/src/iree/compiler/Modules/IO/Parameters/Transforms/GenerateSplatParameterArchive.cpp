@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
+#include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -25,30 +26,53 @@ namespace mlir::iree_compiler::IREE::IO::Parameters {
 
 namespace {
 
+struct ParameterEntry {
+  StringRef key;
+  Type type;
+  int64_t storageSize;
+};
+
 // Returns a set of all unique parameters and the locations using them.
-static SmallVector<std::pair<Location, IREE::Flow::NamedParameterAttr>>
+static SmallVector<std::pair<Location, ParameterEntry>>
 findAllParameters(ModuleOp moduleOp) {
-  llvm::MapVector<IREE::Flow::NamedParameterAttr, SmallVector<Location>>
-      parameterAttrs;
+  llvm::MapVector<Attribute, SmallVector<Location>> parameterAttrs;
   moduleOp.walk([&](Operation *op) {
     if (auto globalOp = dyn_cast<IREE::Util::GlobalOpInterface>(op)) {
-      if (auto parameterAttr =
-              dyn_cast_if_present<IREE::Flow::NamedParameterAttr>(
-                  globalOp.getGlobalInitialValue())) {
-        parameterAttrs[parameterAttr].push_back(globalOp.getLoc());
+      if (isa_and_present<IREE::Flow::NamedParameterAttr,
+                          IREE::Stream::NamedParameterAttr>(
+              globalOp.getGlobalInitialValue())) {
+        parameterAttrs[globalOp.getGlobalInitialValue()].push_back(
+            globalOp.getLoc());
       }
     } else if (auto constantOp = dyn_cast<IREE::Flow::TensorConstantOp>(op)) {
-      if (auto parameterAttr =
-              dyn_cast_if_present<IREE::Flow::NamedParameterAttr>(
-                  constantOp.getValue())) {
-        parameterAttrs[parameterAttr].push_back(constantOp.getLoc());
+      if (isa_and_present<IREE::Flow::NamedParameterAttr>(
+              constantOp.getValue())) {
+        parameterAttrs[constantOp.getValue()].push_back(constantOp.getLoc());
       }
     }
   });
-  SmallVector<std::pair<Location, IREE::Flow::NamedParameterAttr>> locAttrs;
+  SmallVector<std::pair<Location, ParameterEntry>> locAttrs;
   for (auto &entry : parameterAttrs) {
-    locAttrs.push_back(std::make_pair(
-        FusedLoc::get(moduleOp.getContext(), entry.second), entry.first));
+    if (auto flowParam =
+            dyn_cast<IREE::Flow::NamedParameterAttr>(entry.first)) {
+      ParameterEntry paramEntry{flowParam.getKey(), flowParam.getType(),
+                                flowParam.getStorageSize()};
+      auto loc = FusedLoc::get(moduleOp.getContext(), entry.second);
+      locAttrs.push_back({loc, paramEntry});
+    } else if (auto streamParam =
+                   dyn_cast<IREE::Stream::NamedParameterAttr>(entry.first)) {
+      // TODO: We shouldn't have stream.parameter.named in input at all. The
+      // expected input since https://github.com/iree-org/iree/pull/17303
+      // should contain flow.parameter.named . But, since rest of the compiler
+      // and importers haven't caught up, we still have some support for it in
+      // tooling. See
+      // https://github.com/iree-org/iree/pull/17303#issuecomment-2099354883
+      // for more info.
+      ParameterEntry paramEntry{streamParam.getKey(), streamParam.getType(),
+                                streamParam.getStorageSize()};
+      auto loc = FusedLoc::get(moduleOp.getContext(), entry.second);
+      locAttrs.push_back({loc, paramEntry});
+    }
   }
   return locAttrs;
 }
@@ -82,10 +106,10 @@ struct GenerateSplatParameterArchivePass
     // Find all parameters in the module and add them to the builder.
     // NOTE: there may be no parameters but we still will create the archive
     // so that subsequent tooling that tries to load it succeeds.
-    auto parameterAttrs = findAllParameters(moduleOp);
-    for (auto [loc, parameterAttr] : parameterAttrs) {
+    auto parameterEntries = findAllParameters(moduleOp);
+    for (auto [loc, parameterEntry] : parameterEntries) {
       // Only support types we can meaningfully generate splats for.
-      auto shapedType = dyn_cast<ShapedType>(parameterAttr.getType());
+      auto shapedType = dyn_cast<ShapedType>(parameterEntry.type);
       if (!shapedType)
         continue;
 
@@ -102,7 +126,7 @@ struct GenerateSplatParameterArchivePass
       }
 
       // Add a zero-splat entry to the builder for this global.
-      auto parameterName = parameterAttr.getKey().getValue();
+      auto parameterName = parameterEntry.key;
       if (failed(handleRuntimeError(
               moduleOp,
               iree_io_parameter_archive_builder_add_splat_entry(
@@ -113,7 +137,7 @@ struct GenerateSplatParameterArchivePass
                   /*metadata=*/iree_const_byte_span_empty(),
                   /*pattern=*/pattern.data(),
                   /*pattern_length=*/static_cast<uint8_t>(pattern.size()),
-                  /*data_length=*/parameterAttr.getStorageSize()),
+                  /*data_length=*/parameterEntry.storageSize),
               "failed to add splat entry for global"))) {
         return signalPassFailure();
       }
