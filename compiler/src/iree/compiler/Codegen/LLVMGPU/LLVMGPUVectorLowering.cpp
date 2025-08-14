@@ -12,9 +12,10 @@
 #include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/Passes.h"
 
 namespace mlir::iree_compiler {
@@ -183,6 +184,192 @@ struct SetMulAddFMF final : OpRewritePattern<vector::MultiDimReductionOp> {
   }
 };
 
+// TODO: scale to more than 2 rows
+// struct LowerMultiReductionFMAToContract final : OpRewritePattern<vector::MultiDimReductionOp> {
+//   using OpRewritePattern::OpRewritePattern;
+
+//   LogicalResult matchAndRewrite(vector::MultiDimReductionOp redOp,
+//                                 PatternRewriter &rewriter) const override {
+//     if (redOp.getKind() != vector::CombiningKind::ADD) {
+//       return failure();
+//     }
+
+//     Value src = redOp.getSource();
+//     auto fmaOp = src.getDefiningOp<math::FmaOp>();
+//     if (!fmaOp) {
+//       return failure();
+//     }
+
+//     Location loc = redOp.getLoc();
+//     Value lhs = fmaOp.getOperand(0);
+//     Value rhs = fmaOp.getOperand(1);
+//     Value acc = redOp.getAcc();
+
+//     auto srcType = dyn_cast<VectorType>(fmaOp.getResult().getType());
+//     auto resType = dyn_cast<VectorType>(redOp.getResult().getType());
+//     resType.dump();
+
+//     ArrayRef<int64_t> reductionDims = redOp.getReductionDims();
+//     SmallVector<int64_t> parallelDims;
+
+//     // this can definitely be made better
+//     for (int64_t i{}; i < srcType.getRank(); i++) {
+//       if (!llvm::is_contained(reductionDims, i)) {
+//         parallelDims.push_back(i);
+//       }
+//     }
+
+//     int64_t parallelSize = 1;
+//     int64_t reductionSize = 1;
+
+//     for (int64_t dim : parallelDims) {
+//       // 2 * 1
+//       parallelSize *= srcType.getDimSize(dim);
+//     }
+//     for (int64_t dim : reductionDims) {
+//       // 8
+//       reductionSize *= srcType.getDimSize(dim);
+//     }
+
+//     // 2 x 8 x f32
+//     auto flat2DType = VectorType::get({parallelSize, reductionSize},
+//                                       srcType.getElementType());
+//     // 2 x f32
+//     auto flat1DType = VectorType::get({parallelSize}, srcType.getElementType());
+
+//     Value flatLhs = rewriter.create<vector::ShapeCastOp>(loc, flat2DType, lhs);
+//     Value flatRhs = rewriter.create<vector::ShapeCastOp>(loc, flat2DType, rhs);
+//     Value flatAcc = rewriter.create<vector::ShapeCastOp>(loc, flat1DType, acc);
+
+//     MLIRContext *ctx = rewriter.getContext();
+
+//     AffineExpr d0 = getAffineDimExpr(0, ctx); // parallel dimension
+//     AffineExpr d1 = getAffineDimExpr(1, ctx); // reduction dimension
+
+//     auto lhsMap = AffineMap::get(2, 0, {d0, d1}, ctx);
+//     auto rhsMap = AffineMap::get(2, 0, {d0, d1}, ctx);
+//     auto accMap = AffineMap::get(2, 0, {d0}, ctx);
+
+//     // Step 6: Create the contract operation
+//     auto indexingMaps =
+//         rewriter.getAffineMapArrayAttr({lhsMap, rhsMap, accMap});
+//     auto iteratorTypes =
+//         rewriter.getArrayAttr({rewriter.getStringAttr("parallel"),
+//                                rewriter.getStringAttr("reduction")});
+
+//     auto contractOp = rewriter.create<vector::ContractionOp>(
+//         loc, flatLhs, flatRhs, flatAcc, indexingMaps, iteratorTypes,
+//         vector::CombiningKindAttr::get(ctx, vector::CombiningKind::ADD));
+
+//     // Step 7: Shape cast result back to original shape
+//     // Example: vector<2xf32> -> vector<2x1x1xf32>
+//     Value result = rewriter.create<vector::ShapeCastOp>(loc, resType,
+//                                                         contractOp.getResult());
+
+//     // Step 8: Add attribute to mark this as FMA-derived
+//     // (so later lowering knows to preserve FMA)
+//     contractOp->setAttr("fma_chain", rewriter.getUnitAttr());
+
+//     rewriter.replaceOp(redOp, result);
+//     return success();
+//   }
+// };
+
+struct MultiReduceFMAToContract final
+    : OpRewritePattern<vector::MultiDimReductionOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  static bool isZeroSplat(Value v) {
+    // Accept only explicit, foldable zeros.
+    if (auto cst = v.getDefiningOp<arith::ConstantOp>()) {
+      Attribute attr = cst.getValue();
+      // Vector/array: dense splat 0.0
+      if (auto dense = dyn_cast<DenseElementsAttr>(attr)) {
+        if (dense.isSplat()) {
+          if (auto ft = dyn_cast<FloatType>(dense.getElementType())) {
+            return dense.getSplatValue<APFloat>().isZero();
+          }
+        }
+        return false;
+      }
+      // Scalar float 0.0
+      if (auto fa = dyn_cast<FloatAttr>(attr))
+        return fa.getValue().isZero();
+    }
+    return false;
+  }
+
+  LogicalResult matchAndRewrite(vector::MultiDimReductionOp reduceOp,
+                                PatternRewriter &rewriter) const override {
+    if (reduceOp.getKind() != vector::CombiningKind::ADD) {
+      return failure();
+    }
+
+    auto fma = reduceOp.getSource().getDefiningOp<math::FmaOp>();
+    if (!fma)
+      return failure();
+
+    Value a = fma.getOperand(0);
+    Value b = fma.getOperand(1);
+    Value c = fma.getOperand(2);
+    auto aVT = dyn_cast<VectorType>(a.getType());
+    auto bVT = dyn_cast<VectorType>(b.getType());
+    auto srcVT = dyn_cast<VectorType>(fma.getResult().getType());
+    auto resVT = dyn_cast<VectorType>(reduceOp.getResult().getType());
+    if (!aVT || !bVT || !srcVT || !resVT) {
+      return failure();
+    }
+    if (aVT != bVT || aVT != srcVT) {
+      return failure();
+    }
+    if (!isa<FloatType>(srcVT.getElementType())) {
+      return failure();
+    }
+    if (reduceOp.getAcc().getType() != resVT) {
+      return failure();
+    }
+
+    // TODO: support c != 0
+    if (!isZeroSplat(c)) {
+      return failure();
+    }
+
+    // Build iterator types and indexing maps:
+    //  A: id, B: id, C: projection of non-reduction dims; iterator per dim.
+    SmallVector<bool> mask = reduceOp.getReductionMask();
+    if (mask.size() != srcVT.getRank()) {
+      return failure();
+    }
+
+    auto srcMap = rewriter.getMultiDimIdentityMap(mask.size());
+
+    SmallVector<AffineExpr> projExprs;
+    SmallVector<vector::IteratorType> iters;
+    projExprs.reserve(mask.size());
+    iters.reserve(mask.size());
+    for (int i = 0, e = mask.size(); i < e; ++i) {
+      if (!mask[i]) {
+        iters.push_back(vector::IteratorType::parallel);
+        projExprs.push_back(rewriter.getAffineDimExpr(i));
+      } else {
+        iters.push_back(vector::IteratorType::reduction);
+      }
+    }
+
+    auto dstMap = AffineMap::get(mask.size(), /*symbols=*/0, projExprs,
+                                 reduceOp.getContext());
+    auto itersAttr = rewriter.getArrayAttr(llvm::to_vector(
+        llvm::map_range(iters, [&](vector::IteratorType t) -> Attribute {
+          return vector::IteratorTypeAttr::get(rewriter.getContext(), t);
+        })));
+    auto mapsAttr = rewriter.getAffineMapArrayAttr({srcMap, srcMap, dstMap});
+
+    rewriter.replaceOpWithNewOp<vector::ContractionOp>(
+        reduceOp, a, b, reduceOp.getAcc(), mapsAttr, itersAttr);
+    return success();
+  }
+};
+
 struct LLVMGPUVectorLoweringPass final
     : impl::LLVMGPUVectorLoweringPassBase<LLVMGPUVectorLoweringPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -201,38 +388,39 @@ struct LLVMGPUVectorLoweringPass final
       RewritePatternSet fmaPatterns(ctx);
       fmaPatterns.add<SetMulAddFMF>(ctx, PatternBenefit(2));
       populateUpliftToFMAPatterns(fmaPatterns);
+      fmaPatterns.add<MultiReduceFMAToContract>(ctx);
       if (failed(applyPatternsGreedily(funcOp, std::move(fmaPatterns)))) {
         return signalPassFailure();
       }
     }
 
-    {
-      // Lower high level vector operations like contract or multidim reduce ops
-      // to lower level vector ops.
-      RewritePatternSet contractLoweringPatterns(funcOp.getContext());
-      auto options =
-          vector::VectorTransformsOptions().setVectorTransformsOptions(
-              vector::VectorContractLowering::OuterProduct);
-      vector::populateVectorTransferPermutationMapLoweringPatterns(
-          contractLoweringPatterns);
-      vector::TransposeOp::getCanonicalizationPatterns(contractLoweringPatterns,
-                                                       funcOp.getContext());
-      vector::populateVectorBroadcastLoweringPatterns(contractLoweringPatterns);
-      vector::populateVectorContractLoweringPatterns(
-          contractLoweringPatterns, options.vectorContractLowering);
-      contractLoweringPatterns.add<PromoteContractOperands>(
-          funcOp->getContext());
-      vector::populateVectorGatherLoweringPatterns(contractLoweringPatterns);
-      vector::populateVectorMaskOpLoweringPatterns(contractLoweringPatterns);
-      vector::populateVectorShapeCastLoweringPatterns(contractLoweringPatterns);
-      vector::populateVectorMultiReductionLoweringPatterns(
-          contractLoweringPatterns,
-          vector::VectorMultiReductionLowering::InnerReduction);
-      if (failed(applyPatternsGreedily(funcOp,
-                                       std::move(contractLoweringPatterns)))) {
-        return signalPassFailure();
-      }
-    }
+    // {
+    //   // Lower high level vector operations like contract or multidim reduce ops
+    //   // to lower level vector ops.
+    //   RewritePatternSet contractLoweringPatterns(funcOp.getContext());
+    //   auto options =
+    //       vector::VectorTransformsOptions().setVectorTransformsOptions(
+    //           vector::VectorContractLowering::OuterProduct);
+    //   vector::populateVectorTransferPermutationMapLoweringPatterns(
+    //       contractLoweringPatterns);
+    //   vector::TransposeOp::getCanonicalizationPatterns(contractLoweringPatterns,
+    //                                                    funcOp.getContext());
+    //   vector::populateVectorBroadcastLoweringPatterns(contractLoweringPatterns);
+    //   vector::populateVectorContractLoweringPatterns(
+    //       contractLoweringPatterns, options.vectorContractLowering);
+    //   contractLoweringPatterns.add<PromoteContractOperands>(
+    //       funcOp->getContext());
+    //   vector::populateVectorGatherLoweringPatterns(contractLoweringPatterns);
+    //   vector::populateVectorMaskOpLoweringPatterns(contractLoweringPatterns);
+    //   vector::populateVectorShapeCastLoweringPatterns(contractLoweringPatterns);
+    //   vector::populateVectorMultiReductionLoweringPatterns(
+    //       contractLoweringPatterns,
+    //       vector::VectorMultiReductionLowering::InnerReduction);
+    //   if (failed(applyPatternsGreedily(funcOp,
+    //                                    std::move(contractLoweringPatterns)))) {
+    //     return signalPassFailure();
+    //   }
+    // }
 
     {
       RewritePatternSet vectorToLoopsPatterns(&getContext());
