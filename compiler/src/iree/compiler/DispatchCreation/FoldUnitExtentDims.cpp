@@ -80,19 +80,26 @@ struct DropUnitDimsFromCollapseOfExpand
     // `collapseOp` op.
     llvm::SmallDenseSet<int64_t> toDrop;
     for (const auto &[outDim, indices] : llvm::enumerate(collapseReassoc)) {
+      int64_t countUnitIdxs = 0;
+      bool foundFirstUnitDim = false;
+      int64_t firstUnitDim;
       for (auto [innerIdx, inDim] : llvm::enumerate(indices)) {
         // Can't drop this dim if it isnt statically 1 or if it isn't being
         // combined with any other dimensions.
         if (indices.size() == 1 || interShape[inDim] != 1) {
           continue;
         }
-
-        // If we are collapsing multiple unit dims together, at least 1 must be
-        // kept (prefer the first).
-        if (outShape[outDim] == 1 && innerIdx != 0) {
-          continue;
+        if (!foundFirstUnitDim) {
+          firstUnitDim = inDim;
+          foundFirstUnitDim = true;
         }
+        countUnitIdxs++;
+
         toDrop.insert(inDim);
+      }
+      // If we found multiple unit dims, we need to keep the first one.
+      if (countUnitIdxs > 1 && foundFirstUnitDim) {
+        toDrop.erase(firstUnitDim);
       }
     }
 
@@ -171,7 +178,6 @@ struct DropUnitDimsFromCollapseOfExpand
         expandedDim += newExpandReassoc.back().size();
       }
     }
-
     // Construct the new expand_shape and collapse_shape ops.
     // Note: we must handle the cases where the expand/collapse is no longer
     // needed. Both ops require a non-identity reassociation (i.e. they can't be
