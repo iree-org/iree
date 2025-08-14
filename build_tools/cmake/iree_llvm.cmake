@@ -178,7 +178,7 @@ macro(iree_llvm_set_bundled_cmake_options)
 
   # Disable MLIR attempting to configure Python dev packages. We take care of
   # that in IREE as a super-project.
-  set(MLIR_DISABLE_CONFIGURE_PYTHON_DEV_PACKAGES ON CACHE BOOL "" FORCE)
+  set(MLIR_DISABLE_CONFIGURE_PYTHON_DEV_PACKAGES ON CACHE BOOL "")
 
   # If we are building clang/lld/etc, these will be the targets.
   # Otherwise, empty so scripts can detect unavailability.
