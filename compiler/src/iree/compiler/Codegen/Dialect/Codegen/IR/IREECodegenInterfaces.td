@@ -564,9 +564,9 @@ def IREECodegen_UKernelProviderInterface :
                     "::mlir::StringRef":$name,
                     "::mlir::DictionaryAttr":$target_configuration,
                     "::mlir::Operation *":$contextual_op,
-                    "::llvm::SmallVector<Value>&":$inputs,
-                    "::llvm::SmallVector<Value>&":$outputs,
-                    "::llvm::SmallVector<Value>&":$other_operands),
+                    "::llvm::SmallVectorImpl<::mlir::Value>&":$inputs,
+                    "::llvm::SmallVectorImpl<::mlir::Value>&":$outputs,
+                    "::llvm::SmallVectorImpl<::mlir::Value>&":$other_operands),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         return failure();
