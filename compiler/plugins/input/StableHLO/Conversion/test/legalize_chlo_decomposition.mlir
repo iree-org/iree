@@ -531,3 +531,54 @@ func.func @complex_tan(%arg0 : tensor<1xf32>, %arg1 : tensor<1xf32>) -> (tensor<
 // CHECK: %[[REAL:.+]] = stablehlo.real %[[RES]]
 // CHECK: %[[IMAG:.+]] = stablehlo.imag %[[RES]]
 // CHECK: return %[[REAL]], %[[IMAG]]
+
+// -----
+
+// CHECK-LABEL:  func.func @acos_complex_f32
+// CHECK-SAME:    (%arg0: tensor<complex<f32>>) -> tensor<complex<f32>>
+func.func @acos_complex_f32(%arg : tensor<complex<f32>>) -> tensor<complex<f32>> {
+  %result = "chlo.acos"(%arg) : (tensor<complex<f32>>) -> tensor<complex<f32>>
+  func.return %result : tensor<complex<f32>>
+
+  //CHECK: %cst = stablehlo.constant dense<(1.000000e+00,0.000000e+00)> : tensor<complex<f32>>
+  //CHECK:  %cst_0 = stablehlo.constant dense<(-1.000000e+00,0.000000e+00)> : tensor<complex<f32>>
+  //CHECK:  %0 = stablehlo.sqrt %cst_0 
+  //CHECK:  %1 = stablehlo.add %cst, %arg0 
+  //CHECK:  %2 = stablehlo.subtract %cst, %arg0 
+  //CHECK:  %3 = stablehlo.multiply %1, %2 
+  //CHECK:  %4 = stablehlo.sqrt %3 
+  //CHECK:  %5 = stablehlo.multiply %0, %4 
+  //CHECK:  %6 = stablehlo.add %arg0, %5 
+  //CHECK:  %7 = stablehlo.log %6 
+  //CHECK:  %8 = stablehlo.multiply %0, %7 
+  //CHECK:  %9 = stablehlo.negate %8 
+  //CHECK:  return %9 : tensor<complex<f32>>
+}
+
+// -----
+
+// CHECK-LABEL:  func.func @acos_complex_f64_dynamic
+// CHECK-SAME:    (%arg0: tensor<?xcomplex<f64>>) -> tensor<?xcomplex<f64>>
+func.func @acos_complex_f64_dynamic(%arg : tensor<?xcomplex<f64>>) -> tensor<?xcomplex<f64>> {
+  %result = "chlo.acos"(%arg) : (tensor<?xcomplex<f64>>) -> tensor<?xcomplex<f64>>
+  func.return %result : tensor<?xcomplex<f64>>
+  
+  //CHECK:  %cst = stablehlo.constant dense<(1.000000e+00,0.000000e+00)> : tensor<complex<f64>>
+  //CHECK:  %cst_0 = stablehlo.constant dense<(-1.000000e+00,0.000000e+00)> : tensor<complex<f64>>
+  //CHECK:  %0 = shape.shape_of %arg0 : tensor<?xcomplex<f64>> -> tensor<1xindex>
+  //CHECK:  %1 = stablehlo.dynamic_broadcast_in_dim %cst_0, %0, dims = [] : (tensor<complex<f64>>, tensor<1xindex>) -> tensor<?xcomplex<f64>>
+  //CHECK:  %2 = stablehlo.sqrt %1 : tensor<?xcomplex<f64>>
+  //CHECK:  %3 = shape.shape_of %arg0 : tensor<?xcomplex<f64>> -> tensor<1xindex>
+  //CHECK:  %4 = stablehlo.dynamic_broadcast_in_dim %cst, %3, dims = [] : (tensor<complex<f64>>, tensor<1xindex>) -> tensor<?xcomplex<f64>>
+  //CHECK:  %5 = stablehlo.add %4, %arg0 
+  //CHECK:  %6 = stablehlo.subtract %4, %arg0 
+  //CHECK:  %7 = stablehlo.multiply %5, %6 
+  //CHECK:  %8 = stablehlo.sqrt %7 
+  //CHECK:  %9 = stablehlo.multiply %2, %8 
+  //CHECK:  %10 = stablehlo.add %arg0, %9 
+  //CHECK:  %11 = stablehlo.log %10 
+  //CHECK:  %12 = stablehlo.multiply %2, %11 
+  //CHECK:  %13 = stablehlo.negate %12 
+  //CHECK:  return %13
+}
+                                                                 

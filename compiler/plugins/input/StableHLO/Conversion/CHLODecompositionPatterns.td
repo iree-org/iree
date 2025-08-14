@@ -49,9 +49,7 @@ def STABLEHLO_DEFAULT_RESULT_ACCURACY :
 //   acos(x) = 2 * atan2(sqrt(1 - x^2), (1 + x))  if x != -1
 //           = pi                                 if x == -1
 //
-// TODO(b/237376133): Support operands with complex element types separately
-// using the following formula.
-//   acos(x) = -(i * log(x + i * sqrt((1 + x) * (1 - x))))
+
 def : Pat<(CHLO_AcosOp NonComplexElementType:$input),
   (StableHLO_SelectOp
     (StableHLO_CompareOp
@@ -77,6 +75,42 @@ def : Pat<(CHLO_AcosOp NonComplexElementType:$input),
       )
     ),
     (ConstantLike<"M_PI"> $input)
+  )>;
+
+// Formula: acos(x) = -(i * log(x + i * sqrt(1 - x^2)))
+// where x is a complex number.
+
+def : Pat<
+  (CHLO_AcosOp ComplexElementType:$input),
+  (StableHLO_NegOp
+    (StableHLO_MulOp
+      // Create 'i' (0.0 + 1.0i)
+      (StableHLO_ComplexOp
+        (ConstantLike<"0.0"> (StableHLO_RealOp $input)),
+        (ConstantLike<"1.0"> (StableHLO_ImagOp $input))
+      ),
+      (StableHLO_LogOp
+        (StableHLO_AddOp $input,
+          (StableHLO_MulOp
+            // Create 'i' 
+            (StableHLO_ComplexOp
+              (ConstantLike<"0.0"> (StableHLO_RealOp $input)),
+              (ConstantLike<"1.0"> (StableHLO_ImagOp $input))
+            ),
+            (StableHLO_SqrtOp
+              (StableHLO_SubtractOp
+                // Create '1' (1.0 + 0.0i)
+                  (ConstantLike<"1.0"> $input)
+                ,
+                (StableHLO_MulOp $input, $input)
+              ),
+              STABLEHLO_DEFAULT_RESULT_ACCURACY
+            )
+          )
+        ),
+        STABLEHLO_DEFAULT_RESULT_ACCURACY
+      )
+    )
   )>;
 
 // Expand acosh to MHLO dialect as follows:
