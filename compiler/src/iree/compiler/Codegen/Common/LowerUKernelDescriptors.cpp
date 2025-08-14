@@ -261,8 +261,15 @@ processUKernelKind(Operation *root, IREE::Codegen::UKernelArgumentKind kind) {
       FailureOr<Operation *> maybeTargetFunction = provider.getMLIRUKernel(
           name, targetAttr.getConfiguration(), annotationSite);
       if (failed(maybeTargetFunction) || !*maybeTargetFunction) {
-        return op->emitOpError()
-               << "failed to retrieve a uKernel with name " << name;
+        // If not found at the annotation site, look in the first ModuleOp
+        // parent as well.
+        auto moduleParent = op->getParentOfType<ModuleOp>();
+        maybeTargetFunction = provider.getMLIRUKernel(
+            name, targetAttr.getConfiguration(), moduleParent);
+        if (failed(maybeTargetFunction) || !*maybeTargetFunction) {
+          return op->emitOpError()
+                 << "failed to retrieve a uKernel with name " << name;
+        }
       }
       auto targetFunction = dyn_cast<FunctionOpInterface>(*maybeTargetFunction);
       if (!targetFunction) {
