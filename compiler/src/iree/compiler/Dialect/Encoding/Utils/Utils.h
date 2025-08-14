@@ -14,7 +14,7 @@
 
 namespace mlir::iree_compiler::IREE::Encoding {
 
-constexpr char kDataTilingHint[] = "iree.opt.data-tiling";
+constexpr char kDataTilingHint[] = "iree.opt.data_tiling";
 
 /// Returns true if the operation has data-tiling hint attribute.
 inline bool hasDataTilingHint(Operation *op) {

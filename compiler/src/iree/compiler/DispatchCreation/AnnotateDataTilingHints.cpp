@@ -143,7 +143,7 @@ void AnnotateDataTilingHintsPass::runOnOperation() {
   if (result.wasInterrupted()) {
     return;
   }
-  for (auto op : candidates) {
+  for (Operation *op : candidates) {
     IREE::Encoding::setDataTilingHint(op);
   }
 }
