@@ -33,6 +33,37 @@ struct GPUGreedilyDistributeToThreadsPass final
 };
 } // namespace
 
+static void scalarizeOp(RewriterBase &rewriter, Operation *op) {
+  OpBuilder::InsertionGuard g(rewriter);
+
+  auto dpsOp = dyn_cast<DestinationStyleOpInterface>(op);
+  if (!dpsOp || dpsOp->getNumResults() != dpsOp.getNumDpsInits()) {
+    return;
+  }
+
+  rewriter.setInsertionPoint(op);
+
+  SmallVector<Attribute> mapping = {gpu::GPUThreadMappingAttr::get(
+      rewriter.getContext(), gpu::MappingId::LinearDim0)};
+  scf::ForallOp forallOp = rewriter.create<scf::ForallOp>(
+      op->getLoc(), ArrayRef<OpFoldResult>{rewriter.getIndexAttr(0)},
+      ArrayRef<OpFoldResult>{rewriter.getIndexAttr(1)},
+      ArrayRef<OpFoldResult>{rewriter.getIndexAttr(1)},
+      /*outputs=*/dpsOp.getDpsInits(),
+      /*mapping=*/rewriter.getArrayAttr(mapping));
+  rewriter.moveOpBefore(op, forallOp.getBody(), forallOp.getBody()->begin());
+  rewriter.replaceAllOpUsesWith(dpsOp, forallOp);
+
+  scf::InParallelOp terminator = forallOp.getTerminator();
+  rewriter.setInsertionPointToStart(terminator.getBody());
+  for (auto [result, blockInit] :
+       llvm::zip_equal(dpsOp->getResults(), forallOp.getRegionIterArgs())) {
+    rewriter.create<tensor::ParallelInsertSliceOp>(
+        op->getLoc(), result, blockInit, ArrayRef<OpFoldResult>{},
+        ArrayRef<OpFoldResult>{}, ArrayRef<OpFoldResult>{});
+  }
+}
+
 /// Helper to tile and greedily fuse the given operation to threads. This uses
 /// the iree_gpu.derived_thread_config logic internally to determine tile sizes
 /// to use. This does not yield any fused operation and only replaces the tiling
@@ -42,16 +73,23 @@ struct GPUGreedilyDistributeToThreadsPass final
 /// verification steps will throw an error if distribution does not occur.
 static void tileToThreads(RewriterBase &rewriter,
                           TilingInterface tilingInterfaceOp) {
-  rewriter.setInsertionPoint(tilingInterfaceOp);
+  int64_t numLoops = tilingInterfaceOp.getLoopIteratorTypes().size();
+
+  // Special case scalar ops to make the mapping non-empty.
+  if (numLoops == 0) {
+    return scalarizeOp(rewriter, tilingInterfaceOp);
+  }
+
   auto configAttr =
       IREE::GPU::DerivedThreadConfigAttr::get(rewriter.getContext());
   SmallVector<OpFoldResult> tileSizes = configAttr.getTilingLevelSizes(
       rewriter, llvm::to_underlying(IREE::GPU::TilingLevel::Thread),
       tilingInterfaceOp);
 
+  rewriter.setInsertionPoint(tilingInterfaceOp);
+
   // Pad the tile sizes with zero.
   auto zero = rewriter.getIndexAttr(0);
-  int64_t numLoops = tilingInterfaceOp.getLoopIteratorTypes().size();
   if (tileSizes.size() > numLoops) {
     return;
   }
