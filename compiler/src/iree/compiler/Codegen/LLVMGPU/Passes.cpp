@@ -430,6 +430,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   //
   // In the future there may be cases where we want the custom strategy run at
   // later points in the pipeline.
+  funcPassManager.addPass(createLowerTensorUKernelsPass());
   funcPassManager.addPass(createLoweringConfigInterpreterPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -1276,7 +1277,7 @@ void addGPUTransformDialectPasses(OpPassManager &funcPassManager,
 // Common Pass Pipelines
 //===----------------------------------------------------------------------===//
 
-static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
+static void buildLLVMGPUCodegenCommonConfigurationPassPipelineImpl(
     OpPassManager &modulePassManager) {
   {
     FunctionLikeNest funcPassManager(modulePassManager);
@@ -1302,6 +1303,17 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
     funcPassManager.addPass(createConfigTrackingCanonicalizerPass);
     funcPassManager.addPass(createCSEPass);
   }
+}
+
+void buildLLVMGPUCodegenCommonConfigurationPassPipeline(
+    OpPassManager &variantPassManager) {
+  buildLLVMGPUCodegenCommonConfigurationPassPipelineImpl(
+      variantPassManager.nest<ModuleOp>());
+}
+
+static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
+    OpPassManager &modulePassManager) {
+  buildLLVMGPUCodegenCommonConfigurationPassPipelineImpl(modulePassManager);
   modulePassManager.addPass(createMaterializeTuningSpecsPass());
   modulePassManager.addPass(createMaterializeUserConfigsPass());
   modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass());
