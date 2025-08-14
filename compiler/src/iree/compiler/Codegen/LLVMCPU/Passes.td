@@ -173,11 +173,13 @@ def LLVMCPUTileAndFuseProducerConsumerPass
               /*default=*/"false",
               "Specifies if we only want to fuse producer's input operands. "
               "This is helpful to tile&fuse in case of reduction dimensions.">,
+       // TODO(hanchung): Support the case that the last operation is before the
+       // root op.
        Option<"anchorOnRootOp",
               "anchor-on-root-op", "bool",
               /*default=*/"true",
               "Anchor on the root op to start the tiling. Otherwise, find the "
-              "last operation that contains the `tilingLevel` config.">];
+              "last operation after the root op that contains the `tilingLevel` config.">];
 }
 
 def LLVMCPUVerifyVectorSizeLegalityPass :
