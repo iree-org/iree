@@ -70,9 +70,10 @@ struct ChipDetails {
   ChipDetails(
       uint32_t wgp, std::optional<llvm::StringRef> s = std::nullopt,
       std::optional<float> bw = std::nullopt,
-      std::initializer_list<std::pair<ComputeBitwidths, float>> perf = {})
+      std::initializer_list<llvm::detail::DenseMapPair<ComputeBitwidths, float>>
+          perf = {})
       : wgpCount(wgp), sku(s), peakMemoryBandwidthTBs(bw),
-        peakPerfTFLOPs(perf.begin(), perf.end()) {}
+        peakPerfTFLOPs(perf) {}
 };
 
 // Full target details
