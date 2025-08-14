@@ -84,6 +84,7 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::Encoding::IR
+    iree::compiler::Dialect::Encoding::Utils
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms
