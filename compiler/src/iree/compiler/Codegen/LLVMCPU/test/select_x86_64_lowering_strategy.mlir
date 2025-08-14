@@ -2120,7 +2120,7 @@ func.func @decode_reduction_f32(%arg0: tensor<32x262144xf16>, %arg1: tensor<32xf
 
 // -----
 
-#executable_target_embedded_elf_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "znver4", cpu_features = "+mmx,+popcnt,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+sse4a,+fma,+avx512f,+bmi,+bmi2,+aes,+pclmul,+avx512vl,+avx512bw,+avx512dq,+avx512cd,+avx512vbmi,+avx512ifma,+avx512vpopcntdq,+avx512vbmi2,+gfni,+vpclmulqdq,+avx512vnni,+avx512bitalg,+avx512bf16,+adx,+clflushopt,+clwb,+clzero,+cx16,+cx8,+f16c,+fsgsbase,+crc32,+invpcid,+rdpru,+sahf,+lzcnt,+movbe,+mwaitx,+x87,+pku,+evex512,+prfchw,+rdpid,+rdrnd,+rdseed,+sha,+shstk,+vaes,+wbnoinvd,+xsave,+xsavec,+xsaveopt,+xsaves,+fxsr", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>, max_stack_allocation_size = 32768 : i64, native_vector_size = 64 : i64, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+#executable_target_embedded_elf_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", native_vector_size = 64 : i64, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
 func.func @attention_reshape_pack(%arg0: index, %arg1: tensor<4x2x?x32xf16>, %arg2: tensor<?x4x32xf16>, %arg3: tensor<?x4x32xf16>, %arg4: tensor<4x2x?x?xf16>) -> tensor<?x256x1x1xf16> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64} {
   %cst = arith.constant 0.000000e+00 : f16
   %cst_0 = arith.constant 1.767580e-01 : f16
