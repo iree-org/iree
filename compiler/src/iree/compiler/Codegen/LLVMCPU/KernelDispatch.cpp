@@ -19,6 +19,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
+#include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -26,6 +27,7 @@
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "llvm/Support/MathExtras.h"
+#include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -39,6 +41,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Interfaces/IndexingMapOpInterface.h"
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -1065,6 +1068,219 @@ private:
   // `rootOp`'s perspective.
   SmallVector<int64_t> vectorTileSizes;
   SmallVector<bool> vectorScalableFlags;
+};
+
+/// A helper class that tracks dimension mappings both within individual
+/// operations and across multiple operations by analyzing the producer-consumer
+/// relationships of SSA values. This tracking is established by assigning a
+/// global dimension index to all loop dimensions encountered. Dimensions
+/// sharing the same global index are considered equivalent.
+class IterationDimTracker {
+public:
+  explicit IterationDimTracker(ArrayRef<Operation *> operations)
+      : operations(operations.begin(), operations.end()) {
+    // Ensure operations are processed in topological order.
+    mlir::computeTopologicalSorting(this->operations);
+    buildDimMapping();
+  }
+
+  /// Returns true if the given dimension of `op` is common across all
+  /// operations.
+  bool isCommonDim(Operation *op, unsigned pos) {
+    assert(operationToGlobalDimMaps.contains(op));
+    int64_t dim = operationToGlobalDimMaps[op][pos];
+    for ([[maybe_unused]] auto &[_, dims] : operationToGlobalDimMaps) {
+      if (!llvm::is_contained(dims, dim)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+private:
+  /// Builds and unifies dimension index mappings for all operations,
+  /// using producer–consumer SSA value relationships.
+  void buildDimMapping() {
+    // Tracks equivalent global dimension indices.
+    llvm::EquivalenceClasses<int64_t> indicesEquivalence;
+    // For each SSA value, maps its local dimension index to a global index.
+    // Value -> (local dim index -> global dim index)
+    llvm::SmallDenseMap<Value, SmallVector<int64_t>> valueToGlobalDimMaps;
+
+    for (Operation *op : operations) {
+      auto tilingOp = cast<TilingInterface>(op);
+      int64_t numLoops = tilingOp.getLoopIteratorTypes().size();
+      // Unconditionally assign new global indices, to be unified later.
+      for (int64_t i = 0; i < numLoops; ++i) {
+        int64_t globalIndex = totalLoopNum++;
+        indicesEquivalence.insert(globalIndex);
+        operationToGlobalDimMaps[op].push_back(globalIndex);
+      }
+      // The assigned global dimension indices are now unified based on
+      // producer–consumer SSA value relationships:
+      // - For operations implementing `IndexingMapOpInterface`, unify
+      // dimensions by iterating over their indexing maps.
+      // - For pack/unpack operations, use an identity mapping, since tiling
+      // applies to the outer (unpacked) dimensions.
+      // - For all other (unknown) operations, assume an identity mapping for
+      // any value whose rank matches the operation’s loop count.
+      TypeSwitch<Operation *>(op)
+          .Case<IndexingMapOpInterface>([&](auto op) {
+            propagateOnIndexingMapOp(op, indicesEquivalence,
+                                     valueToGlobalDimMaps);
+          })
+          .Case<linalg::PackOp, linalg::UnPackOp>([&](auto op) {
+            propagateOnPackUnpackOp(op, indicesEquivalence,
+                                    valueToGlobalDimMaps, numLoops);
+          })
+          .Default([&](auto op) {
+            propagateOnUnknownOp(op, indicesEquivalence, valueToGlobalDimMaps,
+                                 numLoops);
+          });
+    }
+
+    // Remap the global dimension indices in two steps:
+    // 1. Assign the same temporary index to all equivalent dimensions.
+    // 2. Convert these temporary indices to a compact, zero-based range.
+    auto applyReplaceMap = [&](llvm::SmallDenseMap<int64_t, int64_t> &map) {
+      for (auto &opEntry : operationToGlobalDimMaps) {
+        for (auto &dim : opEntry.second) {
+          dim = map.lookup(dim);
+        }
+      }
+    };
+    llvm::SmallDenseMap<int64_t, int64_t> replaceMap0, replaceMap1;
+    int64_t tempDimIndex = totalLoopNum;
+    totalLoopNum = 0;
+    for (auto it = indicesEquivalence.begin(); it != indicesEquivalence.end();
+         ++it) {
+      if (!(*it)->isLeader()) {
+        continue;
+      }
+      for (auto mit = indicesEquivalence.member_begin(**it);
+           mit != indicesEquivalence.member_end(); ++mit) {
+        replaceMap0[*mit] = tempDimIndex;
+      }
+      replaceMap1[tempDimIndex] = totalLoopNum;
+      tempDimIndex++;
+      totalLoopNum++;
+    }
+    applyReplaceMap(replaceMap0);
+    applyReplaceMap(replaceMap1);
+  }
+
+  /// Ties loop dimensions together based on the operation’s indexing maps,
+  /// considering only simple result dimension expressions (`AffineDimExpr`).
+  ///
+  /// Complex expressions (e.g., `affine_map<(d0, d1, d2, d3) -> (d0 * 2 + d2,
+  /// d1 * 3 + d3)>`) are ignored because they fall outside the "loop dimension"
+  /// concept. Such expressions describe how indices are computed within the
+  /// innermost loop body, but they do not directly identify which loop
+  /// dimensions correspond or should be tied.
+  void propagateOnIndexingMapOp(
+      IndexingMapOpInterface indexingMapOp,
+      llvm::EquivalenceClasses<int64_t> &indicesEquivalence,
+      llvm::SmallDenseMap<Value, SmallVector<int64_t>> &valueToGlobalDimMaps) {
+    Operation *op = indexingMapOp.getOperation();
+    for (OpOperand &operand : op->getOpOperands()) {
+      Value value = operand.get();
+      // Skip operands that have no known mapping from their producers.
+      if (!valueToGlobalDimMaps.contains(value)) {
+        continue;
+      }
+      AffineMap map = indexingMapOp.getMatchingIndexingMap(&operand);
+      for (auto [dim, expr] : llvm::enumerate(map.getResults())) {
+        // Stop if the current dimension exceeds the number of mapped ones.
+        if (dim >= valueToGlobalDimMaps[value].size()) {
+          break;
+        }
+        // Skip on complex expressions.
+        auto dimExpr = dyn_cast<AffineDimExpr>(expr);
+        if (!dimExpr) {
+          continue;
+        }
+        int64_t pos = dimExpr.getPosition();
+        // Unify the dimension index between the producer and the current op.
+        indicesEquivalence.unionSets(valueToGlobalDimMaps[value][dim],
+                                     operationToGlobalDimMaps[op][pos]);
+      }
+    }
+    // Propogate to results.
+    auto dsOp = cast<DestinationStyleOpInterface>(op);
+    for (OpResult result : op->getResults()) {
+      OpOperand *operand = dsOp.getTiedOpOperand(result);
+      AffineMap map = indexingMapOp.getMatchingIndexingMap(operand);
+      for (auto [dim, expr] : llvm::enumerate(map.getResults())) {
+        // Skip on complex expressions.
+        auto dimExpr = dyn_cast<AffineDimExpr>(expr);
+        if (!dimExpr) {
+          continue;
+        }
+        int64_t pos = dimExpr.getPosition();
+        valueToGlobalDimMaps[result].push_back(
+            operationToGlobalDimMaps[op][pos]);
+      }
+    }
+  }
+
+  /// Ties the dimensions of pack and unpack operations with their operands in
+  /// the outer (unpacked) dimensions.
+  void propagateOnPackUnpackOp(
+      Operation *op, llvm::EquivalenceClasses<int64_t> &indicesEquivalence,
+      llvm::SmallDenseMap<Value, SmallVector<int64_t>> &valueToGlobalDimMaps,
+      int64_t numLoops) {
+    for (OpOperand &operand : op->getOpOperands()) {
+      Value value = operand.get();
+      if (!valueToGlobalDimMaps.contains(value)) {
+        continue;
+      }
+      int64_t rank = cast<ShapedType>(value.getType()).getRank();
+      int64_t outDimSize = std::min(rank, numLoops);
+      for (int64_t i = 0; i < outDimSize; ++i) {
+        indicesEquivalence.unionSets(valueToGlobalDimMaps[value][i],
+                                     operationToGlobalDimMaps[op][i]);
+      }
+    }
+    // Propagate to results.
+    for (Value result : op->getResults()) {
+      valueToGlobalDimMaps[result] = operationToGlobalDimMaps[op];
+    }
+  }
+
+  /// Ties the dimensions of operations with their operands, if the operand rank
+  /// matches the operation’s loop count.
+  void propagateOnUnknownOp(
+      Operation *op, llvm::EquivalenceClasses<int64_t> &indicesEquivalence,
+      llvm::SmallDenseMap<Value, SmallVector<int64_t>> &valueToGlobalDimMaps,
+      int64_t numLoops) {
+    for (OpOperand &operand : op->getOpOperands()) {
+      Value value = operand.get();
+      if (!valueToGlobalDimMaps.contains(value) ||
+          numLoops != cast<ShapedType>(value.getType()).getRank()) {
+        continue;
+      }
+      for (int64_t i = 0; i < numLoops; ++i) {
+        indicesEquivalence.unionSets(valueToGlobalDimMaps[value][i],
+                                     operationToGlobalDimMaps[op][i]);
+      }
+    }
+    // Propagate to results.
+    for (Value result : op->getResults()) {
+      if (numLoops == cast<ShapedType>(result.getType()).getRank()) {
+        valueToGlobalDimMaps[result] = operationToGlobalDimMaps[op];
+      }
+    }
+  }
+
+  SmallVector<Operation *> operations;
+  // Tracks the total number of unique loop dimensions among the given set of
+  // operations.
+  int64_t totalLoopNum = 0;
+  // For each compute operation, maps its local loop dimension index to the
+  // global index. Operation -> (local dim index -> global dim
+  // index)
+  llvm::SmallDenseMap<Operation *, SmallVector<int64_t>>
+      operationToGlobalDimMaps;
 };
 
 /// Returns the same lowering_config attribute with the updated tile sizes and
@@ -3054,10 +3270,12 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
   SmallVector<bool> commonVecScalableTileFlags = parallelVecScalableTileSizes;
   SmallVector<int64_t> innerVecTileSizes(maxLoopNums, 0);
   SmallVector<bool> innerVecScalableTileFlags(maxLoopNums, false);
+  IterationDimTracker dimTracker(computeOps);
   for (auto op : computeOps) {
     auto iterTypes = cast<TilingInterface>(op).getLoopIteratorTypes();
     for (auto [idx, iterType] : llvm::enumerate(iterTypes)) {
-      if (iterType == utils::IteratorType::reduction) {
+      if (iterType == utils::IteratorType::reduction ||
+          !dimTracker.isCommonDim(op, idx)) {
         innerVecTileSizes[idx] = parallelVecTileSizes[idx];
         innerVecScalableTileFlags[idx] = parallelVecScalableTileSizes[idx];
         commonVecTileSizes[idx] = 0;
