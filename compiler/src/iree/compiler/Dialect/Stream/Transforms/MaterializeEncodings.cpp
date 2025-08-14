@@ -36,6 +36,30 @@ struct MaterializeEncodingsPass
 };
 } // namespace
 
+/// Returns the set of unique encoding dynamic dims for the `encodeOp`. The
+/// second return value is a list of indices into the set of unique dims for
+/// each non-unique dim of the `encodeOp`. This list maps the dims from the
+/// `encodeOp` to the corresponding unique dim index.
+static std::pair<SetVector<Value>, SmallVector<unsigned>>
+getUniqueEncodingDimsAndMapping(IREE::Stream::TensorEncodeOp encodeOp) {
+  llvm::MapVector<Value, unsigned> uniqueDimsToIndex;
+  SmallVector<unsigned> mapping;
+  for (auto argument : llvm::concat<Value>(encodeOp.getSourceEncodingDims(),
+                                           encodeOp.getResultEncodingDims())) {
+    if (!uniqueDimsToIndex.contains(argument)) {
+      mapping.push_back(uniqueDimsToIndex.size());
+      uniqueDimsToIndex[argument] = mapping.back();
+      continue;
+    }
+    mapping.push_back(uniqueDimsToIndex[argument]);
+  }
+  SetVector<Value> uniqueDims;
+  for (std::pair<Value, unsigned> dimAndIdx : uniqueDimsToIndex) {
+    uniqueDims.insert(dimAndIdx.first);
+  }
+  return {uniqueDims, mapping};
+}
+
 /// Returns a pretty function name based on the `encodeOp` source and result
 /// types. Note that the encodings are dropped in the name because it could be
 /// too verbose.
@@ -74,20 +98,16 @@ static func::FuncOp createWorkgroupFunc(IREE::Stream::TensorEncodeOp encodeOp,
   SmallVector<Type> argumentTypes;
   SmallVector<Location> argumentLocs;
   auto bindingType = IREE::Stream::BindingType::get(ctx);
-  int ordinalCount = 0;
 
   // Add the block argument for the source resource and corresponding dynamic
   // dimension sizes.
   argumentTypes.push_back(bindingType);
   argumentLocs.push_back(loc);
-  for (auto argument : encodeOp.getSourceEncodingDims()) {
-    argumentTypes.push_back(argument.getType());
-    argumentLocs.push_back(argument.getLoc());
-  }
-
-  // Add the block argument for the result resource and corresponding dynamic
-  // dimension sizes.
-  for (auto argument : encodeOp.getResultEncodingDims()) {
+  SetVector<Value> uniqueEncodingDims;
+  SmallVector<unsigned> encodeDimIdxToUniqueDimIdx;
+  std::tie(uniqueEncodingDims, encodeDimIdxToUniqueDimIdx) =
+      getUniqueEncodingDimsAndMapping(encodeOp);
+  for (auto argument : uniqueEncodingDims) {
     argumentTypes.push_back(argument.getType());
     argumentLocs.push_back(argument.getLoc());
   }
@@ -102,20 +122,27 @@ static func::FuncOp createWorkgroupFunc(IREE::Stream::TensorEncodeOp encodeOp,
   OpBuilder builder(funcOp.getBody());
 
   // Build operations to handle load/store from/to the bindings.
-  SmallVector<Value> sourceDynamicDims;
-  SmallVector<Value> destinationDynamicDims;
-  for (auto argument : block.getArguments().drop_front(1).take_front(
-           encodeOp.getSourceEncodingDims().size())) {
-    sourceDynamicDims.push_back(
-        builder.create<IREE::TensorExt::DispatchWorkloadOrdinalOp>(
-            loc, argument, builder.getIndexAttr(ordinalCount++)));
-  }
-  for (auto argument : block.getArguments().drop_back(1).take_back(
-           encodeOp.getResultEncodingDims().size())) {
-    destinationDynamicDims.push_back(
-        builder.create<IREE::TensorExt::DispatchWorkloadOrdinalOp>(
-            loc, argument, builder.getIndexAttr(ordinalCount++)));
-  }
+  llvm::DenseMap<unsigned, Value> createdOrdinals;
+  auto getOrdinalFromIdx = [&](unsigned ordinalIdx) -> Value {
+    // The arguments contain the source binding, followed by all the dynamic
+    // dims, and then the result binding. The dynamic dims are the ordinals,
+    // so we add 1 to the index to account for the source binding.
+    unsigned argIdx = ordinalIdx + 1;
+    if (createdOrdinals.contains(ordinalIdx)) {
+      return createdOrdinals[ordinalIdx];
+    }
+    Value ordinal = builder.create<IREE::TensorExt::DispatchWorkloadOrdinalOp>(
+        loc, block.getArguments()[argIdx], builder.getIndexAttr(ordinalIdx));
+    createdOrdinals[ordinalIdx] = ordinal;
+    return ordinal;
+  };
+  ArrayRef<unsigned> encodeDimIdxToUniqueDimIdxRef(encodeDimIdxToUniqueDimIdx);
+  size_t numSrcDims = encodeOp.getSourceEncodingDims().size();
+  size_t numResDims = encodeOp.getResultEncodingDims().size();
+  SmallVector<Value> sourceDynamicDims = llvm::map_to_vector(
+      encodeDimIdxToUniqueDimIdxRef.take_front(numSrcDims), getOrdinalFromIdx);
+  SmallVector<Value> destinationDynamicDims = llvm::map_to_vector(
+      encodeDimIdxToUniqueDimIdxRef.take_back(numResDims), getOrdinalFromIdx);
 
   auto zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   auto sourceDispatchType = IREE::TensorExt::DispatchTensorType::get(
@@ -164,15 +191,10 @@ createExportOp(RewriterBase &rewriter, Location loc,
                IREE::Stream::ExecutableOp executableOp, func::FuncOp funcOp) {
   SmallVector<Type> workloadTypes;
   SmallVector<Location> workloadLocs;
-  for (auto argument : encodeOp.getSourceEncodingDims()) {
-    Type argumentType = argument.getType();
-    if (!llvm::isa<IndexType>(argumentType)) {
-      continue;
-    }
-    workloadTypes.push_back(argumentType);
-    workloadLocs.push_back(argument.getLoc());
-  }
-  for (auto argument : encodeOp.getResultEncodingDims()) {
+  SetVector<Value> uniqueEncodingDims;
+  std::tie(uniqueEncodingDims, std::ignore) =
+      getUniqueEncodingDimsAndMapping(encodeOp);
+  for (auto argument : uniqueEncodingDims) {
     Type argumentType = argument.getType();
     if (!llvm::isa<IndexType>(argumentType)) {
       continue;
@@ -248,22 +270,15 @@ replaceEncodeOpWithDispatchOp(RewriterBase &rewriter,
   SmallVector<Value> operandEnds = {encodeOp.getSourceSize()};
   SmallVector<Value> operandLengths = {encodeOp.getSourceSize()};
   SmallVector<Value> operands = {encodeOp.getSource()};
-  for (auto argument : encodeOp.getSourceEncodingDims()) {
-    operands.push_back(argument);
-  }
-  for (auto argument : encodeOp.getResultEncodingDims()) {
-    operands.push_back(argument);
-  }
+  SetVector<Value> uniqueEncodingDims;
+  std::tie(uniqueEncodingDims, std::ignore) =
+      getUniqueEncodingDimsAndMapping(encodeOp);
+  operands.append(uniqueEncodingDims.begin(), uniqueEncodingDims.end());
 
   SmallVector<int64_t> tiedArguments = {
       IREE::Util::TiedOpInterface::kUntiedIndex};
   SmallVector<Value> dynamicDims;
-  for (Value argument : encodeOp.getSourceEncodingDims()) {
-    dynamicDims.push_back(argument);
-  }
-  for (Value argument : encodeOp.getResultEncodingDims()) {
-    dynamicDims.push_back(argument);
-  }
+  dynamicDims.append(uniqueEncodingDims.begin(), uniqueEncodingDims.end());
   rewriter.replaceOpWithNewOp<IREE::Stream::AsyncDispatchOp>(
       encodeOp, exportOp,
       /*workload=*/dynamicDims, encodeOp.getResult().getType(), operands,
