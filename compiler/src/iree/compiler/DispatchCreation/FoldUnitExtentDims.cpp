@@ -11,6 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
@@ -252,8 +253,16 @@ foldUnitDimsOnGlobal(IRRewriter &rewriter, IREE::Util::GlobalOpInterface global,
                                                       newGlobalType);
           })
           .Case<IREE::Stream::NamedParameterAttr>(
+              // TODO: Remove this case once frontends have caught up, we should
+              // not have stream.parameter.named at this level.
               [&](IREE::Stream::NamedParameterAttr attr) {
                 return IREE::Stream::NamedParameterAttr::get(
+                    rewriter.getContext(), newGlobalType, attr.getScope(),
+                    attr.getKey(), attr.getConfig());
+              })
+          .Case<IREE::Flow::NamedParameterAttr>(
+              [&](IREE::Flow::NamedParameterAttr attr) {
+                return IREE::Flow::NamedParameterAttr::get(
                     rewriter.getContext(), newGlobalType, attr.getScope(),
                     attr.getKey(), attr.getConfig());
               })
