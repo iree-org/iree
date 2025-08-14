@@ -12,6 +12,7 @@
 #include "compiler/plugins/target/ROCM/Dialect/ROCM/Transforms/Passes.h"
 #include "compiler/plugins/target/ROCM/builtins/ukernel/iree_uk_amdgpu_bitcode.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
@@ -85,6 +86,7 @@ struct ROCMOptions {
   bool globalISel = false;
 
   bool specializeDispatches = false;
+  bool enableTensorUKernels = false;
 
   void bindOptions(OptionsBinder &binder) {
     using namespace llvm;
@@ -156,6 +158,9 @@ struct ROCMOptions {
         cl::cat(category),
         cl::desc(
             "Enable runtime specialization of dynamically shaped dispatches."));
+    binder.opt<bool>("iree-hip-enable-tensor-ukernels", enableTensorUKernels,
+                     cl::cat(category),
+                     cl::desc("Enable MLIR-based ukernels."));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
@@ -329,6 +334,11 @@ public:
       addConfigWavesPerEu(b.getContext(), options.wavesPerEu, configItems);
     }
 
+    if (options.enableTensorUKernels) {
+      addConfig(kUKernelProviderName,
+                IREE::Codegen::SymbolicUKernelProviderAttr::get(context));
+    }
+
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
         b.getStringAttr("rocm"), b.getStringAttr(format),
         b.getDictionaryAttr(configItems));
@@ -365,7 +375,31 @@ public:
         });
       }
     }
-    buildLLVMGPUCodegenConfigurationPassPipeline(passManager);
+    if (options.enableTensorUKernels) {
+      if (auto attr = getGPUTargetAttr(targetAttr.getContext(), targetAttr)) {
+        ROCM::ApplyBuiltinPDLPatternsPassOptions options;
+        options.enableTensorUKernels = true;
+        if (IREE::GPU::TargetChipAttr chip = attr.getChip()) {
+          if (StringAttr sku = chip.getSku()) {
+            options.targets.push_back(sku.str());
+          }
+        }
+        options.targets.push_back(attr.getArch().str());
+        OpPassManager &modulePassManager = passManager.nest<ModuleOp>();
+        FunctionLikeNest(modulePassManager).addPass([&]() {
+          return ROCM::createApplyBuiltinPDLPatternsPass(options);
+        });
+      }
+    }
+    buildLLVMGPUCodegenCommonConfigurationPassPipeline(passManager);
+    OpPassManager &modulePassManager = passManager.nest<ModuleOp>();
+    if (options.enableTensorUKernels) {
+      modulePassManager.addPass(
+          IREE::ROCM::createApplyBuiltinPDLPatternsDriverPass());
+    }
+    modulePassManager.addPass(createMaterializeTuningSpecsPass());
+    modulePassManager.addPass(createMaterializeUserConfigsPass());
+    modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass());
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,

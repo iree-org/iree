@@ -81,6 +81,11 @@ void addGPUDefaultPassPipeline(OpPassManager &funcPassManager,
 /// Pass pipeline to lower IREE HAL executables without tiling and distribution.
 void addGPUBaseLoweringPassPipeline(OpPassManager &pm);
 
+/// Populates the common passes needed to preprocess and select the translation
+/// strategy.
+void buildLLVMGPUCodegenCommonConfigurationPassPipeline(
+    OpPassManager &variantPassManagery);
+
 /// Populates passes needed to preprocess and select the translation strategy.
 void buildLLVMGPUCodegenConfigurationPassPipeline(
     OpPassManager &variantPassManagery);
