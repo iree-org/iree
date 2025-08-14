@@ -9,9 +9,22 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 
 namespace mlir::iree_compiler::IREE::Encoding {
+
+constexpr char kDataTilingHint[] = "iree.opt.data_tiling";
+
+/// Returns true if the operation has data-tiling hint attribute.
+inline bool hasDataTilingHint(Operation *op) {
+  return op->getAttr(kDataTilingHint) ? true : false;
+}
+
+/// Adds an unit attribute with `kDataTilingHint` key to the operation.
+inline void setDataTilingHint(Operation *op) {
+  op->setAttr(kDataTilingHint, UnitAttr::get(op->getContext()));
+}
 
 /// Returns the encoding attribute from the type if there is an encoding that
 /// implements SerializableAttr. Otherwise, returns null.
