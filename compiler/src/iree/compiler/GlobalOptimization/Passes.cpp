@@ -42,7 +42,7 @@ static llvm::cl::opt<bool> clEnableEarlyMaterialization(
     llvm::cl::desc(
         "Enables early materialization on encodings. Note, this flag should be "
         "false eventually. This does not work for heterogeneous computing."),
-    llvm::cl::init(true));
+    llvm::cl::init(false));
 
 static llvm::cl::opt<DemotionOption> clDemoteContractionInputsToBF16Strategy(
     "iree-global-opt-enable-demote-contraction-inputs-to-bf16",
@@ -180,16 +180,14 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(mlir::createCSEPass);
 
   // Enable data tiling after they are in a canonical form.
-  if (transformOptions.options.dataTiling) {
+  if (clEnableEarlyMaterialization) {
     FunctionLikeNest(mainPassManager)
         .addPass(DispatchCreation::createAnnotateDataTilingHintsPass)
         .addPass([&]() {
           return DispatchCreation::createSetEncodingPass(
               DispatchCreation::SetEncodingPassOptions{clSetEncodingStrategy});
         });
-    if (clEnableEarlyMaterialization) {
-      mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
-    }
+    mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
     mainPassManager.addPass(IREE::Flow::createCanonicalizePass());
     mainPassManager.addPass(createCSEPass());
     mainPassManager.addPass(createSimplifyPackUnpackPass());

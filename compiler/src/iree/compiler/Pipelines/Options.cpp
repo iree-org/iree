@@ -158,9 +158,6 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
                    llvm::cl::desc("Transposes all concatenations to happen"
                                   "along the outer most dimension."),
                    llvm::cl::cat(category));
-  binder.opt<bool>("iree-opt-data-tiling", dataTiling,
-                   llvm::cl::desc("Enables data tiling path."),
-                   llvm::cl::cat(category));
   binder.opt<bool>(
       "iree-opt-const-eval", constEval,
       llvm::cl::desc("Enables eager evaluation of constants using the full "
@@ -312,6 +309,13 @@ void DispatchCreationOptions::bindOptions(OptionsBinder &binder) {
                      "since all backends dont support it yet"));
   binder.opt<bool>("iree-dispatch-creation-fuse-multi-use", enableFuseMultiUse,
                    llvm::cl::desc("Fuse operations with multiple uses."));
+  // TODO(hanchung): Enable data-tiling for O3 once GPU fills the perf gap.
+  binder.opt<bool>("iree-opt-data-tiling", dataTiling,
+                   {init_at_opt(llvm::OptimizationLevel::O0, false),
+                    init_at_opt(llvm::OptimizationLevel::O1, true),
+                    init_at_opt(llvm::OptimizationLevel::O3, false)},
+                   llvm::cl::desc("Enables data tiling path."),
+                   llvm::cl::cat(category));
 }
 
 } // namespace mlir::iree_compiler
