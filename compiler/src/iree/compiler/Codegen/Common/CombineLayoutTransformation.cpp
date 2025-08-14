@@ -297,11 +297,8 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
   Location loc = padOp->getLoc();
   SmallVector<OpFoldResult> padSrcSizes =
       tensor::getMixedSizes(rewriter, loc, padOp.getSource());
-  SmallVector<OpFoldResult> ubs =
+  SmallVector<OpFoldResult> padResultSizes =
       tensor::getMixedSizes(rewriter, loc, padOp.getResult());
-  SmallVector<OpFoldResult> lbs(ubs.size(), rewriter.getIndexAttr(0));
-  SmallVector<DistributionConfig> distConfigs = padDistributionConfigFn(
-      padOp.getSourceType().getShape(), rewriter.getContext());
 
   // Write the padding values directly into the outputBuffer.
   Value outputBuffer = storeOp.getBuffer();
@@ -322,41 +319,79 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
                                ivs);
     OpBuilder::InsertionGuard g(b);
     b.setInsertionPointAfter(yieldOp);
-    // Compute the indices into the outputBuffer, and the if condition to
-    // write the padding values. Padding values must obey the existing mask
-    // of the current mapScatterOp, and also be in the low or high pad
-    // range of the padOp.
-    SmallVector<OpFoldResult> mixedLows = padOp.getMixedLowPad();
-    Value writeCond;
-    for (auto [low, srcSize, idx] :
-         llvm::zip_equal(mixedLows, padSrcSizes, ivs)) {
-      Value lowVal = getValueOrCreateConstantIndexOp(rewriter, loc, low);
-      Value isLowPad = rewriter.create<arith::CmpIOp>(
-          loc, arith::CmpIPredicate::ult, idx, lowVal);
-      Value highPadStart = getValueOrCreateConstantIndexOp(
-          rewriter, loc, IREE::LinalgExt::addOfrs(b, loopLoc, low, srcSize));
-      Value isHighPad = rewriter.create<arith::CmpIOp>(
-          loc, arith::CmpIPredicate::uge, idx, highPadStart);
-      Value isPad = rewriter.create<arith::OrIOp>(loc, isLowPad, isHighPad);
-      writeCond = !writeCond
-                      ? isPad
-                      : rewriter.create<arith::OrIOp>(loc, writeCond, isPad);
-    }
     SmallVector<Value> storeIndices(yieldOp.getOperands());
     rewriter.eraseOp(yieldOp);
     Value mask = storeIndices.pop_back_val();
-    writeCond = rewriter.create<arith::AndIOp>(loc, writeCond, mask);
     // Create the store to the outputBuffer.
     auto thenBuilder = [&](OpBuilder &nestedBuilder, Location ifLoc) {
       nestedBuilder.create<memref::StoreOp>(
           ifLoc, padOp.getConstantPaddingValue(), outputBuffer, storeIndices);
       nestedBuilder.create<scf::YieldOp>(ifLoc);
     };
-    b.create<scf::IfOp>(loopLoc, writeCond, thenBuilder);
+    b.create<scf::IfOp>(loopLoc, mask, thenBuilder);
   };
 
-  buildNestedDistributionLoops(rewriter, loc, /*distributionLevel=*/0, lbs, ubs,
-                               distConfigs, innerLoopBuilder);
+  // Distribute the padding of each dimension separately. This causes some
+  // overlap of the iteration spaces across the loops, but simplifies the
+  // implementation. The trade-off is expected to be okay because we expect
+  // the padding to be small relative to the size of the output buffer, which
+  // makes the overlap small. The below example shows what the overlap looks
+  // like.
+  //
+  // 1st loop (low pad d0)        2nd loop (high pad d0)
+  //        |———|                       |———————|
+  //          |                             |
+  //          v                             v
+  //        +———+———————————————————————+———————+     ———
+  //        | . | . . . . . . . . . . . | . . . | <--  |  3rd loop (low pad d1)
+  //        +———+———————————————————————+———————+     ———
+  //        | . | . . . . . . . . . . . | . . . |
+  //        | . | . . . . . . . . . . . | . . . |
+  //        | . | . . . . . . . . . . . | . . . |
+  //        | . | . . . . . . . . . . . | . . . |
+  //        +———+———————————————————————+———————+     ———
+  //        | . | . . . . . . . . . . . | . . . | <--  |  4th loop (high pad d1)
+  //        +———+———————————————————————+———————+     ———
+  //
+  // Each distributed loop performs the padding for a hyperplane spanning the
+  // low or high pad of the corresponding dimension, and fully spanning all
+  // other dimensions of the tensor. This means that there is overlap on the
+  // intersection of high and low padding for each dimension.
+  //
+  // In most cases today, the low padding is generally either 0, or very small,
+  // and the high padding will be small relative to the size of the full tensor,
+  // since padding is usually done to the nearest multiple of some tile size, or
+  // for padding an image for a convolution. Because the padding is small, the
+  // overlap should also be small, and we can live with the small redundant
+  // computation in order to have a more simplified kernel.
+  for (auto [idx, low, high] :
+       llvm::enumerate(padOp.getMixedLowPad(), padOp.getMixedHighPad())) {
+    // Create a distributed loop for the low padding
+    if (!isConstantIntValue(low, 0)) {
+      SmallVector<OpFoldResult> ubs(padResultSizes);
+      SmallVector<OpFoldResult> lbs(ubs.size(), rewriter.getIndexAttr(0));
+      SmallVector<int64_t> shape(padOp.getSourceType().getShape());
+      shape[idx] = padOp.getStaticLow()[idx];
+      ubs[idx] = low;
+      SmallVector<DistributionConfig> distConfigs = padDistributionConfigFn(
+          padOp.getSourceType().getShape(), rewriter.getContext());
+      buildNestedDistributionLoops(rewriter, loc, /*distributionLevel=*/0, lbs,
+                                   ubs, distConfigs, innerLoopBuilder);
+    }
+    // Create a distributed loop for the high padding
+    if (isConstantIntValue(high, 0)) {
+      continue;
+    }
+    SmallVector<OpFoldResult> ubs(padResultSizes);
+    SmallVector<OpFoldResult> lbs(ubs.size(), rewriter.getIndexAttr(0));
+    SmallVector<int64_t> shape(padOp.getSourceType().getShape());
+    shape[idx] = padOp.getStaticHigh()[idx];
+    lbs[idx] = IREE::LinalgExt::addOfrs(rewriter, loc, low, padSrcSizes[idx]);
+    SmallVector<DistributionConfig> distConfigs =
+        padDistributionConfigFn(shape, rewriter.getContext());
+    buildNestedDistributionLoops(rewriter, loc, /*distributionLevel=*/0, lbs,
+                                 ubs, distConfigs, innerLoopBuilder);
+  }
 
   // Now that the padding values are being written to the outputBuffer, the
   // padOp becomes a no-op with respect to the index transformation on the
