@@ -23,11 +23,8 @@ func.func @static_batch_matvec() {
   return
 }
 
-
-// CHECK:     LLVMGPUWarpReduction
+// CHECK:     LLVMGPUVectorDistribute
 // CDNA3:     LLVMGPUTileAndFuse
-
-// We want to deprecate LLVMGPUWarpReduction. Currently LLVMGPUVectorDistribution is not chosen in setReductionVectorDistributionConfig because it fails in 'hasReductionIterator' (which doesn't check specialized ops). This might be an easy whitelisting fix, but I will return to this later (TODO(newling)).
 
 // -----
 
@@ -318,7 +315,7 @@ func.func @i4_dequant_matvec() {
 
 // -----
 
-// Send 2xNxK mmt to the warp reduction pipeline.
+// Send 2xNxK mmt to the vector distribute pipline.
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -340,12 +337,7 @@ func.func @skinny_mmt() {
   return
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 512]{{\]}}>
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
-//       CHECK: func.func @skinny_mmt()
-//  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
-//       CHECK:   linalg.matmul_transpose_b
-//  CHECK-SAME:       lowering_config = #[[$CONFIG]]
+// CHECK: LLVMGPUVectorDistribute
 
 // -----
 
@@ -371,12 +363,7 @@ func.func @skinny_mmt() {
   return
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 512]{{\]}}>
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
-//       CHECK: func.func @skinny_mmt()
-//  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
-//       CHECK:   linalg.matmul_transpose_b
-//  CHECK-SAME:       lowering_config = #[[$CONFIG]]
+// CHECK: LLVMGPUVectorDistribute
 
 // -----
 
