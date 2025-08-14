@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
@@ -298,6 +299,13 @@ bool isReadOnly(Value v) {
           [&](auto op) { return isReadOnly(op.getSrc()); })
       .Case<tensor::CastOp, tensor::ExtractSliceOp>(
           [&](auto op) { return isReadOnly(op.getSource()); })
+      .Case<IREE::Codegen::LoadFromBufferOp>(
+          [&](auto op) { return isReadOnly(op.getBuffer()); })
+      .Case<IREE::HAL::InterfaceBindingSubspanOp>([&](auto op) {
+        return IREE::HAL::bitEnumContainsAny(
+            op.getDescriptorFlags().value_or(IREE::HAL::DescriptorFlags::None),
+            IREE::HAL::DescriptorFlags::ReadOnly);
+      })
       .Case<IREE::TensorExt::DispatchTensorLoadOp>(
           [&](IREE::TensorExt::DispatchTensorLoadOp loadOp) {
             return llvm::cast<IREE::TensorExt::DispatchTensorType>(
