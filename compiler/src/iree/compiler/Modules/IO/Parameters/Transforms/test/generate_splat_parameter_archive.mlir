@@ -21,6 +21,10 @@ util.global private @tensor_2x2xi4 = #flow.parameter.named<"opt"::"tensor_2x2xi4
 //  DUMP-NEXT: - | - | 2 | `tensor_3xi4`
 util.global private @tensor_3xi4 = #flow.parameter.named<"opt"::"tensor_3xi4"> : tensor<3xi4>
 
+// CHECK-NEXT: util.global private @tensor_5xi4
+//  DUMP-NEXT: - | - | 3 | `tensor_5xi4`
+util.global private @tensor_5xi4 = #stream.parameter.named<"opt"::"tensor_5xi4"> : tensor<5xi4>
+
 util.func private @function() {
   //      CHECK: flow.tensor.constant
   //  DUMP-NEXT: - | - | 4 | `inline`
