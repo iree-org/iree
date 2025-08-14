@@ -231,7 +231,19 @@ void LLVMCPUTileAndFuseProducerConsumer::runOnOperation() {
   if (anchorOnRootOp) {
     anchorOp = getRootOp(computeOps, tilingLevel);
   } else {
+    // TODO(hanchung): Support the case that anchor op is root op's producer. It
+    // is not common that the producer op has additional iteration dimensions,
+    // but it should be handled like consumers. I.e., the additional dimensions
+    // should be tiled. It is easier to support after we have solid lowering
+    // config propagation.
+    Operation *rootOp =
+        getRootOp(computeOps, IREE::CPU::TilingLevel::DistributionTiles);
     anchorOp = getLastAnchorOp(computeOps, tilingLevel);
+    if (rootOp &&
+        llvm::find(computeOps, rootOp) > llvm::find(computeOps, anchorOp)) {
+      LDBG() << "anchor op that is rootOp's producer is not supported";
+      return;
+    }
   }
   if (!anchorOp) {
     LDBG() << "unable to find an anchor operation that has "
