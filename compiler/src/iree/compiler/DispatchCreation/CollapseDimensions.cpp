@@ -37,6 +37,7 @@
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 #define DEBUG_TYPE "iree-dispatch-creation-collapse-dimensions"
 
@@ -59,6 +60,94 @@ struct CollapseDimensionsPass final
 //===---------------------------------------------------------------------===//
 // Helper functions
 //===---------------------------------------------------------------------===//
+
+static FailureOr<Value>
+collapseExtractSlice(tensor::ExtractSliceOp sliceOp,
+                     ArrayRef<ReassociationIndices> foldedIterationDims,
+                     RewriterBase &rewriter) {
+
+  SmallVector<ReassociationIndices> reassoc;
+  int64_t rank = sliceOp.getSourceType().getRank();
+  int64_t nextDim = 0;
+  for (ReassociationIndicesRef ref : foldedIterationDims) {
+    while (nextDim < ref.front()) {
+      reassoc.push_back(ReassociationIndices{nextDim++});
+    }
+    reassoc.emplace_back(ref);
+    nextDim = ref.back() + 1;
+  }
+  while (nextDim < rank) {
+    reassoc.push_back(ReassociationIndices{nextDim++});
+  }
+
+  if (sliceOp.getSourceType().getRank() != sliceOp.getResultType().getRank()) {
+    return failure();
+  }
+
+  SmallVector<OpFoldResult> expandedOffsets = sliceOp.getMixedOffsets();
+  SmallVector<OpFoldResult> expandedSizes = sliceOp.getMixedSizes();
+
+  SmallVector<Value> inputDynDims;
+  if (failed(IREE::Flow::getOptimizedDynamicResultDims(
+          rewriter, sliceOp.getSource(), inputDynDims))) {
+    return failure();
+  }
+  SmallVector<OpFoldResult> expandedShape = getMixedValues(
+      sliceOp.getSourceType().getShape(), inputDynDims, rewriter);
+
+  // Helper variables and function for accumulating the size values.
+  Location loc = sliceOp.getLoc();
+  AffineExpr d0, d1, d2;
+  bindDims(rewriter.getContext(), d0, d1, d2);
+  // Multiply two integers.
+  auto mul = [&](OpFoldResult v1, OpFoldResult v2) {
+    auto mulMap = AffineMap::get(2, 0, {d0 * d1});
+    return affine::makeComposedFoldedAffineApply(rewriter, loc, mulMap,
+                                                 {v1, v2});
+  };
+
+  SmallVector<OpFoldResult> collapsedOffsets, collapsedSizes, collapsedStrides;
+  for (const ReassociationIndices &indices : reassoc) {
+    OpFoldResult collapsedSize = rewriter.getIndexAttr(1);
+    SmallVector<OpFoldResult> reassocGroupSizes, reassocGroupOffsets;
+
+    for (long expandedDim : indices) {
+      reassocGroupSizes.push_back(expandedShape[expandedDim]);
+      reassocGroupOffsets.push_back(expandedOffsets[expandedDim]);
+      collapsedSize = mul(collapsedSize, expandedSizes[expandedDim]);
+    }
+
+    SmallVector<Value> offsetVals =
+        llvm::map_to_vector(reassocGroupOffsets, [&](OpFoldResult ofr) {
+          return getValueOrCreateConstantIndexOp(rewriter, loc, ofr);
+        });
+    OpFoldResult collapsedOffset =
+        affine::AffineLinearizeIndexOp::create(rewriter, loc, offsetVals,
+                                               reassocGroupSizes,
+                                               /*disjoint=*/true)
+            .getResult();
+    collapsedOffsets.push_back(collapsedOffset);
+    collapsedSizes.push_back(collapsedSize);
+
+    // Only unit stride is supported.
+    collapsedStrides.push_back(rewriter.getIndexAttr(1));
+  }
+
+  // The shape of the result can be obtained from the sizes passed in.
+  SmallVector<Value> dynDims;
+  SmallVector<int64_t> shape;
+  dispatchIndexOpFoldResults(expandedSizes, dynDims, shape);
+  RankedTensorType resultType = sliceOp.getSourceType().clone(shape);
+
+  // Create a new ExtractSliceOp and ExpandShapeOp.
+  Value collapseOp = rewriter.create<tensor::CollapseShapeOp>(
+      loc, sliceOp.getSource(), reassoc);
+  Value newSliceOp = tensor::ExtractSliceOp::create(
+      rewriter, loc, collapseOp, collapsedOffsets, collapsedSizes,
+      collapsedStrides);
+  return Value(rewriter.create<tensor::ExpandShapeOp>(
+      loc, resultType, newSliceOp, reassoc, expandedSizes));
+}
 
 /// Searches the same sequence in all the affine maps and collapses these
 /// dimensions. It only applies these to "parallel" loops without mixing them
@@ -168,7 +257,8 @@ static SmallVector<ReassociationIndices> getCollapsibleLoops(Operation *op) {
 
 /// Returns true if the given op is collapsable.
 static bool isEligibleForCollapse(Operation *op) {
-  if (isa<IREE::LinalgExt::AttentionOp, linalg::FillOp>(op)) {
+  if (isa<IREE::LinalgExt::AttentionOp, linalg::FillOp, tensor::EmptyOp,
+          tensor::ExtractSliceOp>(op)) {
     return true;
   }
 
@@ -199,76 +289,6 @@ static bool isEligibleForCollapse(Operation *op) {
   return true;
 }
 
-// For the `operand`, get of producer loop -> consumer loop.
-static FailureOr<AffineMap>
-getProducerLoopToConsumerLoopsMap(OpOperand &operand) {
-  auto consumer =
-      dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(operand.getOwner());
-  if (!consumer) {
-    return failure();
-  }
-  auto producer =
-      dyn_cast_or_null<LinalgFusionOpInterface>(operand.get().getDefiningOp());
-  if (!producer) {
-    return failure();
-  }
-
-  AffineMap consumerOperandMap = consumer.getMatchingIndexingMap(&operand);
-  if (!consumerOperandMap.isProjectedPermutation()) {
-    return failure();
-  }
-
-  AffineMap producerResultMap =
-      producer.getIndexingMapMatchingResult(cast<OpResult>(operand.get()));
-  if (!producerResultMap.isProjectedPermutation()) {
-    return failure();
-  }
-
-  AffineMap inverseProducerResultMap =
-      inverseAndBroadcastProjectedPermutation(producerResultMap);
-  if (!inverseProducerResultMap) {
-    return failure();
-  }
-
-  AffineMap producerLoopToConsumerLoop =
-      inverseProducerResultMap.compose(consumerOperandMap);
-  return producerLoopToConsumerLoop;
-}
-
-static FailureOr<AffineMap>
-getConsumerLoopToProducerLoopsMap(OpOperand &operand) {
-  auto consumer = dyn_cast<LinalgFusionOpInterface>(operand.getOwner());
-  if (!consumer) {
-    return failure();
-  }
-  auto producer =
-      dyn_cast_or_null<LinalgFusionOpInterface>(operand.get().getDefiningOp());
-  if (!producer) {
-    return failure();
-  }
-
-  AffineMap consumerOperandMap = consumer.getMatchingIndexingMap(&operand);
-  if (!consumerOperandMap.isProjectedPermutation()) {
-    return failure();
-  }
-
-  AffineMap producerResultMap =
-      producer.getIndexingMapMatchingResult(cast<OpResult>(operand.get()));
-  if (!producerResultMap.isProjectedPermutation()) {
-    return failure();
-  }
-
-  AffineMap inverseConsumerOperandMap =
-      inverseAndBroadcastProjectedPermutation(consumerOperandMap);
-  if (!inverseConsumerOperandMap) {
-    return failure();
-  }
-
-  AffineMap consumerLoopToProducerLoop =
-      inverseConsumerOperandMap.compose(producerResultMap);
-  return consumerLoopToProducerLoop;
-}
-
 //===---------------------------------------------------------------------===//
 // CollapseInfo
 //===---------------------------------------------------------------------===//
@@ -280,7 +300,40 @@ public:
 
   CollapseInfo() = default;
   CollapseInfo(Operation *op) {
-    reassociation = DispatchCreation::getCollapsibleLoops(op);
+    // TODO(IanWood1): move this out.
+    if (auto sliceOp = dyn_cast<tensor::ExtractSliceOp>(op)) {
+      // TODO(IanWood1): not all dims are collapsable.
+      int64_t rank = sliceOp.getSourceType().getRank();
+      reassociation = {
+          SmallVector<int64_t>(llvm::to_vector(llvm::seq<int64_t>(0, rank)))};
+      operandMaps.push_back(
+          AffineMap::getMultiDimIdentityMap(rank, op->getContext()));
+      for (int64_t i = 1; i < sliceOp->getNumOperands(); ++i) {
+        operandMaps.push_back(AffineMap::get(rank, 0, {}, op->getContext()));
+      }
+
+      llvm::SmallBitVector droppedDims = sliceOp.getDroppedDims();
+      SmallVector<AffineExpr> exprs(rank);
+      bindDimsList(op->getContext(), MutableArrayRef(exprs));
+      SmallVector<AffineExpr> filteredExprs;
+      for (auto [i, expr] : llvm::enumerate(exprs)) {
+        if (!droppedDims.test(i)) {
+          filteredExprs.push_back(expr);
+        }
+      }
+      resultMaps.push_back(
+          AffineMap::get(rank, 0, filteredExprs, op->getContext()));
+    } else if (auto emptyOp = dyn_cast<tensor::EmptyOp>(op)) {
+      reassociation = {SmallVector<int64_t>(llvm::to_vector(
+          llvm::seq<int64_t>(0, emptyOp.getResult().getType().getRank())))};
+      resultMaps = {AffineMap::getMultiDimIdentityMap(
+          emptyOp.getResult().getType().getRank(), op->getContext())};
+    } else {
+      reassociation = DispatchCreation::getCollapsibleLoops(op);
+      auto fusionOp = cast<IREE::LinalgExt::LinalgFusionOpInterface>(op);
+      resultMaps = fusionOp.getIndexingMapsForResults();
+      operandMaps = fusionOp.getIndexingMapsArray();
+    }
     collapsableLoops = getCollapsedFromReassociation(reassociation);
   }
 
@@ -304,7 +357,7 @@ public:
   // Update `this` (which is the info for `op`) when either a producer or
   // consumer is not collapsible. This is done by considering all the dims
   // accessed by other to be uncollapsible.
-  bool updateFromUncollapsible(Operation *op, OpOperand *operand);
+  bool updateFromUncollapsible(Operation *op, OpOperand &operand);
 
   // Get `collapsableLoops` after applying the transformation provided by `map`.
   // Note: doesn't modify `collapsableLoops`, the tranformation is applied to a
@@ -347,6 +400,10 @@ private:
   // Update `reassociation` by removing indicies that are no longer in
   // `collapsableLoops` and spliting the reassociation indicies accordingly
   void updateReassociation();
+
+public:
+  SmallVector<AffineMap> operandMaps;
+  SmallVector<AffineMap> resultMaps;
 
 private:
   // A vector of `ReassociationIndicies` representing contiguous dimensions that
@@ -547,12 +604,11 @@ bool CollapseInfo::updateFromOther(FailureOr<AffineMap> otherToThisMap,
   return didChange;
 }
 
-bool CollapseInfo::updateFromUncollapsible(Operation *op, OpOperand *operand) {
-  auto fusionOp = cast<LinalgFusionOpInterface>(op);
-  AffineMap map = operand->getOwner() == op
-                      ? fusionOp.getMatchingIndexingMap(operand)
-                      : fusionOp.getIndexingMapMatchingResult(
-                            cast<OpResult>(operand->get()));
+bool CollapseInfo::updateFromUncollapsible(Operation *op, OpOperand &operand) {
+  AffineMap map =
+      operand.getOwner() == op
+          ? operandMaps[operand.getOperandNumber()]
+          : resultMaps[cast<OpResult>(operand.get()).getResultNumber()];
 
   CollapseInfo::CollapsableLoopsSet uncollapsable;
   for (auto expr : map.getResults()) {
@@ -584,28 +640,93 @@ void CollapseInfo::print(raw_ostream &os) const {
 
 void CollapseInfo::dump() const { print(llvm::dbgs()); }
 
-/// Traverses all the the Ops in DispatchRegionOps and finds a Op
-/// which is the sole producer of the flow.return's operand.
-static FailureOr<Operation *>
-findRootOp(IREE::Flow::DispatchRegionOp regionOp) {
+static SetVector<Operation *>
+findRootOps(IREE::Flow::DispatchRegionOp regionOp) {
+  SetVector<Operation *> rootOps;
   // Check the yielded value is from a single op.
   auto returnOp =
       cast<IREE::Flow::ReturnOp>(regionOp.getBody().front().getTerminator());
   if (!returnOp->getOperands().size()) {
-    return failure();
+    return rootOps;
   }
 
-  Operation *collapsibleOp = returnOp->getOperand(0).getDefiningOp();
-  if (!isEligibleForCollapse(collapsibleOp)) {
-    return failure();
-  }
-  for (auto returnVal : returnOp->getOperands().drop_front()) {
-    if (returnVal.getDefiningOp() != collapsibleOp) {
-      return failure();
+  for (OpOperand &operand : returnOp->getOpOperands()) {
+    Operation *collapsibleOp = operand.get().getDefiningOp();
+    if (!collapsibleOp) {
+      continue;
+    }
+
+    if (auto forallOp = dyn_cast_or_null<scf::ForallOp>(collapsibleOp)) {
+      mlir::visitUsedValuesDefinedAbove(
+          MutableArrayRef<Region>{forallOp.getTerminator().getRegion()},
+          [&](OpOperand *operand) {
+            Operation *definingOp = operand->get().getDefiningOp();
+            if (definingOp && isEligibleForCollapse(definingOp)) {
+              rootOps.insert(definingOp);
+            }
+          });
+    }
+    if (isEligibleForCollapse(collapsibleOp)) {
+      rootOps.insert(collapsibleOp);
     }
   }
 
-  return collapsibleOp;
+  return rootOps;
+}
+
+// For the `operand`, get of producer loop -> consumer loop.
+static FailureOr<AffineMap>
+getProducerLoopToConsumerLoopsMap(OpOperand &operand,
+                                  const CollapseInfo &producer,
+                                  const CollapseInfo &consumer) {
+  AffineMap consumerOperandMap =
+      consumer.operandMaps[operand.getOperandNumber()];
+  if (!consumerOperandMap.isProjectedPermutation()) {
+    return failure();
+  }
+
+  AffineMap producerResultMap =
+      producer.resultMaps[cast<OpResult>(operand.get()).getResultNumber()];
+  if (!producerResultMap.isProjectedPermutation()) {
+    return failure();
+  }
+
+  AffineMap inverseProducerResultMap =
+      inverseAndBroadcastProjectedPermutation(producerResultMap);
+  if (!inverseProducerResultMap) {
+    return failure();
+  }
+
+  AffineMap producerLoopToConsumerLoop =
+      inverseProducerResultMap.compose(consumerOperandMap);
+  return producerLoopToConsumerLoop;
+}
+
+static FailureOr<AffineMap>
+getConsumerLoopToProducerLoopsMap(OpOperand &operand,
+                                  const CollapseInfo &producer,
+                                  const CollapseInfo &consumer) {
+  AffineMap consumerOperandMap =
+      consumer.operandMaps[operand.getOperandNumber()];
+  if (!consumerOperandMap.isProjectedPermutation()) {
+    return failure();
+  }
+
+  AffineMap producerResultMap =
+      producer.resultMaps[cast<OpResult>(operand.get()).getResultNumber()];
+  if (!producerResultMap.isProjectedPermutation()) {
+    return failure();
+  }
+
+  AffineMap inverseConsumerOperandMap =
+      inverseAndBroadcastProjectedPermutation(consumerOperandMap);
+  if (!inverseConsumerOperandMap) {
+    return failure();
+  }
+
+  AffineMap consumerLoopToProducerLoop =
+      inverseConsumerOperandMap.compose(producerResultMap);
+  return consumerLoopToProducerLoop;
 }
 
 //===---------------------------------------------------------------------===//
@@ -621,17 +742,8 @@ hoistTensorReshapesOutOfDispatchRegion(
   Block &body = dispatchOp.getBody().front();
   auto returnOp = cast<IREE::Flow::ReturnOp>(body.getTerminator());
 
-  // 1. Get the slice of operations within `dispatchOp` that produce the yielded
-  // value.
-  BackwardSliceOptions sliceOptions;
-  sliceOptions.omitBlockArguments = true;
-  sliceOptions.filter = [&](Operation *op) {
-    return op->getParentOfType<IREE::Flow::DispatchRegionOp>();
-  };
   SetVector<Operation *> slice;
-  [[maybe_unused]] LogicalResult ret =
-      getBackwardSlice(returnOp, &slice, sliceOptions);
-  assert(ret.succeeded());
+  body.walk([&slice](Operation *op) { slice.insert(op); });
 
   // 2. Get the leaf operations that are `tensor.collapse_shape` and
   // `tensor_expand_shape` ops.
@@ -794,13 +906,11 @@ updateConsumersFromProducers(ArrayRef<Operation *> slice,
 
   // Slice is topologically sorted to ensure that `op`'s producers have been
   // updated before we visit it.
-  for (auto op : slice) {
-    auto consumerOp = cast<LinalgFusionOpInterface>(op);
+  for (auto *consumerOp : slice) {
     CollapseInfo &consumerInfo = opMap.find(consumerOp)->second;
 
-    for (auto *operand :
-         cast<DestinationStyleOpInterface>(op).getDpsInputOperands()) {
-      auto producerOp = operand->get().getDefiningOp();
+    for (auto &operand : consumerOp->getOpOperands()) {
+      auto producerOp = operand.get().getDefiningOp();
       if (!producerOp || IREE::Flow::isNonNullAndOutsideDispatch(producerOp)) {
         continue;
       }
@@ -814,7 +924,8 @@ updateConsumersFromProducers(ArrayRef<Operation *> slice,
 
       const CollapseInfo &producerInfo = opMap.at(producerOp);
       FailureOr<AffineMap> consumerToProducerMap =
-          getProducerLoopToConsumerLoopsMap(*operand);
+          getProducerLoopToConsumerLoopsMap(operand, producerInfo,
+                                            consumerInfo);
       didChange |=
           consumerInfo.updateFromOther(consumerToProducerMap, producerInfo);
     }
@@ -833,8 +944,7 @@ updateProducersFromConsumers(ArrayRef<Operation *> slice,
 
   // Iterate over `slice` in reverse so that we visit each `op` 's consumer
   // before visiting `op`.
-  for (auto op : llvm::reverse(slice)) {
-    auto producerOp = cast<LinalgFusionOpInterface>(op);
+  for (auto producerOp : llvm::reverse(slice)) {
     CollapseInfo &producerInfo = opMap.find(producerOp)->second;
 
     for (auto &operand : producerOp->getUses()) {
@@ -846,7 +956,7 @@ updateProducersFromConsumers(ArrayRef<Operation *> slice,
       // If we can't find the op, the tensor is not collapsable. So, consider
       // all the dimensions of the consumer to be uncollapsable.
       if (!opMap.contains(consumerOp)) {
-        didChange |= producerInfo.updateFromUncollapsible(producerOp, &operand);
+        didChange |= producerInfo.updateFromUncollapsible(producerOp, operand);
         continue;
       }
 
@@ -856,7 +966,8 @@ updateProducersFromConsumers(ArrayRef<Operation *> slice,
       // Only loops collapsable in both the consumer and producer may be
       // collapsed.
       FailureOr<AffineMap> consumerToProducerMap =
-          getConsumerLoopToProducerLoopsMap(operand);
+          getConsumerLoopToProducerLoopsMap(operand, producerInfo,
+                                            consumerInfo);
       didChange |=
           producerInfo.updateFromOther(consumerToProducerMap, consumerInfo);
     }
@@ -876,8 +987,8 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
     return false;
   }
   // Step 1. Find the root Op
-  std::optional<Operation *> rootOp = findRootOp(regionOp);
-  if (!rootOp.has_value()) {
+  SetVector<Operation *> rootOps = findRootOps(regionOp);
+  if (rootOps.empty()) {
     return false;
   }
 
@@ -891,9 +1002,11 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
     return isEligibleForCollapse(op) && parentOp == regionOp;
   };
   SetVector<Operation *> slice;
-  [[maybe_unused]] LogicalResult ret =
-      getBackwardSlice(rootOp.value(), &slice, sliceOptions);
-  assert(ret.succeeded());
+  for (auto *rootOp : rootOps) {
+    [[maybe_unused]] LogicalResult ret =
+        getBackwardSlice(rootOp, &slice, sliceOptions);
+    assert(ret.succeeded());
+  }
 
   // Step 3. Populate each op's info with a maximally collapsable reassociation
   // indicies
@@ -987,6 +1100,17 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
                     return failure();
                   }
                   return maybeReplacements->results;
+                })
+            .Case<tensor::EmptyOp>([](tensor::EmptyOp) { return failure(); })
+            .Case<tensor::ExtractSliceOp>(
+                [&,
+                 &info = info](tensor::ExtractSliceOp sliceOp) -> ResultsType {
+                  FailureOr<Value> result = collapseExtractSlice(
+                      sliceOp, info.getReassocation(), rewriter);
+                  if (failed(result)) {
+                    return failure();
+                  }
+                  return SmallVector<Value>{result.value()};
                 })
             .Default([&](void *) -> ResultsType {
               llvm_unreachable("no type matched");
