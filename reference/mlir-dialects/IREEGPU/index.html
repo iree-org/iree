@@ -6776,6 +6776,8 @@ operations allow arbitrary combinations of fp4/fp6/fp8 inputs.</p>
 <div class="highlight"><pre><span></span><code>#iree_gpu.target_chip&lt;
   uint32_t,   # wgp_count
   StringAttr,   # sku
+  FloatAttr,   # memory_bandwidth_tbps
+  DictionaryAttr,   # perf_tflops
   DictionaryAttr   # extra
 &gt;
 </code></pre></div>
@@ -6801,6 +6803,16 @@ AMD compute units or NVIDIA streaming multiprocessors; it's the final SKU.</p>
 <tr>
 <td style="text-align: center;">sku</td>
 <td style="text-align: center;"><code>StringAttr</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">memory_bandwidth_tbps</td>
+<td style="text-align: center;"><code>FloatAttr</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">perf_tflops</td>
+<td style="text-align: center;"><code>DictionaryAttr</code></td>
 <td></td>
 </tr>
 <tr>
@@ -7077,6 +7089,11 @@ is perfomed as below:</p>
 <td style="text-align: center;">Int8</td>
 <td style="text-align: center;"><code>64</code></td>
 <td>int8</td>
+</tr>
+<tr>
+<td style="text-align: center;">FP8</td>
+<td style="text-align: center;"><code>128</code></td>
+<td>fp8</td>
 </tr>
 </tbody>
 </table>
