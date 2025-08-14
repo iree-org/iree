@@ -31,11 +31,15 @@ def IREEGPU_CIBW_32 : I32BitEnumAttrCaseBit<"Int32", 4, "int32">;
 def IREEGPU_CIBW_16 : I32BitEnumAttrCaseBit<"Int16", 5, "int16">;
 // Signed/unsigned 8-bit integer format in computation
 def IREEGPU_CIBW_8  : I32BitEnumAttrCaseBit<"Int8",  6, "int8">;
+// Generic 8-bit floating point format in computation
+def IREEGPU_CFBW_8  : I32BitEnumAttrCaseBit<"FP8",  7, "fp8">;
+
 
 def IREEGPU_ComputeBitwidths : I32BitEnumAttr<
   "ComputeBitwidths", "Supported bitwidths for compute",
   [IREEGPU_CFBW_64, IREEGPU_CFBW_32, IREEGPU_CFBW_16,
-   IREEGPU_CIBW_64, IREEGPU_CIBW_32, IREEGPU_CIBW_16, IREEGPU_CIBW_8]> {
+   IREEGPU_CIBW_64, IREEGPU_CIBW_32, IREEGPU_CIBW_16,
+   IREEGPU_CIBW_8,  IREEGPU_CFBW_8]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
   let genSpecializedAttr = 0;
 }
