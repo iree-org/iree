@@ -43,9 +43,8 @@ def IREEGPU_ComputeBitwidths : I32BitEnumAttr<
   "ComputeBitwidths", "Supported bitwidths for compute",
   [IREEGPU_CFBW_64, IREEGPU_CFBW_32, IREEGPU_CFBW_16,
    IREEGPU_CIBW_64, IREEGPU_CIBW_32, IREEGPU_CIBW_16,
-   IREEGPU_CIBW_8,  IREEGPU_CFBW_8,
-                    IREEGPU_CFBW_6,
-                    IREEGPU_CFBW_4]> {
+   IREEGPU_CIBW_8, IREEGPU_CFBW_8, IREEGPU_CFBW_6,
+   IREEGPU_CFBW_4]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
   let genSpecializedAttr = 0;
 }
