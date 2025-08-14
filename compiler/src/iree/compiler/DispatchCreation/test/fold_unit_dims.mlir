@@ -109,6 +109,21 @@ module @fold_stream_parameter {
 
 // -----
 
+module @fold_flow_parameter {
+  util.global private mutable @global = #flow.parameter.named<"module"::"global"> : tensor<1x1x10xf32>
+  util.func public @fold_flow_parameter() -> tensor<1x1x10xf32> {
+    %global = util.global.load @global : tensor<1x1x10xf32>
+    util.return %global : tensor<1x1x10xf32>
+  }
+}
+
+//      CHECK: module @fold_flow_parameter
+//      CHECK:   util.global private mutable @[[GLOBAL:.+]] = #flow.parameter.named<"module"::"global"> : tensor<10xf32>
+//      CHECK:   util.func public @fold_flow_parameter
+//      CHECK:     %[[LOAD:.+]] = util.global.load @[[GLOBAL]] : tensor<10xf32>
+
+// -----
+
 util.func public @scatter(%arg0 : tensor<4xi64>, %arg1 : tensor<4x1xi32>, %arg2 : tensor<4xi64>) -> tensor<4xi64> {
   %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(false) ins(%arg0, %arg1: tensor<4xi64>, tensor<4x1xi32>) outs(%arg2 : tensor<4xi64>) {
   ^bb0(%arg3: i64, %arg4: i64):
