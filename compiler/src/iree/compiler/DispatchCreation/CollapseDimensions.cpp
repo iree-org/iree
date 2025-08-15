@@ -91,7 +91,7 @@ collapseExtractSlice(tensor::ExtractSliceOp sliceOp,
     return failure();
   }
 
-  RankedTensorType resultType = sliceOp.getSourceType();
+  RankedTensorType resultType = sliceOp.getResultType();
   Value collapseOp = rewriter.create<tensor::CollapseShapeOp>(
       loc, sliceOp.getSource(), reassociation);
   Value newSliceOp = tensor::ExtractSliceOp::create(
@@ -284,7 +284,8 @@ populateReassocAndMaps(tensor::ExtractSliceOp sliceOp,
       return getIdentityReassoc();
     }
 
-    // TODO(IanWood1): upstream cannot collapse rank reducing extract_slice.
+    // TODO(IanWood1): MLIR's collapsing utility for extract_slice doesn't
+    // handle the rank-reducing case.
     if (sliceOp.getSourceType().getRank() != sliceOp.getType().getRank()) {
       return getIdentityReassoc();
     }
@@ -304,7 +305,7 @@ populateReassocAndMaps(tensor::ExtractSliceOp sliceOp,
     SmallVector<OpFoldResult> sizes = sliceOp.getMixedSizes();
     SmallVector<ReassociationIndices> reassociation;
     ReassociationIndices dimGroup;
-    for (int64_t dim = 0; dim < rank; ++dim) {
+    for (int64_t dim = 0; dim < rank;) {
       // Add all unit size dims
       while (dim < rank && isOneInteger(sizes[dim])) {
         dimGroup.push_back(dim++);
