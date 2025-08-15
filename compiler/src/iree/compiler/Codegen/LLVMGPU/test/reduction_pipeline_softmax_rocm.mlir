@@ -98,3 +98,5 @@ func.func @dynamic_softmax() {
 // Verify that LLVMVectorDistribute is used for dynamic softmax.
 // CHECK: LLVMGPUVectorDistribute workgroup_size = [1024, 1, 1] subgroup_size = 32
 //    CHECK-LABEL: func.func @dynamic_softmax
+//     CHECK:    gpu.subgroup_reduce  maxnumf {{.*}} cluster(size = 32) : (f16) -> f16
+//     CHECK:    gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f16) -> f16
