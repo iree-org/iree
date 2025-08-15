@@ -1655,8 +1655,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_fence_create,  //
   // This should be reworked to just create the fence.
 
   iree_hal_semaphore_t* semaphore = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(
-      device, 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &semaphore));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_semaphore_create(device, IREE_HAL_QUEUE_AFFINITY_ANY, 0ull,
+                                IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &semaphore));
 
   // Create fence with room for our single semaphore.
   iree_hal_fence_t* fence = NULL;
@@ -1927,7 +1928,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_fence_await,  //
         // Block the native thread until the fence is reached or the deadline is
         // exceeded.
         for (iree_host_size_t i = 0; i < fence_count; ++i) {
-          wait_status = iree_hal_fence_wait(fences[i], timeout);
+          wait_status = iree_hal_fence_wait(fences[i], timeout,
+                                            IREE_HAL_WAIT_FLAG_DEFAULT);
           if (!iree_status_is_ok(wait_status)) break;
         }
       } else {

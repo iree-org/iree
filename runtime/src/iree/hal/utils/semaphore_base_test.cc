@@ -97,7 +97,8 @@ struct TestSemaphore {
   }
 
   static iree_status_t Wait(iree_hal_semaphore_t* base_semaphore,
-                            uint64_t value, iree_timeout_t timeout) {
+                            uint64_t value, iree_timeout_t timeout,
+                            iree_hal_wait_flags_t flags) {
     auto* semaphore = Cast(base_semaphore);
     struct notify_state_t {
       TestSemaphore* semaphore;
@@ -306,8 +307,8 @@ TEST_F(TrackingSemaphoreTest, AcquireUnresolvedAsyncTimepoint) {
   iree_event_set(&ev0);
 
   // Wait for the semaphore to be signaled.
-  IREE_ASSERT_OK(
-      iree_hal_semaphore_wait(*semaphore, 1ull, iree_infinite_timeout()));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(
+      *semaphore, 1ull, iree_infinite_timeout(), IREE_HAL_WAIT_FLAG_DEFAULT));
 
   // Should have been called back on the thread.
   ASSERT_EQ(state.callback_count, 1);

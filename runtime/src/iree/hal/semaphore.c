@@ -52,8 +52,9 @@ IREE_API_EXPORT iree_string_view_t iree_hal_semaphore_compatibility_format(
 IREE_HAL_API_RETAIN_RELEASE(semaphore);
 
 IREE_API_EXPORT iree_status_t iree_hal_semaphore_create(
-    iree_hal_device_t* device, uint64_t initial_value,
-    iree_hal_semaphore_flags_t flags, iree_hal_semaphore_t** out_semaphore) {
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    uint64_t initial_value, iree_hal_semaphore_flags_t flags,
+    iree_hal_semaphore_t** out_semaphore) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_semaphore);
   *out_semaphore = NULL;
@@ -61,7 +62,7 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_create(
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, initial_value);
   iree_status_t status =
       IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device, create_semaphore)(
-          device, initial_value, flags, out_semaphore);
+          device, queue_affinity, initial_value, flags, out_semaphore);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -99,13 +100,14 @@ IREE_API_EXPORT void iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore,
   IREE_TRACE_ZONE_END(z0);
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_semaphore_wait(
-    iree_hal_semaphore_t* semaphore, uint64_t value, iree_timeout_t timeout) {
+IREE_API_EXPORT iree_status_t
+iree_hal_semaphore_wait(iree_hal_semaphore_t* semaphore, uint64_t value,
+                        iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
   IREE_ASSERT_ARGUMENT(semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, value);
   iree_status_t status =
-      _VTABLE_DISPATCH(semaphore, wait)(semaphore, value, timeout);
+      _VTABLE_DISPATCH(semaphore, wait)(semaphore, value, timeout, flags);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -134,7 +136,8 @@ iree_status_t iree_hal_semaphore_wait_source_ctl(
     case IREE_WAIT_SOURCE_COMMAND_WAIT_ONE: {
       const iree_timeout_t timeout =
           ((const iree_wait_source_wait_params_t*)params)->timeout;
-      return iree_hal_semaphore_wait(semaphore, target_value, timeout);
+      return iree_hal_semaphore_wait(semaphore, target_value, timeout,
+                                     IREE_HAL_WAIT_FLAG_DEFAULT);
     }
     case IREE_WAIT_SOURCE_COMMAND_EXPORT: {
       const iree_wait_primitive_type_t target_type =
@@ -241,7 +244,8 @@ IREE_API_EXPORT void iree_hal_semaphore_list_fail(
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_semaphore_list_wait(
-    iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout) {
+    iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
+    iree_hal_wait_flags_t flags) {
   if (!semaphore_list.count) return iree_ok_status();
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -259,7 +263,8 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_list_wait(
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
     status = iree_hal_semaphore_wait(semaphore_list.semaphores[i],
-                                     semaphore_list.payload_values[i], timeout);
+                                     semaphore_list.payload_values[i], timeout,
+                                     flags);
     if (!iree_status_is_ok(status)) break;
   }
 
