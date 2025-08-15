@@ -174,6 +174,12 @@ public:
                                    executableBuilder.getI8IntegerAttr(
                                        static_cast<uint8_t>(bindingCount)));
         }
+        size_t paramCount = constantCount + bindingCount;
+        if (paramCount > 0) {
+          funcOp.setReflectionAttr("parameter_count",
+                                   executableBuilder.getI16IntegerAttr(
+                                       static_cast<uint16_t>(paramCount)));
+        }
       }
     }
 
