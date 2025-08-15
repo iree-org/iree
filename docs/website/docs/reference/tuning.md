@@ -317,4 +317,5 @@ implementation detail; in general, each codegen pipeline has its own
 requirements as to what is considered a valid compilation info and how to
 interpret it.
 
-Tuning specs get executed by the 'Materialize User Configs` pass.
+Tuning specs get executed by the [Materialize User Configs](https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/Codegen/Common/MaterializeUserConfigs.cpp)
+pass.
