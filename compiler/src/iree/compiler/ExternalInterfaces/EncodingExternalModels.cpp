@@ -18,8 +18,8 @@
 namespace mlir::iree_compiler {
 namespace {
 
-struct ContractionAttrPropagationInterface
-    : public IREE::Encoding::EncodingPropagationAttrInterface::ExternalModel<
+struct ContractionAttrPropagationInterface final
+    : IREE::Encoding::EncodingPropagationAttrInterface::ExternalModel<
           ContractionAttrPropagationInterface, IREE::Encoding::MatmulKAttr> {
   bool isPropagableUp(Attribute attr, OpResult target) const {
     auto encoding = cast<IREE::Encoding::MatmulKAttr>(attr);
@@ -75,8 +75,8 @@ struct ContractionAttrPropagationInterface
   }
 };
 
-struct ContractionOpPropagationInterface
-    : public IREE::Encoding::EncodingPropagationOpInterface::ExternalModel<
+struct ContractionOpPropagationInterface final
+    : IREE::Encoding::EncodingPropagationOpInterface::ExternalModel<
           ContractionOpPropagationInterface, tensor::CollapseShapeOp> {
   FailureOr<IREE::Encoding::PropagationResult>
   propagateEncoding(Operation *op, RewriterBase &builder,
@@ -109,8 +109,8 @@ struct ContractionOpPropagationInterface
   }
 };
 
-struct EncodingAttrPropagationInterface
-    : public IREE::Encoding::EncodingPropagationAttrInterface::ExternalModel<
+struct EncodingAttrPropagationInterface final
+    : IREE::Encoding::EncodingPropagationAttrInterface::ExternalModel<
           EncodingAttrPropagationInterface, IREE::Encoding::EncodingAttr> {
   bool isPropagableDown(Attribute attr, OpOperand *target) const {
     return TypeSwitch<Operation *, bool>(target->getOwner())
@@ -185,8 +185,8 @@ struct EncodingAttrPropagationInterface
   }
 };
 
-struct GenericOpPropagationInterface
-    : public IREE::Encoding::EncodingPropagationOpInterface::ExternalModel<
+struct GenericOpPropagationInterface final
+    : IREE::Encoding::EncodingPropagationOpInterface::ExternalModel<
           GenericOpPropagationInterface, linalg::GenericOp> {
   FailureOr<IREE::Encoding::PropagationResult>
   propagateEncoding(Operation *op, RewriterBase &rewriter,
@@ -208,7 +208,7 @@ struct GenericOpPropagationInterface
               SmallVector<Value> encodedOperands;
               encodedOperands.reserve(operandEncodings.size() +
                                       resultEncodings.size());
-              for (auto &&[operand, encoding] : llvm::zip(
+              for (auto [operand, encoding] : llvm::zip(
                        genericOp.getDpsInputOperands(), operandEncodings)) {
                 // If the source op is the encoding op, we can just add the
                 // source to new operands vector and continue.
@@ -238,7 +238,7 @@ struct GenericOpPropagationInterface
 
               SmallVector<Type> resultEncodingTypes;
               resultEncodingTypes.reserve(resultEncodings.size());
-              for (auto &&[operand, encoding] :
+              for (auto [operand, encoding] :
                    llvm::zip_equal(genericOp.getDpsInits(), resultEncodings)) {
                 // Manually cast to work around a gcc bug with type deduction in
                 // lambdas.
