@@ -96,5 +96,5 @@ func.func @dynamic_softmax() {
 }
 
 // Verify that LLVMVectorDistribute is used for dynamic softmax.
-// CHECK: LLVMGPUVectorDistribute
+// CHECK: LLVMGPUVectorDistribute workgroup_size = [1024, 1, 1] subgroup_size = 32
 //    CHECK-LABEL: func.func @dynamic_softmax
