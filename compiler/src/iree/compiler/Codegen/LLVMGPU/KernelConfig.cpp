@@ -172,6 +172,32 @@ static bool needsLoweringConfigPropagation(
   return !llvm::is_contained(supportedPipelines, pipeline);
 }
 
+static LogicalResult setDefaultWorkgroupOnlyTilingConfig(
+    FunctionOpInterface entryPoint, Operation *op, IREE::GPU::TargetAttr target,
+    ArrayRef<int64_t> workgroupTileSizes, ArrayRef<int64_t> workgroupSize) {
+  MLIRContext *context = op->getContext();
+  Builder b(context);
+  auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
+      context, /*prefetchSharedMemory=*/false,
+      /*no_reduce_shared_memory_bank_conflicts=*/true,
+      /*use_igemm_convolution=*/false,
+      /*reorder_workgroups_strategy=*/std::nullopt);
+  const int preferredSubgroupSize = target.getPreferredSubgroupSize();
+  SmallVector<NamedAttribute, 3> attrs = {
+      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes))};
+
+  auto configDict = b.getDictionaryAttr(attrs);
+  auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
+  SmallVector<NamedAttribute, 1> pipelineAttrs;
+  pipelineAttrs.emplace_back(
+      b.getStringAttr(IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
+      pipelineOptions);
+  auto pipelineConfig = b.getDictionaryAttr(pipelineAttrs);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUTileAndFuse,
+      workgroupSize, preferredSubgroupSize, pipelineConfig);
+}
+
 //====---------------------------------------------------------------------===//
 // Matmul Configuration Helpers
 //====---------------------------------------------------------------------===//
@@ -2366,10 +2392,8 @@ static LogicalResult setFftConfig(IREE::GPU::TargetAttr target,
       return failure();
     }
   }
-  TileSizesListType tileSizes = {workgroupTileSize};
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes, CodeGenPipeline::LLVMGPUDistribute,
-      workgroupSize);
+  return setDefaultWorkgroupOnlyTilingConfig(entryPoint, op, target,
+                                             workgroupTileSize, workgroupSize);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2419,10 +2443,8 @@ static LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
   auto partitionedLoops =
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   if (partitionedLoops.empty()) {
-    tileSizes.push_back({});
-    return setOpConfigAndEntryPointFnTranslation(
-        entryPoint, op, tileSizes, CodeGenPipeline::LLVMGPUDistribute,
-        {1, 1, 1});
+    return setDefaultWorkgroupOnlyTilingConfig(entryPoint, op, target, {},
+                                               {1, 1, 1});
   }
   size_t numLoops = partitionedLoops.back() + 1;
   // To get peak occupancy we need a workgroup size of at least two warps
@@ -2445,10 +2467,8 @@ static LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
       break;
     }
   }
-  tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes, CodeGenPipeline::LLVMGPUDistribute,
-      workgroupSize);
+  return setDefaultWorkgroupOnlyTilingConfig(entryPoint, op, target,
+                                             workgroupTileSizes, workgroupSize);
 }
 
 //====---------------------------------------------------------------------===//
@@ -2459,17 +2479,34 @@ static LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
 static LogicalResult setRootDefaultConfig(IREE::GPU::TargetAttr target,
                                           mlir::FunctionOpInterface entryPoint,
                                           Operation *op) {
-  CodeGenPipeline passPipeline = CodeGenPipeline::LLVMGPUDistribute;
   TileSizesListType tileSizes;
   auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
   auto partitionedLoops = interfaceOp.getPartitionableLoops(std::nullopt);
+
+  MLIRContext *context = op->getContext();
+  Builder b(context);
+  auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
+      context, /*prefetchSharedMemory=*/false,
+      /*no_reduce_shared_memory_bank_conflicts=*/true,
+      /*use_igemm_convolution=*/false,
+      /*reorder_workgroups_strategy=*/std::nullopt);
+  const int preferredSubgroupSize = target.getPreferredSubgroupSize();
+
   if (partitionedLoops.empty()) {
-    tileSizes.push_back({});
-    return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
-                                                 passPipeline, {1, 1, 1});
+    auto configDict = b.getDictionaryAttr({});
+    auto loweringConfig =
+        IREE::GPU::LoweringConfigAttr::get(context, configDict);
+    SmallVector<NamedAttribute, 1> pipelineAttrs;
+    pipelineAttrs.emplace_back(
+        b.getStringAttr(IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
+        pipelineOptions);
+    auto pipelineConfig = b.getDictionaryAttr(pipelineAttrs);
+
+    return setOpConfigAndEntryPointFnTranslation(
+        entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUTileAndFuse,
+        {1, 1, 1}, preferredSubgroupSize, pipelineConfig);
   }
 
-  const int preferredSubgroupSize = target.getPreferredSubgroupSize();
   size_t numLoops = partitionedLoops.back() + 1;
   // To get peak occupancy we need a workgroup size of at least two warps.
   std::array<int64_t, 3> workgroupSize = {2 * preferredSubgroupSize, 1, 1};
@@ -2544,14 +2581,10 @@ static LogicalResult setRootDefaultConfig(IREE::GPU::TargetAttr target,
   // Pick a vectorSize of 1 for op that we know won't get vectorized.
   // Also skip vectorization for linalg on memref (no result) as the pipeline
   // relies on tensor level tiling.
-  // TODO(thomasraoux): This could be improved by checking if the linalg op
-  // would fail vectorization.
   if (!linalgOp || op->getNumResults() != 1 ||
       llvm::any_of(linalgOp.getIndexingMapsArray(),
                    [](AffineMap m) { return !m.isProjectedPermutation(); })) {
     vectorSize = 1;
-  } else {
-    passPipeline = CodeGenPipeline::LLVMGPUVectorize;
   }
 
   int64_t id = 0;
@@ -2573,15 +2606,37 @@ static LogicalResult setRootDefaultConfig(IREE::GPU::TargetAttr target,
     }
   }
 
+  SmallVector<NamedAttribute, 3> attrs = {
+      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes))};
+
   if (linalgOp) {
-    // Tile reduction dimension to 4 to allow doing load4 if the reduction size
-    // is the most inner dimension.
-    workgroupTileSizes.append(linalgOp.getNumReductionLoops(), 4);
+    int64_t numReduction = linalgOp.getNumReductionLoops();
+    if (numReduction > 0) {
+      // Tile reduction dimension to 4 to allow doing load4 if the reduction
+      // size is the most inner dimension.
+      workgroupTileSizes.append(numReduction, 4);
+      SmallVector<int64_t> reductionTileSizes(linalgOp.getNumLoops(), 0);
+      for (auto [dim, iterType] :
+           llvm::enumerate(linalgOp.getIteratorTypesArray())) {
+        if (linalg::isReductionIterator(iterType)) {
+          reductionTileSizes[dim] = 4;
+        }
+      }
+      attrs.push_back(
+          NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes)));
+    }
   }
-  tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
-  return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
-                                               passPipeline, workgroupSize,
-                                               preferredSubgroupSize);
+
+  auto configDict = b.getDictionaryAttr(attrs);
+  auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
+  SmallVector<NamedAttribute, 1> pipelineAttrs;
+  pipelineAttrs.emplace_back(
+      b.getStringAttr(IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
+      pipelineOptions);
+  auto pipelineConfig = b.getDictionaryAttr(pipelineAttrs);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUTileAndFuse,
+      workgroupSize, preferredSubgroupSize, pipelineConfig);
 }
 
 /// Returns true if it's MatVec like i.e., either the bound of M or N dim = 1,

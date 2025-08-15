@@ -1024,19 +1024,6 @@ void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCanonicalizerPass());
 }
 
-void addGPUSimpleDistributePassPipeline(OpPassManager &funcPassManager) {
-  tileAndBufferize(funcPassManager);
-
-  // Distribute linalg onto threads within the workgroup.
-  funcPassManager.addPass(createLLVMGPUTileAndDistributePass(
-      /*distributeToWarp=*/clDistributeToWorkgroupsUsingForall));
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
-  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
-  funcPassManager.addPass(createRemoveSingleIterationLoopPass());
-}
-
 void addGPUDefaultPassPipeline(OpPassManager &funcPassManager,
                                const GPUPipelineOptions &options) {
   ConvertToDestinationPassingStylePassOptions dpsOptions;
