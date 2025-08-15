@@ -1,8 +1,6 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-and-fuse{tiling-level=0}))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-and-fuse-producer-consumer{tiling-level=vector_common_parallel anchor-on-root-op=false}), cse)" --split-input-file %s | FileCheck %s
 
-// `tiling-level=0`, which is the testing value of the pass option, indicates
-// distribution level tiling.
-#config = #iree_cpu.lowering_config<distribution = [10, 20, 30]>
+#config = #iree_cpu.lowering_config<vector_common_parallel = [10, 20, 0]>
 func.func @matmul_bias_add(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : tensor<?xf32>) -> tensor<?x?xf32> {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
@@ -26,19 +24,14 @@ func.func @matmul_bias_add(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %ar
   return %2 : tensor<?x?xf32>
 }
 //      CHECK: func.func @matmul_bias_add(
-//      CHECK:   scf.for
-// CHECK-SAME:   {
-//      CHECK:     scf.for
-// CHECK-SAME:     {
-//      CHECK:       linalg.fill
-//      CHECK:       linalg.matmul
-//      CHECK:       linalg.generic
-//      CHECK:     }
-//      CHECK:   }
+//      CHECK:   scf.forall
+//      CHECK:     linalg.fill
+//      CHECK:     linalg.matmul
+//      CHECK:     linalg.generic
 
 // -----
 
-#config = #iree_cpu.lowering_config<distribution = [0, 0, 0]>
+#config = #iree_cpu.lowering_config<vector_common_parallel = [0, 0, 0]>
 func.func @all_zeros(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : tensor<?xf32>) -> tensor<?x?xf32> {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
@@ -69,8 +62,8 @@ func.func @all_zeros(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : t
 
 // -----
 
-#config0 = #iree_cpu.lowering_config<distribution = [0, 0]>
-#config1 = #iree_cpu.lowering_config<distribution = [10, 20]>
+#config0 = #iree_cpu.lowering_config<vector_common_parallel = [0, 0]>
+#config1 = #iree_cpu.lowering_config<vector_common_parallel = [10, 20]>
 func.func @multi_config(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : tensor<?xf32>) -> tensor<?x?xf32> {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
@@ -95,19 +88,17 @@ func.func @multi_config(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 
 }
 // Both linalg.matmul op and linalg.generic op have lowering_config. Test that
 // the lowering_config of linalg.generic op is picked in the pass. In this case,
-// scf.for ops are created. If the lowering_config of linalg.matmul op is
-// picked, there are no scf.for ops. Because the tiling sizes are zeros.
+// an scf.forall op is created. If the lowering_config of linalg.matmul op is
+// picked, the scf.forall is not generated. Because the tiling sizes are zeros.
 //      CHECK: func.func @multi_config(
-//      CHECK:   scf.for
-//      CHECK:     scf.for
-//  CHECK-NOT:       scf.for
+//      CHECK:   scf.forall
 //      CHECK:       linalg.fill
 //      CHECK:       linalg.matmul
 //      CHECK:       linalg.generic
 
 // -----
 
-#config = #iree_cpu.lowering_config<distribution = [8, 128, 0]>
+#config = #iree_cpu.lowering_config<vector_common_parallel = [8, 128, 0]>
 func.func @shared_out_operand(%arg0: tensor<391x384xf32>, %arg1: tensor<384x384xf32>, %arg2: tensor<384xf32>, %arg3: tensor<391x384xf32>) -> tensor<391x384xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %cst_0 = arith.constant 6.000000e+00 : f32
@@ -137,20 +128,17 @@ func.func @shared_out_operand(%arg0: tensor<391x384xf32>, %arg1: tensor<384x384x
 // CHECK-SAME:    %{{[a-zA-Z0-9]+}}
 // CHECK-SAME:    %[[DST:[a-zA-Z0-9]+]]
 //  CHECK-DAG:   %[[CST0:.+]] = arith.constant 0.000000e+00 : f32
-//      CHECK:   scf.for
-// CHECK-SAME:       iter_args(%[[ITER0:.+]] = %[[DST]])
-//      CHECK:     scf.for
-// CHECK-SAME:       iter_args(%[[ITER1:.+]] = %[[ITER0]])
-//      CHECK:       %[[OUT_SLICE:.+]] = tensor.extract_slice %[[ITER1]]
+//      CHECK:   scf.forall {{.+}} shared_outs(%[[ITER:.+]] = %[[DST]])
+//      CHECK:       %[[OUT_SLICE:.+]] = tensor.extract_slice %[[DST]]
 //      CHECK:       %{{.+}} = linalg.fill ins(%[[CST0]] : f32) outs(%[[OUT_SLICE]]
 //      CHECK:       %{{.+}} = linalg.matmul
-//      CHECK:       %[[OUT_SLICE2:.+]] = tensor.extract_slice %[[ITER1]]
+//      CHECK:       %[[OUT_SLICE2:.+]] = tensor.extract_slice %[[ITER]]
 //      CHECK:       %{{.+}} = linalg.generic
 // CHECK-SAME:         outs(%[[OUT_SLICE2]]
 
 // -----
 
-#config = #iree_cpu.lowering_config<distribution = [1, [32], 1]>
+#config = #iree_cpu.lowering_config<vector_common_parallel = [1, [32], 0]>
 func.func @scalable_matmul(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>) -> tensor<?x?xf32>{
   // Matrix multiplication (ijk) with scalable tiling in the j-th dimension.
   %1 = linalg.matmul {lowering_config = #config} ins(%A, %B: tensor<?x?xf32>, tensor<?x?xf32>)
@@ -158,20 +146,15 @@ func.func @scalable_matmul(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<
   return %1 : tensor<?x?xf32>
 }
 // CHECK-LABEL: func.func @scalable_matmul(
-//   CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
 //   CHECK-DAG: %[[C32:.*]] = arith.constant 32 : index
 //       CHECK: %[[VSCALE:.*]] = vector.vscale
 //  CHECK-NEXT: %[[SCALABLE_TILE_SIZE:.*]] = arith.muli %[[VSCALE]], %[[C32]] : index
-//       CHECK: scf.for
-//  CHECK-SAME:     step %[[C1]]
-//       CHECK:   scf.for
-//  CHECK-SAME:       step %[[SCALABLE_TILE_SIZE]]
-//       CHECK:     scf.for
-//  CHECK-SAME:         step %[[C1]]
+//       CHECK: scf.forall
+//  CHECK-SAME:   step (1, %[[SCALABLE_TILE_SIZE]])
 
 // -----
 
-#config = #iree_cpu.lowering_config<distribution = [0, 20, 0]>
+#config = #iree_cpu.lowering_config<vector_common_parallel = [0, 20, 0]>
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 func.func @ukernel_generic(%arg0: tensor<1x192x1x16xf32>, %arg1: tensor<1x768x1x1xf32>, %arg2: tensor<192x768x16x1xf32>, %arg3: tensor<1x192x1x16xf32>) -> tensor<1x192x1x16xf32> {
   %c1 = arith.constant 1 : index
@@ -198,7 +181,7 @@ func.func @ukernel_generic(%arg0: tensor<1x192x1x16xf32>, %arg1: tensor<1x768x1x
 // CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[ARG3:[a-zA-Z0-9]+]]
 // CHECK:         %[[UK:.+]] = iree_codegen.ukernel.generic "iree_uk_mmt4d"
-// CHECK:         scf.for {{.+}} iter_args(%[[ITER:.+]] = %[[ARG0]])
+// CHECK:         scf.forall {{.+}} shared_outs(%[[ITER:.+]] = %[[ARG0]])
 // CHECK:           %[[UK_SLICE:.+]] = tensor.extract_slice %[[UK]]
 // CHECK:           %[[ARG3_SLICE:.+]] = tensor.extract_slice %[[ARG3]]
 // CHECK:           %[[ITER_SLICE:.+]] = tensor.extract_slice %[[ITER]]
@@ -208,7 +191,7 @@ func.func @ukernel_generic(%arg0: tensor<1x192x1x16xf32>, %arg1: tensor<1x768x1x
 
 // -----
 
-#config = #iree_cpu.lowering_config<distribution = [0, 1]>
+#config = #iree_cpu.lowering_config<vector_common_parallel = [0, 1]>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 func.func @tile_linalg_ext_scan(%arg0: tensor<128x2xf32>) -> tensor<128x2xi64> {
   %c0_i64 = arith.constant 0 : i64
@@ -233,11 +216,9 @@ func.func @tile_linalg_ext_scan(%arg0: tensor<128x2xf32>) -> tensor<128x2xi64> {
   return %5#0 : tensor<128x2xi64>
 }
 // CHECK-LABEL: func.func @tile_linalg_ext_scan
-// CHECK:         scf.for
-// CHECK-SAME:    {
+// CHECK:         scf.forall
 // CHECK:           linalg.generic
 // CHECK:           linalg.fill
 // CHECK:           linalg.fill
 // CHECK:           iree_linalg_ext.scan
-// CHECK:           scf.yield
-// CHECK:         }
+// CHECK:         scf.forall.in_parallel
