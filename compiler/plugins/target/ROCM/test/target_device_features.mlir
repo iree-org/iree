@@ -9,7 +9,10 @@
 //
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-hip-target=gfx950 %s | FileCheck %s --check-prefixes=GFX950
-//
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-hip-target=mi350x %s | FileCheck %s --check-prefixes=GFX950,MI350X
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-hip-target=mi355x %s | FileCheck %s --check-prefixes=GFX950,MI355X
 //
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-hip-target=rx7900xtx %s | FileCheck %s --check-prefix=GFX1100
@@ -58,6 +61,8 @@
 // GFX950-SAME:         scaled_mma = [<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f8E8M0FNU, rhs_elem_type = f8E8M0FNU, acc_elem_type = f32>, <intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f8E5M2, rhs_elem_type = f8E5M2, acc_elem_type = f32>, <intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f8E5M2FNUZ, rhs_elem_type = f8E5M2FNUZ, acc_elem_type = f32>, <intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f8E4M3FN, rhs_elem_type = f8E4M3FN, acc_elem_type = f32>, <intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f8E4M3FNUZ, rhs_elem_type = f8E4M3FNUZ, acc_elem_type = f32>, <intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>, <intrinsic = MFMA_SCALE_F32_32x32x64_B32, lhs_elem_type = f8E8M0FNU, rhs_elem_type = f8E8M0FNU, acc_elem_type = f32>, <intrinsic = MFMA_SCALE_F32_32x32x64_B32, lhs_elem_type = f8E5M2, rhs_elem_type = f8E5M2, acc_elem_type = f32>, <intrinsic = MFMA_SCALE_F32_32x32x64_B32, lhs_elem_type = f8E5M2FNUZ, rhs_elem_type = f8E5M2FNUZ, acc_elem_type = f32>, <intrinsic = MFMA_SCALE_F32_32x32x64_B32, lhs_elem_type = f8E4M3FN, rhs_elem_type = f8E4M3FN, acc_elem_type = f32>, <intrinsic = MFMA_SCALE_F32_32x32x64_B32, lhs_elem_type = f8E4M3FNUZ, rhs_elem_type = f8E4M3FNUZ, acc_elem_type = f32>, <intrinsic = MFMA_SCALE_F32_32x32x64_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>],
 // GFX950-SAME:         subgroup_size_choices = [64],
 // GFX950-SAME:         max_workgroup_memory_bytes = 163840,
+// MI350X: chip = <wgp_count = 256, sku = "mi350x", memory_bandwidth_tbps = 8.000000e+00 : f32, perf_tflops = {fp16 = 2.300000e+03 : f32, fp32 = 1.442000e+02 : f32, fp4 = 9.200000e+03 : f32, fp6 = 9.200000e+03 : f32, fp8 = 4.600000e+03 : f32, int8 = 4.600000e+03 : f32}>>
+// MI355X: chip = <wgp_count = 256, sku = "mi355x", memory_bandwidth_tbps = 8.000000e+00 : f32, perf_tflops = {fp16 = 2.500000e+03 : f32, fp32 = 1.573000e+02 : f32, fp4 = 1.000000e+04 : f32, fp6 = 1.000000e+04 : f32, fp8 = 5.000000e+03 : f32, int8 = 5.000000e+03 : f32}>>
 
 // GFX1100: target_info = #iree_gpu.target<arch = "gfx1100",
 // GFX1100-SAME:        mma = [<WMMAR3_F32_16x16x16_F16>, <WMMAR3_F16_16x16x16_F16>, <WMMAR3_F32_16x16x16_BF16>, <WMMAR3_BF16_16x16x16_BF16>, <WMMAR3_I32_16x16x16_I8>]
