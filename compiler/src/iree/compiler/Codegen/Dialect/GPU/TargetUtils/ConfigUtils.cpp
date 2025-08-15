@@ -124,33 +124,58 @@ LogicalResult setDataTiledMultiMmaLoweringConfig(
 }
 
 static std::optional<ComputeBitwidths> getComputeBitwidthForType(Type type) {
-  if (type.isF64())
-    return ComputeBitwidths::FP64;
-  if (type.isF32())
-    return ComputeBitwidths::FP32;
-  if (type.isF16() || type.isBF16())
-    return ComputeBitwidths::FP16;
-  if (type.isFloat(8))
-    return ComputeBitwidths::FP8;
-  if (type.isInteger(64))
-    return ComputeBitwidths::Int64;
-  if (type.isInteger(32))
-    return ComputeBitwidths::Int32;
-  if (type.isInteger(16))
-    return ComputeBitwidths::Int16;
-  if (type.isInteger(8))
-    return ComputeBitwidths::Int8;
-
-  return std::nullopt;
+  return llvm::TypeSwitch<Type, std::optional<ComputeBitwidths>>(type)
+      .Case<FloatType>(
+          [](FloatType floatType) -> std::optional<ComputeBitwidths> {
+            switch (floatType.getIntOrFloatBitWidth()) {
+            case 64:
+              return ComputeBitwidths::FP64;
+            case 32:
+              return ComputeBitwidths::FP32;
+            case 16:
+              return ComputeBitwidths::FP16;
+            case 8:
+              return ComputeBitwidths::FP8;
+            case 6:
+              return ComputeBitwidths::FP6;
+            case 4:
+              return ComputeBitwidths::FP4;
+            default:
+              return std::nullopt;
+            }
+          })
+      .Case<IntegerType>(
+          [](IntegerType intType) -> std::optional<ComputeBitwidths> {
+            switch (intType.getWidth()) {
+            case 64:
+              return ComputeBitwidths::Int64;
+            case 32:
+              return ComputeBitwidths::Int32;
+            case 16:
+              return ComputeBitwidths::Int16;
+            case 8:
+              return ComputeBitwidths::Int8;
+            default:
+              return std::nullopt;
+            }
+          })
+      .Default([](Type) { return std::nullopt; });
 }
+
+namespace {
+struct GemmCutoff {
+  float smallGemmCutoff;
+  float largeGemmCutoff;
+};
+} // namespace
 
 /// Function to compute small and large gemm cutoffs based on the target's
 /// peak performance and memory bandwidth.
-static std::pair<float, float> computeGemmCutoffs(IREE::GPU::TargetAttr target,
-                                                  Type computeType) {
+static GemmCutoff computeGemmCutoffs(IREE::GPU::TargetAttr target,
+                                     Type computeType) {
   float smallGemmCutoff = 1.0f;
   float largeGemmCutoff = 1000.0f;
-  if (target.getChip() == nullptr) {
+  if (!target.getChip()) {
     LDBG() << "Target chip is not specified, using default gemm cutoffs: "
            << smallGemmCutoff << ", " << largeGemmCutoff;
     return {smallGemmCutoff, largeGemmCutoff};
@@ -161,7 +186,7 @@ static std::pair<float, float> computeGemmCutoffs(IREE::GPU::TargetAttr target,
   llvm::DenseMap<ComputeBitwidths, float> peakPerfTflops;
   for (NamedAttribute namedAttr : peakPerfTlopsAttr) {
     StringRef bitwidthStr = namedAttr.getName().strref();
-    FloatAttr floatAttr = llvm::dyn_cast<FloatAttr>(namedAttr.getValue());
+    FloatAttr floatAttr = dyn_cast<FloatAttr>(namedAttr.getValue());
     if (!floatAttr) {
       continue;
     }
@@ -255,8 +280,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
          "expected the same aType and bType.");
   int64_t inBitWidth = problem.aType.getIntOrFloatBitWidth();
 
-  std::pair<float, float> gemmCutoffs =
-      computeGemmCutoffs(target, problem.aType);
+  GemmCutoff gemmCutoffs = computeGemmCutoffs(target, problem.aType);
 
   // Note that the following heuristic seeds are just placeholder values.
   // We need to clean it up and make it adjusting to different targets.
@@ -267,20 +291,19 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   int64_t computeIntensity = (2 * mSize * nSize * kSize) /
                              (mSize * nSize + nSize * kSize + mSize * kSize);
 
-  if (computeIntensity <= gemmCutoffs.first) {
-    // For matmuls with small compute intensity, use a smaller
-    // bestMNTileCountPerSubgroup and a larger bestKTileCountPerSubgroup.
-    problem.gemmSize = SmallGemm;
+  if (computeIntensity <= gemmCutoffs.smallGemmCutoff) {
+    // For matmuls with small compute intensity, use small
+    // bestMNTileCountPerSubgroup and large bestKTileCountPerSubgroup.
+    problem.gemmSize = GemmSize::SmallGemm;
     seeds = {/*bestSubgroupCountPerWorkgroup=*/2,
              /*bestMNTileCountPerSubgroup=*/2,
              /*bestKTileCountPerSubgroup=*/4,
              /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
-  } else if (computeIntensity >= gemmCutoffs.second) {
+  } else if (computeIntensity >= gemmCutoffs.largeGemmCutoff) {
     // For matmuls with large compute intensity, use large
-    // bestMNTileCountPerSubgroup and bestKTileCountPerSubgroup  and small
-    // bestKTileCountPerSubgroup to amortize launch/memory costs and maximize
-    // throughput.
-    problem.gemmSize = LargeGemm;
+    // bestMNTileCountPerSubgroup and small bestKTileCountPerSubgroup to
+    // amortize launch/memory costs and maximize throughput.
+    problem.gemmSize = GemmSize::LargeGemm;
     seeds = {/*bestSubgroupCountPerWorkgroup=*/8,
              /*bestMNTileCountPerSubgroup=*/8,
              /*bestKTileCountPerSubgroup=*/2,
@@ -288,8 +311,8 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
                  inBitWidth};
   } else {
     // Choose balanced tile shapes. Empirically, medium-AI workloads can favor
-    // either smaller or larger tiles depending on kernel details.
-    problem.gemmSize = MediumGemm;
+    // either small or large tiles depending on kernel details.
+    problem.gemmSize = GemmSize::MediumGemm;
     seeds = {/*bestSubgroupCountPerWorkgroup=*/8,
              /*bestMNTileCountPerSubgroup=*/4,
              /*bestKTileCountPerSubgroup=*/4,

@@ -149,7 +149,7 @@ func.func @nchw_conv_unaligned_mfma() {
 // MI300X-SAME:     subgroup = [1, 1, 1, 1, 0]
 // MI300X-SAME:     workgroup = [1, 64, 1, 32, 0]
 
-// PAD-CONV-GFX942:     padding_conv = [1, 64, 2, 32, 0, 0, 0]
+// PAD-CONV-GFX942:     padding_conv = [1, 64, 4, 32, 0, 0, 0]
 
 // -----
 
@@ -258,8 +258,7 @@ func.func @group_conv_unaligned(%arg0: tensor<61x93x16x56xbf16>, %arg1: tensor<1
 // MI300X-SAME:     subgroup = [1, 1, 0, 1, 0]
 // MI300X-SAME:     workgroup = [1, 32, 1, 64, 0]
 
-<<<<<<< HEAD
-// PAD-CONV-GFX942:     padding_conv = [1, 32, 1, 64, 0, 0, 32]
+// PAD-CONV-GFX942:     padding_conv = [1, 32, 1, 64, 0, 0, 64]
 
 // -----
 
@@ -281,25 +280,22 @@ module {
 }
 
 // CHECK-LABEL: func.func @conv_nhwc_filter_5x1_unaligned
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 // GFX942-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_BF16>
-// GFX942-SAME:     padding = [2, 2, 32, 64, 32]
+// GFX942-SAME:     padding = [2, 2, 32, 64, 64]
 // GFX942-SAME:     promote_operands = [0, 1, 2]
-// GFX942-SAME:     reduction = [0, 0, 0, 0, 2]
-// GFX942-SAME:     subgroup = [2, 2, 2, 1, 0]
+// GFX942-SAME:     reduction = [0, 0, 0, 0, 4]
+// GFX942-SAME:     subgroup = [2, 2, 1, 1, 0]
 // GFX942-SAME:     workgroup = [2, 2, 32, 64, 0]
 
-// MI300X-SAME:     padding = [1, 1, 32, 64, 32]
+// MI300X-SAME:     padding = [1, 1, 32, 64, 64]
 // MI300X-SAME:     promote_operands = [0, 1, 2]
-// MI300X-SAME:     reduction = [0, 0, 0, 0, 2]
-// MI300X-SAME:     subgroup = [1, 1, 2, 1, 0]
+// MI300X-SAME:     reduction = [0, 0, 0, 0, 4]
+// MI300X-SAME:     subgroup = [1, 1, 1, 1, 0]
 // MI300X-SAME:     workgroup = [1, 1, 32, 64, 0]
 
 // PAD-CONV-GFX942:     padding_conv = [2, 2, 32, 64, 0, 0]
-=======
-//    PAD-CONV:     padding_conv = [1, 32, 1, 64, 0, 0, 64]
->>>>>>> ff39f4d815 (Using peak memory bandwidth and perf to derive gemm size)

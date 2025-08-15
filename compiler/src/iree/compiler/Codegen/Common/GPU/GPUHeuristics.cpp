@@ -492,7 +492,8 @@ static int64_t adjustSeedsForWgpCount(const GPUMatmulShapeType &problem,
     return bestMNTileCountPerSubgroup;
   }
 
-  if (problem.gemmSize == NotSet || problem.gemmSize == SmallGemm) {
+  if (problem.gemmSize == GemmSize::NotSet ||
+      problem.gemmSize == GemmSize::SmallGemm) {
     LDBG() << "Arithmetic intensity is too low, "
            << "skipping adjustment of seeds for workgroup count.";
     return bestMNTileCountPerSubgroup;
