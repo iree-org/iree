@@ -246,6 +246,7 @@ static iree_status_t iree_hal_vmvx_executable_create(
     uint8_t* ptr =
         (uint8_t*)executable + sizeof(*executable) + entry_fn_ordinals_size;
     dispatch_attrs = (iree_hal_executable_dispatch_attrs_v0_t*)ptr;
+    memset(dispatch_attrs, 0, dispatch_attrs_size);
     ptr += dispatch_attrs_size;
     iree_hal_local_executable_initialize(&iree_hal_vmvx_executable_vtable,
                                          host_allocator, &executable->base);
@@ -309,6 +310,15 @@ static iree_status_t iree_hal_vmvx_executable_create(
         iree_string_view_atoi_uint32(binding_count_str, &binding_count);
       }
       dispatch_attrs[i].binding_count = (uint8_t)binding_count;
+
+      iree_string_view_t parameter_count_str =
+          iree_vm_function_lookup_attr_by_name(
+              &entry_fn, iree_make_cstring_view("parameter_count"));
+      uint32_t parameter_count = 0;
+      if (!iree_string_view_is_empty(parameter_count_str)) {
+        iree_string_view_atoi_uint32(parameter_count_str, &parameter_count);
+      }
+      dispatch_attrs[i].parameter_count = (uint16_t)parameter_count;
     }
   }
 
