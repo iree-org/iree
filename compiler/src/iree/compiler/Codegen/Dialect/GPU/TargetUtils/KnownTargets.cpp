@@ -458,17 +458,21 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
                                          "mi350x",
                                          8.0f,
                                          {{ComputeBitwidths::FP32, 144.2f},
-                                          {ComputeBitwidths::FP16, 4600.0f},
+                                          {ComputeBitwidths::FP16, 2300.0f},
                                           {ComputeBitwidths::Int8, 4600.0f},
-                                          {ComputeBitwidths::FP8, 4600.0f}}};
+                                          {ComputeBitwidths::FP8, 4600.0f},
+                                          {ComputeBitwidths::FP6, 9200.0f},
+                                          {ComputeBitwidths::FP4, 9200.0f}}};
 
   static const ChipDetails mi355xChip = {256,
                                          "mi355x",
                                          8.0f,
-                                         {{ComputeBitwidths::FP32, 153.3f},
-                                          {ComputeBitwidths::FP16, 5000.0f},
+                                         {{ComputeBitwidths::FP32, 157.3f},
+                                          {ComputeBitwidths::FP16, 2500.0f},
                                           {ComputeBitwidths::Int8, 5000.0f},
-                                          {ComputeBitwidths::FP8, 5000.0f}}};
+                                          {ComputeBitwidths::FP8, 5000.0f},
+                                          {ComputeBitwidths::FP6, 10000.0f},
+                                          {ComputeBitwidths::FP4, 10000.0f}}};
 
   // "AMD Instinct MI300 Series Product Offerings" in Page 23 of
   // https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/white-papers/amd-cdna-3-white-paper.pdf
