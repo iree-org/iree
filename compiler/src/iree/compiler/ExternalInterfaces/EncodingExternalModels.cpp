@@ -240,7 +240,10 @@ struct GenericOpPropagationInterface
               resultEncodingTypes.reserve(resultEncodings.size());
               for (auto &&[operand, encoding] :
                    llvm::zip_equal(genericOp.getDpsInits(), resultEncodings)) {
-                auto emptyOp = operand.getDefiningOp<tensor::EmptyOp>();
+                // Manually cast to work around a gcc bug with type deduction in
+                // lambdas.
+                auto emptyOp =
+                    dyn_cast_or_null<tensor::EmptyOp>(operand.getDefiningOp());
                 if (!emptyOp) {
                   return failure();
                 }
