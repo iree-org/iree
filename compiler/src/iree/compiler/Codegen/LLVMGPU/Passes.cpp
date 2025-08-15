@@ -1209,6 +1209,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
 
   if (forROCDL) {
     funcPassManager.addPass(amdgpu::createAmdgpuMaskedloadToLoadPass);
+    // This pass needs to be done before the ResolveSwizzleHints Pass
+    funcPassManager.addPass(amdgpu::createAmdgpuFoldMemRefOpsPass);
   }
 
   // This pass needs to run before SCF -> CF.
