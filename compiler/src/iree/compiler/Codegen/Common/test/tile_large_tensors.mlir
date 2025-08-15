@@ -155,3 +155,21 @@ func.func @dynamic_reduction_dim(%arg0: tensor<?x?xf32>, %arg1: tensor<1x?xf32>,
 //       CHECK:     linalg.generic
 //  CHECK-SAME:       ins(%{{.*}}: tensor<1x?xf32>, tensor<1x?xf32>)
 //  CHECK-SAME:       outs(%{{.*}}: tensor<1x1xf32>)
+
+// -----
+
+#map = affine_map<() -> ()>
+func.func @skip_empty_parallel_loops(%arg0: tensor<f32>, %arg1: tensor<f32>, %arg2: tensor<f32>) -> tensor<f32> {
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map, #map],
+    iterator_types = []
+    } ins(%arg0, %arg1 : tensor<f32>, tensor<f32>) outs(%arg2 : tensor<f32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %7 = arith.addf %in, %in_0 : f32
+    linalg.yield %7 : f32
+  } -> tensor<f32>
+  return %0 : tensor<f32>
+}
+
+// CHECK-LABEL: func.func @skip_empty_parallel_loops
+//   CHECK-NOT:   scf.for
