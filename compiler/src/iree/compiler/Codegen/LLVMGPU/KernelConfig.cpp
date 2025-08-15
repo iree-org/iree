@@ -758,9 +758,12 @@ checkDispatchForVectorDistribution(Operation *parentOp) {
       int64_t operandIdx = linalgOp.getIndexingMapIndex(operand);
       AffineMap indexingMap = linalgOp.getIndexingMapsArray()[operandIdx];
 
-      // Check whether the producer exists.
-      Operation *producer = dyn_cast<OpResult>(operand->get()).getOwner();
-      auto producerOp = dyn_cast<linalg::LinalgOp>(producer);
+      auto opResult = dyn_cast<OpResult>(operand->get());
+      if (!opResult) {
+        continue;
+      }
+
+      auto producerOp = dyn_cast<linalg::LinalgOp>(opResult.getOwner());
       if (!producerOp || !computeOps.contains(producerOp)) {
         continue;
       }

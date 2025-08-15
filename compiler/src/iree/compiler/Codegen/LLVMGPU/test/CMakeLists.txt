@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "cast_type_to_fit_mma.mlir"
     "config_custom_op.mlir"
     "config_horizontally_fused_ops.mlir"
+    "config_matmul.mlir"
     "config_matvec.mlir"
     "config_root_op_attribute.mlir"
     "config_sort.mlir"
