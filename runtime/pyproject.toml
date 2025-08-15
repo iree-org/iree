@@ -3,7 +3,7 @@ requires = [
     "setuptools>=42",
     "wheel",
     "cmake",
-    "ninja",
+    "ninja!=1.13.0",
     "numpy>=2.0.0b1",
     "packaging",
     "ml_dtypes>=0.5.1",

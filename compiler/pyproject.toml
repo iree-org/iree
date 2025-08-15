@@ -3,7 +3,7 @@ requires = [
     "setuptools>=42",
     "wheel",
     "cmake",
-    "ninja",
+    "ninja!=1.13.0",
     # MLIR build depends.
     "numpy",
     "packaging",
