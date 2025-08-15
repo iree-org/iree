@@ -217,9 +217,6 @@ module attributes {transform.with_named_sequence} {
 
 // -----
 
-// CHECK-DAG: #[[$MA:.*]] = affine_map<(d0, d1, d2) -> (d0, d2)>
-// CHECK-DAG: #[[$MB:.*]] = affine_map<(d0, d1, d2) -> (d1, d2)>
-// CHECK-DAG: #[[$MC:.*]] = affine_map<(d0, d1, d2) -> (d0, d1)>
 #map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -227,7 +224,6 @@ module attributes {transform.with_named_sequence} {
   // CHECK: func.func @matmul_repeated_operand
   func.func @matmul_repeated_operand(%input: tensor<32x64xi8>, %dest: tensor<32x32xi32>) -> tensor<32x32xi32> {
     // CHECK-NEXT: linalg.matmul
-    // CHECK-SAME:   indexing_maps = [#[[$MA]], #[[$MB]], #[[$MC]]]
     // CHECK-SAME:   match_status = "matched"
     %res = linalg.matmul
           indexing_maps = [#map0, #map1, #map2]
@@ -240,7 +236,6 @@ module attributes {transform.with_named_sequence} {
   // CHECK: func.func @matmul_non_repeated_operand
   func.func @matmul_non_repeated_operand(%input0: tensor<32x64xi8>, %input1: tensor<32x64xi8>, %dest: tensor<32x32xi32>) -> tensor<32x32xi32> {
     // CHECK-NEXT: linalg.matmul
-    // CHECK-SAME:   indexing_maps = [#[[$MA]], #[[$MB]], #[[$MC]]]
     // CHECK-SAME:   match_status = "unmatched"
     %res = linalg.matmul
           indexing_maps = [#map0, #map1, #map2]

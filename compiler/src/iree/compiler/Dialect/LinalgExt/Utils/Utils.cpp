@@ -949,14 +949,15 @@ bool hasOnlyScalarInputs(linalg::GenericOp linalgOp) {
 }
 
 bool isPureMatmul(Operation *op) {
-  return dyn_cast_or_null<linalg::MatmulOp>(op) &&
-         linalg::MatmulOp::isDefaultIndexingMaps(op->getAttr("indexing_maps"));
+  auto matmulOp = dyn_cast_or_null<linalg::MatmulOp>(op);
+  return matmulOp &&
+         linalg::MatmulOp::isDefaultIndexingMaps(matmulOp.getIndexingMaps());
 }
 
 bool isPureBatchMatmul(Operation *op) {
-  return dyn_cast_or_null<linalg::BatchMatmulOp>(op) &&
-         linalg::BatchMatmulOp::isDefaultIndexingMaps(
-             op->getAttr("indexing_maps"));
+  auto batchMatmulOp = dyn_cast_or_null<linalg::BatchMatmulOp>(op);
+  return batchMatmulOp && linalg::BatchMatmulOp::isDefaultIndexingMaps(
+                              batchMatmulOp.getIndexingMaps());
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

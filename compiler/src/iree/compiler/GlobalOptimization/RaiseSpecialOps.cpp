@@ -449,8 +449,7 @@ static bool matchInner2DTranspose(linalg::LinalgOp genericOp, unsigned rank) {
 // Method to match a linalg.matmul(a, linalg.transpose(b)). Returns `b` on
 // success.
 static std::optional<Value> matchATransposeBMatmul(linalg::LinalgOp matmulOp) {
-  Operation *op = matmulOp.getOperation();
-  if (!IREE::LinalgExt::isPureMatmul(op)) {
+  if (!IREE::LinalgExt::isPureMatmul(matmulOp)) {
     return std::nullopt;
   }
   auto rhs = matmulOp.getDpsInputOperand(1);
@@ -465,8 +464,7 @@ static std::optional<Value> matchATransposeBMatmul(linalg::LinalgOp matmulOp) {
 // success.
 static std::optional<Value>
 matchATransposeBBatchMatmul(linalg::LinalgOp bmmOp) {
-  Operation *op = bmmOp.getOperation();
-  if (!IREE::LinalgExt::isPureBatchMatmul(op)) {
+  if (!IREE::LinalgExt::isPureBatchMatmul(bmmOp)) {
     return std::nullopt;
   }
   auto rhs = bmmOp.getDpsInputOperand(1);
