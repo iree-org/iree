@@ -174,6 +174,13 @@ public:
                                    executableBuilder.getI8IntegerAttr(
                                        static_cast<uint8_t>(bindingCount)));
         }
+        // TODO(benvanik): logical parameters and reflection information.
+        size_t paramCount = 0;
+        if (paramCount > 0) {
+          funcOp.setReflectionAttr("parameter_count",
+                                   executableBuilder.getI16IntegerAttr(
+                                       static_cast<uint16_t>(paramCount)));
+        }
       }
     }
 

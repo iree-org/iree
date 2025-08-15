@@ -397,7 +397,7 @@ public:
         llvmFunc->addParamAttr(i, align16);
       }
 
-      LibraryBuilder::DispatchAttrs dispatchAttrs = {0};
+      LibraryBuilder::DispatchAttrs dispatchAttrs = {};
 
       // Entry points may optionally specify that they require workgroup local
       // memory. We fetch that value here and plumb it through so the runtime
@@ -411,6 +411,17 @@ public:
       if (auto layoutAttr = exportOp.getLayout()) {
         dispatchAttrs.constantCount = layoutAttr.getConstants();
         dispatchAttrs.bindingCount = layoutAttr.getBindings().size();
+      }
+
+      // Extract workgroup size if specified at compile time.
+      if (auto workgroupSizeAttr = exportOp.getWorkgroupSize()) {
+        auto workgroupSizeValues = workgroupSizeAttr->getValue();
+        dispatchAttrs.workgroupSize[0] = static_cast<uint32_t>(
+            cast<IntegerAttr>(workgroupSizeValues[0]).getInt());
+        dispatchAttrs.workgroupSize[1] = static_cast<uint32_t>(
+            cast<IntegerAttr>(workgroupSizeValues[1]).getInt());
+        dispatchAttrs.workgroupSize[2] = static_cast<uint32_t>(
+            cast<IntegerAttr>(workgroupSizeValues[2]).getInt());
       }
 
       LibraryBuilder::SourceLocation sourceLocation;

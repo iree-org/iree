@@ -42,6 +42,7 @@ public:
   };
 
   // iree_hal_executable_library_version_t
+  // Tracks IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST.
   enum class Version : uint32_t {
     // NOTE: until we hit v1 the versioning scheme here is not set in stone.
     // We may want to make this major release number, date codes (0x20220307),
@@ -49,10 +50,11 @@ public:
     V_0_3 = 0x0000'0003u, // v0.3 - ~2022-08-08
     V_0_4 = 0x0000'0004u, // v0.4 - ~2024-03-12
     V_0_5 = 0x0000'0005u, // v0.5 - ~2024-08-25
+    V_0_6 = 0x0000'0006u, // v0.6 - ~2025-08-15
 
     // Pinned to the latest version.
     // Requires that the runtime be compiled with the same version.
-    LATEST = V_0_5,
+    LATEST = V_0_6,
   };
 
   // iree_hal_executable_library_features_t
@@ -78,19 +80,24 @@ public:
   // IREE_HAL_EXECUTABLE_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE
   static const int64_t kWorkgroupLocalMemoryPageSize = 4096;
 
+  // iree_hal_executable_dispatch_flags_v0_t
+  enum class DispatchFlags : uint64_t {
+    // IREE_HAL_EXECUTABLE_DISPATCH_FLAG_V0_NONE
+    NONE = 0ull,
+  };
+
   // iree_hal_executable_dispatch_attrs_v0_t
   struct DispatchAttrs {
+    // Flags defining dispatch behavior.
+    DispatchFlags flags = DispatchFlags::NONE;
     // Required workgroup local memory size, in bytes.
     int64_t localMemorySize = 0;
     // Total number of 32-bit constants used by the dispatch.
     uint8_t constantCount = 0;
     // Total number of bindings used by the dispatch.
     uint8_t bindingCount = 0;
-
-    // True if all values are default and the attributes may be omitted.
-    constexpr bool isDefault() const {
-      return localMemorySize == 0 && constantCount == 0 && bindingCount == 0;
-    }
+    // Size of the workgroup, if a compile-time constant.
+    uint32_t workgroupSize[3] = {0};
   };
 
   // iree_hal_executable_source_location_v0_t
@@ -98,6 +105,24 @@ public:
     std::string stage;
     std::string path;
     uint32_t line;
+  };
+
+  // iree_hal_executable_dispatch_parameter_v0_t
+  struct DispatchParameter {
+    enum Type : uint8_t {
+      CONSTANT = 0,   // IREE_HAL_EXECUTABLE_DISPATCH_PARAM_TYPE_V0_CONSTANT
+      BINDING = 1,    // IREE_HAL_EXECUTABLE_DISPATCH_PARAM_TYPE_V0_BINDING
+      BUFFER_PTR = 2, // IREE_HAL_EXECUTABLE_DISPATCH_PARAM_TYPE_V0_BUFFER_PTR
+    };
+    Type type;
+    // Size in bytes.
+    uint8_t size;
+    // Flags indicating parameter behavior.
+    uint16_t flags = 0; // IREE_HAL_EXECUTABLE_DISPATCH_PARAM_FLAG_V0_NONE
+    // Parameter name (optional).
+    std::string name;
+    // Byte offset for constants/buffer_ptr, ordinal for bindings.
+    uint16_t offset;
   };
 
   LibraryBuilder(llvm::Module *module, Mode mode,
@@ -124,14 +149,20 @@ public:
   }
 
   // Defines a new entry point on the library implemented by |func|.
-  // |name| will be used as the library export
-  // |sourceFile| and |sourceLoc| are optional source information
-  // |tag| is an optional attachment
+  // |name| will be used as the library export.
+  // |sourceFile| and |sourceLoc| are optional source information.
+  // |tag| is an optional attachment.
+  // |params| is an optional list of dispatch parameters (empty for HAL ABI).
+  // |flags| optionally defines dispatch behavior (defaults to NONE).
   void addExport(StringRef name, SourceLocation sourceLocation,
                  SmallVector<SourceLocation> stageLocations, StringRef tag,
-                 DispatchAttrs attrs, llvm::Function *func) {
+                 DispatchAttrs attrs, llvm::Function *func,
+                 SmallVector<DispatchParameter> params = {},
+                 DispatchFlags flags = DispatchFlags::NONE) {
+    attrs.flags = flags;
     exports.push_back({name.str(), std::move(sourceLocation),
-                       std::move(stageLocations), tag.str(), attrs, func});
+                       std::move(stageLocations), tag.str(), attrs, func,
+                       std::move(params)});
   }
 
   // Defines a source file embedded in the library.
@@ -176,6 +207,7 @@ private:
     std::string tag;
     DispatchAttrs attrs;
     llvm::Function *func;
+    SmallVector<DispatchParameter> params;
   };
   std::vector<Dispatch> exports;
 
