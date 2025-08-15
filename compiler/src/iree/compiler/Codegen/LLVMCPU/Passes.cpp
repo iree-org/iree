@@ -239,7 +239,7 @@ void addMultiTilingExpertPassPipeline(
     case IREE::CPU::TilingLevel::CacheParallelTiles:
     case IREE::CPU::TilingLevel::VectorCommonParallelTiles:
       funcPassManager.addPass(
-          createLLVMCPUTileRootAndFuseProducerConsumerPass(level));
+          createLLVMCPUTileAndFuseProducerConsumerPass(level));
       break;
     case IREE::CPU::TilingLevel::CacheReductionTiles:
       funcPassManager.addPass(
@@ -270,9 +270,9 @@ void addMultiTilingExpertPassPipeline(
 
   // `VectorInnerParallelTiles` level models the tiling and fusion for the
   // dimensions that are not captured in root op. I.e., root op may not have the
-  // config for the level. Thus, we run the LLVMCPUTileAndFuse pass for
-  // consumers.
-  funcPassManager.addPass(createLLVMCPUTileAndFusePass(
+  // config for the level. Thus, we use the last operation that has the tiling
+  // level as anchor.
+  funcPassManager.addPass(createLLVMCPUTileLastOpAndFuseProducerConsumerPass(
       IREE::CPU::TilingLevel::VectorInnerParallelTiles));
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
   funcPassManager.addPass(createConcretizePadResultShapePass());
@@ -328,7 +328,7 @@ void addConvTileAndDecomposeExpertPassPipeline(
     OpPassManager &funcPassManager, const LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
 
-  funcPassManager.addPass(createLLVMCPUTileRootAndFuseProducerConsumerPass(
+  funcPassManager.addPass(createLLVMCPUTileAndFuseProducerConsumerPass(
       IREE::CPU::TilingLevel::VectorCommonParallelTiles));
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
   funcPassManager.addPass(createConcretizePadResultShapePass());
@@ -386,7 +386,7 @@ void addMmt4dTilingExpertPassPipeline(
     OpPassManager &funcPassManager, const LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
 
-  funcPassManager.addPass(createLLVMCPUTileRootAndFuseProducerConsumerPass(
+  funcPassManager.addPass(createLLVMCPUTileAndFuseProducerConsumerPass(
       IREE::CPU::TilingLevel::VectorCommonParallelTiles));
   // The below two passes are nop if the "mmt4d" is explicitly excluded in the
   // ukernels attribute.
@@ -476,7 +476,7 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
 void addCPULinalgExtTileAndVectorizePipeline(
     OpPassManager &funcPassManager, const LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
-  funcPassManager.addPass(createLLVMCPUTileRootAndFuseProducerConsumerPass(
+  funcPassManager.addPass(createLLVMCPUTileAndFuseProducerConsumerPass(
       IREE::CPU::TilingLevel::VectorCommonParallelTiles));
   funcPassManager.addPass(
       IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass());
@@ -517,7 +517,7 @@ void addCPULinalgExtTileAndVectorizePipeline(
 void addCPUDefaultPassPipeline(OpPassManager &funcPassManager,
                                const LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
-  funcPassManager.addPass(createLLVMCPUTileAndFusePass(
+  funcPassManager.addPass(createLLVMCPUTileLastOpAndFuseProducerConsumerPass(
       IREE::CPU::TilingLevel::VectorCommonParallelTiles));
   addCPUBufferizePasses(funcPassManager);
 }

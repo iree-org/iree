@@ -121,9 +121,6 @@ struct GlobalOptimizationOptions {
   // Enables transposing all concatenations to the outer most dimension.
   bool outerDimConcat = false;
 
-  // Enables data tiling.
-  bool dataTiling = true;
-
   // Enables const-expr hoisting into globals.
   bool constExprHoisting = true;
 
@@ -219,6 +216,7 @@ struct DispatchCreationOptions {
 
   bool enableAggressiveFusion = false;
   bool enableFuseMultiUse = true;
+  bool dataTiling = true;
 
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<DispatchCreationOptions>;

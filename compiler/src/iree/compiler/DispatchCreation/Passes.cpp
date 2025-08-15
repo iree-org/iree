@@ -61,16 +61,6 @@ static llvm::cl::opt<bool> clEnableFuseHorizontalContractions(
         "Enables horizontal fusion of contractions with one common operand"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clEnableDataTiling(
-    "iree-dispatch-creation-experimental-data-tiling",
-    llvm::cl::desc("Enable data-tiling at flow level, i.e., it sets encodings "
-                   "in dispatch regions, hoist them out of region, and enables "
-                   "fusion for the set_encodings. This is still an "
-                   "experimental path. The current main data tiling path is "
-                   "iree-opt-data-tiling, which is on by default. To use this "
-                   "path, --iree-opt-data-tiling=false must be set as wells"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<DispatchCreation::EncodingOptions> clSetEncodingStrategy(
     "iree-dispatch-creation-set-encoding-strategy",
     llvm::cl::desc("Set the encoding strategy for operations."),
@@ -260,10 +250,10 @@ addDispatchRegionCreationPasses(OpPassManager &passManager,
       // increase CSE and deduplication opportunities.
       .addPass(DispatchCreation::createHoistUniformScalarComputePass);
 
-  // Experimental data tiling path. The intent of this path is to set encodings
-  // after fusion decisions have already been made, so encodings can be
-  // separated from compiler fusion decisions.
-  if (clEnableDataTiling) {
+  // The intent of this path is to set encodings after fusion decisions have
+  // already been made, so encodings can be separated from compiler fusion
+  // decisions.
+  if (options.dataTiling) {
     FunctionLikeNest(passManager)
         // Run canonicalizer first to make propagation easier.
         .addPass([&]() {
