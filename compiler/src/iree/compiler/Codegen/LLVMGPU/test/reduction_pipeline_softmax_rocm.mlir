@@ -95,8 +95,8 @@ func.func @dynamic_softmax() {
   return
 }
 
-
-// Finer details of this lowering are captured by the spirv pipeline test. Just
-// verify that warp reduction triggers.
+// Verify that LLVMVectorDistribute is used for dynamic softmax.
+// CHECK: LLVMGPUVectorDistribute workgroup_size = [1024, 1, 1] subgroup_size = 32
 //    CHECK-LABEL: func.func @dynamic_softmax
-// CHECK-COUNT-10: gpu.shuffle  xor {{.*}} : i32
+//     CHECK:    gpu.subgroup_reduce  maxnumf {{.*}} cluster(size = 32) : (f16) -> f16
+//     CHECK:    gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f16) -> f16
