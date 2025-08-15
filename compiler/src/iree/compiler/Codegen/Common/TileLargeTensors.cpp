@@ -188,6 +188,10 @@ static void processRegion(RewriterBase &rewriter, Region *region,
         if (isa<linalg::TransposeOp, linalg::CopyOp, linalg::FillOp>(op)) {
           continue;
         }
+        // Nothing to do for ops without parallel loops.
+        if (linalgOp.getNumParallelLoops() == 0) {
+          continue;
+        }
         tileToMaxVectorSize(rewriter, linalgOp, maxVectorSize);
         continue;
       }
