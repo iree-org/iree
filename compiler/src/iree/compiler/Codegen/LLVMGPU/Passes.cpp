@@ -1199,7 +1199,6 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
 
   FunctionLikeNest funcPassManager(modulePassManager);
   funcPassManager.addPass(createFoldTensorExtractOpPass)
-      .addPass(createLLVMGPUVectorLoweringPass)
       .addPass(createExpandGPUOpsPass)
       // Barrier elimination before we reach unstructured control flow.
       .addPass(createGpuEliminateBarriers)
@@ -1212,6 +1211,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
 
   // This pass needs to run before SCF -> CF.
   addLowerAndOptimizeAddressComputationPasses(funcPassManager);
+  funcPassManager.addPass(createLLVMGPUVectorLoweringPass);
 
   funcPassManager
       // Run checks on shared memory usage.
