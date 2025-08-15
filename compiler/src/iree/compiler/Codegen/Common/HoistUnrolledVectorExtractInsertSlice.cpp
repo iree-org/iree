@@ -31,8 +31,9 @@ namespace mlir::iree_compiler {
 ///      vector.extract_stirded_slice op.
 /// Returns failure if it can not find the set from vector unrolling artifacts.
 static FailureOr<SmallVector<vector::ExtractStridedSliceOp>>
-getUnrolledExtractSlices(BlockArgument srcTensor,
-                         SmallVector<vector::InsertStridedSliceOp> insertOps) {
+getUnrolledExtractSlices(
+    BlockArgument srcTensor,
+    SmallVectorImpl<vector::InsertStridedSliceOp> &insertOps) {
   SmallVector<vector::ExtractStridedSliceOp> res;
   for (auto user : srcTensor.getUsers()) {
     auto extractStridedSliceOp = dyn_cast<vector::ExtractStridedSliceOp>(user);
@@ -44,7 +45,7 @@ getUnrolledExtractSlices(BlockArgument srcTensor,
     return failure();
 
   std::reverse(res.begin(), res.end());
-  for (const auto [extractOp, insertOp] : llvm::zip_equal(res, insertOps)) {
+  for (auto [extractOp, insertOp] : llvm::zip_equal(res, insertOps)) {
     auto offset0 = insertOp.getOffsets();
     auto offset1 = extractOp.getOffsets();
     if (offset0 != offset1)
