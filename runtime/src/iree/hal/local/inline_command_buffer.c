@@ -372,10 +372,9 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
   iree_hal_local_executable_t* local_executable =
       iree_hal_local_executable_cast(executable);
 
-  iree_hal_executable_dispatch_attrs_v0_t dispatch_attrs = {0};
-  if (local_executable->dispatch_attrs) {
-    dispatch_attrs = local_executable->dispatch_attrs[entry_point];
-  }
+  // Dispatch attrs are always present after validation.
+  iree_hal_executable_dispatch_attrs_v0_t dispatch_attrs =
+      local_executable->dispatch_attrs[entry_point];
   const iree_host_size_t local_memory_size =
       dispatch_attrs.local_memory_pages *
           IREE_HAL_EXECUTABLE_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE +
