@@ -300,7 +300,7 @@ static bool isMatmulLike(linalg::LinalgOp &linalgOp) {
 /// Check if `op` is a linalg.reduce or a linalg.generic that has at least one
 /// reduction iterator.
 static bool hasReductionIterator(linalg::LinalgOp &op) {
-  return isa<linalg::ReduceOp, linalg::GenericOp>(op) &&
+  return isa<linalg::MatmulOp, linalg::ReduceOp, linalg::GenericOp>(op) &&
          llvm::any_of(op.getIteratorTypesArray(), linalg::isReductionIterator);
 }
 
