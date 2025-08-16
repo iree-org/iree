@@ -28,8 +28,13 @@ hal.executable private @single_specialization_executable {
         %8 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0], sizes = [1024, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x4096xf16>> -> tensor<1024x4096xf16>
         %9 = tensor.empty(%4) : tensor<?x1024xf32>
         %10 = linalg.fill ins(%cst : f32) outs(%9 : tensor<?x1024xf32>) -> tensor<?x1024xf32>
-        %11 = linalg.matmul_transpose_b {
-          iree_codegen.specialization_ranges = #util<int.assumption.multi_array[
+        %11 = linalg.matmul
+          indexing_maps = [
+            affine_map<(d0, d1, d2) -> (d0, d2)>,
+            affine_map<(d0, d1, d2) -> (d1, d2)>,
+            affine_map<(d0, d1, d2) -> (d0, d1)>
+          ]
+          {iree_codegen.specialization_ranges = #util<int.assumption.multi_array[
             [<umin = 128, umax = 4096, udiv = 128>, <umin = 128, umax = 4096, udiv = 128>, <umin = 64, udiv = 64>],
             [<umin = 4096, udiv = 256>, <umin = 4096, udiv = 256>, <udiv = 64>]]>}
           ins(%7, %8 : tensor<?x4096xf16>, tensor<1024x4096xf16>) outs(%10 : tensor<?x1024xf32>) -> tensor<?x1024xf32>
@@ -97,8 +102,13 @@ hal.executable private @multiple_specialization_executable {
         %8 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0], sizes = [1024, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x4096xf16>> -> tensor<1024x4096xf16>
         %9 = tensor.empty(%4) : tensor<?x1024xf32>
         %10 = linalg.fill ins(%cst : f32) outs(%9 : tensor<?x1024xf32>) -> tensor<?x1024xf32>
-        %11 = linalg.matmul_transpose_b {
-          iree_codegen.specialization_ranges = #util<int.assumption.multi_array[
+        %11 = linalg.matmul
+          indexing_maps = [
+            affine_map<(d0, d1, d2) -> (d0, d2)>,
+            affine_map<(d0, d1, d2) -> (d1, d2)>,
+            affine_map<(d0, d1, d2) -> (d0, d1)>
+          ]
+          {iree_codegen.specialization_ranges = #util<int.assumption.multi_array[
             [<umin = 128, umax = 4096, udiv = 128>, <umin = 128, umax = 4096, udiv = 128>, <umin = 64, udiv = 64>],
             [<umin = 0, udiv = 512>, <umin = 0, udiv = 512>, <udiv = 64>], [<udiv = 16>, <udiv = 16>, <udiv = 64>],
             [<umin = 0, udiv = 512>, <umin = 0, udiv = 512>, <udiv = 64>]]>}
@@ -165,8 +175,13 @@ hal.executable private @multiple_dimension_assume {
         %11 = iree_tensor_ext.dispatch.tensor.load %8, offsets = [0, 0], sizes = [%5, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x4096xf16>>{%5} -> tensor<?x4096xf16>
         %12 = tensor.empty(%6, %5) : tensor<?x?xf32>
         %13 = linalg.fill ins(%cst : f32) outs(%12 : tensor<?x?xf32>) -> tensor<?x?xf32>
-        %14 = linalg.matmul_transpose_b {
-          iree_codegen.specialization_ranges = #util<int.assumption.multi_array[
+        %14 = linalg.matmul
+          indexing_maps = [
+            affine_map<(d0, d1, d2) -> (d0, d2)>,
+            affine_map<(d0, d1, d2) -> (d1, d2)>,
+            affine_map<(d0, d1, d2) -> (d0, d1)>
+          ]
+          {iree_codegen.specialization_ranges = #util<int.assumption.multi_array[
             [<umin = 128, umax = 4096, udiv = 128>, <umin = 128, umax = 4096, udiv = 128>, <umin = 64, udiv = 64>],
             [<umin = 4096, udiv = 256>, <umin = 4096, udiv = 256>, <udiv = 64>]]>}
           ins(%10, %11 : tensor<?x4096xf16>, tensor<?x4096xf16>) outs(%13 : tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -265,8 +280,13 @@ hal.executable private @unrelated_int_assume {
         %8 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0], sizes = [1024, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x4096xf16>> -> tensor<1024x4096xf16>
         %9 = tensor.empty(%4) : tensor<?x1024xf32>
         %10 = linalg.fill ins(%cst : f32) outs(%9 : tensor<?x1024xf32>) -> tensor<?x1024xf32>
-        %11 = linalg.matmul_transpose_b {
-          iree_codegen.specialization_ranges = #util<int.assumption.multi_array[
+        %11 = linalg.matmul
+          indexing_maps = [
+            affine_map<(d0, d1, d2) -> (d0, d2)>,
+            affine_map<(d0, d1, d2) -> (d1, d2)>,
+            affine_map<(d0, d1, d2) -> (d0, d1)>
+          ]
+          {iree_codegen.specialization_ranges = #util<int.assumption.multi_array[
             [<umin = 4096, udiv = 256>, <udiv = 256>, <udiv = 64>]]>}
           ins(%7, %8 : tensor<?x4096xf16>, tensor<1024x4096xf16>) outs(%10 : tensor<?x1024xf32>) -> tensor<?x1024xf32>
         iree_tensor_ext.dispatch.tensor.store %11, %6, offsets = [0, 0], sizes = [%4, 1024], strides = [1, 1] : tensor<?x1024xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x1024xf32>>{%4}
@@ -327,8 +347,13 @@ hal.executable private @no_assume {
         %11 = iree_tensor_ext.dispatch.tensor.load %8, offsets = [0, 0], sizes = [%5, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x4096xf16>>{%5} -> tensor<?x4096xf16>
         %12 = tensor.empty(%6, %5) : tensor<?x?xf32>
         %13 = linalg.fill ins(%cst : f32) outs(%12 : tensor<?x?xf32>) -> tensor<?x?xf32>
-        %14 = linalg.matmul_transpose_b {
-          iree_codegen.specialization_ranges = #util<int.assumption.multi_array[
+        %14 = linalg.matmul
+          indexing_maps = [
+            affine_map<(d0, d1, d2) -> (d0, d2)>,
+            affine_map<(d0, d1, d2) -> (d1, d2)>,
+            affine_map<(d0, d1, d2) -> (d0, d1)>
+          ]
+          {iree_codegen.specialization_ranges = #util<int.assumption.multi_array[
             [<umin = 128, umax = 4096, udiv = 128>, <umin = 128, umax = 4096, udiv = 128>, <umin = 64, udiv = 64>],
             [<umin = 4096, udiv = 256>, <umin = 4096, udiv = 256>, <udiv = 64>]]>}
           ins(%10, %11 : tensor<?x4096xf16>, tensor<?x4096xf16>) outs(%13 : tensor<?x?xf32>) -> tensor<?x?xf32>

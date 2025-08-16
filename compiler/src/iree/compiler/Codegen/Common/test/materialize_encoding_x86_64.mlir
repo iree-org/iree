@@ -1668,7 +1668,14 @@ func.func @matmul_transpose_a_f32f32f32(%arg0: tensor<256x128xf32>, %arg1: tenso
   %6 = iree_encoding.set_encoding %arg0 : tensor<256x128xf32> -> tensor<256x128xf32, #encoding_lhs>
   %10 = iree_encoding.set_encoding %arg1 : tensor<256x512xf32> -> tensor<256x512xf32, #encoding_rhs>
   %14 = iree_encoding.set_encoding %arg2 : tensor<128x512xf32> -> tensor<128x512xf32, #encoding_result>
-  %15 = linalg.matmul_transpose_a ins(%6, %10 : tensor<256x128xf32, #encoding_lhs>, tensor<256x512xf32, #encoding_rhs>) outs(%14 : tensor<128x512xf32, #encoding_result>) -> tensor<128x512xf32, #encoding_result>
+  %15 = linalg.matmul
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d2, d0)>,
+      affine_map<(d0, d1, d2) -> (d2, d1)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ]
+    ins(%6, %10 : tensor<256x128xf32, #encoding_lhs>, tensor<256x512xf32, #encoding_rhs>)
+    outs(%14 : tensor<128x512xf32, #encoding_result>) -> tensor<128x512xf32, #encoding_result>
   %16 = iree_encoding.unset_encoding %15 : tensor<128x512xf32, #encoding_result> -> tensor<128x512xf32>
   return %16 : tensor<128x512xf32>
 }
@@ -1707,7 +1714,14 @@ func.func @matmul_transpose_b_f32f32f32(%arg0: tensor<128x256xf32>, %arg1: tenso
   %6 = iree_encoding.set_encoding %arg0 : tensor<128x256xf32> -> tensor<128x256xf32, #encoding_lhs>
   %10 = iree_encoding.set_encoding %arg1 : tensor<512x256xf32> -> tensor<512x256xf32, #encoding_rhs>
   %14 = iree_encoding.set_encoding %arg2 : tensor<128x512xf32> -> tensor<128x512xf32, #encoding_result>
-  %15 = linalg.matmul_transpose_b ins(%6, %10 : tensor<128x256xf32, #encoding_lhs>, tensor<512x256xf32, #encoding_rhs>) outs(%14 : tensor<128x512xf32, #encoding_result>) -> tensor<128x512xf32, #encoding_result>
+  %15 = linalg.matmul
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d2)>,
+      affine_map<(d0, d1, d2) -> (d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ]
+    ins(%6, %10 : tensor<128x256xf32, #encoding_lhs>, tensor<512x256xf32, #encoding_rhs>)
+    outs(%14 : tensor<128x512xf32, #encoding_result>) -> tensor<128x512xf32, #encoding_result>
   %16 = iree_encoding.unset_encoding %15 : tensor<128x512xf32, #encoding_result> -> tensor<128x512xf32>
   return %16 : tensor<128x512xf32>
 }
@@ -1746,7 +1760,14 @@ func.func @batch_matmul_transpose_a_f32f32f32(%arg0: tensor<2x256x128xf32>, %arg
   %7 = iree_encoding.set_encoding %arg0 : tensor<2x256x128xf32> -> tensor<2x256x128xf32, #encoding_lhs>
   %12 = iree_encoding.set_encoding %arg1 : tensor<2x256x512xf32> -> tensor<2x256x512xf32, #encoding_rhs>
   %17 = iree_encoding.set_encoding %arg2 : tensor<2x128x512xf32> -> tensor<2x128x512xf32, #encoding_result>
-  %18 = linalg.batch_matmul_transpose_a ins(%7, %12 : tensor<2x256x128xf32, #encoding_lhs>, tensor<2x256x512xf32, #encoding_rhs>) outs(%17 : tensor<2x128x512xf32, #encoding_result>) -> tensor<2x128x512xf32, #encoding_result>
+  %18 = linalg.batch_matmul
+    indexing_maps = [
+      affine_map<(d0, d1, d2, d3) -> (d0, d3, d1)>,
+      affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>,
+      affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+    ]
+    ins(%7, %12 : tensor<2x256x128xf32, #encoding_lhs>, tensor<2x256x512xf32, #encoding_rhs>)
+    outs(%17 : tensor<2x128x512xf32, #encoding_result>) -> tensor<2x128x512xf32, #encoding_result>
   %19 = iree_encoding.unset_encoding %18 : tensor<2x128x512xf32, #encoding_result> -> tensor<2x128x512xf32>
   return %19 : tensor<2x128x512xf32>
 }
@@ -1785,7 +1806,14 @@ func.func @batch_matmul_transpose_b_f32f32f32(%arg0: tensor<2x128x256xf32>, %arg
   %7 = iree_encoding.set_encoding %arg0 : tensor<2x128x256xf32> -> tensor<2x128x256xf32, #encoding_lhs>
   %12 = iree_encoding.set_encoding %arg1 : tensor<2x512x256xf32> -> tensor<2x512x256xf32, #encoding_rhs>
   %17 = iree_encoding.set_encoding %arg2 : tensor<2x128x512xf32> -> tensor<2x128x512xf32, #encoding_result>
-  %18 = linalg.batch_matmul_transpose_b ins(%7, %12 : tensor<2x128x256xf32, #encoding_lhs>, tensor<2x512x256xf32, #encoding_rhs>) outs(%17 : tensor<2x128x512xf32, #encoding_result>) -> tensor<2x128x512xf32, #encoding_result>
+  %18 = linalg.batch_matmul
+    indexing_maps = [
+      affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+      affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+      affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+    ]
+    ins(%7, %12 : tensor<2x128x256xf32, #encoding_lhs>, tensor<2x512x256xf32, #encoding_rhs>)
+    outs(%17 : tensor<2x128x512xf32, #encoding_result>) -> tensor<2x128x512xf32, #encoding_result>
   %19 = iree_encoding.unset_encoding %18 : tensor<2x128x512xf32, #encoding_result> -> tensor<2x128x512xf32>
   return %19 : tensor<2x128x512xf32>
 }

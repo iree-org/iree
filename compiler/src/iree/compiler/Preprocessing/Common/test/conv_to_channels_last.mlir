@@ -125,18 +125,29 @@ util.func @mmt_no_transpose(%arg0: tensor<2048x1280xf16>, %arg1: tensor<1280x128
   %zero = arith.constant 0.0 : f32
   %empty = tensor.empty() : tensor<2048x1280xf32>
   %filled = linalg.fill ins(%zero : f32) outs(%empty : tensor<2048x1280xf32>) -> tensor<2048x1280xf32>
-  %res = linalg.matmul_transpose_b
+  %res = linalg.matmul
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d2)>,
+      affine_map<(d0, d1, d2) -> (d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ]
     ins(%arg0, %arg1 : tensor<2048x1280xf16>, tensor<1280x1280xf16>)
     outs(%filled : tensor<2048x1280xf32>) -> tensor<2048x1280xf32>
   util.return %res : tensor<2048x1280xf32>
 }
+// CHECK-DAG:   #[[$MA:.*]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+// CHECK-DAG:   #[[$MB:.*]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+// CHECK-DAG:   #[[$MC:.*]] = affine_map<(d0, d1, d2) -> (d0, d1)>
 // CHECK-LABEL: @mmt_no_transpose
 // CHECK-NOT:     linalg.generic
-// CHECK:         linalg.matmul_transpose_b
+// CHECK:         linalg.matmul indexing_maps = [#[[$MA]], #[[$MB]], #[[$MC]]]
 
+// TILE16-DAG:   #[[$MA:.*]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+// TILE16-DAG:   #[[$MB:.*]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+// TILE16-DAG:   #[[$MC:.*]] = affine_map<(d0, d1, d2) -> (d0, d1)>
 // TILE16-LABEL: @mmt_no_transpose
 // TILE16-NOT:     linalg.generic
-// TILE16:         linalg.matmul_transpose_b
+// TILE16:         linalg.matmul indexing_maps = [#[[$MA]], #[[$MB]], #[[$MC]]]
 
 
 // -----

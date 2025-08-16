@@ -201,7 +201,12 @@ func.func @reshape_propagation_test(%rhs : tensor<2048x4096xf16>, %m : index)
   %init = tensor.empty(%0) : tensor<?x2048xf32>
   %init2 = tensor.empty(%0) : tensor<?x2048xf16>
   %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<?x2048xf32>) -> tensor<?x2048xf32>
-  %1 = linalg.matmul_transpose_b
+  %1 = linalg.matmul
+      indexing_maps = [
+        affine_map<(d0, d1, d2) -> (d0, d2)>,
+        affine_map<(d0, d1, d2) -> (d1, d2)>,
+        affine_map<(d0, d1, d2) -> (d0, d1)>
+      ]
       ins(%lhs, %rhs : tensor<?x4096xf16>, tensor<2048x4096xf16>)
       outs(%fill : tensor<?x2048xf32>) -> tensor<?x2048xf32>
   %2 = linalg.generic {

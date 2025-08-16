@@ -948,4 +948,16 @@ bool hasOnlyScalarInputs(linalg::GenericOp linalgOp) {
   return !foundNonScalar;
 }
 
+bool isPureMatmul(Operation *op) {
+  auto matmulOp = dyn_cast_or_null<linalg::MatmulOp>(op);
+  return matmulOp &&
+         linalg::MatmulOp::isDefaultIndexingMaps(matmulOp.getIndexingMaps());
+}
+
+bool isPureBatchMatmul(Operation *op) {
+  auto batchMatmulOp = dyn_cast_or_null<linalg::BatchMatmulOp>(op);
+  return batchMatmulOp && linalg::BatchMatmulOp::isDefaultIndexingMaps(
+                              batchMatmulOp.getIndexingMaps());
+}
+
 } // namespace mlir::iree_compiler::IREE::LinalgExt

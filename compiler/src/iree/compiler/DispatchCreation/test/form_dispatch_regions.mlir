@@ -603,18 +603,27 @@ util.func public @broadcasting_dequant_op(%arg0 : tensor<?x?xi8>,
       %12 = arith.extui %in : i8 to i32
       linalg.yield %12 : i32
     } -> tensor<?x?x?xi32>
-  %op = linalg.batch_matmul_transpose_b
+  %op = linalg.batch_matmul
+      indexing_maps = [
+        affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+        affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+      ]
       ins(%dequant, %rhs : tensor<?x?x?xi32>, tensor<?x?x?xi32>)
       outs(%init : tensor<?x?x?xi32>) -> tensor<?x?x?xi32>
   util.return %op : tensor<?x?x?xi32>
 }
+// CHECK-DAG: #[[$MA:.*]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+// CHECK-DAG: #[[$MB:.*]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+// CHECK-DAG: #[[$MC:.*]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK-LABEL: func public @broadcasting_dequant_op(
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xi8>
 //   CHECK-NOT:   flow.dispatch.region
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[ARG0]] :
 //       CHECK:   %[[RETURN:.+]] = flow.dispatch.region
-//       CHECK:     %[[MATMUL:.+]] = linalg.batch_matmul_transpose_b
+//       CHECK:     %[[MATMUL:.+]] = linalg.batch_matmul
+//  CHECK-SAME:         indexing_maps = [#[[$MA]], #[[$MB]], #[[$MC]]]
 //  CHECK-SAME:         ins(%[[GENERIC]],
 //       CHECK:     flow.return %[[MATMUL]]
 //       CHECK:   return %[[RETURN]]

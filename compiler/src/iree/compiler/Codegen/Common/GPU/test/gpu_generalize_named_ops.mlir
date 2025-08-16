@@ -4,7 +4,14 @@ func.func @transpose_matmul(%arg0: tensor<1x4096xf32>, %arg1: tensor<32000x4096x
   %cst = arith.constant 0.000000e+00 : f32
   %0 = tensor.empty() : tensor<1x32000xf32>
   %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<1x32000xf32>) -> tensor<1x32000xf32>
-  %2 = linalg.matmul_transpose_b ins(%arg0, %arg1 : tensor<1x4096xf32>, tensor<32000x4096xf32>) outs(%1 : tensor<1x32000xf32>) -> tensor<1x32000xf32>
+  %2 = linalg.matmul
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d2)>,
+      affine_map<(d0, d1, d2) -> (d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ]
+    ins(%arg0, %arg1 : tensor<1x4096xf32>, tensor<32000x4096xf32>)
+    outs(%1 : tensor<1x32000xf32>) -> tensor<1x32000xf32>
   return %2 : tensor<1x32000xf32>
 }
 
@@ -76,7 +83,14 @@ func.func @transpose_batch_matmul(%arg0: tensor<32x1x128xf16>, %arg1: tensor<32x
   %f0 = arith.constant 0.0 : f16
   %empty = tensor.empty(%dim) : tensor<32x1x?xf16>
   %fill = linalg.fill ins(%f0 : f16) outs(%empty : tensor<32x1x?xf16>) -> tensor<32x1x?xf16>
-  %2 = linalg.batch_matmul_transpose_b ins(%arg0, %arg1 : tensor<32x1x128xf16>, tensor<32x?x128xf16>) outs(%fill : tensor<32x1x?xf16>) -> tensor<32x1x?xf16>
+  %2 = linalg.batch_matmul
+    indexing_maps = [
+      affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+      affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+      affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+    ]
+    ins(%arg0, %arg1 : tensor<32x1x128xf16>, tensor<32x?x128xf16>)
+    outs(%fill : tensor<32x1x?xf16>) -> tensor<32x1x?xf16>
   return %2 : tensor<32x1x?xf16>
 }
 
@@ -99,9 +113,15 @@ func.func @lowering_config(%arg0: tensor<512x128xf16>, %arg1: tensor<512x128xf16
   %cst = arith.constant 0.000000e+00 : f32
   %0 = tensor.empty() : tensor<512x512xf32>
   %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<512x512xf32>) -> tensor<512x512xf32>
-  %2 = linalg.matmul_transpose_b {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[16, 16, 16]]>}
-         ins(%arg0, %arg1 : tensor<512x128xf16>, tensor<512x128xf16>)
-         outs(%1 : tensor<512x512xf32>) -> tensor<512x512xf32>
+  %2 = linalg.matmul
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d2)>,
+      affine_map<(d0, d1, d2) -> (d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ]
+    {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[16, 16, 16]]>}
+    ins(%arg0, %arg1 : tensor<512x128xf16>, tensor<512x128xf16>)
+    outs(%1 : tensor<512x512xf32>) -> tensor<512x512xf32>
   return %2 : tensor<512x512xf32>
 }
 

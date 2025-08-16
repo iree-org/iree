@@ -719,7 +719,7 @@ def generate_function(
     acc_tensor_type = f"tensor<{acc_r}x{acc_c}x{acc_type.value}>"
 
     if transpose_rhs:
-        op_name = "linalg.matmul_transpose_b"
+        op_name = "linalg.matmul indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>]"
     else:
         op_name = "linalg.matmul"
 

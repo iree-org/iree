@@ -373,7 +373,13 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
       %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 256], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x256xi8>> -> tensor<256x256xi8>
       %5 = tensor.empty() : tensor<256x256xi32>
       %6 = linalg.fill ins(%cst : i32) outs(%5 : tensor<256x256xi32>) -> tensor<256x256xi32>
-      %7 = linalg.matmul_transpose_b {lowering_config = #config} ins(%3, %4 : tensor<256x256xi8>, tensor<256x256xi8>) outs(%6 : tensor<256x256xi32>) -> tensor<256x256xi32>
+      %7 = linalg.matmul
+        indexing_maps = [
+          affine_map<(d0, d1, d2) -> (d0, d2)>,
+          affine_map<(d0, d1, d2) -> (d1, d2)>,
+          affine_map<(d0, d1, d2) -> (d0, d1)>
+        ]
+        {lowering_config = #config} ins(%3, %4 : tensor<256x256xi8>, tensor<256x256xi8>) outs(%6 : tensor<256x256xi32>) -> tensor<256x256xi32>
       iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [256, 256], strides = [1, 1] : tensor<256x256xi32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<256x256xi32>>
       return
     }

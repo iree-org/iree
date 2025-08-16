@@ -335,16 +335,27 @@ func.func @skinny_mmt() {
   %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [32000, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32000x4096xf16>> -> tensor<32000x4096xf16>
   %5 = tensor.empty() : tensor<2x32000xf16>
   %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<2x32000xf16>) -> tensor<2x32000xf16>
-  %7 = linalg.matmul_transpose_b ins(%3, %4 : tensor<2x4096xf16>, tensor<32000x4096xf16>) outs(%6 : tensor<2x32000xf16>) -> tensor<2x32000xf16>
+  %7 = linalg.matmul
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d2)>,
+      affine_map<(d0, d1, d2) -> (d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ]
+   ins(%3, %4 : tensor<2x4096xf16>, tensor<32000x4096xf16>)
+   outs(%6 : tensor<2x32000xf16>) -> tensor<2x32000xf16>
   iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [2, 32000], strides = [1, 1] : tensor<2x32000xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x32000xf16>>
   return
 }
+
+// CHECK-DAG: #[[$MA:.*]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+// CHECK-DAG: #[[$MB:.*]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+// CHECK-DAG: #[[$MC:.*]] = affine_map<(d0, d1, d2) -> (d0, d1)>
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 512]{{\]}}>
 //       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
 //       CHECK: func.func @skinny_mmt()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
-//       CHECK:   linalg.matmul_transpose_b
+//       CHECK:   linalg.matmul indexing_maps = [#[[$MA]], #[[$MB]], #[[$MC]]]
 //  CHECK-SAME:       lowering_config = #[[$CONFIG]]
 
 // -----
@@ -366,7 +377,14 @@ func.func @skinny_mmt() {
   %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [32000, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32000x4096xf16>> -> tensor<32000x4096xf16>
   %5 = tensor.empty() : tensor<32000x2xf16>
   %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<32000x2xf16>) -> tensor<32000x2xf16>
-  %7 = linalg.matmul_transpose_b ins(%4, %3 : tensor<32000x4096xf16>, tensor<2x4096xf16>) outs(%6 : tensor<32000x2xf16>) -> tensor<32000x2xf16>
+  %7 = linalg.matmul
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d2)>,
+      affine_map<(d0, d1, d2) -> (d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ]
+    ins(%4, %3 : tensor<32000x4096xf16>, tensor<2x4096xf16>)
+    outs(%6 : tensor<32000x2xf16>) -> tensor<32000x2xf16>
   iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [32000, 2], strides = [1, 1] : tensor<32000x2xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32000x2xf16>>
   return
 }
@@ -375,7 +393,7 @@ func.func @skinny_mmt() {
 //       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
 //       CHECK: func.func @skinny_mmt()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
-//       CHECK:   linalg.matmul_transpose_b
+//       CHECK:   linalg.matmul indexing_maps = [#[[$MA]], #[[$MB]], #[[$MC]]]
 //  CHECK-SAME:       lowering_config = #[[$CONFIG]]
 
 // -----
