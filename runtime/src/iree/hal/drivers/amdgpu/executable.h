@@ -73,7 +73,7 @@ iree_status_t iree_hal_amdgpu_executable_create(
 // is no host representation and objects are per agent. To get an agent-specific
 // kernel_object use iree_hal_amdgpu_executable_lookup_kernel_args_for_device.
 iree_status_t iree_hal_amdgpu_executable_lookup_kernel_args_for_host(
-    iree_hal_executable_t* executable, iree_host_size_t entry_point,
+    iree_hal_executable_t* executable, iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_amdgpu_device_kernel_args_t** out_kernel_args);
 
 // Returns metadata about an exported kernel function in device memory.
@@ -81,7 +81,7 @@ iree_status_t iree_hal_amdgpu_executable_lookup_kernel_args_for_host(
 // |device_ordinal| in the topology and cannot be used on any other device. The
 // returned pointers will remain valid for the lifetime of the executable.
 iree_status_t iree_hal_amdgpu_executable_lookup_kernel_args_for_device(
-    iree_hal_executable_t* executable, iree_host_size_t entry_point,
+    iree_hal_executable_t* executable, iree_hal_executable_export_ordinal_t export_ordinal,
     iree_host_size_t device_ordinal,
     const iree_hal_amdgpu_device_kernel_args_t** out_kernel_args);
 
