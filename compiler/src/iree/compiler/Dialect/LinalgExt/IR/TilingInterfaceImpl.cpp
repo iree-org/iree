@@ -670,7 +670,7 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
       },
       [&](OpBuilder &b, Location loc) {
         // Swap the pairs if false.
-        SmallVector<Value> indices(ivs.begin(), ivs.end());
+        SmallVector<Value> indices(ivs);
         Value ivPlusOne =
             b.create<arith::AddIOp>(loc, scfFor.getInductionVar(), one);
         for (int i = 0, e = getNumDpsInits(); i < e; ++i) {
@@ -840,7 +840,7 @@ LogicalResult FftOp::generateScalarImplementation(OpBuilder &b, Location loc,
 
   auto rank = getOperandRank();
   SmallVector<Value> operands;
-  SmallVector<OpFoldResult> lhsIvs(ivs.begin(), ivs.end());
+  SmallVector<OpFoldResult> lhsIvs(ivs);
   SmallVector<OpFoldResult> ones(rank, b.getIndexAttr(1));
   SmallVector<OpFoldResult> sizes(rank, b.getIndexAttr(1));
   sizes.back() = halfSize;
@@ -849,7 +849,7 @@ LogicalResult FftOp::generateScalarImplementation(OpBuilder &b, Location loc,
   operands.push_back(
       b.create<memref::SubViewOp>(loc, imag, lhsIvs, sizes, ones));
 
-  SmallVector<OpFoldResult> rhsIvs(ivs.begin(), ivs.end());
+  SmallVector<OpFoldResult> rhsIvs(ivs);
   rhsIvs.back() =
       b.create<arith::AddIOp>(loc, ivs.back(), halfSize).getResult();
   operands.push_back(
@@ -969,7 +969,7 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
         b.create<scf::YieldOp>(loc);
       },
       [&](OpBuilder &b, Location loc) {
-        SmallVector<Value> indices(ivs.begin(), ivs.end());
+        SmallVector<Value> indices(ivs);
         Value iv = indices[scanDim];
         Value ivMinusOne = b.create<arith::SubIOp>(loc, iv, one);
         indices[scanDim] = ivMinusOne;

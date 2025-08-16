@@ -466,7 +466,7 @@ static SmallVector<Operation *> getAllFusableProducers(TilingInterface op) {
     }
   }
 
-  SmallVector<Operation *> sortedOps(producers.begin(), producers.end());
+  auto sortedOps = llvm::to_vector_of<Operation *>(producers);
   mlir::computeTopologicalSorting(sortedOps);
   return sortedOps;
 }

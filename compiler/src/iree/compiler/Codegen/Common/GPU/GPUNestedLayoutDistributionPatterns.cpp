@@ -54,7 +54,7 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
   ArrayRef<int64_t> batchOffsets(offsets.begin(), rank);
   ArrayRef<int64_t> outerVectorOffsets(offsets.begin() + rank, rank);
 
-  SmallVector<Value> slicedIndices(indices.begin(), indices.end());
+  SmallVector<Value> slicedIndices(indices);
   for (const auto &[i, dim] : llvm::enumerate(permutationMap.getResults())) {
     // Broadcasted dimension offsets can be used as-is; the read index is
     // invariant of the thread in such cases (and illegal for writes).
@@ -272,7 +272,7 @@ static VectorValue projectVector(RewriterBase &rewriter, Location loc,
     slicedDims.erase(iterSpacePos);
   }
 
-  SmallVector<int64_t> transposePerm(slicedDims.begin(), slicedDims.end());
+  auto transposePerm = llvm::to_vector_of<int64_t>(slicedDims);
   transposePerm.append(remaningDims);
   auto transposed =
       rewriter.create<vector::TransposeOp>(loc, val, transposePerm);

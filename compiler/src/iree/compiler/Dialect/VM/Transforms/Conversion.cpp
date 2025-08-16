@@ -67,7 +67,7 @@ gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
 
   // NOTE: to ensure deterministic output we sort the result so that imports are
   // always added in a consistent order.
-  SmallVector<const T *> results = {resultSet.begin(), resultSet.end()};
+  auto results = llvm::to_vector_of<const T *, 4>(resultSet);
   llvm::sort(
       results, +[](const T *a, const T *b) {
         return a->getDialect()->getNamespace().compare(
