@@ -25,7 +25,7 @@ IREE_FLAG(string, executable_format, "",
 IREE_FLAG(string, executable_file, "",
           "Path to the executable library file to load.");
 
-IREE_FLAG(int32_t, entry_point, 0, "Entry point ordinal to run.");
+IREE_FLAG(int32_t, export_ordinal, 0, "Export ordinal to run.");
 
 IREE_FLAG(int32_t, workgroup_count_x, 1,
           "X dimension of the workgroup count defining the number of\n"
@@ -171,7 +171,7 @@ static iree_status_t iree_hal_executable_library_run(
   iree_byte_span_t local_memory = iree_make_byte_span(NULL, 0);
   iree_host_size_t local_memory_size =
       local_executable->dispatch_attrs
-          ? local_executable->dispatch_attrs[FLAG_entry_point]
+          ? local_executable->dispatch_attrs[FLAG_export_ordinal]
                     .local_memory_pages *
                 IREE_HAL_EXECUTABLE_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE
           : 0;
@@ -231,7 +231,8 @@ static iree_status_t iree_hal_executable_library_run(
   int64_t dispatch_count = 0;
   while (iree_benchmark_keep_running(benchmark_state, /*batch_count=*/1)) {
     IREE_RETURN_IF_ERROR(iree_hal_local_executable_issue_dispatch_inline(
-        local_executable, FLAG_entry_point, &dispatch_state, 0, local_memory));
+        local_executable, FLAG_export_ordinal, &dispatch_state, 0,
+        local_memory));
     ++dispatch_count;
   }
 
@@ -278,7 +279,7 @@ int main(int argc, char** argv) {
       "  --executable_format=embedded-elf\n"
       "  --executable_file=iree/hal/local/elf/testdata/"
       "elementwise_mul_x86_64.so\n"
-      "  --entry_point=0\n"
+      "  --export_ordinal=0\n"
       "  --workgroup_count_x=1\n"
       "  --workgroup_count_y=1\n"
       "  --workgroup_count_z=1\n"
