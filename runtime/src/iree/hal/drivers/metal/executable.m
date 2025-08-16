@@ -478,15 +478,15 @@ static void iree_hal_metal_executable_destroy(iree_hal_executable_t* base_execut
 }
 
 iree_status_t iree_hal_metal_executable_lookup_pipeline(
-    const iree_hal_executable_t* base_executable, uint32_t entry_point,
+    const iree_hal_executable_t* base_executable, iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_metal_pipeline_t** out_pipeline) {
   const iree_hal_metal_executable_t* executable =
       iree_hal_metal_executable_const_cast(base_executable);
-  if (entry_point >= executable->pipeline_count) {
+  if (export_ordinal >= executable->pipeline_count) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "invalid entry point ordinal %u",
-                            entry_point);
+                            export_ordinal);
   }
-  *out_pipeline = &executable->pipelines[entry_point];
+  *out_pipeline = &executable->pipelines[export_ordinal];
   return iree_ok_status();
 }
 

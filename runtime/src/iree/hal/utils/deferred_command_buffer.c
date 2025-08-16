@@ -684,7 +684,7 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_collective(
 typedef struct iree_hal_cmd_dispatch_t {
   iree_hal_cmd_header_t header;
   iree_hal_executable_t* executable;
-  int32_t entry_point;
+  iree_hal_executable_export_ordinal_t export_ordinal;
   iree_hal_dispatch_config_t config;
   iree_const_byte_span_t constants;
   iree_hal_buffer_ref_list_t bindings;
@@ -693,7 +693,7 @@ typedef struct iree_hal_cmd_dispatch_t {
 
 static iree_status_t iree_hal_deferred_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point,
+    iree_hal_executable_t* executable, iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   iree_hal_deferred_command_buffer_t* command_buffer =
@@ -717,7 +717,7 @@ static iree_status_t iree_hal_deferred_command_buffer_dispatch(
       &command_buffer->cmd_list, IREE_HAL_CMD_DISPATCH, total_size,
       (void**)&cmd));
   cmd->executable = executable;
-  cmd->entry_point = entry_point;
+  cmd->export_ordinal = export_ordinal;
   memcpy(&cmd->config, &config, sizeof(cmd->config));
   cmd->flags = flags;
 
@@ -758,7 +758,7 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_dispatch(
       .values = binding_refs,
   };
   return iree_hal_command_buffer_dispatch(
-      target_command_buffer, cmd->executable, cmd->entry_point, config,
+      target_command_buffer, cmd->executable, cmd->export_ordinal, config,
       cmd->constants, binding_ref_list, cmd->flags);
 }
 

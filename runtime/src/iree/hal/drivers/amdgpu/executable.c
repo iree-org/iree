@@ -873,37 +873,37 @@ static void iree_hal_amdgpu_executable_destroy(
 }
 
 iree_status_t iree_hal_amdgpu_executable_lookup_kernel_args_for_host(
-    iree_hal_executable_t* base_executable, iree_host_size_t entry_point,
+    iree_hal_executable_t* base_executable, iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_amdgpu_device_kernel_args_t** out_kernel_args) {
   const iree_hal_amdgpu_executable_t* executable =
       iree_hal_amdgpu_executable_const_cast(base_executable);
   *out_kernel_args = NULL;
 
-  if (IREE_UNLIKELY(entry_point >= executable->kernel_count)) {
+  if (IREE_UNLIKELY(export_ordinal >= executable->kernel_count)) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "export ordinal %" PRIhsz
+                            "export ordinal %" PRIu32
                             " out of range; executable has %" PRIhsz " exports",
-                            entry_point, executable->kernel_count);
+                            export_ordinal, executable->kernel_count);
   }
 
-  *out_kernel_args = &executable->host_kernel_args[entry_point];
+  *out_kernel_args = &executable->host_kernel_args[export_ordinal];
 
   return iree_ok_status();
 }
 
 iree_status_t iree_hal_amdgpu_executable_lookup_kernel_args_for_device(
-    iree_hal_executable_t* base_executable, iree_host_size_t entry_point,
+    iree_hal_executable_t* base_executable, iree_hal_executable_export_ordinal_t export_ordinal,
     iree_host_size_t device_ordinal,
     const iree_hal_amdgpu_device_kernel_args_t** out_kernel_args) {
   const iree_hal_amdgpu_executable_t* executable =
       iree_hal_amdgpu_executable_const_cast(base_executable);
   *out_kernel_args = NULL;
 
-  if (IREE_UNLIKELY(entry_point >= executable->kernel_count)) {
+  if (IREE_UNLIKELY(export_ordinal >= executable->kernel_count)) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "export ordinal %" PRIhsz
+                            "export ordinal %" PRIu32
                             " out of range; executable has %" PRIhsz " exports",
-                            entry_point, executable->kernel_count);
+                            export_ordinal, executable->kernel_count);
   } else if (IREE_UNLIKELY(device_ordinal >= executable->device_count)) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "device ordinal %" PRIhsz
@@ -913,7 +913,7 @@ iree_status_t iree_hal_amdgpu_executable_lookup_kernel_args_for_device(
   }
 
   *out_kernel_args =
-      &executable->device_kernel_args[device_ordinal][entry_point];
+      &executable->device_kernel_args[device_ordinal][export_ordinal];
 
   return iree_ok_status();
 }

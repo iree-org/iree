@@ -52,7 +52,7 @@ iree_status_t iree_hal_hip_native_executable_create(
 // Returns the kernel launch parameters for the given |entry_point| in the
 // |executable|.
 iree_status_t iree_hal_hip_native_executable_lookup_kernel_params(
-    iree_hal_executable_t* executable, int32_t entry_point,
+    iree_hal_executable_t* executable, iree_hal_executable_export_ordinal_t export_ordinal,
     iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_hip_kernel_params_t** out_params);
 

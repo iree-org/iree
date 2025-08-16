@@ -685,7 +685,8 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch_bind(
 
 static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point,
+    iree_hal_executable_t* executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
@@ -701,7 +702,7 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch(
 
   const iree_hal_vulkan_pipeline_t* pipeline = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_native_executable_lookup_pipeline(
-      executable, entry_point, &pipeline));
+      executable, export_ordinal, &pipeline));
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
   iree_hal_vulkan_source_location_t source_location = pipeline->source_location;

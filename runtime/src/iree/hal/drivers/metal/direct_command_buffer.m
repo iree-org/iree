@@ -842,7 +842,7 @@ static iree_status_t iree_hal_metal_command_buffer_collective(
 // Prepares kernels and argument buffers needed for kernel dispatches.
 static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_executable_t* executable,
-    int32_t entry_point, const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
+    iree_hal_executable_export_ordinal_t export_ordinal, const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   iree_hal_metal_command_buffer_t* command_buffer =
       iree_hal_metal_command_buffer_cast(base_command_buffer);
@@ -865,7 +865,7 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch(
 
   const iree_hal_metal_pipeline_t* pipeline = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_metal_executable_lookup_pipeline(executable, entry_point, &pipeline));
+      z0, iree_hal_metal_executable_lookup_pipeline(executable, export_ordinal, &pipeline));
 
   // Allocate the command segment and keep track of all necessary API data.
   uint8_t* storage_base = NULL;

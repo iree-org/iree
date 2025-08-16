@@ -493,7 +493,7 @@ static void iree_hal_hip_native_executable_destroy(
 }
 
 iree_status_t iree_hal_hip_native_executable_lookup_kernel_params(
-    iree_hal_executable_t* base_executable, int32_t ordinal,
+    iree_hal_executable_t* base_executable, iree_hal_executable_export_ordinal_t ordinal,
     iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_hip_kernel_params_t** out_params) {
   *out_params = NULL;

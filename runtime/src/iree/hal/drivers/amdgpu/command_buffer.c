@@ -1620,7 +1620,7 @@ static iree_status_t iree_hal_amdgpu_command_buffer_collective(
 // will be used.
 static iree_status_t iree_hal_amdgpu_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point,
+    iree_hal_executable_t* executable, iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   iree_hal_amdgpu_command_buffer_t* command_buffer =
@@ -1691,7 +1691,7 @@ static iree_status_t iree_hal_amdgpu_command_buffer_dispatch(
   // the same export (just different kernel object pointers).
   const iree_hal_amdgpu_device_kernel_args_t* host_kernel_args = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_executable_lookup_kernel_args_for_host(
-      executable, entry_point, &host_kernel_args));
+      executable, export_ordinal, &host_kernel_args));
   if (IREE_UNLIKELY(constants.data_length !=
                     host_kernel_args->constant_count * sizeof(uint32_t))) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -1823,7 +1823,7 @@ static iree_status_t iree_hal_amdgpu_command_buffer_dispatch(
     const iree_hal_amdgpu_device_kernel_args_t* device_kernel_args = NULL;
     IREE_RETURN_IF_ERROR(
         iree_hal_amdgpu_executable_lookup_kernel_args_for_device(
-            executable, entry_point, device_ordinal, &device_kernel_args));
+            executable, export_ordinal, device_ordinal, &device_kernel_args));
 
     cmd->config.flags = cmd_flags;
     cmd->config.kernel_args = device_kernel_args;
