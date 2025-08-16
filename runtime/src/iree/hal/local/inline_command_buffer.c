@@ -355,7 +355,8 @@ static iree_status_t iree_hal_inline_command_buffer_collective(
 
 static iree_status_t iree_hal_inline_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point,
+    iree_hal_executable_t* executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   iree_hal_inline_command_buffer_t* command_buffer =
@@ -374,7 +375,7 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
 
   // Dispatch attrs are always present after validation.
   iree_hal_executable_dispatch_attrs_v0_t dispatch_attrs =
-      local_executable->dispatch_attrs[entry_point];
+      local_executable->dispatch_attrs[export_ordinal];
   const iree_host_size_t local_memory_size =
       dispatch_attrs.local_memory_pages *
           IREE_HAL_EXECUTABLE_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE +
@@ -482,7 +483,7 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
   iree_fpu_state_t fpu_state =
       iree_fpu_state_push(IREE_FPU_STATE_FLAG_FLUSH_DENORMALS_TO_ZERO);
   iree_status_t status = iree_hal_local_executable_issue_dispatch_inline(
-      local_executable, entry_point, dispatch_state,
+      local_executable, export_ordinal, dispatch_state,
       command_buffer->state.processor_id, local_memory);
   iree_fpu_state_pop(fpu_state);
 

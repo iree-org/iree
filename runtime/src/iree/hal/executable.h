@@ -23,6 +23,10 @@ typedef struct iree_hal_device_t iree_hal_device_t;
 // iree_hal_executable_t
 //===----------------------------------------------------------------------===//
 
+// An ordinal of an exported function from an executable.
+// Ordinals begin at 0 and go up to the total export count.
+typedef uint32_t iree_hal_executable_export_ordinal_t;
+
 // Handle to a loaded executable.
 // Loading of executables routes through an executable cache, allowing for
 // context-aware scoped caches. HAL implementations can use this to preserve
