@@ -125,9 +125,10 @@ func.func @promote_result(%a : tensor<?x?xf32>, %b : tensor<?x?xf32>, %mdim : in
 //       CHECK:   %[[COPY1:.+]] = linalg.copy
 //  CHECK-SAME:       ins(%[[MATMUL]] : tensor<?x?xf32>) outs(%[[ALLOC]] : tensor<?x?xf32>)
 //  CHECK-SAME:       -> tensor<?x?xf32>
+//       CHECK:   %[[BARRIER:.+]] = iree_codegen.fusion_barrier %[[COPY1]]
 //       CHECK:   %[[COPY2:.+]] = linalg.copy
 //  CHECK-SAME:       {lowering_config = #iree_gpu.derived_thread_config}
-//  CHECK-SAME:       ins(%[[COPY1]] : tensor<?x?xf32>)
+//  CHECK-SAME:       ins(%[[BARRIER]] : tensor<?x?xf32>)
 //       CHECK:   return %[[COPY2]] : tensor<?x?xf32>
 
 // -----
@@ -152,7 +153,8 @@ func.func @promote_padded_result(%a : tensor<?x?xf32>, %b : tensor<?x?xf32>, %md
 //       CHECK:   %[[ALLOC:.+]] = bufferization.alloc_tensor
 //       CHECK:   %[[COPY1:.+]] = linalg.copy
 //  CHECK-SAME:       ins(%[[MATMUL]] : tensor<?x?xf32>) outs(%[[ALLOC]] : tensor<?x?xf32>)
-//       CHECK:   %[[EXTRACT:.+]] = tensor.extract_slice %[[COPY1]]
+//       CHECK:   %[[BARRIER:.+]] = iree_codegen.fusion_barrier %[[COPY1]]
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract_slice %[[BARRIER]]
 //       CHECK:   %[[COPY2:.+]] = linalg.copy
 //  CHECK-SAME:       {lowering_config = #iree_gpu.derived_thread_config}
 //  CHECK-SAME:       ins(%[[EXTRACT]] : tensor<?x?xf32>)
