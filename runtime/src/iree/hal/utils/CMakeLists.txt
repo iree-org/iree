@@ -187,6 +187,20 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    queue_emulation
+  HDRS
+    "queue_emulation.h"
+  SRCS
+    "queue_emulation.c"
+  DEPS
+    iree::base
+    iree::base::internal
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     resource_set
   HDRS
     "resource_set.h"
@@ -287,6 +301,22 @@ iree_cc_library(
     ::semaphore_base
     iree::base
     iree::base::internal::arena
+    iree::base::internal::synchronization
+    iree::base::internal::threading
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    queue_host_call_emulation
+  HDRS
+    "queue_host_call_emulation.h"
+  SRCS
+    "queue_host_call_emulation.c"
+  DEPS
+    iree::base
+    iree::base::internal
     iree::base::internal::synchronization
     iree::base::internal::threading
     iree::hal
