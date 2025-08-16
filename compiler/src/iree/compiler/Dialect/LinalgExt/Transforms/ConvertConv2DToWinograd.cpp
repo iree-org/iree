@@ -275,7 +275,7 @@ public:
         winogradInput, loc, rewriter, collapsedShape, reassociations);
 
     // Add BatchMatmulOp
-    SmallVector<int64_t> bmmShape(collapsedShape.begin(), collapsedShape.end());
+    SmallVector<int64_t> bmmShape(collapsedShape);
     SmallVector<int64_t> outputShape(outputType.getShape());
     if (isNchwFchw) {
       permute<IREE::LinalgExt::Permutation::NCHW_TO_NHWC>(outputShape);

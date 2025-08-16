@@ -238,16 +238,14 @@ inferScaledContractionDimsImpl(ArrayRef<AffineMap> indexingMaps,
 
   // Return each set in sorted order.
   ScaledContractionDimensions dimensions{
-      SmallVector<unsigned, 2>(batches.begin(), batches.end()),
-      SmallVector<unsigned, 2>(ac.begin(), ac.end()),
-      SmallVector<unsigned, 2>(bc.begin(), bc.end()),
-      SmallVector<unsigned, 2>(sa.begin(), sa.end()),
-      SmallVector<unsigned, 2>(ra.begin(), ra.end())};
-  llvm::sort(dimensions.batch.begin(), dimensions.batch.end());
-  llvm::sort(dimensions.m.begin(), dimensions.m.end());
-  llvm::sort(dimensions.n.begin(), dimensions.n.end());
-  llvm::sort(dimensions.k.begin(), dimensions.k.end());
-  llvm::sort(dimensions.kB.begin(), dimensions.kB.end());
+      llvm::to_vector_of<unsigned, 2>(batches),
+      llvm::to_vector_of<unsigned, 2>(ac), llvm::to_vector_of<unsigned, 2>(bc),
+      llvm::to_vector_of<unsigned, 2>(sa), llvm::to_vector_of<unsigned, 2>(ra)};
+  llvm::sort(dimensions.batch);
+  llvm::sort(dimensions.m);
+  llvm::sort(dimensions.n);
+  llvm::sort(dimensions.k);
+  llvm::sort(dimensions.kB);
   return dimensions;
 }
 

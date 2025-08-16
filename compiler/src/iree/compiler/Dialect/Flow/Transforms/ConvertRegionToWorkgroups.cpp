@@ -143,7 +143,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   }
 
   // Create empty dispatch region.
-  SmallVector<Value> arguments(argumentsSet.begin(), argumentsSet.end());
+  auto arguments = llvm::to_vector_of<Value>(argumentsSet);
   arguments.append(argumentDims);
   for (unsigned i = 0; i < numResults; ++i) {
     // Tied arguments already have their dynamic result dims in `arguments`. Do

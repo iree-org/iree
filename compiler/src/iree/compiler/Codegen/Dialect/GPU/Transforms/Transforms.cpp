@@ -1642,7 +1642,7 @@ struct UnrollInnerTiledPattern
         loc, dstVecType, rewriter.getZeroAttr(dstVecType));
     for (const auto &[offsets, partialResult] : accCache) {
       SmallVector<int64_t> dstStrides(offsets.size() + innerAccShape.size(), 1);
-      SmallVector<int64_t> fullOffsets(offsets.begin(), offsets.end());
+      SmallVector<int64_t> fullOffsets(offsets);
       fullOffsets.append(innerAccShape.size(), 0);
       result = rewriter.create<vector::InsertStridedSliceOp>(
           loc, partialResult, result, fullOffsets, dstStrides);

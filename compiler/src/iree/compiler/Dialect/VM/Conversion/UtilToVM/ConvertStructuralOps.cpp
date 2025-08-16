@@ -268,7 +268,7 @@ struct CallOpConversion : public OpConversionPattern<IREE::Util::CallOp> {
     // Otherwise this is a direct call to an internal function.
     auto newOp = rewriter.create<IREE::VM::CallOp>(loc, calleeName, resultTypes,
                                                    operands);
-    return SmallVector<Value>(newOp.result_begin(), newOp.result_end());
+    return llvm::to_vector_of<Value>(newOp.getResults());
   }
 
   // Converts a call to an import that may be optional.

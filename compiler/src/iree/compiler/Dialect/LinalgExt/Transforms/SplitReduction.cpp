@@ -48,7 +48,7 @@ SmallVector<int64_t> getExpandedShape(ArrayRef<int64_t> shape,
 SmallVector<int64_t> getCollapsedShape(ArrayRef<int64_t> shape,
                                        int64_t splitReductionRatio, int64_t k,
                                        int64_t targetDim) {
-  SmallVector<int64_t> ans(shape.begin(), shape.end());
+  SmallVector<int64_t> ans(shape);
   ans[targetDim] = k * splitReductionRatio;
   return ans;
 }

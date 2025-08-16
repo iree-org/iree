@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -386,7 +387,7 @@ Value QuantizedMatmulRewriter::getGroupReductionInit(Value input) {
   Value zero = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getFloatAttr(inputType.getElementType(), 0.0));
   SmallVector<int64_t> inputShape(inputType.getShape());
-  SmallVector<int64_t> outputShape(inputShape.begin(), inputShape.end() - 1);
+  SmallVector<int64_t> outputShape(llvm::drop_end(inputShape));
   RankedTensorType outputType =
       RankedTensorType::get(outputShape, inputType.getElementType());
   Value emptyOut = rewriter.create<tensor::EmptyOp>(

@@ -302,8 +302,8 @@ findFileInPaths(StringRef filePath, ArrayRef<std::string> searchPaths) {
   // Search each path in turn for a file that exists.
   // It doesn't mean we can open it but we'll get a better error out of the
   // actual open attempt than what we could produce here.
-  for (auto searchPath : searchPaths) {
-    SmallVector<char> tryPath{searchPath.begin(), searchPath.end()};
+  for (const std::string &searchPath : searchPaths) {
+    auto tryPath = llvm::to_vector_of<char>(searchPath);
     llvm::sys::path::append(tryPath, filePath);
     if (llvm::sys::fs::exists(Twine(tryPath))) {
       return Twine(tryPath).str();
