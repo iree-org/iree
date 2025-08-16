@@ -35,6 +35,8 @@ iree_hal_cts_test_suite(
   EXCLUDED_TESTS
     # HAL event is unimplemented for now.
     "event"
+    # TODO: implement executable reflection.
+    "executable"
     # These tests fail with:
     #     UNAVAILABLE; missing hipDrvGraphAddMemcpyNode symbol;
     #     cannot use graph-based command buffer
@@ -69,6 +71,8 @@ iree_hal_cts_test_suite(
   EXCLUDED_TESTS
     # HAL event is unimplemented for now.
     "event"
+    # TODO: implement executable reflection.
+    "executable"
     # These tests fail with:
     #     UNAVAILABLE; missing hipDrvGraphAddMemcpyNode symbol;
     #     cannot use graph-based command buffer
@@ -106,6 +110,8 @@ iree_hal_cts_test_suite(
   EXCLUDED_TESTS
     # HAL event is unimplemented for now.
     "event"
+    # TODO: implement executable reflection.
+    "executable"
     # These tests fail with:
     #     UNAVAILABLE; missing hipDrvGraphAddMemcpyNode symbol;
     #     cannot use graph-based command buffer
@@ -144,6 +150,8 @@ iree_hal_cts_test_suite(
   EXCLUDED_TESTS
     # HAL event is unimplemented for now.
     "event"
+    # TODO: implement executable reflection.
+    "executable"
     # These tests fail with:
     #     UNAVAILABLE; missing hipDrvGraphAddMemcpyNode symbol;
     #     cannot use graph-based command buffer
@@ -183,6 +191,8 @@ iree_hal_cts_test_suite(
   EXCLUDED_TESTS
     # HAL event is unimplemented for now.
     "event"
+    # TODO: implement executable reflection.
+    "executable"
     # These tests fail with:
     #     UNAVAILABLE; missing hipDrvGraphAddMemcpyNode symbol;
     #     cannot use graph-based command buffer
@@ -223,6 +233,8 @@ iree_hal_cts_test_suite(
   EXCLUDED_TESTS
     # HAL event is unimplemented for now.
     "event"
+    # TODO: implement executable reflection.
+    "executable"
     # These tests fail with:
     #     UNAVAILABLE; missing hipDrvGraphAddMemcpyNode symbol;
     #     cannot use graph-based command buffer

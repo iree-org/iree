@@ -45,6 +45,8 @@ iree_hal_cts_test_suite(
     "command_buffer_update_buffer"
     # HAL event is unimplemented for now.
     "event"
+    # TODO: implement executable reflection.
+    "executable"
     "file"
   LABELS
     driver=amdgpu

@@ -33,6 +33,28 @@ void iree_hal_executable_library_deinitialize_imports(
     iree_hal_executable_environment_v0_t* environment,
     iree_allocator_t host_allocator);
 
+// Returns the number of exports in the library.
+iree_host_size_t iree_hal_executable_library_export_count(
+    const iree_hal_executable_library_v0_t* library);
+
+// Returns information about an export at the given ordinal.
+iree_status_t iree_hal_executable_library_export_info(
+    const iree_hal_executable_library_v0_t* library,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_export_info_t* out_info);
+
+// Populates parameter information for an export.
+iree_status_t iree_hal_executable_library_export_parameters(
+    const iree_hal_executable_library_v0_t* library,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_host_size_t capacity,
+    iree_hal_executable_export_parameter_t* out_parameters);
+
+// Looks up an export ordinal by name.
+iree_status_t iree_hal_executable_library_lookup_export_by_name(
+    const iree_hal_executable_library_v0_t* library, iree_string_view_t name,
+    iree_hal_executable_export_ordinal_t* out_export_ordinal);
+
 #if defined(IREE_HAL_EXECUTABLE_LIBRARY_CALL_HOOK)
 #if !IREE_HAVE_ATTRIBUTE_WEAK
 #error IREE_HAL_EXECUTABLE_LIBRARY_CALL_HOOK requires toolchain support for weak symbols.

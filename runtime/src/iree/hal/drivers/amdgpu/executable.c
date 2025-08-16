@@ -873,7 +873,8 @@ static void iree_hal_amdgpu_executable_destroy(
 }
 
 iree_status_t iree_hal_amdgpu_executable_lookup_kernel_args_for_host(
-    iree_hal_executable_t* base_executable, iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_t* base_executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_amdgpu_device_kernel_args_t** out_kernel_args) {
   const iree_hal_amdgpu_executable_t* executable =
       iree_hal_amdgpu_executable_const_cast(base_executable);
@@ -892,7 +893,8 @@ iree_status_t iree_hal_amdgpu_executable_lookup_kernel_args_for_host(
 }
 
 iree_status_t iree_hal_amdgpu_executable_lookup_kernel_args_for_device(
-    iree_hal_executable_t* base_executable, iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_t* base_executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
     iree_host_size_t device_ordinal,
     const iree_hal_amdgpu_device_kernel_args_t** out_kernel_args) {
   const iree_hal_amdgpu_executable_t* executable =
@@ -918,6 +920,55 @@ iree_status_t iree_hal_amdgpu_executable_lookup_kernel_args_for_device(
   return iree_ok_status();
 }
 
+static iree_host_size_t iree_hal_amdgpu_executable_export_count(
+    iree_hal_executable_t* base_executable) {
+  iree_hal_amdgpu_executable_t* executable =
+      iree_hal_amdgpu_executable_cast(base_executable);
+  // TODO(amdgpu): return the total number of exports in the executable.
+  (void)executable;
+  return 0;
+}
+
+static iree_status_t iree_hal_amdgpu_executable_export_info(
+    iree_hal_executable_t* base_executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_export_info_t* out_info) {
+  iree_hal_amdgpu_executable_t* executable =
+      iree_hal_amdgpu_executable_cast(base_executable);
+  (void)executable;
+  // TODO(amdgpu): return export information from kernel metadata.
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "reflection not implemented");
+}
+
+static iree_status_t iree_hal_amdgpu_executable_export_parameters(
+    iree_hal_executable_t* base_executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_host_size_t capacity,
+    iree_hal_executable_export_parameter_t* out_parameters) {
+  iree_hal_amdgpu_executable_t* executable =
+      iree_hal_amdgpu_executable_cast(base_executable);
+  (void)executable;
+  // TODO(amdgpu): return export parameter information from kernel metadata.
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "parameter reflection not implemented");
+}
+
+static iree_status_t iree_hal_amdgpu_executable_lookup_export_by_name(
+    iree_hal_executable_t* base_executable, iree_string_view_t name,
+    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+  iree_hal_amdgpu_executable_t* executable =
+      iree_hal_amdgpu_executable_cast(base_executable);
+  (void)executable;
+  // TODO(amdgpu): lookup the export ordinal by name.
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "reflection not implemented");
+}
+
 static const iree_hal_executable_vtable_t iree_hal_amdgpu_executable_vtable = {
     .destroy = iree_hal_amdgpu_executable_destroy,
+    .export_count = iree_hal_amdgpu_executable_export_count,
+    .export_info = iree_hal_amdgpu_executable_export_info,
+    .export_parameters = iree_hal_amdgpu_executable_export_parameters,
+    .lookup_export_by_name = iree_hal_amdgpu_executable_lookup_export_by_name,
 };

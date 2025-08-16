@@ -24,6 +24,8 @@ iree_hal_cts_test_suite(
   EXCLUDED_TESTS
     # HAL event is unimplemented for now.
     "event"
+    # TODO: implement executable reflection.
+    "executable"
   LABELS
     driver=cuda
     requires-gpu-nvidia
@@ -49,6 +51,8 @@ iree_hal_cts_test_suite(
   EXCLUDED_TESTS
     # HAL event is unimplemented for now.
     "event"
+    # TODO: implement executable reflection.
+    "executable"
   LABELS
     driver=cuda
     requires-gpu-nvidia
