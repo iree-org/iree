@@ -49,14 +49,17 @@ generalizeCandidates(MLIRContext *context,
 namespace {
 struct GPUGeneralizeNamedOpsPass final
     : impl::GPUGeneralizeNamedOpsPassBase<GPUGeneralizeNamedOpsPass> {
+  using GPUGeneralizeNamedOpsPassBase::GPUGeneralizeNamedOpsPassBase;
+
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
     SmallVector<linalg::LinalgOp> namedOpCandidates;
     funcOp.walk([&](linalg::LinalgOp linalgOp) {
-      if (isa<linalg::BatchMatmulTransposeBOp, linalg::MatmulTransposeBOp,
-              linalg::VecmatOp, linalg::MatvecOp, linalg::TransposeOp>(
-              linalgOp.getOperation()))
+      if (isa<linalg::BatchMatmulOp, linalg::BatchMatmulTransposeBOp,
+              linalg::MatmulOp, linalg::MatvecOp, linalg::TransposeOp,
+              linalg::MatmulTransposeBOp, linalg::VecmatOp>(linalgOp)) {
         namedOpCandidates.push_back(linalgOp);
+      }
     });
 
     if (failed(generalizeCandidates(&getContext(), namedOpCandidates))) {
