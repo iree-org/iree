@@ -388,3 +388,62 @@ func.func @consumer_unfusable_due_to_init(%arg0: tensor<?xi32>, %arg1: tensor<?x
 //       DISPATCH-SCOPE:     scf.forall.in_parallel
 //       DISPATCH-SCOPE:       tensor.parallel_insert_slice
 //       DISPATCH-SCOPE:   linalg.generic
+
+// -----
+
+func.func @no_fold_unpack_op_with_lowering_config(%source : tensor<2x2x128x128xf32>, %result : memref<256x256xf32>) {
+  %dest = tensor.empty() : tensor<256x256xf32>
+  %unpack = linalg.unpack %source
+      outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [128, 128]
+      into %dest {lowering_config = #iree_codegen.lowering_config<tile_sizes = []>}
+      : tensor<2x2x128x128xf32> -> tensor<256x256xf32>
+  iree_codegen.store_to_buffer %unpack, %result : tensor<256x256xf32> into memref<256x256xf32>
+  return
+}
+
+// DISPATCH-SCOPE-LABEL: @no_fold_unpack_op_with_lowering_config
+//       DISPATCH-SCOPE:   linalg.unpack
+//   DISPATCH-SCOPE-NOT:   iree_linalg_ext.map_scatter
+
+// -----
+
+func.func @no_fold_pack_op_with_lowering_config(%source : tensor<250x250xf32>, %result : memref<2x2x128x128xf32>) {
+  %cst = arith.constant 0.0 : f32
+  %dest = tensor.empty() : tensor<2x2x128x128xf32>
+  %unpack = linalg.pack %source padding_value(%cst : f32)
+      outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [128, 128]
+      into %dest {lowering_config = #iree_codegen.lowering_config<tile_sizes = []>}
+      : tensor<250x250xf32> -> tensor<2x2x128x128xf32>
+  iree_codegen.store_to_buffer %unpack, %result : tensor<2x2x128x128xf32> into memref<2x2x128x128xf32>
+  return
+}
+
+// DISPATCH-SCOPE-LABEL: @no_fold_pack_op_with_lowering_config
+//       DISPATCH-SCOPE:   linalg.pack
+//   DISPATCH-SCOPE-NOT:   iree_linalg_ext.map_scatter
+
+// -----
+
+func.func @no_propagate_unpack_op_with_lowering_config(%source : tensor<2x2x128x128xf32>, %result : memref<256x256xf16>) {
+  %dest = tensor.empty() : tensor<256x256xf32>
+  %unpack = linalg.unpack %source
+      outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [128, 128]
+      into %dest {lowering_config = #iree_codegen.lowering_config<tile_sizes = []>}
+      : tensor<2x2x128x128xf32> -> tensor<256x256xf32>
+  %init = tensor.empty() : tensor<256x256xf16>
+  %compute_op = linalg.generic
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+       iterator_types = ["parallel", "parallel"]}
+       ins(%unpack : tensor<256x256xf32>) outs(%init : tensor<256x256xf16>) {
+  ^bb0(%in: f32, %out: f16):
+    %trunc = arith.truncf %in : f32 to f16
+    linalg.yield %trunc : f16
+  } -> tensor<256x256xf16>
+  iree_codegen.store_to_buffer %compute_op, %result : tensor<256x256xf16> into memref<256x256xf16>
+  return
+}
+
+// DISPATCH-SCOPE-LABEL: @no_propagate_unpack_op_with_lowering_config
+//       DISPATCH-SCOPE:   linalg.unpack
+//       DISPATCH-SCOPE:   linalg.generic
+//   DISPATCH-SCOPE-NOT:   iree_linalg_ext.map_scatter

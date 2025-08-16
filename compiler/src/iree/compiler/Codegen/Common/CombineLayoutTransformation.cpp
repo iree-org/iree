@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/CombineLayoutTransformation.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
@@ -42,6 +43,9 @@ static void simplifyComplexRelayoutOps(RewriterBase &rewriter,
   SmallVector<linalg::PackOp> packOps(
       funcOp.getFunctionBody().getOps<linalg::PackOp>());
   for (auto packOp : packOps) {
+    if (getLoweringConfig(packOp)) {
+      continue;
+    }
     rewriter.setInsertionPoint(packOp);
     FailureOr<linalg::LowerPackResult> result = linalg::lowerPack(
         rewriter, packOp, /*lowerPadLikeWithInsertSlice=*/false);
@@ -59,6 +63,9 @@ static void simplifyComplexRelayoutOps(RewriterBase &rewriter,
   SmallVector<linalg::UnPackOp> unPackOps(
       funcOp.getFunctionBody().getOps<linalg::UnPackOp>());
   for (auto unPackOp : unPackOps) {
+    if (getLoweringConfig(unPackOp)) {
+      continue;
+    }
     rewriter.setInsertionPoint(unPackOp);
     (void)linalg::lowerUnPack(rewriter, unPackOp,
                               /*lowerUnpadLikeWithExtractSlice=*/false);
@@ -66,6 +73,9 @@ static void simplifyComplexRelayoutOps(RewriterBase &rewriter,
   SmallVector<linalg::GenericOp> genericOps(
       funcOp.getFunctionBody().getOps<linalg::GenericOp>());
   for (auto genericOp : genericOps) {
+    if (getLoweringConfig(genericOp)) {
+      continue;
+    }
     if (linalg::isaTransposeOpInterface(genericOp)) {
       rewriter.setInsertionPoint(genericOp);
       (void)linalg::specializeGenericOp(rewriter, genericOp);
@@ -472,7 +482,14 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
   // Only sink reshape ops, so bail if the consumer operation is a reshape.
   auto controlSinkReshapesFn = [](OpOperand *operand) -> bool {
     Operation *consumer = operand->getOwner();
-    return !llvm::isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp>(consumer);
+    Operation *producer = operand->get().getDefiningOp();
+    if (!producer) {
+      return false;
+    }
+    if (llvm::isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp>(consumer)) {
+      return false;
+    }
+    return !getLoweringConfig(consumer) && !getLoweringConfig(producer);
   };
   linalg::populateFoldReshapeOpsByExpansionPatterns(propagationPatterns,
                                                     controlSinkReshapesFn);
@@ -499,6 +516,9 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
     auto genericConsumer = dyn_cast<linalg::GenericOp>(consumer);
     if (!genericConsumer || genericConsumer.getNumDpsInputs() != 1 ||
         *genericConsumer.getDpsInputOperand(0) != *operand) {
+      return false;
+    }
+    if (getLoweringConfig(consumer) || getLoweringConfig(producer)) {
       return false;
     }
     return llvm::all_of(
