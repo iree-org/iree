@@ -2039,8 +2039,8 @@ SmallVector<AffineMap> AttentionOp::getIndexingMapsForOperands() {
 }
 
 SmallVector<AffineMap> AttentionOp::getIndexingMapsForResults() {
-  auto maps = getIndexingMapsArray();
-  return SmallVector<AffineMap>(maps.begin() + getNumDpsInputs(), maps.end());
+  return llvm::to_vector_of<AffineMap>(
+      llvm::drop_begin(getIndexingMapsArray(), getNumDpsInputs()));
 }
 
 void AttentionOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
@@ -2400,7 +2400,7 @@ LogicalResult Im2colOp::verify() {
            << ") to match the number of shared dimensions (m_Pos + k_pos = "
            << sharedRank << ")";
   }
-  SmallVector<int64_t> permVec(inputKPerm.begin(), inputKPerm.end());
+  SmallVector<int64_t> permVec(inputKPerm);
   llvm::sort(permVec);
   for (int64_t i = 0; i < static_cast<int64_t>(sharedRank); ++i) {
     if (permVec[i] != i) {
