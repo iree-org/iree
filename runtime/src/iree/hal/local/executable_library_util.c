@@ -112,6 +112,155 @@ void iree_hal_executable_library_deinitialize_imports(
   environment->import_thunk = NULL;
 }
 
+iree_host_size_t iree_hal_executable_library_export_count(
+    const iree_hal_executable_library_v0_t* library) {
+  IREE_ASSERT_ARGUMENT(library);
+  return library->exports.count;
+}
+
+iree_status_t iree_hal_executable_library_export_info(
+    const iree_hal_executable_library_v0_t* library,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_export_info_t* out_info) {
+  IREE_ASSERT_ARGUMENT(library);
+  IREE_ASSERT_ARGUMENT(out_info);
+  memset(out_info, 0, sizeof(*out_info));
+
+  if (export_ordinal >= library->exports.count) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "export ordinal %u out of range (count: %u)",
+                            export_ordinal, library->exports.count);
+  }
+
+  // Set the name if available.
+  if (library->exports.names && library->exports.names[export_ordinal]) {
+    out_info->name =
+        iree_make_cstring_view(library->exports.names[export_ordinal]);
+  } else {
+    out_info->name = iree_string_view_empty();
+  }
+
+  // Get dispatch attributes if available.
+  if (library->exports.attrs) {
+    const iree_hal_executable_dispatch_attrs_v0_t* attrs =
+        &library->exports.attrs[export_ordinal];
+
+    if (iree_any_bit_set(attrs->flags,
+                         IREE_HAL_EXECUTABLE_DISPATCH_FLAG_V0_SEQUENTIAL)) {
+      out_info->flags |= IREE_HAL_EXECUTABLE_EXPORT_FLAG_SEQUENTIAL;
+    }
+    if (iree_any_bit_set(
+            attrs->flags,
+            IREE_HAL_EXECUTABLE_DISPATCH_FLAG_V0_WORKGROUP_SIZE_DYNAMIC)) {
+      out_info->flags |= IREE_HAL_EXECUTABLE_EXPORT_FLAG_WORKGROUP_SIZE_DYNAMIC;
+    }
+
+    out_info->constant_count = attrs->constant_count;
+    out_info->binding_count = attrs->binding_count;
+    out_info->parameter_count = attrs->parameter_count;
+
+    out_info->workgroup_size[0] = attrs->workgroup_size_x;
+    out_info->workgroup_size[1] = attrs->workgroup_size_y;
+    out_info->workgroup_size[2] = attrs->workgroup_size_z;
+  }
+
+  // Occupancy info is not yet implemented.
+  memset(&out_info->occupancy_info, 0, sizeof(out_info->occupancy_info));
+
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_executable_library_export_parameters(
+    const iree_hal_executable_library_v0_t* library,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_host_size_t capacity,
+    iree_hal_executable_export_parameter_t* out_parameters) {
+  IREE_ASSERT_ARGUMENT(library);
+  IREE_ASSERT_ARGUMENT(out_parameters || capacity == 0);
+
+  if (export_ordinal >= library->exports.count) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "export ordinal %u out of range (count: %u)",
+                            export_ordinal, library->exports.count);
+  }
+
+  if (!library->exports.attrs || !library->exports.params ||
+      !library->exports.params[export_ordinal]) {
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "reflection data not available");
+  }
+
+  const iree_hal_executable_dispatch_attrs_v0_t* attrs =
+      &library->exports.attrs[export_ordinal];
+  const iree_hal_executable_dispatch_parameter_v0_t** params =
+      library->exports.params;
+  const iree_hal_executable_dispatch_parameter_v0_t* export_params =
+      params[export_ordinal];
+
+  // Copy as many parameters as we can fit.
+  iree_host_size_t count =
+      iree_min(capacity, (iree_host_size_t)attrs->parameter_count);
+  for (iree_host_size_t i = 0; i < count; ++i) {
+    const iree_hal_executable_dispatch_parameter_v0_t* src = &export_params[i];
+    iree_hal_executable_export_parameter_t* dst = &out_parameters[i];
+    switch (src->type) {
+      case IREE_HAL_EXECUTABLE_DISPATCH_PARAM_TYPE_V0_CONSTANT:
+        dst->type = IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_CONSTANT;
+        break;
+      case IREE_HAL_EXECUTABLE_DISPATCH_PARAM_TYPE_V0_BINDING:
+        dst->type = IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_BINDING;
+        break;
+      case IREE_HAL_EXECUTABLE_DISPATCH_PARAM_TYPE_V0_BUFFER_PTR:
+        dst->type = IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_BUFFER_PTR;
+        break;
+      default:
+        dst->type = IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_CONSTANT;
+        break;
+    }
+    dst->size = src->size;
+    dst->flags = src->flags;
+    dst->offset = src->offset;
+    if (library->exports.parameter_names && src->name < UINT16_MAX &&
+        library->exports.parameter_names[src->name]) {
+      dst->name =
+          iree_make_cstring_view(library->exports.parameter_names[src->name]);
+    } else {
+      dst->name = iree_string_view_empty();
+    }
+  }
+
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_executable_library_lookup_export_by_name(
+    const iree_hal_executable_library_v0_t* library, iree_string_view_t name,
+    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+  IREE_ASSERT_ARGUMENT(library);
+  IREE_ASSERT_ARGUMENT(out_export_ordinal);
+
+  // Names array must exist for lookup by name.
+  if (!library->exports.names) {
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "export names not available in library");
+  }
+
+  // Linear search through export names.
+  for (uint32_t i = 0; i < library->exports.count; ++i) {
+    if (library->exports.names[i]) {
+      iree_string_view_t export_name =
+          iree_make_cstring_view(library->exports.names[i]);
+      if (iree_string_view_equal(export_name, name)) {
+        *out_export_ordinal = i;
+        return iree_ok_status();
+      }
+    }
+  }
+
+  return iree_make_status(IREE_STATUS_NOT_FOUND,
+                          "export '%.*s' not found in library", (int)name.size,
+                          name.data);
+}
+
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
 void iree_hal_executable_library_publish_source_files(
