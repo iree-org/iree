@@ -330,13 +330,24 @@ util.func public @gather_matmul(%source : tensor<20x20x100xi32>, %indices : tens
   %result = iree_linalg_ext.gather dimension_map = [1, 0]
                           ins(%source, %indices : tensor<20x20x100xi32>, tensor<100x2xi32>)
                           outs(%empty: tensor<100x100xi32>) -> tensor<100x100xi32>
-  %mm = linalg.matmul_transpose_b ins(%result, %arg2 : tensor<100x100xi32>, tensor<100x100xi32>) outs(%arg3 : tensor<100x100xi32>) -> tensor<100x100xi32>
+  %mm = linalg.matmul
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d2)>,
+      affine_map<(d0, d1, d2) -> (d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ]
+    ins(%result, %arg2 : tensor<100x100xi32>, tensor<100x100xi32>)
+    outs(%arg3 : tensor<100x100xi32>) -> tensor<100x100xi32>
   util.return %mm : tensor<100x100xi32>
 }
 // CHECK-LABEL: util.func public @gather_matmul
 //       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups
 //       CHECK:     %[[GATHER:.+]] = iree_linalg_ext.gather
-//       CHECK:     %[[MATMUL:.+]] = linalg.matmul_transpose_b
+//       CHECK:     %[[MATMUL:.+]] = linalg.matmul
+//  CHECK-SAME:       indexing_maps = [
+//  CHECK-SAME:         affine_map<(d0, d1, d2) -> (d0, d2)>,
+//  CHECK-SAME:         affine_map<(d0, d1, d2) -> (d1, d2)>,
+//  CHECK-SAME:         affine_map<(d0, d1, d2) -> (d0, d1)>]
 //  CHECK-SAME:       ins(%[[GATHER]]
 //       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[MATMUL]]
 //       CHECK:   util.return %[[DISPATCH]]

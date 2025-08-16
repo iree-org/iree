@@ -19,6 +19,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVectorExtras.h"
@@ -1595,7 +1596,9 @@ getMatmulAArch64SMEVectorSizes(linalg::LinalgOp op,
                                SmallVectorImpl<int64_t> &sizes,
                                SmallVectorImpl<bool> &scalableSizeFlags) {
   // Double-check the operation is one that is supported for lowering to ArmSME.
-  if (!llvm::isa<linalg::MatmulOp, linalg::MatmulTransposeAOp>(op))
+  Operation *rawOp = op.getOperation();
+  if (!(IREE::LinalgExt::isPureMatmul(rawOp) ||
+        isa<linalg::MatmulTransposeAOp>(rawOp)))
     return;
 
   auto elementType = nonWideningLinalgElementType(op);
@@ -1655,7 +1658,8 @@ getMatmulVectorSizes(mlir::FunctionOpInterface entryPointFn,
       hasAnyVFeature(targetAttr.getConfiguration())) {
     // Use default tile size for matmul_transpose_b &
     // batch_matmul_transpose_b to avoid performance drop.
-    if (!isa<linalg::MatmulTransposeBOp, linalg::BatchMatmulTransposeBOp>(op)) {
+    if (!isa<linalg::MatmulTransposeBOp, linalg::BatchMatmulTransposeBOp>(
+            op.getOperation())) {
       // Try to maximize the vector register utilization rate for matmul.
       getMatmulRISCVVectorSizes(entryPointFn, op, vectorSize, matmulTileSizes,
                                 matmulScalableFlags);

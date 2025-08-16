@@ -188,7 +188,11 @@ util.func public @aTransposeBMatmul(%arg0 : tensor<10x20xf32>,
 // CHECK-LABEL: util.func public @aTransposeBMatmul
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<10x20xf32>
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<40x20xf32>
-//       CHECK:   %[[RESULT:.+]] = linalg.matmul_transpose_b
+//       CHECK:   %[[RESULT:.+]] = linalg.matmul
+//  CHECK-SAME:       indexing_maps = [
+//  CHECK-SAME:         affine_map<(d0, d1, d2) -> (d0, d2)>,
+//  CHECK-SAME:         affine_map<(d0, d1, d2) -> (d1, d2)>,
+//  CHECK-SAME:         affine_map<(d0, d1, d2) -> (d0, d1)>]
 //  CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 //       CHECK:   util.return %[[RESULT]]
 
@@ -214,7 +218,11 @@ util.func public @aTransposeBBatchMatmul(%arg0 : tensor<5x10x20xf32>,
 // CHECK-LABEL: util.func public @aTransposeBBatchMatmul
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<5x10x20xf32>
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<5x40x20xf32>
-//       CHECK:   %[[RESULT:.+]] = linalg.batch_matmul_transpose_b
+//       CHECK:   %[[RESULT:.+]] = linalg.batch_matmul
+//  CHECK-SAME:       indexing_maps = [
+//  CHECK-SAME:         affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+//  CHECK-SAME:         affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+//  CHECK-SAME:         affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]
 //  CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 //       CHECK:   util.return %[[RESULT]]
 
