@@ -65,46 +65,47 @@ PREPROCESSING_TRANSPOSE_LHS = "--iree-preprocessing-pass-pipeline=builtin.module
 
 PREPROCESSING_PEEL = "--iree-llvmcpu-vector-pproc-strategy=peel"
 
-# LLVMCPU, non-data-tiling, no microkernels, ArmSME
-[iree_generated_e2e_runner_test(
-    name = "e2e_matmul_cpu_arm_sme_nondt_%s_%s%s" % (
-        dtype,
-        "_transpose_lhs" if transpose_lhs else "",
-        "_peel" if peel else "",
-    ),
-    compiler_flags = [
-                         "--iree-opt-data-tiling=false",
-                         "--iree-llvmcpu-enable-scalable-vectorization",
-                         "--iree-llvmcpu-target-triple=aarch64-unknown-unknown",
-                     ] + ([PREPROCESSING_TRANSPOSE_LHS] if transpose_lhs else []) +
-                     ([PREPROCESSING_PEEL] if peel else []),
-    generator = ":generate_e2e_matmul_tests",
-    generator_args = [
-        "--lhs_rhs_type=%s" % dtype,
-        "--acc_type=%s" % dtype,
-    ],
-    tags = [
-        "requires-arm-sme",
-    ],
-    target_backends_and_drivers = [
-        ("llvm-cpu", "local-task"),
-    ],
-    target_cpu_features_variants = ["arm_64:sme:+sve,+sme"],
-    test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
-    test_type = "matmul",
-) for dtype in [
-    "f32",
-    # f64 disabled because it wasn't supported by the test generator at the time
-    # this was added. When adding it in the future, consider passing
-    # --iree-input-demote-f64-to-f32=false to the compiler.
-    # "f64"
-] for transpose_lhs in [
-    True,
-    False,
-] for peel in [
-    True,
-    False,
-]]
+# TODO(#21714) These tests are disabled. See issue for details.
+# # LLVMCPU, non-data-tiling, no microkernels, ArmSME
+# [iree_generated_e2e_runner_test(
+#     name = "e2e_matmul_cpu_arm_sme_nondt_%s_%s%s" % (
+#         dtype,
+#         "_transpose_lhs" if transpose_lhs else "",
+#         "_peel" if peel else "",
+#     ),
+#     compiler_flags = [
+#                          "--iree-opt-data-tiling=false",
+#                          "--iree-llvmcpu-enable-scalable-vectorization",
+#                          "--iree-llvmcpu-target-triple=aarch64-unknown-unknown",
+#                      ] + ([PREPROCESSING_TRANSPOSE_LHS] if transpose_lhs else []) +
+#                      ([PREPROCESSING_PEEL] if peel else []),
+#     generator = ":generate_e2e_matmul_tests",
+#     generator_args = [
+#         "--lhs_rhs_type=%s" % dtype,
+#         "--acc_type=%s" % dtype,
+#     ],
+#     tags = [
+#         "requires-arm-sme",
+#     ],
+#     target_backends_and_drivers = [
+#         ("llvm-cpu", "local-task"),
+#     ],
+#     target_cpu_features_variants = ["arm_64:sme:+sve,+sme"],
+#     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
+#     test_type = "matmul",
+# ) for dtype in [
+#     "f32",
+#     # f64 disabled because it wasn't supported by the test generator at the time
+#     # this was added. When adding it in the future, consider passing
+#     # --iree-input-demote-f64-to-f32=false to the compiler.
+#     # "f64"
+# ] for transpose_lhs in [
+#     True,
+#     False,
+# ] for peel in [
+#     True,
+#     False,
+# ]]
 
 X86_64_AVX2 = [
     "+avx",
