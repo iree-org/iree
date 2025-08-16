@@ -46,6 +46,7 @@ from iree.compiler.dialects import (
 
 # Smoke test for vector transforms
 from iree.compiler.dialects.transform import vector as vt
+from iree.compiler.dialects.transform import loop
 
 # Make sure that our dialects import.
 from iree.compiler.dialects import flow, hal, stream, vm, util, iree_codegen, iree_gpu
