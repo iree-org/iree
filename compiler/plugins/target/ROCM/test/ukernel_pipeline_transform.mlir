@@ -139,7 +139,7 @@ func.func @no_ukernel_argmax_1d_f16i64() attributes {
   return
 }
 
-//      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUDistribute workgroup_size = [1, 1, 1]>
+//      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [1, 1, 1]
 //      CHECK: func.func @no_ukernel_argmax_1d_f16i64()
 // CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //  CHECK-NOT:   iree_codegen.ukernel.generic
@@ -244,7 +244,7 @@ func.func @not_neg_inf_init_argmax_1d() attributes {
   return
 }
 
-//      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUDistribute workgroup_size = [1, 1, 1]>
+//      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [1, 1, 1]
 //      CHECK: func.func @not_neg_inf_init_argmax_1d()
 // CHECK-SAME:    translation_info = #[[$TRANSLATION]]
 //  CHECK-NOT:   iree_codegen.ukernel.generic

@@ -776,49 +776,6 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(
 }
 
 //===---------------------------------------------------------------------===//
-// Transpose
-//===---------------------------------------------------------------------===//
-
-void addGPUTransposePassPipeline(OpPassManager &funcPassManager,
-                                 const GPUPipelineOptions &options) {
-  tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true);
-
-  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
-  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
-  funcPassManager.addPass(
-      createGPUTensorAlloc(GPUPromoteSharedMemPattern::TransposeOpPattern));
-  funcPassManager.addPass(createGPUTensorTilePass());
-
-  // Linalg -> vector
-  addGPUVectorizationPasses(funcPassManager);
-  funcPassManager.addPass(createOptimizeVectorTransferPass());
-  funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
-
-  // tensor to memref
-  addBufferizePasses(funcPassManager);
-
-  // distribute foreach threads
-  funcPassManager.addPass(createGPUDistributePass());
-
-  funcPassManager.addPass(createMemrefCopyToLinalgPass());
-  funcPassManager.addPass(createGPUDistributeSharedMemoryCopyPass());
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
-  if (options.enableReduceSharedMemoryBankConflicts) {
-    // May or may not need to reduce shared mememory conflicts.
-    GPUReduceBankConflictsPassOptions options = {};
-    options.paddingBits = 32;
-    funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
-  }
-
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-}
-
-//===---------------------------------------------------------------------===//
 // Vector Distribution
 //===---------------------------------------------------------------------===//
 
@@ -1065,19 +1022,6 @@ void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(affine::createLoopCoalescingPass());
   funcPassManager.addPass(createCanonicalizerPass());
-}
-
-void addGPUSimpleDistributePassPipeline(OpPassManager &funcPassManager) {
-  tileAndBufferize(funcPassManager);
-
-  // Distribute linalg onto threads within the workgroup.
-  funcPassManager.addPass(createLLVMGPUTileAndDistributePass(
-      /*distributeToWarp=*/clDistributeToWorkgroupsUsingForall));
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
-  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
-  funcPassManager.addPass(createRemoveSingleIterationLoopPass());
 }
 
 void addGPUDefaultPassPipeline(OpPassManager &funcPassManager,

@@ -193,7 +193,7 @@ static bool checkContractionOpEquivalence(MLIRContext *context, Operation *aOp,
   }
 
   // TODO(#20116): hack to prevent codegen failure for small horizontally fused
-  // matmuls that go down LLVMGPUDistribute.
+  // matmuls.
   unsigned mDimsSize = 1;
   for (unsigned dim : aContractionDims.value().m) {
     mDimsSize *= aStaticDims[dim];

@@ -2295,7 +2295,7 @@ hal.executable private @scatter {
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
-      func.func @scatter() attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUDistribute workgroup_size = [1, 1, 1]>} {
+      func.func @scatter() attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [1, 1, 1]>} {
         %c228075520 = arith.constant 228075520 : index
         %c251668480 = arith.constant 251668480 : index
         %c0 = arith.constant 0 : index
