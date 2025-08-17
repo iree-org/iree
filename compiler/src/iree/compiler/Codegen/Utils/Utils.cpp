@@ -1638,6 +1638,8 @@ getScalableTileSizesAndFlags(SmallVector<OpFoldResult> mixedInnerTiles) {
   SmallVector<int64_t> tileSizes(mixedInnerTiles.size(), 0);
   IREE::Codegen::ScalableTileFlags scalableFlags(mixedInnerTiles.size(), false);
   for (unsigned pos = 0; pos < mixedInnerTiles.size(); ++pos) {
+    // Check if we have SSA values that represent the inner tile sizes.
+    // This is the case for scalable tile sizes.
     if (auto innerTileVal = dyn_cast<Value>(mixedInnerTiles[pos])) {
       FailureOr<int64_t> innerTile =
           getStaticPartOfScalableTileSize(innerTileVal.getDefiningOp());
@@ -1649,6 +1651,8 @@ getScalableTileSizesAndFlags(SmallVector<OpFoldResult> mixedInnerTiles) {
       scalableFlags[pos] = true;
       continue;
     }
+    // Check if we have integer attributes that represent the inner tile sizes.
+    // This is the case for static tile sizes.
     std::optional<int64_t> innerTile =
         getConstantIntValue(mixedInnerTiles[pos]);
     if (!innerTile.has_value()) {

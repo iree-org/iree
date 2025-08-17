@@ -1877,7 +1877,7 @@ setContractionRootConfig(mlir::FunctionOpInterface entryPointFn,
 
 // Utility function to return the result inner tile sizes associated with the
 // mmt4d op. I.e. returns the M1 and N1 dimensions of the result shape
-// BxM0xN0xM1xN1. In case of scalable vectors, walks the IR and returns
+// BxM0xN0xM1xN1. In case of scalable dimensions, walks the IR and returns
 // the static inner tile size and the appropriate scalable flag.
 // TODO: By using the IterationDimTracker, extend the logic to
 // infer all inner tile sizes - including the inner K dimension, if possible.
@@ -1895,6 +1895,11 @@ getMmt4dInnerTileSizes(linalg::LinalgOp op) {
   SmallVector<OpFoldResult> innerDims;
   // Currently, the only init tensor of the mmt4d seems to be linalg.fill ops
   // or the bindings. Otherwise, bail out.
+  if (!isa<linalg::FillOp, IREE::TensorExt::DispatchTensorLoadOp>(destOp)) {
+    LDBG() << "Mmt4d with non-fill or tensor load init buffer, cannot infer "
+              "inner tile sizes!";
+    return failure();
+  }
   if (auto fillOp = dyn_cast<linalg::FillOp>(destOp)) {
     auto emptyOp =
         dyn_cast<tensor::EmptyOp>(fillOp.getDpsInitOperand(0)->getOwner());
@@ -1906,10 +1911,6 @@ getMmt4dInnerTileSizes(linalg::LinalgOp op) {
   }
   if (auto loadOp = dyn_cast<IREE::TensorExt::DispatchTensorLoadOp>(destOp)) {
     innerDims = loadOp.getMixedSizes();
-  }
-  if (innerDims.empty()) {
-    LDBG() << "Could not infer inner tile sizes of a scalable mmt4d op!";
-    return failure();
   }
   // We only need the innermost M1 and N1 dims.
   innerDims.erase(innerDims.begin(), innerDims.end() - 2);
@@ -1926,6 +1927,8 @@ static LogicalResult adjustVectorSizesForScalableVectorization(
   ShapedType rhsType = cast<ShapedType>(op.getDpsInputs()[1].getType());
   FailureOr<SizesAndScalableFlags> scalableInnerTilesAndFlags =
       getMmt4dInnerTileSizes(op);
+  // TODO: Enable materialization and add corresponding tile size selection
+  // tests for SME.
   if (hasSMEFeature(targetConfig) && !clDisableArmSMETiling &&
       ShapedType::isDynamic(M0)) {
     int64_t innerTileSize;

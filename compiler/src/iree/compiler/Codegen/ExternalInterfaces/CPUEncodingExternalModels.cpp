@@ -23,6 +23,9 @@
 //   3. Heuristics for cache-friendly dispatch tiling can get complex on CPU,
 //      so it is nice that they have fewer narrow cases to consider.
 //
+// The only current exception to this is Arm SVE. It currently adheres to the
+// canonical form of scalable vectorisation and keeps the N dimension to be
+// scalable.
 // This transposition is made easier by (and was all along part of the idea in)
 // the RHS-transposition in mmt4d (the t in mmt4d), as generally with matrix
 // multiplication
@@ -468,6 +471,7 @@ static SmallVector<TileMxNxK> enumerateMatmulTileArm64(TypeRange elementTypes,
                                                        DictionaryAttr config) {
   // For SVE and scalable vectors, this methods selects base sizes that match
   // the NEON fixed-width sizes.
+  // TODO: Add SME inner tile sizes and corresponding tests.
   assert(elementTypes.size() == 3);
   Type lhs = elementTypes[0];
   Type rhs = elementTypes[1];
