@@ -681,6 +681,11 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
 
   for (const GPUIntrinsicType &intrinsicA : intrinsics) {
     for (const GPUIntrinsicType &intrinsicB : intrinsics) {
+
+      if (intrinsicA.mmaKind != intrinsicB.mmaKind) {
+        continue;
+      }
+
       if (failed(canTargetIntrinsic(qkMatmul, intrinsicA, subgroupSize,
                                     canUpcastAcc, mustBeAligned))) {
         continue;
