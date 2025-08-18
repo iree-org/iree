@@ -110,17 +110,16 @@ convertToUKernelGeneric(RewriterBase &rewriter, Operation *op, StringRef name,
   }
 
   rewriter.setInsertionPoint(op);
-  if (provider) {
-    if (failed(provider.createAndReplaceWithUkernelOp(
-            rewriter, name, targetConfiguration, op, tensorInputs,
-            tensorOutputs, otherOperands))) {
-      return failure();
-    }
-  } else {
+  if (!provider) {
+    // Default ukernel generic op is created when a provider doesn't exist.
     rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
         op, op->getResults().getTypes(), name, tensorInputs, tensorOutputs,
         otherOperands, DictionaryAttr(),
         /*strided_outer_dims=*/0);
+  } else if (failed(provider.createAndReplaceWithUkernelOp(
+                 rewriter, name, targetConfiguration, op, tensorInputs,
+                 tensorOutputs, otherOperands))) {
+    return failure();
   }
   return success();
 }

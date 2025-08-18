@@ -49,6 +49,9 @@ static LogicalResult handleArgmaxUkernel(
   Location loc = genericOp.getLoc();
   Value reductionDimSize = rewriter.create<tensor::DimOp>(
       loc, genericOp.getDpsInputOperand(0)->get(), kReductionDim);
+  // `isPureArgmax` is used to differentiate between the two argmax versions :-
+  // 1. Returns only the index of the max value (isPureArgmax == true)
+  // 2. Returns both the max value as well as the corresponding index.
   bool isPureArgmax = genericOp.getResults()[0].use_empty();
   Value writeMaxValueFlag = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI1Type(), rewriter.getBoolAttr(!isPureArgmax));
@@ -66,8 +69,8 @@ static LogicalResult handleArgmaxUkernel(
                                 ukernelOp.getResults()[1]);
     return success();
   }
-  auto origResults = genericOp.getResults();
-  auto newResults = ukernelOp.getResults();
+  ResultRange origResults = genericOp.getResults();
+  ResultRange newResults = ukernelOp.getResults();
   if (origResults.size() != newResults.size()) {
     return rewriter.notifyMatchFailure(genericOp, "result count mismatch");
   }
