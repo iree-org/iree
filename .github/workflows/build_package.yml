@@ -168,7 +168,7 @@ jobs:
           - runs-on: windows-2022
             build-family: windows
             build-package: py-compiler-pkg
-            experimental: true
+            experimental: false
           - runs-on: windows-2022
             build-family: windows
             build-package: py-runtime-pkg
