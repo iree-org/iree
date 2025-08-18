@@ -771,7 +771,7 @@ static LogicalResult setTilingAndMatmulOpConfig(linalg::LinalgOp op,
   // per subgroup for GPUs.
   std::array<int64_t, 2> workgroupXY = {32, 2};
   std::array<int64_t, 3> threadMNK;
-  auto inputType = llvm::cast<ShapedType>(op->getOperand(0).getType());
+  auto inputType = cast<ShapedType>(op->getOperand(0).getType());
   if (IREE::Util::getTypeBitWidth(inputType.getElementType()) == 16) {
     threadMNK = {8, 8, 8};
   } else {
