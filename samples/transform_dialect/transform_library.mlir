@@ -4,7 +4,7 @@ module attributes { transform.with_named_sequence } {
   // default IREE codegen.
   transform.named_sequence @custom_transform_strategy(
       %variant_op: !transform.any_op) {
-    // Step 1. Re-match the matmul.
+    // Step 1. Re-match the matmul. It is now a linalg.generic, because of op generalization in the SPIRV pipeline
     // ===========================================================================
     %matmul = transform.structured.match ops{["linalg.generic"]} in %variant_op : (!transform.any_op) -> !transform.any_op
 
