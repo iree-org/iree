@@ -17,7 +17,7 @@ namespace mlir::iree_compiler::IREE::TensorExt {
 
 namespace {
 struct ReplaceBitCastIfTensorOperandEmpty final : OpRewritePattern<BitCastOp> {
-  using OpRewritePattern<BitCastOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(BitCastOp op,
                                 PatternRewriter &rewriter) const override {
     auto emptyOp =
@@ -31,7 +31,7 @@ struct ReplaceBitCastIfTensorOperandEmpty final : OpRewritePattern<BitCastOp> {
 };
 
 struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
-  using OpRewritePattern<BitCastOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(BitCastOp bitcastOp,
                                 PatternRewriter &rewriter) const final {

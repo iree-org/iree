@@ -190,7 +190,7 @@ namespace {
 class FuseTransposeWithProducerLinalgOp
     : public OpRewritePattern<linalg::TransposeOp> {
 public:
-  using OpRewritePattern<linalg::TransposeOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   FuseTransposeWithProducerLinalgOp(MLIRContext *ctx, bool aggressiveProp,
                                     bool convProp, PatternBenefit b = 1)
       : OpRewritePattern<linalg::TransposeOp>(ctx, b),
@@ -306,7 +306,7 @@ private:
 class BubbleTransposeThroughCollapseShape
     : public OpRewritePattern<linalg::TransposeOp> {
 public:
-  using OpRewritePattern<linalg::TransposeOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::TransposeOp transposeOp,
                                 PatternRewriter &rewriter) const override {
@@ -375,7 +375,7 @@ namespace {
 // new propagation opportunities and eases the analysis in fusion/later passes.
 class ComposeTransposes : public OpRewritePattern<linalg::TransposeOp> {
 public:
-  using OpRewritePattern<linalg::TransposeOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::TransposeOp consumer,
                                 PatternRewriter &rewriter) const override {
@@ -408,7 +408,7 @@ public:
 class SinkTransposeThroughExtractSlice
     : public OpRewritePattern<tensor::ExtractSliceOp> {
 public:
-  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractOp,
                                 PatternRewriter &rewriter) const override {
@@ -503,7 +503,7 @@ public:
 class SinkTransposeThroughExpandShape
     : public OpRewritePattern<tensor::ExpandShapeOp> {
 public:
-  using OpRewritePattern<tensor::ExpandShapeOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tensor::ExpandShapeOp expandOp,
                                 PatternRewriter &rewriter) const override {
@@ -723,7 +723,7 @@ getTransposedIndexingMaps(linalg::GenericOp genericOp,
 class SinkTransposeThroughUnaryElementwiseInput
     : public OpRewritePattern<linalg::GenericOp> {
 public:
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
@@ -815,7 +815,7 @@ public:
 class BubbleTransposeThroughUnaryElementwiseDpsInit
     : public OpRewritePattern<linalg::TransposeOp> {
 public:
-  using OpRewritePattern<linalg::TransposeOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::TransposeOp transposeOp,
                                 PatternRewriter &rewriter) const override {

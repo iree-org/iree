@@ -29,7 +29,7 @@ static bool isScalarOrTensorOfSizeOne(Type t) {
 /// `flow.dispatch.region`.
 struct RematerializeParallelOpsPattern
     : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {

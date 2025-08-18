@@ -43,7 +43,7 @@ namespace {
 
 /// Converts an tensor.empty() op to `flow.tensor.splat` op.
 struct RewriteTensorEmptyToSplat : public OpRewritePattern<tensor::EmptyOp> {
-  using OpRewritePattern<tensor::EmptyOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::EmptyOp emptyTensorOp,
                                 PatternRewriter &rewriter) const override {
     if (!shouldBeConvertedToFlowTensorOp(emptyTensorOp)) {
@@ -67,7 +67,7 @@ struct RewriteTensorEmptyToSplat : public OpRewritePattern<tensor::EmptyOp> {
 
 /// Converts an tensor.empty() op to `flow.tensor.empty` op.
 struct RewriteTensorEmptyToEmpty : public OpRewritePattern<tensor::EmptyOp> {
-  using OpRewritePattern<tensor::EmptyOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::EmptyOp emptyTensorOp,
                                 PatternRewriter &rewriter) const override {
     if (!shouldBeConvertedToFlowTensorOp(emptyTensorOp)) {

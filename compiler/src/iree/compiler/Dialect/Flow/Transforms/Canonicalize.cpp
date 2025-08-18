@@ -35,7 +35,7 @@ static std::optional<SmallVector<OpFoldResult>> getDefiningMixedSizes(Value v) {
 }
 
 struct FoldFullInsertSlice : public OpRewritePattern<tensor::InsertSliceOp> {
-  using OpRewritePattern<tensor::InsertSliceOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tensor::InsertSliceOp insertSliceOp,
                                 PatternRewriter &rewriter) const override {
@@ -87,7 +87,7 @@ struct FoldFullInsertSlice : public OpRewritePattern<tensor::InsertSliceOp> {
 /// Convert an "affine.apply" operation into a sequence of arith ops.
 class AffineApplyLowering : public OpRewritePattern<affine::AffineApplyOp> {
 public:
-  using OpRewritePattern<affine::AffineApplyOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(affine::AffineApplyOp op,
                                 PatternRewriter &rewriter) const override {
