@@ -449,7 +449,7 @@ namespace {
 
 struct ExpandDynamicShapeConstant
     : public OpRewritePattern<TensorDynamicConstantOp> {
-  using OpRewritePattern<TensorDynamicConstantOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorDynamicConstantOp op,
                                 PatternRewriter &rewriter) const override {
     auto constantOp = rewriter.create<IREE::Flow::TensorConstantOp>(
@@ -566,7 +566,7 @@ struct FlattenTensorCastLikeChain : public OpRewritePattern<CastOpTy> {
 };
 
 struct ResolveShapedRank : public OpRewritePattern<tensor::RankOp> {
-  using OpRewritePattern<tensor::RankOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::RankOp op,
                                 PatternRewriter &rewriter) const override {
     auto shapedType = llvm::cast<ShapedType>(op.getTensor().getType());
@@ -577,7 +577,7 @@ struct ResolveShapedRank : public OpRewritePattern<tensor::RankOp> {
 };
 
 struct ResolveShapedDim : public OpRewritePattern<tensor::DimOp> {
-  using OpRewritePattern<tensor::DimOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::DimOp op,
                                 PatternRewriter &rewriter) const override {
     if (!op.getConstantIndex().has_value()) {
@@ -677,7 +677,7 @@ namespace {
 // Replace `flow.tensor.splat`-`flow.tensor.load` op-pairs by the input
 // primitive value for the splat op.
 struct FoldSplatLoadIntoPrimitive : public OpRewritePattern<TensorLoadOp> {
-  using OpRewritePattern<TensorLoadOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
     auto sourceOp =
@@ -750,7 +750,7 @@ void TensorEmptyOp::getCanonicalizationPatterns(RewritePatternSet &results,
 namespace {
 
 struct FoldSplatReshapeIntoSplat : public OpRewritePattern<TensorReshapeOp> {
-  using OpRewritePattern<TensorReshapeOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorReshapeOp reshapeOp,
                                 PatternRewriter &rewriter) const override {
     auto splatOp = dyn_cast_if_present<TensorSplatOp>(
@@ -1069,7 +1069,7 @@ namespace {
 // When the target tensor is a result of a tensor.cast operation, the op needs
 // to be updated to use the source of the cast as the target tensor.
 struct FoldTensorUpdateOpWithCasts : public OpRewritePattern<TensorUpdateOp> {
-  using OpRewritePattern<TensorUpdateOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorUpdateOp updateOp,
                                 PatternRewriter &rewriter) const override {
     auto targetCastOp = updateOp.getTarget().getDefiningOp<tensor::CastOp>();
@@ -1097,7 +1097,7 @@ struct FoldTensorUpdateOpWithCasts : public OpRewritePattern<TensorUpdateOp> {
 
 struct ReplaceOpIfTensorUpdateOperandZeroElements
     : public OpRewritePattern<TensorUpdateOp> {
-  using OpRewritePattern<TensorUpdateOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorUpdateOp op,
                                 PatternRewriter &rewriter) const override {
     auto operand = op.getUpdate();

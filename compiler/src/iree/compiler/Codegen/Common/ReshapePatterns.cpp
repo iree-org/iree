@@ -90,7 +90,7 @@ inferCollapsedShape(RewriterBase &rewriter, Location loc,
 ///       tensor<864xf32>
 struct FoldCollapseShapeIntoInterfaceTensorLoad
     : OpRewritePattern<tensor::CollapseShapeOp> {
-  using OpRewritePattern<tensor::CollapseShapeOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tensor::CollapseShapeOp reshapeOp,
                                 PatternRewriter &rewriter) const override {
@@ -166,7 +166,7 @@ struct FoldCollapseShapeIntoInterfaceTensorLoad
 ///       tensor<864xf32>
 struct FoldExpandShapeIntoInterfaceTensorLoad
     : OpRewritePattern<tensor::ExpandShapeOp> {
-  using OpRewritePattern<tensor::ExpandShapeOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tensor::ExpandShapeOp reshapeOp,
                                 PatternRewriter &rewriter) const override {
@@ -820,7 +820,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
 /// the source hal.interface.binding.subspan
 struct FoldInnerBitcastIntoInterfaceTensorLoad
     : OpRewritePattern<IREE::TensorExt::BitCastOp> {
-  using OpRewritePattern<IREE::TensorExt::BitCastOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(IREE::TensorExt::BitCastOp bitcastOp,
                                 PatternRewriter &rewriter) const override {
@@ -1031,7 +1031,7 @@ expandMemrefOperand(RewriterBase &rewriter, OpTy tensorToMemrefOp,
 /// tensor operand with the source of the expand_shape.
 struct FoldExpandShapeIntoStoreToBuffer
     : OpRewritePattern<IREE::Codegen::StoreToBufferOp> {
-  using OpRewritePattern<IREE::Codegen::StoreToBufferOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(IREE::Codegen::StoreToBufferOp storeOp,
                                 PatternRewriter &rewriter) const override {
@@ -1055,7 +1055,7 @@ struct FoldExpandShapeIntoStoreToBuffer
 /// tensor operand with the source of the collapse_shape.
 struct FoldCollapseShapeIntoStoreToBuffer
     : OpRewritePattern<IREE::Codegen::StoreToBufferOp> {
-  using OpRewritePattern<IREE::Codegen::StoreToBufferOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(IREE::Codegen::StoreToBufferOp storeOp,
                                 PatternRewriter &rewriter) const override {
@@ -1083,7 +1083,7 @@ struct FoldCollapseShapeIntoStoreToBuffer
 /// the collapse_shape with the collapsed load_from_buffer op.
 struct FoldCollapseShapeIntoLoadFromBuffer
     : OpRewritePattern<IREE::Codegen::LoadFromBufferOp> {
-  using OpRewritePattern<IREE::Codegen::LoadFromBufferOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(IREE::Codegen::LoadFromBufferOp loadOp,
                                 PatternRewriter &rewriter) const override {
@@ -1112,7 +1112,7 @@ struct FoldCollapseShapeIntoLoadFromBuffer
 /// expand_shape with the expanded load_from_buffer op.
 struct FoldExpandShapeIntoLoadFromBuffer
     : OpRewritePattern<IREE::Codegen::LoadFromBufferOp> {
-  using OpRewritePattern<IREE::Codegen::LoadFromBufferOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(IREE::Codegen::LoadFromBufferOp loadOp,
                                 PatternRewriter &rewriter) const override {

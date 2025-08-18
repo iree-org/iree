@@ -28,7 +28,7 @@ static bool isScalarOrTensorOfSizeOne(Type t) {
 }
 
 struct FuseElementWiseGenericOps : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {

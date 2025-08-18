@@ -226,7 +226,7 @@ replaceOffsetSizesAndStridesWith(RewriterBase &rewriter,
 namespace {
 
 struct FromMemRefSubView : public OpRewritePattern<GetBufferDescriptorOp> {
-  using OpRewritePattern<GetBufferDescriptorOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
                                 PatternRewriter &rewriter) const override {
     auto subview = op.getSource().template getDefiningOp<memref::SubViewOp>();
@@ -291,7 +291,7 @@ struct FromMemRefSubView : public OpRewritePattern<GetBufferDescriptorOp> {
 
 struct FromHalInterfaceBindingSubspan
     : public OpRewritePattern<GetBufferDescriptorOp> {
-  using OpRewritePattern<GetBufferDescriptorOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
                                 PatternRewriter &rewriter) const override {
     auto binding =
@@ -338,7 +338,7 @@ getBaseBufferReplacementForDescriptor(GetBufferDescriptorOp descriptorOp,
 
 struct FromMemRefAssumeAlignment
     : public OpRewritePattern<GetBufferDescriptorOp> {
-  using OpRewritePattern<GetBufferDescriptorOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
                                 PatternRewriter &rewriter) const override {
     auto assumeOp = op.getSource().getDefiningOp<memref::AssumeAlignmentOp>();
@@ -380,7 +380,7 @@ struct FromMemRefAssumeAlignment
 // Allocations always return a non-offset memref and are matched by this
 // pattern.
 struct FromAllocation : public OpRewritePattern<GetBufferDescriptorOp> {
-  using OpRewritePattern<GetBufferDescriptorOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
                                 PatternRewriter &rewriter) const override {
     auto alloca = op.getSource().template getDefiningOp<memref::AllocaOp>();
@@ -414,7 +414,7 @@ struct FromAllocation : public OpRewritePattern<GetBufferDescriptorOp> {
 // MemRef globals are always static shaped and reference a non-offset
 // buffer.
 struct FromGlobal : public OpRewritePattern<GetBufferDescriptorOp> {
-  using OpRewritePattern<GetBufferDescriptorOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
                                 PatternRewriter &rewriter) const override {
     auto global = op.getSource().template getDefiningOp<memref::GetGlobalOp>();

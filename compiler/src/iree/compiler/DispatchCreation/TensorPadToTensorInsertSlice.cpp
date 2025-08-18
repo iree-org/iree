@@ -35,7 +35,7 @@ namespace {
 /// tensor.insert_slice. This is needed till tensor.pad op can be fused with its
 /// consumers.
 struct TensorPadOpConversion : public OpRewritePattern<tensor::PadOp> {
-  using OpRewritePattern<tensor::PadOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   TensorPadOpConversion(MLIRContext *context, bool skipSingleLinalgOpUses)
       : OpRewritePattern<tensor::PadOp>(context, skipSingleLinalgOpUses),
         skipSingleLinalgOpUses(skipSingleLinalgOpUses) {}

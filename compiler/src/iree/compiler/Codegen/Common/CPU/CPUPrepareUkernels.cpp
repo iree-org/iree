@@ -171,7 +171,7 @@ dropBatchTileSize(IREE::CPU::LoweringConfigAttr config) {
 /// Pattern to convert linalg.batch_mmt4d with batch dim = 1 into mmt4d.
 struct ConvertBatchMmt4DtoMmt4DPattern
     : public OpRewritePattern<linalg::BatchMmt4DOp> {
-  using OpRewritePattern<linalg::BatchMmt4DOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::BatchMmt4DOp op,
                                 PatternRewriter &rewriter) const override {
@@ -251,7 +251,7 @@ struct ConvertBatchMmt4DtoMmt4DPattern
 };
 
 struct Convert3DPackto2DPackPattern : public OpRewritePattern<linalg::PackOp> {
-  using OpRewritePattern<linalg::PackOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::PackOp packOp,
                                 PatternRewriter &rewriter) const override {
@@ -321,7 +321,7 @@ struct Convert3DPackto2DPackPattern : public OpRewritePattern<linalg::PackOp> {
 
 struct Convert5DUnPackto4DUnPackPattern
     : public OpRewritePattern<linalg::UnPackOp> {
-  using OpRewritePattern<linalg::UnPackOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::UnPackOp unpackOp,
                                 PatternRewriter &rewriter) const override {
