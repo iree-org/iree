@@ -11,7 +11,7 @@ func.func @scaled_matmul_1x1() {
   %empty = tensor.empty() : tensor<1x1xf32>
   %C = linalg.fill ins(%cst : f32) outs(%empty : tensor<1x1xf32>) -> tensor<1x1xf32>
   %D = linalg.generic {
-    indexing_maps = [affine_map<(M, N, Ko, Kb) -> (M, Ko, Kb)>, affine_map<(M, N, Ko, Kb) -> (M, Ko, Kb)>, affine_map<(M, N, Ko, Kb) -> (M, Ko)>, affine_map<(M, N, Ko, Kb) -> (N, Ko)>, affine_map<(M, N, Ko, Kb) -> (M, N)>],
+    indexing_maps = [affine_map<(M, N, Ko, Kb) -> (M, Ko, Kb)>, affine_map<(M, N, Ko, Kb) -> (N, Ko, Kb)>, affine_map<(M, N, Ko, Kb) -> (M, Ko)>, affine_map<(M, N, Ko, Kb) -> (N, Ko)>, affine_map<(M, N, Ko, Kb) -> (M, N)>],
     iterator_types = ["parallel", "parallel", "reduction", "reduction"]
   } ins(%A, %B, %A_scales, %B_scales : tensor<1x1x32xf4E2M1FN>, tensor<1x1x32xf4E2M1FN>, tensor<1x1xf8E8M0FNU>, tensor<1x1xf8E8M0FNU>) outs(%C : tensor<1x1xf32>) {
   ^bb0(%a: f4E2M1FN, %b: f4E2M1FN, %a_scale: f8E8M0FNU, %b_scale: f8E8M0FNU, %out: f32):
@@ -38,7 +38,7 @@ func.func @scaled_matmul_1024x1024() {
   %empty = tensor.empty() : tensor<1024x1024xf32>
   %C = linalg.fill ins(%cst : f32) outs(%empty : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
   %D = linalg.generic {
-    indexing_maps = [affine_map<(M, N, Ko, Kb) -> (M, Ko, Kb)>, affine_map<(M, N, Ko, Kb) -> (M, Ko, Kb)>, affine_map<(M, N, Ko, Kb) -> (M, Ko)>, affine_map<(M, N, Ko, Kb) -> (N, Ko)>, affine_map<(M, N, Ko, Kb) -> (M, N)>],
+    indexing_maps = [affine_map<(M, N, Ko, Kb) -> (M, Ko, Kb)>, affine_map<(M, N, Ko, Kb) -> (N, Ko, Kb)>, affine_map<(M, N, Ko, Kb) -> (M, Ko)>, affine_map<(M, N, Ko, Kb) -> (N, Ko)>, affine_map<(M, N, Ko, Kb) -> (M, N)>],
     iterator_types = ["parallel", "parallel", "reduction", "reduction"]
   } ins(%A, %B, %A_scales, %B_scales : tensor<1024x32x32xf4E2M1FN>, tensor<1024x32x32xf4E2M1FN>, tensor<1024x32xf8E8M0FNU>, tensor<1024x32xf8E8M0FNU>) outs(%C : tensor<1024x1024xf32>) {
   ^bb0(%a: f4E2M1FN, %b: f4E2M1FN, %a_scale: f8E8M0FNU, %b_scale: f8E8M0FNU, %out: f32):
@@ -65,7 +65,7 @@ func.func @scaled_matmul_128x128() {
   %empty = tensor.empty() : tensor<128x128xf32>
   %C = linalg.fill ins(%cst : f32) outs(%empty : tensor<128x128xf32>) -> tensor<128x128xf32>
   %D = linalg.generic {
-    indexing_maps = [affine_map<(M, N, Ko, Kb) -> (M, Ko, Kb)>, affine_map<(M, N, Ko, Kb) -> (M, Ko, Kb)>, affine_map<(M, N, Ko, Kb) -> (M, Ko)>, affine_map<(M, N, Ko, Kb) -> (N, Ko)>, affine_map<(M, N, Ko, Kb) -> (M, N)>],
+    indexing_maps = [affine_map<(M, N, Ko, Kb) -> (M, Ko, Kb)>, affine_map<(M, N, Ko, Kb) -> (N, Ko, Kb)>, affine_map<(M, N, Ko, Kb) -> (M, Ko)>, affine_map<(M, N, Ko, Kb) -> (N, Ko)>, affine_map<(M, N, Ko, Kb) -> (M, N)>],
     iterator_types = ["parallel", "parallel", "reduction", "reduction"]
   } ins(%A, %B, %A_scales, %B_scales : tensor<128x4x32xf4E2M1FN>, tensor<128x4x32xf4E2M1FN>, tensor<128x4xf8E8M0FNU>, tensor<128x4xf8E8M0FNU>) outs(%C : tensor<128x128xf32>) {
   ^bb0(%a: f4E2M1FN, %b: f4E2M1FN, %a_scale: f8E8M0FNU, %b_scale: f8E8M0FNU, %out: f32):
