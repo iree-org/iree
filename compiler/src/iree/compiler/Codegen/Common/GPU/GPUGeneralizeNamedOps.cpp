@@ -60,7 +60,8 @@ struct GPUGeneralizeNamedOpsPass final
     funcOp.walk([&](linalg::LinalgOp linalgOp) {
       if (isa<linalg::BatchMatmulOp, linalg::BatchMatmulTransposeBOp,
               linalg::MatmulOp, linalg::MatvecOp, linalg::TransposeOp,
-              linalg::MatmulTransposeBOp, linalg::VecmatOp>(linalgOp))
+              linalg::MatmulTransposeBOp, linalg::VecmatOp>(
+              linalgOp.getOperation()))
         namedOpCandidates.push_back(linalgOp);
     });
 
