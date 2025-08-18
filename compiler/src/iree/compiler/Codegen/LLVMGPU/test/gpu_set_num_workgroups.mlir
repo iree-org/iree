@@ -268,15 +268,13 @@ func.func @_lowering_config_test_dispatch_1() {
   return
 }
 
-
-//  CHECK-DAG: #[[translation:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 8, 1] subgroup_size = 32,
-//  CHEC K-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 128, 64]{{\]}}
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [16, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 //      CHECK: func.func @_lowering_config_test_dispatch_1()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.fill
 //      CHECK: linalg.generic
-// CHECK-SAME:     lowering_config = #iree_gpu.lowering_config<{reduction = [0, 0, 32], thread = [1, 16, 0], workgroup = [32, 128, 1]
-//  C HECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 128, 64]{{\]}}
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -459,9 +457,14 @@ func.func @large_matmul_f16() {
   return
 }
 
-// SM80:        #config = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 256, 32]]>
-// SM80:        #translation = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [128, 2, 1]
+//      SM80:   #config = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 256, 32]]>
+//      SM80:   #translation = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [128, 2, 1]
 // SM80-SAME:   subgroup_size = 32, {pipeline_depth = 3 : i64, store_stage = 1 : i64}>
+//      SM80:   func.func @large_matmul_f16()
+// SM80-SAME:       translation_info = #[[TRANSLATION]]
+//      SM80:   linalg.fill
+//      SM80:   linalg.generic
+// SM80-SAME:       lowering_config = #config
 
 // -----
 

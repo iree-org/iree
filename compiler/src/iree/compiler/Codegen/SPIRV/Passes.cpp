@@ -624,12 +624,7 @@ static void buildSPIRVCodegenConfigurationPassPipelineImpl(
     OpPassManager &modulePassManager) {
   {
     FunctionLikeNest funcPassManager(modulePassManager);
-    GPUGeneralizeNamedOpsPassOptions options;
-    options.generalizeMatmul = false;
-    funcPassManager.addPass([&]() -> std::unique_ptr<Pass> {
-      return createGPUGeneralizeNamedOpsPass(options);
-    });
-
+    funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
     addEncodingToNopPasses(funcPassManager);
   }

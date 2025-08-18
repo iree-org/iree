@@ -139,15 +139,12 @@ def GPUFuseAndHoistParallelLoopsPass :
 
 def GPUGeneralizeNamedOpsPass :
     InterfacePass<"iree-codegen-gpu-generalize-named-ops", "mlir::FunctionOpInterface"> {
-  let summary = "Convert (a hand-picked set of) named Linalg ops to linalg.generic ops";
+  let summary = "Convert named Linalg ops to linalg.generic ops";
 
-  let options = [
-    Option<"generalizeMatmul", "generalize-matmul", "bool",
-           /*default=*/"true",
-           "When set false, do not generalize matmul. This option should eventually be "
-           "removed, it was added as a workaround for logic added before linalg.matmul was "
-           "generalized in this pass.">,
-  ];
+  let description = [{
+    Convert a whitelisted set of named Linalg ops to linalg.generics. The whitelist
+    does not contain all named ops.
+  }];
 }
 
 def GPUGreedilyDistributeToThreadsPass :
