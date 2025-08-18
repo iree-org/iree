@@ -147,7 +147,7 @@ struct ScalarizeMathOp : public OpRewritePattern<MathOpTy> {
 };
 
 struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
-  using OpRewritePattern<memref::AllocOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(memref::AllocOp allocOp,
                                 PatternRewriter &rewriter) const override {

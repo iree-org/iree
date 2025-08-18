@@ -207,7 +207,7 @@ namespace {
 
 /// Deduplicates operands, merging assume ranges along the way.
 struct DeduplicateOperands : public OpRewritePattern<AssumeIntOp> {
-  using OpRewritePattern<AssumeIntOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(AssumeIntOp op,
                                 PatternRewriter &rewriter) const override {
     ArrayAttr assumptions = op.getAssumptions();
@@ -269,7 +269,7 @@ struct DeduplicateOperands : public OpRewritePattern<AssumeIntOp> {
 ///
 /// Where X | Y.
 struct FoldDivMulOfAssume : public OpRewritePattern<arith::MulIOp> {
-  using OpRewritePattern<arith::MulIOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(arith::MulIOp mulOp,
                                 PatternRewriter &rewriter) const override {
     APInt mulConstantInt;
@@ -343,7 +343,7 @@ namespace {
 /// Folds cast ops into the result of other ops.
 /// Only safe to apply to ops that don't care about their types.
 struct FoldCastIntoNullOp : public OpRewritePattern<CastOp> {
-  using OpRewritePattern<CastOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(CastOp castOp,
                                 PatternRewriter &rewriter) const override {
     auto nullOp = dyn_cast_or_null<NullOp>(castOp.getOperand().getDefiningOp());
@@ -824,7 +824,7 @@ namespace {
 
 struct ExpandUnfoldableConstantOp
     : public OpRewritePattern<UnfoldableConstantOp> {
-  using OpRewritePattern<IREE::Util::UnfoldableConstantOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(UnfoldableConstantOp op,
                                 PatternRewriter &rewriter) const override {
     auto stdConst = rewriter.create<arith::ConstantOp>(
@@ -909,7 +909,7 @@ namespace {
 /// store back to the same global: we want to be able to elide the entire load
 /// and store.
 struct EraseUnusedGlobalStoreOp : public OpRewritePattern<GlobalStoreOp> {
-  using OpRewritePattern<GlobalStoreOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(GlobalStoreOp op,
                                 PatternRewriter &rewriter) const override {

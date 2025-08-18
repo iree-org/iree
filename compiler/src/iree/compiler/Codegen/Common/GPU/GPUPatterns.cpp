@@ -151,7 +151,7 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
 // MMA types but MMA load can transpose the matrix when loading.
 struct CombineTransferReadOpBroadcast final
     : public OpRewritePattern<vector::BroadcastOp> {
-  using OpRewritePattern<vector::BroadcastOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::BroadcastOp op,
                                 PatternRewriter &rewriter) const override {
