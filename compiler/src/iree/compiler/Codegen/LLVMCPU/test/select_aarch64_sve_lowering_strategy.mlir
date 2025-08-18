@@ -265,6 +265,153 @@ func.func @mmtd4_with_fill() attributes {hal.executable.target = #executable_tar
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {cpu = "", cpu_features = "+v9a,+sve", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", link_embedded = false, native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android34"}>
+#map = affine_map<()[s0] -> (320 ceildiv s0)>
+func.func @unpack() attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
+  %c8 = arith.constant 8 : index
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %vscale = vector.vscale
+  %c8_vscale = arith.muli %vscale, %c8 : index
+  %1 = affine.apply #map()[%c8_vscale]
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x10x?x8x?xf32>>{%1, %c8_vscale}
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x80x320xf32>>
+  %4 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0, 0, 0, 0], sizes = [128, 10, %1, 8, %c8_vscale], strides = [1, 1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x10x?x8x?xf32>>{%1, %c8_vscale} -> tensor<128x10x?x8x?xf32>
+  %5 = tensor.empty() : tensor<128x80x320xf32>
+  %unpack = linalg.unpack %4 outer_dims_perm = [0, 1, 2] inner_dims_pos = [1, 2] inner_tiles = [8, %c8_vscale] into %5 : tensor<128x10x?x8x?xf32> -> tensor<128x80x320xf32>
+  iree_tensor_ext.dispatch.tensor.store %unpack, %3, offsets = [0, 0, 0], sizes = [128, 80, 320], strides = [1, 1, 1] : tensor<128x80x320xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x80x320xf32>>
+  return
+}
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 40, 64], vector_common_parallel = [1, 8, [8]]>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDataTiling
+//
+// For SVE, we do not decompose unpacks.
+//   CHECK-NOT: enable_loop_peeling
+//       CHECK: func.func @unpack()
+//  CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//       CHECK:   linalg.unpack
+//  CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 4, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {cpu = "", cpu_features = "+v9a,+sve", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android34"}>
+func.func @unpack_outer_dynamic() attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
+  %c131072 = arith.constant 131072 : index
+  %c0 = arith.constant 0 : index
+  %c8 = arith.constant 8 : index
+  %vscale = vector.vscale
+  %c8_vscale = arith.muli %vscale, %c8 : index
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
+  %2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
+  %3 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : index
+  %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x32x?xi32>>{%0, %1, %c8_vscale}
+  %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c131072) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xi32>>{%2, %3}
+  %6 = iree_tensor_ext.dispatch.tensor.load %4, offsets = [0, 0, 0, 0], sizes = [%0, %1, 32, 16], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x32x?xi32>>{%0, %1, %c8_vscale} -> tensor<?x?x32x?xi32>
+  %7 = tensor.empty(%2, %3) : tensor<?x?xi32>
+  %unpack = linalg.unpack %6 inner_dims_pos = [0, 1] inner_tiles = [32, %c8_vscale] into %7 : tensor<?x?x32x?xi32> -> tensor<?x?xi32>
+  iree_tensor_ext.dispatch.tensor.store %unpack, %5, offsets = [0, 0], sizes = [%2, %3], strides = [1, 1] : tensor<?x?xi32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xi32>>{%2, %3}
+  return
+}
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64], vector_common_parallel = [32, [8]]>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDataTiling
+//
+// For SVE, we do not decompose unpacks.
+//   CHECK-NOT: enable_loop_peeling
+//       CHECK: func.func @unpack_outer_dynamic()
+//  CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//       CHECK:   linalg.unpack
+//  CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 6, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {cpu = "", cpu_features = "+v9a,+sve", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", link_embedded = false, native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android34"}>
+func.func @unpack_fully_dynamic() attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
+  %c131072 = arith.constant 131072 : index
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
+  %2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
+  %3 = hal.interface.constant.load layout(#pipeline_layout) ordinal(3) : index
+  %4 = hal.interface.constant.load layout(#pipeline_layout) ordinal(4) : index
+  %5 = hal.interface.constant.load layout(#pipeline_layout) ordinal(5) : index
+  %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%0, %1, %4, %5}
+  %7 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c131072) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xi32>>{%2, %3}
+  %8 = iree_tensor_ext.dispatch.tensor.load %6, offsets = [0, 0, 0, 0], sizes = [%0, %1, 32, 16], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%0, %1, %4, %5} -> tensor<?x?x?x?xi32>
+  %9 = tensor.empty(%2, %3) : tensor<?x?xi32>
+  %unpack = linalg.unpack %8 inner_dims_pos = [0, 1] inner_tiles = [%4, %5] into %9 : tensor<?x?x?x?xi32> -> tensor<?x?xi32>
+  iree_tensor_ext.dispatch.tensor.store %unpack, %7, offsets = [0, 0], sizes = [%2, %3], strides = [1, 1] : tensor<?x?xi32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xi32>>{%2, %3}
+  return
+}
+// If the inner tile sizes are fully dynamic and/or the scalable tile sizes cannot be inferred from the IR,
+// we fallback to the default tile sizes.
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64], vector_common_parallel = [1, 1]>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDataTiling
+//       CHECK: func.func @unpack_fully_dynamic()
+//  CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//       CHECK:   linalg.unpack
+//  CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#map = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map3 = affine_map<()[s0] -> (320 ceildiv s0)>
+#executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {cpu = "", cpu_features = "+v9a,+sve", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", link_embedded = false, native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android34"}>
+func.func @unpack_generic() attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
+  %c8 = arith.constant 8 : index
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
+  %vscale = vector.vscale
+  %c8_vscale = arith.muli %vscale, %c8 : index
+  %2 = affine.apply #map3()[%c8_vscale]
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x10x?x8x?xf32>>{%2, %c8_vscale}
+  %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x320xf32>>
+  %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%1) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x320x80xf32>>
+  %6 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0, 0, 0, 0], sizes = [128, 10, %2, 8, %c8_vscale], strides = [1, 1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x10x?x8x?xf32>>{%2, %c8_vscale} -> tensor<128x10x?x8x?xf32>
+  %7 = iree_tensor_ext.dispatch.tensor.load %4, offsets = [0, 0], sizes = [128, 320], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x320xf32>> -> tensor<128x320xf32>
+  %8 = tensor.empty() : tensor<128x80x320xf32>
+  %unpack = linalg.unpack %6 outer_dims_perm = [0, 1, 2] inner_dims_pos = [1, 2] inner_tiles = [8, %c8_vscale] into %8 : tensor<128x10x?x8x?xf32> -> tensor<128x80x320xf32>
+  %9 = tensor.empty() : tensor<128x320x80xf32>
+  %generic = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel"]} ins(%7, %unpack : tensor<128x320xf32>, tensor<128x80x320xf32>) outs(%9 : tensor<128x320x80xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %10 = arith.addf %in, %in_0 : f32
+    linalg.yield %10 : f32
+  } -> tensor<128x320x80xf32>
+  iree_tensor_ext.dispatch.tensor.store %generic, %5, offsets = [0, 0, 0], sizes = [128, 320, 80], strides = [1, 1, 1] : tensor<128x320x80xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x320x80xf32>>
+  return
+}
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, [8], 8]>
+//   CHECK-DAG: #[[CONFIG1:.+]] = #iree_cpu.lowering_config<distribution = [64, 64, 40], vector_common_parallel = [1, [8], 8]>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert
+//       CHECK: func.func @unpack_generic()
+//  CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//       CHECK:   linalg.unpack
+//  CHECK-SAME:       lowering_config = #[[CONFIG]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       lowering_config = #[[CONFIG1]]
+
+// -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
