@@ -449,6 +449,7 @@ struct SetEncodingPass final : impl::SetEncodingPassBase<SetEncodingPass> {
       SmallVector<linalg::LinalgOp> candidates =
           getDataTilingCandidates(funcOp);
       for (linalg::LinalgOp linalgOp : candidates) {
+        IREE::Encoding::removeDataTilingHint(linalgOp);
         if (failed(
                 setDataTilingEncodings(rewriter, linalgOp, encodingOption))) {
           return signalPassFailure();

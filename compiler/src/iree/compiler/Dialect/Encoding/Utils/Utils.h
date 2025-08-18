@@ -26,6 +26,12 @@ inline void setDataTilingHint(Operation *op) {
   op->setAttr(kDataTilingHint, UnitAttr::get(op->getContext()));
 }
 
+/// Removes the attribute with `kDataTilingHint` key from the operation, if it
+/// exists.
+inline void removeDataTilingHint(Operation *op) {
+  (void)op->removeAttr(kDataTilingHint);
+}
+
 /// Returns the encoding attribute from the type if there is an encoding that
 /// implements SerializableAttr. Otherwise, returns null.
 SerializableAttr getSerializableAttr(RankedTensorType type);

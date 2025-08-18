@@ -30,6 +30,7 @@ util.func public @matmul_f32f32f32(%arg0 : tensor<100x250xf32>, %arg1 : tensor<2
 //      CHECK-ALL:   %[[OUTS:.+]] = iree_encoding.set_encoding %[[ARG2]]
 // CHECK-ALL-SAME:       tensor<100x500xf32, #[[OUT_ENCODING]]>
 //      CHECK-ALL:   %[[MATMUL:.+]] = linalg.matmul
+//      CHECK-NOT:       iree.opt.data_tiling
 // CHECK-ALL-SAME:       ins(%[[LHS]], %[[RHS]] :
 // CHECK-ALL-SAME:       outs(%[[OUTS]] :
 //      CHECK-ALL:   %[[RESULT:.+]] = iree_encoding.unset_encoding %[[MATMUL]] : tensor<100x500xf32, #[[OUT_ENCODING]]> -> tensor<100x500xf32>
