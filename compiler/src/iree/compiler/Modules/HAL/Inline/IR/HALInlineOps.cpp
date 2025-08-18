@@ -199,7 +199,7 @@ namespace {
 /// Skips a hal.buffer_view.buffer accessor when the buffer view was created in
 /// the same scope and we know the origin buffer.
 struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
-  using OpRewritePattern<BufferViewBufferOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(BufferViewBufferOp op,
                                 PatternRewriter &rewriter) const override {
     if (auto createOp = dyn_cast_or_null<BufferViewCreateOp>(

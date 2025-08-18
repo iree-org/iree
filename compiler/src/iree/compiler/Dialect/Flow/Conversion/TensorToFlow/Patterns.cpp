@@ -50,7 +50,7 @@ struct ConvertLinalgFillPattern final
 /// Convert tensor.insert_slice ops into flow.tensor.update ops where possible.
 struct ConvertTensorInsertSlicePattern
     : public OpRewritePattern<tensor::InsertSliceOp> {
-  using OpRewritePattern<tensor::InsertSliceOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::InsertSliceOp insertOp,
                                 PatternRewriter &rewriter) const override {
     return convertInsertSliceOpToFlowUpdateOp(rewriter, insertOp);
@@ -59,7 +59,7 @@ struct ConvertTensorInsertSlicePattern
 
 /// Convert tensor.insert ops into flow.tensor.store ops where possible.
 struct ConvertTensorInsertPattern : public OpRewritePattern<tensor::InsertOp> {
-  using OpRewritePattern<tensor::InsertOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::InsertOp insertOp,
                                 PatternRewriter &rewriter) const override {
     if (insertOp->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
@@ -75,7 +75,7 @@ struct ConvertTensorInsertPattern : public OpRewritePattern<tensor::InsertOp> {
 /// Convert tensor.extract_slice ops into flow.tensor.slice ops where possible.
 struct ConvertTensorExtractSlicePattern
     : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
     return convertExtractSliceOpToFlowSliceOp(rewriter, sliceOp);
@@ -84,7 +84,7 @@ struct ConvertTensorExtractSlicePattern
 
 struct ConvertTensorExtractPattern
     : public OpRewritePattern<tensor::ExtractOp> {
-  using OpRewritePattern<tensor::ExtractOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tensor::ExtractOp op,
                                 PatternRewriter &rewriter) const override {
@@ -99,7 +99,7 @@ struct ConvertTensorExtractPattern
 
 struct ConvertTensorExtBitcastPattern
     : public OpRewritePattern<TensorExt::BitCastOp> {
-  using OpRewritePattern<TensorExt::BitCastOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorExt::BitCastOp op,
                                 PatternRewriter &rewriter) const override {
     if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
@@ -114,7 +114,7 @@ struct ConvertTensorExtBitcastPattern
 
 struct ConvertTensorBitcastPattern
     : public OpRewritePattern<tensor::BitcastOp> {
-  using OpRewritePattern<tensor::BitcastOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::BitcastOp op,
                                 PatternRewriter &rewriter) const override {
     if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
@@ -130,7 +130,7 @@ struct ConvertTensorBitcastPattern
 };
 
 struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
-  using OpRewritePattern<tensor::CastOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::CastOp op,
                                 PatternRewriter &rewriter) const override {
     if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
@@ -194,7 +194,7 @@ struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
 };
 
 struct ConvertTensorConcatPattern : public OpRewritePattern<tensor::ConcatOp> {
-  using OpRewritePattern<tensor::ConcatOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tensor::ConcatOp concatOp,
                                 PatternRewriter &rewriter) const override {
@@ -277,7 +277,7 @@ struct ConvertTensorConcatPattern : public OpRewritePattern<tensor::ConcatOp> {
 
 struct ConvertTensorFromElementsPattern
     : public OpRewritePattern<tensor::FromElementsOp> {
-  using OpRewritePattern<tensor::FromElementsOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::FromElementsOp op,
                                 PatternRewriter &rewriter) const override {
     // TODO: This pattern was mainly added to iron out some kinks specific to
@@ -337,7 +337,7 @@ static SmallVector<Value> getDynamicTensorSizes(OpBuilder &builder,
 /// Convert tensor.reshape ops into flow.tensor.reshape ops where possible.
 struct ConvertTensorDialectReshapeOpPattern
     : public OpRewritePattern<tensor::ReshapeOp> {
-  using OpRewritePattern<tensor::ReshapeOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::ReshapeOp op,
                                 PatternRewriter &rewriter) const override {
     if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {

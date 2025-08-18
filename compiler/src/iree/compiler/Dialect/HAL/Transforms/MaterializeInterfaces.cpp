@@ -499,7 +499,7 @@ declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
 namespace {
 
 struct ConvertReturnPattern : public OpRewritePattern<IREE::Stream::ReturnOp> {
-  using OpRewritePattern<IREE::Stream::ReturnOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::ReturnOp op,
                                 PatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::HAL::ReturnOp>(op, op.getOperands());
@@ -522,7 +522,7 @@ struct ConvertDispatchWorkgroupInfoPattern final
 
 struct InlineConstantWorkgroupSizePattern
     : public OpRewritePattern<IREE::HAL::InterfaceWorkgroupSizeOp> {
-  using OpRewritePattern<IREE::HAL::InterfaceWorkgroupSizeOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::HAL::InterfaceWorkgroupSizeOp sizeOp,
                                 PatternRewriter &rewriter) const override {
     // Lookup the entry point matching the parent.

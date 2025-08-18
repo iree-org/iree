@@ -162,7 +162,7 @@ static std::optional<int64_t> foldAffineMin(affine::AffineMinOp minOp) {
 namespace {
 struct AffineMinDistributedSCFCanonicalizationPattern
     : public mlir::OpRewritePattern<mlir::affine::AffineMinOp> {
-  using OpRewritePattern<mlir::affine::AffineMinOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   mlir::LogicalResult
   matchAndRewrite(mlir::affine::AffineMinOp minOp,

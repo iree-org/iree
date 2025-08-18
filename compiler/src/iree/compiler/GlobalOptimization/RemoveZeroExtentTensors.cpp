@@ -64,7 +64,7 @@ struct ReplaceZeroExtentOperands : public RewritePattern {
 /// Forward the destination of a `tensor.insert_slice` to its uses
 /// if the source is zero-extent.
 struct FoldZeroExtentInserts : public OpRewritePattern<tensor::InsertSliceOp> {
-  using OpRewritePattern<tensor::InsertSliceOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tensor::InsertSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {

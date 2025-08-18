@@ -17,7 +17,7 @@ namespace {
 // (from
 // https://github.com/ROCm/llvm-project/blob/amd-staging/amd/device-libs/ocml/src/erfF.cl#L11)
 struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
-  using OpRewritePattern<math::ErfOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(math::ErfOp op,
                                 PatternRewriter &rewriter) const override {

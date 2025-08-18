@@ -165,7 +165,7 @@ struct InsertToBroadcast final : OpRewritePattern<vector::InsertOp> {
 
 /// Pattern to sink `gpu.barrier` ops out of a `warp_execute_on_lane_0` op.
 struct WarpOpBarrier final : OpRewritePattern<gpu::WarpExecuteOnLane0Op> {
-  using OpRewritePattern<gpu::WarpExecuteOnLane0Op>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(gpu::WarpExecuteOnLane0Op warpOp,
                                 PatternRewriter &rewriter) const override {

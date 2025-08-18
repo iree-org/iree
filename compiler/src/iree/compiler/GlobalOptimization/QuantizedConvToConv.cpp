@@ -127,7 +127,7 @@ Value multiplyDims(ImplicitLocOpBuilder &builder, Value value,
 // https://arxiv.org/abs/1712.05877.
 struct QuantizedConvToConv
     : public OpRewritePattern<linalg::Conv2DNhwcHwcfQOp> {
-  using OpRewritePattern<linalg::Conv2DNhwcHwcfQOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfQOp op,
                                 PatternRewriter &rewriter) const override {
@@ -247,7 +247,7 @@ struct QuantizedConvToConv
 // https://arxiv.org/abs/1712.05877.
 struct QuantizedDepthwiseConvToDepthwiseConv
     : public OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcQOp> {
-  using OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcQOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::DepthwiseConv2DNhwcHwcQOp op,
                                 PatternRewriter &rewriter) const override {

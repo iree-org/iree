@@ -282,7 +282,7 @@ struct CastLikeInsertSliceOpFolder final
 /// write to memory.
 // TODO: Consider upstreaming
 struct FoldMaskedTransferRAW : OpRewritePattern<vector::TransferReadOp> {
-  using OpRewritePattern<vector::TransferReadOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::TransferReadOp op,
                                 PatternRewriter &rewriter) const override {

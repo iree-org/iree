@@ -574,7 +574,7 @@ static SmallVector<Attribute> appendSplitReductionMappingToWorkgroupMapping(
 // loop also has workgroup mapping.
 struct FoldSplitReductionForallWithWorkgroupForall
     : public OpRewritePattern<scf::ForallOp> {
-  using OpRewritePattern<scf::ForallOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(scf::ForallOp forallOp,
                                 PatternRewriter &rewriter) const override {
@@ -940,7 +940,7 @@ distributeLinalgOpsWithFilter(mlir::FunctionOpInterface funcOp,
 
 namespace {
 struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
-  using OpRewritePattern<scf::ForOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(scf::ForOp loop,
                                 PatternRewriter &rewriter) const final {
     if (loop.getBody()->getOperations().size() == 1) {

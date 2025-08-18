@@ -31,7 +31,7 @@ namespace {
 /// dimension.
 struct MakeReductionInnermostPattern final
     : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
     SmallVector<unsigned> interchange;
@@ -64,7 +64,7 @@ struct MakeReductionInnermostPattern final
 /// fixes up elementwise operations for which that is not the case.
 struct TransposeGenericOpPattern final
     : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
     if (!genericOp.hasPureTensorSemantics()) {

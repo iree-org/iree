@@ -34,7 +34,7 @@ namespace {
 /// not common in practice, so it is not supported now.
 struct SinkDownCollapsingUnitDimsAcrossUnpack final
     : public OpRewritePattern<linalg::UnPackOp> {
-  using OpRewritePattern<linalg::UnPackOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(linalg::UnPackOp op,
                                 PatternRewriter &rewriter) const override {
     if (!isIdentityPermutation(op.getOuterDimsPerm())) {
