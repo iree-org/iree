@@ -767,18 +767,16 @@ static LogicalResult setTilingAndMatmulOpConfig(linalg::LinalgOp op,
   if (!isMatmulOrBatchMatmul(op)) {
     return failure();
   }
-
+  // Try to tile and vectorize first. It's common to see 32 threads
   // per subgroup for GPUs.
   std::array<int64_t, 2> workgroupXY = {32, 2};
   std::array<int64_t, 3> threadMNK;
-
   auto inputType = llvm::cast<ShapedType>(op->getOperand(0).getType());
   if (IREE::Util::getTypeBitWidth(inputType.getElementType()) == 16) {
     threadMNK = {8, 8, 8};
   } else {
     threadMNK = {8, 8, 4};
   }
-
   return detail::setMatmulOpConfig(target, op, workgroupXY, threadMNK);
 }
 
