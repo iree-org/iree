@@ -391,6 +391,7 @@ public:
         });
       }
     }
+    passManager.addPass(createSpecializeExportsPass());
     buildLLVMGPUCodegenCommonConfigurationPassPipeline(passManager);
     OpPassManager &modulePassManager = passManager.nest<ModuleOp>();
     if (options.enableTensorUKernels) {
