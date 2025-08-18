@@ -71,6 +71,7 @@ struct DropUnitDimsFromCollapseOfExpand
 
     const SmallVector<ReassociationIndices, 4> collapseReassoc =
         collapseOp.getReassociationIndices();
+    ArrayRef<int64_t> srcShape = expandOp.getSrcType().getShape();
     ArrayRef<int64_t> interShape = expandOp.getType().getShape();
     ArrayRef<int64_t> outShape = collapseOp.getType().getShape();
     SmallVector<int64_t> interToOutMap(expandOp.getType().getRank());
@@ -80,34 +81,38 @@ struct DropUnitDimsFromCollapseOfExpand
     // `collapseOp` op.
     llvm::SmallDenseSet<int64_t> toDrop;
     for (const auto &[outDim, indices] : llvm::enumerate(collapseReassoc)) {
-      int64_t countUnitIdxs = 0;
-      bool foundFirstUnitDim = false;
-      int64_t firstUnitDim;
+      //int64_t countUnitIdxs = 0;
+      //bool foundFirstUnitDim = false;
+      //int64_t firstUnitDim;
       for (auto [innerIdx, inDim] : llvm::enumerate(indices)) {
         // Can't drop this dim if it isnt statically 1 or if it isn't being
         // combined with any other dimensions.
         if (indices.size() == 1 || interShape[inDim] != 1) {
           continue;
         }
-        if (!foundFirstUnitDim) {
-          firstUnitDim = inDim;
-          foundFirstUnitDim = true;
-        }
-        countUnitIdxs++;
+        // If we are collapsing multiple unit dims together, at least 1 must be
+        // kept (prefer the first).
+        if (outShape[outDim] == 1 && innerIdx != 0) 
+          continue;
+        //if (!foundFirstUnitDim) {
+          //firstUnitDim = inDim;
+          //foundFirstUnitDim = true;
+        //}
+        //countUnitIdxs++;
 
         toDrop.insert(inDim);
       }
       // If we found multiple unit dims, we need to keep the first one.
-      if (countUnitIdxs > 1 && foundFirstUnitDim) {
-        toDrop.erase(firstUnitDim);
-      }
+      //if (countUnitIdxs > 1 && foundFirstUnitDim) {
+      //  toDrop.erase(firstUnitDim);
+      //}
     }
 
     // Remove dimensions from `toDrop` that weren't introduced by the
     // `expandOp` op.
     const auto expandReassoc = expandOp.getReassociationIndices();
     for (const auto &[inDim, indices] : llvm::enumerate(expandReassoc)) {
-      if (indices.size() == 1) {
+      if (indices.size() == 1 || srcShape[inDim] == 1) {
         toDrop.erase(indices[0]);
       }
     }
@@ -168,7 +173,6 @@ struct DropUnitDimsFromCollapseOfExpand
     // Construct new reassociations for the `expand_shape` op that does
     // not include the dropped dimensions.
     SmallVector<ReassociationIndices, 4> newExpandReassoc;
-    ArrayRef<int64_t> srcShape = expandOp.getSrcType().getShape();
     int64_t expandedDim = 0;
     for (auto dim : llvm::seq<int64_t>(0, srcShape.size())) {
       bool changed = pushBackReassociation(newExpandReassoc, expandedDim,
