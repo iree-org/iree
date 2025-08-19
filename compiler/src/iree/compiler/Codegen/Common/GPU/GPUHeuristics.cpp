@@ -684,7 +684,7 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
       SmallVector<VectorType> typesA, typesB;
       intrinsicA.mmaKind.getUndistributedTileTypes(typesA);
       intrinsicB.mmaKind.getUndistributedTileTypes(typesB);
-      if (typesA != typesB){
+      if (typesA != typesB) {
         continue;
       }
 
