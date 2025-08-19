@@ -11,6 +11,7 @@
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
@@ -19,6 +20,8 @@
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/TypeUtilities.h"
+
+#define DEBUG_TYPE "iree-linalgext-utils-matchutils"
 
 // This is based on the upstream implementation of the
 // Linalg::ContractionOpInterface.
@@ -121,17 +124,17 @@ inferIteratorsFromOutMap(AffineMap map) {
 
 bool isScaledContractionBody(Block &block) {
   if (block.empty() || !block.back().mightHaveTrait<OpTrait::IsTerminator>()) {
-    llvm::errs() << "no terminator in the block";
+    LDBG() << "no terminator in the block";
     return false;
   }
   if (block.getNumArguments() != 5) {
-    llvm::errs() << "expected block with 3 arguments";
+    LDBG() << "expected block with 3 arguments";
     return false;
   }
 
   Operation *terminator = block.getTerminator();
   if (terminator->getNumOperands() != 1) {
-    llvm::errs() << "expected terminator with 1 operand";
+    LDBG() << "expected terminator with 1 operand";
     return false;
   }
 
@@ -156,7 +159,7 @@ bool isScaledContractionBody(Block &block) {
   Value yielded = getSourceSkipUnary(terminator->getOperand(0));
   Operation *reductionOp = yielded.getDefiningOp();
   if (reductionOp->getNumResults() != 1 || reductionOp->getNumOperands() != 2) {
-    llvm::errs() << "expected reduction op to be binary";
+    LDBG() << "expected reduction op to be binary";
     return false;
   }
 
@@ -165,9 +168,8 @@ bool isScaledContractionBody(Block &block) {
 
   if (reductionLHS != block.getArgument(4) &&
       reductionRHS != block.getArgument(4)) {
-    llvm::errs()
-        << "expected reduction to take block argument #4 as one of the "
-           "operands (modulo unary casts)";
+    LDBG() << "expected reduction to take block argument #4 as one of the "
+              "operands (modulo unary casts)";
     return false;
   }
 
@@ -176,11 +178,11 @@ bool isScaledContractionBody(Block &block) {
   Operation *elementwiseOp = contributed.getDefiningOp();
   if (!elementwiseOp || elementwiseOp->getNumResults() != 1 ||
       elementwiseOp->getNumOperands() != 2) {
-    llvm::errs() << "expected elementwise op to be binary";
+    LDBG() << "expected elementwise op to be binary";
     return false;
   }
   if (!isValidScaledMmaPair(reductionOp, elementwiseOp)) {
-    llvm::errs() << "expected reduction/elementwise op kind not satisfied";
+    LDBG() << "expected reduction/elementwise op kind not satisfied";
     return false;
   }
 
@@ -193,9 +195,8 @@ bool isScaledContractionBody(Block &block) {
     return true;
   }
 
-  llvm::errs()
-      << "expected elementwise op to apply to block arguments (modulo unary "
-         "casts)";
+  LDBG() << "expected elementwise op to apply to block arguments (modulo unary "
+            "casts)";
   return false;
 }
 
