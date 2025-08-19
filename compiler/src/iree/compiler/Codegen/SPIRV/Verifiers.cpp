@@ -310,53 +310,59 @@ LogicalResult verifySPIRVBaseVectorizePassPipeline(
     return success();
   }
 
-  const int numTileSizeLevels = loweringConfig.getTilingLevels().size();
-  SmallVector<int64_t> workgroupTileSizes =
-      loweringConfig.getTileSizeVals(kWorkgroupTileLevel);
-  SmallVector<int64_t> threadTileSizes =
-      loweringConfig.getTileSizeVals(kThreadTileLevel);
-  SmallVector<int64_t> reductionTileSizes =
-      loweringConfig.getTileSizeVals(kReductionTileLevel);
+  // TODO: removing these checks since IGEMM is always selected in this patch,
+  // however need to check if use_igemm_convolution in GPUPipelineOptions, and
+  // re-enable the checks when false
 
-  if (numTileSizeLevels != 4) {
-    return op->emitOpError("expected 4 levels of tiling sizes, got ")
-           << numTileSizeLevels;
-  }
+  // const int numTileSizeLevels = loweringConfig.getTilingLevels().size();
+  // SmallVector<int64_t> workgroupTileSizes =
+  //     loweringConfig.getTileSizeVals(kWorkgroupTileLevel);
+  // SmallVector<int64_t> threadTileSizes =
+  //     loweringConfig.getTileSizeVals(kThreadTileLevel);
+  // SmallVector<int64_t> reductionTileSizes =
+  //     loweringConfig.getTileSizeVals(kReductionTileLevel);
 
-  ArrayRef<int64_t> outputShape =
-      llvm::cast<ShapedType>(op->getOperand(2).getType()).getShape();
-  const int64_t oh = outputShape[1], ow = outputShape[2], oc = outputShape[3];
+  // if (numTileSizeLevels != 4) {
+  //   return op->emitOpError("expected 4 levels of tiling sizes, got ")
+  //          << numTileSizeLevels;
+  // }
 
-  // Verify the first level tile size divides the Convolution
-  // output size [OH, OW, OC].
-  if (oh % workgroupTileSizes[1] != 0 || ow % workgroupTileSizes[2] != 0 ||
-      oc % workgroupTileSizes[3] != 0) {
-    return op->emitOpError(
-        "expected first level tile size divides the output size [OH, OW, "
-        "OC]");
-  }
+  // ArrayRef<int64_t> outputShape =
+  //     llvm::cast<ShapedType>(op->getOperand(2).getType()).getShape();
+  // const int64_t oh = outputShape[1], ow = outputShape[2], oc =
+  // outputShape[3];
 
-  // Verify that workgroup_tile_size = thread_tile_size * workgroup_size.
-  if (threadTileSizes[1] * workgroupSize[2] != workgroupTileSizes[1] ||
-      threadTileSizes[2] * workgroupSize[1] != workgroupTileSizes[2] ||
-      threadTileSizes[3] * workgroupSize[0] != workgroupTileSizes[3]) {
-    return op->emitOpError(
-        "expected workgroup tile sizes to be the product of thread tile size "
-        "and workgroup size");
-  }
+  // // Verify the first level tile size divides the Convolution
+  // // output size [OH, OW, OC].
+  // if (oh % workgroupTileSizes[1] != 0 || ow % workgroupTileSizes[2] != 0 ||
+  //     oc % workgroupTileSizes[3] != 0) {
+  //   return op->emitOpError(
+  //       "expected first level tile size divides the output size [OH, OW, "
+  //       "OC]");
+  // }
 
-  // Verify that the tile sizes for KH and KW should be 1.
-  if (reductionTileSizes[4] != 1 || reductionTileSizes[5] != 1) {
-    return op->emitOpError("expected tile sizes for KH and KW to be 1");
-  }
+  // // Verify that workgroup_tile_size = thread_tile_size * workgroup_size.
+  // if (threadTileSizes[1] * workgroupSize[2] != workgroupTileSizes[1] ||
+  //     threadTileSizes[2] * workgroupSize[1] != workgroupTileSizes[2] ||
+  //     threadTileSizes[3] * workgroupSize[0] != workgroupTileSizes[3]) {
+  //   return op->emitOpError(
+  //       "expected workgroup tile sizes to be the product of thread tile size
+  //       " "and workgroup size");
+  // }
 
-  // Verify the fourth level of tile size.
-  SmallVector<int64_t> fourthLevelTileSizes = loweringConfig.getTileSizeVals(3);
-  if (fourthLevelTileSizes[0] != 0 || fourthLevelTileSizes[1] != 1 ||
-      fourthLevelTileSizes[2] != 0 || fourthLevelTileSizes[3] != 0) {
-    return op->emitOpError(
-        "expected the fourth level of tile size to be [0, 1, 0, 0]");
-  }
+  // // Verify that the tile sizes for KH and KW should be 1.
+  // if (reductionTileSizes[4] != 1 || reductionTileSizes[5] != 1) {
+  //   return op->emitOpError("expected tile sizes for KH and KW to be 1");
+  // }
+
+  // // Verify the fourth level of tile size.
+  // SmallVector<int64_t> fourthLevelTileSizes =
+  // loweringConfig.getTileSizeVals(3); if (fourthLevelTileSizes[0] != 0 ||
+  // fourthLevelTileSizes[1] != 1 ||
+  //     fourthLevelTileSizes[2] != 0 || fourthLevelTileSizes[3] != 0) {
+  //   return op->emitOpError(
+  //       "expected the fourth level of tile size to be [0, 1, 0, 0]");
+  // }
   return success();
 }
 
