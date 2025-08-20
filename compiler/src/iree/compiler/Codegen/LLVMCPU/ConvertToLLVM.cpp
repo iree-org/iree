@@ -1079,6 +1079,7 @@ void ConvertToLLVMPass::runOnOperation() {
   vector::populateVectorStepLoweringPatterns(patterns);
   populateVectorToLLVMConversionPatterns(typeConverter, patterns,
                                          reassociateFpReductions);
+  vector::populateVectorFromElementsLoweringPatterns(patterns);
   ub::populateUBToLLVMConversionPatterns(typeConverter, patterns);
   vector::populateVectorTransferLoweringPatterns(patterns,
                                                  /*maxTransferRank=*/1);
