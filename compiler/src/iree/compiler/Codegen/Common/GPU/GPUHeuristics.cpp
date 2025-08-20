@@ -9,6 +9,7 @@
 
 #include <cstdint>
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Sequence.h"
 #include "llvm/Support/DebugLog.h"
@@ -681,12 +682,6 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
 
   for (const GPUIntrinsicType &intrinsicA : intrinsics) {
     for (const GPUIntrinsicType &intrinsicB : intrinsics) {
-      SmallVector<VectorType> typesA, typesB;
-      intrinsicA.mmaKind.getUndistributedTileTypes(typesA);
-      intrinsicB.mmaKind.getUndistributedTileTypes(typesB);
-      if (typesA != typesB) {
-        continue;
-      }
 
       if (failed(canTargetIntrinsic(qkMatmul, intrinsicA, subgroupSize,
                                     canUpcastAcc, mustBeAligned))) {
@@ -697,8 +692,7 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
                                     canUpcastAcc, mustBeAligned))) {
         continue;
       }
-      // Check if we can reuse the output of intrinsicA for lhs/rhs of
-      // intrinsicB.
+
       auto matchLayout =
           [](IREE::GPU::MMASingleSubgroupLayout layoutA,
              IREE::GPU::MMASingleSubgroupLayout layoutB) -> bool {
@@ -706,6 +700,16 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
                (layoutA.thread == layoutB.thread) &&
                (layoutA.tstrides == layoutB.tstrides);
       };
+
+      if (!matchLayout(getSingleSubgroupLayout(intrinsicA.mmaKind,
+                                               IREE::GPU::MMAFragment::Acc),
+                       getSingleSubgroupLayout(intrinsicB.mmaKind,
+                                               IREE::GPU::MMAFragment::Acc))) {
+        continue;
+      }
+
+      // Check if we can reuse the output of intrinsicA for lhs/rhs of
+      // intrinsicB.
       bool canReuseAOutForBLhs =
           matchLayout(getSingleSubgroupLayout(intrinsicA.mmaKind,
                                               IREE::GPU::MMAFragment::Acc),
