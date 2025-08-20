@@ -159,7 +159,7 @@ function(iree_check_test)
     list(APPEND _BASE_COMPILER_FLAGS "--iree-input-type=${_RULE_INPUT_TYPE}")
   endif()
   if(_NORMALIZED_TARGET_BACKEND STREQUAL "ROCM")
-    list(APPEND _BASE_COMPILER_FLAGS "--iree-hip-target=${IREE_HIP_TEST_TARGET_CHIP}")
+    list(APPEND _BASE_COMPILER_FLAGS "--iree-rocm-target=${IREE_HIP_TEST_TARGET_CHIP}")
   endif()
 
   if(_BYTECODE_MODULE_BUILD_ENABLED)

@@ -93,7 +93,7 @@ struct ROCMOptions {
     static cl::OptionCategory category("HIP HAL Target");
 
     binder.opt<std::string>(
-        "iree-hip-target", target, cl::cat(category),
+        "iree-rocm-target", target, cl::cat(category),
         cl::desc(
             // clang-format off
             "HIP target as expected by LLVM AMDGPU backend; e.g., "
@@ -107,7 +107,7 @@ struct ROCMOptions {
             ));
 
     binder.opt<std::string>(
-        "iree-hip-target-features", targetFeatures, cl::cat(category),
+        "iree-rocm-target-features", targetFeatures, cl::cat(category),
         cl::desc("HIP target features as expected by LLVM AMDGPU backend; "
                  "e.g., '+sramecc,+xnack'."));
 
@@ -125,21 +125,21 @@ struct ROCMOptions {
                          clEnumValN(ContainerType::HSACO, "hsaco",
                                     "Raw HSACO image (ELF).")));
 
-    binder.opt<std::string>("iree-hip-bc-dir", bitcodeDirectory,
+    binder.opt<std::string>("iree-rocm-bc-dir", bitcodeDirectory,
                             cl::cat(category),
                             cl::desc("Directory of HIP Bitcode."));
 
-    binder.opt<int>("iree-hip-waves-per-eu", wavesPerEu, cl::cat(category),
+    binder.opt<int>("iree-rocm-waves-per-eu", wavesPerEu, cl::cat(category),
                     cl::desc("Optimization hint specifying minimum "
                              "number of waves per execution unit."));
 
     binder.opt<std::string>(
-        "iree-hip-enable-ukernels", enableROCMUkernels, cl::cat(category),
+        "iree-rocm-enable-ukernels", enableROCMUkernels, cl::cat(category),
         cl::desc("Enables microkernels in the HIP compiler backend. May be "
                  "`default`, `none`, `all`, or a comma-separated list of "
                  "specific unprefixed microkernels to enable, e.g. `mmt4d`."));
     binder.opt<std::string>(
-        "iree-hip-encoding-layout-resolver", encodingLayoutResolver,
+        "iree-rocm-encoding-layout-resolver", encodingLayoutResolver,
         cl::cat(category),
         cl::desc("Selects the way that encodings will be "
                  "resolved. Options are: `none` (resolve to "
@@ -147,18 +147,18 @@ struct ROCMOptions {
                  "on allocations to maximize cache bandwidth), "
                  "and `data-tiling` (enable data tiled layouts)"));
 
-    binder.opt<bool>("iree-hip-llvm-slp-vec", slpVectorization,
+    binder.opt<bool>("iree-rocm-llvm-slp-vec", slpVectorization,
                      cl::cat(category),
                      cl::desc("Enable slp vectorization in llvm opt."));
-    binder.opt<bool>("iree-hip-llvm-global-isel", globalISel, cl::cat(category),
+    binder.opt<bool>("iree-rocm-llvm-global-isel", globalISel, cl::cat(category),
                      cl::desc("Enable global instruction selection in llvm."));
 
     binder.opt<bool>(
-        "iree-hip-specialize-dispatches", specializeDispatches,
+        "iree-rocm-specialize-dispatches", specializeDispatches,
         cl::cat(category),
         cl::desc(
             "Enable runtime specialization of dynamically shaped dispatches."));
-    binder.opt<bool>("iree-hip-enable-tensor-ukernels", enableTensorUKernels,
+    binder.opt<bool>("iree-rocm-enable-tensor-ukernels", enableTensorUKernels,
                      cl::cat(category),
                      cl::desc("Enable MLIR-based ukernels."));
   }
@@ -167,7 +167,7 @@ struct ROCMOptions {
     if (target.empty()) {
       return emitError(builder.getUnknownLoc())
              << "HIP target not set; did you forget to pass "
-                "'--iree-hip-target'?";
+                "'--iree-rocm-target'?";
     }
     if (GPU::normalizeHIPTarget(target).empty()) {
       return emitError(builder.getUnknownLoc(), "Unknown HIP target '")
@@ -687,7 +687,7 @@ public:
         return variantOp.emitError()
                << "cannot find ROCM bitcode files. Check your installation "
                   "consistency and in the worst case, set "
-                  "--iree-hip-bc-dir= to a path on your system.";
+                  "--iree-rocm-bc-dir= to a path on your system.";
       }
       if (failed(linkHIPBitcodeIfNeeded(variantOp.getLoc(), llvmModule.get(),
                                         targetArch,

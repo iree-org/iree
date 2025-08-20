@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx908 --iree-convert-to-rocdl %s | FileCheck %s
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx908 --iree-convert-to-rocdl --iree-hip-index-bits=32 %s | FileCheck %s --check-prefix=INDEX32
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx908 --iree-convert-to-rocdl --iree-rocm-index-bits=32 %s | FileCheck %s --check-prefix=INDEX32
 
 // Test that that standard and GPU ops are converted to LLVM and NVVM.
 #pipeline_layout = #hal.pipeline.layout<bindings = [

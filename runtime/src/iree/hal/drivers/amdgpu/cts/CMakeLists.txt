@@ -10,7 +10,7 @@ endif()
 
 unset(IREE_AMDGPU_TEST_COMPILER_FLAGS)
 list(APPEND IREE_AMDGPU_TEST_COMPILER_FLAGS
-  "--iree-hip-target=${IREE_HIP_TEST_TARGET_CHIP}"
+  "--iree-rocm-target=${IREE_HIP_TEST_TARGET_CHIP}"
 )
 
 iree_hal_cts_test_suite(

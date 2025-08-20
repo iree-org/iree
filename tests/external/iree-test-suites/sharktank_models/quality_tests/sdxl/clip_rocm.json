@@ -35,7 +35,7 @@
         "--iree-opt-level=O3",
         "--iree-opt-generalize-matmul=false",
         "--iree-opt-const-eval=false",
-        "--iree-hip-waves-per-eu=2",
+        "--iree-rocm-waves-per-eu=2",
         "--iree-llvmgpu-enable-prefetch",
         "--iree-dispatch-creation-enable-fuse-horizontal-contractions=true",
         "--iree-execution-model=async-external",

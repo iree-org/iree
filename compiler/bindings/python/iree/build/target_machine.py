@@ -77,14 +77,14 @@ def amdgpu_hal_target_from_flags(
     if not hip_target:
         raise RuntimeError(
             "No HIP targets specified. Pass a chip to target as "
-            "--iree-hip-target=gfx..."
+            "--iree-rocm-target=gfx..."
         )
     return [
         TargetMachine(
             f"hip-{hip_target}",
             extra_flags=[
                 "--iree-hal-target-device=hip",
-                f"--iree-hip-target={hip_target}",
+                f"--iree-rocm-target={hip_target}",
             ],
         )
     ]
@@ -146,7 +146,7 @@ def _(p: argparse.ArgumentParser):
         description="Options controlling explicit targeting of HIP devices",
     )
     hip_g.add_argument(
-        "--iree-hip-target",
+        "--iree-rocm-target",
         help="HIP target selection (i.e. 'gfxYYYY')",
     )
 

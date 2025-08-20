@@ -46,7 +46,7 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
 static llvm::cl::opt<int>
-    clROCMIndexingBits("iree-hip-index-bits",
+    clROCMIndexingBits("iree-rocm-index-bits",
                        llvm::cl::desc("Set the bit width of indices in ROCm."),
                        llvm::cl::init(64));
 

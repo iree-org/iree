@@ -18,7 +18,7 @@ iree_check_single_backend_test_suite(
     srcs = ["encoding.mlir"],
     compiler_flags = [
         "--iree-global-opt-enable-early-materialization=false",
-        "--iree-hip-encoding-layout-resolver=data-tiling",
+        "--iree-rocm-encoding-layout-resolver=data-tiling",
         "--iree-llvmgpu-test-combine-layout-transformation=true",
     ],
     driver = "hip",
