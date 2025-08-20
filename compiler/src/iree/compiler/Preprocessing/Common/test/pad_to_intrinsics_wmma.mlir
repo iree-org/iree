@@ -43,7 +43,13 @@ func.func @matmul_static(%arg0 : tensor<10x20xf16>, %arg1 : tensor<20x30xf16>, %
 //  CHECK-SAME:    %[[ARG1:.+]]: tensor<?x?xf16>,
 //  CHECK-SAME:    %[[ARG2:.+]]: tensor<10x?xf16>)
 func.func @mmtb_dynamic_k_n(%arg0 : tensor<10x?xf16>, %arg1 : tensor<?x?xf16>, %arg2 : tensor<10x?xf16>) -> tensor<10x?xf16> {
-    %0 = linalg.matmul_transpose_b ins(%arg0, %arg1 : tensor<10x?xf16>, tensor<?x?xf16>)
+    %0 = linalg.matmul
+        indexing_maps = [
+          affine_map<(d0, d1, d2) -> (d0, d2)>,
+          affine_map<(d0, d1, d2) -> (d1, d2)>,
+          affine_map<(d0, d1, d2) -> (d0, d1)>
+        ]
+        ins(%arg0, %arg1 : tensor<10x?xf16>, tensor<?x?xf16>)
         outs(%arg2 : tensor<10x?xf16>) -> tensor<10x?xf16>
     return %0 : tensor<10x?xf16>
 }

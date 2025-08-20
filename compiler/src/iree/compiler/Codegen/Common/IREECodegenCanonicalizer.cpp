@@ -77,7 +77,7 @@ static bool isTrivialSubViewOp(memref::SubViewOp subviewOp) {
 class DynamicTrivialSubViewOpFolder final
     : public OpRewritePattern<memref::SubViewOp> {
 public:
-  using OpRewritePattern<memref::SubViewOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(memref::SubViewOp subViewOp,
                                 PatternRewriter &rewriter) const override {

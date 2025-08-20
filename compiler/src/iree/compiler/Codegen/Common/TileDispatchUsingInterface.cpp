@@ -466,7 +466,7 @@ static SmallVector<Operation *> getAllFusableProducers(TilingInterface op) {
     }
   }
 
-  SmallVector<Operation *> sortedOps(producers.begin(), producers.end());
+  auto sortedOps = llvm::to_vector_of<Operation *>(producers);
   mlir::computeTopologicalSorting(sortedOps);
   return sortedOps;
 }
@@ -566,7 +566,7 @@ namespace {
 /// slice.
 struct SwapExtractSliceWithDispatchTensorLoad
     : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
@@ -597,7 +597,7 @@ struct SwapExtractSliceWithDispatchTensorLoad
 /// `empty` of the slice.
 struct SwapExtractSliceWithTensorEmpty
     : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {

@@ -438,12 +438,14 @@ getVectorDistributeReductionConfig(
     }
 
     int64_t parallelSize = bounds[parallelDims.back()];
-    if (ShapedType::isDynamic(parallelSize) ||
-        parallelSize % threadLoads != 0) {
+    if (ShapedType::isDynamic(parallelSize)) {
+      parallelSize = kVectorDistributeReductionSizeToTargetIfDynamic;
+    }
+    if (parallelSize % threadLoads != 0) {
       return failure();
     }
-    int64_t lastDimReductionTileSize = workgroupSize * threadLoads;
 
+    int64_t lastDimReductionTileSize = workgroupSize * threadLoads;
     // Setting subgroupBasis to minimum i.e., 1 and threadBasis
     // to maximum i.e., subgroupSize.
     int64_t subgroupBasis = 1;
@@ -758,9 +760,12 @@ checkDispatchForVectorDistribution(Operation *parentOp) {
       int64_t operandIdx = linalgOp.getIndexingMapIndex(operand);
       AffineMap indexingMap = linalgOp.getIndexingMapsArray()[operandIdx];
 
-      // Check whether the producer exists.
-      Operation *producer = dyn_cast<OpResult>(operand->get()).getOwner();
-      auto producerOp = dyn_cast<linalg::LinalgOp>(producer);
+      auto opResult = dyn_cast<OpResult>(operand->get());
+      if (!opResult) {
+        continue;
+      }
+
+      auto producerOp = dyn_cast<linalg::LinalgOp>(opResult.getOwner());
       if (!producerOp || !computeOps.contains(producerOp)) {
         continue;
       }

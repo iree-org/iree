@@ -236,5 +236,12 @@ bool isArgmaxOp(linalg::GenericOp genericOp);
 /// either as inputs or as implicit captures.
 bool hasOnlyScalarInputs(linalg::GenericOp op);
 
+/// Returns true if the operation is a pure MatmulOp (no transpose/broadcast).
+bool isPureMatmul(Operation *op);
+
+/// Returns true if the operation is a pure BatchMatmulOp (no
+/// transpose/broadcast).
+bool isPureBatchMatmul(Operation *op);
+
 } // namespace mlir::iree_compiler::IREE::LinalgExt
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_

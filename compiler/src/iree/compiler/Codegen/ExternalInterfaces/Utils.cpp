@@ -29,7 +29,7 @@ Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
       cast<IREE::Codegen::PackedLayoutMaterializerAttr>(attr);
   MaterializeEncodingInfo encodingInfo = deviceLayoutAttr.getEncodingInfo(type);
   SmallVector<int64_t> paddedShape(type.getShape());
-  SmallVector<Value> paddedDynamicDims(dynamicDims.begin(), dynamicDims.end());
+  SmallVector<Value> paddedDynamicDims(dynamicDims);
   for (auto [dim, size] : llvm::zip_equal(encodingInfo.innerDimsPos,
                                           encodingInfo.innerTileSizes)) {
     // Only VMVX backend has dynamic inner tile sizes when ukernel is enabled.

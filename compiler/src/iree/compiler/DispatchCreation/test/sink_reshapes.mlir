@@ -17,7 +17,13 @@ func.func @do_not_sink_across_already_fusable_ops(
   %0 = tensor.empty(%m, %n) : tensor<?x?xf32>
   %m_by_2 = arith.divsi %m, %c2 : index
   %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<?x?xf32>) -> tensor<?x?xf32>
-  %2 = linalg.matmul_transpose_b ins(%arg0, %arg1 : tensor<?x?xf16>, tensor<?x?xf16>)
+  %2 = linalg.matmul
+      indexing_maps = [
+        affine_map<(d0, d1, d2) -> (d0, d2)>,
+        affine_map<(d0, d1, d2) -> (d1, d2)>,
+        affine_map<(d0, d1, d2) -> (d0, d1)>
+      ]
+      ins(%arg0, %arg1 : tensor<?x?xf16>, tensor<?x?xf16>)
       outs(%1 : tensor<?x?xf32>) -> tensor<?x?xf32>
   %3 = tensor.expand_shape %2 [[0, 1], [2]] output_shape [2, %m, %n]: tensor<?x?xf32> into tensor<2x?x?xf32>
   %4 = tensor.empty(%m_by_2, %n) : tensor<2x?x?xf16>
@@ -59,8 +65,11 @@ func.func @do_not_sink_across_already_fusable_ops(
   func.return %8 : tensor<2x?x?xf16>
 }
 
+// CHECK-DAG: #[[$MA:.*]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+// CHECK-DAG: #[[$MB:.*]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+// CHECK-DAG: #[[$MC:.*]] = affine_map<(d0, d1, d2) -> (d0, d1)>
 // CHECK-LABEL: func @do_not_sink_across_already_fusable_ops
-//       CHECK:   %[[GEMM:.+]] = linalg.matmul_transpose_b
+//       CHECK:   %[[GEMM:.+]] = linalg.matmul indexing_maps = [#[[$MA]], #[[$MB]], #[[$MC]]]
 //       CHECK:   %[[GENERIC1:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[GEMM]],
 //       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[GENERIC1]]
@@ -134,7 +143,13 @@ func.func @do_not_sink_across_dequantize_ops(%arg0: tensor<?x?xf32>) -> tensor<2
 // -> consumer are fusable.
 func.func @better_producer_estimate(%lhs : tensor<2x4096x640xi32>, %rhs : tensor<2x640x640xi32>,
     %fill0 : tensor<2x4096x640xi32>, %fill1 : tensor<2x4096xi32>) -> tensor<2x4096x640x1xf16> {
-  %bmm = linalg.batch_matmul_transpose_b ins(%lhs, %rhs : tensor<2x4096x640xi32>, tensor<2x640x640xi32>)
+  %bmm = linalg.batch_matmul
+      indexing_maps = [
+        affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+        affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+      ]
+      ins(%lhs, %rhs : tensor<2x4096x640xi32>, tensor<2x640x640xi32>)
       outs(%fill0 : tensor<2x4096x640xi32>) -> tensor<2x4096x640xi32>
   %reduction = linalg.generic {
       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
@@ -162,8 +177,11 @@ func.func @better_producer_estimate(%lhs : tensor<2x4096x640xi32>, %rhs : tensor
     } -> tensor<2x4096x640x1xf16>
   return %quant : tensor<2x4096x640x1xf16>
 }
+// CHECK-DAG: #[[$MA:.*]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+// CHECK-DAG: #[[$MB:.*]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+// CHECK-DAG: #[[$MC:.*]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK-LABEL: func @better_producer_estimate(
-//       CHECK:   %[[BMM:.+]] = linalg.batch_matmul_transpose_b
+//       CHECK:   %[[BMM:.+]] = linalg.batch_matmul indexing_maps = [#[[$MA]], #[[$MB]], #[[$MC]]]
 //       CHECK:   %[[REDUCTION:.+]] = linalg.generic
 //  CHECK-SAME:       iterator_types = ["parallel", "parallel", "reduction"]
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic

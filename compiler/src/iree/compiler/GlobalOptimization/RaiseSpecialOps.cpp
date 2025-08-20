@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "iree/compiler/GlobalOptimization/Utils.h"
 #include "llvm/ADT/STLExtras.h"
@@ -448,7 +449,7 @@ static bool matchInner2DTranspose(linalg::LinalgOp genericOp, unsigned rank) {
 // Method to match a linalg.matmul(a, linalg.transpose(b)). Returns `b` on
 // success.
 static std::optional<Value> matchATransposeBMatmul(linalg::LinalgOp matmulOp) {
-  if (!isa<linalg::MatmulOp>(matmulOp.getOperation())) {
+  if (!IREE::LinalgExt::isPureMatmul(matmulOp)) {
     return std::nullopt;
   }
   auto rhs = matmulOp.getDpsInputOperand(1);
@@ -463,7 +464,7 @@ static std::optional<Value> matchATransposeBMatmul(linalg::LinalgOp matmulOp) {
 // success.
 static std::optional<Value>
 matchATransposeBBatchMatmul(linalg::LinalgOp bmmOp) {
-  if (!isa<linalg::BatchMatmulOp>(bmmOp.getOperation())) {
+  if (!IREE::LinalgExt::isPureBatchMatmul(bmmOp)) {
     return std::nullopt;
   }
   auto rhs = bmmOp.getDpsInputOperand(1);
