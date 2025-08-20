@@ -39,9 +39,9 @@ public:
 
 /// Verify that valid configuration is set for all ops within the compiled
 /// module.
-static LogicalResult
-verifyLoweringConfiguration(FunctionOpInterface funcOp,
-                            IREE::Codegen::TranslationInfoAttr translationInfo) {
+static LogicalResult verifyLoweringConfiguration(
+    FunctionOpInterface funcOp,
+    IREE::Codegen::TranslationInfoAttr translationInfo) {
   auto walkResult = funcOp.walk([&](Operation *op) -> WalkResult {
     auto loweringConfig = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
     if (!loweringConfig)
