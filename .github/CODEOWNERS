@@ -49,7 +49,6 @@
 
 # Other Top-Level Directories
 /docs/ @ScottTodd
-/samples/ @ScottTodd
 /tools/ @benvanik
 
 # Compiler
