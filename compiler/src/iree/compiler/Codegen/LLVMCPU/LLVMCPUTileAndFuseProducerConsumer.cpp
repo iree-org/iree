@@ -33,8 +33,42 @@
 
 namespace mlir::iree_compiler {
 
-#define GEN_PASS_DEF_LLVMCPUTILEROOTANDFUSEPRODUCERCONSUMERPASS
+#define GEN_PASS_DEF_LLVMCPUTILEANDFUSEPRODUCERCONSUMERPASS
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
+
+/// Returns the operation that has workgroup tiling level and `level` tiling
+/// level in lowering config.
+/// Returns nullptr if there is not exactly one op that meets the conditions.
+static Operation *getRootOp(ArrayRef<Operation *> computeOps,
+                            IREE::CPU::TilingLevel level) {
+  Operation *rootOp = nullptr;
+  for (Operation *op : computeOps) {
+    IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
+        getLoweringConfig(op);
+    if (loweringConfig && loweringConfig.hasWorkgroupTilingLevel() &&
+        loweringConfig.hasTilingLevel(level)) {
+      if (rootOp) {
+        return nullptr;
+      }
+      rootOp = op;
+    }
+  }
+  return rootOp;
+}
+
+/// Returns the last operation that has `level` tiling level in lowering config.
+/// Returns nullptr if the operation does not exist.
+static Operation *getLastAnchorOp(ArrayRef<Operation *> computeOps,
+                                  IREE::CPU::TilingLevel level) {
+  for (Operation *op : llvm::reverse(computeOps)) {
+    IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
+        getLoweringConfig(op);
+    if (loweringConfig && loweringConfig.hasTilingLevel(level)) {
+      return op;
+    }
+  }
+  return nullptr;
+}
 
 /// Implementation of tile root and fuse producers and consumers greedily. Tile
 /// the root operation and fuse the producers of the root operation then
@@ -172,12 +206,12 @@ namespace {
 /// only fuses producer input operands and disables consumer fusion. The
 /// `tilingLevel` must be specified. It picks the `tilingLevel`-th list as
 /// tiling sizes from lowering_config.
-struct LLVMCPUTileRootAndFuseProducerConsumer
-    : impl::LLVMCPUTileRootAndFuseProducerConsumerPassBase<
-          LLVMCPUTileRootAndFuseProducerConsumer> {
-  using impl::LLVMCPUTileRootAndFuseProducerConsumerPassBase<
-      LLVMCPUTileRootAndFuseProducerConsumer>::
-      LLVMCPUTileRootAndFuseProducerConsumerPassBase;
+struct LLVMCPUTileAndFuseProducerConsumer
+    : impl::LLVMCPUTileAndFuseProducerConsumerPassBase<
+          LLVMCPUTileAndFuseProducerConsumer> {
+  using impl::LLVMCPUTileAndFuseProducerConsumerPassBase<
+      LLVMCPUTileAndFuseProducerConsumer>::
+      LLVMCPUTileAndFuseProducerConsumerPassBase;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, affine::AffineDialect,
                     linalg::LinalgDialect, scf::SCFDialect,
@@ -187,52 +221,41 @@ struct LLVMCPUTileRootAndFuseProducerConsumer
   void runOnOperation() override;
 };
 
-void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
+void LLVMCPUTileAndFuseProducerConsumer::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
   IRRewriter rewriter(funcOp);
 
-  // Returns true if the op has the lowering config and the lowering config has
-  // workgroup tiling level.
-  auto hasRootConfig = [](Operation *op) {
-    IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
-        getLoweringConfig(op);
-    return loweringConfig && loweringConfig.hasWorkgroupTilingLevel();
-  };
-
-  // TODO(#21297): Find the rootOp based on lowering configs directly. It is
-  // expected that at most one compute op has a workgroup tiling level after all
-  // pipelines switch to root op based tiling. The operation order may be
-  // changed by fusion order, which can lead to different result in
-  // `getRootOperation`.
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-  FailureOr<Operation *> rootOp;
-  if (llvm::count_if(computeOps, hasRootConfig) != 1) {
-    rootOp = getRootOperation(computeOps);
+  Operation *anchorOp;
+  if (anchorOnRootOp) {
+    anchorOp = getRootOp(computeOps, tilingLevel);
   } else {
-    rootOp = llvm::filter_to_vector(computeOps, hasRootConfig)[0];
+    // TODO(hanchung): Support the case that anchor op is root op's producer. It
+    // is not common that the producer op has additional iteration dimensions,
+    // but it should be handled like consumers. I.e., the additional dimensions
+    // should be tiled. It is easier to support after we have solid lowering
+    // config propagation.
+    Operation *rootOp =
+        getRootOp(computeOps, IREE::CPU::TilingLevel::DistributionTiles);
+    anchorOp = getLastAnchorOp(computeOps, tilingLevel);
+    if (rootOp &&
+        llvm::find(computeOps, rootOp) > llvm::find(computeOps, anchorOp)) {
+      LDBG() << "anchor op that is rootOp's producer is not supported";
+      return;
+    }
   }
-  if (failed(rootOp) || !rootOp.value()) {
-    LDBG() << "unable to find the root operation";
-    return;
-  }
-
-  IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
-      getLoweringConfig(rootOp.value());
-  if (!loweringConfig) {
-    LDBG() << "unable to find the attached lowering config";
-    return;
-  }
-
-  if (!loweringConfig.hasTilingLevel(tilingLevel)) {
-    LDBG() << "unable to find the lowering config with the tiling level";
+  if (!anchorOp) {
+    LDBG() << "unable to find an anchor operation that has "
+           << IREE::CPU::getTilingLevelName(tilingLevel) << " config";
     return;
   }
 
   if (failed(tileRootAndFuseProducerConsumer(
-          rewriter, cast<TilingInterface>(rootOp.value()), tilingLevel,
+          rewriter, cast<TilingInterface>(anchorOp), tilingLevel,
           onlyFuseProducerInputOperands))) {
-    funcOp.emitError() << "tiling of level " << tilingLevel.getValue()
+    funcOp.emitError() << "tiling of level "
+                       << IREE::CPU::getTilingLevelName(tilingLevel)
                        << " failed\n";
     return signalPassFailure();
   }
@@ -255,19 +278,27 @@ void LLVMCPUTileRootAndFuseProducerConsumer::runOnOperation() {
 } // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUTileRootAndFuseProducerConsumerPass(
+createLLVMCPUTileAndFuseProducerConsumerPass(
     IREE::CPU::TilingLevel tilingLevel) {
-  LLVMCPUTileRootAndFuseProducerConsumerPassOptions options;
+  LLVMCPUTileAndFuseProducerConsumerPassOptions options;
   options.tilingLevel = tilingLevel;
   options.onlyFuseProducerInputOperands = false;
-  return std::make_unique<LLVMCPUTileRootAndFuseProducerConsumer>(options);
+  return std::make_unique<LLVMCPUTileAndFuseProducerConsumer>(options);
 }
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUTileRootAndFuseInputOperandsPass(
     IREE::CPU::TilingLevel tilingLevel) {
-  LLVMCPUTileRootAndFuseProducerConsumerPassOptions options;
+  LLVMCPUTileAndFuseProducerConsumerPassOptions options;
   options.tilingLevel = tilingLevel;
   options.onlyFuseProducerInputOperands = true;
-  return std::make_unique<LLVMCPUTileRootAndFuseProducerConsumer>(options);
+  return std::make_unique<LLVMCPUTileAndFuseProducerConsumer>(options);
+}
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMCPUTileLastOpAndFuseProducerConsumerPass(
+    IREE::CPU::TilingLevel tilingLevel) {
+  LLVMCPUTileAndFuseProducerConsumerPassOptions options;
+  options.tilingLevel = tilingLevel;
+  options.anchorOnRootOp = false;
+  return std::make_unique<LLVMCPUTileAndFuseProducerConsumer>(options);
 }
 } // namespace mlir::iree_compiler
