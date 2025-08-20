@@ -1,7 +1,7 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-root-and-fuse-producer-consumer{tiling-level=vector_common_parallel}), cse)"  --split-input-file %s | FileCheck %s
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-root-and-fuse-producer-consumer{tiling-level=vector_reduction only-fuse-producer-input-operands=true}), cse)"  --split-input-file %s | FileCheck %s --check-prefix=CHECK-REDUCTION
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-and-fuse-producer-consumer{tiling-level=vector_common_parallel}), cse)"  --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-and-fuse-producer-consumer{tiling-level=vector_reduction only-fuse-producer-input-operands=true}), cse)"  --split-input-file %s | FileCheck %s --check-prefix=CHECK-REDUCTION
 
-#config = #iree_cpu.lowering_config<vector_common_parallel = [1, 0, 0, 0, 0, 0]>
+#config = #iree_cpu.lowering_config<distribution = [0, 0, 0, 0, 0, 0], vector_common_parallel = [1, 0, 0, 0, 0, 0]>
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d2)>
 func.func @mmt4d_bias_relu(%arg0: tensor<?x?x16x1xf32>, %arg1: tensor<?x?x16x1xf32>, %arg2: tensor<?x16xf32>) -> tensor<?x?x16x16xf32> {
@@ -32,7 +32,7 @@ func.func @mmt4d_bias_relu(%arg0: tensor<?x?x16x1xf32>, %arg1: tensor<?x?x16x1xf
 
 // -----
 
-#config = #iree_cpu.lowering_config<vector_common_parallel = [1, 0, 0, 0, 0, 0]>
+#config = #iree_cpu.lowering_config<distribution = [0, 0, 0, 0, 0, 0], vector_common_parallel = [1, 0, 0, 0, 0, 0]>
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>
 func.func @quantized_matmul(%arg0: tensor<2x4x128x16x1xi8>, %arg1: tensor<2x4x16xf32>, %arg2: tensor<2x4x16xf32>, %arg3: tensor<2x688x128x16x1xi8>, %arg4: tensor<2x688x16xf32>, %arg5: tensor<2x688x16xf32>) -> tensor<2x11008x64xf32> {
@@ -74,7 +74,7 @@ func.func @quantized_matmul(%arg0: tensor<2x4x128x16x1xi8>, %arg1: tensor<2x4x16
 
 // -----
 
-#config = #iree_cpu.lowering_config<vector_reduction = [0, 0, 0, 0, 1, 5]>
+#config = #iree_cpu.lowering_config<distribution = [0, 0, 0, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 5]>
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 func.func @dequant_avgpool(%arg0: tensor<1x320x65x65xi8>) -> tensor<1x320x1x1xf32> {
   %cst = arith.constant 1.250000e-01 : f32
@@ -120,7 +120,7 @@ func.func @silently_bail_no_root_op(%arg0: tensor<1x2x1x2xi8>, %arg1: tensor<1x2
 
 // -----
 
-#config = #iree_cpu.lowering_config<vector_common_parallel = [4, 8, 0]>
+#config = #iree_cpu.lowering_config<distribution = [0, 0, 0], vector_common_parallel = [4, 8, 0]>
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 func.func @multi_use_producer_no_yield_replacement(%7: tensor<12x197x197xf32>) -> tensor<12x197x197xf32> {
@@ -242,7 +242,7 @@ func.func @reordered_softmax(%arg0: tensor<1x8x4096xf32>, %arg1: tensor<1x8x4096
 
 // -----
 
-#config = #iree_cpu.lowering_config<vector_common_parallel = [10, 20, 30]>
+#config = #iree_cpu.lowering_config<distribution = [0, 0, 0], vector_common_parallel = [10, 20, 30]>
 func.func @matmul_bias_add(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : tensor<?xf32>) -> tensor<?x?xf32> {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
@@ -274,7 +274,7 @@ func.func @matmul_bias_add(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %ar
 
 // -----
 
-#config = #iree_cpu.lowering_config<vector_common_parallel = [0, 0, 0]>
+#config = #iree_cpu.lowering_config<distribution = [0, 0, 0], vector_common_parallel = [0, 0, 0]>
 func.func @all_zeros(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : tensor<?xf32>) -> tensor<?x?xf32> {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
@@ -302,7 +302,7 @@ func.func @all_zeros(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : t
 
 // -----
 
-#config = #iree_cpu.lowering_config<vector_common_parallel = [1, [32], 0]>
+#config = #iree_cpu.lowering_config<distribution = [0, 0, 0], vector_common_parallel = [1, [32], 0]>
 func.func @scalable_matmul(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>) -> tensor<?x?xf32>{
   // Matrix multiplication (ijk) with scalable tiling in the j-th dimension.
   %1 = linalg.matmul {lowering_config = #config} ins(%A, %B: tensor<?x?xf32>, tensor<?x?xf32>)
@@ -319,7 +319,7 @@ func.func @scalable_matmul(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<
 
 // -----
 
-#config = #iree_cpu.lowering_config<vector_common_parallel = [0, 20, 0]>
+#config = #iree_cpu.lowering_config<distribution = [0, 0, 0], vector_common_parallel = [0, 20, 0]>
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 func.func @ukernel_generic(%arg0: tensor<1x192x1x16xf32>, %arg1: tensor<1x768x1x1xf32>, %arg2: tensor<192x768x16x1xf32>, %arg3: tensor<1x192x1x16xf32>) -> tensor<1x192x1x16xf32> {
   %c1 = arith.constant 1 : index
@@ -356,7 +356,7 @@ func.func @ukernel_generic(%arg0: tensor<1x192x1x16xf32>, %arg1: tensor<1x768x1x
 
 // -----
 
-#config = #iree_cpu.lowering_config<vector_common_parallel = [0, 1]>
+#config = #iree_cpu.lowering_config<distribution = [0, 0], vector_common_parallel = [0, 1]>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 func.func @tile_linalg_ext_scan(%arg0: tensor<128x2xf32>) -> tensor<128x2xi64> {
   %c0_i64 = arith.constant 0 : i64
@@ -390,7 +390,7 @@ func.func @tile_linalg_ext_scan(%arg0: tensor<128x2xf32>) -> tensor<128x2xi64> {
 
 // -----
 
-#config = #iree_cpu.lowering_config<vector_common_parallel = [1, 16]>
+#config = #iree_cpu.lowering_config<distribution = [0, 0], vector_common_parallel = [1, 16]>
 #map = affine_map<(d0, d1) -> (d0)>
 #map1 = affine_map<(d0, d1) -> (d1)>
 #map2 = affine_map<(d0, d1) -> (d0, d1)>

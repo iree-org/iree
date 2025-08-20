@@ -43,7 +43,8 @@ namespace {
 /// ```
 /// Here the `linalg.generic` cannot be vectorized with 2D scalable vectors.
 ///
-/// After `tile-and-fuse` (which requires consistent lowering configs):
+/// After `tile-and-fuse` (which requires consistent lowering configs) and
+/// `iree-codegen-forall-to-for`:
 /// ```mlir
 /// scf.for i in range(0, 1000) step 4 x vscale {
 ///   scf.for j in range(0, 2000) step 4 x vscale {

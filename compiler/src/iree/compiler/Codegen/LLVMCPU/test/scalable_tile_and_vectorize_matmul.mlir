@@ -1,7 +1,6 @@
 // RUN: iree-opt --split-input-file \
-// RUN: --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-and-fuse{tiling-level=3},iree-llvmcpu-tile{tiling-level=4},iree-codegen-generic-vectorization{enable-vector-masking}))" %s | FileCheck %s
-// `tiling-level=3` indicates VectorCommonParallelTiles, and `tiling-level=4`
-// indicates VectorReductionTiles. See IREECPUTypes.h for more details.
+// RUN: --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-and-fuse-producer-consumer{tiling-level=vector_common_parallel anchor-on-root-op=false},iree-llvmcpu-tile{tiling-level=4},iree-codegen-generic-vectorization{enable-vector-masking}))" %s | FileCheck %s
+// `tiling-level=4` indicates VectorReductionTiles. See IREECPUTypes.h for more details.
 
 /// This test checks we successfully tile the matmul and invoke the linalg vectorizer,
 /// and produce scalable vector ops.
@@ -19,13 +18,10 @@ func.func @scalable_matmul(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<
 // CHECK-DAG:   %[[C32:.*]] = arith.constant 32 : index
 // CHECK:       %[[VSCALE:.*]] = vector.vscale
 // CHECK-DAG:   %[[SCALABLE_TILE_SIZE:.*]] = arith.muli %[[VSCALE]], %[[C32]] : index
-// CHECK:       scf.for
-// CHECK-SAME:      step %[[C1]]
+// CHECK:       scf.forall {{.+}} step (1, %[[SCALABLE_TILE_SIZE]])
 // CHECK:         scf.for
-// CHECK-SAME:        step %[[SCALABLE_TILE_SIZE]]
-// CHECK:           scf.for
-// CHECK-SAME:          step %[[C1]]
-// CHECK:             vector.create_mask {{.*}} : vector<1x[32]xi1>
-// CHECK:             vector.mask
-// CHECK-SAME:          vector.contract
-// CHECK-SAME:          vector<1x1xf32>, vector<1x[32]xf32> into vector<1x[32]xf32>
+// CHECK-SAME:        step %[[C1]]
+// CHECK:           vector.create_mask {{.*}} : vector<1x[32]xi1>
+// CHECK:           vector.mask
+// CHECK-SAME:        vector.contract
+// CHECK-SAME:        vector<1x1xf32>, vector<1x[32]xf32> into vector<1x[32]xf32>

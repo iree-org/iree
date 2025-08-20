@@ -21,7 +21,7 @@
 // dimensions, and introduce loops. This results in dispatches that fuse both
 // SME and SVE.
 
-// Extracted from an IR dump after iree-llvmcpu-tile-and-fuse:
+// Extracted from an IR dump after iree-llvmcpu-tile-and-fuse-producer-consumer + iree-codegen-forall-to-for:
 func.func @scalable_2d_matmul_and_generic(%arg0: tensor<32400x32xf32>, %arg1: tensor<32x16xf32>, %arg2: tensor<32400x16xf32>, %arg3: tensor<16xf32>) -> tensor<32400x16xf32> {
   %c0 = arith.constant 0 : index
   %c4 = arith.constant 4 : index
