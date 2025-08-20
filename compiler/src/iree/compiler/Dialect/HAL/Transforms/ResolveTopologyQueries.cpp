@@ -132,6 +132,12 @@ static bool tryAddSharedUsageBits(IREE::HAL::DeviceTopologyAttr topology,
   for (auto affinity : optimalAttr.getAffinities()) {
     if (hasTransparentAccessToAll(topology, affinity, optimalAttr)) {
       bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Mapping;
+      // This buffer is shared across devices. Map persistently to
+      // support sharing via export/import.
+      // Persistent mapping in turn requires host-visible memory.
+      bufferUsage =
+          bufferUsage | IREE::HAL::BufferUsageBitfield::MappingPersistent;
+      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::HostVisible;
       return true;
     }
   }
