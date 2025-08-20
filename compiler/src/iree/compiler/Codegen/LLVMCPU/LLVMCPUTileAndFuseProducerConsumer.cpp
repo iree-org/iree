@@ -42,7 +42,7 @@ namespace mlir::iree_compiler {
 static Operation *getRootOp(ArrayRef<Operation *> computeOps,
                             IREE::CPU::TilingLevel level) {
   Operation *rootOp = nullptr;
-  for (auto op : computeOps) {
+  for (Operation *op : computeOps) {
     IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
         getLoweringConfig(op);
     if (loweringConfig && loweringConfig.hasWorkgroupTilingLevel() &&
@@ -60,7 +60,7 @@ static Operation *getRootOp(ArrayRef<Operation *> computeOps,
 /// Returns nullptr if the operation does not exist.
 static Operation *getLastAnchorOp(ArrayRef<Operation *> computeOps,
                                   IREE::CPU::TilingLevel level) {
-  for (auto op : llvm::reverse(computeOps)) {
+  for (Operation *op : llvm::reverse(computeOps)) {
     IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
         getLoweringConfig(op);
     if (loweringConfig && loweringConfig.hasTilingLevel(level)) {
