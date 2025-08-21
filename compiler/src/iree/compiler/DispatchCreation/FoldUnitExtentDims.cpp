@@ -86,7 +86,6 @@ struct DropUnitDimsFromCollapseOfExpand
         if (indices.size() == 1 || interShape[inDim] != 1) {
           continue;
         }
-
         toDrop.insert(inDim);
       }
     }
