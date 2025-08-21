@@ -1424,7 +1424,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
-    "--iree-dispatch-creation-experimental-data-tiling"
+    "--iree-dispatch-creation-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
     "--iree-llvmgpu-test-combine-layout-transformation=true"
   LABELS
@@ -1454,7 +1454,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
-    "--iree-dispatch-creation-experimental-data-tiling"
+    "--iree-dispatch-creation-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
     "--iree-llvmgpu-test-combine-layout-transformation=true"
   LABELS
@@ -1484,7 +1484,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
-    "--iree-dispatch-creation-experimental-data-tiling"
+    "--iree-dispatch-creation-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
     "--iree-llvmgpu-test-combine-layout-transformation=true"
   LABELS
@@ -1515,7 +1515,7 @@ iree_generated_e2e_runner_test(
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
     "--iree-hip-enable-ukernels=multi_mma"
-    "--iree-dispatch-creation-experimental-data-tiling"
+    "--iree-dispatch-creation-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
     "--iree-llvmgpu-test-combine-layout-transformation=true"
   LABELS
@@ -1545,7 +1545,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
-    "--iree-dispatch-creation-experimental-data-tiling"
+    "--iree-dispatch-creation-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
     "--iree-llvmgpu-test-combine-layout-transformation=true"
   LABELS
@@ -1575,7 +1575,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
-    "--iree-dispatch-creation-experimental-data-tiling"
+    "--iree-dispatch-creation-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
     "--iree-llvmgpu-test-combine-layout-transformation=true"
   LABELS
@@ -1605,7 +1605,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
-    "--iree-dispatch-creation-experimental-data-tiling"
+    "--iree-dispatch-creation-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
     "--iree-llvmgpu-test-combine-layout-transformation=true"
   LABELS
@@ -1635,7 +1635,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
-    "--iree-dispatch-creation-experimental-data-tiling"
+    "--iree-dispatch-creation-data-tiling"
     "--iree-input-demote-f64-to-f32=false"
     "--iree-hip-encoding-layout-resolver=data-tiling"
     "--iree-llvmgpu-test-combine-layout-transformation=true"
@@ -1666,7 +1666,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
-    "--iree-dispatch-creation-experimental-data-tiling=true"
+    "--iree-dispatch-creation-data-tiling"
     "--iree-dispatch-creation-set-encoding-strategy=padding"
     "--iree-hip-encoding-layout-resolver=pad"
   LABELS
@@ -1696,7 +1696,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
-    "--iree-dispatch-creation-experimental-data-tiling=true"
+    "--iree-dispatch-creation-data-tiling"
     "--iree-dispatch-creation-set-encoding-strategy=padding"
     "--iree-hip-encoding-layout-resolver=pad"
   LABELS
@@ -1827,7 +1827,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
-    "--iree-dispatch-creation-experimental-data-tiling"
+    "--iree-dispatch-creation-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
   RUNNER_ARGS
     "--require_exact_results=false"
@@ -1859,7 +1859,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
-    "--iree-dispatch-creation-experimental-data-tiling"
+    "--iree-dispatch-creation-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
   LABELS
     "noasan"
@@ -2050,7 +2050,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
-    "--iree-dispatch-creation-experimental-data-tiling"
+    "--iree-dispatch-creation-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
   RUNNER_ARGS
     "--require_exact_results=false"
@@ -2082,7 +2082,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
-    "--iree-dispatch-creation-experimental-data-tiling"
+    "--iree-dispatch-creation-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
   RUNNER_ARGS
     "--require_exact_results=false"
@@ -2114,7 +2114,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
-    "--iree-dispatch-creation-experimental-data-tiling"
+    "--iree-dispatch-creation-data-tiling"
     "--iree-hip-encoding-layout-resolver=data-tiling"
   LABELS
     "noasan"
