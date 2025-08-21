@@ -26,8 +26,9 @@ static iree_hal_null_semaphore_t* iree_hal_null_semaphore_cast(
 }
 
 iree_status_t iree_hal_null_semaphore_create(
-    uint64_t initial_value, iree_hal_semaphore_flags_t flags,
-    iree_allocator_t host_allocator, iree_hal_semaphore_t** out_semaphore) {
+    iree_hal_queue_affinity_t queue_affinity, uint64_t initial_value,
+    iree_hal_semaphore_flags_t flags, iree_allocator_t host_allocator,
+    iree_hal_semaphore_t** out_semaphore) {
   IREE_ASSERT_ARGUMENT(out_semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_semaphore = NULL;
@@ -43,6 +44,15 @@ iree_status_t iree_hal_null_semaphore_create(
   // TODO(null): implement semaphores. Note that there is some basic support
   // provided for timepoints as part of iree/hal/utils/semaphore_base.h but the
   // actual synchronization aspects are handled by the implementation.
+  //
+  // If the DEVICE_LOCAL flag and a |queue_affinity| is assigned (and not just
+  // IREE_HAL_QUEUE_AFFINITY_ANY) then the implementation can assume that it is
+  // only used on that set of queues (never waited/signaled from anywhere else).
+  // If DEVICE_LOCAL is not set then other devices may signal or wait.
+  //
+  // If the IREE_HAL_SEMAPHORE_FLAG_HOST_INTERRUPT flag is not set then waits
+  // from the host are allowed to spin instead of performing optimized platform
+  // blocking (via interrupt mechanisms).
   iree_status_t status =
       iree_make_status(IREE_STATUS_UNIMPLEMENTED, "semaphore not implemented");
 
@@ -137,7 +147,7 @@ static void iree_hal_null_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
 
 static iree_status_t iree_hal_null_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_timeout_t timeout) {
+    iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
   iree_hal_null_semaphore_t* semaphore =
       iree_hal_null_semaphore_cast(base_semaphore);
 

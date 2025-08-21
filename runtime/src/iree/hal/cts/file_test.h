@@ -93,8 +93,9 @@ TEST_F(FileTest, ReadEntireFile) {
   CreatePatternedDeviceBuffer(file_size, 0xCD, &buffer);
 
   iree_hal_semaphore_t* semaphore = NULL;
-  IREE_ASSERT_OK(iree_hal_semaphore_create(
-      device_, 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &semaphore));
+  IREE_ASSERT_OK(
+      iree_hal_semaphore_create(device_, IREE_HAL_QUEUE_AFFINITY_ANY, 0ull,
+                                IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &semaphore));
   iree_hal_fence_t* wait_fence = NULL;
   IREE_ASSERT_OK(iree_hal_fence_create_at(
       semaphore, 1ull, iree_allocator_system(), &wait_fence));
@@ -113,7 +114,8 @@ TEST_F(FileTest, ReadEntireFile) {
       /*source_offset=*/0, /*target_buffer=*/buffer, /*target_offset=*/0,
       /*length=*/file_size, IREE_HAL_READ_FLAG_NONE));
 
-  IREE_ASSERT_OK(iree_hal_fence_wait(signal_fence, iree_infinite_timeout()));
+  IREE_ASSERT_OK(iree_hal_fence_wait(signal_fence, iree_infinite_timeout(),
+                                     IREE_HAL_WAIT_FLAG_DEFAULT));
   iree_hal_fence_release(wait_fence);
   iree_hal_fence_release(signal_fence);
   iree_hal_semaphore_release(semaphore);

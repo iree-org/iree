@@ -105,8 +105,9 @@ int main(int argc, char** argv) {
   // We'll pass these in with the timeline at T=0 so that the runtime isn't
   // allowed to execute anything until we give it the go-ahead.
   iree_hal_semaphore_t* semaphore = NULL;
-  IREE_CHECK_OK(iree_hal_semaphore_create(
-      device, 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &semaphore));
+  IREE_CHECK_OK(iree_hal_semaphore_create(device, IREE_HAL_QUEUE_AFFINITY_ANY,
+                                          0ull, IREE_HAL_SEMAPHORE_FLAG_DEFAULT,
+                                          &semaphore));
   iree_hal_fence_t* fence_t1 = NULL;
   IREE_CHECK_OK(
       iree_hal_fence_create_at(semaphore, 1ull, host_allocator, &fence_t1));
@@ -151,7 +152,8 @@ int main(int argc, char** argv) {
 
   // We could go do other things now while the async work progresses. Here we
   // just immediately wait.
-  IREE_CHECK_OK(iree_hal_fence_wait(fence_t2, iree_infinite_timeout()));
+  IREE_CHECK_OK(iree_hal_fence_wait(fence_t2, iree_infinite_timeout(),
+                                    IREE_HAL_WAIT_FLAG_DEFAULT));
   fprintf(stdout, "REACHED T=2\n");
   fflush(stdout);
 

@@ -224,7 +224,7 @@ static void iree_hal_amdgpu_internal_semaphore_fail(
 
 static iree_status_t iree_hal_amdgpu_internal_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_timeout_t timeout) {
+    iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
   iree_hal_amdgpu_internal_semaphore_t* semaphore =
       iree_hal_amdgpu_internal_semaphore_cast(base_semaphore);
   iree_hal_semaphore_list_t semaphore_list = {
@@ -234,7 +234,7 @@ static iree_status_t iree_hal_amdgpu_internal_semaphore_wait(
   };
   return iree_hal_amdgpu_wait_semaphores(semaphore->libhsa, semaphore->options,
                                          IREE_HAL_WAIT_MODE_ALL, semaphore_list,
-                                         timeout);
+                                         timeout, flags);
 }
 
 static const iree_hal_semaphore_vtable_t
@@ -345,7 +345,8 @@ iree_status_t iree_hal_amdgpu_poll_semaphores(
 iree_status_t iree_hal_amdgpu_wait_semaphores(
     const iree_hal_amdgpu_libhsa_t* libhsa,
     iree_hal_amdgpu_semaphore_options_t options, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout) {
+    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
+    iree_hal_wait_flags_t flags) {
   IREE_ASSERT_ARGUMENT(libhsa);
   if (semaphore_list.count == 0) return iree_ok_status();  // no-op
   IREE_TRACE_ZONE_BEGIN(z0);

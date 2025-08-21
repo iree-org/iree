@@ -1605,8 +1605,9 @@ static iree_status_t iree_hal_vulkan_device_import_file(
 }
 
 static iree_status_t iree_hal_vulkan_device_create_semaphore(
-    iree_hal_device_t* base_device, uint64_t initial_value,
-    iree_hal_semaphore_flags_t flags, iree_hal_semaphore_t** out_semaphore) {
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    uint64_t initial_value, iree_hal_semaphore_flags_t flags,
+    iree_hal_semaphore_t** out_semaphore) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
   return iree_hal_vulkan_native_semaphore_create(device->logical_device,
                                                  initial_value, out_semaphore);
@@ -1634,8 +1635,9 @@ static iree_status_t iree_hal_vulkan_device_queue_alloca(
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   // TODO(benvanik): queue-ordered allocations.
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(wait_semaphore_list,
-                                                    iree_infinite_timeout()));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
+                                   IREE_HAL_WAIT_FLAG_DEFAULT));
   IREE_RETURN_IF_ERROR(
       iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
                                          params, allocation_size, out_buffer));
@@ -1755,7 +1757,8 @@ static iree_status_t iree_hal_vulkan_device_queue_execute(
   // HACK: we don't track async resource lifetimes so we have to block.
   if (iree_status_is_ok(status)) {
     status = iree_hal_semaphore_list_wait(signal_semaphore_list,
-                                          iree_infinite_timeout());
+                                          iree_infinite_timeout(),
+                                          IREE_HAL_WAIT_FLAG_DEFAULT);
   }
 
   // TODO(indirect-cmd): when async these need to be retained until the
@@ -1773,14 +1776,15 @@ static iree_status_t iree_hal_vulkan_device_queue_flush(
 
 static iree_status_t iree_hal_vulkan_device_wait_semaphores(
     iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout) {
+    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
+    iree_hal_wait_flags_t flags) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
   VkSemaphoreWaitFlags wait_flags = 0;
   if (wait_mode == IREE_HAL_WAIT_MODE_ANY) {
     wait_flags |= VK_SEMAPHORE_WAIT_ANY_BIT;
   }
   return iree_hal_vulkan_native_semaphore_multi_wait(
-      device->logical_device, &semaphore_list, timeout, wait_flags);
+      device->logical_device, &semaphore_list, timeout, flags, wait_flags);
 }
 
 static iree_status_t iree_hal_vulkan_device_profiling_begin(

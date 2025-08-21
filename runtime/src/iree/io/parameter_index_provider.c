@@ -403,10 +403,11 @@ static iree_status_t iree_io_parameter_op_batch_advance_timeline(
   const bool is_first_timeline_use = timeline_semaphore == NULL;
   if (!timeline_semaphore) {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_hal_semaphore_create(
-                batch->device, batch->timeline_values[timeline_index],
-                IREE_HAL_SEMAPHORE_FLAG_NONE,
-                &batch->timeline_semaphores[timeline_index]));
+        z0,
+        iree_hal_semaphore_create(batch->device, IREE_HAL_QUEUE_AFFINITY_ANY,
+                                  batch->timeline_values[timeline_index],
+                                  IREE_HAL_SEMAPHORE_FLAG_DEFAULT,
+                                  &batch->timeline_semaphores[timeline_index]));
     timeline_semaphore = batch->timeline_semaphores[timeline_index];
   }
   const uint64_t previous_timeline_value =

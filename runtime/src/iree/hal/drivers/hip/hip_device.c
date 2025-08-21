@@ -986,8 +986,9 @@ static iree_status_t iree_hal_hip_device_create_executable_cache(
 }
 
 static iree_status_t iree_hal_hip_device_create_semaphore(
-    iree_hal_device_t* base_device, uint64_t initial_value,
-    iree_hal_semaphore_flags_t flags, iree_hal_semaphore_t** out_semaphore) {
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    uint64_t initial_value, iree_hal_semaphore_flags_t flags,
+    iree_hal_semaphore_t** out_semaphore) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
   return iree_hal_hip_event_semaphore_create(
       initial_value, device->hip_symbols, device->host_allocator,
@@ -1699,8 +1700,9 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
   // sequencing device work with semaphores. The HIP HAL is not currently
   // asynchronous.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_semaphore_list_wait(wait_semaphore_list,
-                                       iree_infinite_timeout()));
+      z0,
+      iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
+                                   IREE_HAL_WAIT_FLAG_DEFAULT));
 
   status =
       iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
@@ -1800,8 +1802,9 @@ static iree_status_t iree_hal_hip_device_queue_dealloca(
   // sequencing device work with semaphores. The HIP HAL is not currently
   // asynchronous.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_semaphore_list_wait(wait_semaphore_list,
-                                       iree_infinite_timeout()));
+      z0,
+      iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
+                                   IREE_HAL_WAIT_FLAG_DEFAULT));
 
   // Schedule the buffer deallocation if we got it from a pool and otherwise
   // drop it on the floor and let it be freed when the buffer is released.
@@ -2648,10 +2651,11 @@ static iree_status_t iree_hal_hip_device_queue_flush(
 
 static iree_status_t iree_hal_hip_device_wait_semaphores(
     iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout) {
+    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
+    iree_hal_wait_flags_t flags) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
   return iree_hal_hip_semaphore_multi_wait(semaphore_list, wait_mode, timeout,
-                                           device->host_allocator);
+                                           flags, device->host_allocator);
 }
 
 static iree_status_t iree_hal_hip_device_profiling_begin(

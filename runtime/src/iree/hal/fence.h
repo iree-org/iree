@@ -121,7 +121,8 @@ IREE_API_EXPORT void iree_hal_fence_fail(iree_hal_fence_t* fence,
 // used to perform a join that will propagate failures from any semaphore used
 // in timepoints.
 IREE_API_EXPORT iree_status_t iree_hal_fence_wait(iree_hal_fence_t* fence,
-                                                  iree_timeout_t timeout);
+                                                  iree_timeout_t timeout,
+                                                  iree_hal_wait_flags_t flags);
 
 // Returns a wait source reference to |fence| after it reaches or exceeds
 // all defined timepoints.

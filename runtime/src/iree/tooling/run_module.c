@@ -260,7 +260,8 @@ static iree_status_t iree_tooling_run_function(
   // If the function is async we need to wait for it to complete.
   if (iree_status_is_ok(status) && finish_fence) {
     IREE_RETURN_IF_ERROR(
-        iree_hal_fence_wait(finish_fence, iree_infinite_timeout()),
+        iree_hal_fence_wait(finish_fence, iree_infinite_timeout(),
+                            IREE_HAL_WAIT_FLAG_DEFAULT),
         "waiting on finish fence");
   }
   iree_hal_fence_release(finish_fence);

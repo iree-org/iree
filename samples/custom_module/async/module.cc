@@ -137,8 +137,8 @@ class AsyncOp {
     // or add the fence to a multi-wait operation. Here we just block the
     // thread until ready. Due to the nature of ordering it's possible the
     // fence has already been signaled by the time we get here.
-    Status status =
-        iree_hal_fence_wait(wait_fence_.get(), iree_infinite_timeout());
+    Status status = iree_hal_fence_wait(
+        wait_fence_.get(), iree_infinite_timeout(), IREE_HAL_WAIT_FLAG_DEFAULT);
 
     fprintf(stdout, "ASYNC: AFTER WAIT\n");
     fflush(stdout);
@@ -203,7 +203,8 @@ class CustomModuleState final {
     // TODO(benvanik): better fence helpers when timelines are not needed.
     vm::ref<iree_hal_semaphore_t> semaphore;
     IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(
-        device_.get(), 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &semaphore));
+        device_.get(), IREE_HAL_QUEUE_AFFINITY_ANY, 0ull,
+        IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &semaphore));
     vm::ref<iree_hal_fence_t> alloca_fence;
     IREE_RETURN_IF_ERROR(iree_hal_fence_create_at(
         semaphore.get(), 1ull, host_allocator_, &alloca_fence));

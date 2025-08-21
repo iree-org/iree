@@ -65,7 +65,8 @@ iree_status_t iree_hal_sync_semaphore_multi_signal(
 iree_status_t iree_hal_sync_semaphore_multi_wait(
     iree_hal_sync_semaphore_state_t* shared_state,
     iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout);
+    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
+    iree_hal_wait_flags_t flags);
 
 #ifdef __cplusplus
 }  // extern "C"
