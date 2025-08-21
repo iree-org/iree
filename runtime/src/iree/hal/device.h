@@ -151,6 +151,87 @@ enum iree_hal_write_flag_bits_t {
   IREE_HAL_WRITE_FLAG_NONE = 0,
 };
 
+// Bitfield specifying flags controlling a host call operation.
+typedef uint64_t iree_hal_host_call_flags_t;
+enum iree_hal_host_call_flag_bits_e {
+  IREE_HAL_HOST_CALL_FLAG_NONE = 0ull,
+
+  // The call will not block the queue it is executing on.
+  // The signal semaphores provided to iree_hal_device_queue_host_call will be
+  // signaled immediately after the queue has issued the call so that work can
+  // progress. The queue will not wait for the call to be made and it's possible
+  // for it to happen out of order with respect to subsequent work on the queue.
+  // The application itself must ensure that any references captured by the call
+  // (user_data or args) are valid until the callback has completed.
+  //
+  // This is intended primarily for use as an optimization for custom signaling
+  // behavior or notifications.
+  IREE_HAL_HOST_CALL_FLAG_NON_BLOCKING = 1ull << 0,
+
+  // Hints that the host call is expected to be very short and that the issuing
+  // queue may want to spin (possibly with backoff) until the host call has
+  // signaled completion.
+  IREE_HAL_HOST_CALL_FLAG_WAIT_ACTIVE = 1ull << 1,
+
+  // Hints that the host call does not require the device to flush/invalidate
+  // caches. Use if the call does not consume any device resources that may have
+  // been produced but not yet flushed to host memory and does not produce any
+  // device resources that will be consumed without invalidation.
+  IREE_HAL_HOST_CALL_FLAG_RELAXED = 1ull << 2,
+};
+
+// Provides context to a host call about where it was made from as well as any
+// additional data requested.
+typedef struct iree_hal_host_call_context_t {
+  // The device the call was issued on.
+  iree_hal_device_t* device;
+  // The queue the call was issued on.
+  // This is guaranteed to be equal-to or a subset-of the queue affinity
+  // provided when the call was enqueued. Implementations are allowed to pick a
+  // single queue to call the operation on and block that or block entire groups
+  // of queues if there is some internal aliasing that introduces progress
+  // issues if only one queue is treated as blocked.
+  iree_hal_queue_affinity_t queue_affinity;
+  // A list of semaphores that must be signaled once the call has completed.
+  // Omitted if IREE_HAL_HOST_CALL_FLAG_NON_BLOCKING was requested.
+  //
+  // The list lives on the stack and must be copied and each semaphore retained
+  // if the call function does not immediately signal them inline. Asynchronous
+  // completion would clone the list, retain the semaphores, fire off the async
+  // operation, and then upon completion signal the semaphores and release them.
+  iree_hal_semaphore_list_t signal_semaphore_list;
+} iree_hal_host_call_context_t;
+
+// Executes a user-requested host call in queue order.
+// If the call succeeds and returns OK the semaphores will be signaled and
+// otherwise they will be failed. In non-blocking mode any error returned is
+// ignored and no semaphores are available.
+//
+// To implement asynchronous callbacks the signal_semaphore_list provided in
+// |context| should be cloned (list of pointers and retains on semaphores) and
+// stored for later signaling. The callback must return IREE_STATUS_DEFERRED to
+// indicate the asynchronous operation and when the operation has completed use
+// iree_hal_semaphore_list_signal or iree_hal_semaphore_list_fail based on
+// result.
+typedef iree_status_t(IREE_API_PTR* iree_hal_host_call_fn_t)(
+    void* user_data, const uint64_t args[4],
+    iree_hal_host_call_context_t* context);
+
+// Bound host call function and user data.
+typedef struct iree_hal_host_call_t {
+  // Callback function pointer in the host program.
+  iree_hal_host_call_fn_t fn;
+  // User data passed to the callback function. Unowned.
+  void* user_data;
+} iree_hal_host_call_t;
+
+// Returns a host call bound to the given function pointer and user data.
+static inline iree_hal_host_call_t iree_hal_make_host_call(
+    iree_hal_host_call_fn_t fn, void* user_data) {
+  iree_hal_host_call_t call = {fn, user_data};
+  return call;
+}
+
 // Bitfield specifying flags controlling an execution operation.
 typedef uint64_t iree_hal_execute_flags_t;
 enum iree_hal_execute_flag_bits_t {
@@ -384,6 +465,66 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_write(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_file_t* target_file, uint64_t target_offset,
     iree_device_size_t length, iree_hal_write_flags_t flags);
+
+// Enqueues a host call request.
+// The device will issue the host call once all waits are satisfied. Host calls
+// receive the signal semaphores provided and can be either synchronous (signal
+// inline) or asynchronous (signal at any point in the future). A non-blocking
+// mode is provided for unidirectional/post-style calls.
+//
+// WARNING: re-entrancy is not supported. It is safe to perform semaphore
+// queries and signals and synchronously allocate/deallocate buffers and
+// resources but queue operations _may_ lead to hangs/crashes. Avoid using any
+// iree_hal_device_queue_* API or performing any blocking waits. If queuing is
+// required then bounce the call to another thread and have it performed there.
+//
+// Arguments are passed without modification from the enqueue operation to the
+// callback. If the arguments contain pointers those must remain live until the
+// host call has executed.
+//
+// Calls block dependent work by default. Once all waits have been satisfied the
+// queue will issue the call to the host with the signals provided and the host
+// call is responsible for either completing its work and returning OK to
+// automatically signal the semaphores. Note that other independent work in the
+// queue is allowed to progress while the host call is in-flight. Calls can be
+// implemented asynchronously by cloning and retaining the signal semaphores
+// they are provided, returning IREE_STATUS_DEFERRED, and signaling them at any
+// point in the future (from an async completion callback, another queue, etc).
+//
+// The IREE_HAL_HOST_CALL_FLAG_NON_BLOCKING flag can be used to instead have the
+// queue issue the call after waits have been satisfied and then immediately
+// signal dependencies prior to the host call being executed. This allows post
+// style notifications without blocking subsequent device work and can be used
+// as a generic signaling mechanism.
+//
+// Call lifetime in both modes:
+// ```
+// BLOCKING (call responsible for signaling):
+//   [alloc state]->[wait]->[call on host]->[signal]->[free state]
+//                            ^             ^
+//                            |             |
+//                            |             Call must signal before returning
+//                            Call receives signal_semaphore_list
+//
+// NON_BLOCKING (queue signals, call runs detached):
+//   [alloc state]->[wait]->[signal]->[call on host]->[free state]
+//                            ^       ^
+//                            |       |
+//                            |       Call receives empty signal_semaphore_list
+//                            Queue signals immediately
+// ```
+//
+// NOTE: host calls can be extremely expensive and result in significant
+// performance issues. Some implementations are not able to natively support
+// host calls and require emulation with poller threads and other techniques
+// that add non-trivial latency in device->host->device situations. Avoid host
+// calls if at all possible.
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_host_call(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_host_call_t call, const uint64_t args[4],
+    iree_hal_host_call_flags_t flags);
 
 // Enqueues a dispatch over a 3D grid of workgroups.
 // The request may execute overlapped with any other queue operations. The
@@ -653,6 +794,13 @@ typedef struct iree_hal_device_vtable_t {
       iree_hal_file_t* target_file, uint64_t target_offset,
       iree_device_size_t length, iree_hal_write_flags_t flags);
 
+  iree_status_t(IREE_API_PTR* queue_host_call)(
+      iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+      const iree_hal_semaphore_list_t wait_semaphore_list,
+      const iree_hal_semaphore_list_t signal_semaphore_list,
+      iree_hal_host_call_t call, const uint64_t args[4],
+      iree_hal_host_call_flags_t flags);
+
   iree_status_t(IREE_API_PTR* queue_dispatch)(
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
       const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -687,38 +835,6 @@ typedef struct iree_hal_device_vtable_t {
 IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_device_vtable_t);
 
 IREE_API_EXPORT void iree_hal_device_destroy(iree_hal_device_t* device);
-
-IREE_API_EXPORT iree_status_t iree_hal_device_queue_emulated_fill(
-    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
-    const iree_hal_semaphore_list_t wait_semaphore_list,
-    const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length, const void* pattern,
-    iree_host_size_t pattern_length, iree_hal_fill_flags_t flags);
-
-IREE_API_EXPORT iree_status_t iree_hal_device_queue_emulated_update(
-    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
-    const iree_hal_semaphore_list_t wait_semaphore_list,
-    const iree_hal_semaphore_list_t signal_semaphore_list,
-    const void* source_buffer, iree_host_size_t source_offset,
-    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length, iree_hal_update_flags_t flags);
-
-IREE_API_EXPORT iree_status_t iree_hal_device_queue_emulated_copy(
-    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
-    const iree_hal_semaphore_list_t wait_semaphore_list,
-    const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
-    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length, iree_hal_copy_flags_t flags);
-
-IREE_API_EXPORT iree_status_t iree_hal_device_queue_emulated_dispatch(
-    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
-    const iree_hal_semaphore_list_t wait_semaphore_list,
-    const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_executable_t* executable, int32_t entry_point,
-    const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
-    const iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
 
 #ifdef __cplusplus
 }  // extern "C"

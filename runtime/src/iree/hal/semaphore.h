@@ -444,6 +444,25 @@ static inline iree_hal_semaphore_list_t iree_hal_semaphore_list_empty(void) {
   return list;
 }
 
+// Returns true if the |semaphore_list| is empty.
+static inline bool iree_hal_semaphore_list_is_empty(
+    iree_hal_semaphore_list_t semaphore_list) {
+  return semaphore_list.count == 0;
+}
+
+// Retains each semaphore in the semaphore list.
+IREE_API_EXPORT void iree_hal_semaphore_list_retain(
+    iree_hal_semaphore_list_t semaphore_list);
+
+// Releases each semaphore in the semaphore list.
+IREE_API_EXPORT void iree_hal_semaphore_list_release(
+    iree_hal_semaphore_list_t semaphore_list);
+
+// Returns true if all semaphores in the list have reached the specified payload
+// values and false otherwise (or if any have failed).
+IREE_API_EXPORT bool iree_hal_semaphore_list_poll(
+    iree_hal_semaphore_list_t semaphore_list);
+
 // Signals each semaphore in |semaphore_list| to the defined timepoint.
 IREE_API_EXPORT iree_status_t
 iree_hal_semaphore_list_signal(iree_hal_semaphore_list_t semaphore_list);

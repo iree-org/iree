@@ -822,10 +822,6 @@ static iree_status_t iree_hal_amdgpu_logical_device_select_queue(
   return iree_ok_status();
 }
 
-// GNUC #define's alloca!
-// <michael> Why should I change, they're the ones that suck! </michael>
-#undef alloca
-
 static iree_status_t iree_hal_amdgpu_logical_device_queue_alloca(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
