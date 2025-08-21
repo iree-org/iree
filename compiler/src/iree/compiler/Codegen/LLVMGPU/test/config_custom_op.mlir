@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --pass-pipeline='builtin.module(iree-llvmgpu-select-lowering-strategy)' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --pass-pipeline='builtin.module(func.func(iree-codegen-gpu-generalize-named-ops),iree-llvmgpu-select-lowering-strategy)' %s | FileCheck %s
 
 func.func @custom_op(%arg0 : tensor<384x512xf32>, %arg1 : tensor<512x128xf32>,
     %arg2 : tensor<128xf32>) -> tensor<384x128xf32> {
@@ -39,8 +39,9 @@ func.func @custom_op(%arg0 : tensor<384x512xf32>, %arg1 : tensor<512x128xf32>,
 //      CHECK:   iree_linalg_ext.custom_op
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 //      CHECK:   ^bb
-//      CHECK:     linalg.matmul
+//      CHECK:     linalg.generic
 // CHECK-SAME:         lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>, promote_operands = [0, 1], reduction = [0, 0, 32], subgroup_m_count = 2 : i64, subgroup_n_count = 2 : i64, workgroup = [64, 64, 0]}>
+//      CHECK:     linalg.generic
 //      CHECK:   iree_linalg_ext.yield
 
 // -----

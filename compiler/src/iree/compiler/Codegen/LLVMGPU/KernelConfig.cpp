@@ -19,12 +19,10 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
-#include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
@@ -297,10 +295,8 @@ static bool isMatmulLike(linalg::LinalgOp &linalgOp) {
          linalgOp.getNumParallelLoops() >= 1;
 };
 
-/// Check if `op` is a linalg.reduce or a linalg.generic that has at least one
-/// reduction iterator.
-static bool hasReductionIterator(linalg::LinalgOp &op) {
-  return isa<linalg::ReduceOp, linalg::GenericOp>(op) &&
+static bool isGenericWithReductionIterator(linalg::LinalgOp &op) {
+  return isa<linalg::GenericOp>(op.getOperation()) &&
          llvm::any_of(op.getIteratorTypesArray(), linalg::isReductionIterator);
 }
 
@@ -645,7 +641,7 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
   };
 
   for (linalg::LinalgOp linalgOp : computeOps) {
-    if (hasReductionIterator(linalgOp) ||
+    if (isGenericWithReductionIterator(linalgOp) ||
         shouldAttachLoweringConfig(linalgOp)) {
       auto loweringConfig = getVectorDistributeReductionConfig(
           linalgOp, target, sharedWgpTiles, workgroupSize, subgroupSize,
@@ -729,7 +725,7 @@ checkDispatchForVectorDistribution(Operation *parentOp) {
       if (isa<linalg::FillOp>(op)) {
         continue;
       }
-      if (hasReductionIterator(linalgOp) &&
+      if (isGenericWithReductionIterator(linalgOp) &&
           failed(checkSingleCombiner(linalgOp))) {
         containsValidReductionOp = false;
         break;
@@ -777,7 +773,7 @@ checkDispatchForVectorDistribution(Operation *parentOp) {
           llvm::seq<int>(indexingMap.getNumResults()), [&](int val) {
             return reductionDims.contains(indexingMap.getDimPosition(val));
           });
-      if (isOperandReduced && hasReductionIterator(producerOp)) {
+      if (isOperandReduced && isGenericWithReductionIterator(producerOp)) {
         return failure();
       }
     }
@@ -823,7 +819,7 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   MLIRContext *context = op.getContext();
   OpBuilder b(context);
 
-  if (!hasReductionIterator(op)) {
+  if (!isGenericWithReductionIterator(op)) {
     return failure();
   }
 
@@ -3161,6 +3157,11 @@ static LogicalResult setConvolutionConfig(
 static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
                                    mlir::FunctionOpInterface entryPointFn,
                                    Operation *computeOp) {
+
+  if (isInGPUGeneralizeSet(computeOp)) {
+    return computeOp->emitOpError(
+        "is a named op that was expected to be generalized before now.");
+  }
   IREE::GPU::UKernelConfigAttr ukernelConfig = selectUKernel(computeOp);
   LLVM_DEBUG({
     DBGS() << "Selecting root config for: ";

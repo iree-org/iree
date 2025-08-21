@@ -235,3 +235,12 @@ func.func @illegal() attributes {translation_info = #translation} {
   linalg.matmul {lowering_config = #config} ins(%0, %1 : memref<1024x512xi8>, memref<512x256xi8>) outs(%2 : memref<1024x256xi8>)
   return
 }
+
+// -----
+
+//expected-error @+1{{'func.func' op failed to set root config}}
+func.func @check_precondition_that_ops_generalized(%arg0: tensor<6x6xf32>, %arg1: tensor<6x6xf32>, %arg2: tensor<6x6xf32>) {
+  // expected-error @+1{{'linalg.matmul' op is a named op that was expected to be generalized before now.}}
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<6x6xf32>, tensor<6x6xf32>) outs(%arg2 : tensor<6x6xf32>) -> tensor<6x6xf32>
+  return
+}
