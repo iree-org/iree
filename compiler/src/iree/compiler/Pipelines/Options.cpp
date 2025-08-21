@@ -313,6 +313,9 @@ void DispatchCreationOptions::bindOptions(OptionsBinder &binder) {
   binder.opt<bool>("iree-dispatch-creation-fuse-multi-use", enableFuseMultiUse,
                    llvm::cl::desc("Fuse operations with multiple uses."));
   binder.opt<bool>("iree-dispatch-creation-data-tiling", dataTiling,
+                   {init_at_opt(llvm::OptimizationLevel::O0, false),
+                    init_at_opt(llvm::OptimizationLevel::O1, true),
+                    init_at_opt(llvm::OptimizationLevel::O3, false)},
                    llvm::cl::desc("Enables data tiling path."),
                    llvm::cl::cat(category));
 }
