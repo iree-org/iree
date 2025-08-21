@@ -71,7 +71,6 @@ struct DropUnitDimsFromCollapseOfExpand
 
     const SmallVector<ReassociationIndices, 4> collapseReassoc =
         collapseOp.getReassociationIndices();
-    ArrayRef<int64_t> srcShape = expandOp.getSrcType().getShape();
     ArrayRef<int64_t> interShape = expandOp.getType().getShape();
     ArrayRef<int64_t> outShape = collapseOp.getType().getShape();
     SmallVector<int64_t> interToOutMap(expandOp.getType().getRank());
@@ -88,11 +87,6 @@ struct DropUnitDimsFromCollapseOfExpand
           continue;
         }
 
-        // If we are collapsing multiple unit dims together, at least 1 must be
-        // kept (prefer the first).
-        if (outShape[outDim] == 1 && innerIdx != 0) {
-          continue;
-        }
         toDrop.insert(inDim);
       }
     }
@@ -101,7 +95,9 @@ struct DropUnitDimsFromCollapseOfExpand
     // `expandOp` op.
     const auto expandReassoc = expandOp.getReassociationIndices();
     for (const auto &[inDim, indices] : llvm::enumerate(expandReassoc)) {
-      if (indices.size() == 1 || srcShape[inDim]==1) {
+      if (llvm::all_of(indices,
+                       [&](int64_t idx) { return toDrop.contains(idx); })) {
+
         toDrop.erase(indices[0]);
       }
     }
@@ -162,6 +158,7 @@ struct DropUnitDimsFromCollapseOfExpand
     // Construct new reassociations for the `expand_shape` op that does
     // not include the dropped dimensions.
     SmallVector<ReassociationIndices, 4> newExpandReassoc;
+    ArrayRef<int64_t> srcShape = expandOp.getSrcType().getShape();
     int64_t expandedDim = 0;
     for (auto dim : llvm::seq<int64_t>(0, srcShape.size())) {
       bool changed = pushBackReassociation(newExpandReassoc, expandedDim,
