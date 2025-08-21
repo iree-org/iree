@@ -6,7 +6,7 @@
 
 #include "iree/hal/drivers/amdgpu/util/block_pool.h"
 
-#include "iree/hal/drivers/amdgpu/util/bitmap.h"
+#include "iree/base/internal/bitmap.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_block_pool_t
@@ -466,19 +466,19 @@ static iree_status_t iree_hal_amdgpu_block_allocator_allocate_with_lock(
   // up not being enough.
   iree_hal_amdgpu_block_t* block = allocator->block_head;
   while (block) {
-    const iree_hal_amdgpu_bitmap_t bitmap = {
+    const iree_bitmap_t bitmap = {
         .bit_count = allocator->page_count,
         .words = &block->user_data[0],
     };
     const iree_host_size_t page_index =
-        iree_hal_amdgpu_bitmap_find_first_unset_span(bitmap, 0, page_count);
+        iree_bitmap_find_first_unset_span(bitmap, 0, page_count);
     if (page_index == bitmap.bit_count) {
       // No span of sufficient size found - try the next block with free pages.
       block = block->next;
       continue;
     }
     // Span of pages found. Reserve and return the allocation.
-    iree_hal_amdgpu_bitmap_set_span(bitmap, page_index, page_count);
+    iree_bitmap_set_span(bitmap, page_index, page_count);
     *out_ptr = (uint8_t*)block->ptr + page_index * allocator->page_size;
     out_token->page_count = (uint64_t)page_count;
     out_token->block = (uint64_t)block;
@@ -490,11 +490,11 @@ static iree_status_t iree_hal_amdgpu_block_allocator_allocate_with_lock(
       iree_hal_amdgpu_block_pool_acquire(allocator->block_pool, &block));
 
   // Reset the bitmap as the contents are undefined upon acquisition.
-  const iree_hal_amdgpu_bitmap_t bitmap = {
+  const iree_bitmap_t bitmap = {
       .bit_count = allocator->page_count,
       .words = &block->user_data[0],
   };
-  iree_hal_amdgpu_bitmap_reset_all(bitmap);
+  iree_bitmap_reset_all(bitmap);
 
   // Link the block into the list.
   // If it is full to start (page_count == pages per block) we move it to the
@@ -521,7 +521,7 @@ static iree_status_t iree_hal_amdgpu_block_allocator_allocate_with_lock(
 
   // Reserve the the entire page range starting at index 0.
   const iree_host_size_t page_index = 0;
-  iree_hal_amdgpu_bitmap_set_span(bitmap, page_index, page_count);
+  iree_bitmap_set_span(bitmap, page_index, page_count);
   *out_ptr = (uint8_t*)block->ptr + page_index * allocator->page_size;
   out_token->page_count = (uint64_t)page_count;
   out_token->block = (uint64_t)block;
@@ -565,11 +565,11 @@ static void iree_hal_amdgpu_block_allocator_free_with_lock(
   // Calculate and clear the page bits corresponding to the allocated range.
   const uint64_t byte_offset = (uint64_t)ptr - (uint64_t)block->ptr;
   const iree_host_size_t page_index = byte_offset / allocator->page_size;
-  const iree_hal_amdgpu_bitmap_t bitmap = {
+  const iree_bitmap_t bitmap = {
       .bit_count = allocator->page_count,
       .words = &block->user_data[0],
   };
-  iree_hal_amdgpu_bitmap_reset_span(bitmap, page_index, token.page_count);
+  iree_bitmap_reset_span(bitmap, page_index, token.page_count);
 
   // We do two things: moving the block to the head of list so it's found in
   // scans and returning the block to the block pool if it has no more
@@ -588,7 +588,7 @@ static void iree_hal_amdgpu_block_allocator_free_with_lock(
 
   // If the block has no more remaining allocations outstanding it can be
   // returned to the block pool after we unlink it.
-  if (iree_hal_amdgpu_bitmap_empty(bitmap)) {
+  if (!iree_bitmap_any_set(bitmap)) {
     iree_hal_amdgpu_block_pool_release(allocator->block_pool, block);
     return;
   }

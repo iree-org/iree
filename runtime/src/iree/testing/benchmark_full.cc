@@ -155,6 +155,9 @@ const iree_benchmark_def_t* iree_benchmark_register(
 
   switch (benchmark_def->time_unit) {
     default:
+    case IREE_BENCHMARK_UNIT_DEFAULT:
+      // Use whatever the benchmark library defaults to.
+      break;
     case IREE_BENCHMARK_UNIT_MILLISECOND:
       instance->Unit(benchmark::kMillisecond);
       break;
