@@ -23,6 +23,7 @@ iree_cc_library(
     iree::base
     iree::hal
     iree::hal::local::elf::elf_module
+    iree::hal::local::executable_format
     iree::hal::local::executable_library
     iree::hal::local::executable_library_util
     iree::hal::local::executable_loader
@@ -66,6 +67,7 @@ iree_cc_library(
     iree::base
     iree::base::internal::dynamic_library
     iree::hal
+    iree::hal::local::executable_format
     iree::hal::local::executable_library
     iree::hal::local::executable_library_util
     iree::hal::local::executable_loader
