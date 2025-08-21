@@ -253,7 +253,8 @@ static void BenchmarkAsyncFunction(
     for (int32_t i = 0; i < batch_concurrency; ++i) {
       vm::ref<iree_hal_semaphore_t> timeline_semaphore;
       IREE_CHECK_OK(iree_hal_semaphore_create(
-          device, 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &timeline_semaphore));
+          device, IREE_HAL_QUEUE_AFFINITY_ANY, 0ull,
+          IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &timeline_semaphore));
       timeline_semaphores.push_back(std::move(timeline_semaphore));
     }
 
@@ -318,8 +319,9 @@ static void BenchmarkAsyncFunction(
                            /*policy=*/nullptr, invocation_inputs[i].get(),
                            invocation_outputs[i].get(), host_allocator));
       }
-      IREE_CHECK_OK(
-          iree_hal_fence_wait(completion_fence.get(), iree_infinite_timeout()));
+      IREE_CHECK_OK(iree_hal_fence_wait(completion_fence.get(),
+                                        iree_infinite_timeout(),
+                                        IREE_HAL_WAIT_FLAG_DEFAULT));
     }
     state.PauseTiming();
 
