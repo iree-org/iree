@@ -29,6 +29,15 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "executable_format",
+    srcs = ["executable_format.c"],
+    hdrs = ["executable_format.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "executable_library",
     hdrs = ["executable_library.h"],
 )

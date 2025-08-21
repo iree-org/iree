@@ -27,6 +27,18 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    executable_format
+  HDRS
+    "executable_format.h"
+  SRCS
+    "executable_format.c"
+  DEPS
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     executable_library
   HDRS
     "executable_library.h"
