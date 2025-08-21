@@ -125,6 +125,29 @@ void iree_hal_executable_loader_retain(
 void iree_hal_executable_loader_release(
     iree_hal_executable_loader_t* executable_loader);
 
+// Attempts to infer the executable format from the given |executable_data|.
+// Returns the format string in |executable_format| and the inferred data size
+// in |out_inferred_size|. The inferred size indicates the size of valid data
+// following the |executable_data| base pointer and may be less than the
+// provided size.
+//
+// If the size of the data is not know callers can pass the base pointer in
+// |executable_data| with a 0 size. The loader will attempt to discover how many
+// valid bytes follow the pointer _with no bounds check_. **THIS IS UNSAFE** as
+// the data could trivially say it's the entire rest of memory and then we'll be
+// wiring that for access. CUDA (and HIP) have a terrible API, though, and this
+// is required to support loading their modules. This should never be used if
+// the size is available (file length, etc).
+//
+// Returns IREE_STATUS_INCOMPATIBLE if the format could not be recognized by the
+// loader.
+iree_status_t iree_hal_executable_loader_infer_format(
+    iree_hal_executable_loader_t* executable_loader,
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_const_byte_span_t executable_data,
+    iree_host_size_t executable_format_capacity, char* executable_format,
+    iree_host_size_t* out_inferred_size);
+
 // Returns true if the loader can load executables of the given
 // |executable_format|. Note that loading may still fail if the executable uses
 // features not available on the current host or runtime.
@@ -165,6 +188,13 @@ iree_status_t iree_hal_executable_loader_try_load(
 
 typedef struct iree_hal_executable_loader_vtable_t {
   void(IREE_API_PTR* destroy)(iree_hal_executable_loader_t* executable_loader);
+
+  iree_status_t(IREE_API_PTR* infer_format)(
+      iree_hal_executable_loader_t* executable_loader,
+      iree_hal_executable_caching_mode_t caching_mode,
+      iree_const_byte_span_t executable_data,
+      iree_host_size_t executable_format_capacity, char* executable_format,
+      iree_host_size_t* out_inferred_size);
 
   bool(IREE_API_PTR* query_support)(
       iree_hal_executable_loader_t* executable_loader,

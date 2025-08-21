@@ -162,6 +162,29 @@ IREE_API_EXPORT void iree_hal_executable_cache_retain(
 IREE_API_EXPORT void iree_hal_executable_cache_release(
     iree_hal_executable_cache_t* executable_cache);
 
+// Attempts to infer the executable format from the given |executable_data|.
+// Returns the format string in |executable_format| and the inferred data size
+// in |out_inferred_size|. The inferred size indicates the size of valid data
+// following the |executable_data| base pointer and may be less than the
+// provided size.
+//
+// If the size of the data is not know callers can pass the base pointer in
+// |executable_data| with a 0 size. The loader will attempt to discover how many
+// valid bytes follow the pointer _with no bounds check_. **THIS IS UNSAFE** as
+// the data could trivially say it's the entire rest of memory and then we'll be
+// wiring that for access. CUDA (and HIP) have a terrible API, though, and this
+// is required to support loading their modules. This should never be used if
+// the size is available (file length, etc).
+//
+// Returns IREE_STATUS_INCOMPATIBLE if the format could not be recognized by the
+// loader.
+IREE_API_EXPORT iree_status_t iree_hal_executable_cache_infer_format(
+    iree_hal_executable_cache_t* executable_cache,
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_const_byte_span_t executable_data,
+    iree_host_size_t executable_format_capacity, char* executable_format,
+    iree_host_size_t* out_inferred_size);
+
 // Returns true if the executable cache can prepare the given executable input
 // format. Preparation may still fail if the particular version or features
 // required by the executable are not supported.
@@ -190,6 +213,13 @@ IREE_API_EXPORT iree_status_t iree_hal_executable_cache_prepare_executable(
 
 typedef struct iree_hal_executable_cache_vtable_t {
   void(IREE_API_PTR* destroy)(iree_hal_executable_cache_t* executable_cache);
+
+  iree_status_t(IREE_API_PTR* infer_format)(
+      iree_hal_executable_cache_t* executable_cache,
+      iree_hal_executable_caching_mode_t caching_mode,
+      iree_const_byte_span_t executable_data,
+      iree_host_size_t executable_format_capacity, char* executable_format,
+      iree_host_size_t* out_inferred_size);
 
   bool(IREE_API_PTR* can_prepare_format)(
       iree_hal_executable_cache_t* executable_cache,
