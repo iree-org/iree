@@ -279,7 +279,7 @@ iree_status_t iree_hal_task_semaphore_enqueue_timepoint(
 
 static iree_status_t iree_hal_task_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_timeout_t timeout) {
+    iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
   iree_hal_task_semaphore_t* semaphore =
       iree_hal_task_semaphore_cast(base_semaphore);
 
@@ -324,13 +324,15 @@ static iree_status_t iree_hal_task_semaphore_wait(
 iree_status_t iree_hal_task_semaphore_multi_wait(
     iree_hal_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
-    iree_event_pool_t* event_pool, iree_arena_block_pool_t* block_pool) {
+    iree_hal_wait_flags_t flags, iree_event_pool_t* event_pool,
+    iree_arena_block_pool_t* block_pool) {
   if (semaphore_list.count == 0) {
     return iree_ok_status();
   } else if (semaphore_list.count == 1) {
     // Fast-path for a single semaphore.
     return iree_hal_semaphore_wait(semaphore_list.semaphores[0],
-                                   semaphore_list.payload_values[0], timeout);
+                                   semaphore_list.payload_values[0], timeout,
+                                   flags);
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);

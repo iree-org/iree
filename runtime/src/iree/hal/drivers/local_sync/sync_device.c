@@ -274,8 +274,9 @@ static iree_status_t iree_hal_sync_device_import_file(
 }
 
 static iree_status_t iree_hal_sync_device_create_semaphore(
-    iree_hal_device_t* base_device, uint64_t initial_value,
-    iree_hal_semaphore_flags_t flags, iree_hal_semaphore_t** out_semaphore) {
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    uint64_t initial_value, iree_hal_semaphore_flags_t flags,
+    iree_hal_semaphore_t** out_semaphore) {
   iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
   return iree_hal_sync_semaphore_create(&device->semaphore_state, initial_value,
                                         device->host_allocator, out_semaphore);
@@ -296,8 +297,9 @@ static iree_status_t iree_hal_sync_device_queue_alloca(
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   // TODO(benvanik): queue-ordered allocations.
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(wait_semaphore_list,
-                                                    iree_infinite_timeout()));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
+                                   IREE_HAL_WAIT_FLAG_DEFAULT));
   IREE_RETURN_IF_ERROR(
       iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
                                          params, allocation_size, out_buffer));
@@ -427,7 +429,7 @@ static iree_status_t iree_hal_sync_device_queue_execute(
   // Wait for semaphores to be signaled before performing any work.
   IREE_RETURN_IF_ERROR(iree_hal_sync_semaphore_multi_wait(
       &device->semaphore_state, IREE_HAL_WAIT_MODE_ALL, wait_semaphore_list,
-      iree_infinite_timeout()));
+      iree_infinite_timeout(), IREE_HAL_WAIT_FLAG_DEFAULT));
 
   // Run all deferred command buffers - any we could have run inline we already
   // did during recording.
@@ -449,10 +451,11 @@ static iree_status_t iree_hal_sync_device_queue_flush(
 
 static iree_status_t iree_hal_sync_device_wait_semaphores(
     iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout) {
+    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
+    iree_hal_wait_flags_t flags) {
   iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
   return iree_hal_sync_semaphore_multi_wait(&device->semaphore_state, wait_mode,
-                                            semaphore_list, timeout);
+                                            semaphore_list, timeout, flags);
 }
 
 static iree_status_t iree_hal_sync_device_profiling_begin(

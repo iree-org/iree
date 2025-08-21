@@ -275,9 +275,9 @@ static iree_status_t iree_hal_transfer_operation_create(
 
     // Create semaphore for tracking worker progress.
     worker->pending_timepoint = 0ull;
-    status = iree_hal_semaphore_create(device, worker->pending_timepoint,
-                                       IREE_HAL_SEMAPHORE_FLAG_NONE,
-                                       &worker->semaphore);
+    status = iree_hal_semaphore_create(
+        device, IREE_HAL_QUEUE_AFFINITY_ANY, worker->pending_timepoint,
+        IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &worker->semaphore);
     if (!iree_status_is_ok(status)) break;
   }
 

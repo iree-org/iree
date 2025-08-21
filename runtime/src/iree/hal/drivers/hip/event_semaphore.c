@@ -282,7 +282,7 @@ static bool iree_hal_hip_semaphore_is_aborted(
 iree_status_t iree_hal_hip_semaphore_multi_wait(
     const iree_hal_semaphore_list_t semaphore_list,
     iree_hal_wait_mode_t wait_mode, iree_timeout_t timeout,
-    iree_allocator_t host_allocator) {
+    iree_hal_wait_flags_t flags, iree_allocator_t host_allocator) {
   if (semaphore_list.count == 0) return iree_ok_status();
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -296,8 +296,9 @@ iree_status_t iree_hal_hip_semaphore_multi_wait(
     for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
       iree_timeout_t t = iree_make_deadline(deadline_ns);
       status = iree_status_join(
-          status, iree_hal_semaphore_wait(semaphore_list.semaphores[0],
-                                          semaphore_list.payload_values[0], t));
+          status,
+          iree_hal_semaphore_wait(semaphore_list.semaphores[0],
+                                  semaphore_list.payload_values[0], t, flags));
       if (!iree_status_is_ok(status)) {
         break;
       }
@@ -941,7 +942,7 @@ static void iree_hal_hip_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
 
 static iree_status_t iree_hal_hip_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_timeout_t timeout) {
+    iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(base_semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
