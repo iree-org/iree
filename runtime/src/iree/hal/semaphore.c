@@ -200,6 +200,39 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_export_timepoint(
 // iree_hal_semaphore_list_t
 //===----------------------------------------------------------------------===//
 
+IREE_API_EXPORT void iree_hal_semaphore_list_retain(
+    iree_hal_semaphore_list_t semaphore_list) {
+  for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
+    iree_hal_semaphore_retain(semaphore_list.semaphores[i]);
+  }
+}
+
+IREE_API_EXPORT void iree_hal_semaphore_list_release(
+    iree_hal_semaphore_list_t semaphore_list) {
+  for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
+    iree_hal_semaphore_release(semaphore_list.semaphores[i]);
+  }
+}
+
+IREE_API_EXPORT bool iree_hal_semaphore_list_poll(
+    iree_hal_semaphore_list_t semaphore_list) {
+  for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
+    // NOTE: this is unfortunately expensive in failure cases as it'll return
+    // a clone (or maybe the original!) status. We rely on failures being
+    // exceptional to make this acceptable.
+    uint64_t current_value = 0;
+    iree_status_t status =
+        iree_hal_semaphore_query(semaphore_list.semaphores[i], &current_value);
+    if (!iree_status_is_ok(status)) {
+      iree_status_ignore(status);
+      return false;
+    } else if (current_value < semaphore_list.payload_values[i]) {
+      return false;  // not yet reached
+    }
+  }
+  return true;
+}
+
 IREE_API_EXPORT iree_status_t
 iree_hal_semaphore_list_signal(iree_hal_semaphore_list_t semaphore_list) {
   IREE_TRACE_ZONE_BEGIN(z0);

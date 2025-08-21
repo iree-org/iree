@@ -20,6 +20,7 @@
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/file_registry.h"
 #include "iree/hal/utils/file_transfer.h"
+#include "iree/hal/utils/queue_emulation.h"
 
 typedef struct iree_hal_sync_device_t {
   iree_hal_resource_t resource;
@@ -361,6 +362,55 @@ static iree_status_t iree_hal_sync_device_queue_write(
   return loop_status;
 }
 
+static iree_status_t iree_hal_sync_device_queue_host_call(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_host_call_t call, const uint64_t args[4],
+    iree_hal_host_call_flags_t flags) {
+  // Wait for all dependencies.
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(wait_semaphore_list,
+                                                    iree_infinite_timeout()));
+
+  // If non-blocking then immediately signal the dependencies instead of letting
+  // the call do it. We don't expect this to allow more work to proceed in the
+  // sync device case _on this device_ but it may on others.
+  const bool is_nonblocking =
+      iree_any_bit_set(flags, IREE_HAL_HOST_CALL_FLAG_NON_BLOCKING);
+  if (is_nonblocking) {
+    // NOTE: the signals can fail in which case we never perform the call.
+    // That's ok as failure to signal is considered a device-loss/death
+    // situation as there's no telling what has gone wrong.
+    IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
+  }
+
+  // Issue the call.
+  iree_hal_host_call_context_t context = {
+      .device = base_device,
+      .queue_affinity = queue_affinity,
+      .signal_semaphore_list = is_nonblocking ? iree_hal_semaphore_list_empty()
+                                              : signal_semaphore_list,
+  };
+  iree_status_t call_status = call.fn(call.user_data, args, &context);
+
+  if (is_nonblocking || iree_status_is_deferred(call_status)) {
+    // User callback will signal in the future (or they are fire-and-forget).
+    return iree_ok_status();
+  } else if (iree_status_is_ok(call_status)) {
+    // Signal callback completed synchronously.
+    return iree_hal_semaphore_list_signal(signal_semaphore_list);
+  } else {
+    // If the call failed we need to fail all dependent semaphores to propagate
+    // the error.
+    if (!is_nonblocking) {
+      iree_hal_semaphore_list_fail(signal_semaphore_list, call_status);
+    } else {
+      iree_status_ignore(call_status);
+    }
+    return iree_ok_status();
+  }
+}
+
 static iree_status_t iree_hal_sync_device_apply_deferred_command_buffer(
     iree_hal_sync_device_t* device, iree_hal_command_buffer_t* command_buffer,
     iree_hal_buffer_binding_table_t binding_table) {
@@ -508,6 +558,7 @@ static const iree_hal_device_vtable_t iree_hal_sync_device_vtable = {
     .queue_copy = iree_hal_device_queue_emulated_copy,
     .queue_read = iree_hal_sync_device_queue_read,
     .queue_write = iree_hal_sync_device_queue_write,
+    .queue_host_call = iree_hal_sync_device_queue_host_call,
     .queue_dispatch = iree_hal_device_queue_emulated_dispatch,
     .queue_execute = iree_hal_sync_device_queue_execute,
     .queue_flush = iree_hal_sync_device_queue_flush,

@@ -16,6 +16,8 @@
 #include "iree/hal/drivers/null/semaphore.h"
 #include "iree/hal/utils/file_registry.h"
 #include "iree/hal/utils/file_transfer.h"
+#include "iree/hal/utils/queue_emulation.h"
+#include "iree/hal/utils/queue_host_call_emulation.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_null_device_options_t
@@ -459,6 +461,22 @@ static iree_status_t iree_hal_null_device_queue_write(
   return loop_status;
 }
 
+static iree_status_t iree_hal_null_device_queue_host_call(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_host_call_t call, const uint64_t args[4],
+    iree_hal_host_call_flags_t flags) {
+  // TODO(null): if a native queue host call operation is available use that
+  // instead. The emulated host call is horrendous and creates a new thread for
+  // every requested host call. Even if native host call support is not
+  // available an implementation should do _anything_ better than launching a
+  // thread per call (polling threads, worker pools, etc).
+  return iree_hal_device_queue_emulated_host_call(
+      base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+      call, args, flags);
+}
+
 static iree_status_t iree_hal_null_device_queue_dispatch(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -621,6 +639,7 @@ static const iree_hal_device_vtable_t iree_hal_null_device_vtable = {
     .queue_copy = iree_hal_null_device_queue_copy,
     .queue_read = iree_hal_null_device_queue_read,
     .queue_write = iree_hal_null_device_queue_write,
+    .queue_host_call = iree_hal_null_device_queue_host_call,
     .queue_dispatch = iree_hal_null_device_queue_dispatch,
     .queue_execute = iree_hal_null_device_queue_execute,
     .queue_flush = iree_hal_null_device_queue_flush,

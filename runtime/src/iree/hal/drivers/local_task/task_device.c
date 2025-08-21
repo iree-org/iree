@@ -21,6 +21,7 @@
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/file_registry.h"
 #include "iree/hal/utils/file_transfer.h"
+#include "iree/hal/utils/queue_emulation.h"
 
 typedef struct iree_hal_task_device_t {
   iree_hal_resource_t resource;
@@ -448,6 +449,20 @@ static iree_status_t iree_hal_task_device_queue_write(
   return loop_status;
 }
 
+static iree_status_t iree_hal_task_device_queue_host_call(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_host_call_t call, const uint64_t args[4],
+    iree_hal_host_call_flags_t flags) {
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
+  const iree_host_size_t queue_index = iree_hal_task_device_select_queue(
+      device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
+  return iree_hal_task_queue_submit_host_call(
+      &device->queues[queue_index], base_device, 1ull << queue_index,
+      wait_semaphore_list, signal_semaphore_list, call, args, flags);
+}
+
 static iree_status_t iree_hal_task_device_queue_execute(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -457,7 +472,7 @@ static iree_status_t iree_hal_task_device_queue_execute(
     iree_hal_execute_flags_t flags) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   // NOTE: today we are not discriminating queues based on command type.
-  iree_host_size_t queue_index = iree_hal_task_device_select_queue(
+  const iree_host_size_t queue_index = iree_hal_task_device_select_queue(
       device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
   if (command_buffer == NULL) {
     // Fast-path for barriers (fork/join/sequence).
@@ -542,6 +557,7 @@ static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
     .queue_copy = iree_hal_device_queue_emulated_copy,
     .queue_read = iree_hal_task_device_queue_read,
     .queue_write = iree_hal_task_device_queue_write,
+    .queue_host_call = iree_hal_task_device_queue_host_call,
     .queue_dispatch = iree_hal_device_queue_emulated_dispatch,
     .queue_execute = iree_hal_task_device_queue_execute,
     .queue_flush = iree_hal_task_device_queue_flush,
