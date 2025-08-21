@@ -54,8 +54,9 @@ enum iree_hal_semaphore_flag_bits_t {
   IREE_HAL_SEMAPHORE_FLAG_EXPORTABLE_TIMEPOINTS = 1ull << 3,
 
   // Default flags for semaphores.
-  IREE_HAL_SEMAPHORE_FLAG_DEFAULT = IREE_HAL_SEMAPHORE_FLAG_HOST_INTERRUPT |
-                                    IREE_HAL_SEMAPHORE_FLAG_EXPORTABLE,
+  IREE_HAL_SEMAPHORE_FLAG_DEFAULT =
+      IREE_HAL_SEMAPHORE_FLAG_HOST_INTERRUPT |
+      IREE_HAL_SEMAPHORE_FLAG_EXPORTABLE_TIMEPOINTS,
 };
 typedef uint64_t iree_hal_semaphore_flags_t;
 
