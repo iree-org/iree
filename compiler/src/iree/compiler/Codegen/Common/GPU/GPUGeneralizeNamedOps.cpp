@@ -16,22 +16,24 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
-#include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
 
 #define GEN_PASS_DEF_GPUGENERALIZENAMEDOPSPASS
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
-LogicalResult
+static LogicalResult
 generalizeCandidates(MLIRContext *context,
                      ArrayRef<linalg::LinalgOp> namedOpCandidates) {
   IRRewriter rewriter(context);
   for (auto linalgOp : namedOpCandidates) {
-    // Pass down lowering configuration. It can exist due to user set
-    // configuration from the input.
+    // Pass down lowering configuration and compilation info. These
+    // can exist due to user set configuration from the input.
     IREE::Codegen::LoweringConfigAttrInterface config =
         getLoweringConfig(linalgOp);
+    IREE::Codegen::CompilationInfoAttr compilationInfo =
+        getCompilationInfo(linalgOp);
+
     rewriter.setInsertionPoint(linalgOp);
     FailureOr<linalg::GenericOp> generalizedOp =
         linalg::generalizeNamedOp(rewriter, linalgOp);
@@ -41,6 +43,9 @@ generalizeCandidates(MLIRContext *context,
     }
     if (config) {
       setLoweringConfig(*generalizedOp, config);
+    }
+    if (compilationInfo) {
+      setCompilationInfo(*generalizedOp, compilationInfo);
     }
   }
   return success();
@@ -53,9 +58,8 @@ struct GPUGeneralizeNamedOpsPass final
     FunctionOpInterface funcOp = getOperation();
     SmallVector<linalg::LinalgOp> namedOpCandidates;
     funcOp.walk([&](linalg::LinalgOp linalgOp) {
-      if (isa<linalg::BatchMatmulTransposeBOp, linalg::MatmulTransposeBOp,
-              linalg::VecmatOp, linalg::MatvecOp, linalg::TransposeOp>(
-              linalgOp.getOperation()))
+      if (isa<linalg::BatchMatmulOp, linalg::MatmulOp, linalg::MatvecOp,
+              linalg::TransposeOp, linalg::VecmatOp>(linalgOp.getOperation()))
         namedOpCandidates.push_back(linalgOp);
     });
 

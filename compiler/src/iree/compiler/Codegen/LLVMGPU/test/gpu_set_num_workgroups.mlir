@@ -58,7 +58,7 @@ func.func @dot_dispatch_1() {
 //      CHECK: func.func @dot_dispatch_1
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.fill
-//      CHECK:   linalg.matmul
+//      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #iree_gpu.lowering_config<{reduction = [0, 0, 4], thread = [2, 1, 0], workgroup = [4, 2, 1]}>
 
 // -----
@@ -85,7 +85,7 @@ func.func @unaligned_k() {
 //      CHECK: func.func @unaligned_k
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.fill
-//      CHECK:   linalg.matmul
+//      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #iree_gpu.lowering_config<{reduction = [0, 0, 2], thread = [1, 16, 0], workgroup = [32, 128, 1]}>
 
 // -----
@@ -273,7 +273,7 @@ func.func @_lowering_config_test_dispatch_1() {
 //      CHECK: func.func @_lowering_config_test_dispatch_1()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.fill
-//      CHECK: linalg.matmul
+//      CHECK: linalg.generic
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
@@ -456,13 +456,15 @@ func.func @large_matmul_f16() {
   iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [2560, 2048], strides = [1, 1] : tensor<2560x2048xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2560x2048xf16>>
   return
 }
-//  SM80-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 256, 32]{{\]}}
-//  SM80-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [128, 2, 1] subgroup_size = 32, {pipeline_depth = 3 : i64, store_stage = 1 : i64}>
-//      SM80: func.func @large_matmul_f16()
-// SM80-SAME:     translation_info = #[[TRANSLATION]]
-//      SM80: linalg.fill
-//      SM80: linalg.matmul
-// SM80-SAME:     lowering_config = #[[CONFIG]]
+
+//      SM80:   #config = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 256, 32]]>
+//      SM80:   #translation = #iree_codegen.translation_info<pipeline = LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [128, 2, 1]
+// SM80-SAME:   subgroup_size = 32, {pipeline_depth = 3 : i64, store_stage = 1 : i64}>
+//      SM80:   func.func @large_matmul_f16()
+// SM80-SAME:       translation_info = #[[TRANSLATION]]
+//      SM80:   linalg.fill
+//      SM80:   linalg.generic
+// SM80-SAME:       lowering_config = #config
 
 // -----
 
@@ -493,7 +495,7 @@ func.func @large_matmul_f32() {
 //      SM80: func.func @large_matmul_f32()
 // SM80-SAME:     translation_info = #[[TRANSLATION]]
 //      SM80: linalg.fill
-//      SM80: linalg.matmul
+//      SM80: linalg.generic
 // SM80-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
