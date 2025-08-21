@@ -369,8 +369,9 @@ static iree_status_t iree_hal_sync_device_queue_host_call(
     iree_hal_host_call_t call, const uint64_t args[4],
     iree_hal_host_call_flags_t flags) {
   // Wait for all dependencies.
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(wait_semaphore_list,
-                                                    iree_infinite_timeout()));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
+                                   IREE_HAL_WAIT_FLAG_DEFAULT));
 
   // If non-blocking then immediately signal the dependencies instead of letting
   // the call do it. We don't expect this to allow more work to proceed in the

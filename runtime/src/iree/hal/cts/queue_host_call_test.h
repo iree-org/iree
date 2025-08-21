@@ -31,7 +31,8 @@ struct SemaphoreList {
     for (size_t i = 0; i < initial_values.size(); ++i) {
       iree_hal_semaphore_t* semaphore = NULL;
       IREE_EXPECT_OK(iree_hal_semaphore_create(
-          device, initial_values[i], IREE_HAL_SEMAPHORE_FLAG_NONE, &semaphore));
+          device, IREE_HAL_QUEUE_AFFINITY_ANY, initial_values[i],
+          IREE_HAL_SEMAPHORE_FLAG_NONE, &semaphore));
       semaphores.push_back(semaphore);
     }
     payload_values = desired_values;
@@ -148,7 +149,8 @@ TEST_F(QueueHostCallTest, EnqueueBeforeSignal) {
       signal_semaphore_list, call, args, IREE_HAL_HOST_CALL_FLAG_NONE));
 
   IREE_EXPECT_OK(iree_hal_semaphore_list_wait(signal_semaphore_list,
-                                              iree_make_timeout_ms(5000)));
+                                              iree_make_timeout_ms(5000),
+                                              IREE_HAL_WAIT_FLAG_DEFAULT));
 
   EXPECT_EQ(state.did_call, 1);
   EXPECT_EQ(state.args[0], args[0]);
@@ -189,7 +191,8 @@ TEST_F(QueueHostCallTest, NoWaitSemaphores) {
 
   // Wait for completion - the host call should complete quickly.
   IREE_EXPECT_OK(iree_hal_semaphore_list_wait(signal_semaphore_list,
-                                              iree_make_timeout_ms(5000)));
+                                              iree_make_timeout_ms(5000),
+                                              IREE_HAL_WAIT_FLAG_DEFAULT));
 
   EXPECT_EQ(state.did_call, 1);
   EXPECT_EQ(state.args[0], args[0]);
@@ -243,9 +246,11 @@ TEST_F(QueueHostCallTest, NonBlockingFlag) {
   // callback having executed, but it's hard to verify that. Instead we just
   // wait for the signal and then wait again to join the thread.
   IREE_EXPECT_OK(iree_hal_semaphore_list_wait(signal_semaphore_list,
-                                              iree_make_timeout_ms(5000)));
+                                              iree_make_timeout_ms(5000),
+                                              IREE_HAL_WAIT_FLAG_DEFAULT));
   IREE_EXPECT_OK(iree_hal_semaphore_list_wait(state.sideband_semaphore_list,
-                                              iree_make_timeout_ms(5000)));
+                                              iree_make_timeout_ms(5000),
+                                              IREE_HAL_WAIT_FLAG_DEFAULT));
 
   EXPECT_EQ(state.did_call, 1);
   EXPECT_FALSE(state.received_semaphores)
@@ -312,7 +317,8 @@ TEST_F(QueueHostCallTest, AsyncCallback) {
 
   // Now wait for the semaphores to be signaled by the thread.
   IREE_EXPECT_OK(iree_hal_semaphore_list_wait(signal_semaphore_list,
-                                              iree_make_timeout_ms(5000)));
+                                              iree_make_timeout_ms(5000),
+                                              IREE_HAL_WAIT_FLAG_DEFAULT));
 
   EXPECT_EQ(state.did_call, 1);
   EXPECT_TRUE(state.thread_started);
@@ -357,7 +363,8 @@ TEST_F(QueueHostCallTest, CallbackReturnsError) {
   // Wait for semaphores - this should fail because the callback returned an
   // error.
   EXPECT_THAT(Status(iree_hal_semaphore_list_wait(signal_semaphore_list,
-                                                  iree_make_timeout_ms(5000))),
+                                                  iree_make_timeout_ms(5000),
+                                                  IREE_HAL_WAIT_FLAG_DEFAULT)),
               StatusIs(StatusCode::kAborted));
 
   // Query individual semaphores to verify they're in error state.
@@ -421,7 +428,8 @@ TEST_F(QueueHostCallTest, CallbackReturnsErrorAfterWait) {
   // Wait for signal semaphores - this should fail because the callback
   // returned an error after waiting.
   EXPECT_THAT(Status(iree_hal_semaphore_list_wait(signal_semaphore_list,
-                                                  iree_make_timeout_ms(5000))),
+                                                  iree_make_timeout_ms(5000),
+                                                  IREE_HAL_WAIT_FLAG_DEFAULT)),
               StatusIs(StatusCode::kAborted));
 
   // Verify the callback was called after waiting.

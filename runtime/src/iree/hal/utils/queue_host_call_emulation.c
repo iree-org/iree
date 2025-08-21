@@ -91,7 +91,8 @@ static int iree_hal_emulated_host_call_main(void* entry_arg) {
 
   // Wait for all semaphores to be reached.
   iree_status_t status = iree_hal_semaphore_list_wait(
-      state->wait_semaphore_list, iree_infinite_timeout());
+      state->wait_semaphore_list, iree_infinite_timeout(),
+      IREE_HAL_WAIT_FLAG_DEFAULT);
 
   // Release wait semaphores early.
   iree_hal_semaphore_list_release(state->wait_semaphore_list);
