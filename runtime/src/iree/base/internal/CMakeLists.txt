@@ -93,6 +93,45 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    bitmap
+  HDRS
+    "bitmap.h"
+  SRCS
+    "bitmap.c"
+  DEPS
+    ::internal
+    iree::base
+  PUBLIC
+)
+
+iree_cc_binary_benchmark(
+  NAME
+    bitmap_benchmark
+  SRCS
+    "bitmap_benchmark.cc"
+  DEPS
+    ::bitmap
+    ::internal
+    iree::base
+    iree::testing::benchmark
+    iree::testing::benchmark_main
+  TESTONLY
+)
+
+iree_cc_test(
+  NAME
+    bitmap_test
+  SRCS
+    "bitmap_test.cc"
+  DEPS
+    ::bitmap
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     cpu
   HDRS
     "cpu.h"

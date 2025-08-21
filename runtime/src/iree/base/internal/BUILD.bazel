@@ -102,6 +102,39 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_library(
+    name = "bitmap",
+    srcs = ["bitmap.c"],
+    hdrs = ["bitmap.h"],
+    deps = [
+        ":internal",
+        "//runtime/src/iree/base",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "bitmap_benchmark",
+    srcs = ["bitmap_benchmark.cc"],
+    deps = [
+        ":bitmap",
+        ":internal",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:benchmark",
+        "//runtime/src/iree/testing:benchmark_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "bitmap_test",
+    srcs = ["bitmap_test.cc"],
+    deps = [
+        ":bitmap",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "cpu",
     srcs = ["cpu.c"],
     hdrs = ["cpu.h"],
