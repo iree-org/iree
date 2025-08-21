@@ -17,6 +17,7 @@ set(IREE_ALL_CTS_TESTS
   "event"
   "executable_cache"
   "file"
+  "queue_host_call"
   "semaphore"
   "semaphore_submission"
   PARENT_SCOPE
@@ -201,6 +202,19 @@ iree_cc_library(
     file_test_library
   HDRS
     "file_test.h"
+  DEPS
+    ::cts_test_base
+    iree::base
+    iree::hal
+    iree::testing::gtest
+  TESTONLY
+)
+
+iree_cc_library(
+  NAME
+    queue_host_call_test_library
+  HDRS
+    "queue_host_call_test.h"
   DEPS
     ::cts_test_base
     iree::base

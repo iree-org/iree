@@ -126,6 +126,10 @@ typedef struct iree_hal_amdgpu_virtual_queue_t {
   const iree_hal_amdgpu_virtual_queue_vtable_t* vtable;
 } iree_hal_amdgpu_virtual_queue_t;
 
+// GNUC #define's alloca!
+// <michael> Why should I change, they're the ones that suck! </michael>
+#undef alloca
+
 typedef struct iree_hal_amdgpu_virtual_queue_vtable_t {
   // Deinitializes the queue on shutdown.
   void(IREE_API_PTR* deinitialize)(iree_hal_amdgpu_virtual_queue_t* queue);

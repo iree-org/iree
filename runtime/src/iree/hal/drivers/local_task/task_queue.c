@@ -64,6 +64,11 @@
 static iree_status_t iree_hal_semaphore_list_clone(
     const iree_hal_semaphore_list_t* source_list, iree_arena_allocator_t* arena,
     iree_hal_semaphore_list_t* out_target_list) {
+  if (iree_hal_semaphore_list_is_empty(*source_list)) {
+    *out_target_list = iree_hal_semaphore_list_empty();
+    return iree_ok_status();
+  }
+
   iree_host_size_t semaphores_size =
       source_list->count * sizeof(out_target_list->semaphores[0]);
   iree_host_size_t payload_values_size =
@@ -84,12 +89,6 @@ static iree_status_t iree_hal_semaphore_list_clone(
   }
 
   return iree_ok_status();
-}
-
-static void iree_hal_semaphore_list_release(iree_hal_semaphore_list_t* list) {
-  for (iree_host_size_t i = 0; i < list->count; ++i) {
-    iree_hal_semaphore_release(list->semaphores[i]);
-  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -142,7 +141,7 @@ static void iree_hal_task_queue_wait_cmd_cleanup(
   iree_hal_task_queue_wait_cmd_t* cmd = (iree_hal_task_queue_wait_cmd_t*)task;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_semaphore_list_release(&cmd->wait_semaphores);
+  iree_hal_semaphore_list_release(cmd->wait_semaphores);
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -394,13 +393,7 @@ static iree_status_t iree_hal_task_queue_retire_cmd(
   // Signal all semaphores to their new values.
   // Note that if any signal fails then the whole command will fail and all
   // semaphores will be signaled to the failure state.
-  iree_status_t status = iree_ok_status();
-  for (iree_host_size_t i = 0; i < cmd->signal_semaphores.count; ++i) {
-    status =
-        iree_hal_semaphore_signal(cmd->signal_semaphores.semaphores[i],
-                                  cmd->signal_semaphores.payload_values[i]);
-    if (IREE_UNLIKELY(!iree_status_is_ok(status))) break;
-  }
+  iree_status_t status = iree_hal_semaphore_list_signal(cmd->signal_semaphores);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -426,14 +419,12 @@ static void iree_hal_task_queue_retire_cmd_cleanup(
   // If the command failed then fail all semaphores to ensure future
   // submissions fail as well (including those on other queues).
   if (IREE_UNLIKELY(status_code != IREE_STATUS_OK)) {
-    for (iree_host_size_t i = 0; i < cmd->signal_semaphores.count; ++i) {
-      iree_hal_semaphore_fail(cmd->signal_semaphores.semaphores[i],
-                              iree_status_from_code(status_code));
-    }
+    iree_hal_semaphore_list_fail(cmd->signal_semaphores,
+                                 iree_status_from_code(status_code));
   }
 
   // Release all semaphores.
-  iree_hal_semaphore_list_release(&cmd->signal_semaphores);
+  iree_hal_semaphore_list_release(cmd->signal_semaphores);
 
   // Drop all memory used by the submission (**including cmd**).
   iree_arena_allocator_t arena = cmd->arena;
@@ -493,7 +484,167 @@ static iree_status_t iree_hal_task_queue_retire_cmd_allocate(
   } else {
     if (cmd) {
       iree_hal_resource_set_free(cmd->resource_set);
-      iree_hal_semaphore_list_release(&cmd->signal_semaphores);
+      iree_hal_semaphore_list_release(cmd->signal_semaphores);
+    }
+    iree_arena_deinitialize(&arena);
+  }
+  return status;
+}
+
+//===----------------------------------------------------------------------===//
+// iree_hal_task_queue_host_call_cmd_t
+//===----------------------------------------------------------------------===//
+
+// Task to call a user-defined function with host call semantics.
+// This is an optimized version of the internal callback path that avoids the
+// retire command latency and the resource set allocation as host calls need
+// neither. Host calls also have a NON_BLOCKING mode that requires that we
+// signal _before_ calling the user function and that doesn't fit with the
+// normal wait-issue-execute-retire model.
+typedef struct iree_hal_task_queue_host_call_cmd_t {
+  // Call to iree_hal_task_queue_host_call_cmd.
+  iree_task_call_t task;
+
+  // Original arena used for all transient allocations required for the
+  // submission.
+  iree_arena_allocator_t arena;
+
+  // Device the call was scheduled on. Unowned.
+  iree_hal_device_t* device;
+  // Queue affinity as originally requested.
+  // We don't know where we'd actually run so we pass through without
+  // modification.
+  iree_hal_queue_affinity_t queue_affinity;
+  // Target function to call.
+  iree_hal_host_call_t call;
+  // User arguments.
+  uint64_t args[4];
+  // Flags controlling call behavior.
+  iree_hal_host_call_flags_t flags;
+
+  // A list of semaphores to signal upon retiring.
+  iree_hal_semaphore_list_t signal_semaphores;
+} iree_hal_task_queue_host_call_cmd_t;
+
+// Issues a host call submission and either calls the user function which
+// transitively signals semaphores (blocking, call is responsible) or eagerly
+// signals (NON_BLOCKING) and then calls the user function.
+static iree_status_t iree_hal_task_queue_host_call_cmd(
+    void* user_context, iree_task_t* task,
+    iree_task_submission_t* pending_submission) {
+  iree_hal_task_queue_host_call_cmd_t* cmd =
+      (iree_hal_task_queue_host_call_cmd_t*)task;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // When non-blocking we want to eagerly signal all waiters prior to issuing
+  // the call.
+  // Note that if any signal fails then the whole command will fail and all
+  // semaphores will be signaled to the failure state.
+  const bool is_nonblocking =
+      iree_any_bit_set(cmd->flags, IREE_HAL_HOST_CALL_FLAG_NON_BLOCKING);
+  iree_status_t status = iree_ok_status();
+  if (is_nonblocking) {
+    status = iree_hal_semaphore_list_signal(cmd->signal_semaphores);
+  }
+
+  // Issue the call.
+  if (iree_status_is_ok(status)) {
+    iree_hal_host_call_context_t context = {
+        .device = cmd->device,
+        .queue_affinity = cmd->queue_affinity,
+        .signal_semaphore_list = is_nonblocking
+                                     ? iree_hal_semaphore_list_empty()
+                                     : cmd->signal_semaphores,
+    };
+    iree_status_t call_status =
+        cmd->call.fn(cmd->call.user_data, cmd->args, &context);
+    if (is_nonblocking || iree_status_is_deferred(call_status)) {
+      // User callback will signal in the future (or they are fire-and-forget).
+    } else if (iree_status_is_ok(call_status)) {
+      // Signal callback completed synchronously.
+      iree_hal_semaphore_list_signal(cmd->signal_semaphores);
+    } else {
+      if (!is_nonblocking) {
+        iree_hal_semaphore_list_fail(cmd->signal_semaphores, call_status);
+      } else {
+        iree_status_ignore(call_status);
+      }
+    }
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+// Cleanup for iree_hal_task_queue_host_call_cmd_t that ensures that the arena
+// holding the submission is properly disposed and that semaphores are signaled
+// (or signaled to failure if the command failed).
+static void iree_hal_task_queue_host_call_cmd_cleanup(
+    iree_task_t* task, iree_status_code_t status_code) {
+  iree_hal_task_queue_host_call_cmd_t* cmd =
+      (iree_hal_task_queue_host_call_cmd_t*)task;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // If the command failed then fail all semaphores to ensure future
+  // submissions fail as well (including those on other queues).
+  if (IREE_UNLIKELY(status_code != IREE_STATUS_OK)) {
+    iree_hal_semaphore_list_fail(cmd->signal_semaphores,
+                                 iree_status_from_code(status_code));
+  }
+
+  // Release all semaphores.
+  iree_hal_semaphore_list_release(cmd->signal_semaphores);
+
+  // Drop all memory used by the submission (**including cmd**).
+  iree_arena_allocator_t arena = cmd->arena;
+  cmd = NULL;
+  iree_arena_deinitialize(&arena);
+
+  IREE_TRACE_ZONE_END(z0);
+}
+
+// Allocates and initializes a iree_hal_task_queue_host_call_cmd_t task.
+// The command will own an arena that can be used for other submission-related
+// allocations.
+static iree_status_t iree_hal_task_queue_host_call_cmd_allocate(
+    iree_task_scope_t* scope,
+    const iree_hal_semaphore_list_t* signal_semaphores,
+    iree_arena_block_pool_t* block_pool,
+    iree_hal_task_queue_host_call_cmd_t** out_cmd) {
+  // Make an arena we'll use for allocating the command itself.
+  iree_arena_allocator_t arena;
+  iree_arena_initialize(block_pool, &arena);
+
+  // Allocate the command from the arena.
+  iree_hal_task_queue_host_call_cmd_t* cmd = NULL;
+  iree_status_t status =
+      iree_arena_allocate(&arena, sizeof(*cmd), (void**)&cmd);
+  if (!iree_status_is_ok(status)) {
+    iree_arena_deinitialize(&arena);
+    return status;
+  }
+
+  iree_task_call_initialize(
+      scope, iree_task_make_call_closure(iree_hal_task_queue_host_call_cmd, 0),
+      &cmd->task);
+  iree_task_set_cleanup_fn(&cmd->task.header,
+                           iree_hal_task_queue_host_call_cmd_cleanup);
+  cmd->signal_semaphores = iree_hal_semaphore_list_empty();
+
+  // Clone the signal semaphores from the batch - we retain them and their
+  // payloads.
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_semaphore_list_clone(signal_semaphores, &arena,
+                                           &cmd->signal_semaphores);
+  }
+
+  if (iree_status_is_ok(status)) {
+    // Transfer ownership of the arena to command.
+    memcpy(&cmd->arena, &arena, sizeof(cmd->arena));
+    *out_cmd = cmd;
+  } else {
+    if (cmd) {
+      iree_hal_semaphore_list_release(cmd->signal_semaphores);
     }
     iree_arena_deinitialize(&arena);
   }
@@ -698,8 +849,79 @@ iree_status_t iree_hal_task_queue_submit_callback(
   iree_status_t status = iree_hal_task_queue_submit(
       queue, wait_semaphores, signal_semaphores, resource_count, resources,
       iree_hal_task_queue_callback_cmd_allocate, &callback);
+  if (iree_status_is_ok(status)) {
+    iree_task_executor_flush(queue->executor);
+  }
   IREE_TRACE_ZONE_END(z0);
   return status;
+}
+
+iree_status_t iree_hal_task_queue_submit_host_call(
+    iree_hal_task_queue_t* queue, iree_hal_device_t* device,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_semaphore_list_t wait_semaphores,
+    iree_hal_semaphore_list_t signal_semaphores, iree_hal_host_call_t call,
+    const uint64_t args[4], iree_hal_host_call_flags_t flags) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Allocate the task that tracks the host call state and dependencies.
+  // NOTE: unlike most other submissions host calls do not use a retire command.
+  iree_hal_task_queue_host_call_cmd_t* call_cmd = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_task_queue_host_call_cmd_allocate(
+      &queue->scope, &signal_semaphores, queue->small_block_pool, &call_cmd));
+  call_cmd->device = device;  // unowned
+  call_cmd->queue_affinity = queue_affinity;
+  call_cmd->call = call;
+  memcpy(call_cmd->args, args, sizeof(call_cmd->args));
+  call_cmd->flags = flags;
+
+  // A fence we'll use to detect when the entire submission has completed.
+  // TODO(benvanik): fold into the host call command. This is currently required
+  // to keep the scope live for the duration of the callback even in
+  // non-blocking mode.
+  iree_task_fence_t* fence = NULL;
+  iree_status_t status =
+      iree_task_executor_acquire_fence(queue->executor, &queue->scope, &fence);
+  if (iree_status_is_ok(status)) {
+    iree_task_set_completion_task(&call_cmd->task.header, &fence->header);
+  }
+
+  // Task to fork and wait for unsatisfied semaphore dependencies.
+  // This is optional and only required if we have previous submissions still
+  // in-flight - if the queue is empty then we can directly schedule the waits.
+  iree_task_t* wait_task = NULL;
+  if (iree_status_is_ok(status) && wait_semaphores.count > 0) {
+    status = iree_hal_task_queue_wait_cmd_allocate(
+        &queue->scope, &wait_semaphores, &call_cmd->arena, &wait_task);
+  }
+
+  // Last chance for failure - from here on we are submitting.
+  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+    iree_arena_deinitialize(&call_cmd->arena);
+    return status;
+  }
+
+  iree_task_submission_t submission;
+  iree_task_submission_initialize(&submission);
+
+  // Sequencing: wait on semaphores or go directly into the executor queue.
+  iree_task_t* head_task = &call_cmd->task.header;
+  if (wait_task != NULL) {
+    // Ensure that we only issue command buffers after all waits have completed.
+    iree_task_set_completion_task(wait_task, head_task);
+    iree_task_submission_enqueue(&submission, wait_task);
+  } else {
+    // No waits needed; directly enqueue.
+    iree_task_submission_enqueue(&submission, head_task);
+  }
+
+  // Submit the tasks immediately. The executor may queue them up until we
+  // force the flush after all batches have been processed.
+  iree_task_executor_submit(queue->executor, &submission);
+  iree_task_executor_flush(queue->executor);
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
 }
 
 iree_status_t iree_hal_task_queue_wait_idle(iree_hal_task_queue_t* queue,

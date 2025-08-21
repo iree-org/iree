@@ -19,6 +19,8 @@
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/file_registry.h"
 #include "iree/hal/utils/file_transfer.h"
+#include "iree/hal/utils/queue_emulation.h"
+#include "iree/hal/utils/queue_host_call_emulation.h"
 #include "iree/hal/utils/resource_set.h"
 
 typedef struct iree_hal_metal_device_t {
@@ -620,6 +622,7 @@ static const iree_hal_device_vtable_t iree_hal_metal_device_vtable = {
     .queue_copy = iree_hal_device_queue_emulated_copy,
     .queue_read = iree_hal_metal_device_queue_read,
     .queue_write = iree_hal_metal_device_queue_write,
+    .queue_host_call = iree_hal_device_queue_emulated_host_call,
     .queue_dispatch = iree_hal_device_queue_emulated_dispatch,
     .queue_execute = iree_hal_metal_device_queue_execute,
     .queue_flush = iree_hal_metal_device_queue_flush,

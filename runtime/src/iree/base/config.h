@@ -141,6 +141,13 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 #define IREE_SYNCHRONIZATION_DISABLE_UNSAFE 0
 #endif  // !IREE_SYNCHRONIZATION_DISABLE_UNSAFE
 
+#if !defined(IREE_THREADING_ENABLE)
+// On platforms without threads (no pthreads or equivalent available) or in
+// applications where no threads are transitively used, all thread support code
+// can be stripped out.
+#define IREE_THREADING_ENABLE 1
+#endif  // !IREE_THREADING_ENABLE
+
 //===----------------------------------------------------------------------===//
 // File I/O
 //===----------------------------------------------------------------------===//

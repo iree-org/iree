@@ -905,6 +905,8 @@ static iree_status_t iree_hal_hip_semaphore_signal(
 
   if (iree_status_is_ok(status)) {
     semaphore->current_visible_value = new_value;
+    semaphore->max_value_to_be_signaled =
+        iree_max(new_value, semaphore->max_value_to_be_signaled);
   }
 
   iree_slim_mutex_unlock(&semaphore->mutex);

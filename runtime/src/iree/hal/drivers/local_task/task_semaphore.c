@@ -285,7 +285,8 @@ static iree_status_t iree_hal_task_semaphore_wait(
 
   iree_slim_mutex_lock(&semaphore->mutex);
 
-  if (!iree_status_is_ok(semaphore->failure_status)) {
+  if (semaphore->current_value == IREE_HAL_SEMAPHORE_FAILURE_VALUE ||
+      !iree_status_is_ok(semaphore->failure_status)) {
     // Fastest path: failed; return an error to tell callers to query for it.
     iree_slim_mutex_unlock(&semaphore->mutex);
     return iree_status_from_code(IREE_STATUS_ABORTED);
@@ -317,6 +318,20 @@ static iree_status_t iree_hal_task_semaphore_wait(
     iree_hal_semaphore_cancel_timepoint(&semaphore->base, &timepoint.base);
   }
   iree_event_pool_release(semaphore->event_pool, 1, &timepoint.event);
+
+  // Recheck conditions.
+  if (iree_status_is_ok(status)) {
+    iree_slim_mutex_lock(&semaphore->mutex);
+    if (semaphore->current_value == IREE_HAL_SEMAPHORE_FAILURE_VALUE ||
+        !iree_status_is_ok(semaphore->failure_status)) {
+      status = iree_status_from_code(IREE_STATUS_ABORTED);
+    } else if (semaphore->current_value >= value) {
+      status = iree_ok_status();
+    } else if (iree_timeout_is_immediate(timeout)) {
+      status = iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
+    }
+    iree_slim_mutex_unlock(&semaphore->mutex);
+  }
 
   return status;
 }

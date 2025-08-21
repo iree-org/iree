@@ -161,6 +161,17 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "queue_emulation",
+    srcs = ["queue_emulation.c"],
+    hdrs = ["queue_emulation.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "resource_set",
     srcs = ["resource_set.c"],
     hdrs = ["resource_set.h"],
@@ -251,6 +262,19 @@ iree_runtime_cc_library(
         ":semaphore_base",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/base/internal:synchronization",
+        "//runtime/src/iree/base/internal:threading",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "queue_host_call_emulation",
+    srcs = ["queue_host_call_emulation.c"],
+    hdrs = ["queue_host_call_emulation.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:synchronization",
         "//runtime/src/iree/base/internal:threading",
         "//runtime/src/iree/hal",
