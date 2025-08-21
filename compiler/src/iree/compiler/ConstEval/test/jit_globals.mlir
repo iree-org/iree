@@ -335,6 +335,20 @@ module @skip_dependent_initializers {
 
 // -----
 
+// CHECK-LABEL: @skip_parameterized_tensor_constants
+module @skip_parameterized_tensor_constants {
+  util.global private @hoisted : tensor<f32>
+  // CHECK: util.initializer
+  // expected-warning @+1 {{skipping consteval initializer}}
+  util.initializer {
+    %1 = flow.tensor.constant #flow.parameter.named<"runtime"::"global"> : tensor<f32>
+    util.global.store %1, @hoisted : tensor<f32>
+    util.return
+  }
+}
+
+// -----
+
 // TODO(benvanik): rewrite availability to use proper analysis - currently the
 // pass uses ConstExprAnalysis which can't actually indicate what we want when
 // we want it (here that this iota is available for evaluation at compile-time).
