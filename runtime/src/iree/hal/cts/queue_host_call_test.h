@@ -367,6 +367,11 @@ TEST_F(QueueHostCallTest, CallbackReturnsError) {
                                                   IREE_HAL_WAIT_FLAG_DEFAULT)),
               StatusIs(StatusCode::kAborted));
 
+  // NOTE: it's not guaranteed that all semaphores are updated atomically so
+  // it's possible for the wait to return and at least one of the semaphores to
+  // not be ready yet. We give a little time for the assignment to propagate.
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
   // Query individual semaphores to verify they're in error state.
   uint64_t value0 = 0;
   EXPECT_THAT(Status(iree_hal_semaphore_query(
@@ -435,6 +440,11 @@ TEST_F(QueueHostCallTest, CallbackReturnsErrorAfterWait) {
   // Verify the callback was called after waiting.
   EXPECT_EQ(state.did_call, 1);
   EXPECT_TRUE(state.wait_completed);
+
+  // NOTE: it's not guaranteed that all semaphores are updated atomically so
+  // it's possible for the wait to return and at least one of the semaphores to
+  // not be ready yet. We give a little time for the assignment to propagate.
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
   // Query individual semaphores to verify they're in error state.
   uint64_t value0 = 0;
