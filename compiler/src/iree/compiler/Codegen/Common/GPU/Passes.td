@@ -140,6 +140,11 @@ def GPUFuseAndHoistParallelLoopsPass :
 def GPUGeneralizeNamedOpsPass :
     InterfacePass<"iree-codegen-gpu-generalize-named-ops", "mlir::FunctionOpInterface"> {
   let summary = "Convert named Linalg ops to linalg.generic ops";
+
+  let description = [{
+    Convert a whitelisted set of named Linalg ops to linalg.generics. The whitelist
+    does not contain all named ops.
+  }];
 }
 
 def GPUGreedilyDistributeToThreadsPass :

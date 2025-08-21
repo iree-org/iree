@@ -6,7 +6,7 @@ module attributes { transform.with_named_sequence } {
     ( mapping = [#gpu.thread<y>, #gpu.thread<x>] )
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
-    %1 = transform.structured.match ops{["linalg.matmul"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    %1 = transform.structured.match ops{["linalg.generic"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     %forall_2, %tiled_matmul = transform.structured.tile_using_forall %1 num_threads [7, 9]
     ( mapping = [#gpu.thread<x>, #gpu.thread<y>] )
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
