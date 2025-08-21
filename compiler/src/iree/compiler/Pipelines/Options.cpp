@@ -312,6 +312,12 @@ void DispatchCreationOptions::bindOptions(OptionsBinder &binder) {
                      "since all backends dont support it yet"));
   binder.opt<bool>("iree-dispatch-creation-fuse-multi-use", enableFuseMultiUse,
                    llvm::cl::desc("Fuse operations with multiple uses."));
+  binder.opt<int64_t>(
+      "iree-dispatch-creation-target-split-reduction-size",
+      targetSplitReductionSize,
+      llvm::cl::desc("Target tile size for split reduction. Inner reduction "
+                     "dimensions are tiled first, with the tile size rounded "
+                     "up until it evenly divides the iteration domain."));
 }
 
 } // namespace mlir::iree_compiler

@@ -219,6 +219,7 @@ struct DispatchCreationOptions {
 
   bool enableAggressiveFusion = false;
   bool enableFuseMultiUse = true;
+  int64_t targetSplitReductionSize = 0;
 
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<DispatchCreationOptions>;
