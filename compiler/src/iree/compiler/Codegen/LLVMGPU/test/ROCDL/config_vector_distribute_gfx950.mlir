@@ -285,19 +285,21 @@ func.func @attention_large_head_dim_shared_mem() {
 
 // -----
 
-// The fix introdiced for IREE issue 21602 was to constrain the MMA layout to be the same for the 2 matmuls inside attention.
-// Before this fix, the PV matmul used MFMA_F32_16x16x128_F8E4M3FN and the QK matmul used MFMA_F32_32x32x64_F8E4M3FN.
-// Vector distribution failed to distribute these layouts to threads.
+// The fix introduced for bug https://github.com/iree-org/iree/issues/21602 was
+// to constrain the MMA layout to be the same for the 2 matmuls inside
+// attention. Before this fix, the PV matmul used MFMA_F32_16x16x128_F8E4M3FN
+// and the QK matmul used MFMA_F32_32x32x64_F8E4M3FN. Vector distribution failed
+// to distribute these layouts to threads.
 
 //       CHECK: #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64, {}>
-// CHECK-LABEL: func.func @attention_issue_21602
+// CHECK-LABEL: func.func @attention_check_mma_accs_compatable
 
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d3)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d2)>
 #map3 = affine_map<(d0, d1, d2, d3, d4) -> ()>
 #map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
-func.func @attention_issue_21602(%arg0: f32, %arg1: tensor<960x4096x64xf8E4M3FN>, %arg2: tensor<960x4096x64xf8E4M3FN>, %arg3: tensor<960x4096x64xf8E4M3FN>, %arg4: tensor<960x4096x64xf32>, %arg5: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<960x4096x64xf32>>) {
+func.func @attention_check_mma_accs_compatable(%arg0: f32, %arg1: tensor<960x4096x64xf8E4M3FN>, %arg2: tensor<960x4096x64xf8E4M3FN>, %arg3: tensor<960x4096x64xf8E4M3FN>, %arg4: tensor<960x4096x64xf32>, %arg5: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<960x4096x64xf32>>) {
   %0 = iree_linalg_ext.attention {indexing_maps = [#map, #map1, #map2, #map3, #map4]} ins(%arg1, %arg2, %arg3, %arg0 : tensor<960x4096x64xf8E4M3FN>, tensor<960x4096x64xf8E4M3FN>, tensor<960x4096x64xf8E4M3FN>, f32) outs(%arg4 : tensor<960x4096x64xf32>) {
   ^bb0(%arg6: f32):
     iree_linalg_ext.yield %arg6 : f32
