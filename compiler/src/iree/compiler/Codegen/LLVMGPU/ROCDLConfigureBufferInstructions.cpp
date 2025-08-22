@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/GPU/Analysis/ThreadUniformAnalysis.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
-#include "iree/compiler/Codegen/LLVMGPU/Analysis/ROCDLThreadUniformAnalysis.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -148,10 +148,10 @@ void ROCDLConfigureBufferInstructionsPass::runOnOperation() {
 
   // Configure and run the dataflow analysis.
   DataFlowSolver solver;
-  solver.load<dataflow::SparseConstantPropagation>();
-  solver.load<dataflow::DeadCodeAnalysis>();
-  solver.load<dataflow::IntegerRangeAnalysis>();
-  solver.load<ROCDL::ThreadUniformAnalysis>();
+  solver.load<mlir::dataflow::SparseConstantPropagation>();
+  solver.load<mlir::dataflow::DeadCodeAnalysis>();
+  solver.load<mlir::dataflow::IntegerRangeAnalysis>();
+  solver.load<iree_compiler::dataflow::ThreadUniformAnalysis>();
 
   if (failed(solver.initializeAndRun(func))) {
     LDBGS(" Dataflow failed, aborting");
@@ -168,7 +168,7 @@ void ROCDLConfigureBufferInstructionsPass::runOnOperation() {
     if (auto attr = dyn_cast<Attribute>(ofr)) {
       return cast<IntegerAttr>(attr).getValue().getSExtValue();
     }
-    auto *state = solver.lookupState<dataflow::IntegerValueRangeLattice>(
+    auto *state = solver.lookupState<mlir::dataflow::IntegerValueRangeLattice>(
         cast<Value>(ofr));
     if (!state || state->getValue().isUninitialized()) {
       // Return -1 if the state is unknown as we only care for positive values.
@@ -197,7 +197,9 @@ void ROCDLConfigureBufferInstructionsPass::runOnOperation() {
 
     // Skip if the op offsets are not thread uniform.
     if (Value offset = bOp.getByteOffset()) {
-      auto opAnalysis = solver.lookupState<ROCDL::ThreadUniformLattice>(offset);
+      auto opAnalysis =
+          solver.lookupState<iree_compiler::dataflow::ThreadUniformLattice>(
+              offset);
       if (!(opAnalysis && opAnalysis->getValue().isUniform())) {
         LDBGS("- Failure, the op offset is not thread uniform");
         return;
