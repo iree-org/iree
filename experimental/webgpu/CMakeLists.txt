@@ -48,6 +48,7 @@ iree_cc_library(
     iree::hal
     iree::experimental::webgpu::platform
     iree::experimental::webgpu::shaders
+    iree::hal::utils::executable_header
     iree::hal::utils::file_transfer
     iree::hal::utils::files
     iree::hal::utils::queue_emulation

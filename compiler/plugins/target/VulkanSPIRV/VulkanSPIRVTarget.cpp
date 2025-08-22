@@ -386,7 +386,10 @@ public:
     auto binaryOp = IREE::HAL::ExecutableBinaryOp::create(
         executableBuilder, variantOp.getLoc(), variantOp.getSymName(),
         variantOp.getTarget().getFormat(),
-        builder.getBufferAttr(executableBuilder.getContext()));
+        builder.getHeaderPrefixedBufferAttr(
+            executableBuilder.getContext(),
+            /*magic=*/iree_hal_vulkan_ExecutableDef_file_identifier,
+            /*version=*/0));
     binaryOp.setMimeTypeAttr(
         executableBuilder.getStringAttr("application/x-flatbuffers"));
 
@@ -478,7 +481,10 @@ public:
     auto binaryOp = IREE::HAL::ExecutableBinaryOp::create(
         executableBuilder, variantOp.getLoc(), variantOp.getSymName(),
         variantOp.getTarget().getFormat(),
-        builder.getBufferAttr(executableBuilder.getContext()));
+        builder.getHeaderPrefixedBufferAttr(
+            executableBuilder.getContext(),
+            /*magic=*/iree_hal_vulkan_ExecutableDef_file_identifier,
+            /*version=*/0));
     binaryOp.setMimeTypeAttr(
         executableBuilder.getStringAttr("application/x-flatbuffers"));
 

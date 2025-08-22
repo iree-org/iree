@@ -7,6 +7,8 @@
 #ifndef IREE_BASE_INTERNAL_FLATCC_PARSING_H_
 #define IREE_BASE_INTERNAL_FLATCC_PARSING_H_
 
+#include <stdint.h>
+
 //===----------------------------------------------------------------------===//
 // flatcc include order fixes
 //===----------------------------------------------------------------------===//
@@ -28,5 +30,26 @@
 #include "iree/base/internal/flatcc/dummy_verifier.h" // IWYU pragma: export
 
 // clang-format on
+
+//===----------------------------------------------------------------------===//
+// iree_flatbuffer_header_t
+//===----------------------------------------------------------------------===//
+
+// A header preceding flatbuffer data in a file.
+// This is added by IREE tooling to allow for coarse versioning (in case we
+// totally change the file format), flatbuffer sizing, and ensured alignment.
+typedef struct iree_flatbuffer_file_header_t {
+  // 4 byte magic number used for file identification.
+  uint32_t magic;
+  // Version of the content payload.
+  uint32_t version;
+  // Total size, in bytes, of the content following the header.
+  // For flatbuffers this may include the flatbuffer itself plus any trailing
+  // data referenced by it.
+  uint64_t content_size;
+  uint64_t reserved[6];
+} iree_flatbuffer_file_header_t;
+static_assert(sizeof(iree_flatbuffer_file_header_t) == 64,
+              "must be 64-byte padded");
 
 #endif  // IREE_BASE_INTERNAL_FLATCC_PARSING_H_
