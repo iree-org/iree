@@ -1956,8 +1956,8 @@ bool iree_hal_hip_transfer_buffer_size_check_condition(void* user_data) {
   iree_hal_hip_transfer_buffer_size_check_data_t* data =
       (iree_hal_hip_transfer_buffer_size_check_data_t*)user_data;
   return iree_hal_hip_transfer_buffer_size_left(
-             data->device, &data->device->devices[data->device_ordinal]) >=
-         data->num_bytes;
+             data->device, &data->device->devices[data->device_ordinal]) ==
+         data->device->params.file_transfer_buffer_size;
 }
 
 // Returns two chunks that are needed to cover the buffer. Pass in an
