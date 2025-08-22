@@ -204,8 +204,11 @@ iree_status_t iree_hal_cuda_graph_command_buffer_create(
   command_buffer->cu_barrier_node = NULL;
   command_buffer->graph_node_count = 0;
 
-  iree_status_t status =
-      iree_hal_resource_set_allocate(block_pool, &command_buffer->resource_set);
+  iree_status_t status = iree_ok_status();
+  if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED)) {
+    status = iree_hal_resource_set_allocate(block_pool,
+                                            &command_buffer->resource_set);
+  }
 
   if (iree_status_is_ok(status)) {
     iree_hal_collective_batch_initialize(&command_buffer->arena,

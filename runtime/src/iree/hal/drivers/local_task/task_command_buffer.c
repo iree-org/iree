@@ -136,8 +136,10 @@ iree_status_t iree_hal_task_command_buffer_create(
     iree_task_list_initialize(&command_buffer->root_tasks);
     iree_task_list_initialize(&command_buffer->leaf_tasks);
     memset(&command_buffer->state, 0, sizeof(command_buffer->state));
-    status = iree_hal_resource_set_allocate(block_pool,
-                                            &command_buffer->resource_set);
+    if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED)) {
+      status = iree_hal_resource_set_allocate(block_pool,
+                                              &command_buffer->resource_set);
+    }
   }
   if (iree_status_is_ok(status)) {
     *out_command_buffer = &command_buffer->base;
