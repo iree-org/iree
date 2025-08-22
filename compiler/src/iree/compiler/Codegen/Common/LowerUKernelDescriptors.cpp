@@ -13,6 +13,8 @@
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -31,6 +33,9 @@ namespace mlir::iree_compiler {
 namespace {
 struct LowerBitcodeUKernelsPass final
     : impl::LowerBitcodeUKernelsPassBase<LowerBitcodeUKernelsPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<bufferization::BufferizationDialect, gpu::GPUDialect>();
+  }
   void runOnOperation() override;
 };
 struct LowerMemrefUKernelsPass final
