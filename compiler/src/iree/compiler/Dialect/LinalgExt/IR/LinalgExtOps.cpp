@@ -2224,6 +2224,23 @@ void OnlineAttentionOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
 }
 
 //===----------------------------------------------------------------------===//
+// ExpReductionOp
+//===----------------------------------------------------------------------===//
+
+std::string ExpReductionOp::getLibraryCallName() { return ""; }
+
+bool ExpReductionOp::hasIndexSemantics() {
+  // TODO: Index semantics are valid really.
+  return false;
+}
+
+SmallVector<utils::IteratorType> ExpReductionOp::getIteratorTypesArray() {
+  return llvm::map_to_vector(getIteratorTypes(), [](Attribute attr) {
+    return cast<IREE::LinalgExt::IteratorTypeAttr>(attr).getValue();
+  });
+}
+
+//===----------------------------------------------------------------------===//
 // Im2colOp
 //===----------------------------------------------------------------------===//
 

@@ -1045,6 +1045,120 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
 
   let hasCanonicalizer = 1;
 }
+
+//===----------------------------------------------------------------------===//
+// ExpReduction
+//===----------------------------------------------------------------------===//
+
+def IREELinalgExt_ExpReductionOp : IREELinalgExt_PureOp<"exp_reduction",
+    [ AttrSizedOperandSegments,
+      Pure,
+      DestinationStyleOpInterface,
+      DeclareOpInterfaceMethods<LinalgStructuredInterface,
+        ["getLibraryCallName",
+        "getIteratorTypesArray"]>,
+      SingleBlockImplicitTerminator<"::mlir::linalg::YieldOp">,
+      DeclareOpInterfaceMethods<TilingInterface,
+          [ "getIterationDomain",
+            "getLoopIteratorTypes",
+            "getResultTilePosition",
+            "getTiledImplementation",
+            "generateResultTileValue" ]>]> {
+
+  let summary = [{A linalg.generic extension with support for exponential reduction.}];
+  let description = [{
+    This operation extends linalg.generic, allowing specialization on operations that perform exponential reductions.
+
+    The first input and output operands are intrinsically linked, with the initial value of the input operand always calculated as
+    `e` raised to power of the first output operand.
+    We refer to the input operand as the normalizing operand, and the output operand as the reducing operand.
+
+    The operands listed in `exp_reduced_operands` will be multiplied by the normalizing operand in the next reduction iteration.
+
+    As an example,
+
+    ```
+    %M, %O =  iree_linalg_ext.exp_reduction {
+      indexing_maps = [
+        affine_map<(i) -> (i)>,
+        affine_map<(i) -> ()>,
+        affine_map<(i) -> ()>
+      ],
+      iterator_types = [
+        #iree_linalg_ext.iterator_type<reduction>
+      ],
+      exp_reduced_operands = [ 1 ]
+    } ins(%V: tensor<256xf32>)
+      outs(%exp_V, %S: tensor<256xf32>, tensor<f32>) {
+    ^bb0(%norm: f32, %redux: f32, %s: f32):
+      %add = arith.addf %norm, %s: f32
+      linalg.yield %redux, %add: f32, f32
+    } -> tensor<256xf32>, tensor<f32>
+    return %O : tensor<f32>
+  ```
+
+  Encodes the following computation
+
+  ```
+  forall i in [1 .. N]:
+    O += e^(S[i])
+  ```
+
+  And fuses it into
+
+  ```
+  forall i in [1 .. N]:
+    prevM = M
+    M = max(V[i], M)
+
+    norm = e^(V - M)
+    s = O[i] * e^(prevM - M)
+    O[i] = s + norm
+  ```
+
+  Which is more numerically stable.
+
+  This pattern is most commonly observed in the online softmax algorithm, where
+  the subtraction by M in the exponent cancels out.
+  }];
+
+  let arguments = (ins
+    Variadic<AnyRankedTensor>:$inputs,
+    Variadic<AnyRankedTensor>:$outputs,
+    AffineMapArrayAttr:$indexing_maps,
+    IREELinalgExt_IteratorTypeArrayAttr:$iterator_types,
+    DenseI64ArrayAttr:$exp_reduced_operands);
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let regions = (region SizedRegion<1>:$region);
+
+  let hasVerifier = 0;
+
+  let assemblyFormat = [{
+    `{`
+      `indexing_maps` `=` $indexing_maps `,`
+      `iterator_types` `=` $iterator_types `,`
+      `exp_reduced_operands` `=` $exp_reduced_operands
+    `}`
+    attr-dict
+    `ins` `(` $inputs `:` type($inputs) `)`
+    `outs` `(` $outputs `:` type($outputs) `)`
+    $region (`->` type($results)^)?
+  }];
+
+
+  let extraClassDeclaration = [{
+    static std::function<void(ImplicitLocOpBuilder &, Block &, ArrayRef<NamedAttribute>, llvm::function_ref<mlir::InFlightDiagnostic()>)>
+    getRegionBuilder() {
+      return nullptr;
+    }
+
+    // DestinationStyleOpInterface methods
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
+    }
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // Im2col
 //===----------------------------------------------------------------------===//
