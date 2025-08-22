@@ -82,6 +82,16 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "executable_header",
+    srcs = ["executable_header.c"],
+    hdrs = ["executable_header.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal/flatcc:parsing",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "file_cache",
     srcs = ["file_cache.c"],
     hdrs = ["file_cache.h"],

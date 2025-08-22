@@ -701,7 +701,10 @@ public:
     executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
         variantOp.getLoc(), variantOp.getSymName(),
         variantOp.getTarget().getFormat(),
-        builder.getBufferAttr(executableBuilder.getContext()));
+        builder.getHeaderPrefixedBufferAttr(
+            executableBuilder.getContext(),
+            /*magic=*/iree_hal_cuda_ExecutableDef_file_identifier,
+            /*version=*/0));
 
     return success();
   }

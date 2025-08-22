@@ -62,6 +62,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/utils:deferred_command_buffer",
         "//runtime/src/iree/hal/utils:deferred_work_queue",
         "//runtime/src/iree/hal/utils:executable_debug_info",
+        "//runtime/src/iree/hal/utils:executable_header",
         "//runtime/src/iree/hal/utils:file_transfer",
         "//runtime/src/iree/hal/utils:files",
         "//runtime/src/iree/hal/utils:queue_emulation",
