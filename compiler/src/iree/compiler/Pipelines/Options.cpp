@@ -310,6 +310,10 @@ void DispatchCreationOptions::bindOptions(OptionsBinder &binder) {
        init_at_opt(llvm::OptimizationLevel::O2, true)},
       llvm::cl::desc("Aggressive fusion opportunities that are behind a flag "
                      "since all backends dont support it yet"));
+  binder.opt<bool>("iree-dispatch-creation-enable-pad-fusion", enablePadFusion,
+                   {init_at_opt(llvm::OptimizationLevel::O0, false),
+                    init_at_opt(llvm::OptimizationLevel::O3, true)},
+                   llvm::cl::desc("Fuse pads with producers and consumers."));
   binder.opt<bool>("iree-dispatch-creation-fuse-multi-use", enableFuseMultiUse,
                    llvm::cl::desc("Fuse operations with multiple uses."));
   binder.opt<bool>("iree-dispatch-creation-data-tiling", dataTiling,

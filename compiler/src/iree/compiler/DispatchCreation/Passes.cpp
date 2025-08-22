@@ -40,16 +40,6 @@ static llvm::cl::opt<bool> clEnableEarlyTruncFusion(
         "consumers before forming dispatch regions"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgConsumerOps(
-    "iree-dispatch-creation-enable-fuse-padding-into-linalg-consumer-ops",
-    llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops."),
-    llvm::cl::init(false));
-
-static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgProducerOps(
-    "iree-dispatch-creation-enable-fuse-padding-into-linalg-producer-ops",
-    llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops."),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<bool> clEnablePadHandling(
     "iree-flow-enable-pad-handling",
     llvm::cl::desc("Enable native handling of tensor.pad operations."),
@@ -213,10 +203,9 @@ addDispatchRegionCreationPasses(OpPassManager &passManager,
       // producers and consumers.
       .addPass([&] {
         return DispatchCreation::createFormDispatchRegionsPass(
-            FormDispatchRegionsPassOptions{
-                options.enableAggressiveFusion,
-                clEnableFusePaddingIntoLinalgConsumerOps,
-                clEnableFusePaddingIntoLinalgProducerOps});
+            FormDispatchRegionsPassOptions{options.enableAggressiveFusion,
+                                           options.enablePadFusion,
+                                           options.enablePadFusion});
       })
       // Elementwise fuse operations that are iside a dispatch if possible.
       .addPass([&]() {
@@ -301,12 +290,12 @@ void buildDispatchCreationPassPipeline(
 
   // Transform pad operations into linalg.fill + tensor.insert_slice.
   // This is a WAR for not having native pad handling.
-  if (!clEnablePadHandling && !clEnableFusePaddingIntoLinalgProducerOps) {
+  if (!clEnablePadHandling && !transformOptions.options.enablePadFusion) {
     passManager.addPass(
         DispatchCreation::createTensorPadToTensorInsertSlicePass(
             TensorPadToTensorInsertSlicePassOptions{
                 /*skipSingleLinalgOpUses=*/
-                clEnableFusePaddingIntoLinalgConsumerOps}));
+                transformOptions.options.enablePadFusion}));
   }
 
   {
