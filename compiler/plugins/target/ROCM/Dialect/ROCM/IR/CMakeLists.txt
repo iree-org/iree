@@ -28,12 +28,24 @@ iree_cc_library(
   DEPS
     ::ROCMAttrs
     ::ROCMDialectGen
+    LLVMExecutionEngine
+    LLVMIRReader
     LLVMSupport
+    MLIRBufferizationDialect
+    MLIRGPUDialect
+    MLIRGPUTransformOps
+    MLIRGPUTransforms
+    MLIRGPUUtils
     MLIRIR
     MLIRLinalgDialect
     MLIRParser
     MLIRSupport
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::Codegen::Utils
+    iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Codegen::Dialect::GPU::Transforms::GPUTransforms
+    iree::compiler::Codegen::Utils
+    iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
     iree::compiler::plugins::target::ROCM::builtins::mlir_ukernel::iree_mlir_ukernel_patterns_amdgpu
