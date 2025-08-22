@@ -44,7 +44,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-task"
   COMPILER_FLAGS
-    "--iree-dispatch-creation-experimental-data-tiling"
+    "--iree-dispatch-creation-data-tiling"
     "--iree-llvmcpu-target-cpu=generic"
     "--iree-opt-data-tiling=false"
   LABELS

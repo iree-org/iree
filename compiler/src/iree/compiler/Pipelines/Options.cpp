@@ -312,6 +312,9 @@ void DispatchCreationOptions::bindOptions(OptionsBinder &binder) {
                      "since all backends dont support it yet"));
   binder.opt<bool>("iree-dispatch-creation-fuse-multi-use", enableFuseMultiUse,
                    llvm::cl::desc("Fuse operations with multiple uses."));
+  binder.opt<bool>("iree-dispatch-creation-data-tiling", dataTiling,
+                   llvm::cl::desc("Enables data tiling path."),
+                   llvm::cl::cat(category));
 }
 
 } // namespace mlir::iree_compiler
