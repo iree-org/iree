@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 \
 // RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-hal-configure-target-executable-variants{target=rocm})))" \
-// RUN:   --iree-hip-enable-tensor-ukernels \
+// RUN:   --iree-rocm-enable-tensor-ukernels \
 // RUN:   --verify-diagnostics %s | FileCheck %s
 
 // Make sure we can match and insert a tensor ukernel.
