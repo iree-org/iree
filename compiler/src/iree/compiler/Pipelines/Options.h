@@ -121,8 +121,8 @@ struct GlobalOptimizationOptions {
   // Enables transposing all concatenations to the outer most dimension.
   bool outerDimConcat = false;
 
-  // Enables data tiling in global optimization phase.There are two data-tiling
-  // flags during the transition state. The other has to be off if it is
+  // Enables data tiling in global optimization phase. There are two data-tiling
+  // flags during the transition state. The other has to be off if this one is
   // enabled. Any feature built on top of this path will be deprecated.
   bool dataTiling = true;
 
@@ -223,7 +223,7 @@ struct DispatchCreationOptions {
   bool enableFuseMultiUse = true;
 
   // Enables data tiling in dispatch creation phase. There are two data-tiling
-  // flags during the transition state. The other has to be off if it is
+  // flags during the transition state. The other has to be off if this one is
   // enabled. The main difference is that this path enables the fusion for
   // data-tiled ops.
   bool dataTiling = false;
