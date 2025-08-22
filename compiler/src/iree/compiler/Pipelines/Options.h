@@ -218,6 +218,7 @@ struct DispatchCreationOptions {
   llvm::OptimizationLevel optLevel;
 
   bool enableAggressiveFusion = false;
+  bool enablePadFusion = false;
   bool enableFuseMultiUse = true;
 
   void bindOptions(OptionsBinder &binder);
