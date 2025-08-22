@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMGPU/Analysis/ROCDLThreadUniformAnalysis.h"
+#include "iree/compiler/Codegen/Common/GPU/Analysis/ThreadUniformAnalysis.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -17,11 +17,11 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 
-#define DEBUG_TYPE "rocdl-thread-uniform-analysis"
+#define DEBUG_TYPE "iree-codegen-thread-uniform-analysis"
 #define LDBGS(X)                                                               \
   LLVM_DEBUG((llvm::dbgs() << "[" << DEBUG_TYPE << "]") << X << "\n")
 
-namespace mlir::iree_compiler::ROCDL {
+namespace mlir::iree_compiler::dataflow {
 //===----------------------------------------------------------------------===//
 // ThreadUniform
 //===----------------------------------------------------------------------===//
@@ -181,9 +181,9 @@ void ThreadUniformAnalysis::visitNonControlFlowArguments(
 void ThreadUniformAnalysis::visitRegionSuccessors(
     ProgramPoint *point, RegionBranchOpInterface branch,
     RegionBranchPoint successor,
-    ArrayRef<dataflow::AbstractSparseLattice *> latticesRaw) {
+    ArrayRef<mlir::dataflow::AbstractSparseLattice *> latticesRaw) {
   const auto *predecessors =
-      getOrCreateFor<dataflow::PredecessorState>(point, point);
+      getOrCreateFor<mlir::dataflow::PredecessorState>(point, point);
   assert(predecessors->allPredecessorsKnown() &&
          "unexpected unresolved region successors");
 
@@ -254,6 +254,7 @@ void ThreadUniformAnalysis::visitRegionSuccessors(
       join(std::get<1>(it), *getLatticeElementFor(point, std::get<0>(it)));
   }
 }
-} // namespace mlir::iree_compiler::ROCDL
+} // namespace mlir::iree_compiler::dataflow
 
-MLIR_DEFINE_EXPLICIT_TYPE_ID(mlir::iree_compiler::ROCDL::ThreadUniformLattice)
+MLIR_DEFINE_EXPLICIT_TYPE_ID(
+    mlir::iree_compiler::dataflow::ThreadUniformLattice)

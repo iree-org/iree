@@ -6,7 +6,7 @@
 
 #include "mlir/Analysis/DataFlow/SparseAnalysis.h"
 
-namespace mlir::iree_compiler::ROCDL {
+namespace mlir::iree_compiler::dataflow {
 //===----------------------------------------------------------------------===//
 // ThreadUniform
 //===----------------------------------------------------------------------===//
@@ -42,7 +42,7 @@ private:
 // ThreadUniformLattice
 //===----------------------------------------------------------------------===//
 /// Class holding a lattice for the sparse analysis.
-class ThreadUniformLattice : public dataflow::Lattice<ThreadUniform> {
+class ThreadUniformLattice : public mlir::dataflow::Lattice<ThreadUniform> {
 public:
   using Lattice::Lattice;
 };
@@ -52,7 +52,8 @@ public:
 //===----------------------------------------------------------------------===//
 /// The dataflow analysis computing whether a value is thread uniform or not.
 class ThreadUniformAnalysis
-    : public dataflow::SparseForwardDataFlowAnalysis<ThreadUniformLattice> {
+    : public mlir::dataflow::SparseForwardDataFlowAnalysis<
+          ThreadUniformLattice> {
 public:
   using SparseForwardDataFlowAnalysis::SparseForwardDataFlowAnalysis;
 
@@ -78,8 +79,9 @@ public:
   void visitRegionSuccessors(
       ProgramPoint *point, RegionBranchOpInterface branch,
       RegionBranchPoint successor,
-      ArrayRef<dataflow::AbstractSparseLattice *> lattices) override;
+      ArrayRef<mlir::dataflow::AbstractSparseLattice *> lattices) override;
 };
-} // namespace mlir::iree_compiler::ROCDL
+} // namespace mlir::iree_compiler::dataflow
 
-MLIR_DECLARE_EXPLICIT_TYPE_ID(mlir::iree_compiler::ROCDL::ThreadUniformLattice)
+MLIR_DECLARE_EXPLICIT_TYPE_ID(
+    mlir::iree_compiler::dataflow::ThreadUniformLattice)

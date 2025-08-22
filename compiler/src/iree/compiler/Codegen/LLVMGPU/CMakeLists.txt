@@ -176,6 +176,7 @@ iree_cc_library(
     MLIRVectorToSCF
     MLIRVectorTransforms
     iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Common::GPU::Analysis
     iree::compiler::Codegen::Common::GPU::CommonGPUPasses
     iree::compiler::Codegen::Common::GPU::GPUHeuristics
     iree::compiler::Codegen::Common::TransformDialectInterpreterPass
@@ -188,7 +189,6 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::VectorExt::Transforms::VectorExtTransforms
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
-    iree::compiler::Codegen::LLVMGPU::Analysis
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Codegen::LLVMGPU::Utils
     iree::compiler::Codegen::Transforms
