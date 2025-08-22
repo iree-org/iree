@@ -63,6 +63,15 @@ enum iree_hal_command_buffer_mode_bits_t {
   // `IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE=1` - if shimming command buffers
   // or performing replay this validation can be disabled per-command buffer.
   IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED = 1u << 5,
+
+  // Disables resource lifetime management.
+  // ***DANGER***: all resources used in the command buffer will not be retained
+  // and **MUST** remain valid for the lifetime of the command buffer. This is
+  // not safe in IREE as all code assumes proper retain semantics. If layering
+  // on top of the HAL with a different programming model that makes assumptions
+  // about lifetime this flag disables the internal resource tracking to reduce
+  // overhead.
+  IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED = 1u << 6,
 };
 typedef uint32_t iree_hal_command_buffer_mode_t;
 
@@ -141,6 +150,12 @@ typedef struct iree_hal_buffer_ref_list_t {
   iree_host_size_t count;
   const iree_hal_buffer_ref_t* values;
 } iree_hal_buffer_ref_list_t;
+
+// Returns an empty buffer ref list.
+static inline iree_hal_buffer_ref_list_t iree_hal_buffer_ref_list_empty(void) {
+  iree_hal_buffer_ref_list_t list = {0};
+  return list;
+}
 
 // Bitfield specifying which execution stage a barrier should start/end at.
 //

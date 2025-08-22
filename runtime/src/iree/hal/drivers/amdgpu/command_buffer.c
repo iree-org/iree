@@ -973,7 +973,9 @@ iree_status_t iree_hal_amdgpu_command_buffer_create(
   // would want to repack/trim the resource set when freezing (if not one-shot
   // where it doesn't matter). The risk with large allocs is that a user with
   // 10000 reusable command buffers will eat all that memory forever.
-  if (iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status) &&
+      !iree_all_bits_set(options->mode,
+                         IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED)) {
     status = iree_hal_resource_set_allocate(&options->host_block_pools->small,
                                             &command_buffer->resource_set);
   }

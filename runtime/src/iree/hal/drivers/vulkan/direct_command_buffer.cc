@@ -128,8 +128,10 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
     new (&command_buffer->descriptor_set_group) DescriptorSetGroup();
 
     command_buffer->builtin_executables = builtin_executables;
-    status = iree_hal_resource_set_allocate(block_pool,
-                                            &command_buffer->resource_set);
+    if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED)) {
+      status = iree_hal_resource_set_allocate(block_pool,
+                                              &command_buffer->resource_set);
+    }
   }
 
   if (iree_status_is_ok(status)) {

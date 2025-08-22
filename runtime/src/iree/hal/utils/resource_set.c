@@ -277,7 +277,6 @@ static iree_status_t iree_hal_resource_set_insert_1(
 IREE_API_EXPORT iree_status_t
 iree_hal_resource_set_insert(iree_hal_resource_set_t* set,
                              iree_host_size_t count, const void* resources) {
-  IREE_ASSERT_ARGUMENT(set);
   return iree_hal_resource_set_insert_strided(set, count, resources, 0,
                                               sizeof(iree_hal_resource_t*));
 }
@@ -285,7 +284,7 @@ iree_hal_resource_set_insert(iree_hal_resource_set_t* set,
 IREE_API_EXPORT iree_status_t iree_hal_resource_set_insert_strided(
     iree_hal_resource_set_t* set, iree_host_size_t count, const void* elements,
     iree_host_size_t offset, iree_host_size_t stride) {
-  IREE_ASSERT_ARGUMENT(set);
+  if (!set) return iree_ok_status();
   // For now we process one at a time. We should have a stride that lets us
   // amortize the cost of doing the MRU update and insertion allocation by
   // say slicing off 4/8/16/32 resources at a time etc. Today each miss that

@@ -215,6 +215,7 @@ static iree_status_t iree_hal_task_queue_issue_cmd_deferred(
           cmd->queue->device_allocator, &cmd->queue->scope,
           iree_hal_command_buffer_mode(command_buffer) |
               IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT |
+              IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED |
               // NOTE: we need to validate if a binding table is provided as the
               // bindings were not known when it was originally recorded.
               (iree_hal_buffer_binding_table_is_empty(binding_table)
