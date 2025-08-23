@@ -34,17 +34,83 @@ static iree_hal_webgpu_executable_t* iree_hal_webgpu_executable_cast(
   return (iree_hal_webgpu_executable_t*)base_value;
 }
 
+// Reads the flatbuffer size prefix and adjusts the data range.
+static iree_status_t iree_hal_webgpu_executable_flatbuffer_read_size(
+    iree_const_byte_span_t executable_data, bool unsafe_infer_size,
+    iree_const_byte_span_t* out_flatbuffer_data) {
+  // Check minimum size for flatbuffer (size prefix + minimal header).
+  if (!unsafe_infer_size && executable_data.data_length < 16) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "executable flatbuffer data is not present or less than 16 bytes");
+  }
+
+  // Read the size prefix from the flatbuffer.
+  size_t flatbuffer_size = 0;
+  flatbuffers_read_size_prefix((void*)executable_data.data, &flatbuffer_size);
+
+  // Zero-length flatbuffers are invalid.
+  if (flatbuffer_size == 0) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "executable flatbuffer reported as zero-length");
+  }
+
+  // Verify the size is within bounds.
+  if (!unsafe_infer_size) {
+    const iree_host_size_t remaining_length =
+        executable_data.data_length - sizeof(flatbuffers_uoffset_t);
+    if (flatbuffer_size > remaining_length) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "executable flatbuffer size prefix out of bounds (size is %zu but "
+          "only %" PRIhsz " bytes available)",
+          flatbuffer_size, remaining_length);
+    }
+  }
+
+  // Adjust the flatbuffer data to exclude the size prefix.
+  *out_flatbuffer_data = iree_make_const_byte_span(
+      executable_data.data + sizeof(flatbuffers_uoffset_t), flatbuffer_size);
+
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_webgpu_executable_infer_format(
+    iree_const_byte_span_t executable_data,
+    iree_host_size_t executable_format_capacity, char* executable_format,
+    iree_host_size_t* out_inferred_size) {
+  // Read the size prefix (with unsafe inference if size is unknown).
+  const bool unsafe_infer_size = (executable_data.data_length == 0);
+  iree_const_byte_span_t flatbuffer_data = iree_const_byte_span_empty();
+  IREE_RETURN_IF_ERROR(iree_hal_webgpu_executable_flatbuffer_read_size(
+      executable_data, unsafe_infer_size, &flatbuffer_data));
+
+  // Verify the flatbuffer structure.
+  if (!iree_hal_wgsl_ExecutableDef_verify_as_root(
+          flatbuffer_data.data, flatbuffer_data.data_length)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "failed to verify executable flatbuffer structure");
+  }
+
+  // Write the format string.
+  iree_string_view_t format = IREE_SV("webgpu-wgsl-fb");
+  if (format.size >= executable_format_capacity) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "executable format buffer too small");
+  }
+  memcpy(executable_format, format.data, format.size + /*NUL*/ 1);
+
+  // Return the total size (flatbuffer + size prefix).
+  *out_inferred_size =
+      flatbuffer_data.data_length + sizeof(flatbuffers_uoffset_t);
+  return iree_ok_status();
+}
+
 // Verifies the structure of the flatbuffer.
 static iree_status_t iree_hal_webgpu_executable_flatbuffer_verify(
     iree_const_byte_span_t flatbuffer_data,
     iree_host_size_t expected_entry_point_count) {
-  if (!flatbuffer_data.data || flatbuffer_data.data_length < 16) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "flatbuffer data is not present or less than 16 bytes (%" PRIhsz
-        " total)",
-        flatbuffer_data.data_length);
-  }
+  IREE_ASSERT(flatbuffer_data.data && flatbuffer_data.data_length >= 16);
 
   // Run flatcc generated verification. This ensures all pointers are in-bounds
   // and that we can safely walk the file, but not that the actual contents of
@@ -229,14 +295,19 @@ iree_status_t iree_hal_webgpu_executable_create(
         executable_params->executable_format.data);
   }
 
+  // Read and strip the flatbuffer size prefix.
+  iree_const_byte_span_t executable_flatbuffer = iree_const_byte_span_empty();
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_webgpu_executable_flatbuffer_read_size(
+              executable_params->executable_data, /*unsafe_infer_size=*/false,
+              &executable_flatbuffer));
+
   // Verify and fetch the executable flatbuffer wrapper.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_webgpu_executable_flatbuffer_verify(
-              executable_params->executable_data,
-              executable_params->pipeline_layout_count));
+              executable_flatbuffer, executable_params->pipeline_layout_count));
   iree_hal_webgpu_ExecutableDef_table_t executable_def =
-      iree_hal_webgpu_ExecutableDef_as_root(
-          executable_params->executable_data.data);
+      iree_hal_webgpu_ExecutableDef_as_root(executable_flatbuffer.data);
 
   // Create shader modules. This will be cheap on some implementations like
   // Metal that need pipeline information in order to be JIT'ed from WGSL while

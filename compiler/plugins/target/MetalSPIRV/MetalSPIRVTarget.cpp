@@ -220,7 +220,7 @@ public:
 
     // 4. Pack the MTLLibrary and metadata into a FlatBuffer.
     FlatbufferBuilder builder;
-    iree_hal_metal_ExecutableDef_start_as_root(builder);
+    iree_hal_metal_ExecutableDef_start_as_root_with_size(builder);
 
     // Attach embedded source file contents.
     auto sourceFilesRef = createSourceFilesVec(

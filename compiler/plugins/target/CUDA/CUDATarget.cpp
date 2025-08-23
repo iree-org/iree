@@ -613,7 +613,7 @@ public:
     }
 
     FlatbufferBuilder builder;
-    iree_hal_cuda_ExecutableDef_start_as_root(builder);
+    iree_hal_cuda_ExecutableDef_start_as_root_with_size(builder);
 
     auto sourceFilesRef = createSourceFilesVec(
         serOptions.debugLevel, variantOp.getSourcesAttr(), builder);

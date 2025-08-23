@@ -191,6 +191,82 @@ static iree_status_t iree_hal_vulkan_pipeline_layout_flatbuffer_verify(
   return iree_ok_status();
 }
 
+// Reads the flatbuffer size prefix and adjusts the data range.
+static iree_status_t iree_hal_vulkan_executable_flatbuffer_read_size(
+    iree_const_byte_span_t executable_data, bool unsafe_infer_size,
+    iree_const_byte_span_t* out_flatbuffer_data) {
+  // Check minimum size for flatbuffer (size prefix + minimal header).
+  if (!unsafe_infer_size && executable_data.data_length < 16) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "executable flatbuffer data is not present or less than 16 bytes");
+  }
+
+  // Read the size prefix from the flatbuffer.
+  size_t flatbuffer_size = 0;
+  flatbuffers_read_size_prefix((void*)executable_data.data, &flatbuffer_size);
+
+  // Zero-length flatbuffers are invalid.
+  if (flatbuffer_size == 0) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "executable flatbuffer reported as zero-length");
+  }
+
+  // Verify the size is within bounds.
+  if (!unsafe_infer_size) {
+    const iree_host_size_t remaining_length =
+        executable_data.data_length - sizeof(flatbuffers_uoffset_t);
+    if (flatbuffer_size > remaining_length) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "executable flatbuffer size prefix out of bounds (size is %zu but "
+          "only %" PRIhsz " bytes available)",
+          flatbuffer_size, remaining_length);
+    }
+  }
+
+  // Adjust the flatbuffer data to exclude the size prefix.
+  *out_flatbuffer_data = iree_make_const_byte_span(
+      executable_data.data + sizeof(flatbuffers_uoffset_t), flatbuffer_size);
+
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_vulkan_native_executable_infer_format(
+    iree_const_byte_span_t executable_data,
+    iree_host_size_t executable_format_capacity, char* executable_format,
+    iree_host_size_t* out_inferred_size) {
+  // Read the size prefix (with unsafe inference if size is unknown).
+  const bool unsafe_infer_size = (executable_data.data_length == 0);
+  iree_const_byte_span_t flatbuffer_data = iree_const_byte_span_empty();
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_executable_flatbuffer_read_size(
+      executable_data, unsafe_infer_size, &flatbuffer_data));
+
+  // Verify the flatbuffer structure.
+  if (!iree_hal_vulkan_ExecutableDef_verify_as_root(
+          flatbuffer_data.data, flatbuffer_data.data_length)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "failed to verify executable flatbuffer structure");
+  }
+
+  // Write the format string.
+  // NOTE: we return the base format. The "-ptr" variant requires device
+  // features to be checked which isn't available in this context. We should
+  // include the flag in the flatbuffer so we could query it here (note that we
+  // aren't fully verified and would need to do so carefully).
+  iree_string_view_t format = IREE_SV("vulkan-spirv-fb");
+  if (format.size >= executable_format_capacity) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "executable format buffer too small");
+  }
+  memcpy(executable_format, format.data, format.size + /*NUL*/ 1);
+
+  // Return the total size (flatbuffer + size prefix).
+  *out_inferred_size =
+      flatbuffer_data.data_length + sizeof(flatbuffers_uoffset_t);
+  return iree_ok_status();
+}
+
 // Verifies the structure of the FlatBuffer so that we can avoid doing so during
 // runtime. There are still some conditions we must be aware of (such as omitted
 // names on functions with internal linkage), however we shouldn't need to
@@ -198,13 +274,7 @@ static iree_status_t iree_hal_vulkan_pipeline_layout_flatbuffer_verify(
 static iree_status_t iree_hal_vulkan_executable_flatbuffer_verify(
     const iree_hal_vulkan_device_properties_t* device_properties,
     iree_const_byte_span_t flatbuffer_data) {
-  if (!flatbuffer_data.data || flatbuffer_data.data_length < 16) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "FlatBuffer data is not present or less than 16 bytes (%" PRIhsz
-        " total)",
-        flatbuffer_data.data_length);
-  }
+  IREE_ASSERT(flatbuffer_data.data && flatbuffer_data.data_length >= 16);
 
   // Run flatcc generated verification. This ensures all pointers are in-bounds
   // and that we can safely walk the file, but not that the actual contents of
@@ -896,14 +966,19 @@ iree_status_t iree_hal_vulkan_native_executable_create(
   iree_allocator_t host_allocator = logical_device->host_allocator();
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // Read and strip the flatbuffer size prefix.
+  iree_const_byte_span_t executable_flatbuffer = iree_const_byte_span_empty();
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_vulkan_executable_flatbuffer_read_size(
+              executable_params->executable_data, /*unsafe_infer_size=*/false,
+              &executable_flatbuffer));
+
   // Verify and fetch the executable FlatBuffer wrapper.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_vulkan_executable_flatbuffer_verify(
-              &logical_device->supported_properties(),
-              executable_params->executable_data));
+              &logical_device->supported_properties(), executable_flatbuffer));
   iree_hal_vulkan_ExecutableDef_table_t executable_def =
-      iree_hal_vulkan_ExecutableDef_as_root(
-          executable_params->executable_data.data);
+      iree_hal_vulkan_ExecutableDef_as_root(executable_flatbuffer.data);
 
   iree_hal_vulkan_PipelineDef_vec_t pipelines_vec =
       iree_hal_vulkan_ExecutableDef_pipelines_get(executable_def);

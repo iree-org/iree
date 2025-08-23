@@ -826,7 +826,7 @@ protected:
       ArrayRef<IREE::HAL::ExecutableExportOp> exportOps,
       StringRef hsacoModule) {
     iree_compiler::FlatbufferBuilder builder;
-    iree_hal_amdgpu_ExecutableDef_start_as_root(builder);
+    iree_hal_amdgpu_ExecutableDef_start_as_root_with_size(builder);
 
     // Attach embedded source file contents.
     auto sourceFilesRef = createSourceFilesVec(
@@ -898,6 +898,8 @@ protected:
     }
     auto exportsRef = builder.createOffsetVecDestructive(exportRefs);
 
+    auto isaRef = builder.createString(variantOp.getTarget().getFormat());
+    iree_hal_amdgpu_ExecutableDef_isa_add(builder, isaRef);
     iree_hal_amdgpu_ExecutableDef_exports_add(builder, exportsRef);
     iree_hal_amdgpu_ExecutableDef_modules_add(builder, modulesRef);
     iree_hal_amdgpu_ExecutableDef_source_files_add(builder, sourceFilesRef);
@@ -912,7 +914,7 @@ protected:
                               ArrayRef<IREE::HAL::ExecutableExportOp> exportOps,
                               StringRef hsacoModule) {
     iree_compiler::FlatbufferBuilder builder;
-    iree_hal_hip_ExecutableDef_start_as_root(builder);
+    iree_hal_hip_ExecutableDef_start_as_root_with_size(builder);
 
     // Attach embedded source file contents.
     auto sourceFilesRef = createSourceFilesVec(

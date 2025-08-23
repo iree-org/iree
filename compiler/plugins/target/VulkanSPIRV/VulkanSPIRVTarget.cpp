@@ -291,7 +291,7 @@ public:
     }
 
     FlatbufferBuilder builder;
-    iree_hal_vulkan_ExecutableDef_start_as_root(builder);
+    iree_hal_vulkan_ExecutableDef_start_as_root_with_size(builder);
 
     // Attach embedded source file contents.
     auto sourceFilesRef = createSourceFilesVec(
@@ -426,7 +426,7 @@ public:
     }
 
     FlatbufferBuilder builder;
-    iree_hal_vulkan_ExecutableDef_start_as_root(builder);
+    iree_hal_vulkan_ExecutableDef_start_as_root_with_size(builder);
 
     // Wrap and embed shader module binary.
     auto spirvCodeRef = flatbuffers_uint32_vec_create(

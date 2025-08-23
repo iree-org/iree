@@ -732,6 +732,7 @@ public:
     // loader which static library to load for the target binary.
     std::vector<uint8_t> libraryNameVector(libraryName.begin(),
                                            libraryName.end());
+    libraryNameVector.push_back(0); // NUL
     executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
         variantOp.getLoc(), variantOp.getSymName(), "static",
         libraryNameVector);

@@ -300,6 +300,39 @@ static void iree_hal_static_library_loader_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
+static iree_status_t iree_hal_static_library_loader_infer_format(
+    iree_hal_executable_loader_t* base_executable_loader,
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_const_byte_span_t executable_data,
+    iree_host_size_t executable_format_capacity, char* executable_format,
+    iree_host_size_t* out_inferred_size) {
+  // Always return "static" as the format string.
+  const char* format_str = "static";
+  const iree_host_size_t format_length = strlen(format_str) + 1;  // + NUL
+  if (executable_format_capacity < format_length) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "insufficient capacity for format string; need %" PRIhsz
+        " but have %" PRIhsz,
+        format_length, executable_format_capacity);
+  }
+
+  // Copy the format string with NUL terminator.
+  memcpy(executable_format, format_str, format_length);
+
+  // Infer the size of the executable data.
+  if (executable_data.data_length != 0) {
+    // Size is known.
+    *out_inferred_size = executable_data.data_length;
+  } else {
+    // Size is unknown - find the first NUL byte.
+    *out_inferred_size =
+        strlen((const char*)executable_data.data) + 1;  // + NUL
+  }
+
+  return iree_ok_status();
+}
+
 static bool iree_hal_static_library_loader_query_support(
     iree_hal_executable_loader_t* base_executable_loader,
     iree_hal_executable_caching_mode_t caching_mode,
@@ -316,9 +349,9 @@ static iree_status_t iree_hal_static_library_loader_try_load(
       (iree_hal_static_library_loader_t*)base_executable_loader;
 
   // The executable data is just the name of the library.
-  iree_string_view_t library_name = iree_make_string_view(
+  iree_string_view_t library_name = iree_string_view_trim(iree_make_string_view(
       (const char*)executable_params->executable_data.data,
-      executable_params->executable_data.data_length);
+      executable_params->executable_data.data_length));
 
   // Linear scan of the registered libraries; there's usually only one per
   // module (aka source model) and as such it's a small list and probably not
@@ -344,6 +377,7 @@ static iree_status_t iree_hal_static_library_loader_try_load(
 static const iree_hal_executable_loader_vtable_t
     iree_hal_static_library_loader_vtable = {
         .destroy = iree_hal_static_library_loader_destroy,
+        .infer_format = iree_hal_static_library_loader_infer_format,
         .query_support = iree_hal_static_library_loader_query_support,
         .try_load = iree_hal_static_library_loader_try_load,
 };
