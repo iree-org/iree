@@ -297,7 +297,8 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_dispatch(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_executable_t* executable, int32_t entry_point,
+    iree_hal_executable_t* executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings,
     iree_hal_dispatch_flags_t flags) {
@@ -312,7 +313,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_dispatch(
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = _VTABLE_DISPATCH(device, queue_dispatch)(
       device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
-      executable, entry_point, config, constants, bindings, flags);
+      executable, export_ordinal, config, constants, bindings, flags);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

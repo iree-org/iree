@@ -1041,7 +1041,7 @@ typedef struct {
     struct {
       iree_vm_ref_t command_buffer;
       iree_vm_ref_t executable;
-      int32_t entry_point;
+      iree_hal_executable_export_ordinal_t export_ordinal;
       uint32_t workgroup_count[3];
       iree_hal_dispatch_flags_t flags;
     };
@@ -1091,7 +1091,7 @@ static iree_status_t iree_hal_module_command_buffer_dispatch(
       args->workgroup_count[0], args->workgroup_count[1],
       args->workgroup_count[2]);
   return iree_hal_command_buffer_dispatch(
-      command_buffer, executable, args->entry_point, config,
+      command_buffer, executable, args->export_ordinal, config,
       iree_make_const_byte_span(args->constants,
                                 args->constant_count * sizeof(uint32_t)),
       bindings, (iree_hal_dispatch_flags_t)args->flags);
@@ -1144,7 +1144,7 @@ typedef struct {
     struct {
       iree_vm_ref_t command_buffer;
       iree_vm_ref_t executable;
-      int32_t entry_point;
+      iree_hal_executable_export_ordinal_t export_ordinal;
       int32_t workgroups_buffer_slot;
       iree_vm_ref_t workgroups_buffer;
       int64_t workgroups_offset;
@@ -1208,7 +1208,7 @@ static iree_status_t iree_hal_module_command_buffer_dispatch_indirect(
   }
 
   return iree_hal_command_buffer_dispatch(
-      command_buffer, executable, args->entry_point, config,
+      command_buffer, executable, args->export_ordinal, config,
       iree_make_const_byte_span(args->constants,
                                 args->constant_count * sizeof(uint32_t)),
       bindings, flags);
