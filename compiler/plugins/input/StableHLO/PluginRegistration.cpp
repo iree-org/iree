@@ -13,7 +13,7 @@
 #include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
 #include "stablehlo/dialect/VhloOps.h"
-
+#include "stablehlo/transforms/Passes.h"
 namespace mlir::iree_compiler::stablehlo {
 
 namespace {
@@ -61,6 +61,7 @@ struct StableHLOSession
   static void registerPasses() {
     // TODO(scotttodd): register other StableHLO passes?
     registerStableHLOConversionPasses();
+    mlir::stablehlo::registerPasses(); 
   }
 
   void onRegisterDialects(DialectRegistry &registry) override {
