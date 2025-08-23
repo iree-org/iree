@@ -79,7 +79,9 @@ bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache, Region &lhs,
                                 Region &rhs, IRMapping &mapping);
 bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
                                 Operation &lhs, Operation &rhs);
-
+bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
+                                Operation &lhs, Operation &rhs,
+                                IRMapping &parentMapping);
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_UTILS_EQUIVALENCEUTILS_H_
