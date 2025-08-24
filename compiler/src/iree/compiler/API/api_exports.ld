@@ -4,6 +4,8 @@ VER_0 {
     ireeAttributeIsACodegenCompilationInfoAttr;
     ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr;
     ireeAttributeIsACodegenTranslationInfoAttr;
+    ireeAttributeIsAGPUComputeBitwidthsAttr;
+    ireeAttributeIsAGPUStorageBitwidthsAttr;
     ireeAttributeIsAGPULoweringConfigAttr;
     ireeAttributeIsAGPUMMAAttr;
     ireeAttributeIsAGPUVirtualMMAAttr;
@@ -26,6 +28,10 @@ VER_0 {
     ireeCodegenTranslationInfoAttrGet;
     ireeCodegenTranslationInfoAttrGetParameters;
     ireeCodegenTranslationInfoAttrGetTypeID;
+    ireeCodegenHALExecutableTargetAttrGet;
+    ireeCodegenHALExecutableTargetAttrGetInfo;
+    ireeAttributeIsACodegenHALExecutableTargetAttr;
+    ireeCodegenHALExecutableTargetAttrGetTypeID;
     ireeCompilerEnumeratePlugins;
     ireeCompilerEnumerateRegisteredHALTargetBackends;
     ireeCompilerErrorDestroy;
@@ -77,6 +83,12 @@ VER_0 {
     ireeCompilerSourceOpenFile;
     ireeCompilerSourceSplit;
     ireeCompilerSourceWrapBuffer;
+    ireeGPUComputeBitwidthsAttrGet;
+    ireeGPUComputeBitwidthsAttrGetValue;
+    ireeGPUComputeBitwidthsAttrGetTypeID;
+    ireeGPUStorageBitwidthsAttrGet;
+    ireeGPUStorageBitwidthsAttrGetValue;
+    ireeGPUStorageBitwidthsAttrGetTypeID;
     ireeGPULoweringConfigAttrGet;
     ireeGPULoweringConfigAttrGetAttributes;
     ireeGPULoweringConfigAttrGetMmaKind;

@@ -31,6 +31,7 @@ using mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipelineAttr;
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttrInterface;
 using mlir::iree_compiler::IREE::Codegen::TranslationInfoAttr;
 using mlir::iree_compiler::IREE::GPU::MMAIntrinsic;
+using mlir::iree_compiler::IREE::HAL::ExecutableTargetAttr;
 using mlir::iree_compiler::IREE::HAL::ExecutableVariantOp;
 
 bool ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr(
@@ -267,4 +268,45 @@ ireeCodegenGetAttentionOpDetail(MlirAffineMap qMap, MlirAffineMap kMap,
 bool ireeCodegenMlirOperationIsACodegenAttentionOp(MlirOperation op) {
   return llvm::isa<mlir::iree_compiler::IREE::LinalgExt::AttentionOp>(
       unwrap(op));
+}
+
+bool ireeAttributeIsACodegenHALExecutableTargetAttr(MlirAttribute attr) {
+  return llvm::isa<ExecutableTargetAttr>(unwrap(attr));
+}
+
+MlirTypeID ireeCodegenHALExecutableTargetAttrGetTypeID() {
+  return wrap(ExecutableTargetAttr::getTypeID());
+}
+
+MlirAttribute
+ireeCodegenHALExecutableTargetAttrGet(MlirContext mlirCtx,
+                                      ireeCodegenHALExecutableTargetInfo info) {
+  assert(mlirAttributeIsAString(info.backend) && "invalid backend str");
+  assert(mlirAttributeIsAString(info.format) && "invalid format str");
+
+  auto backend = llvm::cast<mlir::StringAttr>(unwrap(info.backend));
+  auto format = llvm::cast<mlir::StringAttr>(unwrap(info.format));
+
+  if (!mlirAttributeIsNull(info.configuration)) {
+    assert(mlirAttributeIsADictionary(info.configuration) &&
+           "invalid configuration dict");
+    auto configuration =
+        llvm::cast<mlir::DictionaryAttr>(unwrap(info.configuration));
+    return wrap(ExecutableTargetAttr::get(unwrap(mlirCtx), backend, format,
+                                          configuration));
+  }
+
+  return wrap(ExecutableTargetAttr::get(unwrap(mlirCtx), backend, format));
+}
+
+ireeCodegenHALExecutableTargetInfo
+ireeCodegenHALExecutableTargetAttrGetInfo(MlirAttribute attr) {
+  auto executableTargetAttr = llvm::cast<ExecutableTargetAttr>(unwrap(attr));
+  ireeCodegenHALExecutableTargetInfo targetInfo = {};
+  targetInfo.backend =
+      wrap(static_cast<mlir::Attribute>(executableTargetAttr.getBackend()));
+  targetInfo.format =
+      wrap(static_cast<mlir::Attribute>(executableTargetAttr.getFormat()));
+  targetInfo.configuration = wrap(executableTargetAttr.getConfiguration());
+  return targetInfo;
 }

@@ -128,6 +128,58 @@ uint32_t ireeGPUReorderWorkgroupsStrategyAttrGetValue(MlirAttribute attr) {
           .getValue());
 }
 
+MlirAttribute ireeGPUComputeBitwidthsAttrGet(MlirContext ctx, uint32_t value) {
+  mlir::MLIRContext *mlirCtx = unwrap(ctx);
+  return wrap(mlir::iree_compiler::IREE::GPU::ComputeBitwidthsAttr::get(
+      mlirCtx,
+      static_cast<mlir::iree_compiler::IREE::GPU::ComputeBitwidths>(value)));
+}
+
+bool ireeAttributeIsAGPUComputeBitwidthsAttr(MlirAttribute attr) {
+  return llvm::isa<mlir::iree_compiler::IREE::GPU::ComputeBitwidthsAttr>(
+      unwrap(attr));
+}
+
+uint32_t ireeGPUComputeBitwidthsAttrGetValue(MlirAttribute attr) {
+  assert(ireeAttributeIsAGPUComputeBitwidthsAttr(attr) &&
+         "attr is not a GPUComputeBitwidthsAttr");
+  return static_cast<uint32_t>(
+      llvm::cast<mlir::iree_compiler::IREE::GPU::ComputeBitwidthsAttr>(
+          unwrap(attr))
+          .getValue());
+}
+
+MlirTypeID ireeGPUComputeBitwidthsAttrGetTypeID() {
+  return wrap(
+      mlir::iree_compiler::IREE::GPU::ComputeBitwidthsAttr::getTypeID());
+}
+
+MlirAttribute ireeGPUStorageBitwidthsAttrGet(MlirContext ctx, uint32_t value) {
+  mlir::MLIRContext *mlirCtx = unwrap(ctx);
+  return wrap(mlir::iree_compiler::IREE::GPU::StorageBitwidthsAttr::get(
+      mlirCtx,
+      static_cast<mlir::iree_compiler::IREE::GPU::StorageBitwidths>(value)));
+}
+
+uint32_t ireeGPUStorageBitwidthsAttrGetValue(MlirAttribute attr) {
+  assert(ireeAttributeIsAGPUStorageBitwidthsAttr(attr) &&
+         "attr is not a GPUStorageBitwidthsAttr");
+  return static_cast<uint32_t>(
+      llvm::cast<mlir::iree_compiler::IREE::GPU::StorageBitwidthsAttr>(
+          unwrap(attr))
+          .getValue());
+}
+
+bool ireeAttributeIsAGPUStorageBitwidthsAttr(MlirAttribute attr) {
+  return llvm::isa<mlir::iree_compiler::IREE::GPU::StorageBitwidthsAttr>(
+      unwrap(attr));
+}
+
+MlirTypeID ireeGPUStorageBitwidthsAttrGetTypeID() {
+  return wrap(
+      mlir::iree_compiler::IREE::GPU::StorageBitwidthsAttr::getTypeID());
+}
+
 bool ireeAttributeIsAGPUMMAIntrinsicAttr(MlirAttribute attr) {
   return llvm::isa<mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr>(
       unwrap(attr));

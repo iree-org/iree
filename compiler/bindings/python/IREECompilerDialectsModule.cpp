@@ -209,6 +209,44 @@ NB_MODULE(_ireeCompilerDialects, m) {
             return parameters.translationInfo;
           });
 
+  //===-------------------------------------------------------------------===//
+  // CodegenExecutableTargetAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_codegen_module, "HAL_ExecutableTargetAttr",
+                          ireeAttributeIsACodegenHALExecutableTargetAttr,
+                          ireeCodegenHALExecutableTargetAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, MlirAttribute backend, MlirAttribute format,
+             std::optional<MlirAttribute> configuration, MlirContext ctx) {
+            ireeCodegenHALExecutableTargetInfo info = {};
+            info.backend = backend;
+            info.format = format;
+            info.configuration = configuration.value_or(mlirAttributeGetNull());
+            return ireeCodegenHALExecutableTargetAttrGet(ctx, info);
+          },
+          "cls"_a, "backend"_a, "format"_a, "configuration"_a = py::none(),
+          "ctx"_a = py::none(),
+          "Gets an #iree_codegen.executable_target from parameters.")
+      .def_property_readonly(
+          "backend",
+          [](MlirAttribute self) -> MlirAttribute {
+            auto info = ireeCodegenHALExecutableTargetAttrGetInfo(self);
+            return info.backend;
+          })
+      .def_property_readonly(
+          "format",
+          [](MlirAttribute self) -> MlirAttribute {
+            auto info = ireeCodegenHALExecutableTargetAttrGetInfo(self);
+            return info.format;
+          })
+      .def_property_readonly(
+          "configuration", [](MlirAttribute self) -> MlirAttribute {
+            auto info = ireeCodegenHALExecutableTargetAttrGetInfo(self);
+            return info.configuration;
+          });
+
   //===--------------------------------------------------------------------===//
 
   auto iree_gpu_module =
@@ -503,6 +541,48 @@ NB_MODULE(_ireeCompilerDialects, m) {
               return attr;
             return std::nullopt;
           });
+
+  //===-------------------------------------------------------------------===//
+  // GPUComputeBitwidthsAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_gpu_module, "ComputeBitwidthsAttr",
+                          ireeAttributeIsAGPUComputeBitwidthsAttr,
+                          ireeGPUComputeBitwidthsAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, uint32_t value, MlirContext ctx) {
+            return ireeGPUComputeBitwidthsAttrGet(ctx, value);
+          },
+          "cls"_a, "value"_a, "ctx"_a = py::none(),
+          "Gets an #iree_gpu.compute_bitwidths from parameters.")
+      .def_property_readonly("raw_value", ireeGPUComputeBitwidthsAttrGetValue)
+      .def_property_readonly("value", [](MlirAttribute self) -> py::object {
+        uint32_t rawValue = ireeGPUComputeBitwidthsAttrGetValue(self);
+        return py::module_::import_(kGpuModuleImportPath)
+            .attr("ComputeBitwidths")(rawValue);
+      });
+
+  //===-------------------------------------------------------------------===//
+  // GPUStorageBitwidthsAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_gpu_module, "StorageBitwidthsAttr",
+                          ireeAttributeIsAGPUStorageBitwidthsAttr,
+                          ireeGPUStorageBitwidthsAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, uint32_t value, MlirContext ctx) {
+            return ireeGPUStorageBitwidthsAttrGet(ctx, value);
+          },
+          "cls"_a, "value"_a, "ctx"_a = py::none(),
+          "Gets an #iree_gpu.storage_bitwidths from a value.")
+      .def_property_readonly("raw_value", ireeGPUStorageBitwidthsAttrGetValue)
+      .def_property_readonly("value", [](MlirAttribute self) -> py::object {
+        uint32_t rawValue = ireeGPUStorageBitwidthsAttrGetValue(self);
+        return py::module_::import_(kGpuModuleImportPath)
+            .attr("StorageBitwidths")(rawValue);
+      });
 
   //===-------------------------------------------------------------------===//
   // Binding to utility function getSingleSubgroupLayout
