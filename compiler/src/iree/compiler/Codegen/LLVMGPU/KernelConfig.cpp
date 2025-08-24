@@ -172,6 +172,32 @@ static bool needsLoweringConfigPropagation(
   return !llvm::is_contained(supportedPipelines, pipeline);
 }
 
+static LogicalResult setDefaultWorkgroupOnlyTilingConfig(
+    FunctionOpInterface entryPoint, Operation *op, IREE::GPU::TargetAttr target,
+    ArrayRef<int64_t> workgroupTileSizes, ArrayRef<int64_t> workgroupSize) {
+  MLIRContext *context = op->getContext();
+  Builder b(context);
+  auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
+      context, /*prefetchSharedMemory=*/false,
+      /*no_reduce_shared_memory_bank_conflicts=*/true,
+      /*use_igemm_convolution=*/false,
+      /*reorder_workgroups_strategy=*/std::nullopt);
+  const int preferredSubgroupSize = target.getPreferredSubgroupSize();
+  SmallVector<NamedAttribute, 3> attrs = {
+      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes))};
+
+  auto configDict = b.getDictionaryAttr(attrs);
+  auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
+  SmallVector<NamedAttribute, 1> pipelineAttrs;
+  pipelineAttrs.emplace_back(
+      b.getStringAttr(IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
+      pipelineOptions);
+  auto pipelineConfig = b.getDictionaryAttr(pipelineAttrs);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUTileAndFuse,
+      workgroupSize, preferredSubgroupSize, pipelineConfig);
+}
+
 //====---------------------------------------------------------------------===//
 // Matmul Configuration Helpers
 //====---------------------------------------------------------------------===//
@@ -2371,10 +2397,8 @@ static LogicalResult setFftConfig(IREE::GPU::TargetAttr target,
       return failure();
     }
   }
-  TileSizesListType tileSizes = {workgroupTileSize};
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes, CodeGenPipeline::LLVMGPUDistribute,
-      workgroupSize);
+  return setDefaultWorkgroupOnlyTilingConfig(entryPoint, op, target,
+                                             workgroupTileSize, workgroupSize);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2424,10 +2448,8 @@ static LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
   auto partitionedLoops =
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   if (partitionedLoops.empty()) {
-    tileSizes.push_back({});
-    return setOpConfigAndEntryPointFnTranslation(
-        entryPoint, op, tileSizes, CodeGenPipeline::LLVMGPUDistribute,
-        {1, 1, 1});
+    return setDefaultWorkgroupOnlyTilingConfig(entryPoint, op, target, {},
+                                               {1, 1, 1});
   }
   size_t numLoops = partitionedLoops.back() + 1;
   // To get peak occupancy we need a workgroup size of at least two warps
@@ -2450,10 +2472,8 @@ static LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
       break;
     }
   }
-  tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes, CodeGenPipeline::LLVMGPUDistribute,
-      workgroupSize);
+  return setDefaultWorkgroupOnlyTilingConfig(entryPoint, op, target,
+                                             workgroupTileSizes, workgroupSize);
 }
 
 //====---------------------------------------------------------------------===//
@@ -2464,17 +2484,34 @@ static LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
 static LogicalResult setRootDefaultConfig(IREE::GPU::TargetAttr target,
                                           mlir::FunctionOpInterface entryPoint,
                                           Operation *op) {
-  CodeGenPipeline passPipeline = CodeGenPipeline::LLVMGPUDistribute;
   TileSizesListType tileSizes;
   auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
   auto partitionedLoops = interfaceOp.getPartitionableLoops(std::nullopt);
+
+  MLIRContext *context = op->getContext();
+  Builder b(context);
+  auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
+      context, /*prefetchSharedMemory=*/false,
+      /*no_reduce_shared_memory_bank_conflicts=*/true,
+      /*use_igemm_convolution=*/false,
+      /*reorder_workgroups_strategy=*/std::nullopt);
+  const int preferredSubgroupSize = target.getPreferredSubgroupSize();
+
   if (partitionedLoops.empty()) {
-    tileSizes.push_back({});
-    return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
-                                                 passPipeline, {1, 1, 1});
+    auto configDict = b.getDictionaryAttr({});
+    auto loweringConfig =
+        IREE::GPU::LoweringConfigAttr::get(context, configDict);
+    SmallVector<NamedAttribute, 1> pipelineAttrs;
+    pipelineAttrs.emplace_back(
+        b.getStringAttr(IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
+        pipelineOptions);
+    auto pipelineConfig = b.getDictionaryAttr(pipelineAttrs);
+
+    return setOpConfigAndEntryPointFnTranslation(
+        entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUTileAndFuse,
+        {1, 1, 1}, preferredSubgroupSize, pipelineConfig);
   }
 
-  const int preferredSubgroupSize = target.getPreferredSubgroupSize();
   size_t numLoops = partitionedLoops.back() + 1;
   // To get peak occupancy we need a workgroup size of at least two warps.
   std::array<int64_t, 3> workgroupSize = {2 * preferredSubgroupSize, 1, 1};
@@ -2549,14 +2586,10 @@ static LogicalResult setRootDefaultConfig(IREE::GPU::TargetAttr target,
   // Pick a vectorSize of 1 for op that we know won't get vectorized.
   // Also skip vectorization for linalg on memref (no result) as the pipeline
   // relies on tensor level tiling.
-  // TODO(thomasraoux): This could be improved by checking if the linalg op
-  // would fail vectorization.
   if (!linalgOp || op->getNumResults() != 1 ||
       llvm::any_of(linalgOp.getIndexingMapsArray(),
                    [](AffineMap m) { return !m.isProjectedPermutation(); })) {
     vectorSize = 1;
-  } else {
-    passPipeline = CodeGenPipeline::LLVMGPUVectorize;
   }
 
   int64_t id = 0;
@@ -2578,15 +2611,37 @@ static LogicalResult setRootDefaultConfig(IREE::GPU::TargetAttr target,
     }
   }
 
+  SmallVector<NamedAttribute, 3> attrs = {
+      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes))};
+
   if (linalgOp) {
-    // Tile reduction dimension to 4 to allow doing load4 if the reduction size
-    // is the most inner dimension.
-    workgroupTileSizes.append(linalgOp.getNumReductionLoops(), 4);
+    int64_t numReduction = linalgOp.getNumReductionLoops();
+    if (numReduction > 0) {
+      // Tile reduction dimension to 4 to allow doing load4 if the reduction
+      // size is the most inner dimension.
+      workgroupTileSizes.append(numReduction, 4);
+      SmallVector<int64_t> reductionTileSizes(linalgOp.getNumLoops(), 0);
+      for (auto [dim, iterType] :
+           llvm::enumerate(linalgOp.getIteratorTypesArray())) {
+        if (linalg::isReductionIterator(iterType)) {
+          reductionTileSizes[dim] = 4;
+        }
+      }
+      attrs.push_back(
+          NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes)));
+    }
   }
-  tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
-  return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
-                                               passPipeline, workgroupSize,
-                                               preferredSubgroupSize);
+
+  auto configDict = b.getDictionaryAttr(attrs);
+  auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
+  SmallVector<NamedAttribute, 1> pipelineAttrs;
+  pipelineAttrs.emplace_back(
+      b.getStringAttr(IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
+      pipelineOptions);
+  auto pipelineConfig = b.getDictionaryAttr(pipelineAttrs);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUTileAndFuse,
+      workgroupSize, preferredSubgroupSize, pipelineConfig);
 }
 
 /// Returns true if it's MatVec like i.e., either the bound of M or N dim = 1,
@@ -2859,7 +2914,8 @@ static bool hasTwoOrThreeLoopsInfo(linalg::LinalgOp linalgOp) {
 // Transpose Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
-static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
+static LogicalResult setTransposeConfig(IREE::GPU::TargetAttr target,
+                                        mlir::FunctionOpInterface entryPoint,
                                         linalg::LinalgOp linalgOp) {
   LinalgOpInfo opInfo(linalgOp, sharedMemTransposeFilter);
 
@@ -2888,12 +2944,16 @@ static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
 
   int32_t tileM = 32;
   int32_t tileN = 32;
-  TileSizesListType tileSizes;
   // Set all tile sizes to 1 except for fastest moving dimensions.
-  SmallVector<int64_t> tileSizesTemp(linalgOp.getNumLoops(), 1);
-  tileSizesTemp[outputFastestDim] = 32;
-  tileSizesTemp[inputFastestDim] = 32;
-  tileSizes.push_back(tileSizesTemp);
+  SmallVector<int64_t> workgroupTileSizes(linalgOp.getNumLoops(), 1);
+  workgroupTileSizes[outputFastestDim] = 32;
+  workgroupTileSizes[inputFastestDim] = 32;
+
+  // Set the thread tile sizes to 1 for all dims except the fastest varying
+  // output dim which we set to 4. Because we promote the tranposed input
+  // operands, this gives both vectorized global reads and writes.
+  SmallVector<int64_t> threadTileSizes(linalgOp.getNumLoops(), 1);
+  threadTileSizes[outputFastestDim] = 4;
 
   // Check alignment with tile size for each transpose. Only the fastest moving
   // dims need to match the transpose tile.
@@ -2905,11 +2965,45 @@ static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
 
   // Workgroup size contains 8 warps. Configured with 8 threads on fastest
   // moving dimension so each thread can execute a vectorized copy of 4
-  // contiguous elements at a time from the 32 block.
+  // contigious elements at a time from the 32 block.
   std::array<int64_t, 3> workgroupSize = {8, 32, 1};
+
+  // Attach the MMA schedule as an attribute to the entry point export function
+  // for later access in the pipeline.
+  MLIRContext *context = linalgOp.getContext();
+  SmallVector<NamedAttribute, 1> attrs;
+  Builder b(context);
+  attrs.emplace_back(StringAttr::get(context, "workgroup"),
+                     b.getI64ArrayAttr(workgroupTileSizes));
+  attrs.emplace_back(StringAttr::get(context, "thread"),
+                     b.getI64ArrayAttr(threadTileSizes));
+  SmallVector<int64_t> promotedOperands;
+  for (auto operand : transposedOperands) {
+    promotedOperands.push_back(operand->getOperandNumber());
+  }
+  IREE::GPU::appendPromotedOperandsList(context, attrs, promotedOperands);
+  auto configDict = DictionaryAttr::get(context, attrs);
+  auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
+
+  SmallVector<NamedAttribute, 1> pipelineAttrs;
+  auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
+      linalgOp->getContext(), /*prefetchSharedMemory=*/false,
+      /*no_reduce_shared_memory_bank_conflicts=*/false,
+      /*use_igemm_convolution=*/false,
+      /*reorder_workgroups_strategy=*/std::nullopt);
+  pipelineAttrs.emplace_back(
+      StringAttr::get(linalgOp->getContext(),
+                      IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
+      pipelineOptions);
+  auto pipelineConfig =
+      DictionaryAttr::get(linalgOp->getContext(), pipelineAttrs);
+  const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
+
+  // TODO(qedawkins): Use a shared pipeline identifier here.
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, linalgOp, tileSizes,
-      CodeGenPipeline::LLVMGPUTransposeSharedMem, workgroupSize);
+      entryPoint, linalgOp, loweringConfig,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
+      workgroupSize, targetSubgroupSize, pipelineConfig);
 }
 
 //====---------------------------------------------------------------------===//
@@ -3225,7 +3319,8 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     }
     auto genericOp = dyn_cast<linalg::GenericOp>(computeOp);
     if (genericOp) {
-      if (succeeded(setTransposeConfig(entryPointFn, genericOp))) {
+      if (genericOp &&
+          succeeded(setTransposeConfig(target, entryPointFn, genericOp))) {
         LDBG() << "Transpose Config";
         return success();
       } else if (ukernelConfig &&

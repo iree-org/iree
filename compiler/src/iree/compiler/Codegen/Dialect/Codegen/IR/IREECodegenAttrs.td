@@ -36,24 +36,20 @@ def LLVMGPU_Default
     : I32EnumAttrCase<"LLVMGPUDefault", 100>;
 def LLVMGPU_BaseLowering
     : I32EnumAttrCase<"LLVMGPUBaseLowering", 101>;
-def LLVMGPU_SimpleDistribute
-    : I32EnumAttrCase<"LLVMGPUDistribute", 102>;
 def LLVMGPU_Vectorize
-    : I32EnumAttrCase<"LLVMGPUVectorize", 103>;
+    : I32EnumAttrCase<"LLVMGPUVectorize", 102>;
 def LLVMGPU_MatmulTensorCore
-    : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 104>;
-def LLVMGPU_TransposeSharedMem
-    : I32EnumAttrCase<"LLVMGPUTransposeSharedMem", 105>;
+    : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 103>;
 def LLVMGPU_WarpReduction
-    : I32EnumAttrCase<"LLVMGPUWarpReduction", 106>;
+    : I32EnumAttrCase<"LLVMGPUWarpReduction", 104>;
 def LLVMGPU_MatmulTensorCoreMmaSync
-    : I32EnumAttrCase<"LLVMGPUMatmulTensorCoreMmaSync", 107>;
+    : I32EnumAttrCase<"LLVMGPUMatmulTensorCoreMmaSync", 105>;
 def LLVMGPU_VectorDistribute
-    : I32EnumAttrCase<"LLVMGPUVectorDistribute", 108>;
+    : I32EnumAttrCase<"LLVMGPUVectorDistribute", 106>;
 def LLVMGPU_WinogradVectorize
-    : I32EnumAttrCase<"LLVMGPUWinogradVectorize", 109>;
+    : I32EnumAttrCase<"LLVMGPUWinogradVectorize", 107>;
 def LLVMGPU_TileAndFuse
-    : I32EnumAttrCase<"LLVMGPUTileAndFuse", 110>;
+    : I32EnumAttrCase<"LLVMGPUTileAndFuse", 108>;
 
 def SPIRV_BaseLowering
     : I32EnumAttrCase<"SPIRVBaseLowering", 200>;
@@ -91,11 +87,10 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
     CPU_DataTiling, CPU_LinalgExtTileAndVectorize,
 
     // LLVMGPU CodeGen pipelines
-    LLVMGPU_Default, LLVMGPU_BaseLowering, LLVMGPU_SimpleDistribute,
+    LLVMGPU_Default, LLVMGPU_BaseLowering,
     LLVMGPU_Vectorize, LLVMGPU_MatmulTensorCore,
-    LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction,
-    LLVMGPU_MatmulTensorCoreMmaSync, LLVMGPU_VectorDistribute,
-    LLVMGPU_WinogradVectorize, LLVMGPU_TileAndFuse,
+    LLVMGPU_WarpReduction, LLVMGPU_MatmulTensorCoreMmaSync,
+    LLVMGPU_VectorDistribute, LLVMGPU_WinogradVectorize, LLVMGPU_TileAndFuse,
 
     // SPIR-V CodeGen pipelines
     SPIRV_BaseLowering, SPIRV_BaseDistribute, SPIRV_BaseVectorize,
