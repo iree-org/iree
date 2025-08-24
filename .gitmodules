@@ -40,3 +40,6 @@
 [submodule "third_party/hsa-runtime-headers"]
 	path = third_party/hsa-runtime-headers
 	url = https://github.com/iree-org/hsa-runtime-headers.git
+[submodule "third_party/nanobind"]
+	path = third_party/nanobind
+	url = https://github.com/wjakob/nanobind.git
