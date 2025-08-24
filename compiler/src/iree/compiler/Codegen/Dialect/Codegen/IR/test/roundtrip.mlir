@@ -72,3 +72,23 @@ func.func @store_to_strided_memref(
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]:
 // CHECK:         iree_codegen.store_to_buffer %[[ARG0]], %[[ARG1]]
 // CHECK-SAME:      : tensor<?x?xf32> into memref<?x?xf32, strided<[?, 1], offset: ?>>
+
+// -----
+
+func.func private @swizzle(%offset: index) -> index
+func.func @symbolic_swizzle(%arg0: memref<?xf32>) -> memref<?xf32> {
+  %0 = iree_codegen.swizzle_hint %arg0[#iree_codegen.swizzle_impl<@swizzle, 1>] : memref<?xf32>
+  return %0 : memref<?xf32>
+}
+// CHECK-LABEL: func.func @symbolic_swizzle(
+// CHECK:         iree_codegen.swizzle_hint %{{[A-Za-z0-9]*}}[#iree_codegen.swizzle_impl<@swizzle, 1>]
+
+// -----
+
+util.func private @swizzle(%offset: index) -> index
+func.func @util_func_symbolic_swizzle(%arg0: memref<?xf32>) -> memref<?xf32> {
+  %0 = iree_codegen.swizzle_hint %arg0[#iree_codegen.swizzle_impl<@swizzle, 1>] : memref<?xf32>
+  return %0 : memref<?xf32>
+}
+// CHECK-LABEL: func.func @util_func_symbolic_swizzle(
+// CHECK:         iree_codegen.swizzle_hint %{{[A-Za-z0-9]*}}[#iree_codegen.swizzle_impl<@swizzle, 1>]
