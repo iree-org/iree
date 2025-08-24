@@ -138,9 +138,6 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
                                               *maybeDepth);
     break;
   }
-  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTransposeSharedMem:
-    addGPUTransposePassPipeline(pipeline, pipelineOptions);
-    break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute:
     addGPUVectorDistributePassPipeline(pipeline, pipelineOptions, forROCDL);
     break;
