@@ -209,6 +209,44 @@ NB_MODULE(_ireeCompilerDialects, m) {
             return parameters.translationInfo;
           });
 
+  //===-------------------------------------------------------------------===//
+  // CodegenExecutableTargetAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_codegen_module, "HAL_ExecutableTargetAttr",
+                          ireeAttributeIsACodegenHALExecutableTargetAttr,
+                          ireeCodegenHALExecutableTargetAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, MlirAttribute backend, MlirAttribute format,
+             std::optional<MlirAttribute> configuration, MlirContext ctx) {
+            ireeCodegenHALExecutableTargetInfo info = {};
+            info.backend = backend;
+            info.format = format;
+            info.configuration = configuration.value_or(mlirAttributeGetNull());
+            return ireeCodegenHALExecutableTargetAttrGet(ctx, info);
+          },
+          "cls"_a, "backend"_a, "format"_a, "configuration"_a = py::none(),
+          "ctx"_a = py::none(),
+          "Gets an #iree_codegen.executable_target from parameters.")
+      .def_property_readonly(
+          "backend",
+          [](MlirAttribute self) -> MlirAttribute {
+            auto info = ireeCodegenHALExecutableTargetAttrGetInfo(self);
+            return info.backend;
+          })
+      .def_property_readonly(
+          "format",
+          [](MlirAttribute self) -> MlirAttribute {
+            auto info = ireeCodegenHALExecutableTargetAttrGetInfo(self);
+            return info.format;
+          })
+      .def_property_readonly(
+          "configuration", [](MlirAttribute self) -> MlirAttribute {
+            auto info = ireeCodegenHALExecutableTargetAttrGetInfo(self);
+            return info.configuration;
+          });
+
   //===--------------------------------------------------------------------===//
 
   auto iree_gpu_module =
@@ -503,6 +541,267 @@ NB_MODULE(_ireeCompilerDialects, m) {
               return attr;
             return std::nullopt;
           });
+
+  //===-------------------------------------------------------------------===//
+  // GPUComputeBitwidthsAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_gpu_module, "ComputeBitwidthsAttr",
+                          ireeAttributeIsAGPUComputeBitwidthsAttr,
+                          ireeGPUComputeBitwidthsAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, uint32_t value, MlirContext ctx) {
+            return ireeGPUComputeBitwidthsAttrGet(ctx, value);
+          },
+          "cls"_a, "value"_a, "ctx"_a = py::none(),
+          "Gets an #iree_gpu.compute_bitwidths from parameters.")
+      .def_property_readonly("raw_value", ireeGPUComputeBitwidthsAttrGetValue)
+      .def_property_readonly("value", [](MlirAttribute self) -> py::object {
+        uint32_t rawValue = ireeGPUComputeBitwidthsAttrGetValue(self);
+        return py::module_::import_(kGpuModuleImportPath)
+            .attr("ComputeBitwidths")(rawValue);
+      });
+
+  //===-------------------------------------------------------------------===//
+  // GPUStorageBitwidthsAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_gpu_module, "StorageBitwidthsAttr",
+                          ireeAttributeIsAGPUStorageBitwidthsAttr,
+                          ireeGPUStorageBitwidthsAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, uint32_t value, MlirContext ctx) {
+            return ireeGPUStorageBitwidthsAttrGet(ctx, value);
+          },
+          "cls"_a, "value"_a, "ctx"_a = py::none(),
+          "Gets an #iree_gpu.storage_bitwidths from a value.")
+      .def_property_readonly("raw_value", ireeGPUStorageBitwidthsAttrGetValue)
+      .def_property_readonly("value", [](MlirAttribute self) -> py::object {
+        uint32_t rawValue = ireeGPUStorageBitwidthsAttrGetValue(self);
+        return py::module_::import_(kGpuModuleImportPath)
+            .attr("StorageBitwidths")(rawValue);
+      });
+
+  //===-------------------------------------------------------------------===//
+  // GPUSubgroupOpsAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_gpu_module, "SubgroupOpsAttr",
+                          ireeAttributeIsAGPUSubgroupOpsAttr,
+                          ireeGPUSubgroupOpsAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, uint32_t value, MlirContext ctx) {
+            return ireeGPUSubgroupOpsAttrGet(ctx, value);
+          },
+          "cls"_a, "value"_a, "ctx"_a = py::none(),
+          "Gets an #iree_gpu.subgroup_ops from a value.")
+      .def_property_readonly("raw_value", ireeGPUSubgroupOpsAttrGetValue)
+      .def_property_readonly("value", [](MlirAttribute self) -> py::object {
+        uint32_t rawValue = ireeGPUSubgroupOpsAttrGetValue(self);
+        return py::module_::import_(kGpuModuleImportPath)
+            .attr("SubgroupOps")(rawValue);
+      });
+
+  //===-------------------------------------------------------------------===//
+  // GPUDotProductOpsAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_gpu_module, "DotProductOpsAttr",
+                          ireeAttributeIsAGPUDotProductOpsAttr,
+                          ireeGPUDotProductOpsAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, uint32_t value, MlirContext ctx) {
+            return ireeGPUDotProductOpsAttrGet(ctx, value);
+          },
+          "cls"_a, "value"_a, "ctx"_a = py::none(),
+          "Gets an #iree_gpu.dotproduct_ops from a value.")
+      .def_property_readonly("raw_value", ireeGPUDotProductOpsAttrGetValue)
+      .def_property_readonly("value", [](MlirAttribute self) -> py::object {
+        uint32_t rawValue = ireeGPUDotProductOpsAttrGetValue(self);
+        return py::module_::import_(kGpuModuleImportPath)
+            .attr("DotProductOps")(rawValue);
+      });
+
+  //===-------------------------------------------------------------------===//
+  // GPUMMAOpsArrayAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_gpu_module, "MMAOpsArrayAttr",
+                          ireeAttributeIsAGPUMMAOpsArrayAttr,
+                          ireeGPUMMAOpsArrayAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, const std::vector<MlirAttribute> &mmaAttrs,
+             MlirContext ctx) {
+            return ireeGPUMMAOpsArrayAttrGet(ctx, mmaAttrs.data(),
+                                             mmaAttrs.size());
+          },
+          "cls"_a, "mma_attrs"_a, "ctx"_a = py::none(),
+          "Gets an #iree_gpu.mma_ops array from MMA attributes.")
+      .def_property_readonly(
+          "value", ireeGPUMMAOpsArrayAttrGetValue,
+          "Gets the underlying MMA attributes as a generic ArrayAttr")
+      .def("__getitem__",
+           [](MlirAttribute self, size_t index) -> MlirAttribute {
+             return ireeGPUMMAOpsArrayAttrGetElement(self, index);
+           })
+      .def("__len__",
+           [](MlirAttribute self) -> size_t {
+             return ireeGPUMMAOpsArrayAttrGetSize(self);
+           })
+      .def("__iter__", [](MlirAttribute self) {
+        py::list result;
+        size_t size = ireeGPUMMAOpsArrayAttrGetSize(self);
+        for (size_t i = 0; i < size; ++i) {
+          result.append(ireeGPUMMAOpsArrayAttrGetElement(self, i));
+        }
+        return result.attr("__iter__")();
+      });
+
+  //===-------------------------------------------------------------------===//
+  // GPUTargetWgpAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_gpu_module, "TargetWgpAttr",
+                          ireeAttributeIsAGPUTargetWgpAttr,
+                          ireeGPUTargetWgpAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, MlirAttribute compute, MlirAttribute storage,
+             MlirAttribute subgroup, MlirAttribute dot, MlirAttribute mma,
+             MlirAttribute subgroup_size_choices,
+             MlirAttribute max_workgroup_sizes,
+             int32_t max_thread_count_per_workgroup,
+             int32_t max_workgroup_memory_bytes,
+             MlirAttribute max_workgroup_counts,
+             std::optional<int32_t> max_load_instruction_bits,
+             std::optional<int32_t> simds_per_wgp,
+             std::optional<int32_t> vgpr_space_bits,
+             std::optional<MlirAttribute> extra, MlirContext ctx) {
+            ireeGPUTargetWgpInfo targetInfo = {};
+            targetInfo.compute = compute;
+            targetInfo.storage = storage;
+            targetInfo.subgroup = subgroup;
+            targetInfo.dot = dot;
+            targetInfo.mma = mma;
+            targetInfo.subgroup_size_choices = subgroup_size_choices;
+            targetInfo.max_workgroup_sizes = max_workgroup_sizes;
+            targetInfo.max_thread_count_per_workgroup =
+                max_thread_count_per_workgroup;
+            targetInfo.max_workgroup_memory_bytes = max_workgroup_memory_bytes;
+            targetInfo.max_workgroup_counts = max_workgroup_counts;
+
+            // Convert std::optional<int32_t> to int32_t with -1 sentinel
+            targetInfo.max_load_instruction_bits =
+                max_load_instruction_bits.value_or(-1);
+            targetInfo.simds_per_wgp = simds_per_wgp.value_or(-1);
+            targetInfo.vgpr_space_bits = vgpr_space_bits.value_or(-1);
+            targetInfo.extra = extra.value_or(mlirAttributeGetNull());
+
+            return ireeGPUTargetWgpAttrGet(ctx, targetInfo);
+          },
+          "cls"_a, "compute"_a, "storage"_a, "subgroup"_a, "dot"_a, "mma"_a,
+          "subgroup_size_choices"_a, "max_workgroup_sizes"_a,
+          "max_thread_count_per_workgroup"_a, "max_workgroup_memory_bytes"_a,
+          "max_workgroup_counts"_a, "max_load_instruction_bits"_a = py::none(),
+          "simds_per_wgp"_a = py::none(), "vgpr_space_bits"_a = py::none(),
+          "extra"_a = py::none(), py::kw_only(), "ctx"_a = py::none(),
+          "Gets an #iree_gpu.target_wgp from parameters.")
+      .def_property_readonly("compute",
+                             [](MlirAttribute self) -> MlirAttribute {
+                               auto targetInfo =
+                                   ireeGPUTargetWgpAttrGetInfo(self);
+                               return targetInfo.compute;
+                             })
+      .def_property_readonly("storage",
+                             [](MlirAttribute self) -> MlirAttribute {
+                               auto targetInfo =
+                                   ireeGPUTargetWgpAttrGetInfo(self);
+                               return targetInfo.storage;
+                             })
+      .def_property_readonly("subgroup",
+                             [](MlirAttribute self) -> MlirAttribute {
+                               auto targetInfo =
+                                   ireeGPUTargetWgpAttrGetInfo(self);
+                               return targetInfo.subgroup;
+                             })
+      .def_property_readonly("dot",
+                             [](MlirAttribute self) -> MlirAttribute {
+                               auto targetInfo =
+                                   ireeGPUTargetWgpAttrGetInfo(self);
+                               return targetInfo.dot;
+                             })
+      .def_property_readonly("mma",
+                             [](MlirAttribute self) -> MlirAttribute {
+                               auto targetInfo =
+                                   ireeGPUTargetWgpAttrGetInfo(self);
+                               return targetInfo.mma;
+                             })
+      .def_property_readonly("subgroup_size_choices",
+                             [](MlirAttribute self) -> MlirAttribute {
+                               auto targetInfo =
+                                   ireeGPUTargetWgpAttrGetInfo(self);
+                               return targetInfo.subgroup_size_choices;
+                             })
+      .def_property_readonly("max_workgroup_sizes",
+                             [](MlirAttribute self) -> MlirAttribute {
+                               auto targetInfo =
+                                   ireeGPUTargetWgpAttrGetInfo(self);
+                               return targetInfo.max_workgroup_sizes;
+                             })
+      .def_property_readonly("max_thread_count_per_workgroup",
+                             [](MlirAttribute self) -> int32_t {
+                               auto targetInfo =
+                                   ireeGPUTargetWgpAttrGetInfo(self);
+                               return targetInfo.max_thread_count_per_workgroup;
+                             })
+      .def_property_readonly("max_workgroup_memory_bytes",
+                             [](MlirAttribute self) -> int32_t {
+                               auto targetInfo =
+                                   ireeGPUTargetWgpAttrGetInfo(self);
+                               return targetInfo.max_workgroup_memory_bytes;
+                             })
+      .def_property_readonly("max_workgroup_counts",
+                             [](MlirAttribute self) -> MlirAttribute {
+                               auto targetInfo =
+                                   ireeGPUTargetWgpAttrGetInfo(self);
+                               return targetInfo.max_workgroup_counts;
+                             })
+      .def_property_readonly("max_load_instruction_bits",
+                             [](MlirAttribute self) -> std::optional<int32_t> {
+                               auto targetInfo =
+                                   ireeGPUTargetWgpAttrGetInfo(self);
+                               if (targetInfo.max_load_instruction_bits == -1) {
+                                 return std::nullopt;
+                               }
+                               return targetInfo.max_load_instruction_bits;
+                             })
+      .def_property_readonly("simds_per_wgp",
+                             [](MlirAttribute self) -> std::optional<int32_t> {
+                               auto targetInfo =
+                                   ireeGPUTargetWgpAttrGetInfo(self);
+                               if (targetInfo.simds_per_wgp == -1) {
+                                 return std::nullopt;
+                               }
+                               return targetInfo.simds_per_wgp;
+                             })
+      .def_property_readonly("vgpr_space_bits",
+                             [](MlirAttribute self) -> std::optional<int32_t> {
+                               auto targetInfo =
+                                   ireeGPUTargetWgpAttrGetInfo(self);
+                               if (targetInfo.simds_per_wgp == -1) {
+                                 return std::nullopt;
+                               }
+                               return targetInfo.vgpr_space_bits;
+                             })
+      .def_property_readonly("extra", [](MlirAttribute self) -> MlirAttribute {
+        auto targetInfo = ireeGPUTargetWgpAttrGetInfo(self);
+        return targetInfo.extra;
+      });
 
   //===-------------------------------------------------------------------===//
   // Binding to utility function getSingleSubgroupLayout

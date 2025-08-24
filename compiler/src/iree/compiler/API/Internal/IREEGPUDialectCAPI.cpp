@@ -128,6 +128,107 @@ uint32_t ireeGPUReorderWorkgroupsStrategyAttrGetValue(MlirAttribute attr) {
           .getValue());
 }
 
+MlirAttribute ireeGPUComputeBitwidthsAttrGet(MlirContext ctx, uint32_t value) {
+  mlir::MLIRContext *mlirCtx = unwrap(ctx);
+  return wrap(mlir::iree_compiler::IREE::GPU::ComputeBitwidthsAttr::get(
+      mlirCtx,
+      static_cast<mlir::iree_compiler::IREE::GPU::ComputeBitwidths>(value)));
+}
+
+bool ireeAttributeIsAGPUComputeBitwidthsAttr(MlirAttribute attr) {
+  return llvm::isa<mlir::iree_compiler::IREE::GPU::ComputeBitwidthsAttr>(
+      unwrap(attr));
+}
+
+uint32_t ireeGPUComputeBitwidthsAttrGetValue(MlirAttribute attr) {
+  assert(ireeAttributeIsAGPUComputeBitwidthsAttr(attr) &&
+         "attr is not a GPUComputeBitwidthsAttr");
+  return static_cast<uint32_t>(
+      llvm::cast<mlir::iree_compiler::IREE::GPU::ComputeBitwidthsAttr>(
+          unwrap(attr))
+          .getValue());
+}
+
+MlirTypeID ireeGPUComputeBitwidthsAttrGetTypeID() {
+  return wrap(
+      mlir::iree_compiler::IREE::GPU::ComputeBitwidthsAttr::getTypeID());
+}
+
+MlirAttribute ireeGPUStorageBitwidthsAttrGet(MlirContext ctx, uint32_t value) {
+  mlir::MLIRContext *mlirCtx = unwrap(ctx);
+  return wrap(mlir::iree_compiler::IREE::GPU::StorageBitwidthsAttr::get(
+      mlirCtx,
+      static_cast<mlir::iree_compiler::IREE::GPU::StorageBitwidths>(value)));
+}
+
+uint32_t ireeGPUStorageBitwidthsAttrGetValue(MlirAttribute attr) {
+  assert(ireeAttributeIsAGPUStorageBitwidthsAttr(attr) &&
+         "attr is not a GPUStorageBitwidthsAttr");
+  return static_cast<uint32_t>(
+      llvm::cast<mlir::iree_compiler::IREE::GPU::StorageBitwidthsAttr>(
+          unwrap(attr))
+          .getValue());
+}
+
+bool ireeAttributeIsAGPUStorageBitwidthsAttr(MlirAttribute attr) {
+  return llvm::isa<mlir::iree_compiler::IREE::GPU::StorageBitwidthsAttr>(
+      unwrap(attr));
+}
+
+MlirTypeID ireeGPUStorageBitwidthsAttrGetTypeID() {
+  return wrap(
+      mlir::iree_compiler::IREE::GPU::StorageBitwidthsAttr::getTypeID());
+}
+
+MlirAttribute ireeGPUSubgroupOpsAttrGet(MlirContext ctx, uint32_t value) {
+  mlir::MLIRContext *mlirCtx = unwrap(ctx);
+  return wrap(mlir::iree_compiler::IREE::GPU::SubgroupOpsAttr::get(
+      mlirCtx,
+      static_cast<mlir::iree_compiler::IREE::GPU::SubgroupOps>(value)));
+}
+
+uint32_t ireeGPUSubgroupOpsAttrGetValue(MlirAttribute attr) {
+  assert(ireeAttributeIsAGPUSubgroupOpsAttr(attr) &&
+         "attr is not a GPUSubgroupOpsAttr");
+  return static_cast<uint32_t>(
+      llvm::cast<mlir::iree_compiler::IREE::GPU::SubgroupOpsAttr>(unwrap(attr))
+          .getValue());
+}
+
+bool ireeAttributeIsAGPUSubgroupOpsAttr(MlirAttribute attr) {
+  return llvm::isa<mlir::iree_compiler::IREE::GPU::SubgroupOpsAttr>(
+      unwrap(attr));
+}
+
+MlirTypeID ireeGPUSubgroupOpsAttrGetTypeID() {
+  return wrap(mlir::iree_compiler::IREE::GPU::SubgroupOpsAttr::getTypeID());
+}
+
+MlirAttribute ireeGPUDotProductOpsAttrGet(MlirContext ctx, uint32_t value) {
+  mlir::MLIRContext *mlirCtx = unwrap(ctx);
+  return wrap(mlir::iree_compiler::IREE::GPU::DotProductOpsAttr::get(
+      mlirCtx,
+      static_cast<mlir::iree_compiler::IREE::GPU::DotProductOps>(value)));
+}
+
+uint32_t ireeGPUDotProductOpsAttrGetValue(MlirAttribute attr) {
+  assert(ireeAttributeIsAGPUDotProductOpsAttr(attr) &&
+         "attr is not a GPUDotProductOpsAttr");
+  return static_cast<uint32_t>(
+      llvm::cast<mlir::iree_compiler::IREE::GPU::DotProductOpsAttr>(
+          unwrap(attr))
+          .getValue());
+}
+
+bool ireeAttributeIsAGPUDotProductOpsAttr(MlirAttribute attr) {
+  return llvm::isa<mlir::iree_compiler::IREE::GPU::DotProductOpsAttr>(
+      unwrap(attr));
+}
+
+MlirTypeID ireeGPUDotProductOpsAttrGetTypeID() {
+  return wrap(mlir::iree_compiler::IREE::GPU::DotProductOpsAttr::getTypeID());
+}
+
 bool ireeAttributeIsAGPUMMAIntrinsicAttr(MlirAttribute attr) {
   return llvm::isa<mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr>(
       unwrap(attr));
@@ -386,4 +487,173 @@ ireeGPUGetSingleSubgroupLayout(MlirAttribute attr, uint32_t fragment) {
   result.tstrides = wrap(builder.getI64ArrayAttr(layout.tstrides));
   result.element = wrap(builder.getI64ArrayAttr(layout.element));
   return result;
+}
+
+bool ireeAttributeIsAGPUMMAOpsArrayAttr(MlirAttribute attr) {
+  return llvm::isa<mlir::iree_compiler::IREE::GPU::MMAOpsArrayAttr>(
+      unwrap(attr));
+}
+
+MlirAttribute ireeGPUMMAOpsArrayAttrGet(MlirContext ctx,
+                                        const MlirAttribute *mmaAttrs,
+                                        size_t numAttrs) {
+  mlir::MLIRContext *mlirCtx = unwrap(ctx);
+  std::vector<mlir::iree_compiler::IREE::GPU::MMAAttr> attrs;
+  attrs.reserve(numAttrs);
+  for (size_t i = 0; i < numAttrs; ++i) {
+    auto mmaAttr = llvm::cast<mlir::iree_compiler::IREE::GPU::MMAAttr>(
+        unwrap(mmaAttrs[i]));
+    attrs.push_back(mmaAttr);
+  }
+  auto mmaOpsArrayAttr =
+      mlir::iree_compiler::IREE::GPU::MMAOpsArrayAttr::get(mlirCtx, attrs);
+  return wrap(mmaOpsArrayAttr);
+}
+
+MlirAttribute ireeGPUMMAOpsArrayAttrGetValue(MlirAttribute attr) {
+  auto mmaOpsArrayAttr =
+      llvm::cast<mlir::iree_compiler::IREE::GPU::MMAOpsArrayAttr>(unwrap(attr));
+  auto valueRef = mmaOpsArrayAttr.getValue();
+
+  std::vector<mlir::Attribute> attrs;
+  for (const auto &mmaAttr : valueRef) {
+    attrs.push_back(mmaAttr);
+  }
+  return wrap(mlir::ArrayAttr::get(mmaOpsArrayAttr.getContext(), attrs));
+}
+
+MlirAttribute ireeGPUMMAOpsArrayAttrGetElement(MlirAttribute attr,
+                                               size_t index) {
+  auto mmaOpsArrayAttr =
+      llvm::cast<mlir::iree_compiler::IREE::GPU::MMAOpsArrayAttr>(unwrap(attr));
+  return wrap(mmaOpsArrayAttr[index]);
+}
+
+size_t ireeGPUMMAOpsArrayAttrGetSize(MlirAttribute attr) {
+  auto mmaOpsArrayAttr =
+      llvm::cast<mlir::iree_compiler::IREE::GPU::MMAOpsArrayAttr>(unwrap(attr));
+  return mmaOpsArrayAttr.size();
+}
+
+MlirTypeID ireeGPUMMAOpsArrayAttrGetTypeID() {
+  return wrap(mlir::iree_compiler::IREE::GPU::MMAOpsArrayAttr::getTypeID());
+}
+
+bool ireeAttributeIsAGPUTargetWgpAttr(MlirAttribute attr) {
+  return llvm::isa<mlir::iree_compiler::IREE::GPU::TargetWgpAttr>(unwrap(attr));
+}
+
+MlirTypeID ireeGPUTargetWgpAttrGetTypeID() {
+  return wrap(mlir::iree_compiler::IREE::GPU::TargetWgpAttr::getTypeID());
+}
+
+MlirAttribute ireeGPUTargetWgpAttrGet(MlirContext mlirCtx,
+                                      ireeGPUTargetWgpInfo targetInfo) {
+  assert(!mlirAttributeIsNull(targetInfo.compute) &&
+         ireeAttributeIsAGPUComputeBitwidthsAttr(targetInfo.compute) &&
+         "Invalid compute bitwidths attr");
+
+  assert(!mlirAttributeIsNull(targetInfo.storage) &&
+         ireeAttributeIsAGPUStorageBitwidthsAttr(targetInfo.storage) &&
+         "Invalid storage bitwidths attr");
+
+  assert(!mlirAttributeIsNull(targetInfo.subgroup) &&
+         ireeAttributeIsAGPUSubgroupOpsAttr(targetInfo.subgroup) &&
+         "Invalid subgroup ops attr");
+
+  assert(!mlirAttributeIsNull(targetInfo.dot) &&
+         ireeAttributeIsAGPUDotProductOpsAttr(targetInfo.dot) &&
+         "Invalid dot product ops attr");
+
+  assert(ireeAttributeIsAGPUMMAOpsArrayAttr(targetInfo.mma) &&
+         "Invalid MMA ops array attr");
+
+  assert(!mlirAttributeIsNull(targetInfo.subgroup_size_choices) &&
+         mlirAttributeIsADenseI32Array(targetInfo.subgroup_size_choices) &&
+         "Invalid subgroup size choices attr");
+
+  assert(!mlirAttributeIsNull(targetInfo.max_workgroup_sizes) &&
+         mlirAttributeIsADenseI32Array(targetInfo.max_workgroup_sizes) &&
+         "Invalid max workgroup sizes attr");
+
+  assert(!mlirAttributeIsNull(targetInfo.max_workgroup_counts) &&
+         mlirAttributeIsADenseI32Array(targetInfo.max_workgroup_counts) &&
+         "Invalid max workgroup counts attr");
+
+  auto compute =
+      llvm::cast<mlir::iree_compiler::IREE::GPU::ComputeBitwidthsAttr>(
+          unwrap(targetInfo.compute));
+  auto storage =
+      llvm::cast<mlir::iree_compiler::IREE::GPU::StorageBitwidthsAttr>(
+          unwrap(targetInfo.storage));
+  auto subgroup = llvm::cast<mlir::iree_compiler::IREE::GPU::SubgroupOpsAttr>(
+      unwrap(targetInfo.subgroup));
+  auto dot = llvm::cast<mlir::iree_compiler::IREE::GPU::DotProductOpsAttr>(
+      unwrap(targetInfo.dot));
+  auto mma = llvm::cast<mlir::iree_compiler::IREE::GPU::MMAOpsArrayAttr>(
+      unwrap(targetInfo.mma));
+  auto subgroup_size_choices = llvm::cast<mlir::DenseI32ArrayAttr>(
+      unwrap(targetInfo.subgroup_size_choices));
+  auto max_workgroup_sizes = llvm::cast<mlir::DenseI32ArrayAttr>(
+      unwrap(targetInfo.max_workgroup_sizes));
+  auto max_workgroup_counts = llvm::cast<mlir::DenseI32ArrayAttr>(
+      unwrap(targetInfo.max_workgroup_counts));
+
+  std::optional<int32_t> max_load_instruction_bits;
+  if (targetInfo.max_load_instruction_bits != -1) {
+    max_load_instruction_bits = targetInfo.max_load_instruction_bits;
+  }
+
+  std::optional<int32_t> simds_per_wgp;
+  if (targetInfo.simds_per_wgp != -1) {
+    simds_per_wgp = targetInfo.simds_per_wgp;
+  }
+
+  std::optional<int32_t> vgpr_space_bits;
+  if (targetInfo.vgpr_space_bits != -1) {
+    vgpr_space_bits = targetInfo.vgpr_space_bits;
+  }
+
+  auto extra =
+      llvm::cast_if_present<mlir::DictionaryAttr>(unwrap(targetInfo.extra));
+
+  // Create null scaled_mma attribute
+  auto scaled_mma =
+      llvm::cast<mlir::iree_compiler::IREE::GPU::ScaledMMAOpsArrayAttr>(
+          unwrap(mlirAttributeGetNull()));
+  mlir::MLIRContext *ctx = unwrap(mlirCtx);
+  return wrap(mlir::iree_compiler::IREE::GPU::TargetWgpAttr::get(
+      ctx, compute, storage, subgroup, dot, mma, scaled_mma,
+      subgroup_size_choices, max_workgroup_sizes,
+      targetInfo.max_thread_count_per_workgroup,
+      targetInfo.max_workgroup_memory_bytes, max_workgroup_counts,
+      max_load_instruction_bits, simds_per_wgp, vgpr_space_bits, extra));
+}
+
+ireeGPUTargetWgpInfo ireeGPUTargetWgpAttrGetInfo(MlirAttribute attr) {
+  auto targetWgpAttr =
+      llvm::cast<mlir::iree_compiler::IREE::GPU::TargetWgpAttr>(unwrap(attr));
+
+  ireeGPUTargetWgpInfo targetInfo = {};
+  targetInfo.compute = wrap(targetWgpAttr.getCompute());
+  targetInfo.storage = wrap(targetWgpAttr.getStorage());
+  targetInfo.subgroup = wrap(targetWgpAttr.getSubgroup());
+  targetInfo.dot = wrap(targetWgpAttr.getDot());
+  targetInfo.mma = wrap(targetWgpAttr.getMma());
+  targetInfo.subgroup_size_choices =
+      wrap(targetWgpAttr.getSubgroupSizeChoices());
+  targetInfo.max_workgroup_sizes = wrap(targetWgpAttr.getMaxWorkgroupSizes());
+  targetInfo.max_thread_count_per_workgroup =
+      targetWgpAttr.getMaxThreadCountPerWorkgroup();
+  targetInfo.max_workgroup_memory_bytes =
+      targetWgpAttr.getMaxWorkgroupMemoryBytes();
+  targetInfo.max_workgroup_counts = wrap(targetWgpAttr.getMaxWorkgroupCounts());
+
+  targetInfo.max_load_instruction_bits =
+      targetWgpAttr.getMaxLoadInstructionBits().value_or(-1);
+
+  targetInfo.simds_per_wgp = targetWgpAttr.getSimdsPerWgp().value_or(-1);
+  targetInfo.vgpr_space_bits = targetWgpAttr.getVgprSpaceBits().value_or(-1);
+  targetInfo.extra = wrap(targetWgpAttr.getExtra());
+  return targetInfo;
 }

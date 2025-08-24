@@ -61,6 +61,62 @@ MLIR_CAPI_EXPORTED MlirAttribute ireeGPUMMAIntrinsicAttrGet(MlirContext mlirCtx,
 
 MLIR_CAPI_EXPORTED uint32_t ireeGPUMMAIntrinsicAttrGetValue(MlirAttribute attr);
 
+MLIR_CAPI_EXPORTED MlirAttribute ireeGPUComputeBitwidthsAttrGet(MlirContext ctx,
+                                                                uint32_t value);
+
+MLIR_CAPI_EXPORTED uint32_t
+ireeGPUComputeBitwidthsAttrGetValue(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED bool
+ireeAttributeIsAGPUComputeBitwidthsAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID ireeGPUComputeBitwidthsAttrGetTypeID();
+
+MLIR_CAPI_EXPORTED MlirAttribute ireeGPUStorageBitwidthsAttrGet(MlirContext ctx,
+                                                                uint32_t value);
+MLIR_CAPI_EXPORTED uint32_t
+ireeGPUStorageBitwidthsAttrGetValue(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED bool
+ireeAttributeIsAGPUStorageBitwidthsAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID ireeGPUStorageBitwidthsAttrGetTypeID();
+
+MLIR_CAPI_EXPORTED MlirAttribute ireeGPUSubgroupOpsAttrGet(MlirContext ctx,
+                                                           uint32_t value);
+
+MLIR_CAPI_EXPORTED uint32_t ireeGPUSubgroupOpsAttrGetValue(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED bool ireeAttributeIsAGPUSubgroupOpsAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID ireeGPUSubgroupOpsAttrGetTypeID();
+
+MLIR_CAPI_EXPORTED MlirAttribute ireeGPUDotProductOpsAttrGet(MlirContext ctx,
+                                                             uint32_t value);
+
+MLIR_CAPI_EXPORTED uint32_t
+ireeGPUDotProductOpsAttrGetValue(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED bool
+ireeAttributeIsAGPUDotProductOpsAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID ireeGPUDotProductOpsAttrGetTypeID();
+
+MLIR_CAPI_EXPORTED MlirAttribute ireeGPUMMAOpsArrayAttrGet(
+    MlirContext ctx, const MlirAttribute *mmaAttrs, size_t numAttrs);
+
+MLIR_CAPI_EXPORTED MlirAttribute
+ireeGPUMMAOpsArrayAttrGetValue(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirAttribute
+ireeGPUMMAOpsArrayAttrGetElement(MlirAttribute attr, size_t index);
+
+MLIR_CAPI_EXPORTED size_t ireeGPUMMAOpsArrayAttrGetSize(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED bool ireeAttributeIsAGPUMMAOpsArrayAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID ireeGPUMMAOpsArrayAttrGetTypeID();
+
 MLIR_CAPI_EXPORTED bool ireeAttributeIsAGPUMMAAttr(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED MlirTypeID ireeGPUMMAAttrGetTypeID(void);
@@ -143,6 +199,39 @@ struct ireeGPUMMASingleSubgroupLayout {
 
 MLIR_CAPI_EXPORTED ireeGPUMMASingleSubgroupLayout
 ireeGPUGetSingleSubgroupLayout(MlirAttribute attr, uint32_t fragment);
+
+// Represent the Wroupgroup processor level info.
+struct ireeGPUTargetWgpInfo {
+  MlirAttribute compute;  // ComputeBitwidthsAttr.
+  MlirAttribute storage;  // StorageBitwidthsAttr.
+  MlirAttribute subgroup; // SubgroupOpsAttr.
+  MlirAttribute dot;      // DotProductOpsAttr.
+  MlirAttribute mma;      // MMAOpsArrayAttr.
+
+  MlirAttribute subgroup_size_choices; // DenseI32ArrayAttr.
+  MlirAttribute max_workgroup_sizes;   // DenseI32ArrayAttr.
+
+  int32_t max_thread_count_per_workgroup;
+  int32_t max_workgroup_memory_bytes;
+
+  MlirAttribute max_workgroup_counts; // DenseI32ArrayAttr.
+
+  // Use -1 to represent "not set" for optional int32_t fields.
+  int32_t max_load_instruction_bits; // std::optional<int32_t>.
+  int32_t simds_per_wgp;             // std::optional<int32_t>.
+  int32_t vgpr_space_bits;           // std::optional<int32_t>.
+  MlirAttribute extra;               // DictionaryAttr.
+};
+
+MLIR_CAPI_EXPORTED MlirAttribute
+ireeGPUTargetWgpAttrGet(MlirContext ctx, ireeGPUTargetWgpInfo info);
+
+MLIR_CAPI_EXPORTED ireeGPUTargetWgpInfo
+ireeGPUTargetWgpAttrGetInfo(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED bool ireeAttributeIsAGPUTargetWgpAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID ireeGPUTargetWgpAttrGetTypeID();
 
 #ifdef __cplusplus
 }

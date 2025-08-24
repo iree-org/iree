@@ -3,7 +3,13 @@ EXPORTS
   ireeAttributeIsACodegenCompilationInfoAttr
   ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr
   ireeAttributeIsACodegenTranslationInfoAttr
+  ireeAttributeIsAGPUComputeBitwidthsAttr
+  ireeAttributeIsAGPUDotProductOpsAttr
+  ireeAttributeIsAGPUStorageBitwidthsAttr
+  ireeAttributeIsAGPUSubgroupOpsAttr
+  ireeAttributeIsAGPUTargetWgpAttr
   ireeAttributeIsAGPULoweringConfigAttr
+  ireeAttributeIsAGPUMMAOpsArrayAttr
   ireeAttributeIsAGPUMMAAttr
   ireeAttributeIsAGPUVirtualMMAAttr
   ireeAttributeIsAGPUMMAIntrinsicAttr
@@ -25,6 +31,10 @@ EXPORTS
   ireeCodegenTranslationInfoAttrGet
   ireeCodegenTranslationInfoAttrGetParameters
   ireeCodegenTranslationInfoAttrGetTypeID
+  ireeCodegenHALExecutableTargetAttrGet
+  ireeCodegenHALExecutableTargetAttrGetInfo
+  ireeAttributeIsACodegenHALExecutableTargetAttr
+  ireeCodegenHALExecutableTargetAttrGetTypeID
   ireeCompilerEnumeratePlugins
   ireeCompilerEnumerateRegisteredHALTargetBackends
   ireeCompilerErrorDestroy
@@ -76,12 +86,32 @@ EXPORTS
   ireeCompilerSourceOpenFile
   ireeCompilerSourceSplit
   ireeCompilerSourceWrapBuffer
+  ireeGPUComputeBitwidthsAttrGet
+  ireeGPUComputeBitwidthsAttrGetTypeID
+  ireeGPUComputeBitwidthsAttrGetValue
+  ireeGPUDotProductOpsAttrGet
+  ireeGPUDotProductOpsAttrGetValue
+  ireeGPUDotProductOpsAttrGetTypeID
+  ireeGPUStorageBitwidthsAttrGet
+  ireeGPUStorageBitwidthsAttrGetValue
+  ireeGPUStorageBitwidthsAttrGetTypeID
+  ireeGPUSubgroupOpsAttrGet
+  ireeGPUSubgroupOpsAttrGetValue
+  ireeGPUSubgroupOpsAttrGetTypeID
+  ireeGPUTargetWgpAttrGet
+  ireeGPUTargetWgpAttrGetInfo
+  ireeGPUTargetWgpAttrGetTypeID
   ireeGPULoweringConfigAttrGet
   ireeGPULoweringConfigAttrGetAttributes
   ireeGPULoweringConfigAttrGetMmaKind
   ireeGPULoweringConfigAttrGetSubgroupCount
   ireeGPULoweringConfigAttrGetTileSizes
   ireeGPULoweringConfigAttrGetTypeID
+  ireeGPUMMAOpsArrayAttrGet
+  ireeGPUMMAOpsArrayAttrGetValue
+  ireeGPUMMAOpsArrayAttrGetElement
+  ireeGPUMMAOpsArrayAttrGetSize
+  ireeGPUMMAOpsArrayAttrGetTypeID
   ireeGPUMMAAttrGet
   ireeGPUVirtualMMAAttrGet
   ireeGPUMMAAttrGetInfo

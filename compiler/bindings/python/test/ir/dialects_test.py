@@ -391,3 +391,232 @@ def compilation_info():
     assert compilation_info is not None
     assert compilation_info.lowering_config == lowering_config
     assert compilation_info.translation_info == translation_info
+
+
+@run
+def executable_target_attr():
+    backend = ir.StringAttr.get("rocm")
+    format = ir.StringAttr.get("rocm-hsaco-fb")
+    target = iree_codegen.HAL_ExecutableTargetAttr.get(backend, format)
+    assert str(target) == '#hal.executable.target<"rocm", "rocm-hsaco-fb">'
+
+
+@run
+def compute_bitwidths_attr():
+    compute_bitwidths_attr = iree_gpu.ComputeBitwidthsAttr.get(
+        iree_gpu.ComputeBitwidths.FP64
+    )
+    assert compute_bitwidths_attr is not None
+
+    assert str(compute_bitwidths_attr) == "#iree_gpu<compute_bitwidths fp64>"
+    raw_value = compute_bitwidths_attr.raw_value
+    assert raw_value == iree_gpu.ComputeBitwidths.FP64
+    value = compute_bitwidths_attr.value
+    assert value == iree_gpu.ComputeBitwidths.FP64
+    assert str(value) == "fp64"
+    assert int(value) == raw_value
+
+    compute_bitwidths_attr = iree_gpu.ComputeBitwidthsAttr.get(
+        iree_gpu.ComputeBitwidths.FP32 | iree_gpu.ComputeBitwidths.FP16
+    )
+    assert compute_bitwidths_attr is not None
+
+    assert str(compute_bitwidths_attr) == "#iree_gpu<compute_bitwidths fp32|fp16>"
+    raw_value = compute_bitwidths_attr.raw_value
+    assert raw_value == iree_gpu.ComputeBitwidths.FP32 | iree_gpu.ComputeBitwidths.FP16
+    value = compute_bitwidths_attr.value
+    assert value == iree_gpu.ComputeBitwidths.FP32 | iree_gpu.ComputeBitwidths.FP16
+    assert str(value) == "fp32|fp16"
+    assert int(value) == raw_value
+
+
+@run
+def storage_bitwidths_attr():
+    storage_bitwidths_attr = iree_gpu.StorageBitwidthsAttr.get(
+        iree_gpu.StorageBitwidths.B64
+    )
+    assert storage_bitwidths_attr is not None
+
+    assert str(storage_bitwidths_attr) == "#iree_gpu<storage_bitwidths b64>"
+    raw_value = storage_bitwidths_attr.raw_value
+    assert raw_value == iree_gpu.StorageBitwidths.B64
+    value = storage_bitwidths_attr.value
+    assert value == iree_gpu.StorageBitwidths.B64
+    assert str(value) == "b64"
+    assert int(value) == raw_value
+
+    storage_bitwidths_attr = iree_gpu.StorageBitwidthsAttr.get(
+        iree_gpu.StorageBitwidths.B32 | iree_gpu.StorageBitwidths.B16
+    )
+    assert storage_bitwidths_attr is not None
+
+    assert str(storage_bitwidths_attr) == "#iree_gpu<storage_bitwidths b32|b16>"
+    raw_value = storage_bitwidths_attr.raw_value
+    assert raw_value == iree_gpu.StorageBitwidths.B32 | iree_gpu.StorageBitwidths.B16
+    value = storage_bitwidths_attr.value
+    assert value == iree_gpu.StorageBitwidths.B32 | iree_gpu.StorageBitwidths.B16
+    assert str(value) == "b32|b16"
+    assert int(value) == raw_value
+
+
+@run
+def subgroup_ops_attr():
+    subgroup_ops_attr = iree_gpu.SubgroupOpsAttr.get(iree_gpu.SubgroupOps.Shuffle)
+    assert subgroup_ops_attr is not None
+
+    assert str(subgroup_ops_attr) == "#iree_gpu<subgroup_ops shuffle>"
+    raw_value = subgroup_ops_attr.raw_value
+    assert raw_value == iree_gpu.SubgroupOps.Shuffle
+    value = subgroup_ops_attr.value
+    assert value == iree_gpu.SubgroupOps.Shuffle
+    assert str(value) == "shuffle"
+    assert int(value) == raw_value
+
+    subgroup_ops_attr = iree_gpu.SubgroupOpsAttr.get(
+        iree_gpu.SubgroupOps.Shuffle | iree_gpu.SubgroupOps.Arithmetic
+    )
+    assert subgroup_ops_attr is not None
+
+    assert str(subgroup_ops_attr) == "#iree_gpu<subgroup_ops shuffle|arithmetic>"
+    raw_value = subgroup_ops_attr.raw_value
+    assert raw_value == iree_gpu.SubgroupOps.Shuffle | iree_gpu.SubgroupOps.Arithmetic
+    value = subgroup_ops_attr.value
+    assert value == iree_gpu.SubgroupOps.Shuffle | iree_gpu.SubgroupOps.Arithmetic
+    assert str(value) == "shuffle|arithmetic"
+    assert int(value) == raw_value
+
+
+@run
+def dotproduct_ops_attr():
+    dotproduct_ops_attr = iree_gpu.DotProductOpsAttr.get(
+        iree_gpu.DotProductOps.DP4xI8ToI32
+    )
+    assert dotproduct_ops_attr is not None
+
+    assert str(dotproduct_ops_attr) == "#iree_gpu<dotproduct_ops dp4xi8toi32>"
+    raw_value = dotproduct_ops_attr.raw_value
+    assert raw_value == iree_gpu.DotProductOps.DP4xI8ToI32
+    value = dotproduct_ops_attr.value
+    assert value == iree_gpu.DotProductOps.DP4xI8ToI32
+    assert str(value) == "dp4xi8toi32"
+    assert int(value) == raw_value
+
+    dotproduct_ops_attr = iree_gpu.DotProductOpsAttr.get(
+        iree_gpu.DotProductOps.None_ | iree_gpu.DotProductOps.DP4xI8ToI32
+    )
+    assert dotproduct_ops_attr is not None
+    assert str(dotproduct_ops_attr) == "#iree_gpu<dotproduct_ops dp4xi8toi32>"
+    raw_value = dotproduct_ops_attr.raw_value
+    assert (
+        raw_value == iree_gpu.DotProductOps.None_ | iree_gpu.DotProductOps.DP4xI8ToI32
+    )
+    value = dotproduct_ops_attr.value
+    assert value == iree_gpu.DotProductOps.None_ | iree_gpu.DotProductOps.DP4xI8ToI32
+    assert str(value) == "dp4xi8toi32"
+    assert int(value) == raw_value
+
+
+@run
+def mma_ops_array_attr():
+    mma_attr1 = iree_gpu.MMAAttr.get(iree_gpu.MMAIntrinsic.MFMA_F32_16x16x16_F16)
+    mma_attr2 = iree_gpu.MMAAttr.get(iree_gpu.MMAIntrinsic.MFMA_F32_32x32x8_F16)
+
+    mma_ops_array = iree_gpu.MMAOpsArrayAttr.get([mma_attr1, mma_attr2])
+    assert mma_ops_array is not None
+    assert len(mma_ops_array) == 2
+    assert mma_ops_array[0] == mma_attr1
+    assert mma_ops_array[1] == mma_attr2
+
+    # Test iteration.
+    mma_list = []
+    for mma in mma_ops_array:
+        mma_list.append(mma)
+
+    assert len(mma_list) == 2
+    assert mma_list[0] == mma_attr1
+    assert mma_list[1] == mma_attr2
+
+    # Test list conversion.
+    mma_list = list(mma_ops_array)
+    assert len(mma_list) == 2
+    assert mma_list[0] == mma_attr1
+    assert mma_list[1] == mma_attr2
+
+
+# @run
+# def target_wgp_attr():
+#     compute_attr = iree_gpu.ComputeBitwidthsAttr.get(
+#         iree_gpu.ComputeBitwidths.FP64
+#         | iree_gpu.ComputeBitwidths.FP32
+#         | iree_gpu.ComputeBitwidths.FP16
+#     )
+#     storage_attr = iree_gpu.StorageBitwidthsAttr.get(
+#         iree_gpu.StorageBitwidths.B64
+#         | iree_gpu.StorageBitwidths.B32
+#         | iree_gpu.StorageBitwidths.B16
+#     )
+#     subgroup_attr = iree_gpu.SubgroupOpsAttr.get(
+#         iree_gpu.SubgroupOps.Shuffle | iree_gpu.SubgroupOps.Arithmetic
+#     )
+
+#     dot_attr = iree_gpu.DotProductOpsAttr.get(iree_gpu.DotProductOps.DP4xI8ToI32)
+
+#     mma_ops = [
+#         iree_gpu.MMAAttr.get(iree_gpu.MMAIntrinsic.MFMA_F32_16x16x16_F16),
+#         iree_gpu.MMAAttr.get(iree_gpu.MMAIntrinsic.MFMA_F32_32x32x8_F16),
+#     ]
+#     mma_attr = iree_gpu.MMAOpsArrayAttr.get(mma_ops)
+
+#     subgroup_sizes = ir.DenseI32ArrayAttr.get([64, 64])
+#     workgroup_sizes = ir.DenseI32ArrayAttr.get([1024, 1024, 1024])
+#     workgroup_counts = ir.DenseI32ArrayAttr.get([65535, 65535, 65535])
+
+#     target_wgp = iree_gpu.TargetWgpAttr.get(
+#         compute_attr,
+#         storage_attr,
+#         subgroup_attr,
+#         dot_attr,
+#         mma_attr,
+#         subgroup_sizes,
+#         workgroup_sizes,
+#         1024,
+#         65536,
+#         workgroup_counts,
+#         max_load_instruction_bits=128,
+#         simds_per_wgp=4,
+#         vgpr_space_bits=512 * 32,
+#     )
+
+#     assert target_wgp is not None
+#     assert target_wgp.max_thread_count_per_workgroup == 1024
+#     assert target_wgp.max_workgroup_memory_bytes == 65536
+#     assert target_wgp.max_load_instruction_bits == 128
+#     assert target_wgp.simds_per_wgp == 4
+#     assert target_wgp.vgpr_space_bits == 16384
+
+#     assert target_wgp.mma == mma_attr
+#     assert len(target_wgp.mma) == 2
+
+#     # Custom extra dictionary with additional features
+#     extra_dict = ir.DictAttr.get(
+#         {
+#             "custom_feature": ir.StringAttr.get("enabled"),
+#         }
+#     )
+
+#     target_wgp = iree_gpu.TargetWgpAttr.get(
+#         compute_attr,
+#         storage_attr,
+#         subgroup_attr,
+#         dot_attr,
+#         mma_attr,
+#         subgroup_sizes,
+#         workgroup_sizes,
+#         1024,
+#         65536,
+#         workgroup_counts,
+#         extra=extra_dict,
+#     )
+
+#     assert target_wgp is not None
+#     assert target_wgp.extra == extra_dict
