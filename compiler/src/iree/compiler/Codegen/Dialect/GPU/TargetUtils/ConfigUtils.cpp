@@ -44,7 +44,7 @@ constexpr int64_t kPreferredCopyNumBits = 128;
 
 LogicalResult setDataTiledMultiMmaLoweringConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
-    Operation *op, IREE::GPU::UKernelConfigAttr ukernelConfig) {
+    Operation *op, IREE::Codegen::UKernelDescriptorAttr ukernelConfig) {
   auto multiMmaOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op);
   if (!multiMmaOp) {
     return failure();
@@ -90,7 +90,9 @@ LogicalResult setDataTiledMultiMmaLoweringConfig(
   attrs.emplace_back(b.getStringAttr("reduction"),
                      b.getI64ArrayAttr(reductionTileSizes));
   if (ukernelConfig) {
-    attrs.emplace_back(b.getStringAttr("ukernel"), ukernelConfig);
+    // TODO(avarma): Better to keep "iree_codegen.ukernel" as a global static
+    // string.
+    op->setAttr("iree_codegen.ukernel", ukernelConfig);
   } else {
     // Promote operands to use shared memory for LHS and RHS.
     // Don't do that with ukernels: their untiled reduction dimension is too
