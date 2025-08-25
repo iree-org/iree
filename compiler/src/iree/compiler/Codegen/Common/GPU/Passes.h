@@ -67,7 +67,7 @@ LogicalResult reduceSharedMemoryBankConflicts(mlir::FunctionOpInterface funcOp,
 
 /// Return true if `op` will be generalized (converted to a linalg.generic) by
 /// the pass GPUGeneralizeNamedOpsPass.
-static bool isInGPUGeneralizeSet(Operation *op) {
+inline bool isInGPUGeneralizeSet(Operation *op) {
   return isa<linalg::BatchMatmulOp, linalg::DotOp, linalg::MatmulOp,
              linalg::MatvecOp, linalg::TransposeOp, linalg::VecmatOp>(op);
 }

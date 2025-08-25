@@ -3157,7 +3157,6 @@ static LogicalResult setConvolutionConfig(
 static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
                                    mlir::FunctionOpInterface entryPointFn,
                                    Operation *computeOp) {
-
   if (isInGPUGeneralizeSet(computeOp)) {
     return computeOp->emitOpError(
         "is a named op that was expected to be generalized before now.");
