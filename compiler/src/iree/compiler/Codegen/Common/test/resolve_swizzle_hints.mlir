@@ -70,7 +70,7 @@ func.func @swizzle_both(%src: memref<?xf32>) {
 // -----
 
 func.func @drop_swizzle_non_access_user(%src: memref<?xf32>) -> (memref<?xf32>, vector<4xf32>) {
-  // expected-error @+1 {{The following SwizzleHintOp user is not supported}}
+  // expected-error @+1 {{unsupported SwizzleHintOp user}}
   %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32>
   %offset = arith.constant 68 : index
   %1 = vector.load %0[%offset] : memref<?xf32>, vector<4xf32>
