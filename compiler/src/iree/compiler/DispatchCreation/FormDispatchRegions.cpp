@@ -762,9 +762,9 @@ static bool isFusableWithProducer(
   }
 
   if (auto padOp = dyn_cast<tensor::PadOp>(consumer)) {
-    if (options.fusePadWithProducers) {
-      return isa<linalg::LinalgOp>(producer);
-    }
+    // if (options.fusePadWithProducers) {
+    //   return isa<linalg::LinalgOp>(producer);
+    // }
     return false;
   }
 
