@@ -142,8 +142,10 @@ def GPUGeneralizeNamedOpsPass :
   let summary = "Convert named Linalg ops to linalg.generic ops";
 
   let description = [{
-    Convert a whitelisted set of named Linalg ops to linalg.generics. The whitelist
-    does not contain all named ops.
+    Convert a subset of named Linalg ops to linalg.generics. The subset does not
+    contain all named ops. The rule-of-thumb is that named ops whose operand
+    maps are projections are in the subset. For example convolutions and pooling ops
+    are not generalized by this pass, but matmuls are.
   }];
 }
 

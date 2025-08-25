@@ -1,14 +1,14 @@
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx942 \
 // RUN: --iree-codegen-llvmgpu-early-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
 // RUN: --iree-codegen-llvmgpu-use-igemm=false \
-// RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefix=CHECK
+// RUN: --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-generalize-named-ops),iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefix=CHECK
 //
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx942 \
 // RUN: --iree-codegen-llvmgpu-use-igemm=false \
-// RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefix=LATE
+// RUN: --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-generalize-named-ops),iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefix=LATE
 
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx942 \
-// RUN:     --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefix=DEFAULT
+// RUN:     --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-generalize-named-ops),iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefix=DEFAULT
 
 // TODO: This test is still using the legacy LLVMGPU kernel config. This needs
 // to be migrated to the rocdl heuristics, but for now is just physically
@@ -146,7 +146,7 @@ func.func @mfma_matmul_1024x1024x1024(%lhs: tensor<1024x1024xf16>, %rhs: tensor<
 // Verify that the fill does not have the lowering config propagated to it.
 //       CHECK:   linalg.fill ins
 
-//       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 //  CHECK-SAME:     promote_operands = [0, 1]
 //  CHECK-SAME:     reduction = [0, 0, 2]
@@ -169,7 +169,8 @@ func.func @mfma_matmul_k_aligned_intrinsic(%lhs: tensor<1024x360xf16>, %rhs: ten
 
 // CHECK-LABEL: func.func @mfma_matmul_k_aligned_intrinsic
 // CHECK:         pipeline = LLVMGPUTileAndFuse
-// CHECK:         linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK:         linalg.fill
+// CHECK:         linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME:    mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
 
 // LATE: LLVMGPUVectorDistribute
@@ -187,7 +188,7 @@ func.func @mfma_matmul_m_aligned_intrinsic(%lhs: tensor<176x1024xi8>, %rhs: tens
 }
 
 // CHECK-LABEL: func.func @mfma_matmul_m_aligned_intrinsic
-// CHECK:         linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK:         linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME:    mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8>
 
 // LATE: LLVMGPUVectorDistribute
@@ -230,7 +231,7 @@ module {
 
 // CHECK-LABEL: func.func @matmul_dynamic_dim
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
-//       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     promote_operands = [0, 1]
 //  CHECK-SAME:     reduction = [0, 0, 4]
 //  CHECK-SAME:     thread = [1, 4, 0]
@@ -334,7 +335,8 @@ func.func @unaligned_to_intrinsic_batched_matmul(%lhs : tensor<12x2x577xf32>, %r
 // LATE-LABEL: func.func @unaligned_to_intrinsic_batched_matmul
 // LATE-SAME:    #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
 // LATE-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
-//      LATE:    linalg.batch_matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+//      LATE:    linalg.fill
+//      LATE:    linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  LATE-SAME:     padding = [1, 16, 16, 4]
 //  LATE-SAME:     promote_operands = [0, 1, 2]
 //  LATE-SAME:     reduction = [0, 0, 0, 1]
@@ -441,7 +443,7 @@ func.func @unaligned_to_intrinsic_batched_matmul_tiling_check(%lhs : tensor<12x5
 // LATE-LABEL: func.func @unaligned_to_intrinsic_batched_matmul_tiling_check
 // LATE-SAME:    #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
 // LATE-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
-//      LATE:    linalg.batch_matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+//      LATE:    linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  LATE-SAME:     padding = [1, 16, 512, 4]
 //  LATE-SAME:     promote_operands = [0, 1, 2]
 //  LATE-SAME:     reduction = [0, 0, 0, 1]

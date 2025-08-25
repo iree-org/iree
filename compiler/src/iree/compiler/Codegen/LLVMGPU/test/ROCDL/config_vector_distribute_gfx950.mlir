@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx950 --iree-codegen-llvmgpu-use-vector-distribution \
 // RUN:   --iree-codegen-llvmgpu-use-unaligned-gemm-vector-distribution --iree-codegen-llvmgpu-use-igemm=false \
-// RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s
+// RUN:   --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-generalize-named-ops),iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s
 
 // TODO: This test is still using the legacy LLVMGPU kernel config. This needs
 // to be migrated to the rocdl heuristics, but for now is just physically
@@ -101,7 +101,7 @@ func.func @mfma_matmul_1024x1024x1024() {
 }
 
 // CHECK-LABEL: func.func @mfma_matmul_1024x1024x1024()
-// CHECK: linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK: linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
 // CHECK-SAME:                           reduction =  [0, 0, 128]
 // CHECK-SAME:                           subgroup_m_count = 2
