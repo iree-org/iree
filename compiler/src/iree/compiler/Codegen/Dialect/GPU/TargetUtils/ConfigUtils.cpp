@@ -206,65 +206,42 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
 
 /// Helper function to get convolution padding sizes if possible.
 static std::optional<ArrayAttr> getPaddingConvSizes(
-    Builder &b, int64_t kSize, int64_t kPaddingSize,
+    Builder &b, int64_t innerKSize, int64_t innerKPaddingSize,
+    int64_t batchDimSize, int64_t mDimSize, int64_t nDimSize, int64_t kDimSize,
     const SmallVector<int64_t> &workgroupTileSizes,
-    const SmallVector<int64_t> &mDims, const SmallVector<int64_t> &nDims,
-    const SmallVector<int64_t> &batchDims,
     std::optional<mlir::linalg::ConvolutionDimensions> &padConvDims) {
   if (!padConvDims.has_value())
     return std::nullopt;
 
-  SmallVector<unsigned> batchAndImageDims;
   mlir::linalg::ConvolutionDimensions convDims = padConvDims.value();
-  bool isBatchLast = !convDims.batch.empty() &&
-                     convDims.outputImage.back() < convDims.batch.front();
-  if (isBatchLast) {
-    batchAndImageDims.append(convDims.outputImage.begin(),
-                             convDims.outputImage.end());
-    batchAndImageDims.append(convDims.batch.begin(), convDims.batch.end());
-  } else {
-    batchAndImageDims.append(convDims.batch.begin(), convDims.batch.end());
-    batchAndImageDims.append(convDims.outputImage.begin(),
-                             convDims.outputImage.end());
-  }
-
-  SmallVector<unsigned> concatMDims, concatNDims;
+  unsigned batchAndImageDimSize =
+      convDims.batch.size() + convDims.outputImage.size();
   bool isOutputChannelFirst =
       convDims.outputChannel.back() < convDims.outputImage.front();
+
+  unsigned concatMDimSize, concatNDimSize;
   if (isOutputChannelFirst) {
-    concatMDims.append(convDims.outputChannel.begin(),
-                       convDims.outputChannel.end());
-    concatNDims = batchAndImageDims;
+    concatMDimSize = convDims.outputChannel.size();
+    concatNDimSize = batchAndImageDimSize;
   } else {
-    concatMDims = batchAndImageDims;
-    concatNDims.append(convDims.outputChannel.begin(),
-                       convDims.outputChannel.end());
+    concatMDimSize = batchAndImageDimSize;
+    concatNDimSize = convDims.outputChannel.size();
   }
 
-  // Verify that the number of M, N dimensions from IGEMM match the
-  // corresponding number of convolution dimensions.
-  if (concatMDims.size() != mDims.size() ||
-      concatNDims.size() != nDims.size() ||
-      convDims.depth.size() != batchDims.size()) {
+  // Verify that the number of dimensions from IGEMM indexing map matches
+  // the corresponding number of convolution dimensions.
+  if (concatMDimSize != mDimSize || concatNDimSize != nDimSize ||
+      convDims.inputChannel.size() != kDimSize ||
+      convDims.depth.size() != batchDimSize) {
     return std::nullopt;
   }
 
   // Padding sizes for parallel dimensions are the same as workgroup tile
   // sizes.
-  int64_t totalNumDims = convDims.batch.size() + convDims.outputImage.size() +
-                         convDims.outputChannel.size() +
-                         convDims.filterLoop.size() +
-                         convDims.inputChannel.size() + convDims.depth.size();
-  SmallVector<int64_t> paddingConvSizes(totalNumDims, 0);
-  if (batchDims.size() != 0) {
-    for (auto [dim, bDim] : llvm::zip(convDims.depth, batchDims)) {
-      paddingConvSizes[dim] = workgroupTileSizes[bDim];
-    }
-  }
-  for (auto [dim, mDim] : llvm::zip(concatMDims, mDims))
-    paddingConvSizes[dim] = workgroupTileSizes[mDim];
-  for (auto [dim, nDim] : llvm::zip(concatNDims, nDims))
-    paddingConvSizes[dim] = workgroupTileSizes[nDim];
+  SmallVector<int64_t> paddingConvSizes = workgroupTileSizes;
+  unsigned appendSize =
+      convDims.filterLoop.size() + convDims.inputChannel.size() - kDimSize;
+  paddingConvSizes.append(appendSize, 0);
 
   // To avoid over-padding, no padding for channel dimensions is needed if
   // the product of reduction sizes is already multiples of k padding
@@ -272,9 +249,9 @@ static std::optional<ArrayAttr> getPaddingConvSizes(
   // TODO (vivian): Padding the innermost channel dimension to a multiple
   // of vector size may still be needed even if the K-dim is aligned, and
   // this should be validated based on performance.
-  if (kSize % kPaddingSize != 0) {
+  if (innerKSize % innerKPaddingSize != 0) {
     int64_t innerChannelDim = convDims.inputChannel.back();
-    paddingConvSizes[innerChannelDim] = kPaddingSize;
+    paddingConvSizes[innerChannelDim] = innerKPaddingSize;
   }
   return b.getI64ArrayAttr(paddingConvSizes);
 }
@@ -538,8 +515,9 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     // Create `padding_conv` attribute when padding convolutions before IGEMM is
     // possible, otherwise fallback to pad IGEMM.
     if (auto attr = getPaddingConvSizes(
-            b, bounds[innerKDim], paddingTileSizes[innerKDim],
-            workgroupTileSizes, mDims, nDims, batchDims, padConvDims)) {
+            b, bounds[innerKDim], paddingTileSizes[innerKDim], batchDims.size(),
+            mDims.size(), nDims.size(), kDims.size(), workgroupTileSizes,
+            padConvDims)) {
       attrs.emplace_back(StringAttr::get(context, "padding_conv"), *attr);
     } else {
       attrs.emplace_back(StringAttr::get(context, "padding"),
