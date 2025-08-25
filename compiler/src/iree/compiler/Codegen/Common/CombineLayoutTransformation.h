@@ -79,6 +79,16 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
                       IREE::LinalgExt::MapScatterOp mapScatterOp,
                       PadDistributionConfigFn padDistributionConfigFn);
 
+/// Fold a `packOp` into a consumer `mapScatterOp` by decomposing the
+/// pack op, and then folding the decomposed ops into the map_scatter. If
+/// the `padDistributionConfigFn` is `nullptr`, then padding semantics are
+/// not allowed on the pack. Otherwise, the `padDistributionConfigFn` will
+/// be used to distribute the pad in the decomposed op sequence.
+FailureOr<IREE::LinalgExt::MapScatterOp> foldPackIntoMapScatter(
+    RewriterBase &rewriter, linalg::PackOp packOp,
+    IREE::LinalgExt::MapScatterOp mapScatterOp,
+    PadDistributionConfigFn padDistributionConfigFn = nullptr);
+
 /// Combines any layout/indexing transformation ops at the ends of a dispatch.
 /// Finds `iree_codegen.store_to_buffer` ops in the `funcOp`, and combines any
 /// layout transformation ops (like expand_shape, transpose, pack, etc.) that
