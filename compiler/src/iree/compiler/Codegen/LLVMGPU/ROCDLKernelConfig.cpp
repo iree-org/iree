@@ -273,7 +273,7 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
 static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
                                    mlir::FunctionOpInterface entryPointFn,
                                    Operation *computeOp) {
-  IREE::GPU::UKernelConfigAttr ukernelConfig = selectUKernel(computeOp);
+  IREE::Codegen::UKernelDescriptorAttr ukernelConfig = selectUKernel(computeOp);
   if (succeeded(setDataTiledMultiMmaLoweringConfig(target, entryPointFn,
                                                    computeOp, ukernelConfig))) {
     return success();
