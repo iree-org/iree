@@ -86,12 +86,6 @@ struct DropUnitDimsFromCollapseOfExpand
         if (indices.size() == 1 || interShape[inDim] != 1) {
           continue;
         }
-
-        // If we are collapsing multiple unit dims together, at least 1 must be
-        // kept (prefer the first).
-        if (outShape[outDim] == 1 && innerIdx != 0) {
-          continue;
-        }
         toDrop.insert(inDim);
       }
     }
@@ -100,7 +94,9 @@ struct DropUnitDimsFromCollapseOfExpand
     // `expandOp` op.
     const auto expandReassoc = expandOp.getReassociationIndices();
     for (const auto &[inDim, indices] : llvm::enumerate(expandReassoc)) {
-      if (indices.size() == 1) {
+      if (llvm::all_of(indices,
+                       [&](int64_t idx) { return toDrop.contains(idx); })) {
+
         toDrop.erase(indices[0]);
       }
     }
