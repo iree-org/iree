@@ -212,7 +212,7 @@ static void resolveHintOp(RewriterBase &rewriter,
       }
     }
     // Throw if we can't rewrite all users.
-    hintOp.emitError() << "The following SwizzleHintOp user is not supported : "
+    hintOp.emitError() << "unsupported SwizzleHintOp user: "
                        << user->getName().getStringRef();
     return;
   }
