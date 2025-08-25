@@ -191,25 +191,23 @@ static void resolveHintOp(RewriterBase &rewriter,
       // subgroup contiguously in order of lane ID
       if (gatherToLDSOp.getDst() == hintOp) {
         continue;
-      } else {
-        int64_t accessBitWidth = cast<MemRefType>(hintOp.getOperand().getType())
-                                     .getElementTypeBitWidth() *
-                                 accessWidth;
-        auto transferBitWidth = [&]() -> int64_t {
-          if (auto vectorType =
-                  dyn_cast<VectorType>(gatherToLDSOp.getTransferType())) {
-            return vectorType.getElementTypeBitWidth() *
-                   vectorType.getNumElements();
-          }
-          return gatherToLDSOp.getTransferType().getIntOrFloatBitWidth();
-        }();
-        if (accessBitWidth != transferBitWidth) {
-          return;
-        }
-        gatherToLDSOps.push_back(gatherToLDSOp);
-
-        continue;
       }
+      int64_t accessBitWidth = cast<MemRefType>(hintOp.getOperand().getType())
+                                   .getElementTypeBitWidth() *
+                               accessWidth;
+      auto transferBitWidth = [&]() -> int64_t {
+        if (auto vectorType =
+                dyn_cast<VectorType>(gatherToLDSOp.getTransferType())) {
+          return vectorType.getElementTypeBitWidth() *
+                 vectorType.getNumElements();
+        }
+        return gatherToLDSOp.getTransferType().getIntOrFloatBitWidth();
+      }();
+      if (accessBitWidth != transferBitWidth) {
+        return;
+      }
+      gatherToLDSOps.push_back(gatherToLDSOp);
+      continue;
     }
     // Throw if we can't rewrite all users.
     hintOp.emitError() << "unsupported SwizzleHintOp user: "

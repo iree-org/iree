@@ -679,7 +679,7 @@ XORShuffleAttr::verify(function_ref<InFlightDiagnostic()> emitError,
   if (rowWidth % accessWidth != 0) {
     return emitError() << "expected access width to divide row width";
   }
-  auto maxPhase = rowWidth / accessWidth;
+  int64_t maxPhase = rowWidth / accessWidth;
   if (perPhase > maxPhase) {
     return emitError() << "per_phase must be smaller than max_phase";
   }
