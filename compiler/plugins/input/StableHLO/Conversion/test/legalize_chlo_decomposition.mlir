@@ -535,4 +535,4 @@ func.func @acos_complex_f32(%arg : tensor<complex<f32>>) -> tensor<complex<f32>>
 func.func @acos_complex_f64_dynamic(%arg : tensor<?xcomplex<f64>>) -> tensor<?xcomplex<f64>> {
   %result = "chlo.acos"(%arg) : (tensor<?xcomplex<f64>>) -> tensor<?xcomplex<f64>>
   func.return %result : tensor<?xcomplex<f64>>
-}                                                               
+}

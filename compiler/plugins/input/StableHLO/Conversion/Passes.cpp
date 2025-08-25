@@ -85,7 +85,8 @@ void buildStableHLOInputConversionPassPipelineImpl(
       stablehlo::createLegalizeShapeComputations());
   passManager.addNestedPass<func::FuncOp>(
       stablehlo::createConvertStableHloToLinalgExt());
-  passManager.addNestedPass<func::FuncOp>(mlir::stablehlo::createChloLegalizeToStablehloPass());
+  passManager.addNestedPass<func::FuncOp>(
+      mlir::stablehlo::createChloLegalizeToStablehloPass());
   passManager.addPass(createConvertStableHloToIreeInputDialects());
   passManager.addPass(createReconcileUnrealizedCastsPass());
 

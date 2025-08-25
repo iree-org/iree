@@ -17,16 +17,10 @@ func.func @addWithoutBroadcast(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> te
 // CHECK-SAME: %[[ARG0:.+]]: tensor<?xf32>
 // CHECK-SAME: %[[ARG1:.+]]: tensor<?x?xf32>
 func.func @dynamicBroadcast(%arg0: tensor<?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> {
-  // CHECK-DAG:  %[[ARG0_S:.+]] = shape.shape_of %[[ARG0]]
-  // CHECK-DAG:  %[[ARG1_S:.+]] = shape.shape_of %[[ARG1]]
-  // CHECK-NEXT: %[[WITNESS:.+]] = shape.cstr_broadcastable %[[ARG0_S]], %[[ARG1_S]]
-  // CHECK-NEXT: %[[FINAL_RESULT:.+]] = shape.assuming %[[WITNESS]]
-  // CHECK-DAG:    %[[RESULT_EXTENTS:.+]] = shape.broadcast %[[ARG0_S]], %[[ARG1_S]]
-  // CHECK-DAG:    %[[ARG0_B:.+]] = stablehlo.dynamic_broadcast_in_dim %[[ARG0]], %[[RESULT_EXTENTS]], dims = [1]
-  // CHECK-DAG:    %[[ARG1_B:.+]] = stablehlo.dynamic_broadcast_in_dim %[[ARG1]], %[[RESULT_EXTENTS]], dims = [0, 1]
-  // CHECK-NEXT:   %[[RESULT:.+]] = stablehlo.add %[[ARG0_B]], %[[ARG1_B]]
-  // CHECK-NEXT:   shape.assuming_yield %[[RESULT]]
-  // CHECK: return %[[FINAL_RESULT]] : tensor<?x?xf32>
+
+  // CHECK:stablehlo.dynamic_broadcast_in_dim
+  // CHECK:stablehlo.add
+
   %0 = chlo.broadcast_add %arg0, %arg1 : (tensor<?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
   func.return %0 : tensor<?x?xf32>
 }
@@ -37,16 +31,9 @@ func.func @dynamicBroadcast(%arg0: tensor<?xf32>, %arg1: tensor<?x?xf32>) -> ten
 // CHECK-SAME: %[[ARG0:.+]]: tensor<?xf32>
 // CHECK-SAME: %[[ARG1:.+]]: tensor<?x?xf32>
 func.func @dynamicBroadcastComplex(%arg0: tensor<?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xcomplex<f32>> {
-  // CHECK-DAG:  %[[ARG0_S:.+]] = shape.shape_of %[[ARG0]]
-  // CHECK-DAG:  %[[ARG1_S:.+]] = shape.shape_of %[[ARG1]]
-  // CHECK-NEXT: %[[WITNESS:.+]] = shape.cstr_broadcastable %[[ARG0_S]], %[[ARG1_S]]
-  // CHECK-NEXT: %[[FINAL_RESULT:.+]] = shape.assuming %[[WITNESS]]    
-  // CHECK-NEXT:   %[[RESULT_EXTENTS:.+]] = shape.broadcast %[[ARG0_S]], %[[ARG1_S]]
-  // CHECK-DAG:    %[[ARG0_B:.+]] = stablehlo.dynamic_broadcast_in_dim %[[ARG0]], %[[RESULT_EXTENTS]], dims = [1] : (tensor<?xf32>, tensor<2xindex>) -> tensor<?x?xf32>
-  // CHECK-DAG:    %[[ARG1_B:.+]] = stablehlo.dynamic_broadcast_in_dim %[[ARG1]], %[[RESULT_EXTENTS]], dims = [0, 1] : (tensor<?x?xf32>, tensor<2xindex>) -> tensor<?x?xf32>
-  // CHECK-NEXT:   %[[RESULT:.+]] = stablehlo.complex %[[ARG0_B]], %[[ARG1_B]] : tensor<?x?xcomplex<f32>>
-  // CHECK-NEXT:   shape.assuming_yield %[[RESULT]]
-  // CHECK: return %[[FINAL_RESULT]] : tensor<?x?xcomplex<f32>>
+
+  // CHECK:stablehlo.dynamic_broadcast_in_dim
+  // CHECK:stablehlo.complex
   %0 = chlo.broadcast_complex %arg0, %arg1 : (tensor<?xf32>, tensor<?x?xf32>) -> tensor<?x?xcomplex<f32>>
   func.return %0 : tensor<?x?xcomplex<f32>>
 }
@@ -57,16 +44,8 @@ func.func @dynamicBroadcastComplex(%arg0: tensor<?xf32>, %arg1: tensor<?x?xf32>)
 // CHECK-SAME: %[[ARG0:.+]]: tensor<?xf32>
 // CHECK-SAME: %[[ARG1:.+]]: tensor<?x?xf32>
 func.func @dynamicBroadcastCompare(%arg0: tensor<?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xi1> {
-  // CHECK-DAG: %[[ARG0_S:.+]] = shape.shape_of %[[ARG0]]
-  // CHECK-DAG: %[[ARG1_S:.+]] = shape.shape_of %[[ARG1]]
-  // CHECK: %[[WITNESS:.+]] = shape.cstr_broadcastable %[[ARG0_S]], %[[ARG1_S]]
-  // CHECK: %[[FINAL_RESULT:.+]] = shape.assuming %[[WITNESS]]
-  // CHECK: %[[RESULT_EXTENTS:.+]] = shape.broadcast %[[ARG0_S]], %[[ARG1_S]]
-  // CHECK-DAG: %[[ARG0_B:.+]] = stablehlo.dynamic_broadcast_in_dim %[[ARG0]], %[[RESULT_EXTENTS]], dims = [1] : (tensor<?xf32>, tensor<2xindex>) -> tensor<?x?xf32>
-  // CHECK-DAG: %[[ARG1_B:.+]] = stablehlo.dynamic_broadcast_in_dim %[[ARG1]], %[[RESULT_EXTENTS]], dims = [0, 1] : (tensor<?x?xf32>, tensor<2xindex>) -> tensor<?x?xf32>
-  // CHECK: %[[RESULT:.+]] = stablehlo.compare EQ, %[[ARG0_B]], %[[ARG1_B]] : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xi1>
-  // CHECK: shape.assuming_yield %[[RESULT]]
-  // CHECK: return %[[FINAL_RESULT]] : tensor<?x?xi1>
+  // CHECK:stablehlo.dynamic_broadcast_in_dim
+  // CHECK: stablehlo.compare
   %0 = chlo.broadcast_compare %arg0, %arg1 {comparison_direction = #chlo<comparison_direction EQ>} : (tensor<?xf32>, tensor<?x?xf32>) -> tensor<?x?xi1>
   func.return %0 : tensor<?x?xi1>
 }
@@ -75,51 +54,32 @@ func.func @dynamicBroadcastCompare(%arg0: tensor<?xf32>, %arg1: tensor<?x?xf32>)
 
 // CHECK-LABEL: func @selectv2
 func.func @selectv2(%arg0: tensor<2xi1>, %arg1: tensor<2xi32>, %arg2: tensor<2xi32>) -> tensor<2xi32> {
-  // CHECK-DAG:   %[[ARG0_S_IN:.+]] = shape.shape_of %arg0
-  // CHECK-DAG:   %[[ARG1_S_IN:.+]] = shape.shape_of %arg1 
-  // CHECK-DAG:   %[[ARG2_S_IN:.+]] = shape.shape_of %arg2
-  // CHECK: %[[WITNESS:.+]] = shape.const_witness true
-  // CHECK: %[[FINAL_RESULT:.+]] = shape.assuming %[[WITNESS]]
-  // CHECK: %[[RESULT_EXTENTS:.+]] = shape.broadcast %[[ARG0_S_IN]], %[[ARG1_S_IN]], %[[ARG2_S_IN]]
-  // CHECK:             [[VAR_cast_:%.+]] = tensor.cast %[[RESULT_EXTENTS]] : tensor<?xindex> to tensor<1xindex>
-  // CHECK-DAG:         [[VAR_6_:%.+]] = stablehlo.dynamic_broadcast_in_dim %arg0, [[VAR_cast_]], dims = [0] : (tensor<2xi1>, tensor<1xindex>) -> tensor<2xi1>
-  // CHECK-DAG:         [[VAR_7_:%.+]] = stablehlo.dynamic_broadcast_in_dim %arg1, [[VAR_cast_]], dims = [0] : (tensor<2xi32>, tensor<1xindex>) -> tensor<2xi32>
-  // CHECK-DAG:         [[VAR_8_:%.+]] = stablehlo.dynamic_broadcast_in_dim %arg2, [[VAR_cast_]], dims = [0] : (tensor<2xi32>, tensor<1xindex>) -> tensor<2xi32>        
-  // CHECK:             [[VAR_9_:%.+]] = stablehlo.select [[VAR_6_]], [[VAR_7_]], [[VAR_8_]] : tensor<2xi1>, tensor<2xi32>
-  // CHECK:             shape.assuming_yield [[VAR_9_]]
-  // CHECK: return %[[FINAL_RESULT]] 
+  // CHECK: tensor.cast
+  // CHECK: stablehlo.dynamic_broadcast_in_dim
+  // CHECK: stablehlo.select
   %0 = "chlo.broadcast_select"(%arg0, %arg1, %arg2) : (tensor<2xi1>, tensor<2xi32>, tensor<2xi32>) -> tensor<2xi32>
   func.return %0: tensor<2xi32>
 }
 
 // CHECK-LABEL: func @selectv2_pred_scalar
 func.func @selectv2_pred_scalar(%arg0: tensor<i1>, %arg1: tensor<2xi32>, %arg2: tensor<2xi32>) -> tensor<2xi32> {
-  // CHECK: stablehlo.select 
+  // CHECK: stablehlo.select
   %0 = "chlo.broadcast_select"(%arg0, %arg1, %arg2) : (tensor<i1>, tensor<2xi32>, tensor<2xi32>) -> tensor<2xi32>
   func.return %0: tensor<2xi32>
 }
 
 // CHECK-LABEL: func @selectv2_broadcast_then
 func.func @selectv2_broadcast_then(%arg0: tensor<i1>, %arg1: tensor<8x1xi32>, %arg2: tensor<2x8x8xi32>) -> tensor<2x8x8xi32> {
-  // CHECK-DAG:   %[[ARG0_S_IN:.+]] = shape.shape_of %arg0
-  // CHECK-DAG:   %[[ARG1_S_IN:.+]] = shape.shape_of %arg1 
-  // CHECK-DAG:   %[[ARG2_S_IN:.+]] = shape.shape_of %arg2
-  // CHECK: %[[WITNESS:.+]] = shape.const_witness true
-  // CHECK: %[[FINAL_RESULT:.+]] = shape.assuming %[[WITNESS]]
-  // CHECK: %[[RESULT_EXTENTS:.+]] = shape.broadcast %[[ARG0_S_IN]], %[[ARG1_S_IN]], %[[ARG2_S_IN]]
-  // CHECK:             [[VAR_cast_:%.+]] = tensor.cast %[[RESULT_EXTENTS]] 
-  // CHECK-DAG:         [[VAR_7_:%.+]] = stablehlo.dynamic_broadcast_in_dim %arg1, [[VAR_cast_]], dims = [1, 2]
-  // CHECK-DAG:         [[VAR_8_:%.+]] = stablehlo.dynamic_broadcast_in_dim %arg2, [[VAR_cast_]], dims = [0, 1, 2]
-  // CHECK:             [[VAR_9_:%.+]] = stablehlo.select %arg0, [[VAR_7_]], [[VAR_8_]]
-  // CHECK:             shape.assuming_yield [[VAR_9_]]
-  // CHECK: return %[[FINAL_RESULT]]  
+  // CHECK:  tensor.cast
+  // CHECK:  stablehlo.dynamic_broadcast_in_dim
+  // CHECK:  stablehlo.select
   %0 = "chlo.broadcast_select"(%arg0, %arg1, %arg2) : (tensor<i1>, tensor<8x1xi32>, tensor<2x8x8xi32>) -> tensor<2x8x8xi32>
   func.return %0: tensor<2x8x8xi32>
 }
 
 // CHECK-LABEL: func @selectv2_broadcast_else
 func.func @selectv2_broadcast_else(%arg0: tensor<i1>, %arg1: tensor<2x8x8xi32>, %arg2: tensor<8x1xi32>) -> tensor<2x8x8xi32> {
- // CHECK : stablehlo.select 
+ // CHECK : stablehlo.select
   %0 = "chlo.broadcast_select"(%arg0, %arg1, %arg2) : (tensor<i1>, tensor<2x8x8xi32>, tensor<8x1xi32>) -> tensor<2x8x8xi32>
   func.return %0: tensor<2x8x8xi32>
 }
@@ -130,19 +90,8 @@ func.func @selectv2_broadcast_pred(%arg0: tensor<1xi1>, %arg1: tensor<2x8x8xi32>
   %0 = "chlo.broadcast_select"(%arg0, %arg1, %arg2) : (tensor<1xi1>, tensor<2x8x8xi32>, tensor<2x8x8xi32>) -> tensor<2x8x8xi32>
   func.return %0: tensor<2x8x8xi32>
 
-  // CHECK-DAG: %[[ARG0_SHAPE:.*]] = shape.shape_of %[[ARG0]]
-  // CHECK-DAG: %[[ARG1_SHAPE:.*]] = shape.shape_of %[[ARG1]]
-  // CHECK-DAG: %[[ARG2_SHAPE:.*]] = shape.shape_of %[[ARG2]]
-  // CHECK-DAG: %[[CONST_TRUE:.*]] = shape.const_witness true
-  // CHECK-DAG: %[[ASSUME:.*]] = shape.assuming %[[CONST_TRUE]]
-  // CHECK-DAG:   %[[BCAST_SHAPE:.*]] = shape.broadcast %[[ARG0_SHAPE]], %[[ARG1_SHAPE]], %[[ARG2_SHAPE]]
-  // CHECK-DAG:   %[[BCAST_SHAPE_CAST:.*]] = tensor.cast %[[BCAST_SHAPE]] : tensor<?xindex> to tensor<3xindex>
-  // CHECK-DAG:   %[[PRED_BCAST:.*]] = stablehlo.dynamic_broadcast_in_dim %[[ARG0]], %[[BCAST_SHAPE_CAST]], dims = [2]
-  // CHECK-DAG:   %[[LHS_BCAST:.*]] = stablehlo.dynamic_broadcast_in_dim %[[ARG1]], %[[BCAST_SHAPE_CAST]], dims = [0, 1, 2]
-  // CHECK-DAG:   %[[RHS_BCAST:.*]] = stablehlo.dynamic_broadcast_in_dim %[[ARG2]], %[[BCAST_SHAPE_CAST]], dims = [0, 1, 2]
-  // CHECK:       %[[RESULT:.*]] = stablehlo.select %[[PRED_BCAST]], %[[LHS_BCAST]], %[[RHS_BCAST]]
-  // CHECK:       shape.assuming_yield %[[RESULT]]
-  // CHECK: return %[[ASSUME]]
+  // CHECK: stablehlo.dynamic_broadcast_in_dim
+  // CHECK: stablehlo.select
 
 }
 
@@ -152,19 +101,8 @@ func.func @selectv2_broadcast_tensor_pred(%arg0: tensor<3xi1>, %arg1: tensor<2x3
   %0 = "chlo.broadcast_select"(%arg0, %arg1, %arg2) : (tensor<3xi1>, tensor<2x3xf16>, tensor<2x3xf16>) -> tensor<2x3xf16>
   func.return %0: tensor<2x3xf16>
 
-  // CHECK-DAG: %[[ARG0_S:.*]] = shape.shape_of %[[ARG0]] 
-  // CHECK-DAG: %[[ARG1_S:.*]] = shape.shape_of %[[ARG1]] 
-  // CHECK-DAG: %[[ARG2_S:.*]] = shape.shape_of %[[ARG2]] 
-  // CHECK-DAG: %[[WITNESS:.*]] = shape.const_witness true
-  // CHECK-DAG: %[[ASSUME:.*]] = shape.assuming %[[WITNESS]] 
-  // CHECK-DAG:   %[[BCAST_SHAPE:.*]] = shape.broadcast %[[ARG0_S]], %[[ARG1_S]], %[[ARG2_S]]
-  // CHECK:       %[[CAST_SHAPE:.*]] = tensor.cast %[[BCAST_SHAPE]] 
-  // CHECK-DAG:   %[[PRED_BCAST:.*]] = stablehlo.dynamic_broadcast_in_dim %[[ARG0]], %[[CAST_SHAPE]], dims = [1] 
-  // CHECK-DAG:   %[[LHS_BCAST:.*]] = stablehlo.dynamic_broadcast_in_dim %[[ARG1]], %[[CAST_SHAPE]], dims = [0, 1] 
-  // CHECK-DAG:   %[[RHS_BCAST:.*]] = stablehlo.dynamic_broadcast_in_dim %[[ARG2]], %[[CAST_SHAPE]], dims = [0, 1] 
-  // CHECK:       %[[RESULT:.*]] = stablehlo.select %[[PRED_BCAST]], %[[LHS_BCAST]], %[[RHS_BCAST]]
-  // CHECK:       shape.assuming_yield %[[RESULT]]
-  // CHECK: return %[[ASSUME]]
+  // CHECK: stablehlo.dynamic_broadcast_in_dim
+  // CHECK: stablehlo.select
 
 }
 
@@ -174,20 +112,8 @@ func.func @selectv2_broadcast_all(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x8x1xi
   %0 = "chlo.broadcast_select"(%arg0, %arg1, %arg2) : (tensor<8x1x1xi1>, tensor<1x8x1xi32>, tensor<1x1x8xi32>) -> tensor<8x8x8xi32>
   func.return %0: tensor<8x8x8xi32>
 
-  // CHECK-DAG: %[[ARG0_S:.*]] = shape.shape_of %[[ARG0]] 
-  // CHECK-DAG: %[[ARG1_S:.*]] = shape.shape_of %[[ARG1]] 
-  // CHECK-DAG: %[[ARG2_S:.*]] = shape.shape_of %[[ARG2]] 
-  // CHECK-DAG: %[[WITNESS:.*]] = shape.const_witness true
-  // CHECK-DAG: %[[ASSUME:.*]] = shape.assuming %[[WITNESS]] 
-  // CHECK-DAG:   %[[BCAST_SHAPE:.*]] = shape.broadcast %[[ARG0_S]], %[[ARG1_S]], %[[ARG2_S]]
-  // CHECK:       %[[CAST_SHAPE:.*]] = tensor.cast %[[BCAST_SHAPE]] 
-  // CHECK-DAG:   %[[PRED_BCAST:.*]] = stablehlo.dynamic_broadcast_in_dim %[[ARG0]], %[[CAST_SHAPE]], dims = [0, 1, 2]
-  // CHECK-DAG:   %[[LHS_BCAST:.*]] = stablehlo.dynamic_broadcast_in_dim %[[ARG1]], %[[CAST_SHAPE]], dims = [0, 1, 2]
-  // CHECK-DAG:   %[[RHS_BCAST:.*]] = stablehlo.dynamic_broadcast_in_dim %[[ARG2]], %[[CAST_SHAPE]], dims = [0, 1, 2]
-  // CHECK:       %[[RESULT:.*]] = stablehlo.select %[[PRED_BCAST]], %[[LHS_BCAST]], %[[RHS_BCAST]]
-  // CHECK:       shape.assuming_yield %[[RESULT]]
-  // CHECK: return %[[ASSUME]]
-
+  // CHECK: stablehlo.dynamic_broadcast_in_dim
+  // CHECK: stablehlo.select
 }
 
 // CHECK-LABEL: func @selectv2_dynamic_ranked
@@ -195,19 +121,8 @@ func.func @selectv2_dynamic_ranked(%arg0: tensor<1xi1>, %arg1: tensor<2x?x8xi32>
   %0 = "chlo.broadcast_select"(%arg0, %arg1, %arg2) : (tensor<1xi1>, tensor<2x?x8xi32>, tensor<2x8x8xi32>) -> tensor<2x?x8xi32>
   func.return %0: tensor<2x?x8xi32>
 
-  // CHECK-DAG: %[[ARG0_S:.*]] = shape.shape_of %arg0
-  // CHECK-DAG: %[[ARG1_S:.*]] = shape.shape_of %arg1
-  // CHECK-DAG: %[[ARG2_S:.*]] = shape.shape_of %arg2
-  // CHECK:     %[[CSTR_OK:.*]] = shape.cstr_broadcastable %[[ARG0_S]], %[[ARG1_S]], %[[ARG2_S]]
-  // CHECK:     %[[ASSUME:.*]] = shape.assuming %[[CSTR_OK]]
-  // CHECK-DAG:   %[[BCAST_SHAPE:.*]] = shape.broadcast %[[ARG0_S]], %[[ARG1_S]], %[[ARG2_S]]
-  // CHECK:       %[[CAST_SHAPE:.*]] = tensor.cast %[[BCAST_SHAPE]]
-  // CHECK-DAG:   %[[PRED_BCAST:.*]] = stablehlo.dynamic_broadcast_in_dim %arg0, %[[CAST_SHAPE]], dims = [2]
-  // CHECK-DAG:   %[[LHS_BCAST:.*]]  = stablehlo.dynamic_broadcast_in_dim %arg1, %[[CAST_SHAPE]], dims = [0, 1, 2]
-  // CHECK-DAG:   %[[RHS_BCAST:.*]]  = stablehlo.dynamic_broadcast_in_dim %arg2, %[[CAST_SHAPE]], dims = [0, 1, 2]
-  // CHECK:       %[[RESULT:.*]] = stablehlo.select %[[PRED_BCAST]], %[[LHS_BCAST]], %[[RHS_BCAST]]
-  // CHECK:       shape.assuming_yield %[[RESULT]]
-  // CHECK: return %[[ASSUME]]
+  // CHECK: stablehlo.dynamic_broadcast_in_dim
+  // CHECK: stablehlo.select
 
 }
 

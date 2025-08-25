@@ -15,7 +15,6 @@ namespace mlir::iree_compiler::stablehlo {
 // General StableHLO/CHLO lowering patterns.
 //===----------------------------------------------------------------------===//
 
-
 /// Collection of rewrite patterns for lowering of StableHLO ops to SCF control
 /// flow ops.
 void populateLegalizeControlFlowPatterns(MLIRContext *context,
