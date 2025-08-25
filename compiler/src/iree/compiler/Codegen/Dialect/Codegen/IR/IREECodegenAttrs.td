@@ -562,7 +562,7 @@ def IREECodegen_XORShuffleAttr  :
       ]>
     ]> {
   let mnemonic = "xor_shuffle";
-  let summary = [{An attribute that describes a XOR-based swizzling pattern.}];
+  let summary = "An attribute that describes an XOR-based swizzling pattern.";
   let description = [{
     Shuffles accesses of |access_width| within rows of size
     |row_width|. For any given access into logical memref of shape
