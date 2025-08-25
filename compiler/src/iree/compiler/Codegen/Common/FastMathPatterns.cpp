@@ -8,6 +8,8 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/PatternMatch.h"
 
 namespace mlir::iree_compiler {
@@ -19,109 +21,121 @@ namespace {
 struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
   using OpRewritePattern::OpRewritePattern;
 
+  // Helper to evaluate a polynomial using FMA chains for both scalar and vector
+  // types.
+  template <typename ValueT>
+  static ValueT evalErfPolynomial(ValueT x, ValueT t, ArrayRef<ValueT> coeffs,
+                                  PatternRewriter &rewriter, Location loc) {
+    ValueT acc = coeffs[0];
+    for (size_t i = 1; i < coeffs.size(); ++i) {
+      acc = rewriter.create<math::FmaOp>(loc, t, acc, coeffs[i]);
+    }
+    return rewriter.create<math::FmaOp>(loc, x, acc, x);
+  }
+
   LogicalResult matchAndRewrite(math::ErfOp op,
                                 PatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
     Value input = op.getOperand();
     Type resultType = op.getType();
 
-    // Erf only supports f32.
-    if (!resultType.isF32()) {
-      return rewriter.notifyMatchFailure(op, "Result only supports f32");
+    // Only support f32 and vector<f32> types.
+    if (!(resultType.isF32() ||
+          (llvm::isa<VectorType>(resultType) &&
+           llvm::cast<VectorType>(resultType).getElementType().isF32()))) {
+      return rewriter.notifyMatchFailure(
+          op, "Result only supports f32 or vector<f32>");
     }
 
-    // Create constants.
-    Type f32Type = rewriter.getF32Type();
-    auto oneF = rewriter.create<arith::ConstantOp>(
-        loc, f32Type, rewriter.getF32FloatAttr(1.0f));
+    // Helper to create constants for both scalar and vector types.
+    auto createConst = [&](float v) -> Value {
+      if (auto vecType = llvm::dyn_cast<VectorType>(resultType)) {
+        SmallVector<float> values(vecType.getNumElements(), v);
+        return rewriter.create<arith::ConstantOp>(
+            loc, vecType,
+            DenseElementsAttr::get(vecType, ArrayRef<float>(values)));
+      } else {
+        return rewriter.create<arith::ConstantOp>(loc, rewriter.getF32Type(),
+                                                  rewriter.getF32FloatAttr(v));
+      }
+    };
 
-    // Get abs value.
+    Value one = createConst(1.0f);
     Value ax = rewriter.create<math::AbsFOp>(loc, input);
+    Value cmp =
+        rewriter.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OLT, ax, one);
 
-    // Create comparison for |x| < 1.0.
-    Value cmp = rewriter.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OLT,
-                                               ax, oneF);
+    // Coefficients for |x| < 1.0.
+    SmallVector<Value, 6> coeffs1 = {
+        createConst(-0x1.268bc2p-11f), createConst(0x1.420828p-8f),
+        createConst(-0x1.b5937p-6f),   createConst(0x1.ce077cp-4f),
+        createConst(-0x1.81266p-2f),   createConst(0x1.06eba0p-3f)};
+    // Coefficients for |x| >= 1.0.
+    SmallVector<Value, 7> coeffs2 = {
+        createConst(0x1.1d3156p-16f), createConst(-0x1.8d129p-12f),
+        createConst(0x1.f9a6d2p-9f),  createConst(-0x1.8c3164p-6f),
+        createConst(0x1.b4e9c8p-4f),  createConst(0x1.4515fap-1f),
+        createConst(0x1.078e50p-3f)};
 
-    // Create if statement.
-    auto ifOp = rewriter.create<scf::IfOp>(loc, resultType, cmp, true);
+    // Select between the two results using scf.if.
+    Value result;
+    if (resultType.isF32()) {
+      // For scalar types, use scf.if
+      auto ifOp = rewriter.create<scf::IfOp>(loc, resultType, cmp,
+                                             /*withElseRegion=*/true);
 
-    // --- Then region (|x| < 1.0) ---
-    {
-      OpBuilder::InsertionGuard guard(rewriter);
+      // Then region: |x| < 1.0 - evaluate polynomial.
       rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
-      // Define polynomial coefficients for |x| < 1.0.
-      auto c1_0 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(-0x1.268bc2p-11f));
-      auto c1_1 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(0x1.420828p-8f));
-      auto c1_2 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(-0x1.b5937p-6f));
-      auto c1_3 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(0x1.ce077cp-4f));
-      auto c1_4 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(-0x1.81266p-2f));
-      auto c1_5 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(0x1.06eba0p-3f));
-
       Value t = rewriter.create<arith::MulFOp>(loc, ax, ax);
-      Value mad1 = rewriter.create<math::FmaOp>(loc, t, c1_0, c1_1);
-      Value mad2 = rewriter.create<math::FmaOp>(loc, t, mad1, c1_2);
-      Value mad3 = rewriter.create<math::FmaOp>(loc, t, mad2, c1_3);
-      Value mad4 = rewriter.create<math::FmaOp>(loc, t, mad3, c1_4);
-      Value p = rewriter.create<math::FmaOp>(loc, t, mad4, c1_5);
-      Value result = rewriter.create<math::FmaOp>(loc, ax, p, ax);
-      rewriter.create<scf::YieldOp>(loc, result);
-    } // End then region.
+      Value result1 =
+          evalErfPolynomial(ax, t, ArrayRef<Value>(coeffs1), rewriter, loc);
+      rewriter.create<scf::YieldOp>(loc, result1);
 
-    // --- Else region (|x| >= 1.0) ---
-    {
-      OpBuilder::InsertionGuard guard(rewriter);
+      // Else region: |x| >= 1.0 - evaluate different polynomial and
+      // post-processing
       rewriter.setInsertionPointToStart(&ifOp.getElseRegion().front());
-
-      // Define polynomial coefficients for |x| >= 1.0
-      auto c2_0 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(0x1.1d3156p-16f));
-      auto c2_1 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(-0x1.8d129p-12f));
-      auto c2_2 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(0x1.f9a6d2p-9f));
-      auto c2_3 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(-0x1.8c3164p-6f));
-      auto c2_4 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(0x1.b4e9c8p-4f));
-      auto c2_5 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(0x1.4515fap-1f));
-      auto c2_6 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(0x1.078e50p-3f));
-
-      Value mad5 = rewriter.create<math::FmaOp>(loc, ax, c2_0, c2_1);
-      Value mad6 = rewriter.create<math::FmaOp>(loc, ax, mad5, c2_2);
-      Value mad7 = rewriter.create<math::FmaOp>(loc, ax, mad6, c2_3);
-      Value mad8 = rewriter.create<math::FmaOp>(loc, ax, mad7, c2_4);
-      Value mad9 = rewriter.create<math::FmaOp>(loc, ax, mad8, c2_5);
-      Value mad10 = rewriter.create<math::FmaOp>(loc, ax, mad9, c2_6);
-      // In the C code, there's an extra fma(ax, p, ax) here, which seems
-      // incorrect based on the standard erf approximation formula and leads to
-      // values > 1. The typical approximation leads directly to the exponent
-      // term. Value p2 = rewriter.create<math::FmaOp>(loc, ax, mad10, ax); //
-      // Original line based on C code.
-      Value p2 = mad10; // Corrected based on typical erf formula structure for
-                        // |x| >= 1
+      Value mad5 = coeffs2[0];
+      for (size_t i = 1; i < coeffs2.size(); ++i) {
+        mad5 = rewriter.create<math::FmaOp>(loc, ax, mad5, coeffs2[i]);
+      }
+      Value p2 = mad5;
       Value negP2 = rewriter.create<arith::NegFOp>(loc, p2);
       Value expNegP2 = rewriter.create<math::ExpOp>(loc, negP2);
-      Value result2 = rewriter.create<arith::SubFOp>(loc, oneF, expNegP2);
+      Value result2 = rewriter.create<arith::SubFOp>(loc, one, expNegP2);
       rewriter.create<scf::YieldOp>(loc, result2);
-    } // End else region
 
-    // Set insertion point after the if.
-    rewriter.setInsertionPointAfter(ifOp);
+      rewriter.setInsertionPointAfter(ifOp);
+      result = ifOp.getResult(0);
+    } else {
+      // For vector types, we need to handle conditional logic differently
+      // since we can't use scf.if with vector boolean conditions.
+      // We'll compute both polynomials but use vector operations to handle
+      // the conditional logic element-wise.
 
-    // Restore the sign: BUILTIN_COPYSIGN_F32(ret, x)
-    Value finalResult =
-        rewriter.create<math::CopySignOp>(loc, ifOp.getResult(0), input);
-    // Replace the original op with our implementation.
+      // Compute t = ax * ax for the first polynomial.
+      Value t = rewriter.create<arith::MulFOp>(loc, ax, ax);
+
+      // Compute first polynomial (for |x| < 1.0)
+      Value result1 =
+          evalErfPolynomial(ax, t, ArrayRef<Value>(coeffs1), rewriter, loc);
+
+      // Compute second polynomial (for |x| >= 1.0)
+      Value mad5 = coeffs2[0];
+      for (size_t i = 1; i < coeffs2.size(); ++i) {
+        mad5 = rewriter.create<math::FmaOp>(loc, ax, mad5, coeffs2[i]);
+      }
+      Value p2 = mad5;
+      Value negP2 = rewriter.create<arith::NegFOp>(loc, p2);
+      Value expNegP2 = rewriter.create<math::ExpOp>(loc, negP2);
+      Value result2 = rewriter.create<arith::SubFOp>(loc, one, expNegP2);
+
+      // Select between the two results based on the condition.
+      result = rewriter.create<arith::SelectOp>(loc, cmp, result1, result2);
+    }
+
+    // Restore the sign
+    Value finalResult = rewriter.create<math::CopySignOp>(loc, result, input);
     rewriter.replaceOp(op, finalResult);
-
     return success();
   }
 };
