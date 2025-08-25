@@ -509,15 +509,25 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   attrs.emplace_back(StringAttr::get(context, "mma_kind"), kind);
   if (mustBeAligned) {
     Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
-    Attribute promotionArray[] = {useGlobalDma, useGlobalDma};
+    SmallVector<Attribute> promotionArray = {useGlobalDma, useGlobalDma};
+    SmallVector<int64_t> promotionList = {0, 1};
+    if (scaled) {
+      promotionArray.append({useGlobalDma, useGlobalDma});
+      promotionList.append({2, 3});
+    }
     ArrayRef<Attribute> promotionTypes =
         useDirectLoad ? ArrayRef<Attribute>(promotionArray)
                       : ArrayRef<Attribute>{};
-    GPU::appendPromotedOperandsList(context, attrs, {0, 1}, promotionTypes);
+    GPU::appendPromotedOperandsList(context, attrs, promotionList,
+                                    promotionTypes);
   } else {
     // TODO (nirvedhmeshram, Max191, jerryyin) : Add support so that unaligned
     // shapes do not require c promotion.
-    GPU::appendPromotedOperandsList(context, attrs, {0, 1, 2});
+    SmallVector<int64_t> promotionList = {0, 1, 2};
+    if (scaled) {
+      promotionList.push_back(3);
+    }
+    GPU::appendPromotedOperandsList(context, attrs, promotionList);
     SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
 
     // Initialize inner and outer padding sizes from reductionTileSizes.
