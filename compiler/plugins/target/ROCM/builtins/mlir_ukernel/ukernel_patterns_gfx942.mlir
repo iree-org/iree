@@ -99,7 +99,7 @@ pdl.pattern @annotate_matmul_like_f8_large_expanded : benefit(2) {
   %rhs = pdl.operand : %rhs_type
   %out_init = pdl.operand : %out_type
 
-  // Match the a matmul-like generic with above indexin maps.
+  // Match the a matmul-like generic with above indexing maps.
   %generic_op = pdl.operation (%lhs, %rhs, %out_init : !pdl.value, !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
   pdl.apply_native_constraint "matchContraction"(
         %generic_op, %elemtypes, %imaps
