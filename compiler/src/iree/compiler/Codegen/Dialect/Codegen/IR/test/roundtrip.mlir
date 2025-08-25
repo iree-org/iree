@@ -72,3 +72,13 @@ func.func @store_to_strided_memref(
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]:
 // CHECK:         iree_codegen.store_to_buffer %[[ARG0]], %[[ARG1]]
 // CHECK-SAME:      : tensor<?x?xf32> into memref<?x?xf32, strided<[?, 1], offset: ?>>
+
+// -----
+
+func.func @fusion_barrier(%arg0: tensor<?xf32>) -> tensor<?xf32> {
+  %0 = iree_codegen.fusion_barrier %arg0 : tensor<?xf32>
+  return %0 : tensor<?xf32>
+}
+// CHECK-LABEL: func.func @fusion_barrier(
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?xf32>
+// CHECK:         iree_codegen.fusion_barrier %[[ARG0]] : tensor<?xf32>
