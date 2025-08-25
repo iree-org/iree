@@ -638,15 +638,15 @@ OpFoldResult XORShuffleAttr::swizzleOffset(OpBuilder &b, Location loc,
   // Number of elements per group.
   Value accessWidthVal =
       b.create<arith::ConstantIndexOp>(loc, getAccessWidth());
-  // Number of rows per phase
+  // Number of rows per phase.
   Value perPhaseVal = b.create<arith::ConstantIndexOp>(loc, perPhase);
 
   Value idVal = getValueOrCreateConstantIndexOp(b, loc, id);
 
-  // Col and row indexes in overall memref
+  // Col and row indexes in overall memref.
   auto col = b.create<arith::RemUIOp>(loc, idVal, rowAlignmentVal);
   auto row = b.create<arith::DivUIOp>(loc, idVal, rowStrideVal);
-  // Futur base id. We swizzle only within accessWidth
+  // Futur base id. We swizzle only within accessWidth.
   auto swizzledBase = b.create<arith::SubIOp>(loc, idVal, col);
   auto colElements = b.create<arith::DivUIOp>(loc, col, accessWidthVal);
 
