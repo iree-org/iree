@@ -84,7 +84,7 @@ func.func @multi_dim_mma_schedule(%lhs: tensor<10x32x128x16xf16>, %rhs: tensor<4
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 //  CHECK-SAME:     promote_operands = [0, 1]
 //  CHECK-SAME:     reduction = [0, 0, 0, 0, 4, 1]
-//  CHECK-SAME:     subgroup = [2, 2, 1, 1, 0, 0]
+//  CHECK-SAME:     subgroup = [2, 1, 2, 1, 0, 0]
 //  CHECK-SAME:     workgroup = [2, 4, 32, 32, 0, 0]
 
 //        LATE:  LLVMGPUVectorDistribute
@@ -439,14 +439,14 @@ func.func @unaligned_to_intrinsic_batched_matmul_tiling_check(%lhs : tensor<12x5
 // schedule with nTileSize of 16 while in reality it should be 8.
 
 // LATE-LABEL: func.func @unaligned_to_intrinsic_batched_matmul_tiling_check
-// LATE-SAME:    #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
+// LATE-SAME:    #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
 // LATE-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
 //      LATE:    linalg.batch_matmul {{.*}}lowering_config = #iree_gpu.lowering_config
-//  LATE-SAME:     padding = [1, 16, 512, 4]
+//  LATE-SAME:     padding = [1, 16, 128, 4]
 //  LATE-SAME:     promote_operands = [0, 1, 2]
 //  LATE-SAME:     reduction = [0, 0, 0, 1]
-//  LATE-SAME:     subgroup = [0, 1, 4, 0]
-//  LATE-SAME:     workgroup = [1, 16, 512, 0]
+//  LATE-SAME:     subgroup = [0, 1, 2, 0]
+//  LATE-SAME:     workgroup = [1, 16, 128, 0]
 
 // -----
 
