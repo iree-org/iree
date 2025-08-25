@@ -620,7 +620,6 @@ SymbolicUKernelProviderAttr::getMLIRUKernel(StringRef name, DictionaryAttr,
 OpFoldResult XORShuffleAttr::swizzleOffset(OpBuilder &b, Location loc,
                                            OpFoldResult offset,
                                            Value src) const {
-
   int64_t rotationInvariant =
       getRowWidth() * (getRowWidth() / getAccessWidth());
   int64_t rowStride =
