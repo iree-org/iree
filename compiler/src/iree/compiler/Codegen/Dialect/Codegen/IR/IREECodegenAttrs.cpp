@@ -677,7 +677,6 @@ LogicalResult
 XORShuffleAttr::verify(function_ref<InFlightDiagnostic()> emitError,
                        int64_t rowWidth, int64_t accessWidth, int64_t rowStride,
                        int64_t perPhase) {
-
   if (rowWidth % accessWidth != 0) {
     return emitError() << "expected access width to divide row width";
   }
