@@ -9,6 +9,7 @@
 
 #include <cstdint>
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Sequence.h"
 #include "llvm/Support/DebugLog.h"
@@ -666,6 +667,13 @@ struct ChainedMMAIntrinsics {
   bool canReuseAOutputForB;
 };
 
+static bool matchLayout(IREE::GPU::MMASingleSubgroupLayout layoutA,
+                        IREE::GPU::MMASingleSubgroupLayout layoutB) {
+  return (layoutA.element == layoutB.element) &&
+         (layoutA.thread == layoutB.thread) &&
+         (layoutA.tstrides == layoutB.tstrides);
+};
+
 FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
     const GPUMatmulShapeType &qkMatmul, const GPUMatmulShapeType &pvMatmul,
     ArrayRef<GPUIntrinsicType> intrinsics,
@@ -677,28 +685,33 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
          qkMatmul.nSizes.size() == 1 && qkMatmul.kSizes.size() == 1 &&
          "unimplemented: multi M/N/K attention schedule");
 
+  SmallVector<uint64_t> qkViableIntrinsicIndices;
+  SmallVector<uint64_t> pvViableIntrinsicIndices;
+  for (const auto &[index, intrinsic] : llvm::enumerate(intrinsics)) {
+    if (!failed(canTargetIntrinsic(qkMatmul, intrinsic, subgroupSize,
+                                   canUpcastAcc, mustBeAligned))) {
+      qkViableIntrinsicIndices.push_back(index);
+    }
+    if (!failed(canTargetIntrinsic(pvMatmul, intrinsic, subgroupSize,
+                                   canUpcastAcc, mustBeAligned))) {
+      pvViableIntrinsicIndices.push_back(index);
+    }
+  }
+
   std::vector<ChainedMMAIntrinsics> intrinsicPairs;
-
-  for (const GPUIntrinsicType &intrinsicA : intrinsics) {
-    for (const GPUIntrinsicType &intrinsicB : intrinsics) {
-      if (failed(canTargetIntrinsic(qkMatmul, intrinsicA, subgroupSize,
-                                    canUpcastAcc, mustBeAligned))) {
+  for (unsigned qkIndex : qkViableIntrinsicIndices) {
+    for (unsigned pvIndex : pvViableIntrinsicIndices) {
+      const GPUIntrinsicType &intrinsicA = intrinsics[qkIndex];
+      const GPUIntrinsicType &intrinsicB = intrinsics[pvIndex];
+      if (!matchLayout(getSingleSubgroupLayout(intrinsicA.mmaKind,
+                                               IREE::GPU::MMAFragment::Acc),
+                       getSingleSubgroupLayout(intrinsicB.mmaKind,
+                                               IREE::GPU::MMAFragment::Acc))) {
         continue;
       }
 
-      if (failed(canTargetIntrinsic(pvMatmul, intrinsicB, subgroupSize,
-                                    canUpcastAcc, mustBeAligned))) {
-        continue;
-      }
       // Check if we can reuse the output of intrinsicA for lhs/rhs of
       // intrinsicB.
-      auto matchLayout =
-          [](IREE::GPU::MMASingleSubgroupLayout layoutA,
-             IREE::GPU::MMASingleSubgroupLayout layoutB) -> bool {
-        return (layoutA.element == layoutB.element) &&
-               (layoutA.thread == layoutB.thread) &&
-               (layoutA.tstrides == layoutB.tstrides);
-      };
       bool canReuseAOutForBLhs =
           matchLayout(getSingleSubgroupLayout(intrinsicA.mmaKind,
                                               IREE::GPU::MMAFragment::Acc),
