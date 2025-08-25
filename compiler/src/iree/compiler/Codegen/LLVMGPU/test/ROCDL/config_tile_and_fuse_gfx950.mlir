@@ -25,14 +25,14 @@ func.func @scaled_matmul(
 }
 
 // CHECK-LABEL: func.func @scaled_matmul
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>
 //  CHECK-SAME:     promote_operands = [0, 1]
 //  CHECK-SAME:     reduction = [0, 0, 8, 1]
-//  CHECK-SAME:     subgroup = [4, 4, 0, 0]
-//  CHECK-SAME:     workgroup = [128, 128, 0, 0]
+//  CHECK-SAME:     subgroup = [2, 2, 0, 0]
+//  CHECK-SAME:     workgroup = [128, 64, 0, 0]
 
 // -----
 
@@ -58,14 +58,14 @@ func.func @scaled_matmul_with_batch(
 }
 
 // CHECK-LABEL: func.func @scaled_matmul_with_batch
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>
 //  CHECK-SAME:     promote_operands = [0, 1]
 //  CHECK-SAME:     reduction = [0, 0, 0, 8, 1]
-//  CHECK-SAME:     subgroup = [0, 4, 4, 0, 0]
-//  CHECK-SAME:     workgroup = [1, 128, 128, 0, 0]
+//  CHECK-SAME:     subgroup = [0, 2, 2, 0, 0]
+//  CHECK-SAME:     workgroup = [1, 128, 64, 0, 0]
 
 // -----
 
