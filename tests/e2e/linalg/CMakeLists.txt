@@ -24,7 +24,6 @@ iree_check_single_backend_test_suite(
     "softmax.mlir"
     "subbyte_to_fp.mlir"
     "unpack.mlir"
-    "scaled_matmul.mlir"
   TARGET_BACKEND
     "llvm-cpu"
   DRIVER
@@ -155,9 +154,9 @@ iree_check_single_backend_test_suite(
   SRCS
     "argmax.mlir"
     "pack_i8.mlir"
+    "scaled_matmul.mlir"
     "softmax.mlir"
     "unpack.mlir"
-    "scaled_matmul.mlir"
   TARGET_BACKEND
     "rocm"
   DRIVER

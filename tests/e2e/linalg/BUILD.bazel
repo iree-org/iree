@@ -31,13 +31,13 @@ LLVM_SRCS = enforce_glob(
         "softmax.mlir",
         "subbyte_to_fp.mlir",
         "unpack.mlir",
-        "scaled_matmul.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
         "large_linalg_matmul.mlir",
         "index.mlir",
         "argmax.mlir",
+        "scaled_matmul.mlir",
     ],
 )
 
@@ -222,9 +222,9 @@ ROCM_SRCS = enforce_glob(
     [
         "argmax.mlir",
         "pack_i8.mlir",
+        "scaled_matmul.mlir",
         "softmax.mlir",
         "unpack.mlir",
-        "scaled_matmul.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
