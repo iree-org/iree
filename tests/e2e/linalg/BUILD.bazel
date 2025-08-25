@@ -238,7 +238,6 @@ ROCM_SRCS = enforce_glob(
         # See bug #20294
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
-        "scaled_matmul.mlir",
     ],
 )
 
