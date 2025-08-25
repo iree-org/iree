@@ -61,6 +61,27 @@ MLIR_CAPI_EXPORTED MlirAttribute ireeGPUMMAIntrinsicAttrGet(MlirContext mlirCtx,
 
 MLIR_CAPI_EXPORTED uint32_t ireeGPUMMAIntrinsicAttrGetValue(MlirAttribute attr);
 
+MLIR_CAPI_EXPORTED MlirAttribute ireeGPUComputeBitwidthsAttrGet(MlirContext ctx,
+                                                                uint32_t value);
+
+MLIR_CAPI_EXPORTED uint32_t
+ireeGPUComputeBitwidthsAttrGetValue(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED bool
+ireeAttributeIsAGPUComputeBitwidthsAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID ireeGPUComputeBitwidthsAttrGetTypeID();
+
+MLIR_CAPI_EXPORTED MlirAttribute ireeGPUStorageBitwidthsAttrGet(MlirContext ctx,
+                                                                uint32_t value);
+MLIR_CAPI_EXPORTED uint32_t
+ireeGPUStorageBitwidthsAttrGetValue(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED bool
+ireeAttributeIsAGPUStorageBitwidthsAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID ireeGPUStorageBitwidthsAttrGetTypeID();
+
 MLIR_CAPI_EXPORTED bool ireeAttributeIsAGPUMMAAttr(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED MlirTypeID ireeGPUMMAAttrGetTypeID(void);

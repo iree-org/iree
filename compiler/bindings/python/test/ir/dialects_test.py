@@ -391,3 +391,69 @@ def compilation_info():
     assert compilation_info is not None
     assert compilation_info.lowering_config == lowering_config
     assert compilation_info.translation_info == translation_info
+
+
+@run
+def executable_target_attr():
+    backend = ir.StringAttr.get("rocm")
+    format = ir.StringAttr.get("rocm-hsaco-fb")
+    target = iree_codegen.HAL_ExecutableTargetAttr.get(backend, format)
+    assert str(target) == '#hal.executable.target<"rocm", "rocm-hsaco-fb">'
+
+
+@run
+def compute_bitwidths_attr():
+    compute_bitwidths_attr = iree_gpu.ComputeBitwidthsAttr.get(
+        iree_gpu.ComputeBitwidths.FP64
+    )
+    assert compute_bitwidths_attr is not None
+
+    assert str(compute_bitwidths_attr) == "#iree_gpu<compute_bitwidths fp64>"
+    raw_value = compute_bitwidths_attr.raw_value
+    assert raw_value == iree_gpu.ComputeBitwidths.FP64
+    value = compute_bitwidths_attr.value
+    assert value == iree_gpu.ComputeBitwidths.FP64
+    assert str(value) == "fp64"
+    assert int(value) == raw_value
+
+    compute_bitwidths_attr = iree_gpu.ComputeBitwidthsAttr.get(
+        iree_gpu.ComputeBitwidths.FP32 | iree_gpu.ComputeBitwidths.FP16
+    )
+    assert compute_bitwidths_attr is not None
+
+    assert str(compute_bitwidths_attr) == "#iree_gpu<compute_bitwidths fp32|fp16>"
+    raw_value = compute_bitwidths_attr.raw_value
+    assert raw_value == iree_gpu.ComputeBitwidths.FP32 | iree_gpu.ComputeBitwidths.FP16
+    value = compute_bitwidths_attr.value
+    assert value == iree_gpu.ComputeBitwidths.FP32 | iree_gpu.ComputeBitwidths.FP16
+    assert str(value) == "fp32|fp16"
+    assert int(value) == raw_value
+
+
+@run
+def storage_bitwidths_attr():
+    storage_bitwidths_attr = iree_gpu.StorageBitwidthsAttr.get(
+        iree_gpu.StorageBitwidths.B64
+    )
+    assert storage_bitwidths_attr is not None
+
+    assert str(storage_bitwidths_attr) == "#iree_gpu<storage_bitwidths b64>"
+    raw_value = storage_bitwidths_attr.raw_value
+    assert raw_value == iree_gpu.StorageBitwidths.B64
+    value = storage_bitwidths_attr.value
+    assert value == iree_gpu.StorageBitwidths.B64
+    assert str(value) == "b64"
+    assert int(value) == raw_value
+
+    storage_bitwidths_attr = iree_gpu.StorageBitwidthsAttr.get(
+        iree_gpu.StorageBitwidths.B32 | iree_gpu.StorageBitwidths.B16
+    )
+    assert storage_bitwidths_attr is not None
+
+    assert str(storage_bitwidths_attr) == "#iree_gpu<storage_bitwidths b32|b16>"
+    raw_value = storage_bitwidths_attr.raw_value
+    assert raw_value == iree_gpu.StorageBitwidths.B32 | iree_gpu.StorageBitwidths.B16
+    value = storage_bitwidths_attr.value
+    assert value == iree_gpu.StorageBitwidths.B32 | iree_gpu.StorageBitwidths.B16
+    assert str(value) == "b32|b16"
+    assert int(value) == raw_value

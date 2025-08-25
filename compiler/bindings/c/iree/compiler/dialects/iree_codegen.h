@@ -95,6 +95,23 @@ ireeCodegenGetAttentionOpDetail(MlirAffineMap qMap, MlirAffineMap kMap,
 MLIR_CAPI_EXPORTED bool
 ireeCodegenMlirOperationIsACodegenAttentionOp(MlirOperation op);
 
+struct ireeCodegenHALExecutableTargetInfo {
+  MlirAttribute backend;
+  MlirAttribute format;
+  MlirAttribute configuration;
+};
+
+MLIR_CAPI_EXPORTED MlirAttribute ireeCodegenHALExecutableTargetAttrGet(
+    MlirContext mlirCtx, ireeCodegenHALExecutableTargetInfo info);
+
+MLIR_CAPI_EXPORTED ireeCodegenHALExecutableTargetInfo
+ireeCodegenHALExecutableTargetAttrGetInfo(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED bool
+ireeAttributeIsACodegenHALExecutableTargetAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID ireeCodegenHALExecutableTargetAttrGetTypeID(void);
+
 #ifdef __cplusplus
 }
 #endif

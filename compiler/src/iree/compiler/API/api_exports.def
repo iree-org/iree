@@ -3,6 +3,8 @@ EXPORTS
   ireeAttributeIsACodegenCompilationInfoAttr
   ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr
   ireeAttributeIsACodegenTranslationInfoAttr
+  ireeAttributeIsAGPUComputeBitwidthsAttr
+  ireeAttributeIsAGPUStorageBitwidthsAttr
   ireeAttributeIsAGPULoweringConfigAttr
   ireeAttributeIsAGPUMMAAttr
   ireeAttributeIsAGPUVirtualMMAAttr
@@ -25,6 +27,10 @@ EXPORTS
   ireeCodegenTranslationInfoAttrGet
   ireeCodegenTranslationInfoAttrGetParameters
   ireeCodegenTranslationInfoAttrGetTypeID
+  ireeCodegenHALExecutableTargetAttrGet
+  ireeCodegenHALExecutableTargetAttrGetInfo
+  ireeAttributeIsACodegenHALExecutableTargetAttr
+  ireeCodegenHALExecutableTargetAttrGetTypeID
   ireeCompilerEnumeratePlugins
   ireeCompilerEnumerateRegisteredHALTargetBackends
   ireeCompilerErrorDestroy
@@ -76,6 +82,12 @@ EXPORTS
   ireeCompilerSourceOpenFile
   ireeCompilerSourceSplit
   ireeCompilerSourceWrapBuffer
+  ireeGPUComputeBitwidthsAttrGet
+  ireeGPUComputeBitwidthsAttrGetTypeID
+  ireeGPUComputeBitwidthsAttrGetValue
+  ireeGPUStorageBitwidthsAttrGet
+  ireeGPUStorageBitwidthsAttrGetValue
+  ireeGPUStorageBitwidthsAttrGetTypeID
   ireeGPULoweringConfigAttrGet
   ireeGPULoweringConfigAttrGetAttributes
   ireeGPULoweringConfigAttrGetMmaKind
