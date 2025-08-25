@@ -189,4 +189,28 @@ iree_tablegen_doc(
     --gen-pass-doc CodegenCommonGPUPasses.md
 )
 
+iree_cc_library(
+  NAME
+    Analysis
+  HDRS
+    "ThreadUniformAnalysis.h"
+  SRCS
+    "ThreadUniformAnalysis.cpp"
+  DEPS
+    LLVMSupport
+    MLIRAffineDialect
+    MLIRAnalysis
+    MLIRArithDialect
+    MLIRGPUDialect
+    MLIRIR
+    MLIRSCFDialect
+    MLIRSupport
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::TensorExt::IR
+    iree::compiler::Dialect::Util::IR
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
