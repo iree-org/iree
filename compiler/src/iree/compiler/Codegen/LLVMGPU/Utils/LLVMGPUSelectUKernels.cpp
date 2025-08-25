@@ -77,7 +77,8 @@ static int64_t getSharedMemoryBytes(IREE::GPU::TargetAttr gpuTarget) {
 // Returns an initial UKernelConfigAttr containing the ukernel name and
 // def_attrs. Does not yet contain bitcode-dependent fields such as shared
 // memory size. Returns {} if no ukernel.
-static IREE::GPU::UKernelConfigAttr getInitialUKernelConfig(Operation *op) {
+static IREE::Codegen::UKernelDescriptorAttr
+getInitialUKernelConfig(Operation *op) {
   MLIRContext *context = op->getContext();
   auto [name, suffix] = getUKernelNameAndSuffix(op);
   if (name.empty()) {
@@ -90,11 +91,9 @@ static IREE::GPU::UKernelConfigAttr getInitialUKernelConfig(Operation *op) {
   if (isROCMBackend(execTarget)) {
     auto nameAttr = StringAttr::get(
         context, llvm::formatv("iree_uk_amdgpu_{}_{}", name, suffix));
-    auto defsAttr = DictionaryAttr::get(
-        context, {{StringAttr::get(context, "vm.import.module"),
-                   StringAttr::get(context, "rocm")}});
-    return IREE::GPU::UKernelConfigAttr::get(context, nameAttr, defsAttr,
-                                             /*shared_memory_bytes=*/0);
+    auto defsAttr = IREE::Codegen::UKernelArgumentKind::Bitcode;
+    return IREE::Codegen::UKernelDescriptorAttr::get(context, nameAttr,
+                                                     defsAttr);
   }
   return {};
 }
@@ -349,42 +348,10 @@ finalizeConfig(Operation *op, IREE::GPU::UKernelConfigAttr ukernelConfig,
   return ukernelConfig;
 }
 
-// Ensures that the op has ukernel bitcode as a hal.executable.object, stored
-// as a hal.executable.objects attribute on the op itself, ready to be hoisted
-// by the HoistExecutableObjects pass, and returns the finalized config attr
-// with the remaining bitcode-dependent fields populated.
-// Returns {} if no bitcode was found for the configured ukernel, of if an error
-// occurred trying to infer bitcode-dependent config fields (which may require
-// interpreting bitcode).
-static IREE::GPU::UKernelConfigAttr ensureUKernelBitcodeAndFinalizeConfig(
-    Operation *op, IREE::GPU::UKernelConfigAttr ukernelConfig) {
-  MLIRContext *context = op->getContext();
-  if (!ukernelConfig) {
-    return {};
-  }
-  auto target = IREE::HAL::ExecutableTargetAttr::lookup(op);
-  IREE::GPU::TargetAttr gpuTarget = getGPUTargetAttr(op->getContext(), target);
-  if (!gpuTarget) {
-    return {};
-  }
-  std::string filename = getBitcodeFilename(gpuTarget, ukernelConfig.getName());
-
-  ArrayAttr sourceExecutableObjects = lookUpExecutableObjects(op);
-  IREE::HAL::ExecutableObjectAttr bitcodeObject =
-      getUKernelBitcode(context, target, sourceExecutableObjects, filename);
-  if (!bitcodeObject) {
-    return {};
-  }
-  op->setAttr(executableObjectsAttrName,
-              ArrayAttr::get(context, bitcodeObject));
-  return finalizeConfig(op, ukernelConfig, bitcodeObject, gpuTarget);
-}
-
 } // namespace
 
-IREE::GPU::UKernelConfigAttr selectUKernel(Operation *op) {
-  IREE::GPU::UKernelConfigAttr initialConfig = getInitialUKernelConfig(op);
-  return ensureUKernelBitcodeAndFinalizeConfig(op, initialConfig);
+IREE::Codegen::UKernelDescriptorAttr selectUKernel(Operation *op) {
+  return getInitialUKernelConfig(op);
 }
 
 } // namespace mlir::iree_compiler

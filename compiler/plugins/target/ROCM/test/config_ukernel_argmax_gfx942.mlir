@@ -23,9 +23,7 @@ func.func @argmax_2d_f32i64(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes
 
 // CHECK-LABEL: func @argmax_2d_f32i64(
 //       CHECK: linalg.generic
-//  CHECK-SAME: hal.executable.objects = [
-//  CEHCK-SAME:   #hal.executable.object<{path = "iree_uk_amdgpu_argmax_f32i64.gfx942.bc", data = dense_resource<iree_uk_amdgpu_argmax_f32i64.gfx942.bc> : vector<{{[0-9]+}}xi8>}>]
-//  CHECK-SAME:   #iree_gpu.lowering_config<{{.*}}ukernel = #iree_gpu.ukernel_config<name = "iree_uk_amdgpu_argmax_f32i64", def_attrs = {vm.import.module = "rocm"}>
+//  CEHCK-SAME:   iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"iree_uk_amdgpu_argmax_f32i64", bitcode>
 
 // -----
 
@@ -52,9 +50,7 @@ func.func @argmax_4d_unit_parallel_f32i64(%arg0 : tensor<1x1x1x?xf32>) -> tensor
 
 // CHECK-LABEL: func @argmax_4d_unit_parallel_f32i64(
 //       CHECK: linalg.generic
-//  CHECK-SAME: hal.executable.objects = [
-//  CEHCK-SAME:   #hal.executable.object<{path = "iree_uk_amdgpu_argmax_f32i64.gfx942.bc", data = dense_resource<iree_uk_amdgpu_argmax_f32i64.gfx942.bc> : vector<{{[0-9]+}}xi8>}>]
-//  CHECK-SAME:   #iree_gpu.lowering_config<{{.*}}ukernel = #iree_gpu.ukernel_config<name = "iree_uk_amdgpu_argmax_f32i64", def_attrs = {vm.import.module = "rocm"}>
+//  CHECK-SAME:   iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"iree_uk_amdgpu_argmax_f32i64", bitcode>
 
 // -----
 
@@ -81,8 +77,7 @@ func.func @argmax_none_ukernel_enabled(%arg0 : tensor<1x?xf32>) -> tensor<1xi64>
 
 // CHECK-LABEL: func @argmax_none_ukernel_enabled(
 //       CHECK: linalg.generic
-//   CHECK-NOT: hal.executable.objects
-//   CHECK-NOT: iree_gpu.ukernel_config
+//   CHECK-NOT: iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
 
 // -----
 
@@ -109,9 +104,7 @@ func.func @argmax_only_argmax_ukernel_enabled(%arg0 : tensor<1x?xf32>) -> tensor
 
 // CHECK-LABEL: func @argmax_only_argmax_ukernel_enabled(
 //       CHECK: linalg.generic
-//  CHECK-SAME: hal.executable.objects = [
-//  CHECK-SAME:   #hal.executable.object<{path = "iree_uk_amdgpu_argmax_f32i64.gfx942.bc", data = dense_resource<iree_uk_amdgpu_argmax_f32i64.gfx942.bc> : vector<{{[0-9]+}}xi8>}>]
-//  CHECK-SAME:   #iree_gpu.lowering_config<{{.*}}ukernel = #iree_gpu.ukernel_config<name = "iree_uk_amdgpu_argmax_f32i64", def_attrs = {vm.import.module = "rocm"}>
+//  CHECK-SAME:   iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"iree_uk_amdgpu_argmax_f32i64", bitcode>
 
 // -----
 
@@ -138,9 +131,7 @@ func.func @argmax_only_foo_argmax_bar_ukernel_enabled(%arg0 : tensor<1x?xf32>) -
 
 // CHECK-LABEL: func @argmax_only_foo_argmax_bar_ukernel_enabled(
 //       CHECK: linalg.generic
-//  CHECK-SAME: hal.executable.objects = [
-//  CHECK-SAME:   #hal.executable.object<{path = "iree_uk_amdgpu_argmax_f32i64.gfx942.bc", data = dense_resource<iree_uk_amdgpu_argmax_f32i64.gfx942.bc> : vector<{{[0-9]+}}xi8>}>]
-//  CHECK-SAME:   #iree_gpu.lowering_config<{{.*}}ukernel = #iree_gpu.ukernel_config<name = "iree_uk_amdgpu_argmax_f32i64", def_attrs = {vm.import.module = "rocm"}>
+//  CHECK-SAME:   iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"iree_uk_amdgpu_argmax_f32i64", bitcode>
 
 // -----
 
@@ -167,8 +158,7 @@ func.func @argmax_only_foo_ukernel_enabled(%arg0 : tensor<1x?xf32>) -> tensor<1x
 
 // CHECK-LABEL: func @argmax_only_foo_ukernel_enabled(
 //       CHECK: linalg.generic
-//   CHECK-NOT: hal.executable.objects
-//   CHECK-NOT: iree_gpu.ukernel_config
+//   CHECK-NOT: iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
 
 // -----
 
@@ -197,7 +187,7 @@ func.func @argmax_2d_f32i64_not_neg_inf_init(%arg0 : tensor<1x?xf32>) -> tensor<
 //   CHECK-NOT: lowering_config<{{.*}}ukernel
 // CHECK-LABEL: func @argmax_2d_f32i64_not_neg_inf_init(
 //       CHECK: linalg.generic
-//   CHECK-NOT: hal.executable.objects
+//   CHECK-NOT: iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
 
 // -----
 
@@ -233,10 +223,4 @@ func.func @argmax_2d_f32i64_custom_bitcode(%arg0 : tensor<1x?xf32>) -> tensor<1x
 
 // CHECK-LABEL: func @argmax_2d_f32i64_custom_bitcode(
 //       CHECK:   linalg.generic
-//  CHECK-SAME:     hal.executable.objects = [
-//  CHECK-SAME:       #hal.executable.object<{
-//  CHECK-SAME:         path = "iree_uk_amdgpu_argmax_f32i64.gfx942.bc",
-//  CHECK-SAME:         data = dense<[66, 67, -64, -34, 1, 35, 69, 103, -119, -85, -51, -17]> : tensor<12xi8>
-//  CHECK-SAME:       }>
-//  CHECK-SAME:     ]
-//  CHECK-SAME: #iree_gpu.lowering_config<{{.*}}ukernel = #iree_gpu.ukernel_config<name = "iree_uk_amdgpu_argmax_f32i64", def_attrs = {vm.import.module = "rocm"}>
+//  CHECK-SAME:       iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"iree_uk_amdgpu_argmax_f32i64", bitcode>
