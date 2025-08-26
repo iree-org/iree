@@ -1131,7 +1131,7 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_PureOp<"exp_reduction",
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region SizedRegion<1>:$region);
 
-  let hasVerifier = 0;
+  let hasVerifier = 1;
 
   let assemblyFormat = [{
     `{`
