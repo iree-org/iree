@@ -346,7 +346,7 @@ public:
     Operation *op = getOperation();
     MLIRContext *context = op->getContext();
     RewritePatternSet patterns(context);
-    linalg::populateLinalgNamedOpConversionPatterns(patterns);
+    linalg::populateSimplifyDepthwiseConvPatterns(patterns);
     patterns.add<QuantizedConvToConv, QuantizedDepthwiseConvToDepthwiseConv>(
         context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
