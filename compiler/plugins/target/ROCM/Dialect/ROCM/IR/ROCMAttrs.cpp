@@ -79,7 +79,7 @@ static LogicalResult handleArgmaxUkernel(
   return success();
 }
 
-LogicalResult UKernelProviderAttr::createAndReplaceWithUkernelOp(
+std::optional<LogicalResult> UKernelProviderAttr::createAndReplaceWithUkernelOp(
     RewriterBase &rewriter, StringRef name, DictionaryAttr targetConfiguration,
     Operation *contextualOp, SmallVectorImpl<Value> &inputs,
     SmallVectorImpl<Value> &outputs,
@@ -89,7 +89,7 @@ LogicalResult UKernelProviderAttr::createAndReplaceWithUkernelOp(
                                contextualOp, inputs, outputs, otherOperands);
   }
   // TODO(avarma): Add multi_mfma ukernel support via descriptors.
-  return failure();
+  return std::nullopt;
 }
 
 //===----------------------------------------------------------------------===//

@@ -558,7 +558,7 @@ def IREECodegen_UKernelProviderInterface :
         |other_operands| and adds to it a few context-specific as well as
         backend specific implementations to create the ukernel op.
       }],
-      /*retTy=*/"::mlir::LogicalResult",
+      /*retTy=*/"std::optional<::mlir::LogicalResult>",
       /*methodName=*/"createAndReplaceWithUkernelOp",
       /*args=*/(ins "::mlir::RewriterBase&":$b,
                     "::mlir::StringRef":$name,

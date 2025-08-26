@@ -110,17 +110,21 @@ convertToUKernelGeneric(RewriterBase &rewriter, Operation *op, StringRef name,
   }
 
   rewriter.setInsertionPoint(op);
-  if (!provider) {
-    // Default ukernel generic op is created when a provider doesn't exist.
-    rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
-        op, op->getResults().getTypes(), name, tensorInputs, tensorOutputs,
-        otherOperands, DictionaryAttr(),
-        /*strided_outer_dims=*/0);
-    return success();
+  if (provider) {
+    std::optional<LogicalResult> retVal =
+        provider.createAndReplaceWithUkernelOp(
+            rewriter, name, targetConfiguration, op, tensorInputs,
+            tensorOutputs, otherOperands);
+    if (retVal)
+      return retVal.value();
   }
-  return provider.createAndReplaceWithUkernelOp(
-      rewriter, name, targetConfiguration, op, tensorInputs, tensorOutputs,
-      otherOperands);
+  // Default ukernel generic op is created when a provider doesn't exist or when
+  // the provider doesn't implement the replacement method.
+  rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
+      op, op->getResults().getTypes(), name, tensorInputs, tensorOutputs,
+      otherOperands, DictionaryAttr(),
+      /*strided_outer_dims=*/0);
+  return success();
 }
 
 /// Replaces the operation `op` with the inlined body of the target function.
