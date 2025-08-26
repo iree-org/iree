@@ -277,10 +277,10 @@ foldPackIntoMapScatter(RewriterBase &rewriter, linalg::PackOp packOp,
 static FailureOr<MapScatterOp>
 foldUnpackIntoMapScatter(RewriterBase &rewriter, linalg::UnPackOp unpackOp,
                          MapScatterOp mapScatterOp) {
-  assert(mapScatterOp.getInput() == packOp->getResult(0) &&
-         "expected packOp to be the producer of mapScatterOp");
+  assert(mapScatterOp.getInput() == unpackOp->getResult(0) &&
+         "expected unpackOp to be the producer of mapScatterOp");
 
-  // Decompose the pack op, and fold each decomposed op one by one.
+  // Decompose the unpack op, and fold each decomposed op one by one.
   rewriter.setInsertionPoint(unpackOp);
   FailureOr<linalg::LowerUnPackOpResult> result = linalg::lowerUnPack(
       rewriter, unpackOp, /*lowerUnpadLikeWithExtractSlice=*/false);
