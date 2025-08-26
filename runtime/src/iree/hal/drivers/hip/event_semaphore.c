@@ -71,7 +71,6 @@ typedef enum {
 typedef struct iree_hal_hip_semaphore_queue_item_t {
   iree_hal_hip_semaphore_queue_item_type_t type;
   iree_hal_hip_event_t* event;
-  iree_hal_hip_event_t* secondary_event;
   iree_hal_hip_cpu_event_t* cpu_event;
   iree_hal_hip_semaphore_work_item_t* work_item;
   iree_hal_hip_per_device_info_t* created_device;
@@ -188,7 +187,6 @@ static void iree_hal_hip_semaphore_destroy(
         (iree_hal_hip_semaphore_queue_item_t*)
             iree_hal_hip_util_tree_node_get_value(i);
     iree_hal_hip_event_release(queue_item->event);
-    iree_hal_hip_event_release(queue_item->secondary_event);
     iree_hal_resource_release(queue_item->cpu_event);
     iree_hal_hip_semaphore_work_item_t* work_item = queue_item->work_item;
     while (work_item) {
@@ -403,7 +401,6 @@ static iree_status_t iree_hal_hip_event_semaphore_run_scheduled_callbacks(
     iree_hal_hip_util_tree_erase(&semaphore->event_queue.tree, node);
     iree_slim_mutex_unlock(&semaphore->mutex);
     iree_hal_hip_event_release(copy.event);
-    iree_hal_hip_event_release(copy.secondary_event);
     if (copy.cpu_event) {
       iree_event_set(&copy.cpu_event->event);
       iree_hal_resource_release(&copy.cpu_event->resource);
@@ -700,34 +697,10 @@ iree_status_t iree_hal_hip_semaphore_create_event_and_record_if_necessary(
       if (iree_status_is_ok(status) && !value->has_been_signaled) {
         // If the event was created on a different device, then we
         // have to actually signal a secondary event first.
-        if (device != value->created_device) {
-          status = iree_hal_hip_event_pool_acquire(event_pool, 1,
-                                                   &value->secondary_event);
-          if (iree_status_is_ok(status)) {
-            status = IREE_HIP_CALL_TO_STATUS(
-                semaphore->symbols, hipEventRecord(iree_hal_hip_event_handle(
-                                                       value->secondary_event),
-                                                   dispatch_stream));
-          }
-          if (iree_status_is_ok(status)) {
-            status = IREE_HIP_CALL_TO_STATUS(
-                semaphore->symbols,
-                hipStreamWaitEvent(
-                    value->created_device->hip_async_memory_stream,
-                    iree_hal_hip_event_handle(value->secondary_event), 0));
-          }
-          if (iree_status_is_ok(status)) {
-            status = IREE_HIP_CALL_TO_STATUS(
-                semaphore->symbols,
-                hipEventRecord(iree_hal_hip_event_handle(value->event),
-                               value->created_device->hip_async_memory_stream));
-          }
-        } else {
-          status = IREE_HIP_CALL_TO_STATUS(
-              semaphore->symbols,
-              hipEventRecord(iree_hal_hip_event_handle(value->event),
-                             dispatch_stream));
-        }
+        status = IREE_HIP_CALL_TO_STATUS(
+            semaphore->symbols,
+            hipEventRecord(iree_hal_hip_event_handle(value->event),
+                            dispatch_stream));
         value->has_been_signaled = true;
       }
     }
