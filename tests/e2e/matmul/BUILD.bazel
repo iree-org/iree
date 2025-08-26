@@ -267,7 +267,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
 )]
 
 [iree_generated_e2e_runner_test(
-      name = "e2e_matmul_vmvx_experimental_dt%s_%s_%s" % (
+    name = "e2e_matmul_vmvx_experimental_dt%s_%s_%s" % (
         ("_uk" if use_uk else ""),
         lhs_rhs_type,
         acc_type,
