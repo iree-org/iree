@@ -207,6 +207,7 @@ addDispatchRegionCreationPasses(OpPassManager &passManager,
                                            options.enablePadFusion,
                                            options.enablePadFusion});
       })
+      .addPass(DispatchCreation::createTensorPadToTensorInsertSlicePass)
       // Elementwise fuse operations that are iside a dispatch if possible.
       .addPass([&]() {
         return DispatchCreation::createElementwiseOpFusionPass(
