@@ -757,14 +757,13 @@ static bool isFusableWithProducer(
   Operation *producer = operand.get().getDefiningOp();
   Operation *consumer = operand.getOwner();
 
-  if (!fuseWithTruncate && IREE::LinalgExt::isBitTruncateOp(producer)) {
+  if (auto padOp = dyn_cast<tensor::PadOp>(consumer)) {
+    if (options.fusePadWithProducers) {
+      return hasRootOpAttribute(consumer) && isa<linalg::LinalgOp>(producer);
+    }
     return false;
   }
-
-  if (auto padOp = dyn_cast<tensor::PadOp>(consumer)) {
-    // if (options.fusePadWithProducers) {
-    //   return isa<linalg::LinalgOp>(producer);
-    // }
+  if (!fuseWithTruncate && IREE::LinalgExt::isBitTruncateOp(producer)) {
     return false;
   }
 
