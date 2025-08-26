@@ -49,22 +49,20 @@ static LogicalResult handleArgmaxUkernel(
   Location loc = genericOp.getLoc();
   Value reductionDimSize = rewriter.create<tensor::DimOp>(
       loc, genericOp.getDpsInputOperand(0)->get(), kReductionDim);
-  // `isPureArgmax` is used to differentiate between the two argmax versions :-
-  // 1. Returns only the index of the max value (isPureArgmax == true)
+  // `returnsMaxValue` differentiates between the two argmax versions :-
+  // 1. Returns only the index of the max value (returnsMaxValue == true)
   // 2. Returns both the max value as well as the corresponding index.
-  bool isPureArgmax = genericOp.getResults()[0].use_empty();
+  bool returnsMaxValue = genericOp.getResults()[0].use_empty();
   Value writeMaxValueFlag = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getI1Type(), rewriter.getBoolAttr(!isPureArgmax));
-  otherOperands.push_back(reductionDimSize);
-  otherOperands.push_back(writeMaxValueFlag);
+      loc, rewriter.getI1Type(), rewriter.getBoolAttr(!returnsMaxValue));
+  llvm::append_values(otherOperands, reductionDimSize, writeMaxValueFlag);
   MLIRContext *context = rewriter.getContext();
   auto fnDefAttrs = DictionaryAttr::get(
       context, {{"vm.import.module", StringAttr::get(context, "rocm")}});
   auto ukernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, contextualOp->getResults().getTypes(), name, inputs, outputs,
-      otherOperands, fnDefAttrs,
-      /*num_strided_outer_dims=*/0);
-  if (isPureArgmax) {
+      loc, contextualOp->getResultTypes(), name, inputs, outputs, otherOperands,
+      fnDefAttrs, /*num_strided_outer_dims=*/0);
+  if (returnsMaxValue) {
     rewriter.replaceAllUsesWith(genericOp.getResults()[1],
                                 ukernelOp.getResults()[1]);
     return success();

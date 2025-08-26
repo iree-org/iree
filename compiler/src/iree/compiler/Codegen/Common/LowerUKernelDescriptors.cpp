@@ -116,12 +116,11 @@ convertToUKernelGeneric(RewriterBase &rewriter, Operation *op, StringRef name,
         op, op->getResults().getTypes(), name, tensorInputs, tensorOutputs,
         otherOperands, DictionaryAttr(),
         /*strided_outer_dims=*/0);
-  } else if (failed(provider.createAndReplaceWithUkernelOp(
-                 rewriter, name, targetConfiguration, op, tensorInputs,
-                 tensorOutputs, otherOperands))) {
-    return failure();
+    return success();
   }
-  return success();
+  return provider.createAndReplaceWithUkernelOp(
+      rewriter, name, targetConfiguration, op, tensorInputs, tensorOutputs,
+      otherOperands);
 }
 
 /// Replaces the operation `op` with the inlined body of the target function.
