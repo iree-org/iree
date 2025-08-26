@@ -42,6 +42,7 @@ iree_lit_test_suite(
     "linalg_transform.mlir"
     "link_executables.mlir"
     "llvmgpu_bufferize.mlir"
+    "nvvm_pipeline_test.mlir"
     "pack_shared_memory_alloc.mlir"
     "prefetch_shared_memory.mlir"
     "reduction_pipeline_cuda.mlir"
