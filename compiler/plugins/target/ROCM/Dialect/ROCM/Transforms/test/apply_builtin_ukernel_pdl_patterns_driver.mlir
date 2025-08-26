@@ -31,6 +31,21 @@ module attributes {
       } -> tensor<1x128x1024xf32>
     return %2 : tensor<1x128x1024xf32>
   }
+  // Check that a second function requiring the same ukernel doesn't lead to a 'redefinition of symbol named ...' error.
+  func.func @matmul_f8_medium_expanded_2(%arg0: tensor<1x128x4096xf8E4M3FNUZ>, %arg1: tensor<1024x4096xf8E4M3FNUZ>) -> tensor<1x128x1024xf32> {
+    %cst = arith.constant 0.000000e+00 : f32
+    %0 = tensor.empty() : tensor<1x128x1024xf32>
+    %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<1x128x1024xf32>) -> tensor<1x128x1024xf32>
+    %2 = linalg.generic {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<1x128x4096xf8E4M3FNUZ>, tensor<1024x4096xf8E4M3FNUZ>) outs(%1 : tensor<1x128x1024xf32>) {
+      ^bb0(%in: f8E4M3FNUZ, %in_4: f8E4M3FNUZ, %out: f32):
+        %12 = arith.extf %in : f8E4M3FNUZ to f32
+        %13 = arith.extf %in_4 : f8E4M3FNUZ to f32
+        %14 = arith.mulf %12, %13 : f32
+        %15 = arith.addf %out, %14 : f32
+        linalg.yield %15 : f32
+      } -> tensor<1x128x1024xf32>
+    return %2 : tensor<1x128x1024xf32>
+  }
 }
 // CHECK-LABEL: util.func private @pingpong_medium_f8_expanded
 // CHECK:         iree_codegen.inner_tiled
