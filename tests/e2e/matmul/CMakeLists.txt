@@ -770,6 +770,54 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
+    e2e_matmul_vmvx_experimental_dt_f32_f32
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+    "--shapes=small"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "vmvx"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling"
+    "--iree-global-opt-enable-early-materialization=false"
+  LABELS
+
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_vmvx_experimental_dt_uk_f32_f32
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+    "--shapes=small"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "vmvx"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling"
+    "--iree-global-opt-enable-early-materialization=false"
+  LABELS
+
+)
+
+iree_generated_e2e_runner_test(
+  NAME
     e2e_matmul_spirv_experimental_dt_f32_f32
   TEST_TYPE
     matmul
