@@ -15,10 +15,13 @@ package(
 iree_runtime_cc_library(
     name = "cuda",
     srcs = [
-        "api.c",
+        "driver.c",
+        "runtime.c",
     ],
     hdrs = [
         "api.h",
+        "driver.h",
+        "runtime.h",
     ],
     defines = [
         "IREE_HAL_STREAMING_CUDA_EXPORTS",
