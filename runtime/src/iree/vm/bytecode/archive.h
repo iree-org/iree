@@ -28,6 +28,13 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_archive_parse_header(
     iree_const_byte_span_t* out_flatbuffer_contents,
     iree_host_size_t* out_rodata_offset);
 
+// Infers the total size of a bytecode archive by parsing its contents.
+// This handles archives with unknown size (data_length == 0) and calculates
+// the total size including any ZIP header, flatbuffer, and rodata segments.
+IREE_API_EXPORT iree_status_t
+iree_vm_bytecode_archive_infer_size(iree_const_byte_span_t archive_contents,
+                                    iree_host_size_t* out_inferred_size);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
