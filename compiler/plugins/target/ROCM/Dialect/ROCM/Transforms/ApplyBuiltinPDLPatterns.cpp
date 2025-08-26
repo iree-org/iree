@@ -299,6 +299,7 @@ public:
     MLIRContext *ctx = moduleOp.getContext();
     auto rocmDialect = ctx->getOrLoadDialect<IREE::ROCM::ROCMDialect>();
     SmallVector<FunctionOpInterface> ukernelFunctions;
+    llvm::SmallDenseSet<StringRef> ukernelSymbols;
     auto res = moduleOp.walk([&](Operation *op) {
       auto builtinName =
           dyn_cast_or_null<StringAttr>(op->getAttr(kBuiltinName));
@@ -306,8 +307,7 @@ public:
       if (!builtinName || !ukernelDesc) {
         return WalkResult::advance();
       }
-      if (moduleOp->hasAttr(ukernelDesc.getUkernelName())) {
-        // Avoid parsing and serializing the same ukernel again and again.
+      if (ukernelSymbols.contains(ukernelDesc.getUkernelName())) {
         return WalkResult::advance();
       }
       std::optional<StringRef> maybeBuiltin =
@@ -335,6 +335,7 @@ public:
       funcOp->remove();
       ukernelFunctions.push_back(funcOp);
       op->removeAttr(kBuiltinName);
+      ukernelSymbols.insert(ukernelDesc.getUkernelName());
       return WalkResult::advance();
     });
     if (res.wasInterrupted()) {
