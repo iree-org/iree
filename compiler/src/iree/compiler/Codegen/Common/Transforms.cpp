@@ -485,7 +485,7 @@ swapCollapseShapeWithSlice(RewriterBase &rewriter,
 
         // Check if offset is from a block argument or an affine.apply op of
         // form (d0 * K) or (K * d0).
-        auto offsetVal = dyn_cast<Value>(collapsedOffset);
+        auto offsetVal = cast<Value>(collapsedOffset);
         auto collapseDefOp = offsetVal.getDefiningOp();
         if (isa<BlockArgument>(offsetVal)) {
           // The loop is already normalized.
