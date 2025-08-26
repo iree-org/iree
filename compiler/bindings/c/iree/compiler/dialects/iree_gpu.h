@@ -144,6 +144,18 @@ struct ireeGPUMMASingleSubgroupLayout {
 MLIR_CAPI_EXPORTED ireeGPUMMASingleSubgroupLayout
 ireeGPUGetSingleSubgroupLayout(MlirAttribute attr, uint32_t fragment);
 
+struct ireeGPUTargetInfo {
+  MlirIdentifier arch;                 // "gfx942".
+  MlirAttribute subgroup_size_choices; // Subgroup size choices.
+  MlirAttribute max_workgroup_sizes;   // Max threads per X/Y/Z dimension.
+  MlirAttribute max_thread_count_per_workgroup; // Max threads per workgroup.
+  MlirAttribute max_workgroup_memory_bytes;     // Max workgroup memory.
+};
+
+// Add function to query GPU target info from ExecutableTargetAttr.
+MLIR_CAPI_EXPORTED ireeGPUTargetInfo
+ireeHALExecutableTargetAttrGetGPUTargetInfo(MlirAttribute attr);
+
 #ifdef __cplusplus
 }
 #endif

@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/dialects/iree_gpu.h"
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir-c/IR.h"
@@ -386,4 +387,42 @@ ireeGPUGetSingleSubgroupLayout(MlirAttribute attr, uint32_t fragment) {
   result.tstrides = wrap(builder.getI64ArrayAttr(layout.tstrides));
   result.element = wrap(builder.getI64ArrayAttr(layout.element));
   return result;
+}
+
+ireeGPUTargetInfo
+ireeHALExecutableTargetAttrGetGPUTargetInfo(MlirAttribute attr) {
+  assert(!mlirAttributeIsNull(attr) && "attr cannot be null");
+  auto executableTargetAttr =
+      llvm::cast<mlir::iree_compiler::IREE::HAL::ExecutableTargetAttr>(
+          unwrap(attr));
+
+  assert(executableTargetAttr && "attr is not a HAL::ExecutableTargetAttr");
+
+  ireeGPUTargetInfo targetInfo = {};
+  auto context = executableTargetAttr.getContext();
+  auto gpuTargetAttr =
+      mlir::iree_compiler::getGPUTargetAttr(context, executableTargetAttr);
+
+  if (gpuTargetAttr) {
+    targetInfo.arch =
+        wrap(mlir::StringAttr::get(context, gpuTargetAttr.getArch()));
+    auto wgpAttr = gpuTargetAttr.getWgp();
+    mlir::Builder builder = mlir::OpBuilder(context);
+
+    targetInfo.subgroup_size_choices =
+        wrap(builder.getI32ArrayAttr(wgpAttr.getSubgroupSizeChoices()));
+
+    targetInfo.max_workgroup_sizes =
+        wrap(builder.getI32ArrayAttr(wgpAttr.getMaxWorkgroupSizes()));
+
+    auto maxThreadCount = wgpAttr.getMaxThreadCountPerWorkgroup();
+    targetInfo.max_thread_count_per_workgroup = wrap(mlir::IntegerAttr::get(
+        mlir::IntegerType::get(context, 32), maxThreadCount));
+
+    auto maxWorkgroupMemory = wgpAttr.getMaxWorkgroupMemoryBytes();
+    targetInfo.max_workgroup_memory_bytes = wrap(mlir::IntegerAttr::get(
+        mlir::IntegerType::get(context, 32), maxWorkgroupMemory));
+  }
+
+  return targetInfo;
 }

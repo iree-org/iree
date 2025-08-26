@@ -505,6 +505,45 @@ NB_MODULE(_ireeCompilerDialects, m) {
           });
 
   //===-------------------------------------------------------------------===//
+  // Binding to query target info
+  //===-------------------------------------------------------------------===//
+
+  py::class_<ireeGPUTargetInfo>(iree_gpu_module, "TargetInfo")
+      .def_prop_ro("arch",
+                   [](const ireeGPUTargetInfo &self) -> std::string {
+                     MlirStringRef strRef = mlirIdentifierStr(self.arch);
+                     return std::string(strRef.data, strRef.length);
+                   })
+      .def_prop_ro("subgroup_size_choices",
+                   [](const ireeGPUTargetInfo &self) -> std::vector<int64_t> {
+                     return getIntArrayAttrValues(self.subgroup_size_choices);
+                   })
+      .def_prop_ro("max_thread_count_per_workgroup",
+                   [](const ireeGPUTargetInfo &self) -> int64_t {
+                     return mlirIntegerAttrGetValueInt(
+                         self.max_thread_count_per_workgroup);
+                   })
+      .def_prop_ro("max_workgroup_sizes",
+                   [](const ireeGPUTargetInfo &self) -> std::vector<int64_t> {
+                     return getIntArrayAttrValues(self.max_workgroup_sizes);
+                   })
+      .def_prop_ro("max_workgroup_memory_bytes",
+                   [](const ireeGPUTargetInfo &self) -> int64_t {
+                     return mlirIntegerAttrGetValueInt(
+                         self.max_workgroup_memory_bytes);
+                   });
+
+  iree_gpu_module.def(
+      "get_gpu_target_info",
+      [](MlirAttribute executableTargetAttr) {
+        ireeGPUTargetInfo result =
+            ireeHALExecutableTargetAttrGetGPUTargetInfo(executableTargetAttr);
+        return result;
+      },
+      "Extracts GPU target information from an executable target attribute.",
+      py::arg("executable_target_attr"));
+
+  //===-------------------------------------------------------------------===//
   // Binding to utility function getSingleSubgroupLayout
   //===-------------------------------------------------------------------===//
   py::class_<ireeGPUMMASingleSubgroupLayout>(iree_gpu_module,
