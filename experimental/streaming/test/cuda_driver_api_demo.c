@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "experimental/streaming/binding/cuda/api.h"
+#include "experimental/streaming/binding/cuda/driver.h"
 
 #define CUDA_CHECK(call)                                                 \
   do {                                                                   \

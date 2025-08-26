@@ -15,8 +15,11 @@ iree_cc_library(
     cuda
   HDRS
     "api.h"
+    "driver.h"
+    "runtime.h"
   SRCS
-    "api.c"
+    "driver.c"
+    "runtime.c"
   DEPS
     iree::base
     iree::experimental::streaming

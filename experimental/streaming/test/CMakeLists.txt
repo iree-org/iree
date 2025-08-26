@@ -12,9 +12,18 @@ iree_add_all_subdirs()
 
 iree_cc_binary(
   NAME
-    cuda_api_demo
+    cuda_driver_api_demo
   SRCS
-    "cuda_api_demo.c"
+    "cuda_driver_api_demo.c"
+  DEPS
+    iree::experimental::streaming::binding::cuda
+)
+
+iree_cc_binary(
+  NAME
+    cuda_runtime_api_demo
+  SRCS
+    "cuda_runtime_api_demo.c"
   DEPS
     iree::experimental::streaming::binding::cuda
 )

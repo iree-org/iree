@@ -23,8 +23,17 @@ package(
 # )
 
 iree_runtime_cc_binary(
-    name = "cuda_api_demo",
-    srcs = ["cuda_api_demo.c"],
+    name = "cuda_driver_api_demo",
+    srcs = ["cuda_driver_api_demo.c"],
+    deps = [
+        # ":stream_hal_test_kernels",  # Would depend on generated kernels
+        "//experimental/streaming/binding/cuda",
+    ],
+)
+
+iree_runtime_cc_binary(
+    name = "cuda_runtime_api_demo",
+    srcs = ["cuda_runtime_api_demo.c"],
     deps = [
         # ":stream_hal_test_kernels",  # Would depend on generated kernels
         "//experimental/streaming/binding/cuda",
