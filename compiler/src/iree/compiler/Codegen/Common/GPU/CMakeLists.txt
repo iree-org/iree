@@ -91,6 +91,7 @@ iree_cc_library(
     "GPUVectorDistribution.cpp"
     "GPUVerifyDistribution.cpp"
     "Passes.cpp"
+    "TestThreadUniformAnalysisPass.cpp"
     "VectorReductionToGPU.cpp"
     "WorkgroupReordering.cpp"
   DEPS
@@ -144,6 +145,7 @@ iree_cc_library(
     MLIRVectorTransforms
     MLIRVectorUtils
     iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Common::GPU::Analysis
     iree::compiler::Codegen::Common::VectorLayoutAnalysis
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::Codegen::Utils

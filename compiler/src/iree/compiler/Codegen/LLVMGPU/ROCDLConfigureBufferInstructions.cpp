@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/DataFlow/ConstantPropagationAnalysis.h"
 #include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
 #include "mlir/Analysis/DataFlow/IntegerRangeAnalysis.h"
@@ -18,7 +19,6 @@
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
 #define DEBUG_TYPE "iree-codegen-rocdl-configure-buffer-instructions"
-#define LDBGS(X) LLVM_DEBUG((llvm::dbgs() << "[" DEBUG_TYPE "]:") << X << "\n")
 
 namespace mlir::iree_compiler {
 static llvm::cl::opt<bool> clROCDLlEnableBufferInstructions(
@@ -65,7 +65,7 @@ static unsigned getTypeBitWidth(Type type) {
   }
   // Over approximate the size of index to not require using the data layout.
   if (type.isIndex()) {
-    return 8u;
+    return 64u;
   }
   // If it's not an int or float return 0.
   return type.isIntOrFloat() ? type.getIntOrFloatBitWidth() : 0;
@@ -91,14 +91,12 @@ isValidTensorSpan(IREE::HAL::InterfaceBindingSubspanOp op,
   }
 
   // Compute the max allowed size.
-  unsigned byteSize = getTypeBitWidth(tensorTy.getElementType());
-  if (byteSize == 0) {
-    LDBGS(
-        "- Couldn't determine the type size of: " << tensorTy.getElementType());
+  unsigned bitSize = getTypeBitWidth(tensorTy.getElementType());
+  if (bitSize == 0) {
+    LDBG() << "- Couldn't determine the type size of: "
+           << tensorTy.getElementType();
     return false;
   }
-  // Convert from bit-width to bytes.
-  byteSize = std::max(byteSize, 8u) / 8u;
 
   // Get the total size.
   ValueRange dymDims = op.getResultDynamicDims(0);
@@ -109,42 +107,44 @@ isValidTensorSpan(IREE::HAL::InterfaceBindingSubspanOp op,
       dim = getMax(dymDims.front());
       // The size is less than 0 if `IntRange` couldn't determine the size.
       if (dim <= 0) {
-        LDBGS("- Failed to get the size of the dynamic dimension: " << i);
+        LDBG() << "- Failed to get the size of the dynamic dimension: " << i;
         return false;
       }
       dymDims = dymDims.drop_front();
     }
     std::optional<int64_t> tmp = safeMul(dim, size);
     if (!tmp) {
-      LDBGS("- Overflow detected between the partial total size: "
-            << size << ", and shape[" << i << "] = " << dim);
+      LDBG() << "- Overflow detected between the partial total size: " << size
+             << ", and shape[" << i << "] = " << dim;
       return false;
     }
-    LDBGS("- shape[" << i << "] = " << dim);
+    LDBG() << "- shape[" << i << "] = " << dim;
     size = *tmp;
   }
 
-  // Get the span in bytes.
-  std::optional<int64_t> tmp = safeMul(byteSize, size);
-  if (!tmp) {
-    LDBGS("- Overflow detected when computing the size of the tensor: "
-          << size << ", and " << byteSize);
+  // Get the span in bits.
+  std::optional<int64_t> tmp = safeMul(bitSize, size);
+  if (!tmp || ((std::numeric_limits<int64_t>::max() - 7) <= (*tmp))) {
+    LDBG() << "- Overflow detected when computing the size of the tensor: "
+           << size << ", and " << bitSize;
     return false;
   }
-  size = *tmp;
-  LDBGS("- The tensor size in bytes is: " << size);
+  size = (*tmp + 7) / 8;
+  LDBG() << "- The tensor size in bytes is: " << size;
   return static_cast<int64_t>(std::numeric_limits<int32_t>::max()) > size;
 }
 
 void ROCDLConfigureBufferInstructionsPass::runOnOperation() {
-  if (!clROCDLlEnableBufferInstructions)
+  if (!clROCDLlEnableBufferInstructions) {
     return;
+  }
   FunctionOpInterface func = getOperation();
 
   // Don't perform any actions if the target is not an AMD GPU.
   IREE::GPU::TargetAttr target = getGPUTargetAttr(func);
-  if (!target || !target.isAMD())
+  if (!target || !target.isAMD()) {
     return;
+  }
 
   // Configure and run the dataflow analysis.
   DataFlowSolver solver;
@@ -154,7 +154,7 @@ void ROCDLConfigureBufferInstructionsPass::runOnOperation() {
   solver.load<iree_compiler::dataflow::ThreadUniformAnalysis>();
 
   if (failed(solver.initializeAndRun(func))) {
-    LDBGS(" Dataflow failed, aborting");
+    LDBG() << " Dataflow failed, aborting";
     return signalPassFailure();
   }
 
@@ -193,7 +193,7 @@ void ROCDLConfigureBufferInstructionsPass::runOnOperation() {
       return;
     }
 
-    LDBGS(" found binding op: " << bOp);
+    LDBG() << " found binding op: " << bOp;
 
     // Skip if the op offsets are not thread uniform.
     if (Value offset = bOp.getByteOffset()) {
@@ -201,19 +201,19 @@ void ROCDLConfigureBufferInstructionsPass::runOnOperation() {
           solver.lookupState<iree_compiler::dataflow::ThreadUniformLattice>(
               offset);
       if (!(opAnalysis && opAnalysis->getValue().isUniform())) {
-        LDBGS("- Failure, the op offset is not thread uniform");
+        LDBG() << "- Failure, the op offset is not thread uniform";
         return;
       }
     }
 
     // Check if we can annotate the binding.
     if (!isValidTensorSpan(bOp, getMax)) {
-      LDBGS("- Failure, the op byte span is too big");
+      LDBG() << "- Failure, the op byte span is too big";
       return;
     }
 
     // Annotate the binding.
-    LDBGS("- Success, annotating the op");
+    LDBG() << "- Success, annotating the op";
     annotationHelper.setAttr(bOp, unitAttr);
   });
 }

@@ -1,4 +1,4 @@
-// Copyright 2024 The IREE Authors
+// Copyright 2025 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -44,17 +44,21 @@ void ThreadUniform::print(llvm::raw_ostream &s) const {
 //===----------------------------------------------------------------------===//
 /// This function is an overly conservative estimate ops that are safe to assume
 /// to be uniform. TODO: Encode this in an interface.
-static bool maybeDefinitelyWorkgroupUniform(Operation *op) {
-  if (op->hasTrait<OpTrait::ConstantLike>() ||
-      op->hasTrait<OpTrait::IsTerminator>())
+static bool isWorkgroupUniform(Operation *op) {
+  if (op->hasTrait<OpTrait::ConstantLike>())
     return true;
   if (isa<IREE::HAL::InterfaceBindingSubspanOp,
-          IREE::HAL::InterfaceConstantLoadOp,
+          IREE::HAL::InterfaceConstantLoadOp, IREE::HAL::InterfaceWorkgroupIDOp,
+          IREE::HAL::InterfaceWorkgroupCountOp,
+          IREE::HAL::InterfaceWorkgroupSizeOp,
           IREE::TensorExt::DispatchTensorLoadOp, IREE::Util::AssumeIntOp,
-          IREE::TensorExt::DispatchWorkloadOrdinalOp, LoopLikeOpInterface>(op))
+          IREE::TensorExt::DispatchWorkloadOrdinalOp, LoopLikeOpInterface>(
+          op)) {
     return true;
-  if (isa<affine::AffineDialect>(op->getDialect()))
+  }
+  if (isa<affine::AffineDialect>(op->getDialect())) {
     return !isa<affine::AffineDmaStartOp, affine::AffineDmaWaitOp>(op);
+  }
   return isa<arith::ArithDialect>(op->getDialect()) &&
          op->getNumResults() == 1 &&
          op->getResult(0).getType().isIntOrIndexOrFloat();
@@ -75,10 +79,11 @@ LogicalResult ThreadUniformAnalysis::visitOperation(
   }
 
   // Check if it's a uniform op.
-  if (maybeDefinitelyWorkgroupUniform(op)) {
+  if (isWorkgroupUniform(op)) {
     LDBGS(" uniform op: " << *op);
-    for (ThreadUniformLattice *v : results)
+    for (ThreadUniformLattice *v : results) {
       propagateIfChanged(v, v->join(ThreadUniform::getUniform()));
+    }
     return success();
   }
 
@@ -144,10 +149,9 @@ void ThreadUniformAnalysis::visitNonControlFlowArguments(
   // Handle `scf.forall` in a pessimistic manner.
   if (auto forAll = dyn_cast<scf::ForallOp>(op)) {
     bool isSafeUniform =
-        llvm::all_of(forAll.getDeviceMappingAttrs(), [](Attribute attr) {
-          return isa<gpu::GPUBlockMappingAttr,
-                     IREE::Codegen::WorkgroupMappingAttr>(attr);
-        });
+        llvm::all_of(forAll.getDeviceMappingAttrs(),
+                     llvm::IsaPred<gpu::GPUBlockMappingAttr,
+                                   IREE::Codegen::WorkgroupMappingAttr>);
     value = isSafeUniform
                 ? ThreadUniform::join(value, ThreadUniform::getUniform())
                 : ThreadUniform::join(value, ThreadUniform::getDependent());

@@ -426,6 +426,11 @@ def ReorderWorkgroupsPass :
   ];
 }
 
+def TestThreadUniformAnalysisPass :
+    InterfacePass<"iree-codegen-gpu-test-thread-uniform-analysis", "mlir::FunctionOpInterface"> {
+  let summary = "Test the ThreadUniformAnalysis";
+}
+
 def VectorReductionToGPUPass :
     InterfacePass<"iree-codegen-vector-reduction-to-gpu", "mlir::FunctionOpInterface"> {
   let summary = "Convert vector reduction to GPU ops.";
