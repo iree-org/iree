@@ -1077,7 +1077,7 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_PureOp<"exp_reduction",
 
     As an example,
 
-    ```
+    ```mlir
     %M, %O =  iree_linalg_ext.exp_reduction {
       indexing_maps = [
         affine_map<(i) -> (i)>,
@@ -1152,7 +1152,7 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_PureOp<"exp_reduction",
       return nullptr;
     }
 
-    // DestinationStyleOpInterface methods
+    // DestinationStyleOpInterface methods.
     MutableOperandRange getDpsInitsMutable() {
       return getOutputsMutable();
     }

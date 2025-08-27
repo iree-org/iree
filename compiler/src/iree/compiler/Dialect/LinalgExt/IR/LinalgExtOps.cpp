@@ -2229,19 +2229,22 @@ void OnlineAttentionOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
 
 LogicalResult ExpReductionOp::verify() {
   Operation *op = getOperation();
-  if (getNumDpsInputs() == 0)
+  if (getNumDpsInputs() == 0) {
     return op->emitOpError("expected at least one input operand to reduce");
-  if (getNumDpsInits() == 0)
+  }
+  if (getNumDpsInits() == 0) {
     return op->emitOpError("expected at least one output operand to reduce");
+  }
 
-  for (auto &reduced_operand : getExpReducedOperands()) {
-    if (reduced_operand == 0)
+  for (long reducedOperand : getExpReducedOperands()) {
+    if (reducedOperand == 0) {
       return op->emitOpError(
           "Index of output operand in exp_reduced_operands cannot be 0.");
-
-    if (reduced_operand >= getNumDpsInits())
+    }
+    if (reducedOperand >= getNumDpsInits()) {
       return op->emitOpError(
           "Index of output operand in exp_reduced_operands does not exist.");
+    }
   }
 
   return success();
