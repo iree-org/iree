@@ -119,7 +119,7 @@ buildTransposeConvolutionPassPipeline(OpPassManager &passManager,
                                       const TransformOptions &options) {
   FunctionLikeNest(passManager)
       .addPass(GlobalOptimization::createDetachElementwiseFromNamedOpsPass)
-      .addPass(mlir::createLinalgNamedOpConversionPass)
+      .addPass(mlir::createSimplifyDepthwiseConvPass)
       .addPass(createConvertConvToChannelsLastPass)
       .addPass(GlobalOptimization::createConvert1X1FilterConv2DToMatmulPass)
       .addPass(createConvertConvFilterToChannelsLastPass);
