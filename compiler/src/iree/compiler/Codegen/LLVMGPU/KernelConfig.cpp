@@ -1130,15 +1130,6 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   Type rhsElemType = getElementTypeOrSelf(rhs);
   Type initElemType = getElementTypeOrSelf(init);
 
-  if (auto lhsOp = lhs.getDefiningOp<linalg::GenericOp>()) {
-    if (IREE::LinalgExt::isBitExtendOp(lhsOp))
-      lhsElemType = getElementTypeOrSelf(lhsOp.getDpsInputs()[0]);
-  }
-  if (auto rhsOp = rhs.getDefiningOp<linalg::GenericOp>()) {
-    if (IREE::LinalgExt::isBitExtendOp(rhsOp))
-      rhsElemType = getElementTypeOrSelf(rhsOp.getDpsInputs()[0]);
-  }
-
   SmallVector<int64_t> batchDims;
   for (int64_t batchDim : contractionDims->batch) {
     if (ShapedType::isStatic(bounds[batchDim])) {
