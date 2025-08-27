@@ -557,6 +557,9 @@ def IREECodegen_UKernelProviderInterface :
         which implementation to provide. It takes in |inputs|, |outputs| and
         |other_operands| and adds to it a few context-specific as well as
         backend specific implementations to create the ukernel op.
+        Returning std::nullopt indicates falling back to default implementation.
+        Otherwise success/failure indicates the status of the custom replacement
+        implementation.
       }],
       /*retTy=*/"std::optional<::mlir::LogicalResult>",
       /*methodName=*/"createAndReplaceWithUkernelOp",
