@@ -12,7 +12,7 @@
 // Flag translation functions
 //===----------------------------------------------------------------------===//
 
-static iree_hal_streaming_stream_flags_t cuda_stream_flags_to_internal(
+static iree_hal_streaming_stream_flags_t iree_cuda_stream_flags_to_internal(
     unsigned int cuda_flags) {
   iree_hal_streaming_stream_flags_t flags = IREE_HAL_STREAMING_STREAM_FLAG_NONE;
   if (cuda_flags & CU_STREAM_NON_BLOCKING) {
@@ -21,7 +21,7 @@ static iree_hal_streaming_stream_flags_t cuda_stream_flags_to_internal(
   return flags;
 }
 
-static iree_hal_streaming_event_flags_t cuda_event_flags_to_internal(
+static iree_hal_streaming_event_flags_t iree_cuda_event_flags_to_internal(
     unsigned int cuda_flags) {
   iree_hal_streaming_event_flags_t flags = IREE_HAL_STREAMING_EVENT_FLAG_NONE;
   if (cuda_flags & CU_EVENT_BLOCKING_SYNC) {
@@ -36,7 +36,7 @@ static iree_hal_streaming_event_flags_t cuda_event_flags_to_internal(
   return flags;
 }
 
-static iree_hal_streaming_memory_flags_t cuda_memory_flags_to_internal(
+static iree_hal_streaming_memory_flags_t iree_cuda_memory_flags_to_internal(
     unsigned int cuda_flags) {
   iree_hal_streaming_memory_flags_t flags = IREE_HAL_STREAMING_MEMORY_FLAG_NONE;
   if (cuda_flags & CU_MEMHOSTALLOC_PORTABLE) {
@@ -70,7 +70,7 @@ cuda_graph_instantiate_flags_to_internal(unsigned long long cuda_flags) {
   return flags;
 }
 
-static iree_hal_streaming_mem_pool_attr_t cuda_mempool_attr_to_internal(
+static iree_hal_streaming_mem_pool_attr_t iree_cuda_mempool_attr_to_internal(
     CUmemPool_attribute attr) {
   switch (attr) {
     case CU_MEMPOOL_ATTR_REUSE_FOLLOW_EVENT_DEPENDENCIES:
@@ -94,8 +94,8 @@ static iree_hal_streaming_mem_pool_attr_t cuda_mempool_attr_to_internal(
   }
 }
 
-static iree_hal_streaming_mem_handle_type_t cuda_mem_handle_type_to_internal(
-    CUmemAllocationHandleType handle_type) {
+static iree_hal_streaming_mem_handle_type_t
+iree_cuda_mem_handle_type_to_internal(CUmemAllocationHandleType handle_type) {
   switch (handle_type) {
     case CU_MEM_HANDLE_TYPE_NONE:
       return IREE_HAL_STREAMING_MEM_HANDLE_TYPE_NONE;
@@ -128,8 +128,8 @@ cuda_mem_location_type_to_internal(CUmemLocationType type) {
   }
 }
 
-static iree_hal_streaming_mem_access_flags_t cuda_mem_access_flags_to_internal(
-    CUmemAccess_flags flags) {
+static iree_hal_streaming_mem_access_flags_t
+iree_cuda_mem_access_flags_to_internal(CUmemAccess_flags flags) {
   switch (flags) {
     case CU_MEM_ACCESS_FLAGS_PROT_NONE:
       return IREE_HAL_STREAMING_MEM_ACCESS_FLAG_PROT_NONE;
@@ -142,7 +142,7 @@ static iree_hal_streaming_mem_access_flags_t cuda_mem_access_flags_to_internal(
   }
 }
 
-static iree_hal_streaming_context_limit_t cuda_limit_to_internal(
+static iree_hal_streaming_context_limit_t iree_cuda_limit_to_internal(
     CUlimit limit) {
   switch (limit) {
     case CU_LIMIT_STACK_SIZE:
@@ -502,7 +502,7 @@ CUDAAPI CUresult cuCtxGetLimit(size_t* pvalue, CUlimit limit) {
 
   // Get the limit value using internal API.
   iree_status_t status = iree_hal_streaming_context_limit(
-      context, cuda_limit_to_internal(limit), pvalue);
+      context, iree_cuda_limit_to_internal(limit), pvalue);
 
   CUresult result = iree_status_to_cu_result(status);
   IREE_TRACE_ZONE_END(z0);
@@ -521,7 +521,7 @@ CUDAAPI CUresult cuCtxSetLimit(CUlimit limit, size_t value) {
 
   // Set the limit value using internal API.
   iree_status_t status = iree_hal_streaming_context_set_limit(
-      context, cuda_limit_to_internal(limit), value);
+      context, iree_cuda_limit_to_internal(limit), value);
 
   CUresult result = iree_status_to_cu_result(status);
   IREE_TRACE_ZONE_END(z0);
@@ -1092,8 +1092,8 @@ CUDAAPI CUresult cuEventCreateWithFlags(CUevent* event, unsigned flags) {
 
   iree_hal_streaming_event_t* stream_event = NULL;
   iree_status_t status = iree_hal_streaming_event_create(
-      context, cuda_event_flags_to_internal(flags), iree_allocator_system(),
-      &stream_event);
+      context, iree_cuda_event_flags_to_internal(flags),
+      iree_allocator_system(), &stream_event);
 
   if (iree_status_is_ok(status)) {
     *event = (CUevent)stream_event;
@@ -1121,8 +1121,8 @@ CUDAAPI CUresult cuEventCreate(CUevent* phEvent, unsigned int Flags) {
 
   iree_hal_streaming_event_t* event = NULL;
   iree_status_t status = iree_hal_streaming_event_create(
-      context, cuda_event_flags_to_internal(Flags), context->host_allocator,
-      &event);
+      context, iree_cuda_event_flags_to_internal(Flags),
+      context->host_allocator, &event);
 
   if (iree_status_is_ok(status)) {
     *phEvent = (CUevent)event;
@@ -1394,7 +1394,7 @@ CUDAAPI CUresult cuMemHostAlloc(void** pp, size_t bytesize,
 
   iree_hal_streaming_buffer_t* buffer = NULL;
   iree_status_t status = iree_hal_streaming_memory_allocate_host(
-      context, bytesize, cuda_memory_flags_to_internal(Flags), &buffer);
+      context, bytesize, iree_cuda_memory_flags_to_internal(Flags), &buffer);
 
   if (iree_status_is_ok(status)) {
     *pp = buffer->host_ptr;
@@ -2635,8 +2635,8 @@ CUDAAPI CUresult cuStreamCreateWithFlags(CUstream* phStream,
 
   iree_hal_streaming_stream_t* stream = NULL;
   iree_status_t status = iree_hal_streaming_stream_create(
-      context, cuda_stream_flags_to_internal(flags), 0, iree_allocator_system(),
-      &stream);
+      context, iree_cuda_stream_flags_to_internal(flags), 0,
+      iree_allocator_system(), &stream);
 
   if (iree_status_is_ok(status)) {
     *phStream = (CUstream)stream;
@@ -2665,8 +2665,8 @@ CUDAAPI CUresult cuStreamCreate(CUstream* phStream, unsigned int Flags) {
 
   iree_hal_streaming_stream_t* stream = NULL;
   iree_status_t status = iree_hal_streaming_stream_create(
-      context, cuda_stream_flags_to_internal(Flags), 0, context->host_allocator,
-      &stream);
+      context, iree_cuda_stream_flags_to_internal(Flags), 0,
+      context->host_allocator, &stream);
 
   if (iree_status_is_ok(status)) {
     *phStream = (CUstream)stream;
@@ -2693,7 +2693,7 @@ CUDAAPI CUresult cuStreamCreateWithPriority(CUstream* phStream,
 
   iree_hal_streaming_stream_t* stream = NULL;
   iree_status_t status = iree_hal_streaming_stream_create(
-      context, cuda_stream_flags_to_internal(flags), priority,
+      context, iree_cuda_stream_flags_to_internal(flags), priority,
       context->host_allocator, &stream);
 
   if (iree_status_is_ok(status)) {
@@ -3272,7 +3272,7 @@ CUDAAPI CUresult cuGraphInstantiateWithFlags(CUgraphExec* phGraphExec,
   iree_hal_streaming_graph_t* graph = (iree_hal_streaming_graph_t*)hGraph;
   iree_hal_streaming_graph_exec_t* exec = NULL;
   iree_status_t status = iree_hal_streaming_graph_instantiate(
-      graph, cuda_graph_instantiate_flags_to_internal(flags), &exec);
+      graph, iree_cuda_graph_instantiate_flags_to_internal(flags), &exec);
 
   if (iree_status_is_ok(status)) {
     *phGraphExec = (CUgraphExec)exec;
@@ -3763,9 +3763,9 @@ CUDAAPI CUresult cuMemPoolCreate(CUmemoryPool* pool,
   // Convert CUDA pool props to internal props.
   iree_hal_streaming_mem_pool_props_t props = {
       .alloc_handle_type =
-          cuda_mem_handle_type_to_internal(poolProps->handleTypes),
+          iree_cuda_mem_handle_type_to_internal(poolProps->handleTypes),
       .location_type =
-          cuda_mem_location_type_to_internal(poolProps->location.type),
+          iree_cuda_mem_location_type_to_internal(poolProps->location.type),
       .location_id = poolProps->location.id,
   };
 
@@ -3818,7 +3818,7 @@ CUDAAPI CUresult cuMemPoolSetAttribute(CUmemoryPool pool,
   }
 
   iree_hal_streaming_mem_pool_attr_t internal_attr =
-      cuda_mempool_attr_to_internal(attr);
+      iree_cuda_mempool_attr_to_internal(attr);
   iree_status_t status = iree_hal_streaming_mem_pool_set_attribute(
       (iree_hal_streaming_mem_pool_t*)pool, internal_attr, attr_value);
 
@@ -3837,7 +3837,7 @@ CUDAAPI CUresult cuMemPoolGetAttribute(CUmemoryPool pool,
 
   uint64_t attr_value = 0;
   iree_hal_streaming_mem_pool_attr_t internal_attr =
-      cuda_mempool_attr_to_internal(attr);
+      iree_cuda_mempool_attr_to_internal(attr);
   iree_status_t status = iree_hal_streaming_mem_pool_get_attribute(
       (iree_hal_streaming_mem_pool_t*)pool, internal_attr, &attr_value);
 
@@ -4070,20 +4070,26 @@ CUDAAPI const char* cuGetErrorName(CUresult error) {
 }
 
 // Thread-local error state.
-static iree_thread_local CUresult cuda_thread_error = CUDA_SUCCESS;
+static iree_thread_local CUresult iree_cuda_thread_error = CUDA_SUCCESS;
 
-static void cuda_thread_error_set(CUresult error) { cuda_thread_error = error; }
+static void iree_cuda_thread_error_set(CUresult error) {
+  iree_cuda_thread_error = error;
+}
 
-static CUresult cuda_thread_error_get_and_clear(void) {
-  CUresult error = cuda_thread_error;
-  cuda_thread_error = CUDA_SUCCESS;
+static CUresult iree_cuda_thread_error_get_and_clear(void) {
+  CUresult error = iree_cuda_thread_error;
+  iree_cuda_thread_error = CUDA_SUCCESS;
   return error;
 }
 
-static CUresult cuda_thread_error_peek(void) { return cuda_thread_error; }
-
-CUDAAPI CUresult cuGetLastError(void) {
-  return cuda_thread_error_get_and_clear();
+static CUresult iree_cuda_thread_error_peek(void) {
+  return iree_cuda_thread_error;
 }
 
-CUDAAPI CUresult cuPeekAtLastError(void) { return cuda_thread_error_peek(); }
+CUDAAPI CUresult cuGetLastError(void) {
+  return iree_cuda_thread_error_get_and_clear();
+}
+
+CUDAAPI CUresult cuPeekAtLastError(void) {
+  return iree_cuda_thread_error_peek();
+}
