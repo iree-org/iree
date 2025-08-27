@@ -612,6 +612,117 @@ SymbolicUKernelProviderAttr::getMLIRUKernel(StringRef name, DictionaryAttr,
   return symbolTable.lookup(name);
 }
 
+//===---------------------------------------------------------------------===//
+// iree_codegen.xor_shuffle
+//===---------------------------------------------------------------------===//
+
+/// Extract column index for XOR swizzling.
+/// ((id%rowStride) / accessWidth)
+static Value extractCol(OpBuilder &builder, Location loc, OpFoldResult id,
+                        OpFoldResult rowAlignment, OpFoldResult accessWidth) {
+  AffineExpr d0, s0, s1;
+  bindDims(builder.getContext(), d0);
+  bindSymbols(builder.getContext(), s0, s1);
+  AffineExpr result = (d0 % s0).floorDiv(s1);
+  return getValueOrCreateConstantIndexOp(
+      builder, loc,
+      affine::makeComposedFoldedAffineApply(builder, loc, result,
+                                            {id, rowAlignment, accessWidth}));
+}
+
+/// Extract row index for XOR swizzling.
+/// row = ((id/rowStride) / perPhase ) % rowAccessAlignment
+static Value extractRow(OpBuilder &builder, Location loc, OpFoldResult id,
+                        OpFoldResult rowStride, OpFoldResult perPhase,
+                        OpFoldResult rowAccessAlignment) {
+  AffineExpr d0, s0, s1, s2;
+  bindDims(builder.getContext(), d0);
+  bindSymbols(builder.getContext(), s0, s1, s2);
+  AffineExpr result = (d0.floorDiv(s0).floorDiv(s1)) % s2;
+  return getValueOrCreateConstantIndexOp(
+      builder, loc,
+      affine::makeComposedFoldedAffineApply(
+          builder, loc, result, {id, rowStride, perPhase, rowAccessAlignment}));
+}
+
+/// Swizzle column on id.
+/// new_id = id-id%rowAlignmentVal+colSwizzled*accessWidthVal
+static Value updateCol(OpBuilder &builder, Location loc, OpFoldResult id,
+                       Value colSwizzled, OpFoldResult rowAlignment,
+                       OpFoldResult accessWidth) {
+  AffineExpr d0, d1, s0, s1;
+  bindDims(builder.getContext(), d0, d1);
+  bindSymbols(builder.getContext(), s0, s1);
+  AffineExpr result = d0 - d0 % s0 + d1 * s1;
+  return getValueOrCreateConstantIndexOp(
+      builder, loc,
+      affine::makeComposedFoldedAffineApply(
+          builder, loc, result, {id, colSwizzled, rowAlignment, accessWidth}));
+}
+
+OpFoldResult XORShuffleAttr::swizzleOffset(OpBuilder &b, Location loc,
+                                           OpFoldResult offset,
+                                           Value src) const {
+  int64_t rotationInvariant =
+      getRowWidth() * (getRowWidth() / getAccessWidth());
+  int64_t rowStride =
+      getRowStride() != int64_t() ? getRowStride() : getRowWidth();
+  int64_t perPhase = getPerPhase() != int64_t() ? getPerPhase() : 1;
+
+  OpFoldResult id =
+      getMinimumConstantOffsetValue(b, loc, offset, rotationInvariant);
+  Value idVal = getValueOrCreateConstantIndexOp(b, loc, id);
+
+  // Number of elements per row.
+  Value rowAlignmentVal = b.create<arith::ConstantIndexOp>(loc, getRowWidth());
+  // Number of elements per group.
+  Value accessWidthVal =
+      b.create<arith::ConstantIndexOp>(loc, getAccessWidth());
+  // Number of rows per phase.
+  Value perPhaseVal = b.create<arith::ConstantIndexOp>(loc, perPhase);
+  // Buffer stride.
+  Value rowStrideVal = b.create<arith::ConstantIndexOp>(loc, rowStride);
+  // Number of contiguous groups of elements per row (swizzled together).
+  Value rowAccessAlignmentVal =
+      b.create<arith::ConstantIndexOp>(loc, getRowWidth() / getAccessWidth());
+
+  Value colVal = extractCol(b, loc, idVal, rowAlignmentVal, accessWidthVal);
+  Value rowVal = extractRow(b, loc, idVal, rowStrideVal, perPhaseVal,
+                            rowAccessAlignmentVal);
+  auto colSwizzled = b.create<arith::XOrIOp>(loc, rowVal, colVal);
+
+  // Update colSwizzled to initial id
+  Value swizzledIdVal =
+      updateCol(b, loc, idVal, colSwizzled, rowAlignmentVal, accessWidthVal);
+  Value diff = b.create<arith::SubIOp>(loc, swizzledIdVal, idVal);
+  return b
+      .create<arith::AddIOp>(
+          loc, getValueOrCreateConstantIndexOp(b, loc, offset), diff)
+      .getResult();
+}
+
+int64_t XORShuffleAttr::getAccessElementCount() const {
+  return getAccessWidth();
+}
+
+LogicalResult
+XORShuffleAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                       int64_t rowWidth, int64_t accessWidth, int64_t rowStride,
+                       int64_t perPhase) {
+  if (rowWidth % accessWidth != 0) {
+    return emitError() << "expected access width to divide row width";
+  }
+  int64_t maxPhase = rowWidth / accessWidth;
+  if (perPhase > maxPhase) {
+    return emitError() << "per_phase must be smaller than max_phase";
+  }
+  if (rowStride % rowWidth != 0) {
+    return emitError() << "expected row width to divide row stride";
+  }
+
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // Initialize attributes
 //===----------------------------------------------------------------------===//

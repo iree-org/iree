@@ -187,6 +187,11 @@ static void resolveHintOp(RewriterBase &rewriter,
       continue;
     }
     if (auto gatherToLDSOp = dyn_cast<amdgpu::GatherToLDSOp>(user)) {
+      // Ignore swizzleHint on Dst Operand. Gather_to_lds writes elements of a
+      // subgroup contiguously in order of lane ID
+      if (gatherToLDSOp.getDst() == hintOp) {
+        continue;
+      }
       int64_t accessBitWidth = cast<MemRefType>(hintOp.getOperand().getType())
                                    .getElementTypeBitWidth() *
                                accessWidth;
@@ -201,11 +206,11 @@ static void resolveHintOp(RewriterBase &rewriter,
       if (accessBitWidth != transferBitWidth) {
         return;
       }
-
       gatherToLDSOps.push_back(gatherToLDSOp);
       continue;
     }
-    // Bail out if we can't rewrite all users.
+    // Throw if we can't rewrite all users.
+    hintOp.emitError() << "unsupported SwizzleHintOp user: " << user;
     return;
   }
 
