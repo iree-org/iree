@@ -2204,7 +2204,7 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-codegen-enable-default-tuning-specs"
+    "--iree-hip-enable-tensor-ukernels"
   LABELS
     "noasan"
     "nomsan"
@@ -2233,7 +2233,7 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-codegen-enable-default-tuning-specs"
+    "--iree-hip-enable-tensor-ukernels"
   LABELS
     "noasan"
     "nomsan"
@@ -2262,7 +2262,7 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-codegen-enable-default-tuning-specs"
+    "--iree-hip-enable-tensor-ukernels"
   LABELS
     "noasan"
     "nomsan"
@@ -2291,7 +2291,7 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    "--iree-codegen-enable-default-tuning-specs"
+    "--iree-hip-enable-tensor-ukernels"
   LABELS
     "noasan"
     "nomsan"
