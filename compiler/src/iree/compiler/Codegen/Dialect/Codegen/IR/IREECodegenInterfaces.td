@@ -549,6 +549,32 @@ def IREECodegen_UKernelProviderInterface :
         return failure();
       }]
     >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Creates and replaces the |contextual_op| with a ukernel referenced by
+        |name| backed by this attribute. Takes |target_configuration| in
+        case the provider wants to make any feature specific decisions for
+        which implementation to provide. It takes in |inputs|, |outputs| and
+        |other_operands| and adds to it a few context-specific as well as
+        backend specific implementations to create the ukernel op.
+        Returning std::nullopt indicates falling back to default implementation.
+        Otherwise success/failure indicates the status of the custom replacement
+        implementation.
+      }],
+      /*retTy=*/"std::optional<::mlir::LogicalResult>",
+      /*methodName=*/"createAndReplaceWithUkernelOp",
+      /*args=*/(ins "::mlir::RewriterBase&":$b,
+                    "::mlir::StringRef":$name,
+                    "::mlir::DictionaryAttr":$target_configuration,
+                    "::mlir::Operation *":$contextual_op,
+                    "::llvm::SmallVectorImpl<::mlir::Value>&":$inputs,
+                    "::llvm::SmallVectorImpl<::mlir::Value>&":$outputs,
+                    "::llvm::SmallVectorImpl<::mlir::Value>&":$other_operands),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return failure();
+      }]
+    >,
   ];
 }
 
