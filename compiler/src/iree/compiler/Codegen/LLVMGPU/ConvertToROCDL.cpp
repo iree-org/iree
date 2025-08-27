@@ -317,7 +317,14 @@ struct ConvertToROCDLPass final
     {
       RewritePatternSet patterns(&getContext());
       populateGpuRewritePatterns(patterns);
-      populateGpuPromoteShuffleToAMDGPUPatterns(patterns, std::nullopt);
+      StringRef targetArch = getGPUTargetAttr(m).getArch();
+      FailureOr<amdgpu::Chipset> maybeChipset =
+          amdgpu::Chipset::parse(targetArch);
+      if (failed(maybeChipset)) {
+        m.emitOpError() << "Invalid chipset name: " << targetArch;
+        return signalPassFailure();
+      }
+      populateGpuPromoteShuffleToAMDGPUPatterns(patterns, maybeChipset);
       populateGpuSubgroupIdPatterns(patterns);
       if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
