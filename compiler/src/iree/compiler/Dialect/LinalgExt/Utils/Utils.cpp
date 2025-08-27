@@ -584,12 +584,17 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   auto inputMapGEMM =
       AffineMap::get(numParallelDims + numKDims, 0, inputDims, ctx);
 
-  // Prepare filter map.
+  // Prepare filter map and add mapping for reduction dimensions.
   int64_t currKPos = numParallelDims;
   SmallVector<AffineExpr> filterDims;
   for (const auto &[iter, indices] :
        llvm::zip_equal(filterIterators, filterReassocIndices)) {
     if (iter == reduction) {
+      for (int64_t reInd : indices) {
+        int64_t convDimIdx =
+            cast<AffineDimExpr>(filterMap.getResult(reInd)).getPosition();
+        convToIgemmDimMap[convDimIdx] = dims[currKPos];
+      }
       filterDims.push_back(dims[currKPos++]);
     } else {
       assert(iter == parallel && "expected a parallel dim");
