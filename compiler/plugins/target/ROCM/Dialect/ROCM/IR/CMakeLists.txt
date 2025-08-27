@@ -30,6 +30,7 @@ iree_cc_library(
     ::ROCMDialectGen
     LLVMSupport
     MLIRIR
+    MLIRLinalgDialect
     MLIRParser
     MLIRSupport
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect

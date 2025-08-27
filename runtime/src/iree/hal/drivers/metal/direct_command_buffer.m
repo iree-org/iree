@@ -357,7 +357,10 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
   iree_arena_initialize(block_pool, &command_buffer->arena);
   command_buffer->staging_buffer = staging_buffer;
   command_buffer->host_allocator = host_allocator;
-  iree_status_t status = iree_hal_resource_set_allocate(block_pool, &command_buffer->resource_set);
+  iree_status_t status = iree_ok_status();
+  if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED)) {
+    status = iree_hal_resource_set_allocate(block_pool, &command_buffer->resource_set);
+  }
   if (iree_status_is_ok(status)) {
     iree_hal_metal_command_segment_list_reset(&command_buffer->segments);
     @autoreleasepool {  // Use @autoreleasepool to trigger the autorelease within encoder creation.

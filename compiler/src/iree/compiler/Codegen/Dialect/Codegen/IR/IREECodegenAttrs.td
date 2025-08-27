@@ -549,4 +549,73 @@ def IREECodegen_UKernelDescriptorAttr  :
   }];
 }
 
+
+//===---------------------------------------------------------------------===//
+// iree_codegen.xor_shuffle
+//===---------------------------------------------------------------------===//
+
+def IREECodegen_XORShuffleAttr  :
+    AttrDef<IREECodegen_Dialect, "XORShuffle", [
+    DeclareAttrInterfaceMethods<IREECodegen_SwizzleAttrInterface, [
+        "swizzleOffset",
+        "getAccessElementCount"
+      ]>
+    ]> {
+  let mnemonic = "xor_shuffle";
+  let summary = "An attribute that describes an XOR-based swizzling pattern.";
+  let description = [{
+    Shuffles accesses of |access_width| within rows of size
+    |row_width|. For any given access into logical memref of shape
+    `memref<...xNx|access_width|x!eltype>` where `N = row_width / access_width`
+    at position `(i, j, 0)` is shuffled to `(i, ((i/per_phase) %N) XOR j , 0)`. For example,
+
+    ```
+    row_width = 16, access_width = 4, per_phase = 1
+
+    0000 1111 2222 3333 /// 0 1 2 3
+    4444 5555 6666 7777 /// 0 1 2 3
+    8888 9999 AAAA BBBB /// 0 1 2 3
+    CCCC DDDD EEEE FFFF /// 0 1 2 3
+    ```
+
+    is swizzled to
+    ```
+    0000 1111 2222 3333 /// 0 1 2 3
+    7777 4444 5555 6666 /// 1 0 3 2
+    BBBB AAAA 8888 9999 /// 2 3 0 1
+    FFFF EEEE DDDD CCCC /// 3 2 1 0
+    ```
+    |access_width| allows to keep the same shuffling accross multiple rows. For example,
+
+    ```
+    row_width = 16, access_width = 4, per_phase = 2
+
+    0000 1111 2222 3333 /// 0 1 2 3
+    4444 5555 6666 7777 /// 0 1 2 3
+    8888 9999 AAAA BBBB /// 0 1 2 3
+    CCCC DDDD EEEE FFFF /// 0 1 2 3
+    ```
+
+    is swizzled to
+    ```
+    0000 1111 2222 3333 /// 0 1 2 3
+    7777 4444 5555 6666 /// 0 1 2 3
+    BBBB AAAA 8888 9999 /// 1 0 3 2
+    FFFF EEEE DDDD CCCC /// 1 0 3 2
+    ```
+
+    The pattern repeats for subsequent rows.
+  }];
+  let parameters = (ins
+    AttrParameter<"int64_t", "">:$row_width,
+    AttrParameter<"int64_t", "">:$access_width,
+    OptionalParameter<"int64_t", "row stride. Default to row_width">:$row_stride,
+    OptionalParameter<"int64_t", "Default to 1">:$per_phase
+  );
+  let assemblyFormat = [{
+    `<` $row_width `,` $access_width  (`,` $row_stride^)? (`,` $per_phase^)? `>`
+  }];
+  let genVerifyDecl = 1;
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS

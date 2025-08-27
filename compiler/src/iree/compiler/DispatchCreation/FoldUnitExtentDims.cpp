@@ -87,9 +87,10 @@ struct DropUnitDimsFromCollapseOfExpand
           continue;
         }
 
-        // If we are collapsing multiple unit dims together, at least 1 must be
-        // kept (prefer the first).
-        if (outShape[outDim] == 1 && innerIdx != 0) {
+        // If outShape[outDim] == 1, we must preserve 1 unit dim,
+        // so we drop the first. If the first is the only unit dim,
+        // we can't drop it anyway.
+        if (outShape[outDim] == 1 && innerIdx == 0) {
           continue;
         }
         toDrop.insert(inDim);
@@ -99,8 +100,13 @@ struct DropUnitDimsFromCollapseOfExpand
     // Remove dimensions from `toDrop` that weren't introduced by the
     // `expandOp` op.
     const auto expandReassoc = expandOp.getReassociationIndices();
-    for (const auto &[inDim, indices] : llvm::enumerate(expandReassoc)) {
-      if (indices.size() == 1) {
+    for (const auto &indices : expandReassoc) {
+      // If all of indices are in `toDrop`, we must preserve at least one
+      // to avoid an empty reassociation map during expansion.
+      // This can happen when outShape does not have a unit dimension
+      // corresponding to the unit dimensions being dropped here.
+      if (llvm::all_of(indices,
+                       [&](int64_t idx) { return toDrop.contains(idx); })) {
         toDrop.erase(indices[0]);
       }
     }

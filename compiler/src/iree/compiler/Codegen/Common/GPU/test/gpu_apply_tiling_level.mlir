@@ -548,15 +548,41 @@ func.func @partial_reduction(%3: tensor<?x?xf32>) -> tensor<?xf32> {
 
 // -----
 
+#config = #iree_gpu.lowering_config<{reduction = [0, 1]}>
+func.func @swap_collapse_shape_with_extract_slice_block_arg(%arg0: tensor<16x1x1x16xf32>) -> tensor<16x16xf32> {
+  %collapsed = tensor.collapse_shape %arg0 [[0], [1, 2, 3]] : tensor<16x1x1x16xf32> into tensor<16x16xf32>
+  %empty = tensor.empty() : tensor<16x16xf32>
+  %0 = linalg.copy {lowering_config = #config} ins(%collapsed : tensor<16x16xf32>) outs(%empty : tensor<16x16xf32>) -> tensor<16x16xf32>
+  return %0: tensor<16x16xf32>
+}
+
+// NORM-REDUCTION-LABEL: func.func @swap_collapse_shape_with_extract_slice_block_arg
+//   NORM-REDUCTION-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   NORM-REDUCTION-DAG:   %[[C16:.+]] = arith.constant 16 : index
+//   NORM-REDUCTION-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//       NORM-REDUCTION:   scf.for %[[ARG1:.+]] = %[[C0]] to %[[C16]] step %[[C1]]
+//       NORM-REDUCTION:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[0, 0, 0, %[[ARG1]]] [16, 1, 1, 1] [1, 1, 1, 1] : tensor<16x1x1x16xf32> to tensor<16x1x1x1xf32>
+//       NORM-REDUCTION:     %[[COLLAPSE:.+]] = tensor.collapse_shape %[[SLICE]] {{\[}}[0], [1, 2, 3]] : tensor<16x1x1x1xf32> into tensor<16x1xf32>
+//       NORM-REDUCTION:     linalg.copy {{.*}} ins(%[[COLLAPSE]]
+
+// Without loop normalization, no swap would happen.
+//                CHECK:   tensor.collapse_shape
+//                CHECK:   scf.for
+//                CHECK:     tensor.extract_slice
+//            CHECK-NOT:     tensor.collapse_shape
+//                CHECK:     linalg.copy
+
+// -----
+
 #config = #iree_gpu.lowering_config<{reduction = [0, 32]}>
-func.func @swap_collapse_shape_with_extract_slice(%arg0: tensor<32x3x3x288xf32>) -> tensor<32x2592xf32> {
+func.func @swap_collapse_shape_with_extract_slice_apply_op(%arg0: tensor<32x3x3x288xf32>) -> tensor<32x2592xf32> {
   %collapsed = tensor.collapse_shape %arg0 [[0], [1, 2, 3]] : tensor<32x3x3x288xf32> into tensor<32x2592xf32>
   %empty = tensor.empty() : tensor<32x2592xf32>
   %0 = linalg.copy {lowering_config = #config} ins(%collapsed : tensor<32x2592xf32>) outs(%empty : tensor<32x2592xf32>) -> tensor<32x2592xf32>
   return %0: tensor<32x2592xf32>
 }
 
-// NORM-REDUCTION-LABEL: func.func @swap_collapse_shape_with_extract_slice
+// NORM-REDUCTION-LABEL: func.func @swap_collapse_shape_with_extract_slice_apply_op
 //   NORM-REDUCTION-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   NORM-REDUCTION-DAG:   %[[C81:.+]] = arith.constant 81 : index
 //   NORM-REDUCTION-DAG:   %[[C0:.+]] = arith.constant 0 : index
