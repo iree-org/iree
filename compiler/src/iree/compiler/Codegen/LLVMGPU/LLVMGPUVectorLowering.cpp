@@ -14,8 +14,12 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
+#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/TypeUtilities.h"
+#include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/Passes.h"
 
 namespace mlir::iree_compiler {
@@ -370,6 +374,643 @@ struct MultiReduceFMAToContract final
   }
 };
 
+namespace {
+
+static SmallVector<int64_t> permuteShape(ArrayRef<int64_t> shape,
+                                         ArrayRef<int64_t> perm) {
+  SmallVector<int64_t> out(shape.size());
+  for (auto it : llvm::enumerate(perm))
+    out[it.index()] = shape[it.value()];
+  return out;
+}
+
+static bool isStaticVector(VectorType vt) {
+  return llvm::all_of(vt.getShape(), ShapedType::isStaticShape);
+}
+
+// Extract iterator classification.
+static void getReductionAndParallelLoopDims(ArrayAttr iters,
+                                            SmallVectorImpl<int64_t> &red,
+                                            SmallVectorImpl<int64_t> &par) {
+  for (auto it : llvm::enumerate(iters)) {
+    auto attr = dyn_cast<vector::IteratorTypeAttr>(it.value());
+    if (!attr || attr.getValue() == vector::IteratorType::reduction)
+      red.push_back(it.index());
+    else
+      par.push_back(it.index());
+  }
+}
+
+// Returns true iff `map` is a projected permutation of loop dims (pure dim
+// exprs, no symbols). Fills `operandDimToLoopDim[j] = d` where j is the j-th
+// vector dim of this operand.
+
+// map of opernaddim index (e.g 4) to loop dim index (d0)
+static bool
+mapToOperandDimLoopDim(AffineMap map,
+                       SmallVectorImpl<unsigned> &operandDimToLoopDim) {
+  if (!map || map.getNumSymbols() != 0) {
+    return false;
+  }
+  operandDimToLoopDim.clear();
+  operandDimToLoopDim.resize(map.getNumResults(), ~0u);
+
+  llvm::SmallDenseSet<unsigned, 8> seen;
+  for (unsigned j = 0, e = map.getNumResults(); j < e; ++j) {
+    AffineExpr r = map.getResult(j); //d0
+    if (auto d = dyn_cast<AffineDimExpr>(r)) { 
+      unsigned loop = d.getPosition(); // 0 position within mapping
+      if (!seen.insert(loop).second) // if seen
+        return false; // repeated loop -> broadcast, bail.
+      operandDimToLoopDim[j] = loop;
+      continue;
+    }
+    return false; // not a pure dim expr -> not a projected permutation.
+  }
+  return true;
+}
+
+// Build a permutation that orders operand vector dims to follow `loopOrder`.
+// `operandDimToLoopDim[j] = loopDim` (from the indexing map).
+// We produce `perm` such that: new[i] = old[perm[i]] with sorted-by-loopOrder.
+static LogicalResult
+buildOperandPermutation(ArrayRef<unsigned> operandDimToLoopDim,
+                        ArrayRef<int64_t> loopOrder,
+                        SmallVectorImpl<int64_t> &perm) {
+  llvm::SmallDenseMap<unsigned, unsigned, 16> posInOrder;
+  for (unsigned i = 0, e = loopOrder.size(); i < e; ++i)
+    posInOrder[static_cast<unsigned>(loopOrder[i])] = i;
+
+  struct Item {
+    unsigned oldIdx;
+    unsigned key;
+  };
+  SmallVector<Item> items;
+  items.reserve(operandDimToLoopDim.size());
+  for (unsigned j = 0, e = operandDimToLoopDim.size(); j < e; ++j) {
+    unsigned loop = operandDimToLoopDim[j];
+    auto it = posInOrder.find(loop);
+    if (it == posInOrder.end())
+      return failure(); // operand uses a loop dim not in loopOrder.
+    items.push_back({j, it->second});
+  }
+  llvm::stable_sort(items,
+                    [](const Item &a, const Item &b) { return a.key < b.key; });
+
+  perm.clear();
+  perm.reserve(items.size());
+  for (auto &x : items)
+    perm.push_back(static_cast<int64_t>(x.oldIdx));
+  return success();
+}
+
+// Multiply a slice of dims: [lo, hi).
+static int64_t productOfDims(VectorType vt, unsigned lo, unsigned hi) {
+  int64_t p = 1;
+  for (unsigned i = lo; i < hi; ++i)
+    p *= vt.getDimSize(i);
+  return p;
+}
+
+// Identity test.
+static bool isIdentityPermutation(ArrayRef<int64_t> p) {
+  for (int64_t i = 0, e = p.size(); i < e; ++i)
+    if (p[i] != i)
+      return false;
+  return true;
+}
+
+struct ContractAddToChainFMA final : OpRewritePattern<vector::ContractionOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::ContractionOp op,
+                                PatternRewriter &rewriter) const override {
+    if (op.getKind() != vector::CombiningKind::ADD) {
+      return failure();
+    }
+
+    Type elemTy = getElementTypeOrSelf(op.getLhsType());
+    if (!isa<Float32Type>(elemTy)) {
+      return failure(); // target v_pk_fma_f32 for now
+    }
+
+    // Static vector types only.
+    auto lhsVT = dyn_cast<VectorType>(op.getLhsType());
+    auto rhsVT = dyn_cast<VectorType>(op.getRhsType());
+    if (!lhsVT || !rhsVT) {
+      return failure();
+    }
+    if (!isStaticVector(lhsVT) || !isStaticVector(rhsVT)) {
+      return failure();
+    }
+
+    // Acc/result type may be vector or scalar.
+    auto accVT = dyn_cast<VectorType>(op.getAccType());
+    if (accVT && !isStaticVector(accVT)) {
+      return failure();
+    }
+
+    // Iterator partition: exactly one reduction dim.
+    SmallVector<int64_t> redDims, parDims;
+    getReductionAndParallelLoopDims(op.getIteratorTypes(), redDims, parDims);
+    if (redDims.size() != 1) {
+      return failure();
+    }
+
+    // Loop order: [reduction..., parallel...].
+    SmallVector<int64_t> loopOrder;
+    loopOrder.append(redDims.begin(), redDims.end());
+    loopOrder.append(parDims.begin(), parDims.end());
+
+    // Indexing maps -> operandDimToLoopDim.
+    SmallVector<AffineMap, 3> maps = op.getIndexingMapsArray();
+    if (maps.size() != 3) {
+      return failure();
+    }
+
+    SmallVector<unsigned, 4> lhsDimToLoop, rhsDimToLoop, accDimToLoop;
+    if (!mapToOperandDimLoopDim(maps[0], lhsDimToLoop))
+      return failure();
+    if (!mapToOperandDimLoopDim(maps[1], rhsDimToLoop))
+      return failure();
+    // Accumulator/result map: must not reference reduction dims.
+    if (accVT) {
+      if (!mapToOperandDimLoopDim(maps[2], accDimToLoop))
+        return failure();
+      for (unsigned loop : accDimToLoop)
+        if (llvm::is_contained(redDims, static_cast<int64_t>(loop)))
+          return failure();
+    } else {
+      // Scalar result: expect zero parallel dims (i.e., dot) -> parDims product
+      // must be 1. We keep this guard loose; we will check sizes later.
+    }
+
+    // Build per-operand permutations that order vector dims as loopOrder.
+    SmallVector<int64_t> lhsPerm, rhsPerm, accPerm;
+    if (failed(buildOperandPermutation(lhsDimToLoop, loopOrder, lhsPerm)))
+      return failure();
+    if (failed(buildOperandPermutation(rhsDimToLoop, loopOrder, rhsPerm)))
+      return failure();
+    if (accVT) {
+      // Build acc permutation w.r.t *parallel* dims order only: remove
+      // reduction dims from loopOrder.
+      SmallVector<int64_t> parOrder =
+          parDims; // already in loopOrder’s tail order
+      if (failed(buildOperandPermutation(accDimToLoop, parOrder, accPerm)))
+        return failure();
+    }
+
+    Location loc = op.getLoc();
+
+    // Transpose operands to [red..., par...].
+    Value lhsTransposed = op.getLhs();
+    Value rhsTransposed = op.getRhs();
+    VectorType lhsTransposedType = lhsVT, rhsTransposedType = rhsVT;
+
+    if (!isIdentityPermutation(lhsPerm)) {
+      auto newShape = permuteShape(lhsVT.getShape(), lhsPerm);
+      lhsTransposedType = VectorType::get(newShape, elemTy);
+      lhsTransposed = rewriter.create<vector::TransposeOp>(loc, lhsTransposedType, lhsTransposed, lhsPerm);
+    }
+
+    if (!isIdentityPermutation(rhsPerm)) {
+      auto newShape = permuteShape(rhsVT.getShape(), rhsPerm);
+      rhsTransposedType = VectorType::get(newShape, elemTy);
+      rhsTransposed = rewriter.create<vector::TransposeOp>(loc, rhsTransposedType, rhsTransposed, rhsPerm);
+    }
+
+    // Check the first `numRed` dims agree between LHS/RHS; same for parallel
+    // product size.
+    unsigned numRedDims = /*exactly one*/ 1;
+    int64_t lhsRedSize = productOfDims(lhsTransposedType, 0, numRedDims);
+    int64_t rhsRedSize = productOfDims(rhsTransposedType, 0, numRedDims);
+    if (lhsRedSize != rhsRedSize)
+      return failure();
+
+    int64_t lhsParSize = productOfDims(lhsTransposedType, numRedDims, lhsTransposedType.getRank());
+    int64_t rhsParSize = productOfDims(rhsTransposedType, numRedDims, rhsTransposedType.getRank());
+    if (lhsParSize != rhsParSize)
+      return failure();
+    int64_t redSize = lhsRedSize;
+    int64_t parSize = lhsParSize;
+
+    // Shape-cast operands to 2D {K, P}.
+    auto flattened2DType = VectorType::get({redSize, parSize}, elemTy);
+    Value lhs2D = rewriter.create<vector::ShapeCastOp>(loc, flattened2DType, lhsTransposed);
+    Value rhs2D = rewriter.create<vector::ShapeCastOp>(loc, flattened2DType, rhsTransposed);
+
+    // Prepare accumulator as {P}.
+    Value flattenedAcc;
+    VectorType parVT = VectorType::get({parSize}, elemTy);
+
+    if (accVT) {
+      Value acc = op.getAcc();
+      VectorType accTransposedType = accVT;
+      if (!isIdentityPermutation(accPerm)) {
+        auto newShape = permuteShape(accVT.getShape(), accPerm);
+        accTransposedType = VectorType::get(newShape, elemTy);
+        acc =
+            rewriter.create<vector::TransposeOp>(loc, accTransposedType, acc, accPerm);
+      }
+      flattenedAcc = rewriter.create<vector::ShapeCastOp>(loc, parVT, acc);
+    } else {
+      // Scalar accumulator/result: splat to length P (P must be 1 for a true
+      // dot).
+      if (parSize <= 0)
+        return failure();
+      Value accScalar = op.getAcc();
+      flattenedAcc = rewriter.create<vector::SplatOp>(loc, parVT, accScalar);
+    }
+
+    // Build FMA chain: resultFlat : vector<Pxf32>
+    Value resultFlat = buildFMAChain2D(rewriter, loc, lhs2D, rhs2D,
+                                       flattenedAcc, redSize, parSize);
+
+    // Restore result shape/types to match op.getAccType()/op.getType().
+    Value resultVal;
+    if (accVT) {
+      // Unflatten to the (possibly transposed) acc shape, then
+      // inverse-transpose. First, compute the intermediate (transposed) shape.
+      VectorType accTType = accVT;
+      if (!isIdentityPermutation(accPerm)) {
+        auto newShape = permuteShape(accVT.getShape(), accPerm);
+        accTType = VectorType::get(newShape, elemTy);
+      }
+      Value reshaped =
+          rewriter.create<vector::ShapeCastOp>(loc, accTType, resultFlat);
+      if (!isIdentityPermutation(accPerm)) {
+        // Inverse permutation.
+        SmallVector<int64_t> inv(accPerm.size(), 0);
+        for (int64_t i = 0, e = accPerm.size(); i < e; ++i)
+          inv[accPerm[i]] = i;
+        resultVal =
+            rewriter.create<vector::TransposeOp>(loc, accVT, reshaped, inv);
+      } else {
+        resultVal = reshaped; // already accVT shape
+      }
+    } else {
+      // Scalar result: P must be 1; extract element 0.
+      if (parSize != 1)
+        return failure(); // not a dot if P>1
+      resultVal = rewriter.create<vector::ExtractOp>(loc, resultFlat,
+                                                     ArrayRef<int64_t>{0});
+    }
+
+    rewriter.replaceOp(op, resultVal);
+    return success();
+  }
+
+private:
+  // Core: produce resultFlat := fold_k fma(lhs2D[k,*], rhs2D[k,*], accFlat)
+  // using vector<2xf32> chunks, chaining from inner-most FMA (backwards).
+  static Value buildFMAChain2D(PatternRewriter &rewriter, Location loc,
+                               Value lhs2D, Value rhs2D, Value accFlat,
+                               int64_t K, int64_t P) {
+    Value current = accFlat;
+    const int64_t chunk = 2;
+
+    for (int64_t k = K - 1; k >= 0; --k) {
+      // Extract row k: vector<Pxf32>
+      Value lhsRow =
+          rewriter.create<vector::ExtractOp>(loc, lhs2D, ArrayRef<int64_t>{k});
+      Value rhsRow =
+          rewriter.create<vector::ExtractOp>(loc, rhs2D, ArrayRef<int64_t>{k});
+
+      if (P >= chunk && (P % chunk) == 0) {
+        Value iter = current;
+        for (int64_t p = 0; p < P; p += chunk) {
+          SmallVector<int64_t> offsets{p}, sizes{chunk}, strides{1};
+          Value a = rewriter.create<vector::ExtractStridedSliceOp>(
+              loc, lhsRow, offsets, sizes, strides);
+          Value b = rewriter.create<vector::ExtractStridedSliceOp>(
+              loc, rhsRow, offsets, sizes, strides);
+          Value c = rewriter.create<vector::ExtractStridedSliceOp>(
+              loc, iter, offsets, sizes, strides);
+          Value f = rewriter.create<math::FmaOp>(loc, a, b, c); // vector<2xf32>
+          iter = rewriter.create<vector::InsertStridedSliceOp>(
+              loc, f, iter, offsets, strides);
+        }
+        current = iter;
+      } else if (P >= chunk) {
+        // Mixed: full 2-lane chunks + scalar tail.
+        Value iter = current;
+        int64_t p = 0;
+        for (; p + chunk <= P; p += chunk) {
+          SmallVector<int64_t> o{p}, s{chunk}, t{1};
+          Value a = rewriter.create<vector::ExtractStridedSliceOp>(loc, lhsRow,
+                                                                   o, s, t);
+          Value b = rewriter.create<vector::ExtractStridedSliceOp>(loc, rhsRow,
+                                                                   o, s, t);
+          Value c = rewriter.create<vector::ExtractStridedSliceOp>(loc, iter, o,
+                                                                   s, t);
+          Value f = rewriter.create<math::FmaOp>(loc, a, b, c);
+          iter =
+              rewriter.create<vector::InsertStridedSliceOp>(loc, f, iter, o, t);
+        }
+        for (; p < P; ++p) {
+          Value a = rewriter.create<vector::ExtractOp>(loc, lhsRow,
+                                                       ArrayRef<int64_t>{p});
+          Value b = rewriter.create<vector::ExtractOp>(loc, rhsRow,
+                                                       ArrayRef<int64_t>{p});
+          Value c = rewriter.create<vector::ExtractOp>(loc, iter,
+                                                       ArrayRef<int64_t>{p});
+          Value f = rewriter.create<math::FmaOp>(loc, a, b, c); // scalar
+          iter = rewriter.create<vector::InsertOp>(loc, f, iter,
+                                                   ArrayRef<int64_t>{p});
+        }
+        current = iter;
+      } else {
+        // P < 2: do a single vector or scalar FMA.
+        current = rewriter.create<math::FmaOp>(loc, lhsRow, rhsRow, current);
+      }
+    }
+    return current; // vector<Pxf32>
+  }
+};
+
+} // end anonymous namespace
+
+//struct ContractAddToChainFMA final : OpRewritePattern<vector::ContractionOp> {
+//  using OpRewritePattern::OpRewritePattern;
+//
+//  LogicalResult matchAndRewrite(vector::ContractionOp contractOp,
+//                                PatternRewriter &rewriter) const override {
+//    if (contractOp.getKind() != vector::CombiningKind::ADD) {
+//      return failure();
+//    }
+//
+//    Type elemType = getElementTypeOrSelf(contractOp.getLhsType());
+//    if (!isa<Float32Type>(elemType)) {
+//      return failure();
+//    }
+//
+//    Location loc = contractOp.getLoc();
+//    VectorType lhsType = cast<VectorType>(contractOp.getLhsType());
+//    VectorType rhsType = cast<VectorType>(contractOp.getRhsType());
+//    VectorType accType = cast<VectorType>(contractOp.getAccType());
+//
+//    if (!lhsType || !rhsType || !accType) {
+//      return failure();
+//    }
+//
+//    if (!isStaticVector(lhsType) || !isStaticVector(rhsType) || !isStaticVector(accType)) {
+//      return failure();
+//    }
+//
+//    // Get indexing maps and iterator types
+//    SmallVector<AffineMap> indexingMaps = contractOp.getIndexingMapsArray();
+//    if (indexingMaps.size() != 3) {
+//      return failure();
+//    }
+//    auto iteratorTypes = contractOp.getIteratorTypes();
+//
+//    // Identify parallel and reduction dimensions
+//    SmallVector<int64_t> parallelDims, reductionDims;
+//    for (auto [idx, attr] : llvm::enumerate(iteratorTypes)) {
+//      if (dyn_cast<vector::IteratorTypeAttr>(attr).getValue() ==
+//          vector::IteratorType::parallel) {
+//        parallelDims.push_back(idx);
+//      } else {
+//        reductionDims.push_back(idx);
+//      }
+//    }
+//
+//
+//    // We want reduction dims in outer positions for processing
+//    // Create transpose permutation: [reduction_dims..., parallel_dims...]
+//    SmallVector<int64_t> transposePermutation;
+//    transposePermutation.append(reductionDims.begin(), reductionDims.end());
+//    transposePermutation.append(parallelDims.begin(), parallelDims.end());
+//
+//    // Check if we need to transpose
+//    bool needsTranspose = false;
+//    for (size_t i = 0; i < transposePermutation.size(); i++) {
+//      if (transposePermutation[i] != i) {
+//        needsTranspose = true;
+//        break;
+//      }
+//    }
+//
+//    Value processedLhs = contractOp.getLhs();
+//    Value processedRhs = contractOp.getRhs();
+//    Value processedAcc = contractOp.getAcc();
+//
+//    if (needsTranspose) {
+//      // Apply transpose to operands
+//      SmallVector<int64_t> newShape =
+//          applyPermutation(lhsType.getShape(), transposePermutation);
+//      VectorType transposedType = VectorType::get(newShape, lhsType.getElementType());
+//
+//      processedLhs = rewriter.create<vector::TransposeOp>(
+//          loc, transposedType, contractOp.getLhs(), transposePermutation);
+//      processedRhs = rewriter.create<vector::TransposeOp>(
+//          loc, transposedType, contractOp.getRhs(), transposePermutation);
+//    }
+//    processedLhs.dump();
+//    processedRhs.dump();
+//    processedAcc.dump();
+//    accType.dump();
+//
+//    SmallVector<int64_t> accTransposePermutation;
+//
+//
+//
+//    // After transpose, we have shape like [reduction_dims..., parallel_dims...]
+//    // For example: 4x1x8 -> 8x4x1 if reduction is dim 2
+//
+//    // Generate FMA chains
+//    Value result = generateFMAChains(rewriter, loc, processedLhs, processedRhs,
+//                                     contractOp.getAcc(), reductionDims.size(),
+//                                     parallelDims.size());
+//
+//    rewriter.replaceOp(contractOp, result);
+//    return success();
+//  }
+//
+//private:
+//  Value generateFMAChains(PatternRewriter &rewriter, Location loc, Value lhs,
+//                          Value rhs, Value acc, size_t numReductionDims,
+//                          size_t numParallelDims) const {
+//    auto lhsType = cast<VectorType>(lhs.getType());
+//
+//    // After transpose, shape is [reduction_dims..., parallel_dims...]
+//    // Get the reduction dimension size (product of all reduction dims)
+//    int64_t reductionSize = 1;
+//    for (size_t i = 0; i < numReductionDims; i++) {
+//      reductionSize *= lhsType.getDimSize(i); // e.g., 8
+//    }
+//
+//    // Get the parallel dimension size (product of all parallel dims)
+//    int64_t parallelSize = 1;
+//    for (size_t i = numReductionDims; i < lhsType.getRank(); i++) {
+//      parallelSize *= lhsType.getDimSize(i); // e.g., 4
+//    }
+//
+//    // Reshape to 2D: [reductionSize, parallelSize]
+//    // e.g., 8x4
+//    SmallVector<int64_t> shape2D = {reductionSize, parallelSize};
+//    auto type2D = VectorType::get(shape2D, lhsType.getElementType());
+//
+//    Value lhs2D = rewriter.create<vector::ShapeCastOp>(loc, type2D, lhs);
+//    Value rhs2D = rewriter.create<vector::ShapeCastOp>(loc, type2D, rhs);
+//
+//    // Transpose accumulator if needed to match [1, parallelSize]
+//    // acc comes in as e.g., vector<4x1xf32>, we need vector<1x4xf32>
+//    auto accType = cast<VectorType>(acc.getType());
+//    Value transposedAcc = acc;
+//
+//    // Check if acc needs transposing
+//    if (accType.getRank() > 1) {
+//      // Create transpose permutation to swap dimensions
+//      SmallVector<int64_t> accTranspose;
+//      for (int64_t i = accType.getRank() - 1; i >= 0; i--) {
+//        accTranspose.push_back(i);
+//      }
+//      auto transposedAccType =
+//          VectorType::get({1, parallelSize}, accType.getElementType());
+//      transposedAcc = rewriter.create<vector::TransposeOp>(
+//          loc, transposedAccType, acc, accTranspose);
+//    } else {
+//      // If 1D, just add a leading dimension
+//      auto reshapedType =
+//          VectorType::get({1, parallelSize}, accType.getElementType());
+//      transposedAcc =
+//          rewriter.create<vector::ShapeCastOp>(loc, reshapedType, acc);
+//    }
+//
+//    // Extract the accumulator row (it's at position 0 after reshape)
+//    Value acc1D = rewriter.create<vector::ExtractOp>(loc, transposedAcc,
+//                                                     ArrayRef<int64_t>{0});
+//
+//    // Process in chunks of 2 for v_pk_fma_f32
+//    const int64_t chunkSize = 2;
+//
+//    // Initialize result - will be set in first iteration
+//    Value result;
+//
+//    // Process each reduction step BACKWARDS for proper FMA chaining
+//    // This creates: fma(a[0], b[0], fma(a[1], b[1], fma(..., fma(a[n-1],
+//    // b[n-1], acc))))
+//    for (int64_t redIdx = reductionSize - 1; redIdx >= 0; redIdx--) {
+//      // Extract the row for this reduction step
+//      Value lhsRow = rewriter.create<vector::ExtractOp>(
+//          loc, lhs2D, ArrayRef<int64_t>{redIdx});
+//      Value rhsRow = rewriter.create<vector::ExtractOp>(
+//          loc, rhs2D, ArrayRef<int64_t>{redIdx});
+//
+//      // First iteration uses accumulator, subsequent iterations use previous
+//      // result
+//      bool isFirstIteration = (redIdx == reductionSize - 1);
+//      Value currentAcc = isFirstIteration ? acc1D : result;
+//
+//      // Process in chunks of 2 elements for packed FMA
+//      if (parallelSize >= chunkSize && parallelSize % chunkSize == 0) {
+//        // Create a new result vector for this iteration
+//        Value iterResult = currentAcc; // Start with current accumulator
+//
+//        for (int64_t chunkIdx = 0; chunkIdx < parallelSize;
+//             chunkIdx += chunkSize) {
+//          SmallVector<int64_t> offsets = {chunkIdx};
+//          SmallVector<int64_t> sizes = {chunkSize};
+//          SmallVector<int64_t> strides = {1};
+//
+//          // auto chunkType =
+//              // VectorType::get({chunkSize}, lhsType.getElementType());
+//
+//          // Extract vector<2xf32> chunks from current row
+//          Value lhsChunk = rewriter.create<vector::ExtractStridedSliceOp>(
+//              loc, lhsRow, offsets, sizes, strides);
+//          Value rhsChunk = rewriter.create<vector::ExtractStridedSliceOp>(
+//              loc, rhsRow, offsets, sizes, strides);
+//
+//          // Extract corresponding chunk from current accumulator
+//          Value accChunk = rewriter.create<vector::ExtractStridedSliceOp>(
+//              loc, currentAcc, offsets, sizes, strides);
+//
+//          // Perform vector<2xf32> FMA - enables v_pk_fma_f32!
+//          Value fmaResult =
+//              rewriter.create<math::FmaOp>(loc, lhsChunk, rhsChunk, accChunk);
+//
+//          // Insert result back
+//          iterResult = rewriter.create<vector::InsertStridedSliceOp>(
+//              loc, fmaResult, iterResult, offsets, strides);
+//        }
+//
+//        result = iterResult;
+//      } else if (parallelSize >= chunkSize) {
+//        // Handle case where parallelSize is not divisible by chunkSize
+//        Value iterResult = currentAcc;
+//
+//        for (int64_t chunkIdx = 0; chunkIdx < parallelSize;
+//             chunkIdx += chunkSize) {
+//          int64_t actualChunkSize =
+//              std::min(chunkSize, parallelSize - chunkIdx);
+//
+//          if (actualChunkSize == chunkSize) {
+//            // Full chunk - use vector ops
+//            SmallVector<int64_t> offsets = {chunkIdx};
+//            SmallVector<int64_t> sizes = {chunkSize};
+//            SmallVector<int64_t> strides = {1};
+//
+//            // auto chunkType =
+//                // VectorType::get({chunkSize}, lhsType.getElementType());
+//
+//            Value lhsChunk = rewriter.create<vector::ExtractStridedSliceOp>(
+//                loc, lhsRow, offsets, sizes, strides);
+//            Value rhsChunk = rewriter.create<vector::ExtractStridedSliceOp>(
+//                loc, rhsRow, offsets, sizes, strides);
+//            Value accChunk = rewriter.create<vector::ExtractStridedSliceOp>(
+//                loc, currentAcc, offsets, sizes, strides);
+//
+//            Value fmaResult =
+//                rewriter.create<math::FmaOp>(loc, lhsChunk, rhsChunk, accChunk);
+//
+//            iterResult = rewriter.create<vector::InsertStridedSliceOp>(
+//                loc, fmaResult, iterResult, offsets, strides);
+//          } else {
+//            // Remainder - handle with scalar FMA
+//            for (int64_t i = 0; i < actualChunkSize; i++) {
+//              int64_t idx = chunkIdx + i;
+//              Value lhsElem = rewriter.create<vector::ExtractOp>(
+//                  loc, lhsRow, ArrayRef<int64_t>{idx});
+//              Value rhsElem = rewriter.create<vector::ExtractOp>(
+//                  loc, rhsRow, ArrayRef<int64_t>{idx});
+//              Value accElem = rewriter.create<vector::ExtractOp>(
+//                  loc, currentAcc, ArrayRef<int64_t>{idx});
+//
+//              Value fmaResult =
+//                  rewriter.create<math::FmaOp>(loc, lhsElem, rhsElem, accElem);
+//
+//              iterResult = rewriter.create<vector::InsertOp>(
+//                  loc, fmaResult, iterResult, ArrayRef<int64_t>{idx});
+//            }
+//          }
+//        }
+//
+//        result = iterResult;
+//      } else {
+//        // Direct FMA on the whole row if it's smaller than chunk size
+//        result = rewriter.create<math::FmaOp>(loc, lhsRow, rhsRow, currentAcc);
+//      }
+//    }
+//
+//    // Reshape result back to original accumulator shape
+//    // e.g., vector<4xf32> -> vector<4x1xf32>
+//    result = rewriter.create<vector::ShapeCastOp>(loc, accType, result);
+//
+//    return result;
+//  }
+//  //   SmallVector<int64_t> applyPermutation(ArrayRef<int64_t> shape,
+//  //                                         ArrayRef<int64_t> permutation)
+//  //                                         const {
+//  //     SmallVector<int64_t> result;
+//  //     for (int64_t idx : permutation) {
+//  //       result.push_back(shape[idx]);
+//  //     }
+//  //     return result;
+//  // }
+//};
+
 struct LLVMGPUVectorLoweringPass final
     : impl::LLVMGPUVectorLoweringPassBase<LLVMGPUVectorLoweringPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -390,6 +1031,22 @@ struct LLVMGPUVectorLoweringPass final
       populateUpliftToFMAPatterns(fmaPatterns);
       fmaPatterns.add<MultiReduceFMAToContract>(ctx);
       if (failed(applyPatternsGreedily(funcOp, std::move(fmaPatterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    {
+      RewritePatternSet patterns(ctx);
+      vector::populateVectorReductionToContractPatterns(patterns);
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    {
+      RewritePatternSet patterns(ctx);
+      patterns.add<ContractAddToChainFMA>(ctx);
+      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }

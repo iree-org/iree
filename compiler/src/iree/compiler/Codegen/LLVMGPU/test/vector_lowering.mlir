@@ -137,10 +137,37 @@
 //// CHECK:                    vector.reduction <add>, %[[E1]], %[[C0]] : vector<8xf32> into f32
 //
 
-func.func @multi_reduction_f32(%a: vector<2x1x8xf32>, %b: vector<2x1x8xf32>) -> vector<2x1xf32> {
-  %cst_4 = arith.constant dense<0.000000e+00> : vector<2x1xf32>
-  %cst_5 = arith.constant dense<0.000000e+00> : vector<2x1x8xf32>
-  %23 = math.fma %a, %b, %cst_5 fastmath<contract> : vector<2x1x8xf32>
-  %24 = vector.multi_reduction <add>, %23, %cst_4 [2] : vector<2x1x8xf32> to vector<2x1xf32>
-  return %24 : vector<2x1xf32>
+// func.func @multi_reduction_f32(%a: vector<4x1x8xf32>, %b: vector<4x1x8xf32>) -> vector<4x1xf32> {
+//   %cst_4 = arith.constant dense<0.000000e+00> : vector<4x1xf32>
+//   %cst_5 = arith.constant dense<0.000000e+00> : vector<4x1x8xf32>
+//   %23 = math.fma %a, %b, %cst_5 fastmath<contract> : vector<4x1x8xf32>
+//   %24 = vector.multi_reduction <add>, %23, %cst_4 [2] : vector<4x1x8xf32> to vector<4x1xf32>
+//   return %24 : vector<4x1xf32>
+// }
+
+
+// func.func @multi_reduction_f32(%a: vector<4x1x8xf32>, %b: vector<4x1x8xf32>) -> vector<4x1xf32> {
+//   %cst_4 = arith.constant dense<0.000000e+00> : vector<4x1xf32>
+//   %cst_5 = arith.constant dense<0.000000e+00> : vector<4x1x8xf32>
+//   %23 = math.fma %a, %b, %cst_5 fastmath<contract> : vector<4x1x8xf32>
+//   %24 = vector.multi_reduction <add>, %23, %cst_4 [2] : vector<4x1x8xf32> to vector<4x1xf32>
+//   return %24 : vector<4x1xf32>
+// }
+
+// (d0, d1, d2) -> (d0, d1, d2)
+// #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+// #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
+// module {
+//   func.func @multi_reduction_f32(%arg0: vector<2x1x8xf32>, %arg1: vector<2x1x8xf32>) -> vector<2x1xf32> {
+//     %cst = arith.constant dense<0.000000e+00> : vector<2x1xf32>
+//     %0 = vector.contract {indexing_maps = [#map, #map, #map1], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %arg0, %arg1, %cst : vector<2x1x8xf32>, vector<2x1x8xf32> into vector<2x1xf32>
+//     return %0 : vector<2x1xf32>
+//   }
+// }
+
+func.func @foo(%a: vector<4x1x8xf32>, %b: vector<4x1x8xf32>) -> vector<4x1xf32> {
+  %cst_4 = arith.constant dense<1.000000e+00> : vector<4x1xf32>
+  %1 = arith.mulf %a, %b : vector<4x1x8xf32>
+  %24 = vector.multi_reduction <add>, %1, %cst_4 [2] : vector<4x1x8xf32> to vector<4x1xf32>
+  return %24 : vector<4x1xf32>
 }
