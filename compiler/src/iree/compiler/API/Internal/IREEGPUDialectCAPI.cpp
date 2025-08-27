@@ -403,22 +403,24 @@ ireeHALExecutableTargetAttrGetGPUTargetInfo(MlirAttribute attr) {
   mlir::iree_compiler::IREE::GPU::TargetAttr gpuTargetAttr =
       mlir::iree_compiler::getGPUTargetAttr(context, executableTargetAttr);
 
-  if (gpuTargetAttr) {
-    targetInfo.arch =
-        wrap(mlir::StringAttr::get(context, gpuTargetAttr.getArch()));
-    mlir::iree_compiler::IREE::GPU::TargetWgpAttr wgpAttr =
-        gpuTargetAttr.getWgp();
-    mlir::Builder builder = mlir::OpBuilder(context);
-
-    targetInfo.subgroupSizeChoices =
-        wrap(builder.getI32ArrayAttr(wgpAttr.getSubgroupSizeChoices()));
-    targetInfo.maxWorkgroupSizes =
-        wrap(builder.getI32ArrayAttr(wgpAttr.getMaxWorkgroupSizes()));
-
-    targetInfo.maxThreadCountPerWorkgroup =
-        wgpAttr.getMaxThreadCountPerWorkgroup();
-    targetInfo.maxWorkgroupMemoryBytes = wgpAttr.getMaxWorkgroupMemoryBytes();
+  if (!gpuTargetAttr) {
+    return targetInfo;
   }
+
+  targetInfo.arch =
+      wrap(mlir::StringAttr::get(context, gpuTargetAttr.getArch()));
+  mlir::iree_compiler::IREE::GPU::TargetWgpAttr wgpAttr =
+      gpuTargetAttr.getWgp();
+  mlir::Builder builder = mlir::OpBuilder(context);
+
+  targetInfo.subgroupSizeChoices =
+      wrap(builder.getI32ArrayAttr(wgpAttr.getSubgroupSizeChoices()));
+  targetInfo.maxWorkgroupSizes =
+      wrap(builder.getI32ArrayAttr(wgpAttr.getMaxWorkgroupSizes()));
+
+  targetInfo.maxThreadCountPerWorkgroup =
+      wgpAttr.getMaxThreadCountPerWorkgroup();
+  targetInfo.maxWorkgroupMemoryBytes = wgpAttr.getMaxWorkgroupMemoryBytes();
 
   return targetInfo;
 }
