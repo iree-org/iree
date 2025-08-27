@@ -2144,6 +2144,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#xorshuffleattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      XORShuffleAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#workgroupmappingattr" class="md-nav__link">
     <span class="md-ellipsis">
       WorkgroupMappingAttr
@@ -5332,6 +5341,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#xorshuffleattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      XORShuffleAttr
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#workgroupmappingattr" class="md-nav__link">
     <span class="md-ellipsis">
       WorkgroupMappingAttr
@@ -5739,6 +5757,7 @@ within a backend.</p>
 <li><a href="#symbolicukernelproviderattr">SymbolicUKernelProviderAttr</a></li>
 <li><a href="#translationinfoattr">TranslationInfoAttr</a></li>
 <li><a href="#ukerneldescriptorattr">UKernelDescriptorAttr</a></li>
+<li><a href="#xorshuffleattr">XORShuffleAttr</a></li>
 <li><a href="#workgroupmappingattr">WorkgroupMappingAttr</a></li>
 </ul>
 </li>
@@ -6608,6 +6627,80 @@ attribute gets propagated to the entry point function.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="xorshuffleattr">XORShuffleAttr<a class="headerlink" href="#xorshuffleattr" title="Permanent link">link</a></h3>
+<p><em>An attribute that describes an XOR-based swizzling pattern.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#iree_codegen.xor_shuffle&lt;
+  int64_t,   # row_width
+  int64_t,   # access_width
+  int64_t,   # row_stride
+  int64_t   # per_phase
+&gt;
+</code></pre></div>
+<p>Shuffles accesses of |access_width| within rows of size
+|row_width|. For any given access into logical memref of shape
+<code>memref&lt;...xNx|access_width|x!eltype&gt;</code> where <code>N = row_width / access_width</code>
+at position <code>(i, j, 0)</code> is shuffled to <code>(i, ((i/per_phase) %N) XOR j , 0)</code>. For example,</p>
+<div class="highlight"><pre><span></span><code>row_width = 16, access_width = 4, per_phase = 1
+
+0000 1111 2222 3333 /// 0 1 2 3
+4444 5555 6666 7777 /// 0 1 2 3
+8888 9999 AAAA BBBB /// 0 1 2 3
+CCCC DDDD EEEE FFFF /// 0 1 2 3
+</code></pre></div>
+<p>is swizzled to
+<div class="highlight"><pre><span></span><code>0000 1111 2222 3333 /// 0 1 2 3
+7777 4444 5555 6666 /// 1 0 3 2
+BBBB AAAA 8888 9999 /// 2 3 0 1
+FFFF EEEE DDDD CCCC /// 3 2 1 0
+</code></pre></div>
+|access_width| allows to keep the same shuffling accross multiple rows. For example,</p>
+<div class="highlight"><pre><span></span><code>row_width = 16, access_width = 4, per_phase = 2
+
+0000 1111 2222 3333 /// 0 1 2 3
+4444 5555 6666 7777 /// 0 1 2 3
+8888 9999 AAAA BBBB /// 0 1 2 3
+CCCC DDDD EEEE FFFF /// 0 1 2 3
+</code></pre></div>
+<p>is swizzled to
+<div class="highlight"><pre><span></span><code>0000 1111 2222 3333 /// 0 1 2 3
+7777 4444 5555 6666 /// 0 1 2 3
+BBBB AAAA 8888 9999 /// 1 0 3 2
+FFFF EEEE DDDD CCCC /// 1 0 3 2
+</code></pre></div></p>
+<p>The pattern repeats for subsequent rows.</p>
+<h5 id="parameters_10">Parameters:<a class="headerlink" href="#parameters_10" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">row_width</td>
+<td style="text-align: center;"><code>int64_t</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">access_width</td>
+<td style="text-align: center;"><code>int64_t</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">row_stride</td>
+<td style="text-align: center;"><code>int64_t</code></td>
+<td>row stride. Default to row_width</td>
+</tr>
+<tr>
+<td style="text-align: center;">per_phase</td>
+<td style="text-align: center;"><code>int64_t</code></td>
+<td>Default to 1</td>
+</tr>
+</tbody>
+</table>
 <h3 id="workgroupmappingattr">WorkgroupMappingAttr<a class="headerlink" href="#workgroupmappingattr" title="Permanent link">link</a></h3>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_codegen.workgroup_mapping&lt;
@@ -6635,7 +6728,7 @@ if <code>a &gt; b</code>. In the same way it is illegal to for the list to
 - have <code>workgroup_mapping&lt;y&gt;</code> but not <code>workgroup_mapping&lt;x&gt;</code>
 - have <code>workgroup_mapping&lt;z:*&gt;</code>  but not have <code>workgroup_mapping&lt;x&gt;</code>
   and <code>workgroup_mapping&lt;y&gt;</code></p>
-<h5 id="parameters_10">Parameters:<a class="headerlink" href="#parameters_10" title="Permanent link">link</a></h5>
+<h5 id="parameters_11">Parameters:<a class="headerlink" href="#parameters_11" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
