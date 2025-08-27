@@ -330,6 +330,10 @@ public:
     }
 
     addConfig("ukernels", b.getStringAttr(options.enableROCMUkernels));
+    if (options.enableROCMUkernels != "none") {
+      addConfig("iree_codegen.ukernel_provider",
+                IREE::ROCM::UKernelProviderAttr::get(context));
+    }
     if (options.wavesPerEu > 0) {
       addConfigWavesPerEu(b.getContext(), options.wavesPerEu, configItems);
     }
