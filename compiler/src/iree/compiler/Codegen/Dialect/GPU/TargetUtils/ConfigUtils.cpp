@@ -390,13 +390,23 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
 
   Value lhs = operands[0];
   Value rhs = operands[1];
-  Value init;
+
+  Value init = operands[2];
   if (scaled) {
     init = operands[4];
-  } else {
-    init = operands[2];
+    [[maybe_unused]] auto getRank = [](Value a) {
+      if (auto typ = dyn_cast<ShapedType>(a.getType())) {
+        return typ.getRank();
+      }
+      return -1l;
+    };
+    assert(llvm::all_of(operands, [&](Value a) { return getRank(a) != -1l; }) &&
+           "All operands must be a shaped type");
+    assert(getRank(lhs) > getRank(operands[3]) &&
+           getRank(rhs) > getRank(operands[4]) &&
+           "Expected operands #1 and #2 to have a greater rank then their "
+           "corresponding scales, operands #3 and #4");
   }
-
   Type lhsElemType = getElementTypeOrSelf(lhs);
   Type rhsElemType = getElementTypeOrSelf(rhs);
   Type initElemType = getElementTypeOrSelf(init);
@@ -525,7 +535,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     // shapes do not require c promotion.
     SmallVector<int64_t> promotionList = {0, 1, 2};
     if (scaled) {
-      promotionList.push_back(3);
+      promotionList.append({3, 4});
     }
     GPU::appendPromotedOperandsList(context, attrs, promotionList);
     SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
