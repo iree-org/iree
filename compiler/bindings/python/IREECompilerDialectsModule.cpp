@@ -516,30 +516,23 @@ NB_MODULE(_ireeCompilerDialects, m) {
                    })
       .def_prop_ro("subgroup_size_choices",
                    [](const ireeGPUTargetInfo &self) -> std::vector<int64_t> {
-                     return getIntArrayAttrValues(self.subgroup_size_choices);
+                     return getIntArrayAttrValues(self.subgroupSizeChoices);
                    })
       .def_prop_ro("max_thread_count_per_workgroup",
                    [](const ireeGPUTargetInfo &self) -> int64_t {
-                     return mlirIntegerAttrGetValueInt(
-                         self.max_thread_count_per_workgroup);
+                     return self.maxThreadCountPerWorkgroup;
                    })
       .def_prop_ro("max_workgroup_sizes",
                    [](const ireeGPUTargetInfo &self) -> std::vector<int64_t> {
-                     return getIntArrayAttrValues(self.max_workgroup_sizes);
+                     return getIntArrayAttrValues(self.maxWorkgroupSizes);
                    })
       .def_prop_ro("max_workgroup_memory_bytes",
                    [](const ireeGPUTargetInfo &self) -> int64_t {
-                     return mlirIntegerAttrGetValueInt(
-                         self.max_workgroup_memory_bytes);
+                     return self.maxWorkgroupMemoryBytes;
                    });
 
   iree_gpu_module.def(
-      "get_gpu_target_info",
-      [](MlirAttribute executableTargetAttr) {
-        ireeGPUTargetInfo result =
-            ireeHALExecutableTargetAttrGetGPUTargetInfo(executableTargetAttr);
-        return result;
-      },
+      "get_gpu_target_info", &ireeHALExecutableTargetAttrGetGPUTargetInfo,
       "Extracts GPU target information from an executable target attribute.",
       py::arg("executable_target_attr"));
 
@@ -631,12 +624,7 @@ NB_MODULE(_ireeCompilerDialects, m) {
       });
 
   iree_codegen_module.def(
-      "get_attention_op_detail",
-      [](MlirAffineMap q, MlirAffineMap k, MlirAffineMap v, MlirAffineMap o) {
-        ireeCodegenAttentionOpDetail result =
-            ireeCodegenGetAttentionOpDetail(q, k, v, o);
-        return result;
-      },
+      "get_attention_op_detail", &ireeCodegenGetAttentionOpDetail,
       "Infers the structure of an attention operation from affine indexing "
       "maps.",
       py::arg("q"), py::arg("k"), py::arg("v"), py::arg("o"));

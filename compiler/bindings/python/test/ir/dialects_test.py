@@ -405,19 +405,16 @@ def gpu_target_info_attribute_parsing():
                     arch = "gfx942",
                     features = "",
                     wgp = <
-                    compute = fp64|fp32|fp16,
-                    storage = b64|b32|b16|b8,
-                    subgroup = shuffle|arithmetic,
-                    dot = dp4xi8toi32,
+                    compute = fp64,
+                    storage = b64,
+                    subgroup = none,
+                    dot = none,
                     mma = [<MFMA_F32_16x16x4_F32>],
                     subgroup_size_choices = [64],
-                    max_workgroup_sizes = [1024, 1024, 1024],
+                    max_workgroup_sizes = [256, 512, 1024],
                     max_thread_count_per_workgroup = 1024,
                     max_workgroup_memory_bytes = 65536,
-                    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
-                    max_load_instruction_bits = 128,
-                    simds_per_wgp = 4,
-                    vgpr_space_bits = 16384
+                    max_workgroup_counts = [2147483647, 2147483647, 2147483647]
                     >
                 >
                 }>
@@ -454,7 +451,49 @@ def gpu_target_info_attribute_parsing():
 
     max_workgroup_sizes = gpu_target_info.max_workgroup_sizes
     assert max_workgroup_sizes == [
+        256,
+        512,
         1024,
-        1024,
-        1024,
-    ], f"Expected max_workgroup_sizes [1024, 1024, 1024], got {max_workgroup_sizes}"
+    ], f"Expected max_workgroup_sizes [256, 512, 1024], got {max_workgroup_sizes}"
+
+    mlir_string = """
+    hal.executable private @main_dispatch_1 {
+        hal.executable.variant public @rocm_hsaco_fb
+            target(<"rocm", "rocm-hsaco-fb",
+                {
+                abi = "hip",
+                iree_codegen.target_info = #iree_gpu.target<
+                    arch = "gfx942",
+                    features = "",
+                    wgp = <
+                    compute = fp16,
+                    storage = b16,
+                    subgroup = none,
+                    dot = none,
+                    mma = [],
+                    subgroup_size_choices = [32, 64],
+                    max_workgroup_sizes = [1024, 1024, 1024],
+                    max_thread_count_per_workgroup = 1024,
+                    max_workgroup_memory_bytes = 65536,
+                    max_workgroup_counts = [1024]
+                    >
+                >
+                }>
+            ) {
+        }
+    }
+    """
+
+    module = ir.Module.parse(mlir_string)
+    variant_op_list = iree_codegen.get_executable_variant_ops(module)
+    assert len(variant_op_list) == 1, "Expect one executable variant op"
+    variant_op = variant_op_list[0]
+    executable_variant_op = variant_op.opview
+    target = executable_variant_op.target
+    gpu_target_info = iree_gpu.get_gpu_target_info(target)
+
+    subgroup_size_choices = gpu_target_info.subgroup_size_choices
+    assert subgroup_size_choices == [
+        32,
+        64,
+    ], f"Expected subgroup_size_choices [32, 64], got {subgroup_size_choices}"

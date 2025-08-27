@@ -399,29 +399,25 @@ ireeHALExecutableTargetAttrGetGPUTargetInfo(MlirAttribute attr) {
   assert(executableTargetAttr && "attr is not a HAL::ExecutableTargetAttr");
 
   ireeGPUTargetInfo targetInfo = {};
-  auto context = executableTargetAttr.getContext();
-  auto gpuTargetAttr =
+  mlir::MLIRContext *context = executableTargetAttr.getContext();
+  mlir::iree_compiler::IREE::GPU::TargetAttr gpuTargetAttr =
       mlir::iree_compiler::getGPUTargetAttr(context, executableTargetAttr);
 
   if (gpuTargetAttr) {
     targetInfo.arch =
         wrap(mlir::StringAttr::get(context, gpuTargetAttr.getArch()));
-    auto wgpAttr = gpuTargetAttr.getWgp();
+    mlir::iree_compiler::IREE::GPU::TargetWgpAttr wgpAttr =
+        gpuTargetAttr.getWgp();
     mlir::Builder builder = mlir::OpBuilder(context);
 
-    targetInfo.subgroup_size_choices =
+    targetInfo.subgroupSizeChoices =
         wrap(builder.getI32ArrayAttr(wgpAttr.getSubgroupSizeChoices()));
-
-    targetInfo.max_workgroup_sizes =
+    targetInfo.maxWorkgroupSizes =
         wrap(builder.getI32ArrayAttr(wgpAttr.getMaxWorkgroupSizes()));
 
-    auto maxThreadCount = wgpAttr.getMaxThreadCountPerWorkgroup();
-    targetInfo.max_thread_count_per_workgroup = wrap(mlir::IntegerAttr::get(
-        mlir::IntegerType::get(context, 32), maxThreadCount));
-
-    auto maxWorkgroupMemory = wgpAttr.getMaxWorkgroupMemoryBytes();
-    targetInfo.max_workgroup_memory_bytes = wrap(mlir::IntegerAttr::get(
-        mlir::IntegerType::get(context, 32), maxWorkgroupMemory));
+    targetInfo.maxThreadCountPerWorkgroup =
+        wgpAttr.getMaxThreadCountPerWorkgroup();
+    targetInfo.maxWorkgroupMemoryBytes = wgpAttr.getMaxWorkgroupMemoryBytes();
   }
 
   return targetInfo;
