@@ -286,7 +286,7 @@ struct DistributeGather final : OpDistributionPattern<vector::GatherOp> {
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
     VectorValue result = gatherOp.getResult();
-    VectorValue indexVec = gatherOp.getIndexVec();
+    VectorValue indexVec = gatherOp.getIndices();
     VectorValue mask = gatherOp.getMask();
     VectorValue passThru = gatherOp.getPassThru();
 
@@ -318,7 +318,7 @@ struct DistributeGather final : OpDistributionPattern<vector::GatherOp> {
     // Simply distribute all operands and results.
     VectorValue distributed = rewriter.create<vector::GatherOp>(
         gatherOp.getLoc(), distributedType, gatherOp.getBase(),
-        gatherOp.getIndices(),
+        gatherOp.getOffsets(),
         getDistributed(rewriter, indexVec, indicesLayout),
         getDistributed(rewriter, mask, maskLayout),
         getDistributed(rewriter, passThru, passThruLayout));
