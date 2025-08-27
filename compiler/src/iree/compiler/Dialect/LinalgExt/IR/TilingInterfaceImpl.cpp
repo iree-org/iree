@@ -1689,8 +1689,9 @@ static SmallVector<OpFoldResult>
 createFlatListOfOperandDims(ExpReductionOp op, OpBuilder &b, Location loc) {
   SmallVector<OpFoldResult> res;
   for (OpOperand &opOperand : op->getOpOperands()) {
-    for (int64_t i = 0, e = op.getRank(&opOperand); i < e; ++i)
+    for (int64_t i = 0, e = op.getRank(&opOperand); i < e; ++i) {
       res.push_back(linalg::createFoldedDimOp(b, loc, opOperand.get(), i));
+    }
   }
   return res;
 }
@@ -1700,15 +1701,15 @@ SmallVector<Range> ExpReductionOp::getIterationDomain(OpBuilder &b) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(op);
   Location loc = getLoc();
-  auto allShapesSizes = createFlatListOfOperandDims(op, b, loc);
+  SmallVector<OpFoldResult> allShapesSizes =
+      createFlatListOfOperandDims(op, b, loc);
   AffineMap map = getShapesToLoopsMap();
 
-  return llvm::to_vector(
-      llvm::map_range(map.getResults(), [&](AffineExpr loopExpr) {
-        OpFoldResult ofr = affine::makeComposedFoldedAffineApply(
-            b, loc, loopExpr, allShapesSizes);
-        return Range{b.getIndexAttr(0), ofr, b.getIndexAttr(1)};
-      }));
+  return llvm::map_to_vector(map.getResults(), [&](AffineExpr loopExpr) {
+    OpFoldResult ofr =
+        affine::makeComposedFoldedAffineApply(b, loc, loopExpr, allShapesSizes);
+    return Range{b.getIndexAttr(0), ofr, b.getIndexAttr(1)};
+  });
 }
 
 FailureOr<TilingResult>
@@ -1753,9 +1754,9 @@ LogicalResult ExpReductionOp::getResultTilePosition(
   AffineExpr d0;
   bindDims(b.getContext(), d0);
   SmallVector<OpFoldResult> subShapeSizes =
-      llvm::to_vector(llvm::map_range(sizes, [&](OpFoldResult ofr) {
+      llvm::map_to_vector(sizes, [&](OpFoldResult ofr) {
         return affine::makeComposedFoldedAffineApply(b, loc, d0 - 1, ofr);
-      }));
+      });
 
   OpOperand *outOperand = linalgOp.getDpsInitOperand(resultNumber);
   linalg::SliceParameters sliceParams = linalg::computeSliceParameters(
@@ -1779,11 +1780,13 @@ ExpReductionOp::generateResultTileValue(OpBuilder &b, unsigned resultNumber,
   FailureOr<TilingResult> tilingResult =
       getTiledImplementation(b, mappedOffsets, mappedSizes);
 
-  if (failed(tilingResult))
+  if (failed(tilingResult)) {
     return failure();
+  }
 
-  if (tilingResult->tiledOps.size() != 1)
+  if (tilingResult->tiledOps.size() != 1) {
     return emitOpError("failed to generate tiled implementation");
+  }
 
   return TilingResult{
       tilingResult->tiledOps,
