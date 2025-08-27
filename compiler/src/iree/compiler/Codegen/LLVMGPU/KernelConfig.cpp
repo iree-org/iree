@@ -1060,9 +1060,10 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   if (intrinsics.empty())
     return failure();
 
-  // Note that the following heuristic seeds are just placeholder values.
-  // We need to clean it up and make it adjusting to different targets.
-  // See https://github.com/iree-org/iree/issues/16341 for details.
+  // TODO: Replace the below with algorithm described in
+  // https://github.com/iree-org/iree/discussions/21506.
+  // This is already implemented in KernelConfig.cpp in tileAndFuse pipeline
+  // and should be ported to here once its perf results are verified.
   GPUMMAHeuristicSeeds seeds{/*bestSubgroupCountPerWorkgroup=*/4,
                              /*bestMNTileCountPerSubgroup=*/8,
                              /*bestKTileCountPerSubgroup=*/2};
@@ -1287,9 +1288,10 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   GPUMMAHeuristicSeeds seeds;
 
-  // Note that the following heuristic seeds are just placeholder values.
-  // We need to clean it up and make it adjusting to different targets.
-  // See https://github.com/iree-org/iree/issues/16341 for details.
+  // TODO: Replace the below with algorithm described in
+  // https://github.com/iree-org/iree/discussions/21506.
+  // This is already implemented in KernelConfig.cpp in tileAndFuse pipeline
+  // and should be ported to here once its perf results are verified.
   if (problem.mSizes[0] * problem.nSizes[0] <= clGPUMatmulCThreshold) {
     // For matmuls with small M*N size, we want to distribute M*N onto more
     // workgroups to fill the GPU. Use a smaller bestMNTileCountPerSubgroup

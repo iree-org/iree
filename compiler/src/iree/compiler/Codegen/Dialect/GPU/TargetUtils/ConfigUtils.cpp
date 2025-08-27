@@ -169,10 +169,10 @@ struct GemmCutoff {
 };
 } // namespace
 
-/// Function to compute small and large gemm cutoffs based on the target's
-/// peak performance and memory bandwidth.
-static GemmCutoff computeGemmCutoffs(IREE::GPU::TargetAttr target,
-                                     Type computeType) {
+/// Function to compute small and large gemm cutoffs for arithmetic intensity
+/// based on the target's peak performance and memory bandwidth.
+static GemmCutoff computeGemmCutoffsForAI(IREE::GPU::TargetAttr target,
+                                          Type computeType) {
   float smallGemmCutoff = 1.0f;
   float largeGemmCutoff = 1000.0f;
   if (!target.getChip()) {
@@ -213,6 +213,9 @@ static GemmCutoff computeGemmCutoffs(IREE::GPU::TargetAttr target,
     return {smallGemmCutoff, largeGemmCutoff};
   }
 
+  // TODO: Attempt to use number of elements loaded per second instead of
+  // Tbps and adopt it if the perf uplift transfer better between different
+  // data types.
   FloatAttr memoryBandwidthTbpsAttr = chip.getMemoryBandwidthTbps();
   float memoryBandwidthTbps =
       memoryBandwidthTbpsAttr.getValue().convertToFloat();
@@ -280,7 +283,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
          "expected the same aType and bType.");
   int64_t inBitWidth = problem.aType.getIntOrFloatBitWidth();
 
-  GemmCutoff gemmCutoffs = computeGemmCutoffs(target, problem.aType);
+  GemmCutoff gemmCutoffs = computeGemmCutoffsForAI(target, problem.aType);
 
   // Note that the following heuristic seeds are just placeholder values.
   // We need to clean it up and make it adjusting to different targets.
@@ -292,7 +295,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
                              (mSize * nSize + nSize * kSize + mSize * kSize);
 
   if (computeIntensity <= gemmCutoffs.smallGemmCutoff) {
-    // For matmuls with small compute intensity, use small
+    // For matmuls with small arithmetic intensity, use small
     // bestMNTileCountPerSubgroup and large bestKTileCountPerSubgroup.
     problem.gemmSize = GemmSize::SmallGemm;
     seeds = {/*bestSubgroupCountPerWorkgroup=*/2,
@@ -300,7 +303,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
              /*bestKTileCountPerSubgroup=*/4,
              /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
   } else if (computeIntensity >= gemmCutoffs.largeGemmCutoff) {
-    // For matmuls with large compute intensity, use large
+    // For matmuls with large arithmetic intensity, use large
     // bestMNTileCountPerSubgroup and small bestKTileCountPerSubgroup to
     // amortize launch/memory costs and maximize throughput.
     problem.gemmSize = GemmSize::LargeGemm;
