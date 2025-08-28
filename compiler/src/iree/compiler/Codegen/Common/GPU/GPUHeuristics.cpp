@@ -312,6 +312,9 @@ getBestKTileSizes(const GPUMatmulShapeType &problem,
   return kTileSizes;
 }
 
+/// Distributes tilesToDistribute to totalTiles using their GCD. Both
+/// totalTiles and tilesToDistribute are updated to reflect the remaining
+/// tiles to distribute. The return value is the number of tiles distributed.
 static int64_t distributeTilesUsingGCD(int64_t &totalTiles,
                                        int64_t &tilesToDistribute) {
   APInt gcd = GreatestCommonDivisor(APInt(64, tilesToDistribute),
@@ -323,6 +326,12 @@ static int64_t distributeTilesUsingGCD(int64_t &totalTiles,
   return distributeTileCount;
 }
 
+/// Distributes the square root of the subgroup and tile counts to both M and N
+/// dimensions. The first argument servers as a flag to indicate whether the
+/// distribution is for the M or N dimension. Both total tiles and remaining
+/// tiles are updated to reflect the remaining tiles to distribute. Note: This
+/// function should only be used for primary distribution as it assigns the sqrt
+/// directly to the dimension.
 static void distributeSqrtForDim(
     bool isMDim, int64_t subgroupSqrt, int64_t tileSqrt,
     int64_t &mTotalTileToDistribute, int64_t &nTotalTileToDistribute,
@@ -343,6 +352,10 @@ static void distributeSqrtForDim(
   remainingTiles /= tileSqrt;
 }
 
+/// Distributes tiles and subgroups to both M and N dimensions using their GCD.
+/// The first argument servers as a flag to indicate whether the distribution is
+/// for the M or N dimension. Both total tiles and remaining tiles are updated
+/// to reflect the remaining tiles to distribute.
 static void distributeGCDForDim(bool isMDim, int64_t &mTotalTileToDistribute,
                                 int64_t &nTotalTileToDistribute,
                                 int64_t &mSubgroupDistributed,
@@ -477,16 +490,16 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
       mTileSizes(problem.mSizes.size(), 0),
       nTileSizes(problem.nSizes.size(), 0);
 
-  // Distribute collapsed tile to M dims from inner -> outer
-  for (int i = problem.mSizes.size() - 1; i >= 0; --i) {
+  // Distribute collapsed tile to M dims from inner -> outer.
+  for (size_t e = problem.mSizes.size(), i = e - 1; i < e; --i) {
     mSubgroupCounts[i] =
         distributeTilesUsingGCD(mTotalTileCounts[i], mSubgroupDistributed);
     mTileSizes[i] =
         distributeTilesUsingGCD(mTotalTileCounts[i], mTileSizeDistributed);
   }
 
-  // Distribute collapsed tile to N dims from inner -> outer
-  for (int i = problem.nSizes.size() - 1; i >= 0; --i) {
+  // Distribute collapsed tile to N dims from inner -> outer.
+  for (size_t e = problem.nSizes.size(), i = e - 1; i < e; --i) {
     nSubgroupCounts[i] =
         distributeTilesUsingGCD(nTotalTileCounts[i], nSubgroupDistributed);
     nTileSizes[i] =
