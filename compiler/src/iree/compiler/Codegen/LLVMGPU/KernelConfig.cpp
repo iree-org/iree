@@ -201,90 +201,6 @@ getMatmulConfig(IREE::GPU::TargetAttr target) {
   return tileSizes;
 }
 
-/// Return the best combination of tile size and wg size when using tensorcore
-/// operations.
-static void
-getTensorCoreConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes,
-                    Type elementType, int64_t M, int64_t N, int64_t K) {
-  // Based on early analysis we found that 128x256x32_3 gives acceptable
-  // performance across many of the large matrix sizes for f16 and fp32. This
-  // needs to be refined into a better strategy based on empirical data but this
-  // gives us a quick solution to achieve performance in the right order of
-  // magnitude for large square like cases.
-  int64_t parallelDim = M * N;
-  static constexpr int64_t kLargDimThreashold = 1536;
-  if (elementType.isF16()) {
-    if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
-      tileSizes.push_back(
-          TileWorkgroupSizePair({{128, 256, 32}, {128, 2, 1}, 3}));
-    }
-    tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 32}, {64, 2, 1}, 4}));
-  } else {
-    if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
-      tileSizes.push_back(
-          TileWorkgroupSizePair({{128, 256, 16}, {128, 2, 1}, 4}));
-    }
-    llvm::append_values(tileSizes,
-                        TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}, 4}),
-                        TileWorkgroupSizePair({{16, 32, 16}, {64, 1, 1}, 4}),
-                        TileWorkgroupSizePair({{32, 16, 16}, {32, 2, 1}, 4}),
-                        TileWorkgroupSizePair({{16, 16, 16}, {32, 1, 1}, 4}));
-  }
-}
-
-static bool supportsTensorCore(IREE::GPU::TargetAttr target,
-                               linalg::LinalgOp op) {
-  // Limit tensor core pipeline to matmul as not all combinations of transpose
-  // are supported upstream.
-  if (!target.supportsSyncMMAOps())
-    return false;
-  if (!(isa<linalg::MatmulOp>(op) || isa<linalg::BatchMatmulOp>(op))) {
-    assert(linalg::isaContractionOpInterface(op));
-    // If this is not a named op matmul check some properties to make sure that
-    // we can map it to tensorcore ops. We should have only mulAdd in the region
-    // and the output map should have no permutation and the last dimension
-    // should be a reduce.
-    Region &body = op->getRegion(0);
-    Region::OpIterator it = body.op_begin();
-    if (it == body.op_end() || !isa<arith::MulFOp>(*(it++)))
-      return false;
-    if (it == body.op_end() || !isa<arith::AddFOp>(*(it++)))
-      return false;
-    if (it == body.op_end() || !isa<linalg::YieldOp>(*(it++)))
-      return false;
-    AffineMap outputMap = op.getMatchingIndexingMap(op.getDpsInitOperand(0));
-    if (outputMap.getNumResults() != outputMap.getNumDims() - 1)
-      return false;
-    OpBuilder b(op);
-    for (unsigned i = 0, e = outputMap.getNumResults(); i < e - 1; i++) {
-      if (outputMap.getResult(i) != b.getAffineDimExpr(i))
-        return false;
-    }
-  }
-  return true;
-}
-
-/// Decides which tensorcore operations to use.
-static CodeGenPipeline getTensorCorePipeline(Type elementType) {
-  // Currently mma.sync is on by default for fp16 only.
-  CodeGenPipeline codegenPipeline = CodeGenPipeline::LLVMGPUMatmulTensorCore;
-
-  // For F16 and F32 use mmasync by default.
-  if (elementType.isF16() || elementType.isF32()) {
-    codegenPipeline = CodeGenPipeline::LLVMGPUMatmulTensorCoreMmaSync;
-  }
-
-  // Override the decision based on cl flags.
-  assert(!(clGPUUseWMMA && clGPUUseMMASync) && "incompatible options.");
-  if (clGPUUseMMASync) {
-    codegenPipeline = CodeGenPipeline::LLVMGPUMatmulTensorCoreMmaSync;
-  }
-  if (clGPUUseWMMA) {
-    codegenPipeline = CodeGenPipeline::LLVMGPUMatmulTensorCore;
-  };
-  return codegenPipeline;
-}
-
 //====---------------------------------------------------------------------===//
 // Vector Distribution Reduction Pipeline Configuration
 //====---------------------------------------------------------------------===//
@@ -2269,30 +2185,6 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
                       ShapedType::isStatic(sizeN) &&
                       ShapedType::isStatic(sizeK);
   if (isStaticSize) {
-    /// Try tensorcore config first.
-    if (supportsTensorCore(target, op)) {
-      SmallVector<TileWorkgroupSizePair> TCtileSizeConfig;
-      Type elementType =
-          cast<ShapedType>(op.getDpsInputOperand(0)->get().getType())
-              .getElementType();
-
-      getTensorCoreConfig(TCtileSizeConfig, elementType, sizeM, sizeN, sizeK);
-      // Pick the best configuration where the original shape is aligned on the
-      // tile size.
-      for (TileWorkgroupSizePair &config : TCtileSizeConfig) {
-        if (sizeK % config.tileSize[2] == 0 &&
-            sizeN % config.tileSize[1] == 0 &&
-            sizeM % config.tileSize[0] == 0) {
-          CodeGenPipeline codegenPipeline = getTensorCorePipeline(elementType);
-          return setMatmulConfig(
-              config.tileSize[0], config.tileSize[1], config.tileSize[2],
-              config.workgroupSize,
-              target.getWgp().getSubgroupSizeChoices().asArrayRef(),
-              sizeK == config.tileSize[2] ? 1 : config.pipelineDepth,
-              codegenPipeline);
-        }
-      }
-    }
     // Special case for very small matrices.
     if (sizeM * sizeN <= target.getPreferredSubgroupSize()) {
       return setMatmulConfig(
