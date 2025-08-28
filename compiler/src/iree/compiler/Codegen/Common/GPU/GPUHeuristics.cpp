@@ -492,20 +492,14 @@ static int64_t adjustSeedsForWgpCount(const GPUMatmulShapeType &problem,
     return bestMNTileCountPerSubgroup;
   }
 
-  int64_t mSize = ShapedType::getNumElements(problem.mSizes);
-  int64_t nSize = ShapedType::getNumElements(problem.nSizes);
-  int64_t kSize = ShapedType::getNumElements(problem.kSizes);
-  float arithmeticIntensity =
-      (2.0f * mSize * nSize * kSize) /
-      static_cast<float>(mSize * nSize + nSize * kSize + mSize * kSize);
-
-  // TODO(jerryyin): compute arithmetic intensity bound based on the information
-  // from the target chip.
-  if (arithmeticIntensity <= 10.0f) {
-    LDBG() << "Arithmetic intensity is too low, " << arithmeticIntensity
-           << ", skipping adjustment of seeds for workgroup count.";
+  if (problem.gemmSize == GemmSize::NotSet ||
+      problem.gemmSize == GemmSize::SmallGemm) {
+    LDBG() << "Arithmetic intensity is too low, "
+           << "skipping adjustment of seeds for workgroup count.";
     return bestMNTileCountPerSubgroup;
   }
+  int64_t mSize = ShapedType::getNumElements(problem.mSizes);
+  int64_t nSize = ShapedType::getNumElements(problem.nSizes);
   auto computeWorkgroupCount = [&] {
     // Compute the number of workgroups needed to cover the problem size.
     // This number tends to be lower than actual workgroup count, since:
