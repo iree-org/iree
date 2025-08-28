@@ -289,7 +289,33 @@ void GPUPackToIntrinsicsPass::runOnOperation() {
     return !getLoweringConfig(producer) && !getLoweringConfig(consumer);
   };
 
+  // Additionally, we do not sink extract slice through generic if slice source
+  // is a block argument or if the source, slice or generic are in different
+  // blocks as this would affect how tiling uses extract slice ops.
+
+  linalg::ControlPropagationFn controlExtract =
+      [](OpOperand *opOperand) -> bool {
+    Operation *producer = opOperand->get().getDefiningOp();
+    Operation *consumer = opOperand->getOwner();
+    if (getLoweringConfig(producer) || getLoweringConfig(consumer)) {
+      return false;
+    }
+    auto sliceOp = dyn_cast<tensor::ExtractSliceOp>(producer);
+    if (!sliceOp) {
+      return false;
+    }
+    Operation *producerSrc = sliceOp.getSource().getDefiningOp();
+    // If source is not an op, e.g is a block argument then return false.
+    if (!producerSrc) {
+      return false;
+    }
+
+    return producerSrc->getBlock() == producer->getBlock() &&
+           consumer->getBlock() == producer->getBlock();
+  };
+
   linalg::populateDataLayoutPropagationPatterns(patterns, control);
+  linalg::populateExtractSliceSinkingPatterns(patterns, controlExtract);
   patterns.add<PackDestinationForOp>(context);
   linalg::UnPackOp::getCanonicalizationPatterns(patterns, context);
   if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
