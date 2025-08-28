@@ -396,8 +396,6 @@ ireeHALExecutableTargetAttrGetGPUTargetInfo(MlirAttribute attr) {
       llvm::cast<mlir::iree_compiler::IREE::HAL::ExecutableTargetAttr>(
           unwrap(attr));
 
-  assert(executableTargetAttr && "attr is not a HAL::ExecutableTargetAttr");
-
   ireeGPUTargetInfo targetInfo = {};
   mlir::MLIRContext *context = executableTargetAttr.getContext();
   mlir::iree_compiler::IREE::GPU::TargetAttr gpuTargetAttr =
