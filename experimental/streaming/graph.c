@@ -85,6 +85,36 @@ void iree_hal_streaming_graph_release(iree_hal_streaming_graph_t* graph) {
   }
 }
 
+iree_host_size_t iree_hal_streaming_graph_size(
+    iree_hal_streaming_graph_t* graph) {
+  IREE_ASSERT_ARGUMENT(graph);
+  return graph->node_count;
+}
+
+void iree_hal_streaming_graph_get_nodes(
+    iree_hal_streaming_graph_t* graph, iree_host_size_t count,
+    iree_hal_streaming_graph_node_t** nodes) {
+  IREE_ASSERT_ARGUMENT(graph);
+  IREE_ASSERT_ARGUMENT(nodes || count == 0);
+
+  // Iterate through the node blocks to collect nodes.
+  iree_host_size_t copied_count = 0;
+  iree_hal_streaming_node_block_t* block = graph->node_blocks;
+  while (block && copied_count < count) {
+    iree_host_size_t nodes_to_copy = block->count;
+    if (copied_count + nodes_to_copy > count) {
+      nodes_to_copy = count - copied_count;
+    }
+
+    // Copy nodes from this block.
+    for (iree_host_size_t i = 0; i < nodes_to_copy; i++) {
+      nodes[copied_count++] = block->nodes[i];
+    }
+
+    block = block->next;
+  }
+}
+
 // Helper to allocate a graph node with trailing dependencies and extra data.
 static iree_status_t iree_hal_streaming_graph_allocate_node(
     iree_allocator_t allocator, iree_host_size_t dependency_count,
@@ -158,7 +188,6 @@ static iree_status_t iree_hal_streaming_graph_add_node(
     // Need a new block.
     const iree_host_size_t block_capacity =
         graph->node_count < 64 ? 16 : 64;  // Grow block size for larger graphs.
-
     iree_hal_streaming_node_block_t* new_block = NULL;
     IREE_RETURN_IF_ERROR(iree_hal_streaming_allocate_node_block(
         graph->arena_allocator, block_capacity, &new_block));
@@ -181,7 +210,6 @@ static iree_status_t iree_hal_streaming_graph_add_node(
                                           graph->current_root_block->capacity) {
       // Need a new root block.
       const iree_host_size_t block_capacity = 8;
-
       iree_hal_streaming_node_block_t* new_block = NULL;
       IREE_RETURN_IF_ERROR(iree_hal_streaming_allocate_node_block(
           graph->arena_allocator, block_capacity, &new_block));
@@ -196,7 +224,7 @@ static iree_status_t iree_hal_streaming_graph_add_node(
     }
 
     graph->current_root_block->nodes[graph->current_root_block->count++] = node;
-    graph->root_count++;
+    ++graph->root_count;
   }
 
   return iree_ok_status();
@@ -229,7 +257,7 @@ iree_status_t iree_hal_streaming_graph_add_empty_node(
   // iree_hal_streaming_graph_empty_attrs_t* attrs = &node->attrs.empty;
 
   iree_status_t status = iree_hal_streaming_graph_add_node(graph, node);
-  if (iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status) && out_node) {
     *out_node = node;
   }
   IREE_TRACE_ZONE_END(z0);
@@ -296,7 +324,7 @@ iree_status_t iree_hal_streaming_graph_add_kernel_node(
               &attrs->bindings));
 
   iree_status_t status = iree_hal_streaming_graph_add_node(graph, node);
-  if (iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status) && out_node) {
     *out_node = node;
   }
   IREE_TRACE_ZONE_END(z0);
@@ -343,7 +371,7 @@ iree_status_t iree_hal_streaming_graph_add_memcpy_node(
   attrs->size = size;
 
   iree_status_t status = iree_hal_streaming_graph_add_node(graph, node);
-  if (iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status) && out_node) {
     *out_node = node;
   }
   IREE_TRACE_ZONE_END(z0);
@@ -387,7 +415,7 @@ iree_status_t iree_hal_streaming_graph_add_memset_node(
   attrs->count = count;
 
   iree_status_t status = iree_hal_streaming_graph_add_node(graph, node);
-  if (iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status) && out_node) {
     *out_node = node;
   }
   IREE_TRACE_ZONE_END(z0);
@@ -424,7 +452,7 @@ iree_status_t iree_hal_streaming_graph_add_host_call_node(
   attrs->user_data = user_data;
 
   iree_status_t status = iree_hal_streaming_graph_add_node(graph, node);
-  if (iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status) && out_node) {
     *out_node = node;
   }
   IREE_TRACE_ZONE_END(z0);

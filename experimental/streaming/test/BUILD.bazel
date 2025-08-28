@@ -58,6 +58,15 @@ iree_runtime_cc_binary(
     ],
 )
 
+iree_runtime_cc_binary(
+    name = "hip_graph_capture_api_demo",
+    srcs = ["hip_graph_capture_api_demo.c"],
+    deps = [
+        # ":stream_hal_test_kernels",  # Would depend on generated kernels
+        "//experimental/streaming/binding/hip",
+    ],
+)
+
 # Graph utility library for benchmarks
 cc_library(
     name = "graph_util",

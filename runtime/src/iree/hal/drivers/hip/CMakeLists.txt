@@ -56,7 +56,7 @@ iree_cc_library(
     "rccl_channel.h"
     "stream_command_buffer.c"
     "stream_command_buffer.h"
-  INCLUDES
+  SYSTEM_INCLUDES
     "${HIP_API_HEADERS_ROOT}"
   DEPS
     ::dynamic_symbols
