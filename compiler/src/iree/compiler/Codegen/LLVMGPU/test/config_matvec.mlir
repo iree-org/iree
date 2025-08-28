@@ -24,10 +24,8 @@ func.func @static_batch_matvec() {
 }
 
 
-// CHECK:     LLVMGPUWarpReduction
+// CHECK:     LLVMGPUVectorDistribute
 // CDNA3:     LLVMGPUTileAndFuse
-
-// We want to deprecate LLVMGPUWarpReduction. Currently LLVMGPUVectorDistribution is not chosen in setReductionVectorDistributionConfig because it fails in 'hasReductionIterator' (which doesn't check specialized ops). This might be an easy whitelisting fix, but I will return to this later (TODO(newling)).
 
 // -----
 
@@ -325,7 +323,7 @@ func.func @i4_dequant_matvec() {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-func.func @skinny_mmt() {
+func.func @skinny_mmt_lhs_is_vector() {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x4096xf16>>
@@ -347,16 +345,19 @@ func.func @skinny_mmt() {
   return
 }
 
-// CHECK-DAG: #[[$MA:.*]] = affine_map<(d0, d1, d2) -> (d0, d2)>
-// CHECK-DAG: #[[$MB:.*]] = affine_map<(d0, d1, d2) -> (d1, d2)>
-// CHECK-DAG: #[[$MC:.*]] = affine_map<(d0, d1, d2) -> (d0, d1)>
-
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 512]{{\]}}>
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
-//       CHECK: func.func @skinny_mmt()
-//  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
-//       CHECK:   linalg.matmul indexing_maps = [#[[$MA]], #[[$MB]], #[[$MC]]]
-//  CHECK-SAME:       lowering_config = #[[$CONFIG]]
+//  CHECK-DAG: #[[$MA:.*]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+//  CHECK-DAG: #[[$MB:.*]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+//  CHECK-DAG: #[[$MC:.*]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+//      CHECK: pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+//      CHECK: linalg.fill
+//      CHECK: linalg.matmul
+// CHECK-SAME: indexing_maps = [#[[$MA]], #[[$MB]], #[[$MC]]]
+// CHECK-SAME: lowering_config = #iree_gpu.lowering_config<{
+// CHECK-SAME:       lane_basis =        {{\[}}[1, 1, 64], [0, 1, 2]],
+// CHECK-SAME:       partial_reduction =       [0, 0, 512],
+// CHECK-SAME:       subgroup_basis =    {{\[}}[1, 1, 1], [0, 1, 2]],
+// CHECK-SAME:       thread =                  [0, 0, 8],
+// CHECK-SAME:       workgroup =               [1, 1, 0]}>}
 
 // -----
 
@@ -367,7 +368,7 @@ func.func @skinny_mmt() {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-func.func @skinny_mmt() {
+func.func @skinny_mmt_lhs_is_matrix() {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x4096xf16>>
@@ -389,12 +390,16 @@ func.func @skinny_mmt() {
   return
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 512]{{\]}}>
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
-//       CHECK: func.func @skinny_mmt()
-//  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
-//       CHECK:   linalg.matmul indexing_maps = [#[[$MA]], #[[$MB]], #[[$MC]]]
-//  CHECK-SAME:       lowering_config = #[[$CONFIG]]
+//      CHECK: pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+//      CHECK: linalg.fill
+//      CHECK: linalg.matmul
+// CHECK-SAME: indexing_maps
+// CHECK-SAME: lowering_config = #iree_gpu.lowering_config<{
+// CHECK-SAME:       lane_basis =        {{\[}}[1, 1, 64], [0, 1, 2]],
+// CHECK-SAME:       partial_reduction =       [0, 0, 512],
+// CHECK-SAME:       subgroup_basis =    {{\[}}[1, 1, 1], [0, 1, 2]],
+// CHECK-SAME:       thread =                  [0, 0, 8],
+// CHECK-SAME:       workgroup =               [8, 1, 0]}>}
 
 // -----
 

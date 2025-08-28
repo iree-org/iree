@@ -100,20 +100,16 @@ func.func @matmul_DYN_32_32(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC, %ar
 
 // -----
 
-// TODO(newling) specialized form should be the same as generalized form.
-
-//      GENERALIZED:         #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
-// GENERALIZED-SAME:         workgroup_size = [1024, 1, 1] subgroup_size = 64,
-// GENERALIZED-SAME:         {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}>
-
-//      SPECIALIZED:         #iree_codegen.translation_info<pipeline = LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
+//      CHECK:         #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK-SAME:         workgroup_size = [1024, 1, 1] subgroup_size = 64,
+// CHECK-SAME:         {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}>
 !TA = tensor<?x4096xf32>
 !TB = tensor<4096x4096xf32>
 !TC = tensor<?x4096xf32>
 !DTC = !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x4096xf32>>
 func.func @matmul_DYN_4096_4096(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC, %arg4 : index) {
-//      GENERALIZED:         #iree_gpu.lowering_config<{lane_basis =  {{\[}}[1, 1, 64], [0, 1, 2]],
-// GENERALIZED-SAME:         partial_reduction = [0, 0, 4096], subgroup_basis =  {{\[}}[1, 1, 16], [0, 1, 2]], thread = [0, 0, 4], workgroup = [1, 1, 0]}
+//      CHECK:         #iree_gpu.lowering_config<{lane_basis =  {{\[}}[1, 1, 64], [0, 1, 2]],
+// CHECK-SAME:         partial_reduction = [0, 0, 4096], subgroup_basis =  {{\[}}[1, 1, 16], [0, 1, 2]], thread = [0, 0, 4], workgroup = [1, 1, 0]}
   %0 = linalg.matmul ins(%arg0, %arg1 : !TA, !TB) outs(%arg2 : !TC) -> !TC
   iree_tensor_ext.dispatch.tensor.store %0, %arg3, offsets = [0, 0], sizes = [%arg4, 4096], strides = [1, 1] : !TC -> !DTC{%arg4}
   return
@@ -190,12 +186,8 @@ func.func @matmul_4096_4096_DYN(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC)
 // Dynamic all
 // ============================================================================
 
-
-// TODO(newling) specialized form should follow generalized form.
-
-//     SPECIALIZED:      LLVMGPUWarpReduction
-//     GENERALIZED:      LLVMGPUVectorDistribute
-// GENERALIZED-SAME:     workgroup_size = [1024, 1, 1] subgroup_size = 64,
+//     CHECK:      LLVMGPUVectorDistribute
+// CHECK-SAME:     workgroup_size = [1024, 1, 1] subgroup_size = 64,
 
 
 !TA = tensor<?x?xf32>
@@ -204,9 +196,9 @@ func.func @matmul_4096_4096_DYN(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC)
 !DTC = !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?xf32>>
 func.func @matmul_DYN_1_4096(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC, %arg4 : index, %arg5 : index, %arg6 : index) {
 
-  //      GENERALIZED:     {lane_basis = {{\[}}[1, 1, 64], [0, 1, 2]],
-  // GENERALIZED-SAME:     partial_reduction = [0, 0, 4096], subgroup_basis = {{\[}}[1, 1, 16], [0, 1, 2]],
-  // GENERALIZED-SAME:     thread = [0, 0, 4], workgroup = [1, 1, 0]}
+  //      CHECK:     {lane_basis = {{\[}}[1, 1, 64], [0, 1, 2]],
+  // CHECK-SAME:     partial_reduction = [0, 0, 4096], subgroup_basis = {{\[}}[1, 1, 16], [0, 1, 2]],
+  // CHECK-SAME:     thread = [0, 0, 4], workgroup = [1, 1, 0]}
   %0 = linalg.matmul ins(%arg0, %arg1 : !TA, !TB) outs(%arg2 : !TC) -> !TC
   iree_tensor_ext.dispatch.tensor.store %0, %arg3, offsets = [0, 0], sizes = [%arg4, %arg5], strides = [1, 1] : !TC -> !DTC{%arg4, %arg5}
   return
