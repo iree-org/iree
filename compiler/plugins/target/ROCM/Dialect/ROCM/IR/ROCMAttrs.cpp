@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
@@ -46,10 +47,11 @@ BuiltinTuningModuleAttr::getModule(Operation * /*annotationSite*/) const {
 //===----------------------------------------------------------------------===//
 
 /// Utility function to help create and replace argmax linalg with a ukernel.
-static LogicalResult handleArgmaxUkernel(
-    RewriterBase &rewriter, StringRef name, DictionaryAttr targetConfiguration,
-    Operation *contextualOp, SmallVectorImpl<Value> &inputs,
-    SmallVectorImpl<Value> &outputs, SmallVectorImpl<Value> &otherOperands) {
+static LogicalResult
+handleArgmaxUkernel(RewriterBase &rewriter, StringRef name,
+                    DictionaryAttr targetConfiguration, Operation *contextualOp,
+                    ArrayRef<Value> inputs, ArrayRef<Value> outputs,
+                    SmallVectorImpl<Value> &otherOperands) {
   auto genericOp = dyn_cast<linalg::GenericOp>(contextualOp);
   if (!genericOp) {
     return rewriter.notifyMatchFailure(
@@ -118,7 +120,7 @@ static ArrayAttr lookUpExecutableObjects(Operation *op) {
 }
 
 static Value createSharedMemory(RewriterBase &rewriter, Location loc,
-                                int sharedMemoryBytes) {
+                                int64_t sharedMemoryBytes) {
   RankedTensorType tensorType =
       RankedTensorType::get({sharedMemoryBytes}, rewriter.getI8Type());
   ValueRange dynSizes{};
@@ -234,7 +236,7 @@ static std::string getBitcodeFilename(IREE::GPU::TargetAttr gpuTarget,
 // Evaluates the shared memory size required by the multi_mma microkernel by
 // interpreting a bitcode function with a specific name.
 // On failure, an op warning is emitted and {} is returned.
-static std::optional<int> expensivelyEvaluateSharedMemoryBytes(
+static std::optional<int64_t> expensivelyEvaluateSharedMemoryBytes(
     MLIRContext *context, IREE::Codegen::InnerTiledOp op, StringRef ukernelName,
     IREE::GPU::TargetAttr gpuTarget) {
   auto target = IREE::HAL::ExecutableTargetAttr::lookup(op);
@@ -301,12 +303,12 @@ static std::optional<int> expensivelyEvaluateSharedMemoryBytes(
                                  interpreter->getErrorMessage()));
     return {};
   }
-  int sharedMemoryBytes = interpreterResult.IntVal.getSExtValue();
+  int64_t sharedMemoryBytes = interpreterResult.IntVal.getSExtValue();
 
   // Reject a ukernel that would consume too much shared memory, which we need
   // to save for other purposes. This threshold can always be adjusted but we
   // default to a low threshold to get an early signal.
-  int maxSharedMemoryBytes = getSharedMemoryBytes(gpuTarget) / 4;
+  int64_t maxSharedMemoryBytes = getSharedMemoryBytes(gpuTarget) / 4;
   if (sharedMemoryBytes > maxSharedMemoryBytes) {
     op.emitWarning(llvm::formatv("The shared memory size {} required by the "
                                  "ukernel exceeds the maximum allowed size {}.",
@@ -320,7 +322,7 @@ static std::optional<int> expensivelyEvaluateSharedMemoryBytes(
 // On failure, an op warning is emitted and {} is returned.
 // Uses a static cache to avoid calling expensivelyEvaluateSharedMemoryBytes
 // more than once per DataTiledMMAAttr value.
-static std::optional<int>
+static std::optional<int64_t>
 getSharedMemoryBytes(MLIRContext *context, IREE::Codegen::InnerTiledOp op,
                      StringRef ukernelName,
                      DictionaryAttr targetConfiguration) {
@@ -336,7 +338,7 @@ getSharedMemoryBytes(MLIRContext *context, IREE::Codegen::InnerTiledOp op,
   std::string key = llvm::formatv("mma = {}, gpuTarget = {}", mma, gpuTarget);
 
   struct CacheEntry {
-    std::optional<int> sharedMemoryBytes;
+    std::optional<int64_t> sharedMemoryBytes;
     std::mutex mutex;
     bool evaluated = false;
   };
@@ -380,8 +382,8 @@ getSharedMemoryBytes(MLIRContext *context, IREE::Codegen::InnerTiledOp op,
 /// Utility function to help create and replace argmax linalg with a ukernel.
 static LogicalResult handleInnerTiledMmaUkernel(
     RewriterBase &rewriter, StringRef name, DictionaryAttr targetConfiguration,
-    Operation *contextualOp, SmallVectorImpl<Value> &inputs,
-    SmallVectorImpl<Value> &outputs, SmallVectorImpl<Value> &otherOperands) {
+    Operation *contextualOp, ArrayRef<Value> inputs, ArrayRef<Value> outputs,
+    SmallVectorImpl<Value> &otherOperands) {
   auto op = dyn_cast<IREE::Codegen::InnerTiledOp>(contextualOp);
   if (!op) {
     return rewriter.notifyMatchFailure(
@@ -405,12 +407,10 @@ static LogicalResult handleInnerTiledMmaUkernel(
   auto constI32 = [&](int val) {
     return rewriter.create<arith::ConstantIntOp>(loc, I32Type, val);
   };
-  // NEED A WAY TO CARRY FORWARD SHARED_MEMORY INFO as it was being inferred via
-  // UkernelConfigAttr. Perhaps use DESCRIPTOR to store/fetch it.
   MLIRContext *context = rewriter.getContext();
-  std::optional<int> maybeSharedMemoryBytes =
+  std::optional<int64_t> maybeSharedMemoryBytes =
       getSharedMemoryBytes(context, op, name, targetConfiguration);
-  int sharedMemoryBytes =
+  int64_t sharedMemoryBytes =
       (!maybeSharedMemoryBytes) ? 0 : maybeSharedMemoryBytes.value();
   Value sharedMemory = createSharedMemory(rewriter, loc, sharedMemoryBytes);
   Value k = castIndexToI32(
@@ -449,8 +449,7 @@ static LogicalResult handleInnerTiledMmaUkernel(
 
 std::optional<LogicalResult> UKernelProviderAttr::createAndReplaceWithUkernelOp(
     RewriterBase &rewriter, StringRef name, DictionaryAttr targetConfiguration,
-    Operation *contextualOp, SmallVectorImpl<Value> &inputs,
-    SmallVectorImpl<Value> &outputs,
+    Operation *contextualOp, ArrayRef<Value> inputs, ArrayRef<Value> outputs,
     SmallVectorImpl<Value> &otherOperands) const {
   if (name.contains("argmax")) {
     return handleArgmaxUkernel(rewriter, name, targetConfiguration,
