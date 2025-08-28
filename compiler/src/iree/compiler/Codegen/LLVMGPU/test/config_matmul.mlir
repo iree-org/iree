@@ -69,11 +69,11 @@ func.func @matmul_4096_32_4096(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC) 
 !TC = tensor<4096x4096xf32>
 !DTC = !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4096x4096xf32>>
 //      CHECK:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
-// CHECK-SAME:   workgroup_size = [256, 1, 1] subgroup_size = 64
+// CHECK-SAME:   workgroup_size = [128, 1, 1] subgroup_size = 64
 // CHECK-SAME:   {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}>
 func.func @matmul_4096_1_4096(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC) {
   //      CHECK: #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
-  // CHECK-SAME: padding = [64, 128, 4], promote_operands = [0, 1, 2], reduction = [0, 0, 1], subgroup = [2, 4, 0], workgroup = [64, 128, 0]}
+  // CHECK-SAME: padding = [32, 32, 4], promote_operands = [0, 1, 2], reduction = [0, 0, 1], subgroup = [1, 2, 0], workgroup = [32, 32, 0]}
   %0 = linalg.matmul ins(%arg0, %arg1 : !TA, !TB) outs(%arg2 : !TC) -> !TC
   iree_tensor_ext.dispatch.tensor.store %0, %arg3, offsets = [0, 0], sizes = [4096, 4096], strides = [1, 1] : !TC -> !DTC
   return
