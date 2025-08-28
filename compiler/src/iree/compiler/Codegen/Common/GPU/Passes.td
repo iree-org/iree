@@ -168,19 +168,6 @@ def GPUInferMemorySpacePass :
   ];
 }
 
-def GPULowerToUKernelsPass :
-    Pass<"iree-codegen-gpu-lower-to-ukernels", ""> {
-  let summary = "Lower suitable ops to previously-selected microkernels";
-  let dependentDialects = [
-    "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
-    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
-    "::mlir::arith::ArithDialect",
-    "::mlir::bufferization::BufferizationDialect",
-    "::mlir::gpu::GPUDialect",
-    "::mlir::tensor::TensorDialect",
-  ];
-}
-
 def GPUMultiBufferingPass :
     InterfacePass<"iree-codegen-gpu-multi-buffering", "mlir::FunctionOpInterface"> {
   let summary = "Pass to do multi buffering.";
