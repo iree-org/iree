@@ -884,14 +884,25 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
   // Normally, that distinction is irrelevant here: we just delinearize the
   // thread-id over all cross-thread dimensions.
   //
-  // There is one case that makes things more complicated, encountered so far
-  // only on RDNA3. That is when some intrinsic has multiple (so far, 2) threads
-  // reading the same data. This redundancy is not encoded in the TileSwizzle
-  // structures that we are using here. Instead, in that case, the thread grid
-  // (as encoded in the TileSwizzle) is smaller than the subgroup size. In that
-  // case, there is an implied thread-distribution-only dimension along which
-  // multiple threads read exactly the same data.
-  // So we need to distinguish layoutThreadSizes vs. distributionThreadSizes.
+  // There are, however, two special cases that require inserting dummy
+  // dimensions into the delinearization index list, which are later
+  // removed when constructing tile offsets:
+  //
+  // 1. On RDNA3 only: some intrinsics use multiple threads (currently 2)
+  //    to read the same data. This redundancy is not represented in the
+  //    TileSwizzle structures we rely on. In these cases, the thread grid
+  //    encoded by TileSwizzle is *smaller* than the subgroup size, and an
+  //    implicit "distribution-only" dimension exists where multiple threads
+  //    map to identical data. To handle this, we distinguish between
+  //    layoutThreadSizes and distributionThreadSizes.
+  //
+  // 2. LHS delinearization when both subGroupsM and subGroupsN > 1.
+  //    Although subGroupsN is not part of the LHS swizzle, we must still
+  //    delinearize over the combined subGroupsM × subGroupsN space. By
+  //    contrast, RHS does *not* need special handling, since subGroupsM can be
+  //    treated as an implicit leading dimension and omitted anyway.
+
+  // Handle the RDNA3 special case.
   SmallVector<int64_t> layoutThreadSizes =
       sliceSwizzledShape(swizzle, [](TileSwizzle::Dim d) {
         return d.kind == TileSwizzle::Dim::Kind::CrossThread;
@@ -920,6 +931,17 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
         getSubgroupSize() / intrinsicLayoutThreadBound);
   }
 
+  // Handle the subgroupsM/N special case.
+  int64_t subgroupsM = getSubgroupsM();
+  int64_t subgroupsN = getSubgroupsN();
+  bool needsLhsSubgroupNDim = (fragment == IREE::GPU::MMAFragment::Lhs) &&
+                              subgroupsM > 1 && subgroupsN > 1;
+  const int lhsSubgroupNDimIdx = 1;
+  if (needsLhsSubgroupNDim) {
+    distributionThreadSizes.insert(
+        distributionThreadSizes.begin() + lhsSubgroupNDimIdx, subgroupsN);
+  }
+
   // Obtain the offsets from delinearization along the distributionThreadSizes.
   // Use a delinearize without outer bound and throw away its initial result
   // to get clamping behavior.
@@ -931,12 +953,15 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
           ->getResults()
           .drop_front();
 
+  // Erase the delinearized index that corresponds to the dummy
+  // dimension that we had inserted above. This is what causes multiple
+  // threads (which only differed in the index being discarded here) to read
+  // exactly the same data.
   if (hasDistributionOnlyDim) {
-    // Erase the delinearized index that corresponds to the extra distribution
-    // dimension that we had inserted above. This is what causes multiple
-    // threads (which only differed in the index being discarded here) to read
-    // exactly the same data.
     tileOffsets.erase(tileOffsets.begin() + distributionOnlyDimIdx);
+  }
+  if (needsLhsSubgroupNDim) {
+    tileOffsets.erase(tileOffsets.begin() + lhsSubgroupNDimIdx);
   }
 
   // Strides are trivial: each slice is contiguous along the *expanded* dims
