@@ -32,12 +32,12 @@ func.func @nhwc_conv_mfma() {
 //  CHECK-SAME:     promote_operands = [0, 1]
 
 //  GFX942-SAME:    reduction = [0, 0, 0, 0, 8]
-//  GFX942-SAME:    subgroup = [1, 4, 1, 1, 0]
+//  GFX942-SAME:    subgroup = [1, 2, 1, 2, 0]
 //  GFX942-SAME:    workgroup = [1, 4, 32, 64, 0]
 
 //  MI300X-SAME:    reduction = [0, 0, 0, 0, 8]
 //  MI300X-SAME:    subgroup = [1, 1, 1, 1, 0]
-//  MI300X-SAME:    workgroup = [1, 1, 32, 64, 0]}>
+//  MI300X-SAME:    workgroup = [1, 2, 32, 32, 0]}>
 
 // -----
 
@@ -66,12 +66,12 @@ func.func @nchw_conv_mfma() {
 //  CHECK-SAME:     promote_operands = [0, 1]
 
 // GFX942-SAME:     reduction = [0, 0, 0, 0, 8]
-// GFX942-SAME:     subgroup = [1, 1, 4, 1, 0]
+// GFX942-SAME:     subgroup = [1, 2, 2, 1, 0]
 // GFX942-SAME:     workgroup = [1, 64, 4, 32, 0]
 
 // MI300X-SAME:     reduction = [0, 0, 0, 0, 8]
 // MI300X-SAME:     subgroup = [1, 1, 1, 1, 0]
-// MI300X-SAME:     workgroup = [1, 64, 1, 32, 0]
+// MI300X-SAME:     workgroup = [1, 32, 2, 32, 0]
 
 // -----
 
@@ -104,11 +104,11 @@ func.func @nhwc_conv_unaligned_mfma() {
 // GFX942-SAME:     subgroup = [2, 1, 1, 1, 0]
 // GFX942-SAME:     workgroup = [2, 1, 32, 64, 0]
 
-// MI300X-SAME:     padding = [1, 1, 32, 64, 32]
+// MI300X-SAME:     padding = [2, 1, 32, 32, 32]
 // MI300X-SAME:     promote_operands = [0, 1, 2]
 // MI300X-SAME:     reduction = [0, 0, 0, 0, 8]
 // MI300X-SAME:     subgroup = [1, 1, 1, 1, 0]
-// MI300X-SAME:     workgroup = [1, 1, 32, 64, 0]
+// MI300X-SAME:     workgroup = [2, 1, 32, 32, 0]
 
 // PAD-CONV-GFX942:     padding_conv = [2, 1, 32, 64, 0, 0, 0]
 
@@ -140,14 +140,14 @@ func.func @nchw_conv_unaligned_mfma() {
 // GFX942-SAME:     padding = [1, 64, 4, 32, 32]
 // GFX942-SAME:     promote_operands = [0, 1, 2]
 // GFX942-SAME:     reduction = [0, 0, 0, 0, 8]
-// GFX942-SAME:     subgroup = [1, 1, 4, 1, 0]
+// GFX942-SAME:     subgroup = [1, 2, 2, 1, 0]
 // GFX942-SAME:     workgroup = [1, 64, 4, 32, 0]
 
-// MI300X-SAME:     padding = [1, 64, 1, 32, 32]
+// MI300X-SAME:     padding = [1, 32, 2, 32, 32]
 // MI300X-SAME:     promote_operands = [0, 1, 2]
 // MI300X-SAME:     reduction = [0, 0, 0, 0, 8]
 // MI300X-SAME:     subgroup = [1, 1, 1, 1, 0]
-// MI300X-SAME:     workgroup = [1, 64, 1, 32, 0]
+// MI300X-SAME:     workgroup = [1, 32, 2, 32, 0]
 
 // PAD-CONV-GFX942:     padding_conv = [1, 64, 4, 32, 0, 0, 0]
 
@@ -176,19 +176,19 @@ func.func @conv_nhwc_fhwc_unaligned_channel(%arg0: tensor<16x26x19x287xf16>, %ar
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 
-// GFX942-SAME:     padding = [1, 8, 32, 32, 32]
+// GFX942-SAME:     padding = [1, 4, 32, 32, 32]
 // GFX942-SAME:     promote_operands = [0, 1, 2]
 // GFX942-SAME:     reduction = [0, 0, 0, 0, 2]
-// GFX942-SAME:     subgroup = [1, 4, 1, 1, 0]
-// GFX942-SAME:     workgroup = [1, 8, 32, 32, 0]
+// GFX942-SAME:     subgroup = [1, 2, 1, 1, 0]
+// GFX942-SAME:     workgroup = [1, 4, 32, 32, 0]
 
-// MI300X-SAME:     padding = [1, 4, 32, 32, 32]
+// MI300X-SAME:     padding = [1, 2, 32, 32, 32]
 // MI300X-SAME:     promote_operands = [0, 1, 2]
 // MI300X-SAME:     reduction = [0, 0, 0, 0, 2]
-// MI300X-SAME:     subgroup = [1, 2, 1, 1, 0]
-// MI300X-SAME:     workgroup = [1, 4, 32, 32, 0]
+// MI300X-SAME:     subgroup = [1, 1, 1, 1, 0]
+// MI300X-SAME:     workgroup = [1, 2, 32, 32, 0]
 
-// PAD-CONV-GFX942:     padding_conv = [1, 8, 32, 32, 0, 0, 32]
+// PAD-CONV-GFX942:     padding_conv = [1, 4, 32, 32, 0, 0, 32]
 
 // -----
 
@@ -289,13 +289,13 @@ module {
 // GFX942-SAME:     padding = [2, 2, 32, 64, 64]
 // GFX942-SAME:     promote_operands = [0, 1, 2]
 // GFX942-SAME:     reduction = [0, 0, 0, 0, 4]
-// GFX942-SAME:     subgroup = [2, 2, 1, 1, 0]
+// GFX942-SAME:     subgroup = [2, 1, 1, 2, 0]
 // GFX942-SAME:     workgroup = [2, 2, 32, 64, 0]
 
-// MI300X-SAME:     padding = [1, 1, 32, 64, 64]
+// MI300X-SAME:     padding = [1, 2, 32, 32, 64]
 // MI300X-SAME:     promote_operands = [0, 1, 2]
 // MI300X-SAME:     reduction = [0, 0, 0, 0, 4]
 // MI300X-SAME:     subgroup = [1, 1, 1, 1, 0]
-// MI300X-SAME:     workgroup = [1, 1, 32, 64, 0]
+// MI300X-SAME:     workgroup = [1, 2, 32, 32, 0]
 
 // PAD-CONV-GFX942:     padding_conv = [2, 2, 32, 64, 0, 0]
