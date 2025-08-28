@@ -223,6 +223,14 @@ struct ConvertToROCDLPass final
     }
     bool use32BitIndices = clROCMIndexingBits == 32;
 
+    StringRef targetArch = getGPUTargetAttr(m).getArch();
+    FailureOr<amdgpu::Chipset> maybeChipset =
+        amdgpu::Chipset::parse(targetArch);
+    if (failed(maybeChipset)) {
+      m.emitOpError() << "Invalid chipset name: " << targetArch;
+      return signalPassFailure();
+    }
+
     /// Customize the bitwidth used for the device side index computations.
     LowerToLLVMOptions options(m.getContext(), DataLayout(m));
     options.overrideIndexBitwidth(use32BitIndices ? 32 : 64);
@@ -251,12 +259,6 @@ struct ConvertToROCDLPass final
               vector::VectorContractLowering::OuterProduct);
       // These patterns only convert a subset of arith that target specific
       // rocdl intrinsics (e.g. fp8 conversions).
-      StringRef chipset = getGPUTargetAttr(m).getArch();
-      FailureOr<amdgpu::Chipset> maybeChipset = amdgpu::Chipset::parse(chipset);
-      if (failed(maybeChipset)) {
-        m.emitOpError() << "Invalid chipset name: " << chipset;
-        return signalPassFailure();
-      }
       WalkResult allTypesValid = m.walk([&](Operation *op) {
         if (failed(validateDataTypes(op, *maybeChipset))) {
           return WalkResult::interrupt();
@@ -317,13 +319,6 @@ struct ConvertToROCDLPass final
     {
       RewritePatternSet patterns(&getContext());
       populateGpuRewritePatterns(patterns);
-      StringRef targetArch = getGPUTargetAttr(m).getArch();
-      FailureOr<amdgpu::Chipset> maybeChipset =
-          amdgpu::Chipset::parse(targetArch);
-      if (failed(maybeChipset)) {
-        m.emitOpError() << "Invalid chipset name: " << targetArch;
-        return signalPassFailure();
-      }
       populateGpuPromoteShuffleToAMDGPUPatterns(patterns, maybeChipset);
       populateGpuSubgroupIdPatterns(patterns);
       if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
@@ -359,7 +354,6 @@ struct ConvertToROCDLPass final
       populateFuncToLLVMConversionPatterns(converter, llvmPatterns);
       cf::populateControlFlowToLLVMConversionPatterns(converter, llvmPatterns);
       arith::populateArithToLLVMConversionPatterns(converter, llvmPatterns);
-      StringRef targetArch = getGPUTargetAttr(m).getArch();
       amdgpu::Chipset chipset =
           amdgpu::Chipset::parse(targetArch).value_or(amdgpu::Chipset());
       populateAMDGPUToROCDLConversionPatterns(converter, llvmPatterns, chipset);
