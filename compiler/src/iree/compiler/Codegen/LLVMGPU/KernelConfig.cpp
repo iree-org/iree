@@ -19,12 +19,10 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
-#include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
@@ -292,15 +290,13 @@ static CodeGenPipeline getTensorCorePipeline(Type elementType) {
 //====---------------------------------------------------------------------===//
 //
 
-static bool isMatmulLike(linalg::LinalgOp &linalgOp) {
+static bool isMatmulLike(linalg::LinalgOp linalgOp) {
   return linalg::isaContractionOpInterface(linalgOp) &&
          linalgOp.getNumParallelLoops() >= 1;
 };
 
-/// Check if `op` is a linalg.reduce or a linalg.generic that has at least one
-/// reduction iterator.
-static bool hasReductionIterator(linalg::LinalgOp &op) {
-  return isa<linalg::ReduceOp, linalg::GenericOp>(op) &&
+static bool hasReductionIterator(linalg::LinalgOp op) {
+  return !linalg::isaConvolutionOpInterface(op) &&
          llvm::any_of(op.getIteratorTypesArray(), linalg::isReductionIterator);
 }
 
