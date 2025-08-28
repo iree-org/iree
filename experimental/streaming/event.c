@@ -112,9 +112,20 @@ iree_status_t iree_hal_streaming_event_record(
   IREE_ASSERT_ARGUMENT(stream);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // Check if we're capturing to a graph.
+  if (stream->capture_status == IREE_HAL_STREAMING_CAPTURE_STATUS_ACTIVE) {
+    // Event record during graph capture is not yet implemented.
+    // TODO(graph-capture): Add event node to graph.
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "event record during graph capture not yet implemented");
+  }
+
   event->record_time_ns = iree_time_now();
 
-  // Set recording stream.
+  // Set recording stream so we can track when we cross streams in a signal/wait
+  // sequence.
   if (event->recording_stream != stream) {
     if (event->recording_stream) {
       iree_hal_streaming_stream_release(event->recording_stream);

@@ -96,7 +96,7 @@ static iree_status_t iree_hal_local_executable_cache_infer_format(
     iree_status_t infer_status = iree_hal_executable_loader_infer_format(
         executable_cache->loaders[i], caching_mode, executable_data,
         executable_format_capacity, executable_format, out_inferred_size);
-    if (iree_status_is_ok(status)) {
+    if (iree_status_is_ok(infer_status)) {
       // Successfully inferred.
       status = iree_ok_status();
       break;

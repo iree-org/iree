@@ -52,7 +52,7 @@ static iree_hal_streaming_memory_flags_t iree_cuda_memory_flags_to_internal(
 }
 
 static iree_hal_streaming_graph_instantiate_flags_t
-cuda_graph_instantiate_flags_to_internal(unsigned long long cuda_flags) {
+iree_cuda_graph_instantiate_flags_to_internal(unsigned long long cuda_flags) {
   iree_hal_streaming_graph_instantiate_flags_t flags =
       IREE_HAL_STREAMING_GRAPH_INSTANTIATE_FLAG_NONE;
   if (cuda_flags & CUDA_GRAPH_INSTANTIATE_FLAG_AUTO_FREE_ON_LAUNCH) {
@@ -111,7 +111,7 @@ iree_cuda_mem_handle_type_to_internal(CUmemAllocationHandleType handle_type) {
 }
 
 static iree_hal_streaming_mem_location_type_t
-cuda_mem_location_type_to_internal(CUmemLocationType type) {
+iree_cuda_mem_location_type_to_internal(CUmemLocationType type) {
   switch (type) {
     case CU_MEM_LOCATION_TYPE_INVALID:
       return IREE_HAL_STREAMING_MEM_LOCATION_TYPE_INVALID;
@@ -2149,9 +2149,9 @@ CUDAAPI CUresult cuModuleGetFunction(CUfunction* hfunc, CUmodule hmod,
   iree_hal_streaming_symbol_t* symbol = NULL;
   iree_status_t status =
       iree_hal_streaming_module_function(module, name, &symbol);
-
   if (iree_status_is_ok(status)) {
-    *hfunc = (CUfunction)symbol;
+    // Tag the symbol before returning it.
+    *hfunc = (CUfunction)iree_hal_streaming_symbol_tag(symbol);
   }
 
   CUresult result = iree_status_to_cu_result(status);
@@ -2189,8 +2189,8 @@ CUDAAPI CUresult cuFuncGetAttribute(int* pi, CUfunction_attribute attrib,
     return CUDA_ERROR_INVALID_VALUE;
   }
 
-  // Cast to symbol pointer.
-  iree_hal_streaming_symbol_t* symbol = (iree_hal_streaming_symbol_t*)hfunc;
+  // Untag the function pointer if it was tagged by cuModuleGetFunction.
+  iree_hal_streaming_symbol_t* symbol = iree_hal_streaming_symbol_untag(hfunc);
 
   // Verify it's a function.
   if (symbol->type != IREE_HAL_STREAMING_SYMBOL_TYPE_FUNCTION) {
@@ -2259,8 +2259,8 @@ CUDAAPI CUresult cuFuncSetAttribute(CUfunction hfunc,
     return CUDA_ERROR_INVALID_VALUE;
   }
 
-  // Cast to symbol pointer.
-  iree_hal_streaming_symbol_t* symbol = (iree_hal_streaming_symbol_t*)hfunc;
+  // Untag the function pointer if it was tagged by cuModuleGetFunction.
+  iree_hal_streaming_symbol_t* symbol = iree_hal_streaming_symbol_untag(hfunc);
 
   // Verify it's a function.
   if (symbol->type != IREE_HAL_STREAMING_SYMBOL_TYPE_FUNCTION) {
@@ -2377,8 +2377,8 @@ CUDAAPI CUresult cuOccupancyMaxActiveBlocksPerMultiprocessor(
     return CUDA_ERROR_INVALID_DEVICE;
   }
 
-  // Get symbol.
-  iree_hal_streaming_symbol_t* symbol = (iree_hal_streaming_symbol_t*)func;
+  // Untag the function pointer if it was tagged by cuModuleGetFunction.
+  iree_hal_streaming_symbol_t* symbol = iree_hal_streaming_symbol_untag(func);
 
   // Verify it's a function.
   if (symbol->type != IREE_HAL_STREAMING_SYMBOL_TYPE_FUNCTION) {
@@ -2436,8 +2436,8 @@ CUDAAPI CUresult cuOccupancyMaxPotentialBlockSize(
     return CUDA_ERROR_INVALID_DEVICE;
   }
 
-  // Get symbol.
-  iree_hal_streaming_symbol_t* symbol = (iree_hal_streaming_symbol_t*)func;
+  // Untag the function pointer if it was tagged by cuModuleGetFunction.
+  iree_hal_streaming_symbol_t* symbol = iree_hal_streaming_symbol_untag(func);
 
   // Verify it's a function.
   if (symbol->type != IREE_HAL_STREAMING_SYMBOL_TYPE_FUNCTION) {
@@ -2500,6 +2500,9 @@ CUDAAPI CUresult cuLaunchKernel(CUfunction f, unsigned int gridDimX,
     params_ptr = kernelParams;
   }
 
+  // Untag the function pointer if it was tagged by cuModuleGetFunction.
+  iree_hal_streaming_symbol_t* symbol = iree_hal_streaming_symbol_untag(f);
+
   const iree_hal_streaming_dispatch_params_t params = {
       .grid_dim = {gridDimX, gridDimY, gridDimZ},
       .block_dim = {blockDimX, blockDimY, blockDimZ},
@@ -2507,9 +2510,8 @@ CUDAAPI CUresult cuLaunchKernel(CUfunction f, unsigned int gridDimX,
       .buffer = params_ptr,
       .flags = IREE_HAL_STREAMING_DISPATCH_FLAG_NONE,
   };
-  iree_status_t status =
-      iree_hal_streaming_launch_kernel((iree_hal_streaming_symbol_t*)f, &params,
-                                       (iree_hal_streaming_stream_t*)hStream);
+  iree_status_t status = iree_hal_streaming_launch_kernel(
+      symbol, &params, (iree_hal_streaming_stream_t*)hStream);
 
   CUresult result = iree_status_to_cu_result(status);
   IREE_TRACE_ZONE_END(z0);
@@ -2544,8 +2546,8 @@ CUDAAPI CUresult cuLaunchCooperativeKernel(
       ((iree_hal_streaming_stream_t*)hStream)->context;
   iree_hal_streaming_device_t* device = context->device_entry;
 
-  // Get symbol.
-  iree_hal_streaming_symbol_t* symbol = (iree_hal_streaming_symbol_t*)f;
+  // Untag the function pointer if it was tagged by cuModuleGetFunction.
+  iree_hal_streaming_symbol_t* symbol = iree_hal_streaming_symbol_untag(f);
 
   // Calculate maximum blocks for cooperative launch.
   // This will return 0 if the device doesn't support cooperative launch.
@@ -3392,11 +3394,14 @@ CUDAAPI CUresult cuGraphAddKernelNode(CUgraphNode* phGraphNode, CUgraph hGraph,
       .buffer = params_ptr,
   };
 
+  // Untag the function pointer if it was tagged by cuModuleGetFunction.
+  iree_hal_streaming_symbol_t* symbol =
+      iree_hal_streaming_symbol_untag(params->func);
+
   // Add kernel node to graph.
   iree_hal_streaming_graph_node_t* node = NULL;
   iree_status_t status = iree_hal_streaming_graph_add_kernel_node(
-      graph, deps, numDependencies, (iree_hal_streaming_symbol_t*)params->func,
-      &dispatch_params, &node);
+      graph, deps, numDependencies, symbol, &dispatch_params, &node);
   if (!iree_status_is_ok(status)) {
     iree_status_ignore(status);
     IREE_TRACE_ZONE_END(z0);

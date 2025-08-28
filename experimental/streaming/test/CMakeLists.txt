@@ -46,6 +46,15 @@ iree_cc_binary(
     iree::experimental::streaming::binding::hip
 )
 
+iree_cc_binary(
+  NAME
+    hip_graph_capture_api_demo
+  SRCS
+    "hip_graph_capture_api_demo.c"
+  DEPS
+    iree::experimental::streaming::binding::hip
+)
+
 iree_cc_library(
   NAME
     graph_util
@@ -128,3 +137,41 @@ add_custom_target(iree_hal_streaming_test_kernels
   COMMENT "Compiling CUDA HAL test kernels for multiple targets"
   VERBATIM
 )
+
+# DO NOT SUBMIT
+# /home/ben/tools/llvm/bin/clang++
+# -DIREE_HAL_STREAMING_HIP_EXPORTS
+# -I/home/ben/src/iree/runtime/src
+# -I/home/ben/src/iree-build/runtime/src
+# -isystem /home/ben/src/iree
+# -isystem /home/ben/src/iree-build
+# -isystem /home/ben/src/TheRock/build/dist/rocm/include
+# -g -fPIE -fvisibility=hidden -fno-rtti -fno-exceptions
+# -x hip
+# --offload-arch=gfx1100
+# --rocm-path=/home/ben/src/TheRock/build/dist/rocm/
+# -MD
+# -MT
+# experimental/streaming/test/hip_demo.cc
+# -o ../iree-build/experimental/streaming/test/hip_demo
+# /home/ben/src/iree/experimental/streaming/test/hip_demo.cc
+# --rocm-device-lib-path=/home/ben/src/TheRock/build/dist/rocm/lib/llvm/amdgcn/bitcode
+if(IREE_ROCM_PATH)
+  iree_cc_binary(
+    NAME
+      hip_demo
+    SRCS
+      "hip_demo.cc"
+    COPTS
+      "-xhip"
+      "--offload-arch=gfx1100"
+      "--rocm-device-lib-path=/home/ben/src/TheRock/build/dist/rocm/lib/llvm/amdgcn/bitcode"
+      "--rocm-path=/home/ben/src/TheRock/build/dist/rocm/"
+      # "--rocm-path=${IREE_ROCM_PATH}"
+      "-isystem /home/ben/src/TheRock/build/dist/rocm/include"
+    DEPS
+      iree::experimental::streaming::binding::hip
+  )
+else()
+  message(WARNING "IREE_ROCM_PATH not specified; skipping HIP C++ demo")
+endif()

@@ -219,6 +219,65 @@ static hipError_t iree_hip_thread_error_peek(void) {
     return _err;                             \
   } while (0)
 
+#define _GET_ARG_COUNT_2(_1, _2, COUNT, ...) COUNT
+#define _GET_ARG_COUNT_3(_1, _2, _3, COUNT, ...) COUNT
+
+#define HIP_RETURN_STATUS_1(status)                         \
+  do {                                                      \
+    iree_status_t _status = (status);                       \
+    if (!iree_status_is_ok(_status)) {                      \
+      hipError_t _err = iree_status_to_hip_result(_status); \
+      iree_hip_thread_error_set(_err, false);               \
+      return _err;                                          \
+    }                                                       \
+  } while (0)
+#define HIP_RETURN_STATUS_2(status, error)                               \
+  do {                                                                   \
+    iree_status_t _status = (status);                                    \
+    if (!iree_status_is_ok(_status)) {                                   \
+      hipError_t _err = iree_status_to_fixed_hip_result(_status, error); \
+      iree_hip_thread_error_set(_err, false);                            \
+      return _err;                                                       \
+    }                                                                    \
+  } while (0)
+
+// Helper macro to set thread-local error and return.
+// Supports two forms:
+// - HIP_RETURN_STATUS(status)
+// - HIP_RETURN_STATUS(status, hipError_t) - fixed error
+#define HIP_RETURN_STATUS(...)                       \
+  _GET_ARG_COUNT_2(__VA_ARGS__, HIP_RETURN_STATUS_2, \
+                   HIP_RETURN_STATUS_1)(__VA_ARGS__)
+
+#define HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR_2(zone, status) \
+  do {                                                          \
+    iree_status_t _status = (status);                           \
+    if (!iree_status_is_ok(_status)) {                          \
+      hipError_t _err = iree_status_to_hip_result(_status);     \
+      IREE_TRACE_ZONE_END(zone);                                \
+      iree_hip_thread_error_set(_err, false);                   \
+      return _err;                                              \
+    }                                                           \
+  } while (0)
+#define HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR_3(zone, status, error)   \
+  do {                                                                   \
+    iree_status_t _status = (status);                                    \
+    if (!iree_status_is_ok(_status)) {                                   \
+      hipError_t _err = iree_status_to_fixed_hip_result(_status, error); \
+      IREE_TRACE_ZONE_END(zone);                                         \
+      iree_hip_thread_error_set(_err, false);                            \
+      return _err;                                                       \
+    }                                                                    \
+  } while (0)
+
+// Helper macro to end trace zone and return if it's an error.
+// Supports two forms:
+// - HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(zone, status)
+// - HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(zone, status, hipError_t)
+#define HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(...)                       \
+  _GET_ARG_COUNT_3(__VA_ARGS__, HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR_3, \
+                   HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR_2)(__VA_ARGS__)
+
 //===----------------------------------------------------------------------===//
 // Status conversion
 //===----------------------------------------------------------------------===//
@@ -255,6 +314,20 @@ static hipError_t iree_status_to_hip_result(iree_status_t status) {
     default:
       return hipErrorUnknown;
   }
+}
+
+static hipError_t iree_status_to_fixed_hip_result(iree_status_t status,
+                                                  hipError_t error) {
+  if (iree_status_is_ok(status)) {
+    return hipSuccess;
+  }
+
+  // DO NOT SUBMIT
+  iree_status_fprint(stderr, status);
+
+  iree_status_free(status);
+
+  return error;
 }
 
 //===----------------------------------------------------------------------===//
@@ -507,20 +580,19 @@ HIPAPI hipError_t hipSetDevice(int device) {
 
   // Get or create the primary context lazily.
   iree_hal_streaming_context_t* primary_context = NULL;
-  iree_status_t status =
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
       iree_hal_streaming_device_get_or_create_primary_context(device_obj,
-                                                              &primary_context);
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorOutOfMemory);
-  }
+                                                              &primary_context),
+      hipErrorOutOfMemory);
 
   // Switch to the primary context for the device.
-  status = iree_hal_streaming_context_set_current(primary_context);
-  hipError_t result = iree_status_to_hip_result(status);
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_streaming_context_set_current(primary_context),
+      hipErrorInvalidDevice);
+
   IREE_TRACE_ZONE_END(z0);
-  return result;
+  return hipSuccess;
 }
 
 // Gets the number of HIP-capable devices.
@@ -703,13 +775,11 @@ HIPAPI hipError_t hipGetDeviceProperties(hipDeviceProp_t* prop, int device) {
   // Get memory information using the internal API.
   iree_device_size_t free_memory = 0;
   iree_device_size_t total_memory = 0;
-  iree_status_t memory_status = iree_hal_streaming_device_memory_info(
-      device, &free_memory, &total_memory);
-  if (!iree_status_is_ok(memory_status)) {
-    iree_status_ignore(memory_status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorInvalidDevice);
-  }
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_streaming_device_memory_info(device, &free_memory,
+                                            &total_memory),
+      hipErrorInvalidDevice);
 
   // Fill device properties from device entry.
   memset(prop, 0, sizeof(hipDeviceProp_t));
@@ -823,6 +893,13 @@ HIPAPI hipError_t hipGetDeviceProperties(hipDeviceProp_t* prop, int device) {
 
   IREE_TRACE_ZONE_END(z0);
   return hipSuccess;
+}
+
+// Alias for ROCm 6.0.0+ compatibility - exports the versioned symbol.
+// Modern HIP runtimes expect this versioned symbol for ABI stability.
+HIPAPI hipError_t hipGetDevicePropertiesR0600(hipDeviceProp_t* prop,
+                                              int device) {
+  return hipGetDeviceProperties(prop, device);
 }
 
 // Gets a specific attribute of a compute device.
@@ -1082,6 +1159,7 @@ HIPAPI hipError_t hipDeviceTotalMem(size_t* bytes, int device) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(hipErrorInvalidValue);
   }
+  *bytes = 0;
 
   // Ensure HIP is initialized.
   hipError_t init_result = iree_hip_ensure_initialized();
@@ -1092,13 +1170,11 @@ HIPAPI hipError_t hipDeviceTotalMem(size_t* bytes, int device) {
 
   iree_device_size_t free_memory = 0;
   iree_device_size_t total_memory = 0;
-  iree_status_t status = iree_hal_streaming_device_memory_info(
-      device, &free_memory, &total_memory);
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorInvalidDevice);
-  }
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_streaming_device_memory_info(device, &free_memory,
+                                            &total_memory),
+      hipErrorInvalidDevice);
 
   *bytes = (size_t)total_memory;
   IREE_TRACE_ZONE_END(z0);
@@ -1137,6 +1213,7 @@ HIPAPI hipError_t hipDeviceCanAccessPeer(int* canAccessPeer, int device,
   if (!canAccessPeer) {
     HIP_RETURN_ERROR(hipErrorInvalidValue);
   }
+  *canAccessPeer = 0;
 
   // Ensure HIP is initialized.
   hipError_t init_result = iree_hip_ensure_initialized();
@@ -1154,13 +1231,9 @@ HIPAPI hipError_t hipDeviceCanAccessPeer(int* canAccessPeer, int device,
 
   // Use the P2P query function.
   bool can_access = false;
-  iree_status_t status = iree_hal_streaming_device_can_access_peer(
-      device, peerDevice, &can_access);
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
-    *canAccessPeer = 0;
-    HIP_RETURN_ERROR(hipErrorInvalidDevice);
-  }
+  HIP_RETURN_STATUS(iree_hal_streaming_device_can_access_peer(
+                        device, peerDevice, &can_access),
+                    hipErrorInvalidDevice);
 
   *canAccessPeer = can_access ? 1 : 0;
   return hipSuccess;
@@ -1256,7 +1329,7 @@ HIPAPI hipError_t hipDeviceGetP2PAttribute(int* value, hipDeviceP2PAttr attrib,
 //  - hipErrorInvalidDevice: Invalid peer device.
 //  - hipErrorInvalidValue: Invalid flags.
 //  - hipErrorPeerAccessAlreadyEnabled: Access already enabled.
-//  - hipErrorPeerAccessNotSupported: Devices cannot access each other.
+//  - hipErrorPeerAccessUnsupported: Devices cannot access each other.
 //
 // Synchronization: This operation is synchronous.
 //
@@ -1281,11 +1354,8 @@ HIPAPI hipError_t hipDeviceEnablePeerAccess(int peerDevice,
 
   // Get the current context.
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -1301,23 +1371,23 @@ HIPAPI hipError_t hipDeviceEnablePeerAccess(int peerDevice,
 
   // Get or create the peer device's primary context.
   iree_hal_streaming_context_t* peer_primary_context = NULL;
-  iree_status_t status =
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
       iree_hal_streaming_device_get_or_create_primary_context(
-          peer_device, &peer_primary_context);
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorOutOfMemory);
-  }
+          peer_device, &peer_primary_context),
+      hipErrorOutOfMemory);
 
   // Enable peer access between the current context and the peer device's
   // context.
-  status = iree_hal_streaming_context_enable_peer_access(context,
-                                                         peer_primary_context);
+  // TODO(benvanik): check for hipErrorPeerAccessAlreadyEnabled.
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_streaming_context_enable_peer_access(context,
+                                                    peer_primary_context),
+      hipErrorPeerAccessUnsupported);
 
-  hipError_t result = iree_status_to_hip_result(status);
   IREE_TRACE_ZONE_END(z0);
-  return result;
+  return hipSuccess;
 }
 
 // Disables direct memory access from current device to peer device.
@@ -1351,11 +1421,8 @@ HIPAPI hipError_t hipDeviceDisablePeerAccess(int peerDevice) {
 
   // Get the current context.
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -1371,23 +1438,22 @@ HIPAPI hipError_t hipDeviceDisablePeerAccess(int peerDevice) {
 
   // Get or create the peer device's primary context.
   iree_hal_streaming_context_t* peer_primary_context = NULL;
-  iree_status_t status =
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
       iree_hal_streaming_device_get_or_create_primary_context(
-          peer_device, &peer_primary_context);
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorOutOfMemory);
-  }
+          peer_device, &peer_primary_context),
+      hipErrorOutOfMemory);
 
   // Disable peer access between the current context and the peer device's
   // context.
-  status = iree_hal_streaming_context_disable_peer_access(context,
-                                                          peer_primary_context);
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_streaming_context_disable_peer_access(context,
+                                                     peer_primary_context),
+      hipErrorPeerAccessNotEnabled);
 
-  hipError_t result = iree_status_to_hip_result(status);
   IREE_TRACE_ZONE_END(z0);
-  return result;
+  return hipSuccess;
 }
 
 // Waits for all operations on the current device to complete.
@@ -1415,19 +1481,25 @@ HIPAPI hipError_t hipDeviceDisablePeerAccess(int peerDevice) {
 // Performance note: Use stream-specific synchronization when possible for
 // better performance.
 //
-// See also: hipStreamSynchronize, hipEventSynchronize, hipSetDevice.
+// Graph capture: Not supported. Returns hipErrorStreamCaptureUnsupported.
+//
 HIPAPI hipError_t hipDeviceSynchronize(void) {
   IREE_TRACE_ZONE_BEGIN(z0);
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
   }
+
+  // Check if capturing - synchronous operations not allowed during capture.
+  if (context->default_stream && context->default_stream->capture_status ==
+                                     IREE_HAL_STREAMING_CAPTURE_STATUS_ACTIVE) {
+    IREE_TRACE_ZONE_END(z0);
+    HIP_RETURN_ERROR(hipErrorStreamCaptureUnsupported);
+  }
+
   iree_status_t status = iree_hal_streaming_context_synchronize(context);
   hipError_t result = iree_status_to_hip_result(status);
   IREE_TRACE_ZONE_END(z0);
@@ -1472,11 +1544,8 @@ HIPAPI hipError_t hipDeviceReset(void) {
 
   // Get current context to determine which device to reset.
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -1543,16 +1612,13 @@ HIPAPI hipError_t hipDevicePrimaryCtxRetain(hipCtx_t* pctx, hipDevice_t dev) {
 
   // Retain the primary context, creating it if necessary.
   iree_hal_streaming_context_t* primary_context = NULL;
-  iree_status_t status = iree_hal_streaming_device_retain_primary_context(
-      device, &primary_context);
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorOutOfMemory);
-  }
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_streaming_device_retain_primary_context(device,
+                                                       &primary_context),
+      hipErrorOutOfMemory);
 
   *pctx = (hipCtx_t)primary_context;
-
   IREE_TRACE_ZONE_END(z0);
   return hipSuccess;
 }
@@ -1596,13 +1662,9 @@ HIPAPI hipError_t hipDevicePrimaryCtxRelease(hipDevice_t dev) {
   }
 
   // Release the primary context (destroys when ref count reaches 0).
-  iree_status_t status =
-      iree_hal_streaming_device_release_primary_context(device);
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorInvalidContext);
-  }
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_streaming_device_release_primary_context(device),
+      hipErrorInvalidContext);
 
   IREE_TRACE_ZONE_END(z0);
   return hipSuccess;
@@ -1676,14 +1738,10 @@ HIPAPI hipError_t hipDevicePrimaryCtxSetFlags(hipDevice_t dev,
       (flags & hipDeviceLmemResizeToMax) != 0;
 
   // Set the primary context flags.
-  iree_status_t status =
-      iree_hal_streaming_device_set_primary_context_flags(dev, &internal_flags);
-
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorInvalidValue);
-  }
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_streaming_device_set_primary_context_flags(dev, &internal_flags),
+      hipErrorInvalidValue);
 
   IREE_TRACE_ZONE_END(z0);
   return hipSuccess;
@@ -1733,14 +1791,11 @@ HIPAPI hipError_t hipDevicePrimaryCtxGetState(hipDevice_t dev,
   // Get the primary context state.
   iree_hal_streaming_context_flags_t internal_flags = {0};
   bool is_active = false;
-  iree_status_t status = iree_hal_streaming_device_primary_context_state(
-      dev, &internal_flags, &is_active);
-
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorInvalidDevice);
-  }
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_streaming_device_primary_context_state(dev, &internal_flags,
+                                                      &is_active),
+      hipErrorInvalidDevice);
 
   if (flags) {
     // Convert internal flags back to HIP flags.
@@ -1841,9 +1896,9 @@ HIPAPI hipError_t hipDevicePrimaryCtxReset(hipDevice_t dev) {
     iree_status_t status = iree_hal_streaming_context_wait_idle(
         device->primary_context, iree_infinite_timeout());
     if (!iree_status_is_ok(status)) {
-      iree_status_free(status);
       IREE_TRACE_ZONE_END(z0);
-      HIP_RETURN_ERROR(hipErrorUnknown);
+      HIP_RETURN_ERROR(
+          iree_status_to_fixed_hip_result(status, hipErrorUnknown));
     }
 
     // Lock to ensure thread safety during reset.
@@ -2247,11 +2302,8 @@ HIPAPI hipError_t hipCtxGetDevice(hipDevice_t* device) {
   }
 
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -2290,11 +2342,8 @@ HIPAPI hipError_t hipCtxGetDevice(hipDevice_t* device) {
 HIPAPI hipError_t hipCtxSynchronize(void) {
   IREE_TRACE_ZONE_BEGIN(z0);
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -2317,7 +2366,7 @@ HIPAPI hipError_t hipCtxSynchronize(void) {
 //  - hipErrorInvalidValue: peerContext is NULL or invalid flags.
 //  - hipErrorInvalidContext: No current context.
 //  - hipErrorPeerAccessAlreadyEnabled: Access already enabled.
-//  - hipErrorPeerAccessNotSupported: Devices cannot access each other.
+//  - hipErrorPeerAccessUnsupported: Devices cannot access each other.
 //  - hipErrorInvalidDevice: Contexts on same device.
 //
 // Synchronization: This operation is synchronous.
@@ -2345,11 +2394,8 @@ HIPAPI hipError_t hipCtxEnablePeerAccess(hipCtx_t peerContext,
   }
 
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -2398,11 +2444,8 @@ HIPAPI hipError_t hipCtxDisablePeerAccess(hipCtx_t peerContext) {
   }
 
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -2454,11 +2497,8 @@ HIPAPI hipError_t hipDeviceGetLimit(size_t* pValue, hipLimit_t limit) {
 
   // Get current context.
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -2506,11 +2546,8 @@ HIPAPI hipError_t hipDeviceSetLimit(hipLimit_t limit, size_t value) {
 
   // Get current context.
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -2565,24 +2602,20 @@ HIPAPI hipError_t hipDeviceSetLimit(hipLimit_t limit, size_t value) {
 HIPAPI hipError_t hipMemGetInfo(size_t* free, size_t* total) {
   IREE_TRACE_ZONE_BEGIN(z0);
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
   }
 
-  size_t free_memory, total_memory;
-  iree_status_t status = iree_hal_streaming_device_memory_info(
-      context->device_ordinal, &free_memory, &total_memory);
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorInvalidDevice);
-  }
+  size_t free_memory = 0;
+  size_t total_memory = 0;
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_streaming_device_memory_info(context->device_ordinal,
+                                            &free_memory, &total_memory),
+      hipErrorInvalidDevice);
 
   if (free) *free = (size_t)free_memory;
   if (total) *total = (size_t)total_memory;
@@ -2619,6 +2652,8 @@ HIPAPI hipError_t hipMemGetInfo(size_t* free, size_t* total) {
 // Warning: Always check return value before using the allocated pointer.
 // Dereferencing a failed allocation results in undefined behavior.
 //
+// Graph capture: Not supported. Returns hipErrorStreamCaptureUnsupported.
+//
 // See also: hipFree, hipMallocPitch, hipMallocHost, hipMallocManaged,
 //           hipMallocAsync.
 HIPAPI hipError_t hipMalloc(void** ptr, size_t size) {
@@ -2629,14 +2664,18 @@ HIPAPI hipError_t hipMalloc(void** ptr, size_t size) {
   }
 
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
+  }
+
+  // Check if capturing - synchronous operations not allowed during capture.
+  if (context->default_stream && context->default_stream->capture_status ==
+                                     IREE_HAL_STREAMING_CAPTURE_STATUS_ACTIVE) {
+    IREE_TRACE_ZONE_END(z0);
+    HIP_RETURN_ERROR(hipErrorStreamCaptureUnsupported);
   }
 
   iree_hal_streaming_buffer_t* buffer = NULL;
@@ -2696,11 +2735,8 @@ HIPAPI hipError_t hipMallocPitch(void** devPtr, size_t* pitch, size_t width,
 
   // Get current context.
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -2710,14 +2746,11 @@ HIPAPI hipError_t hipMallocPitch(void** devPtr, size_t* pitch, size_t width,
   // HIP doesn't have an ElementSizeBytes parameter like CUDA, so we pass 0.
   size_t calculated_pitch = 0;
   iree_hal_streaming_buffer_t* buffer = NULL;
-  iree_status_t status = iree_hal_streaming_memory_allocate_device_pitched(
-      context, width, height, 0, &calculated_pitch, &buffer);
-
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorOutOfMemory);
-  }
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_streaming_memory_allocate_device_pitched(
+          context, width, height, 0, &calculated_pitch, &buffer),
+      hipErrorOutOfMemory);
 
   // Return device pointer and pitch.
   *devPtr = (void*)iree_hal_streaming_buffer_device_pointer(buffer);
@@ -2753,18 +2786,24 @@ HIPAPI hipError_t hipMallocPitch(void** devPtr, size_t* pitch, size_t width,
 // Warning: Ensure all kernels using this memory have completed before
 // freeing. Use hipDeviceSynchronize() if unsure.
 //
+// Graph capture: Not supported. Returns hipErrorStreamCaptureUnsupported.
+//
 // See also: hipMalloc, hipFreeHost, hipFreeAsync.
 HIPAPI hipError_t hipFree(void* ptr) {
   IREE_TRACE_ZONE_BEGIN(z0);
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
+  }
+
+  // Check if capturing - synchronous operations not allowed during capture.
+  if (context->default_stream && context->default_stream->capture_status ==
+                                     IREE_HAL_STREAMING_CAPTURE_STATUS_ACTIVE) {
+    IREE_TRACE_ZONE_END(z0);
+    HIP_RETURN_ERROR(hipErrorStreamCaptureUnsupported);
   }
 
   // hipFree is synchronous - the internal function handles synchronization.
@@ -2806,7 +2845,9 @@ HIPAPI hipError_t hipFree(void* ptr) {
 // Warning: Excessive pinned memory allocation can degrade system
 // performance.
 //
-// See also: hipFreeHost, hipHostMalloc, hipHostRegister, hipMalloc.
+// Graph capture: Not supported. Returns hipErrorStreamCaptureUnsupported.
+//
+// See also: hipMalloc, hipFreeHost, hipFreeAsync.
 HIPAPI hipError_t hipMallocHost(void** ptr, size_t size) {
   IREE_TRACE_ZONE_BEGIN(z0);
   if (!ptr) {
@@ -2815,14 +2856,18 @@ HIPAPI hipError_t hipMallocHost(void** ptr, size_t size) {
   }
 
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
+  }
+
+  // Check if capturing - synchronous operations not allowed during capture.
+  if (context->default_stream && context->default_stream->capture_status ==
+                                     IREE_HAL_STREAMING_CAPTURE_STATUS_ACTIVE) {
+    IREE_TRACE_ZONE_END(z0);
+    HIP_RETURN_ERROR(hipErrorStreamCaptureUnsupported);
   }
 
   iree_hal_streaming_buffer_t* buffer = NULL;
@@ -2861,18 +2906,24 @@ HIPAPI hipError_t hipMallocHost(void** ptr, size_t size) {
 // Warning: Only use for memory allocated with hipMallocHost or
 // hipHostMalloc.
 //
-// See also: hipMallocHost, hipHostMalloc, hipHostFree.
+// Graph capture: Not supported. Returns hipErrorStreamCaptureUnsupported.
+//
+// See also: hipMalloc, hipFreeHost, hipFreeAsync.
 HIPAPI hipError_t hipFreeHost(void* ptr) {
   IREE_TRACE_ZONE_BEGIN(z0);
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
+  }
+
+  // Check if capturing - synchronous operations not allowed during capture.
+  if (context->default_stream && context->default_stream->capture_status ==
+                                     IREE_HAL_STREAMING_CAPTURE_STATUS_ACTIVE) {
+    IREE_TRACE_ZONE_END(z0);
+    HIP_RETURN_ERROR(hipErrorStreamCaptureUnsupported);
   }
 
   // hipFreeHost is synchronous - the internal function handles synchronization.
@@ -2889,7 +2940,7 @@ HIPAPI hipError_t hipFreeHost(void* ptr) {
 //  - ptr: [OUT] Pointer to receive the allocated host memory pointer.
 //  - size: [IN] Size in bytes to allocate.
 //  - flags: [IN] Allocation flags (hipHostMallocDefault, hipHostMallocPortable,
-//                hipHostMallocMapped, hipHostMallocWriteCombined, etc.).
+//                hipHostMallocMapped, hipHostMallocWriteCombined, etc).
 //
 // Returns:
 //  - hipSuccess: Memory allocated successfully.
@@ -2924,11 +2975,8 @@ HIPAPI hipError_t hipHostMalloc(void** ptr, size_t size, unsigned int flags) {
   }
 
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -2971,11 +3019,8 @@ HIPAPI hipError_t hipHostMalloc(void** ptr, size_t size, unsigned int flags) {
 HIPAPI hipError_t hipHostFree(void* ptr) {
   IREE_TRACE_ZONE_BEGIN(z0);
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -3073,11 +3118,8 @@ HIPAPI hipError_t hipHostRegister(void* ptr, size_t size, unsigned int flags) {
   }
 
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -3141,11 +3183,8 @@ HIPAPI hipError_t hipHostUnregister(void* ptr) {
   }
 
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -3193,11 +3232,8 @@ HIPAPI hipError_t hipMemGetAddressRange(hipDeviceptr_t* pbase, size_t* psize,
   }
 
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -3254,11 +3290,8 @@ HIPAPI hipError_t hipHostGetDevicePointer(hipDeviceptr_t* pdptr, void* p,
   }
 
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -3313,11 +3346,8 @@ HIPAPI hipError_t hipHostGetFlags(unsigned int* flagsPtr, void* hostPtr) {
   }
 
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -3385,11 +3415,8 @@ HIPAPI hipError_t hipMemPtrGetInfo(void* ptr, size_t* size) {
   }
 
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -3428,6 +3455,8 @@ HIPAPI hipError_t hipMemPtrGetInfo(void* ptr, size_t* size) {
 // Synchronization: This operation is synchronous. Blocks until copy
 // completes.
 //
+// Graph capture: Not supported. Returns hipErrorStreamCaptureUnsupported.
+//
 // Copy behavior:
 // - hipMemcpyHostToHost: CPU memcpy.
 // - hipMemcpyHostToDevice: Transfer from host to device.
@@ -3446,14 +3475,18 @@ HIPAPI hipError_t hipMemcpy(void* dst, const void* src, size_t sizeBytes,
                             hipMemcpyKind kind) {
   IREE_TRACE_ZONE_BEGIN(z0);
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
+  }
+
+  // Check if capturing - synchronous operations not allowed during capture.
+  if (context->default_stream && context->default_stream->capture_status ==
+                                     IREE_HAL_STREAMING_CAPTURE_STATUS_ACTIVE) {
+    IREE_TRACE_ZONE_END(z0);
+    HIP_RETURN_ERROR(hipErrorStreamCaptureUnsupported);
   }
 
   iree_status_t status = iree_ok_status();
@@ -3510,6 +3543,7 @@ HIPAPI hipError_t hipMemcpy(void* dst, const void* src, size_t sizeBytes,
 // - If stream is NULL, uses the default stream.
 // - Copy executes after all previously enqueued operations in the stream.
 // - Subsequent operations in the stream wait for copy to complete.
+// - Graph capture: Supported. Creates memcpy node when capturing.
 //
 // Memory requirements:
 // - Host memory must be pinned for async H2D/D2H transfers.
@@ -3528,11 +3562,8 @@ HIPAPI hipError_t hipMemcpyAsync(void* dst, const void* src, size_t sizeBytes,
                                  hipMemcpyKind kind, hipStream_t stream) {
   IREE_TRACE_ZONE_BEGIN(z0);
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -3615,6 +3646,7 @@ HIPAPI hipError_t hipMemcpyWithStream(void* dst, const void* src,
 // Synchronization: SYNCHRONOUS - blocks until copy completes.
 // Stream behavior: Executes on default stream (stream 0).
 // Multi-GPU: Current device context determines which device performs copy.
+// Graph capture: Not supported. Returns hipErrorStreamCaptureUnsupported.
 // Limitations: None in current implementation.
 //
 // Warning: Passing device pointer as src or host pointer as dst causes
@@ -3644,6 +3676,7 @@ HIPAPI hipError_t hipMemcpyHtoD(hipDeviceptr_t dst, void* src,
 // Synchronization: SYNCHRONOUS - blocks until copy completes.
 // Stream behavior: Executes on default stream (stream 0).
 // Multi-GPU: Current device context determines which device performs copy.
+// Graph capture: Not supported. Returns hipErrorStreamCaptureUnsupported.
 // Limitations: None in current implementation.
 //
 // Warning: Passing host pointer as src or device pointer as dst causes
@@ -3674,6 +3707,7 @@ HIPAPI hipError_t hipMemcpyDtoH(void* dst, hipDeviceptr_t src,
 // Stream behavior: Executes on default stream (stream 0).
 // Multi-GPU: Both pointers must be accessible from current device. For
 //            cross-device copies, use hipMemcpyPeer.
+// Graph capture: Not supported. Returns hipErrorStreamCaptureUnsupported.
 // Limitations: Intra-device copy only; no automatic peer access.
 //
 // Note: Source and destination regions may overlap; behavior is equivalent
@@ -3707,6 +3741,7 @@ HIPAPI hipError_t hipMemcpyDtoD(hipDeviceptr_t dst, hipDeviceptr_t src,
 // - Copy is enqueued in the specified stream.
 // - If stream is NULL, uses the default stream.
 // - Host memory should be pinned for true async behavior.
+// - Graph capture: Supported. Creates memcpy node when capturing.
 //
 // Multi-GPU: Copies to current device.
 //
@@ -3738,6 +3773,7 @@ HIPAPI hipError_t hipMemcpyHtoDAsync(hipDeviceptr_t dst, void* src,
 // - Copy is enqueued in the specified stream.
 // - If stream is NULL, uses the default stream.
 // - Host memory should be pinned for true async behavior.
+// - Graph capture: Supported. Creates memcpy node when capturing.
 //
 // Multi-GPU: Copies from current device.
 //
@@ -3771,6 +3807,7 @@ HIPAPI hipError_t hipMemcpyDtoHAsync(void* dst, hipDeviceptr_t src,
 // - Copy is enqueued in the specified stream.
 // - If stream is NULL, uses the default stream.
 // - Executes after all previously enqueued operations.
+// - Graph capture: Supported. Creates memcpy node when capturing.
 //
 // Multi-GPU: Both pointers must be accessible from current device.
 // For cross-device copies, use hipMemcpyPeerAsync.
@@ -3800,6 +3837,8 @@ HIPAPI hipError_t hipMemcpyDtoDAsync(hipDeviceptr_t dst, hipDeviceptr_t src,
 //
 // Synchronization: This operation is synchronous. Blocks until complete.
 //
+// Graph capture: Not supported. Returns hipErrorStreamCaptureUnsupported.
+//
 // Memory behavior:
 // - Sets each byte to (unsigned char)(value & 0xFF).
 // - Works with any device memory regardless of allocation type.
@@ -3814,11 +3853,8 @@ HIPAPI hipError_t hipMemcpyDtoDAsync(hipDeviceptr_t dst, hipDeviceptr_t src,
 HIPAPI hipError_t hipMemset(void* dst, int value, size_t sizeBytes) {
   IREE_TRACE_ZONE_BEGIN(z0);
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -3856,6 +3892,7 @@ HIPAPI hipError_t hipMemset(void* dst, int value, size_t sizeBytes) {
 // - If stream is NULL, uses the default stream.
 // - Executes after all previously enqueued operations in the stream.
 // - Subsequent operations in the stream wait for this to complete.
+// - Graph capture: Supported. Creates memset node when capturing.
 //
 // Memory behavior:
 // - Sets each byte to (unsigned char)(value & 0xFF).
@@ -3868,11 +3905,8 @@ HIPAPI hipError_t hipMemsetAsync(void* dst, int value, size_t sizeBytes,
                                  hipStream_t stream) {
   IREE_TRACE_ZONE_BEGIN(z0);
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -3903,6 +3937,8 @@ HIPAPI hipError_t hipMemsetAsync(void* dst, int value, size_t sizeBytes,
 //
 // Synchronization: This operation is synchronous. Blocks until complete.
 //
+// Graph capture: Not supported. Returns hipErrorStreamCaptureUnsupported.
+//
 // Memory behavior:
 // - Sets N consecutive bytes to the value uc.
 // - Total bytes modified: N.
@@ -3914,11 +3950,8 @@ HIPAPI hipError_t hipMemsetD8(hipDeviceptr_t dstDevice, unsigned char uc,
                               size_t N) {
   IREE_TRACE_ZONE_BEGIN(z0);
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -3949,6 +3982,8 @@ HIPAPI hipError_t hipMemsetD8(hipDeviceptr_t dstDevice, unsigned char uc,
 //
 // Synchronization: This operation is synchronous. Blocks until complete.
 //
+// Graph capture: Not supported. Returns hipErrorStreamCaptureUnsupported.
+//
 // Memory behavior:
 // - Sets N consecutive 16-bit values to us.
 // - Total bytes modified: N * 2.
@@ -3963,11 +3998,8 @@ HIPAPI hipError_t hipMemsetD16(hipDeviceptr_t dstDevice, unsigned short us,
                                size_t N) {
   IREE_TRACE_ZONE_BEGIN(z0);
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -3998,6 +4030,8 @@ HIPAPI hipError_t hipMemsetD16(hipDeviceptr_t dstDevice, unsigned short us,
 //
 // Synchronization: This operation is synchronous. Blocks until complete.
 //
+// Graph capture: Not supported. Returns hipErrorStreamCaptureUnsupported.
+//
 // Memory behavior:
 // - Sets N consecutive 32-bit values to i.
 // - Total bytes modified: N * 4.
@@ -4011,11 +4045,8 @@ HIPAPI hipError_t hipMemsetD16(hipDeviceptr_t dstDevice, unsigned short us,
 HIPAPI hipError_t hipMemsetD32(hipDeviceptr_t dstDevice, int i, size_t N) {
   IREE_TRACE_ZONE_BEGIN(z0);
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -4052,6 +4083,7 @@ HIPAPI hipError_t hipMemsetD32(hipDeviceptr_t dstDevice, int i, size_t N) {
 // - Operation is enqueued in the specified stream.
 // - If stream is NULL, uses the default stream.
 // - Memory contents are undefined if read before operation completes.
+// - Graph capture: Supported. Creates memset node when capturing.
 //
 // Memory behavior:
 // - Sets N consecutive bytes to the value uc.
@@ -4064,11 +4096,8 @@ HIPAPI hipError_t hipMemsetD8Async(hipDeviceptr_t dstDevice, unsigned char uc,
                                    size_t N, hipStream_t stream) {
   IREE_TRACE_ZONE_BEGIN(z0);
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -4113,6 +4142,7 @@ HIPAPI hipError_t hipMemsetD8Async(hipDeviceptr_t dstDevice, unsigned char uc,
 // - May be optimized for aligned addresses and specific patterns.
 // - Large fills may be broken into multiple operations internally.
 // - Consider coalescing multiple small fills for better performance.
+// - Graph capture: Supported. Creates memset node when capturing.
 //
 // Warning: Ensure proper alignment for 16-bit access. Unaligned
 // access may cause performance degradation or errors.
@@ -4123,11 +4153,8 @@ HIPAPI hipError_t hipMemsetD16Async(hipDeviceptr_t dstDevice, unsigned short us,
                                     size_t N, hipStream_t stream) {
   IREE_TRACE_ZONE_BEGIN(z0);
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -4173,6 +4200,7 @@ HIPAPI hipError_t hipMemsetD16Async(hipDeviceptr_t dstDevice, unsigned short us,
 // - Large fills may be broken into multiple operations internally.
 // - Consider coalescing multiple small fills for better performance.
 // - Often most efficient for clearing large buffers.
+// - Graph capture: Supported. Creates memset node when capturing.
 //
 // Warning: Ensure proper alignment for 32-bit access. Unaligned
 // access may cause performance degradation or errors.
@@ -4183,11 +4211,8 @@ HIPAPI hipError_t hipMemsetD32Async(hipDeviceptr_t dstDevice, int i, size_t N,
                                     hipStream_t stream) {
   IREE_TRACE_ZONE_BEGIN(z0);
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -4244,11 +4269,8 @@ HIPAPI hipError_t hipStreamCreate(hipStream_t* stream) {
   }
 
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -4314,11 +4336,8 @@ HIPAPI hipError_t hipStreamCreateWithFlags(hipStream_t* stream,
   }
 
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -4391,11 +4410,8 @@ HIPAPI hipError_t hipStreamCreateWithPriority(hipStream_t* stream,
   }
 
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -4623,6 +4639,8 @@ HIPAPI hipError_t hipStreamGetDevice(hipStream_t stream, hipDevice_t* device) {
 // Performance note: Consider using hipStreamQuery for non-blocking status
 // checks or hipEventSynchronize for finer-grained synchronization.
 //
+// Graph capture: Not supported. Returns hipErrorStreamCaptureUnsupported.
+//
 // See also: hipStreamQuery, hipDeviceSynchronize, hipEventSynchronize.
 HIPAPI hipError_t hipStreamSynchronize(hipStream_t stream) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -4637,6 +4655,15 @@ HIPAPI hipError_t hipStreamSynchronize(hipStream_t stream) {
       HIP_RETURN_ERROR(init_result);
     }
     stream = (hipStream_t)context->default_stream;
+  }
+
+  // Check if capturing - synchronous operations not allowed during capture.
+  iree_hal_streaming_stream_t* streaming_stream =
+      (iree_hal_streaming_stream_t*)stream;
+  if (streaming_stream && streaming_stream->capture_status ==
+                              IREE_HAL_STREAMING_CAPTURE_STATUS_ACTIVE) {
+    IREE_TRACE_ZONE_END(z0);
+    HIP_RETURN_ERROR(hipErrorStreamCaptureUnsupported);
   }
 
   iree_status_t status = iree_hal_streaming_stream_synchronize(
@@ -4676,6 +4703,9 @@ HIPAPI hipError_t hipStreamSynchronize(hipStream_t stream) {
 // }
 // ```
 //
+// Graph capture: Not supported. Returns hipErrorStreamCaptureUnsupported.
+//
+//
 // See also: hipStreamSynchronize, hipEventQuery, hipDeviceSynchronize.
 HIPAPI hipError_t hipStreamQuery(hipStream_t stream) {
   // Resolve NULL stream to default stream.
@@ -4687,6 +4717,14 @@ HIPAPI hipError_t hipStreamQuery(hipStream_t stream) {
       HIP_RETURN_ERROR(init_result);
     }
     stream = (hipStream_t)context->default_stream;
+  }
+
+  // Check if capturing - synchronous operations not allowed during capture.
+  iree_hal_streaming_stream_t* streaming_stream =
+      (iree_hal_streaming_stream_t*)stream;
+  if (streaming_stream && streaming_stream->capture_status ==
+                              IREE_HAL_STREAMING_CAPTURE_STATUS_ACTIVE) {
+    HIP_RETURN_ERROR(hipErrorStreamCaptureUnsupported);
   }
 
   int is_complete = 0;
@@ -4717,6 +4755,8 @@ HIPAPI hipError_t hipStreamQuery(hipStream_t stream) {
 //
 // Stream behavior:
 // - If stream is NULL, uses the default stream.
+// - The event can be from the same or different device.
+// - Graph capture: Supported. Creates wait node when capturing.
 // - Stream will wait for the event before executing subsequent operations.
 // - Does not affect operations already enqueued in the stream.
 // - The event can be from the same or different stream.
@@ -4805,11 +4845,8 @@ HIPAPI hipError_t hipEventCreate(hipEvent_t* event) {
   }
 
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -4867,11 +4904,8 @@ HIPAPI hipError_t hipEventCreateWithFlags(hipEvent_t* event,
   }
 
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -4944,6 +4978,7 @@ HIPAPI hipError_t hipEventDestroy(hipEvent_t event) {
 // - All previously enqueued operations in the stream must complete before
 //   the event is signaled.
 // - If stream is NULL, uses the default stream.
+// - Graph capture: Supported. Creates event node when capturing.
 // - The event can be waited on by other streams using hipStreamWaitEvent().
 // - The event can be queried with hipEventQuery() or synchronized with
 //   hipEventSynchronize().
@@ -4988,9 +5023,28 @@ HIPAPI hipError_t hipEventRecord(hipEvent_t event, hipStream_t stream) {
 //
 // Performance note: For polling without blocking, use hipEventQuery.
 //
+// Graph capture: Not supported. Returns hipErrorStreamCaptureUnsupported.
+//
 // See also: hipEventQuery, hipEventRecord, hipStreamSynchronize.
 HIPAPI hipError_t hipEventSynchronize(hipEvent_t event) {
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Check if any stream is capturing - synchronous operations not allowed
+  // during capture. Note: We need to check global capture status since events
+  // can be shared across streams.
+  iree_hal_streaming_context_t* context = NULL;
+  hipError_t init_result = iree_hip_ensure_context(&context);
+  if (init_result != hipSuccess) {
+    IREE_TRACE_ZONE_END(z0);
+    HIP_RETURN_ERROR(init_result);
+  }
+
+  if (context->default_stream && context->default_stream->capture_status ==
+                                     IREE_HAL_STREAMING_CAPTURE_STATUS_ACTIVE) {
+    IREE_TRACE_ZONE_END(z0);
+    HIP_RETURN_ERROR(hipErrorStreamCaptureUnsupported);
+  }
+
   iree_status_t status =
       iree_hal_streaming_event_synchronize((iree_hal_streaming_event_t*)event);
   hipError_t result = iree_status_to_hip_result(status);
@@ -5027,8 +5081,24 @@ HIPAPI hipError_t hipEventSynchronize(hipEvent_t event) {
 // }
 // ```
 //
+// Graph capture: Not supported. Returns hipErrorStreamCaptureUnsupported.
+//
 // See also: hipEventSynchronize, hipEventRecord, hipStreamQuery.
 HIPAPI hipError_t hipEventQuery(hipEvent_t event) {
+  // Check if any stream is capturing - synchronous operations not allowed
+  // during capture. Note: We need to check global capture status since events
+  // can be shared across streams.
+  iree_hal_streaming_context_t* context = NULL;
+  hipError_t init_result = iree_hip_ensure_context(&context);
+  if (init_result != hipSuccess) {
+    HIP_RETURN_ERROR(init_result);
+  }
+
+  if (context->default_stream && context->default_stream->capture_status ==
+                                     IREE_HAL_STREAMING_CAPTURE_STATUS_ACTIVE) {
+    HIP_RETURN_ERROR(hipErrorStreamCaptureUnsupported);
+  }
+
   int is_complete = 0;
   iree_status_t status = iree_hal_streaming_event_query(
       (iree_hal_streaming_event_t*)event, &is_complete);
@@ -5131,11 +5201,8 @@ HIPAPI hipError_t hipModuleLoad(hipModule_t* module, const char* fname) {
   }
 
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -5250,11 +5317,8 @@ HIPAPI hipError_t hipModuleLoadDataEx(hipModule_t* module, const void* image,
   }
 
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -5433,9 +5497,9 @@ HIPAPI hipError_t hipModuleGetFunction(hipFunction_t* function,
   iree_hal_streaming_symbol_t* stream_symbol = NULL;
   iree_status_t status =
       iree_hal_streaming_module_function(stream_module, kname, &stream_symbol);
-
   if (iree_status_is_ok(status)) {
-    *function = (hipFunction_t)stream_symbol;
+    // Tag the symbol before returning it.
+    *function = (hipFunction_t)iree_hal_streaming_symbol_tag(stream_symbol);
   }
 
   hipError_t result = iree_status_to_hip_result(status);
@@ -5497,7 +5561,6 @@ HIPAPI hipError_t hipModuleGetGlobal(hipDeviceptr_t* dptr, size_t* bytes,
   iree_device_size_t size = 0;
   iree_status_t status =
       iree_hal_streaming_module_global(module, name, &device_ptr, &size);
-
   if (iree_status_is_ok(status)) {
     *dptr = (hipDeviceptr_t)device_ptr;
     if (bytes) *bytes = (size_t)size;
@@ -5554,8 +5617,8 @@ HIPAPI hipError_t hipFuncGetAttribute(int* pi, hipFuncAttribute_t attrib,
     HIP_RETURN_ERROR(hipErrorInvalidValue);
   }
 
-  // Cast to symbol pointer.
-  iree_hal_streaming_symbol_t* symbol = (iree_hal_streaming_symbol_t*)hfunc;
+  // Untag the function pointer if it was tagged by hipModuleGetFunction.
+  iree_hal_streaming_symbol_t* symbol = iree_hal_streaming_symbol_untag(hfunc);
 
   // Verify it's a function.
   if (symbol->type != IREE_HAL_STREAMING_SYMBOL_TYPE_FUNCTION) {
@@ -5650,8 +5713,8 @@ HIPAPI hipError_t hipFuncGetAttributes(hipFuncAttributes* attr,
     HIP_RETURN_ERROR(hipErrorInvalidValue);
   }
 
-  // Cast to symbol pointer.
-  iree_hal_streaming_symbol_t* symbol = (iree_hal_streaming_symbol_t*)hfunc;
+  // Untag the function pointer if it was tagged by hipModuleGetFunction.
+  iree_hal_streaming_symbol_t* symbol = iree_hal_streaming_symbol_untag(hfunc);
 
   // Verify it's a function.
   if (symbol->type != IREE_HAL_STREAMING_SYMBOL_TYPE_FUNCTION) {
@@ -5722,8 +5785,8 @@ HIPAPI hipError_t hipFuncSetAttribute(hipFunction_t hfunc,
     HIP_RETURN_ERROR(hipErrorInvalidValue);
   }
 
-  // Cast to symbol pointer.
-  iree_hal_streaming_symbol_t* symbol = (iree_hal_streaming_symbol_t*)hfunc;
+  // Untag the function pointer if it was tagged by hipModuleGetFunction.
+  iree_hal_streaming_symbol_t* symbol = iree_hal_streaming_symbol_untag(hfunc);
 
   // Verify it's a function.
   if (symbol->type != IREE_HAL_STREAMING_SYMBOL_TYPE_FUNCTION) {
@@ -5896,6 +5959,98 @@ HIPAPI hipError_t hipFuncSetSharedMemConfig(hipFunction_t hfunc,
 // Execution control
 //===----------------------------------------------------------------------===//
 
+// Launches a kernel with specified configuration.
+//
+// Parameters:
+//  - function_address: [IN] Host function pointer (registered kernel stub).
+//  - numBlocks: [IN] Grid dimensions in blocks.
+//  - dimBlocks: [IN] Block dimensions in threads.
+//  - args: [IN] Array of kernel arguments.
+//  - sharedMemBytes: [IN] Dynamic shared memory size.
+//  - stream: [IN] Stream for kernel execution.
+//
+// Returns:
+//  - hipSuccess: Kernel launched successfully.
+//  - hipErrorInvalidValue: Invalid parameters.
+//  - hipErrorInvalidDeviceFunction: Unregistered kernel function.
+//  - hipErrorLaunchFailure: Kernel launch failed.
+//
+// Behavior:
+// - This function is typically called from compiler-generated kernel stubs
+//   after they pop the configuration from __hipPopCallConfiguration.
+// - It does NOT read the thread-local configuration directly.
+// - The function_address should be registered via __hipRegisterFunction.
+//
+// Stream behavior:
+// - Kernel execution is enqueued in the specified stream.
+// - If stream is NULL, uses the default stream.
+// - Kernel executes after all previously enqueued operations in the stream.
+// - Graph capture: Supported. Creates kernel node when capturing.
+//
+// Thread safety: Thread-safe.
+HIPAPI hipError_t hipLaunchKernel(const void* function_address, dim3 numBlocks,
+                                  dim3 dimBlocks, void** args,
+                                  size_t sharedMemBytes, hipStream_t stream) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  if (!function_address) {
+    IREE_TRACE_ZONE_END(z0);
+    HIP_RETURN_ERROR(hipErrorInvalidValue);
+  }
+
+  // Ensure initialization and get context.
+  iree_hal_streaming_context_t* context = NULL;
+  hipError_t init_result = iree_hip_ensure_context(&context);
+  if (init_result != hipSuccess) {
+    IREE_TRACE_ZONE_END(z0);
+    HIP_RETURN_ERROR(init_result);
+  }
+
+  // Resolve NULL stream to default stream.
+  if (!stream) {
+    stream = (hipStream_t)context->default_stream;
+  }
+
+  // Resolve the host function pointer to a symbol.
+  // Check if this is already a tagged symbol from hipModuleGetFunction (driver
+  // API) or if we need to do the host lookup.
+  iree_hal_streaming_symbol_t* symbol = NULL;
+  if (iree_hal_streaming_symbol_has_tag(function_address)) {
+    // Fast path: a symbol pointer - just untag and use directly.
+    symbol = iree_hal_streaming_symbol_untag(function_address);
+  } else {
+    // Slow path: must look up in symbol map.
+    // This may demand-load the entire parent module of the function.
+    iree_status_t lookup_status = iree_hal_streaming_context_symbol_map_lookup(
+        &context->symbol_map, (void*)function_address, &symbol);
+    if (!iree_status_is_ok(lookup_status)) {
+      // Symbol not found in registry - invalid function.
+      iree_status_ignore(lookup_status);
+      // DO NOT SUBMIT
+    }
+  }
+
+  if (!symbol) {
+    // This shouldn't happen but handle it just in case.
+    IREE_TRACE_ZONE_END(z0);
+    HIP_RETURN_ERROR(hipErrorInvalidDeviceFunction);
+  }
+
+  const iree_hal_streaming_dispatch_params_t params = {
+      .grid_dim = {numBlocks.x, numBlocks.y, numBlocks.z},
+      .block_dim = {dimBlocks.x, dimBlocks.y, dimBlocks.z},
+      .shared_memory_bytes = sharedMemBytes,
+      .buffer = args,  // args is already the kernelParams array
+      .flags = IREE_HAL_STREAMING_DISPATCH_FLAG_NONE,
+  };
+  iree_status_t status = iree_hal_streaming_launch_kernel(
+      symbol, &params, (iree_hal_streaming_stream_t*)stream);
+
+  hipError_t result = iree_status_to_hip_result(status);
+  IREE_TRACE_ZONE_END(z0);
+  return result;
+}
+
 // Launches a kernel function with specified dimensions and parameters.
 //
 // Parameters:
@@ -5931,6 +6086,7 @@ HIPAPI hipError_t hipFuncSetSharedMemConfig(hipFunction_t hfunc,
 // - Kernel executes after all previously enqueued operations in the stream.
 // - Use hipStreamSynchronize() to wait for kernel completion.
 // - Use hipEventRecord() after launch to mark completion point.
+// - Graph capture: Supported. Creates kernel node when capturing.
 //
 // Launch configuration:
 // - Total threads = gridDim * blockDim.
@@ -5948,7 +6104,7 @@ HIPAPI hipError_t hipFuncSetSharedMemConfig(hipFunction_t hfunc,
 // Multi-GPU: Kernel executes on the device associated with the current
 // context.
 //
-// Warning: Ensure all kernel arguments remain valid until kernel completes.
+// WARNING: Ensure all kernel arguments remain valid until kernel completes.
 // Do not modify or free argument memory while kernel is executing.
 //
 // Note: Check device properties with hipDeviceGetAttribute() to determine
@@ -5960,11 +6116,8 @@ HIPAPI hipError_t hipModuleLaunchKernel(
     void** kernelParams, void** extra) {
   IREE_TRACE_ZONE_BEGIN(z0);
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -5978,8 +6131,11 @@ HIPAPI hipError_t hipModuleLaunchKernel(
   // Extract params pointer from HIP's parameter format.
   void* params_ptr = NULL;
   if (extra) {
-    // Extra format: {HIP_LAUNCH_PARAM_BUFFER_POINTER, &buffer,
-    //                HIP_LAUNCH_PARAM_BUFFER_SIZE, &size, HIP_LAUNCH_PARAM_END}
+    // Extra format: {
+    //   HIP_LAUNCH_PARAM_BUFFER_POINTER, &buffer,
+    //   HIP_LAUNCH_PARAM_BUFFER_SIZE, &size,
+    //   HIP_LAUNCH_PARAM_END,
+    // }
     if (extra[0] == HIP_LAUNCH_PARAM_BUFFER_POINTER) {
       params_ptr = *(void**)extra[1];
     }
@@ -5988,6 +6144,9 @@ HIPAPI hipError_t hipModuleLaunchKernel(
     params_ptr = kernelParams;
   }
 
+  // Untag the function pointer if it was tagged by hipModuleGetFunction.
+  iree_hal_streaming_symbol_t* symbol = iree_hal_streaming_symbol_untag(f);
+
   const iree_hal_streaming_dispatch_params_t params = {
       .grid_dim = {gridDimX, gridDimY, gridDimZ},
       .block_dim = {blockDimX, blockDimY, blockDimZ},
@@ -5995,9 +6154,8 @@ HIPAPI hipError_t hipModuleLaunchKernel(
       .buffer = params_ptr,
       .flags = IREE_HAL_STREAMING_DISPATCH_FLAG_NONE,
   };
-  iree_status_t status =
-      iree_hal_streaming_launch_kernel((iree_hal_streaming_symbol_t*)f, &params,
-                                       (iree_hal_streaming_stream_t*)stream);
+  iree_status_t status = iree_hal_streaming_launch_kernel(
+      symbol, &params, (iree_hal_streaming_stream_t*)stream);
 
   hipError_t result = iree_status_to_hip_result(status);
   IREE_TRACE_ZONE_END(z0);
@@ -6075,11 +6233,8 @@ HIPAPI hipError_t hipModuleLaunchCooperativeKernel(
   }
 
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -6102,13 +6257,11 @@ HIPAPI hipError_t hipModuleLaunchCooperativeKernel(
   // This will return 0 if the device doesn't support cooperative launch.
   int block_size = blockDimX * blockDimY * blockDimZ;
   int max_blocks = 0;
-  iree_status_t status = iree_hal_streaming_calculate_max_cooperative_blocks(
-      device, symbol, block_size, sharedMemBytes, &max_blocks);
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorInvalidValue);
-  }
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_streaming_calculate_max_cooperative_blocks(
+          device, symbol, block_size, sharedMemBytes, &max_blocks),
+      hipErrorInvalidValue);
 
   // Verify grid size doesn't exceed max active blocks.
   // If max_blocks is 0 (device doesn't support cooperative launch) or
@@ -6129,13 +6282,14 @@ HIPAPI hipError_t hipModuleLaunchCooperativeKernel(
       .flags = IREE_HAL_STREAMING_DISPATCH_FLAG_COOPERATIVE,
   };
 
-  status =
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
       iree_hal_streaming_launch_kernel((iree_hal_streaming_symbol_t*)f, &params,
-                                       (iree_hal_streaming_stream_t*)stream);
+                                       (iree_hal_streaming_stream_t*)stream),
+      hipErrorInvalidConfiguration);
 
-  hipError_t result = iree_status_to_hip_result(status);
   IREE_TRACE_ZONE_END(z0);
-  return result;
+  return hipSuccess;
 }
 
 // Enqueues a host function callback in a stream.
@@ -6188,6 +6342,8 @@ HIPAPI hipError_t hipModuleLaunchCooperativeKernel(
 //
 // Warning: Avoid heavy computation in callbacks. Use callbacks for
 // quick signaling or launching work on other streams.
+//
+// Graph capture: Supported. Creates host function node when capturing.
 //
 // See also: hipStreamAddCallback, hipEventRecord,
 //           hipStreamWaitEvent.
@@ -6285,11 +6441,8 @@ HIPAPI hipError_t hipModuleOccupancyMaxActiveBlocksPerMultiprocessor(
 
   // Get the current context and device.
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -6440,11 +6593,8 @@ HIPAPI hipError_t hipModuleOccupancyMaxPotentialBlockSize(
 
   // Get the current context and device.
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -6689,11 +6839,8 @@ HIPAPI hipError_t hipPointerGetAttribute(void* data,
 
   // Get the current context.
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -6704,11 +6851,11 @@ HIPAPI hipError_t hipPointerGetAttribute(void* data,
   iree_status_t status = iree_hal_streaming_memory_lookup(
       context, (iree_hal_streaming_deviceptr_t)ptr, &buffer_ref);
 
-  // If lookup fails, the pointer might not be a valid allocation.
+  // If lookup fails the pointer might not be a valid allocation.
   if (!iree_status_is_ok(status)) {
-    iree_status_free(status);
     IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorInvalidValue);
+    HIP_RETURN_ERROR(
+        iree_status_to_fixed_hip_result(status, hipErrorInvalidValue));
   }
 
   hipError_t result = hipSuccess;
@@ -6867,11 +7014,8 @@ HIPAPI hipError_t hipPointerSetAttribute(const void* value,
 
   // Get the current context.
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -6884,13 +7028,12 @@ HIPAPI hipError_t hipPointerSetAttribute(const void* value,
 
   // If lookup fails, the pointer might not be a valid allocation.
   if (!iree_status_is_ok(status)) {
-    iree_status_free(status);
     IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorInvalidValue);
+    HIP_RETURN_ERROR(
+        iree_status_to_fixed_hip_result(status, hipErrorInvalidValue));
   }
 
   hipError_t result = hipSuccess;
-
   switch (attribute) {
     case HIP_POINTER_ATTRIBUTE_SYNC_MEMOPS: {
       // Set synchronous memory operations flag.
@@ -7070,11 +7213,8 @@ HIPAPI hipError_t hipMemRangeGetAttribute(void* data, size_t data_size,
 
   // Get the current context.
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -7082,13 +7222,11 @@ HIPAPI hipError_t hipMemRangeGetAttribute(void* data, size_t data_size,
 
   // Look up the buffer containing this range.
   iree_hal_streaming_buffer_ref_t buffer_ref;
-  iree_status_t status = iree_hal_streaming_memory_lookup_range(
-      context, (iree_hal_streaming_deviceptr_t)dev_ptr, count, &buffer_ref);
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorInvalidValue);
-  }
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_streaming_memory_lookup_range(
+          context, (iree_hal_streaming_deviceptr_t)dev_ptr, count, &buffer_ref),
+      hipErrorInvalidValue);
 
   // Map the attribute and return the appropriate value.
   hipError_t result = hipSuccess;
@@ -7269,11 +7407,8 @@ HIPAPI hipError_t hipGraphCreate(hipGraph_t* pGraph, unsigned int flags) {
 
   // Get current context.
   // Ensure initialization and get context.
-
   iree_hal_streaming_context_t* context = NULL;
-
   hipError_t init_result = iree_hip_ensure_context(&context);
-
   if (init_result != hipSuccess) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(init_result);
@@ -7281,18 +7416,14 @@ HIPAPI hipError_t hipGraphCreate(hipGraph_t* pGraph, unsigned int flags) {
 
   // Create graph.
   iree_hal_streaming_graph_t* graph = NULL;
-  iree_status_t status = iree_hal_streaming_graph_create(
-      context, iree_hip_graph_flags_to_internal(flags), context->host_allocator,
-      &graph);
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_streaming_graph_create(context,
+                                      iree_hip_graph_flags_to_internal(flags),
+                                      context->host_allocator, &graph),
+      hipErrorOutOfMemory);
 
-  if (iree_status_is_ok(status)) {
-    *pGraph = (hipGraph_t)graph;
-  } else {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorOutOfMemory);
-  }
-
+  *pGraph = (hipGraph_t)graph;
   IREE_TRACE_ZONE_END(z0);
   return hipSuccess;
 }
@@ -7402,17 +7533,13 @@ HIPAPI hipError_t hipGraphInstantiate(hipGraphExec_t* pGraphExec,
 
   iree_hal_streaming_graph_t* stream_graph = (iree_hal_streaming_graph_t*)graph;
   iree_hal_streaming_graph_exec_t* exec = NULL;
-  iree_status_t status = iree_hal_streaming_graph_instantiate(
-      stream_graph, IREE_HAL_STREAMING_GRAPH_INSTANTIATE_FLAG_NONE, &exec);
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_streaming_graph_instantiate(
+          stream_graph, IREE_HAL_STREAMING_GRAPH_INSTANTIATE_FLAG_NONE, &exec),
+      hipErrorInvalidValue);
 
-  if (iree_status_is_ok(status)) {
-    *pGraphExec = (hipGraphExec_t)exec;
-  } else {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorInvalidValue);
-  }
-
+  *pGraphExec = (hipGraphExec_t)exec;
   IREE_TRACE_ZONE_END(z0);
   return hipSuccess;
 }
@@ -7464,17 +7591,14 @@ HIPAPI hipError_t hipGraphInstantiateWithFlags(hipGraphExec_t* pGraphExec,
 
   iree_hal_streaming_graph_t* stream_graph = (iree_hal_streaming_graph_t*)graph;
   iree_hal_streaming_graph_exec_t* exec = NULL;
-  iree_status_t status = iree_hal_streaming_graph_instantiate(
-      stream_graph, iree_hip_graph_instantiate_flags_to_internal(flags), &exec);
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_streaming_graph_instantiate(
+          stream_graph, iree_hip_graph_instantiate_flags_to_internal(flags),
+          &exec),
+      hipErrorInvalidValue);
 
-  if (iree_status_is_ok(status)) {
-    *pGraphExec = (hipGraphExec_t)exec;
-  } else {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorInvalidValue);
-  }
-
+  *pGraphExec = (hipGraphExec_t)exec;
   IREE_TRACE_ZONE_END(z0);
   return hipSuccess;
 }
@@ -7592,13 +7716,9 @@ HIPAPI hipError_t hipGraphLaunch(hipGraphExec_t graphExec, hipStream_t stream) {
     stream_obj = context->default_stream;
   }
 
-  iree_status_t status = iree_hal_streaming_graph_exec_launch(exec, stream_obj);
-
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorInvalidValue);
-  }
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_streaming_graph_exec_launch(exec, stream_obj),
+      hipErrorInvalidValue);
 
   IREE_TRACE_ZONE_END(z0);
   return hipSuccess;
@@ -7669,16 +7789,14 @@ HIPAPI hipError_t hipGraphExecUpdate(hipGraphExec_t hGraphExec,
       (iree_hal_streaming_graph_exec_t*)hGraphExec;
   iree_hal_streaming_graph_t* graph = (iree_hal_streaming_graph_t*)hGraph;
 
-  iree_status_t status = iree_hal_streaming_graph_exec_update(exec, graph);
-
-  if (!iree_status_is_ok(status)) {
-    if (hErrorNode_out) {
-      *hErrorNode_out = NULL;  // We don't track specific error nodes yet.
-    }
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorInvalidValue);
+  // NOTE: we don't track specific error nodes yet.
+  if (hErrorNode_out) {
+    *hErrorNode_out = NULL;
   }
+
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_streaming_graph_exec_update(exec, graph),
+      hipErrorInvalidValue);
 
   IREE_TRACE_ZONE_END(z0);
   return hipSuccess;
@@ -7777,17 +7895,17 @@ HIPAPI hipError_t hipGraphAddKernelNode(hipGraphNode_t* pGraphNode,
       .buffer = params_ptr,
   };
 
+  // Untag the function pointer if it was tagged by hipModuleGetFunction.
+  iree_hal_streaming_symbol_t* symbol =
+      iree_hal_streaming_symbol_untag(params->func);
+
   // Add kernel node to graph.
   iree_hal_streaming_graph_node_t* node = NULL;
-  iree_status_t status = iree_hal_streaming_graph_add_kernel_node(
-      stream_graph, deps, numDependencies,
-      (iree_hal_streaming_symbol_t*)params->func, &dispatch_params, &node);
-
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorInvalidValue);
-  }
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_streaming_graph_add_kernel_node(
+          stream_graph, deps, numDependencies, symbol, &dispatch_params, &node),
+      hipErrorInvalidValue);
 
   *pGraphNode = (hipGraphNode_t)node;
   IREE_TRACE_ZONE_END(z0);
@@ -7876,14 +7994,11 @@ HIPAPI hipError_t hipGraphAddMemcpyNode(hipGraphNode_t* pGraphNode,
 
   // Add memcpy node to graph.
   iree_hal_streaming_graph_node_t* node = NULL;
-  iree_status_t status = iree_hal_streaming_graph_add_memcpy_node(
-      stream_graph, deps, numDependencies, dst, src, size, &node);
-
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorInvalidValue);
-  }
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_streaming_graph_add_memcpy_node(
+          stream_graph, deps, numDependencies, dst, src, size, &node),
+      hipErrorInvalidValue);
 
   *pGraphNode = (hipGraphNode_t)node;
   IREE_TRACE_ZONE_END(z0);
@@ -7962,16 +8077,13 @@ HIPAPI hipError_t hipGraphAddMemsetNode(hipGraphNode_t* pGraphNode,
 
   // Add memset node to graph.
   iree_hal_streaming_graph_node_t* node = NULL;
-  iree_status_t status = iree_hal_streaming_graph_add_memset_node(
-      stream_graph, deps, numDependencies,
-      (iree_hal_streaming_deviceptr_t)params->dst, params->value,
-      params->elementSize, params->width * params->height, &node);
-
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorInvalidValue);
-  }
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_streaming_graph_add_memset_node(
+          stream_graph, deps, numDependencies,
+          (iree_hal_streaming_deviceptr_t)params->dst, params->value,
+          params->elementSize, params->width * params->height, &node),
+      hipErrorInvalidValue);
 
   *pGraphNode = (hipGraphNode_t)node;
   IREE_TRACE_ZONE_END(z0);
@@ -8058,15 +8170,12 @@ HIPAPI hipError_t hipGraphAddHostNode(hipGraphNode_t* pGraphNode,
 
   // Add host node to graph.
   iree_hal_streaming_graph_node_t* node = NULL;
-  iree_status_t status = iree_hal_streaming_graph_add_host_call_node(
-      stream_graph, deps, numDependencies, (void (*)(void*))params->fn,
-      params->userData, &node);
-
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorInvalidValue);
-  }
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_streaming_graph_add_host_call_node(
+          stream_graph, deps, numDependencies, (void (*)(void*))params->fn,
+          params->userData, &node),
+      hipErrorInvalidValue);
 
   *pGraphNode = (hipGraphNode_t)node;
   IREE_TRACE_ZONE_END(z0);
@@ -8145,16 +8254,80 @@ HIPAPI hipError_t hipGraphAddEmptyNode(hipGraphNode_t* pGraphNode,
 
   // Empty nodes are just synchronization points.
   iree_hal_streaming_graph_node_t* node = NULL;
-  iree_status_t status = iree_hal_streaming_graph_add_empty_node(
-      stream_graph, deps, numDependencies, &node);
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_streaming_graph_add_empty_node(stream_graph, deps,
+                                              numDependencies, &node),
+      hipErrorInvalidValue);
 
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
+  *pGraphNode = (hipGraphNode_t)node;
+  IREE_TRACE_ZONE_END(z0);
+  return hipSuccess;
+}
+
+// Gets all nodes from a graph.
+//
+// Parameters:
+//  - graph: [IN] Graph to query nodes from.
+//  - pNodes: [OUT] Array to store node pointers (optional).
+//  - numNodes: [IN/OUT] Size of pNodes array on input, actual count on output.
+//
+// Returns:
+//  - hipSuccess: Nodes retrieved successfully.
+//  - hipErrorInvalidValue: Invalid graph or numNodes is NULL.
+//
+// Query behavior:
+// - If pNodes is NULL, returns only the count in *numNodes.
+// - If pNodes is non-NULL, fills array up to *numNodes elements.
+// - Always updates *numNodes with actual node count.
+//
+// Usage pattern:
+// ```c
+// // Query count first.
+// size_t nodeCount = 0;
+// hipGraphGetNodes(graph, NULL, &nodeCount);
+//
+// // Allocate and get nodes.
+// hipGraphNode_t* nodes = malloc(nodeCount * sizeof(hipGraphNode_t));
+// hipGraphGetNodes(graph, nodes, &nodeCount);
+// ```
+//
+// Node ordering:
+// - No guaranteed order (implementation defined).
+// - May differ between calls.
+// - Includes all node types.
+//
+// Memory management:
+// - Caller allocates pNodes array.
+// - Node pointers remain valid until graph destruction.
+//
+// Thread safety:
+// - Safe to call concurrently for same graph.
+// - Graph must not be modified during call.
+//
+// See also: hipGraphGetRootNodes, hipGraphNodeGetType,
+//           hipGraphNodeGetDependencies.
+HIPAPI hipError_t hipGraphGetNodes(hipGraph_t graph, hipGraphNode_t* pNodes,
+                                   size_t* numNodes) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  if (!graph || !numNodes) {
     IREE_TRACE_ZONE_END(z0);
     HIP_RETURN_ERROR(hipErrorInvalidValue);
   }
 
-  *pGraphNode = (hipGraphNode_t)node;
+  iree_hal_streaming_graph_t* stream_graph = (iree_hal_streaming_graph_t*)graph;
+
+  const size_t total_count = iree_hal_streaming_graph_size(stream_graph);
+
+  // Get nodes from the graph (up to the requested count).
+  if (pNodes != NULL) {
+    const size_t requested_count = *numNodes;
+    iree_hal_streaming_graph_get_nodes(
+        stream_graph, requested_count,
+        (iree_hal_streaming_graph_node_t**)pNodes);
+  }
+
+  *numNodes = total_count;
   IREE_TRACE_ZONE_END(z0);
   return hipSuccess;
 }
@@ -8247,14 +8420,9 @@ HIPAPI hipError_t hipStreamBeginCapture(hipStream_t stream,
       HIP_RETURN_ERROR(hipErrorInvalidValue);
   }
 
-  iree_status_t status =
-      iree_hal_streaming_begin_capture(stream_obj, capture_mode);
-
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorInvalidValue);
-  }
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_streaming_begin_capture(stream_obj, capture_mode),
+      hipErrorInvalidValue);
 
   IREE_TRACE_ZONE_END(z0);
   return hipSuccess;
@@ -8327,9 +8495,7 @@ HIPAPI hipError_t hipStreamEndCapture(hipStream_t stream, hipGraph_t* pGraph) {
   if (iree_status_is_ok(status)) {
     *pGraph = (hipGraph_t)graph;
   } else {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorInvalidValue);
+    HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(z0, status, hipErrorInvalidValue);
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -8593,15 +8759,12 @@ HIPAPI hipError_t hipStreamUpdateCaptureDependencies(
     mode = IREE_HAL_STREAMING_CAPTURE_DEPENDENCIES_SET;
   }
 
-  iree_status_t status = iree_hal_streaming_update_capture_dependencies(
-      stream_obj, (iree_hal_streaming_graph_node_t**)dependencies,
-      numDependencies, mode);
-
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
-    IREE_TRACE_ZONE_END(z0);
-    HIP_RETURN_ERROR(hipErrorInvalidValue);
-  }
+  HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_streaming_update_capture_dependencies(
+          stream_obj, (iree_hal_streaming_graph_node_t**)dependencies,
+          numDependencies, mode),
+      hipErrorInvalidValue);
 
   IREE_TRACE_ZONE_END(z0);
   return hipSuccess;
@@ -9500,51 +9663,275 @@ typedef struct uint3 {
   };
 } uint3;
 
+// Registers a fat binary containing device code with the HIP runtime.
+//
+// Parameters:
+//  - data: [IN] Pointer to the fat binary data containing device code.
+//              This data is compiler-generated and embedded in the executable.
+//              Must remain valid for the lifetime of the registration.
+//
+// Returns:
+//  - Opaque handle to the registered module (actually void** but treated as
+//    opaque). This handle is passed to subsequent registration functions
+//    (__hipRegisterFunction, __hipRegisterVar) to associate symbols with
+//    this module. Returns NULL if registration fails.
+//
+// Calling context:
+// - Called automatically during program startup (before main() or during
+//   dlopen) by compiler-generated initialization code.
+// - Called once per translation unit that contains __global__ functions or
+//   __device__ variables.
+// - Thread-safe: Can be called concurrently from multiple threads during
+//   dynamic library loading.
+//
+// Lifetime:
+// - The fat binary data must remain valid until __hipUnregisterFatBinary.
+// - The returned handle is valid until __hipUnregisterFatBinary is called.
+//
+// Implementation notes:
+// - The fat binary contains all kernels and device variables from a
+//   compilation unit.
+// - May contain code for multiple GPU architectures.
+// - The runtime selects appropriate code for the current device.
 HIPAPI void** __hipRegisterFatBinary(const void* data) {
-  // DO NOT SUBMIT
+  if (!data) return NULL;
+
+  iree_hal_streaming_global_symbol_registry_t* registry =
+      iree_hal_streaming_global_symbol_registry();
+  if (!registry) return NULL;
+
+  iree_hal_streaming_module_registration_t* module = NULL;
+  iree_status_t status =
+      iree_hal_streaming_global_symbol_registry_register_module(registry, data,
+                                                                &module);
+  if (!iree_status_is_ok(status)) {
+    // DO NOT SUBMIT print status
+    iree_status_ignore(status);
+    return NULL;
+  }
+
+  // Return the module handle cast to void**.
+  // The HIP runtime expects a void** but we just return our opaque handle.
+  return (void**)module;
 }
 
+// Unregisters a fat binary previously registered with __hipRegisterFatBinary.
+//
+// Parameters:
+//  - modules: [IN] Handle returned from __hipRegisterFatBinary.
+//
+// Calling context:
+// - Called automatically during program shutdown (after main() or during
+//   dlclose) by compiler-generated finalization code.
+// - Must be called after all kernels from this module have completed.
+// - Thread-safe: Serialized with other registration/unregistration calls.
+//
+// Behavior:
+// - Removes all functions and variables associated with this module.
+// - Frees any device memory allocated for this module.
+// - After this call, all device functions and variables from this module
+//   become invalid.
+//
+// WARNING: Calling kernels from an unregistered module results in undefined
+// behavior.
 HIPAPI void __hipUnregisterFatBinary(void** modules) {
-  // DO NOT SUBMIT
+  if (!modules) return;
+
+  iree_hal_streaming_global_symbol_registry_t* registry =
+      iree_hal_streaming_global_symbol_registry();
+  if (!registry) return;
+
+  // DO NOT SUBMIT print status
+  iree_status_t status =
+      iree_hal_streaming_global_symbol_registry_unregister_module(
+          registry, (iree_hal_streaming_module_registration_t*)modules);
+  iree_status_ignore(status);
 }
 
+// Registers a __global__ function (kernel) with the HIP runtime.
+//
+// Parameters:
+//  - modules: [IN] Handle from __hipRegisterFatBinary for the containing
+//                  module.
+//  - hostFunction: [IN] Host-side function pointer (the stub function).
+//                       Used as the key for kernel launches.
+//  - deviceFunction: [IN] Device function name in the fat binary (mangled).
+//                         Must match the symbol name in the device code.
+//  - deviceName: [IN] Human-readable kernel name (typically unmangled).
+//                     Used for profiling and debugging.
+//  - threadLimit: [IN] Maximum threads per block (0 = no limit).
+//  - tid: [UNUSED] Thread index remapping (legacy, pass NULL).
+//  - bid: [UNUSED] Block index remapping (legacy, pass NULL).
+//  - blockDim: [UNUSED] Static block dimensions (legacy, pass NULL).
+//  - gridDim: [UNUSED] Static grid dimensions (legacy, pass NULL).
+//  - wSize: [UNUSED] Static shared memory size (legacy, pass NULL).
+//
+// Calling context:
+// - Called automatically during program startup after __hipRegisterFatBinary.
+// - Called once per __global__ function in the module.
+// - Thread-safe: Protected by internal mutex.
+//
+// Lifetime:
+// - The deviceFunction and deviceName strings are string literals in the
+//   executable's .rodata section and remain valid for the program lifetime.
+// - Registration remains valid until __hipUnregisterFatBinary.
+//
+// Usage:
+// - After registration, kernels are launched using hipLaunchKernel with
+//   the hostFunction pointer as the function argument.
 HIPAPI void __hipRegisterFunction(void** modules, const void* hostFunction,
                                   char* deviceFunction, const char* deviceName,
                                   unsigned int threadLimit, uint3* tid,
                                   uint3* bid, dim3* blockDim, dim3* gridDim,
                                   int* wSize) {
-  // DO NOT SUBMIT
+  if (!modules || !hostFunction || !deviceName) return;
+
+  iree_hal_streaming_global_symbol_registry_t* registry =
+      iree_hal_streaming_global_symbol_registry();
+  if (!registry) return;
+
+  const uint32_t shared_size = wSize ? *wSize : 0;
+
+  // DO NOT SUBMIT print status
+  iree_status_t status =
+      iree_hal_streaming_global_symbol_registry_insert_function(
+          registry, (iree_hal_streaming_module_registration_t*)modules,
+          (void*)hostFunction, deviceName, threadLimit, shared_size);
+  iree_status_ignore(status);
 }
 
+// Registers a __managed__ variable with the HIP runtime.
+//
+// Parameters:
+//  - hipModule: [IN] Handle from __hipRegisterFatBinary for the containing
+//                    module.
+//  - pointer: [IN/OUT] Pointer to the host-side variable pointer.
+//                      Will be updated to point to managed memory.
+//  - init_value: [IN] Initial value to copy (can be NULL).
+//  - name: [IN] Variable name in device code.
+//  - size: [IN] Size of the variable in bytes.
+//  - align: [IN] Required alignment in bytes.
+//
+// Calling context:
+// - Called during program startup after __hipRegisterFatBinary.
+// - Managed memory allows automatic migration between host and device.
+//
+// Lifetime:
+// - Managed memory persists until module unregistration.
+// - The name string must remain valid (typically a string literal).
+//
+// NOTE: Managed variables are accessible from both host and device code
+// without explicit memory transfers. They should not be used in modern code.
 HIPAPI void __hipRegisterManagedVar(void* hipModule, void** pointer,
                                     void* init_value, const char* name,
                                     size_t size, unsigned align) {
-  // DO NOT SUBMIT
+  if (!hipModule || !pointer || !name) return;
+
+  iree_hal_streaming_global_symbol_registry_t* registry =
+      iree_hal_streaming_global_symbol_registry();
+  if (!registry) return;
+
+  // For managed variables, we need to allocate managed memory.
+  // This is a stub implementation - real implementation would allocate
+  // unified memory that can be accessed from both host and device.
+  // For now, we just register the host pointer.
+  //
+  // TODO: Implement proper managed memory allocation when needed.
+  // This would (probably) involve:
+  // 1. Allocating managed memory via hipMallocManaged?
+  // 2. Copying init_value if provided.
+  // 3. Updating *pointer to point to the managed memory.
+  iree_status_t status =
+      iree_hal_streaming_global_symbol_registry_insert_variable(
+          registry, (iree_hal_streaming_module_registration_t*)hipModule,
+          *pointer, name, size, align);
+  iree_status_ignore(status);
 }
 
-HIPAPI void __hipRegisterSurface(void** modules, void* var, char* hostVar,
-                                 char* deviceVar, int type, int ext) {
-  // DO NOT SUBMIT
-}
+// We make the assumption here that the stack depth is always 0 or 1.
+// Clang never emits more than one push per stub call and each stub call pops
+// exactly once. The whole push/pop design is terrible, anyway, and unless we
+// find something that actually uses the stack we keep things simple.
+typedef struct iree_hip_call_configuration_t {
+  dim3 grid_dim;
+  dim3 block_dim;
+  size_t shared_mem;
+  hipStream_t stream;
+  bool valid;  // true if configuration has been pushed
+} iree_hip_call_configuration_t;
+static iree_thread_local iree_hip_call_configuration_t iree_hip_call_config = {
+    0};
 
-HIPAPI void __hipRegisterTexture(void** modules, void* var, char* hostVar,
-                                 char* deviceVar, int type, int norm, int ext) {
-  // DO NOT SUBMIT
-}
-
-HIPAPI void __hipRegisterVar(void** modules, void* var, char* hostVar,
-                             char* deviceVar, int ext, size_t size,
-                             int constant, int global) {
-  // DO NOT SUBMIT
-}
-
+// Pushes kernel launch configuration onto the call stack.
+//
+// Parameters:
+//  - gridDim: [IN] Grid dimensions (number of blocks).
+//  - blockDim: [IN] Block dimensions (threads per block).
+//  - sharedMem: [IN] Dynamic shared memory size in bytes.
+//  - stream: [IN] Stream to launch on (NULL = default stream).
+//
+// Returns:
+//  - hipSuccess: Configuration pushed successfully.
+//  - hipErrorInvalidConfiguration: Invalid launch configuration.
+//
+// Calling context:
+// - Used by <<<>>> kernel launch syntax in HIP/CUDA.
+// - Must be immediately followed by the kernel call.
+// - Thread-local: Each thread has its own configuration stack.
+//
+// Usage:
+// - Compiler transforms kernel<<<grid,block,shared,stream>>>(...) into:
+//   __hipPushCallConfiguration(grid, block, shared, stream);
+//   kernel(...);
+//
+// NOTE: The pushed configuration is consumed by the next kernel launch
+// on the current thread.
 HIPAPI hipError_t __hipPushCallConfiguration(dim3 gridDim, dim3 blockDim,
                                              size_t sharedMem,
                                              hipStream_t stream) {
-  // DO NOT SUBMIT
+  // Store the configuration in thread-local storage.
+  // This will be consumed by the next kernel launch on this thread.
+  iree_hip_call_config.grid_dim = gridDim;
+  iree_hip_call_config.block_dim = blockDim;
+  iree_hip_call_config.shared_mem = sharedMem;
+  iree_hip_call_config.stream = stream;
+  iree_hip_call_config.valid = true;
+  return hipSuccess;
 }
+
+// Pops kernel launch configuration from the call stack.
+//
+// Parameters:
+//  - gridDim: [OUT] Grid dimensions.
+//  - blockDim: [OUT] Block dimensions.
+//  - sharedMem: [OUT] Dynamic shared memory size.
+//  - stream: [OUT] Stream for launch.
+//
+// Returns:
+//  - hipSuccess: Configuration popped successfully.
+//  - hipErrorInvalidValue: No configuration on stack.
+//
+// Calling context:
+// - Used internally by kernel stub functions.
+// - Retrieves configuration pushed by __hipPushCallConfiguration.
+//
+// NOTE: This is typically called from compiler-generated kernel stubs
+// to retrieve launch parameters.
 HIPAPI hipError_t __hipPopCallConfiguration(dim3* gridDim, dim3* blockDim,
                                             size_t* sharedMem,
                                             hipStream_t* stream) {
-  // DO NOT SUBMIT
+  // Check if configuration has been pushed.
+  if (IREE_UNLIKELY(!iree_hip_call_config.valid)) {
+    HIP_RETURN_ERROR(hipErrorInvalidConfiguration);
+  }
+
+  // Return the pushed configuration.
+  if (gridDim) *gridDim = iree_hip_call_config.grid_dim;
+  if (blockDim) *blockDim = iree_hip_call_config.block_dim;
+  if (sharedMem) *sharedMem = iree_hip_call_config.shared_mem;
+  if (stream) *stream = iree_hip_call_config.stream;
+
+  // Mark configuration as consumed.
+  iree_hip_call_config.valid = false;
+  return hipSuccess;
 }

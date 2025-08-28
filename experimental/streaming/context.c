@@ -104,6 +104,19 @@ iree_status_t iree_hal_streaming_context_create(
                                                       &context->buffer_table);
   }
 
+  // Initialize symbol map with global registry as the backing store.
+  iree_hal_streaming_global_symbol_registry_t* registry =
+      iree_hal_streaming_global_symbol_registry();
+  if (!registry) {
+    status = iree_make_status(IREE_STATUS_INTERNAL,
+                              "global symbol registry failed to initialize");
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_streaming_context_symbol_map_initialize(
+        context, /*initial_capacity=*/16, registry, host_allocator,
+        &context->symbol_map);
+  }
+
   // Allocate stream tracking array.
   if (iree_status_is_ok(status)) {
     status = iree_allocator_malloc(
@@ -154,6 +167,10 @@ static void iree_hal_streaming_context_destroy(
     iree_status_ignore(
         iree_hal_streaming_stream_synchronize(context->default_stream));
   }
+
+  // Deinitialize symbol map and unload any statically-registered modules that
+  // were on-demand loaded for this context.
+  iree_hal_streaming_context_symbol_map_deinitialize(&context->symbol_map);
 
   // Free buffer mapping table.
   iree_hal_streaming_buffer_table_free(context->buffer_table);

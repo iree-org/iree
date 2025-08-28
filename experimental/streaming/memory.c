@@ -503,6 +503,30 @@ iree_status_t iree_hal_streaming_memory_memset(
   IREE_ASSERT_ARGUMENT(stream);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // Check if we're capturing to a graph.
+  if (stream->capture_status == IREE_HAL_STREAMING_CAPTURE_STATUS_ACTIVE) {
+    // Add memset node to the graph instead of recording to command buffer.
+    // Convert pattern to uint32_t (assuming pattern_length is 1, 2, or 4).
+    uint32_t pattern_value = 0;
+    if (pattern_length == 1 || pattern_length == 2 || pattern_length == 4) {
+      memcpy(&pattern_value, pattern, pattern_length);
+    } else {
+      IREE_RETURN_AND_END_ZONE_IF_ERROR(
+          z0,
+          iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                           "unsupported pattern length %zu", pattern_length));
+    }
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_hal_streaming_graph_add_memset_node(
+                stream->capture_graph, stream->capture_dependencies,
+                stream->capture_dependency_count, dst, pattern_value,
+                pattern_length, length / pattern_length, NULL));
+    // Clear dependencies after adding the node.
+    stream->capture_dependency_count = 0;
+    IREE_TRACE_ZONE_END(z0);
+    return iree_ok_status();
+  }
+
   // Look up buffer from device pointer.
   iree_hal_streaming_buffer_ref_t dst_ref;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -534,6 +558,19 @@ iree_status_t iree_hal_streaming_memory_memcpy(
   IREE_ASSERT_ARGUMENT(src);
   IREE_ASSERT_ARGUMENT(stream);
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Check if we're capturing to a graph.
+  if (stream->capture_status == IREE_HAL_STREAMING_CAPTURE_STATUS_ACTIVE) {
+    // Add memcpy node to the graph instead of recording to command buffer.
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_hal_streaming_graph_add_memcpy_node(
+                stream->capture_graph, stream->capture_dependencies,
+                stream->capture_dependency_count, dst, src, size, NULL));
+    // Clear dependencies after adding the node.
+    stream->capture_dependency_count = 0;
+    IREE_TRACE_ZONE_END(z0);
+    return iree_ok_status();
+  }
 
   // Look up buffers from device pointers.
   iree_hal_streaming_buffer_ref_t dst_ref;
