@@ -10,7 +10,6 @@
 
 #include <cstdint>
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -64,13 +63,6 @@ LogicalResult tileReductionToSerialLoops(mlir::FunctionOpInterface funcOp,
 /// **misalign** the rows, but not too much.
 LogicalResult reduceSharedMemoryBankConflicts(mlir::FunctionOpInterface funcOp,
                                               unsigned paddingSizeBits);
-
-/// Return true if `op` will be generalized (converted to a linalg.generic) by
-/// the pass GPUGeneralizeNamedOpsPass.
-inline bool isInGPUGeneralizeSet(Operation *op) {
-  return isa<linalg::BatchMatmulOp, linalg::DotOp, linalg::MatmulOp,
-             linalg::MatvecOp, linalg::TransposeOp, linalg::VecmatOp>(op);
-}
 
 // Lowers workgroup memory copies to distributed transfer_read/transfer_write
 // ops. Expects the memory copy to be marked with copy_to_workgroup_memory

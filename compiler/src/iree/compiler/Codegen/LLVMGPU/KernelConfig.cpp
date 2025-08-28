@@ -290,15 +290,13 @@ static CodeGenPipeline getTensorCorePipeline(Type elementType) {
 //====---------------------------------------------------------------------===//
 //
 
-static bool isMatmulLike(linalg::LinalgOp &linalgOp) {
+static bool isMatmulLike(linalg::LinalgOp linalgOp) {
   return linalg::isaContractionOpInterface(linalgOp) &&
          linalgOp.getNumParallelLoops() >= 1;
 };
 
-static bool isGenericWithReductionIterator(linalg::LinalgOp &op) {
-  bool isGeneric =
-      isa<linalg::GenericOp>(op.getOperation()) || isInGPUGeneralizeSet(op);
-  return isGeneric &&
+static bool hasReductionIterator(linalg::LinalgOp op) {
+  return !linalg::isaConvolutionOpInterface(op) &&
          llvm::any_of(op.getIteratorTypesArray(), linalg::isReductionIterator);
 }
 
@@ -643,7 +641,7 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
   };
 
   for (linalg::LinalgOp linalgOp : computeOps) {
-    if (isGenericWithReductionIterator(linalgOp) ||
+    if (hasReductionIterator(linalgOp) ||
         shouldAttachLoweringConfig(linalgOp)) {
       auto loweringConfig = getVectorDistributeReductionConfig(
           linalgOp, target, sharedWgpTiles, workgroupSize, subgroupSize,
@@ -727,7 +725,7 @@ checkDispatchForVectorDistribution(Operation *parentOp) {
       if (isa<linalg::FillOp>(op)) {
         continue;
       }
-      if (isGenericWithReductionIterator(linalgOp) &&
+      if (hasReductionIterator(linalgOp) &&
           failed(checkSingleCombiner(linalgOp))) {
         containsValidReductionOp = false;
         break;
@@ -775,7 +773,7 @@ checkDispatchForVectorDistribution(Operation *parentOp) {
           llvm::seq<int>(indexingMap.getNumResults()), [&](int val) {
             return reductionDims.contains(indexingMap.getDimPosition(val));
           });
-      if (isOperandReduced && isGenericWithReductionIterator(producerOp)) {
+      if (isOperandReduced && hasReductionIterator(producerOp)) {
         return failure();
       }
     }
@@ -821,7 +819,7 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   MLIRContext *context = op.getContext();
   OpBuilder b(context);
 
-  if (!isGenericWithReductionIterator(op)) {
+  if (!hasReductionIterator(op)) {
     return failure();
   }
 
