@@ -279,6 +279,13 @@ static std::optional<ArrayAttr> getPaddingConvSizes(
   return b.getI64ArrayAttr(paddingConvSizes);
 }
 
+static FailureOr<int64_t> getRank(Value in) {
+  if (auto typ = dyn_cast<ShapedType>(in.getType())) {
+    return typ.getRank();
+  }
+  return failure();
+}
+
 /// Create a lowering config for matmul or IGEMM convolution based on iteration
 /// bounds and indexing maps for a given target. This function computes
 /// contraction dimensions and deduces an MMA intrinsic schedule to choose tile
@@ -394,16 +401,11 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   Value init = operands[2];
   if (scaled) {
     init = operands[4];
-    [[maybe_unused]] auto getRank = [](Value a) {
-      if (auto typ = dyn_cast<ShapedType>(a.getType())) {
-        return typ.getRank();
-      }
-      return -1l;
-    };
-    assert(llvm::all_of(operands, [&](Value a) { return getRank(a) != -1l; }) &&
+    assert(llvm::all_of(operands,
+                        [&](Value a) { return succeeded(getRank(a)); }) &&
            "All operands must be a shaped type");
-    assert(getRank(lhs) > getRank(operands[3]) &&
-           getRank(rhs) > getRank(operands[4]) &&
+    assert(*getRank(lhs) > *getRank(operands[3]) &&
+           *getRank(rhs) > *getRank(operands[4]) &&
            "Expected operands #1 and #2 to have a greater rank then their "
            "corresponding scales, operands #3 and #4");
   }
