@@ -247,6 +247,15 @@ iree_status_t iree_hal_streaming_stream_wait_event(
   IREE_ASSERT_ARGUMENT(event);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // Check if we're capturing to a graph.
+  if (stream->capture_status == IREE_HAL_STREAMING_CAPTURE_STATUS_ACTIVE) {
+    // Event wait during graph capture is not yet implemented.
+    // TODO(#graph-capture): Add wait node to graph.
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "event wait during graph capture not yet implemented");
+  }
+
   // Flush the stream to ensure all prior operations are submitted.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(z0,
                                     iree_hal_streaming_stream_flush(stream));
@@ -355,12 +364,6 @@ iree_status_t iree_hal_streaming_launch_kernel(
         "cooperative kernel launch not yet implemented in HAL layer");
   }
 
-  // Ensure command buffer is recording.
-  if (!stream->command_buffer) {
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(z0,
-                                      iree_hal_streaming_stream_begin(stream));
-  }
-
   // Verify parameter buffer.
   // TODO(benvanik): pass size when we have it so we can check it.
   if (!params->buffer && symbol->parameters.buffer_size > 0) {
@@ -380,6 +383,12 @@ iree_status_t iree_hal_streaming_launch_kernel(
     stream->capture_dependency_count = 0;
     IREE_TRACE_ZONE_END(z0);
     return iree_ok_status();
+  }
+
+  // Ensure command buffer is recording.
+  if (!stream->command_buffer) {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(z0,
+                                      iree_hal_streaming_stream_begin(stream));
   }
 
   // Stack allocate arrays based on cached sizes.
@@ -453,6 +462,19 @@ iree_status_t iree_hal_streaming_launch_host_function(
   IREE_ASSERT_ARGUMENT(stream);
   IREE_ASSERT_ARGUMENT(fn);
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Check if we're capturing to a graph.
+  if (stream->capture_status == IREE_HAL_STREAMING_CAPTURE_STATUS_ACTIVE) {
+    // Add host call node to the graph instead of executing immediately.
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_hal_streaming_graph_add_host_call_node(
+                stream->capture_graph, stream->capture_dependencies,
+                stream->capture_dependency_count, fn, user_data, NULL));
+    // Clear dependencies after adding the node.
+    stream->capture_dependency_count = 0;
+    IREE_TRACE_ZONE_END(z0);
+    return iree_ok_status();
+  }
 
   // Flush any pending operations in the stream's command buffer.
   if (stream->command_buffer) {

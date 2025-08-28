@@ -36,17 +36,75 @@ typedef struct iree_hal_streaming_buffer_t iree_hal_streaming_buffer_t;
 typedef struct iree_hal_streaming_buffer_table_t
     iree_hal_streaming_buffer_table_t;
 typedef struct iree_hal_streaming_context_t iree_hal_streaming_context_t;
+typedef struct iree_hal_streaming_context_module_entry_t
+    iree_hal_streaming_context_module_entry_t;
+typedef struct iree_hal_streaming_context_symbol_map_t
+    iree_hal_streaming_context_symbol_map_t;
 typedef struct iree_hal_streaming_device_t iree_hal_streaming_device_t;
 typedef struct iree_hal_streaming_device_registry_t
     iree_hal_streaming_device_registry_t;
 typedef struct iree_hal_streaming_event_t iree_hal_streaming_event_t;
+typedef struct iree_hal_streaming_global_symbol_registry_t
+    iree_hal_streaming_global_symbol_registry_t;
 typedef struct iree_hal_streaming_graph_t iree_hal_streaming_graph_t;
 typedef struct iree_hal_streaming_graph_exec_t iree_hal_streaming_graph_exec_t;
 typedef struct iree_hal_streaming_graph_node_t iree_hal_streaming_graph_node_t;
 typedef struct iree_hal_streaming_mem_pool_t iree_hal_streaming_mem_pool_t;
 typedef struct iree_hal_streaming_module_t iree_hal_streaming_module_t;
+typedef struct iree_hal_streaming_module_registration_t
+    iree_hal_streaming_module_registration_t;
 typedef struct iree_hal_streaming_stream_t iree_hal_streaming_stream_t;
 typedef struct iree_hal_streaming_symbol_t iree_hal_streaming_symbol_t;
+
+//===----------------------------------------------------------------------===//
+// Symbol tagging
+//===----------------------------------------------------------------------===//
+//
+// We use pointer tagging to quickly identify symbols returned from our registry
+// vs raw device pointers from the driver API. This avoids the slow lookup path
+// for device pointers.
+//
+// We use bits 48-55 (8 bits) which are safe across x86-64, ARM64, and RISC-V:
+// - x86-64: non-canonical address bits (must be sign-extended from bit 47)
+// - ARM64: top byte ignore (TBI) feature ignores bits 56-63
+// - RISC-V: similar to x86-64 canonical addressing
+//
+// This gives us 8 bits for tagging, which is plenty for our needs.
+
+#define IREE_HAL_STREAMING_SYMBOL_TAG_SHIFT 48
+#define IREE_HAL_STREAMING_SYMBOL_TAG_MASK 0x00FF000000000000ULL
+#define IREE_HAL_STREAMING_SYMBOL_TAG_VALUE 0x00EE000000000000ULL
+
+// Tags a symbol pointer to mark it as coming from our registry.
+static inline iree_hal_streaming_symbol_t* iree_hal_streaming_symbol_tag(
+    iree_hal_streaming_symbol_t* symbol) {
+  uintptr_t ptr = (uintptr_t)symbol;
+  // Clear bits 48-55 and set our tag value.
+  ptr = (ptr & 0xFF00FFFFFFFFFFFFULL) | IREE_HAL_STREAMING_SYMBOL_TAG_VALUE;
+  return (iree_hal_streaming_symbol_t*)ptr;
+}
+
+// Checks if a pointer has our tag.
+static inline bool iree_hal_streaming_symbol_has_tag(const void* ptr) {
+  return ((uintptr_t)ptr & IREE_HAL_STREAMING_SYMBOL_TAG_MASK) ==
+         IREE_HAL_STREAMING_SYMBOL_TAG_VALUE;
+}
+
+// Removes tag to get original pointer.
+static inline iree_hal_streaming_symbol_t* iree_hal_streaming_symbol_untag(
+    const void* ptr) {
+  uintptr_t untagged = (uintptr_t)ptr;
+  // Clear our tag bits (48-55).
+  untagged = untagged & 0xFF00FFFFFFFFFFFFULL;
+  // Restore sign extension: if bit 47 is set, set bits 48-63.
+  if (untagged & 0x0000800000000000ULL) {
+    untagged |= 0xFFFF000000000000ULL;
+  }
+  return (iree_hal_streaming_symbol_t*)untagged;
+}
+
+// Type for tagged symbol pointers to prevent accidental dereferencing.
+typedef uintptr_t iree_hal_streaming_tagged_symbol_ptr_t;
 
 //===----------------------------------------------------------------------===//
 // Context types
@@ -86,8 +144,48 @@ typedef struct iree_hal_streaming_limits_t {
   size_t persisting_l2_cache_size;          // Persistent L2 cache size.
 } iree_hal_streaming_limits_t;
 
+// Tracks a module loaded into a context symbol map.
+typedef struct iree_hal_streaming_context_module_entry_t {
+  // Module registration from the global registry (for identification).
+  iree_hal_streaming_module_registration_t* registration;
+  // Compiled module for this context's device (retained).
+  iree_hal_streaming_module_t* module;
+  // Linked list pointers.
+  struct iree_hal_streaming_context_module_entry_t* next;
+} iree_hal_streaming_context_module_entry_t;
+
+typedef struct iree_hal_streaming_context_symbol_entry_t {
+  void* key;
+  iree_hal_streaming_symbol_t* symbol;
+} iree_hal_streaming_context_symbol_entry_t;
+
+// Per-context cache of compiled symbols.
+// Lock-free for lookups (thread-local access).
+// Updated via notifications from global registry.
+typedef struct iree_hal_streaming_context_symbol_map_t {
+  // Hash table: host pointer -> compiled symbol on the context device.
+  iree_hal_streaming_context_symbol_entry_t* entries;
+  iree_host_size_t capacity;
+  iree_host_size_t count;
+
+  // List of modules loaded into this context.
+  iree_hal_streaming_context_module_entry_t* modules;
+
+  // Notification list linkage.
+  struct iree_hal_streaming_context_symbol_map_t* next;
+  struct iree_hal_streaming_context_symbol_map_t* prev;
+
+  // Associated context (not owned).
+  iree_hal_streaming_context_t* context;
+
+  // Global registry the map is tracking.
+  iree_hal_streaming_global_symbol_registry_t* registry;
+
+  iree_allocator_t host_allocator;
+} iree_hal_streaming_context_symbol_map_t;
+
 // Stream context mapped to HAL device.
-typedef struct iree_hal_streaming_context_t {
+struct iree_hal_streaming_context_t {
   // Reference counting.
   iree_atomic_ref_count_t ref_count;
 
@@ -143,7 +241,13 @@ typedef struct iree_hal_streaming_context_t {
     iree_hal_streaming_context_t* next;
     iree_hal_streaming_context_t* prev;
   } context_list_entry;
-} iree_hal_streaming_context_t;
+
+  // Symbol map for HIP/CUDA-style __hip*/__cuda* nasty registration functions.
+  // Lazily initialized on first use. Only used in programs compiled with
+  // HIP/CUDA C++ and embedded kernels split out by the compiler. If only using
+  // the driver API with explicit module management this is bypassed.
+  iree_hal_streaming_context_symbol_map_t symbol_map;
+};
 
 //===----------------------------------------------------------------------===//
 // Device types
@@ -336,9 +440,10 @@ typedef struct iree_hal_streaming_stream_t {
 
 // Symbol type enumeration.
 typedef enum iree_hal_streaming_symbol_type_e {
-  IREE_HAL_STREAMING_SYMBOL_TYPE_FUNCTION = 0,
-  IREE_HAL_STREAMING_SYMBOL_TYPE_GLOBAL = 1,
-  IREE_HAL_STREAMING_SYMBOL_TYPE_DATA = 2,
+  IREE_HAL_STREAMING_SYMBOL_TYPE_UNDEFINED = 0,  // Deleted/invalid entry.
+  IREE_HAL_STREAMING_SYMBOL_TYPE_FUNCTION = 1,
+  IREE_HAL_STREAMING_SYMBOL_TYPE_GLOBAL = 2,
+  IREE_HAL_STREAMING_SYMBOL_TYPE_DATA = 3,
 } iree_hal_streaming_symbol_type_t;
 
 // Copy operation: memcpy(dst_offset, src_offset, size).
@@ -904,7 +1009,6 @@ iree_status_t iree_hal_streaming_module_create_from_file(
     iree_hal_executable_caching_mode_t caching_mode, iree_string_view_t path,
     iree_allocator_t host_allocator, iree_hal_streaming_module_t** out_module);
 
-// Synchronization: none (reference counting).
 void iree_hal_streaming_module_retain(iree_hal_streaming_module_t* module);
 void iree_hal_streaming_module_release(iree_hal_streaming_module_t* module);
 
@@ -1340,6 +1444,13 @@ iree_status_t iree_hal_streaming_graph_create(
 void iree_hal_streaming_graph_retain(iree_hal_streaming_graph_t* graph);
 void iree_hal_streaming_graph_release(iree_hal_streaming_graph_t* graph);
 
+iree_host_size_t iree_hal_streaming_graph_size(
+    iree_hal_streaming_graph_t* graph);
+
+void iree_hal_streaming_graph_get_nodes(
+    iree_hal_streaming_graph_t* graph, iree_host_size_t count,
+    iree_hal_streaming_graph_node_t** nodes);
+
 iree_status_t iree_hal_streaming_graph_add_empty_node(
     iree_hal_streaming_graph_t* graph,
     iree_hal_streaming_graph_node_t** dependencies,
@@ -1423,6 +1534,133 @@ iree_status_t iree_hal_streaming_update_capture_dependencies(
     iree_hal_streaming_graph_node_t** dependencies,
     iree_host_size_t dependency_count,
     iree_hal_streaming_capture_dependencies_mode_t mode);
+
+//===----------------------------------------------------------------------===//
+// Symbol registry
+//===----------------------------------------------------------------------===//
+
+// Complete registration information for a symbol.
+// This contains all the metadata needed to create device-specific symbols.
+// Used for both functions and variables (differentiated by type).
+typedef struct iree_hal_streaming_symbol_registration_t {
+  // Host-side pointer (function or variable).
+  void* host_pointer;
+  // Symbol type.
+  iree_hal_streaming_symbol_type_t type;
+  // Device name (for compilation/lookup).
+  // Points directly to the string in the fat binary - must remain valid for
+  // the lifetime of the registration.
+  const char* device_name;
+  // Module registration that owns this symbol.
+  iree_hal_streaming_module_registration_t* module;
+  union {
+    // Function-specific metadata (only valid if type == FUNCTION).
+    struct {
+      uint32_t thread_limit;
+      uint32_t block_dim[3];
+      uint32_t grid_dim[3];
+      uint32_t shared_size_bytes;
+    } function;
+    // Variable-specific metadata (only valid if type == GLOBAL/DATA).
+    struct {
+      size_t size;
+      uint32_t alignment;
+    } variable;
+  } params;
+} iree_hal_streaming_symbol_registration_t;
+
+// Module registration tracking registered modules and their symbols.
+typedef struct iree_hal_streaming_module_registration_t {
+  // Fat binary data pointer (opaque, interpretation depends on platform).
+  const void* module_binary;
+  // Array of symbol registrations owned by this module.
+  iree_hal_streaming_symbol_registration_t* symbols;
+  iree_host_size_t symbol_count;
+  iree_host_size_t symbol_capacity;
+} iree_hal_streaming_module_registration_t;
+
+// Global registry that holds all symbol registrations and manages local
+// per-context hash maps.
+// Typically one per process, created on demand by HIP/CUDA bindings.
+//
+// Thread-safe: modules and symbols can be registered/unregistered from any
+// thread.
+typedef struct iree_hal_streaming_global_symbol_registry_t {
+  iree_allocator_t host_allocator;
+  iree_slim_mutex_t mutex;
+
+  // All registered modules (array of pointers for stable addresses).
+  iree_hal_streaming_module_registration_t** modules;
+  iree_host_size_t module_count;
+  iree_host_size_t module_capacity;
+
+  // Linked list of all context maps for notifications.
+  iree_hal_streaming_context_symbol_map_t* context_maps_head;
+} iree_hal_streaming_global_symbol_registry_t;
+
+// Returns the global symbol registry, initializing it on first access.
+// Thread-safe via call_once semantics.
+// Returns NULL if initialization fails.
+iree_hal_streaming_global_symbol_registry_t*
+iree_hal_streaming_global_symbol_registry(void);
+
+// Allocates a new global symbol registry.
+// Callers must manage global lifetime to ensure that we don't mix registries
+// from different binding layers.
+iree_status_t iree_hal_streaming_global_symbol_registry_allocate(
+    iree_allocator_t host_allocator,
+    iree_hal_streaming_global_symbol_registry_t** out_registry);
+
+// Frees a global symbol registry.
+void iree_hal_streaming_global_symbol_registry_free(
+    iree_hal_streaming_global_symbol_registry_t* registry);
+
+// Registers a module binary with the registry.
+// Returns an opaque handle that should be passed to unregister.
+iree_status_t iree_hal_streaming_global_symbol_registry_register_module(
+    iree_hal_streaming_global_symbol_registry_t* registry,
+    const void* module_binary,
+    iree_hal_streaming_module_registration_t** out_module);
+
+// Unregisters a module and all its symbols.
+iree_status_t iree_hal_streaming_global_symbol_registry_unregister_module(
+    iree_hal_streaming_global_symbol_registry_t* registry,
+    iree_hal_streaming_module_registration_t* module);
+
+// Registers a function within a module.
+iree_status_t iree_hal_streaming_global_symbol_registry_insert_function(
+    iree_hal_streaming_global_symbol_registry_t* registry,
+    iree_hal_streaming_module_registration_t* module, void* host_function,
+    const char* device_name, uint32_t thread_limit, uint32_t shared_size_bytes);
+
+// Registers a global variable within a module.
+iree_status_t iree_hal_streaming_global_symbol_registry_insert_variable(
+    iree_hal_streaming_global_symbol_registry_t* registry,
+    iree_hal_streaming_module_registration_t* module, void* host_variable,
+    const char* device_name, size_t size, uint32_t alignment);
+
+// Initializes a context-specific symbol map.
+// It will be registered with the given global |registry| until it is
+// deinitialized.
+iree_status_t iree_hal_streaming_context_symbol_map_initialize(
+    iree_hal_streaming_context_t* context, iree_host_size_t initial_capacity,
+    iree_hal_streaming_global_symbol_registry_t* registry,
+    iree_allocator_t host_allocator,
+    iree_hal_streaming_context_symbol_map_t* out_map);
+
+// Deinitializes a context symbol map.
+void iree_hal_streaming_context_symbol_map_deinitialize(
+    iree_hal_streaming_context_symbol_map_t* map);
+
+// Looks up a symbol in the context map.
+// If not found:
+// - Checks global registry for registration
+// - Loads the module executable into the context
+// - Inserts all symbols from the module into the context map
+// Returns identity if not found (assumes it's a driver API symbol).
+iree_status_t iree_hal_streaming_context_symbol_map_lookup(
+    iree_hal_streaming_context_symbol_map_t* map, void* host_pointer,
+    iree_hal_streaming_symbol_t** out_symbol);
 
 #ifdef __cplusplus
 }

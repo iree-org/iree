@@ -979,6 +979,9 @@ HIPAPI hipError_t hipFuncSetSharedMemConfig(hipFunction_t hfunc,
                                             hipSharedMemConfig config);
 
 // Execution control
+HIPAPI hipError_t hipLaunchKernel(const void* function_address,
+                                  dim3 numBlocks, dim3 dimBlocks, void** args,
+                                  size_t sharedMemBytes, hipStream_t stream);
 HIPAPI hipError_t hipModuleLaunchKernel(
     hipFunction_t f, unsigned int gridDimX, unsigned int gridDimY,
     unsigned int gridDimZ, unsigned int blockDimX, unsigned int blockDimY,
@@ -1067,6 +1070,8 @@ HIPAPI hipError_t hipGraphAddEmptyNode(hipGraphNode_t* pGraphNode,
                                        hipGraph_t graph,
                                        const hipGraphNode_t* pDependencies,
                                        size_t numDependencies);
+HIPAPI hipError_t hipGraphGetNodes(hipGraph_t graph, hipGraphNode_t* pNodes,
+                                   size_t* numNodes);
 
 // Stream capture
 HIPAPI hipError_t hipStreamBeginCapture(hipStream_t stream,

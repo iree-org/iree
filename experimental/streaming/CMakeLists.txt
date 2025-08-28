@@ -28,6 +28,7 @@ iree_cc_library(
     "memory.c"
     "module.c"
     "peer.c"
+    "registry.c"
     "stream.c"
   DEPS
     ::internal
