@@ -2236,7 +2236,7 @@ LogicalResult ExpReductionOp::verify() {
     return op->emitOpError("expected at least one output operand to reduce");
   }
 
-  for (long reducedOperand : getExpReducedOperands()) {
+  for (int64_t reducedOperand : getExpReducedOperands()) {
     if (reducedOperand == 0) {
       return op->emitOpError(
           "Index of output operand in exp_reduced_operands cannot be 0.");
