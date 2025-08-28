@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Common/CombineLayoutTransformation.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
@@ -441,6 +442,17 @@ static LogicalResult
 swapCollapseShapeWithSlice(RewriterBase &rewriter,
                            tensor::CollapseShapeOp collapseShapeOp,
                            tensor::ExtractSliceOp sliceOp) {
+  // FIXME: this is a workaround for the fact that this inf loops due to the
+  // creation of `affine::AffineDelinearizeIndexOp` but still returns failure.
+  SmallVector<Operation *> createdOps;
+  auto scope = llvm::make_scope_exit([&]() {
+    for (Operation *op : createdOps) {
+      if (op->use_empty()) {
+        rewriter.eraseOp(op);
+      }
+    }
+  });
+
   // The tensor.extract_slice before applying the pattern works on the result
   // of the tensor.collapse_shape, so variables (i.e. inputs for
   // ExtractSliceOp) referring to the state before applying the pattern are
@@ -532,6 +544,7 @@ swapCollapseShapeWithSlice(RewriterBase &rewriter,
         }
         auto delinearizeOp = rewriter.create<affine::AffineDelinearizeIndexOp>(
             sliceOp.getLoc(), cast<Value>(collapsedOffset), expandedBasis);
+        createdOps.push_back(delinearizeOp);
         ValueRange offsets = delinearizeOp.getResults();
         expandedOffsets.append(offsets.begin(), offsets.end());
 
