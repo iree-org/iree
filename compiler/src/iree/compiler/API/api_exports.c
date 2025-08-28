@@ -113,6 +113,7 @@ extern void ireeGPUPipelineOptionsAttrGetUseIgemmConvolution();
 extern void ireeGPUReorderWorkgroupsStrategyAttrGet();
 extern void ireeGPUReorderWorkgroupsStrategyAttrGetTypeID();
 extern void ireeGPUReorderWorkgroupsStrategyAttrGetValue();
+extern void ireeHALExecutableTargetAttrGetGPUTargetInfo();
 extern void ireeMlirLspServerRunMain();
 extern void ireeOptRunMain();
 extern void ireeReduceRunMain();
@@ -1027,6 +1028,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeGPUReorderWorkgroupsStrategyAttrGet;
   x += (uintptr_t)&ireeGPUReorderWorkgroupsStrategyAttrGetTypeID;
   x += (uintptr_t)&ireeGPUReorderWorkgroupsStrategyAttrGetValue;
+  x += (uintptr_t)&ireeHALExecutableTargetAttrGetGPUTargetInfo;
   x += (uintptr_t)&ireeMlirLspServerRunMain;
   x += (uintptr_t)&ireeOptRunMain;
   x += (uintptr_t)&ireeReduceRunMain;
