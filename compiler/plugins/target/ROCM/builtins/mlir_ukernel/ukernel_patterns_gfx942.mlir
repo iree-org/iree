@@ -15,13 +15,20 @@ pdl.pattern @annotate_matmul_like_f8_medium_expanded : benefit(1) {
   %lhs_type = pdl.type
   %rhs_type = pdl.type
   %out_type = pdl.type
+  %zero_type = pdl.type : f32
 
   %lhs = pdl.operand : %lhs_type
   %rhs = pdl.operand : %rhs_type
   %out_init = pdl.operand : %out_type
 
-  // Match the a matmul-like generic with above indexin maps.
-  %generic_op = pdl.operation (%lhs, %rhs, %out_init : !pdl.value, !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
+  %zero_val = pdl.attribute = 0. : f32
+  %zero_op = pdl.operation "arith.constant" {"value" = %zero_val} -> (%zero_type : !pdl.type)
+  %zero = pdl.result 0 of %zero_op
+  %fill_op = pdl.operation "linalg.fill" (%zero, %out_init : !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
+  %fill = pdl.result 0 of %fill_op
+
+  // Match the a matmul-like generic with above indexing maps.
+  %generic_op = pdl.operation (%lhs, %rhs, %fill : !pdl.value, !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
   pdl.apply_native_constraint "matchContraction"(
         %generic_op, %elemtypes, %imaps
         : !pdl.operation, !pdl.attribute, !pdl.attribute)
@@ -94,13 +101,20 @@ pdl.pattern @annotate_matmul_like_f8_large_expanded : benefit(2) {
   %lhs_type = pdl.type
   %rhs_type = pdl.type
   %out_type = pdl.type
+  %zero_type = pdl.type : f32
 
   %lhs = pdl.operand : %lhs_type
   %rhs = pdl.operand : %rhs_type
   %out_init = pdl.operand : %out_type
 
+  %zero_val = pdl.attribute = 0. : f32
+  %zero_op = pdl.operation "arith.constant" {"value" = %zero_val} -> (%zero_type : !pdl.type)
+  %zero = pdl.result 0 of %zero_op
+  %fill_op = pdl.operation "linalg.fill" (%zero, %out_init : !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
+  %fill = pdl.result 0 of %fill_op
+
   // Match the a matmul-like generic with above indexing maps.
-  %generic_op = pdl.operation (%lhs, %rhs, %out_init : !pdl.value, !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
+  %generic_op = pdl.operation (%lhs, %rhs, %fill : !pdl.value, !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
   pdl.apply_native_constraint "matchContraction"(
         %generic_op, %elemtypes, %imaps
         : !pdl.operation, !pdl.attribute, !pdl.attribute)
@@ -180,13 +194,20 @@ pdl.pattern @annotate_matmul_like_f16_large : benefit(1) {
   %lhs_type = pdl.type
   %rhs_type = pdl.type
   %out_type = pdl.type
+  %zero_type = pdl.type : f32
 
   %lhs = pdl.operand : %lhs_type
   %rhs = pdl.operand : %rhs_type
   %out_init = pdl.operand : %out_type
 
+  %zero_val = pdl.attribute = 0. : f32
+  %zero_op = pdl.operation "arith.constant" {"value" = %zero_val} -> (%zero_type : !pdl.type)
+  %zero = pdl.result 0 of %zero_op
+  %fill_op = pdl.operation "linalg.fill" (%zero, %out_init : !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
+  %fill = pdl.result 0 of %fill_op
+
   // Match the a matmul-like generic with above indexing maps.
-  %generic_op = pdl.operation (%lhs, %rhs, %out_init : !pdl.value, !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
+  %generic_op = pdl.operation (%lhs, %rhs, %fill : !pdl.value, !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
   pdl.apply_native_constraint "matchContraction"(
         %generic_op, %elemtypes, %imaps
         : !pdl.operation, !pdl.attribute, !pdl.attribute)
@@ -256,13 +277,20 @@ pdl.pattern @annotate_matmul_like_f16_medium_expanded : benefit(1) {
   %lhs_type = pdl.type
   %rhs_type = pdl.type
   %out_type = pdl.type
+  %zero_type = pdl.type : f32
 
   %lhs = pdl.operand : %lhs_type
   %rhs = pdl.operand : %rhs_type
   %out_init = pdl.operand : %out_type
 
+  %zero_val = pdl.attribute = 0. : f32
+  %zero_op = pdl.operation "arith.constant" {"value" = %zero_val} -> (%zero_type : !pdl.type)
+  %zero = pdl.result 0 of %zero_op
+  %fill_op = pdl.operation "linalg.fill" (%zero, %out_init : !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
+  %fill = pdl.result 0 of %fill_op
+
   // Match the a matmul-like generic with above indexing maps.
-  %generic_op = pdl.operation (%lhs, %rhs, %out_init : !pdl.value, !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
+  %generic_op = pdl.operation (%lhs, %rhs, %fill : !pdl.value, !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
   pdl.apply_native_constraint "matchContraction"(
         %generic_op, %elemtypes, %imaps
         : !pdl.operation, !pdl.attribute, !pdl.attribute)
@@ -339,13 +367,20 @@ pdl.pattern @annotate_matmul_like_f16_large_expanded : benefit(2) {
   %lhs_type = pdl.type
   %rhs_type = pdl.type
   %out_type = pdl.type
+  %zero_type = pdl.type : f32
 
   %lhs = pdl.operand : %lhs_type
   %rhs = pdl.operand : %rhs_type
   %out_init = pdl.operand : %out_type
 
+  %zero_val = pdl.attribute = 0. : f32
+  %zero_op = pdl.operation "arith.constant" {"value" = %zero_val} -> (%zero_type : !pdl.type)
+  %zero = pdl.result 0 of %zero_op
+  %fill_op = pdl.operation "linalg.fill" (%zero, %out_init : !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
+  %fill = pdl.result 0 of %fill_op
+
   // Match the a matmul-like generic with above indexing maps.
-  %generic_op = pdl.operation (%lhs, %rhs, %out_init : !pdl.value, !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
+  %generic_op = pdl.operation (%lhs, %rhs, %fill : !pdl.value, !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
   pdl.apply_native_constraint "matchContraction"(
         %generic_op, %elemtypes, %imaps
         : !pdl.operation, !pdl.attribute, !pdl.attribute)
@@ -385,7 +420,7 @@ pdl.pattern @annotate_matmul_like_f16_large_expanded : benefit(2) {
 
     %config_name = pdl.attribute = "compilation_info"
     %config = pdl.attribute = #iree_codegen.compilation_info<
-      lowering_config = #iree_gpu.lowering_config<{workgroup = [1, 128, 256, 0]}>,
+      lowering_config = #iree_gpu.lowering_config<{workgroup = [1, 256, 256, 0]}>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
         // This strategy uses the maximum amount of possible shared memory on
@@ -422,13 +457,20 @@ pdl.pattern @annotate_matmul_like_bf16_large : benefit(1) {
   %lhs_type = pdl.type
   %rhs_type = pdl.type
   %out_type = pdl.type
+  %zero_type = pdl.type : f32
 
   %lhs = pdl.operand : %lhs_type
   %rhs = pdl.operand : %rhs_type
   %out_init = pdl.operand : %out_type
 
+  %zero_val = pdl.attribute = 0. : f32
+  %zero_op = pdl.operation "arith.constant" {"value" = %zero_val} -> (%zero_type : !pdl.type)
+  %zero = pdl.result 0 of %zero_op
+  %fill_op = pdl.operation "linalg.fill" (%zero, %out_init : !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
+  %fill = pdl.result 0 of %fill_op
+
   // Match the a matmul-like generic with above indexing maps.
-  %generic_op = pdl.operation (%lhs, %rhs, %out_init : !pdl.value, !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
+  %generic_op = pdl.operation (%lhs, %rhs, %fill : !pdl.value, !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
   pdl.apply_native_constraint "matchContraction"(
         %generic_op, %elemtypes, %imaps
         : !pdl.operation, !pdl.attribute, !pdl.attribute)
@@ -498,13 +540,20 @@ pdl.pattern @annotate_matmul_like_bf16_medium_expanded : benefit(1) {
   %lhs_type = pdl.type
   %rhs_type = pdl.type
   %out_type = pdl.type
+  %zero_type = pdl.type : f32
 
   %lhs = pdl.operand : %lhs_type
   %rhs = pdl.operand : %rhs_type
   %out_init = pdl.operand : %out_type
 
+  %zero_val = pdl.attribute = 0. : f32
+  %zero_op = pdl.operation "arith.constant" {"value" = %zero_val} -> (%zero_type : !pdl.type)
+  %zero = pdl.result 0 of %zero_op
+  %fill_op = pdl.operation "linalg.fill" (%zero, %out_init : !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
+  %fill = pdl.result 0 of %fill_op
+
   // Match the a matmul-like generic with above indexing maps.
-  %generic_op = pdl.operation (%lhs, %rhs, %out_init : !pdl.value, !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
+  %generic_op = pdl.operation (%lhs, %rhs, %fill : !pdl.value, !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
   pdl.apply_native_constraint "matchContraction"(
         %generic_op, %elemtypes, %imaps
         : !pdl.operation, !pdl.attribute, !pdl.attribute)
@@ -583,13 +632,20 @@ pdl.pattern @annotate_matmul_like_bf16_large_expanded : benefit(2) {
   %lhs_type = pdl.type
   %rhs_type = pdl.type
   %out_type = pdl.type
+  %zero_type = pdl.type : f32
 
   %lhs = pdl.operand : %lhs_type
   %rhs = pdl.operand : %rhs_type
   %out_init = pdl.operand : %out_type
 
+  %zero_val = pdl.attribute = 0. : f32
+  %zero_op = pdl.operation "arith.constant" {"value" = %zero_val} -> (%zero_type : !pdl.type)
+  %zero = pdl.result 0 of %zero_op
+  %fill_op = pdl.operation "linalg.fill" (%zero, %out_init : !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
+  %fill = pdl.result 0 of %fill_op
+
   // Match the a matmul-like generic with above indexing maps.
-  %generic_op = pdl.operation (%lhs, %rhs, %out_init : !pdl.value, !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
+  %generic_op = pdl.operation (%lhs, %rhs, %fill : !pdl.value, !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
   pdl.apply_native_constraint "matchContraction"(
         %generic_op, %elemtypes, %imaps
         : !pdl.operation, !pdl.attribute, !pdl.attribute)
