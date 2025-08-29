@@ -497,14 +497,14 @@ def HAL_PipelineLayoutAttr :
     lower-level target-specific argument passing behavior.
   }];
   let parameters = (ins
-    ArrayRefParameter<"PipelineBindingAttr", "">:$bindings,
+    OptionalArrayRefParameter<"PipelineBindingAttr", "">:$bindings,
     OptionalParameter<"int64_t", "0">:$constants,
     OptionalParameter<"std::optional<PipelineLayoutFlags>">:$flags
   );
   let assemblyFormat = [{
     `<`
     (`constants` `=` $constants^ `,` ` `)?
-    `bindings` `=` `[` qualified($bindings) `]`
+    `bindings` `=` `[` (`]`) : (qualified($bindings)^ `]`)?
     (`,` `flags` `=` $flags^)?
     `>`
   }];
