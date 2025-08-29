@@ -1,5 +1,5 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-stablehlo-legalize-chlo))" \
-// RUN:   --split-input-file --verify-diagnostics %s | FileCheck %s
+// RUN: iree-opt --chlo-legalize-to-stablehlo \
+// RUN:     --split-input-file --verify-diagnostics %s | FileCheck %s
 
 // CHECK-LABEL: func.func @asin_bf16(
 func.func @asin_bf16(%arg : tensor<bf16>) -> tensor<bf16> {
@@ -508,6 +508,8 @@ func.func @erf_inv_wide(%arg0 : tensor<16x16xf64>) {
 
 // -----
 
+// CHECK-LABEL: @complex_tan
+// CHECK-SAME: %[[ARG0:.+]]: tensor<1xf32>, %[[ARG1:.+]]: tensor<1xf32>
 func.func @complex_tan(%arg0 : tensor<1xf32>, %arg1 : tensor<1xf32>) -> (tensor<1xf32>, tensor<1xf32>) {
   %0 = stablehlo.complex %arg0, %arg1 : tensor<1xcomplex<f32>>
   %1 = chlo.tan %0 : tensor<1xcomplex<f32>> -> tensor<1xcomplex<f32>>
@@ -516,18 +518,21 @@ func.func @complex_tan(%arg0 : tensor<1xf32>, %arg1 : tensor<1xf32>) -> (tensor<
   func.return %2, %3 : tensor<1xf32>, tensor<1xf32>
 }
 
-// CHECK-LABEL: @complex_tan
-// CHECK-SAME: %[[ARG0:.+]]: tensor<1xf32>, %[[ARG1:.+]]: tensor<1xf32>
-// CHECK: %[[ONE:.+]] = stablehlo.constant dense<1.000000e+00> : tensor<1xf32>
-// CHECK: %[[SINE:.+]] = stablehlo.sine %[[ARG0]]
-// CHECK: %[[COS:.+]] = stablehlo.cosine %[[ARG0]]
-// CHECK: %[[TAN:.+]] = stablehlo.divide %[[SINE]], %[[COS]]
-// CHECK: %[[TANH:.+]] = stablehlo.tanh %[[ARG1]]
-// CHECK: %[[NUM:.+]] = stablehlo.complex %[[TAN]], %[[TANH]]
-// CHECK: %[[MUL:.+]] = stablehlo.multiply %[[TAN]], %[[TANH]]
-// CHECK: %[[NEG:.+]] = stablehlo.negate %[[MUL]]
-// CHECK: %[[DEN:.+]] = stablehlo.complex %[[ONE]], %[[NEG]]
-// CHECK: %[[RES:.+]] = stablehlo.divide %[[NUM]], %[[DEN]]
-// CHECK: %[[REAL:.+]] = stablehlo.real %[[RES]]
-// CHECK: %[[IMAG:.+]] = stablehlo.imag %[[RES]]
-// CHECK: return %[[REAL]], %[[IMAG]]
+
+// -----
+
+// CHECK-LABEL:  func.func @acos_complex_f32
+// CHECK-SAME:    (%[[ARG0:.+]]: tensor<complex<f32>>) -> tensor<complex<f32>>
+func.func @acos_complex_f32(%arg : tensor<complex<f32>>) -> tensor<complex<f32>> {
+  %result = "chlo.acos"(%arg) : (tensor<complex<f32>>) -> tensor<complex<f32>>
+  func.return %result : tensor<complex<f32>>
+}
+
+// -----
+
+// CHECK-LABEL:  func.func @acos_complex_f64_dynamic
+// CHECK-SAME:    (%[[ARG0:.+]]: tensor<?xcomplex<f64>>) -> tensor<?xcomplex<f64>>
+func.func @acos_complex_f64_dynamic(%arg : tensor<?xcomplex<f64>>) -> tensor<?xcomplex<f64>> {
+  %result = "chlo.acos"(%arg) : (tensor<?xcomplex<f64>>) -> tensor<?xcomplex<f64>>
+  func.return %result : tensor<?xcomplex<f64>>
+}
