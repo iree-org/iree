@@ -492,6 +492,7 @@ getVectorDistributeReductionConfig(
   return loweringConfig;
 }
 
+// TODO: Use IndexingMapInterface here instead of linalg::LinalgOp.
 static LogicalResult
 populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
                    IREE::GPU::TargetAttr target, int64_t workgroupSize,
@@ -523,42 +524,28 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
   // LinalgOp with only parallel dims. This is needed if the op cannot be fused
   // with a reduction or introduces new loop dimensions.
   auto shouldAttachLoweringConfig = [&](linalg::LinalgOp linalgOp) -> bool {
-    // If the operation has a gather, we want to fuse it with the
-    // reduction.
-    if (hasExternalCapture(cast<linalg::GenericOp>(linalgOp))) {
-      return false;
-    }
-    // If some of the users are in computeOps and some are outside of
-    // computeOps; attach lowering config, since the op can't be fused.
-    if (llvm::any_of(linalgOp->getUsers(),
-                     [&](Operation *user) {
-                       auto linalgUser = dyn_cast<linalg::LinalgOp>(user);
-                       return linalgUser && computeOps.contains(linalgUser);
-                     }) &&
-        llvm::any_of(linalgOp->getUsers(), [&](Operation *user) {
-          auto linalgUser = dyn_cast<linalg::LinalgOp>(user);
-          return !linalgUser;
-        })) {
+    // We want to attach a lowering config to this operation if it introduces
+    // a new dimension, when going by topological order in the backward slice.
+    // The only two ways to introduce a new dimension are:
+    //
+    // 1. We have a reduction dimension.
+    if (hasReductionIterator(linalgOp)) {
       return true;
     }
-
-    // If the indexing map introduces new dimensions (more inputs than results),
-    // attach a lowering config.
-    for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
-      int64_t operandIdx = linalgOp.getIndexingMapIndex(operand);
-      AffineMap indexingMap = linalgOp.getIndexingMapsArray()[operandIdx];
-      if (indexingMap.getNumResults() > 0 &&
-          indexingMap.getNumInputs() > indexingMap.getNumResults()) {
-        return true;
-      }
+    // 2. There is no consumer which is a compute op (i.e., it already
+    // has some way of getting fused).
+    if (llvm::none_of(linalgOp->getUsers(), [&](Operation *user) {
+          auto linalgUser = dyn_cast<linalg::LinalgOp>(user);
+          return linalgUser && computeOps.contains(linalgUser);
+        })) {
+      return true;
     }
 
     return false;
   };
 
   for (linalg::LinalgOp linalgOp : computeOps) {
-    if (hasReductionIterator(linalgOp) ||
-        shouldAttachLoweringConfig(linalgOp)) {
+    if (shouldAttachLoweringConfig(linalgOp)) {
       auto loweringConfig = getVectorDistributeReductionConfig(
           linalgOp, target, sharedWgpTiles, workgroupSize, subgroupSize,
           threadLoads);
