@@ -216,19 +216,13 @@ module {
 
 // -----
 
-module {
-  func.func @matmul_dynamic_dim(%11: tensor<?x256xf16>, %12: tensor<256x256xf16>) -> tensor<?x256xf32> {
-    %c0 = arith.constant 0 : index
-    %cst = arith.constant 0.000000e+00 : f32
-    %8 = tensor.dim %11, %c0 : tensor<?x256xf16>
-    %13 = tensor.empty(%8) : tensor<?x256xf32>
-    %14 = linalg.fill ins(%cst : f32) outs(%13 : tensor<?x256xf32>) -> tensor<?x256xf32>
-    %15 = linalg.matmul ins(%11, %12 : tensor<?x256xf16>, tensor<256x256xf16>) outs(%14 : tensor<?x256xf32>) -> tensor<?x256xf32>
-    return %15 : tensor<?x256xf32>
-  }
+func.func @matmul_dynamic_M(%arg0: tensor<?x256xf32>, %arg1: tensor<256x256xf32>, %arg2: tensor<?x256xf32>, %arg3: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x256xf32>>, %arg4 : index) {
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<?x256xf32>, tensor<256x256xf32>) outs(%arg2 : tensor<?x256xf32>) -> tensor<?x256xf32>
+  iree_tensor_ext.dispatch.tensor.store %0, %arg3, offsets = [0, 0], sizes = [%arg4, 256], strides = [1, 1] : tensor<?x256xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x256xf32>>{%arg4}
+  return
 }
 
-// CHECK-LABEL: func.func @matmul_dynamic_dim
+// CHECK-LABEL: func.func @matmul_dynamic_M
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
 //       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     promote_operands = [0, 1]
@@ -236,7 +230,7 @@ module {
 //  CHECK-SAME:     thread = [1, 4, 0]
 //  CHECK-SAME:     workgroup = [1, 256, 0]
 
-//        LATE:  LLVMGPUWarpReduction
+//        LATE:  LLVMGPUVectorDistribute
 
 // -----
 
