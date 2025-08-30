@@ -164,6 +164,42 @@
 //   }
 // }
 
+// #lhs = affine_map<(d0, d1, d2) -> (d1, d2, d0)>  // LHS axes = [d1, d2, d0]
+// #rhs = affine_map<(d0, d1, d2) -> (d0, d1, d2)>  // RHS axes = [d0, d1, d2] (identity)
+// #acc = affine_map<(d0, d1, d2) -> (d0, d1)>
+
+// module {
+//   func.func @case_loopToAxis_ne_i(%A: vector<1x4x2xf32>, %B: vector<2x1x4xf32>)
+//       -> vector<2x1xf32> {
+//     %c = arith.constant dense<0.0> : vector<2x1xf32>
+//     %0 = vector.contract
+//           { indexing_maps = [#lhs, #rhs, #acc],
+//             iterator_types = ["parallel", "parallel", "reduction"],
+//             kind = #vector.kind<add> }
+//           %A, %B, %c
+//           : vector<1x4x2xf32>, vector<2x1x4xf32> into vector<2x1xf32>
+//     return %0 : vector<2x1xf32>
+//   }
+// }
+
+#lhs = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
+#rhs = affine_map<(d0, d1, d2) -> (d2, d0, d1)>
+#res = affine_map<(d0, d1, d2) -> (d0, d1)>
+
+func.func @both_non_identity_both_mismatch(
+    %A: vector<3x4x2xf32>,
+    %B: vector<4x3x2xf32>) -> vector<3x2xf32> {
+  %c0 = arith.constant dense<0.000000e+00> : vector<3x2xf32>
+  %out = vector.contract
+           { indexing_maps = [#lhs, #rhs, #res],
+             iterator_types = ["parallel","parallel","reduction"],
+             kind = #vector.kind<add> }
+           %A, %B, %c0
+         : vector<3x4x2xf32>, vector<4x3x2xf32> into vector<3x2xf32>
+  return %out : vector<3x2xf32>
+}
+
+
 // func.func @foo(%a: vector<4x1x1x1x1x1x1x1x8xf32>, %b: vector<4x1x1x1x1x1x1x1x8xf32>, %c: vector<4x1x1x1x1x1xf32>) -> vector<4x1x1x1x1x1xf32> {
 //   // %cst_4 = arith.constant dense<1.000000e+00> : vector<4x1xf32>
 //   %1 = arith.mulf %a, %b : vector<4x1x1x1x1x1x1x1x8xf32>
@@ -171,11 +207,11 @@
 //   return %24 : vector<4x2x1x1x1x1xf32>
 // }
 
-#map = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4, d5, d6, d7, d8)>
-#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d3, d4, d6, d7)>
-module {
-  func.func @foo(%arg0: vector<4x2x1x1x1x1x1x1x8xf32>, %arg1: vector<4x2x1x1x1x1x1x1x8xf32>, %arg2: vector<4x2x1x1x1x1xf32>) -> vector<4x2x1x1x1x1xf32> {
-    %0 = vector.contract {indexing_maps = [#map, #map, #map1], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction", "parallel", "parallel", "reduction"], kind = #vector.kind<add>} %arg0, %arg1, %arg2 : vector<4x2x1x1x1x1x1x1x8xf32>, vector<4x2x1x1x1x1x1x1x8xf32> into vector<4x2x1x1x1x1xf32>
-    return %0 : vector<4x2x1x1x1x1xf32>
-  }
-}
+// #map = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4, d5, d6, d7, d8)>
+// #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d3, d4, d6, d7)>
+// module {
+//   func.func @foo(%arg0: vector<4x2x1x1x1x1x1x1x8xf32>, %arg1: vector<4x2x1x1x1x1x1x1x8xf32>, %arg2: vector<4x2x1x1x1x1xf32>) -> vector<4x2x1x1x1x1xf32> {
+//     %0 = vector.contract {indexing_maps = [#map, #map, #map1], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction", "parallel", "parallel", "reduction"], kind = #vector.kind<add>} %arg0, %arg1, %arg2 : vector<4x2x1x1x1x1x1x1x8xf32>, vector<4x2x1x1x1x1x1x1x8xf32> into vector<4x2x1x1x1x1xf32>
+//     return %0 : vector<4x2x1x1x1x1xf32>
+//   }
+// }
