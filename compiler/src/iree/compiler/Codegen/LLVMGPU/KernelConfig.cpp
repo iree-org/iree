@@ -537,9 +537,9 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
     if (hasReductionIterator(linalgOp)) {
       return true;
     }
-    // 2. There is no consumer which is a compute op (i.e. it already
+    // 2. There is no consumer which is a compute op (i.e., it already
     // has some way of getting fused).
-    if (!llvm::any_of(linalgOp->getUsers(), [&](Operation *user) {
+    if (llvm::none_of(linalgOp->getUsers(), [&](Operation *user) {
           auto linalgUser = dyn_cast<linalg::LinalgOp>(user);
           return linalgUser && computeOps.contains(linalgUser);
         })) {
