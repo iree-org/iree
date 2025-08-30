@@ -98,6 +98,7 @@ iree_compiler_cc_library(
         "GPUVectorDistribution.cpp",
         "GPUVerifyDistribution.cpp",
         "Passes.cpp",
+        "TestThreadUniformAnalysisPass.cpp",
         "VectorReductionToGPU.cpp",
         "WorkgroupReordering.cpp",
     ],
@@ -111,6 +112,7 @@ iree_compiler_cc_library(
         ":PassesIncGen",
         "//compiler/src/iree/compiler/Codegen/Common",
         "//compiler/src/iree/compiler/Codegen/Common:VectorLayoutAnalysis",
+        "//compiler/src/iree/compiler/Codegen/Common/GPU:Analysis",
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/Utils",
         "//compiler/src/iree/compiler/Codegen/Dialect/GPU/IR:IREEGPUDialect",
@@ -209,5 +211,30 @@ iree_tablegen_doc(
     td_file = "Passes.td",
     deps = [
         "@llvm-project//mlir:PassBaseTdFiles",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "Analysis",
+    srcs = [
+        "ThreadUniformAnalysis.cpp",
+    ],
+    hdrs = [
+        "ThreadUniformAnalysis.h",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
+        "//compiler/src/iree/compiler/Codegen/Dialect/GPU/IR:IREEGPUDialect",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Dialect/TensorExt/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:AffineDialect",
+        "@llvm-project//mlir:Analysis",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:GPUDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:Support",
     ],
 )
