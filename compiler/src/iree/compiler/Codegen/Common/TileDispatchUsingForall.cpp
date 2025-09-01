@@ -54,6 +54,7 @@ struct TilingInfo {
   Operation *tilableOp;
   SmallVector<OpFoldResult> tileSizes;
   SmallVector<int64_t> interchange;
+  // scf::SCFTileDistributionFn tileDistributionFn;
 };
 
 static FailureOr<TilingInfo>
@@ -88,6 +89,10 @@ getTiledAndDistributionInfo(RewriterBase &rewriter,
       [&](int64_t t) -> OpFoldResult { return rewriter.getIndexAttr(t); });
   SmallVector<int64_t> interchange = tilableOpConfig.getWorkgroupInterchange();
 
+  auto conditionalTransposeAttr = tilableOpConfig.getWorkgroupOrderingStrategy();
+  if (conditionalTransposeAttr){
+    //  conditionalTransposeAttr.updateIds(::mlir::OpBuilder &b, ::mlir::Location loc, ::mlir::ValueRange ids)
+  }
   // Avoid distributing unit-trip count loops.
 
   // Set tile sizes for non-partitioned loops to zero.
@@ -210,97 +215,108 @@ static bool verifyComputeOpsAfterDistribution(FunctionOpInterface funcOp) {
 // Pass implementation.
 //===---------------------------------------------------------------------===//
 
-static std::tuple<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>,
-                  SmallVector<OpFoldResult>,scf::SCFUpdateInductionVarFn>
-        transposedReorderStatic(RewriterBase &rewriter, Location loc, ArrayRef<Range> loopRanges,
-              ArrayRef<OpFoldResult> tileSizes){
+static std::tuple<SmallVector<Range>, scf::SCFUpdateInductionVarFn>
+transposedReorderStatic(RewriterBase &rewriter, Location loc,
+                        ArrayRef<Range> loopRanges,
+                        ArrayRef<OpFoldResult> tileSizes) {
 
-            SmallVector<OpFoldResult> lbs, ubs, steps;
-            for (auto [loopRange, tileSize] : llvm::zip_equal(loopRanges, tileSizes)) {
-              // No loop if the tile size is 0.
-              if (isZeroInteger(tileSize))
-                continue;
-              lbs.push_back(loopRange.offset);
-              ubs.push_back(loopRange.size);
-              steps.push_back(tileSize);
-            }
+  SmallVector<OpFoldResult> lbs, ubs, steps;
+  for (auto [loopRange, tileSize] : llvm::zip_equal(loopRanges, tileSizes)) {
+    // No loop if the tile size is 0.
+    if (isZeroInteger(tileSize))
+      continue;
+    lbs.push_back(loopRange.offset);
+    ubs.push_back(loopRange.size);
+    steps.push_back(tileSize);
+  }
 
-            assert(lbs.size()!=2 && "rank is not 2");
-            //static swap lbs,ubs,steps
-            std::swap(lbs[0],lbs[1]);
-            std::swap(ubs[0],ubs[1]);
-            std::swap(steps[0],steps[1]);
-            //static InductionVars
-            scf::SCFUpdateInductionVarFn updateInductionVar = 
-            [&](RewriterBase &rewriter, Location &loc, ValueRange ivs)->SmallVector<Value> {
-              SmallVector<Value> out;
-              out.push_back(ivs[1]);
-              out.push_back(ivs[0]);
-              return out;
-              };
+  assert(lbs.size() != 2 && "rank is not 2");
+  // static swap lbs,ubs,steps
+  std::swap(lbs[0], lbs[1]);
+  std::swap(ubs[0], ubs[1]);
+  std::swap(steps[0], steps[1]);
+  // static InductionVars
+  scf::SCFUpdateInductionVarFn updateInductionVar =
+      [&](RewriterBase &rewriter, Location &loc,
+          ValueRange ivs) -> SmallVector<Value> {
+    SmallVector<Value> out;
+    out.push_back(ivs[1]);
+    out.push_back(ivs[0]);
+    return out;
+  };
 
-            return {lbs,ubs,steps,updateInductionVar};
-        
+  SmallVector<Range> ranges;
+  for (auto [lb, ub, step] : llvm::zip_equal(lbs, ubs, steps)) {
+    ranges.push_back(Range{lb, ub, step});
+  }
+
+  return {ranges, updateInductionVar};
 }
 
-static void swapValuesOnCond(RewriterBase &rewriter, Location loc, OpFoldResult cond, SmallVector<OpFoldResult> & values){
-        
-        assert(values.size() >= 2 && "Need at least two values to swap");
-        Value v0 = getValueOrCreateConstantIndexOp(rewriter, loc,values[0]);
-        Value v1 = getValueOrCreateConstantIndexOp(rewriter, loc,values[1]);
-        Value condVal = getValueOrCreateConstantIndexOp(rewriter, loc,cond);
-        OpFoldResult new0 = rewriter.create<mlir::arith::SelectOp>(loc, condVal, v0, v1).getResult();
-        OpFoldResult new1 = rewriter.create<mlir::arith::SelectOp>(loc, condVal, v1, v0).getResult();
-        values[0] = new0;
-        values[1] = new1;
+static void swapValuesOnCond(RewriterBase &rewriter, Location loc,
+                             OpFoldResult cond,
+                             SmallVector<OpFoldResult> &values) {
+
+  assert(values.size() >= 2 && "Need at least two values to swap");
+  Value v0 = getValueOrCreateConstantIndexOp(rewriter, loc, values[0]);
+  Value v1 = getValueOrCreateConstantIndexOp(rewriter, loc, values[1]);
+  Value condVal = getValueOrCreateConstantIndexOp(rewriter, loc, cond);
+  OpFoldResult new0 =
+      rewriter.create<mlir::arith::SelectOp>(loc, condVal, v0, v1).getResult();
+  OpFoldResult new1 =
+      rewriter.create<mlir::arith::SelectOp>(loc, condVal, v1, v0).getResult();
+  values[0] = new0;
+  values[1] = new1;
 }
 
-static std::tuple<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>,
-                  SmallVector<OpFoldResult>,scf::SCFUpdateInductionVarFn>
-        transposedReorderDynamic(RewriterBase &rewriter, Location loc, ArrayRef<Range> loopRanges,
-              ArrayRef<OpFoldResult> tileSizes){
+static std::tuple<SmallVector<Range>, scf::SCFUpdateInductionVarFn>
+transposedReorderDynamic(RewriterBase &rewriter, Location loc,
+                         ArrayRef<Range> loopRanges,
+                         ArrayRef<OpFoldResult> tileSizes) {
 
-            SmallVector<OpFoldResult> lbs, ubs, steps;
-            for (auto [loopRange, tileSize] : llvm::zip_equal(loopRanges, tileSizes)) {
-              // No loop if the tile size is 0.
-              if (isZeroInteger(tileSize))
-                continue;
-              lbs.push_back(loopRange.offset);
-              ubs.push_back(loopRange.size);
-              steps.push_back(tileSize);
-            }
+  SmallVector<OpFoldResult> lbs, ubs, steps;
+  for (auto [loopRange, tileSize] : llvm::zip_equal(loopRanges, tileSizes)) {
+    // No loop if the tile size is 0.
+    if (isZeroInteger(tileSize))
+      continue;
+    lbs.push_back(loopRange.offset);
+    ubs.push_back(loopRange.size);
+    steps.push_back(tileSize);
+  }
 
-            assert(lbs.size()==2 && "rank must be 2");
-            
-            auto lhsDim = getValueOrCreateConstantIndexOp(rewriter, loc, ubs[0]);
-            auto rhsDim = getValueOrCreateConstantIndexOp(rewriter, loc, ubs[1]);
+  assert(lbs.size() == 2 && "rank must be 2");
 
-            //Dumb test for now
-            mlir::Value cond = rewriter.create<mlir::arith::CmpIOp>(
-            loc, 
-            mlir::arith::CmpIPredicate::ult, 
-            // mlir::arith::CmpIPredicate::ugt,
-            lhsDim, 
-            rhsDim
-            );
+  auto lhsDim = getValueOrCreateConstantIndexOp(rewriter, loc, ubs[0]);
+  auto rhsDim = getValueOrCreateConstantIndexOp(rewriter, loc, ubs[1]);
 
-            swapValuesOnCond(rewriter,loc,cond,lbs);
-            swapValuesOnCond(rewriter,loc,cond,ubs);
-            swapValuesOnCond(rewriter,loc,cond,steps);
-        
-            //static InductionVars
-            scf::SCFUpdateInductionVarFn updateInductionVar = 
-            [cond](RewriterBase &rewriter, Location &loc, ValueRange ivs)->SmallVector<Value> {
-              SmallVector<Value> out;
-              out.push_back(rewriter.create<mlir::arith::SelectOp>(loc, cond, ivs[0], ivs[1]));
-              out.push_back(rewriter.create<mlir::arith::SelectOp>(loc, cond, ivs[1], ivs[0]));
-              return out;
-            };
+  // Dumb test for now
+  mlir::Value cond =
+      rewriter.create<mlir::arith::CmpIOp>(loc, mlir::arith::CmpIPredicate::ult,
+                                           // mlir::arith::CmpIPredicate::ugt,
+                                           lhsDim, rhsDim);
 
-            return {lbs,ubs,steps,updateInductionVar};
-        
+  swapValuesOnCond(rewriter, loc, cond, lbs);
+  swapValuesOnCond(rewriter, loc, cond, ubs);
+  swapValuesOnCond(rewriter, loc, cond, steps);
+
+  // static InductionVars
+  scf::SCFUpdateInductionVarFn updateInductionVar =
+      [cond](RewriterBase &rewriter, Location &loc,
+             ValueRange ivs) -> SmallVector<Value> {
+    SmallVector<Value> out;
+    out.push_back(
+        rewriter.create<mlir::arith::SelectOp>(loc, cond, ivs[0], ivs[1]));
+    out.push_back(
+        rewriter.create<mlir::arith::SelectOp>(loc, cond, ivs[1], ivs[0]));
+    return out;
+  };
+
+  SmallVector<Range> ranges;
+  for (auto [lb, ub, step] : llvm::zip_equal(lbs, ubs, steps)) {
+    ranges.push_back(Range{lb, ub, step});
+  }
+  return {ranges, updateInductionVar};
 }
-
 
 /// Returns true if any value produced by `producer` is used as an init value
 /// for the DPS `user`. Returns false if the user is not in DPS.
@@ -397,10 +413,11 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   tileAndFuseOptions.setFusionControlFn(controlFn);
   rewriter.setInsertionPoint(tilableOp);
 
-  if (deviceMappingAttribute.size()==2){
-    //Hardcoded test
-    tileAndFuseOptions.tilingOptions.tileDistributionFunction = transposedReorderDynamic;//transposedReorderStatic;
-  //   tileAndFuseOptions.tilingOptions.interchangeVector = {1,0};
+  if (deviceMappingAttribute.size() == 2) {
+    // Hardcoded test
+    tileAndFuseOptions.tilingOptions.tileDistributionFunction =
+        transposedReorderDynamic; // transposedReorderStatic;
+    //   tileAndFuseOptions.tilingOptions.interchangeVector = {1,0};
   }
 
   // If the `tilableOp` is a `memref` op, then just tile the operation.

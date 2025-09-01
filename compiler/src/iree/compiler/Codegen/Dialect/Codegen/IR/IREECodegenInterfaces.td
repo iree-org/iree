@@ -231,6 +231,40 @@ def IREECodegen_AnyInnerTileDescAttr : Attr<Or<[
   let convertFromStorage = "$_self";
 }
 
+
+def IREECodegen_WorkgroupReorderingAttrInterface :
+  AttrInterface<"WorkgroupReorderingAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
+  let description = [{
+    An interface that describes workgroup reordering patterns.
+  }];
+ 
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the new loop ranges.
+      }],
+      /*retTy=*/"::llvm::SmallVector<::mlir::Range>",
+      /*methodName=*/"generateLoopBounds",
+      /*args=*/(ins "::mlir::OpBuilder&":$b,
+                    "::mlir::Location":$loc,
+                    "::llvm::ArrayRef<::mlir::Range>":$loopRanges,
+                    "::llvm::ArrayRef<::mlir::OpFoldResult>":$tileSizes)
+    >,
+     InterfaceMethod<
+      /*desc=*/[{
+        Recompute old indexes from new ones.
+      }],
+      /*retTy=*/"::llvm::SmallVector<::mlir::Value>",
+      /*methodName=*/"updateIds",
+      /*args=*/(ins "::mlir::OpBuilder&":$b,
+                    "::mlir::Location":$loc,
+                    "::mlir::ValueRange":$ids)
+    >
+  ];
+}
+
+
 def IREECodegen_LoweringConfigAttrInterface :
   AttrInterface<"LoweringConfigAttrInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
@@ -414,6 +448,18 @@ def IREECodegen_LoweringConfigAttrInterface :
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         return std::nullopt;
+      }]
+    >,
+     InterfaceMethod<
+      /*desc=*/[{
+        TODO.
+      }],
+      /*retTy=*/"::mlir::iree_compiler::IREE::Codegen::WorkgroupReorderingAttrInterface",
+      /*methodName=*/"getWorkgroupOrderingStrategy",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return nullptr;
       }]
     >
   ];

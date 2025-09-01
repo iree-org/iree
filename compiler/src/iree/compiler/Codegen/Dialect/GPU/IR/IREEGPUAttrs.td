@@ -30,6 +30,8 @@ def IREEGPU_LoweringConfigAttr :
         "hasTilingLevel",
         "hasWorkgroupTilingLevel",
         "getLoweringStrategy",
+        "getWorkgroupOrderingStrategy"
+        
       ]>
     ]> {
   let mnemonic = "lowering_config";
@@ -684,6 +686,9 @@ def IREEGPU_ReorderWorkgroupsStrategyAttr :
   let assemblyFormat = "`<` $value `>`";
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 }
+
+
+
 
 def IREEGPU_GPUPipelineOptionsAttr : AttrDef<IREEGPU_Dialect, "GPUPipelineOptions"> {
   let summary = [{Options attribute for linalg + tensors -> vector + memref GPU pipelines.}];

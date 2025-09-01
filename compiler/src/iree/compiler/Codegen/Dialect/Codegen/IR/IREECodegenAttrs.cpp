@@ -600,6 +600,35 @@ RotateRowsAttr::verify(function_ref<InFlightDiagnostic()> emitError,
   return success();
 }
 
+
+//===---------------------------------------------------------------------===//
+// conditional_transpose
+//===---------------------------------------------------------------------===//
+
+
+SmallVector<Range> ConditionalTransposeAttr::generateLoopBounds(OpBuilder &b, Location loc,
+                                           ArrayRef<Range> loopRanges,
+                                           ArrayRef<OpFoldResult> tileSizes) const {
+  SmallVector<Range> ret;
+  return ret;
+}
+
+SmallVector<Value> ConditionalTransposeAttr::updateIds(OpBuilder &b, Location loc,
+                                           ValueRange ids) const {
+
+  SmallVector<Value> ret;
+  return ret;
+}
+
+LogicalResult
+ConditionalTransposeAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                       int64_t nbXcds, int64_t nbCus) {
+  if (nbXcds==0 || nbCus == 0) {
+    return emitError() << "ConditionalTransposeAttr must have non-zeros parameters";
+  }
+  return success();
+}
+
 //===---------------------------------------------------------------------===//
 // iree_codegen.symbolic_ukernel_provider
 //===---------------------------------------------------------------------===//

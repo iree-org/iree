@@ -215,6 +215,34 @@ def IREECodegen_SimpleTargetAttr :
 }
 
 
+
+//===---------------------------------------------------------------------===//
+// iree_codegen.conditional_transpose
+//===---------------------------------------------------------------------===//
+
+def IREECodegen_ConditionalTransposeAttr  :
+    AttrDef<IREECodegen_Dialect, "ConditionalTranspose", [
+    DeclareAttrInterfaceMethods<IREECodegen_WorkgroupReorderingAttrInterface, [
+        "generateLoopBounds",
+        "updateIds"
+      ]>
+    ]> {
+  let mnemonic = "conditional_transpose";
+  let summary = [{TODO.}];
+  let description = [{
+    TODO
+  }];
+  let parameters = (ins
+    AttrParameter<"int64_t", "">:$nb_xcds,
+    AttrParameter<"int64_t", "">:$nb_cus
+  );
+  let assemblyFormat = [{
+    `<` $nb_xcds `,` $nb_cus `>`
+  }];
+  let genVerifyDecl = 1;
+}
+
+
 //===---------------------------------------------------------------------===//
 // iree_codegen.translation_info
 //===---------------------------------------------------------------------===//

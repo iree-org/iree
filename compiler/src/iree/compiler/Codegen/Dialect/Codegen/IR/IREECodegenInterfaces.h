@@ -12,8 +12,10 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
-
+#include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "llvm/ADT/STLExtras.h"
+
 
 // clang-format off
 #define GET_ATTRDEF_CLASSES
