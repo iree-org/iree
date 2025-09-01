@@ -15,7 +15,6 @@ iree_cc_library(
     Utils
   HDRS
     "ConversionUtils.h"
-    "ElementPackingUtils.h"
     "EmbeddedDataDirectory.h"
     "EquivalenceUtils.h"
     "FlatbufferUtils.h"
@@ -28,18 +27,21 @@ iree_cc_library(
     "PassUtils.h"
     "PatternUtils.h"
     "Permutation.h"
+    "RegionOpUtils.h"
+    "ShapeUtils.h"
     "StringUtils.h"
     "ToolUtils.h"
     "TracingUtils.h"
   SRCS
     "ConversionUtils.cpp"
-    "ElementPackingUtils.cpp"
     "EquivalenceUtils.cpp"
     "FlatbufferUtils.cpp"
     "Indexing.cpp"
     "ModuleUtils.cpp"
     "OptionUtils.cpp"
     "PassUtils.cpp"
+    "RegionOpUtils.cpp"
+    "ShapeUtils.cpp"
     "StringUtils.cpp"
     "ToolUtils.cpp"
     "TracingUtils.cpp"
@@ -47,6 +49,7 @@ iree_cc_library(
     LLVMPasses
     LLVMSupport
     MLIRAffineDialect
+    MLIRAnalysis
     MLIRArithDialect
     MLIRFuncDialect
     MLIRFunctionInterfaces
@@ -60,9 +63,6 @@ iree_cc_library(
     iree::base::internal::flatcc::building
     iree::base::internal::flatcc::debugging
     iree::base::internal::flatcc::parsing
-    iree::compiler::Dialect::Encoding::IR
-    iree::compiler::Dialect::Encoding::Utils
-    iree::compiler::Dialect::Util::IR
   PUBLIC
 )
 

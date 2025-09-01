@@ -5,7 +5,9 @@ EXPORTS
   ireeAttributeIsACodegenTranslationInfoAttr
   ireeAttributeIsAGPULoweringConfigAttr
   ireeAttributeIsAGPUMMAAttr
+  ireeAttributeIsAGPUVirtualMMAAttr
   ireeAttributeIsAGPUMMAIntrinsicAttr
+  ireeAttributeIsAGPUVirtualIntrinsicAttr
   ireeAttributeIsAGPUPipelineOptionsAttr
   ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr
   ireeCodegenCompilationInfoAttrGet
@@ -15,8 +17,11 @@ EXPORTS
   ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID
   ireeCodegenDispatchLoweringPassPipelineAttrGetValue
   ireeCodegenGetExecutableVariantOps
+  ireeGPUGetSingleSubgroupLayout
   ireeCodegenGetTunerRootOps
+  ireeCodegenGetAttentionOpDetail
   ireeCodegenQueryMMAIntrinsics
+  ireeCodegenMlirOperationIsACodegenAttentionOp
   ireeCodegenTranslationInfoAttrGet
   ireeCodegenTranslationInfoAttrGetParameters
   ireeCodegenTranslationInfoAttrGetTypeID
@@ -78,11 +83,17 @@ EXPORTS
   ireeGPULoweringConfigAttrGetTileSizes
   ireeGPULoweringConfigAttrGetTypeID
   ireeGPUMMAAttrGet
+  ireeGPUVirtualMMAAttrGet
   ireeGPUMMAAttrGetInfo
   ireeGPUMMAAttrGetTypeID
+  ireeGPUVirtualMMAAttrGetTypeID
   ireeGPUMMAIntrinsicAttrGet
+  ireeGPUVirtualMMAIntrinsicAttrGet
   ireeGPUMMAIntrinsicAttrGetTypeID
+  ireeGPUVirtualMMAIntrinsicAttrGetTypeID
   ireeGPUMMAIntrinsicAttrGetValue
+  ireeGPUVirtualMMAIntrinsicAttrGetValue
+  ireeGPUMMAAttrGetVirtualMMAIntrinsic
   ireeGPUPipelineOptionsAttrGet
   ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts
   ireeGPUPipelineOptionsAttrGetPrefetchSharedMemory
@@ -92,6 +103,7 @@ EXPORTS
   ireeGPUReorderWorkgroupsStrategyAttrGet
   ireeGPUReorderWorkgroupsStrategyAttrGetTypeID
   ireeGPUReorderWorkgroupsStrategyAttrGetValue
+  ireeHALExecutableTargetAttrGetGPUTargetInfo
   ireeMlirLspServerRunMain
   ireeOptRunMain
   ireeReduceRunMain

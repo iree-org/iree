@@ -9,16 +9,15 @@
 
 #include "compiler/src/iree/compiler/DispatchCreation/FusionUtils.h"
 #include "compiler/src/iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
-#include "mlir/Analysis/SliceAnalysis.h"
-#include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Transforms/RegionUtils.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 namespace mlir::iree_compiler::DispatchCreation {
 
 bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
-                                bool fuseMultiReduction) {
+                                ElementwiseOpsFusabilityOptions options) {
   Operation *producerOp = fusedOperand->get().getDefiningOp();
   Operation *consumerOp = fusedOperand->getOwner();
   if (!producerOp)
@@ -35,15 +34,6 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
         return false;
       })) {
     return true;
-  }
-
-  // Don't fuse if all of the consumer maps aren't projected permutations.
-  if (auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp)) {
-    if (!llvm::all_of(
-            linalgConsumerOp.getIndexingMapsArray(),
-            [](AffineMap map) { return map.isProjectedPermutation(); })) {
-      return false;
-    }
   }
 
   // If the generic op is "just" copy, then fuse always.
@@ -76,6 +66,26 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
   if (!linalgConsumerOp) {
     return false;
   }
+
+  if (!options.fuseTruncateOps &&
+      IREE::LinalgExt::isBitTruncateOp(producerOp)) {
+    // Do not fuse with bit-truncate-like operations with their consumers
+    // unless:
+    //
+    // 1. The consumer has only one ins operand and is an elementwise
+    // operation. The elementwise operation implies that the `outs` operand is
+    // not real usage (and is typically a `tensor.empty`), so the core condition
+    // is that there is only one "real" operand of the consumer.
+    //
+    // 2. The consumer is also a truncate (e.g. trunc from f32 to f16 to f8).
+    bool isUnaryElementwise = linalgConsumerOp.getNumLoops() ==
+                                  linalgConsumerOp.getNumParallelLoops() &&
+                              linalgConsumerOp.getNumDpsInputs() == 1;
+    if (!IREE::LinalgExt::isBitTruncateOp(consumerOp) && !isUnaryElementwise) {
+      return false;
+    }
+  }
+
   // If the producer has a single use (this op), only fuse if
   // - 1) The consumer op is all parallel loops. The parallelism of the consumer
   //      can be used as a way to amortize cost of redundant computation
@@ -89,7 +99,8 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
              .isPermutation()) {
       return false;
     }
-    if (!fuseMultiReduction && linalgConsumerOp.getNumReductionLoops() != 1) {
+    if (!options.fuseMultiReduction &&
+        linalgConsumerOp.getNumReductionLoops() != 1) {
       return false;
     }
     if (linalg::isaContractionOpInterface(linalgConsumerOp) ||
@@ -100,48 +111,53 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
   return true;
 }
 
-LogicalResult moveOperandDefs(RewriterBase &rewriter,
-                              ArrayRef<Operation *> operations,
-                              Operation *insertionPoint,
-                              DominanceInfo &dominanceInfo,
-                              ArrayRef<Operation *> ignoreOperations) {
-  BackwardSliceOptions options;
-  llvm::DenseSet<Operation *> ignoreOperationsSet;
-  ignoreOperationsSet.insert(ignoreOperations.begin(), ignoreOperations.end());
-  options.filter = [&](Operation *op) {
-    return !dominanceInfo.properlyDominates(op, insertionPoint) &&
-           !ignoreOperationsSet.contains(op);
-  };
-  // Set inclusive to true cause the slice is computed from the operand, and
-  // we want to include the defining op (which is the point here)
-  options.omitUsesFromAbove = false;
-  options.inclusive = true;
+std::optional<std::pair<OpResult, SmallVector<Operation *>>>
+getProducerDispatchValueAndOpChain(Value operand) {
+  auto operandType = dyn_cast<RankedTensorType>(operand.getType());
+  if (!operandType || operandType.getRank() == 0) {
+    return std::nullopt;
+  }
 
-  llvm::SetVector<Operation *> slice;
-  for (auto op : operations) {
-    for (auto operand : op->getOperands()) {
-      [[maybe_unused]] LogicalResult result =
-          getBackwardSlice(operand, &slice, options);
-      assert(result.succeeded());
+  SmallVector<Operation *> opChain;
+  auto producerValue = dyn_cast<OpResult>(operand);
+  while (producerValue &&
+         !isa<IREE::Flow::DispatchRegionOp>(producerValue.getOwner())) {
+    if (!llvm::hasSingleElement(producerValue.getUses())) {
+      return std::nullopt;
     }
-    auto regions = op->getRegions();
-    if (regions.empty()) {
+
+    // If it is an operation that we want to look past, add it to the chain
+    // and update the `producerValue`.
+    Operation *currOperation = producerValue.getOwner();
+    if (isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(currOperation)) {
+      opChain.push_back(currOperation);
+      producerValue = dyn_cast<OpResult>(currOperation->getOperand(0));
       continue;
     }
-    llvm::SetVector<Value> capturedVals;
-    mlir::getUsedValuesDefinedAbove(regions, capturedVals);
-    for (auto value : capturedVals) {
-      [[maybe_unused]] LogicalResult result =
-          getBackwardSlice(value, &slice, options);
-      assert(result.succeeded());
-    }
+
+    // Conservative, bail out.
+    return std::nullopt;
   }
 
-  mlir::topologicalSort(slice);
-  for (auto op : slice) {
-    rewriter.moveOpBefore(op, insertionPoint);
+  if (!producerValue) {
+    return std::nullopt;
   }
-  return success();
+
+  auto producerDispatch =
+      dyn_cast<IREE::Flow::DispatchRegionOp>(producerValue.getOwner());
+  // TODO(MaheshRavishankar): Multi-result producer dispatches can be supported.
+  // Will require to move the consumer dispatch immediately after the producer
+  // instead of what is done below and move other operands of the consumer
+  // dispatch before the producer dispatch.
+  if (!producerDispatch ||
+      !llvm::hasSingleElement(producerDispatch.getBody()) ||
+      producerDispatch->getNumResults() != 1) {
+    return std::nullopt;
+  }
+  if (!llvm::hasSingleElement(producerValue.getUses())) {
+    return std::nullopt;
+  }
+  return std::make_pair(producerValue, opChain);
 }
 
 } // namespace mlir::iree_compiler::DispatchCreation

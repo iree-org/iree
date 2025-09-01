@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree/compiler/Utils/RegionOpUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/CommandLine.h"
@@ -294,6 +295,15 @@ reifyDynamicResultDimsImpl(OpBuilder &b, Value value,
     return success();
   }
 
+  // Case 6: Value corresponds to a dps init. Reify the dimensions of the
+  // operand.
+  if (auto dpsOp = dyn_cast<DestinationStyleOpInterface>(op)) {
+    return reifyDynamicResultDimsImpl(
+        b, dpsOp.getDpsInitOperand(opResult.getResultNumber())->get(),
+        dynamicDims,
+        /*createTensorDimOps=*/true);
+  }
+
   if (!createTensorDimOps)
     return failure();
 
@@ -511,14 +521,11 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
 FailureOr<IREE::Flow::DispatchRegionOp>
 moveFollowingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
                                   IREE::Flow::DispatchRegionOp regionOp) {
-  // Fail if any of the `target` operands do not dominate the dispatch region.
+  OpBuilder::InsertionGuard g(rewriter);
   mlir::DominanceInfo dominanceInfo(regionOp);
-  for (Value operand : target->getOperands()) {
-    Operation *definingOp = operand.getDefiningOp();
-    if (definingOp && !dominanceInfo.dominates(definingOp, regionOp)) {
-      return rewriter.notifyMatchFailure(
-          target, "target operands do not dominate the dispatch region op.");
-    }
+  if (failed(moveOperandDefs(rewriter, target, regionOp, dominanceInfo, {}))) {
+    return rewriter.notifyMatchFailure(
+        target, "target operands can't be moved before region");
   }
 
   // Values replaced by moving the `target` into the dispatch region.
@@ -533,7 +540,6 @@ moveFollowingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
 
   Block &body = regionOp.getBody().front();
   // Clone op into dispatch region.
-  OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(body.getTerminator());
   Operation *clonedTarget = rewriter.clone(*target);
 

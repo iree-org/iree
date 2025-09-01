@@ -51,6 +51,7 @@ constexpr StringLiteral kTuningSpecEntrypointAttrName =
 constexpr StringLiteral kSerializedTuningSpecAttrName =
     "iree_codegen.tuning_spec_mlirbc";
 constexpr StringLiteral kKernelConfigSpecName = "__kernel_config";
+constexpr StringLiteral kUKernelProviderName = "iree_codegen.ukernel_provider";
 
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting iree_codegen.translation_info attribute on a
@@ -226,6 +227,22 @@ void setCompilationInfo(Operation *op,
 /// Removes the `#iree_codegen.compilation_info` attribute that is set on the
 /// operation.
 void eraseCompilationInfo(Operation *op);
+
+//===----------------------------------------------------------------------===//
+// Helpers for getting/setting attributes related to ukernels.
+//===----------------------------------------------------------------------===//
+
+/// Returns the `iree_codegen.ukernel_provider` in the provided dictionary if
+/// present.
+IREE::Codegen::UKernelProviderInterface
+getUKernelProviderFromTarget(DictionaryAttr dict);
+
+/// Returns the `iree_codegen.ukernel` on the operation.
+IREE::Codegen::UKernelDescriptorAttr getUKernelDescriptor(Operation *op);
+
+/// Sets the `iree_codegen.ukernel` on the operation.
+void setUKernelDescriptor(Operation *op,
+                          IREE::Codegen::UKernelDescriptorAttr descriptor);
 
 } // namespace mlir::iree_compiler
 

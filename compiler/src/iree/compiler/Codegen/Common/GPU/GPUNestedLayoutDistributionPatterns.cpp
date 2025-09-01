@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Utils/Permutation.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
@@ -20,6 +21,7 @@
 #include "mlir/Dialect/GPU/Utils/GPUUtils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Dialect/Vector/Utils/VectorUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -52,7 +54,7 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
   ArrayRef<int64_t> batchOffsets(offsets.begin(), rank);
   ArrayRef<int64_t> outerVectorOffsets(offsets.begin() + rank, rank);
 
-  SmallVector<Value> slicedIndices(indices.begin(), indices.end());
+  SmallVector<Value> slicedIndices(indices);
   for (const auto &[i, dim] : llvm::enumerate(permutationMap.getResults())) {
     // Broadcasted dimension offsets can be used as-is; the read index is
     // invariant of the thread in such cases (and illegal for writes).
@@ -228,7 +230,7 @@ static LogicalResult populateWarpAndThreadIndices(
 }
 
 static VectorValue getSlicedPermutedMask(PatternRewriter &rewriter,
-                                         Location loc, AffineMap permMap,
+                                         Location loc,
                                          ArrayRef<int64_t> offsets,
                                          NestedLayoutAttr vectorLayout,
                                          VectorValue mask) {
@@ -238,6 +240,18 @@ static VectorValue getSlicedPermutedMask(PatternRewriter &rewriter,
   VectorValue slicedMask = rewriter.create<vector::ExtractStridedSliceOp>(
       loc, mask, sliceMaskOffsets, vectorLayout.getElementTile(), strides);
   return slicedMask;
+}
+
+static VectorValue getSlicedIndexVec(PatternRewriter &rewriter, Location loc,
+                                     ArrayRef<int64_t> offsets,
+                                     NestedLayoutAttr vectorLayout,
+                                     VectorValue indexVec) {
+  SmallVector<int64_t> sliceMaskOffsets =
+      getDistributedTransferOffsetsFromNestedLayout(offsets, vectorLayout);
+  SmallVector<int64_t> strides(vectorLayout.getElementTile().size(), 1);
+  VectorValue slicedIndexVec = rewriter.create<vector::ExtractStridedSliceOp>(
+      loc, indexVec, sliceMaskOffsets, vectorLayout.getElementTile(), strides);
+  return slicedIndexVec;
 }
 
 /// Project a vector based on a provided projection map.
@@ -258,7 +272,7 @@ static VectorValue projectVector(RewriterBase &rewriter, Location loc,
     slicedDims.erase(iterSpacePos);
   }
 
-  SmallVector<int64_t> transposePerm(slicedDims.begin(), slicedDims.end());
+  auto transposePerm = llvm::to_vector_of<int64_t>(slicedDims);
   transposePerm.append(remaningDims);
   auto transposed =
       rewriter.create<vector::TransposeOp>(loc, val, transposePerm);
@@ -267,6 +281,17 @@ static VectorValue projectVector(RewriterBase &rewriter, Location loc,
   auto sliced =
       rewriter.create<vector::ExtractOp>(loc, transposed, extractedPos);
   return cast<VectorValue>(sliced.getResult());
+}
+
+static VectorValue extractSliceAsVector(RewriterBase &rewriter, Location loc,
+                                        Value src, ArrayRef<int64_t> offsets) {
+  Value slice = rewriter.create<vector::ExtractOp>(loc, src, offsets);
+  // Promote the slicedVector to 0-d vector if it is a scalar.
+  if (!isa<VectorType>(slice.getType())) {
+    auto promotedType = VectorType::get({}, getElementTypeOrSelf(slice));
+    slice = rewriter.create<vector::BroadcastOp>(loc, promotedType, slice);
+  }
+  return cast<VectorValue>(slice);
 }
 
 namespace {
@@ -361,7 +386,7 @@ struct DistributeTransferRead final
         SmallVector<int64_t> maskTileShape =
             getElementVectorTileShape(maskLayout);
         SmallVector<int64_t> maskOffsets = allMaskOffsets[idx];
-        slicedMask = getSlicedPermutedMask(rewriter, readOp.getLoc(), permMap,
+        slicedMask = getSlicedPermutedMask(rewriter, readOp.getLoc(),
                                            maskOffsets, maskLayout, mask);
       }
 
@@ -463,16 +488,9 @@ struct DistributeTransferWrite final
       // dimensions are either unrolled or distributed such that this is a
       // contiguous slice.
       ArrayRef<int64_t> offsetArray(offsets);
-      Value slicedVector = rewriter.create<vector::ExtractOp>(
-          writeOp.getLoc(), distributedVector,
-          offsetArray.take_front(rank * 2));
-      // Promote the slicedVector to 0-d vector if it is a scalar.
-      if (!isa<VectorType>(slicedVector.getType())) {
-        auto promotedType =
-            VectorType::get({}, getElementTypeOrSelf(slicedVector));
-        slicedVector = rewriter.create<vector::BroadcastOp>(
-            writeOp.getLoc(), promotedType, slicedVector);
-      }
+      VectorValue slicedVector =
+          extractSliceAsVector(rewriter, writeOp.getLoc(), distributedVector,
+                               offsetArray.take_front(rank * 2));
 
       VectorValue slicedMask = nullptr;
       if (mask) {
@@ -480,7 +498,7 @@ struct DistributeTransferWrite final
         SmallVector<int64_t> maskTileShape =
             getElementVectorTileShape(maskLayout);
         SmallVector<int64_t> maskOffsets = allMaskOffsets[idx];
-        slicedMask = getSlicedPermutedMask(rewriter, writeOp.getLoc(), permMap,
+        slicedMask = getSlicedPermutedMask(rewriter, writeOp.getLoc(),
                                            maskOffsets, maskLayout, mask);
       }
 
@@ -491,6 +509,269 @@ struct DistributeTransferWrite final
     }
 
     rewriter.eraseOp(writeOp);
+    return success();
+  }
+
+  Value threadId;
+  int64_t subgroupSize;
+};
+
+/// Pattern to distribute `vector.transfer_gather` ops with nested layouts.
+struct DistributeTransferGather final
+    : OpDistributionPattern<IREE::VectorExt::TransferGatherOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  DistributeTransferGather(MLIRContext *context, Value threadId,
+                           int64_t subgroupSize)
+      : OpDistributionPattern(context), threadId(threadId),
+        subgroupSize(subgroupSize) {}
+
+  LogicalResult matchAndRewrite(IREE::VectorExt::TransferGatherOp gatherOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+
+    NestedLayoutAttr vectorLayout =
+        dyn_cast<NestedLayoutAttr>(signature[gatherOp.getResult()]);
+    if (!vectorLayout) {
+      return rewriter.notifyMatchFailure(gatherOp,
+                                         "non-nested transfer_gather layout");
+    }
+
+    SmallVector<NestedLayoutAttr> indexVecLayouts;
+    SmallVector<VectorValue> disIndexVecs;
+    for (Value indexVec : gatherOp.getIndexVecs()) {
+      auto vec = cast<VectorValue>(indexVec);
+      NestedLayoutAttr layout = dyn_cast<NestedLayoutAttr>(signature[vec]);
+      if (!layout) {
+        return rewriter.notifyMatchFailure(gatherOp,
+                                           "non-nested index vec layout");
+      }
+      indexVecLayouts.push_back(layout);
+      vec = getDistributed(rewriter, vec, layout);
+      vec = getDeinterleavedUnpackedForm(rewriter, vec, layout);
+      disIndexVecs.push_back(vec);
+    }
+
+    VectorValue mask = gatherOp.getMask();
+    NestedLayoutAttr maskLayout;
+    if (mask) {
+      maskLayout = dyn_cast<NestedLayoutAttr>(signature[mask]);
+      if (!maskLayout) {
+        return rewriter.notifyMatchFailure(gatherOp,
+                                           "non-nested mask vector layout");
+      }
+      mask = getDistributed(rewriter, mask, maskLayout);
+      mask = getDeinterleavedUnpackedForm(rewriter, mask, maskLayout);
+    }
+
+    // Guard on memrefs for distribution. In isolation this pattern is agnostic
+    // to tensors or memrefs.
+    if (!isa<MemRefType>(gatherOp.getBase().getType())) {
+      return rewriter.notifyMatchFailure(gatherOp,
+                                         "distribution expects memrefs");
+    }
+
+    SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
+    SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
+    int64_t rank = vectorLayout.getRank();
+
+    Type elementType = gatherOp.getBase().getType().getElementType();
+    auto vectorType = VectorType::get(distShape, elementType);
+    // The shape of the vector we read is pre-permutation. The permutation is
+    // a transpose on the resulting read vector.
+    auto innerVectorType =
+        VectorType::get(vectorLayout.getElementTile(), elementType);
+
+    // Initialize the full distributed vector for unrolling the batch/outer
+    // vector dimensions.
+    Value zero = rewriter.create<arith::ConstantOp>(
+        gatherOp.getLoc(), vectorType, rewriter.getZeroAttr(vectorType));
+    VectorValue acc = cast<VectorValue>(zero);
+
+    SmallVector<Value> warpIndices, threadIndices;
+    if (failed(populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
+                                            vectorLayout, warpIndices,
+                                            threadIndices))) {
+      return rewriter.notifyMatchFailure(
+          gatherOp, "warp or thread tiles have overlapping strides");
+    }
+
+    ValueRange indices = gatherOp.getIndices();
+    AffineMap permMap = gatherOp.getPermutationMap();
+    SmallVector<int64_t> strides(rank, 1);
+
+    SmallVector<SmallVector<int64_t>> allMaskOffsets;
+    std::vector<StaticTileOffsetRange::IteratorTy> allIndexVecOffsets;
+    if (mask) {
+      SmallVector<int64_t> maskDistShape = maskLayout.getDistributedShape();
+      SmallVector<int64_t> maskTileShape =
+          getElementVectorTileShape(maskLayout);
+      allMaskOffsets =
+          llvm::to_vector(StaticTileOffsetRange(maskDistShape, maskTileShape));
+    }
+    for (NestedLayoutAttr layout : indexVecLayouts) {
+      SmallVector<int64_t> vecDistShape = layout.getDistributedShape();
+      SmallVector<int64_t> vecTileShape = getElementVectorTileShape(layout);
+      allIndexVecOffsets.push_back(
+          StaticTileOffsetRange(vecDistShape, vecTileShape).begin());
+    }
+
+    SmallVector<bool> indexed =
+        llvm::to_vector(gatherOp.getIndexed().getAsValueRange<BoolAttr>());
+
+    for (auto [idx, offsets] :
+         llvm::enumerate(StaticTileOffsetRange(distShape, tileShape))) {
+      SmallVector<Value> slicedIndices = getTransferIndicesFromNestedLayout(
+          rewriter, indices, offsets, vectorLayout, permMap, warpIndices,
+          threadIndices);
+
+      // Only take the sliced indices for the non-indexed values.
+      for (auto [dim, slicedIndex, index] :
+           llvm::enumerate(slicedIndices, indices)) {
+        if (indexed[dim]) {
+          slicedIndex = index;
+        }
+      }
+
+      // Extract offset from index_vecs.
+      SmallVector<Value> slicedIndexVecs;
+      for (auto [indexVecIdx, disIndexVec, layout] :
+           llvm::enumerate(disIndexVecs, indexVecLayouts)) {
+        SmallVector<int64_t> offsets =
+            llvm::to_vector(*(allIndexVecOffsets[indexVecIdx]));
+        ++allIndexVecOffsets[indexVecIdx];
+        VectorValue slicedIndexVec = getSlicedIndexVec(
+            rewriter, gatherOp.getLoc(), offsets, layout, disIndexVec);
+        slicedIndexVecs.push_back(slicedIndexVec);
+      }
+
+      VectorValue slicedMask = nullptr;
+      if (mask) {
+        SmallVector<int64_t> maskDistShape = maskLayout.getDistributedShape();
+        SmallVector<int64_t> maskTileShape =
+            getElementVectorTileShape(maskLayout);
+        SmallVector<int64_t> maskOffsets = allMaskOffsets[idx];
+        slicedMask = getSlicedPermutedMask(rewriter, gatherOp.getLoc(),
+                                           maskOffsets, maskLayout, mask);
+      }
+
+      VectorValue slicedGather =
+          rewriter.create<IREE::VectorExt::TransferGatherOp>(
+              gatherOp.getLoc(), innerVectorType, gatherOp.getBase(),
+              slicedIndices, slicedIndexVecs, gatherOp.getIndexed(),
+              gatherOp.getIndexedMaps(), gatherOp.getPermutationMapAttr(),
+              gatherOp.getPadding(), slicedMask, gatherOp.getInBoundsAttr());
+
+      if (acc.getType().getRank() == 0) {
+        // TODO: This should really be a folding pattern in
+        // insert_strided_slice, but instead insert_strided_slice just doesn't
+        // support 0-d vectors...
+        acc = slicedGather;
+      } else {
+        acc = rewriter.create<vector::InsertStridedSliceOp>(
+            gatherOp.getLoc(), slicedGather, acc, offsets, strides);
+      }
+    }
+
+    replaceOpWithDistributedValues(rewriter, gatherOp, acc);
+    return success();
+  }
+
+  Value threadId;
+  int64_t subgroupSize;
+};
+
+/// Pattern to distribute `iree_linalg_ext.map_scatter` ops with nested layouts.
+/// Only the input is distributed, since the output is never a vector. The
+/// distribution of the input is similar to that of a vector.transfer_write.
+struct DistributeMapScatter final
+    : OpDistributionPattern<IREE::LinalgExt::MapScatterOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  DistributeMapScatter(MLIRContext *context, Value threadId,
+                       int64_t subgroupSize)
+      : OpDistributionPattern(context), threadId(threadId),
+        subgroupSize(subgroupSize) {}
+
+  LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    auto input = dyn_cast<VectorValue>(mapScatterOp.getInput());
+    if (!input) {
+      return rewriter.notifyMatchFailure(mapScatterOp, "input is not a vector");
+    }
+    NestedLayoutAttr vectorLayout =
+        dyn_cast<NestedLayoutAttr>(signature[input]);
+    if (!vectorLayout) {
+      return rewriter.notifyMatchFailure(mapScatterOp,
+                                         "non-nested map_scatter layout");
+    }
+    if (!isa<MemRefType>(mapScatterOp.getOutput().getType())) {
+      return rewriter.notifyMatchFailure(mapScatterOp,
+                                         "distribution expects memrefs");
+    }
+    SmallVector<Value> warpIndices, threadIndices;
+    if (failed(populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
+                                            vectorLayout, warpIndices,
+                                            threadIndices))) {
+      return rewriter.notifyMatchFailure(
+          mapScatterOp, "warp or thread tiles have overlapping strides");
+    }
+
+    Value distributedVector = getDistributed(rewriter, input, vectorLayout);
+
+    Location loc = mapScatterOp.getLoc();
+    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
+    SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
+    for (auto [idx, offsets] :
+         llvm::enumerate(StaticTileOffsetRange(distShape, tileShape))) {
+      // Extract the "element vector" from the inner most dimensions. All outer
+      // dimensions are either unrolled or distributed such that this is a
+      // contiguous slice.
+      ArrayRef<int64_t> offsetArray(offsets);
+      VectorValue distributedInput = extractSliceAsVector(
+          rewriter, loc, distributedVector,
+          offsetArray.take_front(vectorLayout.getRank() * 2));
+
+      // Clone the map_scatter op with the "element vector" as the input, and
+      // adjust the transformation region to account for the distributed
+      // offsets.
+      AffineMap permutationMap =
+          rewriter.getMultiDimIdentityMap(input.getType().getRank());
+      SmallVector<Value> indices(input.getType().getRank(), zero);
+      SmallVector<Value> distributedOffsets =
+          getTransferIndicesFromNestedLayout(rewriter, indices, offsets,
+                                             vectorLayout, permutationMap,
+                                             warpIndices, threadIndices);
+      IREE::LinalgExt::MapScatterOp distributedMapScatter =
+          clone(rewriter, mapScatterOp, mapScatterOp.getResultTypes(),
+                {distributedInput, mapScatterOp.getOutput()});
+      int64_t sliceRank = distributedInput.getType().getRank();
+      int64_t rankDiff = input.getType().getRank() - sliceRank;
+      // Add the distributed offsets in the map_scatter transformation body.
+      auto transformationBuilder = [&](ArrayRef<BlockArgument> newIndices) {
+        SmallVector<Value> replacementIndices(distributedOffsets);
+        for (auto [i, replacementIdx] : llvm::enumerate(replacementIndices)) {
+          // Rank-reduced dimensions can be directly replaced by the distributed
+          // index, since their size is 1 in the new map_scatter input.
+          if (i < rankDiff) {
+            continue;
+          }
+          // Otherwise, the dimension is a contiguous element dimension, so
+          // the mapping is achieved by adding the corresponding block argument
+          // to the sliced index.
+          BlockArgument newTransformationIdx = newIndices[i - rankDiff];
+          replacementIdx = rewriter.create<arith::AddIOp>(
+              loc, newTransformationIdx, replacementIdx);
+        }
+        return replacementIndices;
+      };
+      distributedMapScatter.insertTransformationAtStart(
+          rewriter, transformationBuilder, sliceRank);
+    }
+
+    rewriter.eraseOp(mapScatterOp);
     return success();
   }
 
@@ -804,6 +1085,165 @@ struct DistributeMultiReduction final
     return res;
   }
 
+  Value getBufferForSubgroupReduction(RewriterBase &rewriter, MemRefType memTy,
+                                      Value val) const {
+    auto alloc = rewriter.create<memref::AllocOp>(val.getLoc(), memTy);
+    // Insert gpu.barrier to make sure previous iteration of batch loop has
+    // fully read the subgroup partial reductions.
+    // TODO: We should be only creating a barrier if this buffer is going to be
+    // reused.
+    rewriter.create<gpu::BarrierOp>(val.getLoc());
+    return alloc;
+  }
+
+  NestedLayoutAttr
+  getLayoutForReductionFromBuffer(NestedLayoutAttr srcLayout,
+                                  ArrayRef<int64_t> reductionDims) const {
+    // Create new layout where the elements of a subgroup are
+    // distributed to every threads.
+    IREE::VectorExt::NestedLayoutAttr bufferReduceLayout;
+    auto subgroupTileLens =
+        llvm::to_vector_of<int64_t>(srcLayout.getSubgroupTile());
+    auto batchTileLens = llvm::to_vector_of<int64_t>(srcLayout.getBatchTile());
+    auto outerTileLens = llvm::to_vector_of<int64_t>(srcLayout.getOuterTile());
+    auto threadTileLens =
+        llvm::to_vector_of<int64_t>(srcLayout.getThreadTile());
+    auto elementTileLens =
+        llvm::to_vector_of<int64_t>(srcLayout.getElementTile());
+    auto subgroupStrides =
+        llvm::to_vector_of<int64_t>(srcLayout.getSubgroupStrides());
+    auto threadStrides =
+        llvm::to_vector_of<int64_t>(srcLayout.getThreadStrides());
+
+    // Check if we had enough threads on one of the reduction dimensions
+    // to use for a subgroup reduction. If not, do a serialized reduction.
+    // This usually works, because we would be distributing the reduction
+    // dimension on atleast more threads than number of subgroups, and if we
+    // aren't, it's probably best to do a serialized reduction anyway.
+    int64_t threadsRequired = 1;
+    for (int64_t rDim : reductionDims) {
+      // The size or #lanes needs to be a power of 2.
+      threadsRequired *= llvm::PowerOf2Ceil(subgroupTileLens[rDim]);
+    }
+    std::optional<int64_t> availableThreads;
+    int64_t threadStride = 0;
+    for (int64_t rDim : reductionDims) {
+      // TODO: We could merge two different dimension threads into one, but they
+      // can be disjoint.
+      if (threadTileLens[rDim] >= threadsRequired) {
+        availableThreads = threadTileLens[rDim];
+        threadStride = threadStrides[rDim];
+        break;
+      }
+    }
+
+    for (int64_t rDim : reductionDims) {
+      batchTileLens[rDim] = 1;
+      outerTileLens[rDim] = 1;
+      elementTileLens[rDim] = 1;
+      if (availableThreads.has_value()) {
+        int64_t used = llvm::PowerOf2Ceil(subgroupTileLens[rDim]);
+        threadStrides[rDim] = threadStride;
+        threadTileLens[rDim] = used;
+        availableThreads.value() /= used;
+        threadStride *= used;
+      } else {
+        threadStrides[rDim] = 0;
+        threadTileLens[rDim] = 1;
+      }
+      subgroupTileLens[rDim] = 1;
+      subgroupStrides[rDim] = 0;
+    }
+    bufferReduceLayout = IREE::VectorExt::NestedLayoutAttr::get(
+        srcLayout.getContext(), subgroupTileLens, batchTileLens, outerTileLens,
+        threadTileLens, elementTileLens, subgroupStrides, threadStrides);
+    return bufferReduceLayout;
+  }
+
+  void writePartialResultToBuffer(RewriterBase &rewriter, Location loc,
+                                  VectorValue valueToWrite, Value buffer,
+                                  NestedLayoutAttr srcLayout,
+                                  ArrayRef<int64_t> reductionDims) const {
+    Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    VectorType unDistributedType = valueToWrite.getType();
+    SmallVector<Value> indices(unDistributedType.getRank(), c0);
+    SmallVector<bool> inBounds(unDistributedType.getRank(), true);
+    auto write = rewriter.create<vector::TransferWriteOp>(
+        loc, valueToWrite, buffer, indices, inBounds);
+    // Set layouts signature for write.
+    // We need to set the layout on the srcVector/first operand.
+    auto subgroupTileLens =
+        llvm::to_vector_of<int64_t>(srcLayout.getSubgroupTile());
+    auto batchTileLens = llvm::to_vector_of<int64_t>(srcLayout.getBatchTile());
+    auto outerTileLens = llvm::to_vector_of<int64_t>(srcLayout.getOuterTile());
+    auto threadTileLens =
+        llvm::to_vector_of<int64_t>(srcLayout.getThreadTile());
+    auto elementTileLens =
+        llvm::to_vector_of<int64_t>(srcLayout.getElementTile());
+    auto subgroupStrides =
+        llvm::to_vector_of<int64_t>(srcLayout.getSubgroupStrides());
+    auto threadStrides =
+        llvm::to_vector_of<int64_t>(srcLayout.getThreadStrides());
+    // Replace the reduced tiles with unit dimension.
+    for (int64_t rDim : reductionDims) {
+      batchTileLens[rDim] = 1;
+      outerTileLens[rDim] = 1;
+      threadTileLens[rDim] = 1;
+      elementTileLens[rDim] = 1;
+      threadStrides[rDim] = 0;
+    }
+    auto interSubGroupLayout = IREE::VectorExt::NestedLayoutAttr::get(
+        rewriter.getContext(), subgroupTileLens, batchTileLens, outerTileLens,
+        threadTileLens, elementTileLens, subgroupStrides, threadStrides);
+    setSignatureForRedistribution(rewriter, write, {interSubGroupLayout}, {});
+  }
+
+  Value doSubgroupReductionFromBuffer(RewriterBase &rewriter, Location loc,
+                                      Value buffer, NestedLayoutAttr srcLayout,
+                                      VectorLayoutInterface resLayout,
+                                      ArrayRef<int64_t> reductionDims,
+                                      vector::CombiningKind kind,
+                                      Value acc) const {
+    NestedLayoutAttr readLayout =
+        getLayoutForReductionFromBuffer(srcLayout, reductionDims);
+    Value padValue = getCombiningIdentityValue(loc, rewriter, kind,
+                                               getElementTypeOrSelf(buffer));
+    auto readTy = VectorType::get(readLayout.getUndistributedShape(),
+                                  getElementTypeOrSelf(buffer));
+    auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    auto inBounds = rewriter.getBoolArrayAttr(
+        SmallVector<bool>(readLayout.getRank(), true));
+    auto mask = rewriter.create<vector::CreateMaskOp>(
+        loc, readTy.clone(rewriter.getI1Type()),
+        memref::getMixedSizes(rewriter, loc, buffer));
+    auto read = rewriter.create<vector::TransferReadOp>(
+        loc,
+        /*vectorType=*/readTy,
+        /*source=*/buffer,
+        /*indices=*/SmallVector<Value>(readLayout.getRank(), zero),
+        /*permMap=*/rewriter.getMultiDimIdentityMap(readLayout.getRank()),
+        /*padding=*/padValue,
+        /*mask=*/mask,
+        /*inBounds=*/inBounds);
+    setSignatureForRedistribution(rewriter, mask, {}, {readLayout});
+    setSignatureForRedistribution(rewriter, read, {readLayout}, {readLayout});
+    // A newly created reduction to complete the reduction
+    // that reduces the data that was otherwise was on
+    // different subgroups.
+    // Since the data was distributed to every thread, it will
+    // form a gpu.subgroup_reduce operation later.
+    auto secondReduction = rewriter.create<vector::MultiDimReductionOp>(
+        loc, kind, read, acc, reductionDims);
+    if (resLayout) {
+      setSignatureForRedistribution(rewriter, secondReduction,
+                                    {readLayout, resLayout}, {resLayout});
+    } else {
+      setSignatureForRedistribution(rewriter, secondReduction, {readLayout},
+                                    {});
+    }
+    return secondReduction.getResult();
+  }
+
   // The reductions across subgroups are performed
   // as follows:
   // 1) Re-cover the subgroup-local result as the same rank as the
@@ -853,136 +1293,24 @@ struct DistributeMultiReduction final
       // tile.
       partialReductionShape[rDim] = preDistrShape[rDim];
     }
+    auto unDistributedType = VectorType::get(
+        partialReductionShape, srcVector.getType().getElementType());
+    VectorValue valueToWrite = rewriter.create<IREE::VectorExt::ToSIMDOp>(
+        loc, unDistributedType, isoRankThreadReduced);
+
     auto workgroupMemoryAddressSpace = Attribute(gpu::AddressSpaceAttr::get(
         rewriter.getContext(), gpu::AddressSpace::Workgroup));
     MemRefType allocType = MemRefType::get(
         partialReductionShape, srcVector.getType().getElementType(),
         AffineMap(), workgroupMemoryAddressSpace);
-    auto alloc = rewriter.create<memref::AllocOp>(loc, allocType);
-    VectorType unDistributedType = VectorType::get(
-        partialReductionShape, srcVector.getType().getElementType());
-    Value undistrWrite = rewriter.create<IREE::VectorExt::ToSIMDOp>(
-        loc, unDistributedType, isoRankThreadReduced);
-    Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    SmallVector<Value> indices(unDistributedType.getRank(), c0);
-    SmallVector<bool> inBounds(unDistributedType.getRank(), false);
-    // Insert gpu.barrier to make sure previuos iteration
-    // of batch loop has fully read the subgroup partial
-    // reductions.
+    auto alloc =
+        getBufferForSubgroupReduction(rewriter, allocType, valueToWrite);
+    writePartialResultToBuffer(rewriter, loc, valueToWrite, alloc, srcLayout,
+                               reductionDims);
+    // Wait for writes to buffer to finish.
     rewriter.create<gpu::BarrierOp>(loc);
-    auto write = rewriter.create<vector::TransferWriteOp>(
-        loc, undistrWrite, alloc, indices, inBounds);
-    // Set layouts signature for write.
-    // We need to set the layout on the srcVector/first operand.
-    auto unitAttr = UnitAttr::get(rewriter.getContext());
-    {
-      SmallVector<int64_t> subgroupTileLens =
-          llvm::to_vector(srcLayout.getSubgroupTile());
-      SmallVector<int64_t> batchTileLens =
-          llvm::to_vector(srcLayout.getBatchTile());
-      SmallVector<int64_t> outerTileLens =
-          llvm::to_vector(srcLayout.getOuterTile());
-      SmallVector<int64_t> threadTileLens =
-          llvm::to_vector(srcLayout.getThreadTile());
-      SmallVector<int64_t> elementTileLens =
-          llvm::to_vector(srcLayout.getElementTile());
-      SmallVector<int64_t> subgroupStrides =
-          llvm::to_vector(srcLayout.getSubgroupStrides());
-      SmallVector<int64_t> threadStrides =
-          llvm::to_vector(srcLayout.getThreadStrides());
-      // Replace the reduced tiles with unit dimension.
-      for (int64_t rDim : reductionDims) {
-        batchTileLens[rDim] = 1;
-        outerTileLens[rDim] = 1;
-        threadTileLens[rDim] = 1;
-        elementTileLens[rDim] = 1;
-        threadStrides[rDim] = 0;
-      }
-      auto interSubGroupLayout = IREE::VectorExt::NestedLayoutAttr::get(
-          rewriter.getContext(), subgroupTileLens, batchTileLens, outerTileLens,
-          threadTileLens, elementTileLens, subgroupStrides, threadStrides);
-      auto writeAttrs =
-          SmallVector<Attribute>(write->getNumOperands(), unitAttr);
-      writeAttrs[0] = interSubGroupLayout;
-      ArrayAttr writeOperandsAttr =
-          ArrayAttr::get(rewriter.getContext(), writeAttrs);
-      ArrayAttr writeResultsAttr = ArrayAttr::get(rewriter.getContext(), {});
-      setSignatureForRedistribution(rewriter, write.getOperation(),
-                                    writeOperandsAttr, writeResultsAttr);
-    }
-
-    auto ceilToPowerOf2 = [](uint32_t x) {
-      return llvm::isPowerOf2_32(x) ? x : llvm::NextPowerOf2(x);
-    };
-
-    // Insert gpu.barrier
-    rewriter.create<gpu::BarrierOp>(write.getLoc());
-    auto read = rewriter.create<vector::TransferReadOp>(
-        loc, unDistributedType, alloc, indices, inBounds);
-    // Create new layout where the elements of a subgroup are
-    // distributed to every threads.
-    IREE::VectorExt::NestedLayoutAttr subgroupToThreadsLayout;
-    {
-      // We intentionally make the subgroup tile to be 1
-      SmallVector<int64_t> subgroupTileLens =
-          llvm::to_vector(srcLayout.getSubgroupTile());
-      SmallVector<int64_t> batchTileLens =
-          llvm::to_vector(srcLayout.getBatchTile());
-      SmallVector<int64_t> outerTileLens =
-          llvm::to_vector(srcLayout.getOuterTile());
-      SmallVector<int64_t> threadTileLens =
-          llvm::to_vector(srcLayout.getThreadTile());
-      SmallVector<int64_t> elementTileLens =
-          llvm::to_vector(srcLayout.getElementTile());
-      SmallVector<int64_t> subgroupStrides =
-          llvm::to_vector(srcLayout.getSubgroupStrides());
-      SmallVector<int64_t> threadStrides =
-          llvm::to_vector(srcLayout.getThreadStrides());
-
-      for (int64_t rDim : reductionDims) {
-        batchTileLens[rDim] = 1;
-        outerTileLens[rDim] = 1;
-        elementTileLens[rDim] = 1;
-        threadStrides[rDim] *= subgroupStrides[rDim];
-        // The size or #lanes needs to be a power of 2.
-        threadTileLens[rDim] = ceilToPowerOf2(subgroupTileLens[rDim]);
-        subgroupStrides[rDim] = 1;
-        subgroupTileLens[rDim] = 1;
-      }
-      subgroupToThreadsLayout = IREE::VectorExt::NestedLayoutAttr::get(
-          rewriter.getContext(), subgroupTileLens, batchTileLens, outerTileLens,
-          threadTileLens, elementTileLens, subgroupStrides, threadStrides);
-      auto readAttrs = SmallVector<Attribute>(read->getNumOperands(), unitAttr);
-      ArrayAttr readOperandsAttr =
-          ArrayAttr::get(rewriter.getContext(), readAttrs);
-      ArrayAttr readResultsAttr =
-          ArrayAttr::get(rewriter.getContext(), {subgroupToThreadsLayout});
-      setSignatureForRedistribution(rewriter, read.getOperation(),
-                                    readOperandsAttr, readResultsAttr);
-    }
-    // A newly created reduction to complete the reduction
-    // that reduces the data that was otherwise was on
-    // different subgroups.
-    // Since the data was distributed to every thread, it will
-    // form a gpu.subgroup_reduce operation later.
-    auto secondReduction = rewriter.create<vector::MultiDimReductionOp>(
-        loc, kind, read, acc, reductionDims);
-    {
-      auto reduceAttrs =
-          SmallVector<Attribute>(secondReduction->getNumOperands(), unitAttr);
-      reduceAttrs[0] = subgroupToThreadsLayout;
-      ArrayAttr reduceResultsAttr =
-          ArrayAttr::get(rewriter.getContext(), {unitAttr});
-      if (auto dstLayout = dyn_cast_or_null<NestedLayoutAttr>(resLayout)) {
-        reduceAttrs[1] = dstLayout;
-        reduceResultsAttr = ArrayAttr::get(rewriter.getContext(), {dstLayout});
-      }
-      ArrayAttr reduceOperandsAttr =
-          ArrayAttr::get(rewriter.getContext(), reduceAttrs);
-      setSignatureForRedistribution(rewriter, secondReduction.getOperation(),
-                                    reduceOperandsAttr, reduceResultsAttr);
-    }
-    return secondReduction.getResult();
+    return doSubgroupReductionFromBuffer(rewriter, loc, alloc, srcLayout,
+                                         resLayout, reductionDims, kind, acc);
   }
 
   int64_t subgroupSize;
@@ -1179,22 +1507,13 @@ struct DistributeContract final
     auto partialReduction = rewriter.create<vector::MultiDimReductionOp>(
         loc, contractOp.getKind(), undistrLocalReduced, acc,
         partialReductionDims);
-    {
-      auto unitAttr = UnitAttr::get(rewriter.getContext());
-      auto reduceAttrs =
-          SmallVector<Attribute>(partialReduction->getNumOperands(), unitAttr);
-      reduceAttrs[0] = reductionLayout;
-      ArrayAttr reduceResultsAttr =
-          ArrayAttr::get(rewriter.getContext(), {unitAttr});
-      if (auto dstLayout =
-              dyn_cast_or_null<NestedLayoutAttr>(signature[resVector])) {
-        reduceAttrs[1] = dstLayout;
-        reduceResultsAttr = ArrayAttr::get(rewriter.getContext(), {dstLayout});
-      }
-      ArrayAttr reduceOperandsAttr =
-          ArrayAttr::get(rewriter.getContext(), reduceAttrs);
-      setSignatureForRedistribution(rewriter, partialReduction.getOperation(),
-                                    reduceOperandsAttr, reduceResultsAttr);
+    if (resVector) {
+      setSignatureForRedistribution(rewriter, partialReduction,
+                                    {reductionLayout, signature[resVector]},
+                                    {signature[resVector]});
+    } else {
+      setSignatureForRedistribution(rewriter, partialReduction,
+                                    {reductionLayout}, {});
     }
     rewriter.replaceOp(contractOp, partialReduction);
     return success();
@@ -1813,7 +2132,8 @@ void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
                                                    Value threadId,
                                                    int64_t subgroupSize,
                                                    int64_t maxBitsPerShuffle) {
-  patterns.add<DistributeTransferRead, DistributeTransferWrite>(
+  patterns.add<DistributeTransferRead, DistributeTransferWrite,
+               DistributeTransferGather, DistributeMapScatter>(
       patterns.getContext(), threadId, subgroupSize);
   patterns.add<DistributeBroadcast, DistributeTranspose>(patterns.getContext());
   patterns.add<DistributeMultiReduction>(patterns.getContext(), subgroupSize,

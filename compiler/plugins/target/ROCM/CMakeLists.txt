@@ -67,6 +67,7 @@ iree_cc_library(
     iree::compiler::PluginAPI
     iree::compiler::Utils
     iree::compiler::plugins::target::ROCM::Dialect::ROCM::IR::ROCMDialect
+    iree::compiler::plugins::target::ROCM::Dialect::ROCM::Transforms
     iree::compiler::plugins::target::ROCM::builtins::ukernel::iree_uk_amdgpu_bitcode
     iree::schemas::amdgpu_executable_def_c_fbs
     iree::schemas::executable_debug_info_c_fbs

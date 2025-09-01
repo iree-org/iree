@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -pass-pipeline='builtin.module(func.func(iree-vector-ext-vectorize-ops, iree-codegen-generic-vectorization{enable-vector-masking=true}),canonicalize,cse,canonicalize)' --split-input-file --mlir-print-local-scope | FileCheck %s
+// RUN: iree-opt %s -pass-pipeline='builtin.module(func.func(iree-vector-ext-vectorize-ops, iree-codegen-generic-vectorization{enable-vector-masking=true}),canonicalize,cse,func.func(iree-codegen-optimize-tensor-insert-extract-slices),canonicalize)' --split-input-file --mlir-print-local-scope | FileCheck %s
 
 #layout = #iree_vector_ext.nested_layout<
   subgroup_tile = [1, 1],
@@ -58,14 +58,14 @@ func.func @vectorize_matmul_dyn_parallel(%A: tensor<?x64xf32>,
   %BL = iree_vector_ext.to_layout %B to layout(#layout) : tensor<64x?xf32>
   %CL = iree_vector_ext.to_layout %C to layout(#layout) : tensor<?x?xf32>
   %matmul = linalg.matmul ins(%AL, %BL : tensor<?x64xf32>, tensor<64x?xf32>)
-                          outs(%CL: tensor<?x?xf32>) {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0], [64, 64, 0], [0, 0, 64]]>}
+                          outs(%CL: tensor<?x?xf32>) {lowering_config = #iree_cpu.lowering_config<vector_common_parallel = [64, 64, 0], vector_reduction = [0, 0, 64]>}
                           -> tensor<?x?xf32>
   return %matmul : tensor<?x?xf32>
 }
 
 // CHECK-LABEL: func.func @vectorize_matmul_dyn_parallel
 // CHECK-SAME: %[[AT:.+]]: tensor<?x64xf32>, %[[BT:.+]]: tensor<64x?xf32>, %[[CT:.+]]: tensor<?x?xf32>
-// CHECK-DAG: %[[PAD:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK-DAG: %[[PAD:.+]] = ub.poison : f32
 // CHECK-DAG: %[[ADIM:.+]] = tensor.dim %arg0, %c0 : tensor<?x64xf32>
 // CHECK-DAG: %[[BDIM:.+]] = tensor.dim %arg1, %c1 : tensor<64x?xf32>
 // CHECK-DAG: %[[AMASK:.+]] = vector.create_mask %[[ADIM]], %c64 : vector<64x64xi1>
@@ -88,12 +88,13 @@ func.func @linalg_ext_gather(%source : tensor<1024x128xi32>, %indices : tensor<1
 // CHECK-LABEL: @linalg_ext_gather
 //  CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
 //  CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
-//       CHECK:   %[[C0:.+]] = arith.constant 0 : index
-//       CHECK:   %[[READ:.+]] = vector.transfer_read %[[ARG1]]
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[PAD:.+]] = ub.poison
+//       CHECK:   %[[READ:.+]] = vector.transfer_read %[[ARG1]][%[[C0]]], %[[PAD]]
 //  CHECK-SAME:     : tensor<10xi32>, vector<10xi32>
 //       CHECK:   %[[CAST:.+]] = arith.index_cast %[[READ]]
 //       CHECK:   %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[ARG0]]
-//  CHECK-SAME:     [%[[C0]], %[[C0]]][%[[CAST]]: vector<10xindex>, None]
+//  CHECK-SAME:     [%[[C0]], %[[C0]]][%[[CAST]]: vector<10xindex>, None], %[[PAD]]
 
 // -----
 
@@ -146,3 +147,30 @@ func.func @linalg_ext_gather_unit_dim(%source : tensor<1024x128xi32>, %indices :
 //       CHECK:   %[[CAST:.+]] = arith.index_cast %[[READ]]
 //       CHECK:   %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[ARG0]]
 //  CHECK-SAME:     [%[[C0]], %[[C0]]][%[[CAST]]: vector<10xindex>, None]
+
+// -----
+
+func.func @linalg_ext_gather_masked(%source : tensor<?x128xi32>, %indices : tensor<?x1xi32>) -> (tensor<?x128xi32>) {
+  %c0 = arith.constant 0 : index
+  %dim = tensor.dim %indices, %c0 : tensor<?x1xi32>
+  %dim_ub = util.assume.int %dim[<umin = 1, umax = 12>] : index
+  %empty = tensor.empty(%dim_ub) : tensor<?x128xi32>
+  %result = iree_linalg_ext.gather dimension_map = [0]
+    ins(%source, %indices : tensor<?x128xi32>, tensor<?x1xi32>)
+    outs(%empty: tensor<?x128xi32>) -> tensor<?x128xi32>
+  return %result : tensor<?x128xi32>
+}
+
+// CHECK-LABEL: @linalg_ext_gather_masked
+//  CHECK-SAME:    %[[SOURCE:[a-zA-Z0-9]+]]
+//  CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]
+//  CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG: %[[C128:.+]] = arith.constant 128 : index
+//  CHECK: %[[DIM:.+]] = tensor.dim %[[INDICES]], %[[C0]]
+//  CHECK: %[[DIM_UB:.+]] = util.assume.int %[[DIM]]
+//  CHECK: %[[INDICES_MASK:.+]] = vector.create_mask %[[DIM_UB]]
+//  CHECK: vector.transfer_read %[[INDICES]]
+//  CHECK-SAME: %[[INDICES_MASK]]
+//  CHECK: %[[MASK:.+]] = vector.create_mask %[[DIM_UB]], %[[C128]]
+//  CHECK: iree_vector_ext.transfer_gather %[[SOURCE]]
+//  CHECK-SAME: %[[MASK]]

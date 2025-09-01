@@ -166,7 +166,7 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
                    bool skipIntermediateRoundings) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   const char ukernelName[] = "mmt4d";
-  if (!hasUkernel(targetAttr, ukernelName)) {
+  if (!targetAttr || !hasUkernel(targetAttr.getConfiguration(), ukernelName)) {
     return failure();
   }
   Value lhs = getInputForUKernel(op.getDpsInputOperand(0)->get());
@@ -260,7 +260,7 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
       loc, returnTypes, fn.name, ValueRange{lhs, rhs}, out,
       ValueRange{m, n, k, m0, n0, k0, flagsVal},
       /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
-      /*strided_outer_dims=*/rewriter.getIndexAttr(1));
+      /*num_strided_outer_dims=*/1);
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
 }
@@ -270,7 +270,7 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::PackOp op,
                    bool /*skipIntermediateRoundings*/) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   const char ukernelName[] = "pack";
-  if (!hasUkernel(targetAttr, ukernelName)) {
+  if (!targetAttr || !hasUkernel(targetAttr.getConfiguration(), ukernelName)) {
     return failure();
   }
   Value in = op.getSource();
@@ -383,7 +383,7 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::PackOp op,
       ValueRange{in_size0, in_size1, out_size0, out_size1, out_size2, out_size3,
                  paddingVal, flagsVal},
       /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
-      /*strided_outer_dims=*/rewriter.getIndexAttr(2));
+      /*num_strided_outer_dims=*/2);
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
 }
@@ -393,7 +393,7 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::UnPackOp op,
                    bool /*skipIntermediateRoundings*/) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   const char ukernelName[] = "unpack";
-  if (!hasUkernel(targetAttr, ukernelName)) {
+  if (!targetAttr || !hasUkernel(targetAttr.getConfiguration(), ukernelName)) {
     return failure();
   }
   Value in = op.getSource();
@@ -471,7 +471,7 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::UnPackOp op,
       ValueRange{in_size0, in_size1, in_size2, in_size3, out_size0, out_size1,
                  flagsVal},
       /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
-      /*strided_outer_dims=*/rewriter.getIndexAttr(2));
+      /*num_strided_outer_dims=*/2);
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
 }
@@ -526,7 +526,7 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
                    bool /*skipIntermediateRoundings*/) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   const char ukernelName[] = "query_tile_sizes.2d";
-  if (!hasUkernel(targetAttr, ukernelName)) {
+  if (!targetAttr || !hasUkernel(targetAttr.getConfiguration(), ukernelName)) {
     return failure();
   }
   auto tensorType = dyn_cast<RankedTensorType>(op.getTensorType());
@@ -551,7 +551,7 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
     if (layoutAttr.getLayouts().size() != 1) {
       return rewriter.notifyMatchFailure(op, "only single layout is handled");
     }
-    auto encodingLayoutAttr = dyn_cast<IREE::CPU::VMVXEncodingLayoutAttr>(
+    auto encodingLayoutAttr = dyn_cast<IREE::CPU::VMVXEncodingResolverAttr>(
         layoutAttr.getLayouts().getValue()[0]);
     if (!encodingLayoutAttr || !encodingLayoutAttr.getConfiguration()) {
       return rewriter.notifyMatchFailure(
@@ -592,7 +592,7 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
       loc, resultTypes, fn.name, inputValues, /*outs=*/ValueRange{},
       /*other_operands=*/ValueRange{},
       /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
-      /*strided_outer_dims=*/IntegerAttr{});
+      /*strided_dims=*/nullptr);
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
 }

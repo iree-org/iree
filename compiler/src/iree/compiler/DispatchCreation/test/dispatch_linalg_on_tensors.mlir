@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="builtin.module(canonicalize, util.func(iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true}, iree-dispatch-creation-clone-producers-into-dispatch-regions, iree-dispatch-creation-convert-dispatch-regions-to-workgroups, iree-dispatch-creation-convert-tensor-to-flow, canonicalize, iree-dispatch-creation-materialize-default-workgroup-count-region), cse, iree-flow-canonicalize, cse)" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(canonicalize, util.func(iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true}, iree-dispatch-creation-clone-producers-into-dispatch-regions, iree-dispatch-creation-convert-dispatch-regions-to-workgroups, iree-dispatch-creation-convert-tensor-to-flow, canonicalize, iree-dispatch-creation-materialize-default-workgroup-count-region), cse, canonicalize, cse)" %s | FileCheck %s
 
 util.func public @tile_matmul_alone(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
              %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
@@ -47,7 +47,7 @@ util.func public @tile_matmul_alone(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?x
 //      CHECK:     iree_tensor_ext.dispatch.tensor.store %[[GEMM]], %[[ARG5]]
 // CHECK-SAME:         offsets = [0, 0], sizes = [%[[ARG10_W]], %[[ARG11_W]]], strides = [1, 1]
 //      CHECK:     count(%[[W0:.+]]: index, %[[W1:.+]]: index, %[[W2:.+]]: index, %[[W3:.+]]: index, %[[W4:.+]]: index, %[[W5:.+]]: index)
-//      CHECK:       %[[WX:.+]], %[[WY:.+]], %[[WZ:.+]] = iree_tensor_ext.dispatch.workgroup_count_from_slice %[[W0]], %[[W1]], %[[W2]], %[[W3]], %[[W4]], %[[W5]]
+//      CHECK:       %[[WX:.+]], %[[WY:.+]], %[[WZ:.+]] = iree_tensor_ext.dispatch.workgroup_count_from_slice(%[[W0]], %[[W1]], %[[W2]], %[[W3]], %[[W4]], %[[W5]])
 //      CHECK:       flow.return %[[WX]], %[[WY]], %[[WZ]]
 
 // -----
@@ -1823,7 +1823,7 @@ util.func public @batchnorm_training(%arg0: tensor<12xf32>, %arg1: tensor<12x12x
 // -----
 
 #map = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
 util.func public @pad_and_set_encoding_op(%arg0 : tensor<?x?xf32>)
     -> tensor<?x?xf32, #encoding> {
   %c0 = arith.constant 0 : index
@@ -1843,7 +1843,7 @@ util.func public @pad_and_set_encoding_op(%arg0 : tensor<?x?xf32>)
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> ((s0 ceildiv 16) * 16)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
-//  CHECK-DAG: #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
+//  CHECK-DAG: #[[ENCODING:.+]] = #iree_encoding.testing<>
 //      CHECK: util.func public @pad_and_set_encoding
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32>
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -1875,7 +1875,7 @@ util.func public @pad_and_set_encoding_op(%arg0 : tensor<?x?xf32>)
 //      CHECK:     flow.return
 //      CHECK:   count(%[[WL0:[a-zA-Z0-9]+]]: index, %[[WL1:[a-zA-Z0-9]+]]: index,
 // CHECK-SAME:         %[[WL2:[a-zA-Z0-9]+]]: index, %[[WL3:[a-zA-Z0-9]+]]: index)
-//      CHECK:     %[[X:[a-zA-Z0-9]+]], %[[Y:[a-zA-Z0-9]+]], %[[Z:.+]] = iree_tensor_ext.dispatch.workgroup_count_from_slice %[[WL0]], %[[WL1]], %[[WL2]], %[[WL3]]
+//      CHECK:     %[[X:[a-zA-Z0-9]+]], %[[Y:[a-zA-Z0-9]+]], %[[Z:.+]] = iree_tensor_ext.dispatch.workgroup_count_from_slice(%[[WL0]], %[[WL1]], %[[WL2]], %[[WL3]])
 //      CHECK:     flow.return %[[X]], %[[Y]], %[[Z]]
 //      CHECK:   util.return %[[DISPATCH]]
 
@@ -1883,7 +1883,7 @@ util.func public @pad_and_set_encoding_op(%arg0 : tensor<?x?xf32>)
 
 #map = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
 util.func public @root_on_unset_encoding(
     %arg0: tensor<784x96xf32, #encoding>,
     %arg1: tensor<96xf32>) -> tensor<784x96xf32> {
@@ -1905,7 +1905,7 @@ util.func public @root_on_unset_encoding(
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d1)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
-//  CHECK-DAG: #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
+//  CHECK-DAG: #[[ENCODING:.+]] = #iree_encoding.testing<>
 //      CHECK: util.func public @root_on_unset_encoding
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<784x96xf32, #[[ENCODING]]>
 // CHECK-SAME:     %[[ARG1:.+]]: tensor<96xf32>

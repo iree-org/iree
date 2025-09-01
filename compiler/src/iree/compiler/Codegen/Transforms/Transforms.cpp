@@ -14,6 +14,7 @@
 #include <cassert>
 #include <cstdint>
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
@@ -193,7 +194,7 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
 
     int index = 0;
     for (auto dimSize : allocLikeType.getShape()) {
-      if (!ShapedType::isDynamic(dimSize)) {
+      if (ShapedType::isStatic(dimSize)) {
         auto dimSizeAttr = builder.getIndexAttr(dimSize);
         allocSizes.push_back(dimSizeAttr);
         subviewSizes.push_back(dimSizeAttr);
@@ -352,15 +353,19 @@ template void hoistStaticallyBoundAllocationsInFunc<memref::AllocaOp>(
 // Lowering `iree_tensor_ext.dispatch.workgroup_count_from_slice` operation.
 //===---------------------------------------------------------------------===//
 
-LogicalResult lowerWorkgroupCountFromSliceOp(
-    RewriterBase &rewriter,
-    IREE::TensorExt::DispatchWorkgroupCountFromSliceOp workgroupCountOp,
-    mlir::FunctionOpInterface entryPointFn,
-    ArrayRef<OpFoldResult> workgroupCount, int maxWorkgroupParallelDims) {
+FailureOr<SmallVector<OpFoldResult>> materializeWorkgroupCountComputation(
+    RewriterBase &rewriter, mlir::FunctionOpInterface entryPointFn,
+    ArrayRef<OpFoldResult> workgroupCount, ValueRange workloadVals) {
   // Compute the backward slice of the workgroup count operations.
   BackwardSliceOptions options;
-  options.filter = [](Operation *op) {
-    return !isa<IREE::TensorExt::DispatchWorkloadOrdinalOp>(op);
+  SmallVector<IREE::TensorExt::DispatchWorkloadOrdinalOp> leaves;
+  options.filter = [&leaves](Operation *op) {
+    if (auto ordinalOp =
+            dyn_cast<IREE::TensorExt::DispatchWorkloadOrdinalOp>(op)) {
+      leaves.push_back(ordinalOp);
+      return false;
+    }
+    return true;
   };
   options.inclusive = true;
   llvm::SetVector<Operation *> slice;
@@ -378,26 +383,19 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
   // Insert the slice into workgroup count region with all `hal.constant.index`
   // operations replaced with arguments (drop the front argument since that is
   // `hal.device`).
-  auto workloadVals = workgroupCountOp.getOperands();
   IRMapping map;
-  // Map `flow.dispatch.constant_ordinal` op with the corresponding operand of
-  // the `flow.dispatch.workgroup_count_default` operation.
-  SmallVector<IREE::TensorExt::DispatchWorkloadOrdinalOp> ordinalOps;
-  entryPointFn.walk([&](IREE::TensorExt::DispatchWorkloadOrdinalOp ordinalOp) {
-    ordinalOps.push_back(ordinalOp);
-  });
-  for (auto ordinalOp : ordinalOps) {
+  for (auto ordinalOp : leaves) {
+    // Map `flow.dispatch.constant_ordinal` op with the corresponding operand of
+    // the `flow.dispatch.workgroup_count_default` operation.
     int64_t ordinal = ordinalOp.getOrdinal().getSExtValue();
     if (ordinal >= workloadVals.size()) {
-      ordinalOp.emitOpError(
+      return ordinalOp.emitOpError(
           "ordinal number is higher than the number of workloads captured in "
           "the workgroup count region");
     }
     map.map(ordinalOp.getResult(),
             workloadVals[ordinalOp.getOrdinal().getSExtValue()]);
   }
-  OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPoint(workgroupCountOp);
   for (auto op : slice) {
     // TODO(#13038) This is a WAR for the these ops ending up in workgroup count
     // computation. They should not. Some pre-processing at MaterializeEncoding
@@ -421,6 +419,28 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
     } else {
       results.push_back(ofr);
     }
+  }
+  return results;
+}
+
+LogicalResult lowerWorkgroupCountFromSliceOp(
+    RewriterBase &rewriter,
+    IREE::TensorExt::DispatchWorkgroupCountFromSliceOp workgroupCountOp,
+    mlir::FunctionOpInterface entryPointFn,
+    ArrayRef<OpFoldResult> workgroupCount, int maxWorkgroupParallelDims) {
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(workgroupCountOp);
+
+  SmallVector<OpFoldResult> results;
+  {
+    FailureOr<SmallVector<OpFoldResult>> resultsOr =
+        materializeWorkgroupCountComputation(rewriter, entryPointFn,
+                                             workgroupCount,
+                                             workgroupCountOp.getOperands());
+    if (failed(resultsOr)) {
+      return failure();
+    }
+    std::swap(results, resultsOr.value());
   }
 
   // The `maxWorkgroupParallelDims` represents the maximum dimension number
@@ -452,10 +472,6 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
   }
   rewriter.replaceOp(workgroupCountOp,
                      getValueOrCreateConstantIndexOp(rewriter, loc, results));
-  for (auto ordinalOp : ordinalOps) {
-    rewriter.replaceOp(ordinalOp, ordinalOp.getOperand());
-  }
-
   return success();
 }
 
@@ -486,6 +502,166 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
   return lowerWorkgroupCountFromSliceOp(rewriter, *countOps.begin(),
                                         entryPointFn, workgroupCount,
                                         maxWorkgroupParallelDims);
+}
+
+/// Pattern to fold `scf.forall` created from split reduction with an
+/// `scf.forall` created by workgroup distribution
+namespace {
+
+// Given a list of workgroup mappings, finds the highest workgroup mapping
+// in the list and returns the workgroup mapping "one more" than the highest.
+static IREE::Codegen::WorkgroupMappingAttr
+getNextWorkgroupMapping(IREE::Codegen::WorkgroupMappingAttr mapping) {
+  MLIRContext *context = mapping.getContext();
+  switch (mapping.getId()) {
+  case IREE::Codegen::WorkgroupId::IdX:
+    return IREE::Codegen::WorkgroupMappingAttr::get(
+        context, IREE::Codegen::WorkgroupId::IdY);
+  case IREE::Codegen::WorkgroupId::IdY:
+    return IREE::Codegen::WorkgroupMappingAttr::get(
+        context, IREE::Codegen::WorkgroupId::IdZ);
+  case IREE::Codegen::WorkgroupId::IdZ:
+    return IREE::Codegen::WorkgroupMappingAttr::get(
+        context, IREE::Codegen::WorkgroupId::IdZ,
+        mapping.getDelinearizedDim() + 1);
+  }
+  llvm_unreachable("Unhandled WorkgroupId case");
+}
+
+static SmallVector<Attribute> appendSplitReductionMappingToWorkgroupMapping(
+    ArrayRef<Attribute> currWorkgroupMapping,
+    ArrayRef<Attribute> splitReductionMapping) {
+  auto castedCurrWorkgroupMapping =
+      llvm::map_to_vector(currWorkgroupMapping, [](Attribute attr) {
+        return cast<IREE::Codegen::WorkgroupMappingAttr>(attr);
+      });
+  llvm::sort(castedCurrWorkgroupMapping);
+
+  auto castedSplitReductionMapping =
+      llvm::map_to_vector(splitReductionMapping, [](Attribute attr) {
+        return cast<IREE::LinalgExt::SplitReductionMappingAttr>(attr);
+      });
+  llvm::sort(castedSplitReductionMapping);
+
+  IREE::Codegen::WorkgroupMappingAttr currHighestMapping =
+      castedCurrWorkgroupMapping.back();
+  DenseMap<IREE::LinalgExt::SplitReductionMappingAttr,
+           IREE::Codegen::WorkgroupMappingAttr>
+      splitToWorkgroupMap;
+
+  for (IREE::LinalgExt::SplitReductionMappingAttr mapping :
+       castedSplitReductionMapping) {
+    IREE::Codegen::WorkgroupMappingAttr nextHighestMapping =
+        getNextWorkgroupMapping(currHighestMapping);
+    splitToWorkgroupMap[mapping] = nextHighestMapping;
+    currHighestMapping = nextHighestMapping;
+  }
+
+  auto combinedMapping = llvm::map_to_vector(
+      splitReductionMapping, [&](Attribute attr) -> Attribute {
+        return splitToWorkgroupMap.lookup(
+            cast<IREE::LinalgExt::SplitReductionMappingAttr>(attr));
+      });
+  llvm::append_range(combinedMapping, currWorkgroupMapping);
+  return combinedMapping;
+}
+
+// Pattern to fold the `scf.forall` produced by split reduction
+// and the one produced by workgroup distribution. The newly created
+// `scf.forall` has rank equal to the sum of the two `scf.forall`s merged,
+// with the higher dimensions corresponding to the split-reduction loop
+// and lower corresponding to the workgoup mapping. The newly created
+// loop also has workgroup mapping.
+struct FoldSplitReductionForallWithWorkgroupForall
+    : public OpRewritePattern<scf::ForallOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(scf::ForallOp forallOp,
+                                PatternRewriter &rewriter) const override {
+    if (forallOp.getNumResults() != 0) {
+      return rewriter.notifyMatchFailure(
+          forallOp, "unhandled operation with return values");
+    }
+
+    std::optional<ArrayAttr> mappingAttr = forallOp.getMapping();
+    if (!mappingAttr) {
+      return rewriter.notifyMatchFailure(forallOp,
+                                         "not split reduction scf.forall");
+    }
+    if (failed(IREE::LinalgExt::SplitReductionMappingAttr::verifyAttrList(
+            rewriter.getContext(), forallOp.getLoc(), mappingAttr->getValue(),
+            /*emitDiagnosticsErrors =*/false))) {
+      return rewriter.notifyMatchFailure(
+          forallOp, "invalid split reduction mapping attribute list");
+    }
+
+    // Get all workgroup mapping loops. It is assumed that the workgroup mapping
+    // loop is nested within the split reduction loop.
+    auto nestedForallOps = forallOp.getOps<scf::ForallOp>();
+
+    // For now bail on more than one scf.forall ops.
+    if (!llvm::hasSingleElement(nestedForallOps)) {
+      return rewriter.notifyMatchFailure(
+          forallOp, "unhandled multiple `scf.forall` ops nested within the "
+                    "split-reduction loop");
+    }
+    scf::ForallOp workgroupLoop = *nestedForallOps.begin();
+    if (workgroupLoop.getNumResults() != 0) {
+      return rewriter.notifyMatchFailure(
+          workgroupLoop, "unhandled merging of workgourp mapping loop with "
+                         "results and split reduction mapped loop");
+    }
+    std::optional<ArrayAttr> workgroupMapping = workgroupLoop.getMapping();
+    if (!workgroupMapping ||
+        llvm::any_of(workgroupMapping->getValue(), [](Attribute attr) {
+          return !isa<IREE::Codegen::WorkgroupMappingAttr>(attr);
+        })) {
+      return rewriter.notifyMatchFailure(
+          workgroupLoop, "nested loop is not a workgroup mapping loop");
+    }
+
+    SmallVector<OpFoldResult> newLbs, newUbs, newSteps;
+    newLbs = forallOp.getMixedLowerBound();
+    newUbs = forallOp.getMixedUpperBound();
+    newSteps = forallOp.getMixedStep();
+    llvm::append_range(newLbs, workgroupLoop.getMixedLowerBound());
+    llvm::append_range(newUbs, workgroupLoop.getMixedUpperBound());
+    llvm::append_range(newSteps, workgroupLoop.getMixedStep());
+
+    SmallVector<Attribute> newMapping =
+        appendSplitReductionMappingToWorkgroupMapping(
+            workgroupMapping->getValue(), mappingAttr->getValue());
+
+    auto newMappingAttr = rewriter.getArrayAttr(newMapping);
+    auto newForallOp = rewriter.create<scf::ForallOp>(
+        forallOp.getLoc(), newLbs, newUbs, newSteps, /*outputs=*/ValueRange{},
+        newMappingAttr, [](OpBuilder &, Location, ValueRange) {});
+    Block *oldBlock = forallOp.getBody();
+    Block *newForallBody = newForallOp.getBody();
+    SmallVector<Value> newInductionVars = newForallOp.getInductionVars();
+    ArrayRef<Value> newInductionVarsRef(newInductionVars);
+
+    rewriter.mergeBlocks(oldBlock, newForallBody,
+                         newInductionVarsRef.take_front(forallOp.getRank()));
+    rewriter.eraseOp(forallOp);
+
+    Block *workgroupLoopBody = workgroupLoop.getBody();
+    rewriter.eraseOp(workgroupLoopBody->getTerminator());
+    rewriter.inlineBlockBefore(
+        workgroupLoopBody, workgroupLoop,
+        newInductionVarsRef.take_back(workgroupLoop.getRank()));
+    rewriter.eraseOp(workgroupLoop);
+
+    return success();
+  }
+};
+
+} // namespace
+
+void populateFoldSplitReductionAndWorkgroupMappingLoops(
+    RewritePatternSet &patterns) {
+  patterns.insert<FoldSplitReductionForallWithWorkgroupForall>(
+      patterns.getContext());
 }
 
 //===---------------------------------------------------------------------===//
@@ -567,66 +743,6 @@ void moveLoopInvariantCodeFromGuaranteedLoops(Operation *target) {
         },
         [&](Operation *op, Region *) { op->moveBefore(genericOp); });
   });
-}
-
-//===--------------------------------------------------------------------====//
-// Pattern to remove dead allocations
-//===--------------------------------------------------------------------====//
-
-namespace {
-
-static LogicalResult eraseAlignmentOnlyDeadOp(PatternRewriter &rewriter,
-                                              Operation *op) {
-  if (!op->use_empty()) {
-    return failure();
-  }
-  rewriter.eraseOp(op);
-  return success();
-}
-
-// Removes operations with Allocate MemoryEffects but no uses.
-struct RemoveDeadMemAllocs : RewritePattern {
-  RemoveDeadMemAllocs(MLIRContext *context, PatternBenefit benefit = 1)
-      : RewritePattern(MatchAnyOpTypeTag(), benefit, context) {}
-
-  LogicalResult matchAndRewrite(Operation *op,
-                                PatternRewriter &rewriter) const override {
-    auto memEffect = dyn_cast<MemoryEffectOpInterface>(op);
-    if (!memEffect || !memEffect.hasEffect<MemoryEffects::Allocate>()) {
-      return failure();
-    }
-    return eraseAlignmentOnlyDeadOp(rewriter, op);
-  }
-};
-
-// Removes hal.interface.binding.subspan ops with only assume_alignment uses.
-struct RemoveDeadInterfaceBindings
-    : OpRewritePattern<IREE::HAL::InterfaceBindingSubspanOp> {
-  RemoveDeadInterfaceBindings(MLIRContext *context, PatternBenefit benefit = 1)
-      : OpRewritePattern<IREE::HAL::InterfaceBindingSubspanOp>(context,
-                                                               benefit) {}
-
-  LogicalResult matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op,
-                                PatternRewriter &rewriter) const override {
-    return eraseAlignmentOnlyDeadOp(rewriter, op);
-  }
-};
-
-struct RemoveDeadAssumeAlighment : OpRewritePattern<memref::AssumeAlignmentOp> {
-  RemoveDeadAssumeAlighment(MLIRContext *context, PatternBenefit benefit = 1)
-      : OpRewritePattern<memref::AssumeAlignmentOp>(context, benefit) {}
-
-  LogicalResult matchAndRewrite(memref::AssumeAlignmentOp op,
-                                PatternRewriter &rewriter) const override {
-    return eraseAlignmentOnlyDeadOp(rewriter, op);
-  }
-};
-} // namespace
-
-void populateRemoveDeadMemAllocPatterns(RewritePatternSet &patterns) {
-  patterns.insert<RemoveDeadMemAllocs>(patterns.getContext());
-  patterns.insert<RemoveDeadInterfaceBindings, RemoveDeadAssumeAlighment>(
-      patterns.getContext());
 }
 
 //===--------------------------------------------------------------------====//
@@ -824,7 +940,7 @@ distributeLinalgOpsWithFilter(mlir::FunctionOpInterface funcOp,
 
 namespace {
 struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
-  using OpRewritePattern<scf::ForOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(scf::ForOp loop,
                                 PatternRewriter &rewriter) const final {
     if (loop.getBody()->getOperations().size() == 1) {

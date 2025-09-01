@@ -460,6 +460,7 @@ class BuildFileFunctions(object):
         args=None,
         tags=None,
         includes=None,
+        group=None,
         **kwargs,
     ):
         if self._should_skip_target(tags=tags, **kwargs):
@@ -475,6 +476,7 @@ class BuildFileFunctions(object):
         labels_block = self._convert_string_list_block("LABELS", tags)
         timeout_block = self._convert_timeout_arg_block("TIMEOUT", timeout)
         includes_block = self._convert_includes_block(includes)
+        group_block = self._convert_string_arg_block("GROUP", group)
 
         self._converter.body += (
             f"iree_cc_test(\n"
@@ -489,6 +491,7 @@ class BuildFileFunctions(object):
             f"{labels_block}"
             f"{timeout_block}"
             f"{includes_block}"
+            f"{group_block}"
             f")\n\n"
         )
 

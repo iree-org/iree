@@ -236,6 +236,156 @@ verifyGatherScatter(OpTy op, int64_t sliceRank, ShapedType originalType,
   return success();
 }
 
+/// For each of the operand in `operands` this function maps the static sizes of
+/// dimensions to their affine dim expressions.
+template <typename OpTy>
+static void populateMap(OpTy op, MutableArrayRef<OpOperand> operands,
+                        llvm::DenseMap<AffineExpr, int64_t> &affineExprToSize) {
+  for (OpOperand &opOperand : operands) {
+    if (op.isScalar(&opOperand)) {
+      continue;
+    }
+    Value src = opOperand.get();
+    auto sourceType = llvm::cast<RankedTensorType>(src.getType());
+    auto sourceMap = op.getMatchingIndexingMap(&opOperand);
+
+    // Get the `sourceShape` of the `sourceType`. If the operand is a result of
+    // `tensor.cast` operation and source of the cast operation has a static
+    // shape, then assign it to the `sourceShape`.
+    auto castOp = src.getDefiningOp<tensor::CastOp>();
+    ArrayRef<int64_t> sourceShape = sourceType.getShape();
+    if (castOp && tensor::canFoldIntoConsumerOp(castOp)) {
+      sourceShape = castOp.getSource().getType().getShape();
+    }
+
+    // If the source shape's dimension has a static shape, map the affine dim
+    // expression to the known static size.
+    for (unsigned i = 0; i < sourceShape.size(); ++i) {
+      if (sourceType.isDynamicDim(i)) {
+        continue;
+      }
+      if (auto affineDimExpr =
+              dyn_cast<AffineDimExpr>(sourceMap.getResult(i))) {
+        affineExprToSize.try_emplace(affineDimExpr, sourceShape[i]);
+      }
+    }
+  }
+}
+
+/// Creates new operand w.r.t 'opOperand' of `op` with static sizes
+/// mapped in `affineExprToSize`. New operands are created in `newOperands` and
+/// their result types is stored in `resultTypes`. If `opOperand` requires no
+/// change then `changeNeeded` is false and same operand is added in the
+/// `newOperands` list.
+template <typename OpTy>
+static void createNewOperandWithStaticSizes(
+    Location loc, PatternRewriter &rewriter, OpOperand *opOperand,
+    const llvm::DenseMap<AffineExpr, int64_t> &affineExprToSize, OpTy op,
+    SmallVector<Value> &newOperands, SmallVector<Type> &resultTypes,
+    bool &changeNeeded) {
+  Value src = opOperand->get();
+  newOperands.push_back(src);
+  if (op.isScalar(opOperand)) {
+    return;
+  }
+  auto sourceType = llvm::cast<RankedTensorType>(src.getType());
+  Type resultType = sourceType;
+  ArrayRef<int64_t> sourceShape = sourceType.getShape();
+  AffineMap sourceMap = op.getMatchingIndexingMap(opOperand);
+  SmallVector<int64_t> newShape;
+
+  // If operand is updated with new shape, `newOperandNeeded` will be
+  // true.
+  bool newOperandNeeded = false;
+  for (unsigned i = 0; i < sourceShape.size(); ++i) {
+    int64_t dimShape = sourceShape[i];
+    AffineExpr dimExpr = sourceMap.getResult(i);
+    if (!affineExprToSize.contains(dimExpr) || !sourceType.isDynamicDim(i)) {
+      newShape.push_back(dimShape);
+      continue;
+    }
+    // Dimension has a dynamic shape and corresponding affine dim
+    // expression is present in the map. So assign the size for the
+    // given affine dim expression to the dimension.
+    newShape.push_back(affineExprToSize.at(dimExpr));
+    newOperandNeeded = true;
+  }
+  resultType = RankedTensorType::get(newShape, sourceType.getElementType(),
+                                     sourceType.getEncoding());
+  if (newOperandNeeded) {
+    changeNeeded = true;
+    // Get the new operand value given its size and element type by
+    // casting it.
+    Value newOperand = rewriter.create<tensor::CastOp>(loc, resultType, src);
+    unsigned index = opOperand->getOperandNumber();
+    newOperands[index] = newOperand;
+  }
+  if (op.isDpsInit(opOperand)) {
+    resultTypes.push_back(resultType);
+  }
+}
+
+namespace {
+/// Pattern to make an operation more static by looking at the affine dim
+/// expressions of other, more static, operands. This requires the operation to
+/// implement the DPS interface and to have indexing maps.
+template <typename OpTy>
+struct StaticizeLinalgExtOp : public OpRewritePattern<OpTy> {
+  using OpRewritePattern<OpTy>::OpRewritePattern;
+  LogicalResult matchAndRewrite(OpTy op,
+                                PatternRewriter &rewriter) const override {
+    if (!op.hasPureTensorSemantics()) {
+      return failure();
+    }
+
+    if (llvm::any_of(op.getIndexingMapsArray(), [](AffineMap map) {
+          return !map.isProjectedPermutation();
+        })) {
+      return failure();
+    }
+
+    Location loc = op.getLoc();
+
+    // For each of the affine dim expression, check if the size is known. If
+    // known add that in the map.
+    llvm::DenseMap<AffineExpr, int64_t> affineExprToSize;
+    populateMap(op, op->getOpOperands(), affineExprToSize);
+
+    SmallVector<Value> newOperands;
+    SmallVector<Type> resultTypes;
+    newOperands.reserve(op->getNumOperands());
+    resultTypes.reserve(op.getNumDpsInits());
+
+    // Iterate over all the operands and update the static sizes.
+    bool changeNeeded = false;
+    for (OpOperand &opOperand : op->getOpOperands()) {
+      createNewOperandWithStaticSizes(loc, rewriter, &opOperand,
+                                      affineExprToSize, op, newOperands,
+                                      resultTypes, changeNeeded);
+    }
+    if (!changeNeeded) {
+      return failure();
+    }
+
+    // Clone op.
+    Operation *newOp = clone(rewriter, op, resultTypes, newOperands);
+    SmallVector<Value> replacements;
+    replacements.reserve(newOp->getNumResults());
+    for (auto [oldResult, newResult] :
+         llvm::zip_equal(op->getResults(), newOp->getResults())) {
+      Type newType = newResult.getType();
+      Type oldType = oldResult.getType();
+      replacements.push_back((newType != oldType)
+                                 ? rewriter.create<tensor::CastOp>(
+                                       loc, oldType, cast<Value>(newResult))
+                                 : cast<Value>(newResult));
+    }
+    rewriter.replaceOp(op, replacements);
+    return success();
+  }
+};
+} // namespace
+
 //===----------------------------------------------------------------------===//
 // ScatterOp
 //===----------------------------------------------------------------------===//
@@ -295,7 +445,7 @@ ScatterOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
-FailureOr<SmallVector<int64_t>> ScatterOp::getStaticLoopRanges() {
+SmallVector<int64_t> ScatterOp::getStaticLoopRanges() {
   // Scatter loop ranges are loop ranges for update.
   return SmallVector<int64_t>(getUpdateType().getShape());
 }
@@ -327,7 +477,7 @@ GatherOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
-FailureOr<SmallVector<int64_t>> GatherOp::getStaticLoopRanges() {
+SmallVector<int64_t> GatherOp::getStaticLoopRanges() {
   return SmallVector<int64_t>(getOutputType().getShape());
 }
 
@@ -531,6 +681,36 @@ void MapScatterOp::insertTransformationAtStart(
     }
   }
   transformBody.eraseArguments(0, oldSourceIndices.size());
+}
+
+void MapScatterOp::inlineMapScatterBody(
+    OpBuilder &b, Location loc, ValueRange transformBodyIndices,
+    function_ref<void(OpBuilder &, Location, ArrayRef<Value>)> bodyBuilder) {
+  Block &transformBlock = getTransformationRegion().front();
+  IRMapping mapping;
+  // Map the induction variables of the loop nest to the block arguments of the
+  // transformation body. The induction variables are the indices looping over
+  // the elements of input operand.
+  for (auto [idx, arg] : llvm::enumerate(transformBlock.getArguments())) {
+    mapping.map(arg, transformBodyIndices[idx]);
+  }
+  // Clone the operations within the transformation body to the current
+  // insertion point, and map their results to the new cloned operations'
+  // results.
+  for (Operation &op : transformBlock.without_terminator()) {
+    Operation *clonedOp = b.clone(op, mapping);
+    for (auto [result, clonedResult] :
+         llvm::zip_equal(op.getResults(), clonedOp->getResults())) {
+      mapping.map(result, clonedResult);
+    }
+  }
+
+  // Get the cloned values that were yielded by the transformation body to pass
+  // to the bodyBuilder.
+  SmallVector<Value> mappedYieldedValues = llvm::map_to_vector(
+      transformBlock.getTerminator()->getOperands(),
+      [&](Value operand) -> Value { return mapping.lookupOrDefault(operand); });
+  bodyBuilder(b, loc, mappedYieldedValues);
 }
 
 bool MapScatterOp::isIdentity() {
@@ -787,8 +967,8 @@ LogicalResult ScanOp::verify() {
   }
   if (llvm::any_of(llvm::zip_equal(expectedAccumulatorShape, accumulatorShape),
                    [](std::tuple<int64_t, int64_t> s) {
-                     return !ShapedType::isDynamic(std::get<0>(s)) &&
-                            !ShapedType::isDynamic(std::get<1>(s)) &&
+                     return ShapedType::isStatic(std::get<0>(s)) &&
+                            ShapedType::isStatic(std::get<1>(s)) &&
                             std::get<0>(s) != std::get<1>(s);
                    })) {
     return op->emitOpError("incompatible input/accumulator shapes");
@@ -802,8 +982,8 @@ LogicalResult ScanOp::verify() {
   }
   if (llvm::any_of(llvm::zip_equal(inputShapes, outputShapes),
                    [](std::tuple<int64_t, int64_t> s) {
-                     return !ShapedType::isDynamic(std::get<0>(s)) &&
-                            !ShapedType::isDynamic(std::get<1>(s)) &&
+                     return ShapedType::isStatic(std::get<0>(s)) &&
+                            ShapedType::isStatic(std::get<1>(s)) &&
                             std::get<0>(s) != std::get<1>(s);
                    })) {
     return op->emitOpError("incompatible input/output shapes");
@@ -1297,7 +1477,7 @@ SmallVector<OpFoldResult> PackOp::getResultShape(
   // use dispatchIndexOpFoldResults on the result, and rely on exact number of
   // dynamic dims returned by that.
   for (unsigned i = 0; i < resultDims.size(); ++i) {
-    if (!ShapedType::isDynamic(resultTypeShape[i])) {
+    if (ShapedType::isStatic(resultTypeShape[i])) {
       continue;
     }
     resultDims[i] =
@@ -1691,6 +1871,17 @@ void AttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
         indexingMaps, DictionaryAttr());
 }
 
+void AttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+                        TypeRange results, ValueRange inputOperands,
+                        ValueRange initOperands, ArrayAttr indexingMaps) {
+  assert(inputOperands.size() < 6);
+  assert(initOperands.size() == 1);
+  Value mask = inputOperands.size() > 4 ? inputOperands[4] : Value();
+  build(odsBuilder, odsState, results, inputOperands[0], inputOperands[1],
+        inputOperands[2], inputOperands[3], mask, initOperands[0], indexingMaps,
+        DictionaryAttr());
+}
+
 LogicalResult AttentionOp::verify() {
   AttentionOp attnOp = *this;
 
@@ -1815,7 +2006,7 @@ SmallVector<AffineMap> AttentionOp::getIndexingMapsArray() {
       getIndexingMaps().getAsValueRange<AffineMapAttr>());
 }
 
-FailureOr<SmallVector<int64_t>> AttentionOp::getStaticLoopRanges() {
+SmallVector<int64_t> AttentionOp::getStaticLoopRanges() {
   SmallVector<int64_t> bounds(getIterationDomainRank());
   SmallVector<bool> dimsFound(getIterationDomainRank(), false);
 
@@ -1848,8 +2039,18 @@ SmallVector<AffineMap> AttentionOp::getIndexingMapsForOperands() {
 }
 
 SmallVector<AffineMap> AttentionOp::getIndexingMapsForResults() {
-  auto maps = getIndexingMapsArray();
-  return SmallVector<AffineMap>(maps.begin() + getNumDpsInputs(), maps.end());
+  return llvm::to_vector_of<AffineMap>(
+      llvm::drop_begin(getIndexingMapsArray(), getNumDpsInputs()));
+}
+
+void AttentionOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                              MLIRContext *ctx) {
+  patterns.insert<StaticizeLinalgExtOp<AttentionOp>>(ctx);
+}
+
+AffineMap AttentionOp::getMatchingIndexingMap(OpOperand *operand) {
+  return *(getIndexingMaps().getAsValueRange<AffineMapAttr>().begin() +
+           operand->getOperandNumber());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1987,6 +2188,11 @@ LogicalResult OnlineAttentionOp::reifyResultShapes(
 SmallVector<AffineMap> OnlineAttentionOp::getIndexingMapsArray() {
   return SmallVector<AffineMap>(
       getIndexingMaps().getAsValueRange<AffineMapAttr>());
+}
+
+void OnlineAttentionOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                                    MLIRContext *ctx) {
+  patterns.insert<StaticizeLinalgExtOp<OnlineAttentionOp>>(ctx);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2194,7 +2400,7 @@ LogicalResult Im2colOp::verify() {
            << ") to match the number of shared dimensions (m_Pos + k_pos = "
            << sharedRank << ")";
   }
-  SmallVector<int64_t> permVec(inputKPerm.begin(), inputKPerm.end());
+  SmallVector<int64_t> permVec(inputKPerm);
   llvm::sort(permVec);
   for (int64_t i = 0; i < static_cast<int64_t>(sharedRank); ++i) {
     if (permVec[i] != i) {

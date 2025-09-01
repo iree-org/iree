@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <iomanip>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -335,8 +336,9 @@ TransferBuffersToHost(
 
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_end(command_buffer.get()));
   vm::ref<iree_hal_semaphore_t> semaphore;
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(
-      device, 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &semaphore));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_semaphore_create(device, IREE_HAL_QUEUE_AFFINITY_ANY, 0ull,
+                                IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &semaphore));
   vm::ref<iree_hal_fence_t> fence;
   IREE_RETURN_IF_ERROR(iree_hal_fence_create_at(
       semaphore.get(), 1ull, iree_hal_device_host_allocator(device), &fence));
@@ -344,8 +346,8 @@ TransferBuffersToHost(
       device, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
       iree_hal_fence_semaphore_list(fence.get()), command_buffer.get(),
       iree_hal_buffer_binding_table_empty(), IREE_HAL_EXECUTE_FLAG_NONE));
-  IREE_RETURN_IF_ERROR(
-      iree_hal_fence_wait(fence.get(), iree_infinite_timeout()));
+  IREE_RETURN_IF_ERROR(iree_hal_fence_wait(fence.get(), iree_infinite_timeout(),
+                                           IREE_HAL_WAIT_FLAG_DEFAULT));
   return std::move(target_views);
 }
 
@@ -564,7 +566,9 @@ class CheckModuleState final {
         os << " Contents does not match to tolerance parameters atol=" << atol
            << ", rtol=" << rtol << ". The first failure occurs at index "
            << diagnostic.index << " as the lhs value " << diagnostic.lhs_value
-           << " differs from the rhs value " << diagnostic.rhs_value << ".";
+           << " differs from the rhs value " << diagnostic.rhs_value << " by "
+           << std::scientific << std::setprecision(3)
+           << diagnostic.rhs_value - diagnostic.lhs_value << ".";
       }
       // TODO(gcmn): Propagate original variable names.
       os << "\n"

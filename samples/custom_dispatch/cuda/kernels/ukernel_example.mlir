@@ -35,7 +35,7 @@ func.func @ukernel_example() {
       (%size : index)
       // Set the operation to not incorporate any strides. The implementation
       // expects no stride arguments.
-      strided_outer_dims(0) -> tensor<?xf32>
+      strided_dims([[], [], []]) -> tensor<?xf32>
 
     // Insert the result back into the result at the right position.
     %5 = tensor.insert_slice %4 into %dest[%offset] [%size] [1] : tensor<?xf32> into tensor<10xf32>

@@ -41,15 +41,16 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/ExternalInterfaces/Utils.h"
+#include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/IR/BuiltinAttributes.h"
 
-#define DEBUG_TYPE "iree-cpu-encoding-external-models"
+#define DEBUG_TYPE "iree-codegen-materialize-encoding"
 
 namespace mlir::iree_compiler::IREE::CPU {
 
@@ -61,6 +62,43 @@ namespace {
 //===----------------------------------------------------------------------===//
 // Utilities.
 //===----------------------------------------------------------------------===//
+
+static FailureOr<IREE::Codegen::ScalableTileFlags>
+getScalableTileFlags(linalg::ContractionDimensions cDims,
+                     IREE::Encoding::EncodingAttr encoding,
+                     DictionaryAttr config) {
+  // TODO(egebeysel): I think this isScalable*Enabled flag should be temporary
+  // and the temporary SME flag should probably come next to it.
+  if (!isAArch64(config) || !isScalableVectorizationEnabled()) {
+    LDBG() << "Pre-conditions to enable scalable tiling are not met!";
+    return failure();
+  }
+
+  std::optional<unsigned> mDim =
+      cDims.m.empty() ? std::nullopt
+                      : encoding.mapDimToOperandIndex(cDims.m[0]);
+  std::optional<unsigned> nDim =
+      cDims.n.empty() ? std::nullopt
+                      : encoding.mapDimToOperandIndex(cDims.n[0]);
+  std::optional<unsigned> kDim = encoding.mapDimToOperandIndex(cDims.k[0]);
+  IREE::Codegen::ScalableTileFlags scalableTiles;
+  // TODO(egebeysel): Add logic for SME.
+  if (mDim.has_value()) {
+    if (hasFeature(config, "+sme")) {
+      LDBG() << "SME with data-tiling is not supported yet!";
+      return failure();
+    }
+    scalableTiles.push_back(false);
+  }
+  if (nDim.has_value()) {
+    scalableTiles.push_back(hasFeature(config, "+sve") ||
+                            hasFeature(config, "+sve2"));
+  }
+  if (kDim.has_value()) {
+    scalableTiles.push_back(false);
+  }
+  return scalableTiles;
+}
 
 static void transposeInPlace(MaterializeEncodingInfo &info) {
   // Vector cases: nothing to do.
@@ -223,10 +261,9 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
     }
     ratedTile.productMxNxK = tile.M * tile.N * tile.K;
     ratedTiles.push_back(ratedTile);
-    LLVM_DEBUG(llvm::dbgs()
-               << "candidate: "
-               << llvm::interleaved(ArrayRef{tile.M, tile.N, tile.K})
-               << " penalty:" << ratedTile.paddingPenalty << "\n");
+    LDBG() << "candidate: "
+           << llvm::interleaved(ArrayRef{tile.M, tile.N, tile.K})
+           << " penalty:" << ratedTile.paddingPenalty;
     bestPaddingPenalty = std::min(bestPaddingPenalty, ratedTile.paddingPenalty);
   }
   RatedTileMxNxK bestRatedTile;
@@ -241,11 +278,10 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
   // Sanity check. This assert can only fail if there's a programming mistake
   // locally here.
   assert(bestRatedTile.paddingPenalty == bestPaddingPenalty);
-  LLVM_DEBUG(
-      llvm::dbgs() << "bestRatedTile: "
-                   << llvm::interleaved(ArrayRef{
-                          bestRatedTile.M, bestRatedTile.N, bestRatedTile.K})
-                   << " penalty:" << bestRatedTile.paddingPenalty << "\n");
+  LDBG() << "bestRatedTile: "
+         << llvm::interleaved(
+                ArrayRef{bestRatedTile.M, bestRatedTile.N, bestRatedTile.K})
+         << " penalty:" << bestRatedTile.paddingPenalty;
   return bestRatedTile;
 }
 
@@ -321,7 +357,7 @@ FailureOr<Operation *> lowerContractionOpWithEncoding(
 }
 
 //===----------------------------------------------------------------------===//
-// Interface methods implementaion for iree_cpu.cpu_encoding_layout.
+// Interface methods implementaion for iree_cpu.cpu_encoding_resolver.
 //===----------------------------------------------------------------------===//
 
 // Enumerate tile sizes to choose from on riscv32.
@@ -409,10 +445,8 @@ enumerateMatmulTileRiscv64(TypeRange elementTypes, DictionaryAttr config) {
 // are handled by transposition in chooseMatmulTile.
 static SmallVector<TileMxNxK> enumerateMatmulTileArm64(TypeRange elementTypes,
                                                        DictionaryAttr config) {
-  // Data-tiling for SVE is not implemented yet.
-  if (hasFeature(config, "+sve") || hasFeature(config, "+sve2")) {
-    return {};
-  }
+  // For SVE and scalable vectors, this methods selects base sizes that match
+  // the NEON fixed-width sizes.
   assert(elementTypes.size() == 3);
   Type lhs = elementTypes[0];
   Type rhs = elementTypes[1];
@@ -626,15 +660,15 @@ enumerateCPUMatmulTiles(IREE::Encoding::EncodingAttr encoding,
 
 struct CPUEncodingPackedLayoutMaterializerAttr
     : public PackedLayoutMaterializerAttrExternalModelBase<
-          CPUEncodingPackedLayoutMaterializerAttr, CPUEncodingLayoutAttr> {
+          CPUEncodingPackedLayoutMaterializerAttr, CPUEncodingResolverAttr> {
 
   DictionaryAttr getConfiguration(Attribute attr) const {
-    return cast<CPUEncodingLayoutAttr>(attr).getConfiguration();
+    return cast<CPUEncodingResolverAttr>(attr).getConfiguration();
   }
 
   MaterializeEncodingInfo getEncodingInfoImpl(Attribute attr,
                                               RankedTensorType type) const {
-    auto layoutAttr = cast<CPUEncodingLayoutAttr>(attr);
+    auto layoutAttr = cast<CPUEncodingResolverAttr>(attr);
 
     auto encoding = llvm::dyn_cast_or_null<IREE::Encoding::EncodingAttr>(
         type.getEncoding());
@@ -670,18 +704,23 @@ struct CPUEncodingPackedLayoutMaterializerAttr
     if (IREE::Encoding::isNarrowNResult(encoding)) {
       transposeInPlace(info);
     }
+    FailureOr<IREE::Codegen::ScalableTileFlags> scalableFlags =
+        getScalableTileFlags(*cDims, encoding, layoutAttr.getConfiguration());
+    if (succeeded(scalableFlags)) {
+      info.scalableTiles = std::move(scalableFlags);
+    }
     return info;
   }
 };
 
-struct CPUEncodingLayoutMaterializerAttr final
+struct CPUEncodingResolverMaterializerAttr final
     : public EncodingLayoutMaterializerAttrExternalModelBase<
-          CPUEncodingLayoutMaterializerAttr, CPUEncodingLayoutAttr> {
+          CPUEncodingResolverMaterializerAttr, CPUEncodingResolverAttr> {
 
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
                      ValueRange convertedOperands) const {
-    auto layoutAttr = cast<CPUEncodingLayoutAttr>(attr);
+    auto layoutAttr = cast<CPUEncodingResolverAttr>(attr);
     auto linalgOp = llvm::dyn_cast<linalg::LinalgOp>(op);
     if (!linalgOp) {
       return nullptr;
@@ -695,28 +734,32 @@ struct CPUEncodingLayoutMaterializerAttr final
 };
 
 struct CPULayoutResolverAttr final
-    : IREE::Encoding::LayoutResolverAttr::ExternalModel<CPULayoutResolverAttr,
-                                                        CPUEncodingLayoutAttr> {
+    : IREE::Encoding::LayoutResolverAttr::ExternalModel<
+          CPULayoutResolverAttr, CPUEncodingResolverAttr> {
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
     SmallVector<NamedAttribute> configItems;
-    storeNamedAttrIfPresent(configItems, config, "cpu_features");
-    storeNamedAttrIfPresent(configItems, config, "target_triple");
+    if (std::optional<StringRef> cpuFeatures = getConfigCpuFeatures(config)) {
+      addConfigCpuFeatures(ctx, cpuFeatures.value(), configItems);
+    }
+    if (std::optional<StringRef> targetTriple = getConfigTargetTriple(config)) {
+      addConfigTargetTriple(ctx, targetTriple.value(), configItems);
+    }
     storeNamedAttrIfPresent(configItems, config, "ukernels");
-    return CPUEncodingLayoutAttr::get(ctx,
-                                      DictionaryAttr::get(ctx, configItems));
+    return CPUEncodingResolverAttr::get(ctx,
+                                        DictionaryAttr::get(ctx, configItems));
   }
 
   Attribute getLayout(Attribute attr, RankedTensorType type) const {
     MLIRContext *ctx = attr.getContext();
-    return CPUEncodingLayoutAttr::get(ctx, getPackedLayoutImpl(attr, type));
+    return CPUEncodingResolverAttr::get(ctx, getPackedLayoutImpl(attr, type));
   }
 };
 
 struct CPUSerializableAttr final
     : IREE::Encoding::SerializableAttr::ExternalModel<CPUSerializableAttr,
-                                                      CPUEncodingLayoutAttr> {
+                                                      CPUEncodingResolverAttr> {
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
@@ -727,7 +770,7 @@ struct CPUSerializableAttr final
 };
 
 //===----------------------------------------------------------------------===//
-// Interface methods implementaion for iree_cpu.vmvx_encoding_layout.
+// Interface methods implementaion for iree_cpu.vmvx_encoding_resolver.
 //===----------------------------------------------------------------------===//
 
 // Enumerate tile sizes to choose from when no specific architecture is
@@ -762,15 +805,15 @@ enumerateVMVXMatmulTiles(linalg::ContractionDimensions cDims,
 
 struct VMVXEncodingPackedLayoutMaterializerAttr final
     : PackedLayoutMaterializerAttrExternalModelBase<
-          VMVXEncodingPackedLayoutMaterializerAttr, VMVXEncodingLayoutAttr> {
+          VMVXEncodingPackedLayoutMaterializerAttr, VMVXEncodingResolverAttr> {
 
   DictionaryAttr getConfiguration(Attribute attr) const {
-    return cast<VMVXEncodingLayoutAttr>(attr).getConfiguration();
+    return cast<VMVXEncodingResolverAttr>(attr).getConfiguration();
   }
 
   MaterializeEncodingInfo getEncodingInfoImpl(Attribute attr,
                                               RankedTensorType type) const {
-    auto layoutAttr = cast<VMVXEncodingLayoutAttr>(attr);
+    auto layoutAttr = cast<VMVXEncodingResolverAttr>(attr);
 
     auto encoding = llvm::dyn_cast_or_null<IREE::Encoding::EncodingAttr>(
         type.getEncoding());
@@ -810,14 +853,14 @@ struct VMVXEncodingPackedLayoutMaterializerAttr final
   }
 };
 
-struct VMVXEncodingLayoutMaterializerAttr final
+struct VMVXEncodingResolverMaterializerAttr final
     : EncodingLayoutMaterializerAttrExternalModelBase<
-          VMVXEncodingLayoutMaterializerAttr, VMVXEncodingLayoutAttr> {
+          VMVXEncodingResolverMaterializerAttr, VMVXEncodingResolverAttr> {
 
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
                      ValueRange convertedOperands) const {
-    auto layoutAttr = cast<VMVXEncodingLayoutAttr>(attr);
+    auto layoutAttr = cast<VMVXEncodingResolverAttr>(attr);
     auto linalgOp = llvm::dyn_cast<linalg::LinalgOp>(op);
     if (!linalgOp) {
       return nullptr;
@@ -832,26 +875,26 @@ struct VMVXEncodingLayoutMaterializerAttr final
 
 struct VMVXLayoutResolverAttr final
     : IREE::Encoding::LayoutResolverAttr::ExternalModel<
-          VMVXLayoutResolverAttr, VMVXEncodingLayoutAttr> {
+          VMVXLayoutResolverAttr, VMVXEncodingResolverAttr> {
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
     SmallVector<NamedAttribute> configItems;
     storeNamedAttrIfPresent(configItems, config, "ukernels");
-    return VMVXEncodingLayoutAttr::get(ctx,
-                                       DictionaryAttr::get(ctx, configItems));
+    return VMVXEncodingResolverAttr::get(ctx,
+                                         DictionaryAttr::get(ctx, configItems));
   }
 
   Attribute getLayout(Attribute attr, RankedTensorType type) const {
     MLIRContext *ctx = attr.getContext();
-    return VMVXEncodingLayoutAttr::get(
+    return VMVXEncodingResolverAttr::get(
         ctx, getPackedLayoutImpl(attr, type, /*addEncodingAttr=*/true));
   }
 };
 
 struct VMVXSerializableAttr final
-    : IREE::Encoding::SerializableAttr::ExternalModel<VMVXSerializableAttr,
-                                                      VMVXEncodingLayoutAttr> {
+    : IREE::Encoding::SerializableAttr::ExternalModel<
+          VMVXSerializableAttr, VMVXEncodingResolverAttr> {
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
                                     ValueRange dynamicDims) const {
@@ -865,13 +908,13 @@ struct VMVXSerializableAttr final
 void registerCPUEncodingExternalModels(DialectRegistry &registry) {
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::CPU::IREECPUDialect *dialect) {
-        IREE::CPU::CPUEncodingLayoutAttr::attachInterface<
+        IREE::CPU::CPUEncodingResolverAttr::attachInterface<
             CPUEncodingPackedLayoutMaterializerAttr,
-            CPUEncodingLayoutMaterializerAttr, CPULayoutResolverAttr,
+            CPUEncodingResolverMaterializerAttr, CPULayoutResolverAttr,
             CPUSerializableAttr>(*ctx);
-        IREE::CPU::VMVXEncodingLayoutAttr::attachInterface<
+        IREE::CPU::VMVXEncodingResolverAttr::attachInterface<
             VMVXEncodingPackedLayoutMaterializerAttr,
-            VMVXEncodingLayoutMaterializerAttr, VMVXLayoutResolverAttr,
+            VMVXEncodingResolverMaterializerAttr, VMVXLayoutResolverAttr,
             VMVXSerializableAttr>(*ctx);
       });
 }

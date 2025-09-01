@@ -36,7 +36,7 @@ static void appendDynamicDims(OpBuilder &b, Location loc,
   }
 
   for (auto dim : llvm::enumerate(tensorType.getShape())) {
-    if (!ShapedType::isDynamic(dim.value()))
+    if (ShapedType::isStatic(dim.value()))
       continue;
     argumentDims.push_back(
         b.createOrFold<tensor::DimOp>(loc, tensor, dim.index()));
@@ -143,7 +143,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   }
 
   // Create empty dispatch region.
-  SmallVector<Value> arguments(argumentsSet.begin(), argumentsSet.end());
+  auto arguments = llvm::to_vector_of<Value>(argumentsSet);
   arguments.append(argumentDims);
   for (unsigned i = 0; i < numResults; ++i) {
     // Tied arguments already have their dynamic result dims in `arguments`. Do

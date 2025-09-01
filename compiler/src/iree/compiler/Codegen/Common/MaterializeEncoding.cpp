@@ -8,7 +8,6 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
-#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
@@ -19,18 +18,20 @@
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
+#include "llvm/Support/DebugLog.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/CSE.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-materialize-encoding"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -42,6 +43,22 @@ using namespace IREE::Encoding;
 
 namespace {
 
+static void
+updateFuncSignature(FunctionOpInterface funcOp,
+                    const MaterializeEncodingTypeConverter &typeConverter) {
+  // Do not convert the type if the type converter does not understand the
+  // conversion. E.g., `!hal.buffer_view` type.
+  auto convertType = [&](Type t) {
+    Type newType = typeConverter.convertType(t);
+    return newType ? newType : t;
+  };
+  SmallVector<Type> newInputs =
+      llvm::map_to_vector(funcOp.getArgumentTypes(), convertType);
+  SmallVector<Type> newResults =
+      llvm::map_to_vector(funcOp.getResultTypes(), convertType);
+  funcOp.setType(FunctionType::get(funcOp.getContext(), newInputs, newResults));
+}
+
 static LogicalResult
 materializeFuncOpEncodings(FunctionOpInterface funcOp,
                            IREE::HAL::ExecutableTargetAttr targetAttr,
@@ -51,31 +68,36 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     RewritePatternSet patterns(ctx);
     DictionaryAttr targetConfig =
         targetAttr ? targetAttr.getConfiguration() : nullptr;
-    // Check if the encoding resolver is a GPUPadLayoutAttr. For padding
+    // Check if the encoding resolver is a GPUPaddingResolverAttr. For padding
     // encoding materialization, we use a separate pass, so skip materialization
     // here.
-    // TODO(#20160): Support GPUPadLayoutAttr materialization through this
+    // TODO(#20160): Support GPUPaddingResolverAttr materialization through this
     // pass, and remove the ad-hoc materialization pass for padding.
-    if (targetConfig && targetConfig.getAs<IREE::GPU::GPUPadLayoutAttr>(
+    if (targetConfig && targetConfig.getAs<IREE::GPU::GPUPaddingResolverAttr>(
                             IREE::Encoding::kEncodingResolverAttrName)) {
-      LDBG("Found GPUPadLayoutAttr encoding resolver. Materialization will "
-           "be handled later.");
+      LDBG()
+          << "Found GPUPaddingResolverAttr encoding resolver. Materialization "
+             "will be handled later.";
       return success();
     }
 
     auto getTestTargetOrNopLayout =
         [&]() -> IREE::Encoding::LayoutMaterializerAttr {
       if (testCLGPUTarget) {
-        LDBG("Select GPUEncodingLayoutAttr attribute as the layout attribute. "
-             "(testCLGPUTarget)");
+        LDBG() << "Select GPUEncodingResolverAttr attribute as the layout "
+                  "attribute. (testCLGPUTarget)";
+        SmallVector<NamedAttribute> configItems;
+        // Setting a nullptr to `target` below returns the target from command
+        // line.
+        IREE::GPU::TargetAttr targetAttr =
+            getGPUTargetAttr(ctx, /*target=*/nullptr);
+        addConfigGPUTarget(ctx, targetAttr, configItems);
         return cast<IREE::Encoding::LayoutMaterializerAttr>(
-            IREE::GPU::GPUEncodingLayoutAttr::get(
-                ctx,
-                DictionaryAttr::get(ctx, NamedAttribute(kGPUTargetAttrName,
-                                                        getCLGPUTarget(ctx)))));
+            IREE::GPU::GPUEncodingResolverAttr::get(
+                ctx, DictionaryAttr::get(ctx, configItems)));
       }
-      LDBG("Select EncodingNopLayoutAttr attribute as the layout "
-           "attribute (Encoding resolver unknown or unsupported).");
+      LDBG() << "Select EncodingNopLayoutAttr attribute as the layout "
+                "attribute (Encoding resolver unknown or unsupported).";
       return cast<IREE::Encoding::LayoutMaterializerAttr>(
           IREE::Codegen::EncodingNopLayoutAttr::get(ctx));
     };
@@ -101,34 +123,52 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
                   resolverAttr.cloneWithSimplifiedConfig(targetConfig))
             : getTestTargetOrNopLayout();
 
-    LDBG("Selected Encoding::LayoutMaterializerAttr with target configuration: "
-         << layoutAttrWithTargetInfo);
+    LDBG() << "Selected Encoding::LayoutMaterializerAttr with target "
+              "configuration: "
+           << layoutAttrWithTargetInfo;
 
     MaterializeEncodingTypeConverter typeConverter(layoutAttrWithTargetInfo);
     MaterializeEncodingConversionTarget target(*ctx);
     populateMaterializeEncodingPatterns(patterns, target, typeConverter);
 
     if (failed(applyPartialConversion(funcOp, target, std::move(patterns)))) {
-      funcOp.emitOpError("materialization failed");
-      return failure();
+      return funcOp.emitOpError("materialization failed");
     }
+
+    // The update is required for testing purposes, which results in fewer IRs.
+    // We do not expect inputs and outputs from `funcOp` in practice.
+    updateFuncSignature(funcOp, typeConverter);
   }
 
   // Run patterns to fold pack/unpack ops with pad/extract_slice ops, resolve
   // dims ops, and eliminate common sub-expressions.
   {
     RewritePatternSet patterns(ctx);
+    // NOTE: These patterns are currently load-bearing for sub-byte floats.
     populateReshapeToInterfaceTensorPatterns(patterns);
     tensor::CastOp::getCanonicalizationPatterns(patterns, ctx);
     tensor::populateFoldTensorEmptyPatterns(patterns);
     linalg::FillOp::getCanonicalizationPatterns(patterns, ctx);
     linalg::PackOp::getCanonicalizationPatterns(patterns, ctx);
     linalg::UnPackOp::getCanonicalizationPatterns(patterns, ctx);
-    linalg::populateFoldIntoPackAndUnpackPatterns(patterns);
+    linalg::populateFoldIntoPackAndUnpackPatterns(
+        patterns, [](OpOperand *opOperand) {
+          Operation *producer = opOperand->get().getDefiningOp();
+          Operation *consumer = opOperand->getOwner();
+          // If we have a pack/unpack consumer and a producer that has multiple
+          // uses, this _probably_ means the producer won't get dce'd. If that
+          // is the case, by folding the consumer pack/unpack, we break the
+          // producer consumer chain between them and inhibit fusion later in
+          // the pipeline.
+          if (isa<linalg::PackOp, linalg::UnPackOp>(consumer) &&
+              isa_and_nonnull<TilingInterface>(producer) &&
+              !producer->hasOneUse())
+            return false;
+          return true;
+        });
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
-      funcOp.emitOpError("folding patterns failed");
-      return failure();
+      return funcOp.emitOpError("folding patterns failed");
     }
 
     IRRewriter rewriter(ctx);
@@ -234,7 +274,7 @@ struct MaterializeDeviceEncodingPass final
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, tensor::TensorDialect,
-                    IREE::Codegen::IREECodegenDialect,
+                    vector::VectorDialect, IREE::Codegen::IREECodegenDialect,
                     IREE::CPU::IREECPUDialect, IREE::GPU::IREEGPUDialect>();
   }
 

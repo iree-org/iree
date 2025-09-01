@@ -131,7 +131,7 @@ namespace {
 
 struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
     : public OpRewritePattern<memref::ExtractStridedMetadataOp> {
-  using OpRewritePattern<memref::ExtractStridedMetadataOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(memref::ExtractStridedMetadataOp op,
                                 PatternRewriter &rewriter) const override {
     auto binding =
@@ -284,7 +284,6 @@ void IREEExpandStridedMetadataPass::runOnOperation() {
   RewritePatternSet patterns(context);
   populateIREEResolveExtractStridedMetadataPatterns(patterns,
                                                     allowSubviewExpansion);
-  populateRemoveDeadMemAllocPatterns(patterns);
   if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
   }

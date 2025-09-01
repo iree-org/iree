@@ -30,12 +30,9 @@ func.func @test_target_wgp() attributes {
 func.func @test_target_wgp_none() attributes {
   // CHECK: #iree_gpu.target_wgp<
   // CHECK-SAME: subgroup =  none,
-  // CHECK-SAME: dot =  none,
-  // CHECK-SAME: mma = [],
   wgp = #iree_gpu.target_wgp<
     compute = fp16|fp32|int8, storage = b16|b32,
-    subgroup = none, dot = none,
-    mma = [],
+    subgroup = none,
     subgroup_size_choices = [32],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,

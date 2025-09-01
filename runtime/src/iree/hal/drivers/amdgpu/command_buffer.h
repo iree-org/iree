@@ -99,7 +99,7 @@ typedef struct iree_hal_amdgpu_command_buffer_options_t {
   // use fewer packets.
   iree_host_size_t block_aql_packet_count;
 
-  // Block pools for host memory blocks of various sizes.
+  // Block pools for host-only (heap) memory blocks of various sizes.
   iree_hal_amdgpu_host_block_pools_t* host_block_pools;
 
   // Bitmap of physical devices that the command buffer will be recorded for.
@@ -109,6 +109,10 @@ typedef struct iree_hal_amdgpu_command_buffer_options_t {
   // Compact list of physical device block pools corresponding to the bits set
   // in the device_affinity bitmap. A device affinity of 0b110 would lead to two
   // device block pools in the list at [0] and [1].
+  //
+  // These pools should be allocated from coarse-grained memory as once we
+  // record command buffers we will never change them again and do not need any
+  // synchronization.
   iree_hal_amdgpu_block_pools_t* const* device_block_pools /*[device_count]*/;
 } iree_hal_amdgpu_command_buffer_options_t;
 

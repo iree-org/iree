@@ -279,13 +279,14 @@ iree_status_t iree_hal_task_semaphore_enqueue_timepoint(
 
 static iree_status_t iree_hal_task_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_timeout_t timeout) {
+    iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
   iree_hal_task_semaphore_t* semaphore =
       iree_hal_task_semaphore_cast(base_semaphore);
 
   iree_slim_mutex_lock(&semaphore->mutex);
 
-  if (!iree_status_is_ok(semaphore->failure_status)) {
+  if (semaphore->current_value == IREE_HAL_SEMAPHORE_FAILURE_VALUE ||
+      !iree_status_is_ok(semaphore->failure_status)) {
     // Fastest path: failed; return an error to tell callers to query for it.
     iree_slim_mutex_unlock(&semaphore->mutex);
     return iree_status_from_code(IREE_STATUS_ABORTED);
@@ -318,19 +319,35 @@ static iree_status_t iree_hal_task_semaphore_wait(
   }
   iree_event_pool_release(semaphore->event_pool, 1, &timepoint.event);
 
+  // Recheck conditions.
+  if (iree_status_is_ok(status)) {
+    iree_slim_mutex_lock(&semaphore->mutex);
+    if (semaphore->current_value == IREE_HAL_SEMAPHORE_FAILURE_VALUE ||
+        !iree_status_is_ok(semaphore->failure_status)) {
+      status = iree_status_from_code(IREE_STATUS_ABORTED);
+    } else if (semaphore->current_value >= value) {
+      status = iree_ok_status();
+    } else if (iree_timeout_is_immediate(timeout)) {
+      status = iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
+    }
+    iree_slim_mutex_unlock(&semaphore->mutex);
+  }
+
   return status;
 }
 
 iree_status_t iree_hal_task_semaphore_multi_wait(
     iree_hal_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
-    iree_event_pool_t* event_pool, iree_arena_block_pool_t* block_pool) {
+    iree_hal_wait_flags_t flags, iree_event_pool_t* event_pool,
+    iree_arena_block_pool_t* block_pool) {
   if (semaphore_list.count == 0) {
     return iree_ok_status();
   } else if (semaphore_list.count == 1) {
     // Fast-path for a single semaphore.
     return iree_hal_semaphore_wait(semaphore_list.semaphores[0],
-                                   semaphore_list.payload_values[0], timeout);
+                                   semaphore_list.payload_values[0], timeout,
+                                   flags);
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);

@@ -126,6 +126,10 @@ Attribute ExecutableTargetAttr::parse(AsmParser &p, Type type) {
   if (failed(p.parseGreater())) {
     return {};
   }
+  // Make sure the configurationAttr is present.
+  if (!configurationAttr) {
+    configurationAttr = DictionaryAttr::get(p.getContext());
+  }
   return get(p.getContext(), backendAttr, formatAttr, configurationAttr);
 }
 
@@ -298,8 +302,8 @@ findFileInPaths(StringRef filePath, ArrayRef<std::string> searchPaths) {
   // Search each path in turn for a file that exists.
   // It doesn't mean we can open it but we'll get a better error out of the
   // actual open attempt than what we could produce here.
-  for (auto searchPath : searchPaths) {
-    SmallVector<char> tryPath{searchPath.begin(), searchPath.end()};
+  for (const std::string &searchPath : searchPaths) {
+    auto tryPath = llvm::to_vector_of<char>(searchPath);
     llvm::sys::path::append(tryPath, filePath);
     if (llvm::sys::fs::exists(Twine(tryPath))) {
       return Twine(tryPath).str();
@@ -1101,7 +1105,7 @@ bool DevicePromiseAttr::isLegalToInline(Operation *inlineSite,
 static Attribute getAffinityDevice(IREE::Stream::AffinityAttr affinityAttr) {
   if (auto deviceAffinityAttr =
           dyn_cast<IREE::HAL::DeviceAffinityAttr>(affinityAttr)) {
-    return deviceAffinityAttr.getDevice();
+    return deviceAffinityAttr.getDevice().getLeafReference();
   } else if (auto devicePromiseAttr =
                  dyn_cast<IREE::HAL::DevicePromiseAttr>(affinityAttr)) {
     return devicePromiseAttr.getDevice();
@@ -1109,26 +1113,46 @@ static Attribute getAffinityDevice(IREE::Stream::AffinityAttr affinityAttr) {
   return {};
 }
 
-bool DeviceTopologyAttr::requiresTransfer(
+bool DeviceTopologyAttr::hasTransparentAccess(
     IREE::Stream::AffinityAttr source,
     IREE::Stream::AffinityAttr target) const {
   Attribute sourceDevice = getAffinityDevice(source);
   Attribute targetDevice = getAffinityDevice(target);
 
   if (!sourceDevice || !targetDevice)
-    return true;
-  if (sourceDevice == targetDevice)
     return false;
+  if (sourceDevice == targetDevice)
+    return true; // Same device has transparent access.
 
-  // Search for a matching link and check if it has transparent access
-  // or unified memory.
+  // Search for a matching link and check if it has transparent access.
   for (DeviceLinkAttr link : getLinks()) {
-    if ((sourceDevice == link.getSourceDevice() &&
-         targetDevice == link.getTargetDevice())) {
-      return !link.getTransparentAccess() && !link.getUnifiedMemory();
+    if ((sourceDevice == link.getSourceDevice().getLeafReference() &&
+         targetDevice == link.getTargetDevice().getLeafReference())) {
+      return link.getTransparentAccess();
     }
   }
-  return true;
+  return false;
+}
+
+bool DeviceTopologyAttr::hasUnifiedMemory(
+    IREE::Stream::AffinityAttr source,
+    IREE::Stream::AffinityAttr target) const {
+  Attribute sourceDevice = getAffinityDevice(source);
+  Attribute targetDevice = getAffinityDevice(target);
+
+  if (!sourceDevice || !targetDevice)
+    return false;
+  if (sourceDevice == targetDevice)
+    return true; // Same device has unified memory.
+
+  // Search for a matching link and check if it has unified memory.
+  for (DeviceLinkAttr link : getLinks()) {
+    if ((sourceDevice == link.getSourceDevice().getLeafReference() &&
+         targetDevice == link.getTargetDevice().getLeafReference())) {
+      return link.getUnifiedMemory();
+    }
+  }
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1231,6 +1255,7 @@ DeviceOptimalAttr::joinOR(IREE::Stream::AffinityAttr other) const {
         if (it == affinitySet.end()) {
           // New device entry.
           affinitySet.insert({otherDeviceAttr, affinityAttr});
+          return true;
         }
         // OR in with existing entry.
         auto joinedAttr = it->second.joinOR(other);

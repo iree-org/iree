@@ -33,6 +33,7 @@ iree_cc_library(
     MLIRPass
     MLIRTransformUtils
     MLIRTransforms
+    MLIRUBDialect
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Utils
@@ -73,6 +74,7 @@ iree_cc_library(
     "GPUMultiBuffering.cpp"
     "GPUNestedLayoutDistributionPatterns.cpp"
     "GPUPackToIntrinsics.cpp"
+    "GPUPadConvs.cpp"
     "GPUPadOperands.cpp"
     "GPUPatterns.cpp"
     "GPUPipelining.cpp"
@@ -83,6 +85,7 @@ iree_cc_library(
     "GPUTensorTile.cpp"
     "GPUTensorTileToSerialLoops.cpp"
     "GPUTile.cpp"
+    "GPUTileAndConvertConvToMatmul.cpp"
     "GPUTileReduction.cpp"
     "GPUVectorAlloc.cpp"
     "GPUVectorDistribution.cpp"
@@ -114,6 +117,7 @@ iree_cc_library(
     MLIRIR
     MLIRLLVMCommonConversion
     MLIRLinalgDialect
+    MLIRLinalgInterfacesIncGenLib
     MLIRLinalgTransforms
     MLIRLinalgUtils
     MLIRLoopLikeInterface
@@ -133,10 +137,12 @@ iree_cc_library(
     MLIRTilingInterface
     MLIRTransformUtils
     MLIRTransforms
+    MLIRUBDialect
     MLIRValueBoundsOpInterface
     MLIRVectorDialect
     MLIRVectorToSCF
     MLIRVectorTransforms
+    MLIRVectorUtils
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::VectorLayoutAnalysis
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
@@ -149,6 +155,7 @@ iree_cc_library(
     iree::compiler::Codegen::Utils
     iree::compiler::Codegen::Utils::VectorOpUtils
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::TensorExt::IR

@@ -26,8 +26,10 @@ func.func @matmul_static_dispatch_0() attributes {hal.executable.target = #execu
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<250x1020xf32>) -> tensor<250x1020xf32>
 
   //      CHECK: linalg.fill ins(%{{.*}} : f32) outs(%{{.*}} : memref<250x1020xf32, #hal.descriptor_type<storage_buffer>>)
-  // CHECK-NEXT: linalg.matmul{{.*}}ins(%{{.*}} : memref<250x500xf32, #hal.descriptor_type<storage_buffer>>, memref<500x1020xf32, #hal.descriptor_type<storage_buffer>>) outs(%{{.*}} : memref<250x1020xf32, #hal.descriptor_type<storage_buffer>>)
-  // CHECK-NEXT: return
+  //      CHECK: linalg.generic
+  // CHECK-SAME: ins(%{{.*}} : memref<250x500xf32, #hal.descriptor_type<storage_buffer>>, memref<500x1020xf32, #hal.descriptor_type<storage_buffer>>)
+  // CHECK-SAME: outs(%{{.*}} : memref<250x1020xf32, #hal.descriptor_type<storage_buffer>>)
+  //  CHECK: return
 
   // workgroup_size is explicitly set to [10, 11].
   // FOREACH-TO-GPU: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = None workgroup_size = [10, 11, 1] subgroup_size = 32>
@@ -64,7 +66,8 @@ func.func @matmul_static_dispatch_0() attributes {hal.executable.target = #execu
   // FOREACH-TO-GPU-DAG:   affine.apply #{{.*}}()[%[[TIDY]]]
   // FOREACH-TO-GPU-DAG:   %[[svB:.*]] = memref.subview {{.*}} : memref<500x1020xf32{{.*}}> to memref<500x?xf32
   // FOREACH-TO-GPU-DAG:   %[[svC:.*]] = memref.subview {{.*}} : memref<250x1020xf32{{.*}}> to memref<?x?xf32
-  // FOREACH-TO-GPU:   linalg.matmul ins(%[[svA]], %[[svB]] : memref<?x500xf32{{.*}}>, memref<500x?xf32{{.*}}>) outs(%[[svC]] : memref<?x?xf32{{.*}}>)
+  // FOREACH-TO-GPU:   linalg.generic
+  // FOREACH-TO-GPU-SAME: ins(%[[svA]], %[[svB]] : memref<?x500xf32{{.*}}>, memref<500x?xf32{{.*}}>) outs(%[[svC]] : memref<?x?xf32{{.*}}>)
   // FOREACH-TO-GPU: }
   // FOREACH-TO-GPU: gpu.barrier
 

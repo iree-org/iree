@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -25,6 +26,26 @@ struct ResolveSwizzleHintsPass final
   void runOnOperation() override;
 };
 } // namespace
+
+static Value createOrFoldNewStaticAdd(RewriterBase &rewriter, Value v,
+                                      int64_t offset) {
+  // Early exit for the common offset = 0 case.
+  if (offset == 0) {
+    return v;
+  }
+
+  if (auto add = v.getDefiningOp<arith::AddIOp>()) {
+    llvm::APInt constant;
+    if (matchPattern(add.getRhs(), m_ConstantInt(&constant))) {
+      Value combined = rewriter.create<arith::ConstantIndexOp>(
+          add.getLoc(), offset + constant.getSExtValue());
+      return rewriter.create<arith::AddIOp>(add.getLoc(), add.getLhs(),
+                                            combined, add.getOverflowFlags());
+    }
+  }
+  Value offsetVal = rewriter.create<arith::ConstantIndexOp>(v.getLoc(), offset);
+  return rewriter.create<arith::AddIOp>(v.getLoc(), v, offsetVal);
+}
 
 /// Swizzles vector.load(iree_codegen.swizzle_hint, offset). The
 /// SwizzleInterfaceAttr exposes two methods:
@@ -53,10 +74,6 @@ static void swizzleLoad(RewriterBase &rewriter, vector::LoadOp load,
   VectorType swizzledLoadType =
       VectorType::get({accessWidth}, type.getElementType());
 
-  AffineExpr s0, s1;
-  bindSymbols(rewriter.getContext(), s0, s1);
-  AffineMap sum = AffineMap::get(0, 2, s0 + s1);
-
   // ~ vector.undef, overwritten by unrolling.
   Value replacement = rewriter.create<arith::ConstantOp>(
       hintLoc, type, rewriter.getZeroAttr(type));
@@ -65,10 +82,7 @@ static void swizzleLoad(RewriterBase &rewriter, vector::LoadOp load,
   // i = 0 -> C += k is the offset into the vector of a contiguous group of
   // swizzled elements.
   for (int64_t i = 0; i < loadWidth; i += accessWidth) {
-    auto vecOffset = rewriter.getIndexAttr(i);
-    auto newBaseOffset = affine::makeComposedFoldedAffineApply(
-        rewriter, hintLoc, sum, {memrefOffset, vecOffset});
-
+    Value newBaseOffset = createOrFoldNewStaticAdd(rewriter, memrefOffset, i);
     Value newOffset = getValueOrCreateConstantIndexOp(
         rewriter, hintLoc,
         hintOp.getSwizzle().swizzleOffset(rewriter, hintOp.getLoc(),
@@ -103,10 +117,6 @@ static void swizzleStore(RewriterBase &rewriter, vector::StoreOp store,
   int64_t storeWidth = type.getShape()[0];
   Value memrefOffset = store.getIndices()[0];
 
-  AffineExpr s0, s1;
-  bindSymbols(rewriter.getContext(), s0, s1);
-  AffineMap sum = AffineMap::get(0, 2, s0 + s1);
-
   // Store type = vector<C>, k = accessWidth
   // i = 0 -> C += k is the offset into the vector of a contiguous group of
   // swizzled elements.
@@ -114,9 +124,7 @@ static void swizzleStore(RewriterBase &rewriter, vector::StoreOp store,
     Value subVec = rewriter.create<vector::ExtractStridedSliceOp>(
         store.getLoc(), store.getValueToStore(), ArrayRef<int64_t>{i},
         ArrayRef<int64_t>{accessWidth}, ArrayRef<int64_t>{1});
-    auto vecOffset = rewriter.getIndexAttr(i);
-    auto newBaseOffset = affine::makeComposedFoldedAffineApply(
-        rewriter, hintLoc, sum, {memrefOffset, vecOffset});
+    Value newBaseOffset = createOrFoldNewStaticAdd(rewriter, memrefOffset, i);
 
     Value newOffset = getValueOrCreateConstantIndexOp(
         rewriter, hintLoc,
@@ -128,6 +136,26 @@ static void swizzleStore(RewriterBase &rewriter, vector::StoreOp store,
   rewriter.eraseOp(store);
 }
 
+/// Swizzles:
+///  amdgpu.gather_to_lds
+///    (iree_codegen.swizzle_hint, srcIndices, dst, dstIndices, transferType)
+///
+/// For now, only support gather_to_lds width == accessWidth.
+static void swizzleGatherToLDS(RewriterBase &rewriter,
+                               amdgpu::GatherToLDSOp gatherOp,
+                               IREE::Codegen::SwizzleHintOp hintOp) {
+  Location hintLoc = hintOp.getLoc();
+  Value memrefOffset = gatherOp.getSrcIndices()[0];
+  Value newOffset = getValueOrCreateConstantIndexOp(
+      rewriter, hintLoc,
+      hintOp.getSwizzle().swizzleOffset(rewriter, hintOp.getLoc(), memrefOffset,
+                                        hintOp.getOperand()));
+  rewriter.modifyOpInPlace(gatherOp, [&]() {
+    gatherOp.getSrcMutable().assign(hintOp.getOperand());
+    gatherOp.getSrcIndicesMutable().assign(newOffset);
+  });
+}
+
 /// Resolves all hints. Walks all direct users and splits them into loads and
 /// stores. If any user is not a swizzle-able load or store, bail out and
 /// silently drop the optimization hint.
@@ -135,6 +163,7 @@ static void resolveHintOp(RewriterBase &rewriter,
                           IREE::Codegen::SwizzleHintOp hintOp) {
   SmallVector<vector::LoadOp> loads;
   SmallVector<vector::StoreOp> stores;
+  SmallVector<amdgpu::GatherToLDSOp> gatherToLDSOps;
   int64_t accessWidth = hintOp.getSwizzle().getAccessElementCount();
   for (Operation *user : hintOp->getUsers()) {
     if (auto load = dyn_cast<vector::LoadOp>(user)) {
@@ -157,7 +186,31 @@ static void resolveHintOp(RewriterBase &rewriter,
       stores.push_back(store);
       continue;
     }
-    // Bail out if we can't rewrite all users.
+    if (auto gatherToLDSOp = dyn_cast<amdgpu::GatherToLDSOp>(user)) {
+      // Ignore swizzleHint on Dst Operand. Gather_to_lds writes elements of a
+      // subgroup contiguously in order of lane ID
+      if (gatherToLDSOp.getDst() == hintOp) {
+        continue;
+      }
+      int64_t accessBitWidth = cast<MemRefType>(hintOp.getOperand().getType())
+                                   .getElementTypeBitWidth() *
+                               accessWidth;
+      auto transferBitWidth = [&]() -> int64_t {
+        if (auto vectorType =
+                dyn_cast<VectorType>(gatherToLDSOp.getTransferType())) {
+          return vectorType.getElementTypeBitWidth() *
+                 vectorType.getNumElements();
+        }
+        return gatherToLDSOp.getTransferType().getIntOrFloatBitWidth();
+      }();
+      if (accessBitWidth != transferBitWidth) {
+        return;
+      }
+      gatherToLDSOps.push_back(gatherToLDSOp);
+      continue;
+    }
+    // Throw if we can't rewrite all users.
+    hintOp.emitError() << "unsupported SwizzleHintOp user: " << user;
     return;
   }
 
@@ -168,6 +221,10 @@ static void resolveHintOp(RewriterBase &rewriter,
   for (vector::StoreOp store : stores) {
     rewriter.setInsertionPoint(store);
     swizzleStore(rewriter, store, hintOp);
+  }
+  for (amdgpu::GatherToLDSOp gatherToLDSOp : gatherToLDSOps) {
+    rewriter.setInsertionPoint(gatherToLDSOp);
+    swizzleGatherToLDS(rewriter, gatherToLDSOp, hintOp);
   }
 }
 

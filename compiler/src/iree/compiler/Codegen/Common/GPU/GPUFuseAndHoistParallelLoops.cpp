@@ -12,6 +12,8 @@
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -24,8 +26,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-fuse-and-hoist-parallel-loops"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -133,6 +133,27 @@ struct FuseForalls final : OpRewritePattern<scf::ForallOp> {
 
 private:
   int64_t flatWorkgroupSize;
+};
+
+struct FuseNestedLaneAndWarpForalls final : OpRewritePattern<scf::ForallOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(scf::ForallOp warpForallOp,
+                                PatternRewriter &rewriter) const override {
+    SmallVector<scf::ForallOp> innerForallOps(
+        warpForallOp.getBody()->getOps<scf::ForallOp>());
+    if (innerForallOps.size() != 1) {
+      return failure();
+    }
+    scf::ForallOp laneForallOp = innerForallOps[0];
+    FailureOr<scf::ForallOp> threadForallOp =
+        fuseNestedLaneAndWarpForalls(rewriter, warpForallOp, laneForallOp);
+    if (failed(threadForallOp)) {
+      return failure();
+    }
+    rewriter.replaceOp(warpForallOp, *threadForallOp);
+    return success();
+  }
 };
 
 struct FuseTilableDestinationProducers final : OpRewritePattern<scf::ForallOp> {
@@ -269,65 +290,6 @@ struct FuseTilableSliceProducers final
   }
 };
 
-struct FuseTilableForallConsumers final
-    : OpInterfaceRewritePattern<TilingInterface> {
-  using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
-  LogicalResult matchAndRewrite(TilingInterface tilableOp,
-                                PatternRewriter &rewriter) const override {
-    // Currently consumer fusion requires DPS, and we don't want to fuse through
-    // inits anyway.
-    auto dpsOp = dyn_cast<DestinationStyleOpInterface>(*tilableOp);
-    if (!dpsOp) {
-      return failure();
-    }
-
-    tensor::ParallelInsertSliceOp producerSlice;
-    LoopLikeOpInterface sliceOwner;
-    Value fusionOperand;
-    for (auto operand : dpsOp.getDpsInputs()) {
-      auto forallProducer = operand.getDefiningOp<scf::ForallOp>();
-      if (!forallProducer) {
-        continue;
-      }
-      Value iterArg = forallProducer.getTiedBlockArgument(
-          forallProducer.getTiedOpOperand(cast<OpResult>(operand)));
-
-      for (auto user : iterArg.getUsers()) {
-        auto sliceOp = dyn_cast<tensor::ParallelInsertSliceOp>(user);
-        if (sliceOp && sliceOp.getDest() == iterArg) {
-          producerSlice = sliceOp;
-          sliceOwner = forallProducer;
-          fusionOperand = operand;
-          break;
-        }
-      }
-      if (producerSlice) {
-        break;
-      }
-    }
-
-    if (!producerSlice) {
-      return rewriter.notifyMatchFailure(tilableOp,
-                                         "no scf.forall producer to fuse into");
-    }
-
-    for (auto operand : tilableOp->getOperands()) {
-      if (operand != fusionOperand && operand.getDefiningOp() == sliceOwner) {
-        return rewriter.notifyMatchFailure(tilableOp,
-                                           "unimplemented: Cannot fuse op with "
-                                           "multiple uses of producer loop");
-      }
-    }
-
-    FailureOr<scf::SCFFuseConsumerOfSliceResult> fuseConsumerResults =
-        scf::tileAndFuseConsumerOfSlice(rewriter, producerSlice, {sliceOwner});
-    if (failed(fuseConsumerResults)) {
-      return failure();
-    }
-    return success();
-  }
-};
-
 struct FuseCollapseShapeConsumers final
     : OpRewritePattern<tensor::CollapseShapeOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -393,14 +355,16 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
       patterns.add<FuseForalls>(context, *maybeFlatWorkgroupSize,
                                 /*benefit=*/1);
     }
-    patterns.add<FuseTilableForallConsumers>(context);
+    populateFuseTilableForallConsumersPattern(patterns);
+    tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
+    patterns.add<FuseNestedLaneAndWarpForalls>(context);
     populateForallLoopHoistingPattern(patterns);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }
 
-  LDBG("After fusing and hoisting loops\n" << funcOp);
+  LDBG() << "After fusing and hoisting loops\n" << funcOp;
 
   // After hoisting parallel loops, try to fuse in any newly revealed consumers
   // and destinations.
@@ -410,7 +374,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     RewritePatternSet patterns(context);
     patterns.add<FuseTilableDestinationProducers>(context);
     patterns.add<FuseUnitLoopDestination>(context);
-    patterns.add<FuseTilableForallConsumers>(context);
+    populateFuseTilableForallConsumersPattern(patterns);
     patterns.add<FuseCollapseShapeConsumers>(context);
     patterns.add<FuseExtractSliceConsumers>(context);
     populateSwapExtractWithExpandPattern(patterns);
@@ -421,7 +385,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     }
   }
 
-  LDBG("After fusing new consumers\n" << funcOp);
+  LDBG() << "After fusing new consumers\n" << funcOp;
 
   // Finally try to do any new producer fusions.
   {
@@ -435,7 +399,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
     }
   }
 
-  LDBG("After fusing new producers\n" << funcOp);
+  LDBG() << "After fusing new producers\n" << funcOp;
 }
 
 } // namespace mlir::iree_compiler

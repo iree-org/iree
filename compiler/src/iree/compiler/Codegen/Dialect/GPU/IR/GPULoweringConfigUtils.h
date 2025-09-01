@@ -12,9 +12,9 @@
 namespace mlir::iree_compiler::IREE::GPU {
 
 /// Helper to retrieve/set a target mma intrinsic.
-MmaInterfaceAttr getMmaKind(LoweringConfigAttr config);
+IREE::Codegen::InnerTileDescAttrInterface getMmaKind(LoweringConfigAttr config);
 void setMmaKind(MLIRContext *context, SmallVectorImpl<NamedAttribute> &attrs,
-                MmaInterfaceAttr kind);
+                IREE::Codegen::InnerTileDescAttrInterface kind);
 
 // TODO: Merge subgroup counts functionality into subgroup tiling level
 //       lowering, when we have it implemented.
@@ -70,8 +70,9 @@ IREE::GPU::LoweringConfigAttr setPromotedOperandsList(
     ArrayRef<int64_t> operands,
     std::optional<ArrayRef<Attribute>> promotionTypes = std::nullopt);
 
-/// Helper to retrieve  list of operand to pad.
-std::optional<SmallVector<int64_t>> getPaddingList(LoweringConfigAttr config);
+/// Helper to retrieve list of operand to pad.
+std::optional<SmallVector<int64_t>> getPaddingList(LoweringConfigAttr config,
+                                                   bool paddingConv = false);
 
 IREE::GPU::UKernelConfigAttr
 getUkernelSpec(IREE::GPU::LoweringConfigAttr config);

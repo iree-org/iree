@@ -55,7 +55,7 @@ func.func @ukernel_example(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>) -> tens
       fn_def_attrs {hal.import.fields = ["processor_id", "processor_data"]}
       // Set the operation to not incorporate any strides. The implementation
       // expects no stride arguments.
-      strided_outer_dims(0) -> tensor<?xf32>
+      strided_dims([[], [], []]) -> tensor<?xf32>
 
     // Insert the result back into the result at the right position.
     %5 = tensor.insert_slice %4 into %dest[%offset] [%size] [1] : tensor<?xf32> into tensor<?xf32>

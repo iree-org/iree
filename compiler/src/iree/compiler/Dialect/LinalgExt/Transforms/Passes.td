@@ -60,6 +60,17 @@ def DecomposeIm2colPass :
   ];
 }
 
+def DecomposeMapScatterPass :
+    InterfacePass<"iree-linalg-ext-decompose-map-scatter", "mlir::FunctionOpInterface"> {
+  let summary =
+      "Decomposes vectorized map_scatter ops into vector ops";
+  let dependentDialects = [
+    "::mlir::tensor::TensorDialect",
+    "::mlir::vector::VectorDialect",
+    "::mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect"
+  ];
+}
+
 def DecomposeWinogradTransformPass :
     InterfacePass<"iree-linalg-ext-decompose-winograd", "mlir::FunctionOpInterface"> {
   let summary =
@@ -97,6 +108,10 @@ def ConvertAttentionToOnlineAttentionPass :
 def FoldUnitExtentDimsPass :
       Pass<"iree-linalg-ext-fold-unit-extent-dims", "">  {
   let summary = "Folds unit dims for iree_linalg_ext ops";
+  let options = [
+    Option<"useReshapes", "use-reshapes", "bool", /*default=*/"true",
+           "Use reshapes vs slices for rank reduction">,
+  ];
   let dependentDialects = [
     "::mlir::tensor::TensorDialect",
     "::mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect"

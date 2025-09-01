@@ -1,5 +1,5 @@
-// RUN: iree-opt --split-input-file --iree-dispatch-creation-tensor-pad-to-tensor-insert-slice --iree-flow-canonicalize %s | FileCheck %s
-// RUN: iree-opt --split-input-file --iree-dispatch-creation-tensor-pad-to-tensor-insert-slice=skip-one-linalg-use-case --iree-flow-canonicalize %s | FileCheck %s --check-prefix=SKIP
+// RUN: iree-opt --split-input-file --iree-dispatch-creation-tensor-pad-to-tensor-insert-slice --canonicalize %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-dispatch-creation-tensor-pad-to-tensor-insert-slice=skip-one-linalg-use-case --canonicalize %s | FileCheck %s --check-prefix=SKIP
 
 util.func public @tensor_pad(%arg0 : tensor<?x?xf32>, %arg1 : tensor<f32>, %arg2 : index, %arg3 : index) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
@@ -24,8 +24,8 @@ util.func public @tensor_pad(%arg0 : tensor<?x?xf32>, %arg1 : tensor<f32>, %arg2
 //   CHECK-DAG:   %[[VAL:.+]] = tensor.extract %[[ARG1]]
 //   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
-//   CHECK-DAG:   %[[RD0:.+]] = affine.apply #[[MAP0]]()[%[[ARG3]], %[[D0]]]
-//   CHECK-DAG:   %[[RD1:.+]] = affine.apply #[[MAP1]]()[%[[ARG2]], %[[D1]]]
+//   CHECK-DAG:   %[[RD0:.+]] = affine.apply #[[MAP0]]()[%[[D0]], %[[ARG3]]]
+//   CHECK-DAG:   %[[RD1:.+]] = affine.apply #[[MAP1]]()[%[[D1]], %[[ARG2]]]
 //       CHECK:   %[[INIT:.+]] = tensor.empty(%[[RD0]], %[[RD1]])
 //       CHECK:   %[[FILL:.+]] = linalg.fill
 //  CHECK-SAME:       ins(%[[VAL]] :
@@ -79,7 +79,7 @@ util.func public @_main(%arg0: tensor<1x33x33x480xf32>, %arg1: tensor<3x3x480x1x
 
 // -----
 
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
 util.func public @dispatch_dispatch_0_generic_512x1024_f32(
     %arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<512x1024xf32>>,
     %arg1: index, %arg2: index, %arg3: index, %arg4: index,
@@ -99,7 +99,7 @@ util.func public @dispatch_dispatch_0_generic_512x1024_f32(
   iree_tensor_ext.dispatch.tensor.store %11, %2, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1] : tensor<?x?xf32, #encoding> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32, #encoding>>{%0, %1}
   util.return
 }
-// CHECK:  #[[ENCODING:.+]] = #iree_encoding.testing_encoding<>
+// CHECK:  #[[ENCODING:.+]] = #iree_encoding.testing<>
 // CHECK:  util.func public @dispatch_dispatch_0_generic_512x1024_f32
 // CHECK:    %[[LOAD:.+]] = iree_tensor_ext.dispatch.tensor.load
 // CHECK:    %[[PAD:.+]] = tensor.pad %[[LOAD]] low

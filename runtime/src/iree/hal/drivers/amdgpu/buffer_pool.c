@@ -244,7 +244,8 @@ iree_status_t iree_hal_amdgpu_buffer_pool_initialize(
   const iree_host_size_t min_capacity_per_allocation = iree_host_size_ceil_div(
       alloc_rec_granule, sizeof(iree_hal_amdgpu_device_allocation_handle_t));
   const iree_host_size_t capacity_per_allocation =
-      iree_host_size_ceil_div(block_capacity, min_capacity_per_allocation);
+      iree_host_size_ceil_div(block_capacity, min_capacity_per_allocation) *
+      min_capacity_per_allocation;
   out_buffer_pool->block_capacity = capacity_per_allocation;
 
   IREE_TRACE_ZONE_END(z0);
@@ -362,10 +363,10 @@ iree_status_t iree_hal_amdgpu_buffer_pool_acquire(
   iree_slim_mutex_unlock(&buffer_pool->mutex);
 
   if (iree_status_is_ok(status)) {
-    // Assign queue affinity based on the requested parameters.
-    buffer->base.placement.queue_affinity = params.queue_affinity
-                                                ? params.queue_affinity
-                                                : IREE_HAL_QUEUE_AFFINITY_ANY;
+    // Reset buffer properties to those requested.
+    iree_hal_amdgpu_transient_buffer_reset(buffer, params, allocation_size,
+                                           /*byte_offset=*/0,
+                                           /*byte_length=*/allocation_size);
 
     // Return with a 1 ref count as if we had allocated it.
     iree_atomic_ref_count_inc(&buffer->base.resource.ref_count);
@@ -400,7 +401,7 @@ void iree_hal_amdgpu_buffer_pool_trim(
   iree_hal_amdgpu_buffer_pool_block_t* block = buffer_pool->free_head;
   while (block != NULL) {
     iree_hal_amdgpu_buffer_pool_block_t* next_block = block->next_free;
-    if (block->free_count == block->capacity) {
+    if (block->free_count != block->capacity) {
       // One or more buffers in use - cannot free the block.
       prev_block = block;
       block = next_block;

@@ -15,10 +15,13 @@ iree_check_single_backend_test_suite(
     check_llvm-cpu_local-task
   SRCS
     "conv2d.mlir"
+    "fp4_f32_conversion.mlir"
     "fp_to_subbyte.mlir"
     "narrow_n_matmuls.mlir"
+    "pack.mlir"
     "pack_dynamic_inner_tiles.mlir"
     "pack_i8.mlir"
+    "softmax.mlir"
     "subbyte_to_fp.mlir"
     "unpack.mlir"
   TARGET_BACKEND
@@ -33,18 +36,19 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_llvm-cpu_local-task_noriscv
+    check_llvm-cpu_dt_fusion_local-task
   SRCS
-    "pack.mlir"
+    "narrow_n_matmuls.mlir"
   TARGET_BACKEND
     "llvm-cpu"
   DRIVER
     "local-task"
   COMPILER_FLAGS
+    "--iree-dispatch-creation-data-tiling"
     "--iree-llvmcpu-target-cpu=generic"
+    "--iree-opt-data-tiling=false"
   LABELS
     "nowasm"
-    "noriscv"
 )
 
 iree_check_single_backend_test_suite(
@@ -56,6 +60,7 @@ iree_check_single_backend_test_suite(
     "pack.mlir"
     "pack_dynamic_inner_tiles.mlir"
     "pack_i8.mlir"
+    "softmax.mlir"
     "unpack.mlir"
   TARGET_BACKEND
     "vmvx"
@@ -85,6 +90,7 @@ iree_check_single_backend_test_suite(
   SRCS
     "conv2d.mlir"
     "narrow_n_matmuls.mlir"
+    "softmax.mlir"
     "subbyte_to_fp.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
@@ -128,6 +134,7 @@ iree_check_single_backend_test_suite(
     "large_linalg_matmul.mlir"
     "narrow_n_matmuls.mlir"
     "pack_i8.mlir"
+    "softmax.mlir"
     "subbyte_to_fp.mlir"
     "unpack.mlir"
   TARGET_BACKEND
@@ -148,6 +155,7 @@ iree_check_single_backend_test_suite(
   SRCS
     "argmax.mlir"
     "pack_i8.mlir"
+    "softmax.mlir"
     "unpack.mlir"
   TARGET_BACKEND
     "rocm"

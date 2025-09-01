@@ -26,22 +26,6 @@ public:
   void notifyOperationReplaced(Operation *op, ValueRange replacement) override;
 };
 
-/// Fold a tensor::ExpandShapeOp into a consumer `mapScatterOp`, by linearizing
-/// and then delinearizing the source indices of the `mapScatterOp`s index
-/// transformation.
-IREE::LinalgExt::MapScatterOp
-foldExpandShapeIntoMapScatter(RewriterBase &rewriter,
-                              tensor::ExpandShapeOp expandShapeOp,
-                              IREE::LinalgExt::MapScatterOp mapScatterOp);
-
-/// Fold a tensor::CollapseShapeOp into a consumer `mapScatterOp`, by
-/// linearizing and then delinearizing the source indices of the
-/// `mapScatterOp`s index transformation.
-IREE::LinalgExt::MapScatterOp
-foldCollapseShapeIntoMapScatter(RewriterBase &rewriter,
-                                tensor::CollapseShapeOp collapseShapeOp,
-                                IREE::LinalgExt::MapScatterOp mapScatterOp);
-
 using IGEMMConfigFn =
     std::function<LogicalResult(linalg::GenericOp, IREE::LinalgExt::Im2colOp)>;
 using IGEMMControlFn = std::function<bool(Operation *)>;
@@ -93,11 +77,26 @@ FailureOr<IREETilingResult>
 tileDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
                           linalg::LinalgTilingOptions options);
 
+/// Transform a `scf.for` loop with a strictly positive step
+///   for %i = %lb to %ub step %s
+/// into a 0-based loop with step 1
+///   for %ii = 0 to ceildiv(%ub - %lb, %s) step 1
+/// Insert an `affine.apply` operation to compute the denormalized index value.
+LogicalResult normalizeLoopBounds(RewriterBase &rewriter, scf::ForOp forOp);
+
+/// Transform a `scf.forall` loop with a strictly positive steps
+///   forall (%i, %j) = (%lb0, %lb1) to (%ub0, %ub1) step (%s0, %s1)
+/// into a 0-based loop with step 1 (normalized)
+///   forall (%i, %j) in (ceildiv(%ub0 - %lb0, %s0), ceildiv(%ub1 - %lb1, %s1))
+/// Insert `affine.apply` operations to compute the denormalized index values.
+LogicalResult normalizeLoopBounds(RewriterBase &rewriter,
+                                  scf::ForallOp forallOp);
+
 /// Populate patterns that fold tensor.expand/collapse_shape into the memref
 /// of iree_codegen.load_from_buffer or iree_codegen.store_to_buffer ops.
 void populateFoldTensorReshapeIntoBufferPatterns(RewritePatternSet &patterns);
 
-/// Populate patterns that fold tensor.expand/collapse_shape into the source
+/// Populate patterns that fold reshaping and bitcasting ops into the source
 /// hal.interface.binding.subspan.
 void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns);
 
@@ -116,10 +115,23 @@ void populateIREEResolveExtractStridedMetadataPatterns(
 /// for maximumf/minimumf ops, e.g. LLVM NVIDIA-PTX.
 void populateReplaceSlowMinMaxOpsPatterns(RewritePatternSet &patterns);
 
+/// Populate pattern to convert `tensor.extract_slice(tensor.expand_shape)` to
+/// `tensor.expand_shape(tensor.extract_slice)`.
 void populateSwapExtractWithExpandPattern(RewritePatternSet &patterns);
 
-/// Populate patterns to fold relayout operations into map_scatter ops.
-void populateCombineRelayoutOpPatterns(RewritePatternSet &patterns);
+/// Populate pattern to convert `tensor.extract_slice(tensor.collapse_shape)` to
+/// `tensor.collapse_shape(tensor.extract_slice)`.
+void populateSwapExtractWithCollapsePattern(RewritePatternSet &patterns);
+
+/// Populate patterns to fold relayout operations into map_scatter ops. If a
+/// `padDistributionConfigFn` is passed, then the tensor.pad folding pattern
+/// will be added, using the padDistributionConfigFn for distribution.
+void populateCombineRelayoutOpPatterns(
+    RewritePatternSet &patterns,
+    PadDistributionConfigFn padDistributionConfigFn = nullptr);
+
+/// Populate patterns to fuse tilable consumers of forall ops into it.
+void populateFuseTilableForallConsumersPattern(RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler
 

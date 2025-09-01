@@ -99,12 +99,8 @@ Operation *stripElementBitPatternPreservingParents(Value op) {
             .Case<vector::BroadcastOp>([](vector::BroadcastOp broadcast) {
               return broadcast.getVector();
             })
-            .Case<vector::ExtractOp, vector::ExtractElementOp,
-                  vector::ExtractStridedSliceOp>(
+            .Case<vector::ExtractOp, vector::ExtractStridedSliceOp>(
                 [](auto extract) { return extract.getVector(); })
-            .Case<vector::InsertElementOp>([](vector::InsertElementOp insert) {
-              return insert.getSource();
-            })
             .Case<vector::InsertOp, vector::InsertStridedSliceOp>(
                 [](auto insert) { return insert.getValueToStore(); })
             .Case<vector::TransposeOp>([](vector::TransposeOp transpose) {
@@ -265,10 +261,7 @@ void populateVectorUnrollPatterns(RewritePatternSet &patterns,
 bool supportsIntegerDotProductOps(mlir::FunctionOpInterface fn) {
   // First check if the function op itself has a target env attribute. This may
   // be preferred in tests.
-  auto targetEnvAttr =
-      fn->getAttrOfType<IREE::GPU::TargetAttr>(kGPUTargetAttrName);
-  if (!targetEnvAttr)
-    targetEnvAttr = getGPUTargetAttr(fn);
+  auto targetEnvAttr = getGPUTargetAttr(fn);
   if (!targetEnvAttr)
     return false;
 

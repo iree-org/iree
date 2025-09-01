@@ -2087,3 +2087,20 @@ func.func @custom_op_index(%arg0 : tensor<?x?xindex>) -> tensor<?x?xindex> {
 //       CHECK:     iree_linalg_ext.index 0
 //       CHECK:     iree_linalg_ext.index 1
 //       CHECK:     iree_linalg_ext.yield
+
+// -----
+
+func.func @split_reduction_mapping(%arg0 : index,
+    %arg1 : index, %arg2 : index) {
+  scf.forall (%iv0, %iv1, %iv2) in (%arg0, %arg1, %arg2) {
+
+  } {mapping = [#iree_linalg_ext.split_reduction_mapping<1>,
+                #iree_linalg_ext.split_reduction_mapping<0>,
+                #iree_linalg_ext.split_reduction_mapping<2>]}
+  return
+}
+// CHECK-LABEL: func @split_reduction_mapping
+//       CHECK:   mapping = [
+//  CHECK-SAME:       #iree_linalg_ext.split_reduction_mapping<1>,
+//  CHECK-SAME:       #iree_linalg_ext.split_reduction_mapping<0>,
+//  CHECK-SAME:       #iree_linalg_ext.split_reduction_mapping<2>]

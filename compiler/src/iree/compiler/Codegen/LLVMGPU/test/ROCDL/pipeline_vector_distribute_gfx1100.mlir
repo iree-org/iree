@@ -14,7 +14,7 @@
 hal.executable @matmul_256x256x256_f16_f32 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
   hal.executable.export public @matmul_256x256x256_f16_f32 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2)
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -60,7 +60,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 hal.executable @matmul_256x256x256_f16_f16 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
   hal.executable.export public @matmul_256x256x256_f16_f16 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2)
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -98,7 +98,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 hal.executable private @matvec_dispatch_0 {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export public @matvec_dispatch_0_matmul_transpose_b_32000x2x4096_f16xf16xf32 ordinal(0) layout(#hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -112,7 +112,7 @@ hal.executable private @matvec_dispatch_0 {
         %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [2, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x4096xf16>> -> tensor<2x4096xf16>
         %5 = tensor.empty() : tensor<32000x2xf32>
         %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<32000x2xf32>) -> tensor<32000x2xf32>
-        %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%3, %4 : tensor<32000x4096xf16>, tensor<2x4096xf16>) outs(%6 : tensor<32000x2xf32>) attrs =  {lowering_config = #iree_gpu.lowering_config<{partial_reduction = [0, 0, 512], subgroup_basis = [[1, 1, 4], [0, 1, 2]], thread = [0, 0, 4], thread_basis = [[1, 1, 32], [0, 1, 2]], workgroup = [16, 1, 0]}>} {
+        %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%3, %4 : tensor<32000x4096xf16>, tensor<2x4096xf16>) outs(%6 : tensor<32000x2xf32>) attrs =  {lowering_config = #iree_gpu.lowering_config<{partial_reduction = [0, 0, 512], subgroup_basis = [[1, 1, 4], [0, 1, 2]], thread = [0, 0, 4], lane_basis = [[1, 1, 32], [0, 1, 2]], workgroup = [16, 1, 0]}>} {
         ^bb0(%in: f16, %in_0: f16, %out: f32):
           %8 = arith.extf %in : f16 to f32
           %9 = arith.extf %in_0 : f16 to f32

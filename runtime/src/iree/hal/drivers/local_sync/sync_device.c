@@ -20,6 +20,7 @@
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/file_registry.h"
 #include "iree/hal/utils/file_transfer.h"
+#include "iree/hal/utils/queue_emulation.h"
 
 typedef struct iree_hal_sync_device_t {
   iree_hal_resource_t resource;
@@ -274,8 +275,9 @@ static iree_status_t iree_hal_sync_device_import_file(
 }
 
 static iree_status_t iree_hal_sync_device_create_semaphore(
-    iree_hal_device_t* base_device, uint64_t initial_value,
-    iree_hal_semaphore_flags_t flags, iree_hal_semaphore_t** out_semaphore) {
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    uint64_t initial_value, iree_hal_semaphore_flags_t flags,
+    iree_hal_semaphore_t** out_semaphore) {
   iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
   return iree_hal_sync_semaphore_create(&device->semaphore_state, initial_value,
                                         device->host_allocator, out_semaphore);
@@ -296,8 +298,9 @@ static iree_status_t iree_hal_sync_device_queue_alloca(
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   // TODO(benvanik): queue-ordered allocations.
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(wait_semaphore_list,
-                                                    iree_infinite_timeout()));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
+                                   IREE_HAL_WAIT_FLAG_DEFAULT));
   IREE_RETURN_IF_ERROR(
       iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
                                          params, allocation_size, out_buffer));
@@ -357,6 +360,56 @@ static iree_status_t iree_hal_sync_device_queue_write(
       source_buffer, source_offset, target_file, target_offset, length, flags,
       options));
   return loop_status;
+}
+
+static iree_status_t iree_hal_sync_device_queue_host_call(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_host_call_t call, const uint64_t args[4],
+    iree_hal_host_call_flags_t flags) {
+  // Wait for all dependencies.
+  IREE_RETURN_IF_ERROR(
+      iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
+                                   IREE_HAL_WAIT_FLAG_DEFAULT));
+
+  // If non-blocking then immediately signal the dependencies instead of letting
+  // the call do it. We don't expect this to allow more work to proceed in the
+  // sync device case _on this device_ but it may on others.
+  const bool is_nonblocking =
+      iree_any_bit_set(flags, IREE_HAL_HOST_CALL_FLAG_NON_BLOCKING);
+  if (is_nonblocking) {
+    // NOTE: the signals can fail in which case we never perform the call.
+    // That's ok as failure to signal is considered a device-loss/death
+    // situation as there's no telling what has gone wrong.
+    IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
+  }
+
+  // Issue the call.
+  iree_hal_host_call_context_t context = {
+      .device = base_device,
+      .queue_affinity = queue_affinity,
+      .signal_semaphore_list = is_nonblocking ? iree_hal_semaphore_list_empty()
+                                              : signal_semaphore_list,
+  };
+  iree_status_t call_status = call.fn(call.user_data, args, &context);
+
+  if (is_nonblocking || iree_status_is_deferred(call_status)) {
+    // User callback will signal in the future (or they are fire-and-forget).
+    return iree_ok_status();
+  } else if (iree_status_is_ok(call_status)) {
+    // Signal callback completed synchronously.
+    return iree_hal_semaphore_list_signal(signal_semaphore_list);
+  } else {
+    // If the call failed we need to fail all dependent semaphores to propagate
+    // the error.
+    if (!is_nonblocking) {
+      iree_hal_semaphore_list_fail(signal_semaphore_list, call_status);
+    } else {
+      iree_status_ignore(call_status);
+    }
+    return iree_ok_status();
+  }
 }
 
 static iree_status_t iree_hal_sync_device_apply_deferred_command_buffer(
@@ -427,7 +480,7 @@ static iree_status_t iree_hal_sync_device_queue_execute(
   // Wait for semaphores to be signaled before performing any work.
   IREE_RETURN_IF_ERROR(iree_hal_sync_semaphore_multi_wait(
       &device->semaphore_state, IREE_HAL_WAIT_MODE_ALL, wait_semaphore_list,
-      iree_infinite_timeout()));
+      iree_infinite_timeout(), IREE_HAL_WAIT_FLAG_DEFAULT));
 
   // Run all deferred command buffers - any we could have run inline we already
   // did during recording.
@@ -449,10 +502,11 @@ static iree_status_t iree_hal_sync_device_queue_flush(
 
 static iree_status_t iree_hal_sync_device_wait_semaphores(
     iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout) {
+    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
+    iree_hal_wait_flags_t flags) {
   iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
   return iree_hal_sync_semaphore_multi_wait(&device->semaphore_state, wait_mode,
-                                            semaphore_list, timeout);
+                                            semaphore_list, timeout, flags);
 }
 
 static iree_status_t iree_hal_sync_device_profiling_begin(
@@ -505,6 +559,8 @@ static const iree_hal_device_vtable_t iree_hal_sync_device_vtable = {
     .queue_copy = iree_hal_device_queue_emulated_copy,
     .queue_read = iree_hal_sync_device_queue_read,
     .queue_write = iree_hal_sync_device_queue_write,
+    .queue_host_call = iree_hal_sync_device_queue_host_call,
+    .queue_dispatch = iree_hal_device_queue_emulated_dispatch,
     .queue_execute = iree_hal_sync_device_queue_execute,
     .queue_flush = iree_hal_sync_device_queue_flush,
     .wait_semaphores = iree_hal_sync_device_wait_semaphores,

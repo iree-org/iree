@@ -1,5 +1,11 @@
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx942 \
-// RUN: --iree-codegen-llvmgpu-use-igemm=true --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s
+// RUN: --iree-codegen-llvmgpu-use-igemm=true --iree-codegen-llvmgpu-igemm-pad-convolution=false --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefixes=CHECK,GFX942
+
+// RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=mi300x@hip \
+// RUN: --iree-codegen-llvmgpu-use-igemm=true --iree-codegen-llvmgpu-igemm-pad-convolution=false --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefixes=CHECK,MI300X
+
+// RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx942 \
+// RUN: --iree-codegen-llvmgpu-use-igemm=true --iree-codegen-llvmgpu-igemm-pad-convolution=true --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefix=PAD-CONV-GFX942
 
 func.func @nhwc_conv_mfma() {
   %cst = arith.constant 0.000000e+00 : f32
@@ -17,16 +23,21 @@ func.func @nhwc_conv_mfma() {
 }
 
 // CHECK-LABEL: func.func @nhwc_conv_mfma
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
 //       CHECK:   linalg.conv_2d_nhwc_hwcf {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
 //  CHECK-SAME:     promote_operands = [0, 1]
-//  CHECK-SAME:     reduction = [0, 0, 0, 0, 8]
-//  CHECK-SAME:     subgroup = [1, 2, 2, 1, 0]
-//  CHECK-SAME:     workgroup = [1, 2, 32, 64, 0]
+
+//  GFX942-SAME:    reduction = [0, 0, 0, 0, 8]
+//  GFX942-SAME:    subgroup = [1, 2, 1, 2, 0]
+//  GFX942-SAME:    workgroup = [1, 4, 32, 64, 0]
+
+//  MI300X-SAME:    reduction = [0, 0, 0, 0, 8]
+//  MI300X-SAME:    subgroup = [1, 1, 1, 1, 0]
+//  MI300X-SAME:    workgroup = [1, 2, 32, 32, 0]}>
 
 // -----
 
@@ -46,16 +57,21 @@ func.func @nchw_conv_mfma() {
 }
 
 // CHECK-LABEL: func.func @nchw_conv_mfma
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
 //       CHECK:   linalg.conv_2d_nchw_fchw {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
 //  CHECK-SAME:     promote_operands = [0, 1]
-//  CHECK-SAME:     reduction = [0, 0, 0, 0, 8]
-//  CHECK-SAME:     subgroup = [1, 2, 2, 1, 0]
-//  CHECK-SAME:     workgroup = [1, 64, 2, 32, 0]
+
+// GFX942-SAME:     reduction = [0, 0, 0, 0, 8]
+// GFX942-SAME:     subgroup = [1, 2, 2, 1, 0]
+// GFX942-SAME:     workgroup = [1, 64, 4, 32, 0]
+
+// MI300X-SAME:     reduction = [0, 0, 0, 0, 8]
+// MI300X-SAME:     subgroup = [1, 1, 1, 1, 0]
+// MI300X-SAME:     workgroup = [1, 32, 2, 32, 0]
 
 // -----
 
@@ -75,17 +91,26 @@ func.func @nhwc_conv_unaligned_mfma() {
 }
 
 // CHECK-LABEL: func.func @nhwc_conv_unaligned_mfma
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
 //       CHECK:   linalg.conv_2d_nhwc_hwcf {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
-//  CHECK-SAME:     padding = [2, 1, 32, 64, 32]
-//  CHECK-SAME:     promote_operands = [0, 1, 2]
-//  CHECK-SAME:     reduction = [0, 0, 0, 0, 8]
-//  CHECK-SAME:     subgroup = [2, 1, 2, 1, 0]
-//  CHECK-SAME:     workgroup = [2, 1, 32, 64, 0]
+
+// GFX942-SAME:     padding = [2, 1, 32, 64, 32]
+// GFX942-SAME:     promote_operands = [0, 1, 2]
+// GFX942-SAME:     reduction = [0, 0, 0, 0, 8]
+// GFX942-SAME:     subgroup = [2, 1, 1, 1, 0]
+// GFX942-SAME:     workgroup = [2, 1, 32, 64, 0]
+
+// MI300X-SAME:     padding = [2, 1, 32, 32, 32]
+// MI300X-SAME:     promote_operands = [0, 1, 2]
+// MI300X-SAME:     reduction = [0, 0, 0, 0, 8]
+// MI300X-SAME:     subgroup = [1, 1, 1, 1, 0]
+// MI300X-SAME:     workgroup = [2, 1, 32, 32, 0]
+
+// PAD-CONV-GFX942:     padding_conv = [2, 1, 32, 64, 0, 0, 0]
 
 // -----
 
@@ -105,14 +130,172 @@ func.func @nchw_conv_unaligned_mfma() {
 }
 
 // CHECK-LABEL: func.func @nchw_conv_unaligned_mfma
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
 
 //       CHECK:   linalg.conv_2d_nchw_fchw {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
-//  CHECK-SAME:     padding = [1, 64, 2, 32, 32]
+
+// GFX942-SAME:     padding = [1, 64, 4, 32, 32]
+// GFX942-SAME:     promote_operands = [0, 1, 2]
+// GFX942-SAME:     reduction = [0, 0, 0, 0, 8]
+// GFX942-SAME:     subgroup = [1, 2, 2, 1, 0]
+// GFX942-SAME:     workgroup = [1, 64, 4, 32, 0]
+
+// MI300X-SAME:     padding = [1, 32, 2, 32, 32]
+// MI300X-SAME:     promote_operands = [0, 1, 2]
+// MI300X-SAME:     reduction = [0, 0, 0, 0, 8]
+// MI300X-SAME:     subgroup = [1, 1, 1, 1, 0]
+// MI300X-SAME:     workgroup = [1, 32, 2, 32, 0]
+
+// PAD-CONV-GFX942:     padding_conv = [1, 64, 4, 32, 0, 0, 0]
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d3, d4, d5, d6)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+func.func @conv_nhwc_fhwc_unaligned_channel(%arg0: tensor<16x26x19x287xf16>, %arg1: tensor<287x3x3x287xf16>, %arg2: tensor<16x24x17x287xf32>) -> tensor<16x24x17x287xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<16x26x19x287xf16>, tensor<287x3x3x287xf16>) outs(%arg2 : tensor<16x24x17x287xf32>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f32):
+    %1 = arith.extf %in : f16 to f32
+    %2 = arith.extf %in_0 : f16 to f32
+    %3 = arith.mulf %1, %2 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<16x24x17x287xf32>
+  return %0 : tensor<16x24x17x287xf32>
+}
+
+// CHECK-LABEL: func.func @conv_nhwc_fhwc_unaligned_channel
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
+//  CHECK-SAME:   use_igemm_convolution = true
+
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+
+// GFX942-SAME:     padding = [1, 4, 32, 32, 32]
+// GFX942-SAME:     promote_operands = [0, 1, 2]
+// GFX942-SAME:     reduction = [0, 0, 0, 0, 2]
+// GFX942-SAME:     subgroup = [1, 2, 1, 1, 0]
+// GFX942-SAME:     workgroup = [1, 4, 32, 32, 0]
+
+// MI300X-SAME:     padding = [1, 2, 32, 32, 32]
+// MI300X-SAME:     promote_operands = [0, 1, 2]
+// MI300X-SAME:     reduction = [0, 0, 0, 0, 2]
+// MI300X-SAME:     subgroup = [1, 1, 1, 1, 0]
+// MI300X-SAME:     workgroup = [1, 2, 32, 32, 0]
+
+// PAD-CONV-GFX942:     padding_conv = [1, 4, 32, 32, 0, 0, 32]
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d1 + d5 * 2, d2 + d6 * 2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d0)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+func.func @conv_chwn_chwf_unaligned(%arg0: tensor<16x193x129x40xbf16>, %arg1: tensor<16x96x64x40xbf16>, %arg2: tensor<40x3x3x40xf32>) -> tensor<40x3x3x40xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<16x193x129x40xbf16>, tensor<16x96x64x40xbf16>) outs(%arg2 : tensor<40x3x3x40xf32>) {
+  ^bb0(%in: bf16, %in_0: bf16, %out: f32):
+    %1 = arith.extf %in : bf16 to f32
+    %2 = arith.extf %in_0 : bf16 to f32
+    %3 = arith.mulf %1, %2 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<40x3x3x40xf32>
+  return %0 : tensor<40x3x3x40xf32>
+}
+
+// CHECK-LABEL: func.func @conv_chwn_chwf_unaligned
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
+//  CHECK-SAME:   use_igemm_convolution = true
+
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_BF16>
+//  CHECK-SAME:     padding = [16, 1, 1, 16, 64]
 //  CHECK-SAME:     promote_operands = [0, 1, 2]
-//  CHECK-SAME:     reduction = [0, 0, 0, 0, 8]
-//  CHECK-SAME:     subgroup = [1, 2, 2, 1, 0]
-//  CHECK-SAME:     workgroup = [1, 64, 2, 32, 0]
+//  CHECK-SAME:     reduction = [0, 0, 0, 0, 4]
+//  CHECK-SAME:     subgroup = [1, 1, 1, 1, 0]
+//  CHECK-SAME:     workgroup = [16, 1, 1, 16, 0]
+
+// PAD-CONV-GFX942:     padding_conv = [16, 1, 1, 16, 0, 0, 0]
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0 + d4, d1 + d5, d2, d6)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d2, d3, d4, d5, d6)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+func.func @group_conv_unaligned(%arg0: tensor<61x93x16x56xbf16>, %arg1: tensor<16x56x3x3x56xbf16>, %arg2: tensor<59x91x16x56xf32>) -> tensor<59x91x16x56xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<61x93x16x56xbf16>, tensor<16x56x3x3x56xbf16>) outs(%arg2 : tensor<59x91x16x56xf32>) {
+    ^bb0(%in: bf16, %in_4: bf16, %out: f32):
+      %10 = arith.extf %in : bf16 to f32
+      %11 = arith.extf %in_4 : bf16 to f32
+      %12 = arith.mulf %10, %11 : f32
+      %13 = arith.addf %out, %12 : f32
+      linalg.yield %13 : f32
+    } -> tensor<59x91x16x56xf32>
+  return %0 : tensor<59x91x16x56xf32>
+}
+
+// CHECK-LABEL: func.func @group_conv_unaligned
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
+//  CHECK-SAME:   use_igemm_convolution = true
+
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+// GFX942-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_BF16>
+// GFX942-SAME:     padding = [1, 32, 1, 64, 64]
+// GFX942-SAME:     promote_operands = [0, 1, 2]
+// GFX942-SAME:     reduction = [0, 0, 0, 0, 4]
+// GFX942-SAME:     subgroup = [1, 1, 0, 1, 0]
+// GFX942-SAME:     workgroup = [1, 32, 1, 64, 0]
+
+// MI300X-SAME:     padding = [1, 32, 1, 64, 64]
+// MI300X-SAME:     promote_operands = [0, 1, 2]
+// MI300X-SAME:     reduction = [0, 0, 0, 0, 4]
+// MI300X-SAME:     subgroup = [1, 1, 0, 1, 0]
+// MI300X-SAME:     workgroup = [1, 32, 1, 64, 0]
+
+// PAD-CONV-GFX942:     padding_conv = [1, 32, 1, 64, 0, 0, 64]
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1 + d4, d2, d5)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d4, d5)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+module {
+  func.func @conv_nhwc_filter_5x1_unaligned(%arg0: tensor<16x42x19x64xbf16>, %arg1: tensor<64x5x64xbf16>, %arg2: tensor<16x38x19x64xf32>) -> tensor<16x38x19x64xf32> {
+    %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<16x42x19x64xbf16>, tensor<64x5x64xbf16>) outs(%arg2 : tensor<16x38x19x64xf32>) {
+    ^bb0(%in: bf16, %in_0: bf16, %out: f32):
+      %1 = arith.extf %in : bf16 to f32
+      %2 = arith.extf %in_0 : bf16 to f32
+      %3 = arith.mulf %1, %2 : f32
+      %4 = arith.addf %out, %3 : f32
+      linalg.yield %4 : f32
+    } -> tensor<16x38x19x64xf32>
+    return %0 : tensor<16x38x19x64xf32>
+  }
+}
+
+// CHECK-LABEL: func.func @conv_nhwc_filter_5x1_unaligned
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
+//  CHECK-SAME:   use_igemm_convolution = true
+
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+// GFX942-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_BF16>
+// GFX942-SAME:     padding = [2, 2, 32, 64, 64]
+// GFX942-SAME:     promote_operands = [0, 1, 2]
+// GFX942-SAME:     reduction = [0, 0, 0, 0, 4]
+// GFX942-SAME:     subgroup = [2, 1, 1, 2, 0]
+// GFX942-SAME:     workgroup = [2, 2, 32, 64, 0]
+
+// MI300X-SAME:     padding = [1, 2, 32, 32, 64]
+// MI300X-SAME:     promote_operands = [0, 1, 2]
+// MI300X-SAME:     reduction = [0, 0, 0, 0, 4]
+// MI300X-SAME:     subgroup = [1, 1, 1, 1, 0]
+// MI300X-SAME:     workgroup = [1, 2, 32, 32, 0]
+
+// PAD-CONV-GFX942:     padding_conv = [2, 2, 32, 64, 0, 0]

@@ -68,6 +68,23 @@ MLIR_CAPI_EXPORTED MlirTypeID ireeGPUMMAAttrGetTypeID(void);
 MLIR_CAPI_EXPORTED MlirAttribute ireeGPUMMAAttrGet(MlirContext mlirCtx,
                                                    uint32_t value);
 
+MLIR_CAPI_EXPORTED bool
+ireeAttributeIsAGPUVirtualMMAIntrinsicAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID ireeGPUVirtualMMAIntrinsicAttrGetTypeID(void);
+
+MLIR_CAPI_EXPORTED MlirAttribute
+ireeGPUVirtualMMAIntrinsicAttrGet(MlirContext mlirCtx, uint32_t value);
+
+MLIR_CAPI_EXPORTED uint32_t
+ireeGPUVirtualMMAIntrinsicAttrGetValue(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED bool ireeAttributeIsAGPUVirtualMMAAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID ireeGPUVirtualMMAAttrGetTypeID(void);
+
+MLIR_CAPI_EXPORTED MlirAttribute ireeGPUVirtualMMAAttrGet(MlirContext mlirCtx,
+                                                          uint32_t value);
 struct ireeGPUMMAInfo {
   MlirType aElementType;
   MlirType bElementType;
@@ -81,6 +98,9 @@ struct ireeGPUMMAInfo {
 };
 
 MLIR_CAPI_EXPORTED ireeGPUMMAInfo ireeGPUMMAAttrGetInfo(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirAttribute
+ireeGPUMMAAttrGetVirtualMMAIntrinsic(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED bool
 ireeAttributeIsAGPULoweringConfigAttr(MlirAttribute attr);
@@ -111,6 +131,30 @@ ireeGPULoweringConfigAttrGetSubgroupCount(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED MlirAttribute
 ireeGPULoweringConfigAttrGetMmaKind(MlirAttribute attr);
+
+// Represents the subgroup-level layout of an MMA fragment.
+// Each field is an ArrayAttr of two i64 values.
+struct ireeGPUMMASingleSubgroupLayout {
+  MlirAttribute outer;
+  MlirAttribute thread;
+  MlirAttribute tstrides;
+  MlirAttribute element;
+};
+
+MLIR_CAPI_EXPORTED ireeGPUMMASingleSubgroupLayout
+ireeGPUGetSingleSubgroupLayout(MlirAttribute attr, uint32_t fragment);
+
+struct ireeGPUTargetInfo {
+  MlirIdentifier arch;                // E.g., "gfx942".
+  MlirAttribute subgroupSizeChoices;  // Subgroup size choices.
+  MlirAttribute maxWorkgroupSizes;    // Max threads per X/Y/Z dimension.
+  int64_t maxThreadCountPerWorkgroup; // Max threads per workgroup.
+  int64_t maxWorkgroupMemoryBytes;    // Max workgroup memory.
+};
+
+// Queries GPU target info from the given `ExecutableTargetAttr` attribute.
+MLIR_CAPI_EXPORTED ireeGPUTargetInfo
+ireeHALExecutableTargetAttrGetGPUTargetInfo(MlirAttribute attr);
 
 #ifdef __cplusplus
 }

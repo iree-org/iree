@@ -22,7 +22,7 @@ namespace {
 class ConvertStridedContractionToContraction
     : public OpRewritePattern<linalg::GenericOp> {
 public:
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(linalg::GenericOp op,
                                 PatternRewriter &rewriter) const override {
     // Check if the generic op satisfies all other conditions for being a
@@ -56,7 +56,7 @@ public:
     }
     if (inputMap.isProjectedPermutation())
       return failure();
-    SmallVector<int64_t, 4> staticShape = op.getStaticLoopRanges();
+    SmallVector<int64_t> staticShape = op.getStaticLoopRanges();
 
     llvm::SmallDenseMap<unsigned, int64_t> strides;
     SmallVector<AffineExpr> replacementExprs;

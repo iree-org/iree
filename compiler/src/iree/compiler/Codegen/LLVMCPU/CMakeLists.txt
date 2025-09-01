@@ -32,6 +32,7 @@ iree_cc_library(
     MLIRPass
     MLIRTransformUtils
     MLIRTransforms
+    iree::compiler::Codegen::Dialect::CPU::IR::IREECPUDialect
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Utils
@@ -65,8 +66,7 @@ iree_cc_library(
     "LLVMCPUSplitReduction.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
     "LLVMCPUTile.cpp"
-    "LLVMCPUTileAndFuse.cpp"
-    "LLVMCPUTileRootAndFuseProducerConsumer.cpp"
+    "LLVMCPUTileAndFuseProducerConsumer.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
     "LLVMCPUVectorShapeCastLowering.cpp"
     "LLVMCPUVectorTransposeLowering.cpp"
@@ -113,6 +113,7 @@ iree_cc_library(
     MLIRFunctionInterfaces
     MLIRIR
     MLIRIndexToLLVM
+    MLIRIndexingMapOpInterface
     MLIRLLVMCommonConversion
     MLIRLLVMDialect
     MLIRLinalgDialect
@@ -134,6 +135,7 @@ iree_cc_library(
     MLIRSCFUtils
     MLIRTensorDialect
     MLIRTensorTransforms
+    MLIRTilingInterface
     MLIRTosaDialect
     MLIRTosaToArith
     MLIRTransformDialect
@@ -151,6 +153,7 @@ iree_cc_library(
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::CPU::CommonCPUPasses
     iree::compiler::Codegen::Common::TransformDialectInterpreterPass
+    iree::compiler::Codegen::Dialect::CPU::IR::IREECPUDialect
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Transforms

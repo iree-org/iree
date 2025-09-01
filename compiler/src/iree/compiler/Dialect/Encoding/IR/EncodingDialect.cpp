@@ -36,8 +36,8 @@ struct EncodingOpAsmInterface : public OpAsmDialectInterface {
   // `.` or end with a numeric digit([0-9]+). Returns success if an alias was
   // provided, failure otherwise.
   AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
-    if (llvm::isa<EncodingAttr, MatmulKAttr, LayoutAttr, TestingEncodingAttr,
-                  UnknownEncodingAttr>(attr)) {
+    if (llvm::isa<EncodingAttr, MatmulKAttr, LayoutAttr, TestingAttr,
+                  UnknownAttr>(attr)) {
       os << "encoding";
       return AliasResult::OverridableAlias;
     }

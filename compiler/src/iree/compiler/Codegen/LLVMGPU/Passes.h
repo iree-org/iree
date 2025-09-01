@@ -28,16 +28,6 @@ using IREE::GPU::GPUPipelineOptions;
 // LLVMGPU Backend Pass Pipelines
 //----------------------------------------------------------------------------//
 
-/// Lowering using mma.sync Tensor Core operations.
-void addGPUMatmulTensorCoreMmaSyncPassPipeline(
-    OpPassManager &funcPassManager, const GPUPipelineOptions &options,
-    unsigned pipelineDepth);
-
-/// Lowering using wmma Tensor Core operations.
-void addGPUMatmulTensorCorePassPipeline(OpPassManager &funcPassManager,
-                                        const GPUPipelineOptions &options,
-                                        unsigned pipelineDepth);
-
 /// Simple lowering only distributute linalg ops on blocks and threads. This
 /// will result in scalar operations. Expects pass manager to be a
 /// module-level pass manager.
@@ -46,7 +36,8 @@ void addGPUSimpleDistributePassPipeline(OpPassManager &funcPassManager);
 /// Lowering config driven pipeline that uses greedy tile + fuse to distribute
 /// to threads.
 void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
-                                   const GPUPipelineOptions &pipelineOptions);
+                                   const GPUPipelineOptions &pipelineOptions,
+                                   bool forROCDL);
 
 /// Transform dialect-based path.
 void addGPUTransformDialectPasses(OpPassManager &funcPassManager,
@@ -66,7 +57,8 @@ void addGPUWinogradVectorizePassPipeline(OpPassManager &funcPassManager);
 
 /// Lowering based on vector distribution patterns.
 void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
-                                        const GPUPipelineOptions &options);
+                                        const GPUPipelineOptions &options,
+                                        bool forROCDL);
 
 /// Lowering reductions to warp reductions.
 void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager,
@@ -79,6 +71,11 @@ void addGPUDefaultPassPipeline(OpPassManager &funcPassManager,
 /// Pass pipeline to lower IREE HAL executables without tiling and distribution.
 void addGPUBaseLoweringPassPipeline(OpPassManager &pm);
 
+/// Populates the common passes needed to preprocess and select the translation
+/// strategy.
+void buildLLVMGPUCodegenCommonConfigurationPassPipeline(
+    OpPassManager &variantPassManagery);
+
 /// Populates passes needed to preprocess and select the translation strategy.
 void buildLLVMGPUCodegenConfigurationPassPipeline(
     OpPassManager &variantPassManagery);
@@ -88,17 +85,10 @@ void buildLLVMGPUCodegenConfigurationPassPipeline(
 /// the module within the IREE::HAL::ExecutableOp.
 void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManagery,
                                      bool useROCM);
-LogicalResult
-verifyGPUMatmulPipeline(Operation *op,
-                        IREE::GPU::LoweringConfigAttr loweringConfig,
-                        IREE::Codegen::TranslationInfoAttr translationInfo);
 
-/// Lowering calling vectorization patterns.
-LogicalResult
-verifyGPUMatmulPipeline(Operation *op,
-                        IREE::Codegen::LoweringConfigAttr loweringConfig,
-                        IREE::Codegen::TranslationInfoAttr translationInfo,
-                        ArrayRef<int64_t> workgroupSize);
+/// Verify configuration set for the LLVMGPUVectorDistribute pass pipeline.
+LogicalResult verifyLLVMGPUVectorDistributePipeline(
+    Operation *op, IREE::GPU::LoweringConfigAttr loweringConfig);
 
 //----------------------------------------------------------------------------//
 // LLVMGPU Linking Passes and Pipelines

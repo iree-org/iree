@@ -50,7 +50,6 @@ using llvm::dbgs;
 #define DEBUG_VECTOR_TO_MMA "transform-llvmgpu-extensions-vector-to-mma"
 
 #define DBGS() (dbgs() << '[' << DEBUG_TYPE << "] ")
-#define LDBG(X) LLVM_DEBUG(dbgs() << '[' << DEBUG_TYPE << "] " << X)
 #define DBGS_ALIAS() (dbgs() << '[' << DEBUG_TYPE_ALIAS << "] ")
 #define DBGS_VECTOR_TO_MMA() (dbgs() << '[' << DEBUG_VECTOR_TO_MMA << "] ")
 
@@ -393,23 +392,6 @@ static OpOperand *getWarpResult(gpu::WarpExecuteOnLane0Op warpOp,
 }
 
 namespace {
-/// Pattern to convert InsertElement to broadcast, this is a workaround
-/// until MultiDimReduction distribution is supported.
-class InsertElementToBroadcast final
-    : public OpRewritePattern<vector::InsertElementOp> {
-public:
-  using OpRewritePattern<vector::InsertElementOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(vector::InsertElementOp insertOp,
-                                PatternRewriter &rewriter) const override {
-    if (insertOp.getDestVectorType().getNumElements() != 1)
-      return failure();
-    rewriter.replaceOpWithNewOp<vector::BroadcastOp>(
-        insertOp, insertOp.getDestVectorType(), insertOp.getSource());
-    return success();
-  }
-};
-
 /// Sink out load op feeding into a warp op yield.
 /// ```
 /// %0 = vector.warp_execute_on_lane_0(%arg0) -> (f32) {
@@ -428,7 +410,7 @@ public:
 /// gpu.synchronize
 /// %0 = memref.load %src[%c0] : memref<1024xf32>
 struct WarpOpLoad : public OpRewritePattern<gpu::WarpExecuteOnLane0Op> {
-  using OpRewritePattern<gpu::WarpExecuteOnLane0Op>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(gpu::WarpExecuteOnLane0Op warpOp,
                                 PatternRewriter &rewriter) const override {
     OpOperand *operand = getWarpResult(warpOp, llvm::IsaPred<memref::LoadOp>);
@@ -472,7 +454,7 @@ struct WarpOpLoad : public OpRewritePattern<gpu::WarpExecuteOnLane0Op> {
 /// really have the semantic of global variables. Therefore hoisting them is
 /// always correct for static allocations.
 struct HoistSharedMemoryAlloc : public OpRewritePattern<memref::AllocOp> {
-  using OpRewritePattern<memref::AllocOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(memref::AllocOp alloc,
                                 PatternRewriter &rewriter) const override {
     if (!iree_compiler::hasSharedMemoryAddressSpace(alloc.getType()))
@@ -500,7 +482,6 @@ static void populateMultiReductionLoweringPatterns(Operation *target,
 
   vector::populateVectorMultiReductionLoweringPatterns(
       patterns, vector::VectorMultiReductionLowering::InnerReduction, benefit);
-  patterns.add<InsertElementToBroadcast>(target->getContext(), benefit);
 }
 
 static AffineMap simpleDistributionFunction(Value val) {
@@ -1366,7 +1347,7 @@ namespace {
 /// Polygeist.
 class BarrierElimination final : public OpRewritePattern<gpu::BarrierOp> {
 public:
-  using OpRewritePattern<gpu::BarrierOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(gpu::BarrierOp barrier,
                                 PatternRewriter &rewriter) const override {
@@ -1457,16 +1438,6 @@ transform_dialect::PrefetchSharedMemoryCopiesOp::applyToOne(
   results.push_back(pipelinedFor.value());
   return DiagnosedSilenceableFailure::success();
 }
-
-class TransformVectorLayoutOptions : public VectorLayoutOptions {
-public:
-  TransformVectorLayoutOptions(Operation *root, bool fullConversion)
-      : VectorLayoutOptions(root, fullConversion) {}
-
-  VectorLayoutInterface getDefaultLayout(VectorType type) const override {
-    return VectorLayoutInterface();
-  }
-};
 
 DiagnosedSilenceableFailure
 transform_dialect::AMDGPUDistributeVectorsOp::applyToOne(

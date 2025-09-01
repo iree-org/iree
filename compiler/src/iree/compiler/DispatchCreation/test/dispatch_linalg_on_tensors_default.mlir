@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions, iree-dispatch-creation-clone-producers-into-dispatch-regions,iree-dispatch-creation-convert-dispatch-regions-to-workgroups), cse, iree-flow-canonicalize, cse)" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions, iree-dispatch-creation-clone-producers-into-dispatch-regions,iree-dispatch-creation-convert-dispatch-regions-to-workgroups), cse, iree-flow-canonicalize, cse)" %s | FileCheck %s
 
 util.func public @no_fuse_quantized(%arg0 : tensor<?x113x113x64xi8>, %arg1 : tensor<3x3x64xi8>,
     %arg2 : i32, %arg3 : i32) -> tensor<?x56x56x64xi8> {
@@ -32,7 +32,7 @@ util.func public @no_fuse_quantized(%arg0 : tensor<?x113x113x64xi8>, %arg1 : ten
 
 #map = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
-#encoding = #iree_encoding.testing_encoding<>
+#encoding = #iree_encoding.testing<>
 util.func public @elem_set_encoding(%arg0: tensor<512xf32>, %arg1: tensor<384x512xf32>,
     %arg2: tensor<384x512xf32>) -> tensor<384x512xf32, #encoding> {
   %0 = tensor.empty() : tensor<384x512xf32>
@@ -113,7 +113,7 @@ util.func @mixed_conv(%arg0 : tensor<2x130x130x16xf16>, %arg1 : tensor<3x3x16x32
   util.return %truncf : tensor<2x128x128x320xf16>
 }
 // CHECK-LABEL: func public @mixed_conv(
-//       CHECK:   flow.dispatch.workgroups
+//       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.workgroups
 //       CHECK:     %[[FILL:.+]] = linalg.fill
 //       CHECK:     %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
 //  CHECK-SAME:         outs(%[[FILL]] :

@@ -7,8 +7,8 @@
   #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = shuffle|arithmetic, dot = none, mma = [],
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = shuffle|arithmetic,
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -42,7 +42,6 @@ func.func @warp_reduction_dispatch_0() attributes {hal.executable.target = #exec
 //     CHECK-DAG:    %[[C32I:.+]] = arith.constant 32 : index
 //     CHECK-DAG:    %[[C512:.+]] = arith.constant 512 : index
 //     CHECK-DAG:    %[[C10240:.+]] = arith.constant 10240 : index
-//     CHECK-DAG:    %[[IDENTITY:.+]] = arith.constant 0.000000e+00 : f32
 //     CHECK-DAG:    %[[CF:.+]] = arith.constant 1.000000e+00 : f32
 //     CHECK-DAG:    %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<4xf32>
 //     CHECK-DAG:    %[[TID:.+]] = gpu.thread_id  x
@@ -69,7 +68,7 @@ func.func @warp_reduction_dispatch_0() attributes {hal.executable.target = #exec
 //         CHECK:    %[[R8:.+]] = arith.addf %[[R7]], %[[S6]] : f32
 //         CHECK:    %[[S7:.+]], %{{.*}} = gpu.shuffle  idx %[[R8]], %[[C0I]], %[[C32]] : f32
 //         CHECK:    %[[R12:.+]] = arith.addf %[[S7]], %[[CF]] : f32
-//         CHECK:    %[[R13:.+]] = vector.splat %[[R12]] : vector<1xf32>
+//         CHECK:    %[[R13:.+]] = vector.broadcast %[[R12]] : f32 to vector<1xf32>
 //         CHECK:    %[[TID0:.+]] = arith.cmpi eq, %[[TID]], %[[C0]] : index
 //         CHECK:    scf.if %[[TID0]] {
 //         CHECK:      vector.transfer_write %[[R13]], %{{.*}}[%{{.*}}] {in_bounds = [true]} : vector<1xf32>, memref<512xf32, #hal.descriptor_type<storage_buffer>>
@@ -82,8 +81,8 @@ func.func @warp_reduction_dispatch_0() attributes {hal.executable.target = #exec
   #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = shuffle|arithmetic, dot = none, mma = [],
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = shuffle|arithmetic,
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -126,6 +125,7 @@ func.func @warp_reduction_dispatch_1() attributes {hal.executable.target = #exec
 //     CHECK-DAG:    %[[C1024:.+]] = arith.constant 1024 : index
 //     CHECK-DAG:    %[[C9216:.+]] = arith.constant 9216 : index
 
+//     CHECK-DAG:    %[[PV:.+]] = ub.poison : f16
 //     CHECK-DAG:    %[[F0:.+]] = arith.constant 0.000000e+00 : f16
 
 //     CHECK-DAG:    %[[WGIDX:.+]] = hal.interface.workgroup.id[0] upper_bound 65535 : index
@@ -144,15 +144,15 @@ func.func @warp_reduction_dispatch_1() attributes {hal.executable.target = #exec
 //         CHECK:    %[[TRUNC:.+]] = arith.trunci %{{.+}} : i32 to i16
 //         CHECK:    %[[BCAST:.+]] = arith.bitcast %[[TRUNC]] : i16 to f16
 //         CHECK:    %[[ADD1:.+]] = arith.addf %[[BCAST]], %[[F0]] : f16
-//         CHECK:    %[[SPLAT:.+]] = vector.splat %[[ADD1]] : vector<4xf16>
+//         CHECK:    %[[BROADCAST:.+]] = vector.broadcast %[[ADD1]] : f16 to vector<4xf16>
 //         CHECK:    scf.for %[[IV:.+]] = %[[C0]] to %[[C9216]] step %[[C1024]] {
 //         CHECK:      %[[OFFSET:.+]] = affine.apply {{.*}}(%[[IV]])[%[[TIDX]]]
-//         CHECK:      %[[READ:.+]] = vector.transfer_read %[[SPAN0]][%[[WGIDY]], %[[WGIDX]], %[[OFFSET]]], %[[F0]] {in_bounds = [true]} : memref<10x9216x9216xf16{{.*}}>, vector<8xf16>
+//         CHECK:      %[[READ:.+]] = vector.transfer_read %[[SPAN0]][%[[WGIDY]], %[[WGIDX]], %[[OFFSET]]], %[[PV]] {in_bounds = [true]} : memref<10x9216x9216xf16{{.*}}>, vector<8xf16>
 //         CHECK:      %[[SLICE0:.+]] = vector.extract_strided_slice %[[READ]] {offsets = [0], sizes = [4], strides = [1]}
-//         CHECK:      %[[DIV0:.+]] = arith.divf %[[SLICE0]], %[[SPLAT]] : vector<4xf16>
+//         CHECK:      %[[DIV0:.+]] = arith.divf %[[SLICE0]], %[[BROADCAST]] : vector<4xf16>
 //         CHECK:      %[[SLICE1:.+]] = vector.insert_strided_slice %[[DIV0]], %cst {offsets = [0], strides = [1]}
 //         CHECK:      %[[SLICE2:.+]] = vector.extract_strided_slice %[[READ]] {offsets = [4], sizes = [4], strides = [1]}
-//         CHECK:      %[[DIV1:.+]] = arith.divf %[[SLICE2]], %[[SPLAT]] : vector<4xf16>
+//         CHECK:      %[[DIV1:.+]] = arith.divf %[[SLICE2]], %[[BROADCAST]] : vector<4xf16>
 //         CHECK:      %[[SLICE3:.+]] = vector.insert_strided_slice %[[DIV1]], %[[SLICE1]] {offsets = [4], strides = [1]}
 //         CHECK:      vector.transfer_write %[[SLICE3]], %[[SPAN1]][%[[WGIDY]], %[[WGIDX]], %{{.*}}] {in_bounds = [true]} : vector<8xf16>, memref<10x9216x9216xf16{{.*}}>
 //         CHECK:    }
@@ -164,8 +164,8 @@ func.func @warp_reduction_dispatch_1() attributes {hal.executable.target = #exec
   #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = shuffle|arithmetic, dot = none, mma = [],
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = shuffle|arithmetic,
     subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 64],
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -210,7 +210,7 @@ func.func @softmax() attributes {hal.executable.target = #executable_target_vulk
 //         CHECK:    arith.maxnumf
 //         CHECK:    gpu.shuffle  xor
 //         CHECK:    arith.maxnumf
-//         CHECK:    vector.splat %{{.*}} : vector<4xf32>
+//         CHECK:    vector.broadcast %{{.*}} : f32 to vector<4xf32>
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
 //         CHECK:      vector.transfer_read
 //         CHECK:      arith.subf
@@ -236,8 +236,8 @@ func.func @softmax() attributes {hal.executable.target = #executable_target_vulk
 //         CHECK:    gpu.shuffle  xor
 //         CHECK:    arith.addf
 //         CHECK:    arith.addf
-//         CHECK:    vector.splat
-//         CHECK:    vector.splat
+//         CHECK:    vector.broadcast
+//         CHECK:    vector.broadcast
 //         CHECK:    scf.for
 //         CHECK:      vector.transfer_read
 //         CHECK:      arith.subf
@@ -254,8 +254,8 @@ func.func @softmax() attributes {hal.executable.target = #executable_target_vulk
   #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|fp16|int32, storage = b32|b16, subgroup = shuffle|arithmetic, dot = none, mma = [],
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|fp16|int32, storage = b32|b16, subgroup = shuffle|arithmetic,
     subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -284,7 +284,7 @@ func.func @dynamic_softmax() attributes {hal.executable.target = #executable_tar
 // CHECK-DAG:     %[[MIN_F16:.+]] = arith.constant dense<0xFE00> : vector<1xf16>
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:     %[[C64:.+]] = arith.constant 64 : index
-// CHECK-DAG:     %[[C0_F16:.+]] = arith.constant 0.000000e+00 : f16
+// CHECK-DAG:     %[[PV:.+]] = ub.poison : f16
 
 // CHECK:         %[[DIM_LBITS:.+]] = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
 // CHECK:         %[[DIM_UBITS:.+]] = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
@@ -298,16 +298,16 @@ func.func @dynamic_softmax() attributes {hal.executable.target = #executable_tar
 // CHECK:         vector.transfer_write %[[MIN_F16]], %{{.*}} : vector<1xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>
 // CHECK:         scf.for {{.*}} %[[C0]] to %[[DYNAMIC_SIZE]] step %[[C64]]
 // CHECK:           %[[MASK:.+]] = vector.create_mask %{{.*}} : vector<1xi1>
-// CHECK-DAG:       %[[ACC:.+]] = vector.transfer_read %{{.*}}, %[[C0_F16]], %[[MASK]] {{.*}} : memref<1x64xf16, #gpu.address_space<workgroup>>, vector<1xf16>
-// CHECK-DAG:       %[[NEW:.+]] = vector.transfer_read %{{.*}}, %[[C0_F16]], %[[MASK]] {{.*}} : memref<32x?xf16, #hal.descriptor_type<storage_buffer>>, vector<1xf16>
+// CHECK-DAG:       %[[ACC:.+]] = vector.transfer_read %{{.*}}, %[[PV]], %[[MASK]] {{.*}} : memref<1x64xf16, #gpu.address_space<workgroup>>, vector<1xf16>
+// CHECK-DAG:       %[[NEW:.+]] = vector.transfer_read %{{.*}}, %[[PV]], %[[MASK]] {{.*}} : memref<32x?xf16, #hal.descriptor_type<storage_buffer>>, vector<1xf16>
 // CHECK:           %[[MAX:.+]] = arith.maxnumf %[[NEW]], %[[ACC]] : vector<1xf16>
 // CHECK:           vector.transfer_write %[[MAX]], %{{.*}}, %[[MASK]] {{.*}} : vector<1xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>
 // CHECK:           gpu.barrier
 
 // Finish the first reduction.
 // CHECK:         vector.transfer_read {{.*}} : memref<1x64xf16, #gpu.address_space<workgroup>>, vector<1xf16>
-// CHECK:         vector.extract {{.*}} : f16 from vector<1xf16>
-// CHECK:         gpu.subgroup_reduce  maxnumf %10 : (f16) -> f16
+// CHECK:         %[[V11:.*]] = vector.extract {{.*}} : f16 from vector<1xf16>
+// CHECK:         gpu.subgroup_reduce  maxnumf %[[V11]] : (f16) -> f16
 
 // Do the elementwise scaling and second local reduction.
 // CHECK:         vector.transfer_write %[[ADD_PAD]], %{{.*}} : vector<1xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>
@@ -327,8 +327,8 @@ func.func @dynamic_softmax() attributes {hal.executable.target = #executable_tar
 // CHECK:         gpu.subgroup_reduce  add {{.*}} : (f16) -> f16
 // CHECK:         arith.addf {{.*}} : f16
 // CHECK:         gpu.subgroup_reduce  maxnumf {{.*}} : (f16) -> f16
-// CHECK:         vector.splat {{.*}} : vector<1xf16>
-// CHECK:         vector.splat {{.*}} : vector<1xf16>
+// CHECK:         vector.broadcast {{.*}} : f16 to vector<1xf16>
+// CHECK:         vector.broadcast {{.*}} : f16 to vector<1xf16>
 
 // Store the result back to global memory in a loop, recomputing the
 // elementwise part.

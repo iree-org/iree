@@ -19,10 +19,10 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/LogicalResult.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -154,11 +154,38 @@ static FailureOr<Operation *> lowerGenericOpWithEncoding(
     RewriterBase &rewriter, linalg::GenericOp genericOp,
     ValueRange convertedInputOperands, ValueRange convertedOutputOperands,
     const MaterializeEncodingTypeConverter &typeConverter) {
+  if (genericOp.getNumResults() == 0) {
+    return rewriter.notifyMatchFailure(genericOp,
+                                       "Must have at least 1 result");
+  }
   OpOperand *outputOperand = genericOp.getDpsInitOperand(0);
   AffineMap outputMap = genericOp.getMatchingIndexingMap(outputOperand);
+  for (OpOperand &initOperand : genericOp.getDpsInitsMutable()) {
+    if (genericOp.getMatchingIndexingMap(&initOperand) != outputMap) {
+      return rewriter.notifyMatchFailure(genericOp,
+                                         "Output maps are not all equivalent");
+    }
+  }
+  // The pattern expects a generic op with an identity map for all outputs. If
+  // this is not the case, then interchange the generic op before converting.
   if (!outputMap.isIdentity()) {
-    return rewriter.notifyMatchFailure(genericOp,
-                                       "Output indexing map is not identity");
+    if (!outputMap.isPermutation()) {
+      return rewriter.notifyMatchFailure(genericOp,
+                                         "Output map is not a permutation");
+    }
+    SmallVector<unsigned int> interchange = llvm::map_to_vector(
+        outputMap.getResults(), [](AffineExpr expr) -> unsigned int {
+          return cast<AffineDimExpr>(expr).getPosition();
+        });
+    FailureOr<linalg::GenericOp> interchangedGenericOp =
+        linalg::interchangeGenericOp(rewriter, genericOp, interchange);
+    if (failed(interchangedGenericOp)) {
+      return rewriter.notifyMatchFailure(genericOp,
+                                         "Failed to interchange indexing maps");
+    }
+    genericOp = interchangedGenericOp.value();
+    outputOperand = genericOp.getDpsInitOperand(0);
+    outputMap = genericOp.getMatchingIndexingMap(outputOperand);
   }
   // Step 1: Retrieve the output encoding materialization information and
   // compute the new indexing maps for the packed and potentially swizzled
@@ -241,6 +268,16 @@ static FailureOr<Operation *> lowerGenericOpWithEncoding(
 
   SmallVector<AffineMap> packedIndexingMaps;
   for (OpOperand *inputOperand : genericOp.getDpsInputOperands()) {
+    AffineMap inputMap = genericOp.getMatchingIndexingMap(inputOperand);
+    // Special case for 0D inputs. They will resolve to identity layout, so
+    // skip the logic to compute the packed indexing map.
+    if (inputMap.getNumResults() == 0) {
+      auto packedInputMap = AffineMap::get(
+          /*dimCount=*/iteratorTypes.size(), /*symbolCount=*/0, {},
+          rewriter.getContext());
+      packedIndexingMaps.push_back(packedInputMap);
+      continue;
+    }
     // Step 2: Retrieve the encoding for every input operand and perform the
     // outer dimension permutation, inner dimension expansion and permutation,
     // swizzle expansion and swizzle permutation.
@@ -282,7 +319,6 @@ static FailureOr<Operation *> lowerGenericOpWithEncoding(
     }
     ArrayRef<int64_t> innerDimsPos = materializeEncodingInfo.innerDimsPos;
     ArrayRef<int64_t> outerDimsPerm = materializeEncodingInfo.outerDimsPerm;
-    AffineMap inputMap = genericOp.getMatchingIndexingMap(inputOperand);
     // Permute result dims to the input packed domain, and map dims to the
     // output packed domain.
     SmallVector<int64_t> packedResultDims = llvm::map_to_vector(
@@ -370,10 +406,17 @@ static FailureOr<Operation *> lowerGenericOpWithEncoding(
     packedIndexingMaps.push_back(packedInputMap);
   }
   // Create the new packed identity map for the output.
-  packedIndexingMaps.push_back(
+  packedIndexingMaps.append(
+      genericOp.getNumDpsInits(),
       rewriter.getMultiDimIdentityMap(convertedResultType.getRank()));
+  SmallVector<Type> convertedResultTypes =
+      llvm::map_to_vector(genericOp.getResultTypes(), [&](Type t) -> Type {
+        return RankedTensorType::get(
+            convertedResultType.getShape(),
+            cast<RankedTensorType>(t).getElementType());
+      });
   auto materializedGenericOp = rewriter.create<linalg::GenericOp>(
-      genericOp.getLoc(), convertedResultType, convertedInputOperands,
+      genericOp.getLoc(), convertedResultTypes, convertedInputOperands,
       convertedOutputOperands, packedIndexingMaps, iteratorTypes,
       /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(genericOp));
   rewriter.inlineRegionBefore(genericOp.getRegion(),
@@ -399,9 +442,6 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
   }
   if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops()) {
     return rewriter.notifyMatchFailure(linalgOp, "Loops are not all parallel");
-  }
-  if (linalgOp.getNumDpsInits() != 1) {
-    return rewriter.notifyMatchFailure(linalgOp, "Not only 1 init operand");
   }
 
   return TypeSwitch<Operation *, FailureOr<Operation *>>(linalgOp)
@@ -628,14 +668,7 @@ struct MaterializeOperation : public OpConversionPattern<OpTy> {
     if (failed(convertedOp))
       return failure();
 
-    SmallVector<Value> replacements;
-    for (auto [type, res] : llvm::zip_equal(
-             op->getResultTypes(), convertedOp.value()->getResults())) {
-      Type targetType = this->getTypeConverter()->convertType(type);
-      replacements.push_back(
-          rewriter.createOrFold<tensor::CastOp>(op.getLoc(), targetType, res));
-    }
-    rewriter.replaceOp(op, replacements);
+    rewriter.replaceOp(op, convertedOp.value());
     return success();
   }
 };
@@ -687,16 +720,16 @@ struct SetEncodingOpLoweringConversion
   LogicalResult
   matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    if (encodingOp.getSource().getType().getRank() == 0) {
+      rewriter.replaceOp(encodingOp, adaptor.getSource());
+      return success();
+    }
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         getTypeConverter());
     auto packedValue = lowerSetEncodingOpToPackOp(
         rewriter, encodingOp, adaptor.getSource(), *converter);
     if (failed(packedValue)) {
-      Type targetType =
-          getTypeConverter()->convertType(encodingOp.getResultType());
-      Value result = rewriter.createOrFold<tensor::CastOp>(
-          encodingOp.getLoc(), targetType, adaptor.getSource());
-      rewriter.replaceOp(encodingOp, result);
+      rewriter.replaceOp(encodingOp, adaptor.getSource());
       return success();
     }
 
@@ -759,11 +792,7 @@ struct UnsetEncodingOpLoweringConversion
     MaterializeEncodingInfo encodingInfo =
         converter->getEncodingInfo(unsetEncodingOp.getSource().getType());
     if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
-      Type targetType =
-          getTypeConverter()->convertType(unsetEncodingOp.getSourceType());
-      Value result = rewriter.createOrFold<tensor::CastOp>(
-          unsetEncodingOp.getLoc(), targetType, adaptor.getSource());
-      rewriter.replaceOp(unsetEncodingOp, result);
+      rewriter.replaceOp(unsetEncodingOp, adaptor.getSource());
       return success();
     }
 
@@ -806,11 +835,7 @@ struct UnsetEncodingOpLoweringConversion
     auto unpackedValue = lowerUnsetEncodingToUnpackOp(rewriter, unsetEncodingOp,
                                                       unpackSrc, *converter);
     if (failed(unpackedValue)) {
-      Type targetType =
-          getTypeConverter()->convertType(unsetEncodingOp.getResultType());
-      Value result = rewriter.createOrFold<tensor::CastOp>(loc, targetType,
-                                                           adaptor.getSource());
-      rewriter.replaceOp(unsetEncodingOp, result);
+      rewriter.replaceOp(unsetEncodingOp, adaptor.getSource());
       return success();
     }
     rewriter.replaceOp(unsetEncodingOp, unpackedValue.value());
@@ -852,6 +877,25 @@ public:
   }
 };
 
+static bool isRankedTensorTypeWithEncoding(Type type) {
+  auto rankedTensorType = dyn_cast<RankedTensorType>(type);
+  if (!rankedTensorType) {
+    return false;
+  }
+  return rankedTensorType.getEncoding() ? true : false;
+}
+
+struct MaterializeFuncReturnOp final
+    : public OpConversionPattern<func::ReturnOp> {
+  using OpConversionPattern<func::ReturnOp>::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(func::ReturnOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<func::ReturnOp>(op, adaptor.getOperands());
+    return success();
+  }
+};
+
 } // namespace
 
 void populateMaterializeEncodingPatterns(
@@ -887,6 +931,10 @@ void populateMaterializeEncodingPatterns(
           return true;
         return resultType == typeConverter.convertType(resultType);
       });
+  target.addDynamicallyLegalOp<func::ReturnOp>([](func::ReturnOp returnOp) {
+    return !llvm::any_of(returnOp.getOperandTypes(),
+                         isRankedTensorTypeWithEncoding);
+  });
 
   patterns.insert<MaterializeContractionOp, SetEncodingOpLoweringConversion,
                   UnsetEncodingOpLoweringConversion,
@@ -896,7 +944,8 @@ void populateMaterializeEncodingPatterns(
                   MaterializeOptimizationBarrierOp,
                   MaterializeTensorExtDispatchTensorLoadOp,
                   MaterializeTensorExtDispatchTensorStoreOp,
-                  MaterializeInterfaceBindingEncoding>(typeConverter, context);
+                  MaterializeInterfaceBindingEncoding, MaterializeFuncReturnOp>(
+      typeConverter, context);
 };
 
 } // namespace mlir::iree_compiler

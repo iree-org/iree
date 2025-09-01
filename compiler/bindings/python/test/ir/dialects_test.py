@@ -46,6 +46,7 @@ from iree.compiler.dialects import (
 
 # Smoke test for vector transforms
 from iree.compiler.dialects.transform import vector as vt
+from iree.compiler.dialects.transform import loop
 
 # Make sure that our dialects import.
 from iree.compiler.dialects import flow, hal, stream, vm, util, iree_codegen, iree_gpu
@@ -228,6 +229,17 @@ def mma_intrinsic_attr():
     assert mma_intrinsic_attr is not None
     assert str(mma_intrinsic_attr) == "#iree_gpu<mma_intrinsic MFMA_F32_32x32x8_F16>"
 
+    # Fragment: 0 = lrhs, 1 = rhs, 2 = acc.
+    fragment = 0
+    mma_single_subgroup_layout = iree_gpu.get_single_subgroup_layout(
+        attr=mma_intrinsic_attr, fragment=fragment
+    )
+    assert isinstance(mma_single_subgroup_layout, iree_gpu.GPUMMASingleSubgroupLayout)
+    assert mma_single_subgroup_layout.outer == [1, 1]
+    assert mma_single_subgroup_layout.thread == [32, 2]
+    assert mma_single_subgroup_layout.tstrides == [1, 32]
+    assert mma_single_subgroup_layout.element == [1, 4]
+
     raw_value = mma_intrinsic_attr.raw_value
     assert raw_value == iree_gpu.MMAIntrinsic.MFMA_F32_32x32x8_F16
     value = mma_intrinsic_attr.value
@@ -245,9 +257,11 @@ def mma_intrinsic_attr():
     assert c_type == f32
 
     vec_4xf16 = ir.VectorType.get((4,), f16)
-    a_vec_type, b_vec_type, _c_vec_type = mma_attr.abc_vector_types
+    vec_16xf32 = ir.VectorType.get((16,), f32)
+    a_vec_type, b_vec_type, c_vec_type = mma_attr.abc_vector_types
     assert a_vec_type == vec_4xf16
     assert b_vec_type == vec_4xf16
+    assert c_vec_type == vec_16xf32
 
     M, N, K = mma_attr.mnk_shape
     assert M == 32
@@ -255,6 +269,74 @@ def mma_intrinsic_attr():
     assert K == 8
 
     assert mma_intrinsic_attr.mma == mma_attr
+
+    virtual_mma_intrinsics = mma_attr.get_virtual_intrinsics()
+    assert isinstance(virtual_mma_intrinsics[0], iree_gpu.VirtualMMAIntrinsic)
+    assert (
+        virtual_mma_intrinsics[0] == iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_32x32x16_F16
+    )
+
+    mma_attr = iree_gpu.MMAAttr.get(iree_gpu.MMAIntrinsic.MFMA_F32_16x16x4_F32)
+    virtual_mma_intrinsics = mma_attr.get_virtual_intrinsics()
+    assert virtual_mma_intrinsics == []
+
+
+@run
+def virtual_mma_intrinsic_attr():
+    virtual_mma_intrinsic_attr = iree_gpu.VirtualMMAIntrinsicAttr.get(
+        iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_16x16x32_F16
+    )
+    assert virtual_mma_intrinsic_attr is not None
+    assert (
+        str(virtual_mma_intrinsic_attr)
+        == "#iree_gpu<virtual_mma_intrinsic VMFMA_F32_16x16x32_F16>"
+    )
+
+    # Fragment: 0 = lhs, 1 = rhs, 2 = acc.
+    fragment = 0
+    virtual_mma_single_subgroup_layout = iree_gpu.get_single_subgroup_layout(
+        virtual_mma_intrinsic_attr, fragment
+    )
+    assert isinstance(
+        virtual_mma_single_subgroup_layout, iree_gpu.GPUMMASingleSubgroupLayout
+    )
+    assert virtual_mma_single_subgroup_layout.outer == [1, 1]
+    assert virtual_mma_single_subgroup_layout.thread == [16, 4]
+    assert virtual_mma_single_subgroup_layout.tstrides == [
+        1,
+        16,
+    ]
+    assert virtual_mma_single_subgroup_layout.element == [1, 8]
+
+    raw_value = virtual_mma_intrinsic_attr.raw_value
+    assert raw_value == iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_16x16x32_F16
+    value = virtual_mma_intrinsic_attr.value
+    assert str(value) == "VMFMA_F32_16x16x32_F16"
+    assert int(value) == raw_value
+
+    virtual_mma_attr = iree_gpu.VirtualMMAAttr.get(raw_value)
+    assert virtual_mma_attr is not None
+
+    f16 = ir.F16Type.get()
+    f32 = ir.F32Type.get()
+    a_type, b_type, c_type = virtual_mma_attr.abc_element_types
+    assert a_type == f16
+    assert b_type == f16
+    assert c_type == f32
+
+    vec_4xf32 = ir.VectorType.get((4,), f32)
+    vec_8xf16 = ir.VectorType.get((8,), f16)
+    a_vec_type, b_vec_type, c_vec_type = virtual_mma_attr.abc_vector_types
+    assert a_vec_type == vec_8xf16
+    assert b_vec_type == vec_8xf16
+    assert c_vec_type == vec_4xf32
+
+    M, N, K = virtual_mma_attr.mnk_shape
+    assert M == 16
+    assert N == 16
+    assert K == 32
+
+    assert virtual_mma_intrinsic_attr.mma == virtual_mma_attr
 
 
 @run
@@ -309,3 +391,68 @@ def compilation_info():
     assert compilation_info is not None
     assert compilation_info.lowering_config == lowering_config
     assert compilation_info.translation_info == translation_info
+
+
+@run
+def gpu_target_info_attribute_parsing():
+    mlir_string = """
+    hal.executable private @main_dispatch_0 {
+        hal.executable.variant public @rocm_hsaco_fb
+            target(<"rocm", "rocm-hsaco-fb",
+                {
+                abi = "hip",
+                iree_codegen.target_info = #iree_gpu.target<
+                    arch = "gfx942",
+                    features = "",
+                    wgp = <
+                    compute = fp64,
+                    storage = b64,
+                    subgroup = none,
+                    dot = none,
+                    mma = [<MFMA_F32_16x16x4_F32>],
+                    subgroup_size_choices = [32, 64],
+                    max_workgroup_sizes = [256, 512, 1024],
+                    max_thread_count_per_workgroup = 1024,
+                    max_workgroup_memory_bytes = 65536,
+                    max_workgroup_counts = [256, 512, 1024]
+                    >
+                >
+                }>
+            ) {
+        }
+    }
+    """
+
+    module = ir.Module.parse(mlir_string)
+    variant_op_list = iree_codegen.get_executable_variant_ops(module)
+    assert len(variant_op_list) == 1, "Expect one executable variant op"
+    variant_op = variant_op_list[0]
+    executable_variant_op = variant_op.opview
+    target = executable_variant_op.target
+    gpu_target_info = iree_gpu.get_gpu_target_info(target)
+
+    arch = gpu_target_info.arch
+    assert arch == "gfx942", f"Expected arch 'gfx942', got '{arch}'"
+
+    subgroup_size_choices = gpu_target_info.subgroup_size_choices
+    assert subgroup_size_choices == [
+        32,
+        64,
+    ], f"Expected subgroup_size_choice [32, 64], got {subgroup_size_choices}"
+
+    max_thread_count = gpu_target_info.max_thread_count_per_workgroup
+    assert (
+        max_thread_count == 1024
+    ), f"Expected max_thread_count_per_workgroup 1024, got {max_thread_count}"
+
+    max_memory_bytes = gpu_target_info.max_workgroup_memory_bytes
+    assert (
+        max_memory_bytes == 65536
+    ), f"Expected max_workgroup_memory_bytes 65536, got {max_memory_bytes}"
+
+    max_workgroup_sizes = gpu_target_info.max_workgroup_sizes
+    assert max_workgroup_sizes == [
+        256,
+        512,
+        1024,
+    ], f"Expected max_workgroup_sizes [256, 512, 1024], got {max_workgroup_sizes}"

@@ -19,7 +19,7 @@
 #include "llvm/ADT/STLForwardCompat.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
@@ -38,7 +38,6 @@
 
 #define DEBUG_TYPE "iree-gpu-attrs"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.cpp.inc"
 #define GET_ATTRDEF_CLASSES
@@ -451,6 +450,21 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
   return baseLayout;
 }
 
+MMASingleSubgroupLayout
+getSingleSubgroupLayout(VirtualMMAIntrinsic virtualIntrinsic,
+                        MMAFragment fragment, bool colMajor) {
+  MMASingleSubgroupLayout baseLayout =
+      getSingleSubgroupLayout(virtualIntrinsic, fragment);
+  assert(baseLayout.element.size() == 2 && "expected 2d layout");
+  if (colMajor) {
+    std::swap(baseLayout.element[0], baseLayout.element[1]);
+    std::swap(baseLayout.thread[0], baseLayout.thread[1]);
+    std::swap(baseLayout.outer[0], baseLayout.outer[1]);
+    std::swap(baseLayout.tstrides[0], baseLayout.tstrides[1]);
+  }
+  return baseLayout;
+}
+
 // Struct describing the shape of a MMA operation, but not the detailed layout.
 struct OpaqueMmaLayout {
   int64_t mSize = 0;
@@ -491,17 +505,20 @@ static OpaqueMmaLayout getOpaqueMMALayout(MLIRContext *context,
   return o;
 }
 
-MMASingleSubgroupLayout getSingleSubgroupLayout(MmaInterfaceAttr mmaKind,
-                                                MMAFragment fragment) {
+MMASingleSubgroupLayout
+getSingleSubgroupLayout(IREE::Codegen::InnerTileDescAttrInterface mmaKind,
+                        MMAFragment fragment) {
   if (auto mmaAttr = dyn_cast<MMAAttr>(mmaKind)) {
     // |colMajor| indicates that the accumulator layout should be returned
     // column major.
-    return getSingleSubgroupLayout(mmaAttr.getIntrinsic(), fragment,
-                                   fragment == MMAFragment::Acc &&
-                                       mmaAttr.getColMajor());
+    return IREE::GPU::getSingleSubgroupLayout(mmaAttr.getIntrinsic(), fragment,
+                                              fragment == MMAFragment::Acc &&
+                                                  mmaAttr.getColMajor());
   }
   if (auto vmmaAttr = dyn_cast<VirtualMMAAttr>(mmaKind)) {
-    return getSingleSubgroupLayout(vmmaAttr.getIntrinsic(), fragment);
+    return IREE::GPU::getSingleSubgroupLayout(vmmaAttr.getIntrinsic(), fragment,
+                                              fragment == MMAFragment::Acc &&
+                                                  vmmaAttr.getColMajor());
   }
   assert(false && "unhandled MMA Interface type.");
   return {};
@@ -552,6 +569,20 @@ void MMAAttr::getDistributedTileTypes(
   result.assign({getThreadVectorType(context, intrinsic, MMAFragment::Lhs),
                  getThreadVectorType(context, intrinsic, MMAFragment::Rhs),
                  getThreadVectorType(context, intrinsic, MMAFragment::Acc)});
+}
+
+std::optional<SmallVector<int64_t, 2>>
+MMAAttr::getUndistributedTileDimExpansion(int64_t operandIndex,
+                                          int64_t dim) const {
+  assert(operandIndex <= 2 && "invalid operand index");
+  assert(dim < 2 && "pre-expansion inner tiles all have two elements");
+  MMASingleSubgroupLayout layout =
+      getSingleSubgroupLayout(*this, static_cast<MMAFragment>(operandIndex));
+  if (layout.outer[dim] > 1) {
+    return SmallVector<int64_t, 2>{layout.outer[dim],
+                                   layout.element[dim] * layout.thread[dim]};
+  }
+  return std::nullopt;
 }
 
 int64_t MMAAttr::getBlockSize() const {
@@ -853,14 +884,25 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
   // Normally, that distinction is irrelevant here: we just delinearize the
   // thread-id over all cross-thread dimensions.
   //
-  // There is one case that makes things more complicated, encountered so far
-  // only on RDNA3. That is when some intrinsic has multiple (so far, 2) threads
-  // reading the same data. This redundancy is not encoded in the TileSwizzle
-  // structures that we are using here. Instead, in that case, the thread grid
-  // (as encoded in the TileSwizzle) is smaller than the subgroup size. In that
-  // case, there is an implied thread-distribution-only dimension along which
-  // multiple threads read exactly the same data.
-  // So we need to distinguish layoutThreadSizes vs. distributionThreadSizes.
+  // There are, however, two special cases that require inserting dummy
+  // dimensions into the delinearization index list, which are later
+  // removed when constructing tile offsets:
+  //
+  // 1. On RDNA3 only: some intrinsics use multiple threads (currently 2)
+  //    to read the same data. This redundancy is not represented in the
+  //    TileSwizzle structures we rely on. In these cases, the thread grid
+  //    encoded by TileSwizzle is *smaller* than the subgroup size, and an
+  //    implicit "distribution-only" dimension exists where multiple threads
+  //    map to identical data. To handle this, we distinguish between
+  //    layoutThreadSizes and distributionThreadSizes.
+  //
+  // 2. LHS delinearization when both subGroupsM and subGroupsN > 1.
+  //    Although subGroupsN is not part of the LHS swizzle, we must still
+  //    delinearize over the combined subGroupsM × subGroupsN space. By
+  //    contrast, RHS does *not* need special handling, since subGroupsM can be
+  //    treated as an implicit leading dimension and omitted anyway.
+
+  // Handle the RDNA3 special case.
   SmallVector<int64_t> layoutThreadSizes =
       sliceSwizzledShape(swizzle, [](TileSwizzle::Dim d) {
         return d.kind == TileSwizzle::Dim::Kind::CrossThread;
@@ -889,6 +931,17 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
         getSubgroupSize() / intrinsicLayoutThreadBound);
   }
 
+  // Handle the subgroupsM/N special case.
+  int64_t subgroupsM = getSubgroupsM();
+  int64_t subgroupsN = getSubgroupsN();
+  bool needsLhsSubgroupNDim = (fragment == IREE::GPU::MMAFragment::Lhs) &&
+                              subgroupsM > 1 && subgroupsN > 1;
+  const int lhsSubgroupNDimIdx = 1;
+  if (needsLhsSubgroupNDim) {
+    distributionThreadSizes.insert(
+        distributionThreadSizes.begin() + lhsSubgroupNDimIdx, subgroupsN);
+  }
+
   // Obtain the offsets from delinearization along the distributionThreadSizes.
   // Use a delinearize without outer bound and throw away its initial result
   // to get clamping behavior.
@@ -900,12 +953,15 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
           ->getResults()
           .drop_front();
 
+  // Erase the delinearized index that corresponds to the dummy
+  // dimension that we had inserted above. This is what causes multiple
+  // threads (which only differed in the index being discarded here) to read
+  // exactly the same data.
   if (hasDistributionOnlyDim) {
-    // Erase the delinearized index that corresponds to the extra distribution
-    // dimension that we had inserted above. This is what causes multiple
-    // threads (which only differed in the index being discarded here) to read
-    // exactly the same data.
     tileOffsets.erase(tileOffsets.begin() + distributionOnlyDimIdx);
+  }
+  if (needsLhsSubgroupNDim) {
+    tileOffsets.erase(tileOffsets.begin() + lhsSubgroupNDimIdx);
   }
 
   // Strides are trivial: each slice is contiguous along the *expanded* dims
@@ -961,7 +1017,7 @@ distributeMmaFragmentToIntrinsics(OpBuilder &builder, Location loc, Value value,
       sliceSwizzledShape(swizzle, [](TileSwizzle::Dim dim) {
         return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
       });
-  LDBG("crossIntrinsicShape: " << llvm::interleaved(crossIntrinsicShape));
+  LDBG() << "crossIntrinsicShape: " << llvm::interleaved(crossIntrinsicShape);
   int rank = internalShape.size();
   SmallVector<int64_t> indices(rank, 0);
   SmallVector<int64_t> strides(rank, 1);
@@ -993,20 +1049,20 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
 
   // Prepare Lhs/Rhs/Acc operand slices to feed the intrinsic.
   TileSwizzle lhsSwizzle = getSwizzle(*this, MMAFragment::Lhs);
-  LDBG("DataTiledMMAAttr::buildMmaOperation");
-  LDBG("    lhsSwizzle: " << lhsSwizzle);
+  LDBG() << "DataTiledMMAAttr::buildMmaOperation";
+  LDBG() << "    lhsSwizzle: " << lhsSwizzle;
   SmallVector<Value> intrinsicsLhs =
       distributeMmaFragmentToIntrinsics(builder, loc, inputs[0], lhsSwizzle);
 
   TileSwizzle rhsSwizzle = getSwizzle(*this, MMAFragment::Rhs);
-  LDBG("DataTiledMMAAttr::buildMmaOperation");
-  LDBG("    rhsSwizzle: " << rhsSwizzle);
+  LDBG() << "DataTiledMMAAttr::buildMmaOperation";
+  LDBG() << "    rhsSwizzle: " << rhsSwizzle;
   SmallVector<Value> intrinsicsRhs =
       distributeMmaFragmentToIntrinsics(builder, loc, inputs[1], rhsSwizzle);
 
   TileSwizzle accSwizzle = getSwizzle(*this, MMAFragment::Acc);
-  LDBG("DataTiledMMAAttr::buildMmaOperation");
-  LDBG("    accSwizzle: " << accSwizzle);
+  LDBG() << "DataTiledMMAAttr::buildMmaOperation";
+  LDBG() << "    accSwizzle: " << accSwizzle;
 
   SmallVector<Value> intrinsicsAcc =
       distributeMmaFragmentToIntrinsics(builder, loc, outputs[0], accSwizzle);
@@ -1037,8 +1093,9 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
         return dim.kind == TileSwizzle::Dim::Kind::Internal;
       });
 
-  LDBG("accCrossIntrinsicShape: " << llvm::interleaved(accCrossIntrinsicShape));
-  LDBG("accInternalShape: " << llvm::interleaved(accInternalShape));
+  LDBG() << "accCrossIntrinsicShape: "
+         << llvm::interleaved(accCrossIntrinsicShape);
+  LDBG() << "accInternalShape: " << llvm::interleaved(accInternalShape);
   int dstRank = accCrossIntrinsicShape.size();
   SmallVector<int64_t> strides(dstRank, 1);
   SmallVector<int64_t> indices(dstRank, 0);
@@ -1061,6 +1118,11 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
 //===----------------------------------------------------------------------===//
 // VirtualMMA Attributes
 //===----------------------------------------------------------------------===//
+
+VirtualMMAAttr VirtualMMAAttr::get(MLIRContext *context,
+                                   VirtualMMAIntrinsic type) {
+  return Base::get(context, type, /*colMajor=*/false);
+}
 
 static std::tuple<int64_t, int64_t, int64_t>
 getMNKShape(VirtualMMAIntrinsic type) {
@@ -1168,8 +1230,8 @@ LogicalResult VirtualMMAAttr::populateOperandOffsetsSizesStrides(
     SmallVectorImpl<OpFoldResult> &strides) const {
   assert(operandIndex <= 2 && "Must index valid MMA operand");
   auto fragment = static_cast<IREE::GPU::MMAFragment>(operandIndex);
-  MMASingleSubgroupLayout subgroupLayout =
-      getSingleSubgroupLayout(getIntrinsic(), fragment);
+  MMASingleSubgroupLayout subgroupLayout = getSingleSubgroupLayout(
+      getIntrinsic(), fragment, fragment == MMAFragment::Acc && getColMajor());
   SmallVector<OpFoldResult> canonicalOffsets;
   SmallVector<OpFoldResult> canonicalSizes;
   if (failed(populateCanonicalOffsetsSizesAndStrides(
@@ -1243,6 +1305,9 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
       Value sliced_rhs = builder.create<vector::ExtractStridedSliceOp>(
           loc, inputs[1], ArrayRef<int64_t>{offset},
           ArrayRef<int64_t>{vectorWidth}, ArrayRef<int64_t>{1});
+      if (getColMajor()) {
+        std::swap(sliced_lhs, sliced_rhs);
+      }
       acc = builder
                 .create<amdgpu::MFMAOp>(loc, outputs[0].getType(), m, n,
                                         nativeKSize, getBlockSize(), sliced_lhs,
@@ -1326,6 +1391,295 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
 }
 
 //===----------------------------------------------------------------------===//
+// ScaledMMA Attributes
+//===----------------------------------------------------------------------===//
+
+int64_t ScaledMMAAttr::getExpectedNumInputs() const { return 4; }
+
+int64_t ScaledMMAAttr::getExpectedNumOutputs() const { return 1; }
+
+MMASingleSubgroupLayout getSingleSubgroupLayout(ScaledMMAIntrinsic intrinsic,
+                                                int64_t operandIndex) {
+  const MMASingleSubgroupLayout mfmaAcc16x16 = {
+      /*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
+      /*element=*/{4, 1}};
+  const MMASingleSubgroupLayout mfmaAcc32x32 = {
+      /*outer=*/{4, 1}, /*thread=*/{2, 32}, /*tstrides=*/{32, 1},
+      /*element=*/{4, 1}};
+
+  switch (intrinsic) {
+  case ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32:
+    switch (operandIndex) {
+    case 0: // LHS
+      return {/*outer=*/{1, 1, 1}, /*thread=*/{16, 4, 1},
+              /*tstrides=*/{1, 16, 1},
+              /*element=*/{1, 1, 32}};
+    case 1: // LHS scales
+      return {/*outer=*/{1, 1}, /*thread=*/{16, 4}, /*tstrides=*/{1, 16},
+              /*element=*/{1, 1}};
+    case 2: // RHS
+      return {/*outer=*/{1, 1, 1}, /*thread=*/{4, 1, 16},
+              /*tstrides=*/{16, 1, 1},
+              /*element=*/{1, 32, 1}};
+    case 3: // RHS scale
+      return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
+              /*element=*/{1, 1}};
+    case 4: // acc
+      return mfmaAcc16x16;
+    }
+  case ScaledMMAIntrinsic::MFMA_SCALE_F32_32x32x64_B32:
+    switch (operandIndex) {
+    case 0: // LHS
+      return {/*outer=*/{1, 1, 1}, /*thread=*/{32, 2, 1},
+              /*tstrides=*/{1, 32, 1},
+              /*element=*/{1, 1, 32}};
+    case 1: // LHS scales
+      return {/*outer=*/{1, 1}, /*thread=*/{32, 2}, /*tstrides=*/{1, 32},
+              /*element=*/{1, 1}};
+    case 2: // RHS
+      return {/*outer=*/{1, 1, 1}, /*thread=*/{2, 1, 32},
+              /*tstrides=*/{32, 1, 1},
+              /*element=*/{1, 32, 1}};
+    case 3: // RHS scales
+      return {/*outer=*/{1, 1}, /*thread=*/{2, 32}, /*tstrides=*/{32, 1},
+              /*element=*/{1, 1}};
+    case 4: // Acc
+      return mfmaAcc32x32;
+    }
+  }
+  assert(false && "Unhandled scaled MMA intrinsic");
+  return {};
+}
+
+int64_t ScaledMMAAttr::getBlockSize() const {
+  switch (getIntrinsic()) {
+  case ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32:
+  case ScaledMMAIntrinsic::MFMA_SCALE_F32_32x32x64_B32:
+    return 32;
+  }
+  assert(false &&
+         "all cases should've been handled in ScaledMMA::getBlockSize()");
+  return 0;
+}
+
+MMASingleSubgroupLayout getSingleSubgroupLayout(ScaledMMAIntrinsic intrinsic,
+                                                int64_t operandIndex,
+                                                bool isAccColMajor) {
+  MMASingleSubgroupLayout baseLayout =
+      getSingleSubgroupLayout(intrinsic, operandIndex);
+  if (operandIndex == 4 && isAccColMajor) {
+    std::swap(baseLayout.outer[0], baseLayout.outer[1]);
+    std::swap(baseLayout.thread[0], baseLayout.thread[1]);
+    std::swap(baseLayout.tstrides[0], baseLayout.tstrides[1]);
+    std::swap(baseLayout.element[0], baseLayout.element[1]);
+  }
+  return baseLayout;
+}
+
+int64_t ScaledMMAAttr::getSubgroupSize() const {
+  switch (getIntrinsic()) {
+  case ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32:
+  case ScaledMMAIntrinsic::MFMA_SCALE_F32_32x32x64_B32:
+    return 64;
+  }
+  assert(false &&
+         "all cases should'vee been handled in ScaledMMA::getBlockSize()");
+  return 0;
+}
+
+SmallVector<Type> ScaledMMAAttr::getSupportedInputTypes(MLIRContext *ctx) {
+  return {Float8E8M0FNUType::get(ctx),  Float8E5M2Type::get(ctx),
+          Float8E5M2FNUZType::get(ctx), Float8E4M3FNType::get(ctx),
+          Float8E4M3FNUZType::get(ctx), Float4E2M1FNType::get(ctx)};
+}
+
+SmallVector<Type> ScaledMMAAttr::getSupportedOutputTypes(MLIRContext *ctx) {
+  return {Float32Type::get(ctx)};
+}
+
+LogicalResult
+ScaledMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
+  if (failed(verifyMmaIndexingMaps({maps[0], maps[2], maps[4]}))) {
+    return failure();
+  }
+
+  SmallVector<llvm::SmallDenseSet<AffineExpr, 4>> resExprs(
+      maps.size(), llvm::SmallDenseSet<AffineExpr, 4>());
+  for (auto [set, map] : llvm::zip_equal(resExprs, maps)) {
+    set.insert_range(map.getResults());
+  }
+  // Note: the below conditions are a best guess and may be too strict.
+
+  // Check LHS scales aren't using indexes that LHS isn't.
+  if (llvm::any_of(resExprs[1],
+                   [&](auto e) { return !resExprs[0].contains(e); })) {
+    return failure();
+  }
+  // Check RHS scales aren't using indexes that RHS isn't.
+  if (llvm::any_of(resExprs[3],
+                   [&](auto e) { return !resExprs[2].contains(e); })) {
+    return failure();
+  }
+  return success();
+}
+
+void ScaledMMAAttr::getUndistributedTileTypes(
+    SmallVectorImpl<VectorType> &results) const {
+  MMASingleSubgroupLayout lhsLayout =
+      getSingleSubgroupLayout(getIntrinsic(), 0);
+  MMASingleSubgroupLayout rhsLayout =
+      getSingleSubgroupLayout(getIntrinsic(), 2);
+
+  int64_t blockSize = getBlockSize();
+  int64_t m = lhsLayout.outer[0] * lhsLayout.thread[0] * lhsLayout.element[0];
+  int64_t kScale =
+      lhsLayout.outer[1] * lhsLayout.thread[1] * lhsLayout.element[1];
+  [[maybe_unused]] int64_t layoutBlockSize =
+      lhsLayout.outer[2] * lhsLayout.thread[2] * lhsLayout.element[2];
+  assert(blockSize == layoutBlockSize &&
+         "expected block size to be set up correctly");
+  int64_t n = rhsLayout.outer[2] * rhsLayout.thread[2] * rhsLayout.element[2];
+
+  Type lhsType = getLhsElemType();
+  Type rhsType = getRhsElemType();
+  Type accType = getAccElemType();
+  Type scaleType = Float8E8M0FNUType::get(getContext());
+
+  results.push_back(VectorType::get({m, kScale, blockSize}, lhsType));
+  results.push_back(VectorType::get({m, kScale}, scaleType));
+  results.push_back(VectorType::get({kScale, blockSize, n}, rhsType));
+  results.push_back(VectorType::get({kScale, n}, scaleType));
+  results.push_back(VectorType::get({m, n}, accType));
+}
+
+void ScaledMMAAttr::getDistributedTileTypes(
+    SmallVectorImpl<VectorType> &results) const {
+  Type lhsType = getLhsElemType();
+  Type rhsType = getRhsElemType();
+  Type accType = getAccElemType();
+  Type scaleType = Float8E8M0FNUType::get(getContext());
+
+  std::array<Type, 5> argTypes = {lhsType, scaleType, rhsType, scaleType,
+                                  accType};
+  for (auto [opIndex, type] : llvm::enumerate(argTypes)) {
+    MMASingleSubgroupLayout layout =
+        getSingleSubgroupLayout(getIntrinsic(), opIndex);
+    int64_t outer = ShapedType::getNumElements(layout.outer);
+    int64_t element = ShapedType::getNumElements(layout.element);
+    results.push_back(VectorType::get({outer * element}, type));
+  }
+}
+
+std::optional<SmallVector<int64_t, 2>>
+ScaledMMAAttr::getUndistributedTileDimExpansion(int64_t operandIndex,
+                                                int64_t dim) const {
+  assert(operandIndex <= 4 && "invalid operand index");
+  MMASingleSubgroupLayout layout =
+      getSingleSubgroupLayout(getIntrinsic(), operandIndex, getColMajor());
+  if (layout.outer[dim] > 1) {
+    return SmallVector<int64_t, 2>{layout.outer[dim],
+                                   layout.element[dim] * layout.thread[dim]};
+  }
+  return std::nullopt;
+}
+
+Attribute ScaledMMAAttr::getDistributionMappingKind() const {
+  return IREE::GPU::LaneIdAttr::get(getContext(), 0);
+}
+
+OpFoldResult ScaledMMAAttr::getDistributionWorkerCount(OpBuilder &, Location,
+                                                       Operation *) const {
+  return getAsIndexOpFoldResult(getContext(), getSubgroupSize());
+}
+
+LogicalResult ScaledMMAAttr::populateOperandOffsetsSizesStrides(
+    OpBuilder &builder, Location loc, uint32_t operandIndex, Value laneId,
+    ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
+    SmallVectorImpl<OpFoldResult> &sizes,
+    SmallVectorImpl<OpFoldResult> &strides) const {
+  assert(operandIndex <= 4 && "Scaled MFMA has 5 operands");
+
+  MMASingleSubgroupLayout subgroupLayout =
+      getSingleSubgroupLayout(getIntrinsic(), operandIndex, getColMajor());
+
+  SmallVector<OpFoldResult> canonicalOffsets;
+  SmallVector<OpFoldResult> canonicalSizes;
+  if (failed(populateCanonicalOffsetsSizesAndStrides(
+          builder, loc, laneId, permutation, subgroupLayout, canonicalOffsets,
+          canonicalSizes, strides))) {
+    return failure();
+  }
+  offsets.append(canonicalOffsets);
+  sizes.append(canonicalSizes);
+
+  return success();
+}
+
+LogicalResult ScaledMMAAttr::buildUnderlyingOperations(
+    OpBuilder &builder, Location loc, ValueRange inputs, ValueRange outputs,
+    SmallVectorImpl<Value> &results) const {
+  if (inputs.size() != 4) {
+    return failure();
+  }
+  if (outputs.size() != 1) {
+    return failure();
+  }
+  SmallVector<VectorType> threadTypes;
+  getDistributedTileTypes(threadTypes);
+  if (!llvm::equal(threadTypes,
+                   llvm::concat<Type>(inputs.getTypes(), outputs.getTypes()))) {
+    return failure();
+  }
+
+  SmallVector<VectorType> subgroupTypes;
+  getUndistributedTileTypes(subgroupTypes);
+
+  // Note: the scales argument is given as a vector of 4
+  // scales + a constant selector to say which byte in the vector is to be used.
+  // This'll allow better value reuse, hence why we extend to 4-vectors
+  // instead of clamping to scalars here.
+
+  FloatType f8E8M0 = builder.getF8E8M0Type();
+  Value zeroScales = builder.create<arith::ConstantOp>(
+      loc, SplatElementsAttr::get(
+               VectorType::get({4}, f8E8M0),
+               llvm::APFloat::getSmallest(f8E8M0.getFloatSemantics())));
+  auto padScales = [&](Value scales) {
+    Value scale = builder.create<vector::ExtractOp>(loc, scales, 0);
+    Value padded = builder.create<vector::InsertOp>(loc, scale, zeroScales, 0);
+    return padded;
+  };
+
+  Value lhs = inputs[0];
+  Value lhsScales = padScales(inputs[1]);
+  Value rhs = inputs[2];
+  Value rhsScales = padScales(inputs[3]);
+  Value acc = outputs[0];
+
+  ArrayRef<int64_t> lhsShape = subgroupTypes[0].getShape();
+  ArrayRef<int64_t> rhsShape = subgroupTypes[2].getShape();
+  int64_t m = lhsShape[0];
+  // We use m x [k / kPerBlock] x blockSize as the LHS pre-distribution shape
+  // since this makes the higher-level tiling clearer.
+  int64_t k = lhsShape[1] * lhsShape[2];
+  int64_t n = rhsShape[2];
+
+  // Since the LHS and RHS layouts are both {M,N}xK, we can get a column-major
+  // result just by swapping the LHS and RHS.
+  if (getColMajor()) {
+    std::swap(lhs, rhs);
+    std::swap(lhsScales, rhsScales);
+    std::swap(n, m);
+  }
+
+  Value result = builder.create<amdgpu::ScaledMFMAOp>(
+      loc, m, n, k, lhs, rhs, acc, lhsScales, rhsScales, /*scalesIdxA=*/0,
+      /*scalesIdxB=*/0);
+  results.push_back(result);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // Target Attributes
 //===----------------------------------------------------------------------===//
 
@@ -1352,6 +1706,17 @@ bool TargetAttr::supportsSyncMMAOps() const {
   if (auto cc = getCUDAComputeCapability())
     return cc >= 80;
   return false;
+}
+
+std::array<int64_t, 3> TargetAttr::getMaximumWorkgroupCount() const {
+  DenseI32ArrayAttr maxWgpCount = getWgp().getMaxWorkgroupCounts();
+  assert(maxWgpCount.size() <= 3 && "expected only workgroup count for x,y,z");
+  std::array<int64_t, 3> maxWorkgroupCount = {
+      ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
+  for (auto [index, value] : llvm::enumerate(maxWgpCount.asArrayRef())) {
+    maxWorkgroupCount[index] = value;
+  }
+  return maxWorkgroupCount;
 }
 
 //===----------------------------------------------------------------------===//

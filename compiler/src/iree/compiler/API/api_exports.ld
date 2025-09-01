@@ -6,7 +6,9 @@ VER_0 {
     ireeAttributeIsACodegenTranslationInfoAttr;
     ireeAttributeIsAGPULoweringConfigAttr;
     ireeAttributeIsAGPUMMAAttr;
+    ireeAttributeIsAGPUVirtualMMAAttr;
     ireeAttributeIsAGPUMMAIntrinsicAttr;
+    ireeAttributeIsAGPUVirtualMMAIntrinsicAttr;
     ireeAttributeIsAGPUPipelineOptionsAttr;
     ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr;
     ireeCodegenCompilationInfoAttrGet;
@@ -16,8 +18,11 @@ VER_0 {
     ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID;
     ireeCodegenDispatchLoweringPassPipelineAttrGetValue;
     ireeCodegenGetExecutableVariantOps;
+    ireeGPUGetSingleSubgroupLayout;
     ireeCodegenGetTunerRootOps;
+    ireeCodegenGetAttentionOpDetail;
     ireeCodegenQueryMMAIntrinsics;
+    ireeCodegenMlirOperationIsACodegenAttentionOp;
     ireeCodegenTranslationInfoAttrGet;
     ireeCodegenTranslationInfoAttrGetParameters;
     ireeCodegenTranslationInfoAttrGetTypeID;
@@ -79,11 +84,17 @@ VER_0 {
     ireeGPULoweringConfigAttrGetTileSizes;
     ireeGPULoweringConfigAttrGetTypeID;
     ireeGPUMMAAttrGet;
+    ireeGPUVirtualMMAAttrGet;
     ireeGPUMMAAttrGetInfo;
     ireeGPUMMAAttrGetTypeID;
+    ireeGPUVirtualMMAAttrGetTypeID;
     ireeGPUMMAIntrinsicAttrGet;
+    ireeGPUVirtualMMAIntrinsicAttrGet;
     ireeGPUMMAIntrinsicAttrGetTypeID;
+    ireeGPUVirtualMMAIntrinsicAttrGetTypeID;
     ireeGPUMMAIntrinsicAttrGetValue;
+    ireeGPUVirtualMMAIntrinsicAttrGetValue;
+    ireeGPUMMAAttrGetVirtualMMAIntrinsic;
     ireeGPUPipelineOptionsAttrGet;
     ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts;
     ireeGPUPipelineOptionsAttrGetPrefetchSharedMemory;
@@ -93,6 +104,7 @@ VER_0 {
     ireeGPUReorderWorkgroupsStrategyAttrGet;
     ireeGPUReorderWorkgroupsStrategyAttrGetTypeID;
     ireeGPUReorderWorkgroupsStrategyAttrGetValue;
+    ireeHALExecutableTargetAttrGetGPUTargetInfo;
     ireeMlirLspServerRunMain;
     ireeOptRunMain;
     ireeReduceRunMain;

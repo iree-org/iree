@@ -18,6 +18,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -40,6 +41,11 @@
 #include "mlir/Transforms/RegionUtils.h"
 
 #define DEBUG_TYPE "iree-codegen-utils"
+
+constexpr char kCpuFeaturesAttrName[] = "cpu_features";
+constexpr char kDataLayoutAttrName[] = "data_layout";
+constexpr char kTargetInfoAttrName[] = "iree_codegen.target_info";
+constexpr char kTargetTripleAttrName[] = "target_triple";
 
 namespace mlir::iree_compiler {
 
@@ -66,74 +72,59 @@ bool isEntryPoint(mlir::FunctionOpInterface func) {
   return func.isPublic() && getEntryPoint(func);
 }
 
-std::optional<StringAttr> getConfigStringAttr(Attribute srcAttr,
-                                              StringRef stringAttr) {
-  if (!srcAttr) {
-    return std::nullopt;
+std::optional<StringRef> getConfigCpuFeatures(DictionaryAttr targetConfig) {
+  auto attr = targetConfig.getAs<StringAttr>(kCpuFeaturesAttrName);
+  if (attr) {
+    return attr.getValue();
   }
-  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(srcAttr);
-  DictionaryAttr config;
-  if (targetAttr) {
-    config = targetAttr.getConfiguration();
-  } else {
-    config = dyn_cast<DictionaryAttr>(srcAttr);
-  }
-  if (!config) {
-    return std::nullopt;
-  }
-  auto attr = config.getAs<StringAttr>(stringAttr);
-  if (!attr) {
-    return std::nullopt;
-  }
-  return attr;
+  return std::nullopt;
+}
+void addConfigCpuFeatures(MLIRContext *context, StringRef cpuFeaturesStr,
+                          SmallVectorImpl<NamedAttribute> &config) {
+  config.emplace_back(StringAttr::get(context, kCpuFeaturesAttrName),
+                      StringAttr::get(context, cpuFeaturesStr));
 }
 
-std::optional<IntegerAttr> getConfigIntegerAttr(Attribute srcAttr,
-                                                StringRef integerAttr) {
-  if (!srcAttr) {
-    return std::nullopt;
+std::optional<StringRef> getConfigDataLayout(DictionaryAttr targetConfig) {
+  auto attr = targetConfig.getAs<StringAttr>(kDataLayoutAttrName);
+  if (attr) {
+    return attr.getValue();
   }
-  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(srcAttr);
-  DictionaryAttr config;
-  if (targetAttr) {
-    config = targetAttr.getConfiguration();
-  } else {
-    config = dyn_cast<DictionaryAttr>(srcAttr);
-  }
-  if (!config) {
-    return std::nullopt;
-  }
-  auto attr = config.getAs<IntegerAttr>(integerAttr);
-  if (!attr) {
-    return std::nullopt;
-  }
-  return attr;
+  return std::nullopt;
+}
+void addConfigDataLayout(MLIRContext *context, StringRef dataLayoutStr,
+                         SmallVectorImpl<NamedAttribute> &config) {
+  config.emplace_back(StringAttr::get(context, kDataLayoutAttrName),
+                      StringAttr::get(context, dataLayoutStr));
 }
 
-std::optional<BoolAttr> getConfigBoolAttr(Attribute srcAttr,
-                                          StringRef boolAttr) {
-  if (!srcAttr) {
-    return std::nullopt;
-  }
-  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(srcAttr);
-  DictionaryAttr config;
-  if (targetAttr) {
-    config = targetAttr.getConfiguration();
-  } else {
-    config = dyn_cast<DictionaryAttr>(srcAttr);
-  }
-  if (!config) {
-    return std::nullopt;
-  }
-  auto attr = config.getAs<BoolAttr>(boolAttr);
-  if (!attr) {
-    return std::nullopt;
-  }
-  return attr;
+IREE::Codegen::TargetInfoAttrInterface
+getConfigTargetInfo(DictionaryAttr targetConfig) {
+  return targetConfig.getAs<IREE::Codegen::TargetInfoAttrInterface>(
+      kTargetInfoAttrName);
+}
+void addConfigTargetInfo(MLIRContext *context,
+                         IREE::Codegen::TargetInfoAttrInterface targetAttr,
+                         SmallVectorImpl<NamedAttribute> &config) {
+  config.emplace_back(StringAttr::get(context, kTargetInfoAttrName),
+                      targetAttr);
 }
 
-std::optional<llvm::Triple> getTargetTriple(Attribute attr) {
-  auto triple = getConfigStringAttr(attr, "target_triple");
+std::optional<StringRef> getConfigTargetTriple(DictionaryAttr targetConfig) {
+  auto attr = targetConfig.getAs<StringAttr>(kTargetTripleAttrName);
+  if (attr) {
+    return attr.getValue();
+  }
+  return std::nullopt;
+}
+void addConfigTargetTriple(MLIRContext *context, StringRef targetTripleStr,
+                           SmallVectorImpl<NamedAttribute> &config) {
+  config.emplace_back(StringAttr::get(context, kTargetTripleAttrName),
+                      StringAttr::get(context, targetTripleStr));
+}
+
+std::optional<llvm::Triple> getTargetTriple(DictionaryAttr attr) {
+  auto triple = getConfigTargetTriple(attr);
   if (!triple) {
     return std::nullopt;
   }
@@ -178,35 +169,29 @@ bool isWebGPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return targetAttr && targetAttr.getBackend().getValue().starts_with("webgpu");
 }
 
-static const char *getDefaultEnabledUkernels(Attribute attr) {
+static const char *getDefaultEnabledUkernels(DictionaryAttr targetConfig) {
   const char *kNone = "none";
-  if (!attr) {
-    return kNone;
-  }
-  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(attr);
-  if (!targetAttr) {
-    return kNone;
-  }
-  if (isX86_64(targetAttr)) {
+  if (isX86_64(targetConfig)) {
     return "mmt4d";
   }
-  if (isAArch64(targetAttr)) {
+  if (isAArch64(targetConfig)) {
     return "mmt4d";
   }
   return kNone;
 }
 
-bool hasUkernel(Attribute attr, StringRef ukernelName) {
-  auto enabledUkernels = getConfigStringAttr(attr, "ukernels");
+bool hasUkernel(DictionaryAttr targetConfig, StringRef ukernelName) {
+  auto enabledUkernels = targetConfig.getAs<StringAttr>("ukernels");
+
   StringRef enabledUkernelsStr;
   if (enabledUkernels) {
-    enabledUkernelsStr = enabledUkernels->getValue();
+    enabledUkernelsStr = enabledUkernels.getValue();
   } else {
     enabledUkernelsStr = "default";
   }
   // Resolve `default`.
   if (enabledUkernelsStr == "default") {
-    enabledUkernelsStr = getDefaultEnabledUkernels(attr);
+    enabledUkernelsStr = getDefaultEnabledUkernels(targetConfig);
   }
   // Resolve `none`.
   if (enabledUkernelsStr == "none") {
@@ -231,20 +216,12 @@ bool hasUkernel(Attribute attr, StringRef ukernelName) {
   return false;
 }
 
-std::optional<StringRef> getCpuFeatures(Attribute attr) {
-  auto cpuFeatures = getConfigStringAttr(attr, "cpu_features");
-  if (!cpuFeatures) {
-    return std::nullopt;
-  }
-  return cpuFeatures->getValue();
-}
-
 // TODO(dcaballe): If we have to check for a significantly large number of
 // features in the future, we may want to consider a persistent state to carry
 // over processed HAL information or keeping the TTI instance alive and query
 // subtarget features data structure.
-bool hasFeature(Attribute attr, StringRef feature) {
-  std::optional<StringRef> features = getCpuFeatures(attr);
+bool hasFeature(DictionaryAttr targetConfig, StringRef feature) {
+  std::optional<StringRef> features = getConfigCpuFeatures(targetConfig);
   if (!features) {
     return false;
   }
@@ -262,34 +239,52 @@ bool hasFeature(Attribute attr, StringRef feature) {
   return false;
 }
 
-bool isX86(Attribute attr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(attr);
+bool isX86(DictionaryAttr targetConfig) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
   return triple && triple.value().isX86();
 }
 
-bool isX86_64(Attribute attr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(attr);
+bool isX86_64(DictionaryAttr targetConfig) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
   return triple && triple.value().getArch() == llvm::Triple::x86_64;
 }
 
-bool isAArch64(Attribute attr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(attr);
+bool isAArch64(DictionaryAttr targetConfig) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
   return triple && triple.value().isAArch64();
 }
 
-bool isRISCV(Attribute attr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(attr);
+bool isRISCV(DictionaryAttr targetConfig) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
   return triple && triple.value().isRISCV();
 }
 
-bool isRISCV32(Attribute attr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(attr);
+bool isRISCV32(DictionaryAttr targetConfig) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
   return triple && triple.value().isRISCV32();
 }
 
-bool isRISCV64(Attribute attr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(attr);
+bool isRISCV64(DictionaryAttr targetConfig) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
   return triple && triple.value().isRISCV64();
+}
+
+std::array<int64_t, 3> getMaxWorkgroupCount(DictionaryAttr targetConfig) {
+  // TODO(MaheshRavishankar): For now the target info is only available for
+  // GPUs, and is recorded in the configuration with the name `iree.gpu.target`.
+  // Fix this to be `iree.codegen.target`.
+  IREE::Codegen::TargetInfoAttrInterface targetInfo =
+      getConfigTargetInfo(targetConfig);
+  if (!targetInfo) {
+    return {ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
+  }
+  return targetInfo.getMaximumWorkgroupCount();
+}
+std::array<int64_t, 3> getMaxWorkgroupCount(Operation *op) {
+  if (auto target = IREE::HAL::ExecutableTargetAttr::lookup(op)) {
+    return getMaxWorkgroupCount(target.getConfiguration());
+  }
+  return {ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
 }
 
 bool isReadOnly(Value v) {
@@ -916,6 +911,10 @@ isTiledAndDistributedLoop(scf::ForOp forOp) {
   return loopInfo;
 }
 
+bool isComputeOp(Operation *op) {
+  return isa<TilingInterface, IREE::Codegen::UKernelOpInterface>(op);
+}
+
 SmallVector<Operation *> getComputeOps(Operation *containingOp) {
   if (containingOp->getNumRegions() == 0) {
     return {};
@@ -924,7 +923,7 @@ SmallVector<Operation *> getComputeOps(Operation *containingOp) {
          "expected op with a single region");
   SmallVector<Operation *> computeOps;
   containingOp->getRegion(0).walk([&](Operation *op) {
-    if (isa<TilingInterface, IREE::Codegen::UKernelOpInterface>(op)) {
+    if (isComputeOp(op)) {
       computeOps.push_back(op);
     }
   });
@@ -1369,12 +1368,7 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(user);
 
-  LLVM_DEBUG({
-    llvm::dbgs() << "\tReplacing in user by creating new user : ";
-    user->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
-    llvm::dbgs() << "\n";
-  });
-
+  LDBG() << "\tReplacing in user by creating new user : " << *user;
   if (auto castOp = dyn_cast<memref::CastOp>(user)) {
     auto replacementType = llvm::cast<MemRefType>(replacement.getType());
     auto currentResultType =
@@ -1388,12 +1382,7 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
         replacementType.getLayout(), replacementType.getMemorySpace());
     auto newCastOp =
         rewriter.create<memref::CastOp>(loc, newResultType, replacement);
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "\t\tNew user : ";
-      newCastOp->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
-      llvm::dbgs() << "\n";
-    });
+    LDBG() << "\t\tNew user : " << *newCastOp;
     return SmallVector<Value>(newCastOp->result_begin(),
                               newCastOp->result_end());
   }
@@ -1414,11 +1403,7 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
     auto newSubviewOp = rewriter.create<memref::SubViewOp>(
         loc, newResultType, replacement, offsets, sizes, strides);
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "\t\tNew user : ";
-      newSubviewOp->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
-      llvm::dbgs() << "\n";
-    });
+    LDBG() << "\t\tNew user : " << *newSubviewOp;
     return llvm::to_vector_of<Value>(newSubviewOp->getResults());
   }
   if (auto expandOp = dyn_cast<memref::ExpandShapeOp>(user)) {
@@ -1437,11 +1422,7 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
     auto newExpandOp = rewriter.create<memref::ExpandShapeOp>(
         loc, *newResultType, replacement, expandOp.getReassociation(),
         expandOp.getOutputShape(), expandOp.getStaticOutputShape());
-    LLVM_DEBUG({
-      llvm::dbgs() << "\t\tNew user : ";
-      newExpandOp->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
-      llvm::dbgs() << "\n";
-    });
+    LDBG() << "\t\tNew user : " << *newExpandOp;
     return llvm::to_vector_of<Value>(newExpandOp->getResults());
   }
   if (auto collapseOp = dyn_cast<memref::CollapseShapeOp>(user)) {
@@ -1455,11 +1436,7 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
 
     auto newCollapseOp = rewriter.create<memref::CollapseShapeOp>(
         loc, *newResultType, replacement, collapseOp.getReassociation());
-    LLVM_DEBUG({
-      llvm::dbgs() << "\t\tNew user : ";
-      newCollapseOp->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
-      llvm::dbgs() << "\n";
-    });
+    LDBG() << "\t\tNew user : " << *newCollapseOp;
     return llvm::to_vector_of<Value>(newCollapseOp->getResults());
   }
   return std::nullopt;
@@ -1474,26 +1451,16 @@ void replaceMemrefUsesAndPropagateType(RewriterBase &rewriter, Location loc,
 
   while (!worklist.empty()) {
     auto [original, replacement] = worklist.pop_back_val();
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "//===------------------------------------------===//\n";
-      llvm::dbgs() << "Replacing : ";
-      original.print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
-      llvm::dbgs() << "\n";
-    });
+    LDBG() << "//===------------------------------------------===//";
+    LDBG() << "Replacing : " << original;
 
     llvm::SmallDenseSet<OpOperand *> preservedUses;
-
     if (original.getType() != replacement.getType()) {
       for (OpOperand &use : original.getUses()) {
         Operation *user = use.getOwner();
         // Some uses cannot be replaced.
         if (user->hasTrait<OpTrait::ReturnLike>()) {
-          LLVM_DEBUG({
-            llvm::dbgs() << "\tUnhandled user : ";
-            user->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
-            llvm::dbgs() << "\n";
-          });
+          LDBG() << "\tUnhandled user : " << *user;
           preservedUses.insert(&use);
           continue;
         }
@@ -1519,12 +1486,7 @@ void replaceMemrefUsesAndPropagateType(RewriterBase &rewriter, Location loc,
     // Replace all non-preserved uses.
     rewriter.replaceUsesWithIf(original, replacement, [&](OpOperand &use) {
       if (!preservedUses.count(&use)) {
-        LLVM_DEBUG({
-          llvm::dbgs() << "\t\tReplacing use in :";
-          use.getOwner()->print(llvm::dbgs(),
-                                OpPrintingFlags().assumeVerified());
-          llvm::dbgs() << "\n";
-        });
+        LDBG() << "\t\tReplacing use in :" << *use.getOwner();
         return true;
       }
       return false;
@@ -1620,7 +1582,7 @@ bool hasFusedLeadingOp(linalg::LinalgOp rootOp) {
 
 std::optional<vector::VscaleRange>
 getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  if (isAArch64(targetAttr)) {
+  if (targetAttr && isAArch64(targetAttr.getConfiguration())) {
     // On AArch64 the scalable vector length will always be between 128-bit and
     // 2048-bit. This works out as a vscale range of 1 to 16. See:
     // https://developer.arm.com/Architectures/Scalable%20Vector%20Extensions
@@ -1696,16 +1658,20 @@ bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
 // Utility functions for vector size inference for dynamic shapes
 //===----------------------------------------------------------------------===//
 
+std::optional<VectorizationTileSizes> inferSizesFromIR(scf::ForOp forOp,
+                                                       OpResult opResult) {
+  LDBG() << "Inferring sizes for: " << forOp;
+  unsigned resultNumber = opResult.getResultNumber();
+  LDBG() << " where OpResult.resultNumber = " << resultNumber;
+  return inferSizesFromIR(forOp.getInitsMutable()[resultNumber].get());
+}
+
 std::optional<VectorizationTileSizes>
 inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
-  LLVM_DEBUG({
-    llvm::dbgs() << "Inferring sizes for:\n" << linalgOp;
-    if (opResult) {
-      llvm::dbgs() << " with OpResult.resultNumber="
-                   << opResult->getResultNumber();
-    }
-    llvm::dbgs() << '\n';
-  });
+  LDBG() << "Inferring sizes for: " << linalgOp;
+  if (opResult) {
+    LDBG() << " where OpResult.resultNumber = " << opResult->getResultNumber();
+  }
 
   std::optional<vector::VscaleRange> vscaleRange;
   if (!opResult) {
@@ -1733,11 +1699,11 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
     int64_t dimSize = llvm::cast<ShapedType>(firstOperand.getType())
                           .getShape()[firstOperandDim];
     bool dimScalable = false;
-    if (!ShapedType::isDynamic(dimSize)) {
+    if (ShapedType::isStatic(dimSize)) {
       result.vectorSizes.push_back(dimSize);
       result.vectorScalableFlags.push_back(dimScalable);
-      LLVM_DEBUG(llvm::dbgs() << "Inferred iteration size '" << dimSize
-                              << "' for dimension '" << dim << "'\n");
+      LDBG() << "Inferred iteration size '" << dimSize << "' for dimension '"
+             << dim << "'";
       continue;
     }
 
@@ -1761,10 +1727,9 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
     dimScalable = maybeDimBound->scalable;
     result.vectorSizes.push_back(dimSize);
     result.vectorScalableFlags.push_back(dimScalable);
-
-    LLVM_DEBUG(llvm::dbgs() << "Inferred iteration size '" << dimSize
-                            << (dimScalable ? " x vscale" : "")
-                            << "' for dimension '" << dim << "'\n");
+    LDBG() << "Inferred iteration size '" << dimSize
+           << (dimScalable ? " x vscale" : "") << "' for dimension '" << dim
+           << "'";
   }
 
   if (opResult) {
@@ -1778,13 +1743,11 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
 }
 
 std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::PackOp op) {
-  LLVM_DEBUG(llvm::dbgs() << "Inferring dest sizes for:\n" << op << "\n");
-
+  LDBG() << "Inferring dest sizes for: " << op;
   if (llvm::any_of(op.getInnerTiles(), [](OpFoldResult v) {
         return !getConstantIntValue(v).has_value();
       })) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "skip, because inner_tiles are not all constant");
+    LDBG() << "skip, because inner_tiles are not all constant";
     return std::nullopt;
   }
 
@@ -1809,10 +1772,9 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::PackOp op) {
   }
 
   LLVM_DEBUG({
-    llvm::dbgs() << "After adjustment with inner tiles and "
-                    "outer_dims_perm:\n";
+    LDBG() << "After adjustment with inner tiles and outer_dims_perm:";
     for (auto [idx, val] : llvm::enumerate(result.vectorSizes)) {
-      llvm::dbgs() << "Dim #" << idx << ": " << val << "\n";
+      LDBG() << "Dim #" << idx << ": " << val;
     }
   });
   result.destShape = result.vectorSizes;
@@ -1820,15 +1782,63 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::PackOp op) {
   return result;
 }
 
+std::optional<SizesAndScalableFlags>
+getVectorInputSizesFromDestTiles(linalg::UnPackOp op,
+                                 ArrayRef<int64_t> writeVectorSizes,
+                                 ArrayRef<bool> scalableFlags) {
+  assert(writeVectorSizes.size() == op.getDestRank());
+  if (llvm::any_of(scalableFlags, [](bool val) { return val == true; })) {
+    return std::nullopt;
+  }
+
+  ArrayRef<int64_t> innerDimPos = op.getInnerDimsPos();
+  ArrayRef<int64_t> innerTiles = op.getStaticInnerTiles();
+  ArrayRef<int64_t> sourceShape = op.getSourceType().getShape();
+  ArrayRef<int64_t> outerDimsPerm = op.getOuterDimsPerm();
+
+  // readVectorSizes is the size of tensor used to read and apply mask. It is
+  // set like this: Let's say the vectorSize (VS) array is size 'N' and
+  // the sourceShape(SS) is 'M' where M >= N and InnerTileSizes (IT) of
+  // size M-N
+  // Thus:
+  // - initially: readVectorSizes = vectorInputSizes
+  // - Divide all the readMaskShape locations pointed by innerDimPos
+  //   by the innerTileSize attribute value.
+  // - if outer_dims_perms is present: do that permutation on readVectorSizes.
+  // - Append the remaining shape from SS
+  // E.g. let's say let's say unpackTensorType.getShape() = <8x8x32x16>
+  // inner Dim Pos = [0, 1] and Inner Tiles = [32, 16], vector_sizes are [512,
+  // 128] and outer_dims_perm is [1, 0] then read shape is:
+  //   ReadVectorSizes(initial): [512, 128]
+  //   Final Value(after innerDim Adjustment): [512/32, 128/16]
+  //                                           = [16, 8]
+  //   After applying outer_dims_perm: [8, 16]
+  //   After appending the rest of the sourceShape: [8, 16, 32, 16]
+  SmallVector<int64_t> vectorSizes(writeVectorSizes);
+  for (auto [index, size] : enumerate(innerTiles)) {
+    vectorSizes[innerDimPos[index]] =
+        llvm::divideCeil(vectorSizes[innerDimPos[index]], size);
+  }
+  if (!outerDimsPerm.empty()) {
+    applyPermutationToVector(vectorSizes, outerDimsPerm);
+  }
+  vectorSizes.append(sourceShape.begin() + vectorSizes.size(),
+                     sourceShape.end());
+
+  SizesAndScalableFlags result;
+  result.first.assign(vectorSizes.begin(), vectorSizes.end());
+  result.second.resize(result.first.size(), false);
+
+  return result;
+}
+
 std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::UnPackOp op) {
-  LLVM_DEBUG(llvm::dbgs() << "Inferring dest sizes for:\n" << op << "\n");
+  LDBG() << "Inferring dest sizes for: " << op;
 
   if (llvm::any_of(op.getInnerTiles(), [](OpFoldResult v) {
         return !getConstantIntValue(v).has_value();
       })) {
-    LLVM_DEBUG(
-        llvm::dbgs()
-        << "failed on inference because inner_tiles are not all constant");
+    LDBG() << "failed on inference because inner_tiles are not all constant";
     return std::nullopt;
   }
 
@@ -1852,14 +1862,47 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::UnPackOp op) {
   }
 
   LLVM_DEBUG({
-    llvm::dbgs() << "After adjustment with inner tiles and "
-                    "outer_dims_perm:\n";
+    LDBG() << "After adjustment with inner tiles and outer_dims_perm:";
     for (auto [idx, val] : llvm::enumerate(result.vectorSizes)) {
-      llvm::dbgs() << "Dim #" << idx << ": " << val << "\n";
+      LDBG() << "Dim #" << idx << ": " << val;
+    }
+  });
+
+  std::optional<SizesAndScalableFlags> maybeInputVectorSizes =
+      getVectorInputSizesFromDestTiles(op, result.vectorSizes,
+                                       result.vectorScalableFlags);
+  if (!maybeInputVectorSizes) {
+    return std::nullopt;
+  }
+  std::tie(result.vectorSizes, result.vectorScalableFlags) =
+      maybeInputVectorSizes.value();
+  LLVM_DEBUG({
+    LDBG() << "After infer read vector sizes from dest shape:";
+    for (auto [idx, val] : llvm::enumerate(result.vectorSizes)) {
+      LDBG() << "Dim #" << idx << ": " << val;
     }
   });
   result.destShape = result.vectorSizes;
 
+  return result;
+}
+
+std::optional<VectorizationTileSizes> static inferSizesFromMixedSizes(
+    SmallVector<OpFoldResult> shape) {
+  VectorizationTileSizes result;
+  for (OpFoldResult dim : shape) {
+    FailureOr<int64_t> maybeDimBound =
+        ValueBoundsConstraintSet::computeConstantBound(
+            presburger::BoundType::UB, dim,
+            /*stopCondition=*/nullptr, /*closedUB=*/true);
+    if (failed(maybeDimBound)) {
+      LDBG() << "failed to infer bounds for dim #" << dim;
+      return std::nullopt;
+    }
+    LDBG() << "Dim #" << dim << ": " << maybeDimBound.value();
+    result.vectorSizes.push_back(maybeDimBound.value());
+    result.destShape.push_back(maybeDimBound.value());
+  }
   return result;
 }
 
@@ -1868,32 +1911,20 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
     return std::nullopt;
 
   std::optional<VectorizationTileSizes> result;
+  LDBG() << "Inferring sizes for: " << val;
   TypeSwitch<Operation *, void>(val.getDefiningOp())
       .Case<linalg::LinalgOp>(
           [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
       .Case<linalg::PackOp>([&](auto op) { result = inferSizesFromIR(op); })
-      .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp op) {
+      .Case<scf::ForOp>(
+          [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
+      .Case<tensor::ExtractSliceOp, tensor::EmptyOp>([&](auto op) {
         // tensor::ExtractSliceOp is not vectorizable, so only `destShape` has
         // the values.
-        result = VectorizationTileSizes();
-        LLVM_DEBUG(llvm::dbgs() << "Inferring sizes for:\n" << op << "\n");
-        int64_t destRank = op.getResult().getType().getRank();
-        for (int dim = 0; dim < destRank; ++dim) {
-          LLVM_DEBUG(llvm::dbgs() << "Dim #" << dim << ": ");
-          FailureOr<int64_t> maybeDimBound =
-              ValueBoundsConstraintSet::computeConstantBound(
-                  presburger::BoundType::UB, {op, dim},
-                  /*stopCondition=*/nullptr, /*closedUB=*/true);
-          if (failed(maybeDimBound)) {
-            LLVM_DEBUG(llvm::dbgs() << "failed\n");
-            result = std::nullopt;
-            return;
-          }
-          LLVM_DEBUG(llvm::dbgs() << maybeDimBound.value() << "\n");
-          result->destShape.push_back(maybeDimBound.value());
-        }
+        result = inferSizesFromMixedSizes(op.getMixedSizes());
       })
       .Default([&](Operation *) {});
+
   return result;
 }
 
@@ -1932,6 +1963,34 @@ bool neverRunsSecondIteration(scf::ForOp op) {
       getAsOpFoldResult(op.getLowerBound()), ValueBoundsConstraintSet::GE,
       getAsIndexOpFoldResult(op.getContext(), 0));
   return isUbUnderStep.value_or(false) && isLbNonNegative.value_or(false);
+}
+
+bool hasExternalCapture(linalg::GenericOp genericOp) {
+  Block &body = genericOp.getRegion().front();
+  for (Operation &op : body.getOperations()) {
+    for (Value operand : op.getOperands()) {
+      if (auto bArg = dyn_cast<BlockArgument>(operand)) {
+        // Check whether the operand lies in the same block.
+        if (bArg.getOwner() == &body) {
+          continue;
+        }
+        return true;
+      }
+      Operation *defOp = operand.getDefiningOp();
+      // Scalar constant is allowed.
+      if (defOp && defOp->hasTrait<mlir::OpTrait::ConstantLike>()) {
+        Type type = operand.getType();
+        if (type.isIntOrFloat() || type.isIndex()) {
+          continue;
+        }
+      }
+      // If defining op is not inside the block, it’s an external value.
+      if (!defOp || defOp->getBlock() != &body) {
+        return true;
+      }
+    }
+  }
+  return false; // All operands are locally defined or block arguments.
 }
 
 } // namespace mlir::iree_compiler

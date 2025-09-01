@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
+#include <cstdint>
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
@@ -13,11 +14,14 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVectorExtras.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -285,6 +289,175 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
 
   rewriter.replaceOp(producer, barrierOp);
   return success();
+}
+
+FailureOr<scf::ForallOp>
+fuseNestedLaneAndWarpForalls(RewriterBase &rewriter, scf::ForallOp warpForallOp,
+                             scf::ForallOp laneForallOp) {
+  // Verify mappings.
+  if (!warpForallOp.getMapping() ||
+      !llvm::all_of(*warpForallOp.getMapping(), [](Attribute mappingAttr) {
+        return isa<gpu::GPUWarpMappingAttr>(mappingAttr);
+      })) {
+    return rewriter.notifyMatchFailure(warpForallOp, "not a warp forall op");
+  }
+  if (!laneForallOp.getMapping() || laneForallOp.getMapping()->size() != 1 ||
+      !isa<IREE::GPU::LaneIdAttr>(laneForallOp.getMapping()->getValue()[0])) {
+    return rewriter.notifyMatchFailure(
+        laneForallOp, "inner forall op is not mapped to a single lane id");
+  }
+  // Verify the lane forall is the only nested forall op.
+  SmallVector<scf::ForallOp> innerForallOps(
+      warpForallOp.getBody()->getOps<scf::ForallOp>());
+  if (innerForallOps.size() != 1) {
+    return rewriter.notifyMatchFailure(warpForallOp,
+                                       "expected a single inner forall op");
+  }
+  if (warpForallOp.getOperation() != laneForallOp->getParentOp()) {
+    return rewriter.notifyMatchFailure(
+        laneForallOp, "expected warp forall op to be the lane forall's parent");
+  }
+  // Only allow arith/affine ops and tensor.extract_slice. We would want other
+  // ops to be fused into the lane forall before this transformation happens.
+  for (Operation &op : warpForallOp.getBody()->getOperations()) {
+    if (!isa_and_nonnull<arith::ArithDialect, affine::AffineDialect>(
+            op.getDialect()) &&
+        !isa<tensor::ExtractSliceOp, scf::ForallOp, scf::InParallelOp>(op)) {
+      return rewriter.notifyMatchFailure(
+          warpForallOp,
+          "Warp forall body has non arith, affine, or extract_slice ops");
+    }
+  }
+  if (!warpForallOp.isNormalized() || !laneForallOp.isNormalized()) {
+    return rewriter.notifyMatchFailure(warpForallOp,
+                                       "forall ops are not normalized");
+  }
+  if (laneForallOp.getNumResults() != warpForallOp.getNumResults()) {
+    return rewriter.notifyMatchFailure(
+        laneForallOp,
+        "lane and warp foralls have a different number of results");
+  }
+  auto hasSingleNonStridedFullRankParallelInsert = [](scf::ForallOp forall) {
+    for (BlockArgument initArg : forall.getRegionOutArgs()) {
+      SmallVector<Operation *> combiningOps = forall.getCombiningOps(initArg);
+      if (combiningOps.size() != 1) {
+        return false;
+      }
+      auto parallelInsertOp =
+          dyn_cast<tensor::ParallelInsertSliceOp>(combiningOps[0]);
+      if (!parallelInsertOp ||
+          !areAllConstantIntValue(parallelInsertOp.getMixedStrides(), 1)) {
+        return false;
+      }
+      if (parallelInsertOp.getSourceType().getRank() !=
+          parallelInsertOp.getDestType().getRank()) {
+        return false;
+      }
+    }
+    return true;
+  };
+  if (!hasSingleNonStridedFullRankParallelInsert(warpForallOp) ||
+      !hasSingleNonStridedFullRankParallelInsert(laneForallOp)) {
+    return rewriter.notifyMatchFailure(warpForallOp,
+                                       "forall op has strided combining op");
+  }
+  // Verify that the source of all combining ops of the warpForallOp are
+  // produced by the laneForallOp, and that the laneForallOp combining ops
+  // have the same rank as the corresponding combining op in the warpForallOp.
+  // This is the requirement for composing the combining ops into a single
+  // thread distributed combining op.
+  for (auto [warpResult, laneResult] :
+       llvm::zip_equal(warpForallOp.getResults(), laneForallOp.getResults())) {
+    unsigned int resultIdx = warpResult.getResultNumber();
+    BlockArgument warpInitArg = warpForallOp.getTiedBlockArgument(
+        &warpForallOp.getOutputsMutable()[resultIdx]);
+    auto warpInsertOp = cast<tensor::ParallelInsertSliceOp>(
+        warpForallOp.getCombiningOps(warpInitArg)[0]);
+    if (warpInsertOp.getSource() != laneResult) {
+      return rewriter.notifyMatchFailure(
+          warpForallOp, "combining op source is not inner lane forall result");
+    }
+  }
+
+  // Create the thread mapped forall to replace the nested foralls.
+  SmallVector<Attribute> threadMappings = llvm::map_to_vector(
+      llvm::seq<unsigned>(warpForallOp.getRank() + laneForallOp.getRank()),
+      [&](unsigned mappingDim) -> Attribute {
+        unsigned mappingId =
+            static_cast<unsigned>(gpu::MappingId::LinearDim0) + mappingDim;
+        return gpu::GPUThreadMappingAttr::get(
+            rewriter.getContext(), static_cast<gpu::MappingId>(mappingId));
+      });
+  std::reverse(threadMappings.begin(), threadMappings.end());
+  SmallVector<OpFoldResult> lbs(threadMappings.size(),
+                                rewriter.getIndexAttr(0));
+  SmallVector<OpFoldResult> steps(threadMappings.size(),
+                                  rewriter.getIndexAttr(1));
+  SmallVector<OpFoldResult> ubs = llvm::to_vector(llvm::concat<OpFoldResult>(
+      warpForallOp.getMixedUpperBound(), laneForallOp.getMixedUpperBound()));
+  scf::ForallOp threadForallOp = rewriter.create<scf::ForallOp>(
+      warpForallOp.getLoc(), lbs, ubs, steps, warpForallOp.getOutputs(),
+      ArrayAttr::get(rewriter.getContext(), threadMappings));
+
+  // Collect pairs of combining ops to compose after inlining everything.
+  SmallVector<
+      std::pair<tensor::ParallelInsertSliceOp, tensor::ParallelInsertSliceOp>>
+      insertPairs;
+  for (auto [warpArg, laneArg] : llvm::zip_equal(
+           warpForallOp.getRegionOutArgs(), laneForallOp.getRegionOutArgs())) {
+    auto warpInsert = cast<tensor::ParallelInsertSliceOp>(
+        warpForallOp.getCombiningOps(warpArg)[0]);
+    auto laneInsert = cast<tensor::ParallelInsertSliceOp>(
+        laneForallOp.getCombiningOps(laneArg)[0]);
+    insertPairs.push_back({warpInsert, laneInsert});
+  }
+  // The lane forall's terminator also needs to be erased after inlining.
+  Operation *laneForallTerminator = laneForallOp.getBody()->getTerminator();
+  // Inline the warp and lane forall bodies into the thread forall, and remap
+  // the induction variables.
+  // The terminator will be replaced with the terminator of the inlined block.
+  rewriter.eraseOp(threadForallOp.getTerminator());
+  SmallVector<Value> replacementArgs(threadForallOp.getInductionVars());
+  replacementArgs.pop_back();
+  replacementArgs.append(threadForallOp.getRegionOutArgs().begin(),
+                         threadForallOp.getRegionOutArgs().end());
+  rewriter.mergeBlocks(warpForallOp.getBody(), threadForallOp.getBody(),
+                       replacementArgs);
+  SmallVector<Value> innerReplacementArgs(laneForallOp.getOutputs());
+  innerReplacementArgs.insert(innerReplacementArgs.begin(),
+                              threadForallOp.getInductionVars().back());
+  rewriter.inlineBlockBefore(laneForallOp.getBody(), laneForallOp,
+                             innerReplacementArgs);
+  for (auto [warpInsert, laneInsert] : insertPairs) {
+    SmallVector<OpFoldResult> composedOffsets;
+    for (auto [warpOffset, laneOffset] : llvm::zip_equal(
+             warpInsert.getMixedOffsets(), laneInsert.getMixedOffsets())) {
+      SmallVector<Value> offsets;
+      if (auto warpOffsetVal = dyn_cast<Value>(warpOffset)) {
+        offsets.push_back(warpOffsetVal);
+      }
+      if (auto laneOffsetVal = dyn_cast<Value>(laneOffset)) {
+        offsets.push_back(laneOffsetVal);
+      }
+      OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPoint(warpInsert);
+      if (!offsets.empty()) {
+        (void)setInsertionPointAfterLastValue(rewriter, offsets);
+      }
+      composedOffsets.push_back(IREE::LinalgExt::addOfrs(
+          rewriter, laneInsert.getLoc(), warpOffset, laneOffset));
+    }
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(warpInsert);
+    rewriter.replaceOpWithNewOp<tensor::ParallelInsertSliceOp>(
+        warpInsert, laneInsert.getSource(), warpInsert.getDest(),
+        composedOffsets, laneInsert.getMixedSizes(),
+        laneInsert.getMixedStrides());
+    rewriter.eraseOp(laneInsert);
+  }
+  rewriter.eraseOp(laneForallTerminator);
+  rewriter.eraseOp(laneForallOp);
+  return threadForallOp;
 }
 
 /// Return whether a parallel insert slice operation can be collapsed with
@@ -782,7 +955,7 @@ fuseExtractSliceIntoProducerForall(RewriterBase &rewriter,
 namespace {
 struct LowerInnerTiledPattern
     : public OpRewritePattern<IREE::Codegen::InnerTiledOp> {
-  using OpRewritePattern<IREE::Codegen::InnerTiledOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
     if (tiledOp.hasTensorSemantics()) {
@@ -853,16 +1026,167 @@ AffineMap dropDims(MLIRContext *context, int64_t newDimCount, AffineMap map,
                         context);
 }
 
+FailureOr<IREE::Codegen::InnerTiledOp> convertScaledContractionToInnerTiledMma(
+    RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+    IREE::Codegen::InnerTileDescAttrInterface kind) {
+  auto smmaKind = dyn_cast<IREE::GPU::ScaledMMAAttr>(kind);
+  FailureOr<IREE::LinalgExt::ScaledContractionDimensions> contractionDims =
+      IREE::LinalgExt::inferScaledContractionDims(linalgOp);
+  if (failed(contractionDims)) {
+    return failure();
+  }
+
+  if (contractionDims->m.empty() || contractionDims->n.empty() ||
+      contractionDims->k.empty() || contractionDims->kB.empty()) {
+    return failure();
+  }
+
+  MLIRContext *context = rewriter.getContext();
+
+  int64_t innerM = contractionDims->m.back();
+  int64_t innerN = contractionDims->n.back();
+  int64_t innerK = contractionDims->k.back();
+  int64_t innerKb = contractionDims->kB.back();
+
+  AffineExpr mExpr = rewriter.getAffineDimExpr(innerM);
+  AffineExpr nExpr = rewriter.getAffineDimExpr(innerN);
+  AffineExpr kExpr = rewriter.getAffineDimExpr(innerK);
+  AffineExpr kBExpr = rewriter.getAffineDimExpr(innerKb);
+
+  SmallVector<AffineMap> indexingMaps = linalgOp.getIndexingMapsArray();
+  AffineMap lhsMap = indexingMaps[0];
+  AffineMap rhsMap = indexingMaps[1];
+  AffineMap sc1Map = indexingMaps[2];
+  AffineMap sc2Map = indexingMaps[3];
+  AffineMap accMap = indexingMaps[4];
+
+  auto getNormalizedPermutation =
+      [&](AffineMap map,
+          ArrayRef<AffineExpr> expectedDimOrder) -> SmallVector<int64_t> {
+    llvm::SmallDenseMap<AffineExpr, int64_t> dimMap;
+    for (auto [i, expr] : llvm::enumerate(expectedDimOrder)) {
+      dimMap[expr] = i;
+    }
+    SmallVector<int64_t> permutation;
+    for (AffineExpr resExpr : map.getResults()) {
+      if (!dimMap.contains(resExpr)) {
+        return {};
+      }
+      permutation.push_back(dimMap[resExpr]);
+    }
+    return permutation;
+  };
+
+  // TODO: Enable batched intrinsics and get the appropriate sub-map here.
+  SmallVector<int64_t> lhsInnerPerm = getNormalizedPermutation(
+      lhsMap.getMinorSubMap(3), {mExpr, kExpr, kBExpr});
+  SmallVector<int64_t> sc1InnerPerm =
+      getNormalizedPermutation(sc1Map.getMinorSubMap(2), {mExpr, kExpr});
+  SmallVector<int64_t> rhsInnerPerm = getNormalizedPermutation(
+      rhsMap.getMinorSubMap(3), {kExpr, kBExpr, nExpr});
+  SmallVector<int64_t> sc2InnerPerm =
+      getNormalizedPermutation(sc2Map.getMinorSubMap(2), {nExpr, kExpr});
+  SmallVector<int64_t> accInnerPerm =
+      getNormalizedPermutation(accMap.getMinorSubMap(2), {mExpr, nExpr});
+  if (lhsInnerPerm.empty() || sc1InnerPerm.empty() || rhsInnerPerm.empty() ||
+      sc2InnerPerm.empty() || accInnerPerm.empty()) {
+    return failure();
+  }
+
+  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
+  auto [intrinsicM, intrinsicN, intrinsicK, intrinsicKB] =
+      smmaKind.getScaledMNKShape();
+  if (intrinsicM != bounds[innerM] || intrinsicN != bounds[innerN] ||
+      intrinsicK != bounds[innerK]) {
+    return failure();
+  }
+
+  auto reorderInputs = [](SmallVector<Value> inputs) {
+    SmallVector<Value> res;
+    int numInputs = inputs.size() - 1;
+    int offset = numInputs / 2;
+    for (int i = 0; i < numInputs; i++) {
+      res.push_back(inputs[i / 2 + (i % 2) * offset]);
+    }
+    res.push_back(inputs.back());
+    return res;
+  };
+  SmallVector<Value> inputs = reorderInputs(linalgOp->getOperands());
+
+  SmallVector<Type> eltTypes;
+  smmaKind.getElementTypes(eltTypes);
+  if (cast<RankedTensorType>(inputs[0].getType()).getElementType() !=
+          eltTypes[0] ||
+      cast<RankedTensorType>(inputs[2].getType()).getElementType() !=
+          eltTypes[2] ||
+      cast<RankedTensorType>(inputs[4].getType()).getElementType() !=
+          eltTypes[4]) {
+    return failure();
+  }
+
+  SmallVector<utils::IteratorType> linalgIteratorTypes =
+      linalgOp.getIteratorTypesArray();
+  llvm::SmallDenseSet<int64_t> droppedDims = {innerM, innerN, innerK, innerKb};
+  llvm::SmallDenseMap<int64_t, int64_t> oldDimsToNewDimsMap;
+  int64_t currentDim = 0;
+  int64_t numDims = lhsMap.getNumDims();
+  SmallVector<utils::IteratorType> iteratorTypes;
+  for (int64_t dim = 0, e = numDims; dim < e; ++dim) {
+    if (droppedDims.contains(dim)) {
+      continue;
+    }
+    iteratorTypes.push_back(linalgIteratorTypes[dim]);
+    oldDimsToNewDimsMap[dim] = currentDim++;
+  }
+  AffineMap outerLhsMap =
+      dropDims(context, numDims - 4, lhsMap, oldDimsToNewDimsMap);
+  AffineMap outerRhsMap =
+      dropDims(context, numDims - 4, rhsMap, oldDimsToNewDimsMap);
+  AffineMap outerSc1Map =
+      dropDims(context, numDims - 4, sc1Map, oldDimsToNewDimsMap);
+  AffineMap outerSc2Map =
+      dropDims(context, numDims - 4, sc2Map, oldDimsToNewDimsMap);
+  AffineMap outerAccMap =
+      dropDims(context, numDims - 4, accMap, oldDimsToNewDimsMap);
+  std::optional<SmallVector<SmallVector<int64_t>>> perms =
+      SmallVector<SmallVector<int64_t>>{
+          lhsInnerPerm, sc1InnerPerm, rhsInnerPerm, sc2InnerPerm, accInnerPerm};
+  SmallVector<int64_t> identityPerm = {0, 1};
+  if (lhsInnerPerm == identityPerm && rhsInnerPerm == identityPerm &&
+      accInnerPerm == identityPerm)
+    perms = std::nullopt;
+
+  IREE::Codegen::LoweringConfigAttrInterface maybeLoweringConfig =
+      getLoweringConfig(linalgOp);
+  auto newMmaOp = rewriter.replaceOpWithNewOp<IREE::Codegen::InnerTiledOp>(
+      linalgOp, /*inputs=*/ValueRange{inputs}.drop_back(),
+      /*inits=*/ValueRange{inputs}.back(),
+      ArrayRef<AffineMap>{outerLhsMap, outerSc1Map, outerRhsMap, outerSc2Map,
+                          outerAccMap},
+      iteratorTypes, smmaKind, perms);
+  if (maybeLoweringConfig) {
+    setLoweringConfig(newMmaOp, maybeLoweringConfig);
+  }
+  return newMmaOp;
+}
+
 // Helper to convert a contraction-like linalg op to an iree_codegen.inner_tiled
 // op with a MMA-like intrinsic descriptor.
-FailureOr<IREE::Codegen::InnerTiledOp>
-convertContractionToInnerTiledMma(RewriterBase &rewriter,
-                                  linalg::LinalgOp linalgOp,
-                                  IREE::GPU::MmaInterfaceAttr mmaKind) {
+FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
+    RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+    IREE::Codegen::InnerTileDescAttrInterface kind) {
   if (!linalgOp.hasPureTensorSemantics()) {
     return failure();
   }
 
+  FailureOr<IREE::LinalgExt::ScaledContractionDimensions> maybeScaledContrDims =
+      IREE::LinalgExt::inferScaledContractionDims(linalgOp);
+  if (succeeded(maybeScaledContrDims)) {
+    return convertScaledContractionToInnerTiledMma(rewriter, linalgOp, kind);
+  }
+
+  IREE::GPU::MmaInterfaceAttr mmaKind =
+      dyn_cast<IREE::GPU::MmaInterfaceAttr>(kind);
   FailureOr<linalg::ContractionDimensions> maybeContractionDims =
       linalg::inferContractionDims(linalgOp);
   if (failed(maybeContractionDims)) {
@@ -1105,7 +1429,7 @@ distributeInnerTiledOp(RewriterBase &rewriter,
 namespace {
 struct DropInnerTiledUnitDimsPattern
     : public OpRewritePattern<IREE::Codegen::InnerTiledOp> {
-  using OpRewritePattern<IREE::Codegen::InnerTiledOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
     if (tiledOp.hasTensorSemantics()) {
@@ -1318,7 +1642,7 @@ struct UnrollInnerTiledPattern
         loc, dstVecType, rewriter.getZeroAttr(dstVecType));
     for (const auto &[offsets, partialResult] : accCache) {
       SmallVector<int64_t> dstStrides(offsets.size() + innerAccShape.size(), 1);
-      SmallVector<int64_t> fullOffsets(offsets.begin(), offsets.end());
+      SmallVector<int64_t> fullOffsets(offsets);
       fullOffsets.append(innerAccShape.size(), 0);
       result = rewriter.create<vector::InsertStridedSliceOp>(
           loc, partialResult, result, fullOffsets, dstStrides);
@@ -1346,34 +1670,35 @@ static bool isParallelIterator(Attribute attr) {
          utils::IteratorType::parallel;
 }
 
-/// Pick an unrolling order that reuses the LHS register.
+/// Pick an unrolling order that reuses the LHS register, assuming that the LHS
+/// register is the first argument.
 static std::optional<SmallVector<int64_t>>
-gpuMultiMmaUnrollOrder(Operation *op) {
-  IREE::Codegen::InnerTiledOp mmaOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op);
-  // TODO: review for generalizability to other inner tiled ops.
-  if (!mmaOp || !isa<GPU::MmaInterfaceAttr>(mmaOp.getKind())) {
+gpuMatmulLikeUnrollOrder(Operation *op) {
+  IREE::Codegen::InnerTiledOp tiledOp =
+      dyn_cast<IREE::Codegen::InnerTiledOp>(op);
+  if (!tiledOp) {
     return std::nullopt;
   }
   SmallVector<int64_t> order;
   // First make reduction the outer dimensions.
-  for (auto [index, iter] : llvm::enumerate(mmaOp.getIteratorTypes())) {
+  for (auto [index, iter] : llvm::enumerate(tiledOp.getIteratorTypes())) {
     if (isReductionIterator(iter)) {
       order.push_back(index);
     }
   }
 
   llvm::SmallDenseSet<int64_t> dimsInLhs;
-  for (AffineExpr expr : mmaOp.getIndexingMapsArray()[0].getResults()) {
+  for (AffineExpr expr : tiledOp.getIndexingMapsArray()[0].getResults()) {
     dimsInLhs.insert(cast<AffineDimExpr>(expr).getPosition());
   }
   // Then parallel dimensions that are part of Lhs as we want to re-use Lhs.
-  for (auto [index, iter] : llvm::enumerate(mmaOp.getIteratorTypes())) {
+  for (auto [index, iter] : llvm::enumerate(tiledOp.getIteratorTypes())) {
     if (isParallelIterator(iter) && dimsInLhs.count(index)) {
       order.push_back(index);
     }
   }
   // Then the remaining parallel loops.
-  for (auto [index, iter] : llvm::enumerate(mmaOp.getIteratorTypes())) {
+  for (auto [index, iter] : llvm::enumerate(tiledOp.getIteratorTypes())) {
     if (isParallelIterator(iter) && !dimsInLhs.count(index)) {
       order.push_back(index);
     }
@@ -1395,7 +1720,7 @@ void populateIREEGPUVectorUnrollPatterns(RewritePatternSet &patterns) {
   populateIREEGPUVectorUnrollPatterns(
       patterns, vector::UnrollVectorOptions()
                     .setNativeShapeFn(getInnerTiledUnitShape)
-                    .setUnrollTraversalOrderFn(gpuMultiMmaUnrollOrder));
+                    .setUnrollTraversalOrderFn(gpuMatmulLikeUnrollOrder));
 }
 
 //===---------------------------------------------------------------------===//
@@ -1461,7 +1786,7 @@ void mapLaneForalls(RewriterBase &rewriter, Operation *funcOp,
 namespace {
 struct LowerBarrierRegion
     : public OpRewritePattern<IREE::GPU::BarrierRegionOp> {
-  using OpRewritePattern<IREE::GPU::BarrierRegionOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::GPU::BarrierRegionOp barrierRegionOp,
                                 PatternRewriter &rewriter) const final {
     Location loc = barrierRegionOp.getLoc();
@@ -1552,7 +1877,7 @@ vectorizeStaticInnerTiledOp(RewriterBase &rewriter,
 namespace {
 struct VectorizeStaticInnerTiledOpPattern final
     : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
-  using OpRewritePattern<IREE::Codegen::InnerTiledOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
     return vectorizeStaticInnerTiledOp(rewriter, tiledOp);
@@ -1571,7 +1896,7 @@ void populateIREEGPUVectorizationPatterns(RewritePatternSet &patterns) {
 namespace {
 struct LowerValueBarrierPattern
     : public OpRewritePattern<IREE::GPU::ValueBarrierOp> {
-  using OpRewritePattern<IREE::GPU::ValueBarrierOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::GPU::ValueBarrierOp barrier,
                                 PatternRewriter &rewriter) const override {
     if (barrier.hasTensorSemantics()) {
@@ -1588,7 +1913,7 @@ struct LowerValueBarrierPattern
 
 struct LowerGlobalLoadDMAPattern
     : public OpRewritePattern<IREE::GPU::GlobalLoadDMAOp> {
-  using OpRewritePattern<IREE::GPU::GlobalLoadDMAOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::GPU::GlobalLoadDMAOp dmaOp,
                                 PatternRewriter &rewriter) const override {
     Type transferType = rewriter.getI32Type();

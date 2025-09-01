@@ -23,6 +23,7 @@
 # LINKOPTS: List of link options
 # TESTONLY: for testing; won't compile when tests are disabled
 # HOSTONLY: host only; compile using host toolchain when cross-compiling
+# COVERAGE: whether to enable code coverage during compilation/linking.
 # SETUP_INSTALL_RPATH: Sets an install RPATH which assumes the standard
 #   directory layout (to be used if linking against installed shared libs).
 # INSTALL_COMPONENT: CMake install component (Defaults to "IREETool-${_RULE_NAME}").
@@ -53,7 +54,7 @@ function(iree_cc_binary)
   cmake_parse_arguments(
     _RULE
     "EXCLUDE_FROM_ALL;HOSTONLY;TESTONLY;SETUP_INSTALL_RPATH;DISABLE_LLVM_LINK_LLVM_DYLIB"
-    "NAME;INSTALL_COMPONENT"
+    "NAME;INSTALL_COMPONENT;COVERAGE"
     "SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS"
     ${ARGN}
   )
@@ -130,6 +131,21 @@ function(iree_cc_binary)
       ${IREE_DEFAULT_LINKOPTS}
       ${_RULE_LINKOPTS}
   )
+
+  # Enable coverage if requested.
+  if(${_RULE_COVERAGE})
+    target_compile_options(${_NAME}
+      PRIVATE
+        "-fprofile-instr-generate"
+        "-fcoverage-mapping"
+    )
+    target_link_options(${_NAME}
+      PRIVATE
+        "-fprofile-instr-generate"
+        "-fcoverage-mapping"
+    )
+    set_property(GLOBAL APPEND PROPERTY IREE_RUNTIME_COVERAGE_TARGETS "${_NAME}=$<TARGET_FILE:${_NAME}>")
+  endif()
 
   # Replace dependencies passed by ::name with iree::package::name
   list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")

@@ -17,7 +17,7 @@
 hal.executable private @matmul_tensors {
   hal.executable.variant public @llvm target(#executable_target_embedded_elf_arm_64_) {
     hal.executable.export public @matmul_tensors layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -66,9 +66,9 @@ hal.executable private @matmul_tensors {
 //      CHECK:    hal.return %[[D1]], %[[D0]], %[[C1]] : index, index, index
 //      CHECK: func.func @matmul_tensors()
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
-//  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(0)
-//  CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1)
-//  CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(2)
+//  CHECK-DAG:   %[[M:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 0
+//  CHECK-DAG:   %[[N:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 1
+//  CHECK-DAG:   %[[K:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 2
 //  CHECK-DAG:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //  CHECK-DAG:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //  CHECK-DAG:   %[[INIT_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
@@ -113,7 +113,7 @@ hal.executable private @matmul_tensors {
 hal.executable private @add {
   hal.executable.variant public @llvm target(#executable_target_embedded_elf_x86_64_) {
     hal.executable.export public @add layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -183,7 +183,7 @@ hal.executable private @add {
 hal.executable private @add4D {
   hal.executable.variant public @llvm target(#executable_target_embedded_elf_x86_64_) {
     hal.executable.export public @add4D layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 :index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3, %arg4)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -259,7 +259,7 @@ hal.executable private @add4D {
 hal.executable private @add_distribute4D {
   hal.executable.variant public @llvm target(#executable_target_embedded_elf_x86_64_) {
     hal.executable.export public @add_distribute4D layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 :index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3, %arg4)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -321,10 +321,10 @@ hal.executable private @add_distribute4D {
 //      CHECK:    hal.return %[[D2]], %[[D1]], %[[D0]] : index, index, index
 //      CHECK:    func.func @add_distribute4D()
 // CHECK-SAME:    translation_info = #[[TRANSLATION]]
-//  CHECK-DAG:      %[[D0:.*]] = hal.interface.constant.load layout({{.+}}) ordinal(0) : index
-//  CHECK-DAG:      %[[D1:.*]] = hal.interface.constant.load layout({{.+}}) ordinal(1) : index
-//  CHECK-DAG:      %[[D2:.*]] = hal.interface.constant.load layout({{.+}}) ordinal(2) : index
-//  CHECK-DAG:      %[[D3:.*]] = hal.interface.constant.load layout({{.+}}) ordinal(3) : index
+//  CHECK-DAG:      %[[D0:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 0
+//  CHECK-DAG:      %[[D1:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 1
+//  CHECK-DAG:      %[[D2:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 2
+//  CHECK-DAG:      %[[D3:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 3
 //  CHECK-DAG:      %[[D4:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(32) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x?xf32>>{%[[D0]], %[[D1]], %[[D2]], %[[D3]]}
 //  CHECK-DAG:      %[[D5:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(32) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?x?xf32>>{%[[D0]], %[[D1]], %[[D2]], %[[D3]]}
 //  CHECK-DAG:      %[[D6:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(2) alignment(32) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?x?x?xf32>>{%[[D0]], %[[D1]], %[[D2]], %[[D3]]}
@@ -379,7 +379,7 @@ hal.executable private @add_distribute4D {
 hal.executable private @add_distribute4D_zero_tile_size {
   hal.executable.variant public @llvm target(#executable_target_embedded_elf_x86_64_) {
     hal.executable.export public @add_distribute4D_zero_tile_size layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 :index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3, %arg4)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -450,7 +450,7 @@ hal.executable private @add_distribute4D_zero_tile_size {
 hal.executable private @batch_matmul_tensors {
   hal.executable.variant public @llvm target(#executable_target_embedded_elf_arm_64_) {
     hal.executable.export public @batch_matmul_tensors layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3, %arg4)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -518,7 +518,7 @@ hal.executable private @batch_matmul_tensors {
 hal.executable private @preset_config_matmul_tensors {
   hal.executable.variant public @system_elf_x86_64 target(#executable_target_system_elf_x86_64_) {
     hal.executable.export public @preset_config layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -578,7 +578,7 @@ hal.executable private @preset_config_matmul_tensors {
 hal.executable public @copy_op {
   hal.executable.variant public @system_elf_x86_64 target(#executable_target_system_elf_x86_64_) {
     hal.executable.export public @copy_op layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3: index, %arg4 : index, %arg5: index, %arg6 : index, %arg7: index, %arg8 : index, %arg9: index, %arg10: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7, %arg8, %arg9, %arg10
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7, %arg8, %arg9, %arg10)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -632,16 +632,16 @@ hal.executable public @copy_op {
 //      CHECK:   hal.return %[[D1]], %[[D0]], %[[C1]]
 //      CHECK: func.func @copy_op()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//  CHECK-DAG:   %[[SOURCE_SIZE_Y:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(0) : index
-//  CHECK-DAG:   %[[SOURCE_SIZE_X:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1) : index
-//  CHECK-DAG:   %[[DEST_SIZE_Y:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(2) : index
-//  CHECK-DAG:   %[[DEST_SIZE_X:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(3) : index
-//  CHECK-DAG:   %[[SOURCE_OFFSET_Y:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(4) : index
-//  CHECK-DAG:   %[[SOURCE_OFFSET_X:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(5) : index
-//  CHECK-DAG:   %[[DEST_OFFSET_Y:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(6) : index
-//  CHECK-DAG:   %[[DEST_OFFSET_X:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(7) : index
-//  CHECK-DAG:   %[[SLICE_SIZE_Y:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(8) : index
-//  CHECK-DAG:   %[[SLICE_SIZE_X:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(9) : index
+//  CHECK-DAG:   %[[SOURCE_SIZE_Y:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 0 : index
+//  CHECK-DAG:   %[[SOURCE_SIZE_X:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 1 : index
+//  CHECK-DAG:   %[[DEST_SIZE_Y:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 2 : index
+//  CHECK-DAG:   %[[DEST_SIZE_X:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 3 : index
+//  CHECK-DAG:   %[[SOURCE_OFFSET_Y:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 4 : index
+//  CHECK-DAG:   %[[SOURCE_OFFSET_X:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 5 : index
+//  CHECK-DAG:   %[[DEST_OFFSET_Y:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 6 : index
+//  CHECK-DAG:   %[[DEST_OFFSET_X:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 7 : index
+//  CHECK-DAG:   %[[SLICE_SIZE_Y:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 8 : index
+//  CHECK-DAG:   %[[SLICE_SIZE_X:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 9 : index
 //  CHECK-DAG:   %[[SOURCE_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //  CHECK-DAG:   %[[DEST_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //  CHECK-DAG:   %[[SOURCE:.+]] = memref.subview %[[SOURCE_BINDING]][%[[SOURCE_OFFSET_Y]], %[[SOURCE_OFFSET_X]]]
@@ -676,7 +676,7 @@ hal.executable public @copy_op {
 hal.executable private @static_1d_fft_stage2 {
   hal.executable.variant public @system_elf_x86_64 target(#executable_target_system_elf_x86_64_) {
     hal.executable.export public @static_1d_fft_stage2 layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -728,7 +728,7 @@ hal.executable private @static_1d_fft_stage2 {
 hal.executable private @static_3d_fft_stage3 {
   hal.executable.variant public @system_elf_x86_64 target(#executable_target_system_elf_x86_64_) {
     hal.executable.export public @static_3d_fft_stage3 layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -781,7 +781,7 @@ hal.executable private @static_3d_fft_stage3 {
 hal.executable private @outs_fusion {
   hal.executable.variant public @system_elf_x86_64 target(#executable_target_system_elf_x86_64_) {
     hal.executable.export public @outs_fusion_fn layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -862,7 +862,7 @@ hal.executable private @outs_fusion {
 hal.executable private @conv {
   hal.executable.variant public @system_elf_x86_64 target(#executable_target_system_elf_x86_64_) {
     hal.executable.export public @conv layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index, %arg5 : index, %arg6 : index, %arg7 : index, %arg8 : index, %arg9 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7, %arg8, %arg9
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7, %arg8, %arg9)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -949,7 +949,7 @@ hal.executable private @conv {
 hal.executable private @conv_static {
   hal.executable.variant public @system_elf_x86_64 target(#executable_target_system_elf_x86_64_) {
     hal.executable.export public @conv_static layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index, %arg5 : index, %arg6 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4, %arg5, %arg6
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2, %arg3, %arg4, %arg5, %arg6)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1021,7 +1021,7 @@ hal.executable private @conv_static {
 hal.executable private @generic_static {
   hal.executable.variant public @system_elf_x86_64 target(#executable_target_system_elf_x86_64_) {
     hal.executable.export public @generic_static layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1084,7 +1084,7 @@ hal.executable private @generic_static {
 hal.executable private @matmul_static {
   hal.executable.variant public @system_elf_arm_64 target(#executable_target_system_elf_arm_64_) {
     hal.executable.export public @matmul_static layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1136,7 +1136,7 @@ hal.executable private @matmul_static {
 hal.executable private @restrict_num_workgroups {
   hal.executable.variant public @system_elf_arm_64 target(#executable_target_system_elf_arm_64_) {
     hal.executable.export public @restrict_num_workgroups layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1190,7 +1190,7 @@ hal.executable private @restrict_num_workgroups {
 hal.executable private @reduction {
   hal.executable.variant public @reduction target(#executable_target_embedded_elf_x86_64_) {
     hal.executable.export public @reduction ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     } attributes {translation_info = #translation}
     builtin.module {
@@ -1257,7 +1257,7 @@ hal.executable private @reduction {
 hal.executable private @gemm_unit_N {
   hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64_) {
     hal.executable.export public @gemm_unit_N ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1300,7 +1300,7 @@ hal.executable private @gemm_unit_N {
 //      CHECK:   hal.return %[[D0]], %[[C1]], %[[C1]] : index, index, index
 //      CHECK: func.func @gemm_unit_N()
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
-//  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load layout(#pipeline_layout) ordinal(0)
+//  CHECK-DAG:   %[[M:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 0
 //  CHECK-DAG:   %[[WG_ID_X:.+]] = hal.interface.workgroup.id[0]
 //  CHECK-DAG:   %[[WG_COUNT_X:.+]] = hal.interface.workgroup.count[0]
 //  CHECK-DAG:   %[[LB:.+]] = affine.apply #[[MAP1]]()[%[[WG_ID_X]]]
@@ -1326,7 +1326,7 @@ hal.executable private @gemm_unit_N {
 hal.executable private @gemm_unit_M_unit_N {
   hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64_) {
     hal.executable.export public @gemm_unit_M_unit_N ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1382,7 +1382,7 @@ hal.executable private @gemm_unit_M_unit_N {
 hal.executable private @generic_unit_dims {
   hal.executable.variant public @llvm target(#executable_target_embedded_elf_x86_64_) {
     hal.executable.export public @generic_unit_dims layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3, %arg4)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1454,7 +1454,7 @@ hal.executable private @generic_unit_dims {
 hal.executable private @reduce_to_scalar {
   hal.executable.variant public @llvm target(#executable_target_embedded_elf_x86_64_) {
     hal.executable.export public @reduce_to_scalar layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1510,7 +1510,7 @@ hal.executable private @reduce_to_scalar {
 hal.executable private @scalar {
   hal.executable.variant public @llvm target(#executable_target_embedded_elf_x86_64_) {
     hal.executable.export public @scalar layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1564,7 +1564,7 @@ hal.executable private @scalar {
 hal.executable private @rank_reduced_slice {
   hal.executable.variant public @llvm target(#executable_target_embedded_elf_arm_64_) {
     hal.executable.export public @rank_reduced_slice layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1629,7 +1629,7 @@ hal.executable private @rank_reduced_slice {
 hal.executable private @matmul_interchange {
   hal.executable.variant public @llvm target(#executable_target_embedded_elf_x86_64_) {
     hal.executable.export public @matmul_interchange layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1677,8 +1677,8 @@ hal.executable private @matmul_interchange {
 //      CHECK:    hal.return %[[D0]], %[[D1]], %[[C1]] : index, index, index
 //      CHECK: func.func @matmul_interchange()
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
-//  CHECK-DAG:   %[[D0:.+]] = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
-//  CHECK-DAG:   %[[D1:.+]] = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
+//  CHECK-DAG:   %[[D0:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 0 : index
+//  CHECK-DAG:   %[[D1:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 1 : index
 //      CHECK:   scf.for %{{.+}} = %{{.+}} to %[[D1]] step %{{.+}} {
 //      CHECK:     scf.for %{{.+}} = %{{.+}} to %[[D0]] step %{{.+}} {
 
@@ -1691,7 +1691,7 @@ hal.executable private @matmul_interchange {
 hal.executable private @no_compute {
   hal.executable.variant public @embedded_elf_x86_64 target(<"llvm-cpu", "embedded-elf-x86_64", {}>) {
     hal.executable.export public @no_compute ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4 : index, %arg5 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4, %arg5
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3, %arg4, %arg5)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1734,7 +1734,7 @@ hal.executable private @no_compute {
 hal.executable private @tile_multiuse_producer {
   hal.executable.variant public @embedded_elf_x86_64 target(<"llvm-cpu", "embedded-elf_x86_64", {}>) {
     hal.executable.export public @tile_multiuse_producer ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1833,7 +1833,7 @@ hal.executable private @tile_multiuse_producer {
 hal.executable private @no_tile {
   hal.executable.variant public @embedded_elf_x86_64 target(<"llvm-cpu", "embedded-elf-x86_64", {}>) {
     hal.executable.export public @no_tile ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1873,7 +1873,7 @@ hal.executable private @no_tile {
 hal.executable private @pack_lowering {
   hal.executable.variant public @embedded_elf_x86_64 target(<"llvm-cpu", "embedded-elf-x86_64", {}>) {
     hal.executable.export public @gemm_lhs_pack ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1883,15 +1883,15 @@ hal.executable private @pack_lowering {
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
             : !iree_tensor_ext.dispatch.tensor<readonly:tensor<100x250xf32>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0)
-            : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<14x64x8x4xf32>>
+            : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<13x63x8x4xf32>>
         %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [100, 250], strides = [1, 1]
             : !iree_tensor_ext.dispatch.tensor<readonly:tensor<100x250xf32>> -> tensor<100x250xf32>
-        %3 = tensor.empty() : tensor<14x64x8x4xf32>
+        %3 = tensor.empty() : tensor<13x63x8x4xf32>
         %4 = linalg.pack %2 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 4] into %3
             {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[12, 12]]>}
-            : tensor<100x250xf32> -> tensor<14x64x8x4xf32>
-        iree_tensor_ext.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [14, 64, 8, 4], strides = [1, 1, 1, 1]
-            : tensor<14x64x8x4xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<14x64x8x4xf32>>
+            : tensor<100x250xf32> -> tensor<13x63x8x4xf32>
+        iree_tensor_ext.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [13, 63, 8, 4], strides = [1, 1, 1, 1]
+            : tensor<13x63x8x4xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<13x63x8x4xf32>>
         return
       }
     }
@@ -1912,7 +1912,7 @@ hal.executable private @pack_lowering {
 hal.executable private @pack_lowering {
   hal.executable.variant public @embedded_elf_x86_64 target(<"llvm-cpu", "embedded-elf-x86_64", {}>) {
     hal.executable.export public @gemm_rhs_transpose_pack ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1923,15 +1923,15 @@ hal.executable private @pack_lowering {
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
             : !iree_tensor_ext.dispatch.tensor<readonly:tensor<250x500xf32>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c114688)
-            : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<64x64x8x4xf32>>
+            : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<63x63x8x4xf32>>
         %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [250, 500], strides = [1, 1]
             : !iree_tensor_ext.dispatch.tensor<readonly:tensor<250x500xf32>> -> tensor<250x500xf32>
-        %3 = tensor.empty() : tensor<64x64x8x4xf32>
+        %3 = tensor.empty() : tensor<63x63x8x4xf32>
         %4 = linalg.pack %2 padding_value(%cst : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [8, 4] into %3
             {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[12, 14]]>}
-            : tensor<250x500xf32> -> tensor<64x64x8x4xf32>
-        iree_tensor_ext.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [64, 64, 8, 4], strides = [1, 1, 1, 1]
-            : tensor<64x64x8x4xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<64x64x8x4xf32>>
+            : tensor<250x500xf32> -> tensor<63x63x8x4xf32>
+        iree_tensor_ext.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [63, 63, 8, 4], strides = [1, 1, 1, 1]
+            : tensor<63x63x8x4xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<63x63x8x4xf32>>
         return
       }
     }
@@ -1952,7 +1952,7 @@ hal.executable private @pack_lowering {
 hal.executable private @clone_index_computations {
   hal.executable.variant public @embedded_elf_x86_64 target(<"llvm-cpu", "embedded-elf-x86_64", {}>) {
     hal.executable.export public @clone_index_computations ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3 : index, %arg4 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3, %arg4)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -2017,7 +2017,7 @@ hal.executable private @clone_index_computations {
 hal.executable private @dynamic_unpack {
   hal.executable.variant public @embedded_elf_x86_64 target(<"llvm-cpu", "embedded-elf-x86_64", {}>) {
     hal.executable.export public @dynamic_unpack ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3, %arg4)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -2063,7 +2063,7 @@ hal.executable private @dynamic_unpack {
 hal.executable private @dynamic_unpack_dynamic_tile {
   hal.executable.variant public @embedded_elf_x86_64 target(<"llvm-cpu", "embedded-elf-x86_64", {}>) {
     hal.executable.export public @dynamic_unpack_dynamic_tile ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3, %arg4)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -2115,7 +2115,7 @@ hal.executable private @dynamic_unpack_dynamic_tile {
 hal.executable private @unpack_elem {
   hal.executable.variant public @embedded_elf_arm_64 target(<"llvm-cpu", "embedded-elf-arm_64", {}>) {
     hal.executable.export public @unpack_elem ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -2156,7 +2156,7 @@ hal.executable private @unpack_elem {
 hal.executable private @dynamic_unpack_fusion {
   hal.executable.variant public @vmvx_bytecode_fb target(<"vmvx", "vmvx-bytecode-fb", {ukernels = true}>) {
     hal.executable.export public @dynamic_unpack_fusion ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -2219,7 +2219,7 @@ hal.executable private @dynamic_unpack_fusion {
 hal.executable private @elem_pack {
   hal.executable.variant public @embedded_elf_arm_64 target(<"llvm-cpu", "embedded-elf-arm_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>) {
     hal.executable.export public @elem_pack ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -2291,7 +2291,7 @@ hal.executable private @scatter {
       #hal.pipeline.binding<storage_buffer>
     ]>)
     count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -2330,7 +2330,7 @@ hal.executable private @scatter {
 hal.executable private @collapse_workgroups_dispatch_dispatch_0 {
   hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export public @collapse_workgroups_dispatch_dispatch_0_generic_1024x128x16x64 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -2377,7 +2377,7 @@ hal.executable private @collapse_workgroups_dispatch_dispatch_0 {
 hal.executable private @matmul_tensors {
   hal.executable.variant public @llvm target(#executable_target_embedded_elf_arm_64_) {
     hal.executable.export public @matmul_tensor_count_from_dag_root layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2, %arg3)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -2488,7 +2488,7 @@ module {
 hal.executable private @avoid_unit_range_distribute {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export public @avoid_unit_range_distribute ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2)
       hal.return %x, %y, %z : index, index, index
     } attributes {subgroup_size = 32 : index, translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute>, workgroup_size = [32 : index, 1 : index, 1 : index]}
     builtin.module {
@@ -2563,7 +2563,7 @@ hal.executable private @avoid_unit_range_distribute {
 hal.executable private @set_size_to_tilesize_when_divisible {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export public @set_size_to_tilesize_when_divisible ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -2639,7 +2639,7 @@ hal.executable private @set_size_to_tilesize_when_divisible {
 hal.executable private @reshape_matmul_tensors {
   hal.executable.variant public @system_elf_x86_64 target(#executable_target_system_elf_x86_64_) {
     hal.executable.export public @reshape_matmul layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {

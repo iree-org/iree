@@ -5,8 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/GlobalOptimization/Utils.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -107,21 +105,6 @@ Value createGenericElementwiseCastOp(
       .getResult(0);
 }
 
-FailureOr<IREE::Flow::DispatchRegionOp>
-wrapConsecutiveOpsInDispatchRegion(RewriterBase &rewriter,
-                                   SmallVector<Operation *> ops) {
-  FailureOr<IREE::Flow::DispatchRegionOp> maybeRegionOp =
-      IREE::Flow::wrapOpInDispatchRegion(rewriter, ops.back());
-  if (failed(maybeRegionOp)) {
-    return failure();
-  }
-  IREE::Flow::DispatchRegionOp regionOp = maybeRegionOp.value();
-
-  SmallVector<Operation *> precedingOps(ops.begin(), ops.end() - 1);
-  return IREE::Flow::movePrecedingOpsIntoDispatchRegion(rewriter, precedingOps,
-                                                        regionOp);
-}
-
 Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,
                                Type accETy, ArrayRef<bool> is_reduction) {
   auto context = val.getContext();
@@ -142,7 +125,7 @@ Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,
   // Create a zero-filled accumulator.
   Value initAcc =
       rewriter.create<tensor::EmptyOp>(staticSizes, accETy, dynSizes);
-  Value zeroInt = rewriter.create<arith::ConstantIntOp>(0, accETy).getResult();
+  Value zeroInt = rewriter.create<arith::ConstantIntOp>(accETy, 0).getResult();
   Value zeroAcc =
       rewriter.create<linalg::FillOp>(zeroInt, initAcc).getResult(0);
 

@@ -176,7 +176,7 @@ static iree_status_t iree_hal_webgpu_simple_allocator_allocate_buffer(
     usage_flags |= WGPUBufferUsage_Uniform;
   }
   if (iree_any_bit_set(params->usage,
-                       IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS)) {
+                       IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMETERS)) {
     usage_flags |= WGPUBufferUsage_Indirect;
   }
 

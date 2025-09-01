@@ -72,11 +72,13 @@ iree_cc_binary(
     iree::base
     iree::base::internal::flags
     iree::hal
+    iree::io::file_handle
     iree::modules::hal::types
     iree::testing::benchmark
     iree::tooling::device_util
     iree::tooling::function_io
     iree::vm
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
   INSTALL_COMPONENT IREETools-Runtime
 )
 
@@ -95,6 +97,7 @@ iree_cc_binary(
     iree::tooling::device_util
     iree::tooling::function_io
     iree::vm
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
   INSTALL_COMPONENT IREETools-Runtime
 )
 
@@ -105,7 +108,6 @@ iree_cc_binary(
     "iree-check-module-main.cc"
   DEPS
     iree::base
-    iree::base::internal::file_io
     iree::base::internal::flags
     iree::hal
     iree::modules::check
@@ -115,6 +117,7 @@ iree_cc_binary(
     iree::vm
     iree::vm::bytecode::module
   TESTONLY
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
 )
 
 iree_cc_binary(
@@ -124,13 +127,14 @@ iree_cc_binary(
     "iree-convert-parameters-main.c"
   DEPS
     iree::base
-    iree::base::internal::file_io
     iree::base::internal::flags
     iree::hal
+    iree::io::file_handle
     iree::io::formats::irpa
     iree::io::parameter_index
     iree::io::scope_map
     iree::tooling::parameter_util
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
   INSTALL_COMPONENT IREETools-Runtime
 )
 
@@ -143,6 +147,7 @@ iree_cc_binary(
     iree::base
     iree::base::internal::cpu
     iree::schemas::cpu_data
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
   INSTALL_COMPONENT IREETools-Runtime
 )
 
@@ -153,13 +158,14 @@ iree_cc_binary(
     "iree-create-parameters-main.c"
   DEPS
     iree::base
-    iree::base::internal::file_io
     iree::base::internal::flags
     iree::hal
+    iree::io::file_handle
     iree::io::formats::irpa
     iree::io::parameter_index
     iree::io::scope_map
     iree::io::stream
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
   INSTALL_COMPONENT IREETools-Runtime
 )
 
@@ -171,10 +177,11 @@ iree_cc_binary(
   DEPS
     flatcc::runtime
     iree::base
-    iree::base::internal::file_io
     iree::base::internal::flatcc::parsing
+    iree::io::file_handle
     iree::schemas::instruments
     iree::schemas::instruments::dispatch_def_c_fbs
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
   INSTALL_COMPONENT IREETools-Runtime
 )
 
@@ -186,12 +193,13 @@ iree_cc_binary(
   DEPS
     flatcc::runtime
     iree::base
-    iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::internal::flatcc::debugging
     iree::base::internal::flatcc::parsing
+    iree::io::file_handle
     iree::schemas::bytecode_module_def_c_fbs
     iree::vm::bytecode::module
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
   INSTALL_COMPONENT IREETools-Runtime
 )
 
@@ -202,11 +210,12 @@ iree_cc_binary(
     "iree-dump-parameters-main.c"
   DEPS
     iree::base
-    iree::base::internal::file_io
     iree::base::internal::flags
+    iree::io::file_handle
     iree::io::parameter_index
     iree::io::scope_map
     iree::tooling::parameter_util
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
   INSTALL_COMPONENT IREETools-Runtime
 )
 
@@ -222,9 +231,10 @@ iree_cc_binary(
     "iree-fatelf.c"
   DEPS
     iree::base
-    iree::base::internal::file_io
     iree::base::internal::path
+    iree::io::file_handle
     iree::hal::local::elf::elf_module
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
   INSTALL_COMPONENT IREETools-Runtime
 )
 endif()  # IREE_HAL_EXECUTABLE_*_EMBEDDED_ELF
@@ -241,6 +251,7 @@ iree_cc_binary(
     iree::tooling::context_util
     iree::tooling::run_module
     iree::vm
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
   INSTALL_COMPONENT IREETools-Runtime
 )
 

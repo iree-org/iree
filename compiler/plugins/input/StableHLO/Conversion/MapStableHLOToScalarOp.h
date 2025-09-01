@@ -197,7 +197,7 @@ struct MapStableHloOpToScalarOpImpl<StdScalarOp> {
   Value operator()(Location loc, ArrayRef<Type> resultTypes,
                    ArrayRef<Type> /*argTypes*/, ValueRange args, OpBuilder *b) {
     return b->template create<StdScalarOp>(loc, resultTypes, args,
-                                           std::nullopt);
+                                           ArrayRef<NamedAttribute>{});
   }
 };
 
@@ -208,7 +208,7 @@ struct MapStableHloOpToScalarOpImpl<SupportedType, StdScalarOp, Args...> {
     Type elementType = getElementTypeOrSelf(argTypes.front());
     if (SupportedType{}(elementType)) {
       return b->template create<StdScalarOp>(loc, resultTypes, args,
-                                             std::nullopt);
+                                             ArrayRef<NamedAttribute>{});
     }
     return MapStableHloOpToScalarOpImpl<Args...>{}(loc, resultTypes, argTypes,
                                                    args, b);
@@ -489,7 +489,7 @@ inline Value mapStableHloOpToStdScalarOp<stablehlo::ReducePrecisionOp>(
   expBitsMask = ((expBitsMask << srcExponentBits) - 1) << srcMantissaBits;
 
   auto createConstant = [&](const APInt &v) {
-    return b.create<arith::ConstantIntOp>(v.getZExtValue(), intType)
+    return b.create<arith::ConstantIntOp>(intType, v.getZExtValue())
         .getResult();
   };
 
@@ -510,7 +510,7 @@ inline Value mapStableHloOpToStdScalarOp<stablehlo::ReducePrecisionOp>(
     APInt baseRoundingBias = lastMantissaBitMask.lshr(1) - 1;
 
     Value mantissaDiff = b.create<arith::ConstantIntOp>(
-        srcMantissaBits - destMantissaBits, intType);
+        intType, srcMantissaBits - destMantissaBits);
     Value highestMantissaMaskVal = createConstant(lastMantissaBitMask);
     Value baseRoundingBiasVal = createConstant(baseRoundingBias);
     Value xLastMantissaBit = b.create<arith::ShRUIOp>(
@@ -683,22 +683,22 @@ inline Value mapConvertOpToStdScalarOp(Location loc, ArrayRef<Type> targetTypes,
       mlir::arith::UIToFPOp::areCastCompatible(convertedSourceType,
                                                targetType)) {
     return b->create<mlir::arith::UIToFPOp>(loc, resultTypes, args,
-                                            std::nullopt);
+                                            ArrayRef<NamedAttribute>{});
   }
   if (mlir::arith::SIToFPOp::areCastCompatible(sourceType, targetType)) {
     return b->create<mlir::arith::SIToFPOp>(loc, resultTypes, args,
-                                            std::nullopt);
+                                            ArrayRef<NamedAttribute>{});
   }
   if (isa<FloatType>(sourceType) && isa<FloatType>(targetType)) {
     auto src = cast<FloatType>(sourceType);
     auto res = cast<FloatType>(targetType);
     if (src.getWidth() > res.getWidth()) {
       return b->create<mlir::arith::TruncFOp>(loc, resultTypes, args,
-                                              std::nullopt);
+                                              ArrayRef<NamedAttribute>{});
     }
     if (src.getWidth() < res.getWidth()) {
       return b->create<mlir::arith::ExtFOp>(loc, resultTypes, args,
-                                            std::nullopt);
+                                            ArrayRef<NamedAttribute>{});
     }
     // There's no direct conversion between different 16 bit floating point
     // types, so go through 32 bit float.
@@ -731,16 +731,16 @@ inline Value mapConvertOpToStdScalarOp(Location loc, ArrayRef<Type> targetTypes,
     auto res = cast<IntegerType>(targetType);
     if (src.getWidth() > res.getWidth()) {
       return b->create<mlir::arith::TruncIOp>(loc, resultTypes, args,
-                                              std::nullopt);
+                                              ArrayRef<NamedAttribute>{});
     }
     if (src.getWidth() < res.getWidth()) {
       // Special case boolean values, so they get casted to `1` instead of `-1`.
       if (IsUnsignedIntegerType{}(src)) {
         return b->create<mlir::arith::ExtUIOp>(loc, resultTypes, args,
-                                               std::nullopt);
+                                               ArrayRef<NamedAttribute>{});
       }
       return b->create<mlir::arith::ExtSIOp>(loc, resultTypes, args,
-                                             std::nullopt);
+                                             ArrayRef<NamedAttribute>{});
     }
     // No conversion is needed for the same width integers
     return args.front();
@@ -749,12 +749,12 @@ inline Value mapConvertOpToStdScalarOp(Location loc, ArrayRef<Type> targetTypes,
       mlir::arith::FPToUIOp::areCastCompatible(convertedSourceType,
                                                targetType)) {
     return b->create<mlir::arith::FPToUIOp>(loc, resultTypes, args,
-                                            std::nullopt);
+                                            ArrayRef<NamedAttribute>{});
   }
   if (mlir::arith::FPToSIOp::areCastCompatible(convertedSourceType,
                                                targetType)) {
     return b->create<mlir::arith::FPToSIOp>(loc, resultTypes, args,
-                                            std::nullopt);
+                                            ArrayRef<NamedAttribute>{});
   }
   if (isa<ComplexType>(targetType)) {
     Type targetElementType = cast<ComplexType>(targetType).getElementType();

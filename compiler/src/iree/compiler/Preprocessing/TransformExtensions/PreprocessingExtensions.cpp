@@ -7,6 +7,7 @@
 #include "iree/compiler/Preprocessing/TransformExtensions/PreprocessingExtensions.h"
 
 #include "iree/compiler/Utils/EquivalenceUtils.h"
+#include "iree/compiler/Utils/ShapeUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -32,32 +33,6 @@ void registerTransformDialectPreprocessingExtension(DialectRegistry &registry) {
 //===----------------------------------------------------------------------===//
 // MatchCastCompatibleDagFromRootOp
 //===----------------------------------------------------------------------===//
-
-static bool isCastableToTensorType(Type from, RankedTensorType to) {
-  auto tensorType = dyn_cast<RankedTensorType>(from);
-  if (!tensorType) {
-    return false;
-  }
-  if (tensorType.getRank() != to.getRank()) {
-    return false;
-  }
-  if (tensorType.getElementType() != to.getElementType()) {
-    return false;
-  }
-  for (auto [fromSize, toSize] :
-       llvm::zip_equal(tensorType.getShape(), to.getShape())) {
-    // If the target dimension is dynamic we can always cast to it.
-    if (ShapedType::isDynamic(toSize)) {
-      continue;
-    }
-    // Casting a dynamic dimension to a static one is never valid, and static
-    // sizes must always match.
-    if (toSize != fromSize) {
-      return false;
-    }
-  }
-  return true;
-}
 
 // Compares the regions between two operations in lockstep for equality.
 static DiagnosedSilenceableFailure

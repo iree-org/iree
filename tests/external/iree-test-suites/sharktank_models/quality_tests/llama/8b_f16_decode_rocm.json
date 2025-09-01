@@ -22,9 +22,7 @@
     "compiler_flags": [
         "--iree-hal-target-device=hip",
         "--iree-opt-level=O3",
-        "--iree-hal-indirect-command-buffers=true",
-        "--iree-stream-resource-memory-model=discrete",
-        "--iree-hal-memoization=true"
+        "--iree-stream-resource-memory-model=discrete"
     ],
     "run_function": "decode_bs4"
 }

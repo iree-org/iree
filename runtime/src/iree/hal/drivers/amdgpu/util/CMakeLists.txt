@@ -41,6 +41,8 @@ iree_cc_test(
   LABELS
     "driver=amdgpu"
     "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 iree_cc_library(
@@ -70,6 +72,8 @@ iree_cc_test(
   LABELS
     "driver=amdgpu"
     "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 iree_cc_library(
@@ -77,15 +81,16 @@ iree_cc_library(
     util
   HDRS
     "affinity.h"
-    "bitmap.h"
     "block_pool.h"
     "device_library.h"
+    "error_callback.h"
+    "info.h"
     "kfd.h"
     "vmem.h"
   SRCS
-    "bitmap.c"
     "block_pool.c"
     "device_library.c"
+    "info.c"
     "kfd.c"
     "vmem.c"
   DEPS
@@ -93,23 +98,12 @@ iree_cc_library(
     ::topology
     iree::base
     iree::base::internal
+    iree::base::internal::bitmap
     iree::base::internal::synchronization
     iree::base::internal::threading
     iree::hal::drivers::amdgpu::device::binaries
     iree::hal::drivers::amdgpu::device::headers
   PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    bitmap_test
-  SRCS
-    "bitmap_test.cc"
-  DEPS
-    ::util
-    iree::base
-    iree::testing::gtest
-    iree::testing::gtest_main
 )
 
 iree_cc_test(
@@ -126,6 +120,8 @@ iree_cc_test(
   LABELS
     "driver=amdgpu"
     "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 iree_cc_test(
@@ -142,6 +138,8 @@ iree_cc_test(
   LABELS
     "driver=amdgpu"
     "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 iree_cc_test(
@@ -159,6 +157,8 @@ iree_cc_test(
   LABELS
     "driver=amdgpu"
     "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 iree_cc_test(
@@ -176,6 +176,8 @@ iree_cc_test(
   LABELS
     "driver=amdgpu"
     "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

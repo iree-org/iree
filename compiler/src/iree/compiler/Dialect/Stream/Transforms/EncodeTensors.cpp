@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 // TODO(benvanik): have a stream/upstream equivalent of the flow.dispatch.* ops.
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
+#include "iree/compiler/Dialect/Encoding/Utils/ElementPackingUtils.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
@@ -16,7 +17,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "iree/compiler/Utils/ElementPackingUtils.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"

@@ -209,7 +209,7 @@ util.func private @ElideUnneededTensorClones(%arg0: !stream.resource<*>, %arg1: 
 
 // -----
 
-#encoding = #iree_encoding.pad_encoding_layout<[0, 0]>
+#encoding = #iree_encoding.padding<[0, 0]>
 // CHECK-LABEL: @FoldTensorEncodeOpWithIdentitySource(
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
 util.func private @FoldTensorEncodeOpWithIdentitySource(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
@@ -220,7 +220,7 @@ util.func private @FoldTensorEncodeOpWithIdentitySource(%arg0: !stream.resource<
 
 // -----
 
-#encoding = #iree_encoding.pad_encoding_layout<[0, 0]>
+#encoding = #iree_encoding.padding<[0, 0]>
 // CHECK-LABEL: @FoldTensorEncodeOpWithIdentityResult(
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
 util.func private @FoldTensorEncodeOpWithIdentityResult(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
@@ -231,7 +231,7 @@ util.func private @FoldTensorEncodeOpWithIdentityResult(%arg0: !stream.resource<
 
 // -----
 
-#encoding = #iree_encoding.unknown_encoding
+#encoding = #iree_encoding.unknown
 // CHECK-LABEL: @FoldTensorEncodeOpWithSameSourceResultEncodings(
 // CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
 util.func private @FoldTensorEncodeOpWithSameSourceResultEncodings(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
@@ -242,7 +242,7 @@ util.func private @FoldTensorEncodeOpWithSameSourceResultEncodings(%arg0: !strea
 
 // -----
 
-#encoding = #iree_encoding.unknown_encoding
+#encoding = #iree_encoding.unknown
 // CHECK-LABEL:  @NofoldTensorEncodingOpWithUnknownSourceEncoding
 util.func public @NofoldTensorEncodingOpWithUnknownSourceEncoding(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index) -> !stream.resource<*> {
   // CHECK: %[[RESULT:.+]] = stream.tensor.encode
@@ -255,7 +255,7 @@ util.func public @NofoldTensorEncodingOpWithUnknownSourceEncoding(%arg0: !stream
 
 // -----
 
-#encoding = #iree_encoding.unknown_encoding
+#encoding = #iree_encoding.unknown
 // CHECK-LABEL:  @NofoldTensorEncodingOpWithUnknownResultEncoding
 util.func public @NofoldTensorEncodingOpWithUnknownResultEncoding(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index) -> !stream.resource<*> {
   // CHECK: %[[RESULT:.+]] = stream.tensor.encode

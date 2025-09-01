@@ -8,6 +8,7 @@
 #define IREE_DIALECT_LINALGEXT_BASE
 
 include "mlir/Dialect/Utils/StructuredOpsUtils.td"
+include "mlir/Dialect/SCF/IR/DeviceMappingInterface.td"
 include "mlir/IR/OpBase.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
@@ -58,5 +59,36 @@ def IREELinalgExt_IteratorTypeEnum : EnumAttr<IREELinalgExt_Dialect,
 def IREELinalgExt_IteratorTypeArrayAttr :
     TypedArrayAttrBase<IREELinalgExt_IteratorTypeEnum,
     "LinalgExt iterator type">;
+
+//===----------------------------------------------------------------------===//
+// Split reduction mapping attribute
+//===----------------------------------------------------------------------===//
+
+def SplitReductionMappingAttr :
+    AttrDef<IREELinalgExt_Dialect, "SplitReductionMapping", [
+      DeclareAttrInterfaceMethods<DeviceMappingAttrInterface, []>]> {
+  let mnemonic = "split_reduction_mapping";
+  let parameters = (ins
+    "int64_t":$dimension
+  );
+  let assemblyFormat = "`<` $dimension `>`";
+  let description = [{
+    Mapping attribute to indicate distribution for split-reduction.
+
+    This attribute indicates that the `scf.forall` represent parallel partial
+    reductions generated through the use of
+    `ReductionTilingStrategy::PartialReductionOuterParallel`.
+  }];
+  let extraClassDeclaration = [{
+    // Checks that a list of attributes is well-defined.
+    static LogicalResult verifyAttrList(::mlir::MLIRContext *context,
+        Location loc, ArrayRef<Attribute> attrs, bool emitDiagnosticErrors = true);
+
+    // Less than operator for easy comparison.
+    bool operator<(
+        const ::mlir::iree_compiler::IREE::LinalgExt::SplitReductionMappingAttr &rhs)
+        const;
+  }];
+}
 
 #endif // IREE_DIALECT_LINALGEXT_BASE

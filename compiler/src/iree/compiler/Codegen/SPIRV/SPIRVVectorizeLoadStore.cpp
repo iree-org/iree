@@ -338,8 +338,8 @@ public:
 
     // Creates a new function with the update signature.
     rewriter.modifyOpInPlace(funcOp, [&] {
-      funcOp.setType(rewriter.getFunctionType(
-          signatureConverter.getConvertedTypes(), std::nullopt));
+      funcOp.setType(
+          rewriter.getFunctionType(signatureConverter.getConvertedTypes(), {}));
     });
     return success();
   }
@@ -580,7 +580,7 @@ MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
   MemRefLayoutAttrInterface layout = {};
   if (auto stridedLayout = dyn_cast<StridedLayoutAttr>(type.getLayout())) {
     auto offset = stridedLayout.getOffset();
-    if (!ShapedType::isDynamic(offset)) {
+    if (ShapedType::isStatic(offset)) {
       offset = offset / ratio;
     }
 
@@ -653,7 +653,7 @@ public:
 
     // This should be guaranteed by the analysis step. But just double check.
     assert(memrefType.getRank() > 0 &&
-           !ShapedType::isDynamic(memrefType.getShape().back()));
+           ShapedType::isStatic(memrefType.getShape().back()));
 
     auto vecMemRef = getVectorizedMemRefType(rewriter, subspanOp.getResult());
     if (!vecMemRef) {
@@ -828,7 +828,8 @@ struct ScalarizeVectorTransferRead final
 
       Value scalar = predicateMaybeMaskedScalarTransfer(
           rewriter, loc, maybeMaskBit, thenCond, elseCond);
-      rewriter.replaceOpWithNewOp<vector::SplatOp>(readOp, vectorType, scalar);
+      rewriter.replaceOpWithNewOp<vector::BroadcastOp>(readOp, vectorType,
+                                                       scalar);
       return success();
     }
 
@@ -889,7 +890,8 @@ struct ScalarizeVectorLoad final : public OpRewritePattern<vector::LoadOp> {
     if (vectorType.getRank() == 0) {
       Value scalar = rewriter.create<memref::LoadOp>(loc, loadOp.getBase(),
                                                      loadOp.getIndices());
-      rewriter.replaceOpWithNewOp<vector::SplatOp>(loadOp, vectorType, scalar);
+      rewriter.replaceOpWithNewOp<vector::BroadcastOp>(loadOp, vectorType,
+                                                       scalar);
       return success();
     }
 
@@ -941,8 +943,7 @@ struct ScalarizeVectorTransferWrite final
       }
 
       auto thenCond = [&](OpBuilder &b, Location loc) {
-        Value scalar =
-            b.create<vector::ExtractElementOp>(loc, writeOp.getVector());
+        Value scalar = b.create<vector::ExtractOp>(loc, writeOp.getVector());
         b.create<memref::StoreOp>(loc, scalar, writeOp.getBase(),
                                   writeOp.getIndices());
         return Value();

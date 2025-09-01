@@ -17,6 +17,8 @@ iree_cc_library(
     "FusionUtils.h"
     "Passes.h"
   SRCS
+    "AnnotateDataTilingHints.cpp"
+    "BitcastUnsupportedElementTypes.cpp"
     "BubbleUpExpandShapes.cpp"
     "CloneProducersIntoDispatchRegions.cpp"
     "CollapseDimensions.cpp"
@@ -27,12 +29,14 @@ iree_cc_library(
     "FoldUnitExtentDims.cpp"
     "FormDispatchRegions.cpp"
     "FormScalarDispatches.cpp"
+    "FormSplitReductionDispatches.cpp"
     "FuseEncodingOpsIntoDispatchRegions.cpp"
     "FuseHorizontalContractions.cpp"
     "FuseMultiUseElementwiseProducer.cpp"
     "FusionPreprocessing.cpp"
     "FusionUtils.cpp"
     "HoistEncodingOps.cpp"
+    "HoistUniformScalarCompute.cpp"
     "MaterializeDefaultWorkgroupCountRegion.cpp"
     "Passes.cpp"
     "PropagateEncodings.cpp"
@@ -80,6 +84,7 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::Encoding::IR
+    iree::compiler::Dialect::Encoding::Utils
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms
@@ -91,6 +96,7 @@ iree_cc_library(
     iree::compiler::Dialect::TensorExt::Transforms
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Analysis::Attributes
+    iree::compiler::Dialect::Util::Analysis::Constant
     iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms

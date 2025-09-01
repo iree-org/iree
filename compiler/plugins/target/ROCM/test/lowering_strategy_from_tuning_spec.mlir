@@ -28,7 +28,7 @@
 hal.executable public @main {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export public @matmul_transpose_b ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -43,7 +43,12 @@ hal.executable public @main {
         %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [10240, 1280], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<10240x1280xf16>> -> tensor<10240x1280xf16>
         %5 = tensor.empty() : tensor<2048x10240xf32>
         %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<2048x10240xf32>) -> tensor<2048x10240xf32>
-        %7 = linalg.matmul_transpose_b
+        %7 = linalg.matmul
+          indexing_maps = [
+            affine_map<(d0, d1, d2) -> (d0, d2)>,
+            affine_map<(d0, d1, d2) -> (d1, d2)>,
+            affine_map<(d0, d1, d2) -> (d0, d1)>
+          ]
           ins(%3, %4 : tensor<2048x1280xf16>, tensor<10240x1280xf16>)
           outs(%6 : tensor<2048x10240xf32>) -> tensor<2048x10240xf32>
         iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [2048, 10240], strides = [1, 1] : tensor<2048x10240xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2048x10240xf32>>

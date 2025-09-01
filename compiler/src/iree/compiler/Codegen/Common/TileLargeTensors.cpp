@@ -62,8 +62,9 @@ static void tileToMaxVectorSize(RewriterBase &rewriter,
   // because outputs should reflect the full parallel iteration space.
   int64_t staticNumTrips = 1;
   for (auto [size, type] : llvm::zip_equal(staticTileSizes, iteratorTypes)) {
-    // Skip reduction iterators.
+    // Skip tiling of reduction iterators.
     if (type == utils::IteratorType::reduction) {
+      size = 0;
       continue;
     }
     if (ShapedType::isDynamic(size)) {
@@ -185,6 +186,10 @@ static void processRegion(RewriterBase &rewriter, Region *region,
         // as they typically arise organically. Fills in particular are almost
         // never found on their own and will be fused when tiling if need be.
         if (isa<linalg::TransposeOp, linalg::CopyOp, linalg::FillOp>(op)) {
+          continue;
+        }
+        // Nothing to do for ops without parallel loops.
+        if (linalgOp.getNumParallelLoops() == 0) {
           continue;
         }
         tileToMaxVectorSize(rewriter, linalgOp, maxVectorSize);

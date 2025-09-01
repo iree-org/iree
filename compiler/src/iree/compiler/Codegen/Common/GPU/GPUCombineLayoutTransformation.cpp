@@ -12,8 +12,6 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-combine-layout-transformation"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -66,8 +64,15 @@ struct GPUCombineLayoutTransformationPass final
       GPUCombineLayoutTransformationPassBase;
 
   void runOnOperation() override {
+    // The GPUCombineLayoutTransformationPass provides a distribution
+    // implementation for tensor.pad ops, but pad ops can't be combined in
+    // Workgroup scope anyway, so there is no point in using the pass with
+    // Workgroup scope.
+    CombineRelayoutOpsControlFn controlFn = getCombineRelayoutOpsControlFn(
+        IREE::Codegen::RelayoutCombinationScope::Dispatch);
     if (failed(combineLayoutTransformation(&getContext(), getOperation(),
-                                           gpuPadDistributionConfigFn))) {
+                                           gpuPadDistributionConfigFn,
+                                           controlFn))) {
       return signalPassFailure();
     }
   }

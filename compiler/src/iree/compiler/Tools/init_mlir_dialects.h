@@ -38,7 +38,6 @@
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/TransformOps/MemRefTransformOps.h"
-#include "mlir/Dialect/Mesh/IR/MeshDialect.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
@@ -47,6 +46,7 @@
 #include "mlir/Dialect/SCF/TransformOps/SCFTransformOps.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
+#include "mlir/Dialect/Shard/IR/ShardDialect.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/IR/TensorInferTypeOpInterfaceImpl.h"
 #include "mlir/Dialect/Tensor/IR/TensorTilingInterfaceImpl.h"
@@ -78,7 +78,7 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   LLVM::LLVMDialect,
                   linalg::LinalgDialect,
                   math::MathDialect,
-                  mesh::MeshDialect,
+                  shard::ShardDialect,
                   memref::MemRefDialect,
                   ml_program::MLProgramDialect,
                   NVVM::NVVMDialect,

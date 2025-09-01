@@ -26,6 +26,75 @@ class IREETensorExt_Op<string mnemonic, list<Trait> traits = []> :
 class IREETensorExt_PureOp<string mnemonic, list<Trait> traits = []> :
     IREETensorExt_Op<mnemonic, !listconcat(traits, [Pure])>;
 
+def IREETensorExt_BitCastOp : IREETensorExt_PureOp<"bitcast", [
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<Util_HoistableOpInterface>,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+      "getTiedResult",
+      "getTiedResultOperandIndex",
+      "getTiedResultOperandIndices",
+  ]>,
+  Util_ShapeAwareOp,
+]> {
+  let summary = [{Bitcasts a tensor without modifying the contents.}];
+  let description = [{
+    Bitcasts a tensor |source| to the shape implied by this operations result
+    type interleaved with |result_dims|, potentially with a different element
+    type. For example,
+
+    ```
+    result_dims = {%0, %1}
+    result_type = tensor<1x?x2x?x3 x!eltype>
+    ```
+
+    produces a tensor of shape [1, %0, 2, %1, 3] and element type `!eltype`.
+    Note that the source and result tensors must serialized to the same size.
+
+    Different from the flow.bitcast op, the op is allowed to be cloned into
+    dispatch regions and supports transformations required by executable
+    translation such as bufferization.
+  }];
+
+  let arguments = (ins
+    AnyRankedTensor:$source,
+    IREETensorExt_ShapeDynamicDims:$source_dims,
+    IREETensorExt_ShapeDynamicDims:$result_dims
+  );
+  let results = (outs
+    AnyRankedTensor:$result
+  );
+
+  let assemblyFormat = [{
+    $source `:`
+    type($source) (`{` $source_dims^ `}`)? `->`
+    type($result) (`{` $result_dims^ `}`)?
+    attr-dict-with-keyword
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "Type":$result_type, "Value":$source, "ValueRange":$target_dims),
+    [{
+      build($_builder, $_state,
+          result_type,
+          source,
+          IREE::Util::buildDynamicDimsForValue($_state.location, source, $_builder),
+          target_dims);
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    bool isHoistableLeafOp() { return false; }
+
+    ValueRange getOperandDynamicDims(unsigned idx) { return getSourceDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getResultDims(); }
+  }];
+
+  let hasVerifier = 1;
+  let hasFolder = 1;
+  let hasCanonicalizer = 1;
+}
+
 def IREETensorExt_DispatchTensorLoadOp : IREETensorExt_PureOp<"dispatch.tensor.load", [
   AttrSizedOperandSegments,
   OffsetSizeAndStrideOpInterface,
@@ -263,7 +332,7 @@ class IREETensorExt_DispatchWorkgroupCountOp<string mnemonic, list<Trait> traits
   let results = (outs Index:$x, Index:$y, Index:$z);
 
   let assemblyFormat = [{
-    attr-dict ($operands^)?
+    attr-dict `(` $operands `)`
   }];
 }
 
@@ -304,6 +373,46 @@ def IREETensorExt_DispatchWorkgroupCountFromSliceOp :
     arbitrary computation. The computation of the workgroup count can then be
     done on the device itself, if this is data dependent. In such cases the
     workload could be more than just values of index types.
+  }];
+}
+
+def IREETensorExt_DispatchWorkgroupCountSplitReductionModifierOp :
+    IREETensorExt_PureOp<"dispatch.workgroup_count_split_reduction_modifier"> {
+  let summary = [{
+    Modifies the workgroup count calculation to account for split reductions.
+  }];
+  let description = [{
+    A split reduction dispatch contains an `scf.forall` within which the
+    partial reduction computation is done. The `scf.forall` represents parallel
+    partial reduction computations. `workgroup_x`, `workgroup_y`, and
+    `workgroup_z` represent the workgroups needed to execute the inner compute
+    ops. This is combined with `workload` to determine the total number of
+    workgroups required to run the computation after accounting for the
+    `scf.forall`.
+  }];
+  let arguments = (ins
+    Index:$workgroup_x,
+    Index:$workgroup_y,
+    Index:$workgroup_z,
+    Variadic<Index>:$workload
+  );
+  let results = (outs Index:$result_x, Index:$result_y, Index:$result_z);
+
+  let assemblyFormat = [{
+    attr-dict `workgroups` `(` $workgroup_x `,` $workgroup_y `,` $workgroup_z `)` `workload` `(` $workload `)`
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "ValueRange":$workgroups,
+      "ValueRange":$workload
+    )>,
+  ];
+
+  let extraClassDeclaration = [{
+    SmallVector<Value> getSourceWorkgroupCount() {
+      return {getWorkgroupX(), getWorkgroupY(), getWorkgroupZ()};
+    }
   }];
 }
 

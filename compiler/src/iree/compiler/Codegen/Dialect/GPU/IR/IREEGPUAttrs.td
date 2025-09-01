@@ -182,6 +182,7 @@ def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
     "verifyIndexingMaps",
     "getUndistributedTileTypes",
     "getDistributedTileTypes",
+    "getUndistributedTileDimExpansion",
     "populateOperandOffsetsSizesStrides",
     "getDistributionMappingKind",
     "getDistributionWorkerCount",
@@ -288,9 +289,9 @@ def IREEGPU_VirtualMMAAttr :
     "verifyIndexingMaps",
     "getUndistributedTileTypes",
     "getDistributedTileTypes",
-    "populateOperandOffsetsSizesStrides",
     "getDistributionMappingKind",
     "getDistributionWorkerCount",
+    "populateOperandOffsetsSizesStrides",
     "buildUnderlyingOperations",
   ]>
 ]> {
@@ -305,14 +306,25 @@ def IREEGPU_VirtualMMAAttr :
     These interleaving and/or unrolling changes in the layout is especially
     useful to coalesce reads from shared memory to register or align layouts
     in a chained-matmul operation.
+
+    If set to true (similar to MMAAttr), |col_major| indicates the computation
+    is perfomed as below:
+
+    ```
+      C^T += B^T x A^T
+    ```
   }];
 
-  let assemblyFormat = "`<` struct(params) `>`";
+  let assemblyFormat = "`<` $intrinsic (`,` `col_major` `=` $col_major^)? `>`";
 
   let parameters = (ins
-    EnumParameter<IREEGPU_VirtualMMAIntrinsic>:$intrinsic
+    EnumParameter<IREEGPU_VirtualMMAIntrinsic>:$intrinsic,
+    DefaultValuedParameter<"bool", "false">:$col_major
   );
 
+  let builders = [
+    AttrBuilder<(ins "VirtualMMAIntrinsic":$intrinsic)>
+  ];
   let extraClassDeclaration = [{
     int64_t getBlockSize() const;
 
@@ -326,6 +338,80 @@ def IREEGPU_VirtualMMAAttr :
 def IREEGPU_MMAOpsArrayAttr : ArrayOfAttr<
   IREEGPU_Dialect, "MMAOpsArray", "mma_ops", "MMAAttr"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+}
+
+def IREEGPU_ScaledMMAOpsArrayAttr : ArrayOfAttr<
+  IREEGPU_Dialect, "ScaledMMAOpsArray", "scaled_mma_ops", "ScaledMMAAttr"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+}
+
+def IREEGPU_ScaledMMAAttr :
+    AttrDef<IREEGPU_Dialect, "ScaledMMA", [
+  DeclareAttrInterfaceMethods<IREECodegen_InnerTileDescAttrInterface, [
+    "getExpectedNumInputs",
+    "getExpectedNumOutputs",
+    "verifyIndexingMaps",
+    "getUndistributedTileTypes",
+    "getDistributedTileTypes",
+    "getUndistributedTileDimExpansion",
+    "populateOperandOffsetsSizesStrides",
+    "getDistributionMappingKind",
+    "getDistributionWorkerCount",
+    "buildUnderlyingOperations",
+  ]>
+]> {
+  let mnemonic = "scaled_mma_layout";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let description = [{
+    This attribute represents MMAs that operate on low-precision floating point
+    types (like fp4 or fp8) and apply _block scales_ to their inputs,
+    where each |blockSize| elements share a scale (which is currently
+    always a f32 exponent / f8E8M0).
+
+    The intrinsic is a ScaledMMAIntrinsic, and the element types are given
+    on the attribute, not in the intrinsic enum, since these scaled
+    operations allow arbitrary combinations of fp4/fp6/fp8 inputs.
+
+    This intrinsic takes its four parameters as (lhs, lhs_scale, rhs, rhs_scale).
+  }];
+
+  let assemblyFormat = "`<` struct(params) `>`";
+
+  let parameters = (ins
+    EnumParameter<IREEGPU_ScaledMMAIntrinsic>:$intrinsic,
+    "::mlir::Type":$lhs_elem_type,
+    "::mlir::Type":$rhs_elem_type,
+    "::mlir::Type":$acc_elem_type,
+    DefaultValuedParameter<"bool", "false", "if this is a column-major scaled MFMA">:$col_major
+  );
+
+  let extraClassDeclaration = [{
+    // Return all supported element types for inputs
+    static SmallVector<Type> getSupportedInputTypes(MLIRContext *ctx);
+    static SmallVector<Type> getSupportedOutputTypes(MLIRContext *ctx);
+
+    // Return the number of elements per shared scale.
+    int64_t getBlockSize() const;
+
+    // Return preferred subgroup size
+    int64_t getSubgroupSize() const;
+
+    /// Returns the shape of the scaled MMA operation:
+    /// ```
+    ///   C += A * B
+    /// ```
+    /// Where, up to some transpositions, `A` has shape `<M, K, KB>`, `B`
+    /// has shape `<K, KB, N>`, and `C` has shape `<M, N>`.
+    ::std::tuple<int64_t, int64_t, int64_t, int64_t>
+    getScaledMNKShape() const {
+      ::llvm::SmallVector<::mlir::VectorType> preThreadTypes;
+      getUndistributedTileTypes(preThreadTypes);
+      ::llvm::ArrayRef<int64_t> accShape = preThreadTypes[4].getShape();
+      ::llvm::ArrayRef<int64_t> lhsShape = preThreadTypes[0].getShape();
+      return {accShape[0], accShape[1], lhsShape[1], lhsShape[2]};
+    }
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -342,7 +428,7 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
   }];
 
   let parameters = (ins
-    "::mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr":$intrinsic,
+    "::mlir::iree_compiler::IREE::Codegen::InnerTileDescAttrInterface":$intrinsic,
     "int64_t":$subgroup_m_count,
     "int64_t":$subgroup_n_count
   );
@@ -351,12 +437,12 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
 }
 
 //===----------------------------------------------------------------------===//
-// iree_gpu.gpu_encoding_layout
+// iree_gpu.gpu_encoding_resolver
 //===----------------------------------------------------------------------===//
 
-def IREEGPU_GPUEncodingLayoutAttr :
-    AttrDef<IREEGPU_Dialect, "GPUEncodingLayout"> {
-  let mnemonic = "gpu_encoding_layout";
+def IREEGPU_GPUEncodingResolverAttr :
+    AttrDef<IREEGPU_Dialect, "GPUEncodingResolver"> {
+  let mnemonic = "gpu_encoding_resolver";
   let summary = [{The encoding layout attribute for GPU backend.}];
   let description = [{
     This attribute can implement any layout interface methods for encoding
@@ -376,11 +462,11 @@ def IREEGPU_GPUEncodingLayoutAttr :
 }
 
 //===----------------------------------------------------------------------===//
-// iree_gpu.gpu_pad_layout
+// iree_gpu.gpu_padding_resolver
 //===----------------------------------------------------------------------===//
 
-def IREEGPU_GPUPadLayoutAttr : AttrDef<IREEGPU_Dialect, "GPUPadLayout"> {
-  let mnemonic = "gpu_pad_layout";
+def IREEGPU_GPUPaddingResolverAttr : AttrDef<IREEGPU_Dialect, "GPUPaddingResolver"> {
+  let mnemonic = "gpu_padding_resolver";
   let summary = [{The padded encoding layout attribute for GPU targets.}];
   let assemblyFormat = "`<` struct(params) `>`";
 
@@ -423,9 +509,10 @@ def IREEGPU_TargetWgpAttr : AttrDef<IREEGPU_Dialect, "TargetWgp"> {
     "ComputeBitwidthsAttr":$compute,
     "StorageBitwidthsAttr":$storage,
     "SubgroupOpsAttr":$subgroup,
-    "DotProductOpsAttr":$dot,
+    DefaultValuedParameter<"DotProductOpsAttr", "DotProductOpsAttr::get($_ctxt, DotProductOps::None)">:$dot,
     // MMAs available on this target. Heuristic MMA selection runs is order.
-    "MMAOpsArrayAttr":$mma,
+    DefaultValuedParameter<"MMAOpsArrayAttr", "MMAOpsArrayAttr::get($_ctxt, {})">:$mma,
+    DefaultValuedParameter<"ScaledMMAOpsArrayAttr", "ScaledMMAOpsArrayAttr::get($_ctxt, {})">:$scaled_mma,
 
     // Limits
     // Supported subgroup size choices.
@@ -480,6 +567,10 @@ def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
 
     // An optional SKU identifier to distinguish different models.
     OptionalParameter<"StringAttr">:$sku,
+    // An optional memory bandwidth in TB/s.
+    OptionalParameter<"FloatAttr">:$memory_bandwidth_tbps,
+    // An optional performance dictionary in TFLOPS.
+    OptionalParameter<"DictionaryAttr">:$perf_tflops,
     // An optional extra dict
     // This field allows to inject more features/limits not supported in the
     // above list for better flexibility.
@@ -493,7 +584,9 @@ def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
 // GPU Target Attributes
 //===----------------------------------------------------------------------===//
 
-def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
+def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target", [
+  DeclareAttrInterfaceMethods<IREECodegen_TargetInfoAttrInterface, [
+    "getMaximumWorkgroupCount"]>]> {
   let summary = [{Full GPU target attribute.}];
   let description = [{
     This attributes describes a full GPU target. It contains a few fields:

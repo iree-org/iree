@@ -46,35 +46,35 @@ def CleanupTensorShapesPass :
   let summary = "Cleans up any remaining tensor shape metadata after lowering.";
 }
 
-def ConvertMeshToFlowPass :
-    Pass<"iree-convert-mesh-to-flow", "mlir::ModuleOp"> {
-  let summary = "Convert Mesh dialect operations to flow.";
+def ConvertShardToFlowPass :
+    Pass<"iree-convert-shard-to-flow", "mlir::ModuleOp"> {
+  let summary = "Convert Shard dialect operations to flow.";
   let description = [{
-    Each mesh corresponds to a default !flow.channel with the same group name.
+    Each grid corresponds to a default !flow.channel with the same group name.
     ```
-    mesh.mesh @mesh_1(shape = 2x3)
+    shard.grid @grid_1(shape = 2x3)
     ```
     ```
-    %channel = flow.channel.default "mesh_1" : !flow.channel
+    %channel = flow.channel.default "grid_1" : !flow.channel
     ```
-    If there is onl one mesh in the program than the name is omitted and the
+    If there is only one grid in the program than the name is omitted and the
     ```
     %channel = flow.channel.default : !flow.channel
     ```
 
-    Each (mesh, mesh_axes) pair partitions and orders the devices into disjoint
+    Each (shard, grid_axes) pair partitions and orders the devices into disjoint
     groups, each corresponding to a !flow.channel to perform a collective
     operation.
     For example
     ```
-    mesh.mesh @mesh(shape = 2x3x4x5)
+    shard.grid @grid(shape = 2x3x4x5)
     ...
-    %1 = mesh.all_reduce on @mesh mesh_axes = [2, 0] : tensor<10x20xf32>
+    %1 = shard.all_reduce on @grid grid_axes = [2, 0] : tensor<10x20xf32>
     ```
     For more information see
-    [Mesh dialect](https://mlir.llvm.org/docs/Dialects/Mesh/#device-groups).
+    [Shard dialect](https://mlir.llvm.org/docs/Dialects/Shard/#device-groups).
 
-    The mesh partition and device ordering determines the values for the
+    The shard partition and device ordering determines the values for the
     `color` and `key` in the corresponding `flow.channel.split` operation used
     to create the channel.
     For more information on the meaning of `color` and `key` see
@@ -87,7 +87,7 @@ def ConvertMeshToFlowPass :
   let dependentDialects = [
     "mlir::affine::AffineDialect",
     "mlir::linalg::LinalgDialect",
-    "mlir::mesh::MeshDialect",
+    "mlir::shard::ShardDialect",
     "mlir::tensor::TensorDialect",
     "IREE::Flow::FlowDialect",
   ];

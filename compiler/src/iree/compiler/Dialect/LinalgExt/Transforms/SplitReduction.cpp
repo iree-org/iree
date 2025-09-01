@@ -48,7 +48,7 @@ SmallVector<int64_t> getExpandedShape(ArrayRef<int64_t> shape,
 SmallVector<int64_t> getCollapsedShape(ArrayRef<int64_t> shape,
                                        int64_t splitReductionRatio, int64_t k,
                                        int64_t targetDim) {
-  SmallVector<int64_t> ans(shape.begin(), shape.end());
+  SmallVector<int64_t> ans(shape);
   ans[targetDim] = k * splitReductionRatio;
   return ans;
 }
@@ -209,7 +209,7 @@ Value offsetParallelIndices(Location loc, RewriterBase &rewriter,
   SmallVector<utils::IteratorType> iterators(parallelIndicesRank,
                                              utils::IteratorType::parallel);
   Value mSplitVal = rewriter.create<arith::ConstantIntOp>(
-      loc, kDimParallelSize, parallelIndicesType.getElementType());
+      loc, parallelIndicesType.getElementType(), kDimParallelSize);
   return rewriter
       .create<linalg::GenericOp>(
           loc,
@@ -308,8 +308,8 @@ struct TopkSplitReductionPass final
 
     TopkSplitReductionControlFn splitReductionFn =
         [&](int64_t splitReductionDepth) -> int64_t {
-      SmallVector<int64_t, 4> reductionRatios(splitRatios.begin(),
-                                              splitRatios.end());
+      SmallVector<int64_t> reductionRatios(splitRatios.begin(),
+                                           splitRatios.end());
       if (splitReductionDepth >= reductionRatios.size()) {
         return -1;
       } else {
@@ -556,7 +556,7 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
     insertSplitDimension = reductionDim + 1;
   }
 
-  SmallVector<int64_t, 4> loopRanges = genericOp.getStaticLoopRanges();
+  SmallVector<int64_t> loopRanges = genericOp.getStaticLoopRanges();
   int64_t reductionDimSize = loopRanges[reductionDim];
   if (ShapedType::isDynamic(reductionDimSize) ||
       reductionDimSize % ratio != 0) {

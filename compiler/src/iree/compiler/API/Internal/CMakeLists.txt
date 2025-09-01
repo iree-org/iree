@@ -116,8 +116,11 @@ iree_cc_library(
     IREELLVMIncludeSetup
     MLIRCAPIIR
     MLIRIR
+    MLIRSupport
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Utils
+    iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::bindings::c::headers
   PUBLIC
 )
@@ -132,6 +135,7 @@ iree_cc_library(
     MLIRCAPIIR
     MLIRIR
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Codegen::Utils
     iree::compiler::bindings::c::headers
   PUBLIC
 )

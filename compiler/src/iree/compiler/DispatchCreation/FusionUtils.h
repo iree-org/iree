@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "mlir/IR/Dominance.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 
@@ -18,14 +17,20 @@ namespace mlir::iree_compiler::DispatchCreation {
 
 /// Return true of the producer and consumer of `operand` are fusable
 /// using elementwise op fusion transformation.
+struct ElementwiseOpsFusabilityOptions {
+  // Control fusion with consumer that has multiple reduction dimensions.
+  bool fuseMultiReduction = false;
+  // Control fusion with producer that is a truncate-like operation.
+  bool fuseTruncateOps = false;
+};
 bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *operand,
-                                bool fuseMultiReduction);
+                                ElementwiseOpsFusabilityOptions options);
 
-/// Move the definition of operands of `operations` before `insertionPoint`.
-LogicalResult moveOperandDefs(RewriterBase &rewriter,
-                              ArrayRef<Operation *> operations,
-                              Operation *insertionPoint,
-                              DominanceInfo &dominanceInfo,
-                              ArrayRef<Operation *> ignoreOperations = {});
+/// Returns the closest producer dispatch region op result and the chain of
+/// operations being looked past during the traversal to find the producer
+/// dispatch. Returns std::nullopt if the dispatch or any ops in the chain have
+/// multiple uses.
+std::optional<std::pair<OpResult, SmallVector<Operation *>>>
+getProducerDispatchValueAndOpChain(Value operand);
 
 } // namespace mlir::iree_compiler::DispatchCreation

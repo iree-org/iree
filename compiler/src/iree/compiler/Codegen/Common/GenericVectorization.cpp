@@ -5,10 +5,12 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/Common/TileSizeSelection.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -24,7 +26,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-generic-vectorization"
-#define VEC_DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
 namespace mlir::iree_compiler {
 
@@ -37,14 +38,33 @@ namespace {
 static std::optional<SizesAndScalableFlags>
 getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
   // Get vector sizes from the lowering config, if available in the op itself.
-  auto loweringConfig =
-      getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op);
+  IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
+      getLoweringConfig(op);
   if (useConfiguredVectorSizes && loweringConfig) {
-    TilingConfig tilingConfig(loweringConfig);
-    auto [vectorSizes, scalableFlags] = tilingConfig.getVectorTileSizes();
-    // Replace zeros in canonical vector shape to turn it into a valid shape.
-    std::replace(vectorSizes.begin(), vectorSizes.end(), 0, 1);
-    return std::make_pair(vectorSizes, scalableFlags);
+    LDBG() << "Use configured vector sizes from lowering config";
+    std::optional<SmallVector<int64_t>> vectorSizes =
+        loweringConfig.getVectorSizes();
+    SmallVector<bool> scalableFlags = loweringConfig.getVectorScalableFlags();
+    if (vectorSizes) {
+      if (scalableFlags.empty()) {
+        scalableFlags.assign(vectorSizes->size(), false);
+      }
+      if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
+        std::optional<SizesAndScalableFlags> maybeInputVectorSizes =
+            getVectorInputSizesFromDestTiles(unpackOp, *vectorSizes,
+                                             scalableFlags);
+        if (maybeInputVectorSizes) {
+          std::tie(vectorSizes, scalableFlags) = maybeInputVectorSizes.value();
+        } else {
+          LDBG() << "Failed to get input vector sizes for unpack op";
+          return std::nullopt;
+        }
+      }
+      // Replace zeros in canonical vector shape to turn it into a valid shape.
+      std::replace(vectorSizes->begin(), vectorSizes->end(), 0, 1);
+      return std::make_pair(*vectorSizes, scalableFlags);
+    }
+    LDBG() << "Failed to get configured vector sizes, fall back to inference";
   }
 
   // Try to infer the vector sizes from the IR.
@@ -72,6 +92,13 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
         if (!ty.hasStaticShape())
           return;
         vectorSizes = SmallVector<int64_t>(ty.getShape());
+      })
+      .Case<IREE::LinalgExt::GatherOp>([&](IREE::LinalgExt::GatherOp gatherOp) {
+        std::optional<VectorizationTileSizes> result =
+            inferSizesFromIR(gatherOp.getOutput());
+        if (result) {
+          vectorSizes = result->vectorSizes;
+        }
       })
       .Default([&](Operation *) {});
 
@@ -143,9 +170,7 @@ void GenericVectorizationPass::runOnOperation() {
       std::optional<SizesAndScalableFlags> vectorSizesAndScalableDims =
           getVectorSizes(op, useConfiguredVectorSizes);
       if (vectorSizesAndScalableDims) {
-        auto [sizes, scalableDims] = *vectorSizesAndScalableDims;
-        vectorSizes.append(sizes.begin(), sizes.end());
-        scalableVecDims.append(scalableDims.begin(), scalableDims.end());
+        std::tie(vectorSizes, scalableVecDims) = *vectorSizesAndScalableDims;
       }
     }
 
@@ -170,11 +195,14 @@ void GenericVectorizationPass::runOnOperation() {
           rewriter, cast<linalg::GenericOp>(op), vectorSizes, scalableVecDims,
           vectorizeGatherAccesses);
     } else if (auto gatherOp = dyn_cast<IREE::LinalgExt::GatherOp>(op)) {
-      (void)IREE::VectorExt::vectorizeLinalgExtGatherToTransferGather(rewriter,
-                                                                      gatherOp);
+      (void)IREE::VectorExt::vectorizeLinalgExtGatherToTransferGather(
+          rewriter, gatherOp, vectorSizes);
     } else {
-      (void)linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
-                              vectorizeGatherAccesses);
+      FailureOr<linalg::VectorizationResult> result = linalg::vectorize(
+          rewriter, op, vectorSizes, scalableVecDims, vectorizeGatherAccesses);
+      if (succeeded(result)) {
+        rewriter.replaceOp(op, result->replacements);
+      }
     }
   };
 
@@ -220,6 +248,7 @@ void GenericVectorizationPass::runOnOperation() {
   if (enableVectorMasking) {
     vector::populateVectorMaskLoweringPatternsForSideEffectingOps(
         vectorizationPatterns);
+    IREE::VectorExt::populateVectorMaskLoweringPatterns(vectorizationPatterns);
     vectorizationPatterns.add<linalg::LinalgCopyVTRForwardingPattern,
                               linalg::LinalgCopyVTWForwardingPattern>(
         funcOp.getContext(), /*benefit=*/2);

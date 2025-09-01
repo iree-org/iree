@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -20,8 +21,6 @@
 #include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
 
 #define DEBUG_TYPE "iree-codegen-optimize-tensor-insert-extract-slices"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -283,7 +282,7 @@ struct CastLikeInsertSliceOpFolder final
 /// write to memory.
 // TODO: Consider upstreaming
 struct FoldMaskedTransferRAW : OpRewritePattern<vector::TransferReadOp> {
-  using OpRewritePattern<vector::TransferReadOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::TransferReadOp op,
                                 PatternRewriter &rewriter) const override {
@@ -338,8 +337,8 @@ struct FoldMaskedTransferRAW : OpRewritePattern<vector::TransferReadOp> {
            "GenericVectorization.cpp::FoldMaskedTransferRAW for information");
 
     // Materialize the padding with a constant.
-    auto padVal = rewriter.create<vector::SplatOp>(rPad.getLoc(),
-                                                   valToStore.getType(), rPad);
+    auto padVal = rewriter.create<vector::BroadcastOp>(
+        rPad.getLoc(), valToStore.getType(), rPad);
     rewriter.replaceOpWithNewOp<arith::SelectOp>(op, wMask, valToStore, padVal);
     return success();
   }
@@ -380,21 +379,21 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
   });
 
   funcOp.walk([&](scf::ForOp forOp) { moveLoopInvariantCode(forOp); });
-  LDBG("after hoisting loop invariant code\n" << funcOp);
+  LDBG() << "after hoisting loop invariant code\n" << funcOp;
 
   moveLoopInvariantCodeFromGenericOps(funcOp);
-  LDBG("after hoisting loop invariant code out of generic ops\n" << funcOp);
+  LDBG() << "after hoisting loop invariant code out of generic ops\n" << funcOp;
 
   // TODO: walking in some reverse / inside-out order would be more efficient
   // and would capture more cases.
   funcOp.walk(
       [&](scf::ForOp forOp) { hoistLoopInvariantSubsets(rewriter, forOp); });
-  LDBG("after hoisting loop invariant subsets\n" << funcOp);
+  LDBG() << "after hoisting loop invariant subsets\n" << funcOp;
 
   funcOp.walk([&](scf::ForOp forOp) {
     hoistSubsetWithLoopInvariantTensor(rewriter, forOp);
   });
-  LDBG("after hoisting subset loop invariant tensors" << funcOp);
+  LDBG() << "after hoisting subset loop invariant tensors" << funcOp;
 
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
@@ -413,8 +412,8 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
     return signalPassFailure();
   }
 
-  LDBG("after folding tensor.extract_slice and vector.transfer_read Ops \n"
-       << funcOp);
+  LDBG() << "after folding tensor.extract_slice and vector.transfer_read Ops \n"
+         << funcOp;
 }
 
 } // namespace

@@ -9,6 +9,7 @@
 #include <optional>
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "mlir/IR/Attributes.h"
@@ -42,6 +43,8 @@ struct WgpDetails {
   DotProductOps dotproductOps;
   uint32_t mmaCount;
   const MMAIntrinsic *mmaOps;
+  uint32_t scaledMmaCount;
+  const ScaledMMAIntrinsic *scaledMmaOps;
 
   // We support two static values here mostly due to AMD RDNA GPUs have two
   // modes. Use duplicated values if the GPU only have one subgroup size.
@@ -59,6 +62,18 @@ struct WgpDetails {
 struct ChipDetails {
   uint32_t wgpCount;
   std::optional<StringRef> sku;
+  // Aggregate chip-level bandwidth in TB/s.
+  std::optional<float> peakMemoryBandwidthTBs;
+  // Optional per-data-type compute performance (TFLOPs/s).
+  llvm::SmallDenseMap<ComputeBitwidths, float> peakPerfTFLOPs;
+
+  ChipDetails(
+      uint32_t wgp, std::optional<llvm::StringRef> s = std::nullopt,
+      std::optional<float> bw = std::nullopt,
+      std::initializer_list<llvm::detail::DenseMapPair<ComputeBitwidths, float>>
+          perf = {})
+      : wgpCount(wgp), sku(s), peakMemoryBandwidthTBs(bw),
+        peakPerfTFLOPs(perf) {}
 };
 
 // Full target details
@@ -99,6 +114,17 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
   for (int i = 0; i < wgp->mmaCount; ++i)
     mmaAttrs.push_back(MMAAttr::get(context, wgp->mmaOps[i]));
 
+  SmallVector<ScaledMMAAttr, 8> scaledMmaAttrs;
+  scaledMmaAttrs.reserve(wgp->scaledMmaCount);
+  for (int i = 0; i < wgp->scaledMmaCount; ++i) {
+    for (auto inTy : ScaledMMAAttr::getSupportedInputTypes(context)) {
+      for (auto outTy : ScaledMMAAttr::getSupportedOutputTypes(context)) {
+        scaledMmaAttrs.push_back(
+            ScaledMMAAttr::get(context, wgp->scaledMmaOps[i], inTy, inTy, outTy,
+                               /*columnMajor=*/false));
+      }
+    }
+  }
   SmallVector<int32_t, 2> subgroupSizes;
   assert(wgp->subgroupSizeChoices.front() != 0);
   assert(wgp->subgroupSizeChoices.back() != 0);
@@ -113,6 +139,7 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
       SubgroupOpsAttr::get(context, wgp->subgroupOps),
       DotProductOpsAttr::get(context, wgp->dotproductOps),
       MMAOpsArrayAttr::get(context, mmaAttrs),
+      ScaledMMAOpsArrayAttr::get(context, scaledMmaAttrs),
       DenseI32ArrayAttr::get(context, subgroupSizes),
       DenseI32ArrayAttr::get(context, wgp->maxWorkgroupSizes),
       wgp->maxThreadSize, wgp->maxWorkgroupMemoryBytes,
@@ -125,8 +152,26 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
     auto skuAttr = details.chip->sku
                        ? StringAttr::get(context, *details.chip->sku)
                        : StringAttr{};
+
+    FloatAttr peakMemoryBandwidthAttr =
+        details.chip->peakMemoryBandwidthTBs
+            ? FloatAttr::get(Float32Type::get(context),
+                             *details.chip->peakMemoryBandwidthTBs)
+            : FloatAttr{};
+
+    DictionaryAttr peakPerfTFLOPsAttr = {};
+    if (!details.chip->peakPerfTFLOPs.empty()) {
+      SmallVector<NamedAttribute> attributes = llvm::map_to_vector(
+          details.chip->peakPerfTFLOPs, [&](const auto &pair) {
+            return NamedAttribute(
+                stringifyComputeBitwidths(pair.first),
+                FloatAttr::get(Float32Type::get(context), pair.second));
+          });
+      peakPerfTFLOPsAttr = DictionaryAttr::get(context, attributes);
+    }
     targetChip = TargetChipAttr::get(context, details.chip->wgpCount, skuAttr,
-                                     DictionaryAttr{});
+                                     peakMemoryBandwidthAttr,
+                                     peakPerfTFLOPsAttr, DictionaryAttr{});
   }
 
   return TargetAttr::get(context, arch, features, targetWgp, targetChip);
@@ -178,12 +223,19 @@ const WgpDetails *getCDNA4WgpDetails() {
       MMAIntrinsic::MFMA_F32_16x16x16_F16,
       MMAIntrinsic::MFMA_F32_32x32x8_F16,
   };
+  static const ScaledMMAIntrinsic cdna4ScaledMMAOps[] = {
+      // Introduced in CDNA4
+      ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32,
+      ScaledMMAIntrinsic::MFMA_SCALE_F32_32x32x64_B32,
+  };
   static const WgpDetails cdna4Wgp = {allComputeBits,
                                       allStorageBits,
                                       allSubgroupOps,
                                       allDotProductOps,
                                       ARRAY_SIZE(cdna4MMAOps),
                                       cdna4MMAOps,
+                                      ARRAY_SIZE(cdna4ScaledMMAOps),
+                                      cdna4ScaledMMAOps,
                                       {64, 64},
                                       {1024, 1024, 1024},
                                       1024,
@@ -225,6 +277,8 @@ const WgpDetails *getCDNA3WgpDetails() {
                                       allDotProductOps,
                                       ARRAY_SIZE(cdna3MMAOps),
                                       cdna3MMAOps,
+                                      0,
+                                      nullptr,
                                       {64, 64},
                                       {1024, 1024, 1024},
                                       1024,
@@ -255,6 +309,8 @@ const WgpDetails *getCDNA2WgpDetails() {
                                       allDotProductOps,
                                       ARRAY_SIZE(cdna2MMAOps),
                                       cdna2MMAOps,
+                                      0,
+                                      nullptr,
                                       {64, 64},
                                       {1024, 1024, 1024},
                                       1024,
@@ -278,6 +334,8 @@ const WgpDetails *getCDNA1WgpDetails() {
                                       allDotProductOps,
                                       ARRAY_SIZE(cdna1MMAOps),
                                       cdna1MMAOps,
+                                      0,
+                                      nullptr,
                                       {64, 64},
                                       {1024, 1024, 1024},
                                       1024,
@@ -308,6 +366,8 @@ const WgpDetails *getRDNA4WgpDetails() {
                                       allDotProductOps,
                                       ARRAY_SIZE(rdna4MMAOps),
                                       rdna4MMAOps,
+                                      0,
+                                      nullptr,
                                       {32, 64},
                                       {1024, 1024, 1024},
                                       1024,
@@ -334,6 +394,8 @@ const WgpDetails *getRDNA3WgpDetails() {
                                       allDotProductOps,
                                       ARRAY_SIZE(rdna3MMAOps),
                                       rdna3MMAOps,
+                                      0,
+                                      nullptr,
                                       {32, 64},
                                       {1024, 1024, 1024},
                                       1024,
@@ -346,24 +408,36 @@ const WgpDetails *getRDNA3WgpDetails() {
 }
 
 const WgpDetails *getRDNA2WgpDetails() {
-  static const WgpDetails rdna2Wgp = {
-      allComputeBits,     allStorageBits,
-      allSubgroupOps,     allDotProductOps,
-      /*mmaCount=*/0,
-      /*mmaOps=*/nullptr, {32, 64},
-      {1024, 1024, 1024}, 1024,
-      64 * 1024,          {0x7fffffff, 0x7fffffff, 0x7fffffff}};
+  static const WgpDetails rdna2Wgp = {allComputeBits,
+                                      allStorageBits,
+                                      allSubgroupOps,
+                                      allDotProductOps,
+                                      /*mmaCount=*/0,
+                                      /*mmaOps=*/nullptr,
+                                      /*scaledMmaCount=*/0,
+                                      /*scaledMmaOps=*/nullptr,
+                                      {32, 64},
+                                      {1024, 1024, 1024},
+                                      1024,
+                                      64 * 1024,
+                                      {0x7fffffff, 0x7fffffff, 0x7fffffff}};
   return &rdna2Wgp;
 }
 
 const WgpDetails *getRDNA1WgpDetails() {
-  static const WgpDetails rdna1Wgp = {
-      allComputeBits,     allStorageBits,
-      allSubgroupOps,     DotProductOps::None,
-      /*mmaCount=*/0,
-      /*mmaOps=*/nullptr, {32, 64},
-      {1024, 1024, 1024}, 1024,
-      64 * 1024,          {0x7fffffff, 0x7fffffff, 0x7fffffff}};
+  static const WgpDetails rdna1Wgp = {allComputeBits,
+                                      allStorageBits,
+                                      allSubgroupOps,
+                                      DotProductOps::None,
+                                      /*mmaCount=*/0,
+                                      /*mmaOps=*/nullptr,
+                                      /*scaledMmaCount=*/0,
+                                      /*scaledMmaOps=*/nullptr,
+                                      {32, 64},
+                                      {1024, 1024, 1024},
+                                      1024,
+                                      64 * 1024,
+                                      {0x7fffffff, 0x7fffffff, 0x7fffffff}};
   return &rdna1Wgp;
 }
 
@@ -378,23 +452,97 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   const WgpDetails *rdna1Wgp = getRDNA1WgpDetails();
 
   // --- CDNA --- //
+  // "AMD Instinct MI350 Series Product Offerings" in Page 18 of
+  // https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/white-papers/amd-cdna-4-architecture-whitepaper.pdf
+  static const ChipDetails mi350xChip = {256,
+                                         "mi350x",
+                                         8.0f,
+                                         {{ComputeBitwidths::FP32, 144.2f},
+                                          {ComputeBitwidths::FP16, 2300.0f},
+                                          {ComputeBitwidths::Int8, 4600.0f},
+                                          {ComputeBitwidths::FP8, 4600.0f},
+                                          {ComputeBitwidths::FP6, 9200.0f},
+                                          {ComputeBitwidths::FP4, 9200.0f}}};
+
+  static const ChipDetails mi355xChip = {256,
+                                         "mi355x",
+                                         8.0f,
+                                         {{ComputeBitwidths::FP32, 157.3f},
+                                          {ComputeBitwidths::FP16, 2500.0f},
+                                          {ComputeBitwidths::Int8, 5000.0f},
+                                          {ComputeBitwidths::FP8, 5000.0f},
+                                          {ComputeBitwidths::FP6, 10000.0f},
+                                          {ComputeBitwidths::FP4, 10000.0f}}};
 
   // "AMD Instinct MI300 Series Product Offerings" in Page 23 of
   // https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/white-papers/amd-cdna-3-white-paper.pdf
-  static const ChipDetails mi300xChip = {304, "mi300x"};
-  static const ChipDetails mi300aChip = {228, "mi300a"};
-  static const ChipDetails mi308xChip = {80, "mi308x"};
-  static const ChipDetails mi325xChip = {304, "mi325x"};
+  static const ChipDetails mi300xChip = {304,
+                                         "mi300x",
+                                         5.3f,
+                                         {{ComputeBitwidths::FP32, 163.4f},
+                                          {ComputeBitwidths::FP16, 1307.4f},
+                                          {ComputeBitwidths::Int8, 2614.9f},
+                                          {ComputeBitwidths::FP8, 2614.9f}}};
+
+  static const ChipDetails mi300aChip = {228,
+                                         "mi300a",
+                                         5.3f,
+                                         {{ComputeBitwidths::FP32, 122.6f},
+                                          {ComputeBitwidths::FP16, 980.6f},
+                                          {ComputeBitwidths::Int8, 1961.2f},
+                                          {ComputeBitwidths::FP8, 1961.2f}}};
+
+  static const ChipDetails mi308xChip = {
+      80,
+      "mi308x",
+      5.3f,
+      // Peak fp32 perf estimated from:
+      // 80(CUs)*4(SIMDs)*1.42(Freq)*(16*16*4)(GEMM shape)*2(mul+add)/32(latency
+      // instruction)
+      {{ComputeBitwidths::FP32, 29.0f},
+       {ComputeBitwidths::FP16, 188.4f},
+       {ComputeBitwidths::FP8, 176.8f},
+       // Estimated int8 performance based on FP8
+       {ComputeBitwidths::Int8, 176.8f}}};
+
+  static const ChipDetails mi325xChip = {304,
+                                         "mi325x",
+                                         5.3f,
+                                         {{ComputeBitwidths::FP32, 163.4f},
+                                          {ComputeBitwidths::FP16, 1307.4f},
+                                          {ComputeBitwidths::Int8, 2614.9f},
+                                          {ComputeBitwidths::FP8, 2614.9f}}};
 
   // "AMD Instinct MI200 Series Accelerator Product Offerings" in Page 14 of
   // https://www.amd.com/content/dam/amd/en/documents/instinct-business-docs/white-papers/amd-cdna2-white-paper.pdf
-  static const ChipDetails mi250xChip = {220, "mi250x"};
-  static const ChipDetails mi250Chip = {208, "mi250"};
-  static const ChipDetails mi210Chip = {104, "mi210"};
+  static const ChipDetails mi250xChip = {220,
+                                         "mi250x",
+                                         3.2f,
+                                         {{ComputeBitwidths::FP32, 95.7f},
+                                          {ComputeBitwidths::FP16, 383.0f},
+                                          {ComputeBitwidths::Int8, 383.0f}}};
+
+  static const ChipDetails mi250Chip = {208,
+                                        "mi250",
+                                        3.2f,
+                                        {{ComputeBitwidths::FP32, 90.5f},
+                                         {ComputeBitwidths::FP16, 362.1f},
+                                         {ComputeBitwidths::Int8, 362.1f}}};
+  static const ChipDetails mi210Chip = {104,
+                                        "mi210",
+                                        1.6f,
+                                        {{ComputeBitwidths::FP32, 45.3f},
+                                         {ComputeBitwidths::FP16, 181.0f},
+                                         {ComputeBitwidths::Int8, 181.0f}}};
 
   // "AMD CDNA Architecture Compute Units" in Page 5 of
   // https://www.amd.com/content/dam/amd/en/documents/instinct-business-docs/white-papers/amd-cdna-white-paper.pdf
-  static const ChipDetails mi100Chip = {120, "mi100"};
+  static const ChipDetails mi100Chip = {120,
+                                        "mi100",
+                                        1.23f,
+                                        {{ComputeBitwidths::FP32, 46.1f},
+                                         {ComputeBitwidths::FP16, 184.6f},
+                                         {ComputeBitwidths::Int8, 184.6f}}};
 
   // --- RDNA --- //
 
@@ -407,10 +555,38 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
 
   // AMD RDNA4 architecture:
   // https://www.amd.com/en/newsroom/press-releases/2025-2-28-amd-unveils-next-generation-amd-rdna-4-architectu.html.
-  static const ChipDetails r9070Chip = {64 / 2, "r9070"};
-  static const ChipDetails rx9070xtChip = {64 / 2, "rx9070xt"};
-  static const ChipDetails rx9070Chip = {56 / 2, "rx9070"};
-  static const ChipDetails rx9060xtChip = {32 / 2, "rx9060xt"};
+  // https://www.amd.com/en/products/graphics/workstations/radeon-ai-pro/ai-9000-series/amd-radeon-ai-pro-r9700.html
+  static const ChipDetails r9700Chip = {64 / 2,
+                                        "r9700",
+                                        0.64f,
+                                        {{ComputeBitwidths::FP32, 47.8f},
+                                         {ComputeBitwidths::FP16, 191.0f},
+                                         {ComputeBitwidths::Int8, 383.0f},
+                                         {ComputeBitwidths::FP8, 383.0f}}};
+  // https://www.amd.com/en/products/graphics/desktops/radeon/9000-series/amd-radeon-rx-9070xt.html
+  static const ChipDetails rx9070xtChip = {64 / 2,
+                                           "rx9070xt",
+                                           0.64f,
+                                           {{ComputeBitwidths::FP32, 48.7f},
+                                            {ComputeBitwidths::FP16, 195.0f},
+                                            {ComputeBitwidths::Int8, 389.0f},
+                                            {ComputeBitwidths::FP8, 389.0f}}};
+  // https://www.amd.com/en/products/graphics/desktops/radeon/9000-series/amd-radeon-rx-9070.html
+  static const ChipDetails rx9070Chip = {56 / 2,
+                                         "rx9070",
+                                         0.64f,
+                                         {{ComputeBitwidths::FP32, 36.1f},
+                                          {ComputeBitwidths::FP16, 145.0f},
+                                          {ComputeBitwidths::Int8, 289.0f},
+                                          {ComputeBitwidths::FP8, 289.0f}}};
+  // https://www.amd.com/en/products/graphics/desktops/radeon/9000-series/amd-radeon-rx-9060xt.html
+  static const ChipDetails rx9060xtChip = {32 / 2,
+                                           "rx9060xt",
+                                           0.32f,
+                                           {{ComputeBitwidths::FP32, 25.6f},
+                                            {ComputeBitwidths::FP16, 103.0f},
+                                            {ComputeBitwidths::Int8, 205.0f},
+                                            {ComputeBitwidths::FP8, 205.0f}}};
 
   // AMD RDNA3.
   static const ChipDetails rx7900xtxChip = {96 / 2, "rx7900xtx"};
@@ -425,6 +601,8 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   // See https://llvm.org/docs/AMDGPUUsage.html#processors for gfxN to
   // cdnaN/rdnaN mapping.
   return llvm::StringSwitch<std::optional<TargetDetails>>(target.lower())
+      .Case("mi355x", TargetDetails{cdna4Wgp, &mi355xChip})
+      .Case("mi350x", TargetDetails{cdna4Wgp, &mi350xChip})
       .Cases("cdna4", "gfx950", TargetDetails{cdna4Wgp, nullptr})
       .Case("mi325x", TargetDetails{cdna3Wgp, &mi325xChip})
       .Case("mi300x", TargetDetails{cdna3Wgp, &mi300xChip})
@@ -442,7 +620,7 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
       // https://www.techpowerup.com/gpu-specs/radeon-rx-9070.c4250
       .Case("rx9070", TargetDetails{rdna4Wgp, &rx9070Chip})
       // https://www.techpowerup.com/gpu-specs/radeon-ai-pro-r9700.c4290
-      .Case("r9070", TargetDetails{rdna4Wgp, &r9070Chip})
+      .Case("r9700", TargetDetails{rdna4Wgp, &r9700Chip})
       // https://www.techpowerup.com/gpu-specs/radeon-rx-9060-xt-16-gb.c4293
       .Case("rx9060xt", TargetDetails{rdna4Wgp, &rx9060xtChip})
       // https://www.techpowerup.com/gpu-specs/radeon-rx-7900-xtx.c3941
@@ -481,10 +659,11 @@ StringRef normalizeAMDGPUTarget(StringRef target) {
     return target;
 
   return llvm::StringSwitch<StringRef>(target.lower())
+      .Cases("mi350x", "mi355x", "gfx950")
       .Cases("mi300a", "mi300x", "mi308x", "mi325x", "gfx942")
       .Cases("mi250x", "mi250", "mi210", "cdna2", "gfx90a")
       .Cases("mi100", "cdna1", "gfx908")
-      .Cases("rx9070xt", "rx9070", "r9070", "gfx1201")
+      .Cases("rx9070xt", "rx9070", "r9700", "gfx1201")
       .Case("rx9060xt", "gfx1200")
       .Cases("rx7900xtx", "rx7900xt", "w7900", "w7800", "gfx1100")
       .Cases("rx7800xt", "rx7700xt", "v710", "w7700", "gfx1101")
@@ -501,7 +680,8 @@ std::optional<TargetDetails> getAppleTargetDetails() {
   // clang-format off
   static const WgpDetails wgp = {
       computeBitwdiths,   allStorageBits,     allSubgroupOps,  allDotProductOps,
-      /*mmaCount=*/0,     /*mmaOps=*/nullptr, {32, 32},
+      /*mmaCount=*/0,     /*mmaOps=*/nullptr, /*scaledMmaCount=*/0,
+      /*scaledMmaOps=*/nullptr,               {32, 32},
       {1024, 1024, 1024}, 1024,               32 * 1024,
       // Note: These values have not been checked and may be higher
       {0xffff, 0xffff, 0xffff}};
@@ -524,7 +704,8 @@ const WgpDetails *getValhallWgpDetails() {
   // clang-format off
   static const WgpDetails valhallWgp = {
       computeBitwdiths,   allStorageBits,     allSubgroupOps,  allDotProductOps,
-      /*mmaCount=*/0,     /*mmaOps=*/nullptr, {16, 16},        {512, 512, 512},
+      /*mmaCount=*/0,     /*mmaOps=*/nullptr, /*scaledMmaCount=*/0,
+      /*scaledMmaOps=*/nullptr,               {16, 16},        {512, 512, 512},
       512,                32 * 1024,
       // Note: These values have not been checked and may be higher
       {0xffff, 0xffff, 0xffff}};
@@ -589,6 +770,8 @@ const WgpDetails *getAmpereWgpDetails() {
                                        allDotProductOps,
                                        ARRAY_SIZE(mmaOps),
                                        mmaOps,
+                                       0,
+                                       nullptr,
                                        {32, 32},
                                        {1024, 1024, 1024},
                                        1024,
@@ -608,6 +791,8 @@ const WgpDetails *getTuringWgpDetails() {
                                        allDotProductOps,
                                        ARRAY_SIZE(mmaOps),
                                        mmaOps,
+                                       0,
+                                       nullptr,
                                        {32, 32},
                                        {1024, 1024, 1024},
                                        1024,
@@ -623,9 +808,10 @@ const WgpDetails *getVoltaWgpDetails() {
   };
   // clang-format off
   static const WgpDetails voltaWgp = {
-      allComputeBits,     allStorageBits, allSubgroupOps, DotProductOps::None,
-      ARRAY_SIZE(mmaOps), mmaOps,         {32, 32},       {1024, 1024, 1024},
-      1024,               96 * 1024,
+      allComputeBits,       allStorageBits,     allSubgroupOps,
+      DotProductOps::None,  ARRAY_SIZE(mmaOps), mmaOps,
+      0,                    nullptr,            {32, 32},
+      {1024, 1024, 1024},   1024,               96 * 1024,
       {0x7fffffff, 0xffff, 0xffff}};
   // clang-format on
   return &voltaWgp;
@@ -636,6 +822,7 @@ const WgpDetails *getPascalWgpDetails() {
   static const WgpDetails pascalWgp = {
       allComputeBits, allStorageBits, allSubgroupOps, DotProductOps::None,
       0, nullptr, // Pascal does not have tensor core support.
+      0, nullptr,
       {32, 32}, {1024, 1024, 1024}, 1024, 48 * 1024,
       {0x7fffffff, 0xffff, 0xffff}};
   // clang-format on
@@ -717,6 +904,7 @@ const WgpDetails *getAdrenoWgpDetails() {
   static const WgpDetails adrenoWgp = {
       computeBitwdiths,   storageBitwidths,   allSubgroupOps,
       allDotProductOps,   /*mmaCount=*/0,     /*mmaOps=*/nullptr,
+      /*scaledMmaCount=*/0,                   /*scaledMmaOps=*/nullptr,
       {64, 64},           {1024, 1024, 1024}, 1024,
       32 * 1024,
       // Note: These values have not been checked and may be higher
@@ -785,6 +973,7 @@ const WgpDetails *getAndroidBaseline2022WgpDetails() {
   static const WgpDetails androidWgp = {
       computeBitwdiths,    storageBitwidths,   SubgroupOps::None,
       DotProductOps::None, /*mmaCount=*/0,     /*mmaOps=*/nullptr,
+      /*scaledMmaCount=*/0,                    /*scaledMmaOps=*/nullptr,
       {64, 64},            {128, 128, 64},     128,
       16 * 1024,
       {0xffff, 0xffff, 0xffff}};
@@ -843,16 +1032,17 @@ TargetAttr getHIPTargetDetails(StringRef target, StringRef features,
 Attribute getHIPTargetEncodingLayoutAttr(TargetAttr target,
                                          StringRef resolver) {
   if (resolver == kDataTilingEncodingLayoutResolverName) {
-    // Return a GPUEncodingLayoutAttr with an empty configuration. The addtional
-    // attributes will be attached by the `cloneWithSimplifiedConfig` interface
-    // method when the resolver needs to be configured.
-    return IREE::GPU::GPUEncodingLayoutAttr::get(target.getContext(), {});
+    // Return a GPUEncodingResolverAttr with an empty configuration. The
+    // addtional attributes will be attached by the `cloneWithSimplifiedConfig`
+    // interface method when the resolver needs to be configured.
+    return IREE::GPU::GPUEncodingResolverAttr::get(target.getContext(), {});
   }
 
   if (resolver == kPadEncodingLayoutResolverName) {
-    return IREE::GPU::GPUPadLayoutAttr::get(target.getContext(),
-                                            /*cache_line_bytes=*/std::nullopt,
-                                            /*cache_sets=*/std::nullopt);
+    return IREE::GPU::GPUPaddingResolverAttr::get(
+        target.getContext(),
+        /*cache_line_bytes=*/std::nullopt,
+        /*cache_sets=*/std::nullopt);
   }
   return nullptr;
 }
@@ -867,11 +1057,6 @@ TargetAttr getVulkanTargetDetails(llvm::StringRef target,
   // duplicated product or microarchitecture names among vendors, which should
   // be the case.
 
-  // For mobile GPUs we target Vulkan 1.1, which accepts SPIR-V 1.3 as the
-  // maximum. But the VK_KHR_spirv_1_4 extension is commonly available so we use
-  // SPIR-V 1.4. For non-mobile GPUs we target Vulkan 1.3, which accepts
-  // SPIR-V 1.6 as the maximum.
-
   // TODO: Add feature bits for physical storage buffer.
 
   if (std::optional<TargetDetails> details = getAMDGPUTargetDetails(target)) {
@@ -880,7 +1065,7 @@ TargetAttr getVulkanTargetDetails(llvm::StringRef target,
   }
   if (std::optional<TargetDetails> details = getARMGPUTargetDetails(target)) {
     return createTargetAttr(*details, normalizeARMGPUTarget(target),
-                            /*features=*/"spirv:v1.4,cap:Shader", context);
+                            /*features=*/"spirv:v1.6,cap:Shader", context);
   }
   if (std::optional<TargetDetails> details =
           getNVIDIAGPUTargetDetails(target)) {
@@ -890,7 +1075,7 @@ TargetAttr getVulkanTargetDetails(llvm::StringRef target,
   if (std::optional<TargetDetails> details =
           getQualcommGPUTargetDetails(target)) {
     return createTargetAttr(*details, target,
-                            /*features=*/"spirv:v1.4,cap:Shader", context);
+                            /*features=*/"spirv:v1.6,cap:Shader", context);
   }
 
   // Go through common profiles if not hit in the above.
@@ -911,15 +1096,16 @@ TargetAttr getWebGPUTargetDetails(MLIRContext *context) {
   static const WgpDetails wgp = {
       computeBitwdiths,    storageBitwidths,   SubgroupOps::None,
       DotProductOps::None, /*mmaCount=*/0,     /*mmaOps=*/nullptr,
+      /*scaledMmaCount=*/0,                    /*scaledMmaOps=*/nullptr,
       {32, 32},            {128, 128, 64},     128,
       16 * 1024,
       {0xffff, 0xffff, 0xffff}};
   // clang-format on
 
-  return createTargetAttr(
-      {&wgp, nullptr}, /*arch=*/"",
-      "spirv:v1.0,cap:Shader,ext:SPV_KHR_storage_buffer_storage_class",
-      context);
+  return createTargetAttr({&wgp, nullptr}, /*arch=*/"",
+                          "spirv:v1.0,cap:Shader,ext:SPV_KHR_storage_buffer_"
+                          "storage_class,ext:SPV_KHR_non_semantic_info",
+                          context);
 }
 
 TargetAttr getFullTarget(StringRef targetAPI, StringRef aliasTarget,

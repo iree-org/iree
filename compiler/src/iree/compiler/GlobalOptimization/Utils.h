@@ -9,8 +9,6 @@
 #include <optional>
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 
 namespace mlir {
 class Type;
@@ -49,11 +47,6 @@ Value createGenericElementwiseCastOp(
     OpBuilder &builder, Location loc, Value input, CastOpInterface castOp,
     ArrayRef<NamedAttribute> attrs,
     std::optional<IREE::Encoding::EncodingAttr> encoding = std::nullopt);
-
-/// Creates a dispatch region out of a sequence of consecutive ops.
-FailureOr<IREE::Flow::DispatchRegionOp>
-wrapConsecutiveOpsInDispatchRegion(RewriterBase &rewriter,
-                                   SmallVector<Operation *> ops);
 
 // Reduce the input value along the reduction dimensions.
 Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,

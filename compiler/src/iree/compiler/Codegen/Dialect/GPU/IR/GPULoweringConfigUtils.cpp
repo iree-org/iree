@@ -19,13 +19,14 @@ static std::optional<SmallVector<int64_t>> getIntegerVector(ArrayAttr array) {
 
 constexpr StringLiteral kMmaKindName = "mma_kind";
 
-IREE::GPU::MmaInterfaceAttr getMmaKind(LoweringConfigAttr config) {
-  return config.getAttributes().getAs<IREE::GPU::MmaInterfaceAttr>(
-      kMmaKindName);
+IREE::Codegen::InnerTileDescAttrInterface
+getMmaKind(LoweringConfigAttr config) {
+  return config.getAttributes()
+      .getAs<IREE::Codegen::InnerTileDescAttrInterface>(kMmaKindName);
 }
 
 void setMmaKind(MLIRContext *context, SmallVectorImpl<NamedAttribute> &attrs,
-                IREE::GPU::MmaInterfaceAttr kind) {
+                IREE::Codegen::InnerTileDescAttrInterface kind) {
   attrs.emplace_back(kMmaKindName, kind);
 }
 
@@ -69,12 +70,14 @@ void setSubgroupNCount(MLIRContext *context,
 }
 
 const StringLiteral kSubgroupBasisName = "subgroup_basis";
-const StringLiteral kThreadBasisName = "thread_basis";
+const StringLiteral kLaneBasisName = "lane_basis";
 
 static StringLiteral getBasisLevelName(IREE::GPU::TilingLevel level) {
   switch (level) {
   case GPU::TilingLevel::Thread:
-    return kThreadBasisName;
+    // We use the term 'lane_basis' here in the context of thread distribution
+    // because of the strict nesting of 'lane_basis' within 'subgroup_basis'.
+    return kLaneBasisName;
   case GPU::TilingLevel::Subgroup:
     return kSubgroupBasisName;
   default:
@@ -175,9 +178,12 @@ setPromotedOperandsList(MLIRContext *context,
 }
 
 constexpr StringLiteral kPaddingName = "padding";
+constexpr StringLiteral kPaddingConvName = "padding_conv";
 
-std::optional<SmallVector<int64_t>> getPaddingList(LoweringConfigAttr config) {
-  auto array = config.getAttributes().getAs<ArrayAttr>(kPaddingName);
+std::optional<SmallVector<int64_t>> getPaddingList(LoweringConfigAttr config,
+                                                   bool paddingConv) {
+  auto attrName = paddingConv ? kPaddingConvName : kPaddingName;
+  auto array = config.getAttributes().getAs<ArrayAttr>(attrName);
   if (!array) {
     return std::nullopt;
   }

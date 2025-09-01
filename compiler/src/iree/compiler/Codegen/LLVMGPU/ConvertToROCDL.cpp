@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Conversion/AMDGPUToROCDL/AMDGPUToROCDL.h"
 #include "mlir/Conversion/ArithToAMDGPU/ArithToAMDGPU.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
@@ -38,8 +39,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-convert-to-rocdl"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -60,7 +59,7 @@ namespace {
 // operations as well.
 struct ReplaceGPUBarrierWithLDSBarrier
     : public OpRewritePattern<gpu::BarrierOp> {
-  using OpRewritePattern<gpu::BarrierOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(gpu::BarrierOp op,
                                 PatternRewriter &rewriter) const override {
@@ -97,7 +96,7 @@ static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns) {
 /// effort.
 constexpr StringLiteral kSwapName = "iree_gpu.swap_mfma";
 struct SwapSetPrioWithMFMA : public OpRewritePattern<ROCDL::SetPrioOp> {
-  using OpRewritePattern<ROCDL::SetPrioOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(ROCDL::SetPrioOp setPrio,
                                 PatternRewriter &rewriter) const override {
     if (!setPrio->hasAttr(kSwapName)) {
@@ -242,7 +241,6 @@ struct ConvertToROCDLPass final
       if (allTypesValid.wasInterrupted()) {
         return signalPassFailure();
       }
-
       arith::populateArithToAMDGPUConversionPatterns(
           patterns, /*convertFP8Arithmetic=*/true, /*saturateFP8Truncf=*/false,
           /*allowPackedF16Rtz=*/false, /*chipset=*/*maybeChipset);
@@ -251,7 +249,6 @@ struct ConvertToROCDLPass final
       populateConvertGPUToAMDGPUPatterns(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
       populateDropSharedMemoryDeallocOpPatterns(patterns);
-      populateScalarizeMathOps(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
       vector::populateBubbleVectorBitCastOpPatterns(patterns);
       vector::populateVectorBroadcastLoweringPatterns(patterns);
@@ -275,21 +272,32 @@ struct ConvertToROCDLPass final
       if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
       }
+
+      // TODO: remove this once ArithToAMDGPU learns to take a PatternBenefit.
+      RewritePatternSet fallbackSmallFloatPatterns(&getContext());
+      arith::populateExpandScalingExtTruncPatterns(fallbackSmallFloatPatterns);
+      arith::populateExpandF4E2M1Patterns(fallbackSmallFloatPatterns);
+      arith::populateExpandF8E8M0Patterns(fallbackSmallFloatPatterns);
+      if (failed(applyPatternsGreedily(
+              m, std::move(fallbackSmallFloatPatterns)))) {
+        LDBG() << "Small float patterns failed\n" << m;
+        return signalPassFailure();
+      }
     }
 
-    LDBG("After applying in-dialect conversions\n" << m);
+    LDBG() << "After applying in-dialect conversions\n" << m;
 
     {
       RewritePatternSet patterns(&getContext());
       populateGpuRewritePatterns(patterns);
-      populateGpuPromoteShuffleToAMDGPUPatterns(patterns);
+      populateGpuPromoteShuffleToAMDGPUPatterns(patterns, std::nullopt);
       populateGpuSubgroupIdPatterns(patterns);
       if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
 
-    LDBG("After applying GPU rewrite patterns\n" << m);
+    LDBG() << "After applying GPU rewrite patterns\n" << m;
 
     {
       // Convert arith::maximumf/minimumf ops on AMD gpus since the lowering
@@ -303,7 +311,7 @@ struct ConvertToROCDLPass final
       }
     }
 
-    LDBG("After converting maximumf/minimumf ops\n" << m);
+    LDBG() << "After converting maximumf/minimumf ops\n" << m;
 
     {
       RewritePatternSet llvmPatterns(&getContext());
@@ -336,11 +344,12 @@ struct ConvertToROCDLPass final
       populateMathToROCDLConversionPatterns(converter, llvmPatterns);
       ub::populateUBToLLVMConversionPatterns(converter, llvmPatterns);
 
-      if (failed(applyPartialConversion(m, target, std::move(llvmPatterns))))
-        signalPassFailure();
+      if (failed(applyPartialConversion(m, target, std::move(llvmPatterns)))) {
+        return signalPassFailure();
+      }
     }
 
-    LDBG("After converting to rocdl\n" << m);
+    LDBG() << "After converting to rocdl\n" << m;
 
     // 16 is the maximum relevant alignment for all AMD GPUs. Unceremoniously
     // set it to 16 as all of our allocations almost always have much greater
@@ -348,7 +357,7 @@ struct ConvertToROCDLPass final
     // TODO(qedawkins): Set this much earlier when we introduce the allocations.
     setSharedMemoryAlignment(m, 16);
 
-    LDBG("After updating shared memory alignments\n" << m);
+    LDBG() << "After updating shared memory alignments\n" << m;
   }
 };
 } // namespace mlir::iree_compiler

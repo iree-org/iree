@@ -83,7 +83,7 @@ def ConcretizePadResultShapePass :
 }
 
 def ConvertAccGEMMToGEMMPass :
-    Pass<"iree-convert-accgemm-to-gemm", ""> {
+    InterfacePass<"iree-convert-accgemm-to-gemm", "mlir::FunctionOpInterface"> {
   let summary = "Convert accumulating GEMMs to GEMMs post dispatch creation.";
 }
 
@@ -128,13 +128,26 @@ def CombineLayoutTransformationPass :
   let summary =
     "Combines layout transformation operations into a single map_scatter operation.";
   let description = [{
-    Starting from iree_codegen.store_to_buffer ops, iteratively combine producer
+    Starting from the specified leaf ops, iteratively combine producer
     layout/indexing transformation ops (linalg.transpose, tensor.collapse_shape,
     etc.) into a single iree_linalg_ext.map_scatter operation. For tensor.pad
     ops, the writing of pad values is distributed to workgroups, and then the
     padding values are written directly to the output buffer of the
     store_to_buffer op.
   }];
+  let options = [
+    Option<"scope", "scope",
+           "::mlir::iree_compiler::IREE::Codegen::RelayoutCombinationScope",
+           /*default=*/"IREE::Codegen::RelayoutCombinationScope::Dispatch",
+           "Specify the roots for layout transformation combination.",
+           [{
+           ::llvm::cl::values(
+             clEnumValN(IREE::Codegen::RelayoutCombinationScope::Dispatch, "dispatch",
+               "Combine relayout ops starting from iree_codegen.store_to_buffer"),
+             clEnumValN(IREE::Codegen::RelayoutCombinationScope::Workgroup, "workgroup",
+               "Combine relayout ops starting from workgroup forall terminator ops"))
+           }]>
+  ];
   let dependentDialects = [
     "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
     "scf::SCFDialect",
@@ -277,7 +290,7 @@ def ReconcileTranslationInfoPass
   let options = [
     Option<"distributeAlong", "distribute-along",
            "::mlir::iree_compiler::IREE::Codegen::WorkgroupId",
-           /*default=*/"IREE::Codegen::WorkgroupId::IdZ",
+           /*default=*/"IREE::Codegen::WorkgroupId::IdX",
            "Constrain the workgroup distribution along grid dimensions.",
            [{
            ::llvm::cl::values(
@@ -286,7 +299,11 @@ def ReconcileTranslationInfoPass
             clEnumValN(IREE::Codegen::WorkgroupId::IdY, "y",
               "Constrain the workgroup distribution to use only workgroups along x and y."),
             clEnumValN(IREE::Codegen::WorkgroupId::IdZ, "z",
-              "Constrain the workgroup distribution to use only workgroups along x, y and z."))}]>
+              "Constrain the workgroup distribution to use only workgroups along x, y and z."))}]>,
+    Option<"foldSplitReductionLoopIntoWorkgroupMappingLoop",
+           "fold-split-reduction-loop-into-workgroup-mapping-loop",
+           "bool", /*default=*/"true",
+           "Resolve scf.forall loops created by split reduction by folding into workgroup mapping loop">
   ];
 }
 
@@ -380,6 +397,11 @@ def FoldAffineMinInDistributedLoopsPass :
 def FoldReshapeIntoInterfaceTensorPass :
     Pass<"iree-codegen-fold-reshape-into-interface-tensor", ""> {
   let summary = "Folds reshape operations into the interface bindings.";
+}
+
+def FoldSplitReductionAndWorkgroupMappingLoopsPass :
+    Pass<"iree-codegen-fold-split-reduction-and-workgroup-mapping-loops", ""> {
+  let summary  = "Folds `scf.forall` loops created by split reduction and workgroup mapping.";
 }
 
 def FoldTensorExtractOpPass :
@@ -484,6 +506,15 @@ def IREEBufferizeConstantsPass :
   let summary = "Convert from arith.constant on tensors to buffers";
 }
 
+def IREECodegenCanonicalizerPass :
+    Pass<"iree-codegen-canonicalize", ""> {
+  let summary = "Codegen canonicalization pass with IREE specific patterns";
+  let options = [
+    Option<"testConvergence", "test-convergence", "bool",
+           /*default=*/"false", "Fails if the patterns fail to converge">
+  ];
+}
+
 def IREEComprehensiveBufferizePass :
     InterfacePass<"iree-codegen-iree-comprehensive-bufferize", "mlir::FunctionOpInterface"> {
   let summary = "Convert from to Linalg ops on tensors to buffers";
@@ -555,6 +586,30 @@ def LowerUKernelOpsToCallsPass :
   let summary = "Lower micro-kernel wrapper ops into function calls";
 }
 
+def LowerBitcodeUKernelsPass :
+    Pass<"iree-codegen-lower-bitcode-ukernels", ""> {
+  let summary = "Lowers ops with ukernel descriptors to ukernel_generic";
+  let dependentDialects = [
+    "iree_compiler::IREE::Codegen::IREECodegenDialect"
+  ];
+}
+
+def LowerMemrefUKernelsPass :
+    Pass<"iree-codegen-lower-memref-ukernels", ""> {
+  let summary = "Lowers ops with ukernel descriptors and memref operands";
+  let dependentDialects = [
+    "memref::MemRefDialect"
+  ];
+}
+
+def LowerTensorUKernelsPass :
+    Pass<"iree-codegen-lower-tensor-ukernels", ""> {
+  let summary = "Lowers ops with ukernel descriptors and tensor operands";
+  let dependentDialects = [
+    "tensor::TensorDialect"
+  ];
+}
+
 def MaterializeHostEncodingPass :
     Pass<"iree-codegen-materialize-host-encoding", "mlir::ModuleOp"> {
   let summary = "Materialize the encoding for tensor as specified by the backend.";
@@ -577,9 +632,9 @@ def MaterializeEncodingIntoNopPass :
 
 def MaterializeEncodingIntoPaddingPass :
     InterfacePass<"iree-codegen-materialize-encoding-into-padding", "mlir::FunctionOpInterface"> {
-  let summary = "Materialize `#iree_encoding.pad_encoding_layout` attributes.";
+  let summary = "Materialize `#iree_encoding.padding` attributes.";
   let description = [{
-    Handles padding introduced by `pad_encoding_layout` encoding layouts, which
+    Handles padding introduced by `padding` encoding layouts, which
     requires `iree_tensor_ext.dispatch.tensor.load`/`.store` to be adjusted to account for
     padding regions.
     Materializes any other encoding layouts into nop.
@@ -656,12 +711,36 @@ def PadDynamicAllocPass :
   let summary = "Pass to pad dynamic alloc into static one.";
 }
 
+def PatchFuncOpsPass : Pass<"iree-codegen-debug-patch-func-ops", ""> {
+  let summary = "A debugging pass for patching func ops with external func ops";
+  let description = [{
+    Pass to replace func ops if they matches the provided func op names. It is
+    useful when you know what the intermediate IR is, since you can patch the
+    func op without modifying any transformation code.
+
+    If the pass is not run at ModuleOp scope, it will track the parent chain to
+    find the first ModuleOp and apply patches.
+
+    NOTE: This is for debugging purpose. You should not rely on the pass in
+          default pipelines.
+  }];
+}
+
 def MathTransformPass :
     Pass<"iree-codegen-math-transform", ""> {
   let summary = "Apply math ops transformations: approximations, rewrites to other math ops, operand casts.";
   let dependentDialects = [
     "mlir::scf::SCFDialect",
     "mlir::arith::ArithDialect"
+  ];
+}
+
+def PropagateConstantOffsetsPass :
+    InterfacePass<"iree-codegen-propagate-constant-offsets", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to push constant offsets towards loads/stores";
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect",
+    "::mlir::arith::ArithDialect"
   ];
 }
 

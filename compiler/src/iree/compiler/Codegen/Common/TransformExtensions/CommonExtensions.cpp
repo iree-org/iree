@@ -136,7 +136,7 @@ namespace {
 // TODO: atm hardcoded on linalg.fill but we could take any result of any
 // generic that yields a constant in that result.
 struct FoldFillIntoPad : public OpRewritePattern<tensor::PadOp> {
-  using OpRewritePattern<tensor::PadOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::PadOp padOp,
                                 PatternRewriter &rewriter) const final {
     Operation *currentOp = padOp.getSource().getDefiningOp();
@@ -886,16 +886,13 @@ static IREEOneShotBufferizationOptions getBufferizationOptions() {
 
   // This type converter converts tensor types to memref types when no exact
   // memref type can be inferred from the context.
-  options.unknownTypeConverterFn = [](Value value, Attribute memorySpace,
+  options.unknownTypeConverterFn = [](TensorType tensorType,
+                                      Attribute memorySpace,
                                       const BufferizationOptions &options) {
-    auto tensorType = llvm::cast<TensorType>(value.getType());
-
-    // Special rule for ConstantOps: These always lower to some memref with a
-    // static identity layout.
-    if (value.getDefiningOp<arith::ConstantOp>())
+    if (tensorType.hasStaticShape()) {
       return bufferization::getMemRefTypeWithStaticIdentityLayout(tensorType,
                                                                   memorySpace);
-
+    }
     // Default case: Fully dynamic layout map for best compatibility.
     return bufferization::getMemRefTypeWithFullyDynamicLayout(tensorType,
                                                               memorySpace);
@@ -907,7 +904,7 @@ static IREEOneShotBufferizationOptions getBufferizationOptions() {
 namespace {
 /// Pattern to rewrite tensor.empty to tensor.alloc.
 struct EmptyTensorLoweringPattern : public OpRewritePattern<tensor::EmptyOp> {
-  using OpRewritePattern<tensor::EmptyOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tensor::EmptyOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1217,16 +1214,16 @@ applyFuseConsumer(RewriterBase &rewriter, Operation *transformOp,
     rewriter.setInsertionPoint(target);
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fuseConsumerResults =
-        scf::tileAndFuseConsumerOfSlice(rewriter, target, loops);
+        scf::tileAndFuseConsumerOfSlices(rewriter, target, loops);
 
     if (failed(fuseConsumerResults))
       return failure();
 
     // Report back the relevant handles to the transform op.
     originalConsumerOps.push_back(
-        fuseConsumerResults->origConsumerOperand->getOwner());
+        fuseConsumerResults->origConsumerOperands.front()->getOwner());
     fusedConsumerOps.push_back(
-        fuseConsumerResults->tiledAndFusedConsumerOperand->getOwner());
+        fuseConsumerResults->tiledAndFusedConsumerOperands.front()->getOwner());
   }
 
   transformResults.set(transformOp->getOpResult(0), originalConsumerOps);

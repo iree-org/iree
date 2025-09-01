@@ -7,6 +7,8 @@
 #ifndef IREE_COMPILER_CODEGEN_COMMON_COMBINELAYOUTTRANSFORMATION_H_
 #define IREE_COMPILER_CODEGEN_COMMON_COMBINELAYOUTTRANSFORMATION_H_
 
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler {
@@ -31,6 +33,52 @@ struct DistributionConfig {
 using PadDistributionConfigFn = function_ref<SmallVector<DistributionConfig>(
     ArrayRef<int64_t> iterationBounds, MLIRContext *)>;
 
+/// Control function type for layout transformation combination. The control
+/// function takes a leaf of a relayout op chain, and returns a bool indicating
+/// whether to combine the relayout op chain, starting from the leaf.
+using CombineRelayoutOpsControlFnRef = function_ref<bool(OpResult leaf)>;
+using CombineRelayoutOpsControlFn = std::function<bool(OpResult leaf)>;
+
+namespace IREE::Codegen {
+/// Enum defining the scope of the CombineLayoutTransformationPass.
+///  - The `Dispatch` scope will combine layout transformation chains that are
+///    consumed by an `iree_codegen.store_to_buffer` op.
+///  - The `Workgroup` scope will combine layout transformation chains that are
+///    consumed by a `tensor.parallel_insert_slice` op at the end of an
+///    scf.forall with an `iree_codegen.workgroup_mapping` attribute.
+enum class RelayoutCombinationScope { Dispatch, Workgroup };
+} // namespace IREE::Codegen
+
+/// Get the corresponding control function for the given scope. The control
+/// functions implement the filtering described in the enum definitions.
+CombineRelayoutOpsControlFn
+getCombineRelayoutOpsControlFn(IREE::Codegen::RelayoutCombinationScope scope);
+
+/// Returns true if the `op` type has a folding pattern into
+/// iree_linalg_ext.map_scatter.
+bool isSupportedRelayoutOp(Operation *op);
+
+/// Fold the `op` into the `mapScatterOp` and return the resulting map_scatter,
+/// or failure if the transformation is not supported. The `op` is should be a
+/// supported relayout op, and not a tensor.pad. For tensor.pad, the folding is
+/// handled by `foldPadIntoMapScatter`, because it requires a
+/// `PadDistributionConfigFn`.
+FailureOr<IREE::LinalgExt::MapScatterOp>
+foldIntoMapScatter(RewriterBase &rewriter, Operation *op,
+                   IREE::LinalgExt::MapScatterOp mapScatterOp);
+
+/// Fold a tensor.pad op into a iree_linalg_ext.map_scatter op, and separate
+/// the writing of padding values into a separate operation on the buffer that
+/// the map_scatter op is ultimately written into. The result buffer is taken
+/// from the direct consumer of the `mapScatterOp`, which is expected to be an
+/// `iree_codegen.store_to_buffer` op. Return failure if the result buffer is
+/// not found. The `padDistributionConfigFn` provides distribution configs for
+/// the writing of padding values to the corresponding output buffer.
+FailureOr<IREE::LinalgExt::MapScatterOp>
+foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
+                      IREE::LinalgExt::MapScatterOp mapScatterOp,
+                      PadDistributionConfigFn padDistributionConfigFn);
+
 /// Combines any layout/indexing transformation ops at the ends of a dispatch.
 /// Finds `iree_codegen.store_to_buffer` ops in the `funcOp`, and combines any
 /// layout transformation ops (like expand_shape, transpose, pack, etc.) that
@@ -45,7 +93,8 @@ using PadDistributionConfigFn = function_ref<SmallVector<DistributionConfig>(
 /// the inner distributed tile will be tiled to a loop nest of memref.store ops.
 LogicalResult
 combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
-                            PadDistributionConfigFn padDistributionConfigFn);
+                            PadDistributionConfigFn padDistributionConfigFn,
+                            CombineRelayoutOpsControlFnRef controlFn = nullptr);
 
 } // namespace mlir::iree_compiler
 #endif // IREE_COMPILER_CODEGEN_COMMON_COMBINELAYOUTTRANSFORMATION_H_

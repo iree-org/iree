@@ -33,6 +33,8 @@
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/file_registry.h"
 #include "iree/hal/utils/file_transfer.h"
+#include "iree/hal/utils/queue_emulation.h"
+#include "iree/hal/utils/queue_host_call_emulation.h"
 #include "iree/hal/utils/stream_tracing.h"
 
 #define IREE_HAL_DEVICE_TRANSFER_DEFAULT_BUFFER_SIZE (128 * 1024 * 1024)
@@ -986,8 +988,9 @@ static iree_status_t iree_hal_hip_device_create_executable_cache(
 }
 
 static iree_status_t iree_hal_hip_device_create_semaphore(
-    iree_hal_device_t* base_device, uint64_t initial_value,
-    iree_hal_semaphore_flags_t flags, iree_hal_semaphore_t** out_semaphore) {
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    uint64_t initial_value, iree_hal_semaphore_flags_t flags,
+    iree_hal_semaphore_t** out_semaphore) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
   return iree_hal_hip_event_semaphore_create(
       initial_value, device->hip_symbols, device->host_allocator,
@@ -1006,7 +1009,11 @@ static void iree_hal_hip_async_buffer_release(
   iree_hal_hip_device_t* device = (iree_hal_hip_device_t*)user_data;
   void* ptr = iree_hal_hip_buffer_device_pointer(buffer);
   if (ptr) {
-    iree_hal_hip_allocator_free_async(device->device_allocator, buffer);
+    if (device->params.async_caching) {
+      iree_hal_hip_allocator_free_async(device->device_allocator, buffer);
+    } else {
+      iree_hal_hip_allocator_free_sync(device->device_allocator, buffer);
+    }
   }
 }
 
@@ -1695,8 +1702,9 @@ static iree_status_t iree_hal_hip_device_queue_alloca(
   // sequencing device work with semaphores. The HIP HAL is not currently
   // asynchronous.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_semaphore_list_wait(wait_semaphore_list,
-                                       iree_infinite_timeout()));
+      z0,
+      iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
+                                   IREE_HAL_WAIT_FLAG_DEFAULT));
 
   status =
       iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
@@ -1796,8 +1804,9 @@ static iree_status_t iree_hal_hip_device_queue_dealloca(
   // sequencing device work with semaphores. The HIP HAL is not currently
   // asynchronous.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_semaphore_list_wait(wait_semaphore_list,
-                                       iree_infinite_timeout()));
+      z0,
+      iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
+                                   IREE_HAL_WAIT_FLAG_DEFAULT));
 
   // Schedule the buffer deallocation if we got it from a pool and otherwise
   // drop it on the floor and let it be freed when the buffer is released.
@@ -1947,8 +1956,8 @@ bool iree_hal_hip_transfer_buffer_size_check_condition(void* user_data) {
   iree_hal_hip_transfer_buffer_size_check_data_t* data =
       (iree_hal_hip_transfer_buffer_size_check_data_t*)user_data;
   return iree_hal_hip_transfer_buffer_size_left(
-             data->device, &data->device->devices[data->device_ordinal]) >=
-         data->num_bytes;
+             data->device, &data->device->devices[data->device_ordinal]) ==
+         data->device->params.file_transfer_buffer_size;
 }
 
 // Returns two chunks that are needed to cover the buffer. Pass in an
@@ -2644,10 +2653,11 @@ static iree_status_t iree_hal_hip_device_queue_flush(
 
 static iree_status_t iree_hal_hip_device_wait_semaphores(
     iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout) {
+    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
+    iree_hal_wait_flags_t flags) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
   return iree_hal_hip_semaphore_multi_wait(semaphore_list, wait_mode, timeout,
-                                           device->host_allocator);
+                                           flags, device->host_allocator);
 }
 
 static iree_status_t iree_hal_hip_device_profiling_begin(
@@ -2693,6 +2703,8 @@ static const iree_hal_device_vtable_t iree_hal_hip_device_vtable = {
     .queue_copy = iree_hal_device_queue_emulated_copy,
     .queue_read = iree_hal_hip_device_queue_read,
     .queue_write = iree_hal_hip_device_queue_write,
+    .queue_host_call = iree_hal_device_queue_emulated_host_call,
+    .queue_dispatch = iree_hal_device_queue_emulated_dispatch,
     .queue_execute = iree_hal_hip_device_queue_execute,
     .queue_flush = iree_hal_hip_device_queue_flush,
     .wait_semaphores = iree_hal_hip_device_wait_semaphores,

@@ -7,10 +7,9 @@
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
+
 #define DEBUG_TYPE "iree-codegen-rocdl-buffer-instructions-optimization"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -100,7 +99,7 @@ void simplifyMaskOps(RewriterBase &rewriter, vector::CreateMaskOp maskOp) {
 
     rewriter.setInsertionPoint(readOp);
     Value selectValue = createI1And(loc, ValuesToAnd, rewriter);
-    auto constantValue = rewriter.create<vector::SplatOp>(
+    auto constantValue = rewriter.create<vector::BroadcastOp>(
         loc, readOp.getVectorType(), readOp.getPadding());
 
     auto newReadOp = rewriter.create<vector::TransferReadOp>(

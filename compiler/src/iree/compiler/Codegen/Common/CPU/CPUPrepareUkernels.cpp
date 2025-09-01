@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -18,8 +19,6 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/CPU/Passes.h.inc"
 
 namespace {
-
-using IREE::Codegen::LoweringConfigAttr;
 
 static void tileBatchDimsForBatchMmt4dOp(RewriterBase &rewriter,
                                          FunctionOpInterface funcOp) {
@@ -151,27 +150,28 @@ static LogicalResult reduceDefiningOp(PatternRewriter &rewriter, Value input) {
 
 /// Drops the first element from all the tile sizes list. The first element is
 /// for the batch dimension.
-static LoweringConfigAttr
-dropBatchTileSize(IREE::Codegen::LoweringConfigAttr config) {
-  TileSizesListType tileSizesList = config.getTileSizeVals();
-  ScalableTileFlagsListType scalableTileFlagsList =
-      config.getScalableTileFlagVals();
-  for (auto &tileSizes : tileSizesList) {
+static IREE::CPU::LoweringConfigAttr
+dropBatchTileSize(IREE::CPU::LoweringConfigAttr config) {
+  SmallVector<IREE::CPU::LoweringConfigLevelInfo> tilingInfo =
+      config.getAvailableTilingInfo();
+  SmallVector<NamedAttribute> newItems;
+  for (auto [level, tileSizes, scalableTileFlags] : tilingInfo) {
     tileSizes.erase(tileSizes.begin());
-  }
-  for (auto &scalableTileFlags : scalableTileFlagsList) {
-    if (!scalableTileFlags.empty()) {
+    if (!scalableTileFlags.empty())
       scalableTileFlags.erase(scalableTileFlags.begin());
-    }
+    newItems.emplace_back(
+        IREE::CPU::getTilingLevelName(level),
+        IREE::CPU::LoweringConfigAttr::getTilingLevelAttr(
+            config.getContext(), tileSizes, scalableTileFlags));
   }
-  return IREE::Codegen::LoweringConfigAttr::get(
-      config.getContext(), tileSizesList, scalableTileFlagsList);
+  return IREE::CPU::LoweringConfigAttr::get(
+      config.getContext(), DictionaryAttr::get(config.getContext(), newItems));
 }
 
 /// Pattern to convert linalg.batch_mmt4d with batch dim = 1 into mmt4d.
 struct ConvertBatchMmt4DtoMmt4DPattern
     : public OpRewritePattern<linalg::BatchMmt4DOp> {
-  using OpRewritePattern<linalg::BatchMmt4DOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::BatchMmt4DOp op,
                                 PatternRewriter &rewriter) const override {
@@ -202,7 +202,7 @@ struct ConvertBatchMmt4DtoMmt4DPattern
               .result();
 
       auto loweringConfig =
-          getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(oldFillOp);
+          getLoweringConfig<IREE::CPU::LoweringConfigAttr>(oldFillOp);
       if (loweringConfig) {
         auto config = dropBatchTileSize(loweringConfig);
         setLoweringConfig(reducedOut.getDefiningOp(), config);
@@ -237,8 +237,7 @@ struct ConvertBatchMmt4DtoMmt4DPattern
         loc, reducedOut.getType(), ValueRange{reducedLhs, reducedRhs},
         ValueRange{reducedOut});
 
-    auto loweringConfig =
-        getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op);
+    auto loweringConfig = getLoweringConfig<IREE::CPU::LoweringConfigAttr>(op);
     if (loweringConfig) {
       auto config = dropBatchTileSize(loweringConfig);
       setLoweringConfig(mmt4DOp, config);
@@ -252,7 +251,7 @@ struct ConvertBatchMmt4DtoMmt4DPattern
 };
 
 struct Convert3DPackto2DPackPattern : public OpRewritePattern<linalg::PackOp> {
-  using OpRewritePattern<linalg::PackOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::PackOp packOp,
                                 PatternRewriter &rewriter) const override {
@@ -322,7 +321,7 @@ struct Convert3DPackto2DPackPattern : public OpRewritePattern<linalg::PackOp> {
 
 struct Convert5DUnPackto4DUnPackPattern
     : public OpRewritePattern<linalg::UnPackOp> {
-  using OpRewritePattern<linalg::UnPackOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::UnPackOp unpackOp,
                                 PatternRewriter &rewriter) const override {
@@ -417,15 +416,15 @@ void CPUPrepareUkernelsPass::runOnOperation() {
   IRRewriter rewriter(ctx);
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
 
-  if (hasUkernel(targetAttr, "mmt4d")) {
+  if (targetAttr && hasUkernel(targetAttr.getConfiguration(), "mmt4d")) {
     tileBatchDimsForBatchMmt4dOp(rewriter, funcOp);
     patterns.add<ConvertBatchMmt4DtoMmt4DPattern>(ctx);
   }
-  if (hasUkernel(targetAttr, "pack")) {
+  if (targetAttr && hasUkernel(targetAttr.getConfiguration(), "pack")) {
     tileNonPackedDimsFor3DPackOps(rewriter, funcOp);
     patterns.add<Convert3DPackto2DPackPattern>(ctx);
   }
-  if (hasUkernel(targetAttr, "unpack")) {
+  if (targetAttr && hasUkernel(targetAttr.getConfiguration(), "unpack")) {
     tileNonPackedDimsFor5DPUnpackOps(rewriter, funcOp);
     patterns.add<Convert5DUnPackto4DUnPackPattern>(ctx);
   }

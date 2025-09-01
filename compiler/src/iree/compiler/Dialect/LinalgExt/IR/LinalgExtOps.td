@@ -103,8 +103,8 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
          "getLoopIteratorTypes",
          "getResultTilePosition",
          "getTiledImplementation",
-         "getIterationDomainTileFromOperandTile",
-         "getTiledImplementationFromOperandTile"]>]> {
+         "getIterationDomainTileFromOperandTiles",
+         "getTiledImplementationFromOperandTiles"]>]> {
   let summary = [{Scatters an input in slices based on a tensor of indices.}];
   let description = [{
     Takes two `inputs` (`update` and `indices`) and `outputs` value (`original`).
@@ -326,8 +326,8 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
          "getLoopIteratorTypes",
          "getResultTilePosition",
          "getTiledImplementation",
-         "getIterationDomainTileFromOperandTile",
-         "getTiledImplementationFromOperandTile",
+         "getIterationDomainTileFromOperandTiles",
+         "getTiledImplementationFromOperandTiles",
          "generateScalarImplementation"]>,
      SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">]> {
   let summary = [{Scatter with a mapping from source indices to result indices.}];
@@ -391,6 +391,15 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
         function_ref<SmallVector<Value>(ArrayRef<BlockArgument>)>
             transformationBuilder,
         int64_t numSourceIndices);
+
+    // Inline the transformation region of the map_scatter op without its
+    // terminator, replacing the block arguments with the passed
+    // `transformBodyIndices`. The `bodyBuilder` function is called with the
+    // cloned index `Value`s that would have been yielded by the terminator of
+    // the inlined transformation body.
+    void inlineMapScatterBody(
+      OpBuilder &b, Location loc, ValueRange transformBodyIndices,
+      function_ref<void(OpBuilder &, Location, ArrayRef<Value>)> bodyBuilder);
 
     // Return true if the mapScatterOp is an identity transformation, meaning
     // it is just doing a copy from input to output. This is true if the mask
@@ -554,11 +563,6 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
                        BoolAttr:$inclusive
   );
 
-  let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
-      CArg<"int64_t", "0">:$dimension, CArg<"bool", "true">:$inclusive)>
-  ];
-
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region AnyRegion:$region);
   let hasFolder = 1;
@@ -675,7 +679,16 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
 
 def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
   SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
-  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<LinalgExtInterface>,
+  DeclareOpInterfaceMethods<TilingInterface,
+  ["generateScalarImplementation",
+   "getLoopIteratorTypes",
+   "getResultTilePosition",
+   "getTiledImplementation",
+   "generateResultTileValue",
+   "getIterationDomain"]
+  >
 ]> {
   let summary = "Performs an arg-reduction using a user-defined comparator.";
   let description = [{
@@ -793,6 +806,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
      DeclareOpInterfaceMethods<LinalgFusionInterface,
       ["getIndexingMapsForResults", "getIndexingMapsForOperands",
        "getStaticLoopRanges"]>,
+     DeclareOpInterfaceMethods<IndexingMapOpInterface, ["getMatchingIndexingMap"]>,
      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>,
      DeclareOpInterfaceMethods<TilingInterface,
@@ -839,13 +853,17 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
 
   let builders = [
     OpBuilder<(ins "TypeRange":$results,
-    "Value":$query,
-    "Value":$key,
-    "Value":$value,
-    "Value":$scale,
-    "Value":$output,
-    "ArrayAttr":$indexing_maps,
-    CArg<"std::optional<Value>", "std::nullopt">:$mask)>
+      "Value":$query,
+      "Value":$key,
+      "Value":$value,
+      "Value":$scale,
+      "Value":$output,
+      "ArrayAttr":$indexing_maps,
+      CArg<"std::optional<Value>", "std::nullopt">:$mask)>,
+    OpBuilder<(ins "TypeRange":$results,
+      "ValueRange":$inputOperands,
+      "ValueRange":$initOperands,
+      "ArrayAttr":$indexing_maps)>
   ];
 
   let extraClassDeclaration = [{
@@ -886,6 +904,8 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     static StringRef getQKAttrStr() { return "qk_attrs"; }
     static StringRef getPVAttrStr() { return "pv_attrs"; }
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -895,7 +915,9 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
 def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
-     DestinationStyleOpInterface, LinalgExtInterface,
+     DestinationStyleOpInterface,
+     IndexingMapOpInterface,
+     LinalgExtInterface,
      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>,
      DeclareOpInterfaceMethods<TilingInterface,
@@ -1019,6 +1041,8 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
     static StringRef getQKAttrStr() { return "qk_attrs"; }
     static StringRef getPVAttrStr() { return "pv_attrs"; }
   }];
+
+  let hasCanonicalizer = 1;
 }
 //===----------------------------------------------------------------------===//
 // Im2col
@@ -1544,12 +1568,6 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
                        DenseI64ArrayAttr:$image_dimensions
   );
 
-  let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
-      CArg<"int64_t", "8">:$output_tile_size, CArg<"int64_t", "3">:$kernel_size,
-      CArg<"ArrayRef<int64_t>", "{1, 2}">:$image_dimensions)>
-  ];
-
   let results = (outs Variadic<AnyRankedTensor>:$result);
   let hasFolder = 1;
   let assemblyFormat = [{
@@ -1654,12 +1672,6 @@ def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_
                        I64Attr:$kernel_size,
                        DenseI64ArrayAttr:$kernel_dimensions
   );
-
-  let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
-      CArg<"int64_t", "8">:$output_tile_size, CArg<"int64_t", "3">:$kernel_size,
-      CArg<"ArrayRef<int64_t>", "{0, 1}">:$kernel_dimensions)>
-  ];
 
   let results = (outs Variadic<AnyRankedTensor>:$result);
   let hasFolder = 1;
@@ -1774,12 +1786,6 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
                        I64Attr:$kernel_size,
                        DenseI64ArrayAttr:$image_dimensions
   );
-
-  let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
-      CArg<"int64_t", "8">:$output_tile_size, CArg<"int64_t", "3">:$kernel_size,
-      CArg<"ArrayRef<int64_t>", "{1, 2}">:$image_dimensions)>
-  ];
 
   let results = (outs Variadic<AnyRankedTensor>:$result);
   let hasFolder = 1;

@@ -153,7 +153,7 @@ getIntrinsics(linalg::LinalgOp linalgOp,
   IREE::GPU::TargetAttr target;
   if (executableTargets.size() == 1) {
     auto targetAttr = executableTargets.front();
-    target = getGPUTargetAttr(targetAttr);
+    target = getGPUTargetAttr(targetAttr.getConfiguration());
   } else {
     // For LIT testing, also directly search TargetAttr around the op.
     target = getGPUTargetAttr(linalgOp);
@@ -180,7 +180,7 @@ padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
     return;
 
   // Check that conv has met conditions to go down mfma.
-  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
   FailureOr<mlir::linalg::ConvolutionDimensions> convolutionDims =
       mlir::linalg::inferConvolutionDims(linalgOp);
   assert(succeeded(convolutionDims) && "Could not infer contraction dims");
@@ -359,14 +359,14 @@ static void padContractionLikeOp(
   int64_t kDim = contractionDims->k.back();
 
   // If none of the shape is dynamic, we'd fallback to using pad to intrinsics.
-  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
   int64_t mSize = bounds[mDim];
   int64_t nSize = bounds[nDim];
   int64_t kSize = bounds[kDim];
 
   // Bail out on matvec-like/skinny matmul cases.
-  if ((!ShapedType::isDynamic(mSize) && mSize <= kVerySkinnyDimThreshold) ||
-      (!ShapedType::isDynamic(nSize) && nSize <= kVerySkinnyDimThreshold)) {
+  if ((ShapedType::isStatic(mSize) && mSize <= kVerySkinnyDimThreshold) ||
+      (ShapedType::isStatic(nSize) && nSize <= kVerySkinnyDimThreshold)) {
     return;
   }
 

@@ -7,9 +7,10 @@
 #include <stdio.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/file_io.h"
 #include "iree/base/internal/path.h"
 #include "iree/hal/local/elf/fatelf.h"
+#include "iree/io/file_contents.h"
+#include "iree/io/stdio_util.h"
 
 // NOTE: we don't verify ELF information in here and just pass it along. Don't
 // run this on untrusted ELFs.
@@ -20,14 +21,6 @@
 // TODO(benvanik): make this based on the archs used? It needs to be the common
 // page size across all targets used within the file.
 #define IREE_FATELF_PAGE_SIZE 4096
-
-#if defined(IREE_PLATFORM_WINDOWS)
-#include <fcntl.h>
-#include <io.h>
-#define IREE_SET_BINARY_MODE(handle) _setmode(_fileno(handle), O_BINARY)
-#else
-#define IREE_SET_BINARY_MODE(handle) ((void)0)
-#endif  // IREE_PLATFORM_WINDOWS
 
 static int print_usage() {
   fprintf(stderr, "Syntax: iree-fatelf [join|split|select|dump] files...\n");
@@ -176,13 +169,13 @@ static iree_status_t fatelf_parse_elf_metadata(
 
 typedef struct {
   uint64_t offset;
-  iree_file_contents_t* contents;
+  iree_io_file_contents_t* contents;
   iree_const_byte_span_t elf_data;
 } fatelf_entry_t;
 
 // Joins one or more ELF files together and writes the output to stdout.
 static iree_status_t fatelf_join(int argc, char** argv) {
-  IREE_SET_BINARY_MODE(stdout);  // ensure binary output mode
+  IREE_IO_SET_BINARY_MODE(stdout);  // ensure binary output mode
 
 #if IREE_ENDIANNESS_BIG
 #error "FatELF writing support only available on little-endian systems today"
@@ -194,9 +187,9 @@ static iree_status_t fatelf_join(int argc, char** argv) {
       (fatelf_entry_t*)iree_alloca(entry_count * sizeof(fatelf_entry_t));
   memset(entries, 0, entry_count * sizeof(*entries));
   for (iree_elf64_byte_t i = 0; i < entry_count; ++i) {
-    IREE_RETURN_IF_ERROR(
-        iree_file_read_contents(argv[i], IREE_FILE_READ_FLAG_DEFAULT,
-                                iree_allocator_system(), &entries[i].contents));
+    IREE_RETURN_IF_ERROR(iree_io_file_contents_read(
+        iree_make_cstring_view(argv[i]), iree_allocator_system(),
+        &entries[i].contents));
     entries[i].elf_data = entries[i].contents->const_buffer;
   }
 
@@ -265,7 +258,7 @@ static iree_status_t fatelf_join(int argc, char** argv) {
   fflush(stdout);
 
   for (iree_elf64_byte_t i = 0; i < entry_count; ++i) {
-    iree_file_contents_free(entries[i].contents);
+    iree_io_file_contents_free(entries[i].contents);
   }
   return iree_ok_status();
 }
@@ -327,10 +320,10 @@ static const char* fatelf_byte_order_id_str(iree_elf64_byte_t value) {
 
 // Splits a FatELF into multiple files, writing each beside the input file.
 static iree_status_t fatelf_split(int argc, char** argv) {
-  iree_file_contents_t* fatelf_contents = NULL;
+  iree_io_file_contents_t* fatelf_contents = NULL;
   IREE_RETURN_IF_ERROR(
-      iree_file_read_contents(argv[0], IREE_FILE_READ_FLAG_DEFAULT,
-                              iree_allocator_system(), &fatelf_contents));
+      iree_io_file_contents_read(iree_make_cstring_view(argv[0]),
+                                 iree_allocator_system(), &fatelf_contents));
   iree_fatelf_header_t* header = NULL;
   IREE_RETURN_IF_ERROR(fatelf_parse(fatelf_contents->const_buffer, &header));
 
@@ -361,29 +354,31 @@ static iree_status_t fatelf_split(int argc, char** argv) {
 
     iree_const_byte_span_t record_data = iree_make_const_byte_span(
         fatelf_contents->const_buffer.data + record->offset, record->size);
-    IREE_RETURN_IF_ERROR(iree_file_write_contents(record_path, record_data));
+    IREE_RETURN_IF_ERROR(
+        iree_io_file_contents_write(iree_make_cstring_view(record_path),
+                                    record_data, iree_allocator_system()));
   }
 
   fprintf(stdout, "Wrote %d records to %.*s!\n", header->record_count,
           (int)dirname.size, dirname.data);
   iree_allocator_free(iree_allocator_system(), header);
-  iree_file_contents_free(fatelf_contents);
+  iree_io_file_contents_free(fatelf_contents);
   return iree_ok_status();
 }
 
 // Selects the ELF matching the current host config from a FatELF and writes
 // it to stdout.
 static iree_status_t fatelf_select(int argc, char** argv) {
-  IREE_SET_BINARY_MODE(stdout);  // ensure binary output mode
-  iree_file_contents_t* fatelf_contents = NULL;
+  IREE_IO_SET_BINARY_MODE(stdout);  // ensure binary output mode
+  iree_io_file_contents_t* fatelf_contents = NULL;
   IREE_RETURN_IF_ERROR(
-      iree_file_read_contents(argv[0], IREE_FILE_READ_FLAG_DEFAULT,
-                              iree_allocator_system(), &fatelf_contents));
+      iree_io_file_contents_read(iree_make_cstring_view(argv[0]),
+                                 iree_allocator_system(), &fatelf_contents));
   iree_const_byte_span_t elf_data = iree_const_byte_span_empty();
   IREE_RETURN_IF_ERROR(
       iree_fatelf_select(fatelf_contents->const_buffer, &elf_data));
   fwrite(elf_data.data, 1, elf_data.data_length, stdout);
-  iree_file_contents_free(fatelf_contents);
+  iree_io_file_contents_free(fatelf_contents);
   return iree_ok_status();
 }
 
@@ -411,10 +406,10 @@ static const char* fatelf_byte_order_enum_str(iree_elf64_byte_t value) {
 
 // Dumps the FatELF file records.
 static iree_status_t fatelf_dump(int argc, char** argv) {
-  iree_file_contents_t* fatelf_contents = NULL;
+  iree_io_file_contents_t* fatelf_contents = NULL;
   IREE_RETURN_IF_ERROR(
-      iree_file_read_contents(argv[0], IREE_FILE_READ_FLAG_DEFAULT,
-                              iree_allocator_system(), &fatelf_contents));
+      iree_io_file_contents_read(iree_make_cstring_view(argv[0]),
+                                 iree_allocator_system(), &fatelf_contents));
   iree_fatelf_header_t* header = NULL;
   IREE_RETURN_IF_ERROR(fatelf_parse(fatelf_contents->const_buffer, &header));
 
@@ -450,7 +445,7 @@ static iree_status_t fatelf_dump(int argc, char** argv) {
   }
 
   iree_allocator_free(iree_allocator_system(), header);
-  iree_file_contents_free(fatelf_contents);
+  iree_io_file_contents_free(fatelf_contents);
   return iree_ok_status();
 }
 

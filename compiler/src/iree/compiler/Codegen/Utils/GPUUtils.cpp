@@ -14,7 +14,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
@@ -33,9 +33,10 @@
 #define DEBUG_TYPE "iree-codegen-gpu-utils"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define DBGSNL() (llvm::dbgs() << "\n")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
-static constexpr unsigned kShuffleBitWidth = 32;
+constexpr unsigned kShuffleBitWidth = 32;
+// TODO: These are AMD GPU specific. These need to find a better home.
+constexpr char kWavesPerEuAttrName[] = "waves_per_eu";
 
 static llvm::cl::opt<std::string> clTestTarget(
     "iree-gpu-test-target",
@@ -630,7 +631,7 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
     SmallVector<Value> indices = {warpId};
     builder.create<scf::IfOp>(loc, lane0, [&](OpBuilder &b, Location l) {
       b.create<memref::StoreOp>(l, laneVal, alloc, indices);
-      b.create<scf::YieldOp>(l, std::nullopt);
+      b.create<scf::YieldOp>(l);
     });
     builder.create<gpu::BarrierOp>(loc);
     // Further reduce the outputs from each warps with a single warp reduce.
@@ -790,7 +791,7 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
     else if (sourceType.isF32())
       mmaShapeK = 8;
     else {
-      LDBG("unsupported shape for vector.contract: ");
+      LDBG() << "unsupported shape for vector.contract: ";
       return std::nullopt;
     }
 
@@ -798,7 +799,7 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
     // to 1.
     SmallVector<int64_t> mmaShape(contract.getIteratorTypes().size() - 3, 1);
     mmaShape.append({mmaShapeM, mmaShapeN, mmaShapeK});
-    LDBG("shape for vector.contract: " << llvm::interleaved(mmaShape));
+    LDBG() << "shape for vector.contract: " << llvm::interleaved(mmaShape);
     return mmaShape;
   }
 
@@ -808,7 +809,7 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
       return std::nullopt;
     SmallVector<int64_t> outputShape(writeOp.getVectorType().getRank() - 2, 1);
     outputShape.append({mmaShapeM, mmaShapeN});
-    LDBG("shape for vector.xfer_write: " << llvm::interleaved(outputShape));
+    LDBG() << "shape for vector.xfer_write: " << llvm::interleaved(outputShape);
     return outputShape;
   }
 
@@ -821,7 +822,7 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
     std::optional<int> operandId =
         getVectorContractOpOperandIdForVectorReadOp(op);
     if (!operandId) {
-      LDBG("Failed to get operandId for vector::xfer_read: " << *op);
+      LDBG() << "Failed to get operandId for vector::xfer_read: " << *op;
       return std::nullopt;
     }
 
@@ -873,14 +874,16 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
       if (*operandId == 2) {
         SmallVector<int64_t> readShape;
         readShape.append({mmaShapeM, mmaShapeN});
-        LDBG("shape for vector.xfer_read: " << llvm::interleaved(readShape));
+        LDBG() << "shape for vector.xfer_read: "
+               << llvm::interleaved(readShape);
         return readShape;
       }
       // For matrixA.
       if (*operandId == 0) {
         SmallVector<int64_t> readShape;
         readShape.append({mmaShapeM, mmaShapeK});
-        LDBG("shape for vector.xfer_read: " << llvm::interleaved(readShape));
+        LDBG() << "shape for vector.xfer_read: "
+               << llvm::interleaved(readShape);
         return readShape;
       }
       // For matrixB.
@@ -899,13 +902,13 @@ std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op) {
             return std::nullopt;
           sliceType = vecType;
         }
-        LDBG("shape for vector.xfer_read: "
-             << llvm::interleaved(sliceType.getShape()));
+        LDBG() << "shape for vector.xfer_read: "
+               << llvm::interleaved(sliceType.getShape());
         return llvm::to_vector(sliceType.getShape());
       }
     }
   }
-  LDBG("unsupported shape for " << op->getName().getStringRef());
+  LDBG() << "unsupported shape for " << op->getName().getStringRef();
   return std::nullopt;
 }
 
@@ -995,32 +998,47 @@ IREE::GPU::TargetAttr getCLGPUTarget(MLIRContext *context) {
   return IREE::GPU::getFullTarget(backend, arch, features, context);
 }
 
-IREE::GPU::TargetAttr getGPUTargetAttr(Attribute attr) {
-  if (!attr) {
-    return {};
+IREE::GPU::TargetAttr getGPUTargetAttr(DictionaryAttr attr) {
+  return dyn_cast_or_null<IREE::GPU::TargetAttr>(getConfigTargetInfo(attr));
+}
+
+IREE::GPU::TargetAttr getGPUTargetAttr(MLIRContext *context,
+                                       IREE::HAL::ExecutableTargetAttr target) {
+  IREE::GPU::TargetAttr gpuTargetAttr;
+  if (target) {
+    gpuTargetAttr = getGPUTargetAttr(target.getConfiguration());
   }
-  DictionaryAttr config;
-  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(attr);
-  if (targetAttr) {
-    config = targetAttr.getConfiguration();
-  } else {
-    config = dyn_cast<DictionaryAttr>(attr);
+  if (!gpuTargetAttr) {
+    gpuTargetAttr = getCLGPUTarget(context);
   }
-  if (!config) {
-    return getCLGPUTarget(attr.getContext());
-  }
-  auto gpuAttr = config.getAs<IREE::GPU::TargetAttr>(kGPUTargetAttrName);
-  if (!gpuAttr) {
-    return getCLGPUTarget(attr.getContext());
-  }
-  return gpuAttr;
+  return gpuTargetAttr;
 }
 
 IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op) {
-  if (auto target = IREE::HAL::ExecutableTargetAttr::lookup(op)) {
-    return getGPUTargetAttr(target);
+  return getGPUTargetAttr(op->getContext(),
+                          IREE::HAL::ExecutableTargetAttr::lookup(op));
+}
+void addConfigGPUTarget(MLIRContext *context,
+                        IREE::GPU::TargetAttr gpuTargetAttr,
+                        SmallVectorImpl<NamedAttribute> &config) {
+  addConfigTargetInfo(context, gpuTargetAttr, config);
+}
+
+IntegerAttr getConfigWavesPerEuAttr(DictionaryAttr targetConfig) {
+  return targetConfig.getAs<IntegerAttr>(kWavesPerEuAttrName);
+}
+std::optional<int64_t> getConfigWavesPerEu(DictionaryAttr targetConfig) {
+  auto attr = getConfigWavesPerEuAttr(targetConfig);
+  if (attr) {
+    return attr.getInt();
   }
-  return getCLGPUTarget(op->getContext());
+  return std::nullopt;
+}
+void addConfigWavesPerEu(MLIRContext *context, int64_t wavesPerEu,
+                         SmallVectorImpl<NamedAttribute> &config) {
+  config.emplace_back(
+      StringAttr::get(context, kWavesPerEuAttrName),
+      IntegerAttr::get(IntegerType::get(context, 64), wavesPerEu));
 }
 
 std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func) {
