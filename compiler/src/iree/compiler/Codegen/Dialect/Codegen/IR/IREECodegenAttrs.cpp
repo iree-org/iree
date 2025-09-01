@@ -13,10 +13,13 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/StorageUniquerSupport.h"
 
 #define GET_ATTRDEF_CLASSES
@@ -605,19 +608,86 @@ RotateRowsAttr::verify(function_ref<InFlightDiagnostic()> emitError,
 // conditional_transpose
 //===---------------------------------------------------------------------===//
 
+static void swapValuesOnCond(OpBuilder &b, Location loc,
+                             OpFoldResult cond,
+                             SmallVector<OpFoldResult> &values) {
+
+  assert(values.size() >= 2 && "Need at least two values to swap");
+  Value v0 = getValueOrCreateConstantIndexOp(b, loc, values[0]);
+  Value v1 = getValueOrCreateConstantIndexOp(b, loc, values[1]);
+  Value condVal = getValueOrCreateConstantIndexOp(b, loc, cond);
+  OpFoldResult new0 =
+      b.create<mlir::arith::SelectOp>(loc, condVal, v0, v1).getResult();
+  OpFoldResult new1 =
+      b.create<mlir::arith::SelectOp>(loc, condVal, v1, v0).getResult();
+  values[0] = new0;
+  values[1] = new1;
+}
+
+static std::tuple<SmallVector<OpFoldResult> ,SmallVector<OpFoldResult> ,SmallVector<OpFoldResult>> getloopBounds(ArrayRef<Range> loopRanges,
+                                           ArrayRef<OpFoldResult> tileSizes){
+
+  SmallVector<OpFoldResult> lbs, ubs, steps;
+    for (auto [loopRange, tileSize] : llvm::zip_equal(loopRanges, tileSizes)) {
+      // No loop if the tile size is 0.
+      if (isZeroInteger(tileSize))
+        continue;
+      lbs.push_back(loopRange.offset);
+      ubs.push_back(loopRange.size);
+      steps.push_back(tileSize);
+    }
+    return {lbs,ubs,steps};
+}
+
+static Value getCondition(OpBuilder &b, Location loc,ArrayRef<OpFoldResult> ubs){
+
+  auto lhsDim = getValueOrCreateConstantIndexOp(b, loc, ubs[0]);
+  auto rhsDim = getValueOrCreateConstantIndexOp(b, loc, ubs[1]);
+
+  assert(ubs.size() == 2 && "rank must be 2");
+  // Dumb test for now
+  Value cond =
+      b.create<mlir::arith::CmpIOp>(loc,
+                                          mlir::arith::CmpIPredicate::ult,
+                                            // mlir::arith::CmpIPredicate::ugt,
+                                           lhsDim, rhsDim);
+
+  return cond;
+}
 
 SmallVector<Range> ConditionalTransposeAttr::generateLoopBounds(OpBuilder &b, Location loc,
                                            ArrayRef<Range> loopRanges,
                                            ArrayRef<OpFoldResult> tileSizes) const {
-  SmallVector<Range> ret;
-  return ret;
+  
+  SmallVector<OpFoldResult> lbs, ubs, steps;
+  std::tie(lbs,ubs,steps) = getloopBounds(loopRanges, tileSizes);
+
+  assert(lbs.size() == 2 && "rank must be 2");
+
+  Value cond = getCondition(b, loc,ubs);
+
+  swapValuesOnCond(b, loc, cond, lbs);
+  swapValuesOnCond(b, loc, cond, ubs);
+  swapValuesOnCond(b, loc, cond, steps);
+  SmallVector<Range> ranges;
+  for (auto [lb, ub, step] : llvm::zip_equal(lbs, ubs, steps)) {
+    ranges.push_back(Range{lb, ub, step});
+  }
+  return ranges;
 }
 
 SmallVector<Value> ConditionalTransposeAttr::updateIds(OpBuilder &b, Location loc,
+                                           ArrayRef<Range> loopRanges,
+                                           ArrayRef<OpFoldResult> tileSizes,
                                            ValueRange ids) const {
-
-  SmallVector<Value> ret;
-  return ret;
+  SmallVector<OpFoldResult> lbs, ubs, steps;
+  std::tie(lbs,ubs,steps) = getloopBounds(loopRanges, tileSizes);
+  assert(lbs.size() == 2 && "rank must be 2");
+  Value cond = getCondition(b, loc,ubs);
+  SmallVector<Value> out;
+  out.push_back(b.create<mlir::arith::SelectOp>(loc, cond, ids[0], ids[1]));
+  out.push_back(b.create<mlir::arith::SelectOp>(loc, cond, ids[1], ids[0]));
+  return out;
 }
 
 LogicalResult

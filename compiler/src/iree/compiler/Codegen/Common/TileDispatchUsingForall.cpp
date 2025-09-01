@@ -54,8 +54,30 @@ struct TilingInfo {
   Operation *tilableOp;
   SmallVector<OpFoldResult> tileSizes;
   SmallVector<int64_t> interchange;
-  // scf::SCFTileDistributionFn tileDistributionFn;
+  scf::SCFTileDistributionFn tileDistributionFn;
 };
+
+static scf::SCFTileDistributionFn
+makeWorkgroupReorderingFunctor(IREE::Codegen::WorkgroupReorderingAttrInterface attrInterface) {
+  return [attrInterface](RewriterBase &rewriter, Location loc,
+                         ArrayRef<Range> loopRanges,
+                         ArrayRef<OpFoldResult> tileSizes)
+             -> std::tuple<SmallVector<Range>, scf::SCFUpdateInductionVarFn> {
+    SmallVector<::mlir::Range> ranges;
+    scf::SCFUpdateInductionVarFn updateIndVarFn = nullptr;
+    //TODO. Error check/fallback
+    if (attrInterface){
+      ranges = attrInterface.generateLoopBounds(rewriter, loc, loopRanges, tileSizes);
+      using SCFUpdateInductionVarFn = std::function<SmallVector<Value>(
+      RewriterBase &, Location &, ValueRange ivs)>;
+        updateIndVarFn = [attrInterface,loopRanges,tileSizes](RewriterBase &rewriter, Location &loc, ValueRange ivs) -> SmallVector<Value> {
+          return attrInterface.updateIds(rewriter, loc, loopRanges, tileSizes, ivs);
+      };
+    }
+    
+    return std::make_tuple(ranges, updateIndVarFn);
+  };
+}
 
 static FailureOr<TilingInfo>
 getTiledAndDistributionInfo(RewriterBase &rewriter,
@@ -89,9 +111,10 @@ getTiledAndDistributionInfo(RewriterBase &rewriter,
       [&](int64_t t) -> OpFoldResult { return rewriter.getIndexAttr(t); });
   SmallVector<int64_t> interchange = tilableOpConfig.getWorkgroupInterchange();
 
+  scf::SCFTileDistributionFn tileDistributionFn = nullptr;
   auto conditionalTransposeAttr = tilableOpConfig.getWorkgroupOrderingStrategy();
   if (conditionalTransposeAttr){
-    //  conditionalTransposeAttr.updateIds(::mlir::OpBuilder &b, ::mlir::Location loc, ::mlir::ValueRange ids)
+    tileDistributionFn = makeWorkgroupReorderingFunctor(conditionalTransposeAttr);
   }
   // Avoid distributing unit-trip count loops.
 
@@ -141,7 +164,7 @@ getTiledAndDistributionInfo(RewriterBase &rewriter,
     }
   }
 
-  return TilingInfo{tilableOp, tileSizes, interchange};
+  return TilingInfo{tilableOp, tileSizes, interchange,tileDistributionFn};
 }
 
 /// Helper function to return the mapping attribute to use given the tile sizes.
@@ -369,6 +392,8 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   tilingOptions.setTileSizes(tilingInfo->tileSizes);
   tilingOptions.setInterchange(tilingInfo->interchange);
   tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
+  tilingOptions.tileDistributionFunction = tilingInfo->tileDistributionFn;
+
   SmallVector<Attribute> deviceMappingAttribute =
       getMapping(context, tilingInfo->tileSizes);
   if (failed(IREE::Codegen::WorkgroupMappingAttr::verifyAttrList(
@@ -413,12 +438,6 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   tileAndFuseOptions.setFusionControlFn(controlFn);
   rewriter.setInsertionPoint(tilableOp);
 
-  if (deviceMappingAttribute.size() == 2) {
-    // Hardcoded test
-    tileAndFuseOptions.tilingOptions.tileDistributionFunction =
-        transposedReorderDynamic; // transposedReorderStatic;
-    //   tileAndFuseOptions.tilingOptions.interchangeVector = {1,0};
-  }
 
   // If the `tilableOp` is a `memref` op, then just tile the operation.
   SmallVector<LoopLikeOpInterface> tilingLoops;

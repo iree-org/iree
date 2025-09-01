@@ -259,6 +259,8 @@ def IREECodegen_WorkgroupReorderingAttrInterface :
       /*methodName=*/"updateIds",
       /*args=*/(ins "::mlir::OpBuilder&":$b,
                     "::mlir::Location":$loc,
+                    "::llvm::ArrayRef<::mlir::Range>":$loopRanges,
+                    "::llvm::ArrayRef<::mlir::OpFoldResult>":$tileSizes,
                     "::mlir::ValueRange":$ids)
     >
   ];
