@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
+#include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpDefinition.h"
@@ -603,13 +604,11 @@ RotateRowsAttr::verify(function_ref<InFlightDiagnostic()> emitError,
   return success();
 }
 
-
 //===---------------------------------------------------------------------===//
 // conditional_transpose
 //===---------------------------------------------------------------------===//
 
-static void swapValuesOnCond(OpBuilder &b, Location loc,
-                             OpFoldResult cond,
+static void swapValuesOnCond(OpBuilder &b, Location loc, OpFoldResult cond,
                              SmallVector<OpFoldResult> &values) {
 
   assert(values.size() >= 2 && "Need at least two values to swap");
@@ -624,48 +623,77 @@ static void swapValuesOnCond(OpBuilder &b, Location loc,
   values[1] = new1;
 }
 
-static std::tuple<SmallVector<OpFoldResult> ,SmallVector<OpFoldResult> ,SmallVector<OpFoldResult>> getloopBounds(ArrayRef<Range> loopRanges,
-                                           ArrayRef<OpFoldResult> tileSizes){
+static std::tuple<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>,
+                  SmallVector<OpFoldResult>>
+getloopBounds(ArrayRef<Range> loopRanges, ArrayRef<OpFoldResult> tileSizes) {
 
   SmallVector<OpFoldResult> lbs, ubs, steps;
-    for (auto [loopRange, tileSize] : llvm::zip_equal(loopRanges, tileSizes)) {
-      // No loop if the tile size is 0.
-      if (isZeroInteger(tileSize))
-        continue;
-      lbs.push_back(loopRange.offset);
-      ubs.push_back(loopRange.size);
-      steps.push_back(tileSize);
-    }
-    return {lbs,ubs,steps};
+  for (auto [loopRange, tileSize] : llvm::zip_equal(loopRanges, tileSizes)) {
+    // No loop if the tile size is 0.
+    if (isZeroInteger(tileSize))
+      continue;
+    lbs.push_back(loopRange.offset);
+    ubs.push_back(loopRange.size);
+    steps.push_back(tileSize);
+  }
+  return {lbs, ubs, steps};
 }
 
-static Value getCondition(OpBuilder &b, Location loc,ArrayRef<OpFoldResult> ubs){
+/// Computes the number of Tile loads needed per iteration. This is based on
+/// ping pong matmul pattern. Tiles are distributed to XCDs in a round-robin
+/// fashion. NumLoadsX = MIN(ceildiv(X/TILE_SIZE_X),NB_XCD),NB_CUs) NumLoadsY =
+/// ceildiv(NB_CUs/NB_X) NumLoads = NumLoadsX + NumLoadsY
+static Value computeNumTileLoads(OpBuilder &b, Location loc, OpFoldResult size,
+                                 OpFoldResult tile, OpFoldResult nbXcds) {
+  AffineExpr s0, s1, s2;
+  bindSymbols(b.getContext(), s0, s1, s2);
+  AffineExpr nbLoadsExpr = (s0).floorDiv(s1).ceilDiv(s2);
 
-  auto lhsDim = getValueOrCreateConstantIndexOp(b, loc, ubs[0]);
-  auto rhsDim = getValueOrCreateConstantIndexOp(b, loc, ubs[1]);
+  return getValueOrCreateConstantIndexOp(
+      b, loc,
+      affine::makeComposedFoldedAffineApply(b, loc, nbLoadsExpr,
+                                            {size, tile, nbXcds}));
+}
 
-  assert(ubs.size() == 2 && "rank must be 2");
-  // Dumb test for now
-  Value cond =
-      b.create<mlir::arith::CmpIOp>(loc,
-                                          mlir::arith::CmpIPredicate::ult,
-                                            // mlir::arith::CmpIPredicate::ugt,
-                                           lhsDim, rhsDim);
+/// Computes the total number of Tile loads per iteration for the pingpong
+/// matmul kernel.
+static Value computeNumTileLoadsPerXCD(OpBuilder &b, Location loc,
+                                       OpFoldResult size, OpFoldResult tileSize,
+                                       Value nbXcds, Value nbCus) {
+  Value nbX = computeNumTileLoads(b, loc, size, tileSize, nbXcds);
+  auto nbXClamped =
+      b.create<mlir::arith::MinUIOp>(loc, nbX, nbXcds).getResult();
+  auto nbY = b.create<mlir::arith::DivUIOp>(loc, nbCus, nbXClamped);
+  return getValueOrCreateConstantIndexOp(
+      b, loc, b.create<mlir::arith::AddIOp>(loc, nbX, nbY).getResult());
+}
 
+/// Computes condition on using transposed workgroup reordering. We pick the
+/// solution where the number of Tile loads is minimal.
+static Value getCondition(OpBuilder &b, Location loc,
+                          ArrayRef<OpFoldResult> ubs,
+                          ArrayRef<OpFoldResult> steps, Value nbXcds,
+                          Value nbCus) {
+  assert(ubs.size() == 2 && steps.size() == 2 && "rank must be 2");
+  Value defaultOrder =
+      computeNumTileLoadsPerXCD(b, loc, ubs[0], steps[0], nbXcds, nbCus);
+  Value transposedOrder =
+      computeNumTileLoadsPerXCD(b, loc, ubs[1], steps[1], nbXcds, nbCus);
+  Value cond = b.create<mlir::arith::CmpIOp>(
+      loc, mlir::arith::CmpIPredicate::ugt, defaultOrder, transposedOrder);
   return cond;
 }
 
-SmallVector<Range> ConditionalTransposeAttr::generateLoopBounds(OpBuilder &b, Location loc,
-                                           ArrayRef<Range> loopRanges,
-                                           ArrayRef<OpFoldResult> tileSizes) const {
-  
+SmallVector<Range> ConditionalTransposeAttr::generateLoopBounds(
+    OpBuilder &b, Location loc, ArrayRef<Range> loopRanges,
+    ArrayRef<OpFoldResult> tileSizes) const {
   SmallVector<OpFoldResult> lbs, ubs, steps;
-  std::tie(lbs,ubs,steps) = getloopBounds(loopRanges, tileSizes);
-
+  std::tie(lbs, ubs, steps) = getloopBounds(loopRanges, tileSizes);
   assert(lbs.size() == 2 && "rank must be 2");
-
-  Value cond = getCondition(b, loc,ubs);
-
+  Value nbCusVal = b.create<arith::ConstantIndexOp>(loc, getNbCus());
+  Value nbXCDs = b.create<arith::ConstantIndexOp>(loc, getNbXcds());
+  Value cond = getCondition(b, loc, ubs, steps, nbXCDs, nbCusVal);
+  // Swap X & Y axis based on cond.
   swapValuesOnCond(b, loc, cond, lbs);
   swapValuesOnCond(b, loc, cond, ubs);
   swapValuesOnCond(b, loc, cond, steps);
@@ -676,14 +704,15 @@ SmallVector<Range> ConditionalTransposeAttr::generateLoopBounds(OpBuilder &b, Lo
   return ranges;
 }
 
-SmallVector<Value> ConditionalTransposeAttr::updateIds(OpBuilder &b, Location loc,
-                                           ArrayRef<Range> loopRanges,
-                                           ArrayRef<OpFoldResult> tileSizes,
-                                           ValueRange ids) const {
+SmallVector<Value> ConditionalTransposeAttr::updateIds(
+    OpBuilder &b, Location loc, ArrayRef<Range> loopRanges,
+    ArrayRef<OpFoldResult> tileSizes, ValueRange ids) const {
   SmallVector<OpFoldResult> lbs, ubs, steps;
-  std::tie(lbs,ubs,steps) = getloopBounds(loopRanges, tileSizes);
+  std::tie(lbs, ubs, steps) = getloopBounds(loopRanges, tileSizes);
   assert(lbs.size() == 2 && "rank must be 2");
-  Value cond = getCondition(b, loc,ubs);
+  Value nbCusVal = b.create<arith::ConstantIndexOp>(loc, getNbCus());
+  Value nbXCDs = b.create<arith::ConstantIndexOp>(loc, getNbXcds());
+  Value cond = getCondition(b, loc, ubs, steps, nbXCDs, nbCusVal);
   SmallVector<Value> out;
   out.push_back(b.create<mlir::arith::SelectOp>(loc, cond, ids[0], ids[1]));
   out.push_back(b.create<mlir::arith::SelectOp>(loc, cond, ids[1], ids[0]));
@@ -692,9 +721,10 @@ SmallVector<Value> ConditionalTransposeAttr::updateIds(OpBuilder &b, Location lo
 
 LogicalResult
 ConditionalTransposeAttr::verify(function_ref<InFlightDiagnostic()> emitError,
-                       int64_t nbXcds, int64_t nbCus) {
-  if (nbXcds==0 || nbCus == 0) {
-    return emitError() << "ConditionalTransposeAttr must have non-zeros parameters";
+                                 int64_t nbXcds, int64_t nbCus) {
+  if (nbXcds == 0 || nbCus == 0) {
+    return emitError()
+           << "ConditionalTransposeAttr must have non-zeros parameters";
   }
   return success();
 }

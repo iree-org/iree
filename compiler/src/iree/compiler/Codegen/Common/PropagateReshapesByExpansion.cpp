@@ -141,8 +141,7 @@ expandVerifiedUsers(PatternRewriter &rewriter, Location loc, MLIRContext *ctx,
           expandedOffsets.begin() + expandedOffsetsIdx,
           affine::makeComposedFoldedAffineApply(
               rewriter, loc, outerDimExpr,
-              {offsetVal,
-               rewriter.getIndexAttr(totalInnerSizes[index])}));
+              {offsetVal, rewriter.getIndexAttr(totalInnerSizes[index])}));
 
       expandedOffsetsIdx = expandedOffsets.size();
     }

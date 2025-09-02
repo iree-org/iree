@@ -238,7 +238,7 @@ def IREECodegen_WorkgroupReorderingAttrInterface :
   let description = [{
     An interface that describes workgroup reordering patterns.
   }];
- 
+
   let methods = [
     InterfaceMethod<
       /*desc=*/[{

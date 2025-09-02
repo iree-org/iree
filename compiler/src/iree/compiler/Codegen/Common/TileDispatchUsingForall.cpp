@@ -57,24 +57,28 @@ struct TilingInfo {
   scf::SCFTileDistributionFn tileDistributionFn;
 };
 
-static scf::SCFTileDistributionFn
-makeWorkgroupReorderingFunctor(IREE::Codegen::WorkgroupReorderingAttrInterface attrInterface) {
+static scf::SCFTileDistributionFn makeWorkgroupReorderingFunctor(
+    IREE::Codegen::WorkgroupReorderingAttrInterface attrInterface) {
   return [attrInterface](RewriterBase &rewriter, Location loc,
                          ArrayRef<Range> loopRanges,
                          ArrayRef<OpFoldResult> tileSizes)
              -> std::tuple<SmallVector<Range>, scf::SCFUpdateInductionVarFn> {
     SmallVector<::mlir::Range> ranges;
     scf::SCFUpdateInductionVarFn updateIndVarFn = nullptr;
-    //TODO. Error check/fallback
-    if (attrInterface){
-      ranges = attrInterface.generateLoopBounds(rewriter, loc, loopRanges, tileSizes);
+    // TODO. Error check/fallback
+    if (attrInterface) {
+      ranges = attrInterface.generateLoopBounds(rewriter, loc, loopRanges,
+                                                tileSizes);
       using SCFUpdateInductionVarFn = std::function<SmallVector<Value>(
-      RewriterBase &, Location &, ValueRange ivs)>;
-        updateIndVarFn = [attrInterface,loopRanges,tileSizes](RewriterBase &rewriter, Location &loc, ValueRange ivs) -> SmallVector<Value> {
-          return attrInterface.updateIds(rewriter, loc, loopRanges, tileSizes, ivs);
+          RewriterBase &, Location &, ValueRange ivs)>;
+      updateIndVarFn = [attrInterface, loopRanges,
+                        tileSizes](RewriterBase &rewriter, Location &loc,
+                                   ValueRange ivs) -> SmallVector<Value> {
+        return attrInterface.updateIds(rewriter, loc, loopRanges, tileSizes,
+                                       ivs);
       };
     }
-    
+
     return std::make_tuple(ranges, updateIndVarFn);
   };
 }
@@ -112,9 +116,11 @@ getTiledAndDistributionInfo(RewriterBase &rewriter,
   SmallVector<int64_t> interchange = tilableOpConfig.getWorkgroupInterchange();
 
   scf::SCFTileDistributionFn tileDistributionFn = nullptr;
-  auto conditionalTransposeAttr = tilableOpConfig.getWorkgroupOrderingStrategy();
-  if (conditionalTransposeAttr){
-    tileDistributionFn = makeWorkgroupReorderingFunctor(conditionalTransposeAttr);
+  auto conditionalTransposeAttr =
+      tilableOpConfig.getWorkgroupOrderingStrategy();
+  if (conditionalTransposeAttr) {
+    tileDistributionFn =
+        makeWorkgroupReorderingFunctor(conditionalTransposeAttr);
   }
   // Avoid distributing unit-trip count loops.
 
@@ -164,7 +170,7 @@ getTiledAndDistributionInfo(RewriterBase &rewriter,
     }
   }
 
-  return TilingInfo{tilableOp, tileSizes, interchange,tileDistributionFn};
+  return TilingInfo{tilableOp, tileSizes, interchange, tileDistributionFn};
 }
 
 /// Helper function to return the mapping attribute to use given the tile sizes.
@@ -437,7 +443,6 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   };
   tileAndFuseOptions.setFusionControlFn(controlFn);
   rewriter.setInsertionPoint(tilableOp);
-
 
   // If the `tilableOp` is a `memref` op, then just tile the operation.
   SmallVector<LoopLikeOpInterface> tilingLoops;

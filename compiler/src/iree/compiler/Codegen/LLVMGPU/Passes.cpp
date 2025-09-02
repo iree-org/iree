@@ -424,8 +424,8 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
       getReorderWorkgroupsStrategy(pipelineOptions.reorderStrategy);
 
   tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true,
-    /*convertToDpsOptions=*/std::nullopt,
-                              reorderStrategy);
+                               /*convertToDpsOptions=*/std::nullopt,
+                               reorderStrategy);
 
   // Step 0. Apply any user annotated lowering strategies. This runs first as
   // steps 1 - 4 are essentially applying patterns based on the lowering config,
