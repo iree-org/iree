@@ -1609,11 +1609,11 @@ func.func @matmul_f32f32f32_dispatch_0_matmul_DxDxD_f32() {
   %32 = arith.shli %31, %c32_i64 : i64
   %33 = arith.ori %30, %32 : i64
   %34 = arith.index_castui %33 : i64 to index
-  %35:5 = util.assume.int 
-      %14<udiv = 8192>, 
-      %19<umin = 0, umax = 9007199254740991>, 
-      %24<umin = 0, umax = 9007199254740991>, 
-      %29<umin = 0, umax = 9007199254740991>, 
+  %35:5 = util.assume.int
+      %14<udiv = 8192>,
+      %19<umin = 0, umax = 9007199254740991>,
+      %24<umin = 0, umax = 9007199254740991>,
+      %29<umin = 0, umax = 9007199254740991>,
       %34<umin = 0, umax = 9007199254740991>
     : index, index, index, index, index
   %36 = iree_tensor_ext.dispatch.workload.ordinal %35#1, 0 : index
@@ -1673,8 +1673,8 @@ func.func @_encoding_0_encode_DxDxf32_to_DxDxf32() {
   %11 = arith.shli %10, %c32_i64 : i64
   %12 = arith.ori %9, %11 : i64
   %13 = arith.index_castui %12 : i64 to index
-  %14:2 = util.assume.int 
-      %8<umin = 0, umax = 9007199254740991>, 
+  %14:2 = util.assume.int
+      %8<umin = 0, umax = 9007199254740991>,
       %13<umin = 0, umax = 9007199254740991>
     : index, index
   %15 = iree_tensor_ext.dispatch.workload.ordinal %14#0, 0 : index
@@ -1759,11 +1759,11 @@ func.func @matmul_f32f32f32_dispatch_0_matmul_DxDxD_f32() {
   %32 = arith.shli %31, %c32_i64 : i64
   %33 = arith.ori %30, %32 : i64
   %34 = arith.index_castui %33 : i64 to index
-  %35:5 = util.assume.int 
-      %14<udiv = 8192>, 
-      %19<umin = 0, umax = 9007199254740991>, 
-      %24<umin = 0, umax = 9007199254740991>, 
-      %29<umin = 0, umax = 9007199254740991>, 
+  %35:5 = util.assume.int
+      %14<udiv = 8192>,
+      %19<umin = 0, umax = 9007199254740991>,
+      %24<umin = 0, umax = 9007199254740991>,
+      %29<umin = 0, umax = 9007199254740991>,
       %34<umin = 0, umax = 9007199254740991>
     : index, index, index, index, index
   %36 = iree_tensor_ext.dispatch.workload.ordinal %35#1, 0 : index
@@ -1838,8 +1838,8 @@ func.func @_encoding_0_encode_DxDxf32_to_DxDxf32() {
   %11 = arith.shli %10, %c32_i64 : i64
   %12 = arith.ori %9, %11 : i64
   %13 = arith.index_castui %12 : i64 to index
-  %14:2 = util.assume.int 
-      %8<umin = 0, umax = 9007199254740991>, 
+  %14:2 = util.assume.int
+      %8<umin = 0, umax = 9007199254740991>,
       %13<umin = 0, umax = 9007199254740991>
     : index, index
   %15 = iree_tensor_ext.dispatch.workload.ordinal %14#0, 0 : index
