@@ -409,7 +409,7 @@ def gpu_target_info_attribute_parsing():
                     storage = b64,
                     subgroup = none,
                     dot = none,
-                    mma = [<MFMA_F32_16x16x4_F32>],
+                    mma = [<MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>],
                     subgroup_size_choices = [32, 64],
                     max_workgroup_sizes = [256, 512, 1024],
                     max_thread_count_per_workgroup = 1024,
@@ -456,3 +456,53 @@ def gpu_target_info_attribute_parsing():
         512,
         1024,
     ], f"Expected max_workgroup_sizes [256, 512, 1024], got {max_workgroup_sizes}"
+
+    mma_intrinsics = gpu_target_info.mma_intrinsics
+    assert mma_intrinsics == [
+        iree_gpu.MMAIntrinsic.MFMA_F32_16x16x4_F32,
+        iree_gpu.MMAIntrinsic.MFMA_F32_16x16x16_F16,
+        iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_16x16x32_F16,
+    ], f"Expected mma_intrinsics [MFMA_F32_16x16x4_F32, MFMA_F32_16x16x16_F16, VMFMA_F32_16x16x32_F16], got {mma_intrinsics}"
+
+
+@run
+def gpu_target_info_constructor():
+    context = ir.Context()
+
+    target_info = iree_gpu.TargetInfo.get(
+        context=context,
+        arch="gfx942",
+        subgroup_size_choices=[32, 64],
+        max_workgroup_sizes=[256, 512, 1024],
+        max_thread_count_per_workgroup=1024,
+        max_workgroup_memory_bytes=65536,
+        mma_intrinsics=[
+            iree_gpu.MMAIntrinsic.MFMA_F32_16x16x4_F32,
+            iree_gpu.MMAIntrinsic.MFMA_F32_16x16x16_F16,
+            iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_16x16x32_F16,
+        ],
+    )
+
+    assert (
+        target_info.arch == "gfx942"
+    ), f"Expected arch 'gfx942', got '{target_info.arch}'"
+    assert target_info.subgroup_size_choices == [
+        32,
+        64,
+    ], f"Expected subgroup_size_choices [32, 64], got {target_info.subgroup_size_choices}"
+    assert target_info.max_workgroup_sizes == [
+        256,
+        512,
+        1024,
+    ], f"Expected max_workgroup_sizes [256, 512, 1024], got {target_info.max_workgroup_sizes}"
+    assert (
+        target_info.max_thread_count_per_workgroup == 1024
+    ), f"Expected max_thread_count_per_workgroup 1024, got {target_info.max_thread_count_per_workgroup}"
+    assert (
+        target_info.max_workgroup_memory_bytes == 65536
+    ), f"Expected max_workgroup_memory_bytes 65536, got {target_info.max_workgroup_memory_bytes}"
+    assert target_info.mma_intrinsics == [
+        iree_gpu.MMAIntrinsic.MFMA_F32_16x16x4_F32,
+        iree_gpu.MMAIntrinsic.MFMA_F32_16x16x16_F16,
+        iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_16x16x32_F16,
+    ], f"Expected mma_intrinsics [MFMA_F32_16x16x4_F32, MFMA_F32_16x16x16_F16, VMFMA_F32_16x16x32_F16], got {target_info.mma_intrinsics}"

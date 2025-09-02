@@ -10,6 +10,7 @@
 #include "iree/compiler/dialects/iree_codegen.h"
 #include "iree/compiler/dialects/iree_gpu.h"
 #include "mlir-c/BuiltinAttributes.h"
+#include "mlir-c/BuiltinTypes.h"
 #include "mlir-c/IR.h"
 #include "mlir/Bindings/Python/Nanobind.h"
 #include "mlir/Bindings/Python/NanobindAdaptors.h"
@@ -74,6 +75,56 @@ static std::vector<int64_t> getIntArrayAttrValues(MlirAttribute attr) {
     result.push_back(val);
   }
   return result;
+}
+
+static ireeGPUTargetInfo
+createGPUTargetInfo(MlirContext context, const std::string &arch,
+                    const std::vector<int64_t> &subgroupChoices,
+                    const std::vector<int64_t> &workgroupSizes,
+                    int64_t threadCount, int64_t memoryBytes,
+                    const py::list &mmaIntrinsicObjects) {
+  ireeGPUTargetInfo gpuTargetInfo;
+
+  // Initialize arch
+  MlirStringRef archRef = mlirStringRefCreate(arch.c_str(), arch.length());
+  gpuTargetInfo.arch = mlirIdentifierGet(context, archRef);
+
+  // Initialize subgroupSizeChoices
+  std::vector<MlirAttribute> subgroupAttrs;
+  for (int64_t val : subgroupChoices) {
+    subgroupAttrs.push_back(
+        mlirIntegerAttrGet(mlirIntegerTypeGet(context, 32), val));
+  }
+  gpuTargetInfo.subgroupSizeChoices =
+      mlirArrayAttrGet(context, subgroupAttrs.size(), subgroupAttrs.data());
+
+  std::vector<MlirAttribute> workgroupAttrs;
+  for (int64_t val : workgroupSizes) {
+    workgroupAttrs.push_back(
+        mlirIntegerAttrGet(mlirIntegerTypeGet(context, 32), val));
+  }
+  gpuTargetInfo.maxWorkgroupSizes =
+      mlirArrayAttrGet(context, workgroupAttrs.size(), workgroupAttrs.data());
+
+  // Initialize simple fields
+  gpuTargetInfo.maxThreadCountPerWorkgroup = threadCount;
+  gpuTargetInfo.maxWorkgroupMemoryBytes = memoryBytes;
+
+  // Initialize mmaIntrinsics from Python objects
+  if (py::len(mmaIntrinsicObjects) == 0) {
+    gpuTargetInfo.mmaIntrinsics = mlirAttributeGetNull();
+  } else {
+    std::vector<MlirAttribute> mmaAttrs;
+    for (auto item : mmaIntrinsicObjects) {
+      uint32_t enumValue = py::cast<uint32_t>(item.attr("value"));
+      mmaAttrs.push_back(
+          mlirIntegerAttrGet(mlirIntegerTypeGet(context, 32), enumValue));
+    }
+    gpuTargetInfo.mmaIntrinsics =
+        mlirArrayAttrGet(context, mmaAttrs.size(), mmaAttrs.data());
+  }
+
+  return gpuTargetInfo;
 }
 
 NB_MODULE(_ireeCompilerDialects, m) {
@@ -509,6 +560,13 @@ NB_MODULE(_ireeCompilerDialects, m) {
   //===-------------------------------------------------------------------===//
 
   py::class_<ireeGPUTargetInfo>(iree_gpu_module, "TargetInfo")
+      .def_static("get", &createGPUTargetInfo, "context"_a, "arch"_a,
+                  "subgroup_size_choices"_a, "max_workgroup_sizes"_a,
+                  "max_thread_count_per_workgroup"_a,
+                  "max_workgroup_memory_bytes"_a,
+                  "mma_intrinsics"_a = py::list{},
+                  "Create a GPUTargetInfo with the given parameters")
+
       .def_prop_ro("arch",
                    [](const ireeGPUTargetInfo &self) -> std::string {
                      MlirStringRef strRef = mlirIdentifierStr(self.arch);
@@ -529,7 +587,37 @@ NB_MODULE(_ireeCompilerDialects, m) {
       .def_prop_ro("max_workgroup_memory_bytes",
                    [](const ireeGPUTargetInfo &self) -> int64_t {
                      return self.maxWorkgroupMemoryBytes;
-                   });
+                   })
+      .def_prop_ro(
+          "mma_intrinsics", [](const ireeGPUTargetInfo &self) -> py::list {
+            std::vector<int64_t> rawValues =
+                getIntArrayAttrValues(self.mmaIntrinsics);
+
+            py::list result;
+            py::module_ gpuModule = py::module_::import_(kGpuModuleImportPath);
+
+            for (uint32_t rawValue : rawValues) {
+              try {
+                py::object mmaIntrinsicEnum = gpuModule.attr("MMAIntrinsic");
+                py::object mmaIntrinsic = mmaIntrinsicEnum(rawValue);
+                result.append(mmaIntrinsic);
+              } catch (const std::exception &) {
+                try {
+                  py::object virtualMmaIntrinsicEnum =
+                      gpuModule.attr("VirtualMMAIntrinsic");
+                  py::object virtualMmaIntrinsic =
+                      virtualMmaIntrinsicEnum(rawValue);
+                  result.append(virtualMmaIntrinsic);
+                } catch (const std::exception &) {
+                  assert(false && ("Invalid MMA intrinsic value: " +
+                                   std::to_string(rawValue))
+                                      .c_str());
+                }
+              }
+            }
+
+            return result;
+          });
 
   iree_gpu_module.def(
       "get_gpu_target_info", &ireeHALExecutableTargetAttrGetGPUTargetInfo,

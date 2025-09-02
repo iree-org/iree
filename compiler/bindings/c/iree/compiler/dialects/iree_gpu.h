@@ -150,6 +150,7 @@ struct ireeGPUTargetInfo {
   MlirAttribute maxWorkgroupSizes;    // Max threads per X/Y/Z dimension.
   int64_t maxThreadCountPerWorkgroup; // Max threads per workgroup.
   int64_t maxWorkgroupMemoryBytes;    // Max workgroup memory.
+  MlirAttribute mmaIntrinsics;        // MMA Intrinsics.
 };
 
 // Queries GPU target info from the given `ExecutableTargetAttr` attribute.
