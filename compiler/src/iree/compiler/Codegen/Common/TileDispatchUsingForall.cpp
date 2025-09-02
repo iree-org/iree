@@ -295,7 +295,7 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   tilingOptions.setTileSizes(tilingInfo->tileSizes);
   tilingOptions.setInterchange(tilingInfo->interchange);
   tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
-  tilingOptions.tileDistributionFunction = tilingInfo->tileDistributionFn;
+  tilingOptions.setTileDistributionFunction(tilingInfo->tileDistributionFn);
 
   SmallVector<Attribute> deviceMappingAttribute =
       getMapping(context, tilingInfo->tileSizes);
@@ -402,9 +402,9 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
     // Reorder the workgroups if the strategy is set to `transpose`.
     // This just transposes the first two dimensions of the workgroup i.e., the
     // #iree.codegen.workgroup_id_x and #iree.codegen.workgroup_id_y.
-    // Only reorders if the loop bounds are static.
+    // Only reorders if the loop bounds are static and tileDistributionFunction disabled.
     auto forallOp = cast<scf::ForallOp>(tilingLoops[0]);
-    if (transposeWorkgroup) {
+    if (transposeWorkgroup && !tilingOptions.tileDistributionFunction) {
       SmallVector<Attribute> mappingAttrs(forallOp.getMappingAttr().getValue());
       int64_t mappingSize = mappingAttrs.size();
       if (areAllStaticLoopBounds(forallOp) && mappingSize >= 2) {
