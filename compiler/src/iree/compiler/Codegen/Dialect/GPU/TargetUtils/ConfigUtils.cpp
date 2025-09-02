@@ -535,7 +535,6 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
       llvm::cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
 
   bool mustBeAligned = true;
-  bool doCPromotion = false;
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
       target, problem, transposedLhs, transposedRhs, /*mustBeAligned*/ true,
       /*doCPromotion*/ false, scaled);
@@ -547,10 +546,9 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   if (!schedule && canSupportUnaligned) {
     LDBG() << "Attempting to deduce unaligned TileAndFuse MMA schedulee";
     mustBeAligned = false;
-    doCPromotion = true;
     schedule = getMmaScheduleFromProblemAndTarget(
         target, problem, transposedLhs, transposedRhs, mustBeAligned,
-        doCPromotion, scaled);
+        /*doCPromotion*/ false, scaled);
   }
 
   if (!schedule) {
@@ -626,17 +624,13 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   attrs.emplace_back(StringAttr::get(context, "subgroup"),
                      b.getI64ArrayAttr(subgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "mma_kind"), kind);
-  if (mustBeAligned) {
-    Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
-    Attribute promotionArray[] = {useGlobalDma, useGlobalDma};
-    ArrayRef<Attribute> promotionTypes =
-        useDirectLoad ? ArrayRef<Attribute>(promotionArray)
-                      : ArrayRef<Attribute>{};
-    GPU::appendPromotedOperandsList(context, attrs, {0, 1}, promotionTypes);
-  } else {
-    // TODO (nirvedhmeshram, Max191, jerryyin) : Add support so that unaligned
-    // shapes do not require c promotion.
-    GPU::appendPromotedOperandsList(context, attrs, {0, 1, 2});
+  Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
+  Attribute promotionArray[] = {useGlobalDma, useGlobalDma};
+  ArrayRef<Attribute> promotionTypes = useDirectLoad
+                                           ? ArrayRef<Attribute>(promotionArray)
+                                           : ArrayRef<Attribute>{};
+  GPU::appendPromotedOperandsList(context, attrs, {0, 1}, promotionTypes);
+  if (!mustBeAligned) {
     SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
 
     // Initialize inner and outer padding sizes from reductionTileSizes.
