@@ -55,56 +55,76 @@ namespace mlir::iree_compiler::DispatchCreation {
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 //===----------------------------------------------------------------------===//
-// Root and fusion group attribute handling
+// Root and fusion group handling
 //===----------------------------------------------------------------------===//
 
-/// Returns true if an op has a root operation.
-static bool hasRootOpAttribute(Operation *op) {
-  return static_cast<bool>(op->getAttrOfType<IntegerAttr>(kRootOpAttr));
-}
-/// Removes root attribute. Asserts if root attribute is not present.
-static void removeRootOpAttribute(Operation *op) {
-  op->removeAttr(kRootOpAttr);
-}
-/// Sets the root attribute for an operation. The root attribute needs a number
-/// to identify the root. Asserts if root attribute is already set on an
-/// operation.
-static void setRootAttribute(MLIRContext *context, Operation *op,
-                             int64_t rootNumber) {
-  assert(!op->hasAttr(kRootOpAttr) &&
-         "invalid to update root attribute on an op");
-  op->setAttr(kRootOpAttr,
-              IntegerAttr::get(IntegerType::get(context, 64), rootNumber));
-}
-/// Returns the number of the root. Asserts if the operation is not already set
-/// as a root.
-static int64_t getRootNumber(Operation *op) {
-  return op->getAttrOfType<IntegerAttr>(kRootOpAttr).getInt();
-}
-/// Returns true if an op is part of a fusion group.
-static bool hasFusionGroupsAttribute(Operation *op) {
-  return static_cast<bool>(op->getAttrOfType<ArrayAttr>(kFusionGroupsAttr));
-}
-/// Returns the fusion groups for the given `op`.
-static SmallVector<int64_t, 1> getFusionGroups(Operation *op) {
-  SmallVector<int64_t, 1> fusionGroups = {};
-  if (auto fusionGroupsAttr = op->getAttrOfType<ArrayAttr>(kFusionGroupsAttr)) {
-    fusionGroups = llvm::map_to_vector(fusionGroupsAttr, [](Attribute attr) {
-      return llvm::cast<IntegerAttr>(attr).getInt();
-    });
+namespace {
+class FusionGroup {
+public:
+  FusionGroup(Operation *root) : rootOp(root){};
+
+  SmallVector<Operation *> getFusedOperations() const {
+    SmallVector<Operation *> ops;
+    ops.push_back(rootOp);
+    llvm::append_range(ops, producers);
+    llvm::append_range(ops, consumers);
+    return ops;
   }
-  return fusionGroups;
-}
-/// Appends the given `op` to the `newGroups` fusion groups.
-static void appendToFusionGroup(Operation *op, ArrayRef<int64_t> newGroups) {
-  SmallVector<int64_t> fusionGroups = getFusionGroups(op);
-  fusionGroups.append(newGroups.begin(), newGroups.end());
-  op->setAttr(kFusionGroupsAttr, Builder(op).getI64ArrayAttr(fusionGroups));
-}
-/// Removes the fusion groups attribute.
-static void removeFusionGroupsAttribute(Operation *op) {
-  op->removeAttr(kFusionGroupsAttr);
-}
+
+  Operation *getRoot() const { return rootOp; }
+
+  void insertProducer(Operation *op) { producers.insert(op); }
+
+  void insertConsumer(Operation *op) { consumers.insert(op); }
+
+private:
+  Operation *rootOp;
+  SetVector<Operation *> producers;
+  SetVector<Operation *> consumers;
+};
+
+class GraphFusionTracker {
+private:
+public:
+  bool isRootOp(Operation *op) const { return fusionGroups.contains(op); }
+
+  const FusionGroup &createFusionGroup(MLIRContext *ctx, Operation *op) {
+    return fusionGroups.insert(std::make_pair(op, FusionGroup(op)))
+        .first->getSecond();
+  }
+
+  const FusionGroup &getFusionGroup(Operation *op) const {
+    assert(isRootOp(op));
+    return fusionGroups.at(op);
+  }
+
+  /// Returns whether or not this op will be fused with a root op.
+  bool isFusedOp(Operation *op) const { return fusedOps.contains(op); }
+
+  DenseMap<Operation *, FusionGroup> getFusionGroups() { return fusionGroups; }
+
+  /// Appends the given `op` to the `fusionGroup` fusion groups.
+  void appendProducerToFusionGroup(Operation *op,
+                                   const FusionGroup &fusionGroup) {
+    assert(!isRootOp(op));
+    assert(!isFusedOp(op));
+    fusionGroups.find(fusionGroup.getRoot())->getSecond().insertProducer(op);
+    fusedOps.insert(op);
+  }
+
+  void appendConsumerToFusionGroup(Operation *op,
+                                   const FusionGroup &fusionGroup) {
+    assert(!isRootOp(op));
+    assert(!isFusedOp(op));
+    fusionGroups.find(fusionGroup.getRoot())->getSecond().insertConsumer(op);
+    fusedOps.insert(op);
+  }
+
+private:
+  DenseMap<Operation *, FusionGroup> fusionGroups;
+  DenseSet<Operation *> fusedOps;
+};
+} // namespace
 
 //===----------------------------------------------------------------------===//
 // Op property charecterizations
@@ -702,12 +722,13 @@ isFusableWithConsumer(OpOperand &fusedOperand,
 static void
 fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
                        DominanceInfo const &dominanceInfo,
-                       FormDispatchRegionsPassOptions const &options) {
+                       FormDispatchRegionsPassOptions const &options,
+                       GraphFusionTracker &tracker) {
   // Fuse with consumers where possible.
   for (Operation *root : roots) {
     SmallVector<Operation *> workList;
     llvm::SmallBitVector rootOuterParallelLoops = getOuterParallelLoops(root);
-    int64_t rootNumber = getRootNumber(root);
+    const FusionGroup &fusionGroup = tracker.getFusionGroup(root);
     workList.push_back(root);
     while (!workList.empty()) {
       Operation *currRoot = workList.pop_back_val();
@@ -733,14 +754,13 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
       // Analyse the use to see if it is fusable.
       for (OpOperand *fusableUse : fusableUses) {
         Operation *consumerOp = fusableUse->getOwner();
-        if (hasRootOpAttribute(consumerOp) ||
-            hasFusionGroupsAttribute(consumerOp)) {
+        if (tracker.isRootOp(consumerOp) || tracker.isFusedOp(consumerOp)) {
           continue;
         }
 
         if (isFusableWithConsumer(*fusableUse, rootOuterParallelLoops,
                                   options)) {
-          appendToFusionGroup(consumerOp, rootNumber);
+          tracker.appendConsumerToFusionGroup(consumerOp, fusionGroup);
           workList.push_back(consumerOp);
         } else {
           break;
@@ -824,10 +844,11 @@ static bool isFusableWithProducer(
 /// Starting from the `root` op, traverse the operand use-def chain
 /// in reverse to fuse with producers.
 static void
-fuseRootsWithProducers(MLIRContext *context, Operation *root, unsigned groupNum,
+fuseRootsWithProducers(MLIRContext *context, Operation *root,
+                       const FusionGroup &fusionGroup,
                        DominanceInfo const &dominanceInfo,
                        FormDispatchRegionsPassOptions const &options,
-                       bool fuseWithTruncate) {
+                       GraphFusionTracker &tracker, bool fuseWithTruncate) {
   SmallVector<Operation *> worklist;
   worklist.push_back(root);
   llvm::SmallBitVector rootOuterParallelLoops = getOuterParallelLoops(root);
@@ -840,7 +861,7 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root, unsigned groupNum,
       if (!producer)
         continue;
       if (IREE::Flow::isClonableIntoDispatchOp(producer, clonableOptions) ||
-          hasFusionGroupsAttribute(producer) || hasRootOpAttribute(producer)) {
+          tracker.isFusedOp(producer) || tracker.isRootOp(producer)) {
         continue;
       }
 
@@ -855,7 +876,7 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root, unsigned groupNum,
       if (fusableUses.empty() || fusableUses.front()->getOwner() != candidate)
         continue;
 
-      appendToFusionGroup(producer, groupNum);
+      tracker.appendProducerToFusionGroup(producer, fusionGroup);
       worklist.push_back(producer);
     }
   }
@@ -869,10 +890,10 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root, unsigned groupNum,
 /// be marked to fuse with multiple root operations (i.e. replicated). For now a
 /// very simple heuristic is used below, but the mechanism should be general
 /// enough to capture any heuristic.
-static unsigned
+static void
 decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
                        FormDispatchRegionsPassOptions const &options,
-                       unsigned numRootOps = 0) {
+                       GraphFusionTracker &tracker, unsigned numRootOps = 0) {
   MLIRContext *context = region.getContext();
   OpBuilder builder(context);
   IREE::Flow::ClonableIntoDispatchOptions clonableOptions;
@@ -887,27 +908,27 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
     for (Operation &op : llvm::reverse(block)) {
       if (isa<scf::SCFDialect>(op.getDialect())) {
         for (auto &region : op.getRegions()) {
-          numRootOps = decideFusableLinalgOps(region, dominanceInfo, options,
-                                              numRootOps);
+          decideFusableLinalgOps(region, dominanceInfo, options, tracker,
+                                 numRootOps);
         }
         continue;
       }
 
       // Start with a root operation and fuse its producers.
-      if (hasFusionGroupsAttribute(&op) || !isRootOp(&op))
+      if (tracker.isFusedOp(&op) || !isRootOp(&op))
         continue;
-      unsigned newGroup = numRootOps++;
-      setRootAttribute(context, &op, newGroup);
-
+      const FusionGroup &newGroup = tracker.createFusionGroup(context, &op);
       fuseRootsWithProducers(context, &op, newGroup, dominanceInfo, options,
+                             tracker,
                              /*fuseWithTruncate=*/false);
       roots.push_back(&op);
     }
     roots = llvm::to_vector(llvm::reverse(roots));
-    fuseRootsWithConsumers(context, roots, dominanceInfo, options);
+    fuseRootsWithConsumers(context, roots, dominanceInfo, options, tracker);
     for (Operation *root : roots) {
-      int64_t rootNumber = getRootNumber(root);
-      fuseRootsWithProducers(context, root, rootNumber, dominanceInfo, options,
+      const FusionGroup &fusionGroup = tracker.getFusionGroup(root);
+      fuseRootsWithProducers(context, root, fusionGroup, dominanceInfo, options,
+                             tracker,
                              /*fuseWithTruncate=*/true);
     }
   }
@@ -918,7 +939,7 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
     SmallVector<Operation *> roots;
     for (Operation &op : llvm::reverse(block)) {
       // If it is part of a fusion group or root op, ignore it.
-      if (hasFusionGroupsAttribute(&op) || hasRootOpAttribute(&op))
+      if (tracker.isFusedOp(&op) || tracker.isRootOp(&op))
         continue;
       // Only look for Linalg ops here. Avoid moving `linalg.fill` that aren't
       // fused with anything else into their own dispatches since it is better
@@ -942,23 +963,21 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
         continue;
       }
 
-      unsigned newGroup = numRootOps++;
-      setRootAttribute(context, &op, newGroup);
-
+      const FusionGroup &newGroup = tracker.createFusionGroup(context, &op);
       fuseRootsWithProducers(context, &op, newGroup, dominanceInfo, options,
+                             tracker,
                              /*fuseWithTruncate=*/false);
       roots.push_back(&op);
     }
     roots = llvm::to_vector(llvm::reverse(roots));
-    fuseRootsWithConsumers(context, roots, dominanceInfo, options);
+    fuseRootsWithConsumers(context, roots, dominanceInfo, options, tracker);
     for (Operation *root : roots) {
-      int64_t rootNumber = getRootNumber(root);
-      fuseRootsWithProducers(context, root, rootNumber, dominanceInfo, options,
+      const FusionGroup &fusionGroup = tracker.getFusionGroup(root);
+      fuseRootsWithProducers(context, root, fusionGroup, dominanceInfo, options,
+                             tracker,
                              /*fuseWithTruncate=*/true);
     }
   }
-
-  return numRootOps;
 }
 
 //===----------------------------------------------------------------------===//
@@ -973,10 +992,9 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
                    FormDispatchRegionsPassOptions const &options) {
   // Step 1: Decide fusion groups (heuristic). This marks rootOps with an
   // attribute
-  unsigned numRoots =
-      decideFusableLinalgOps(funcOp.getFunctionBody(), dominanceInfo, options);
-  SmallVector<Operation *> roots(numRoots, nullptr);
-  DenseMap<unsigned, SmallVector<Operation *>> fusedOperations;
+  GraphFusionTracker tracker;
+  decideFusableLinalgOps(funcOp.getFunctionBody(), dominanceInfo, options,
+                         tracker);
 
   LLVM_DEBUG({
     llvm::dbgs() << "\n--- After deciding fusion groups ---\n";
@@ -984,29 +1002,14 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
     llvm::dbgs() << "\n\n";
   });
 
-  // TODO: Incrementally add ops to an empty DispatchGroupOp instead of
-  // annotating fusion group IDs via attributes.
-  funcOp.walk([&](Operation *op) {
-    if (hasRootOpAttribute(op)) {
-      roots[getRootNumber(op)] = op;
-      fusedOperations[getRootNumber(op)].push_back(op);
-      removeRootOpAttribute(op);
-    }
-    if (hasFusionGroupsAttribute(op)) {
-      assert(getFusionGroups(op).size() == 1 && "expected exactly one group");
-      fusedOperations[getFusionGroups(op).front()].push_back(op);
-      removeFusionGroupsAttribute(op);
-    }
-  });
-
   // Step 2. Create a DispatchRegionOp for every fusion group.
   OpBuilder::InsertionGuard g(rewriter);
   SmallVector<IREE::Flow::DispatchRegionOp> regionOps;
-  for (auto [rootIndex, root] : llvm::enumerate(roots)) {
-
+  for (const auto &[root, fusionGroup] : tracker.getFusionGroups()) {
     // Sort producers and consumers topologically. All fused ops must be in the
     // same block as the root.
-    SmallVector<Operation *> &currFusedOperations = fusedOperations[rootIndex];
+    SmallVector<Operation *> currFusedOperations =
+        fusionGroup.getFusedOperations();
     bool sortResult = mlir::computeTopologicalSorting(currFusedOperations);
     (void)sortResult;
     assert(sortResult && "could not compute topological sorting");
