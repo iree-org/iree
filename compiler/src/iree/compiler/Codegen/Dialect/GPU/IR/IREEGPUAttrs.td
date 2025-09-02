@@ -676,7 +676,35 @@ def IREEGPU_UKernelConfigAttr  :
        DefaultValuedParameter<"int64_t", "0", "Size in bytes of shared memory workspace">:$shared_memory_bytes
   );
 }
+//===---------------------------------------------------------------------===//
+// iree_codegen.dynamic_transpose
+//===---------------------------------------------------------------------===//
 
+def IREEGPU_DynamicTransposeAttr  :
+    AttrDef<IREEGPU_Dialect, "DynamicTranspose", [
+    DeclareAttrInterfaceMethods<IREECodegen_WorkgroupReorderingAttrInterface, [
+        "generateLoopBounds",
+        "updateIds"
+      ]>
+    ]> {
+  let mnemonic = "dynamic_transpose";
+  let summary = [{Enable or disable transposed workgroup reordering based the workload.}];
+  let description = [{ This attribute controls conditional transposed workgroup reordering, determined by tile size, the number of XCDs, and the number of CUs. The reordering strategy is also influenced by the memory access pattern, and is specifically designed to optimize the ping-pong matmul specialization.
+  On gfx9 architectures, all CUs within a single XCD share an L2 cache. This attribute helps determine whether applying transposed workgroup reordering will improve the L2 cache hit rate.
+
+  Fields:
+    - nb_xcds: Number of XCDs.
+    - nb_CUs: Number of CUs per XCD.
+  }];
+  let parameters = (ins
+    AttrParameter<"int64_t", "">:$nbXcds,
+    AttrParameter<"int64_t", "">:$nbCus
+  );
+  let assemblyFormat = [{
+    `<` $nbXcds `,` $nbCus `>`
+  }];
+  let genVerifyDecl = 1;
+}
 //===----------------------------------------------------------------------===//
 // GPU Pipeline Options
 //===----------------------------------------------------------------------===//
@@ -686,9 +714,6 @@ def IREEGPU_ReorderWorkgroupsStrategyAttr :
   let assemblyFormat = "`<` $value `>`";
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 }
-
-
-
 
 def IREEGPU_GPUPipelineOptionsAttr : AttrDef<IREEGPU_Dialect, "GPUPipelineOptions"> {
   let summary = [{Options attribute for linalg + tensors -> vector + memref GPU pipelines.}];
