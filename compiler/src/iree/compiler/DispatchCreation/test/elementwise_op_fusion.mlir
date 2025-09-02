@@ -536,3 +536,49 @@ util.func public @gather_replace_linalg_index_transpose(%arg0 : tensor<256x256xf
 //  CHECK-SAME:     ins(%[[ARG1]] : tensor<100xindex>
 //       CHECK:     arith.index_cast %[[ARG2]]
 //       CHECK:   return %[[GATHER]]
+
+// -----
+
+util.func public @fuse_transpose_with_conv(%arg0 : tensor<100x32x32x3xbf16>, %arg1 : tensor<32x3x3x3xbf16>) -> tensor<100x30x30x32xbf16> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %2 = tensor.empty() : tensor<100x3x32x32xbf16>
+  %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d3, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg0 : tensor<100x32x32x3xbf16>) outs(%2 : tensor<100x3x32x32xbf16>) {
+  ^bb0(%in: bf16, %out: bf16):
+    linalg.yield %in : bf16
+  } -> tensor<100x3x32x32xbf16>
+  %4 = tensor.empty() : tensor<32x3x3x3xbf16>
+  %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d3, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg1 : tensor<32x3x3x3xbf16>) outs(%4 : tensor<32x3x3x3xbf16>) {
+  ^bb0(%in: bf16, %out: bf16):
+    linalg.yield %in : bf16
+  } -> tensor<32x3x3x3xbf16>
+  %6 = tensor.empty() : tensor<100x32x30x30xf32>
+  %7 = linalg.fill ins(%cst : f32) outs(%6 : tensor<100x32x30x30xf32>) -> tensor<100x32x30x30xf32>
+  %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d4, d2 + d5, d3 + d6)>, affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d4, d5, d6)>, affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%3, %5 : tensor<100x3x32x32xbf16>, tensor<32x3x3x3xbf16>) outs(%7 : tensor<100x32x30x30xf32>) {
+  ^bb0(%in: bf16, %in_0: bf16, %out: f32):
+    %15 = arith.extf %in : bf16 to f32
+    %16 = arith.extf %in_0 : bf16 to f32
+    %17 = arith.mulf %15, %16 : f32
+    %18 = arith.addf %out, %17 : f32
+    linalg.yield %18 : f32
+  } -> tensor<100x32x30x30xf32>
+  %9 = tensor.empty() : tensor<100x32x30x30xbf16>
+  %10 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%8 : tensor<100x32x30x30xf32>) outs(%9 : tensor<100x32x30x30xbf16>) {
+  ^bb0(%in: f32, %out: bf16):
+    %15 = arith.truncf %in : f32 to bf16
+    linalg.yield %15 : bf16
+  } -> tensor<100x32x30x30xbf16>
+  %11 = tensor.empty() : tensor<100x30x30x32xbf16>
+  %12 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d2, d3, d1)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%10 : tensor<100x32x30x30xbf16>) outs(%11 : tensor<100x30x30x32xbf16>) {
+  ^bb0(%in: bf16, %out: bf16):
+    linalg.yield %in : bf16
+  } -> tensor<100x30x30x32xbf16>
+  util.return %12 : tensor<100x30x30x32xbf16>
+}
+// CHECK-LABEL: util.func public @fuse_transpose_with_conv(
+//  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor
+//  CHECK-SAME:   %[[ARG1:[A-Za-z0-9]+]]: tensor
+//       CHECK:   %[[CONV:.+]] = linalg.generic
+//  CHECK-SAME:     ins(%[[ARG0]], %[[ARG1]]
+//       CHECK:   %[[TRUNCF:.+]] = linalg.generic
+//  CHECK-SAME:     ins(%[[CONV]]
+//       CHECK:   return %[[TRUNCF]]

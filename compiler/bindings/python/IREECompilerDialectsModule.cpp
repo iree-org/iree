@@ -505,6 +505,38 @@ NB_MODULE(_ireeCompilerDialects, m) {
           });
 
   //===-------------------------------------------------------------------===//
+  // Binding to query target info
+  //===-------------------------------------------------------------------===//
+
+  py::class_<ireeGPUTargetInfo>(iree_gpu_module, "TargetInfo")
+      .def_prop_ro("arch",
+                   [](const ireeGPUTargetInfo &self) -> std::string {
+                     MlirStringRef strRef = mlirIdentifierStr(self.arch);
+                     return std::string(strRef.data, strRef.length);
+                   })
+      .def_prop_ro("subgroup_size_choices",
+                   [](const ireeGPUTargetInfo &self) -> std::vector<int64_t> {
+                     return getIntArrayAttrValues(self.subgroupSizeChoices);
+                   })
+      .def_prop_ro("max_thread_count_per_workgroup",
+                   [](const ireeGPUTargetInfo &self) -> int64_t {
+                     return self.maxThreadCountPerWorkgroup;
+                   })
+      .def_prop_ro("max_workgroup_sizes",
+                   [](const ireeGPUTargetInfo &self) -> std::vector<int64_t> {
+                     return getIntArrayAttrValues(self.maxWorkgroupSizes);
+                   })
+      .def_prop_ro("max_workgroup_memory_bytes",
+                   [](const ireeGPUTargetInfo &self) -> int64_t {
+                     return self.maxWorkgroupMemoryBytes;
+                   });
+
+  iree_gpu_module.def(
+      "get_gpu_target_info", &ireeHALExecutableTargetAttrGetGPUTargetInfo,
+      "Extracts GPU target information from an executable target attribute.",
+      py::arg("executable_target_attr"));
+
+  //===-------------------------------------------------------------------===//
   // Binding to utility function getSingleSubgroupLayout
   //===-------------------------------------------------------------------===//
   py::class_<ireeGPUMMASingleSubgroupLayout>(iree_gpu_module,
@@ -592,12 +624,7 @@ NB_MODULE(_ireeCompilerDialects, m) {
       });
 
   iree_codegen_module.def(
-      "get_attention_op_detail",
-      [](MlirAffineMap q, MlirAffineMap k, MlirAffineMap v, MlirAffineMap o) {
-        ireeCodegenAttentionOpDetail result =
-            ireeCodegenGetAttentionOpDetail(q, k, v, o);
-        return result;
-      },
+      "get_attention_op_detail", &ireeCodegenGetAttentionOpDetail,
       "Infers the structure of an attention operation from affine indexing "
       "maps.",
       py::arg("q"), py::arg("k"), py::arg("v"), py::arg("o"));

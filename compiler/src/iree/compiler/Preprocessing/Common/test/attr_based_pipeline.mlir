@@ -12,10 +12,10 @@ func.func @single_dispatch_dropunitdims(%lhs : tensor<1x26x18x288xbf16>, %rhs : 
 // CHECK-LABEL: @single_dispatch_dropunitdims
 //  CHECK-SAME: %[[ARG0:[A-Za-z0-9]+]]: tensor<1x26x18x288xbf16>
 //       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
-//       CHECK:     %[[EXPAND:.+]] = tensor.expand_shape %[[ARG0]]
-//       CHECK:     %[[COLLAPSE:.+]] = tensor.collapse_shape %[[EXPAND]]
+//       CHECK:     %[[COLLAPSE:.+]] = tensor.collapse_shape %[[ARG0]]
 //       CHECK:     %[[CONV:.+]] = linalg.generic {{.*}} ins(%[[COLLAPSE]]
-//       CHECK:     flow.return %[[CONV]]
+//       CHECK:     %[[EXPAND:.+]] = tensor.expand_shape %[[CONV]]
+//       CHECK:     flow.return %[[EXPAND]]
 //       CHECK:   return %[[DISPATCH]]
 
 // -----

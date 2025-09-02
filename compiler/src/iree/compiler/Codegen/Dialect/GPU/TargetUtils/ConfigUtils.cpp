@@ -26,6 +26,7 @@
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -122,6 +123,119 @@ LogicalResult setDataTiledMultiMmaLoweringConfig(
       workgroupSize, targetSubgroupSize, pipelineConfig);
 }
 
+static std::optional<ComputeBitwidths> getComputeBitwidthForType(Type type) {
+  return llvm::TypeSwitch<Type, std::optional<ComputeBitwidths>>(type)
+      .Case<FloatType>(
+          [](FloatType floatType) -> std::optional<ComputeBitwidths> {
+            switch (floatType.getIntOrFloatBitWidth()) {
+            case 64:
+              return ComputeBitwidths::FP64;
+            case 32:
+              return ComputeBitwidths::FP32;
+            case 16:
+              return ComputeBitwidths::FP16;
+            case 8:
+              return ComputeBitwidths::FP8;
+            case 6:
+              return ComputeBitwidths::FP6;
+            case 4:
+              return ComputeBitwidths::FP4;
+            default:
+              return std::nullopt;
+            }
+          })
+      .Case<IntegerType>(
+          [](IntegerType intType) -> std::optional<ComputeBitwidths> {
+            switch (intType.getWidth()) {
+            case 64:
+              return ComputeBitwidths::Int64;
+            case 32:
+              return ComputeBitwidths::Int32;
+            case 16:
+              return ComputeBitwidths::Int16;
+            case 8:
+              return ComputeBitwidths::Int8;
+            default:
+              return std::nullopt;
+            }
+          })
+      .Default([](Type) { return std::nullopt; });
+}
+
+namespace {
+struct GemmCutoff {
+  float smallGemmCutoff;
+  float largeGemmCutoff;
+};
+} // namespace
+
+/// Function to compute small and large gemm cutoffs for arithmetic intensity
+/// based on the target's peak performance and memory bandwidth.
+static GemmCutoff computeGemmCutoffsForAI(IREE::GPU::TargetAttr target,
+                                          Type computeType) {
+  float smallGemmCutoff = 1.0f;
+  float largeGemmCutoff = 1000.0f;
+  if (!target.getChip()) {
+    LDBG() << "Target chip is not specified, using default gemm cutoffs: "
+           << smallGemmCutoff << ", " << largeGemmCutoff;
+    return {smallGemmCutoff, largeGemmCutoff};
+  }
+
+  TargetChipAttr chip = target.getChip();
+  DictionaryAttr peakPerfTlopsAttr = chip.getPerfTflops();
+  llvm::DenseMap<ComputeBitwidths, float> peakPerfTflops;
+  for (NamedAttribute namedAttr : peakPerfTlopsAttr) {
+    StringRef bitwidthStr = namedAttr.getName().strref();
+    FloatAttr floatAttr = dyn_cast<FloatAttr>(namedAttr.getValue());
+    if (!floatAttr) {
+      continue;
+    }
+
+    std::optional<ComputeBitwidths> bitwidth =
+        symbolizeComputeBitwidths(bitwidthStr);
+    if (!bitwidth) {
+      continue;
+    }
+
+    peakPerfTflops[*bitwidth] = floatAttr.getValue().convertToFloat();
+  }
+
+  bool peakPerfTflopsFound = false;
+  auto computeBitwidth = getComputeBitwidthForType(computeType);
+  if (computeBitwidth) {
+    peakPerfTflopsFound = peakPerfTflops.contains(computeBitwidth.value());
+  }
+  bool memoryBandwidthFound = chip.getMemoryBandwidthTbps() != nullptr;
+  if (!peakPerfTflopsFound || !memoryBandwidthFound) {
+    LDBG() << "Target chip does not have peak performance or memory bandwidth "
+              "information, using default gemm cutoffs: "
+           << smallGemmCutoff << ", " << largeGemmCutoff;
+    return {smallGemmCutoff, largeGemmCutoff};
+  }
+
+  // TODO: Attempt to use number of elements loaded per second instead of
+  // Tbps and adopt it if the perf uplift transfer better between different
+  // data types.
+  FloatAttr memoryBandwidthTbpsAttr = chip.getMemoryBandwidthTbps();
+  float memoryBandwidthTbps =
+      memoryBandwidthTbpsAttr.getValue().convertToFloat();
+
+  float perfTflops = peakPerfTflops[computeBitwidth.value()];
+  float computeMemoryCutoff = perfTflops / memoryBandwidthTbps;
+  LDBG() << "Target chip peak performance: " << perfTflops << " TFlops for "
+         << stringifyComputeBitwidths(computeBitwidth.value())
+         << " bitwidth, memory bandwidth: " << memoryBandwidthTbps
+         << " Tbps, compute-memory cutoff: " << computeMemoryCutoff;
+
+  // The constants below are determined and generalized based on empirical data
+  // based on the approach in https://github.com/iree-org/iree/discussions/21506
+  smallGemmCutoff = 0.05f * computeMemoryCutoff;
+  largeGemmCutoff = 5.0f * computeMemoryCutoff;
+  LDBG() << "Target chip small gemm cutoff: " << smallGemmCutoff
+         << ", large gemm cutoff: " << largeGemmCutoff;
+  return {smallGemmCutoff, largeGemmCutoff};
+}
+
 /// Given a target and a matmul problem, try to find an MMA schedule for the
 /// problem based on the available mma intrinsics.
 static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
@@ -169,25 +283,43 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
          "expected the same aType and bType.");
   int64_t inBitWidth = problem.aType.getIntOrFloatBitWidth();
 
+  GemmCutoff gemmCutoffs = computeGemmCutoffsForAI(target, problem.aType);
+
   // Note that the following heuristic seeds are just placeholder values.
   // We need to clean it up and make it adjusting to different targets.
   // See https://github.com/iree-org/iree/issues/16341 for details.
   int64_t mSize = ShapedType::getNumElements(problem.mSizes);
   int64_t nSize = ShapedType::getNumElements(problem.nSizes);
-  if (mSize * nSize <= 512 * 512) {
-    // For matmuls with small M*N size, we want to distribute M*N onto more
-    // workgroups to fill the GPU. Use a smaller bestMNTileCountPerSubgroup
-    // and a larger bestKTileCountPerSubgroup.
-    seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
-             /*bestMNTileCountPerSubgroup=*/4,
-             /*bestKTileCountPerSubgroup=*/8,
-             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
-  } else {
-    seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
-             /*bestMNTileCountPerSubgroup=*/16,
+  int64_t kSize = ShapedType::getNumElements(problem.kSizes);
+  int64_t computeIntensity = (2 * mSize * nSize * kSize) /
+                             (mSize * nSize + nSize * kSize + mSize * kSize);
+
+  if (computeIntensity <= gemmCutoffs.smallGemmCutoff) {
+    // For matmuls with small arithmetic intensity, use small
+    // bestMNTileCountPerSubgroup and large bestKTileCountPerSubgroup.
+    problem.gemmSize = GemmSize::SmallGemm;
+    seeds = {/*bestSubgroupCountPerWorkgroup=*/2,
+             /*bestMNTileCountPerSubgroup=*/2,
              /*bestKTileCountPerSubgroup=*/4,
+             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
+  } else if (computeIntensity >= gemmCutoffs.largeGemmCutoff) {
+    // For matmuls with large arithmetic intensity, use large
+    // bestMNTileCountPerSubgroup and small bestKTileCountPerSubgroup to
+    // amortize launch/memory costs and maximize throughput.
+    problem.gemmSize = GemmSize::LargeGemm;
+    seeds = {/*bestSubgroupCountPerWorkgroup=*/8,
+             /*bestMNTileCountPerSubgroup=*/8,
+             /*bestKTileCountPerSubgroup=*/2,
              /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / 2 /
                  inBitWidth};
+  } else {
+    // Choose balanced tile shapes. Empirically, medium-AI workloads can favor
+    // either small or large tiles depending on kernel details.
+    problem.gemmSize = GemmSize::MediumGemm;
+    seeds = {/*bestSubgroupCountPerWorkgroup=*/8,
+             /*bestMNTileCountPerSubgroup=*/4,
+             /*bestKTileCountPerSubgroup=*/4,
+             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
   }
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
@@ -206,75 +338,60 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
 
 /// Helper function to get convolution padding sizes if possible.
 static std::optional<ArrayAttr> getPaddingConvSizes(
-    Builder &b, int64_t kSize, int64_t kPaddingSize,
+    Builder &b, const SmallVector<int64_t> &bounds,
+    const SmallVector<int64_t> &paddingSizes,
     const SmallVector<int64_t> &workgroupTileSizes,
-    const SmallVector<int64_t> &mDims, const SmallVector<int64_t> &nDims,
-    const SmallVector<int64_t> &batchDims,
-    std::optional<mlir::linalg::ConvolutionDimensions> &padConvDims) {
-  if (!padConvDims.has_value())
+    const SmallVector<int64_t> &reductionTileSizes,
+    std::optional<DenseMap<int64_t, AffineExpr>> &convToIgemmDimMap,
+    std::optional<mlir::linalg::ConvolutionDimensions> &convDims) {
+  if (!convToIgemmDimMap.has_value() || !convDims.has_value())
     return std::nullopt;
 
-  SmallVector<unsigned> batchAndImageDims;
-  mlir::linalg::ConvolutionDimensions convDims = padConvDims.value();
-  bool isBatchLast = !convDims.batch.empty() &&
-                     convDims.outputImage.back() < convDims.batch.front();
-  if (isBatchLast) {
-    batchAndImageDims.append(convDims.outputImage.begin(),
-                             convDims.outputImage.end());
-    batchAndImageDims.append(convDims.batch.begin(), convDims.batch.end());
-  } else {
-    batchAndImageDims.append(convDims.batch.begin(), convDims.batch.end());
-    batchAndImageDims.append(convDims.outputImage.begin(),
-                             convDims.outputImage.end());
-  }
-
-  SmallVector<unsigned> concatMDims, concatNDims;
-  bool isOutputChannelFirst =
-      convDims.outputChannel.back() < convDims.outputImage.front();
-  if (isOutputChannelFirst) {
-    concatMDims.append(convDims.outputChannel.begin(),
-                       convDims.outputChannel.end());
-    concatNDims = batchAndImageDims;
-  } else {
-    concatMDims = batchAndImageDims;
-    concatNDims.append(convDims.outputChannel.begin(),
-                       convDims.outputChannel.end());
-  }
-
-  // Verify that the number of M, N dimensions from IGEMM match the
-  // corresponding number of convolution dimensions.
-  if (concatMDims.size() != mDims.size() ||
-      concatNDims.size() != nDims.size() ||
-      convDims.depth.size() != batchDims.size()) {
-    return std::nullopt;
-  }
-
+  DenseMap<int64_t, AffineExpr> convToIgemmMap = convToIgemmDimMap.value();
   // Padding sizes for parallel dimensions are the same as workgroup tile
   // sizes.
-  int64_t totalNumDims = convDims.batch.size() + convDims.outputImage.size() +
-                         convDims.outputChannel.size() +
-                         convDims.filterLoop.size() +
-                         convDims.inputChannel.size() + convDims.depth.size();
-  SmallVector<int64_t> paddingConvSizes(totalNumDims, 0);
-  if (batchDims.size() != 0) {
-    for (auto [dim, bDim] : llvm::zip(convDims.depth, batchDims)) {
-      paddingConvSizes[dim] = workgroupTileSizes[bDim];
+  DenseSet<int64_t> paddedIGEMMDims;
+  DenseMap<int64_t, SmallVector<int64_t>> paddedReductionConvDims;
+  SetVector<int64_t> inputChannelDims(convDims->inputChannel.begin(),
+                                      convDims->inputChannel.end());
+  SmallVector<int64_t> paddingConvSizes(convToIgemmMap.size(), 0);
+  for (auto [convDim, IGEMMExpr] : convToIgemmMap) {
+    auto IGEMMDimExpr = cast<AffineDimExpr>(IGEMMExpr);
+    unsigned IGEMMPos = IGEMMDimExpr.getPosition();
+    if (reductionTileSizes[IGEMMPos] != 0) {
+      // For reduction dimensions, avoid setting padding on the convolution
+      // if the product of the corresponding conv sizes are already divisible
+      // by the padding size.
+      if (paddingSizes[IGEMMPos] &&
+          bounds[IGEMMPos] % paddingSizes[IGEMMPos] == 0) {
+        paddedIGEMMDims.insert(IGEMMPos);
+        continue;
+      }
+      // Only pad input channel dims. If we need to pad filter dims, then we
+      // would rather just do padding on the GEMM instead.
+      if (inputChannelDims.contains(convDim)) {
+        // Multiple input channel dims for a single IGEMMPos is not supported.
+        if (paddedIGEMMDims.contains(IGEMMPos)) {
+          return std::nullopt;
+        }
+        paddingConvSizes[convDim] = paddingSizes[IGEMMPos];
+        paddedIGEMMDims.insert(IGEMMPos);
+      }
+      continue;
     }
+    // Multiple padded parallel dims mapping to the same IGEMM dim is not
+    // supported.
+    if (workgroupTileSizes[IGEMMPos] != 0 &&
+        paddedIGEMMDims.contains(IGEMMPos)) {
+      return std::nullopt;
+    }
+    paddingConvSizes[convDim] = paddingSizes[IGEMMPos];
+    paddedIGEMMDims.insert(IGEMMPos);
   }
-  for (auto [dim, mDim] : llvm::zip(concatMDims, mDims))
-    paddingConvSizes[dim] = workgroupTileSizes[mDim];
-  for (auto [dim, nDim] : llvm::zip(concatNDims, nDims))
-    paddingConvSizes[dim] = workgroupTileSizes[nDim];
 
-  // To avoid over-padding, no padding for channel dimensions is needed if
-  // the product of reduction sizes is already multiples of k padding
-  // size. Otherwise, pad the innermost channel dimension.
-  // TODO (vivian): Padding the innermost channel dimension to a multiple
-  // of vector size may still be needed even if the K-dim is aligned, and
-  // this should be validated based on performance.
-  if (kSize % kPaddingSize != 0) {
-    int64_t innerChannelDim = convDims.inputChannel.back();
-    paddingConvSizes[innerChannelDim] = kPaddingSize;
+  // Ensure that all dimensions have been padded.
+  if (paddedIGEMMDims.size() != paddingSizes.size()) {
+    return std::nullopt;
   }
   return b.getI64ArrayAttr(paddingConvSizes);
 }
@@ -291,7 +408,9 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     SmallVector<int64_t> bounds, ArrayRef<AffineMap> maps,
     ArrayRef<Value> operands, IREE::GPU::TargetAttr target, bool useDirectLoad,
     bool scaled,
-    std::optional<mlir::linalg::ConvolutionDimensions> padConvDims = {}) {
+    std::optional<DenseMap<int64_t, AffineExpr>> convToIgemmDimMap =
+        std::nullopt,
+    std::optional<linalg::ConvolutionDimensions> convDims = std::nullopt) {
   if (target.getWgp().getMma().empty()) {
     return failure();
   }
@@ -537,9 +656,9 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
 
     // Create `padding_conv` attribute when padding convolutions before IGEMM is
     // possible, otherwise fallback to pad IGEMM.
-    if (auto attr = getPaddingConvSizes(
-            b, bounds[innerKDim], paddingTileSizes[innerKDim],
-            workgroupTileSizes, mDims, nDims, batchDims, padConvDims)) {
+    if (auto attr = getPaddingConvSizes(b, bounds, paddingTileSizes,
+                                        workgroupTileSizes, reductionTileSizes,
+                                        convToIgemmDimMap, convDims)) {
       attrs.emplace_back(StringAttr::get(context, "padding_conv"), *attr);
     } else {
       attrs.emplace_back(StringAttr::get(context, "padding"),
@@ -580,15 +699,18 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
       igemmGenericConvDetails->igemmLoopBounds;
   SmallVector<Value> igemmOperands = igemmGenericConvDetails->igemmOperands;
 
-  std::optional<mlir::linalg::ConvolutionDimensions> padConvDims;
-  if (padConv)
-    padConvDims = igemmGenericConvDetails->convDims;
+  std::optional<DenseMap<int64_t, AffineExpr>> convToIgemmDimMap;
+  std::optional<linalg::ConvolutionDimensions> convDims;
+  if (padConv) {
+    convDims = igemmGenericConvDetails->convDims;
+    convToIgemmDimMap = igemmGenericConvDetails->convToIgemmDimMap;
+  }
 
   SmallVector<int64_t> bounds = igemmLoopBounds;
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
       getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
           bounds, igemmContractionMaps, igemmOperands, target, useDirectLoad,
-          /*scaled*/ false, padConvDims);
+          /*scaled*/ false, convToIgemmDimMap, convDims);
   if (failed(configAndWgSize)) {
     return failure();
   }

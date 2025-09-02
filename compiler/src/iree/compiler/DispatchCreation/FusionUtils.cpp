@@ -36,15 +36,6 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
     return true;
   }
 
-  // Don't fuse if all of the consumer maps aren't projected permutations.
-  if (auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp)) {
-    if (!llvm::all_of(
-            linalgConsumerOp.getIndexingMapsArray(),
-            [](AffineMap map) { return map.isProjectedPermutation(); })) {
-      return false;
-    }
-  }
-
   // If the generic op is "just" copy, then fuse always.
   Block &body = producerOp->getRegion(0).front();
   if (std::begin(body)->hasTrait<OpTrait::IsTerminator>())

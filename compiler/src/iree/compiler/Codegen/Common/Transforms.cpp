@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Common/CombineLayoutTransformation.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
@@ -441,6 +442,17 @@ static LogicalResult
 swapCollapseShapeWithSlice(RewriterBase &rewriter,
                            tensor::CollapseShapeOp collapseShapeOp,
                            tensor::ExtractSliceOp sliceOp) {
+  // FIXME: this is a workaround for the fact that this inf loops due to the
+  // creation of `affine::AffineDelinearizeIndexOp` but still returns failure.
+  SmallVector<Operation *> createdOps;
+  auto scope = llvm::make_scope_exit([&]() {
+    for (Operation *op : createdOps) {
+      if (op->use_empty()) {
+        rewriter.eraseOp(op);
+      }
+    }
+  });
+
   // The tensor.extract_slice before applying the pattern works on the result
   // of the tensor.collapse_shape, so variables (i.e. inputs for
   // ExtractSliceOp) referring to the state before applying the pattern are
@@ -476,41 +488,53 @@ swapCollapseShapeWithSlice(RewriterBase &rewriter,
       // IGEMM, while the offset is dynamic and the size is static.
       if (isa<Attribute>(collapsedSize) && isa<Value>(collapsedOffset) &&
           reassocIndices.size() != 1) {
-        // Check if offset is from affine.apply of form (d0 * K) or (K * d0).
-        auto applyOp = collapsedOffset.dyn_cast<Value>()
-                           .getDefiningOp<affine::AffineApplyOp>();
-        if (!applyOp) {
-          return rewriter.notifyMatchFailure(sliceOp,
-                                             "offset is not from affine.apply");
-        }
-
-        AffineMap map = applyOp.getAffineMap();
-        if (map.getNumResults() != 1) {
-          return rewriter.notifyMatchFailure(
-              sliceOp, "affine.apply must have only one result");
-        }
-
         auto maybeStaticSize = getConstantIntValue(collapsedSize);
         if (!maybeStaticSize) {
           return rewriter.notifyMatchFailure(sliceOp,
                                              "collapsed size must be static");
         }
+        auto staticSize = maybeStaticSize.value();
 
-        // Compose all nested affine.apply chains and check if the offset is
-        // multiple of collapsed size.
-        SmallVector<Value> operands(applyOp.getOperands());
-        affine::fullyComposeAffineMapAndOperands(&map, &operands);
-        map = simplifyAffineMap(map);
-        if (!map.getResult(0).isMultipleOf(maybeStaticSize.value())) {
-          return rewriter.notifyMatchFailure(
-              sliceOp, "offset multiplier must be multiple of collapsed size");
-        }
+        // Check if offset is from a block argument or an affine.apply op of
+        // form (d0 * K) or (K * d0).
+        auto offsetVal = cast<Value>(collapsedOffset);
+        auto collapseDefOp = offsetVal.getDefiningOp();
+        if (isa<BlockArgument>(offsetVal)) {
+          // The loop is already normalized.
+          if (staticSize != 1) {
+            return rewriter.notifyMatchFailure(
+                sliceOp, "collapsed size must be 1 when the collapsed offset "
+                         "is a block argument");
+          }
+        } else if (auto applyOp =
+                       dyn_cast<affine::AffineApplyOp>(collapseDefOp)) {
+          AffineMap map = applyOp.getAffineMap();
+          if (map.getNumResults() != 1) {
+            return rewriter.notifyMatchFailure(
+                sliceOp, "affine.apply must have only one result");
+          }
 
-        unsigned lastReassocSize = srcShape[reassocIndices.back()];
-        if (lastReassocSize % maybeStaticSize.value() != 0) {
+          // Compose all nested affine.apply chains and check if the offset is
+          // multiple of collapsed size.
+          SmallVector<Value> operands(applyOp.getOperands());
+          affine::fullyComposeAffineMapAndOperands(&map, &operands);
+          map = simplifyAffineMap(map);
+          if (!map.getResult(0).isMultipleOf(staticSize)) {
+            return rewriter.notifyMatchFailure(
+                sliceOp,
+                "offset multiplier must be multiple of collapsed size");
+          }
+
+          unsigned lastReassocSize = srcShape[reassocIndices.back()];
+          if (lastReassocSize % staticSize != 0) {
+            return rewriter.notifyMatchFailure(
+                sliceOp,
+                "the last expanded size is not divisible by collapse size");
+          }
+        } else {
           return rewriter.notifyMatchFailure(
               sliceOp,
-              "the last expanded size is not divisible by collapse size");
+              "offset is not from a block argument or affine.apply op");
         }
 
         // Calculate expanded offsets and sizes.
@@ -520,6 +544,7 @@ swapCollapseShapeWithSlice(RewriterBase &rewriter,
         }
         auto delinearizeOp = rewriter.create<affine::AffineDelinearizeIndexOp>(
             sliceOp.getLoc(), cast<Value>(collapsedOffset), expandedBasis);
+        createdOps.push_back(delinearizeOp);
         ValueRange offsets = delinearizeOp.getResults();
         expandedOffsets.append(offsets.begin(), offsets.end());
 

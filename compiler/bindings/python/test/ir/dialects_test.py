@@ -391,3 +391,68 @@ def compilation_info():
     assert compilation_info is not None
     assert compilation_info.lowering_config == lowering_config
     assert compilation_info.translation_info == translation_info
+
+
+@run
+def gpu_target_info_attribute_parsing():
+    mlir_string = """
+    hal.executable private @main_dispatch_0 {
+        hal.executable.variant public @rocm_hsaco_fb
+            target(<"rocm", "rocm-hsaco-fb",
+                {
+                abi = "hip",
+                iree_codegen.target_info = #iree_gpu.target<
+                    arch = "gfx942",
+                    features = "",
+                    wgp = <
+                    compute = fp64,
+                    storage = b64,
+                    subgroup = none,
+                    dot = none,
+                    mma = [<MFMA_F32_16x16x4_F32>],
+                    subgroup_size_choices = [32, 64],
+                    max_workgroup_sizes = [256, 512, 1024],
+                    max_thread_count_per_workgroup = 1024,
+                    max_workgroup_memory_bytes = 65536,
+                    max_workgroup_counts = [256, 512, 1024]
+                    >
+                >
+                }>
+            ) {
+        }
+    }
+    """
+
+    module = ir.Module.parse(mlir_string)
+    variant_op_list = iree_codegen.get_executable_variant_ops(module)
+    assert len(variant_op_list) == 1, "Expect one executable variant op"
+    variant_op = variant_op_list[0]
+    executable_variant_op = variant_op.opview
+    target = executable_variant_op.target
+    gpu_target_info = iree_gpu.get_gpu_target_info(target)
+
+    arch = gpu_target_info.arch
+    assert arch == "gfx942", f"Expected arch 'gfx942', got '{arch}'"
+
+    subgroup_size_choices = gpu_target_info.subgroup_size_choices
+    assert subgroup_size_choices == [
+        32,
+        64,
+    ], f"Expected subgroup_size_choice [32, 64], got {subgroup_size_choices}"
+
+    max_thread_count = gpu_target_info.max_thread_count_per_workgroup
+    assert (
+        max_thread_count == 1024
+    ), f"Expected max_thread_count_per_workgroup 1024, got {max_thread_count}"
+
+    max_memory_bytes = gpu_target_info.max_workgroup_memory_bytes
+    assert (
+        max_memory_bytes == 65536
+    ), f"Expected max_workgroup_memory_bytes 65536, got {max_memory_bytes}"
+
+    max_workgroup_sizes = gpu_target_info.max_workgroup_sizes
+    assert max_workgroup_sizes == [
+        256,
+        512,
+        1024,
+    ], f"Expected max_workgroup_sizes [256, 512, 1024], got {max_workgroup_sizes}"

@@ -19,12 +19,10 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
-#include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
@@ -203,104 +201,18 @@ getMatmulConfig(IREE::GPU::TargetAttr target) {
   return tileSizes;
 }
 
-/// Return the best combination of tile size and wg size when using tensorcore
-/// operations.
-static void
-getTensorCoreConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes,
-                    Type elementType, int64_t M, int64_t N, int64_t K) {
-  // Based on early analysis we found that 128x256x32_3 gives acceptable
-  // performance across many of the large matrix sizes for f16 and fp32. This
-  // needs to be refined into a better strategy based on empirical data but this
-  // gives us a quick solution to achieve performance in the right order of
-  // magnitude for large square like cases.
-  int64_t parallelDim = M * N;
-  static constexpr int64_t kLargDimThreashold = 1536;
-  if (elementType.isF16()) {
-    if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
-      tileSizes.push_back(
-          TileWorkgroupSizePair({{128, 256, 32}, {128, 2, 1}, 3}));
-    }
-    tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 32}, {64, 2, 1}, 4}));
-  } else {
-    if (parallelDim >= kLargDimThreashold * kLargDimThreashold) {
-      tileSizes.push_back(
-          TileWorkgroupSizePair({{128, 256, 16}, {128, 2, 1}, 4}));
-    }
-    llvm::append_values(tileSizes,
-                        TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}, 4}),
-                        TileWorkgroupSizePair({{16, 32, 16}, {64, 1, 1}, 4}),
-                        TileWorkgroupSizePair({{32, 16, 16}, {32, 2, 1}, 4}),
-                        TileWorkgroupSizePair({{16, 16, 16}, {32, 1, 1}, 4}));
-  }
-}
-
-static bool supportsTensorCore(IREE::GPU::TargetAttr target,
-                               linalg::LinalgOp op) {
-  // Limit tensor core pipeline to matmul as not all combinations of transpose
-  // are supported upstream.
-  if (!target.supportsSyncMMAOps())
-    return false;
-  if (!(isa<linalg::MatmulOp>(op) || isa<linalg::BatchMatmulOp>(op))) {
-    assert(linalg::isaContractionOpInterface(op));
-    // If this is not a named op matmul check some properties to make sure that
-    // we can map it to tensorcore ops. We should have only mulAdd in the region
-    // and the output map should have no permutation and the last dimension
-    // should be a reduce.
-    Region &body = op->getRegion(0);
-    Region::OpIterator it = body.op_begin();
-    if (it == body.op_end() || !isa<arith::MulFOp>(*(it++)))
-      return false;
-    if (it == body.op_end() || !isa<arith::AddFOp>(*(it++)))
-      return false;
-    if (it == body.op_end() || !isa<linalg::YieldOp>(*(it++)))
-      return false;
-    AffineMap outputMap = op.getMatchingIndexingMap(op.getDpsInitOperand(0));
-    if (outputMap.getNumResults() != outputMap.getNumDims() - 1)
-      return false;
-    OpBuilder b(op);
-    for (unsigned i = 0, e = outputMap.getNumResults(); i < e - 1; i++) {
-      if (outputMap.getResult(i) != b.getAffineDimExpr(i))
-        return false;
-    }
-  }
-  return true;
-}
-
-/// Decides which tensorcore operations to use.
-static CodeGenPipeline getTensorCorePipeline(Type elementType) {
-  // Currently mma.sync is on by default for fp16 only.
-  CodeGenPipeline codegenPipeline = CodeGenPipeline::LLVMGPUMatmulTensorCore;
-
-  // For F16 and F32 use mmasync by default.
-  if (elementType.isF16() || elementType.isF32()) {
-    codegenPipeline = CodeGenPipeline::LLVMGPUMatmulTensorCoreMmaSync;
-  }
-
-  // Override the decision based on cl flags.
-  assert(!(clGPUUseWMMA && clGPUUseMMASync) && "incompatible options.");
-  if (clGPUUseMMASync) {
-    codegenPipeline = CodeGenPipeline::LLVMGPUMatmulTensorCoreMmaSync;
-  }
-  if (clGPUUseWMMA) {
-    codegenPipeline = CodeGenPipeline::LLVMGPUMatmulTensorCore;
-  };
-  return codegenPipeline;
-}
-
 //====---------------------------------------------------------------------===//
 // Vector Distribution Reduction Pipeline Configuration
 //====---------------------------------------------------------------------===//
 //
 
-static bool isMatmulLike(linalg::LinalgOp &linalgOp) {
+static bool isMatmulLike(linalg::LinalgOp linalgOp) {
   return linalg::isaContractionOpInterface(linalgOp) &&
          linalgOp.getNumParallelLoops() >= 1;
 };
 
-/// Check if `op` is a linalg.reduce or a linalg.generic that has at least one
-/// reduction iterator.
-static bool hasReductionIterator(linalg::LinalgOp &op) {
-  return isa<linalg::ReduceOp, linalg::GenericOp>(op) &&
+static bool hasReductionIterator(linalg::LinalgOp op) {
+  return !linalg::isaConvolutionOpInterface(op) &&
          llvm::any_of(op.getIteratorTypesArray(), linalg::isReductionIterator);
 }
 
@@ -580,6 +492,7 @@ getVectorDistributeReductionConfig(
   return loweringConfig;
 }
 
+// TODO: Use IndexingMapInterface here instead of linalg::LinalgOp.
 static LogicalResult
 populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
                    IREE::GPU::TargetAttr target, int64_t workgroupSize,
@@ -611,42 +524,28 @@ populateConfigInfo(const llvm::SetVector<linalg::LinalgOp> &computeOps,
   // LinalgOp with only parallel dims. This is needed if the op cannot be fused
   // with a reduction or introduces new loop dimensions.
   auto shouldAttachLoweringConfig = [&](linalg::LinalgOp linalgOp) -> bool {
-    // If the operation has a gather, we want to fuse it with the
-    // reduction.
-    if (hasExternalCapture(cast<linalg::GenericOp>(linalgOp))) {
-      return false;
-    }
-    // If some of the users are in computeOps and some are outside of
-    // computeOps; attach lowering config, since the op can't be fused.
-    if (llvm::any_of(linalgOp->getUsers(),
-                     [&](Operation *user) {
-                       auto linalgUser = dyn_cast<linalg::LinalgOp>(user);
-                       return linalgUser && computeOps.contains(linalgUser);
-                     }) &&
-        llvm::any_of(linalgOp->getUsers(), [&](Operation *user) {
-          auto linalgUser = dyn_cast<linalg::LinalgOp>(user);
-          return !linalgUser;
-        })) {
+    // We want to attach a lowering config to this operation if it introduces
+    // a new dimension, when going by topological order in the backward slice.
+    // The only two ways to introduce a new dimension are:
+    //
+    // 1. We have a reduction dimension.
+    if (hasReductionIterator(linalgOp)) {
       return true;
     }
-
-    // If the indexing map introduces new dimensions (more inputs than results),
-    // attach a lowering config.
-    for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
-      int64_t operandIdx = linalgOp.getIndexingMapIndex(operand);
-      AffineMap indexingMap = linalgOp.getIndexingMapsArray()[operandIdx];
-      if (indexingMap.getNumResults() > 0 &&
-          indexingMap.getNumInputs() > indexingMap.getNumResults()) {
-        return true;
-      }
+    // 2. There is no consumer which is a compute op (i.e., it already
+    // has some way of getting fused).
+    if (llvm::none_of(linalgOp->getUsers(), [&](Operation *user) {
+          auto linalgUser = dyn_cast<linalg::LinalgOp>(user);
+          return linalgUser && computeOps.contains(linalgUser);
+        })) {
+      return true;
     }
 
     return false;
   };
 
   for (linalg::LinalgOp linalgOp : computeOps) {
-    if (hasReductionIterator(linalgOp) ||
-        shouldAttachLoweringConfig(linalgOp)) {
+    if (shouldAttachLoweringConfig(linalgOp)) {
       auto loweringConfig = getVectorDistributeReductionConfig(
           linalgOp, target, sharedWgpTiles, workgroupSize, subgroupSize,
           threadLoads);
@@ -1060,9 +959,10 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   if (intrinsics.empty())
     return failure();
 
-  // Note that the following heuristic seeds are just placeholder values.
-  // We need to clean it up and make it adjusting to different targets.
-  // See https://github.com/iree-org/iree/issues/16341 for details.
+  // TODO: Replace the below with algorithm described in
+  // https://github.com/iree-org/iree/discussions/21506.
+  // This is already implemented in KernelConfig.cpp in tileAndFuse pipeline
+  // and should be ported to here once its perf results are verified.
   GPUMMAHeuristicSeeds seeds{/*bestSubgroupCountPerWorkgroup=*/4,
                              /*bestMNTileCountPerSubgroup=*/8,
                              /*bestKTileCountPerSubgroup=*/2};
@@ -1230,15 +1130,6 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   Type rhsElemType = getElementTypeOrSelf(rhs);
   Type initElemType = getElementTypeOrSelf(init);
 
-  if (auto lhsOp = lhs.getDefiningOp<linalg::GenericOp>()) {
-    if (IREE::LinalgExt::isBitExtendOp(lhsOp))
-      lhsElemType = getElementTypeOrSelf(lhsOp.getDpsInputs()[0]);
-  }
-  if (auto rhsOp = rhs.getDefiningOp<linalg::GenericOp>()) {
-    if (IREE::LinalgExt::isBitExtendOp(rhsOp))
-      rhsElemType = getElementTypeOrSelf(rhsOp.getDpsInputs()[0]);
-  }
-
   SmallVector<int64_t> batchDims;
   for (int64_t batchDim : contractionDims->batch) {
     if (ShapedType::isStatic(bounds[batchDim])) {
@@ -1287,9 +1178,10 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   GPUMMAHeuristicSeeds seeds;
 
-  // Note that the following heuristic seeds are just placeholder values.
-  // We need to clean it up and make it adjusting to different targets.
-  // See https://github.com/iree-org/iree/issues/16341 for details.
+  // TODO: Replace the below with algorithm described in
+  // https://github.com/iree-org/iree/discussions/21506.
+  // This is already implemented in KernelConfig.cpp in tileAndFuse pipeline
+  // and should be ported to here once its perf results are verified.
   if (problem.mSizes[0] * problem.nSizes[0] <= clGPUMatmulCThreshold) {
     // For matmuls with small M*N size, we want to distribute M*N onto more
     // workgroups to fill the GPU. Use a smaller bestMNTileCountPerSubgroup
@@ -2271,30 +2163,6 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
                       ShapedType::isStatic(sizeN) &&
                       ShapedType::isStatic(sizeK);
   if (isStaticSize) {
-    /// Try tensorcore config first.
-    if (supportsTensorCore(target, op)) {
-      SmallVector<TileWorkgroupSizePair> TCtileSizeConfig;
-      Type elementType =
-          cast<ShapedType>(op.getDpsInputOperand(0)->get().getType())
-              .getElementType();
-
-      getTensorCoreConfig(TCtileSizeConfig, elementType, sizeM, sizeN, sizeK);
-      // Pick the best configuration where the original shape is aligned on the
-      // tile size.
-      for (TileWorkgroupSizePair &config : TCtileSizeConfig) {
-        if (sizeK % config.tileSize[2] == 0 &&
-            sizeN % config.tileSize[1] == 0 &&
-            sizeM % config.tileSize[0] == 0) {
-          CodeGenPipeline codegenPipeline = getTensorCorePipeline(elementType);
-          return setMatmulConfig(
-              config.tileSize[0], config.tileSize[1], config.tileSize[2],
-              config.workgroupSize,
-              target.getWgp().getSubgroupSizeChoices().asArrayRef(),
-              sizeK == config.tileSize[2] ? 1 : config.pipelineDepth,
-              codegenPipeline);
-        }
-      }
-    }
     // Special case for very small matrices.
     if (sizeM * sizeN <= target.getPreferredSubgroupSize()) {
       return setMatmulConfig(

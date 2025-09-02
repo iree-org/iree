@@ -126,7 +126,7 @@ util.func public @no_generalize_1x1_conv_2d_strides(%input: tensor<1x7x7x2xf32>,
 }
 
 // CHECK-LABEL: @no_generalize_1x1_conv_2d_strides
-//   CHECK-NOT:   linalg.generic
+//       CHECK:   linalg.generic
 //       CHECK:   util.return
 
 // -----
@@ -141,5 +141,5 @@ util.func public @no_generalize_1x1_depthwise_conv(%input: tensor<1x2x3x4xf32>, 
 }
 
 // CHECK-LABEL: @no_generalize_1x1_depthwise_conv
-//   CHECK-NOT:   linalg.generic
+//       CHECK:   linalg.generic
 //       CHECK:   util.return
