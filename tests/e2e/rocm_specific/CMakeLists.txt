@@ -21,7 +21,6 @@ iree_check_single_backend_test_suite(
     "hip"
   COMPILER_FLAGS
     "--iree-llvmgpu-use-direct-load"
-    "--iree-codegen-llvmgpu-early-tile-and-fuse-matmul"
   LABELS
     "requires-gpu-cdna3"
 )
