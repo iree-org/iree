@@ -18,7 +18,7 @@
         "--iree-hal-local-target-device-backends=llvm-cpu",
         "--iree-hal-target-device=local",
         "--iree-llvmcpu-target-cpu-features=host",
-        "--iree-opt-level=O3"
+        "--iree-opt-level=O2"
     ],
     "threshold_args": [
         "--expected_f32_threshold=0.01f"

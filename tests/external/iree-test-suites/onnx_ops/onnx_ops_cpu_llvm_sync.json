@@ -3,6 +3,7 @@
   "iree_compile_flags": [
     "--iree-hal-target-device=local",
     "--iree-hal-local-target-device-backends=llvm-cpu",
+    "--iree-opt-level=O2",
     "--iree-input-demote-f64-to-f32=false"
   ],
   "iree_run_module_flags": [
