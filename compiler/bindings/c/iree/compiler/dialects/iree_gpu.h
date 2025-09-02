@@ -157,6 +157,12 @@ struct ireeGPUTargetInfo {
 MLIR_CAPI_EXPORTED ireeGPUTargetInfo
 ireeHALExecutableTargetAttrGetGPUTargetInfo(MlirAttribute attr);
 
+MLIR_CAPI_EXPORTED ireeGPUTargetInfo ireeGPUTargetInfoGet(
+    MlirContext mlirCtx, const char *arch, const int32_t *subgroupChoices,
+    size_t numSubgroupChoices, const int32_t *workgroupSizes,
+    size_t numWorkgroupSizes, int64_t threadCount, int64_t memoryBytes,
+    const int32_t *mmaIntrinsics, size_t numMmaIntrinsics);
+
 #ifdef __cplusplus
 }
 #endif

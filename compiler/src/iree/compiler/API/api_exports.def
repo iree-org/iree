@@ -103,6 +103,7 @@ EXPORTS
   ireeGPUReorderWorkgroupsStrategyAttrGet
   ireeGPUReorderWorkgroupsStrategyAttrGetTypeID
   ireeGPUReorderWorkgroupsStrategyAttrGetValue
+  ireeGPUTargetInfoGet
   ireeHALExecutableTargetAttrGetGPUTargetInfo
   ireeMlirLspServerRunMain
   ireeOptRunMain

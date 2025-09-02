@@ -429,7 +429,7 @@ def gpu_target_info_attribute_parsing():
     variant_op = variant_op_list[0]
     executable_variant_op = variant_op.opview
     target = executable_variant_op.target
-    gpu_target_info = iree_gpu.get_gpu_target_info(target)
+    gpu_target_info = iree_gpu.TargetInfo.get_gpu_target_info(target)
 
     arch = gpu_target_info.arch
     assert arch == "gfx942", f"Expected arch 'gfx942', got '{arch}'"
@@ -469,7 +469,7 @@ def gpu_target_info_attribute_parsing():
 def gpu_target_info_constructor():
     context = ir.Context()
 
-    target_info = iree_gpu.TargetInfo.get(
+    target_info = iree_gpu.TargetInfo(
         context=context,
         arch="gfx942",
         subgroup_size_choices=[32, 64],
