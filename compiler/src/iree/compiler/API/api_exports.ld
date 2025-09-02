@@ -21,7 +21,6 @@ VER_0 {
     ireeGPUGetSingleSubgroupLayout;
     ireeCodegenGetTunerRootOps;
     ireeCodegenGetAttentionOpDetail;
-    ireeCodegenQueryMMAIntrinsics;
     ireeCodegenMlirOperationIsACodegenAttentionOp;
     ireeCodegenTranslationInfoAttrGet;
     ireeCodegenTranslationInfoAttrGetParameters;

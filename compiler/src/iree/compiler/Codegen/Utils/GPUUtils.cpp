@@ -1065,17 +1065,6 @@ getExecutableVariantOps(mlir::ModuleOp moduleOp) {
   return executableVariantOps;
 }
 
-SmallVector<IREE::GPU::MMAIntrinsic>
-queryMMAIntrinsics(IREE::HAL::ExecutableVariantOp executableOp) {
-  SmallVector<IREE::GPU::MMAIntrinsic> mmaIntrinsics;
-  if (IREE::GPU::TargetAttr target = getGPUTargetAttr(executableOp)) {
-    mmaIntrinsics = llvm::map_to_vector(
-        target.getWgp().getMma(),
-        [](IREE::GPU::MMAAttr attr) { return attr.getIntrinsic(); });
-  }
-  return mmaIntrinsics;
-}
-
 SmallVector<Operation *> getTunerRootOps(mlir::ModuleOp moduleOp) {
   SmallVector<Operation *> rootOps;
 

@@ -94,7 +94,6 @@ iree_cc_library(
     "ROCDLConfigureBufferInstructions.cpp"
     "ROCDLLowerExecutableTarget.cpp"
     "ROCDLPrefetching.cpp"
-    "TestLLVMGPUQueryMMAPass.cpp"
     "Verifiers.cpp"
   DEPS
     ::PassHeaders
