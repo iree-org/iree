@@ -12,15 +12,25 @@ readtime: 30
 
 # Data-Tiling Walkthrough
 
-Data-tiling is a technique that transforms the input data to be in a particular
-layout for good performance. It allows you to access data through the cache
-hierarchy efficiently and do the computation with very less latency.
+Data-tiling is the modification of data layout of operands of certain
+operations, such as matrix multiplication, that prefer specific layouts. These
+layout preferences depend on the operations and the target hardware. For
+example, matrix multiplications may need to use hardware matrix multiplication
+instructions that perform optimally with a specific matrix data layout.
 
-As the IREE is a compiler which sees the whole graph, there are many
-opportunities to remove layout-transformation overheads. They may be propagated,
-fused into other operations, or be constant-evaluated when the source is from
-weights. IREE uses encodings to apply data-tiling technique, and the post
-explores how encodings work in data-tiling.
+Layout changes may also be motivated by memory access performance, as
+data-tiling can result in improved locality of memory accesses, fewer cache
+lines being accessed, and generally simpler memory access patterns that are more
+likely to be handled performantly by the memory system.
+
+These layout changes can be propagated as far as possible across the workload,
+so the entire workload can use the updated layouts, as opposed to having to
+perform layout transformations at runtime. This may involve fusions or
+constant-evaluation that can amortize or remove layout-transformation overheads.
+
+The main conceptual difficulty in modeling this in tensor-level MLIR is that
+tensors don't have layouts: tensors are higher-level, abstract arrays. This is
+addressed by the concept of tensor encodings, which this document will explain.
 
 <!-- more -->
 
