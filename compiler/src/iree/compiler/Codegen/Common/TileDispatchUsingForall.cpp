@@ -116,11 +116,9 @@ getTiledAndDistributionInfo(RewriterBase &rewriter,
   SmallVector<int64_t> interchange = tilableOpConfig.getWorkgroupInterchange();
 
   scf::SCFTileDistributionFn tileDistributionFn = nullptr;
-  auto conditionalTransposeAttr =
-      tilableOpConfig.getWorkgroupOrderingStrategy();
-  if (conditionalTransposeAttr) {
-    tileDistributionFn =
-        makeWorkgroupReorderingFunctor(conditionalTransposeAttr);
+  auto dynamicTransposeAttr = tilableOpConfig.getWorkgroupOrderingStrategy();
+  if (dynamicTransposeAttr) {
+    tileDistributionFn = makeWorkgroupReorderingFunctor(dynamicTransposeAttr);
   }
   // Avoid distributing unit-trip count loops.
 
@@ -402,7 +400,8 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
     // Reorder the workgroups if the strategy is set to `transpose`.
     // This just transposes the first two dimensions of the workgroup i.e., the
     // #iree.codegen.workgroup_id_x and #iree.codegen.workgroup_id_y.
-    // Only reorders if the loop bounds are static and tileDistributionFunction disabled.
+    // Only reorders if the loop bounds are static and tileDistributionFunction
+    // disabled.
     auto forallOp = cast<scf::ForallOp>(tilingLoops[0]);
     if (transposeWorkgroup && !tilingOptions.tileDistributionFunction) {
       SmallVector<Attribute> mappingAttrs(forallOp.getMappingAttr().getValue());

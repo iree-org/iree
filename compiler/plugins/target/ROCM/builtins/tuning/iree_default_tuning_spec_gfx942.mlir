@@ -1783,7 +1783,9 @@ transform.named_sequence
     lowering_config = #iree_gpu.lowering_config<{
       workgroup = [256, 256, 0],
       lowering_strategy = "cast_and_call_pingpong_matmul",
-      workgroup_ordering_strategy = #iree_codegen.conditional_transpose<8,38>
+      // gfx942 has 8 XCDs with each 38 CUs. Enabling workgroup reordering to improve L2 cache hit rate.
+      // In CPX mode, this does not affect performance since the L2 cache is shared across all workgroups.
+      workgroup_ordering_strategy = #iree_codegen.dynamic_transpose<8,38>
       }>,
     translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
       workgroup_size = [512, 1, 1] subgroup_size = 64,
@@ -2044,7 +2046,7 @@ transform.named_sequence
     lowering_config = #iree_gpu.lowering_config<{
       workgroup = [1, 256, 256, 0],
       lowering_strategy = "cast_and_call_expanded_pingpong_matmul",
-      workgroup_ordering_strategy = #iree_codegen.conditional_transpose<8,38>
+      workgroup_ordering_strategy = #iree_codegen.dynamic_transpose<8,38>
       }>,
     translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
       workgroup_size = [512, 1, 1] subgroup_size = 64,

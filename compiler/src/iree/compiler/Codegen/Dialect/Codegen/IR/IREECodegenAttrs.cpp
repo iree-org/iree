@@ -683,13 +683,13 @@ static Value getCondition(OpBuilder &b, Location loc,
       loc, mlir::arith::CmpIPredicate::ugt, defaultOrder, transposedOrder);
   return cond;
 }
-SmallVector<Range> ConditionalTransposeAttr::generateLoopBounds(
+SmallVector<Range> DynamicTransposeAttr::generateLoopBounds(
     OpBuilder &b, Location loc, ArrayRef<Range> loopRanges,
     ArrayRef<OpFoldResult> tileSizes) const {
   SmallVector<OpFoldResult> lbs, ubs, steps;
   std::tie(lbs, ubs, steps) = getloopBounds(loopRanges, tileSizes);
   // We only support rank 2.
-  if (lbs.size() == 2){
+  if (lbs.size() == 2) {
     Value nbCusVal = b.create<arith::ConstantIndexOp>(loc, getNbCus());
     Value nbXCDs = b.create<arith::ConstantIndexOp>(loc, getNbXcds());
     Value cond = getCondition(b, loc, ubs, steps, nbXCDs, nbCusVal);
@@ -705,31 +705,30 @@ SmallVector<Range> ConditionalTransposeAttr::generateLoopBounds(
   return ranges;
 }
 
-SmallVector<Value> ConditionalTransposeAttr::updateIds(
+SmallVector<Value> DynamicTransposeAttr::updateIds(
     OpBuilder &b, Location loc, ArrayRef<Range> loopRanges,
     ArrayRef<OpFoldResult> tileSizes, ValueRange ids) const {
   SmallVector<OpFoldResult> lbs, ubs, steps;
   std::tie(lbs, ubs, steps) = getloopBounds(loopRanges, tileSizes);
   SmallVector<Value> out;
   // We only support rank 2.
-  if (lbs.size() == 2){
+  if (lbs.size() == 2) {
     Value nbCusVal = b.create<arith::ConstantIndexOp>(loc, getNbCus());
     Value nbXCDs = b.create<arith::ConstantIndexOp>(loc, getNbXcds());
     Value cond = getCondition(b, loc, ubs, steps, nbXCDs, nbCusVal);
     out.push_back(b.create<mlir::arith::SelectOp>(loc, cond, ids[0], ids[1]));
     out.push_back(b.create<mlir::arith::SelectOp>(loc, cond, ids[1], ids[0]));
-  }else{
+  } else {
     out = ids;
   }
   return out;
 }
 
 LogicalResult
-ConditionalTransposeAttr::verify(function_ref<InFlightDiagnostic()> emitError,
-                                 int64_t nbXcds, int64_t nbCus) {
+DynamicTransposeAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                             int64_t nbXcds, int64_t nbCus) {
   if (nbXcds == 0 || nbCus == 0) {
-    return emitError()
-           << "ConditionalTransposeAttr must have non-zeros parameters";
+    return emitError() << "DynamicTransposeAttr must have non-zeros parameters";
   }
   return success();
 }
