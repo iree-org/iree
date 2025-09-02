@@ -176,7 +176,8 @@ static LogicalResult setDataTilingEncodings(RewriterBase &rewriter,
       if (!failed(cDims)) {
         kCDims.append(cDims->k.begin(), cDims->k.end());
       }
-      auto scaledCDims = IREE::LinalgExt::inferScaledContractionDims(linalgOp);
+      FailureOr<IREE::LinalgExt::ScaledContractionDimensions> scaledCDims =
+          IREE::LinalgExt::inferScaledContractionDims(linalgOp);
       if (!failed(scaledCDims)) {
         kCDims.append(scaledCDims->k.begin(), scaledCDims->k.end());
         kCDims.append(scaledCDims->kB.begin(), scaledCDims->kB.end());

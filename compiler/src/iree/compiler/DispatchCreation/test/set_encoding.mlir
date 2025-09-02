@@ -1250,7 +1250,7 @@ util.func public @scaled_contraction_f4_f4_f8_f8_f32(
 // MATMULK-DAG:     #[[$ENC1:.+]] = #iree_encoding.matmul_k<k_dims = [1]>
 // MATMULK-DAG:     #[[$ENC2:.+]] = #iree_encoding.matmul_k<k_dims = []>
 
-//      CHECK-ALL: util.func public @scaled_contraction_f4_f4_f8_f8_f32
+// CHECK-ALL:       util.func public @scaled_contraction_f4_f4_f8_f8_f32
 // CHECK-ALL-SAME:      %[[A:.*]]: tensor<256x128x32xf4E2M1FN>
 // CHECK-ALL-SAME:      %[[B:.*]]: tensor<512x128x32xf4E2M1FN>
 // CHECK-ALL-SAME:      %[[AS:.*]]: tensor<256x128xf8E8M0FNU>
@@ -1303,8 +1303,8 @@ util.func public @scaled_contraction_multi_k_f4_f4_f8_f8_f32(
   util.return %0 : tensor<256x512xf32>
 }
 
-//      CHECK-ALL: util.func public @scaled_contraction_multi_k_f4_f4_f8_f8_f32
-//  CHECK-ALL-NOT: iree_encoding.set_encoding
+//  CHECK-ALL:     util.func public @scaled_contraction_multi_k_f4_f4_f8_f8_f32
+//  CHECK-ALL-NOT:   iree_encoding.set_encoding
 
 // -----
 util.func public @scaled_contraction_multi_kb_f4_f4_f8_f8_f32(
@@ -1330,5 +1330,5 @@ util.func public @scaled_contraction_multi_kb_f4_f4_f8_f8_f32(
   util.return %0 : tensor<256x512xf32>
 }
 
-//      CHECK-ALL: util.func public @scaled_contraction_multi_kb_f4_f4_f8_f8_f32
-//  CHECK-ALL-NOT: iree_encoding.set_encoding
+//  CHECK-ALL:     util.func public @scaled_contraction_multi_kb_f4_f4_f8_f8_f32
+//  CHECK-ALL-NOT:   iree_encoding.set_encoding
