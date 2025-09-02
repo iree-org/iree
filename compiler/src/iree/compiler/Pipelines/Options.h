@@ -124,14 +124,14 @@ struct GlobalOptimizationOptions {
   // Enables data tiling in global optimization phase. There are two data-tiling
   // flags during the transition state. The other has to be off if this one is
   // enabled. Any feature built on top of this path will be deprecated.
-  bool dataTiling = true;
+  bool dataTiling = false;
 
   // Enables const-expr hoisting into globals.
-  bool constExprHoisting = true;
+  bool constExprHoisting = false;
 
   // Enables recursive evaluation of immutable globals using the compiler
   // and runtime.
-  bool constEval = true;
+  bool constEval = false;
 
   // Optimizations to reduce numeric precision where it is safe to do so.
   bool numericPrecisionReduction = false;
