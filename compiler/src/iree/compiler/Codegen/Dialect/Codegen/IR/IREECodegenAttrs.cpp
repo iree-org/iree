@@ -611,7 +611,7 @@ RotateRowsAttr::verify(function_ref<InFlightDiagnostic()> emitError,
 static void swapValuesOnCond(OpBuilder &b, Location loc, OpFoldResult cond,
                              SmallVector<OpFoldResult> &values) {
 
-  assert(values.size() >= 2 && "Need at least two values to swap");
+  assert(values.size() == 2 && "only vector size 2 is supported");
   Value v0 = getValueOrCreateConstantIndexOp(b, loc, values[0]);
   Value v1 = getValueOrCreateConstantIndexOp(b, loc, values[1]);
   Value condVal = getValueOrCreateConstantIndexOp(b, loc, cond);
@@ -683,20 +683,21 @@ static Value getCondition(OpBuilder &b, Location loc,
       loc, mlir::arith::CmpIPredicate::ugt, defaultOrder, transposedOrder);
   return cond;
 }
-
 SmallVector<Range> ConditionalTransposeAttr::generateLoopBounds(
     OpBuilder &b, Location loc, ArrayRef<Range> loopRanges,
     ArrayRef<OpFoldResult> tileSizes) const {
   SmallVector<OpFoldResult> lbs, ubs, steps;
   std::tie(lbs, ubs, steps) = getloopBounds(loopRanges, tileSizes);
-  assert(lbs.size() == 2 && "rank must be 2");
-  Value nbCusVal = b.create<arith::ConstantIndexOp>(loc, getNbCus());
-  Value nbXCDs = b.create<arith::ConstantIndexOp>(loc, getNbXcds());
-  Value cond = getCondition(b, loc, ubs, steps, nbXCDs, nbCusVal);
-  // Swap X & Y axis based on cond.
-  swapValuesOnCond(b, loc, cond, lbs);
-  swapValuesOnCond(b, loc, cond, ubs);
-  swapValuesOnCond(b, loc, cond, steps);
+  // We only support rank 2.
+  if (lbs.size() == 2){
+    Value nbCusVal = b.create<arith::ConstantIndexOp>(loc, getNbCus());
+    Value nbXCDs = b.create<arith::ConstantIndexOp>(loc, getNbXcds());
+    Value cond = getCondition(b, loc, ubs, steps, nbXCDs, nbCusVal);
+    // Swap X & Y axis based on cond.
+    swapValuesOnCond(b, loc, cond, lbs);
+    swapValuesOnCond(b, loc, cond, ubs);
+    swapValuesOnCond(b, loc, cond, steps);
+  }
   SmallVector<Range> ranges;
   for (auto [lb, ub, step] : llvm::zip_equal(lbs, ubs, steps)) {
     ranges.push_back(Range{lb, ub, step});
@@ -709,13 +710,18 @@ SmallVector<Value> ConditionalTransposeAttr::updateIds(
     ArrayRef<OpFoldResult> tileSizes, ValueRange ids) const {
   SmallVector<OpFoldResult> lbs, ubs, steps;
   std::tie(lbs, ubs, steps) = getloopBounds(loopRanges, tileSizes);
-  assert(lbs.size() == 2 && "rank must be 2");
-  Value nbCusVal = b.create<arith::ConstantIndexOp>(loc, getNbCus());
-  Value nbXCDs = b.create<arith::ConstantIndexOp>(loc, getNbXcds());
-  Value cond = getCondition(b, loc, ubs, steps, nbXCDs, nbCusVal);
   SmallVector<Value> out;
-  out.push_back(b.create<mlir::arith::SelectOp>(loc, cond, ids[0], ids[1]));
-  out.push_back(b.create<mlir::arith::SelectOp>(loc, cond, ids[1], ids[0]));
+  // We only support rank 2.
+  if (lbs.size() == 2){
+    Value nbCusVal = b.create<arith::ConstantIndexOp>(loc, getNbCus());
+    Value nbXCDs = b.create<arith::ConstantIndexOp>(loc, getNbXcds());
+    Value cond = getCondition(b, loc, ubs, steps, nbXCDs, nbCusVal);
+    SmallVector<Value> out;
+    out.push_back(b.create<mlir::arith::SelectOp>(loc, cond, ids[0], ids[1]));
+    out.push_back(b.create<mlir::arith::SelectOp>(loc, cond, ids[1], ids[0]));
+  }else{
+    out = ids;
+  }
   return out;
 }
 
