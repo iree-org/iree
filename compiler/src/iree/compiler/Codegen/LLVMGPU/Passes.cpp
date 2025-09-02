@@ -1040,8 +1040,6 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
         auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 64; };
         return createGPUCheckResourceUsagePass(getIndexBitwidth);
       })
-      .addPass(createCanonicalizerPass)
-      .addPass(createCSEPass)
       // Hoist allocations back into the entry block, as lowering to CF may have
       // split the block at a point before the allocation.
       .addPass(createHoistStaticallyBoundAllocationsPass)
