@@ -1054,7 +1054,8 @@ void ConvertToLLVMPass::runOnOperation() {
   populateAffineToStdConversionPatterns(patterns);
   populateSCFToControlFlowConversionPatterns(patterns);
   cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
-  populateExpandTanhPattern(patterns);
+  math::populateExpansionPatterns(patterns,
+                            /*OpMnemonics=*/{math::TanhOp::getOperationName()});
 
   populateComplexToLLVMConversionPatterns(typeConverter, patterns);
   populateMathToLLVMConversionPatterns(typeConverter, patterns);
