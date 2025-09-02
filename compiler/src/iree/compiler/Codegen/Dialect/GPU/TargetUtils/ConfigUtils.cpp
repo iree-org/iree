@@ -240,8 +240,8 @@ static GemmCutoff computeGemmCutoffsForAI(IREE::GPU::TargetAttr target,
 /// problem based on the available mma intrinsics.
 static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     IREE::GPU::TargetAttr target, GPUMatmulShapeType problem,
-    bool transposedLhs, bool transposedRhs, bool mustBeAligned = true,
-    bool doCPromotion = false, bool scaled = false) {
+    bool transposedLhs, bool transposedRhs, bool isGemm,
+    bool mustBeAligned = true, bool doCPromotion = false, bool scaled = false) {
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
   SmallVector<GPUIntrinsicType> intrinsics;
   if (scaled) {
@@ -307,19 +307,40 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     // bestMNTileCountPerSubgroup and small bestKTileCountPerSubgroup to
     // amortize launch/memory costs and maximize throughput.
     problem.gemmSize = GemmSize::LargeGemm;
-    seeds = {/*bestSubgroupCountPerWorkgroup=*/8,
-             /*bestMNTileCountPerSubgroup=*/8,
-             /*bestKTileCountPerSubgroup=*/2,
-             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / 2 /
-                 inBitWidth};
+    if (isGemm) {
+      seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
+               /*bestMNTileCountPerSubgroup=*/16,
+               /*bestKTileCountPerSubgroup=*/2,
+               /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / 2 /
+                   inBitWidth};
+    } else {
+      // Favor more subgroups for convolution to help latency hiding from global
+      // loads.
+      seeds = {/*bestSubgroupCountPerWorkgroup=*/8,
+               /*bestMNTileCountPerSubgroup=*/8,
+               /*bestKTileCountPerSubgroup=*/2,
+               /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / 2 /
+                   inBitWidth};
+    }
   } else {
     // Choose balanced tile shapes. Empirically, medium-AI workloads can favor
     // either small or large tiles depending on kernel details.
     problem.gemmSize = GemmSize::MediumGemm;
-    seeds = {/*bestSubgroupCountPerWorkgroup=*/8,
-             /*bestMNTileCountPerSubgroup=*/4,
-             /*bestKTileCountPerSubgroup=*/4,
-             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
+    if (isGemm) {
+      seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
+               /*bestMNTileCountPerSubgroup=*/8,
+               /*bestKTileCountPerSubgroup=*/4,
+               /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits /
+                   inBitWidth};
+    } else {
+      // Favor more subgroups for convolution to help latency hiding from global
+      // loads.
+      seeds = {/*bestSubgroupCountPerWorkgroup=*/8,
+               /*bestMNTileCountPerSubgroup=*/4,
+               /*bestKTileCountPerSubgroup=*/4,
+               /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits /
+                   inBitWidth};
+    }
   }
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
@@ -407,7 +428,7 @@ static FailureOr<std::pair<LoweringConfigAttr, int64_t>>
 getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     SmallVector<int64_t> bounds, ArrayRef<AffineMap> maps,
     ArrayRef<Value> operands, IREE::GPU::TargetAttr target, bool useDirectLoad,
-    bool scaled,
+    bool isGemm, bool scaled,
     std::optional<DenseMap<int64_t, AffineExpr>> convToIgemmDimMap =
         std::nullopt,
     std::optional<linalg::ConvolutionDimensions> convDims = std::nullopt) {
@@ -537,7 +558,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   bool mustBeAligned = true;
   bool doCPromotion = false;
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
-      target, problem, transposedLhs, transposedRhs, /*mustBeAligned*/ true,
+      target, problem, transposedLhs, transposedRhs, isGemm,
+      /*mustBeAligned*/ true,
       /*doCPromotion*/ false, scaled);
 
   // TODO (nirvedhmeshram, qedawkins): The performance with this will be bad if
@@ -549,7 +571,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     mustBeAligned = false;
     doCPromotion = true;
     schedule = getMmaScheduleFromProblemAndTarget(
-        target, problem, transposedLhs, transposedRhs, mustBeAligned,
+        target, problem, transposedLhs, transposedRhs, isGemm, mustBeAligned,
         doCPromotion, scaled);
   }
 
@@ -710,7 +732,7 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
       getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
           bounds, igemmContractionMaps, igemmOperands, target, useDirectLoad,
-          /*scaled*/ false, convToIgemmDimMap, convDims);
+          /*isGemm=*/false, /*scaled*/ false, convToIgemmDimMap, convDims);
   if (failed(configAndWgSize)) {
     return failure();
   }
@@ -756,7 +778,8 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
 
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
       getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
-          bounds, maps, operands, target, useDirectLoad, /*scaled*/ false);
+          bounds, maps, operands, target, useDirectLoad, /*isGemm=*/true,
+          /*scaled*/ false);
 
   // TODO (muzasyed) : add generalization for scaled and nonscaled versions of
   // matmul lowering.
@@ -765,7 +788,8 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
     // conflicts when dealing with scaled matmuls. For now it is disabled.
     useDirectLoad = true;
     configAndWgSize = getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
-        bounds, maps, operands, target, useDirectLoad, /*scaled*/ true);
+        bounds, maps, operands, target, useDirectLoad, /*isGemm=*/true,
+        /*scaled*/ true);
   }
 
   if (failed(configAndWgSize)) {
