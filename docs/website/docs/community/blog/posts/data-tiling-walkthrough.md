@@ -1172,7 +1172,9 @@ util.func public @multi_device_set_encoding() {
 <!-- markdownlint-restore -->
 
 For more examples, see the
-<a href="https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/Dialect/Stream/Transforms/test/specialize_encodings.mlir">lit tests</a>.
+<a href="https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/Dialect/Stream/Transforms/test/specialize_encodings.mlir">
+lit tests
+</a>.
 
 </details>
 
