@@ -716,7 +716,6 @@ SmallVector<Value> ConditionalTransposeAttr::updateIds(
     Value nbCusVal = b.create<arith::ConstantIndexOp>(loc, getNbCus());
     Value nbXCDs = b.create<arith::ConstantIndexOp>(loc, getNbXcds());
     Value cond = getCondition(b, loc, ubs, steps, nbXCDs, nbCusVal);
-    SmallVector<Value> out;
     out.push_back(b.create<mlir::arith::SelectOp>(loc, cond, ids[0], ids[1]));
     out.push_back(b.create<mlir::arith::SelectOp>(loc, cond, ids[1], ids[0]));
   }else{
