@@ -78,7 +78,7 @@ func.func @conv_nhwc() {
 
 // -----
 
-// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -103,10 +103,9 @@ func.func @mfma_matmul_1024x1024x1024() {
 // CHECK-LABEL: func.func @mfma_matmul_1024x1024x1024()
 // CHECK: linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
-// CHECK-SAME:                           reduction =  [0, 0, 128]
-// CHECK-SAME:                           subgroup_m_count = 2
-// CHECK-SAME:                           subgroup_n_count = 2
-// CHECK-SAME:                           workgroup =  [64, 128, 0]
+// CHECK-SAME:                           reduction =  [0, 0, 2]
+// CHECK-SAME:                           subgroup = [2, 2, 0]
+// CHECK-SAME:                           workgroup =  [128, 64, 0]
 
 // -----
 
