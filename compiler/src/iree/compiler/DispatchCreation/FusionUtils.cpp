@@ -73,6 +73,11 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
 
   if (!options.fuseTruncateOps &&
       IREE::LinalgExt::isBitTruncateOp(producerOp)) {
+    // TODO(IanWood1): do this regardless of `options.fuseTruncateOps`.
+    // Never fuse truncate -> extend.
+    if (IREE::LinalgExt::isBitExtendOp(consumerOp)) {
+      return false;
+    }
     // Do not fuse with bit-truncate-like operations with their consumers
     // unless:
     //
