@@ -151,6 +151,7 @@ enable data-tiling for matmuls. There are two modes:
 
 It allows users to set the attribute in preprocessing phase or the model.
 
+<!-- markdownlint-disable -->
 <details><summary>IR dump before the pass</summary>
 
 ```mlir linenums="1" hl_lines="12-14"
@@ -202,7 +203,7 @@ util.func public @matmul_f32f32f32(%arg0: !hal.buffer_view, %arg1: !hal.buffer_v
 ```
 
 </details>
-
+<!-- markdownlint-restore -->
 
 ### SetEncodingPass (DispatchCreation)
 
@@ -235,6 +236,7 @@ to the local dispatch. However, it is very useful in the later lowering because
 IREE can fuse `iree_encoding.set_encoding` ops with producers that provide the
 information across dispatches.
 
+<!-- markdownlint-disable -->
 <details><summary>IR dump after the pass</summary>
 
 ```mlir linenums="1" hl_lines="4-15 25 26 32"
@@ -278,6 +280,7 @@ util.func public @matmul_f32f32f32(%arg0: !hal.buffer_view, %arg1: !hal.buffer_v
 ```
 
 </details>
+<!-- markdownlint-restore -->
 
 ### HoistEncodingOpsPass (DispatchCreation)
 
@@ -285,6 +288,7 @@ The pass runs local propagation locally and hoists tensor encoding ops outside
 Flow dispatch regions, so the `iree_encoding.set_encoding` ops can be fused
 within producers later on.
 
+<!-- markdownlint-disable -->
 <details><summary>IR dump after the pass</summary>
 
 ```mlir linenums="1" hl_lines="23 24"
@@ -328,6 +332,7 @@ util.func public @matmul_f32f32f32(%arg0: !hal.buffer_view, %arg1: !hal.buffer_v
 ```
 
 </details>
+<!-- markdownlint-restore -->
 
 <details><summary>Example with local propagation</summary>
 
@@ -340,6 +345,7 @@ second input operand has an encoding after propagation. Thus, there are three
 
 IR dump before the pass:
 
+<!-- markdownlint-disable -->
 ```mlir linenums="1" hl_lines="33-39"
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
@@ -440,6 +446,7 @@ util.func public @foo(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.
   util.return %6 : !hal.buffer_view
 }
 ```
+<!-- markdownlint-restore -->
 
 </details>
 
@@ -476,6 +483,7 @@ Note: the `canonicalize` is run after the pass in this example, because it makes
 IR clear. Otherwise, there are `arith.constant` ops and `tensor.dim` ops around
 `flow.tensor.encode` ops.
 
+<!-- markdownlint-disable -->
 ```mlir linenums="1" hl_lines="25-26"
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
@@ -517,6 +525,7 @@ module {
   }
 }
 ```
+<!-- markdownlint-restore -->
 
 </details>
 
@@ -542,6 +551,7 @@ they can only be executed in initialization phase today.
 
 IR dump before the pass:
 
+<!-- markdownlint-disable -->
 ```mlir linenums="1" hl_lines="26-27"
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
@@ -592,9 +602,11 @@ util.func public @foo(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.
   util.return %6 : !hal.buffer_view
 }
 ```
+<!-- markdownlint-restore -->
 
 IR dump after the pass:
 
+<!-- markdownlint-disable -->
 ```mlir linenums="1" hl_lines="27-32 37"
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip", iree.encoding.resolver = #iree_gpu.gpu_encoding_resolver<>, iree_codegen.target_info = #iree_gpu.target<arch = "gfx942", features = "", wgp = <compute =  fp64|fp32|fp16|int64|int32|int16|int8, storage =  b64|b32|b16|b8, subgroup =  shuffle|arithmetic, dot =  dp4xi8toi32, mma = [<MFMA_F32_16x16x16_BF16>, <MFMA_F32_32x32x8_BF16>, <MFMA_F32_16x16x32_F8E5M2FNUZ>, <MFMA_F32_16x16x32_F8E5M2FNUZ_F8E4M3FNUZ>, <MFMA_F32_16x16x32_F8E4M3FNUZ>, <MFMA_F32_16x16x32_F8E4M3FNUZ_F8E5M2FNUZ>, <MFMA_F32_32x32x16_F8E5M2FNUZ>, <MFMA_F32_32x32x16_F8E5M2FNUZ_F8E4M3FNUZ>, <MFMA_F32_32x32x16_F8E4M3FNUZ>, <MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ>, <MFMA_I32_16x16x32_I8>, <MFMA_I32_32x32x16_I8>, <MFMA_F64_16x16x4_F64>, <MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>, <MFMA_F32_32x32x8_F16>], subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647], max_load_instruction_bits = 128, simds_per_wgp = 4, vgpr_space_bits = 16384>>, ukernels = "none"}>
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -656,6 +668,7 @@ module attributes {stream.affinity.default = #hal.device.affinity<@__device_0>} 
   }
 }
 ```
+<!-- markdownlint-restore -->
 
 </details>
 
@@ -676,6 +689,7 @@ The host code is mostly composed of `stream.tensor.sizeof` and
   the storage buffer size that will be used to issue the allocation later on.
 * The `dispatch` op describes how we call the functions in the program.
 
+<!-- markdownlint-disable -->
 <details><summary>IR dump before the pass</summary>
 
 ```mlir linenums="1"
@@ -732,7 +746,9 @@ module attributes {stream.affinity.default = #hal.device.affinity<@__device_0>} 
 ```
 
 </details>
+<!-- markdownlint-restore -->
 
+<!-- markdownlint-disable -->
 <details><summary>IR dump after the pass</summary>
 
 ```mlir linenums="1"
@@ -804,6 +820,7 @@ module attributes {stream.affinity.default = #hal.device.affinity<@__device_0>} 
 ```
 
 </details>
+<!-- markdownlint-restore -->
 
 ### SpecializeEncodingsPass (Stream)
 
@@ -913,6 +930,7 @@ func.func @set_encoding_LHS_with_layout() attributes {
 }
 ```
 
+<!-- markdownlint-disable -->
 <details><summary>IR dump after the pass</summary>
 
 ```mlir linenums="1"
@@ -1018,6 +1036,7 @@ module attributes {stream.affinity.default = #hal.device.affinity<@__device_0>} 
 ```
 
 </details>
+<!-- markdownlint-restore -->
 
 <details><summary>Deep dive into multi-device cases</summary>
 
@@ -1038,6 +1057,7 @@ possibilities. In this case, we have to duplicate the executable with updated
 encoding, and modify the dispatch to launch proper executable based on resolved
 encoding layouts.
 
+<!-- markdownlint-disable -->
 ```mlir linenums="1" hl_lines="18 19"
 stream.executable private @ex {
   stream.executable.export public @set_encoding
@@ -1061,6 +1081,7 @@ util.func public @multi_device_set_encoding() {
   util.return
 }
 ```
+<!-- markdownlint-restore -->
 
 Thus, the SpecializeEncoding pass collects all the layout variants per
 executable, duplicate the executables with updated encodings, and update the
@@ -1072,6 +1093,7 @@ Note that the duplication does not only look at execution affinity, but also
 look at the layouts for each input operands. Because the actual layout can vary
 based on where the input operands come from.
 
+<!-- markdownlint-disable -->
 ```mlir linenums="1" hl_lines="1-7 8-12 16-21 33-38 54-59 65-68"
 #encoding = #iree_encoding.encoding<
   operand_index = 0 : index,
@@ -1144,6 +1166,7 @@ util.func public @multi_device_set_encoding() {
   util.return
 }
 ```
+<!-- markdownlint-restore -->
 
 For more examples, see the <a href="https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/Dialect/Stream/Transforms/test/specialize_encodings.mlir">lit tests</a>.
 
