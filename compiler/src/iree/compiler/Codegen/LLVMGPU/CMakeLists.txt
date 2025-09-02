@@ -67,7 +67,6 @@ iree_cc_library(
     "ConvertToLLVM.h"
     "KernelConfig.h"
     "Passes.h"
-    "ROCDLKernelConfig.h"
     "ROCDLPasses.h"
   SRCS
     "AMDGPUEmulateNarrowType.cpp"
@@ -93,10 +92,8 @@ iree_cc_library(
     "ROCDLAnnotateKernelForTranslation.cpp"
     "ROCDLBufferInstructionsOptimization.cpp"
     "ROCDLConfigureBufferInstructions.cpp"
-    "ROCDLKernelConfig.cpp"
     "ROCDLLowerExecutableTarget.cpp"
     "ROCDLPrefetching.cpp"
-    "ROCDLSelectLoweringStrategy.cpp"
     "TestLLVMGPUQueryMMAPass.cpp"
     "Verifiers.cpp"
   DEPS
