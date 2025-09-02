@@ -155,8 +155,8 @@ struct ireeGPUTargetInfo {
   MlirIdentifier arch;                // E.g., "gfx942".
   MlirAttribute subgroupSizeChoices;  // Subgroup size choices.
   MlirAttribute maxWorkgroupSizes;    // Max threads per X/Y/Z dimension.
-  int32_t maxThreadCountPerWorkgroup; // Max threads per workgroup.
-  int32_t maxWorkgroupMemoryBytes;    // Max workgroup memory.
+  int64_t maxThreadCountPerWorkgroup; // Max threads per workgroup.
+  int64_t maxWorkgroupMemoryBytes;    // Max workgroup memory.
   MlirAttribute mmaIntrinsics;        // MMA Intrinsics.
 };
 
