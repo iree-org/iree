@@ -233,10 +233,12 @@ void structDefinition(OpBuilder builder, Location location,
 }
 
 Value structMember(OpBuilder builder, Location location, Type type,
-                   StringRef memberName,
-                   TypedValue<emitc::LValueType> operand) {
-  TypedValue<emitc::LValueType> member = builder.create<emitc::MemberOp>(
-      location, emitc::LValueType::get(type), memberName, operand);
+                   StringRef memberName, TypedValue<mlir::Type> operand) {
+  TypedValue<mlir::Type> member =
+      builder
+          .create<emitc::MemberOp>(location, emitc::LValueType::get(type),
+                                   memberName, operand)
+          .getResult();
   return builder.create<emitc::LoadOp>(location, type, member).getResult();
 }
 
@@ -246,12 +248,14 @@ structMemberAddress(OpBuilder builder, Location location,
                     TypedValue<emitc::LValueType> operand) {
   auto member = builder.create<emitc::MemberOp>(location, type.getPointee(),
                                                 memberName, operand);
-  return addressOf(builder, location, member.getResult());
+  return addressOf(
+      builder, location,
+      llvm::cast<TypedValue<emitc::LValueType>>(member.getResult()));
 }
 
 void structMemberAssign(OpBuilder builder, Location location,
-                        StringRef memberName,
-                        TypedValue<emitc::LValueType> operand, Value data) {
+                        StringRef memberName, TypedValue<mlir::Type> operand,
+                        Value data) {
   Value member = builder.create<emitc::MemberOp>(
       location, emitc::LValueType::get(data.getType()), memberName, operand);
   builder.create<emitc::AssignOp>(location, member, data);
@@ -260,7 +264,7 @@ void structMemberAssign(OpBuilder builder, Location location,
 Value structPtrMember(OpBuilder builder, Location location, Type type,
                       StringRef memberName,
                       TypedValue<emitc::LValueType> operand) {
-  TypedValue<emitc::LValueType> member = builder.create<emitc::MemberOfPtrOp>(
+  TypedValue<mlir::Type> member = builder.create<emitc::MemberOfPtrOp>(
       location, emitc::LValueType::get(type), memberName, operand);
   return builder.create<emitc::LoadOp>(location, type, member).getResult();
 }
@@ -271,7 +275,9 @@ structPtrMemberAddress(OpBuilder builder, Location location,
                        TypedValue<emitc::LValueType> operand) {
   auto member = builder.create<emitc::MemberOfPtrOp>(
       location, emitc::LValueType::get(type.getPointee()), memberName, operand);
-  return addressOf(builder, location, member.getResult());
+  return addressOf(
+      builder, location,
+      llvm::cast<TypedValue<emitc::LValueType>>(member.getResult()));
 }
 
 void structPtrMemberAssign(OpBuilder builder, Location location,

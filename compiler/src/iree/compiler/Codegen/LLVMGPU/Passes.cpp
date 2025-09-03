@@ -755,6 +755,9 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
                                /*convertToDpsOptions=*/std::nullopt,
                                /*reorderStrategy=*/reorderStrategy);
 
+  // Some of the elementwise fusion can benefit from this pass.
+  funcPassManager.addPass(createRematerializeParallelOpsPass());
+
   funcPassManager.addPass(
       IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass());
 
@@ -873,56 +876,6 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
-}
-
-void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager,
-                                     bool forROCDL) {
-  tileAndDistributeToWorkgroup(
-      funcPassManager, /*useForall=*/clDistributeToWorkgroupsUsingForall);
-  funcPassManager.addPass(createRematerializeParallelOpsPass());
-  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
-  funcPassManager.addPass(createGPUTileReductionPass());
-  funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
-
-  // Linalg -> vector
-  {
-    GenericVectorizationPassOptions options;
-    options.enableVectorMasking = true;
-    options.useConfiguredVectorSizes = false;
-    options.vectorizePadding = true;
-    options.vectorizeGatherAccesses = true;
-    options.enableCleanup = false;
-    options.generateContract = false;
-    funcPassManager.addPass(createGenericVectorizationPass(options));
-    funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
-    funcPassManager.addPass(createCanonicalizerPass());
-    funcPassManager.addPass(createCSEPass());
-  }
-  funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-
-  addBufferizePasses(funcPassManager);
-
-  funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
-  funcPassManager.addPass(createOptimizeVectorTransferPass());
-  funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
-  funcPassManager.addPass(createIREELoopInvariantCodeMotionPass());
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(createForOpCanonicalizationPass());
-  funcPassManager.addPass(createCanonicalizerPass());
-
-  // vector -> simt gpu + vector
-  VectorReductionToGPUPassOptions options;
-  options.expandSubgroupReduction = !forROCDL;
-  funcPassManager.addPass(createVectorReductionToGPUPass(options));
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(affine::createLoopCoalescingPass());
-  funcPassManager.addPass(createCanonicalizerPass());
 }
 
 void addGPUSimpleDistributePassPipeline(OpPassManager &funcPassManager) {
@@ -1249,27 +1202,6 @@ void buildLLVMGPULinkingPassPipeline(OpPassManager &modulePassManager,
 // ROCDL Pass Pipelines
 //===----------------------------------------------------------------------===//
 
-static void buildROCDLCodegenConfigurationPassPipelineImpl(
-    OpPassManager &modulePassManager) {
-  {
-    FunctionLikeNest funcPassManager(modulePassManager);
-    funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
-    funcPassManager.addPass(createROCDLConfigureBufferInstructionsPass);
-    addCommonTargetExecutablePreprocessingPasses(funcPassManager);
-  }
-  modulePassManager.addPass(createMaterializeTuningSpecsPass());
-  modulePassManager.addPass(createMaterializeUserConfigsPass());
-
-  modulePassManager.addPass(createROCDLSelectLoweringStrategyPass());
-}
-
-void buildROCDLCodegenConfigurationPassPipeline(
-    OpPassManager &variantPassManager) {
-  variantPassManager.addPass(createSpecializeExportsPass());
-  OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
-  buildROCDLCodegenConfigurationPassPipelineImpl(modulePassManager);
-}
-
 void buildROCDLCodegenPassPipeline(OpPassManager &variantPassManager) {
   {
     OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
@@ -1348,13 +1280,6 @@ namespace rocdl {
 void registerCodegenROCDLPasses() {
   // Generated.
   rocdl::registerPasses();
-
-  static PassPipelineRegistration<> ROCDLConfigPipeline(
-      "iree-codegen-rocdl-configuration-pipeline",
-      "Runs pass pipeline to select a suitable lowering strategy for ROCDL",
-      [](OpPassManager &modulePassManager) {
-        buildROCDLCodegenConfigurationPassPipelineImpl(modulePassManager);
-      });
 
   static PassPipelineRegistration<> LinalgROCDLPipeline(
       "iree-codegen-linalg-to-rocdl-pipeline2",

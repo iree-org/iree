@@ -35,7 +35,6 @@ iree_lit_test_suite(
     "elementwise_pipeline.mlir"
     "extract_address_computation_gpu.mlir"
     "gpu_pipeline_data_tiling.mlir"
-    "gpu_pipeline_generalize_named_ops.mlir"
     "gpu_pipeline_relayout_ops.mlir"
     "horizontal_fusion_pipeline.mlir"
     "legalize.mlir"

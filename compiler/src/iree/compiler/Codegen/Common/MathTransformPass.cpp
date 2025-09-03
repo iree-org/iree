@@ -22,36 +22,24 @@ namespace mlir::iree_compiler {
 static void populateMathFunctionsRewritePatterns(
     RewritePatternSet &patterns,
     const std::function<bool(StringRef)> &predicate) {
-  if (predicate(math::TanOp::getOperationName())) {
-    populateExpandTanPattern(patterns);
+  llvm::SmallVector<StringRef> opNames,
+      opFullNames = {math::TanOp::getOperationName(),
+                     math::SinhOp::getOperationName(),
+                     math::CoshOp::getOperationName(),
+                     math::AsinhOp::getOperationName(),
+                     math::AcoshOp::getOperationName(),
+                     math::AtanhOp::getOperationName(),
+                     math::PowFOp::getOperationName(),
+                     math::FPowIOp::getOperationName(),
+                     math::Exp2Op::getOperationName(),
+                     math::RoundEvenOp::getOperationName()};
+  size_t prefix = math::MathDialect::getDialectNamespace().size() + 1;
+  for (auto name : opFullNames) {
+    if (predicate(name)) {
+      opNames.push_back(name.drop_front(prefix));
+    }
   }
-  if (predicate(math::SinhOp::getOperationName())) {
-    populateExpandSinhPattern(patterns);
-  }
-  if (predicate(math::CoshOp::getOperationName())) {
-    populateExpandCoshPattern(patterns);
-  }
-  if (predicate(math::AsinhOp::getOperationName())) {
-    populateExpandAsinhPattern(patterns);
-  }
-  if (predicate(math::AcoshOp::getOperationName())) {
-    populateExpandAcoshPattern(patterns);
-  }
-  if (predicate(math::AtanhOp::getOperationName())) {
-    populateExpandAtanhPattern(patterns);
-  }
-  if (predicate(math::PowFOp::getOperationName())) {
-    populateExpandPowFPattern(patterns);
-  }
-  if (predicate(math::FPowIOp::getOperationName())) {
-    populateExpandFPowIPattern(patterns);
-  }
-  if (predicate(math::Exp2Op::getOperationName())) {
-    populateExpandExp2FPattern(patterns);
-  }
-  if (predicate(math::RoundEvenOp::getOperationName())) {
-    populateExpandRoundEvenPattern(patterns);
-  }
+  math::populateExpansionPatterns(patterns, opNames);
 }
 
 static bool predicateRewrite(StringRef name,
