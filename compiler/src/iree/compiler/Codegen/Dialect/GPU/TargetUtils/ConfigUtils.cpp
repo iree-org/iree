@@ -376,6 +376,8 @@ static std::optional<ArrayAttr> getPaddingConvSizes(
   SetVector<int64_t> inputChannelDims(convDims->inputChannel.begin(),
                                       convDims->inputChannel.end());
   SmallVector<int64_t> paddingConvSizes(convToIgemmMap.size(), 0);
+  bool isChannelFirst =
+      convDims->inputChannel.back() < convDims->filterLoop.front();
   for (auto [convDim, IGEMMExpr] : convToIgemmMap) {
     auto IGEMMDimExpr = cast<AffineDimExpr>(IGEMMExpr);
     unsigned IGEMMPos = IGEMMDimExpr.getPosition();
@@ -391,8 +393,9 @@ static std::optional<ArrayAttr> getPaddingConvSizes(
       // Only pad input channel dims. If we need to pad filter dims, then we
       // would rather just do padding on the GEMM instead.
       if (inputChannelDims.contains(convDim)) {
-        // Multiple input channel dims for a single IGEMMPos is not supported.
-        if (paddedIGEMMDims.contains(IGEMMPos)) {
+        // `CHW` layout or multiple input channel dims for a single IGEMMPos is
+        // not supported.
+        if (isChannelFirst || paddedIGEMMDims.contains(IGEMMPos)) {
           return std::nullopt;
         }
         paddingConvSizes[convDim] = paddingSizes[IGEMMPos];

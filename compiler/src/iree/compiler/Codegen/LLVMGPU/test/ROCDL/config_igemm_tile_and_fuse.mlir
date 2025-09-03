@@ -299,3 +299,24 @@ module {
 // MI300X-SAME:     workgroup = [1, 2, 32, 32, 0]
 
 // PAD-CONV-GFX942:     padding_conv = [2, 2, 32, 64, 0, 0]
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d1 + d5 * 2, d2 + d6 * 2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d0)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+func.func @conv_chwn_chwf_no_pad_conv(%arg0: tensor<2x192x128x40xbf16>, %arg1: tensor<2x95x63x40xbf16>, %arg2: tensor<40x3x3x40xf32>) -> tensor<40x3x3x40xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<2x192x128x40xbf16>, tensor<2x95x63x40xbf16>) outs(%arg2 : tensor<40x3x3x40xf32>) {
+  ^bb0(%in: bf16, %in_0: bf16, %out: f32):
+    %1 = arith.extf %in : bf16 to f32
+    %2 = arith.extf %in_0 : bf16 to f32
+    %3 = arith.mulf %1, %2 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<40x3x3x40xf32>
+  return %0 : tensor<40x3x3x40xf32>
+}
+
+//         CHECK-LABEL:  func.func @conv_chwn_chwf_no_pad_conv
+//     PAD-CONV-GFX942:     padding = [16, 1, 1, 16, 16]
+// PAD-CONV-GFX942-NOT:     padding_conv
