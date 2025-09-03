@@ -593,5 +593,5 @@ def gpu_target_info_constructor_error_cases():
             mma_intrinsics=[123],  # should be MMA intrinsic objects.
         )
         assert False, "Expected TypeError for wrong MMA intrinsic object type"
-    except AttributeError:
+    except TypeError:
         pass

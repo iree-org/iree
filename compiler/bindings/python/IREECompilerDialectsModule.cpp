@@ -515,11 +515,22 @@ NB_MODULE(_ireeCompilerDialects, m) {
           [](ireeGPUTargetInfo *self, MlirContext context,
              const std::string &arch,
              const std::vector<int32_t> &subgroupChoices,
-             const std::vector<int32_t> &workgroupSizes, int64_t threadCount,
-             int64_t memoryBytes, const py::list &mmaIntrinsicObjs) {
-            std::vector<int32_t> mmaIntrinsicVals;
+             const std::vector<int32_t> &workgroupSizes, int32_t threadCount,
+             int32_t memoryBytes, const py::list &mmaIntrinsicObjs) {
+            std::vector<mma_intrinsic_t> mmaIntrinsicVals;
+            py::module_ gpuModule = py::module_::import_(kGpuModuleImportPath);
+            py::object mmaIntrinsicClass = gpuModule.attr("MMAIntrinsic");
+            py::object virtualMmaIntrinsicClass =
+                gpuModule.attr("VirtualMMAIntrinsic");
+
             for (auto item : mmaIntrinsicObjs) {
-              int32_t enumValue = py::cast<int32_t>(item.attr("value"));
+              if (!py::isinstance(item, mmaIntrinsicClass) &&
+                  !py::isinstance(item, virtualMmaIntrinsicClass)) {
+                throw py::type_error("All items must be MMAIntrinsic or "
+                                     "VirtualMMAIntrinsic objects");
+              }
+              mma_intrinsic_t enumValue =
+                  py::cast<mma_intrinsic_t>(item.attr("value"));
               mmaIntrinsicVals.push_back(enumValue);
             }
 
@@ -534,11 +545,7 @@ NB_MODULE(_ireeCompilerDialects, m) {
           "max_workgroup_memory_bytes"_a, "mma_intrinsics"_a = py::list{},
           "Create a GPUTargetInfo with the given parameters")
       .def_static(
-          "get_gpu_target_info",
-          [](MlirAttribute executable_target_attr) -> ireeGPUTargetInfo {
-            return ireeHALExecutableTargetAttrGetGPUTargetInfo(
-                executable_target_attr);
-          },
+          "get_gpu_target_info", &ireeHALExecutableTargetAttrGetGPUTargetInfo,
           "executable_target_attr"_a,
           "Get GPU target information from an executable target attribute")
       .def_prop_ro("arch",
@@ -564,44 +571,32 @@ NB_MODULE(_ireeCompilerDialects, m) {
                    })
       .def_prop_ro(
           "mma_intrinsics", [](const ireeGPUTargetInfo &self) -> py::list {
-            if (mlirAttributeIsNull(self.mmaIntrinsics)) {
-              return py::list();
-            }
-            size_t numElements =
-                mlirArrayAttrGetNumElements(self.mmaIntrinsics);
-            if (numElements == 0) {
-              return py::list();
-            }
+            ireeGPUMMAIntrinsicResult result =
+                ireeGPUTargetInfoGetMMAIntrinsics(self.mmaIntrinsics);
 
-            py::list result;
+            if (!result.mmaIntrinsicVals) {
+              return py::list();
+            }
+            py::list intrinsics;
             py::module_ gpuModule = py::module_::import_(kGpuModuleImportPath);
             py::object mmaIntrinsicEnum = gpuModule.attr("MMAIntrinsic");
             py::object virtualMmaIntrinsicEnum =
                 gpuModule.attr("VirtualMMAIntrinsic");
-            for (size_t i = 0; i < numElements; i++) {
-              MlirAttribute element =
-                  mlirArrayAttrGetElement(self.mmaIntrinsics, i);
 
-              if (ireeAttributeIsAGPUMMAIntrinsicAttr(element)) {
-                uint32_t value = ireeGPUMMAIntrinsicAttrGetValue(element);
-                py::object mmaIntrinsic = mmaIntrinsicEnum(value);
-                result.append(mmaIntrinsic);
-                continue;
+            for (size_t i = 0; i < result.numMmaIntrinsics; i++) {
+              if (result.isVirtual[i]) {
+                py::object virtualMmaIntrinsic =
+                    virtualMmaIntrinsicEnum(result.mmaIntrinsicVals[i]);
+                intrinsics.append(virtualMmaIntrinsic);
+              } else {
+                py::object mmaIntrinsic =
+                    mmaIntrinsicEnum(result.mmaIntrinsicVals[i]);
+                intrinsics.append(mmaIntrinsic);
               }
-
-              if (ireeAttributeIsAGPUVirtualMMAIntrinsicAttr(element)) {
-                uint32_t value =
-                    ireeGPUVirtualMMAIntrinsicAttrGetValue(element);
-                py::object virtualMmaIntrinsic = virtualMmaIntrinsicEnum(value);
-                result.append(virtualMmaIntrinsic);
-                continue;
-              }
-
-              assert(false &&
-                     "Unexpected attribute type in MMA intrinsics array");
             }
 
-            return result;
+            ireeGPUTargetInfoFreeMMAIntrinsics(&result);
+            return intrinsics;
           });
 
   //===-------------------------------------------------------------------===//

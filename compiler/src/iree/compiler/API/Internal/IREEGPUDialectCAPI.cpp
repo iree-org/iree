@@ -159,32 +159,33 @@ static_assert(
                        mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic>>,
     "Enum type changed");
 
-MlirAttribute ireeGPUMMAIntrinsicAttrGet(MlirContext mlirCtx, uint32_t value) {
+MlirAttribute ireeGPUMMAIntrinsicAttrGet(MlirContext mlirCtx,
+                                         mma_intrinsic_t value) {
   mlir::MLIRContext *ctx = unwrap(mlirCtx);
   return wrap(mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr::get(
       ctx, static_cast<mlir::iree_compiler::IREE::GPU::MMAIntrinsic>(value)));
 }
 
 MlirAttribute ireeGPUVirtualMMAIntrinsicAttrGet(MlirContext mlirCtx,
-                                                uint32_t value) {
+                                                mma_intrinsic_t value) {
   mlir::MLIRContext *ctx = unwrap(mlirCtx);
   return wrap(mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsicAttr::get(
       ctx,
       static_cast<mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic>(value)));
 }
 
-uint32_t ireeGPUMMAIntrinsicAttrGetValue(MlirAttribute attr) {
+mma_intrinsic_t ireeGPUMMAIntrinsicAttrGetValue(MlirAttribute attr) {
   assert(ireeAttributeIsAGPUMMAIntrinsicAttr(attr) &&
          "attr is not a GPUMMAIntrinsicAttr");
-  return static_cast<uint32_t>(
+  return static_cast<mma_intrinsic_t>(
       llvm::cast<mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr>(unwrap(attr))
           .getValue());
 }
 
-uint32_t ireeGPUVirtualMMAIntrinsicAttrGetValue(MlirAttribute attr) {
+mma_intrinsic_t ireeGPUVirtualMMAIntrinsicAttrGetValue(MlirAttribute attr) {
   assert(ireeAttributeIsAGPUVirtualMMAIntrinsicAttr(attr) &&
          "attr is not a GPUVirtualMMAIntrinsicAttr");
-  return static_cast<uint32_t>(
+  return static_cast<mma_intrinsic_t>(
       llvm::cast<mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsicAttr>(
           unwrap(attr))
           .getValue());
@@ -207,13 +208,14 @@ MlirTypeID ireeGPUVirtualMMAAttrGetTypeID() {
   return wrap(mlir::iree_compiler::IREE::GPU::VirtualMMAAttr::getTypeID());
 }
 
-MlirAttribute ireeGPUMMAAttrGet(MlirContext mlirCtx, uint32_t value) {
+MlirAttribute ireeGPUMMAAttrGet(MlirContext mlirCtx, mma_intrinsic_t value) {
   mlir::MLIRContext *ctx = unwrap(mlirCtx);
   return wrap(mlir::iree_compiler::IREE::GPU::MMAAttr::get(
       ctx, static_cast<mlir::iree_compiler::IREE::GPU::MMAIntrinsic>(value)));
 }
 
-MlirAttribute ireeGPUVirtualMMAAttrGet(MlirContext mlirCtx, uint32_t value) {
+MlirAttribute ireeGPUVirtualMMAAttrGet(MlirContext mlirCtx,
+                                       mma_intrinsic_t value) {
   mlir::MLIRContext *ctx = unwrap(mlirCtx);
   return wrap(mlir::iree_compiler::IREE::GPU::VirtualMMAAttr::get(
       ctx,
@@ -446,12 +448,11 @@ ireeHALExecutableTargetAttrGetGPUTargetInfo(MlirAttribute attr) {
   return targetInfo;
 }
 
-ireeGPUTargetInfo
-ireeGPUTargetInfoGet(MlirContext mlirCtx, const char *arch,
-                     const int32_t *subgroupChoices, size_t numSubgroupChoices,
-                     const int32_t *workgroupSizes, size_t numWorkgroupSizes,
-                     int64_t threadCount, int64_t memoryBytes,
-                     const int32_t *mmaIntrinsics, size_t numMmaIntrinsics) {
+ireeGPUTargetInfo ireeGPUTargetInfoGet(
+    MlirContext mlirCtx, const char *arch, const int32_t *subgroupChoices,
+    size_t numSubgroupChoices, const int32_t *workgroupSizes,
+    size_t numWorkgroupSizes, int32_t threadCount, int32_t memoryBytes,
+    const mma_intrinsic_t *mmaIntrinsics, size_t numMmaIntrinsics) {
   assert(!mlirContextIsNull(mlirCtx) && "mlirCtx cannot be null");
   assert(arch && "arch cannot be null");
 
@@ -473,42 +474,85 @@ ireeGPUTargetInfoGet(MlirContext mlirCtx, const char *arch,
   targetInfo.maxThreadCountPerWorkgroup = threadCount;
   targetInfo.maxWorkgroupMemoryBytes = memoryBytes;
 
-  if (numMmaIntrinsics == 0) {
-    targetInfo.mmaIntrinsics = wrap(builder.getArrayAttr({}));
-  } else {
-    std::vector<mlir::Attribute> mmaIntrinsicAttrs;
-    mmaIntrinsicAttrs.reserve(numMmaIntrinsics);
-    for (size_t i = 0; i < numMmaIntrinsics; i++) {
-      int32_t enumValue = mmaIntrinsics[i];
+  std::vector<mlir::Attribute> mmaIntrinsicAttrs;
+  mmaIntrinsicAttrs.reserve(numMmaIntrinsics);
+  for (size_t i = 0; i < numMmaIntrinsics; i++) {
+    mma_intrinsic_t enumValue = mmaIntrinsics[i];
 
-      std::optional<mlir::iree_compiler::IREE::GPU::MMAIntrinsic> mmaIntrinsic =
-          mlir::iree_compiler::IREE::GPU::symbolizeMMAIntrinsic(enumValue);
-      if (mmaIntrinsic) {
-        auto mmaIntrinsicAttr =
-            mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr::get(
-                context, *mmaIntrinsic);
-        mmaIntrinsicAttrs.push_back(mmaIntrinsicAttr);
-        continue;
-      }
-
-      std::optional<mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic>
-          virtualMmaIntrinsic =
-              mlir::iree_compiler::IREE::GPU::symbolizeVirtualMMAIntrinsic(
-                  enumValue);
-      if (virtualMmaIntrinsic) {
-        auto virtualMmaIntrinsicAttr =
-            mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsicAttr::get(
-                context, *virtualMmaIntrinsic);
-        mmaIntrinsicAttrs.push_back(virtualMmaIntrinsicAttr);
-        continue;
-      }
-
-      assert(false &&
-             ("Invalid MMA intrinsic value: " + std::to_string(enumValue))
-                 .c_str());
+    std::optional<mlir::iree_compiler::IREE::GPU::MMAIntrinsic> mmaIntrinsic =
+        mlir::iree_compiler::IREE::GPU::symbolizeMMAIntrinsic(enumValue);
+    if (mmaIntrinsic) {
+      auto mmaIntrinsicAttr =
+          mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr::get(context,
+                                                                *mmaIntrinsic);
+      mmaIntrinsicAttrs.push_back(mmaIntrinsicAttr);
+      continue;
     }
-    targetInfo.mmaIntrinsics = wrap(builder.getArrayAttr(mmaIntrinsicAttrs));
+
+    std::optional<mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic>
+        virtualMmaIntrinsic =
+            mlir::iree_compiler::IREE::GPU::symbolizeVirtualMMAIntrinsic(
+                enumValue);
+    if (virtualMmaIntrinsic) {
+      auto virtualMmaIntrinsicAttr =
+          mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsicAttr::get(
+              context, *virtualMmaIntrinsic);
+      mmaIntrinsicAttrs.push_back(virtualMmaIntrinsicAttr);
+      continue;
+    }
+
+    assert(
+        false &&
+        ("Invalid MMA intrinsic value: " + std::to_string(enumValue)).c_str());
   }
+  targetInfo.mmaIntrinsics = wrap(builder.getArrayAttr(mmaIntrinsicAttrs));
 
   return targetInfo;
+}
+
+ireeGPUMMAIntrinsicResult
+ireeGPUTargetInfoGetMMAIntrinsics(MlirAttribute mmaIntrinsics) {
+  ireeGPUMMAIntrinsicResult result = {NULL, NULL, 0};
+  if (mlirAttributeIsNull(mmaIntrinsics) ||
+      !mlirAttributeIsAArray(mmaIntrinsics)) {
+    return result;
+  }
+
+  size_t numElements = mlirArrayAttrGetNumElements(mmaIntrinsics);
+  if (numElements == 0) {
+    return result;
+  }
+
+  result.mmaIntrinsicVals =
+      (mma_intrinsic_t *)malloc(numElements * sizeof(mma_intrinsic_t));
+  result.isVirtual = (bool *)malloc(numElements * sizeof(bool));
+  result.numMmaIntrinsics = numElements;
+
+  for (size_t i = 0; i < numElements; i++) {
+    MlirAttribute element = mlirArrayAttrGetElement(mmaIntrinsics, i);
+    if (ireeAttributeIsAGPUMMAIntrinsicAttr(element)) {
+      result.mmaIntrinsicVals[i] = ireeGPUMMAIntrinsicAttrGetValue(element);
+      result.isVirtual[i] = false;
+    } else if (ireeAttributeIsAGPUVirtualMMAIntrinsicAttr(element)) {
+      result.mmaIntrinsicVals[i] =
+          ireeGPUVirtualMMAIntrinsicAttrGetValue(element);
+      result.isVirtual[i] = true;
+    } else {
+      assert(false && "Unexpected attribute type in MMA intrinsics array");
+    }
+  }
+
+  return result;
+}
+
+void ireeGPUTargetInfoFreeMMAIntrinsics(ireeGPUMMAIntrinsicResult *result) {
+  if (result) {
+    if (result->mmaIntrinsicVals)
+      free(result->mmaIntrinsicVals);
+    if (result->isVirtual)
+      free(result->isVirtual);
+    result->mmaIntrinsicVals = NULL;
+    result->isVirtual = NULL;
+    result->numMmaIntrinsics = 0;
+  }
 }
