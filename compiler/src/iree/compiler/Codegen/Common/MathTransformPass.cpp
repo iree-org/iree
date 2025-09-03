@@ -22,26 +22,24 @@ namespace mlir::iree_compiler {
 static void populateMathFunctionsRewritePatterns(
     RewritePatternSet &patterns,
     const std::function<bool(StringRef)> &predicate) {
-  llvm::SmallVector<StringRef> opMnemonics = {
-    math::TanOp::getOperationName(),
-    math::SinhOp::getOperationName(),
-    math::CoshOp::getOperationName(),
-    math::AsinhOp::getOperationName(),
-    math::AcoshOp::getOperationName(),
-    math::AtanhOp::getOperationName(),
-    math::PowFOp::getOperationName(),
-    math::FPowIOp::getOperationName(),
-    math::Exp2Op::getOperationName(),
-    math::RoundEvenOp::getOperationName()
-  };
-  for (auto it = opMnemonics.begin(); it != opMnemonics.end(); ) {
-    if (!predicate(*it)) {
-      it = opMnemonics.erase(it);
-    } else {
-      ++it;
+  llvm::SmallVector<StringRef> opNames,
+      opFullNames = {math::TanOp::getOperationName(),
+                     math::SinhOp::getOperationName(),
+                     math::CoshOp::getOperationName(),
+                     math::AsinhOp::getOperationName(),
+                     math::AcoshOp::getOperationName(),
+                     math::AtanhOp::getOperationName(),
+                     math::PowFOp::getOperationName(),
+                     math::FPowIOp::getOperationName(),
+                     math::Exp2Op::getOperationName(),
+                     math::RoundEvenOp::getOperationName()};
+  size_t prefix = math::MathDialect::getDialectNamespace().size() + 1;
+  for (auto name : opFullNames) {
+    if (predicate(name)) {
+      opNames.push_back(name.drop_front(prefix));
     }
   }
-  math::populateExpansionPatterns(patterns, opMnemonics);
+  math::populateExpansionPatterns(patterns, opNames);
 }
 
 static bool predicateRewrite(StringRef name,

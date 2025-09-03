@@ -2282,14 +2282,14 @@ private:
     auto ctx = builder.getContext();
 
     // byteSpan = call.<memberName>;
-    TypedValue<mlir::Type> byteSpan = builder
-                        .create<emitc::MemberOp>(
-                            loc,
-                            emitc::LValueType::get(emitc::OpaqueType::get(
-                                ctx, "iree_byte_span_t")),
-                            memberName, call)
-                        .getResult();
-    // assert(isa<TypedValue<emitc::LValueType>>(byteSpan) )
+    TypedValue<mlir::Type> byteSpan =
+        builder
+            .create<emitc::MemberOp>(
+                loc,
+                emitc::LValueType::get(
+                    emitc::OpaqueType::get(ctx, "iree_byte_span_t")),
+                memberName, call)
+            .getResult();
 
     // alloca_(0) returns NULL in some configurations on Windows. Make sure to
     // allocate at least one byte to get a valid pointer.
@@ -2507,8 +2507,8 @@ private:
         emitc::LValueType::get(emitc::PointerType::get(
             emitc::OpaqueType::get(ctx, "iree_vm_module_t"))),
         /*memberName=*/"module",
-        /*operand=*/import).getResult();
-    auto importModule = dyn_cast<TypedValue<emitc::LValueType>>(im);
+        /*operand=*/import);
+    auto importModule = dyn_cast<TypedValue<emitc::LValueType>>(im.getResult());
     if (!importModule) {
       return failure();
     }
