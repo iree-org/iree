@@ -11,6 +11,7 @@ include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/DestinationStyleOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
@@ -247,6 +248,91 @@ def IREEGPU_GlobalLoadDMAOp : Op<IREEGPU_Dialect, "global_load_dma", [
   let assemblyFormat = [{
     $source`[` $sourceIndices `]` `->` $target `[` $targetIndices `]` attr-dict
       `:` type($source) `->` type($target)
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// CoalescedGatherDMAOp
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
+    DeclareOpInterfaceMethods<DestinationStyleOpInterface>]> {
+  let summary = "Coalesced gather DMA operation for efficient GPU memory access";
+  let description = [{
+    Performs a coalesced gather operation that reads elements from a source tensor
+    based on indices and writes them to a destination tensor. This operation is
+    designed to maximize memory bandwidth utilization on GPU hardware through
+    coalesced memory access patterns. Conceptually:
+
+    for %dim_indices in dimension($init):
+      $result[%index] = $source[$indices[%dim_index]]
+
+    The operation is specifically designed for subgroup-level parallelism, where
+    threads within a subgroup cooperatively gather data with coalesced memory
+    accesses. It must be nested inside an `scf.forall` operation that distributes
+    work across subgroups.
+
+    ## Lowering Paths
+
+    Two lowering strategies are supported:
+    1. Lowers to `amdgpu.gather_to_lds` operations when lowering
+       requirements are met
+    2. Default lowering using `vector.gather` operations
+
+    ## Operands and Results
+
+    * `$indices`: Tensor of i32 indices specifying gather locations in the source tensor
+    * `$source`: Source tensor containing the data to be gathered
+    * `$init`: Destination tensor receiving the gathered data (destination-passing style)
+    * `$result`: Output tensor with gathered data (same type as `$init`)
+
+    ## Restrictions
+
+    * Must be nested inside an `scf.forall` operation to
+       coordinate parallel execution across subgroups
+    * Indices tensor must have `i32` element type
+    * Size ratio: The ratio of destination tensor byte size to number of indices
+       must be 1, 2, or 4 for proper memory alignment and coalescing:
+       ```
+       (num_dest_elements x bytes_per_element) / num_indices_elements ∈ {1, 2, 4}
+       ```
+
+    ## Example
+
+    ```mlir
+    %result = scf.forall (%i) in (%c1) shared_outs(%out = %dest) -> (tensor<64x32xf32>) {
+      // Gather 64x32 elements from source based on indices
+      // Size ratio: (64x32x4 bytes) / (64x32 indices) = 4
+      %gathered = iree_gpu.coalesced_gather_dma %indices, %source into %out
+        : tensor<64x32xi32>, tensor<1024x64xf32>, tensor<64x32xf32> -> tensor<64x32xf32>
+      scf.forall.in_parallel {
+        tensor.parallel_insert_slice %gathered into %out[0, 0] [64, 32] [1, 1]
+          : tensor<64x32xf32> into tensor<64x32xf32>
+      }
+    }
+    ```
+  }];
+
+  let arguments = (ins
+    AnyRankedTensor:$indices,
+    AnyRankedTensor:$source,
+    AnyRankedTensor:$init
+  );
+
+  let results = (outs AnyRankedTensor:$result);
+
+  let assemblyFormat = [{
+    $indices `,` $source `into` $init attr-dict
+    `:` type($indices) `,` type($source) `,` type($init) `->` type($result)
+  }];
+
+  let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    // Get the rank of the result tensor
+    unsigned getResultRank() {
+      return ::llvm::cast<RankedTensorType>(getResult().getType()).getRank();
+    }
   }];
 }
 

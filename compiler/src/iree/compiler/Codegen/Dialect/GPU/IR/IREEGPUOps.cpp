@@ -7,11 +7,14 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/Interfaces/DestinationStyleOpInterface.h"
 #include "mlir/Support/LLVM.h"
 
 // clang-format off
@@ -177,6 +180,88 @@ struct FoldBufferCastOfTensorCast final
 void BufferResourceCastOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *ctx) {
   results.add<FoldBufferCastOfTensorCast>(ctx);
+}
+
+//===----------------------------------------------------------------------===//
+// CoalescedGatherDMAOp
+//===----------------------------------------------------------------------===//
+
+// DestinationStyleOpInterface implementation
+MutableOperandRange CoalescedGatherDMAOp::getDpsInitsMutable() {
+  return getInitMutable();
+}
+
+LogicalResult CoalescedGatherDMAOp::verify() {
+  // Verify that this op must be inside a scf.forall op
+  Operation *parent = (*this)->getParentOp();
+  bool insideForall = false;
+  while (parent) {
+    if (isa<scf::ForallOp>(parent)) {
+      insideForall = true;
+      break;
+    }
+    parent = parent->getParentOp();
+  }
+  if (!insideForall) {
+    return emitOpError("must be nested inside an scf.forall operation");
+  }
+
+  // Indices and source tensors have compatible types
+  auto indicesType = cast<RankedTensorType>(getIndices().getType());
+  auto initType = cast<RankedTensorType>(getInit().getType());
+  auto resultType = cast<RankedTensorType>(getResult().getType());
+
+  // Indices must be of i32 data type
+  auto indicesElementType = indicesType.getElementType();
+  if (!indicesElementType.isInteger(32)) {
+    return emitOpError("indices must have i32 element type");
+  }
+
+  if (initType != resultType) {
+    return emitOpError("init and result types must match");
+  }
+
+  // Size constraints between indices and init tensors
+  // Calculate the number of elements in each tensor
+  // Skip dynamic shape verification at compile time
+  int64_t indicesNumElements = 1;
+  for (int64_t dim : indicesType.getShape()) {
+    if (dim == ShapedType::kDynamic) {
+      break;
+    }
+    indicesNumElements *= dim;
+  }
+
+  int64_t initNumElements = 1;
+  for (int64_t dim : initType.getShape()) {
+    if (dim == ShapedType::kDynamic) {
+      break;
+    }
+    initNumElements *= dim;
+  }
+
+  auto initElementType = initType.getElementType();
+  unsigned initElementByteSize = initElementType.getIntOrFloatBitWidth() / 8;
+
+  int64_t initTotalBytes = initNumElements * initElementByteSize;
+
+  if (initTotalBytes % indicesNumElements != 0) {
+    return emitOpError() << "the total byte size of init (" << initTotalBytes
+                         << " = " << initNumElements << " elements * "
+                         << initElementByteSize
+                         << " bytes/element) must be divisible by "
+                         << "the number of indices elements ("
+                         << indicesNumElements << ")";
+  }
+
+  // The division result must be 1, 2, or 4
+  int64_t ratio = initTotalBytes / indicesNumElements;
+  if (ratio != 1 && ratio != 2 && ratio != 4) {
+    return emitOpError() << "the ratio of init bytes to indices elements ("
+                         << ratio << ") must be 1, 2, or 4";
+  }
+
+  return success();
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU
