@@ -86,6 +86,14 @@ tileRootAndFuseProducerConsumer(IRRewriter &rewriter, TilingInterface rootOp,
 
   llvm::DenseSet<Operation *> yieldReplacementsFor;
   for (auto op : tiledAndFusedOps) {
+    // Fusion would clone the producer into the new loop op, which may lead to
+    // invalid dominance property.
+    bool isSameParent = llvm::all_of(op->getUsers(), [&](Operation *user) {
+      return user->getParentOp() == rootOp->getParentOp();
+    });
+    if (!isSameParent) {
+      continue;
+    }
     // If an op result is used after `rootOp`, yield a replacement---unless the
     // op using the result will also later be fused.
     // For example:
