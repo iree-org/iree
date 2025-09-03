@@ -2,7 +2,8 @@
   "config_name": "gpu_cuda_t4",
   "iree_compile_flags": [
     "--iree-hal-target-device=cuda",
-    "--iree-input-demote-f64-to-f32=false"
+    "--iree-input-demote-f64-to-f32=false",
+    "--iree-opt-level=O0"
   ],
   "iree_run_module_flags": [
     "--device=cuda"
