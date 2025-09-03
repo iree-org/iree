@@ -145,13 +145,8 @@ getProducerDispatchValueAndOpChain(Value operand) {
 
   auto producerDispatch =
       dyn_cast<IREE::Flow::DispatchRegionOp>(producerValue.getOwner());
-  // TODO(MaheshRavishankar): Multi-result producer dispatches can be supported.
-  // Will require to move the consumer dispatch immediately after the producer
-  // instead of what is done below and move other operands of the consumer
-  // dispatch before the producer dispatch.
   if (!producerDispatch ||
-      !llvm::hasSingleElement(producerDispatch.getBody()) ||
-      producerDispatch->getNumResults() != 1) {
+      !llvm::hasSingleElement(producerDispatch.getBody())) {
     return std::nullopt;
   }
   if (!llvm::hasSingleElement(producerValue.getUses())) {

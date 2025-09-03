@@ -392,16 +392,24 @@ static SmallVector<unsigned> getOperandsToPad(Operation *op) {
     OpOperand &operand = op->getOpOperand(operandNum);
     std::optional<std::pair<OpResult, SmallVector<Operation *>>>
         dispatchAndOpChain = getProducerDispatchValueAndOpChain(operand.get());
-    if (dispatchAndOpChain.has_value()) {
-      auto producerDispatch = cast<IREE::Flow::DispatchRegionOp>(
-          dispatchAndOpChain->first.getOwner());
-      WalkResult res =
-          producerDispatch->walk([&](IREE::LinalgExt::AttentionOp op) {
-            return WalkResult::interrupt();
-          });
-      if (res.wasInterrupted()) {
-        return {};
-      }
+    if (!dispatchAndOpChain.has_value()) {
+      continue;
+    }
+    auto producerDispatch = cast<IREE::Flow::DispatchRegionOp>(
+        dispatchAndOpChain->first.getOwner());
+    // TODO(MaheshRavishankar): Multi-result producer dispatches can be
+    // supported. Will require to move the consumer dispatch immediately after
+    // the producer instead of what is done below and move other operands of the
+    // consumer dispatch before the producer dispatch.
+    if (producerDispatch->getNumResults() != 1) {
+      continue;
+    }
+    WalkResult res =
+        producerDispatch->walk([&](IREE::LinalgExt::AttentionOp op) {
+          return WalkResult::interrupt();
+        });
+    if (res.wasInterrupted()) {
+      return {};
     }
   }
 
