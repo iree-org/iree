@@ -87,9 +87,9 @@ getDataTilingCandidates(FunctionOpInterface funcOp) {
   return result;
 }
 
-/// Contains the invariant information across operands for the Generic encoding.
-/// The operand number is not included because it is not invariant across
-/// operands.
+/// Contains the invariant information across operands for the
+/// iree_encoding.encoding. The operand number is not included because
+/// it is not invariant across operands.
 struct GenericEncodingCommonInfo {
   IREE::Encoding::EncodingOpType opType;
   SmallVector<Type> elemTypes;
