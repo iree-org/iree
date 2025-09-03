@@ -1049,12 +1049,17 @@ void ConvertToLLVMPass::runOnOperation() {
   if (use32BitImpl) {
     patterns.add<ExpandMulSIExtended>(patterns.getContext(), /*benefit=*/1024);
   }
-
+  auto populateTanhPatterns = [](RewritePatternSet &p) {
+    StringRef fname = math::TanhOp::getOperationName();
+    size_t prefix = math::MathDialect::getDialectNamespace().size() + 1;
+    StringRef opName = fname.drop_front(prefix);
+    math::populateExpansionPatterns(p, /*OpMnemonics=*/{opName});
+  };
   LLVMConversionTarget target(getContext());
   populateAffineToStdConversionPatterns(patterns);
   populateSCFToControlFlowConversionPatterns(patterns);
   cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
-  populateExpandTanhPattern(patterns);
+  populateTanhPatterns(patterns);
 
   populateComplexToLLVMConversionPatterns(typeConverter, patterns);
   populateMathToLLVMConversionPatterns(typeConverter, patterns);

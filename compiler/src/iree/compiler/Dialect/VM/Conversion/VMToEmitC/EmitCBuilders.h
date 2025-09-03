@@ -103,7 +103,7 @@ void structDefinition(OpBuilder builder, Location location,
                       StringRef structName, ArrayRef<StructField> fields);
 
 Value structMember(OpBuilder builder, Location location, Type type,
-                   StringRef memberName, TypedValue<emitc::LValueType> operand);
+                   StringRef memberName, TypedValue<mlir::Type> operand);
 
 TypedValue<emitc::PointerType>
 structMemberAddress(OpBuilder builder, Location location,
@@ -111,8 +111,8 @@ structMemberAddress(OpBuilder builder, Location location,
                     TypedValue<emitc::LValueType> operand);
 
 void structMemberAssign(OpBuilder builder, Location location,
-                        StringRef memberName,
-                        TypedValue<emitc::LValueType> operand, Value data);
+                        StringRef memberName, TypedValue<mlir::Type> operand,
+                        Value data);
 
 Value structPtrMember(OpBuilder builder, Location location, Type type,
                       StringRef memberName,
