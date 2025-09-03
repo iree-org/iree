@@ -210,18 +210,6 @@ static bool verifyComputeOpsAfterDistribution(FunctionOpInterface funcOp) {
 // Pass implementation.
 //===---------------------------------------------------------------------===//
 
-/// Returns true if any value produced by `producer` is used as an init value
-/// for the DPS `user`. Returns false if the user is not in DPS.
-static bool isUsedAsInit(Operation *producer, Operation *user) {
-  auto dpsIface = dyn_cast<DestinationStyleOpInterface>(user);
-  if (!dpsIface)
-    return false;
-  ValueRange results = producer->getResults();
-  return llvm::any_of(dpsIface.getDpsInits(), [&](Value operand) {
-    return llvm::is_contained(results, operand);
-  });
-}
-
 void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   auto funcOp = getOperation();
   auto *context = &getContext();
@@ -244,14 +232,10 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
 
   llvm::DenseSet<Operation *> yieldReplacementsFor;
   for (auto op : tiledAndFusedOps) {
-    // Require replacement for values that are used after the main tilable op or
-    // by ops that will definitely not be fused. Note that if a value is used as
-    // an init of a DPS op, the user currently cannot be fused. Having a
-    // replacement for it would attempt fusion and fail, so avoid such cases.
+    // If tiledAndFused ops doesn't contain the user; add an replacement
+    // for that.
     if (llvm::any_of(op->getUsers(), [&](Operation *user) {
-          if (isUsedAsInit(op, user))
-            return false;
-          return dominanceInfo.properlyDominates(tilableOp, user) ||
+          return dominanceInfo.properlyDominates(tilableOp, user) &&
                  !tiledAndFusedOps.contains(user);
         })) {
       yieldReplacementsFor.insert(op);
@@ -333,18 +317,16 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
       });
     }
     std::swap(tileAndFuseResult->loops, tilingLoops);
-
+    Operation *rootTiledOp = tileAndFuseResult->tiledAndFusedOps.front();
     FailureOr<std::queue<Operation *>> newFusionOpportunities =
-        fuseConsumersIntoForall(
-            rewriter, tileAndFuseResult->tiledAndFusedOps.getArrayRef(),
-            tilingLoops, [&tiledAndFusedOps](Operation *op) {
-              return tiledAndFusedOps.contains(op);
-            });
+        fuseConsumersIntoForall(rewriter, rootTiledOp, tilingLoops,
+                                [&tiledAndFusedOps](Operation *op) {
+                                  return tiledAndFusedOps.contains(op);
+                                });
     if (failed(newFusionOpportunities)) {
       // Continue the work if the failure is allowed.
       if (!verifyComputeOpsAfterDistribution(funcOp)) {
-        tileAndFuseResult->tiledAndFusedOps.front()->emitOpError(
-            "failed to fuse consumers");
+        rootTiledOp->emitOpError("failed to fuse consumers");
         return signalPassFailure();
       }
     } else {
