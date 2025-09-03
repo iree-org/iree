@@ -15,6 +15,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/IR/Iterators.h"
 #include "mlir/IR/SymbolTable.h"
 
 #define DEBUG_TYPE "iree-constexpr"
@@ -328,29 +329,24 @@ public:
 
     // Since we are mutating the const-expr ops, the ConstExprAnalysis will no
     // longer be valid after this point.
-    SmallVector<Operation *> worklist;
-    worklist.reserve(allOps.size());
-    bool madeChanges = true;
-    while (madeChanges) {
-      madeChanges = false;
-
-      // Prepare worklist.
-      worklist.clear();
-      worklist.append(allOps.begin(), allOps.end());
-
-      for (Operation *checkOp : worklist) {
-        if (checkOp->use_empty()) {
-          // Bingo.
-          LLVM_DEBUG({
-            llvm::dbgs() << "[HoistIntoGlobals] erase dead op: ";
-            checkOp->print(llvm::dbgs(), constExprs.getAsmState());
-            llvm::dbgs() << "\n";
+    for (auto funcOp : getOperation().getOps<FunctionOpInterface>()) {
+      // Ignore initializers.
+      if (isa<IREE::Util::InitializerOpInterface>(funcOp.getOperation()))
+        continue;
+      funcOp.walk<WalkOrder::PostOrder, ReverseIterator>(
+          [&](Operation *iterOp) {
+            if (allOps.contains(iterOp) && iterOp->use_empty()) {
+              // Bingo.
+              LLVM_DEBUG({
+                llvm::dbgs() << "[HoistIntoGlobals] erase dead op: ";
+                iterOp->print(llvm::dbgs(), constExprs.getAsmState());
+                llvm::dbgs() << "\n";
+              });
+              allOps.erase(iterOp);
+              iterOp->erase();
+            }
+            return WalkResult::advance();
           });
-          madeChanges = true;
-          allOps.erase(checkOp);
-          checkOp->erase();
-        }
-      }
     }
   }
 
