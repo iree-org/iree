@@ -191,102 +191,7 @@ struct SetMulAddFMF final : OpRewritePattern<vector::MultiDimReductionOp> {
   }
 };
 
-struct MultiReduceFMAToContract final
-    : OpRewritePattern<vector::MultiDimReductionOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  static bool isZeroSplat(Value v) {
-    // Accept only explicit, foldable zeros.
-    if (auto cst = v.getDefiningOp<arith::ConstantOp>()) {
-      Attribute attr = cst.getValue();
-      // Vector/array: dense splat 0.0
-      if (auto dense = dyn_cast<DenseElementsAttr>(attr)) {
-        if (dense.isSplat()) {
-          if (auto ft = dyn_cast<FloatType>(dense.getElementType())) {
-            return dense.getSplatValue<APFloat>().isZero();
-          }
-        }
-        return false;
-      }
-      // Scalar float 0.0
-      if (auto fa = dyn_cast<FloatAttr>(attr))
-        return fa.getValue().isZero();
-    }
-    return false;
-  }
-
-  LogicalResult matchAndRewrite(vector::MultiDimReductionOp reduceOp,
-                                PatternRewriter &rewriter) const override {
-    if (reduceOp.getKind() != vector::CombiningKind::ADD) {
-      return failure();
-    }
-
-    auto fma = reduceOp.getSource().getDefiningOp<math::FmaOp>();
-    if (!fma)
-      return failure();
-
-    Value a = fma.getOperand(0);
-    Value b = fma.getOperand(1);
-    Value c = fma.getOperand(2);
-    auto aVT = dyn_cast<VectorType>(a.getType());
-    auto bVT = dyn_cast<VectorType>(b.getType());
-    auto srcVT = dyn_cast<VectorType>(fma.getResult().getType());
-    auto resVT = dyn_cast<VectorType>(reduceOp.getResult().getType());
-    if (!aVT || !bVT || !srcVT || !resVT) {
-      return failure();
-    }
-    if (aVT != bVT || aVT != srcVT) {
-      return failure();
-    }
-    if (!isa<FloatType>(srcVT.getElementType())) {
-      return failure();
-    }
-    if (reduceOp.getAcc().getType() != resVT) {
-      return failure();
-    }
-
-    // TODO: support c != 0
-    if (!isZeroSplat(c)) {
-      return failure();
-    }
-
-    // Build iterator types and indexing maps:
-    //  A: id, B: id, C: projection of non-reduction dims; iterator per dim.
-    SmallVector<bool> mask = reduceOp.getReductionMask();
-    if (mask.size() != srcVT.getRank()) {
-      return failure();
-    }
-
-    auto srcMap = rewriter.getMultiDimIdentityMap(mask.size());
-
-    SmallVector<AffineExpr> projExprs;
-    SmallVector<vector::IteratorType> iters;
-    projExprs.reserve(mask.size());
-    iters.reserve(mask.size());
-    for (int i = 0, e = mask.size(); i < e; ++i) {
-      if (!mask[i]) {
-        iters.push_back(vector::IteratorType::parallel);
-        projExprs.push_back(rewriter.getAffineDimExpr(i));
-      } else {
-        iters.push_back(vector::IteratorType::reduction);
-      }
-    }
-
-    auto dstMap = AffineMap::get(mask.size(), /*symbols=*/0, projExprs,
-                                 reduceOp.getContext());
-    auto itersAttr = rewriter.getArrayAttr(llvm::to_vector(
-        llvm::map_range(iters, [&](vector::IteratorType t) -> Attribute {
-          return vector::IteratorTypeAttr::get(rewriter.getContext(), t);
-        })));
-    auto mapsAttr = rewriter.getAffineMapArrayAttr({srcMap, srcMap, dstMap});
-
-    rewriter.replaceOpWithNewOp<vector::ContractionOp>(
-        reduceOp, a, b, reduceOp.getAcc(), mapsAttr, itersAttr);
-    return success();
-  }
-};
-
-struct ContractAddToChainFMA final : OpRewritePattern<vector::ContractionOp> {
+struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::ContractionOp op,
@@ -402,7 +307,7 @@ struct ContractAddToChainFMA final : OpRewritePattern<vector::ContractionOp> {
 private:
   static SmallVector<int64_t> invert(ArrayRef<int64_t> p) {
     SmallVector<int64_t> inv(p.size());
-    for (int64_t i = 0, e = p.size(); i < e; ++i) {
+    for (int64_t i = 0; i < p.size(); ++i) {
       inv[p[i]] = i;
     }
     return inv;
@@ -546,55 +451,48 @@ struct LLVMGPUVectorLoweringPass final
       RewritePatternSet fmaPatterns(ctx);
       fmaPatterns.add<SetMulAddFMF>(ctx, PatternBenefit(2));
       populateUpliftToFMAPatterns(fmaPatterns);
-      fmaPatterns.add<MultiReduceFMAToContract>(ctx);
       if (failed(applyPatternsGreedily(funcOp, std::move(fmaPatterns)))) {
         return signalPassFailure();
       }
     }
 
-    {
-      RewritePatternSet patterns(ctx);
-      vector::populateVectorReductionToContractPatterns(patterns);
-      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
-    }
-
-    {
-      RewritePatternSet patterns(ctx);
-      patterns.add<ContractAddToChainFMA>(ctx);
-      if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
-    }
-
     // {
-    //   // Lower high level vector operations like contract or multidim reduce ops
-    //   // to lower level vector ops.
-    //   RewritePatternSet contractLoweringPatterns(funcOp.getContext());
-    //   auto options =
-    //       vector::VectorTransformsOptions().setVectorTransformsOptions(
-    //           vector::VectorContractLowering::OuterProduct);
-    //   vector::populateVectorTransferPermutationMapLoweringPatterns(
-    //       contractLoweringPatterns);
-    //   vector::TransposeOp::getCanonicalizationPatterns(contractLoweringPatterns,
-    //                                                    funcOp.getContext());
-    //   vector::populateVectorBroadcastLoweringPatterns(contractLoweringPatterns);
-      // vector::populateVectorContractLoweringPatterns(
-          // contractLoweringPatterns, options.vectorContractLowering);
-    //   contractLoweringPatterns.add<PromoteContractOperands>(
-    //       funcOp->getContext());
-    //   vector::populateVectorGatherLoweringPatterns(contractLoweringPatterns);
-    //   vector::populateVectorMaskOpLoweringPatterns(contractLoweringPatterns);
-    //   vector::populateVectorShapeCastLoweringPatterns(contractLoweringPatterns);
-    //   vector::populateVectorMultiReductionLoweringPatterns(
-    //       contractLoweringPatterns,
-    //       vector::VectorMultiReductionLowering::InnerReduction);
-    //   if (failed(applyPatternsGreedily(funcOp,
-    //                                    std::move(contractLoweringPatterns)))) {
+    //   RewritePatternSet patterns(ctx);
+    //   vector::populateVectorReductionToContractPatterns(patterns);
+    //   if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
     //     return signalPassFailure();
     //   }
     // }
+
+    {
+      // Lower high level vector operations like contract or multidim reduce ops
+      // to lower level vector ops.
+      RewritePatternSet contractLoweringPatterns(funcOp.getContext());
+      auto options =
+          vector::VectorTransformsOptions().setVectorTransformsOptions(
+              vector::VectorContractLowering::OuterProduct);
+      vector::populateVectorTransferPermutationMapLoweringPatterns(
+          contractLoweringPatterns);
+      vector::TransposeOp::getCanonicalizationPatterns(contractLoweringPatterns,
+                                                       funcOp.getContext());
+      vector::populateVectorBroadcastLoweringPatterns(contractLoweringPatterns);
+      vector::populateVectorContractLoweringPatterns(
+          contractLoweringPatterns, options.vectorContractLowering);
+      contractLoweringPatterns.add<PromoteContractOperands>(
+          funcOp->getContext());
+      // contractLoweringPatterns.add<ContractToChainFMA>(funcOp->getContext(),
+      //                                                     PatternBenefit(2));
+      vector::populateVectorGatherLoweringPatterns(contractLoweringPatterns);
+      vector::populateVectorMaskOpLoweringPatterns(contractLoweringPatterns);
+      vector::populateVectorShapeCastLoweringPatterns(contractLoweringPatterns);
+      vector::populateVectorMultiReductionLoweringPatterns(
+          contractLoweringPatterns,
+          vector::VectorMultiReductionLowering::InnerReduction);
+      if (failed(applyPatternsGreedily(funcOp,
+                                       std::move(contractLoweringPatterns)))) {
+        return signalPassFailure();
+      }
+    }
 
     {
       RewritePatternSet vectorToLoopsPatterns(&getContext());
