@@ -105,8 +105,7 @@ VER_0 {
     ireeGPUReorderWorkgroupsStrategyAttrGetTypeID;
     ireeGPUReorderWorkgroupsStrategyAttrGetValue;
     ireeGPUTargetInfoGet;
-    ireeGPUTargetInfoGetMMAIntrinsics
-    ireeGPUTargetInfoFreeMMAIntrinsics
+    ireeGPUTargetInfoGetMMAIntrinsics;
     ireeHALExecutableTargetAttrGetGPUTargetInfo;
     ireeMlirLspServerRunMain;
     ireeOptRunMain;

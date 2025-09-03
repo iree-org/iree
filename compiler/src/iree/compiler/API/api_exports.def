@@ -105,7 +105,6 @@ EXPORTS
   ireeGPUReorderWorkgroupsStrategyAttrGetValue
   ireeGPUTargetInfoGet
   ireeGPUTargetInfoGetMMAIntrinsics
-  ireeGPUTargetInfoFreeMMAIntrinsics
   ireeHALExecutableTargetAttrGetGPUTargetInfo
   ireeMlirLspServerRunMain
   ireeOptRunMain
