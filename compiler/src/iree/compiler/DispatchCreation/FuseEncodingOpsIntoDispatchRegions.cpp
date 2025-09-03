@@ -31,7 +31,7 @@ namespace mlir::iree_compiler::DispatchCreation {
 namespace {
 
 /// Return true if the op is fusable with a SetEncodingOp consumer. The op's
-/// containing dispatch must contain only
+/// containing dispatch must contain only:
 ///   - Reshape ops, encoding ops, linalg ops, gather ops, and attention ops.
 ///   - Non ShapedType ops, e.g., like arith ops, dim ops, etc.
 ///   - tensor::ExtractSliceOp is allowed as they can be folded into dispatch
