@@ -76,7 +76,7 @@ util.func public @negative_dynamic_reduction(%arg0: tensor<64x?xf32>, %d0: index
   %cst = arith.constant 0.0 : f32
   %0 = tensor.empty() : tensor<64xf32>
   %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<64xf32>) -> tensor<64xf32>
-  // No tiling expected.
+  // expected-remark@below {{failed to infer split-reduction tile sizes due to a reduction dim (dim 1) having a dynamic size}}
   %2 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>],
       iterator_types = ["parallel", "reduction"]
