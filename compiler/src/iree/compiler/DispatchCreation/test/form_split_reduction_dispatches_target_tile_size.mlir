@@ -1,4 +1,4 @@
-// RUN: iree-opt --verify-diagnostics --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-split-reduction-dispatches{target-split-reduction-size=1024,emit-remarks=true}))" --split-input-file
+// RUN: iree-opt %s --verify-diagnostics --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-split-reduction-dispatches{target-split-reduction-size=1024 emit-remarks=true}))" --split-input-file
 
 util.func public @basic(%arg0: tensor<4096xf32>) -> tensor<f32> {
   %1 = arith.constant dense<0.0> : tensor<f32>
