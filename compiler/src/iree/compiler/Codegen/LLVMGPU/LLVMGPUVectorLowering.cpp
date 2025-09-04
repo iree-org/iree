@@ -196,6 +196,11 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
 
   LogicalResult matchAndRewrite(vector::ContractionOp op,
                                 PatternRewriter &rewriter) const override {
+    // TODO: add rewrite to support relevant contractions nested in vector.mask
+    if (op->getParentOfType<vector::MaskOp>()) {
+      return failure();
+    }
+
     if (op.getKind() != vector::CombiningKind::ADD) {
       return failure();
     }
@@ -367,7 +372,7 @@ private:
   }
 
   static bool isIdentityPermutation(ArrayRef<int64_t> perm) {
-    for (size_t i = 0, e = perm.size(); i < e; ++i) {
+    for (size_t i = 0; i < perm.size(); ++i) {
       if (perm[i] != i) {
         return false;
       }
