@@ -148,6 +148,9 @@ MlirTypeID ireeGPUVirtualMMAIntrinsicAttrGetTypeID() {
       mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsicAttr::getTypeID());
 }
 
+static_assert(std::is_same_v<mma_intrinsic_enum_t, uint32_t>,
+              "mma_intrinsic_enum_t must be uint32_t");
+
 static_assert(
     std::is_same_v<uint32_t, std::underlying_type_t<
                                  mlir::iree_compiler::IREE::GPU::MMAIntrinsic>>,
@@ -478,7 +481,7 @@ ireeGPUTargetInfo ireeGPUTargetInfoGet(
 
   std::vector<mlir::Attribute> mmaIntrinsicAttrs;
   mmaIntrinsicAttrs.reserve(numMmaIntrinsics);
-  for (size_t i = 0; i < numMmaIntrinsics; i++) {
+  for (size_t i = 0; i < numMmaIntrinsics; ++i) {
     mma_intrinsic_enum_t enumValue = mmaIntrinsics[i];
 
     std::optional<mlir::iree_compiler::IREE::GPU::MMAIntrinsic> mmaIntrinsic =
@@ -503,20 +506,16 @@ ireeGPUTargetInfo ireeGPUTargetInfoGet(
       continue;
     }
 
-    assert(
-        false &&
-        ("Invalid MMA intrinsic value: " + std::to_string(enumValue)).c_str());
+    assert(false && "Invalid MMA intrinsic value");
   }
   targetInfo.mmaIntrinsics = wrap(builder.getArrayAttr(mmaIntrinsicAttrs));
 
   return targetInfo;
 }
 
-void ireeGPUTargetInfoGetMMAIntrinsics(
-    MlirAttribute mmaIntrinsics, mma_intrinsic_enum_t *mmaIntrinsicVals,
-    uint8_t
-        *virtualMmaIntrinsicTags // 1 if VirtualMMAIntrinsic, 0 if MMAIntrinsic.
-) {
+void ireeGPUTargetInfoGetMMAIntrinsics(MlirAttribute mmaIntrinsics,
+                                       mma_intrinsic_enum_t *mmaIntrinsicVals,
+                                       uint8_t *virtualMmaIntrinsicTags) {
   assert(mlirAttributeIsAArray(mmaIntrinsics) &&
          "mmaIntrinsics must be an array attribute");
   size_t numElements = mlirArrayAttrGetNumElements(mmaIntrinsics);
@@ -524,7 +523,7 @@ void ireeGPUTargetInfoGetMMAIntrinsics(
     return;
   }
 
-  for (size_t i = 0; i < numElements; i++) {
+  for (size_t i = 0; i < numElements; ++i) {
     MlirAttribute element = mlirArrayAttrGetElement(mmaIntrinsics, i);
     if (ireeAttributeIsAGPUMMAIntrinsicAttr(element)) {
       mmaIntrinsicVals[i] = ireeGPUMMAIntrinsicAttrGetValue(element);

@@ -530,12 +530,14 @@ NB_MODULE(_ireeCompilerDialects, m) {
             for (py::handle item : mmaIntrinsicObjs) {
               if (!py::isinstance(item, mmaIntrinsicClass) &&
                   !py::isinstance(item, virtualMmaIntrinsicClass)) {
-                throw py::type_error("All items must be MMAIntrinsic or "
-                                     "VirtualMMAIntrinsic objects");
+                throw py::type_error(
+                    ("All items must be " + std::string(kMMAIntrinsicEnumName) +
+                     " or " + std::string(kVirtualMMAIntrinsicEnumName) +
+                     " objects")
+                        .c_str());
               }
-              mma_intrinsic_enum_t enumValue =
-                  py::cast<mma_intrinsic_enum_t>(item.attr("value"));
-              mmaIntrinsicVals.push_back(enumValue);
+              mmaIntrinsicVals.push_back(
+                  py::cast<mma_intrinsic_enum_t>(item.attr("value")));
             }
 
             *self = ireeGPUTargetInfoGet(
@@ -582,9 +584,6 @@ NB_MODULE(_ireeCompilerDialects, m) {
 
             size_t numElements =
                 mlirArrayAttrGetNumElements(self.mmaIntrinsics);
-            if (numElements == 0) {
-              return py::list();
-            }
 
             std::vector<mma_intrinsic_enum_t> mmaIntrinsicVals(numElements);
             // Use uint8_t instead of bool because std::vector<bool> is a
@@ -600,18 +599,15 @@ NB_MODULE(_ireeCompilerDialects, m) {
             py::object virtualMmaIntrinsicEnum =
                 gpuModule.attr(kVirtualMMAIntrinsicEnumName);
 
-            for (size_t i = 0; i < numElements; i++) {
+            for (size_t i = 0; i < numElements; ++i) {
               if (virtualMmaIntrinsicTags[i]) {
                 py::object virtualMmaIntrinsic =
                     virtualMmaIntrinsicEnum(mmaIntrinsicVals[i]);
                 intrinsics.append(virtualMmaIntrinsic);
                 continue;
               }
-              if (!virtualMmaIntrinsicTags[i]) {
-                py::object mmaIntrinsic = mmaIntrinsicEnum(mmaIntrinsicVals[i]);
-                intrinsics.append(mmaIntrinsic);
-                continue;
-              }
+              py::object mmaIntrinsic = mmaIntrinsicEnum(mmaIntrinsicVals[i]);
+              intrinsics.append(mmaIntrinsic);
             }
 
             return intrinsics;
