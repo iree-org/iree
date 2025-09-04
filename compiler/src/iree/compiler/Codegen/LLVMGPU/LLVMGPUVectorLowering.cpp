@@ -404,10 +404,8 @@ private:
     Value current = accFlat;
 
     for (int64_t k = K - 1; k >= 0; --k) {
-      Value lhsRow =
-          rewriter.create<vector::ExtractOp>(loc, lhs2D, k);
-      Value rhsRow =
-          rewriter.create<vector::ExtractOp>(loc, rhs2D, k);
+      Value lhsRow = rewriter.create<vector::ExtractOp>(loc, lhs2D, k);
+      Value rhsRow = rewriter.create<vector::ExtractOp>(loc, rhs2D, k);
 
       // Process full chunks
       int64_t p = 0;
@@ -475,7 +473,7 @@ struct LLVMGPUVectorLoweringPass final
       contractLoweringPatterns.add<PromoteContractOperands>(
           funcOp->getContext());
       contractLoweringPatterns.add<ContractToChainFMA>(funcOp->getContext(),
-                                                          PatternBenefit(2));
+                                                       PatternBenefit(2));
       vector::populateVectorGatherLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorMaskOpLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorShapeCastLoweringPatterns(contractLoweringPatterns);
