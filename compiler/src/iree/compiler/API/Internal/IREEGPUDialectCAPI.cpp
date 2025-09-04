@@ -427,26 +427,26 @@ ireeHALExecutableTargetAttrGetGPUTargetInfo(MlirAttribute attr) {
   targetInfo.mmaIntrinsics = wrap(builder.getArrayAttr({}));
   mlir::iree_compiler::IREE::GPU::MMAOpsArrayAttr mmaOpsArray =
       wgpAttr.getMma();
-  if (mmaOpsArray) {
-    std::vector<mlir::Attribute> mmaIntrinsicAttrs;
-    for (mlir::iree_compiler::IREE::GPU::MMAAttr mmaAttr : mmaOpsArray) {
-      mlir::iree_compiler::IREE::GPU::MMAIntrinsic intrinsic =
-          mmaAttr.getIntrinsic();
-      auto mmaIntrinsicAttr =
-          mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr::get(context,
-                                                                intrinsic);
-      mmaIntrinsicAttrs.push_back(mmaIntrinsicAttr);
-
-      for (mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic
-               virtualIntrinsic : mmaAttr.getVirtualIntrinsics()) {
-        auto virtualMmaIntrinsicAttr =
-            mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsicAttr::get(
-                context, virtualIntrinsic);
-        mmaIntrinsicAttrs.push_back(virtualMmaIntrinsicAttr);
-      }
-    }
-    targetInfo.mmaIntrinsics = wrap(builder.getArrayAttr(mmaIntrinsicAttrs));
+  if (!mmaOpsArray) {
+    return targetInfo;
   }
+
+  std::vector<mlir::Attribute> mmaIntrinsicAttrs;
+  for (mlir::iree_compiler::IREE::GPU::MMAAttr mmaAttr : mmaOpsArray) {
+    mlir::iree_compiler::IREE::GPU::MMAIntrinsic intrinsic =
+        mmaAttr.getIntrinsic();
+    mmaIntrinsicAttrs.push_back(
+        mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr::get(context,
+                                                              intrinsic));
+
+    for (mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic virtualIntrinsic :
+         mmaAttr.getVirtualIntrinsics()) {
+      mmaIntrinsicAttrs.push_back(
+          mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsicAttr::get(
+              context, virtualIntrinsic));
+    }
+  }
+  targetInfo.mmaIntrinsics = wrap(builder.getArrayAttr(mmaIntrinsicAttrs));
   return targetInfo;
 }
 
@@ -512,21 +512,27 @@ ireeGPUTargetInfo ireeGPUTargetInfoGet(
   return targetInfo;
 }
 
-void ireeGPUTargetInfoGetMMAIntrinsics(MlirAttribute mmaIntrinsics,
-                                       mma_intrinsic_enum_t *mmaIntrinsicVals,
-                                       uint8_t *isVirtuals,
-                                       size_t numElements) {
+void ireeGPUTargetInfoGetMMAIntrinsics(
+    MlirAttribute mmaIntrinsics, mma_intrinsic_enum_t *mmaIntrinsicVals,
+    uint8_t
+        *virtualMmaIntrinsicTags // 1 if VirtualMMAIntrinsic, 0 if MMAIntrinsic.
+) {
+  size_t numElements = mlirArrayAttrGetNumElements(mmaIntrinsics);
+  if (numElements == 0) {
+    return;
+  }
+
   for (size_t i = 0; i < numElements; i++) {
     MlirAttribute element = mlirArrayAttrGetElement(mmaIntrinsics, i);
     if (ireeAttributeIsAGPUMMAIntrinsicAttr(element)) {
       mmaIntrinsicVals[i] = ireeGPUMMAIntrinsicAttrGetValue(element);
-      isVirtuals[i] = 0; // false.
+      virtualMmaIntrinsicTags[i] = 0; // false.
       continue;
     }
 
     if (ireeAttributeIsAGPUVirtualMMAIntrinsicAttr(element)) {
       mmaIntrinsicVals[i] = ireeGPUVirtualMMAIntrinsicAttrGetValue(element);
-      isVirtuals[i] = 1; // true.
+      virtualMmaIntrinsicTags[i] = 1; // true.
       continue;
     }
     assert(false && "Unexpected attribute type in MMA intrinsics array");

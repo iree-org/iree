@@ -173,7 +173,7 @@ MLIR_CAPI_EXPORTED ireeGPUTargetInfo ireeGPUTargetInfoGet(
 MLIR_CAPI_EXPORTED void
 ireeGPUTargetInfoGetMMAIntrinsics(MlirAttribute mmaIntrinsics,
                                   mma_intrinsic_enum_t *mmaIntrinsicVals,
-                                  uint8_t *isVirtuals, size_t numElements);
+                                  uint8_t *virtualMmaIntrinsicTags);
 
 #ifdef __cplusplus
 }

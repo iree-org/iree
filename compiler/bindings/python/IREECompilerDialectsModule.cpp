@@ -21,6 +21,9 @@ static const char *kCodegenModuleImportPath =
 static const char *kGpuModuleImportPath =
     MAKE_MLIR_PYTHON_QUALNAME("dialects.iree_gpu");
 
+static const char *kMMAIntrinsicEnumName = "MMAIntrinsic";
+static const char *kVirtualMMAIntrinsicEnumName = "VirtualMMAIntrinsic";
+
 namespace py = nanobind;
 using namespace nanobind::literals;
 using namespace mlir::python::nanobind_adaptors;
@@ -43,7 +46,7 @@ ireeCodegenQueryMMAIntrinsicsBinding(MlirOperation op) {
   ireeCodegenQueryMMAIntrinsics(op, &numMMAs, mmaIntrinsics.data());
 
   py::object mmaIntrinsicEnum =
-      py::module_::import_(kGpuModuleImportPath).attr("MMAIntrinsic");
+      py::module_::import_(kGpuModuleImportPath).attr(kMMAIntrinsicEnumName);
   std::vector<py::object> mmaList(numMMAs);
   for (size_t i = 0; i < numMMAs; ++i) {
     mmaList[i] = mmaIntrinsicEnum(mmaIntrinsics[i]);
@@ -326,7 +329,7 @@ NB_MODULE(_ireeCompilerDialects, m) {
                                uint32_t rawValue =
                                    ireeGPUMMAIntrinsicAttrGetValue(self);
                                return py::module_::import_(kGpuModuleImportPath)
-                                   .attr("MMAIntrinsic")(rawValue);
+                                   .attr(kMMAIntrinsicEnumName)(rawValue);
                              })
       .def_property_readonly("mma", [](MlirAttribute self) -> MlirAttribute {
         uint32_t value = ireeGPUMMAIntrinsicAttrGetValue(self);
@@ -378,7 +381,7 @@ NB_MODULE(_ireeCompilerDialects, m) {
 
             static py::object virtualEnum =
                 py::module_::import_(kGpuModuleImportPath)
-                    .attr("VirtualMMAIntrinsic");
+                    .attr(kVirtualMMAIntrinsicEnumName);
 
             std::vector<py::object> result;
             for (int64_t val : getIntArrayAttrValues(rawArrayAttr)) {
@@ -405,13 +408,13 @@ NB_MODULE(_ireeCompilerDialects, m) {
           "Gets an #iree_gpu.virtual_mma_intrinsic from parameters.")
       .def_property_readonly("raw_value",
                              ireeGPUVirtualMMAIntrinsicAttrGetValue)
-      .def_property_readonly("value",
-                             [](MlirAttribute self) -> py::object {
-                               uint32_t rawValue =
-                                   ireeGPUVirtualMMAIntrinsicAttrGetValue(self);
-                               return py::module_::import_(kGpuModuleImportPath)
-                                   .attr("VirtualMMAIntrinsic")(rawValue);
-                             })
+      .def_property_readonly(
+          "value",
+          [](MlirAttribute self) -> py::object {
+            uint32_t rawValue = ireeGPUVirtualMMAIntrinsicAttrGetValue(self);
+            return py::module_::import_(kGpuModuleImportPath)
+                .attr(kVirtualMMAIntrinsicEnumName)(rawValue);
+          })
       .def_property_readonly("mma", [](MlirAttribute self) -> MlirAttribute {
         uint32_t value = ireeGPUVirtualMMAIntrinsicAttrGetValue(self);
         return ireeGPUVirtualMMAAttrGet(mlirAttributeGetContext(self), value);
@@ -519,11 +522,12 @@ NB_MODULE(_ireeCompilerDialects, m) {
              int32_t memoryBytes, const py::list &mmaIntrinsicObjs) {
             std::vector<mma_intrinsic_enum_t> mmaIntrinsicVals;
             py::module_ gpuModule = py::module_::import_(kGpuModuleImportPath);
-            py::object mmaIntrinsicClass = gpuModule.attr("MMAIntrinsic");
+            py::object mmaIntrinsicClass =
+                gpuModule.attr(kMMAIntrinsicEnumName);
             py::object virtualMmaIntrinsicClass =
-                gpuModule.attr("VirtualMMAIntrinsic");
+                gpuModule.attr(kVirtualMMAIntrinsicEnumName);
 
-            for (auto item : mmaIntrinsicObjs) {
+            for (py::handle item : mmaIntrinsicObjs) {
               if (!py::isinstance(item, mmaIntrinsicClass) &&
                   !py::isinstance(item, virtualMmaIntrinsicClass)) {
                 throw py::type_error("All items must be MMAIntrinsic or "
@@ -585,25 +589,28 @@ NB_MODULE(_ireeCompilerDialects, m) {
             std::vector<mma_intrinsic_enum_t> mmaIntrinsicVals(numElements);
             // Use uint8_t instead of bool because std::vector<bool> is a
             // specialized template that doesn't provide .data() method.
-            std::vector<uint8_t> isVirtuals(numElements);
+            std::vector<uint8_t> virtualMmaIntrinsicTags(numElements);
             ireeGPUTargetInfoGetMMAIntrinsics(self.mmaIntrinsics,
                                               mmaIntrinsicVals.data(),
-                                              isVirtuals.data(), numElements);
+                                              virtualMmaIntrinsicTags.data());
 
             py::list intrinsics;
             py::module_ gpuModule = py::module_::import_(kGpuModuleImportPath);
-            py::object mmaIntrinsicEnum = gpuModule.attr("MMAIntrinsic");
+            py::object mmaIntrinsicEnum = gpuModule.attr(kMMAIntrinsicEnumName);
             py::object virtualMmaIntrinsicEnum =
-                gpuModule.attr("VirtualMMAIntrinsic");
+                gpuModule.attr(kVirtualMMAIntrinsicEnumName);
 
             for (size_t i = 0; i < numElements; i++) {
-              if (isVirtuals[i]) {
+              if (virtualMmaIntrinsicTags[i]) {
                 py::object virtualMmaIntrinsic =
                     virtualMmaIntrinsicEnum(mmaIntrinsicVals[i]);
                 intrinsics.append(virtualMmaIntrinsic);
-              } else {
+                continue;
+              }
+              if (!virtualMmaIntrinsicTags[i]) {
                 py::object mmaIntrinsic = mmaIntrinsicEnum(mmaIntrinsicVals[i]);
                 intrinsics.append(mmaIntrinsic);
+                continue;
               }
             }
 
