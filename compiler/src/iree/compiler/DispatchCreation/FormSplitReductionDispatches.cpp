@@ -201,6 +201,11 @@ FormSplitReductionDispatchesPass::getUserSpecifiedTileSize(
         llvm::divideCeil(targetSplitReductionSize, currentSplitReductionSize);
     int64_t dimSize = (*opReductionSizes)[i];
     if (dimSize == ShapedType::kDynamic) {
+      if (emitRemarks) {
+        op.emitRemark() << "failed to infer split-reduction tile sizes due to "
+                           "a reduction dim (dim "
+                        << getReductionDims(op)[i] << ") having a dynamic size";
+      }
       return std::nullopt;
     }
     int64_t tileSize = findSmallestFactorWithLowerBound(dimSize, remainingSize)
