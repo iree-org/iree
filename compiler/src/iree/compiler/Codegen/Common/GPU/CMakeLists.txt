@@ -91,6 +91,7 @@ iree_cc_library(
     "GPUVectorDistribution.cpp"
     "GPUVerifyDistribution.cpp"
     "Passes.cpp"
+    "TestThreadUniformAnalysisPass.cpp"
     "VectorReductionToGPU.cpp"
     "WorkgroupReordering.cpp"
   DEPS
@@ -144,6 +145,7 @@ iree_cc_library(
     MLIRVectorTransforms
     MLIRVectorUtils
     iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Common::GPU::Analysis
     iree::compiler::Codegen::Common::VectorLayoutAnalysis
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::Codegen::Utils
@@ -187,6 +189,30 @@ iree_tablegen_doc(
     "Passes.td"
   OUTS
     --gen-pass-doc CodegenCommonGPUPasses.md
+)
+
+iree_cc_library(
+  NAME
+    Analysis
+  HDRS
+    "ThreadUniformAnalysis.h"
+  SRCS
+    "ThreadUniformAnalysis.cpp"
+  DEPS
+    LLVMSupport
+    MLIRAffineDialect
+    MLIRAnalysis
+    MLIRArithDialect
+    MLIRGPUDialect
+    MLIRIR
+    MLIRSCFDialect
+    MLIRSupport
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::TensorExt::IR
+    iree::compiler::Dialect::Util::IR
+  PUBLIC
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
