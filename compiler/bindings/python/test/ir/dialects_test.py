@@ -394,17 +394,6 @@ def compilation_info():
 
 
 @run
-def test_mma_intrinsic_class_name():
-    assert hasattr(iree_gpu, "MMAIntrinsic"), "MMAIntrinsic class should exist"
-    assert hasattr(
-        iree_gpu, "VirtualMMAIntrinsic"
-    ), "VirtualMMAIntrinsic class should exist"
-
-    assert iree_gpu.MMAIntrinsic.__name__ == "MMAIntrinsic"
-    assert iree_gpu.VirtualMMAIntrinsic.__name__ == "VirtualMMAIntrinsic"
-
-
-@run
 def gpu_target_info_attribute_parsing():
     mlir_string = """
     hal.executable private @main_dispatch_0 {
@@ -512,11 +501,16 @@ def gpu_target_info_constructor():
     assert (
         target_info.max_workgroup_memory_bytes == 65536
     ), f"Expected max_workgroup_memory_bytes 65536, got {target_info.max_workgroup_memory_bytes}"
-    assert target_info.mma_intrinsics == [
+    mma_intrinsics = target_info.mma_intrinsics
+    assert mma_intrinsics == [
         iree_gpu.MMAIntrinsic.MFMA_F32_16x16x4_F32,
         iree_gpu.MMAIntrinsic.MFMA_F32_16x16x16_F16,
         iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_16x16x32_F16,
-    ], f"Expected mma_intrinsics [MFMA_F32_16x16x4_F32, MFMA_F32_16x16x16_F16, VMFMA_F32_16x16x32_F16], got {target_info.mma_intrinsics}"
+    ], f"Expected mma_intrinsics [MFMA_F32_16x16x4_F32, MFMA_F32_16x16x16_F16, VMFMA_F32_16x16x32_F16], got {mma_intrinsics}"
+
+    assert isinstance(mma_intrinsics[0], iree_gpu.MMAIntrinsic)
+    assert isinstance(mma_intrinsics[1], iree_gpu.MMAIntrinsic)
+    assert isinstance(mma_intrinsics[2], iree_gpu.VirtualMMAIntrinsic)
 
 
 @run
