@@ -30,7 +30,7 @@ func.func @erf_fastmath_vector(%arg0: vector<4xf32>) -> vector<4xf32> attributes
   // First polynomial evaluation (using t = ax * ax).
   // CHECK-COUNT-5: %{{.*}} = math.fma %{{.*}}, %[[T]], %{{.*}} : vector<4xf32>
   // CHECK: %{{.*}} = math.fma %[[AX]], %{{.*}}, %[[AX]] : vector<4xf32>
-  
+
   // Second polynomial evaluation (using ax directly).
   // CHECK-COUNT-6: %{{.*}} = math.fma %{{.*}}, %[[AX]], %{{.*}} : vector<4xf32>
   // CHECK: %{{.*}} = math.fma %[[AX]], %{{.*}}, %[[AX]] : vector<4xf32>
