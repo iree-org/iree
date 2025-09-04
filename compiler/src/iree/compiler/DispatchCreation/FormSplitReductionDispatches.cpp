@@ -171,46 +171,44 @@ FormSplitReductionDispatchesPass::getUserSpecifiedTileSize(
     return getAsIndexOpFoldResult(context, tileSizes);
   }
 
-  if (targetSplitReductionSize > 0) {
-    std::optional<SmallVector<int64_t>> opReductionSizes =
-        getStaticReductionDimSizes(op);
-    if (opReductionSizes.has_value()) {
-      auto findSmallestFactorWithLowerBound =
-          [](int64_t x, int64_t lowerBound) -> std::optional<int64_t> {
-        // We expect all numbers here to be relatively small, so just do trial
-        // division (with a limit just to be safe).
-        static constexpr int64_t kMaxIterations = 1 << 15;
-        for (int64_t i = lowerBound; i <= std::min(x, kMaxIterations); i++) {
-          if (x % i == 0) {
-            return i;
-          }
-        }
-        return std::nullopt;
-      };
-      int64_t currentSplitReductionSize = 1;
-      SmallVector<int64_t> tileSizes(opReductionSizes->size());
-      // Tile dimensions until we reach or exceed the target. Tile sizes must
-      // divide the dimension size evenly, and we start with inner dimensions as
-      // we prefer tiling those.
-      for (int64_t i = tileSizes.size() - 1; i >= 0; i--) {
-        int64_t remainingSize = llvm::divideCeil(targetSplitReductionSize,
-                                                 currentSplitReductionSize);
-        int64_t dimSize = (*opReductionSizes)[i];
-        if (dimSize == ShapedType::kDynamic) {
-          return std::nullopt;
-        }
-        int64_t tileSize =
-            findSmallestFactorWithLowerBound(dimSize, remainingSize)
-                .value_or(dimSize);
-        tileSizes[i] = tileSize;
-        currentSplitReductionSize *= tileSize;
-      }
-      return getAsIndexOpFoldResult(op->getContext(), tileSizes);
-    }
+  if (targetSplitReductionSize <= 0) {
+    return std::nullopt;
   }
-
-  // Default.
-  return std::nullopt;
+  std::optional<SmallVector<int64_t>> opReductionSizes =
+      getStaticReductionDimSizes(op);
+  if (!opReductionSizes.has_value()) {
+    return std::nullopt;
+  }
+  auto findSmallestFactorWithLowerBound =
+      [](int64_t x, int64_t lowerBound) -> std::optional<int64_t> {
+    // We expect all numbers here to be relatively small, so just do trial
+    // division (with a limit just to be safe).
+    static constexpr int64_t kMaxIterations = 1 << 15;
+    for (int64_t i = lowerBound; i <= std::min(x, kMaxIterations); i++) {
+      if (x % i == 0) {
+        return i;
+      }
+    }
+    return std::nullopt;
+  };
+  int64_t currentSplitReductionSize = 1;
+  SmallVector<int64_t> tileSizes(opReductionSizes->size());
+  // Tile dimensions until we reach or exceed the target. Tile sizes must
+  // divide the dimension size evenly, and we start with inner dimensions as
+  // we prefer tiling those.
+  for (int64_t i = tileSizes.size() - 1; i >= 0; i--) {
+    int64_t remainingSize =
+        llvm::divideCeil(targetSplitReductionSize, currentSplitReductionSize);
+    int64_t dimSize = (*opReductionSizes)[i];
+    if (dimSize == ShapedType::kDynamic) {
+      return std::nullopt;
+    }
+    int64_t tileSize = findSmallestFactorWithLowerBound(dimSize, remainingSize)
+                           .value_or(dimSize);
+    tileSizes[i] = tileSize;
+    currentSplitReductionSize *= tileSize;
+  }
+  return getAsIndexOpFoldResult(op->getContext(), tileSizes);
 }
 
 void FormSplitReductionDispatchesPass::runOnOperation() {
