@@ -517,6 +517,8 @@ void ireeGPUTargetInfoGetMMAIntrinsics(
     uint8_t
         *virtualMmaIntrinsicTags // 1 if VirtualMMAIntrinsic, 0 if MMAIntrinsic.
 ) {
+  assert(mlirAttributeIsAArray(mmaIntrinsics) &&
+         "mmaIntrinsics must be an array attribute");
   size_t numElements = mlirArrayAttrGetNumElements(mmaIntrinsics);
   if (numElements == 0) {
     return;
