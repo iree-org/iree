@@ -519,9 +519,6 @@ void ireeGPUTargetInfoGetMMAIntrinsics(MlirAttribute mmaIntrinsics,
   assert(mlirAttributeIsAArray(mmaIntrinsics) &&
          "mmaIntrinsics must be an array attribute");
   size_t numElements = mlirArrayAttrGetNumElements(mmaIntrinsics);
-  if (numElements == 0) {
-    return;
-  }
 
   for (size_t i = 0; i < numElements; ++i) {
     MlirAttribute element = mlirArrayAttrGetElement(mmaIntrinsics, i);
