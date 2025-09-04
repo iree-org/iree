@@ -170,14 +170,12 @@ MLIR_CAPI_EXPORTED ireeGPUTargetInfo ireeGPUTargetInfoGet(
     size_t numWorkgroupSizes, int32_t threadCount, int32_t memoryBytes,
     const mma_intrinsic_enum_t *mmaIntrinsics, size_t numMmaIntrinsics);
 
-/**
- * Extracts MMA intrinsic values and their virtual status from an ArrayAttr.
- *
- * `mmaIntrinsics`: Array attribute containing MMA intrinsic attributes.
- * `mmaIntrinsicVals`: Output array for MMA intrinsic enum values.
- * `virtualMmaIntrinsicTags`: Output array - 1 if VirtualMMAIntrinsic, 0 if
- * MMAIntrinsic.
- */
+// Extracts MMA intrinsic values and their virtual status from an ArrayAttr.
+//
+// mmaIntrinsics: Array attribute containing MMA intrinsic attributes.
+// mmaIntrinsicVals: Output array for MMA intrinsic enum values.
+// virtualMmaIntrinsicTags: Output array - 1 if VirtualMMAIntrinsic, 0 if
+// MMAIntrinsic.
 MLIR_CAPI_EXPORTED void
 ireeGPUTargetInfoGetMMAIntrinsics(MlirAttribute mmaIntrinsics,
                                   mma_intrinsic_enum_t *mmaIntrinsicVals,

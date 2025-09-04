@@ -394,6 +394,17 @@ def compilation_info():
 
 
 @run
+def test_mma_intrinsic_class_name():
+    assert hasattr(iree_gpu, "MMAIntrinsic"), "MMAIntrinsic class should exist"
+    assert hasattr(
+        iree_gpu, "VirtualMMAIntrinsic"
+    ), "VirtualMMAIntrinsic class should exist"
+
+    assert iree_gpu.MMAIntrinsic.__name__ == "MMAIntrinsic"
+    assert iree_gpu.VirtualMMAIntrinsic.__name__ == "VirtualMMAIntrinsic"
+
+
+@run
 def gpu_target_info_attribute_parsing():
     mlir_string = """
     hal.executable private @main_dispatch_0 {
