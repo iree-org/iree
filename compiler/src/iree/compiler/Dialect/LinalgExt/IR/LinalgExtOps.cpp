@@ -2196,6 +2196,46 @@ void OnlineAttentionOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
 }
 
 //===----------------------------------------------------------------------===//
+// ExpReductionOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult ExpReductionOp::verify() {
+  Operation *op = getOperation();
+  if (getNumDpsInputs() == 0) {
+    return op->emitOpError("expected at least one input operand to reduce");
+  }
+  if (getNumDpsInits() == 0) {
+    return op->emitOpError("expected at least one output operand to reduce");
+  }
+
+  for (int64_t reducedOperand : getExpReducedOperands()) {
+    if (reducedOperand == 0) {
+      return op->emitOpError(
+          "Index of output operand in exp_reduced_operands cannot be 0.");
+    }
+    if (reducedOperand >= getNumDpsInits()) {
+      return op->emitOpError(
+          "Index of output operand in exp_reduced_operands does not exist.");
+    }
+  }
+
+  return success();
+}
+
+std::string ExpReductionOp::getLibraryCallName() { return ""; }
+
+bool ExpReductionOp::hasIndexSemantics() {
+  // TODO: Index semantics are valid really.
+  return false;
+}
+
+SmallVector<utils::IteratorType> ExpReductionOp::getIteratorTypesArray() {
+  return llvm::map_to_vector(getIteratorTypes(), [](Attribute attr) {
+    return cast<IREE::LinalgExt::IteratorTypeAttr>(attr).getValue();
+  });
+}
+
+//===----------------------------------------------------------------------===//
 // Im2colOp
 //===----------------------------------------------------------------------===//
 
