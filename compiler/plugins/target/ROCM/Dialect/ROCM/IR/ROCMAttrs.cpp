@@ -93,7 +93,7 @@ handleArgmaxUkernel(RewriterBase &rewriter, StringRef name,
   return success();
 }
 
-static constexpr char executableObjectsAttrName[] = "hal.executable.objects";
+constexpr char executableObjectsAttrName[] = "hal.executable.objects";
 
 // Walks parents ops from `op` to return the nearest hal.executable.objects
 // array attribute. If the parent hal.executable.variant is reached, its objects
@@ -257,15 +257,15 @@ static std::optional<int64_t> expensivelyEvaluateSharedMemoryBytes(
     return {};
   }
   llvm::LLVMContext llvmContext;
-  llvm::Expected<std::unique_ptr<llvm::Module>> module =
+  llvm::Expected<std::unique_ptr<llvm::Module>> moduleOp =
       llvm::getLazyBitcodeModule(llvm::MemoryBufferRef{buffer, ukernelName},
                                  llvmContext,
                                  /*ShouldLazyLoadMetadata=*/true);
-  if (!module) {
+  if (!moduleOp) {
     op.emitWarning("Failed to parse bitcode module.");
     return {};
   }
-  llvm::EngineBuilder builder(std::move(module.get()));
+  llvm::EngineBuilder builder(std::move(moduleOp.get()));
   std::string builderError;
   builder.setEngineKind(llvm::EngineKind::Interpreter)
       .setErrorStr(&builderError);
