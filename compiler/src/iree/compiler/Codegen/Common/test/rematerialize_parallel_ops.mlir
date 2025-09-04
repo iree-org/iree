@@ -172,33 +172,38 @@ func.func @no_external_capture_fusion(%arg0: tensor<4096x64xi64>, %arg1: tensor<
 
 // -----
 
-func.func @producer_has_direct_write() {
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
+#map3 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#pipeline_layout = #hal.pipeline.layout<
+  bindings = [
+    #hal.pipeline.binding<storage_buffer, Indirect>,
+    #hal.pipeline.binding<storage_buffer, Indirect>
+  ]>
+func.func @producer_has_direct_write(%arg0: tensor<3x4x5xf32>, %arg1: tensor<3x5xf32>) {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %c64 = arith.constant 64 : index
   %c128 = arith.constant 128 : index
-  %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x4x5xf32>>
-  %1 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x5xf32>>
-  %2 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c64) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<3x5xf32>>
-  %3 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(3) alignment(64) offset(%c128) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<3x4x5xf32>>
-  %4 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [3, 4, 5], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x4x5xf32>> -> tensor<3x4x5xf32>
-  %5 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [3, 5], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x5xf32>> -> tensor<3x5xf32>
-  %6 = tensor.empty() : tensor<3x5xf32>
-  %7 = tensor.empty() : tensor<3x4x5xf32>
-  %8 = linalg.fill ins(%cst : f32) outs(%6 : tensor<3x5xf32>) -> tensor<3x5xf32>
-  %9 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%4, %5 : tensor<3x4x5xf32>, tensor<3x5xf32>) outs(%7 : tensor<3x4x5xf32>) {
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c64) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<3x5xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c128) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<3x4x5xf32>>
+  %2 = tensor.empty() : tensor<3x5xf32>
+  %3 = tensor.empty() : tensor<3x4x5xf32>
+  %4 = linalg.fill ins(%cst : f32) outs(%2 : tensor<3x5xf32>) -> tensor<3x5xf32>
+  %5 = linalg.generic {indexing_maps = [#map, #map1, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0, %arg1 : tensor<3x4x5xf32>, tensor<3x5xf32>) outs(%3 : tensor<3x4x5xf32>) {
   ^bb0(%in: f32, %in_0: f32, %out: f32):
-    %11 = arith.subf %in, %in_0 : f32
-    linalg.yield %11 : f32
+    %7 = arith.subf %in, %in_0 : f32
+    linalg.yield %7 : f32
   } -> tensor<3x4x5xf32>
-  %10 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%9 : tensor<3x4x5xf32>) outs(%8 : tensor<3x5xf32>) {
+  %6 = linalg.generic {indexing_maps = [#map2, #map3], iterator_types = ["parallel", "parallel", "reduction"]} ins(%5 : tensor<3x4x5xf32>) outs(%4 : tensor<3x5xf32>) {
   ^bb0(%in: f32, %out: f32):
-    %11 = math.exp %in : f32
-    %12 = arith.addf %11, %out : f32
-    linalg.yield %12 : f32
+    %7 = math.exp %in : f32
+    %8 = arith.addf %7, %out : f32
+    linalg.yield %8 : f32
   } -> tensor<3x5xf32>
-  iree_tensor_ext.dispatch.tensor.store %10, %2, offsets = [0, 0], sizes = [3, 5], strides = [1, 1] : tensor<3x5xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<3x5xf32>>
-  iree_tensor_ext.dispatch.tensor.store %9, %3, offsets = [0, 0, 0], sizes = [3, 4, 5], strides = [1, 1, 1] : tensor<3x4x5xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<3x4x5xf32>>
+  iree_tensor_ext.dispatch.tensor.store %6, %0, offsets = [0, 0], sizes = [3, 5], strides = [1, 1] : tensor<3x5xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<3x5xf32>>
+  iree_tensor_ext.dispatch.tensor.store %5, %1, offsets = [0, 0, 0], sizes = [3, 4, 5], strides = [1, 1, 1] : tensor<3x4x5xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<3x4x5xf32>>
   return
 }
 // CHECK-LABEL: func.func @producer_has_direct_write
