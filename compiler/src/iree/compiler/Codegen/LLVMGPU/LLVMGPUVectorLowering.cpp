@@ -264,13 +264,13 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
 
     Value flattenedAcc;
     VectorType parVecType = VectorType::get({parSize}, elemTy);
-    VectorType transposedVecType;
+    VectorType transposedAccVecType;
     if (accVecType) {
       Value acc = op.getAcc();
-      transposedVecType = accVecType;
+      transposedAccVecType = accVecType;
       if (!isIdentityPermutation(accPerm)) {
         acc = rewriter.create<vector::TransposeOp>(loc, acc, accPerm);
-        transposedVecType = cast<VectorType>(acc.getType());
+        transposedAccVecType = cast<VectorType>(acc.getType());
       }
       flattenedAcc = rewriter.create<vector::ShapeCastOp>(loc, parVecType, acc);
     } else {
@@ -289,7 +289,7 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
 
       // Unflatten
       Value reshaped = rewriter.create<vector::ShapeCastOp>(
-          loc, transposedVecType, resultFlat);
+          loc, transposedAccVecType, resultFlat);
 
       result = needTranspose ? rewriter.create<vector::TransposeOp>(
                                    loc, accVecType, reshaped, invert(accPerm))
@@ -325,17 +325,17 @@ private:
   }
 
   /// Constructs a permutation for vector.transpose from an affine map and a
-  /// reordered list of dimension indices ([red ..., par ...])
+  /// reordered list of dimension.
   ///
   /// Example:
   ///   map: (d0, d1, d2) -> (d0, d2, d1)
   ///   iterator_types = ["parallel","parallel","reduction"]
-  //    ==> new indices: [2, 0, 1]
+  //    ==> new dim order: [2, 0, 1]
   ///
-  ///   Step 1: Build dim-to-result mapping from the map
-  ///           dimToRes = {0: 0, 1: 2, 2: 1} -> [0, 2, 1]
+  ///   Step 1: Build dim-to-result mapping from the map.
+  ///           dimToRes = [0, 2, 1] i.e {0: 0, 1: 2, 2: 1}
   ///
-  ///   Step 2: Walk new indices in order to build permutation
+  ///   Step 2: Walk new dimension order in order to build permutation.
   ///           indices[0]=2 -> dimToRes[2]=1
   ///           indices[1]=0 -> dimToRes[0]=0
   ///           indices[2]=1 -> dimToRes[1]=2
@@ -374,14 +374,6 @@ private:
       }
     }
     return true;
-  }
-
-  static VectorType permutedType(VectorType vt, ArrayRef<int64_t> perm) {
-    SmallVector<int64_t> shape;
-    for (int64_t i : perm) {
-      shape.push_back(vt.getDimSize(i));
-    }
-    return VectorType::get(shape, vt.getElementType());
   }
 
   static Value processFMAChunk(PatternRewriter &rewriter, Location loc,
@@ -466,26 +458,26 @@ struct LLVMGPUVectorLoweringPass final
       // Lower high level vector operations like contract or multidim reduce ops
       // to lower level vector ops.
       RewritePatternSet contractLoweringPatterns(funcOp.getContext());
-      // auto options =
-      //     vector::VectorTransformsOptions().setVectorTransformsOptions(
-      //         vector::VectorContractLowering::OuterProduct);
-      // vector::populateVectorTransferPermutationMapLoweringPatterns(
-      //     contractLoweringPatterns);
-      // vector::TransposeOp::getCanonicalizationPatterns(contractLoweringPatterns,
-      //                                                  funcOp.getContext());
-      // vector::populateVectorBroadcastLoweringPatterns(contractLoweringPatterns);
-      // vector::populateVectorContractLoweringPatterns(
-      //     contractLoweringPatterns, options.vectorContractLowering);
-      // contractLoweringPatterns.add<PromoteContractOperands>(
-      //     funcOp->getContext());
+      auto options =
+          vector::VectorTransformsOptions().setVectorTransformsOptions(
+              vector::VectorContractLowering::OuterProduct);
+      vector::populateVectorTransferPermutationMapLoweringPatterns(
+          contractLoweringPatterns);
+      vector::TransposeOp::getCanonicalizationPatterns(contractLoweringPatterns,
+                                                       funcOp.getContext());
+      vector::populateVectorBroadcastLoweringPatterns(contractLoweringPatterns);
+      vector::populateVectorContractLoweringPatterns(
+          contractLoweringPatterns, options.vectorContractLowering);
+      contractLoweringPatterns.add<PromoteContractOperands>(
+          funcOp->getContext());
       contractLoweringPatterns.add<ContractToChainFMA>(funcOp->getContext(),
                                                           PatternBenefit(2));
-      // vector::populateVectorGatherLoweringPatterns(contractLoweringPatterns);
-      // vector::populateVectorMaskOpLoweringPatterns(contractLoweringPatterns);
-      // vector::populateVectorShapeCastLoweringPatterns(contractLoweringPatterns);
-      // vector::populateVectorMultiReductionLoweringPatterns(
-      //     contractLoweringPatterns,
-      //     vector::VectorMultiReductionLowering::InnerReduction);
+      vector::populateVectorGatherLoweringPatterns(contractLoweringPatterns);
+      vector::populateVectorMaskOpLoweringPatterns(contractLoweringPatterns);
+      vector::populateVectorShapeCastLoweringPatterns(contractLoweringPatterns);
+      vector::populateVectorMultiReductionLoweringPatterns(
+          contractLoweringPatterns,
+          vector::VectorMultiReductionLowering::InnerReduction);
       if (failed(applyPatternsGreedily(funcOp,
                                        std::move(contractLoweringPatterns)))) {
         return signalPassFailure();
