@@ -149,45 +149,46 @@ fuseConsumersIntoForall(RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
         continue;
       }
       mlir::computeTopologicalSorting(users);
-
-      Operation *fusableUser = users.front();
-      // Check all operands from the `scf.forall`
-      SmallVector<OpResult> loopResults;
-      for (OpOperand &opOperand : fusableUser->getOpOperands()) {
-        if (opOperand.get().getDefiningOp() == currLoop.getOperation()) {
-          loopResults.push_back(cast<OpResult>(opOperand.get()));
+      for (Operation *fusableUser : users) {
+        // Check all operands from the `scf.forall`
+        SmallVector<OpResult> loopResults;
+        for (OpOperand &opOperand : fusableUser->getOpOperands()) {
+          if (opOperand.get().getDefiningOp() == currLoop.getOperation()) {
+            loopResults.push_back(cast<OpResult>(opOperand.get()));
+          }
         }
-      }
 
-      SmallVector<Operation *> fusedSlices;
-      for (OpResult result : loopResults) {
-        BlockArgument tiedBlockArg =
-            currLoop.getTiedBlockArgument(currLoop.getTiedOpOperand(result));
-        SmallVector<tensor::ParallelInsertSliceOp> slices = llvm::map_to_vector(
-            currLoop.getCombiningOps(tiedBlockArg), [](Operation *op) {
-              return cast<tensor::ParallelInsertSliceOp>(op);
-            });
-        llvm::append_range(fusedSlices, slices);
-        allCandidates.insert_range(slices);
-      }
-      if (!fusedSlices.empty()) {
-        ConsumerFusionQueueEntry entry(std::move(fusedSlices), fusableUser);
+        SmallVector<Operation *> fusedSlices;
+        for (OpResult result : loopResults) {
+          BlockArgument tiedBlockArg =
+              currLoop.getTiedBlockArgument(currLoop.getTiedOpOperand(result));
+          SmallVector<tensor::ParallelInsertSliceOp> slices =
+              llvm::map_to_vector(
+                  currLoop.getCombiningOps(tiedBlockArg), [](Operation *op) {
+                    return cast<tensor::ParallelInsertSliceOp>(op);
+                  });
+          llvm::append_range(fusedSlices, slices);
+          allCandidates.insert_range(slices);
+        }
+        if (!fusedSlices.empty()) {
+          ConsumerFusionQueueEntry entry(std::move(fusedSlices), fusableUser);
 
-        // Comparator that puts the dominating user last.
-        auto comp = [&](const ConsumerFusionQueueEntry &lhs,
-                        const ConsumerFusionQueueEntry &rhs) {
-          return dominanceInfo.properlyDominates(rhs.fusableUser,
-                                                 lhs.fusableUser);
-        };
+          // Comparator that puts the dominating user last.
+          auto comp = [&](const ConsumerFusionQueueEntry &lhs,
+                          const ConsumerFusionQueueEntry &rhs) {
+            return dominanceInfo.properlyDominates(rhs.fusableUser,
+                                                   lhs.fusableUser);
+          };
 
-        // If the fusable user is already a candidate, update it with the new
-        // list of slices to handle. Otherwise, insert it into the right
-        // position based on dominance.
-        auto *it = llvm::lower_bound(candidates, entry, comp);
-        if (it != candidates.end() && it->fusableUser == fusableUser)
-          *it = std::move(entry);
-        else
-          candidates.insert(it, std::move(entry));
+          // If the fusable user is already a candidate, update it with the new
+          // list of slices to handle. Otherwise, insert it into the right
+          // position based on dominance.
+          auto *it = llvm::lower_bound(candidates, entry, comp);
+          if (it != candidates.end() && it->fusableUser == fusableUser)
+            *it = std::move(entry);
+          else
+            candidates.insert(it, std::move(entry));
+        }
       }
     }
   };
