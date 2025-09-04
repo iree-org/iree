@@ -281,30 +281,27 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
 
     ## Operands and Results
 
-    * `$indices`: Tensor of i32 indices specifying gather locations in the source tensor
+    * `$indices`: Tensor of index type specifying gather locations in the source tensor
     * `$source`: Source tensor containing the data to be gathered
     * `$init`: Destination tensor receiving the gathered data (destination-passing style)
     * `$result`: Output tensor with gathered data (same type as `$init`)
 
     ## Restrictions
 
-    * Must be nested inside an `scf.forall` operation to
+    1. **Nesting requirement**: Must be nested inside an `scf.forall` operation to
        coordinate parallel execution across subgroups
-    * Indices tensor must have `i32` element type
-    * Size ratio: The ratio of destination tensor byte size to number of indices
-       must be 1, 2, or 4 for proper memory alignment and coalescing:
-       ```
-       (num_dest_elements x bytes_per_element) / num_indices_elements ∈ {1, 2, 4}
-       ```
+
+    2. **Index type**: Indices tensor must have `index` element type
+
+    3. **Destination-passing style**: Init and result tensors must have identical types
 
     ## Example
 
     ```mlir
     %result = scf.forall (%i) in (%c1) shared_outs(%out = %dest) -> (tensor<64x32xf32>) {
       // Gather 64x32 elements from source based on indices
-      // Size ratio: (64x32x4 bytes) / (64x32 indices) = 4
       %gathered = iree_gpu.coalesced_gather_dma %indices, %source into %out
-        : tensor<64x32xi32>, tensor<1024x64xf32>, tensor<64x32xf32> -> tensor<64x32xf32>
+        : tensor<64x32xindex>, tensor<1024x64xf32>, tensor<64x32xf32> -> tensor<64x32xf32>
       scf.forall.in_parallel {
         tensor.parallel_insert_slice %gathered into %out[0, 0] [64, 32] [1, 1]
           : tensor<64x32xf32> into tensor<64x32xf32>
