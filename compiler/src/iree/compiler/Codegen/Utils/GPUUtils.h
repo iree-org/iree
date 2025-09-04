@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_UTILS_GPUUTILS_H_
 #define IREE_COMPILER_CODEGEN_UTILS_GPUUTILS_H_
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -207,11 +208,19 @@ IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op);
 std::optional<int64_t> getConfigWavesPerEu(DictionaryAttr targetAttr);
 IntegerAttr getConfigWavesPerEuAttr(DictionaryAttr targetAttr);
 
+IREE::Codegen::DenormalFpMathAttr
+getConfigDenormalFpMathF32Attr(DictionaryAttr targetConfig);
+std::optional<IREE::Codegen::DenormalFpMath>
+getConfigDenormalFpMathF32(DictionaryAttr targetConfig);
+
 /// Methods to add attributes to the `config` list.
 void addConfigGPUTarget(MLIRContext *context, IREE::GPU::TargetAttr,
                         SmallVectorImpl<NamedAttribute> &config);
 void addConfigWavesPerEu(MLIRContext *context, int64_t wavesPerEu,
                          SmallVectorImpl<NamedAttribute> &config);
+void addConfigDenormalFpMathF32(MLIRContext *context,
+                                IREE::Codegen::DenormalFpMath mode,
+                                SmallVectorImpl<NamedAttribute> &config);
 
 /// Returns the GPU subgroup size chosen for the current CodeGen pipeline if
 /// exists; otherwise returns the subgroup size from the GPU target description.
