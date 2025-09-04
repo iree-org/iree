@@ -710,7 +710,6 @@ void ConvertToSPIRVPass::runOnOperation() {
       typeConverter, std::numeric_limits<int64_t>::max() / 8, patterns);
 
   // Pull in vector patterns to convert vector ops.
-  vector::populateVectorFromElementsLoweringPatterns(patterns);
   mlir::populateVectorToSPIRVPatterns(typeConverter, patterns);
 
   // Pull in builtin func to spirv.func conversion.
