@@ -402,8 +402,6 @@ private:
                                                          stride);
   }
 
-  // Core: produce resultFlat := fold_k fma(lhs2D[k,*], rhs2D[k,*], accFlat)
-  // using vector<2xf32> chunks, chaining from inner-most FMA (backwards).
   static Value buildFMAChain(PatternRewriter &rewriter, Location loc,
                              Value lhs2D, Value rhs2D, Value accFlat, int64_t K,
                              int64_t P, int chunkSize) {
