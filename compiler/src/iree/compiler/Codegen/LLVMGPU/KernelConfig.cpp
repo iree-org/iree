@@ -792,7 +792,8 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   unsigned threadLoads = largestLoadSizeInBits / *bitWidth;
   if (!hasDynamicReductionDim) {
-    while ((reductionSize / threadLoads) % subgroupSize != 0) {
+    // Ensure threads either load a full vector, or nothing.
+    while (reductionSize % threadLoads != 0) {
       threadLoads /= 2;
     }
   }
