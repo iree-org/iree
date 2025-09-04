@@ -148,19 +148,17 @@ MlirTypeID ireeGPUVirtualMMAIntrinsicAttrGetTypeID() {
       mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsicAttr::getTypeID());
 }
 
-static_assert(std::is_same_v<mma_intrinsic_enum_t, uint32_t>,
-              "mma_intrinsic_enum_t must be uint32_t");
+static_assert(
+    std::is_same_v<
+        mma_intrinsic_enum_t,
+        std::underlying_type_t<mlir::iree_compiler::IREE::GPU::MMAIntrinsic>>,
+    "MMAIntrinsic Enum type changed");
 
 static_assert(
-    std::is_same_v<uint32_t, std::underlying_type_t<
-                                 mlir::iree_compiler::IREE::GPU::MMAIntrinsic>>,
-    "Enum type changed");
-
-static_assert(
-    std::is_same_v<uint32_t,
+    std::is_same_v<mma_intrinsic_enum_t,
                    std::underlying_type_t<
                        mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic>>,
-    "Enum type changed");
+    "VirtualMMAIntrinsic Enum type changed");
 
 MlirAttribute ireeGPUMMAIntrinsicAttrGet(MlirContext mlirCtx,
                                          mma_intrinsic_enum_t value) {
