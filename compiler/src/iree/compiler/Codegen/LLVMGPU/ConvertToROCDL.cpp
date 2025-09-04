@@ -172,6 +172,24 @@ static LogicalResult validateDataTypes(Operation *op,
   return success();
 }
 
+struct LowerToElementsPattern : public OpRewritePattern<vector::ToElementsOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(vector::ToElementsOp op,
+                                PatternRewriter &rewriter) const override {
+    VectorType vecType = op.getSource().getType();
+    if (vecType.getRank() == 1 || vecType.getNumScalableDims() > 0) {
+      return failure();
+    }
+    auto vec1DType =
+        VectorType::get({vecType.getNumElements()}, vecType.getElementType());
+    Value shapeCast = rewriter.create<vector::ShapeCastOp>(
+        op.getLoc(), vec1DType, op.getSource());
+    rewriter.replaceOpWithNewOp<vector::ToElementsOp>(op, op.getResultTypes(),
+                                                      shapeCast);
+    return success();
+  }
+};
+
 /// A pass that replaces all occurrences of GPU device operations with their
 /// corresponding ROCDL equivalent.
 ///
@@ -270,6 +288,7 @@ struct ConvertToROCDLPass final
           patterns, options.vectorTransposeLowering);
       vector::populateVectorTransferLoweringPatterns(patterns);
       arith::populateExpandBFloat16Patterns(patterns);
+      patterns.insert<LowerToElementsPattern>(&getContext());
       if (failed(applyPatternsGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
       }
