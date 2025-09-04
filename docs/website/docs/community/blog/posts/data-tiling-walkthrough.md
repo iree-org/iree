@@ -1403,7 +1403,7 @@ be found in
 * The compute ops, e.g., `linalg.matmul`, are replaced with the ops without
   encodings. In the example, the GPU encoding resolver lowers `linalg.matmul` to
   `iree_codegen.inner_tiled` ops. The implementation is done by
-  [interface methods](https://github.com/iree-org/iree/blob/e6fb1e180438c4f78a1ea2bafd9a653fbe7a064b/compiler/src/iree/compiler/Codegen/ExternalInterfaces/GPUEncodingExternalModels.cpp#L364-L383)
+  [interface methods](https://github.com/iree-org/iree/blob/e6fb1e180438c4f78a1ea2bafd9a653fbe7a064b/compiler/src/iree/compiler/Codegen/ExternalInterfaces/GPUEncodingExternalModels.cpp#L364-L383).
 
 After the encoding materialization, the code-generation pipeline is as the same
 as regular input. In the example, they all go down to GPU TileAndFuse pipeline.
