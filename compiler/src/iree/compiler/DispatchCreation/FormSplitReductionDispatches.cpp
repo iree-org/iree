@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -204,9 +205,13 @@ tileOpAndWrapInDispatch(RewriterBase &rewriter, TilingInterface op,
   scf::SCFTileAndFuseOptions tileAndFuseOptions;
   // Only fuse along the dest operand.
   scf::SCFTileAndFuseOptions::ControlFnTy fusionControlFn =
-      [](tensor::ExtractSliceOp, OpResult result, bool isDestArg)
+      [](tensor::ExtractSliceOp extractOp, OpResult result, bool isDestArg)
       -> std::optional<scf::SCFTileAndFuseOptions::ControlFnResult> {
     if (isDestArg) {
+      return scf::SCFTileAndFuseOptions::ControlFnResult{false};
+    }
+    Operation *extractSource = extractOp.getSource().getDefiningOp();
+    if (extractSource && IREE::LinalgExt::isBitExtendOp(extractSource)) {
       return scf::SCFTileAndFuseOptions::ControlFnResult{false};
     }
     return std::nullopt;
