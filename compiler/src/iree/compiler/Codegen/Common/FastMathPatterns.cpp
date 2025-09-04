@@ -24,13 +24,13 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
   // Helper to evaluate a polynomial using FMA chains for both scalar and vector
   // types.
   template <typename ValueT>
-  static ValueT evalErfPolynomial(ValueT x, ValueT t, ArrayRef<ValueT> coeffs,
+  static ValueT evalErfPolynomial(ValueT ax, ValueT t, ArrayRef<ValueT> coeffs,
                                   PatternRewriter &rewriter, Location loc) {
     ValueT acc = coeffs[0];
     for (size_t i = 1; i < coeffs.size(); ++i) {
-      acc = rewriter.create<math::FmaOp>(loc, t, acc, coeffs[i]);
+      acc = rewriter.create<math::FmaOp>(loc, acc, t, coeffs[i]);
     }
-    return rewriter.create<math::FmaOp>(loc, x, acc, x);
+    return rewriter.create<math::FmaOp>(loc, ax, acc, ax);
   }
 
   LogicalResult matchAndRewrite(math::ErfOp op,
@@ -92,13 +92,10 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
       rewriter.create<scf::YieldOp>(loc, result1);
 
       // Else region: |x| >= 1.0 - evaluate different polynomial and
-      // post-processing
+      // post-processing.
       rewriter.setInsertionPointToStart(&ifOp.getElseRegion().front());
-      Value mad5 = coeffs2[0];
-      for (size_t i = 1; i < coeffs2.size(); ++i) {
-        mad5 = rewriter.create<math::FmaOp>(loc, ax, mad5, coeffs2[i]);
-      }
-      Value p2 = mad5;
+      Value p2 =
+          evalErfPolynomial(ax, ax, ArrayRef<Value>(coeffs2), rewriter, loc);
       Value negP2 = rewriter.create<arith::NegFOp>(loc, p2);
       Value expNegP2 = rewriter.create<math::ExpOp>(loc, negP2);
       Value result2 = rewriter.create<arith::SubFOp>(loc, one, expNegP2);
@@ -120,11 +117,8 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
           evalErfPolynomial(ax, t, ArrayRef<Value>(coeffs1), rewriter, loc);
 
       // Compute second polynomial (for |x| >= 1.0)
-      Value mad5 = coeffs2[0];
-      for (size_t i = 1; i < coeffs2.size(); ++i) {
-        mad5 = rewriter.create<math::FmaOp>(loc, ax, mad5, coeffs2[i]);
-      }
-      Value p2 = mad5;
+      Value p2 =
+          evalErfPolynomial(ax, ax, ArrayRef<Value>(coeffs2), rewriter, loc);
       Value negP2 = rewriter.create<arith::NegFOp>(loc, p2);
       Value expNegP2 = rewriter.create<math::ExpOp>(loc, negP2);
       Value result2 = rewriter.create<arith::SubFOp>(loc, one, expNegP2);
