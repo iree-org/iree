@@ -278,7 +278,7 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
           rewriter.create<vector::BroadcastOp>(loc, parVecType, op.getAcc());
     }
 
-    const int chunkSize = 2;
+    const int64_t chunkSize = 2;
     Value resultFlat = buildFMAChain(rewriter, loc, lhs2D, rhs2D, flattenedAcc,
                                      redSize, parSize, chunkSize);
 
@@ -295,8 +295,7 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
                                    loc, accVecType, reshaped, invert(accPerm))
                              : reshaped;
     } else {
-      result = rewriter.create<vector::ExtractOp>(loc, resultFlat,
-                                                  ArrayRef<int64_t>{0});
+      result = rewriter.create<vector::ExtractOp>(loc, resultFlat, 0);
     }
 
     rewriter.replaceOp(op, result);
@@ -304,10 +303,10 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
   }
 
 private:
-  static SmallVector<int64_t> invert(ArrayRef<int64_t> p) {
-    SmallVector<int64_t> inv(p.size());
-    for (int64_t i = 0; i < p.size(); ++i) {
-      inv[p[i]] = i;
+  static SmallVector<int64_t> invert(ArrayRef<int64_t> perm) {
+    SmallVector<int64_t> inv(perm.size());
+    for (int64_t i = 0; i < perm.size(); ++i) {
+      inv[perm[i]] = i;
     }
     return inv;
   }
@@ -367,9 +366,9 @@ private:
     return p;
   }
 
-  static bool isIdentityPermutation(ArrayRef<int64_t> p) {
-    for (int64_t i = 0, e = p.size(); i < e; ++i) {
-      if (p[i] != i) {
+  static bool isIdentityPermutation(ArrayRef<int64_t> perm) {
+    for (size_t i = 0, e = perm.size(); i < e; ++i) {
+      if (perm[i] != i) {
         return false;
       }
     }
@@ -378,7 +377,7 @@ private:
 
   static Value processFMAChunk(PatternRewriter &rewriter, Location loc,
                                Value lhsRow, Value rhsRow, Value acc,
-                               int64_t offset, int chunkSize) {
+                               int64_t offset, int64_t chunkSize) {
     int64_t stride = 1;
 
     Value a = rewriter.create<vector::ExtractStridedSliceOp>(
@@ -396,14 +395,14 @@ private:
 
   static Value buildFMAChain(PatternRewriter &rewriter, Location loc,
                              Value lhs2D, Value rhs2D, Value accFlat, int64_t K,
-                             int64_t P, int chunkSize) {
+                             int64_t P, int64_t chunkSize) {
     Value current = accFlat;
 
     for (int64_t k = K - 1; k >= 0; --k) {
       Value lhsRow =
-          rewriter.create<vector::ExtractOp>(loc, lhs2D, ArrayRef<int64_t>{k});
+          rewriter.create<vector::ExtractOp>(loc, lhs2D, k);
       Value rhsRow =
-          rewriter.create<vector::ExtractOp>(loc, rhs2D, ArrayRef<int64_t>{k});
+          rewriter.create<vector::ExtractOp>(loc, rhs2D, k);
 
       // Process full chunks
       int64_t p = 0;
