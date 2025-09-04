@@ -1921,3 +1921,32 @@ func.func @_encoding_0_encode_DxDxf32_to_DxDxf32() {
 
 </details>
 <!-- markdownlint-restore -->
+
+## Build Your Own Encoding Attributes and Resolver
+
+Data-tiling is an optional optimization technique, and it is not supported by
+all backends. The targets that support data-tiling are:
+
+* CPU (x86)
+* CPU (AArch64)
+* CPU (RISC-V)
+* GPU (ROCm)
+* VMVX
+
+More targets may be supported in the future, and contributions are welcome. You
+can explore the available options in
+[Codegen/ExternalInterfaces/](https://github.com/iree-org/iree/tree/main/compiler/src/iree/compiler/Codegen/ExternalInterfaces).
+
+The encoding type attributes are defined in
+[EncodingAttrs.td](https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/Dialect/Encoding/IR/EncodingAttrs.td);
+the target-specific encoding resolvers, which decide how these attributes are
+lowered, are defined in their dialects. E.g., CPU defines the encoding
+resolvers in
+[IREECPUAttrs.td](https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/Codegen/Dialect/CPU/IR/IREECPUAttrs.td),
+and GPU defines the encoding resolvers in
+[IREEGPUAttrs.td](https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.td).
+
+The interface implementations are isolated in
+[Codegen/ExternalInterfaces/](https://github.com/iree-org/iree/tree/main/compiler/src/iree/compiler/Codegen/ExternalInterfaces),
+to avoid moving domain-specific logic into the dialect implementations. You can
+follow one of the implementations to build your own encoding resolver.
