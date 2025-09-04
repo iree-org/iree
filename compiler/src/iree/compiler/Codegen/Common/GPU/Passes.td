@@ -261,6 +261,7 @@ def GPUPromoteMatmulOperandsPass :
     "::mlir::bufferization::BufferizationDialect",
     "::mlir::gpu::GPUDialect",
     "::mlir::linalg::LinalgDialect",
+    "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
   ];
 }
