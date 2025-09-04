@@ -179,8 +179,9 @@ static void addDispatchRegionCreationPreprocessingPasses(
       //        - Split reduction using partial reduction tiling.
       .addPass([&]() {
         return DispatchCreation::createFormSplitReductionDispatchesPass(
-            {.targetSplitReductionSize =
-                 dispatchOptions.targetSplitReductionSize});
+            FormSplitReductionDispatchesPassOptions{
+                /*targetSplitReductionSize=*/
+                dispatchOptions.targetSplitReductionSize});
       })
 
       //     c. Transpose generic ops to
