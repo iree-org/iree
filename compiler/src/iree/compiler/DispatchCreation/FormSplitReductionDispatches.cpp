@@ -86,9 +86,11 @@ tileOpAndWrapInDispatch(RewriterBase &rewriter, TilingInterface op,
   scf::SCFTileAndFuseOptions tileAndFuseOptions;
   // Only fuse along the dest operand.
   scf::SCFTileAndFuseOptions::ControlFnTy fusionControlFn =
-      [](tensor::ExtractSliceOp, OpResult, bool isDestArg)
+      [](tensor::ExtractSliceOp extractOp, OpResult, bool isDestArg)
       -> std::optional<scf::SCFTileAndFuseOptions::ControlFnResult> {
-    if (isDestArg) {
+    Operation *extractSource = extractOp.getSource().getDefiningOp();
+    if (isDestArg ||
+        (extractSource && IREE::LinalgExt::isBitExtendOp(extractSource))) {
       return scf::SCFTileAndFuseOptions::ControlFnResult{false};
     }
     return std::nullopt;
