@@ -192,20 +192,24 @@ static bool hasCompatibleOuterParallelLoops(
 namespace {
 class FusionGroup {
 public:
-  FusionGroup(Operation *root) : rootOp(root) {
-    parallelLoops.insert_or_assign(root, getOuterParallelLoops(root));
+  FusionGroup(Operation *op) : rootOp(op) {
+    llvm::SmallBitVector loops = getOuterParallelLoops(op);
+    auto map = AffineMap::getFilteredIdentityMap(
+        op->getContext(), loops.size(), [&](AffineDimExpr dimExpr) {
+          return loops.test(dimExpr.getPosition());
+        });
+    map = inverseAndBroadcastProjectedPermutation(map);
+    loopMaps.insert({op, map});
   };
 
   // TODO(IanWood1): REMOVE... only for my debug
   void print() const {
     llvm::dbgs() << "================================\n";
     llvm::dbgs() << "START OF GROUP\n";
-    for (const auto &[op, loops] : parallelLoops) {
+    for (const auto &[op, map] : loopMaps) {
       llvm::dbgs() << "OP!\n parallel loops: ";
       op->dumpPretty();
-      for (int i = 0; i < loops.size(); i++) {
-        llvm::dbgs() << loops.test(i) << " ";
-      }
+      map.dump();
       llvm::dbgs() << '\n';
     }
   }
@@ -221,26 +225,23 @@ public:
 
   Operation *getRoot() const { return rootOp; }
 
-  void insert(Operation *op) {
-    assert(op != rootOp);
-
+  FailureOr<AffineMap> getMapping(Operation *op) const {
     auto fusionOp = dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(op);
     if (!fusionOp) {
-      parallelLoops.insert_or_assign(op, getOuterParallelLoops(op));
-      fusedOps.insert(op);
-      return;
+      llvm::SmallBitVector loops = getOuterParallelLoops(op);
+      auto map = AffineMap::getFilteredIdentityMap(
+          op->getContext(), loops.size(), [&](AffineDimExpr dimExpr) {
+            return loops.test(dimExpr.getPosition());
+          });
+      map = inverseAndBroadcastProjectedPermutation(map);
+      return map;
     }
-
-    // 2 exclusive cases:
-    //   (1) it is a producer of the root
-    //   (2) it is a consumer of the root
     bool isConsumer = llvm::any_of(op->getOperands(), [&](Value v) {
       auto *definingOp = v.getDefiningOp();
       return fusedOps.contains(definingOp) || definingOp == rootOp;
     });
 
     if (isConsumer) {
-      llvm::SmallBitVector consumerLoops(fusionOp.getNumLoops());
       for (OpOperand &operand : op->getOpOperands()) {
         auto fusionProducer =
             operand.get()
@@ -248,8 +249,8 @@ public:
         if (!fusionProducer) {
           continue;
         }
-        auto it = parallelLoops.find(fusionProducer);
-        if (it == parallelLoops.end()) {
+        auto it = loopMaps.find(fusionProducer);
+        if (it == loopMaps.end()) {
           continue;
         }
 
@@ -259,31 +260,19 @@ public:
         AffineMap inverseMap =
             inverseAndBroadcastProjectedPermutation(operandMap);
         AffineMap composedMap = inverseMap.compose(resultMap);
-        auto &producerLoops = it->getSecond();
-        for (auto [producerDim, expr] :
-             llvm::enumerate(composedMap.getResults())) {
-          auto dimExpr = dyn_cast<AffineDimExpr>(expr);
-          if (!dimExpr) {
-            continue;
-          }
-          if (producerLoops.test(producerDim)) {
-            consumerLoops.set(dimExpr.getPosition());
-          }
-        }
+        auto &producerMap = it->getSecond();
+        return composedMap.compose(producerMap);
       }
-      parallelLoops.insert_or_assign(op,
-                                     consumerLoops & getOuterParallelLoops(op));
     } else {
-      llvm::SmallBitVector producerLoops(fusionOp.getNumLoops());
       for (OpOperand &operand : op->getUses()) {
+        auto it = loopMaps.find(operand.getOwner());
+        if (it == loopMaps.end()) {
+          continue;
+        }
         auto fusionConsumer =
             dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(
                 operand.getOwner());
         if (!fusionConsumer) {
-          continue;
-        }
-        auto it = parallelLoops.find(fusionConsumer);
-        if (it == parallelLoops.end()) {
           continue;
         }
 
@@ -293,22 +282,25 @@ public:
         AffineMap inverseMap =
             inverseAndBroadcastProjectedPermutation(resultMap);
         AffineMap composedMap = inverseMap.compose(consumerMap);
-        auto &producerLoops = it->getSecond();
-        for (auto [producerDim, expr] :
-             llvm::enumerate(composedMap.getResults())) {
-          auto dimExpr = dyn_cast<AffineDimExpr>(expr);
-          if (!dimExpr) {
-            continue;
-          }
-          if (producerLoops.test(producerDim)) {
-            producerLoops.set(dimExpr.getPosition());
-          }
-        }
+        auto &other = it->getSecond();
+        return composedMap.compose(other);
       }
-      parallelLoops.insert_or_assign(op,
-                                     producerLoops & getOuterParallelLoops(op));
     }
+    return failure();
+  }
 
+  void insert(Operation *op) {
+    assert(op != rootOp);
+
+    // 2 exclusive cases:
+    //   (1) it is a producer of the root
+    //   (2) it is a consumer of the root
+    FailureOr<AffineMap> map = getMapping(op);
+    rootOp->dump();
+    op->dump();
+    if (succeeded(map)) {
+      loopMaps.insert({op, map.value()});
+    }
     fusedOps.insert(op);
     print();
   }
@@ -316,7 +308,7 @@ public:
 private:
   Operation *rootOp;
   SetVector<Operation *> fusedOps;
-  DenseMap<Operation *, llvm::SmallBitVector> parallelLoops;
+  DenseMap<Operation *, AffineMap> loopMaps;
 };
 
 class GraphFusionTracker {
