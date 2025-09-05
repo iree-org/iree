@@ -1596,3 +1596,65 @@ util.func public @dynamic_quantization_fp4(%arg0 : tensor<?x32xf16>, %arg1 : ind
 //       CHECK:     flow.return %[[SCALE]], %[[QUANTIZED]]
 //       CHECK:   %[[BITCAST:.+]] = iree_tensor_ext.bitcast %[[DISPATCH]]#1
 //       CHECK:   return %[[BITCAST]], %[[DISPATCH]]#0
+
+// -----
+
+util.func public @fuse_both_uses_transposed(%arg0 : tensor<?x?xf32>,
+    %arg1 : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %cst = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %d0 = tensor.dim %arg1, %c0 : tensor<?x?xf32>
+  %d1 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
+  %empty = tensor.empty(%d0, %d1) : tensor<?x?xf32>
+  %3 = linalg.matmul ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>)
+          outs(%empty : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %5 = linalg.generic  {
+      indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>,
+                       affine_map<(d0, d1) -> (d1, d0)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%3, %3 : tensor<?x?xf32>, tensor<?x?xf32>)
+      outs(%empty : tensor<?x?xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32, %b2 :f32) :
+      %6 = arith.addf %b0, %b1 : f32
+      linalg.yield %6 : f32
+  } -> tensor<?x?xf32>
+  util.return %5 : tensor<?x?xf32>
+}
+// CHECK-LABEL: @fuse_both_uses_transposed
+//       CHECK:   flow.dispatch.region
+//       CHECK:     %[[MATMUL:.+]] = linalg.matmul
+//       CHECK:     linalg.generic
+//  CHECK-SAME:       ins(%[[MATMUL]], %[[MATMUL]]
+
+// -----
+
+util.func public @dont_fuse_use_transpose_and_identity(%arg0 : tensor<?x?xf32>,
+    %arg1 : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %cst = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %d0 = tensor.dim %arg1, %c0 : tensor<?x?xf32>
+  %d1 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
+  %empty = tensor.empty(%d0, %d1) : tensor<?x?xf32>
+  %3 = linalg.matmul ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>)
+          outs(%empty : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %5 = linalg.generic  {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d1, d0)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%3, %3 : tensor<?x?xf32>, tensor<?x?xf32>)
+      outs(%empty : tensor<?x?xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32, %b2 :f32) :
+      %6 = arith.addf %b0, %b1 : f32
+      linalg.yield %6 : f32
+  } -> tensor<?x?xf32>
+  util.return %5 : tensor<?x?xf32>
+}
+// CHECK-LABEL: @dont_fuse_use_transpose_and_identity
+//       CHECK:   flow.dispatch.region
+//       CHECK:     linalg.matmul
+//       CHECK:   flow.dispatch.region
+//       CHECK:     linalg.generic
