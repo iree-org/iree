@@ -279,7 +279,7 @@ static std::optional<ArrayAttr> getPaddingConvSizes(
   return b.getI64ArrayAttr(paddingConvSizes);
 }
 
-static FailureOr<int64_t> getRank(Value in) {
+[[maybe_unused]] static FailureOr<int64_t> getRank(Value in) {
   if (auto typ = dyn_cast<ShapedType>(in.getType())) {
     return typ.getRank();
   }
@@ -401,9 +401,9 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   Value init = operands[2];
   if (scaled) {
     init = operands[4];
-    assert(llvm::all_of(operands,
-                        [&](Value a) { return succeeded(getRank(a)); }) &&
-           "All operands must be a shaped type");
+    assert(
+        llvm::all_of(operands, [](Value a) { return succeeded(getRank(a)); }) &&
+        "All operands must be a shaped type");
     assert(*getRank(lhs) > *getRank(operands[3]) &&
            *getRank(rhs) > *getRank(operands[4]) &&
            "Expected operands #1 and #2 to have a greater rank then their "
