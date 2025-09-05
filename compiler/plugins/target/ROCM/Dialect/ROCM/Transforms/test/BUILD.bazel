@@ -13,7 +13,8 @@ package(
 )
 
 gpu_archs = [
-    "gfx942","gfx950"
+    "gfx942",
+    "gfx950",
 ]
 
 ukernel_pdl_patterns_files = [

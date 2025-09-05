@@ -25,7 +25,8 @@ endif()
 
 # Target archs for specialization patternsets. https://llvm.org/docs/AMDGPUUsage.html#processors
 gpu_archs = [
-    "gfx942","gfx950"
+    "gfx942",
+    "gfx950",
 ]
 
 ukernel_patterns_mlir_files = [
