@@ -192,21 +192,8 @@ MutableOperandRange CoalescedGatherDMAOp::getDpsInitsMutable() {
 }
 
 LogicalResult CoalescedGatherDMAOp::verify() {
-  // Verify that this op must be inside a scf.forall op
-  if (!(*this)->getParentOfType<scf::ForallOp>()) {
-    return emitOpError("must be nested inside an scf.forall operation");
-  }
-
-  // Indices and source tensors have compatible types
-  auto indicesType = cast<RankedTensorType>(getIndices().getType());
   auto initType = cast<RankedTensorType>(getInit().getType());
   auto resultType = cast<RankedTensorType>(getResult().getType());
-
-  // Indices must be of index type
-  auto indicesElementType = indicesType.getElementType();
-  if (!indicesElementType.isIndex()) {
-    return emitOpError("indices must have index element type");
-  }
 
   if (initType != resultType) {
     return emitOpError("init and result types must match");

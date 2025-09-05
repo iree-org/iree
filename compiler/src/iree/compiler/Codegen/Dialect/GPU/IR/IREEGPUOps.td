@@ -311,7 +311,7 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
   }];
 
   let arguments = (ins
-    AnyRankedTensor:$indices,
+    RankedTensorOf<[Index]>:$indices,
     AnyRankedTensor:$source,
     AnyRankedTensor:$init
   );
