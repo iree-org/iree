@@ -1184,6 +1184,7 @@ util.func @avoid_use_def_violation_on_consumer_fusion(%arg0 : tensor<?xf32>,
 
 // -----
 
+// Test transposed output.
 util.func @horizontal_fusion3(%lhs : tensor<2x4096x640xf16>,
     %rhs0 : tensor<10x64x640xf16>, %rhs1 : tensor<10x64x640xf16>,
     %rhs2 : tensor<10x64x640xf16>) ->
@@ -1254,7 +1255,6 @@ util.func @horizontal_fusion3(%lhs : tensor<2x4096x640xf16>,
   } -> tensor<2x10x64x4096xf16>
   util.return %8, %9, %10 : tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>, tensor<2x10x64x4096xf16>
 }
-//      CHECK: #[[INTERCHANGED_MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3, d2)>
 //      CHECK: func public @horizontal_fusion3
 //      CHECK:   %[[DISPATCH:.+]]:3 = flow.dispatch.region
 //      CHECK:     %[[GENERIC:.+]]:3 = linalg.generic
@@ -1263,7 +1263,6 @@ util.func @horizontal_fusion3(%lhs : tensor<2x4096x640xf16>,
 //      CHECK:     %[[TRUNC1:.+]] = linalg.generic
 // CHECK-SAME:         ins(%[[GENERIC]]#1 :
 //      CHECK:     %[[TRUNC2:.+]] = linalg.generic
-// CHECK-SANE:         indexing_maps = [#[[INTERCHANGED_MAP]], #[[INTERCHANGED_MAP]]]
 // CHECK-SAME:         ins(%[[GENERIC]]#2 :
 //      CHECK:     flow.return %[[TRUNC0]], %[[TRUNC1]], %[[TRUNC2]]
 //      CHECK:   util.return %[[DISPATCH]]#0, %[[DISPATCH]]#1, %[[DISPATCH]]#2

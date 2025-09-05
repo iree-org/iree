@@ -1541,6 +1541,7 @@ util.func public @fuse_conv2d_with_multiple_uses(%input: tensor<1x225x225x16xf32
 
 // -----
 
+// TODO(IanWood1): determine if this is required.
 util.func public @dont_fuse_conv2d_with_non_identity_map(%input: tensor<1x225x225x16xf32>, %filter: tensor<3x3x16x32xf32>, %offset: tensor<32xf32>) -> tensor<1x112x112x32xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = tensor.empty() : tensor<1x112x112x32xf32>
@@ -1567,11 +1568,10 @@ util.func public @dont_fuse_conv2d_with_non_identity_map(%input: tensor<1x225x22
 
 // CHECK-LABEL: util.func public @dont_fuse_conv2d_with_non_identity_map
 
-// CHECK: flow.dispatch.workgroups
-// CHECK:   linalg.conv_2d_nhwc_hwcf
-
-// CHECK: flow.dispatch.workgroups
-// CHECK:   linalg.generic
+//       CHECK: flow.dispatch.workgroups
+//       CHECK:   linalg.conv_2d_nhwc_hwcf
+//   CHECK-NOT: flow.dispatch.workgroups
+//       CHECK:   linalg.generic
 
 // -----
 

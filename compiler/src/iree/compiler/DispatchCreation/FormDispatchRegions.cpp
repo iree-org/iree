@@ -135,56 +135,6 @@ matchIteratorTypes(const llvm::SmallBitVector &rootOuterParallelLoop,
   return true;
 }
 
-// Method to check if the op with have compatible indexing map on outer-parallel
-// loops. Currently it means the map needs to be identity on the those
-// dimensions, ignoring its reduction dimensions.
-static bool hasCompatibleOuterParallelLoops(
-    TilingInterface tileOp, AffineMap indexingMap,
-    const llvm::SmallBitVector &rootOuterParallelLoops) {
-  if (!indexingMap.isProjectedPermutation()) {
-    return false;
-  }
-
-  llvm::SmallBitVector parallelLoops = getOuterParallelLoops(tileOp);
-  if (!matchIteratorTypes(rootOuterParallelLoops, parallelLoops)) {
-    return false;
-  }
-
-  /// Project out the non-parallel dimensions.
-  llvm::SmallBitVector projectedDims(rootOuterParallelLoops);
-  projectedDims.flip();
-  projectedDims.resize(tileOp.getLoopIteratorTypes().size(), true);
-  auto projectedMap = getProjectedMap(indexingMap, projectedDims);
-  return isIdentityMapWithZeros(projectedMap);
-}
-
-// Method to check if two `linalg.generic` op with producer-consumer
-// relationship through `operand` have compatible outer-parallel loops.
-static bool hasCompatibleOuterParallelLoops(
-    OpOperand &operand, const llvm::SmallBitVector &rootOuterParallelLoops) {
-  auto producer =
-      operand.get().getDefiningOp<IREE::LinalgExt::LinalgFusionOpInterface>();
-  auto consumer =
-      dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(operand.getOwner());
-  if (!producer || !consumer)
-    return false;
-
-  auto producerIndexingMap = producer.getIndexingMapMatchingResult(
-      llvm::cast<OpResult>(operand.get()));
-  auto consumerIndexingMap = consumer.getMatchingIndexingMap(&operand);
-
-  if (!producerIndexingMap || !consumerIndexingMap) {
-    return false;
-  }
-
-  return hasCompatibleOuterParallelLoops(
-             cast<TilingInterface>(producer.getOperation()),
-             producerIndexingMap, rootOuterParallelLoops) &&
-         hasCompatibleOuterParallelLoops(
-             cast<TilingInterface>(consumer.getOperation()),
-             consumerIndexingMap, rootOuterParallelLoops);
-}
-
 //===----------------------------------------------------------------------===//
 // Root and fusion group handling
 //===----------------------------------------------------------------------===//
@@ -200,18 +150,19 @@ public:
         });
     map = inverseAndBroadcastProjectedPermutation(map);
     loopMaps.insert({op, map});
+    print();
   };
 
   // TODO(IanWood1): REMOVE... only for my debug
   void print() const {
-    llvm::dbgs() << "================================\n";
-    llvm::dbgs() << "START OF GROUP\n";
-    for (const auto &[op, map] : loopMaps) {
-      llvm::dbgs() << "OP!\n parallel loops: ";
-      op->dumpPretty();
-      map.dump();
-      llvm::dbgs() << '\n';
-    }
+    // llvm::dbgs() << "================================\n";
+    // llvm::dbgs() << "START OF GROUP\n";
+    // for (const auto &[op, map] : loopMaps) {
+    //   llvm::dbgs() << "OP!\n parallel loops: ";
+    //   op->dumpPretty();
+    //   map.dump();
+    //   llvm::dbgs() << '\n';
+    // }
   }
 
   // TODO(IanWood1): rename to make it clear this includes the root.
@@ -242,6 +193,7 @@ public:
     });
 
     if (isConsumer) {
+      AffineMap newMap;
       for (OpOperand &operand : op->getOpOperands()) {
         auto fusionProducer =
             operand.get()
@@ -257,13 +209,23 @@ public:
         AffineMap resultMap = fusionProducer.getIndexingMapMatchingResult(
             cast<OpResult>(operand.get()));
         AffineMap operandMap = fusionOp.getMatchingIndexingMap(&operand);
+        if (!resultMap || !operandMap || !resultMap.isProjectedPermutation() ||
+            !operandMap.isProjectedPermutation()) {
+          return failure();
+        }
         AffineMap inverseMap =
             inverseAndBroadcastProjectedPermutation(operandMap);
         AffineMap composedMap = inverseMap.compose(resultMap);
         auto &producerMap = it->getSecond();
-        return composedMap.compose(producerMap);
+        composedMap = composedMap.compose(producerMap);
+        if (newMap && composedMap != newMap) {
+          return failure();
+        }
+        newMap = composedMap;
       }
+      return newMap;
     } else {
+      AffineMap newMap;
       for (OpOperand &operand : op->getUses()) {
         auto it = loopMaps.find(operand.getOwner());
         if (it == loopMaps.end()) {
@@ -279,15 +241,30 @@ public:
         AffineMap consumerMap = fusionConsumer.getMatchingIndexingMap(&operand);
         AffineMap resultMap = fusionOp.getIndexingMapMatchingResult(
             cast<OpResult>(operand.get()));
+        if (!resultMap || !consumerMap || !resultMap.isProjectedPermutation() ||
+            !consumerMap.isProjectedPermutation()) {
+          return failure();
+        }
         AffineMap inverseMap =
             inverseAndBroadcastProjectedPermutation(resultMap);
         AffineMap composedMap = inverseMap.compose(consumerMap);
         auto &other = it->getSecond();
-        return composedMap.compose(other);
+        composedMap = composedMap.compose(other);
+        if (newMap && composedMap != newMap) {
+          return failure();
+        }
+        newMap = composedMap;
+
+        if (compressUnusedDims(newMap).getNumDims() != other.getNumDims()) {
+          return failure();
+        }
       }
+      return newMap;
     }
-    return failure();
+    llvm_unreachable("should have returned above");
   }
+
+  bool isFusable(Operation *op) const { return succeeded(getMapping(op)); }
 
   void insert(Operation *op) {
     assert(op != rootOp);
@@ -296,8 +273,6 @@ public:
     //   (1) it is a producer of the root
     //   (2) it is a consumer of the root
     FailureOr<AffineMap> map = getMapping(op);
-    rootOp->dump();
-    op->dump();
     if (succeeded(map)) {
       loopMaps.insert({op, map.value()});
     }
@@ -314,36 +289,49 @@ private:
 class GraphFusionTracker {
 private:
 public:
-  bool isRootOp(Operation *op) const { return fusionGroups.contains(op); }
-
   const FusionGroup &createFusionGroup(MLIRContext *ctx, Operation *op) {
-    return fusionGroups.insert(std::make_pair(op, FusionGroup(op)))
-        .first->getSecond();
+    fusionGroups.emplace_back(std::make_unique<FusionGroup>(op));
+    opToGroup[op] = fusionGroups.back().get();
+    return *fusionGroups.back();
   }
 
   const FusionGroup &getFusionGroup(Operation *op) const {
-    assert(isRootOp(op));
-    return fusionGroups.at(op);
+    return *opToGroup.at(op);
   }
 
-  /// Returns whether or not this op will be fused with a root op.
-  bool isFusedOp(Operation *op) const { return fusedOps.contains(op); }
+  FusionGroup &getFusionGroup(Operation *op) { return *opToGroup.at(op); }
 
-  DenseMap<Operation *, FusionGroup> getFusionGroups() { return fusionGroups; }
+  /// Returns whether or not this op will be fused with a root op.
+  bool isFusedOp(Operation *op) const { return opToGroup.contains(op); }
+
+  bool isRootOp(Operation *op) const {
+    return isFusedOp(op) && op == getFusionGroup(op).getRoot();
+  }
+
+  const SmallVector<std::unique_ptr<FusionGroup>> &getFusionGroups() const {
+    return fusionGroups;
+  }
 
   /// Appends the given `op` to the `fusionGroup` fusion groups.
   void appendToFusionGroup(Operation *op, const FusionGroup &fusionGroup) {
     assert(!isRootOp(op));
     assert(!isFusedOp(op));
-    fusionGroups.find(fusionGroup.getRoot())->getSecond().insert(op);
-    fusedOps.insert(op);
+    getFusionGroup(fusionGroup.getRoot()).insert(op);
+    opToGroup[op] = &getFusionGroup(fusionGroup.getRoot());
   }
 
 private:
-  DenseMap<Operation *, FusionGroup> fusionGroups;
-  DenseSet<Operation *> fusedOps;
+  // TODO(IanWood1): fix to have a better data structure.
+  SmallVector<std::unique_ptr<FusionGroup>> fusionGroups;
+  DenseMap<Operation *, FusionGroup *> opToGroup;
 };
 } // namespace
+
+static bool hasCompatibleOuterParallelLoops(Operation *op,
+                                            const FusionGroup &fusionGroup,
+                                            const GraphFusionTracker &tracker) {
+  return succeeded(fusionGroup.getMapping(op));
+}
 
 //===----------------------------------------------------------------------===//
 // Op property charecterizations
@@ -465,28 +453,7 @@ getFusableUses(MLIRContext *context, Operation *op,
   return usesVec;
 }
 
-/// Returns true if the operands are fusable.
-static bool areOpsFusable(Operation *producer, Operation *consumer,
-                          const llvm::SmallBitVector &rootOuterParallelLoops) {
-  // Collect all the uses from producer to consumer.
-  SmallVector<OpOperand *> allUses;
-  for (OpOperand &producerUse : producer->getUses()) {
-    if (producerUse.getOwner() != consumer)
-      continue;
-    allUses.push_back(&producerUse);
-  }
-
-  // Check that the consumer and producer have compatible outer parallel loops.
-  if (!llvm::all_of(allUses, [&](OpOperand *operand) {
-        return hasCompatibleOuterParallelLoops(*operand,
-                                               rootOuterParallelLoops);
-      })) {
-    return false;
-  }
-  return true;
-}
-
-/// The logic to decide fusability (using the `hasCompatibleOuterParallelLoops`)
+/// The logic to decide fusability
 /// currently works when the indexing map corresponding to result of the
 /// producer and indexing map corresponding to operand in the result are not
 /// transposed with respect to each other. To find more fusion opportunities for
@@ -665,7 +632,7 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
 /// consumer.
 static bool
 isFusableWithConsumer(OpOperand &fusedOperand,
-                      const llvm::SmallBitVector &rootOuterParallelLoops,
+                      const GraphFusionTracker &tracker,
                       FormDispatchRegionsPassOptions const &options) {
   Operation *producer = fusedOperand.get().getDefiningOp();
   Operation *consumer = fusedOperand.getOwner();
@@ -697,13 +664,15 @@ isFusableWithConsumer(OpOperand &fusedOperand,
     return TypeSwitch<Operation *, bool>(producer)
         .Case<tensor::PadOp>([&](auto padOp) { return true; })
         .Case<linalg::LinalgOp>([&](auto linalgOp) {
-          auto producerIndexingMap = linalgOp.getIndexingMapMatchingResult(
+          AffineMap producerIndexingMap = linalgOp.getIndexingMapMatchingResult(
               llvm::cast<OpResult>(fusedOperand.get()));
           // Make sure the producer op has an identity result indexing map. As
           // CPU backend currently can't handle transpose between fused ops.
-          return hasCompatibleOuterParallelLoops(
-              cast<TilingInterface>(linalgOp.getOperation()),
-              producerIndexingMap, rootOuterParallelLoops);
+          // TODO(IanWood1): check this
+          // return hasCompatibleOuterParallelLoops(
+          //     cast<TilingInterface>(linalgOp.getOperation()),
+          //     producerIndexingMap, rootOuterParallelLoops);
+          return producerIndexingMap.isIdentity();
         })
         .Default([](Operation *) { return false; });
   }
@@ -751,15 +720,8 @@ isFusableWithConsumer(OpOperand &fusedOperand,
     return false;
   }
 
-  if (!areOpsFusable(producer, consumer, rootOuterParallelLoops)) {
-    // Check if interchange in the consumer makes it fusable.
-    // Currently limit it to horizontally fused gemms.
-    // TODO(#20019) to remove this restriction.
-    if (!IREE::LinalgExt::isaHorizontallyFusedContraction(producer) ||
-        !makeConsumerFusableViaInterchange(fusedOperand,
-                                           rootOuterParallelLoops)) {
-      return false;
-    }
+  if (!tracker.getFusionGroup(producer).isFusable(consumer)) {
+    return false;
   }
 
   // Check if the iteration spaces of the producer and consumer are same.
@@ -819,7 +781,6 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
   // Fuse with consumers where possible.
   for (Operation *root : roots) {
     SmallVector<Operation *> workList;
-    llvm::SmallBitVector rootOuterParallelLoops = getOuterParallelLoops(root);
     const FusionGroup &fusionGroup = tracker.getFusionGroup(root);
     workList.push_back(root);
     while (!workList.empty()) {
@@ -850,8 +811,7 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
           continue;
         }
 
-        if (isFusableWithConsumer(*fusableUse, rootOuterParallelLoops,
-                                  options)) {
+        if (isFusableWithConsumer(*fusableUse, tracker, options)) {
           tracker.appendToFusionGroup(consumerOp, fusionGroup);
           workList.push_back(consumerOp);
         } else {
@@ -863,9 +823,10 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
 }
 
 /// Method to check if the consumer of a use can be fused with its producer.
-static bool isFusableWithProducer(
-    OpOperand &operand, const llvm::SmallBitVector &rootOuterParallelLoops,
-    FormDispatchRegionsPassOptions const &options, bool fuseWithTruncate) {
+static bool isFusableWithProducer(OpOperand &operand,
+                                  const GraphFusionTracker &tracker,
+                                  FormDispatchRegionsPassOptions const &options,
+                                  bool fuseWithTruncate) {
   Operation *producer = operand.get().getDefiningOp();
   Operation *consumer = operand.getOwner();
 
@@ -902,13 +863,15 @@ static bool isFusableWithProducer(
               return false;
             }
           }
-          auto producerIndexingMap = linalgOp.getIndexingMapMatchingResult(
+          AffineMap producerIndexingMap = linalgOp.getIndexingMapMatchingResult(
               llvm::cast<OpResult>(operand.get()));
           // Make sure the producer op has an identity result indexing map. As
           // CPU backend currently can't handle transpose between fused ops.
-          return hasCompatibleOuterParallelLoops(
-              cast<TilingInterface>(linalgOp.getOperation()),
-              producerIndexingMap, rootOuterParallelLoops);
+          // TODO(IanWood1): check this
+          // return hasCompatibleOuterParallelLoops(
+          //     cast<TilingInterface>(linalgOp.getOperation()),
+          //     producerIndexingMap, rootOuterParallelLoops);
+          return producerIndexingMap.isIdentity();
         })
         .Default([](Operation *) { return false; });
   }
@@ -925,10 +888,8 @@ static bool isFusableWithProducer(
     }
   }
 
-  if (!areOpsFusable(producer, consumer, rootOuterParallelLoops)) {
-    if (!makeProducerFusableViaInterchange(operand, rootOuterParallelLoops)) {
-      return false;
-    }
+  if (!tracker.getFusionGroup(consumer).isFusable(producer)) {
+    return false;
   }
   return true;
 }
@@ -957,8 +918,7 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root,
         continue;
       }
 
-      if (!isFusableWithProducer(operand, rootOuterParallelLoops, options,
-                                 fuseWithTruncate)) {
+      if (!isFusableWithProducer(operand, tracker, options, fuseWithTruncate)) {
         continue;
       }
 
@@ -1097,11 +1057,12 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
   // Step 2. Create a DispatchRegionOp for every fusion group.
   OpBuilder::InsertionGuard g(rewriter);
   SmallVector<IREE::Flow::DispatchRegionOp> regionOps;
-  for (const auto &[root, fusionGroup] : tracker.getFusionGroups()) {
+  for (const auto &fusionGroup : tracker.getFusionGroups()) {
+    Operation *root = fusionGroup->getRoot();
     // Sort producers and consumers topologically. All fused ops must be in the
     // same block as the root.
     SmallVector<Operation *> currFusedOperations =
-        fusionGroup.getFusedOperations();
+        fusionGroup->getFusedOperations();
     bool sortResult = mlir::computeTopologicalSorting(currFusedOperations);
     (void)sortResult;
     assert(sortResult && "could not compute topological sorting");
