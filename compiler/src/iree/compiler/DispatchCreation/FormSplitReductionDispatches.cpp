@@ -181,10 +181,17 @@ FormSplitReductionDispatchesPass::getUserSpecifiedTileSize(
   }
   auto findSmallestFactorWithLowerBound =
       [](int64_t x, int64_t lowerBound) -> std::optional<int64_t> {
+    assert(x > 0);
+    assert(lowerBound > 0);
+    // If 'sqrt(x)' is greater than the lower bound, we don't need to search
+    // past it.
+    int64_t xSqrt = std::ceil(std::sqrt(x));
+    int64_t upperBound = (xSqrt > lowerBound) ? xSqrt : x;
     // We expect all numbers here to be relatively small, so just do trial
     // division (with a limit just to be safe).
     static constexpr int64_t kMaxIterations = 1 << 15;
-    for (int64_t i = lowerBound; i <= std::min(x, kMaxIterations); i++) {
+    upperBound = std::min(upperBound, kMaxIterations);
+    for (int64_t i = lowerBound; i <= upperBound; i++) {
       if (x % i == 0) {
         return i;
       }
