@@ -15,8 +15,10 @@ iree_lit_test_suite(
     lit
   SRCS
     "apply_builtin_pdl_patterns.mlir"
-    "apply_builtin_ukernel_pdl_patterns.mlir"
-    "apply_builtin_ukernel_pdl_patterns_driver.mlir"
+    "apply_builtin_ukernel_pdl_patterns_driver_gfx942.mlir"
+    "apply_builtin_ukernel_pdl_patterns_driver_gfx950.mlir"
+    "apply_builtin_ukernel_pdl_patterns_gfx942.mlir"
+    "apply_builtin_ukernel_pdl_patterns_gfx950.mlir"
   TOOLS
     FileCheck
     iree-opt
