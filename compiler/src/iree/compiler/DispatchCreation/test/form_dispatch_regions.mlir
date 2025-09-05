@@ -1658,3 +1658,54 @@ util.func public @dont_fuse_use_transpose_and_identity(%arg0 : tensor<?x?xf32>,
 //       CHECK:     linalg.matmul
 //       CHECK:   flow.dispatch.region
 //       CHECK:     linalg.generic
+
+// -----
+
+util.func public @dont_fuse_use_consumer_transposed_use_of_producer(%arg0 : tensor<?x?x?xf32>) -> tensor<?x?x?xf32> {
+  %cst = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?x?xf32>
+  %d1 = tensor.dim %arg0, %c1 : tensor<?x?x?xf32>
+  %empty = tensor.empty(%d0, %d0, %d0) : tensor<?x?x?xf32>
+  %empty2 = tensor.empty(%d0, %d0) : tensor<?x?xf32>
+  %5 = linalg.generic  {
+      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                       affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel"]}
+      ins(%arg0 : tensor<?x?x?xf32>)
+      outs(%empty : tensor<?x?x?xf32>) {
+    ^bb0(%b0 : f32, %b1 :f32) :
+      %6 = arith.addf %b0, %b1 : f32
+      linalg.yield %6 : f32
+  } -> tensor<?x?x?xf32>
+  %6 = linalg.generic  {
+      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                       affine_map<(d0, d1, d2) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel", "reduction"]}
+      ins(%5 : tensor<?x?x?xf32>)
+      outs(%empty2 : tensor<?x?xf32>) {
+    ^bb0(%b0 : f32, %b1 :f32) :
+      %6 = arith.addf %b0, %b1 : f32
+      linalg.yield %6 : f32
+  } -> tensor<?x?xf32>
+  // The transpose on %5 makes this unfusable
+  %7 = linalg.generic  {
+      indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d0, d2)>,
+                       affine_map<(d0, d1, d2) -> (d0, d1)>,
+                       affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel"]}
+      ins(%5, %6 : tensor<?x?x?xf32>, tensor<?x?xf32>)
+      outs(%empty : tensor<?x?x?xf32>) {
+    ^bb0(%b0 : f32, %b1 :f32, %b2 : f32) :
+      %8 = arith.addf %b0, %b1 : f32
+      linalg.yield %8 : f32
+  } -> tensor<?x?x?xf32>
+  util.return %7 : tensor<?x?x?xf32>
+}
+// CHECK-LABEL: @dont_fuse_use_consumer_transposed_use_of_producer
+//       CHECK:   flow.dispatch.region
+//       CHECK:     linalg.generic
+//       CHECK:     linalg.generic
+//       CHECK:   flow.dispatch.region
+//       CHECK:     linalg.generic
