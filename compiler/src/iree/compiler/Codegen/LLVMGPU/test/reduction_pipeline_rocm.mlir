@@ -26,16 +26,16 @@ func.func @group_reduction_1d() {
   return
 }
 
-// On CDNA, we require subgroup size of 64.
+// On CDNA, we require subgroup size of 64. On RDNA we require subgroup size of 32.
 
-//        CHECK:   #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [16, 1, 1] subgroup_size = 64
+//        CHECK:   #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
 //  CHECK-LABEL:   func.func @group_reduction_1d
-//        CHECK:   gpu.subgroup_reduce  add {{.*}} cluster(size = 16) : (f32) -> f32
+//        CHECK:   gpu.subgroup_reduce  add {{.*}} cluster(size = 64) : (f32) -> f32
 
-//        RDNA3:   #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [16, 1, 1] subgroup_size = 32
+//        RDNA3:   #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [32, 1, 1] subgroup_size = 32
 //  RDNA3-LABEL:   func.func @group_reduction_1d()
 //   RDNA3-SAME:   translation_info = #[[$TRANSLATION]]
-//        RDNA3:   gpu.subgroup_reduce  add {{.*}} cluster(size = 16) : (f32) -> f32
+//        RDNA3:   gpu.subgroup_reduce  add {{.*}} cluster(size = 32) : (f32) -> f32
 
 // -----
 
@@ -79,25 +79,25 @@ func.func @i4_dequant_matvec() {
   return
 }
 
-//         CHECK:  #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [4, 1, 1] subgroup_size = 64
+//         CHECK:  #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
 //   CHECK-LABEL:  func.func @i4_dequant_matvec()
 //    CHECK-SAME:  translation_info = #[[$TRANSLATION]]
 
-//         RDNA3:  #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [4, 1, 1] subgroup_size = 32,
+//         RDNA3:  #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [32, 1, 1] subgroup_size = 32,
 //   RDNA3-LABEL:  func.func @i4_dequant_matvec()
 //    RDNA3-SAME:  translation_info = #[[$TRANSLATION]]
 //     RDNA3-DAG:  %[[C0:.+]] = arith.constant 0 : index
 //     RDNA3-DAG:  %[[C32:.+]] = arith.constant 32 : index
 //     RDNA3-DAG:  %[[C1:.+]] = arith.constant 1 : index
-//     RDNA3-DAG:  %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x32xf16>
-//         RDNA3:  %[[FOR:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]] iter_args(%{{.*}} = %[[CST]]) -> (vector<1x1x32xf16>)
-//         RDNA3:  %{{.*}} = arith.extui %{{.*}} : vector<1x1x32xi4> to vector<1x1x32xi32>
-//         RDNA3:  %{{.*}} = arith.uitofp %{{.*}} : vector<1x1x32xi32> to vector<1x1x32xf16>
-//         RDNA3:  %{{.*}} = arith.subf %{{.*}}, %{{.*}} : vector<1x1x32xf16>
-//         RDNA3:  %{{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<1x1x32xf16>
-//         RDNA3:  %{{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<1x1x32xf16>
-//         RDNA3:  %{{.*}} = arith.addf %{{.*}}, %{{.*}} : vector<1x1x32xf16>
-//         RDNA3:  %{{.*}} = vector.multi_reduction <add>, %{{.*}}, %{{.*}} [0, 1, 2] : vector<1x1x32xf16> to f16
+//     RDNA3-DAG:  %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<4x1x1x1x1x32xf16>
+//         RDNA3:  %[[FOR:.+]] = scf.for %{{.+}} = %[[C0]] to %[[C32]] step %[[C1]] iter_args(%{{.*}} = %[[CST]]) -> (vector<4x1x1x1x1x32xf16>)
+//         RDNA3:  %{{.*}} = arith.extui %{{.*}} : vector<4x1x1x1x1x32xi4> to vector<4x1x1x1x1x32xi32>
+//         RDNA3:  %{{.*}} = arith.uitofp %{{.*}} : vector<4x1x1x1x1x32xi32> to vector<4x1x1x1x1x32xf16>
+//         RDNA3:  %{{.*}} = arith.subf %{{.*}}, %{{.*}} : vector<4x1x1x1x1x32xf16>
+//         RDNA3:  %{{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<4x1x1x1x1x32xf16>
+//         RDNA3:  %{{.*}} = arith.mulf %{{.*}}, %{{.*}} : vector<4x1x1x1x1x32xf16>
+//         RDNA3:  %{{.*}} = arith.addf %{{.*}}, %{{.*}} : vector<4x1x1x1x1x32xf16>
+//         RDNA3:  %{{.*}} = vector.multi_reduction <add>, %{{.*}}, %{{.*}} [1, 3, 5] : vector<4x1x1x1x1x32xf16> to vector<4x1x1xf16>
 
 // -----
 
@@ -215,7 +215,7 @@ func.func @multi_reduction() {
 
 // Check that all loops are singly nested.
 //
-//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [480, 1, 1] subgroup_size = 64
+//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [512, 1, 1] subgroup_size = 64
 //          CHECK: func.func @multi_reduction()
 //     CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
