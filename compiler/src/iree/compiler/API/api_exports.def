@@ -20,7 +20,6 @@ EXPORTS
   ireeGPUGetSingleSubgroupLayout
   ireeCodegenGetTunerRootOps
   ireeCodegenGetAttentionOpDetail
-  ireeCodegenQueryMMAIntrinsics
   ireeCodegenMlirOperationIsACodegenAttentionOp
   ireeCodegenTranslationInfoAttrGet
   ireeCodegenTranslationInfoAttrGetParameters

@@ -223,11 +223,6 @@ std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func);
 SmallVector<IREE::HAL::ExecutableVariantOp>
 getExecutableVariantOps(mlir::ModuleOp moduleOp);
 
-// Returns the MMA intrinsics associated with the given
-// `IREE::HAL::ExecutableVariantOp`.
-SmallVector<IREE::GPU::MMAIntrinsic>
-queryMMAIntrinsics(IREE::HAL::ExecutableVariantOp executableOp);
-
 // Returns all operations within the given module that are marked with the
 // tuner root op attribute (i.e., have the `root_op` UnitAttr).
 SmallVector<Operation *> getTunerRootOps(mlir::ModuleOp moduleOp);

@@ -38,23 +38,6 @@ ireeCodegenGetExecutableVariantOpsBinding(MlirModule module) {
   return ops;
 }
 
-static std::vector<py::object>
-ireeCodegenQueryMMAIntrinsicsBinding(MlirOperation op) {
-  size_t numMMAs = 0;
-  ireeCodegenQueryMMAIntrinsics(op, &numMMAs, nullptr);
-  std::vector<uint32_t> mmaIntrinsics(numMMAs);
-  ireeCodegenQueryMMAIntrinsics(op, &numMMAs, mmaIntrinsics.data());
-
-  py::object mmaIntrinsicEnum =
-      py::module_::import_(kGpuModuleImportPath).attr(kMMAIntrinsicEnumName);
-  std::vector<py::object> mmaList(numMMAs);
-  for (size_t i = 0; i < numMMAs; ++i) {
-    mmaList[i] = mmaIntrinsicEnum(mmaIntrinsics[i]);
-  }
-
-  return mmaList;
-}
-
 static std::vector<MlirOperation>
 ireeCodegenGetTunerRootOpsBinding(MlirModule module) {
   size_t numOps = 0;
@@ -647,15 +630,6 @@ NB_MODULE(_ireeCompilerDialects, m) {
       "get_executable_variant_ops", &ireeCodegenGetExecutableVariantOpsBinding,
       "Gets the executable variant operations from a module.",
       py::arg("module"));
-
-  //===-------------------------------------------------------------------===//
-  // Binding to utility function queryMMAIntrinsics
-  //===-------------------------------------------------------------------===//
-
-  iree_codegen_module.def(
-      "query_mma_intrinsics", &ireeCodegenQueryMMAIntrinsicsBinding,
-      "Queries the MMA intrinsics from an executable variant op.",
-      py::arg("op"));
 
   //===-------------------------------------------------------------------===//
   // Binding to utility function ireeCodegenGetTunerRootOps
