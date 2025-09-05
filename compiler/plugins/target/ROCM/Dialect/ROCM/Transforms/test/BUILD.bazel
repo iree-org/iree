@@ -12,18 +12,10 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-gpu_archs = [
-    "gfx942",
-    "gfx950",
-]
-
 ukernel_pdl_patterns_files = [
-    "apply_builtin_ukernel_pdl_patterns_%s.mlir" % gpu_arch
-    for gpu_arch in gpu_archs
-] + [
-    "apply_builtin_ukernel_pdl_patterns_driver_%s.mlir" % gpu_arch
-    for gpu_arch in gpu_archs
-] + ["apply_builtin_pdl_patterns.mlir"]
+    "apply_builtin_ukernel_pdl_patterns.mlir",
+    "apply_builtin_ukernel_pdl_patterns_driver.mlir",
+]
 
 iree_lit_test_suite(
     name = "lit",

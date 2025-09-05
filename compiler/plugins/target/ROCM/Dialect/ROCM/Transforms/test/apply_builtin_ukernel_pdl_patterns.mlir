@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-rocm-apply-builtin-pdl-patterns{targets=gfx942 enable-tensor-ukernels=true}))' \
+// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-rocm-apply-builtin-pdl-patterns{targets=gfx942,gfx950 enable-tensor-ukernels=true}))' \
 // RUN:   --mlir-print-local-scope --split-input-file %s | FileCheck %s
 
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
@@ -23,7 +23,7 @@ func.func @matmul_f8(%arg0: tensor<1x128x4096xf8E4M3FNUZ>, %arg1: tensor<1024x40
 // CHECK-SAME:      compilation_info = #iree_codegen.compilation_info
 // CHECK-SAME:      lowering_config =
 // CHECK-SAME:      translation_info =
-// CHECK-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8_expanded", tensor>
+// CHECK-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
 
 // -----
 
@@ -46,7 +46,7 @@ func.func @negative_matmul_f8(%arg0: tensor<1x128x256xf8E4M3FNUZ>, %arg1: tensor
 }
 // CHECK-LABEL: @negative_matmul_f8
 // CHECK-NOT:     compilation_info = #iree_codegen.compilation_info
-// CHECK-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8_expanded", tensor>
+// CHECK-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
 
 // -----
 
@@ -100,7 +100,7 @@ func.func @matmul_f8_dynamic(%arg0: index) -> tensor<1x128x1024xf32> {
 // CHECK-SAME:      compilation_info = #iree_codegen.compilation_info
 // CHECK-SAME:      lowering_config =
 // CHECK-SAME:      translation_info =
-// CHECK-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8_expanded", tensor>
+// CHECK-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
 
 // -----
 
@@ -127,7 +127,7 @@ func.func @negative_matmul_f8_dynamic_multiple_of(%arg0: tensor<1024x512xf8E4M3F
 }
 // CHECK-LABEL: @negative_matmul_f8_dynamic_multiple_of
 // CHECK-NOT:     compilation_info = #iree_codegen.compilation_info
-// CHECK-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8_expanded", tensor>
+// CHECK-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
 
 // -----
 
@@ -155,7 +155,7 @@ func.func @negative_matmul_f8_dynamic_lower_bound(%arg0: index) -> tensor<1x128x
 }
 // CHECK-LABEL: @negative_matmul_f8_dynamic_lower_bound
 // CHECK-NOT:     compilation_info = #iree_codegen.compilation_info
-// CHECK-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8_expanded", tensor>
+// CHECK-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
 
 // -----
 

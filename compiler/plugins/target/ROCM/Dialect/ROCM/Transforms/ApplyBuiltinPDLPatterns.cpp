@@ -19,6 +19,7 @@
 #include "iree/compiler/Utils/ShapeUtils.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/Regex.h"
 #include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
@@ -203,6 +204,20 @@ populatePDLModuleFromBuiltin(MLIRContext *context, RewritePatternSet &patterns,
 
 namespace {
 
+SmallVector<llvm::StringRef>
+filterUkernelPatternsByTarget(const SmallVector<llvm::StringRef> &names,
+                              StringRef target) {
+  SmallVector<llvm::StringRef> results;
+  std::string pattern =
+      "ukernel_patterns(_.*)*" + target.str() + "(_.*)*\\.mlir";
+  llvm::Regex regex(pattern);
+  for (auto name : names) {
+    if (regex.match(name)) {
+      results.push_back(name);
+    }
+  }
+  return results;
+}
 class ApplyBuiltinPDLPatternsPass
     : public iree_compiler::IREE::ROCM::impl::ApplyBuiltinPDLPatternsPassBase<
           ApplyBuiltinPDLPatternsPass> {
@@ -232,16 +247,24 @@ public:
     }
     if (enableTensorUKernels) {
       for (std::string target : targets) {
-        std::string builtinName =
-            llvm::formatv("ukernel_patterns_{}.mlir", target);
-        std::optional<StringRef> maybeBuiltin =
-            rocmDialect->getBuiltin(builtinName);
-        if (!maybeBuiltin) {
+        SmallVector<llvm::StringRef> allBuiltinNames =
+            rocmDialect->getBuiltinNames();
+        SmallVector<llvm::StringRef> builtinNames =
+            filterUkernelPatternsByTarget(allBuiltinNames, target);
+        std::string builtinSrc;
+        for (auto builtinName : builtinNames) {
+          std::optional<StringRef> maybeBuiltin =
+              rocmDialect->getBuiltin(builtinName);
+          if (maybeBuiltin) {
+            builtinSrc += maybeBuiltin.value().str() + "\n";
+          }
+        }
+        if (builtinSrc.empty()) {
           // Skip when no patterns are present.
           continue;
         }
         if (failed(populatePDLModuleFromBuiltin(context, tmpPatterns,
-                                                maybeBuiltin.value()))) {
+                                                builtinSrc))) {
           return failure();
         }
       }

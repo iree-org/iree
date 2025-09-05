@@ -58,4 +58,12 @@ std::optional<StringRef> ROCMDialect::getBuiltin(llvm::StringRef name) {
   return builtins.getFile(name);
 }
 
+SmallVector<StringRef> ROCMDialect::getBuiltinNames() {
+  SmallVector<StringRef> results;
+  for (auto key : builtins.getMap().keys()) {
+    results.push_back(key);
+  }
+  return results;
+}
+
 } // namespace mlir::iree_compiler::IREE::ROCM
