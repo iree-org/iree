@@ -172,6 +172,8 @@ static LogicalResult validateDataTypes(Operation *op,
   return success();
 }
 
+/// TODO(hanchung): Delete the pattern once it is upstreamed:
+/// https://github.com/llvm/llvm-project/pull/156992
 struct LowerToElementsPattern : public OpRewritePattern<vector::ToElementsOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(vector::ToElementsOp op,
