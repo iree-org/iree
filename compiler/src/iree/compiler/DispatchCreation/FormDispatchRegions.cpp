@@ -149,6 +149,7 @@ public:
           return loops.test(dimExpr.getPosition());
         });
     map = inverseAndBroadcastProjectedPermutation(map);
+    assert(map && "expected non null map");
     loopMaps.insert({op, map});
     print();
   };
@@ -223,6 +224,9 @@ public:
         }
         newMap = composedMap;
       }
+      if (!newMap) {
+        return failure();
+      }
       return newMap;
     } else {
       AffineMap newMap;
@@ -259,6 +263,9 @@ public:
           return failure();
         }
       }
+      if (!newMap) {
+        return failure();
+      }
       return newMap;
     }
     llvm_unreachable("should have returned above");
@@ -267,13 +274,10 @@ public:
   bool isFusable(Operation *op) const { return succeeded(getMapping(op)); }
 
   void insert(Operation *op) {
-    assert(op != rootOp);
-
-    // 2 exclusive cases:
-    //   (1) it is a producer of the root
-    //   (2) it is a consumer of the root
+    assert(!fusedOps.contains(op) && "op already fused");
     FailureOr<AffineMap> map = getMapping(op);
     if (succeeded(map)) {
+      assert(map.value() && "expected non null map");
       loopMaps.insert({op, map.value()});
     }
     fusedOps.insert(op);
