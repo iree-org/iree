@@ -1,5 +1,7 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-annotate-data-tiling-hints,iree-dispatch-creation-set-encoding))" %s | FileCheck %s --check-prefixes=CHECK-ALL,CHECK
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-annotate-data-tiling-hints,iree-dispatch-creation-set-encoding{encoding-option=matmulk}))" %s | FileCheck %s --check-prefixes=CHECK-ALL,MATMULK
+// RUN: iree-opt --split-input-file --iree-dispatch-creation-test-set-scaled-matmul-encodings \
+// RUN:   --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-annotate-data-tiling-hints,iree-dispatch-creation-set-encoding))" %s | FileCheck %s --check-prefixes=CHECK-ALL,CHECK
+// RUN: iree-opt --split-input-file --iree-dispatch-creation-test-set-scaled-matmul-encodings \
+// RUN:   --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-annotate-data-tiling-hints,iree-dispatch-creation-set-encoding{encoding-option=matmulk}))" %s | FileCheck %s --check-prefixes=CHECK-ALL,MATMULK
 // Test with `iree-dispatch-creation-annotate-data-tiling-hints` that adds the
 // data-tiling hint to all the available gemm ops. Otherwise, we have to add the
 // hint to all the gemm ops in the file.
@@ -1203,6 +1205,130 @@ util.func public @region_with_workgroup_count(%arg0: !hal.buffer_view, %arg1: !h
   util.return %4 : !hal.buffer_view
 }
 
-// CHECK-LABEL:  util.func public @region_with_workgroup_count
-// CHECK-NOT:      iree_encoding.set_encoding
-// CHECK-NOT:      iree_encoding.unset_encoding
+// CHECK-ALL-LABEL:  util.func public @region_with_workgroup_count
+// CHECK-NOT:          iree_encoding.set_encoding
+// CHECK-NOT:          iree_encoding.unset_encoding
+
+// -----
+
+util.func public @scaled_contraction_f4_f4_f8_f8_f32(
+    %a : tensor<256x128x32xf4E2M1FN>, %b : tensor<512x128x32xf4E2M1FN>,
+    %a_scales : tensor<256x128xf8E8M0FNU>, %b_scales : tensor<512x128xf8E8M0FNU>,
+    %c : tensor<256x512xf32>) -> tensor<256x512xf32> {
+  %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d2)>,
+                       affine_map<(d0, d1, d2, d3) -> (d1, d2)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel", "reduction", "reduction"]}
+      ins(%a, %b, %a_scales, %b_scales : tensor<256x128x32xf4E2M1FN>, tensor<512x128x32xf4E2M1FN>, tensor<256x128xf8E8M0FNU>, tensor<512x128xf8E8M0FNU>)
+      outs(%c : tensor<256x512xf32>) {
+  ^bb0(%in: f4E2M1FN, %in_0: f4E2M1FN, %in_1: f8E8M0FNU, %in_2: f8E8M0FNU, %out: f32):
+    %12 = arith.scaling_extf %in, %in_1 : f4E2M1FN, f8E8M0FNU to f32
+    %13 = arith.scaling_extf %in_0, %in_2 : f4E2M1FN, f8E8M0FNU to f32
+    %14 = arith.mulf %12, %13 : f32
+    %15 = arith.addf %out, %14 : f32
+    linalg.yield %15 : f32
+  } -> tensor<256x512xf32>
+  util.return %0 : tensor<256x512xf32>
+}
+
+// CHECK-ALL-DAG:   #[[$MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+// CHECK-ALL-DAG:   #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+// CHECK-ALL-DAG:   #[[$MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2)>
+// CHECK-ALL-DAG:   #[[$MAP3:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
+// CHECK-ALL-DAG:   #[[$MAP4:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+
+// CHECK-DAG:       #[[$ENC0:.+]] = #iree_encoding.encoding<operand_index = 0 : index, op_type =  scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32], user_indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]], #[[$MAP3]], #[[$MAP4]]], iteration_sizes = [256, 512, 128, 32]>
+// CHECK-DAG:       #[[$ENC1:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type =  scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32], user_indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]], #[[$MAP3]], #[[$MAP4]]], iteration_sizes = [256, 512, 128, 32]>
+// CHECK-DAG:       #[[$ENC2:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type =  scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32], user_indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]], #[[$MAP3]], #[[$MAP4]]], iteration_sizes = [256, 512, 128, 32]>
+// CHECK-DAG:       #[[$ENC3:.+]] = #iree_encoding.encoding<operand_index = 3 : index, op_type =  scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32], user_indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]], #[[$MAP3]], #[[$MAP4]]], iteration_sizes = [256, 512, 128, 32]>
+// CHECK-DAG:       #[[$ENC4:.+]] = #iree_encoding.encoding<operand_index = 4 : index, op_type =  scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32], user_indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]], #[[$MAP3]], #[[$MAP4]]], iteration_sizes = [256, 512, 128, 32]>
+
+// MATMULK-DAG:     #[[$ENC0:.+]] = #iree_encoding.matmul_k<k_dims = [1, 2]>
+// MATMULK-DAG:     #[[$ENC1:.+]] = #iree_encoding.matmul_k<k_dims = [1]>
+// MATMULK-DAG:     #[[$ENC2:.+]] = #iree_encoding.matmul_k<k_dims = []>
+
+// CHECK-ALL:       util.func public @scaled_contraction_f4_f4_f8_f8_f32
+// CHECK-ALL-SAME:      %[[A:.*]]: tensor<256x128x32xf4E2M1FN>
+// CHECK-ALL-SAME:      %[[B:.*]]: tensor<512x128x32xf4E2M1FN>
+// CHECK-ALL-SAME:      %[[AS:.*]]: tensor<256x128xf8E8M0FNU>
+// CHECK-ALL-SAME:      %[[BS:.*]]: tensor<512x128xf8E8M0FNU>
+// CHECK-ALL-SAME:      %[[C:.*]]: tensor<256x512xf32>
+
+// CHECK-DAG:         %[[A_ENC:.*]] = iree_encoding.set_encoding %[[A]] : tensor<256x128x32xf4E2M1FN> -> tensor<256x128x32xf4E2M1FN, #[[$ENC0]]>
+// CHECK-DAG:         %[[B_ENC:.*]] = iree_encoding.set_encoding %[[B]] : tensor<512x128x32xf4E2M1FN> -> tensor<512x128x32xf4E2M1FN, #[[$ENC1]]>
+// CHECK-DAG:         %[[AS_ENC:.*]] = iree_encoding.set_encoding %[[AS]] : tensor<256x128xf8E8M0FNU> -> tensor<256x128xf8E8M0FNU, #[[$ENC2]]>
+// CHECK-DAG:         %[[BS_ENC:.*]] = iree_encoding.set_encoding %[[BS]] : tensor<512x128xf8E8M0FNU> -> tensor<512x128xf8E8M0FNU, #[[$ENC3]]>
+// CHECK-DAG:         %[[C_ENC:.*]] = iree_encoding.set_encoding %[[C]] : tensor<256x512xf32> -> tensor<256x512xf32, #[[$ENC4]]>
+
+// MATMULK-DAG:       %[[A_ENC:.*]] = iree_encoding.set_encoding %[[A]] : tensor<256x128x32xf4E2M1FN> -> tensor<256x128x32xf4E2M1FN, #[[$ENC0]]>
+// MATMULK-DAG:       %[[B_ENC:.*]] = iree_encoding.set_encoding %[[B]] : tensor<512x128x32xf4E2M1FN> -> tensor<512x128x32xf4E2M1FN, #[[$ENC0]]>
+// MATMULK-DAG:       %[[AS_ENC:.*]] = iree_encoding.set_encoding %[[AS]] : tensor<256x128xf8E8M0FNU> -> tensor<256x128xf8E8M0FNU, #[[$ENC1]]
+// MATMULK-DAG:       %[[BS_ENC:.*]] = iree_encoding.set_encoding %[[BS]] : tensor<512x128xf8E8M0FNU> -> tensor<512x128xf8E8M0FNU, #[[$ENC1]]
+// MATMULK-DAG:       %[[C_ENC:.*]] = iree_encoding.set_encoding %[[C]] : tensor<256x512xf32> -> tensor<256x512xf32, #[[$ENC2]]>
+
+// CHECK-ALL:         %[[GENERIC:.*]] = linalg.generic
+// CHECK-ALL-SAME:      indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]], #[[$MAP3]], #[[$MAP4]]]
+// CHECK-ALL-SAME:      iterator_types = ["parallel", "parallel", "reduction", "reduction"]
+// CHECK-ALL-SAME:      ins(%[[A_ENC]], %[[B_ENC]], %[[AS_ENC]], %[[BS_ENC]]
+// CHECK-ALL-SAME:      outs(%[[C_ENC]]
+// CHECK:             %[[RESULT:.*]] = iree_encoding.unset_encoding %[[GENERIC]] : tensor<256x512xf32, #[[$ENC4]]> -> tensor<256x512xf32>
+// MATMULK:           %[[RESULT:.*]] = iree_encoding.unset_encoding %[[GENERIC]] : tensor<256x512xf32, #[[$ENC2]]> -> tensor<256x512xf32>
+// CHECK-ALL:         util.return %[[RESULT]] : tensor<256x512xf32>
+
+// -----
+
+util.func public @scaled_contraction_multi_k_f4_f4_f8_f8_f32(
+    %a : tensor<256x2x64x32xf4E2M1FN>, %b : tensor<512x2x64x32xf4E2M1FN>,
+    %a_scales : tensor<256x2x64xf8E8M0FNU>, %b_scales : tensor<512x2x64xf8E8M0FNU>,
+    %c : tensor<256x512xf32>) -> tensor<256x512xf32> {
+  %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d1, d2, d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel", "reduction", "reduction", "reduction"]}
+      ins(%a, %b, %a_scales, %b_scales : tensor<256x2x64x32xf4E2M1FN>, tensor<512x2x64x32xf4E2M1FN>, tensor<256x2x64xf8E8M0FNU>, tensor<512x2x64xf8E8M0FNU>)
+      outs(%c : tensor<256x512xf32>) {
+  ^bb0(%in: f4E2M1FN, %in_0: f4E2M1FN, %in_1: f8E8M0FNU, %in_2: f8E8M0FNU, %out: f32):
+    %12 = arith.scaling_extf %in, %in_1 : f4E2M1FN, f8E8M0FNU to f32
+    %13 = arith.scaling_extf %in_0, %in_2 : f4E2M1FN, f8E8M0FNU to f32
+    %14 = arith.mulf %12, %13 : f32
+    %15 = arith.addf %out, %14 : f32
+    linalg.yield %15 : f32
+  } -> tensor<256x512xf32>
+  util.return %0 : tensor<256x512xf32>
+}
+
+//  CHECK-ALL:     util.func public @scaled_contraction_multi_k_f4_f4_f8_f8_f32
+//  CHECK-ALL-NOT:   iree_encoding.set_encoding
+
+// -----
+util.func public @scaled_contraction_multi_kb_f4_f4_f8_f8_f32(
+    %a : tensor<256x128x2x32xf4E2M1FN>, %b : tensor<512x128x2x32xf4E2M1FN>,
+    %a_scales : tensor<256x128xf8E8M0FNU>, %b_scales : tensor<512x128xf8E8M0FNU>,
+    %c : tensor<256x512xf32>) -> tensor<256x512xf32> {
+  %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d1, d2, d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d2)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d1, d2)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel", "reduction", "reduction", "reduction"]}
+      ins(%a, %b, %a_scales, %b_scales : tensor<256x128x2x32xf4E2M1FN>, tensor<512x128x2x32xf4E2M1FN>, tensor<256x128xf8E8M0FNU>, tensor<512x128xf8E8M0FNU>)
+      outs(%c : tensor<256x512xf32>) {
+  ^bb0(%in: f4E2M1FN, %in_0: f4E2M1FN, %in_1: f8E8M0FNU, %in_2: f8E8M0FNU, %out: f32):
+    %12 = arith.scaling_extf %in, %in_1 : f4E2M1FN, f8E8M0FNU to f32
+    %13 = arith.scaling_extf %in_0, %in_2 : f4E2M1FN, f8E8M0FNU to f32
+    %14 = arith.mulf %12, %13 : f32
+    %15 = arith.addf %out, %14 : f32
+    linalg.yield %15 : f32
+  } -> tensor<256x512xf32>
+  util.return %0 : tensor<256x512xf32>
+}
+
+//  CHECK-ALL:     util.func public @scaled_contraction_multi_kb_f4_f4_f8_f8_f32
+//  CHECK-ALL-NOT:   iree_encoding.set_encoding

@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/DispatchCreation/FusionUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -86,55 +87,102 @@ getDataTilingCandidates(FunctionOpInterface funcOp) {
   return result;
 }
 
+/// Contains the invariant information across operands for the
+/// iree_encoding.encoding. The operand number is not included because
+/// it is not invariant across operands.
+struct GenericEncodingCommonInfo {
+  IREE::Encoding::EncodingOpType opType;
+  SmallVector<Type> elemTypes;
+  SmallVector<AffineMap> maps;
+  SmallVector<int64_t> iterationSizes;
+};
+
+/// Get the `GenericEncodingCommonInfo` for the `linalgOp` or return failure
+/// if op is not supported. Supported ops are contraction ops and scaled
+/// contraction ops.
+static FailureOr<GenericEncodingCommonInfo>
+getGenericEncodingCommonInfo(RewriterBase &rewriter,
+                             linalg::LinalgOp linalgOp) {
+  // Case 1: ContractionOpInterface
+  if (linalg::isaContractionOpInterface(linalgOp)) {
+    Type lhsElemType = getContractionInputTypeWithSignedness(
+        rewriter, linalgOp, linalgOp.getDpsInputOperand(0));
+    Type rhsElemType = getContractionInputTypeWithSignedness(
+        rewriter, linalgOp, linalgOp.getDpsInputOperand(1));
+    Type outElemType = getContractionInputTypeWithSignedness(
+        rewriter, linalgOp, linalgOp.getDpsInitOperand(0));
+    if (!lhsElemType || !rhsElemType || !outElemType) {
+      return failure();
+    }
+    return GenericEncodingCommonInfo(
+        {/*opType=*/IREE::Encoding::EncodingOpType::matmul,
+         /*elemTypes=*/{lhsElemType, rhsElemType, outElemType},
+         /*map=*/linalgOp.getIndexingMapsArray(),
+         /*iterationSizes=*/linalgOp.getStaticLoopRanges()});
+  }
+  // Case 2: Scaled ContractionOpInterface
+  if (!IREE::LinalgExt::isaScaledContractionOpInterface(linalgOp)) {
+    return failure();
+  }
+  FailureOr<IREE::LinalgExt::ScaledContractionDimensions> cDims =
+      IREE::LinalgExt::inferScaledContractionDims(
+          linalgOp.getIndexingMapsArray());
+  Type lhsElemType =
+      getElementTypeOrSelf(linalgOp.getDpsInputOperand(0)->get().getType());
+  Type rhsElemType =
+      getElementTypeOrSelf(linalgOp.getDpsInputOperand(1)->get().getType());
+  Type lhsScalesElemType =
+      getElementTypeOrSelf(linalgOp.getDpsInputOperand(2)->get().getType());
+  Type rhsScalesElemType =
+      getElementTypeOrSelf(linalgOp.getDpsInputOperand(3)->get().getType());
+  Type outElemType =
+      getElementTypeOrSelf(linalgOp.getDpsInitOperand(0)->get().getType());
+  return GenericEncodingCommonInfo(
+      {/*opType=*/IREE::Encoding::EncodingOpType::scaled_matmul,
+       /*elemTypes=*/
+       {lhsElemType, rhsElemType, lhsScalesElemType, rhsScalesElemType,
+        outElemType},
+       /*map=*/linalgOp.getIndexingMapsArray(),
+       /*iterationSizes=*/linalgOp.getStaticLoopRanges()});
+}
+
 static LogicalResult setDataTilingEncodings(RewriterBase &rewriter,
                                             linalg::LinalgOp linalgOp,
                                             EncodingOptions encodingOption) {
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(linalgOp);
-
-  Value lhs = linalgOp.getDpsInputOperand(0)->get();
-  Value rhs = linalgOp.getDpsInputOperand(1)->get();
-  Value out = linalgOp.getDpsInitOperand(0)->get();
-  Type lhsElemType = getContractionInputTypeWithSignedness(
-      rewriter, linalgOp, linalgOp.getDpsInputOperand(0));
-  Type rhsElemType = getContractionInputTypeWithSignedness(
-      rewriter, linalgOp, linalgOp.getDpsInputOperand(1));
-  Type outElemType = getContractionInputTypeWithSignedness(
-      rewriter, linalgOp, linalgOp.getDpsInitOperand(0));
-  if (!lhsElemType || !rhsElemType || !outElemType) {
-    return failure();
-  }
-  SmallVector<Type> elemTypes = {lhsElemType, rhsElemType, outElemType};
-
-  // The `iteration_sizes` are the linalg op's static loop ranges. From the
-  // combination of `iteration_sizes` and `user_indexing_maps`, we can later
-  // derive information such as the iteration size of the M/N dimensions of a
-  // matmul-like operation for example.
-  FailureOr<SmallVector<int64_t>> maybeIterationSizes =
-      linalgOp.getStaticLoopRanges();
-  if (failed(maybeIterationSizes)) {
-    return failure();
-  }
-  SmallVector<int64_t> iterationSizes = std::move(maybeIterationSizes.value());
-
   Location loc = linalgOp.getLoc();
-  SmallVector<AffineMap> maps = linalgOp.getIndexingMapsArray();
 
-  auto opType = IREE::Encoding::EncodingOpType::matmul;
+  FailureOr<GenericEncodingCommonInfo> encodingInfo =
+      getGenericEncodingCommonInfo(rewriter, linalgOp);
+  if (failed(encodingInfo)) {
+    return failure();
+  }
   auto setEncodingWrapper = [&](Value src, int64_t operandIndex) -> Value {
     MLIRContext *ctx = linalgOp.getContext();
     Attribute encoding;
     switch (encodingOption) {
     case EncodingOptions::Generic: {
-      encoding = EncodingAttr::get(ctx, operandIndex, opType, elemTypes, maps,
-                                   iterationSizes);
+      encoding = EncodingAttr::get(ctx, operandIndex, encodingInfo->opType,
+                                   encodingInfo->elemTypes, encodingInfo->maps,
+                                   encodingInfo->iterationSizes);
       break;
     }
     case EncodingOptions::MatmulK: {
       SmallVector<int32_t> kDims;
-      AffineMap indexingMap = maps[operandIndex];
+      AffineMap indexingMap = encodingInfo->maps[operandIndex];
+      SmallVector<int64_t> kCDims;
       auto cDims = linalg::inferContractionDims(linalgOp);
-      for (auto k : cDims->k) {
+      if (!failed(cDims)) {
+        kCDims.append(cDims->k.begin(), cDims->k.end());
+      }
+      FailureOr<IREE::LinalgExt::ScaledContractionDimensions> scaledCDims =
+          IREE::LinalgExt::inferScaledContractionDims(linalgOp);
+      if (!failed(scaledCDims)) {
+        kCDims.append(scaledCDims->k.begin(), scaledCDims->k.end());
+        kCDims.append(scaledCDims->kB.begin(), scaledCDims->kB.end());
+      }
+      for (auto k : kCDims) {
         std::optional<unsigned> dimIdx =
             indexingMap.getResultPosition(rewriter.getAffineDimExpr(k));
         if (!dimIdx) {
@@ -152,16 +200,37 @@ static LogicalResult setDataTilingEncodings(RewriterBase &rewriter,
     }
     return setEncoding(rewriter, loc, src, encoding);
   };
-  auto encodedLhs = setEncodingWrapper(lhs, IREE::Encoding::MATMUL_LHS);
-  auto encodedRhs = setEncodingWrapper(rhs, IREE::Encoding::MATMUL_RHS);
-  auto encodedOut = setEncodingWrapper(out, IREE::Encoding::MATMUL_RESULT);
-  Value opTiled = clone(rewriter, linalgOp, encodedOut.getType(),
-                        ValueRange{encodedLhs, encodedRhs, encodedOut})
-                      ->getResult(0);
+
+  SmallVector<Value> encodedInputOperands;
+  Value encodedInitOperand;
+  if (linalg::isaContractionOpInterface(linalgOp)) {
+    encodedInputOperands.push_back(setEncodingWrapper(
+        linalgOp.getDpsInputs()[0], IREE::Encoding::MATMUL_LHS));
+    encodedInputOperands.push_back(setEncodingWrapper(
+        linalgOp.getDpsInputs()[1], IREE::Encoding::MATMUL_RHS));
+    encodedInitOperand = setEncodingWrapper(linalgOp.getDpsInits()[0],
+                                            IREE::Encoding::MATMUL_RESULT);
+  } else {
+    encodedInputOperands.push_back(setEncodingWrapper(
+        linalgOp.getDpsInputs()[0], IREE::Encoding::SCALED_MATMUL_LHS));
+    encodedInputOperands.push_back(setEncodingWrapper(
+        linalgOp.getDpsInputs()[1], IREE::Encoding::SCALED_MATMUL_RHS));
+    encodedInputOperands.push_back(setEncodingWrapper(
+        linalgOp.getDpsInputs()[2], IREE::Encoding::SCALED_MATMUL_LHS_SCALES));
+    encodedInputOperands.push_back(setEncodingWrapper(
+        linalgOp.getDpsInputs()[3], IREE::Encoding::SCALED_MATMUL_RHS_SCALES));
+    encodedInitOperand = setEncodingWrapper(
+        linalgOp.getDpsInits()[0], IREE::Encoding::SCALED_MATMUL_RESULT);
+  }
+  SmallVector<Value> encodedOperands(encodedInputOperands);
+  encodedOperands.push_back(encodedInitOperand);
+  Value opTiled =
+      clone(rewriter, linalgOp, encodedInitOperand.getType(), encodedOperands)
+          ->getResult(0);
 
   // Sizes are computed by original output size.
   SmallVector<OpFoldResult> outSizes =
-      tensor::getMixedSizes(rewriter, loc, out);
+      tensor::getMixedSizes(rewriter, loc, linalgOp.getDpsInits()[0]);
   Value result = unsetEncoding(rewriter, loc, opTiled, outSizes);
 
   rewriter.replaceOp(linalgOp, result);
