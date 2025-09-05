@@ -455,6 +455,15 @@ bool isSupportedRelayoutOp(Operation *op) {
              linalg::TransposeOp>(op);
 }
 
+// This is only desirable in the dispatch scope but not in the workgroup scope.
+static bool
+shouldDoReshapesByExpansion(IREE::Codegen::RelayoutCombinationScope scope) {
+  if (scope == IREE::Codegen::RelayoutCombinationScope::Dispatch) {
+    return true;
+  }
+  return false;
+}
+
 /// Insert identity map_scatter ops after the given operation if it is a valid
 /// leaf op of a relayout op chain. A relayout op chain is a sequence of
 /// relayout ops (defined by `isSupportedRelayoutOp`) for which the only users
@@ -497,6 +506,7 @@ private:
 LogicalResult
 combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
                             PadDistributionConfigFn padDistributionConfigFn,
+                            bool doReshapeByExpansion,
                             CombineRelayoutOpsControlFnRef controlFn) {
   // Sink relayout operations to the end of the funcOp.
   RewritePatternSet propagationPatterns(ctx);
@@ -504,13 +514,16 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
   tensor::ExpandShapeOp::getCanonicalizationPatterns(propagationPatterns, ctx);
   tensor::CollapseShapeOp::getCanonicalizationPatterns(propagationPatterns,
                                                        ctx);
-  // Only sink reshape ops, so bail if the consumer operation is a reshape.
-  auto controlSinkReshapesFn = [](OpOperand *operand) -> bool {
-    Operation *consumer = operand->getOwner();
-    return !llvm::isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp>(consumer);
-  };
-  linalg::populateFoldReshapeOpsByExpansionPatterns(propagationPatterns,
-                                                    controlSinkReshapesFn);
+  if (doReshapeByExpansion) {
+    // Only sink reshape ops, so bail if the consumer operation is a reshape.
+    auto controlSinkReshapesFn = [](OpOperand *operand) -> bool {
+      Operation *consumer = operand->getOwner();
+      return !llvm::isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp>(
+          consumer);
+    };
+    linalg::populateFoldReshapeOpsByExpansionPatterns(propagationPatterns,
+                                                      controlSinkReshapesFn);
+  }
   // Only sink unpack ops, so bail if the producer operation is not an unpack.
   // Also only sink unpack ops when new pack operations will not be created.
   // This means the consumer op must have at most one additional destination
@@ -671,9 +684,11 @@ struct CombineLayoutTransformationPass final
   void runOnOperation() override {
     CombineRelayoutOpsControlFn controlFn =
         getCombineRelayoutOpsControlFn(this->scope);
-    if (failed(combineLayoutTransformation(
-            &getContext(), getOperation(),
-            defaultPadWorkgroupDistributionConfigFn, controlFn))) {
+    bool doReshapesByExpansion = shouldDoReshapesByExpansion(this->scope);
+    if (failed(
+            combineLayoutTransformation(&getContext(), getOperation(),
+                                        defaultPadWorkgroupDistributionConfigFn,
+                                        doReshapesByExpansion, controlFn))) {
       return signalPassFailure();
     }
 
