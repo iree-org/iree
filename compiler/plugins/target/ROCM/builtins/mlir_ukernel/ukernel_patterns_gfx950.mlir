@@ -69,7 +69,7 @@ pdl.pattern @annotate_matmul_like_f8_medium_expanded : benefit(1) {
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
         // This strategy uses the maximum amount of possible shared memory on
-        // all gfx942 architectures so shared memory padding to reduce bank
+        // all gfx9 architectures so shared memory padding to reduce bank
         // conflicts must be disabled. Also prefetching is done manually in the
         // above and is disabled here as well.
         {gpu_pipeline_options =
@@ -161,7 +161,7 @@ pdl.pattern @annotate_matmul_like_f8_large_expanded : benefit(2) {
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
         // This strategy uses the maximum amount of possible shared memory on
-        // all gfx942 architectures so shared memory padding to reduce bank
+        // all gfx9 architectures so shared memory padding to reduce bank
         // conflicts must be disabled. Also prefetching is done manually in the
         // above and is disabled here as well.
         {gpu_pipeline_options =
@@ -246,7 +246,7 @@ pdl.pattern @annotate_matmul_like_f16_large : benefit(1) {
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
         // This strategy uses the maximum amount of possible shared memory on
-        // all gfx942 architectures so shared memory padding to reduce bank
+        // all gfx9 architectures so shared memory padding to reduce bank
         // conflicts must be disabled. Also prefetching is done manually in the
         // above and is disabled here as well.
         {gpu_pipeline_options =
@@ -335,7 +335,7 @@ pdl.pattern @annotate_matmul_like_f16_medium_expanded : benefit(1) {
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
         // This strategy uses the maximum amount of possible shared memory on
-        // all gfx942 architectures so shared memory padding to reduce bank
+        // all gfx9 architectures so shared memory padding to reduce bank
         // conflicts must be disabled. Also prefetching is done manually in the
         // above and is disabled here as well.
         {gpu_pipeline_options =
@@ -424,7 +424,7 @@ pdl.pattern @annotate_matmul_like_f16_large_expanded : benefit(2) {
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
         // This strategy uses the maximum amount of possible shared memory on
-        // all gfx942 architectures so shared memory padding to reduce bank
+        // all gfx9 architectures so shared memory padding to reduce bank
         // conflicts must be disabled. Also prefetching is done manually in the
         // above and is disabled here as well.
         {gpu_pipeline_options =
@@ -509,7 +509,7 @@ pdl.pattern @annotate_matmul_like_bf16_large : benefit(1) {
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
         // This strategy uses the maximum amount of possible shared memory on
-        // all gfx942 architectures so shared memory padding to reduce bank
+        // all gfx9 architectures so shared memory padding to reduce bank
         // conflicts must be disabled. Also prefetching is done manually in the
         // above and is disabled here as well.
         {gpu_pipeline_options =
@@ -600,7 +600,7 @@ pdl.pattern @annotate_matmul_like_bf16_medium_expanded : benefit(1) {
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
         // This strategy uses the maximum amount of possible shared memory on
-        // all gfx942 architectures so shared memory padding to reduce bank
+        // all gfx9 architectures so shared memory padding to reduce bank
         // conflicts must be disabled. Also prefetching is done manually in the
         // above and is disabled here as well.
         {gpu_pipeline_options =
@@ -683,7 +683,7 @@ pdl.pattern @annotate_matmul_like_bf16_large_expanded : benefit(2) {
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
         // This strategy uses the maximum amount of possible shared memory on
-        // all gfx942 architectures so shared memory padding to reduce bank
+        // all gfx9 architectures so shared memory padding to reduce bank
         // conflicts must be disabled. Also prefetching is done manually in the
         // above and is disabled here as well.
         {gpu_pipeline_options =
