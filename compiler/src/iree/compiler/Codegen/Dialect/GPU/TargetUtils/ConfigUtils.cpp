@@ -358,7 +358,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
 }
 
 struct ConvToIgemmInfo {
-  bool isChannelFirst;
+  bool isInputChannelLast;
   linalg::ConvolutionDimensions convDims;
   DenseMap<int64_t, AffineExpr> convToIgemmDimMap;
   DenseMap<int64_t, int64_t> inputChannelDimToSize;
@@ -404,11 +404,11 @@ getPaddingConvSizes(Builder &b, const SmallVector<int64_t> &bounds,
         bool isInputChannelSizeSmall =
             (paddingSizes[IGEMMPos] / inputChannelSize > 2);
         // The following cases are not supported:
-        // 1) Channel first, i.e., `CHW` layout;
+        // 1) Input channel is not the innermost dimension;
         // 2) Input channel size is too small compared to padding size;
         // 3) Multiple input channel dims for a single IGEMMPos.
-        if (convToIgemmInfo->isChannelFirst ||
-            paddedIGEMMDims.contains(IGEMMPos) || isInputChannelSizeSmall) {
+        if (!convToIgemmInfo->isInputChannelLast || isInputChannelSizeSmall ||
+            paddedIGEMMDims.contains(IGEMMPos)) {
           return std::nullopt;
         }
         paddingConvSizes[convDim] = paddingSizes[IGEMMPos];
@@ -732,22 +732,24 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
 
   ConvToIgemmInfo convToIgemmInfo;
   if (padConv) {
-    convToIgemmInfo.isChannelFirst =
-        igemmGenericConvDetails->isOutputChannelFirst;
-    convToIgemmInfo.convDims = igemmGenericConvDetails->convDims;
-    convToIgemmInfo.convToIgemmDimMap =
-        igemmGenericConvDetails->convToIgemmDimMap;
-
     auto inputType = llvm::cast<ShapedType>(op->getOperands()[0].getType());
     ArrayRef<int64_t> inputShape = inputType.getShape();
     AffineMap inputMap = linalgOp.getIndexingMapsArray()[0];
+    SmallVector<int64_t> inputChannelPos;
     for (auto dim : igemmGenericConvDetails->convDims.inputChannel) {
       for (auto [idx, e] : llvm::enumerate(inputMap.getResults())) {
         if (e.isFunctionOfDim(dim)) {
           convToIgemmInfo.inputChannelDimToSize[dim] = inputShape[idx];
+          inputChannelPos.push_back(idx);
         }
       }
     }
+    llvm::sort(inputChannelPos);
+    convToIgemmInfo.isInputChannelLast =
+        inputChannelPos.back() == inputShape.size() - 1;
+    convToIgemmInfo.convDims = igemmGenericConvDetails->convDims;
+    convToIgemmInfo.convToIgemmDimMap =
+        igemmGenericConvDetails->convToIgemmDimMap;
   }
 
   SmallVector<AffineMap> igemmContractionMaps =
