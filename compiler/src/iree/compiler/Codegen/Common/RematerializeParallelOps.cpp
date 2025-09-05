@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
+#include "llvm/Support/Casting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -23,6 +25,11 @@ static bool isScalarOrTensorOfSizeOne(Type t) {
     return tensorType.hasStaticShape() && tensorType.getNumElements() == 1;
   }
   return t.isIntOrIndexOrFloat();
+}
+
+static bool hasDirectWriteResult(Operation *op) {
+  return llvm::any_of(op->getUsers(),
+                      llvm::IsaPred<IREE::TensorExt::DispatchTensorStoreOp>);
 }
 
 /// Rematerialize all parallel elementwise operations into its users within a
@@ -49,6 +56,9 @@ struct RematerializeParallelOpsPattern
       }
       auto producer = opOperand.get().getDefiningOp<linalg::GenericOp>();
       if (producer && hasExternalCapture(producer)) {
+        continue;
+      }
+      if (producer && hasDirectWriteResult(producer)) {
         continue;
       }
       FailureOr<linalg::ElementwiseOpFusionResult> fusionResult =
