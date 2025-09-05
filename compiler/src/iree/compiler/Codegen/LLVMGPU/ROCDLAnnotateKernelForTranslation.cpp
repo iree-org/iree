@@ -6,6 +6,7 @@
 
 #include <cassert>
 #include "iree/compiler/Codegen/Common/PassUtils.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -73,6 +74,32 @@ annotateKernelForTranslation(LLVM::LLVMFuncOp funcOp,
   if (IntegerAttr attr =
           getConfigWavesPerEuAttr(targetAttr.getConfiguration())) {
     rocdlDialect->getWavesPerEuAttrHelper().setAttr(funcOp, attr);
+  }
+
+  // Check if the `optimize_occupancy` attribute was set, and set the
+  // `waves-per-eu` value to 2.
+  // TODO: use a heuristic to compute the value.
+  if (auto attr = cast_or_null<DictionaryAttr>(
+          funcOp->getDiscardableAttr("llvm_func_attrs"))) {
+    DictionaryAttr dictAttr = attr;
+    if (dictAttr.getAs<IREE::GPU::OptimizeOccupancyAttr>(
+            IREE::GPU::OptimizeOccupancyAttr::getDictKeyName())) {
+      NamedAttrList attrs(dictAttr);
+      rocdlDialect->getWavesPerEuAttrHelper().setAttr(
+          funcOp, builder.getI64IntegerAttr(2));
+      attrs.erase(IREE::GPU::OptimizeOccupancyAttr::getDictKeyName());
+      dictAttr =
+          attrs.empty() ? nullptr : attrs.getDictionary(builder.getContext());
+    }
+
+    // Update the `llvm_func_attrs`.
+    if (dictAttr != attr) {
+      if (dictAttr == nullptr) {
+        funcOp->removeDiscardableAttr("llvm_func_attrs");
+      } else {
+        funcOp->setDiscardableAttr("llvm_func_attrs", dictAttr);
+      }
+    }
   }
 
   // Kernel argument preloading is only supported on gfx942 and newer targets
