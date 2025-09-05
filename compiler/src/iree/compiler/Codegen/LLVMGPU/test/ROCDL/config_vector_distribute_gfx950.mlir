@@ -240,6 +240,7 @@ func.func @attention_20x4096x64x4096x64() {
 
 // CHECK:       #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
 // CHECK-NOT:   prefetch_shared_memory = true
+// CHECK:       gpu_optimize_occupancy = #iree_gpu.optimize_occupancy
 
 // CHECK-LABEL: func.func @attention_large_head_dim_shared_mem()
 
@@ -291,7 +292,8 @@ func.func @attention_large_head_dim_shared_mem() {
 // and the QK matmul used MFMA_F32_32x32x64_F8E4M3FN. Vector distribution failed
 // to distribute these layouts to threads.
 
-//       CHECK: #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64, {}>
+//       CHECK: #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64
+// CHECK-SAME:  gpu_optimize_occupancy = #iree_gpu.optimize_occupancy
 // CHECK-LABEL: func.func @attention_check_mma_accs_compatable
 
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>

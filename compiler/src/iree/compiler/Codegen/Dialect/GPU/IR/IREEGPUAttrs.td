@@ -749,4 +749,28 @@ def IREEGPU_GPUPipelineOptionsAttr : AttrDef<IREEGPU_Dialect, "GPUPipelineOption
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// GPU Occupancy Optimization Attribute
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_OptimizeOccupancyAttr : AttrDef<IREEGPU_Dialect, "OptimizeOccupancy"> {
+  let mnemonic = "optimize_occupancy";
+  let summary = [{An attribute indicating GPU occupancy needs to be optimized.}];
+  let description = [{
+    This attribute can be attached to operations to indicate that GPU occupancy
+    should be optimized during code generation.
+  }];
+
+  let assemblyFormat = "";
+  let parameters = (ins);
+
+  let extraClassDeclaration = [{
+    // Returns the key name for OptimizeOccupancyAttr in the translation info
+    // config dictionary.
+    static StringRef getDictKeyName() {
+      return "gpu_optimize_occupancy";
+    }
+  }];
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUATTRS
