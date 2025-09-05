@@ -36,6 +36,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
+#include "llvm/Frontend/Offloading/Utility.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
@@ -259,6 +260,24 @@ static std::string translateModuleToISA(llvm::Module &module,
     codegenPasses.run(module);
   }
   return targetISA;
+}
+
+void checkRegisterSpilling(OpBuilder &builder, const std::string obj){
+    uint16_t abi_version;
+    llvm::StringMap<llvm::offloading::amdgpu::AMDGPUKernelMetaData> info_map;
+
+    if (!llvm::offloading::amdgpu::getAMDGPUMetaDataFromImage(
+            llvm::MemoryBufferRef(obj, ""), info_map, abi_version)) {
+          for (auto &entry : info_map) {
+              llvm::StringRef kernelName = entry.getKey();
+              llvm::offloading::amdgpu::AMDGPUKernelMetaData &metaData = entry.getValue();
+              if (metaData.SGPRSpillCount>0 || metaData.VGPRSpillCount){
+                emitWarning(builder.getUnknownLoc()) <<
+                "Register spill on kernel "  << kernelName << ": " <<
+                "VGPRSpillCount : " << metaData.VGPRSpillCount << " / SGPRSpillCount : " << metaData.SGPRSpillCount;
+              }
+          }
+    }
 }
 
 } // namespace
@@ -783,6 +802,8 @@ public:
       targetHSACO = createHsaco(variantOp.getLoc(), targetObj, libraryName);
       if (targetHSACO.empty())
         return failure();
+      
+      checkRegisterSpilling(executableBuilder, targetObj);
     }
 
     if (!serializationOptions.dumpBinariesPath.empty()) {
