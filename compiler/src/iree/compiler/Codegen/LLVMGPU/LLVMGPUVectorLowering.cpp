@@ -274,40 +274,41 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
         rewriter.create<vector::ShapeCastOp>(loc, flattened2DType, rhs);
 
     Value flattenedAcc;
-    VectorType parVecType = VectorType::get({parSize}, elemTy);
-    VectorType transposedAccVecType;
+    VectorType flatAccVecType = VectorType::get({parSize}, elemTy);
+    VectorType preFlattenVecType = accVecType;
 
     if (accVecType) {
       Value acc = op.getAcc();
-      transposedAccVecType = accVecType;
 
       if (!isIdentityPermutation(accPerm)) {
         acc = rewriter.create<vector::TransposeOp>(loc, acc, accPerm);
-        transposedAccVecType = cast<VectorType>(acc.getType());
+        preFlattenVecType = cast<VectorType>(acc.getType());
       }
 
-      flattenedAcc = rewriter.create<vector::ShapeCastOp>(loc, parVecType, acc);
-    } else {
       flattenedAcc =
-          rewriter.create<vector::BroadcastOp>(loc, parVecType, op.getAcc());
+          rewriter.create<vector::ShapeCastOp>(loc, flatAccVecType, acc);
+    } else {
+      flattenedAcc = rewriter.create<vector::BroadcastOp>(loc, flatAccVecType,
+                                                          op.getAcc());
     }
 
-    const int64_t chunkSize = 2;
+    constexpr int64_t chunkSize = 2;
     Value resultFlat = buildFMAChain(rewriter, loc, lhs2D, rhs2D, flattenedAcc,
                                      redSize, parSize, chunkSize);
 
     // Restore result shape/types
     Value result;
     if (accVecType) {
-      const bool needTranspose = !isIdentityPermutation(accPerm);
-
-      // Unflatten
       Value reshaped = rewriter.create<vector::ShapeCastOp>(
-          loc, transposedAccVecType, resultFlat);
+          loc, preFlattenVecType, resultFlat);
 
-      result = needTranspose ? rewriter.create<vector::TransposeOp>(
-                                   loc, accVecType, reshaped, invert(accPerm))
-                             : reshaped;
+      if (!isIdentityPermutation(accPerm)) {
+        result = rewriter.create<vector::TransposeOp>(loc, accVecType, reshaped,
+                                                      invert(accPerm));
+      } else {
+        result = reshaped;
+      }
+
     } else {
       result = rewriter.create<vector::ExtractOp>(loc, resultFlat, 0);
     }
@@ -326,12 +327,9 @@ private:
       }
     });
 
-    for (int64_t parDim : parallelDims) {
-      if (!usedDims.contains(parDim)) {
-        return false;
-      }
-    }
-    return true;
+    return llvm::all_of(parallelDims, [&](int64_t parDim) {
+      return usedDims.contains(parDim);
+    });
   }
 
   static SmallVector<int64_t> invert(ArrayRef<int64_t> perm) {
@@ -378,13 +376,8 @@ private:
       dimToRes[map.getDimPosition(res)] = res;
     }
 
-    SmallVector<int64_t> perm;
-    for (int64_t i : indices) {
-      int64_t res = dimToRes[i];
-      perm.push_back(res);
-    }
-
-    return perm;
+    return to_vector(
+        llvm::map_range(indices, [&](int64_t i) { return dimToRes[i]; }));
   }
 
   static int64_t productOfDims(VectorType vt, unsigned lo, unsigned hi) {
@@ -396,12 +389,8 @@ private:
   }
 
   static bool isIdentityPermutation(ArrayRef<int64_t> perm) {
-    for (size_t i = 0; i < perm.size(); ++i) {
-      if (perm[i] != i) {
-        return false;
-      }
-    }
-    return true;
+    return llvm::all_of(llvm::enumerate(perm),
+                        [](auto p) { return p.value() == p.index(); });
   }
 
   static Value processFMAChunk(PatternRewriter &rewriter, Location loc,

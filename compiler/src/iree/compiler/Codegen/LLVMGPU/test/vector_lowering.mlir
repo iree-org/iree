@@ -159,6 +159,27 @@ func.func @multi_reduction_f32_to_single_chain_fma(%a: vector<2x1x8xf32>, %b: ve
 
 // -----
 
+func.func @multi_reduction_f16_to_single_chain_fma(%a: vector<2x1x8xf16>, %b: vector<2x1x8xf16>) -> vector<2x1xf16> {
+  %cst = arith.constant dense<0.000000e+00> : vector<2x1xf16>
+  %0 = arith.mulf %a, %b : vector<2x1x8xf16>
+  %1 = vector.multi_reduction <add>, %0, %cst [2] : vector<2x1x8xf16> to vector<2x1xf16>
+  return %1 : vector<2x1xf16>
+}
+
+// CHECK-LABEL: func.func @multi_reduction_f16_to_single_chain_fma
+// CHECK:  %[[C0:.+]]  = arith.constant dense<0.000000e+00> : vector<2xf16>
+// CHECK:  %[[FMA0:.*]] = math.fma %{{.*}}, %{{.*}}, %[[C0]] : vector<2xf16>
+// CHECK:  %[[FMA1:.*]] = math.fma %{{.*}}, %{{.*}}, %[[FMA0]] : vector<2xf16>
+// CHECK:  %[[FMA2:.*]] = math.fma %{{.*}}, %{{.*}}, %[[FMA1]] : vector<2xf16>
+// CHECK:  %[[FMA3:.*]] = math.fma %{{.*}}, %{{.*}}, %[[FMA2]] : vector<2xf16>
+// CHECK:  %[[FMA4:.*]] = math.fma %{{.*}}, %{{.*}}, %[[FMA3]] : vector<2xf16>
+// CHECK:  %[[FMA5:.*]] = math.fma %{{.*}}, %{{.*}}, %[[FMA4]] : vector<2xf16>
+// CHECK:  %[[FMA6:.*]] = math.fma %{{.*}}, %{{.*}}, %[[FMA5]] : vector<2xf16>
+// CHECK:  %[[FMA7:.*]] = math.fma %{{.*}}, %{{.*}}, %[[FMA6]] : vector<2xf16>
+// CHECK:  return %{{.*}} : vector<2x1xf16>
+
+// -----
+
 func.func @multi_reduction_f32_to_double_chain_fma(%a: vector<4x1x8xf32>, %b: vector<4x1x8xf32>) -> vector<4x1xf32> {
  %cst = arith.constant dense<0.000000e+00> : vector<4x1xf32>
  %0 = arith.mulf %a, %b : vector<4x1x8xf32>
