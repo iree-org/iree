@@ -226,6 +226,16 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
     indices.append(parDims.begin(), parDims.end());
 
     SmallVector<AffineMap, 4> maps = op.getIndexingMapsArray();
+
+    // We only lower contracts where both LHS and RHS carry the same set of
+    // parallel iterators. Order may differ, but no parallel dim
+    // may be dropped on either side. This excludes matmul-like cases and any
+    // contract where parallel sizes would differ between operands.
+    if (!verifyParallelDimsInMap(parDims, maps[0]) ||
+        !verifyParallelDimsInMap(parDims, maps[1])) {
+      return failure();
+    }
+
     SmallVector<int64_t> lhsPerm =
         getPermutationFromIndexingMap(maps[0], indices);
     SmallVector<int64_t> rhsPerm =
@@ -248,11 +258,15 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
       rhs = rewriter.create<vector::TransposeOp>(loc, rhs, rhsPerm);
     }
 
-    // Shape-cast operands to 2D {reduction_size, parallel_size}.
     const size_t numRed = redDims.size();
-    VectorType vecType = cast<VectorType>(lhs.getType());
-    int64_t redSize = productOfDims(vecType, 0, numRed);
-    int64_t parSize = productOfDims(vecType, numRed, vecType.getRank());
+    auto lhsTransposedVecType = cast<VectorType>(lhs.getType());
+    int64_t lhsRedSize = productOfDims(lhsTransposedVecType, 0, numRed);
+    int64_t lhsParSize = productOfDims(lhsTransposedVecType, numRed,
+                                       lhsTransposedVecType.getRank());
+
+    // Shape-cast operands to 2D {reduction_size, parallel_size}.
+    int64_t redSize = lhsRedSize;
+    int64_t parSize = lhsParSize;
     VectorType flattened2DType = VectorType::get({redSize, parSize}, elemTy);
     Value lhs2D =
         rewriter.create<vector::ShapeCastOp>(loc, flattened2DType, lhs);
@@ -262,13 +276,16 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
     Value flattenedAcc;
     VectorType parVecType = VectorType::get({parSize}, elemTy);
     VectorType transposedAccVecType;
+
     if (accVecType) {
       Value acc = op.getAcc();
       transposedAccVecType = accVecType;
+
       if (!isIdentityPermutation(accPerm)) {
         acc = rewriter.create<vector::TransposeOp>(loc, acc, accPerm);
         transposedAccVecType = cast<VectorType>(acc.getType());
       }
+
       flattenedAcc = rewriter.create<vector::ShapeCastOp>(loc, parVecType, acc);
     } else {
       flattenedAcc =
@@ -300,6 +317,23 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
   }
 
 private:
+  static bool verifyParallelDimsInMap(ArrayRef<int64_t> parallelDims,
+                                      AffineMap map) {
+    llvm::SmallSetVector<int64_t, 8> usedDims;
+    map.walkExprs([&](AffineExpr expr) {
+      if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
+        usedDims.insert(dimExpr.getPosition());
+      }
+    });
+
+    for (int64_t parDim : parallelDims) {
+      if (!usedDims.contains(parDim)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   static SmallVector<int64_t> invert(ArrayRef<int64_t> perm) {
     SmallVector<int64_t> inv(perm.size());
     for (int64_t i = 0; i < perm.size(); ++i) {
@@ -339,7 +373,7 @@ private:
   ///   Result: perm = [1, 0, 2]
   static SmallVector<int64_t>
   getPermutationFromIndexingMap(AffineMap map, ArrayRef<int64_t> indices) {
-    SmallVector<int64_t> dimToRes(map.getNumDims(), -1);
+    SmallVector<int64_t> dimToRes(map.getNumDims());
     for (int res = 0; res < map.getNumResults(); ++res) {
       dimToRes[map.getDimPosition(res)] = res;
     }
@@ -347,9 +381,7 @@ private:
     SmallVector<int64_t> perm;
     for (int64_t i : indices) {
       int64_t res = dimToRes[i];
-      if (res >= 0) {
-        perm.push_back(res);
-      }
+      perm.push_back(res);
     }
 
     return perm;
