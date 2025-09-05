@@ -20,7 +20,7 @@
  affine_map<(i, j, k) -> (i, j)>
 ]
 
-util.func @pingpong_medium_f8_expanded(%lhs_base: !mexp_in_ty_f8, %rhs_base: !in_ty_f8, %unused_acc: tensor<1x128x256xf32>) -> tensor<1x128x256xf32> {
+util.func @pingpong_medium_f8E4M3FNUZ_expanded(%lhs_base: !mexp_in_ty_f8, %rhs_base: !in_ty_f8, %unused_acc: tensor<1x128x256xf32>) -> tensor<1x128x256xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
@@ -210,7 +210,7 @@ util.func @pingpong_medium_f8_expanded(%lhs_base: !mexp_in_ty_f8, %rhs_base: !in
   util.return %collapse : tensor<1x128x256xf32>
 }
 
-util.func private @pingpong_large_f8_expanded(%lhs_base: !exp_in_ty_f8, %rhs_base: !in_ty_f8, %unused_acc: tensor<1x256x256xf32>) -> tensor<1x256x256xf32> {
+util.func private @pingpong_large_f8E4M3FNUZ_expanded(%lhs_base: !exp_in_ty_f8, %rhs_base: !in_ty_f8, %unused_acc: tensor<1x256x256xf32>) -> tensor<1x256x256xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index

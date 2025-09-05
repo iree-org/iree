@@ -12,16 +12,14 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+ukernel_pdl_patterns_files = [
+    "apply_builtin_ukernel_pdl_patterns.mlir",
+    "apply_builtin_ukernel_pdl_patterns_driver.mlir",
+]
+
 iree_lit_test_suite(
     name = "lit",
-    srcs = enforce_glob(
-        [
-            "apply_builtin_pdl_patterns.mlir",
-            "apply_builtin_ukernel_pdl_patterns.mlir",
-            "apply_builtin_ukernel_pdl_patterns_driver.mlir",
-        ],
-        include = ["*.mlir"],
-    ),
+    srcs = ukernel_pdl_patterns_files,
     cfg = "//compiler:lit.cfg.py",
     tools = [
         "//tools:iree-opt",
