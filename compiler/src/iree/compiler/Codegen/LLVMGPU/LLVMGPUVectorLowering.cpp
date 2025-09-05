@@ -296,7 +296,7 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
     Value resultFlat = buildFMAChain(rewriter, loc, lhs2D, rhs2D, flattenedAcc,
                                      redSize, parSize, chunkSize);
 
-    // Restore result shape/types
+    // Restore result to original form.
     Value result;
     if (accVecType) {
       Value reshaped = rewriter.create<vector::ShapeCastOp>(
@@ -420,14 +420,14 @@ private:
       Value lhsRow = rewriter.create<vector::ExtractOp>(loc, lhs2D, k);
       Value rhsRow = rewriter.create<vector::ExtractOp>(loc, rhs2D, k);
 
-      // Process full chunks
+      // Process full chunks.
       int64_t p = 0;
       for (; p + chunkSize <= P; p += chunkSize) {
         current = processFMAChunk(rewriter, loc, lhsRow, rhsRow, current, p,
                                   chunkSize);
       }
 
-      // Process any remaining scalars
+      // Process any remaining scalars.
       int64_t tail = P - p;
       if (tail > 0) {
         current =
