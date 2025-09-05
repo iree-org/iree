@@ -486,7 +486,8 @@ swapCollapseShapeWithSlice(RewriterBase &rewriter,
     if (isa<Value>(collapsedSize) || isa<Value>(collapsedOffset)) {
       // Special case especially for collapse shape of convolution filter in
       // IGEMM, while the offset is dynamic and the size is static.
-      if (isa<Attribute>(collapsedSize) && isa<Value>(collapsedOffset)) {
+      if (isa<Attribute>(collapsedSize) && isa<Value>(collapsedOffset) &&
+          reassocIndices.size() != 1) {
         auto maybeStaticSize = getConstantIntValue(collapsedSize);
         if (!maybeStaticSize) {
           return rewriter.notifyMatchFailure(sliceOp,
