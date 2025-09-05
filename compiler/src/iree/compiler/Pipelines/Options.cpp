@@ -159,15 +159,21 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
                                   "along the outer most dimension."),
                    llvm::cl::cat(category));
   binder.opt<bool>("iree-opt-data-tiling", dataTiling,
+                   {init_at_opt(llvm::OptimizationLevel::O0, false),
+                    init_at_opt(llvm::OptimizationLevel::O2, true)},
                    llvm::cl::desc("Enables data tiling path."),
                    llvm::cl::cat(category));
   binder.opt<bool>(
       "iree-opt-const-eval", constEval,
+      {init_at_opt(llvm::OptimizationLevel::O0, false),
+       init_at_opt(llvm::OptimizationLevel::O1, true)},
       llvm::cl::desc("Enables eager evaluation of constants using the full "
                      "compiler and runtime (on by default)."),
       llvm::cl::cat(category));
   binder.opt<bool>(
       "iree-opt-const-expr-hoisting", constExprHoisting,
+      {init_at_opt(llvm::OptimizationLevel::O0, false),
+       init_at_opt(llvm::OptimizationLevel::O1, true)},
       llvm::cl::desc(
           "Hoists the results of latent constant expressions into immutable "
           "global initializers for evaluation at program load."),

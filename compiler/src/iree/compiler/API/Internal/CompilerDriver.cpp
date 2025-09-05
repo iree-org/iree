@@ -454,6 +454,14 @@ Session::Session(GlobalInit &globalInit)
   vmTargetOptions.bindOptions(binder);
   bytecodeTargetOptions.bindOptions(binder);
   // TODO: Fix binder support for cTargetOptions.
+
+  if (pipelineOptions.optLevel == llvm::OptimizationLevel::O0) {
+    std::string msg = R"MSG(
+Defaulting to O0 will result in poor performance, which enables only minimal optimizations while higher levels enable progressively more aggressive optimizations.
+
+See https://iree.dev/reference/optimization-options/#optimization-level for more details.)MSG";
+    llvm::dbgs() << msg << "\n";
+  }
 }
 
 struct Source {
