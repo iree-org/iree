@@ -610,4 +610,31 @@ def IREECodegen_XORShuffleAttr  :
   let genVerifyDecl = 1;
 }
 
+//===---------------------------------------------------------------------===//
+// iree_codegen.denormal_mode
+//===---------------------------------------------------------------------===//
+
+def DenormalMode_None : I32EnumCase<"None", 0, "none">;
+def DenormalMode_IEEE : I32EnumCase<"IEEE", 1, "ieee">;
+def DenormalMode_PreserveSign : I32EnumCase<"PreserveSign", 2, "preserve-sign">;
+def DenormalMode_PositiveZero : I32EnumCase<"PositiveZero", 3, "positive-zero">;
+def DenormalMode_Dynamic : I32EnumCase<"Dynamic", 4, "dynamic">;
+
+def DenormalFpMathEnum : I32Enum<
+  "DenormalFpMath",
+  "Denormal mode for fp math", [
+    DenormalMode_None,
+    DenormalMode_IEEE,
+    DenormalMode_PreserveSign,
+    DenormalMode_PositiveZero,
+    DenormalMode_Dynamic
+  ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
+}
+
+def DenormalFpMathAttr :
+  EnumAttr<IREECodegen_Dialect, DenormalFpMathEnum, "denormal_fp_math"> {
+  let assemblyFormat = "`<` $value `>`";
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS
