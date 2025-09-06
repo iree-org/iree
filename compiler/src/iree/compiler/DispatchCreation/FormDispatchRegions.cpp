@@ -279,6 +279,14 @@ public:
     if (succeeded(map)) {
       assert(map.value() && "expected non null map");
       loopMaps.insert({op, map.value()});
+    } else {
+      llvm::SmallBitVector loops = getOuterParallelLoops(op);
+      auto map = AffineMap::getFilteredIdentityMap(
+          op->getContext(), loops.size(), [&](AffineDimExpr dimExpr) {
+            return loops.test(dimExpr.getPosition());
+          });
+      map = inverseAndBroadcastProjectedPermutation(map);
+      loopMaps.insert({op, map});
     }
     fusedOps.insert(op);
     print();
