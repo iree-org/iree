@@ -728,9 +728,12 @@ public:
         std::string header =
             llvm::formatv(R"TXT(
 ; To reproduce the .optimized.ll from the .linked.ll, run:
-; opt -S -mtriple={} -mcpu={} --passes='{}'
+; opt -S -mtriple={0} -mcpu={1} --passes='{2}' <.lined.ll>
 ; The flag '-S' to emit LLVMIR.
 ; The behavior of some passes depends on '-mtriple' and '-mcpu'
+;
+; To reproduce the .rocmasm from .optimized.ll, run:
+; llc -mtriple={0} -mcpu={1} <.optimized.ll> -o <out.rocmasm>
 
 )TXT",
                           targetTriple, targetCPU, passesString);
