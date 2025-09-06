@@ -961,6 +961,13 @@ static std::string getTargetTripleString(ModuleOp module) {
   return stringAttr ? stringAttr.value().str() : std::string("");
 }
 
+static void populateTanhPatterns(RewritePatternSet &p) {
+  StringRef fname = math::TanhOp::getOperationName();
+  StringRef opName =
+      fname.drop_front(math::MathDialect::getDialectNamespace().size() + 1);
+  math::populateExpansionPatterns(p, /*OpMnemonics=*/{opName});
+};
+
 void ConvertToLLVMPass::runOnOperation() {
   auto module = getOperation();
   std::string dataLayoutStr = targetDataLayout;
@@ -1050,12 +1057,6 @@ void ConvertToLLVMPass::runOnOperation() {
   if (use32BitImpl) {
     patterns.add<ExpandMulSIExtended>(patterns.getContext(), /*benefit=*/1024);
   }
-  auto populateTanhPatterns = [](RewritePatternSet &p) {
-    StringRef fname = math::TanhOp::getOperationName();
-    size_t prefix = math::MathDialect::getDialectNamespace().size() + 1;
-    StringRef opName = fname.drop_front(prefix);
-    math::populateExpansionPatterns(p, /*OpMnemonics=*/{opName});
-  };
   LLVMConversionTarget target(getContext());
   populateAffineToStdConversionPatterns(patterns);
   populateSCFToControlFlowConversionPatterns(patterns);
