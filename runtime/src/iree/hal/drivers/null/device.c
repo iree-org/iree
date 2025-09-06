@@ -481,7 +481,8 @@ static iree_status_t iree_hal_null_device_queue_dispatch(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_executable_t* executable, int32_t entry_point,
+    iree_hal_executable_t* executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings,
     iree_hal_dispatch_flags_t flags) {
@@ -490,7 +491,7 @@ static iree_status_t iree_hal_null_device_queue_dispatch(
   // it's best if the extra recording/upload/allocation time can be avoided.
   return iree_hal_device_queue_emulated_dispatch(
       base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
-      executable, entry_point, config, constants, bindings, flags);
+      executable, export_ordinal, config, constants, bindings, flags);
 }
 
 static iree_status_t iree_hal_null_device_queue_execute(
