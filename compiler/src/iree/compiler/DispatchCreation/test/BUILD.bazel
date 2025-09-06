@@ -38,6 +38,7 @@ iree_lit_test_suite(
             "dispatch_linalg_on_tensors_fusion_with_transpose.mlir",
             "form_scalar_dispatches.mlir",
             "form_split_reduction_dispatches.mlir",
+            "form_split_reduction_dispatches_target_tile_size.mlir",
             "fuse_encoding_ops_into_dispatch_regions.mlir",
             "fuse_horizontal_contractions.mlir",
             "fuse_multiuse_elementwise_producer.mlir",
