@@ -5,8 +5,8 @@
 // to be migrated to the rocdl heuristics, but for now is just physically
 // located here.
 
-// WMMA:      #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
-// WMMA-SAME: workgroup_size = [128, 1, 1]
+// WMMA:      #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+// WMMA-SAME: workgroup_size = [256, 1, 1]
 // WMMA-SAME: subgroup_size = 32
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -32,7 +32,6 @@ func.func @wmma_matmul_1024x1024x1024() {
 // WMMA-LABEL: func.func @wmma_matmul_1024x1024x1024()
 // WMMA: linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 // WMMA-SAME:                           mma_kind = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>
-// WMMA-SAME:                           reduction =  [0, 0, 64]
-// WMMA-SAME:                           subgroup_m_count = 2
-// WMMA-SAME:                           subgroup_n_count = 2
-// WMMA-SAME:                           workgroup =  [64, 128, 0]
+// WMMA-SAME:                           reduction =  [0, 0, 4]
+// WMMA-SAME:                           subgroup = [2, 2, 0]
+// WMMA-SAME:                           workgroup =  [128, 64, 0]
