@@ -222,3 +222,79 @@ func.func @tile_linalg_ext_scan(%arg0: tensor<128x2xf32>) -> tensor<128x2xi64> {
 // CHECK:           linalg.fill
 // CHECK:           iree_linalg_ext.scan
 // CHECK:         scf.forall.in_parallel
+
+// -----
+
+// See #21828 for how the test is generated.
+
+#config = #iree_cpu.lowering_config<vector_common_parallel = [0, 8]>
+#config1 = #iree_cpu.lowering_config<distribution = [41, 0], vector_common_parallel = [4, 0], vector_reduction = [0, 8]>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+func.func @issue_21828(%arg0: tensor<123x456xf32>) -> (tensor<123x456xf32>, tensor<123x456xf32>) {
+  %c8 = arith.constant 8 : index
+  %c456 = arith.constant 456 : index
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<123x456xf32>
+  %1:2 = scf.forall (%arg1) = (0) to (123) step (41) shared_outs(%arg2 = %0, %arg3 = %0) -> (tensor<123x456xf32>, tensor<123x456xf32>) {
+    %extracted_slice = tensor.extract_slice %arg0[%arg1, 0] [41, 456] [1, 1] : tensor<123x456xf32> to tensor<41x456xf32>
+    %2 = tensor.empty() : tensor<41x456xf32>
+    %3 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%extracted_slice : tensor<41x456xf32>) outs(%2 : tensor<41x456xf32>) attrs =  {lowering_config = #config} {
+    ^bb0(%in: f32, %out: f32):
+      %11 = arith.addf %in, %in : f32
+      linalg.yield %11 : f32
+    } -> tensor<41x456xf32>
+    %extracted_slice_0 = tensor.extract_slice %arg2[%arg1, 0] [41, 456] [1, 1] : tensor<123x456xf32> to tensor<41x456xf32>
+    %4 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%extracted_slice : tensor<41x456xf32>) outs(%extracted_slice_0 : tensor<41x456xf32>) attrs =  {lowering_config = #config} {
+    ^bb0(%in: f32, %out: f32):
+      %11 = arith.addf %in, %in : f32
+      linalg.yield %11 : f32
+    } -> tensor<41x456xf32>
+    %5 = tensor.empty() : tensor<41xf32>
+    %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<41xf32>) -> tensor<41xf32>
+    %7 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]} ins(%4 : tensor<41x456xf32>) outs(%6 : tensor<41xf32>) attrs =  {lowering_config = #config} {
+    ^bb0(%in: f32, %out: f32):
+      %11 = arith.addf %in, %in : f32
+      linalg.yield %11 : f32
+    } -> tensor<41xf32>
+    %8 = scf.for %arg4 = %c0 to %c456 step %c8 iter_args(%arg5 = %6) -> (tensor<41xf32>) {
+      %extracted_slice_2 = tensor.extract_slice %arg0[%arg1, %arg4] [41, 8] [1, 1] : tensor<123x456xf32> to tensor<41x8xf32>
+      %11 = tensor.empty() : tensor<41x8xf32>
+      %12 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%extracted_slice_2 : tensor<41x8xf32>) outs(%11 : tensor<41x8xf32>) attrs =  {lowering_config = #config} {
+      ^bb0(%in: f32, %out: f32):
+        %14 = arith.addf %in, %in : f32
+        linalg.yield %14 : f32
+      } -> tensor<41x8xf32>
+      %13 = linalg.generic {indexing_maps = [#map, #map1, #map1], iterator_types = ["parallel", "reduction"]} ins(%12, %7 : tensor<41x8xf32>, tensor<41xf32>) outs(%arg5 : tensor<41xf32>) attrs =  {lowering_config = #config1} {
+      ^bb0(%in: f32, %in_3: f32, %out: f32):
+        %14 = arith.addf %in, %in_3 : f32
+        linalg.yield %14 : f32
+      } -> tensor<41xf32>
+      scf.yield %13 : tensor<41xf32>
+    }
+    %9 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]} ins(%3 : tensor<41x456xf32>) outs(%6 : tensor<41xf32>) attrs =  {lowering_config = #config} {
+    ^bb0(%in: f32, %out: f32):
+      %11 = arith.addf %in, %in : f32
+      linalg.yield %11 : f32
+    } -> tensor<41xf32>
+    %extracted_slice_1 = tensor.extract_slice %arg3[%arg1, 0] [41, 456] [1, 1] : tensor<123x456xf32> to tensor<41x456xf32>
+    %10 = linalg.generic {indexing_maps = [#map, #map1, #map1, #map], iterator_types = ["parallel", "parallel"]} ins(%4, %9, %8 : tensor<41x456xf32>, tensor<41xf32>, tensor<41xf32>) outs(%extracted_slice_1 : tensor<41x456xf32>) attrs =  {lowering_config = #config} {
+    ^bb0(%in: f32, %in_2: f32, %in_3: f32, %out: f32):
+      %11 = arith.addf %in, %in_2 : f32
+      %12 = arith.mulf %11, %in_3 : f32
+      linalg.yield %12 : f32
+    } -> tensor<41x456xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %4 into %arg2[%arg1, 0] [41, 456] [1, 1] : tensor<41x456xf32> into tensor<123x456xf32>
+      tensor.parallel_insert_slice %10 into %arg3[%arg1, 0] [41, 456] [1, 1] : tensor<41x456xf32> into tensor<123x456xf32>
+    }
+  } {mapping = [#iree_codegen.workgroup_mapping<x>]}
+  return %1#1, %1#0 : tensor<123x456xf32>, tensor<123x456xf32>
+}
+// Verify that only one operand is yield in the new forall op.
+// CHECK-LABEL: func.func @issue_21828
+// CHECK:         scf.forall
+// CHECK:           scf.for
+// CHECK:         scf.forall
+// CHECK-SAME:      shared_outs(%{{[a-zA-Z0-9_]+}} = %{{[a-zA-Z0-9_]+}})
