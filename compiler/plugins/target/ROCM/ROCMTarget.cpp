@@ -711,10 +711,10 @@ public:
                          ".linked.ll", *llvmModule);
       }
 
-      // For example 'gfx942'
+      // For example 'gfx942'.
       StringRef targetCPU = targetMachine->getTargetCPU();
 
-      // For example 'amdgcn-amd-amdhsa'
+      // For example 'amdgcn-amd-amdhsa'.
       std::string targetTriple = targetMachine->getTargetTriple().str();
 
       // Run LLVM optimization passes.
@@ -722,21 +722,16 @@ public:
       optimizeModule(*llvmModule, *targetMachine, options.slpVectorization,
                      passesString);
       if (!serializationOptions.dumpIntermediatesPath.empty()) {
-
         // Additional context on '-mcpu' flag in PR comments, see for example:
         // https://github.com/iree-org/iree/pull/20716#issuecomment-2851650421
-        std::string header =
-            llvm::formatv(R"TXT(
-; To reproduce the .optimized.ll from the .linked.ll, run:
-; opt -S -mtriple={0} -mcpu={1} --passes='{2}' <.linked.ll>
-; The flag '-S' to emit LLVMIR.
-; The behavior of some passes depends on '-mtriple' and '-mcpu'
-;
-; To reproduce the .rocmasm from .optimized.ll, run:
-; llc -mtriple={0} -mcpu={1} <.optimized.ll> -o <out.rocmasm>
+        std::string header = llvm::formatv(
+            R"TXT(; To reproduce the .optimized.ll from the .linked.ll, run:
+; opt -S -mtriple={} -mcpu={} --passes='{}' <.linked.ll>
+; The flag '-S' is to emit LLVMIR.
+; The behavior of some passes depends on '-mtriple' and '-mcpu'.
 
 )TXT",
-                          targetTriple, targetCPU, passesString);
+            targetTriple, targetCPU, passesString);
 
         dumpModuleToPath(serializationOptions.dumpIntermediatesPath,
                          serializationOptions.dumpBaseName, variantOp.getName(),
@@ -754,11 +749,18 @@ public:
           llvm::errs() << "Error: cloning LLVM IR failed\n";
           return failure();
         }
+        std::string asmHeader = llvm::formatv(
+            R"TXT(; To reproduce the .rocmasm from .optimized.ll, run:
+; llc -mtriple={} -mcpu={} <.optimized.ll> -o <out.rocmasm>
+
+)TXT",
+            targetTriple, targetCPU);
+
         std::string targetISA =
             translateModuleToISA(*moduleCopy.get(), *targetMachine);
         dumpDataToPath(serializationOptions.dumpIntermediatesPath,
                        serializationOptions.dumpBaseName, variantOp.getName(),
-                       ".rocmasm", targetISA);
+                       ".rocmasm", asmHeader + targetISA);
       }
 
       // Serialize hsaco kernel into the binary that we will embed in the
