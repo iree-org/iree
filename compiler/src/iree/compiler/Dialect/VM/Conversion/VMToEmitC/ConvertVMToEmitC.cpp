@@ -207,8 +207,8 @@ createVmTypeDefPtr(ConversionPatternRewriter &rewriter, Location loc,
                 ArrayAttr::get(
                     ctx, {emitc::OpaqueAttr::get(ctx, ptr->second.first)}))
             .getResult(0);
-  } else if (llvm::isa<IREE::VM::RefType>(elementType)) {
-    Type objType = llvm::cast<IREE::VM::RefType>(elementType).getObjectType();
+  } else if (auto elemRefType = dyn_cast<IREE::VM::RefType>(elementType)) {
+    Type objType = elemRefType.getObjectType();
 
     Type typeRefType = emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t");
     Type typeRefArrayType = emitc::PointerType::get(typeRefType);
@@ -2743,7 +2743,6 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
         importOp ? importOp.getFunctionType().getNumInputs() : operands.size();
     for (int i = 0; i < numInputs; i++) {
       if (importOp && importOp.isFuncArgumentVariadic(i)) {
-        assert(isa<IREE::VM::CallVariadicOp>(op));
         auto variadicCallOp = cast<IREE::VM::CallVariadicOp>(op);
         APInt segment = *(variadicCallOp.getSegmentSizes().begin() + i);
         int64_t size = segment.getSExtValue();
