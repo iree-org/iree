@@ -80,26 +80,6 @@ static int64_t getSubgroupNCount(Operation *op) {
   return getSubgroupNCount(config).value();
 }
 
-// Apply the permuted projection map to the layout.
-static IREE::VectorExt::VectorLayoutInterface
-getLayoutForMap(VectorLayoutInterface layout, AffineMap map) {
-  // Project out unusued dims in layout.
-  SmallVector<bool> projectedDims(layout.getRank(), false);
-  llvm::SmallBitVector unusedBits = getUnusedDimsBitVector(map);
-  for (int dim : unusedBits.set_bits()) {
-    projectedDims[dim] = true;
-  }
-  IREE::VectorExt::VectorLayoutInterface projectedLayout =
-      layout.project(projectedDims);
-
-  // Transpose dims in layout.
-  AffineMap permMap = compressUnusedDims(map);
-  SmallVector<int64_t> identity =
-      llvm::to_vector(llvm::seq<int64_t>(permMap.getNumDims()));
-  SmallVector<int64_t> perm = applyPermutationMap<int64_t>(permMap, identity);
-  return projectedLayout.permute(perm);
-}
-
 // Get the layouts to use for the contraction given the intrinsic to use and
 // number of subgroups on the M and N dimension.
 //
@@ -139,7 +119,7 @@ getContractionLayout(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
   // Distribute on M and then N.
   // TODO: Use subgroup_basis to get the strides.
   subgroupStrides[innerMDim] = 1;
-  subgroupStrides[innerNDim] = 1;
+  subgroupStrides[innerNDim] = subgroupNCount;
 
   // Since these MMA intrinsics have a given tile size for each subgroup, we can
   // calculate the batch dimensions without looking at the subgroup layout.
@@ -186,7 +166,7 @@ getContractionLayout(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
     auto fragmentSpaceLayout = NestedLayoutAttr::get(
         map.getContext(), subgroupCounts, batchCounts, outerCounts,
         threadCounts, elementCounts, subgroupStrides, threadStrides);
-    return getLayoutForMap(fragmentSpaceLayout, map);
+    return fragmentSpaceLayout.apply(map);
   };
 
   VectorLayoutInterface lhs =
@@ -583,7 +563,7 @@ static LogicalResult setDerivedThreadConfigLayout(
   rewriter.setInsertionPointAfter(linalgOp);
   for (OpResult result : linalgOp->getResults()) {
     VectorLayoutInterface resultLayout =
-        getLayoutForMap(layout, linalgOp.getIndexingMapMatchingResult(result));
+        layout.apply(linalgOp.getIndexingMapMatchingResult(result));
     auto toLayout = rewriter.create<ToLayoutOp>(loc, result, resultLayout);
     rewriter.replaceAllUsesExcept(result, toLayout, toLayout);
   }
@@ -747,7 +727,7 @@ static LogicalResult setGPULoweringConfigLayout(
   rewriter.setInsertionPoint(candidate);
   for (OpOperand &operand : candidate->getOpOperands()) {
     VectorLayoutInterface operandLayout =
-        getLayoutForMap(layout, candidate.getMatchingIndexingMap(&operand));
+        layout.apply(candidate.getMatchingIndexingMap(&operand));
     auto toLayout =
         rewriter.create<ToLayoutOp>(loc, operand.get(), operandLayout);
     // Set shared memory promotion if requested.
@@ -759,7 +739,7 @@ static LogicalResult setGPULoweringConfigLayout(
   rewriter.setInsertionPointAfter(candidate);
   for (OpResult result : candidate->getResults()) {
     VectorLayoutInterface resultLayout =
-        getLayoutForMap(layout, candidate.getIndexingMapMatchingResult(result));
+        layout.apply(candidate.getIndexingMapMatchingResult(result));
     auto toLayout = rewriter.create<ToLayoutOp>(loc, result, resultLayout);
     rewriter.replaceAllUsesExcept(result, toLayout, toLayout);
   }
