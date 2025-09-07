@@ -30,45 +30,6 @@ void setMmaKind(MLIRContext *context, SmallVectorImpl<NamedAttribute> &attrs,
   attrs.emplace_back(kMmaKindName, kind);
 }
 
-// TODO: Merge subgroup counts functionality into subgroup tiling level
-//       lowering, when we have it implemented.
-constexpr StringLiteral kSubgroupMCountName = "subgroup_m_count";
-constexpr StringLiteral kSubgroupNCountName = "subgroup_n_count";
-
-std::optional<int64_t> getSubgroupMCount(LoweringConfigAttr config) {
-  auto subgroup_m_count_attr =
-      config.getAttributes().getAs<IntegerAttr>(kSubgroupMCountName);
-  if (!subgroup_m_count_attr) {
-    return std::nullopt;
-  }
-  return subgroup_m_count_attr.getInt();
-}
-
-std::optional<int64_t> getSubgroupNCount(LoweringConfigAttr config) {
-  auto subgroup_n_count_attr =
-      config.getAttributes().getAs<IntegerAttr>(kSubgroupNCountName);
-  if (!subgroup_n_count_attr) {
-    return std::nullopt;
-  }
-  return subgroup_n_count_attr.getInt();
-}
-
-void setSubgroupMCount(MLIRContext *context,
-                       SmallVectorImpl<NamedAttribute> &attrs,
-                       int64_t subgroup_m_count) {
-  attrs.emplace_back(
-      kSubgroupMCountName,
-      IntegerAttr::get(IntegerType::get(context, 64), subgroup_m_count));
-}
-
-void setSubgroupNCount(MLIRContext *context,
-                       SmallVectorImpl<NamedAttribute> &attrs,
-                       int64_t subgroup_n_count) {
-  attrs.emplace_back(
-      kSubgroupNCountName,
-      IntegerAttr::get(IntegerType::get(context, 64), subgroup_n_count));
-}
-
 const StringLiteral kSubgroupBasisName = "subgroup_basis";
 const StringLiteral kLaneBasisName = "lane_basis";
 
@@ -86,7 +47,7 @@ static StringLiteral getBasisLevelName(IREE::GPU::TilingLevel level) {
   }
 }
 
-void setBasis(MLIRContext *context, SmallVector<NamedAttribute> &attrs,
+void setBasis(MLIRContext *context, SmallVectorImpl<NamedAttribute> &attrs,
               IREE::GPU::TilingLevel level, const Basis &basis) {
   Builder b(context);
   ArrayAttr basisAttr = b.getArrayAttr(

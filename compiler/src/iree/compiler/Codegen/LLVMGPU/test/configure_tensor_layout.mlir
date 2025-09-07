@@ -14,7 +14,7 @@
   indexing_maps = #maps,
   iterator_types = ["parallel", "parallel", "reduction"],
   lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
-                                              subgroup_m_count = 1, subgroup_n_count = 1}>
+                                              subgroup_basis = [[1, 1, 1], [0, 1, 2]]}>
 }
 
 func.func @matmul_96x64x16_mfma(%lhs: tensor<96x16xf16>,
@@ -64,7 +64,7 @@ func.func @matmul_96x64x16_mfma(%lhs: tensor<96x16xf16>,
   indexing_maps = #maps,
   iterator_types = ["parallel", "parallel", "reduction"],
   lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>,
-                                              subgroup_m_count = 1 : i64, subgroup_n_count = 1 : i64}>
+                                              subgroup_basis = [[1, 1, 1], [0, 1, 2]]}>
 }
 
 func.func @matmul_96x64x16_wmmar3(%lhs: tensor<96x16xf16>,
@@ -114,7 +114,7 @@ func.func @matmul_96x64x16_wmmar3(%lhs: tensor<96x16xf16>,
   indexing_maps = #maps,
   iterator_types = ["parallel", "parallel", "reduction"],
   lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<WMMAR4_F32_16x16x16_F16>,
-                                              subgroup_m_count = 1 : i64, subgroup_n_count = 1 : i64}>
+                                              subgroup_basis = [[1, 1, 1], [0, 1, 2]]}>
 }
 
 func.func @matmul_96x64x16_wmmar4(%lhs: tensor<96x16xf16>,
@@ -164,7 +164,7 @@ func.func @matmul_96x64x16_wmmar4(%lhs: tensor<96x16xf16>,
   indexing_maps = #maps,
   iterator_types = ["parallel", "parallel", "reduction"],
   lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-                                              subgroup_m_count = 4, subgroup_n_count = 1}>
+                                              subgroup_basis = [[4, 1, 1], [0, 1, 2]]}>
 }
 
 func.func @matmul_128x64x16_multi_subgroup(%lhs: tensor<128x16xf16>,
