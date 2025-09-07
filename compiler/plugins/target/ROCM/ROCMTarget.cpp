@@ -751,10 +751,10 @@ public:
         }
         std::string asmHeader = llvm::formatv(
             R"TXT(; To reproduce the .rocmasm from .optimized.ll, run:
-; llc -mtriple={} -mcpu={} <.optimized.ll> -o <out.rocmasm>
+; llc -mtriple={} -mcpu={} -mattr='{}' <.optimized.ll> -o <out.rocmasm>
 
 )TXT",
-            targetTriple, targetCPU);
+            targetTriple, targetCPU, targetMachine->getTargetFeatureString());
 
         std::string targetISA =
             translateModuleToISA(*moduleCopy.get(), *targetMachine);
