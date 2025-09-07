@@ -27,9 +27,9 @@ Value promoteValue(OpBuilder &builder, Location loc, Value v, Attribute attr) {
   auto tensorType = cast<RankedTensorType>(v.getType());
   SmallVector<OpFoldResult> mixedSizes = tensor::getMixedSizes(builder, loc, v);
 
-  Value empty = builder.create<tensor::EmptyOp>(loc, mixedSizes,
-                                                tensorType.getElementType());
-  auto copy = builder.create<linalg::CopyOp>(loc, v, empty);
+  Value empty = tensor::EmptyOp::create(builder, loc, mixedSizes,
+                                        tensorType.getElementType());
+  auto copy = linalg::CopyOp::create(builder, loc, v, empty);
   setLoweringConfig(copy, attr);
   return copy.getResult(0);
 }
@@ -125,8 +125,8 @@ Value cacheSwizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
   // Insert the resource cast optimistically. If the input is not castable
   // (e.g. another producer) later patterns will drop it anyway as it is treated
   // like a hint.
-  auto resourceCast = builder.create<IREE::GPU::BufferResourceCastOp>(
-      loc, tensorType, bufferCastValue, cacheSwizzleVal);
+  auto resourceCast = IREE::GPU::BufferResourceCastOp::create(
+      builder, loc, tensorType, bufferCastValue, cacheSwizzleVal);
   bufferCastOperand->assign(resourceCast);
 
   return promotedValue;
