@@ -45,8 +45,8 @@ struct LLVMGPUCastAddressSpaceFunctionPass final
             mlir::MemRefType new_memrefType = mlir::MemRefType::get(
                 memrefType.getShape(), memrefType.getElementType(),
                 memrefType.getLayout());
-            operand = rewriter.create<memref::MemorySpaceCastOp>(
-                operand.getLoc(), new_memrefType, operand);
+            operand = memref::MemorySpaceCastOp::create(
+                rewriter, operand.getLoc(), new_memrefType, operand);
             anyCasted = true;
           }
         }

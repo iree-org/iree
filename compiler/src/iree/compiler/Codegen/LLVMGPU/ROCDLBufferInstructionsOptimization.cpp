@@ -19,12 +19,12 @@ namespace mlir::iree_compiler {
 namespace {
 
 Value createI1And(Location loc, ArrayRef<Value> values, OpBuilder &builder) {
-  Value base =
-      builder.create<arith::IndexCastUIOp>(loc, builder.getI1Type(), values[0]);
+  Value base = arith::IndexCastUIOp::create(builder, loc, builder.getI1Type(),
+                                            values[0]);
   for (Value value : values.drop_front()) {
     Value rhs =
-        builder.create<arith::IndexCastUIOp>(loc, builder.getI1Type(), value);
-    base = builder.create<arith::AndIOp>(loc, base, rhs);
+        arith::IndexCastUIOp::create(builder, loc, builder.getI1Type(), value);
+    base = arith::AndIOp::create(builder, loc, base, rhs);
   }
   return base;
 }
@@ -99,14 +99,14 @@ void simplifyMaskOps(RewriterBase &rewriter, vector::CreateMaskOp maskOp) {
 
     rewriter.setInsertionPoint(readOp);
     Value selectValue = createI1And(loc, ValuesToAnd, rewriter);
-    auto constantValue = rewriter.create<vector::BroadcastOp>(
-        loc, readOp.getVectorType(), readOp.getPadding());
+    auto constantValue = vector::BroadcastOp::create(
+        rewriter, loc, readOp.getVectorType(), readOp.getPadding());
 
-    auto newReadOp = rewriter.create<vector::TransferReadOp>(
-        loc, readOp.getVectorType(), readOp.getBase(), readOp.getIndices(),
-        readOp.getPadding(), ArrayRef<bool>{inBounds});
-    auto selectOp = rewriter.create<arith::SelectOp>(loc, selectValue,
-                                                     newReadOp, constantValue);
+    auto newReadOp = vector::TransferReadOp::create(
+        rewriter, loc, readOp.getVectorType(), readOp.getBase(),
+        readOp.getIndices(), readOp.getPadding(), ArrayRef<bool>{inBounds});
+    auto selectOp = arith::SelectOp::create(rewriter, loc, selectValue,
+                                            newReadOp, constantValue);
     rewriter.replaceAllUsesWith(readOp, selectOp);
   }
 }

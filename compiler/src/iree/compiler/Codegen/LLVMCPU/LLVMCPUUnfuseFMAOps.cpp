@@ -26,10 +26,11 @@ public:
   LogicalResult matchAndRewrite(LLVM::FMAOp op,
                                 PatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
-    auto mulPart = rewriter.create<LLVM::FMulOp>(loc, op.getResult().getType(),
-                                                 op.getA(), op.getB());
-    auto fmaResult = rewriter.create<LLVM::FAddOp>(
-        loc, mulPart.getResult().getType(), mulPart.getResult(), op.getC());
+    auto mulPart = LLVM::FMulOp::create(rewriter, loc, op.getResult().getType(),
+                                        op.getA(), op.getB());
+    auto fmaResult =
+        LLVM::FAddOp::create(rewriter, loc, mulPart.getResult().getType(),
+                             mulPart.getResult(), op.getC());
     rewriter.replaceOp(op, fmaResult.getResult());
     return success();
   }

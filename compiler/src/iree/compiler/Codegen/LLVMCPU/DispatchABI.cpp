@@ -610,12 +610,12 @@ static Value buildArgDI(Operation *forOp, int argNum, Value value, Twine name,
   if (!isLocationValidForDI(loc))
     return value;
   auto scopeAttr = getLocalScopeAttr(forOp);
-  builder.create<LLVM::DbgValueOp>(
-      loc, value,
-      LLVM::DILocalVariableAttr::get(
-          scopeAttr, builder.getStringAttr(name), scopeAttr.getFile(),
-          /*line=*/1, /*arg=*/argNum + 1,
-          /*alignInBits=*/0, type, LLVM::DIFlags::Zero));
+  LLVM::DbgValueOp::create(builder, loc, value,
+                           LLVM::DILocalVariableAttr::get(
+                               scopeAttr, builder.getStringAttr(name),
+                               scopeAttr.getFile(),
+                               /*line=*/1, /*arg=*/argNum + 1,
+                               /*alignInBits=*/0, type, LLVM::DIFlags::Zero));
   return value;
 }
 
@@ -627,12 +627,12 @@ static Value buildValueDI(Operation *forOp, Value value, Twine name,
   if (!isLocationValidForDI(loc))
     return value;
   auto scopeAttr = getLocalScopeAttr(forOp);
-  builder.create<LLVM::DbgValueOp>(
-      loc, value,
-      LLVM::DILocalVariableAttr::get(
-          scopeAttr, builder.getStringAttr(name), scopeAttr.getFile(),
-          /*line=*/1, /*arg=*/0,
-          /*alignInBits=*/0, type, LLVM::DIFlags::Zero));
+  LLVM::DbgValueOp::create(builder, loc, value,
+                           LLVM::DILocalVariableAttr::get(
+                               scopeAttr, builder.getStringAttr(name),
+                               scopeAttr.getFile(),
+                               /*line=*/1, /*arg=*/0,
+                               /*alignInBits=*/0, type, LLVM::DIFlags::Zero));
   return value;
 }
 
@@ -715,11 +715,11 @@ Value HALDispatchABI::loadPushConstant(Operation *forOp, int64_t offset,
   auto constantsPtrValue =
       loadFieldValue(forOp, DispatchStateField::constants, builder);
   auto pushConstantType = IntegerType::get(context, 32);
-  Value constantPtrValue = builder.create<LLVM::GEPOp>(
-      loc, constantsPtrValue.getType(), pushConstantType, constantsPtrValue,
-      LLVM::GEPArg(int32_t(offset)));
+  Value constantPtrValue = LLVM::GEPOp::create(
+      builder, loc, constantsPtrValue.getType(), pushConstantType,
+      constantsPtrValue, LLVM::GEPArg(int32_t(offset)));
   Value constantValue =
-      builder.create<LLVM::LoadOp>(loc, pushConstantType, constantPtrValue);
+      LLVM::LoadOp::create(builder, loc, pushConstantType, constantPtrValue);
   auto resultValue = castValueToType(loc, constantValue, resultType, builder);
   return buildValueDI(forOp, resultValue,
                       StringRef("constant[") + std::to_string(offset) + "]",
@@ -741,12 +741,12 @@ Value HALDispatchABI::loadBindingPtr(Operation *forOp, int64_t ordinal,
   auto loc = forOp->getLoc();
   auto ptrsPtrValue =
       loadFieldValue(forOp, DispatchStateField::binding_ptrs, builder);
-  auto elementPtrValue = builder.create<LLVM::GEPOp>(
-      loc, ptrsPtrValue.getType(),
+  auto elementPtrValue = LLVM::GEPOp::create(
+      builder, loc, ptrsPtrValue.getType(),
       mlir::LLVM::LLVMPointerType::get(builder.getContext()), ptrsPtrValue,
       LLVM::GEPArg(int32_t(ordinal)));
-  auto elementValue = builder.create<LLVM::LoadOp>(
-      loc, mlir::LLVM::LLVMPointerType::get(builder.getContext()),
+  auto elementValue = LLVM::LoadOp::create(
+      builder, loc, mlir::LLVM::LLVMPointerType::get(builder.getContext()),
       elementPtrValue);
   return buildValueDI(forOp, elementValue,
                       StringRef("binding_ptrs[") + std::to_string(ordinal) +
@@ -760,11 +760,11 @@ Value HALDispatchABI::loadBindingLength(Operation *forOp, int64_t ordinal,
   auto lengthsPtrValue =
       loadFieldValue(forOp, DispatchStateField::binding_lengths, builder);
   auto indexType = typeConverter->convertType(IndexType::get(context));
-  auto elementPtrValue = builder.create<LLVM::GEPOp>(
-      loc, lengthsPtrValue.getType(), indexType, lengthsPtrValue,
-      LLVM::GEPArg(int32_t(ordinal)));
+  auto elementPtrValue =
+      LLVM::GEPOp::create(builder, loc, lengthsPtrValue.getType(), indexType,
+                          lengthsPtrValue, LLVM::GEPArg(int32_t(ordinal)));
   auto elementValue =
-      builder.create<LLVM::LoadOp>(loc, indexType, elementPtrValue);
+      LLVM::LoadOp::create(builder, loc, indexType, elementPtrValue);
   return buildValueDI(forOp, elementValue,
                       StringRef("binding_lengths[") + std::to_string(ordinal) +
                           "]",
@@ -809,13 +809,13 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
       // the element type byte width.
       int32_t elementBitWidth =
           IREE::Util::getTypeBitWidth(memRefType.getElementType());
-      Value elementWidthVal =
-          builder.create<LLVM::ConstantOp>(loc, llvmIndexType, elementBitWidth);
-      Value eight = builder.create<LLVM::ConstantOp>(loc, llvmIndexType, 8);
+      Value elementWidthVal = LLVM::ConstantOp::create(
+          builder, loc, llvmIndexType, elementBitWidth);
+      Value eight = LLVM::ConstantOp::create(builder, loc, llvmIndexType, 8);
       Value bitOffset =
-          builder.create<LLVM::MulOp>(loc, baseOffsetValue, eight);
+          LLVM::MulOp::create(builder, loc, baseOffsetValue, eight);
       Value elementOffsetVal =
-          builder.create<LLVM::UDivOp>(loc, bitOffset, elementWidthVal);
+          LLVM::UDivOp::create(builder, loc, bitOffset, elementWidthVal);
       desc.setOffset(builder, loc, elementOffsetVal);
     } else {
       desc.setConstantOffset(builder, loc, offset);
@@ -846,13 +846,13 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
           Value currentStrideVal;
           if (std::optional<int64_t> currentStrideInt =
                   getConstantIntValue(currentStride)) {
-            currentStrideVal = builder.create<LLVM::ConstantOp>(
-                loc, llvmIndexType, currentStrideInt.value());
+            currentStrideVal = LLVM::ConstantOp::create(
+                builder, loc, llvmIndexType, currentStrideInt.value());
           } else {
             currentStrideVal = cast<Value>(currentStride);
           }
           currentStride =
-              builder.create<LLVM::MulOp>(loc, currentStrideVal, dim)
+              LLVM::MulOp::create(builder, loc, currentStrideVal, dim)
                   .getResult();
           desc.setStride(builder, loc, i - 1, cast<Value>(currentStride));
         } else {
@@ -941,29 +941,29 @@ Value HALDispatchABI::updateProcessorDataFromTargetAttr(
   MLIRContext *context = forOp->getContext();
   auto ptrType = LLVM::LLVMPointerType::get(context);
   auto i64Ty = builder.getI64Type();
-  Value arraySize = builder.create<LLVM::ConstantOp>(
-      loc, i64Ty, builder.getI64IntegerAttr(ProcessorDataCapacity));
-  Value alloca = builder.create<LLVM::AllocaOp>(loc, ptrType, i64Ty, arraySize,
-                                                /*alignment=*/sizeof(uint64_t));
+  Value arraySize = LLVM::ConstantOp::create(
+      builder, loc, i64Ty, builder.getI64IntegerAttr(ProcessorDataCapacity));
+  Value alloca = LLVM::AllocaOp::create(builder, loc, ptrType, i64Ty, arraySize,
+                                        /*alignment=*/sizeof(uint64_t));
   // Load the 0-th value.
   Value srcData0 =
-      builder.create<LLVM::LoadOp>(loc, i64Ty, processorDataPtrValue);
+      LLVM::LoadOp::create(builder, loc, i64Ty, processorDataPtrValue);
   // Set the specified CPU arch data.
-  Value bitPatternVal = builder.create<LLVM::ConstantOp>(
-      loc, i64Ty, builder.getI64IntegerAttr(specifiedCpuDataField0));
-  srcData0 = builder.create<LLVM::OrOp>(loc, srcData0, bitPatternVal);
-  builder.create<LLVM::StoreOp>(loc, srcData0, alloca);
+  Value bitPatternVal = LLVM::ConstantOp::create(
+      builder, loc, i64Ty, builder.getI64IntegerAttr(specifiedCpuDataField0));
+  srcData0 = LLVM::OrOp::create(builder, loc, srcData0, bitPatternVal);
+  LLVM::StoreOp::create(builder, loc, srcData0, alloca);
   // Copy over the rest.
   for (int64_t i = 1, e = ProcessorDataCapacity; i < e; ++i) {
-    Value loadPtr = builder.create<LLVM::GEPOp>(
-        loc, processorDataPtrValue.getType(), i64Ty, processorDataPtrValue,
-        LLVM::GEPArg(int32_t(i)),
+    Value loadPtr = LLVM::GEPOp::create(
+        builder, loc, processorDataPtrValue.getType(), i64Ty,
+        processorDataPtrValue, LLVM::GEPArg(int32_t(i)),
         /*noWrapFlags =*/LLVM::GEPNoWrapFlags::inbounds);
-    Value loadVal = builder.create<LLVM::LoadOp>(loc, i64Ty, loadPtr);
-    Value storePtr = builder.create<LLVM::GEPOp>(
-        loc, alloca.getType(), i64Ty, alloca, LLVM::GEPArg(int32_t(i)),
+    Value loadVal = LLVM::LoadOp::create(builder, loc, i64Ty, loadPtr);
+    Value storePtr = LLVM::GEPOp::create(
+        builder, loc, alloca.getType(), i64Ty, alloca, LLVM::GEPArg(int32_t(i)),
         /*noWrapFlags =*/LLVM::GEPNoWrapFlags::inbounds);
-    builder.create<LLVM::StoreOp>(loc, loadVal, storePtr);
+    LLVM::StoreOp::create(builder, loc, loadVal, storePtr);
   }
   return alloca;
 }
@@ -980,13 +980,13 @@ Value HALDispatchABI::loadProcessorData(Operation *forOp, OpBuilder &builder) {
   auto environmentPtrValue =
       buildArgDI(forOp, /*argNum=*/0, getLocalArgument(forOp, 0), "environment",
                  di.getPtrOf(di.getConstOf(di.getEnvironmentV0T())), builder);
-  Value processorPtrValue = builder.create<LLVM::GEPOp>(
-      loc, LLVM::LLVMPointerType::get(context),
+  Value processorPtrValue = LLVM::GEPOp::create(
+      builder, loc, LLVM::LLVMPointerType::get(context),
       LLVM::LLVMPointerType::get(context), environmentPtrValue,
       LLVM::GEPArg(int32_t(EnvironmentField::processor)),
       /*noWrapFlags =*/LLVM::GEPNoWrapFlags::inbounds);
-  Value processorDataPtrValue = builder.create<LLVM::GEPOp>(
-      loc, LLVM::LLVMPointerType::get(context),
+  Value processorDataPtrValue = LLVM::GEPOp::create(
+      builder, loc, LLVM::LLVMPointerType::get(context),
       LLVM::LLVMPointerType::get(context), processorPtrValue,
       LLVM::GEPArg(int32_t(ProcessorField::data)),
       /*noWrapFlags =*/LLVM::GEPNoWrapFlags::inbounds);
@@ -1003,8 +1003,8 @@ Value HALDispatchABI::loadProcessorData(Operation *forOp, int64_t index,
   // Load the value; it should always be in bounds.
   Value dataArrayValue = loadFieldValue(forOp, ProcessorField::data, builder);
   SmallVector<int64_t, 1> position = {index};
-  Value dataValue = builder.create<LLVM::ExtractValueOp>(
-      forOp->getLoc(), dataArrayValue, position);
+  Value dataValue = LLVM::ExtractValueOp::create(builder, forOp->getLoc(),
+                                                 dataArrayValue, position);
   return buildValueDI(forOp, dataValue,
                       StringRef("processor_data[") + std::to_string(index) +
                           "]",
@@ -1024,26 +1024,26 @@ Value HALDispatchABI::loadExecutableConstant(Operation *forOp, StringRef key,
   LLVM::GlobalOp globalOp;
   if (!(globalOp = moduleOp.lookupSymbol<LLVM::GlobalOp>(globalName))) {
     auto moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
-    globalOp = moduleBuilder.create<LLVM::GlobalOp>(
-        loc, builder.getI32Type(),
+    globalOp = LLVM::GlobalOp::create(
+        moduleBuilder, loc, builder.getI32Type(),
         /*isConstant=*/false, LLVM::Linkage::Internal, globalName, Attribute{});
     globalOp->setAttr(IREE::HAL::ExecutableConstantBlockOp::getKeyAttrName(),
                       builder.getStringAttr(key));
   }
 
   // Load the placeholder global ordinal.
-  Value globalPtr = builder.create<LLVM::AddressOfOp>(loc, globalOp);
+  Value globalPtr = LLVM::AddressOfOp::create(builder, loc, globalOp);
   Value ordinalValue =
-      builder.create<LLVM::LoadOp>(loc, globalOp.getType(), globalPtr);
+      LLVM::LoadOp::create(builder, loc, globalOp.getType(), globalPtr);
 
   // Load constant from the executable constants struct.
   auto constantsPtrValue =
       loadFieldValue(forOp, EnvironmentField::constants, builder);
   Value constantPtrValue =
-      builder.create<LLVM::GEPOp>(loc, constantsPtrValue.getType(), resultType,
-                                  constantsPtrValue, ordinalValue);
+      LLVM::GEPOp::create(builder, loc, constantsPtrValue.getType(), resultType,
+                          constantsPtrValue, ordinalValue);
   Value constantValue =
-      builder.create<LLVM::LoadOp>(loc, resultType, constantPtrValue);
+      LLVM::LoadOp::create(builder, loc, resultType, constantPtrValue);
   auto resultValue = castValueToType(loc, constantValue, resultType, builder);
   return buildValueDI(forOp, resultValue,
                       StringRef("executable_constant['") + key + "']",
@@ -1062,8 +1062,8 @@ Value HALDispatchABI::loadImportOrdinal(Operation *forOp, StringRef importName,
   LLVM::GlobalOp globalOp;
   if (!(globalOp = moduleOp.lookupSymbol<LLVM::GlobalOp>(globalName))) {
     auto moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
-    globalOp = moduleBuilder.create<LLVM::GlobalOp>(
-        loc, builder.getI32Type(),
+    globalOp = LLVM::GlobalOp::create(
+        moduleBuilder, loc, builder.getI32Type(),
         /*isConstant=*/false, LLVM::Linkage::Internal, globalName, Attribute{});
     globalOp->setAttr("hal.executable.import.key",
                       builder.getStringAttr(importName));
@@ -1073,8 +1073,8 @@ Value HALDispatchABI::loadImportOrdinal(Operation *forOp, StringRef importName,
   }
 
   // Load the placeholder global ordinal.
-  Value globalPtr = builder.create<LLVM::AddressOfOp>(loc, globalOp);
-  return builder.create<LLVM::LoadOp>(loc, globalOp.getType(), globalPtr);
+  Value globalPtr = LLVM::AddressOfOp::create(builder, loc, globalOp);
+  return LLVM::LoadOp::create(builder, loc, globalOp.getType(), globalPtr);
 }
 
 std::pair<Value, Value> HALDispatchABI::loadImportFunc(Operation *forOp,
@@ -1085,16 +1085,16 @@ std::pair<Value, Value> HALDispatchABI::loadImportFunc(Operation *forOp,
       loadFieldValue(forOp, EnvironmentField::import_funcs, builder);
   auto opaquePtrType = LLVM::LLVMPointerType::get(builder.getContext());
   auto funcPtrValue =
-      builder.create<LLVM::GEPOp>(loc, funcPtrsValue.getType(), opaquePtrType,
-                                  funcPtrsValue, importOrdinal);
+      LLVM::GEPOp::create(builder, loc, funcPtrsValue.getType(), opaquePtrType,
+                          funcPtrsValue, importOrdinal);
   auto contextPtrsValue =
       loadFieldValue(forOp, EnvironmentField::import_contexts, builder);
-  auto contextPtrValue = builder.create<LLVM::GEPOp>(
-      loc, contextPtrsValue.getType(), opaquePtrType, contextPtrsValue,
-      importOrdinal);
+  auto contextPtrValue =
+      LLVM::GEPOp::create(builder, loc, contextPtrsValue.getType(),
+                          opaquePtrType, contextPtrsValue, importOrdinal);
   return std::make_pair(
-      builder.create<LLVM::LoadOp>(loc, opaquePtrType, funcPtrValue),
-      builder.create<LLVM::LoadOp>(loc, opaquePtrType, contextPtrValue));
+      LLVM::LoadOp::create(builder, loc, opaquePtrType, funcPtrValue),
+      LLVM::LoadOp::create(builder, loc, opaquePtrType, contextPtrValue));
 }
 
 Value HALDispatchABI::isImportFuncAvailable(Operation *forOp,
@@ -1105,10 +1105,10 @@ Value HALDispatchABI::isImportFuncAvailable(Operation *forOp,
       loadImportOrdinal(forOp, importName, /*weak=*/true, builder);
   auto importFunc = loadImportFunc(forOp, importOrdinal, builder);
   Value nullPtrValue =
-      builder.create<LLVM::ZeroOp>(loc, importFunc.first.getType());
-  return builder.create<LLVM::ICmpOp>(loc, builder.getI1Type(),
-                                      LLVM::ICmpPredicate::ne, importFunc.first,
-                                      nullPtrValue);
+      LLVM::ZeroOp::create(builder, loc, importFunc.first.getType());
+  return LLVM::ICmpOp::create(builder, loc, builder.getI1Type(),
+                              LLVM::ICmpPredicate::ne, importFunc.first,
+                              nullPtrValue);
 }
 
 Value HALDispatchABI::callImport(Operation *forOp, StringRef importName,
@@ -1124,8 +1124,8 @@ Value HALDispatchABI::callImport(Operation *forOp, StringRef importName,
   // null as in isImportFuncAvailable but we'll need to make the control flow.
   assert(!weak && "calls to weak imports not yet implemented");
 
-  Value nullPtrValue = builder.create<LLVM::ZeroOp>(
-      loc, LLVM::LLVMPointerType::get(builder.getContext()));
+  Value nullPtrValue = LLVM::ZeroOp::create(
+      builder, loc, LLVM::LLVMPointerType::get(builder.getContext()));
   SmallVector<Value> args = {
       /*thunk_func_ptr=*/thunkPtrValue,
       /*import_func_ptr=*/importFunc.first,
@@ -1134,7 +1134,7 @@ Value HALDispatchABI::callImport(Operation *forOp, StringRef importName,
       /*reserved=*/nullPtrValue,
   };
   auto callOp =
-      builder.create<LLVM::CallOp>(loc, TypeRange{builder.getI32Type()}, args);
+      LLVM::CallOp::create(builder, loc, TypeRange{builder.getI32Type()}, args);
   callOp.getProperties().operandSegmentSizes = {
       static_cast<int32_t>(args.size()), 0};
   callOp.getProperties().op_bundle_sizes = builder.getDenseI32ArrayAttr({});
@@ -1177,26 +1177,27 @@ HALDispatchABI::packIntoParameterStruct(Operation *forOp, TypeRange resultTypes,
   if (!structType) {
     Type voidPtrType = LLVM::LLVMPointerType::get(context);
     return {voidPtrType,
-            builder.create<LLVM::UndefOp>(loc, voidPtrType).getResult()};
+            LLVM::UndefOp::create(builder, loc, voidPtrType).getResult()};
   }
 
   auto ptrStructType = LLVM::LLVMPointerType::get(context);
-  Value one = builder.create<LLVM::ConstantOp>(loc, builder.getI64Type(),
-                                               builder.getIndexAttr(1));
+  Value one = LLVM::ConstantOp::create(builder, loc, builder.getI64Type(),
+                                       builder.getIndexAttr(1));
   Value paramsPtr =
-      builder.create<LLVM::AllocaOp>(loc, ptrStructType, *structType, one,
-                                     /*alignment=*/0);
-  Value structVal = builder.create<LLVM::UndefOp>(loc, *structType);
+      LLVM::AllocaOp::create(builder, loc, ptrStructType, *structType, one,
+                             /*alignment=*/0);
+  Value structVal = LLVM::UndefOp::create(builder, loc, *structType);
   for (int64_t i = 0, e = args.size(); i < e; ++i) {
-    structVal = builder.create<LLVM::InsertValueOp>(loc, structVal, args[i],
-                                                    i + resultTypes.size());
+    structVal = LLVM::InsertValueOp::create(builder, loc, structVal, args[i],
+                                            i + resultTypes.size());
   }
   for (int64_t i = 0, e = extraFields.size(); i < e; ++i) {
-    structVal = builder.create<LLVM::InsertValueOp>(
-        loc, structVal, extraFields[i], i + resultTypes.size() + args.size());
+    structVal =
+        LLVM::InsertValueOp::create(builder, loc, structVal, extraFields[i],
+                                    i + resultTypes.size() + args.size());
   }
   // Store into the alloca'ed descriptor.
-  builder.create<LLVM::StoreOp>(loc, structVal, paramsPtr);
+  LLVM::StoreOp::create(builder, loc, structVal, paramsPtr);
   return {*structType, paramsPtr};
 }
 
@@ -1303,8 +1304,9 @@ FailureOr<SmallVector<Value>> HALDispatchABI::materializeABI(
 
   Location loc = forOp->getLoc();
   if (cConv == IREE::HAL::CallingConvention::Default) {
-    auto callOp = rewriter.create<LLVM::CallOp>(
-        loc, abiFunctionType->getReturnTypes(), allArgsList, forOp->getAttrs());
+    auto callOp =
+        LLVM::CallOp::create(rewriter, loc, abiFunctionType->getReturnTypes(),
+                             allArgsList, forOp->getAttrs());
     callOp.getProperties().operandSegmentSizes = {
         static_cast<int32_t>(allArgsList.size()), 0};
     callOp.getProperties().op_bundle_sizes = rewriter.getDenseI32ArrayAttr({});
@@ -1337,19 +1339,20 @@ SmallVector<Value> HALDispatchABI::wrapAndCallImport(
   // Check the call results and branch to exit if it failed.
   // Note that we weight the true branch (call successful) higher.
   builder.setInsertionPointAfterValue(callResult);
-  Value zeroI32 = builder.create<LLVM::ConstantOp>(
-      loc, builder.getI32Type(), builder.getI32IntegerAttr(0));
-  Value cmpZero = builder.create<LLVM::ICmpOp>(
-      loc, builder.getI1Type(), LLVM::ICmpPredicate::eq, callResult, zeroI32);
-  builder.create<LLVM::CondBrOp>(loc, cmpZero, trueDest, ValueRange{},
-                                 falseDest, ValueRange{callResult},
-                                 std::make_pair(1u, 0u));
+  Value zeroI32 = LLVM::ConstantOp::create(builder, loc, builder.getI32Type(),
+                                           builder.getI32IntegerAttr(0));
+  Value cmpZero =
+      LLVM::ICmpOp::create(builder, loc, builder.getI1Type(),
+                           LLVM::ICmpPredicate::eq, callResult, zeroI32);
+  LLVM::CondBrOp::create(builder, loc, cmpZero, trueDest, ValueRange{},
+                         falseDest, ValueRange{callResult},
+                         std::make_pair(1u, 0u));
 
   // Failure return block.
   // Return the call result to the runtime.
   builder.setInsertionPointToStart(falseDest);
-  builder.create<LLVM::ReturnOp>(
-      loc, falseDest->addArgument(builder.getI32Type(), loc));
+  LLVM::ReturnOp::create(builder, loc,
+                         falseDest->addArgument(builder.getI32Type(), loc));
 
   // Successful continuation block.
   // Marshal results out of the params struct.
@@ -1357,10 +1360,10 @@ SmallVector<Value> HALDispatchABI::wrapAndCallImport(
   SmallVector<Value> results;
   if (!resultTypes.empty()) {
     results.reserve(resultTypes.size());
-    Value structVal = builder.create<LLVM::LoadOp>(loc, structType, paramsPtr);
+    Value structVal = LLVM::LoadOp::create(builder, loc, structType, paramsPtr);
     for (int64_t i = 0, e = resultTypes.size(); i < e; ++i) {
       results.push_back(
-          builder.create<LLVM::ExtractValueOp>(loc, structVal, i));
+          LLVM::ExtractValueOp::create(builder, loc, structVal, i));
     }
   }
   return results;
@@ -1368,8 +1371,8 @@ SmallVector<Value> HALDispatchABI::wrapAndCallImport(
 
 Value HALDispatchABI::getIndexValue(Location loc, int64_t value,
                                     OpBuilder &builder) {
-  return builder.create<LLVM::ConstantOp>(
-      loc, typeConverter->convertType(builder.getIndexType()),
+  return LLVM::ConstantOp::create(
+      builder, loc, typeConverter->convertType(builder.getIndexType()),
       builder.getI64IntegerAttr(value));
 }
 
@@ -1388,9 +1391,9 @@ Value HALDispatchABI::loadFieldValue(Operation *forOp, EnvironmentField field,
       buildArgDI(forOp, /*argNum=*/0, getLocalArgument(forOp, 0), "environment",
                  di.getPtrOf(di.getConstOf(di.getEnvironmentV0T())), builder);
   Value environmentValue =
-      builder.create<LLVM::LoadOp>(loc, environmentType, environmentPtrValue);
+      LLVM::LoadOp::create(builder, loc, environmentType, environmentPtrValue);
   SmallVector<int64_t, 1> position = {int64_t(field)};
-  return builder.create<LLVM::ExtractValueOp>(loc, environmentValue, position);
+  return LLVM::ExtractValueOp::create(builder, loc, environmentValue, position);
 }
 
 Value HALDispatchABI::loadFieldValue(Operation *forOp, ProcessorField field,
@@ -1399,7 +1402,7 @@ Value HALDispatchABI::loadFieldValue(Operation *forOp, ProcessorField field,
   Value processorValue =
       loadFieldValue(forOp, EnvironmentField::processor, builder);
   SmallVector<int64_t, 1> position = {int64_t(field)};
-  return builder.create<LLVM::ExtractValueOp>(loc, processorValue, position);
+  return LLVM::ExtractValueOp::create(builder, loc, processorValue, position);
 }
 
 Value HALDispatchABI::loadFieldValue(Operation *forOp, DispatchStateField field,
@@ -1409,9 +1412,9 @@ Value HALDispatchABI::loadFieldValue(Operation *forOp, DispatchStateField field,
       forOp, /*argNum=*/1, getLocalArgument(forOp, 1), "dispatch_state",
       di.getPtrOf(di.getConstOf(di.getDispatchStateV0T())), builder);
   Value stateValue =
-      builder.create<LLVM::LoadOp>(loc, dispatchStateType, statePtrValue);
+      LLVM::LoadOp::create(builder, loc, dispatchStateType, statePtrValue);
   SmallVector<int64_t, 1> position = {int64_t(field)};
-  return builder.create<LLVM::ExtractValueOp>(loc, stateValue, position);
+  return LLVM::ExtractValueOp::create(builder, loc, stateValue, position);
 }
 
 Type HALDispatchABI::getFieldType(WorkgroupStateField field) {
@@ -1426,9 +1429,9 @@ Value HALDispatchABI::loadFieldValue(Operation *forOp,
       forOp, /*argNum=*/2, getLocalArgument(forOp, 2), "workgroup_state",
       di.getPtrOf(di.getConstOf(di.getWorkgroupStateV0T())), builder);
   Value stateValue =
-      builder.create<LLVM::LoadOp>(loc, workgroupStateType, statePtrValue);
+      LLVM::LoadOp::create(builder, loc, workgroupStateType, statePtrValue);
   SmallVector<int64_t, 1> position = {int64_t(field)};
-  return builder.create<LLVM::ExtractValueOp>(loc, stateValue, position);
+  return LLVM::ExtractValueOp::create(builder, loc, stateValue, position);
 }
 
 Type HALDispatchABI::getExtraFieldType(StringRef extraField) {

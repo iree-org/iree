@@ -148,7 +148,7 @@ static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
     auto allocType =
         MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
                         AffineMap(), addressSpace);
-    return builder.create<memref::AllocaOp>(loc, allocType, dynamicSizes)
+    return memref::AllocaOp::create(builder, loc, allocType, dynamicSizes)
         .getResult();
   }
 
@@ -157,7 +157,7 @@ static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
   auto allocType =
       MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
                       AffineMap(), addressSpace);
-  return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes)
+  return memref::AllocOp::create(builder, loc, allocType, dynamicSizes)
       .getResult();
 }
 
@@ -174,11 +174,11 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
     needsBarrier = true;
   }
   if (needsBarrier)
-    builder.create<gpu::BarrierOp>(loc);
-  Operation *copy = builder.create<memref::CopyOp>(loc, from, to);
+    gpu::BarrierOp::create(builder, loc);
+  Operation *copy = memref::CopyOp::create(builder, loc, from, to);
   if (needsBarrier) {
     setMarker(copy, getCopyToWorkgroupMemoryMarker());
-    builder.create<gpu::BarrierOp>(loc);
+    gpu::BarrierOp::create(builder, loc);
   }
   return success();
 }
@@ -353,13 +353,13 @@ static FailureOr<Value> gpuRequireMemSpaceAllocationFn(OpBuilder &builder,
   }
 
   if (memorySpace == privateSpace) {
-    return builder.create<memref::AllocaOp>(loc, allocType, dynamicSizes)
+    return memref::AllocaOp::create(builder, loc, allocType, dynamicSizes)
         .getResult();
   }
   allocType =
       MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
                       AffineMap(), workgroupSpace);
-  return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes)
+  return memref::AllocOp::create(builder, loc, allocType, dynamicSizes)
       .getResult();
 }
 
@@ -374,7 +374,7 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
       gpuRequireMemSpaceAllocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = [](OpBuilder &builder, Location loc,
                                                Value from, Value to) {
-    builder.create<memref::CopyOp>(loc, from, to);
+    memref::CopyOp::create(builder, loc, from, to);
     return success();
   };
   funcPassManager.addPass(
@@ -721,17 +721,18 @@ static LogicalResult gpuVectorCopyFn(OpBuilder &builder, Location loc,
     needsBarrier = true;
   }
   if (needsBarrier)
-    builder.create<gpu::BarrierOp>(loc);
+    gpu::BarrierOp::create(builder, loc);
   VectorType vectorType =
       VectorType::get(fromType.getShape(), fromType.getElementType());
-  Value c0 = builder.create<arith::ConstantIndexOp>(loc, 0);
+  Value c0 = arith::ConstantIndexOp::create(builder, loc, 0);
   SmallVector<Value> indices(vectorType.getRank(), c0);
   SmallVector<bool> inBounds(vectorType.getRank(), true);
-  Value read = builder.create<vector::TransferReadOp>(
-      loc, vectorType, from, indices, /*padding=*/std::nullopt, inBounds);
-  builder.create<vector::TransferWriteOp>(loc, read, to, indices, inBounds);
+  Value read =
+      vector::TransferReadOp::create(builder, loc, vectorType, from, indices,
+                                     /*padding=*/std::nullopt, inBounds);
+  vector::TransferWriteOp::create(builder, loc, read, to, indices, inBounds);
   if (needsBarrier) {
-    builder.create<gpu::BarrierOp>(loc);
+    gpu::BarrierOp::create(builder, loc);
   }
   return success();
 }
