@@ -119,7 +119,7 @@ getContractionLayout(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
   // Distribute on M and then N.
   // TODO: Use subgroup_basis to get the strides.
   subgroupStrides[innerMDim] = 1;
-  subgroupStrides[innerNDim] = subgroupNCount;
+  subgroupStrides[innerNDim] = subgroupMCount;
 
   // Since these MMA intrinsics have a given tile size for each subgroup, we can
   // calculate the batch dimensions without looking at the subgroup layout.
