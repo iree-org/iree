@@ -605,17 +605,17 @@ resolveSplitReduceForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
     return forallOp->emitOpError("failed to lower split reduction modifier op");
   }
 
-  auto procIdOp = rewriter.create<IREE::HAL::InterfaceWorkgroupIDOp>(
-      loc, static_cast<unsigned>(delinearizeFrom));
-  auto nTotalProcsOp = rewriter.create<IREE::HAL::InterfaceWorkgroupCountOp>(
-      loc, static_cast<unsigned>(delinearizeFrom));
+  auto procIdOp = IREE::HAL::InterfaceWorkgroupIDOp::create(
+      rewriter, loc, static_cast<unsigned>(delinearizeFrom));
+  auto nTotalProcsOp = IREE::HAL::InterfaceWorkgroupCountOp::create(
+      rewriter, loc, static_cast<unsigned>(delinearizeFrom));
   OpFoldResult nTotalProcs = nTotalProcsOp.getResult();
   OpFoldResult origNProcs = affine::makeComposedFoldedAffineApply(
       rewriter, loc, s0.floorDiv(s1), {nTotalProcs, nSplitProcs});
   SmallVector<OpFoldResult> basis = numIters;
   basis.push_back(origNProcs);
-  auto delinearizeOp = rewriter.create<affine::AffineDelinearizeIndexOp>(
-      loc, procIdOp.getResult(), basis);
+  auto delinearizeOp = affine::AffineDelinearizeIndexOp::create(
+      rewriter, loc, procIdOp.getResult(), basis);
 
   Value workgroupIdReplacement = delinearizeOp.getResults().back();
 

@@ -122,17 +122,17 @@ LogicalResult resolveGPUMappedForallOp(RewriterBase &rewriter,
   // can use a lower bound of 0 and keep the loop bounds static. This helps
   // simplify later loop folding patterns without an `affine.linearize_index` op
   // to help with inferring int ranges.
-  Value lb = perfectlyDivides ? rewriter.create<arith::ConstantIndexOp>(loc, 0)
+  Value lb = perfectlyDivides ? arith::ConstantIndexOp::create(rewriter, loc, 0)
                               : flatId;
   Value ub = getValueOrCreateConstantIndexOp(rewriter, loc, totalLoopTripCount);
   Value step =
-      rewriter.create<arith::ConstantIndexOp>(loc, flatTotalNumWorkers);
+      arith::ConstantIndexOp::create(rewriter, loc, flatTotalNumWorkers);
   // We need to add barriers before and after the distributed loop because the
   // loop might have reads/writes to shared memory that can have a different
   // layout compared to rest of the program.
-  rewriter.create<gpu::BarrierOp>(loc);
-  auto forLoop = rewriter.create<scf::ForOp>(loc, lb, ub, step, ValueRange{});
-  rewriter.create<gpu::BarrierOp>(loc);
+  gpu::BarrierOp::create(rewriter, loc);
+  auto forLoop = scf::ForOp::create(rewriter, loc, lb, ub, step, ValueRange{});
+  gpu::BarrierOp::create(rewriter, loc);
   Block *loopBody = forLoop.getBody();
 
   // Get the replacement IDs for the forall iterator ids.
@@ -145,8 +145,8 @@ LogicalResult resolveGPUMappedForallOp(RewriterBase &rewriter,
 
   // We require a descending relative mapping, so we can reuse the upper bound
   // sizes directly.
-  auto delinearize = rewriter.create<affine::AffineDelinearizeIndexOp>(
-      loc, newFlatProducerId, delinSizes);
+  auto delinearize = affine::AffineDelinearizeIndexOp::create(
+      rewriter, loc, newFlatProducerId, delinSizes);
 
   SmallVector<Value> newBlockArgs = delinearize.getResults();
 
@@ -213,8 +213,9 @@ void GPUDistributeForallPass::runOnOperation() {
   SmallVector<int64_t> threadGridBasis = {workgroupSize[2], workgroupSize[1],
                                           workgroupSize[0]};
 
-  Value linearThreadIdVal = rewriter.create<affine::AffineLinearizeIndexOp>(
-      funcOp.getLoc(), threadGrid, threadGridBasis, /*disjoint=*/true);
+  Value linearThreadIdVal = affine::AffineLinearizeIndexOp::create(
+      rewriter, funcOp.getLoc(), threadGrid, threadGridBasis,
+      /*disjoint=*/true);
   for (auto forall : forallOps) {
     rewriter.setInsertionPoint(forall);
     if (failed(resolveGPUMappedForallOp(rewriter, forall, linearThreadIdVal,

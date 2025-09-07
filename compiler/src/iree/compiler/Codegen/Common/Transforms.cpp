@@ -325,11 +325,12 @@ swapExpandShapeWithSlice(RewriterBase &rewriter,
       shape, expandShapeOp.getResultType().getElementType());
 
   // Create a new ExtractSliceOp and ExpandShapeOp.
-  Value newSliceOp = rewriter.create<tensor::ExtractSliceOp>(
-      loc, expandShapeOp.getSrc(), newOffsets, newLengths, newStrides);
-  auto newExpandShapeOp = rewriter.create<tensor::ExpandShapeOp>(
-      loc, resultType, newSliceOp, expandShapeOp.getReassociationIndices(),
-      sizes);
+  Value newSliceOp =
+      tensor::ExtractSliceOp::create(rewriter, loc, expandShapeOp.getSrc(),
+                                     newOffsets, newLengths, newStrides);
+  auto newExpandShapeOp = tensor::ExpandShapeOp::create(
+      rewriter, loc, resultType, newSliceOp,
+      expandShapeOp.getReassociationIndices(), sizes);
   rewriter.replaceOp(sliceOp, newExpandShapeOp);
   return success();
 }
@@ -542,8 +543,9 @@ swapCollapseShapeWithSlice(RewriterBase &rewriter,
         for (auto dimIdx : reassocIndices) {
           expandedBasis.push_back(rewriter.getIndexAttr(srcShape[dimIdx]));
         }
-        auto delinearizeOp = rewriter.create<affine::AffineDelinearizeIndexOp>(
-            sliceOp.getLoc(), cast<Value>(collapsedOffset), expandedBasis);
+        auto delinearizeOp = affine::AffineDelinearizeIndexOp::create(
+            rewriter, sliceOp.getLoc(), cast<Value>(collapsedOffset),
+            expandedBasis);
         createdOps.push_back(delinearizeOp);
         ValueRange offsets = delinearizeOp.getResults();
         expandedOffsets.append(offsets.begin(), offsets.end());
@@ -666,9 +668,9 @@ swapCollapseShapeWithSlice(RewriterBase &rewriter,
                            groupExpandedOffsets.rend());
   }
 
-  Value newSliceOp = rewriter.create<tensor::ExtractSliceOp>(
-      collapseShapeOp->getLoc(), collapseShapeOp.getSrc(), expandedOffsets,
-      expandedSizes, expandedStrides);
+  Value newSliceOp = tensor::ExtractSliceOp::create(
+      rewriter, collapseShapeOp->getLoc(), collapseShapeOp.getSrc(),
+      expandedOffsets, expandedSizes, expandedStrides);
   rewriter.replaceOpWithNewOp<tensor::CollapseShapeOp>(
       sliceOp, sliceOp.getResultType(), newSliceOp,
       collapseShapeOp.getReassociationIndices());

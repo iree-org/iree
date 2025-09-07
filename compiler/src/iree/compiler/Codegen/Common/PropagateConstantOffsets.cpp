@@ -81,10 +81,10 @@ struct ExtractConstantApplyOffset final
 
     AffineMap newMap =
         AffineMap::get(map.getNumDims(), map.getNumSymbols(), addExpr.getLHS());
-    Value newApply = rewriter.create<affine::AffineApplyOp>(
-        apply.getLoc(), newMap, apply.getOperands());
-    Value offset =
-        rewriter.create<arith::ConstantIndexOp>(apply.getLoc(), constantOffset);
+    Value newApply = affine::AffineApplyOp::create(rewriter, apply.getLoc(),
+                                                   newMap, apply.getOperands());
+    Value offset = arith::ConstantIndexOp::create(rewriter, apply.getLoc(),
+                                                  constantOffset);
     rewriter.replaceOpWithNewOp<arith::AddIOp>(
         apply, newApply, offset, arith::IntegerOverflowFlags::nsw);
     return success();
@@ -159,7 +159,7 @@ struct PropagateConstantAddsThroughLinearize final
     auto getZero = [&]() {
       if (zero)
         return zero;
-      zero = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
+      zero = arith::ConstantIndexOp::create(rewriter, op.getLoc(), 0);
       return zero;
     };
     bool didReplace = false;
@@ -220,9 +220,10 @@ struct PropagateConstantAddsThroughLinearize final
 
     rewriter.setInsertionPointAfter(op);
     Value offset =
-        rewriter.create<arith::ConstantIndexOp>(op.getLoc(), runningOffset);
-    auto addOp = rewriter.create<arith::AddIOp>(
-        op.getLoc(), op.getResult(), offset, arith::IntegerOverflowFlags::nsw);
+        arith::ConstantIndexOp::create(rewriter, op.getLoc(), runningOffset);
+    auto addOp =
+        arith::AddIOp::create(rewriter, op.getLoc(), op.getResult(), offset,
+                              arith::IntegerOverflowFlags::nsw);
     rewriter.replaceAllUsesExcept(op, addOp, addOp);
     return success();
   }
@@ -253,7 +254,7 @@ struct FoldDivisibleConstantMulsIntoLinearize final
     auto getZero = [&]() {
       if (zero)
         return zero;
-      zero = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
+      zero = arith::ConstantIndexOp::create(rewriter, op.getLoc(), 0);
       return zero;
     };
 

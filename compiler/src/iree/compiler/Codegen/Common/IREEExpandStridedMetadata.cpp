@@ -202,11 +202,11 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
       newBufferType = MemRefType::get(
           staticLinearShape, memRefType.getElementType(),
           MemRefLayoutAttrInterface(), memRefType.getMemorySpace());
-      Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-      newBinding = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-          loc, newBufferType, binding.getLayoutAttr(), binding.getBindingAttr(),
-          zero, dynamicLinearShape, binding.getAlignmentAttr(),
-          binding.getDescriptorFlagsAttr());
+      Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+      newBinding = IREE::HAL::InterfaceBindingSubspanOp::create(
+          rewriter, loc, newBufferType, binding.getLayoutAttr(),
+          binding.getBindingAttr(), zero, dynamicLinearShape,
+          binding.getAlignmentAttr(), binding.getDescriptorFlagsAttr());
     }
     SmallVector<Value> results;
     results.reserve(memRefType.getRank() * 2 + 2);
@@ -215,8 +215,8 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
       if (newBufferType == baseBufferType) {
         results.push_back(newBinding);
       } else {
-        Value reinterpretCast = rewriter.create<memref::ReinterpretCastOp>(
-            loc, baseBufferType, newBinding, /*offset=*/0,
+        Value reinterpretCast = memref::ReinterpretCastOp::create(
+            rewriter, loc, baseBufferType, newBinding, /*offset=*/0,
             /*sizes=*/ArrayRef<int64_t>(),
             /*strides=*/ArrayRef<int64_t>());
         results.push_back(reinterpretCast);

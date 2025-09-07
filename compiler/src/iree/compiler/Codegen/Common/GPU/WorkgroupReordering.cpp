@@ -34,10 +34,10 @@ static std::pair<Value, Value> makeTransposedIds(Location loc, OpBuilder b,
                                                  Value workgroupCountX,
                                                  Value workgroupCountY) {
   Value linearized =
-      b.create<arith::MulIOp>(loc, workgroupIdY, workgroupCountX);
-  linearized = b.create<arith::AddIOp>(loc, linearized, workgroupIdX);
-  Value newX = b.create<arith::DivUIOp>(loc, linearized, workgroupCountY);
-  Value newY = b.create<arith::RemUIOp>(loc, linearized, workgroupCountY);
+      arith::MulIOp::create(b, loc, workgroupIdY, workgroupCountX);
+  linearized = arith::AddIOp::create(b, loc, linearized, workgroupIdX);
+  Value newX = arith::DivUIOp::create(b, loc, linearized, workgroupCountY);
+  Value newY = arith::RemUIOp::create(b, loc, linearized, workgroupCountY);
   return {newX, newY};
 }
 
@@ -55,17 +55,17 @@ getWorkgroupCountsXY(OpBuilder &builder, FunctionOpInterface funcOp,
                << "Using static workgroup counts: X = " << workgroupCounts[0]
                << ", Y = " << workgroupCounts[1] << "\n");
     Value workgroupCountX =
-        builder.create<arith::ConstantIndexOp>(loc, workgroupCounts[0]);
+        arith::ConstantIndexOp::create(builder, loc, workgroupCounts[0]);
     Value workgroupCountY =
-        builder.create<arith::ConstantIndexOp>(loc, workgroupCounts[1]);
+        arith::ConstantIndexOp::create(builder, loc, workgroupCounts[1]);
     return {workgroupCountX, workgroupCountY};
   }
 
   LLVM_DEBUG(llvm::dbgs() << "Using dynamic workgroup counts\n");
   Value dynamicCountX =
-      builder.create<IREE::HAL::InterfaceWorkgroupCountOp>(loc, 0, xBound);
+      IREE::HAL::InterfaceWorkgroupCountOp::create(builder, loc, 0, xBound);
   Value dynamicCountY =
-      builder.create<IREE::HAL::InterfaceWorkgroupCountOp>(loc, 1, yBound);
+      IREE::HAL::InterfaceWorkgroupCountOp::create(builder, loc, 1, yBound);
   return {dynamicCountX, dynamicCountY};
 }
 
@@ -101,10 +101,10 @@ reorderWorkgroupsInFunc(FunctionOpInterface funcOp,
   // that to RAUW the old ones. This way we don't have to worry about the
   // picking the exact insertion points that do not violate dominance between
   // their defs and users.
-  Value workgroupIdX = builder.create<IREE::HAL::InterfaceWorkgroupIDOp>(
-      funcOp.getLoc(), 0, oldXId.getUpperBound());
-  Value workgroupIdY = builder.create<IREE::HAL::InterfaceWorkgroupIDOp>(
-      funcOp.getLoc(), 1, oldYId.getUpperBound());
+  Value workgroupIdX = IREE::HAL::InterfaceWorkgroupIDOp::create(
+      builder, funcOp.getLoc(), 0, oldXId.getUpperBound());
+  Value workgroupIdY = IREE::HAL::InterfaceWorkgroupIDOp::create(
+      builder, funcOp.getLoc(), 1, oldYId.getUpperBound());
   auto [workgroupCntX, workgroupCntY] = getWorkgroupCountsXY(
       builder, funcOp, oldXId.getUpperBound(), oldYId.getUpperBound());
   Value newWorkgroupIdX;

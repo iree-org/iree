@@ -240,12 +240,12 @@ DiagnosedSilenceableFailure transform_dialect::CopyTensorOperandOp::applyToOne(
                                      "Non tensor type operand to copy");
   }
   rewriter.setInsertionPoint(target);
-  Value empty = rewriter.create<tensor::EmptyOp>(
-      target->getLoc(),
+  Value empty = tensor::EmptyOp::create(
+      rewriter, target->getLoc(),
       tensor::getMixedSizes(rewriter, target->getLoc(), operand),
       tensorType.getElementType());
   Operation *copy =
-      rewriter.create<linalg::CopyOp>(target->getLoc(), operand, empty);
+      linalg::CopyOp::create(rewriter, target->getLoc(), operand, empty);
   target->setOperand(operandIndex, copy->getResult(0));
   results.push_back(copy);
   return DiagnosedSilenceableFailure::success();
@@ -345,17 +345,17 @@ static FailureOr<scf::ForallOp> flattenForallOp(RewriterBase &rewriter,
   OpFoldResult one = rewriter.getIndexAttr(1);
 
   // Step 3. Create a new parallel loop with a single mapping id.
-  auto newForallOp = rewriter.create<scf::ForallOp>(
-      loc, ArrayRef<OpFoldResult>{zero}, ArrayRef<OpFoldResult>{newUpperBound},
-      ArrayRef<OpFoldResult>{one}, forallOp.getOutputs(),
-      rewriter.getArrayAttr({flatMapping}));
+  auto newForallOp = scf::ForallOp::create(
+      rewriter, loc, ArrayRef<OpFoldResult>{zero},
+      ArrayRef<OpFoldResult>{newUpperBound}, ArrayRef<OpFoldResult>{one},
+      forallOp.getOutputs(), rewriter.getArrayAttr({flatMapping}));
 
   rewriter.setInsertionPointToStart(newForallOp.getBody());
   Value linearId = newForallOp.getInductionVar(0);
 
   // Step 4. Delinearize the flat ID to the original basis.
-  auto ids = rewriter.create<affine::AffineDelinearizeIndexOp>(
-      loc, linearId, forallOp.getMixedUpperBound());
+  auto ids = affine::AffineDelinearizeIndexOp::create(
+      rewriter, loc, linearId, forallOp.getMixedUpperBound());
 
   // Step 5. Inline the region of the original forall op.
   SmallVector<Value> newArgs(ids.getResults());
@@ -431,7 +431,7 @@ static LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
   for (auto attr : {bX, bY, bZ}) {
     if (!llvm::is_contained(blockMapping, attr)) {
       blockMapping.push_back(attr);
-      one = one ? one : rewriter.create<arith::ConstantIndexOp>(loc, 1);
+      one = one ? one : arith::ConstantIndexOp::create(rewriter, loc, 1);
       numBlocks.push_back(one);
     }
   }
@@ -452,9 +452,9 @@ static LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
     auto idx = static_cast<int64_t>(
         llvm::cast<gpu::GPUBlockMappingAttr>(attr).getBlock());
     workgroupIdOps.push_back(
-        rewriter.create<HAL::InterfaceWorkgroupIDOp>(loc, idx));
+        HAL::InterfaceWorkgroupIDOp::create(rewriter, loc, idx));
     workgroupCountOps.push_back(
-        rewriter.create<HAL::InterfaceWorkgroupCountOp>(loc, idx));
+        HAL::InterfaceWorkgroupCountOp::create(rewriter, loc, idx));
   }
   bvm.map(forallOp.getInductionVars(), workgroupIdOps);
   bvm.map(forallOp.getUpperBound(rewriter), workgroupCountOps);
@@ -781,7 +781,7 @@ static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
   // as an OpDSL named op. However, IREE-specific patterns to cleanup spurious
   // post-bufferization copies do not trigger properly.
   // So we keep using `createLinalgCopyOp` which builds a GenericOp.
-  // builder.create<linalg::CopyOp>(loc, from, to);
+  // linalg::CopyOp::create(builder, loc, from, to);
   mlir::iree_compiler::createLinalgCopyOp(builder, loc, from, to);
   return success();
 }
@@ -811,15 +811,15 @@ static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
     needsBarrier = true;
   }
   if (needsBarrier)
-    builder.create<gpu::BarrierOp>(loc);
+    gpu::BarrierOp::create(builder, loc);
   // TODO: ideally we should use linalg.copy which was recently reintroduced
   // as an OpDSL named op. However, IREE-specific patterns to cleanup spurious
   // post-bufferization copies do not trigger properly.
   // So we keep using `createLinalgCopyOp` which builds a GenericOp.
-  // builder.create<linalg::CopyOp>(loc, from, to);
+  // linalg::CopyOp::create(builder, loc, from, to);
   mlir::iree_compiler::createLinalgCopyOp(builder, loc, from, to);
   if (needsBarrier)
-    builder.create<gpu::BarrierOp>(loc);
+    gpu::BarrierOp::create(builder, loc);
   return success();
 }
 
@@ -1081,7 +1081,7 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
   //
   // lane_id = (tid_x + tid_y * dim_x + tid_z * dim_y * dim_x) % subgroup_size;
   Value laneId =
-      rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::x);
+      gpu::ThreadIdOp::create(rewriter, target.getLoc(), gpu::Dimension::x);
   int64_t subgroupSize = getSubgroupSize();
 
   populateGPUDistributionPatterns(patterns);

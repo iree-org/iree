@@ -56,7 +56,7 @@ static void populateCastConversions(TypeConverter &converter) {
     if (!inputTy || !CastOpTy::areCastCompatible(inputTy, resultType)) {
       return Value();
     }
-    return builder.create<CastOpTy>(loc, resultType, input).getResult();
+    return CastOpTy::create(builder, loc, resultType, input).getResult();
   });
   converter.addTargetMaterialization([](OpBuilder &builder, TargetTy resultType,
                                         ValueRange inputs,
@@ -69,7 +69,7 @@ static void populateCastConversions(TypeConverter &converter) {
     if (!inputTy || !CastOpTy::areCastCompatible(inputTy, resultType)) {
       return Value();
     }
-    return builder.create<CastOpTy>(loc, resultType, input).getResult();
+    return CastOpTy::create(builder, loc, resultType, input).getResult();
   });
 }
 

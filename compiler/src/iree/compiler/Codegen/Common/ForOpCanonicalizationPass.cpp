@@ -161,9 +161,9 @@ struct CanonicalizeForOpInductionVarShape final
     if (iteratorFolded.empty())
       return failure();
 
-    auto newLoop = rewriter.create<scf::ForOp>(
-        forOp.getLoc(), forOp.getLowerBound(), forOp.getUpperBound(),
-        forOp.getStep(), initArgs);
+    auto newLoop =
+        scf::ForOp::create(rewriter, forOp.getLoc(), forOp.getLowerBound(),
+                           forOp.getUpperBound(), forOp.getStep(), initArgs);
 
     SmallVector<Value> newReturnVals = transferBody(
         forOp.getBody(), newLoop.getBody(), returnValues, rewriter);
@@ -238,16 +238,16 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
     for (auto [index, castType, targetType] :
          llvm::zip_equal(ivIndices, castTypes, targetTypes)) {
       Value oldValue = ivInitValues[index];
-      Value shapeCast = rewriter.create<vector::ShapeCastOp>(
-          oldValue.getLoc(), castType, oldValue);
-      ivInitValues[index] = rewriter.create<vector::BitCastOp>(
-          oldValue.getLoc(), targetType, shapeCast);
+      Value shapeCast = vector::ShapeCastOp::create(rewriter, oldValue.getLoc(),
+                                                    castType, oldValue);
+      ivInitValues[index] = vector::BitCastOp::create(
+          rewriter, oldValue.getLoc(), targetType, shapeCast);
     }
 
     // Create a new loop with the casted init values. This also creates
     // induction variables with proper type.
-    auto newLoop = rewriter.create<scf::ForOp>(
-        forOp.getLoc(), forOp.getLowerBound(), forOp.getUpperBound(),
+    auto newLoop = scf::ForOp::create(
+        rewriter, forOp.getLoc(), forOp.getLowerBound(), forOp.getUpperBound(),
         forOp.getStep(), ivInitValues);
 
     // Move all operations to the new for op. This also replaces block
@@ -261,9 +261,9 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
          llvm::zip_equal(ivIndices, castTypes, ivTypes)) {
       Value newIv = newLoop.getRegionIterArgs()[index];
       auto bitcastOp =
-          rewriter.create<vector::BitCastOp>(newIv.getLoc(), castType, newIv);
-      auto shapeCastOp = rewriter.create<vector::ShapeCastOp>(
-          newIv.getLoc(), origType, bitcastOp);
+          vector::BitCastOp::create(rewriter, newIv.getLoc(), castType, newIv);
+      auto shapeCastOp = vector::ShapeCastOp::create(rewriter, newIv.getLoc(),
+                                                     origType, bitcastOp);
       // Replace all uses of the new induction variable with a bitcast. We need
       // to exclude the bitcast op itself given it also uses the induction
       // variable.
@@ -279,10 +279,10 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
     for (auto [index, castType, targetType] :
          llvm::zip_equal(ivIndices, castTypes, targetTypes)) {
       Value oldRet = ivRetValues[index];
-      Value shapeCast = rewriter.create<vector::ShapeCastOp>(oldRet.getLoc(),
-                                                             castType, oldRet);
-      ivRetValues[index] = rewriter.create<vector::BitCastOp>(
-          oldRet.getLoc(), targetType, shapeCast);
+      Value shapeCast = vector::ShapeCastOp::create(rewriter, oldRet.getLoc(),
+                                                    castType, oldRet);
+      ivRetValues[index] = vector::BitCastOp::create(rewriter, oldRet.getLoc(),
+                                                     targetType, shapeCast);
     }
     yieldOp->setOperands(ivRetValues);
 
@@ -295,10 +295,10 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
     for (auto [index, castType, origType] :
          llvm::zip_equal(ivIndices, castTypes, ivTypes)) {
       Value oldRet = forRetValues[index];
-      Value bitCast =
-          rewriter.create<vector::BitCastOp>(oldRet.getLoc(), castType, oldRet);
-      forRetValues[index] = rewriter.create<vector::ShapeCastOp>(
-          oldRet.getLoc(), origType, bitCast);
+      Value bitCast = vector::BitCastOp::create(rewriter, oldRet.getLoc(),
+                                                castType, oldRet);
+      forRetValues[index] = vector::ShapeCastOp::create(
+          rewriter, oldRet.getLoc(), origType, bitCast);
     }
 
     rewriter.replaceOp(forOp, forRetValues);

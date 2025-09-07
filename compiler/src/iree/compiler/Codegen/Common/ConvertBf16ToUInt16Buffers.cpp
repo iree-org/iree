@@ -256,7 +256,7 @@ struct ConvertAmdgpuFatRawBufferCast final
 
 Value materializeArithBitcast(OpBuilder &builder, Type resultTy,
                               mlir::ValueRange inputs, mlir::Location loc) {
-  return builder.create<arith::BitcastOp>(loc, resultTy, inputs);
+  return arith::BitcastOp::create(builder, loc, resultTy, inputs);
 }
 
 static void populateIreeBf16EmulationPatterns(RewritePatternSet &patterns,

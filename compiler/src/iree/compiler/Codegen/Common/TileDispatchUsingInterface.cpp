@@ -169,12 +169,12 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
     Value lbVal = getValueOrCreateConstantIndexOp(builder, loc, lb);
     Value ubVal = getValueOrCreateConstantIndexOp(builder, loc, ub);
     Value stepVal = getValueOrCreateConstantIndexOp(builder, loc, step);
-    auto loop = builder.create<scf::ForOp>(
-        loc, lbVal, ubVal, stepVal, ValueRange{},
+    auto loop = scf::ForOp::create(
+        builder, loc, lbVal, ubVal, stepVal, ValueRange{},
         [&](OpBuilder &bodyBuilder, Location bodyLoc, Value iv,
             ValueRange /*iterArgs*/) {
           sizes[index] = createBoundedTileSize(iv, tileSizeVals[index], ub);
-          builder.create<scf::YieldOp>(loc);
+          scf::YieldOp::create(builder, loc);
         });
     offsets[index] = loop.getInductionVar();
     loops.push_back(loop);
@@ -232,8 +232,8 @@ static LogicalResult replaceStoresWithTiledVersion(
         "failed to create tiled iree_tensor_ext.dispatch.tensor.store op");
   }
 
-  rewriter.create<IREE::TensorExt::DispatchTensorStoreOp>(
-      storeOp.getLoc(), tiledValue, storeOp.getTarget(),
+  IREE::TensorExt::DispatchTensorStoreOp::create(
+      rewriter, storeOp.getLoc(), tiledValue, storeOp.getTarget(),
       clonedSliceAndVals.dynamicDims, combinedOffsets, combinedSizes,
       combinedStrides);
   rewriter.eraseOp(storeOp);

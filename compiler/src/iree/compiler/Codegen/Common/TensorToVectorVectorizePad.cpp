@@ -134,8 +134,8 @@ struct VectorizePadWithConditions final
       auto srcDimSize =
           rewriter.createOrFold<tensor::DimOp>(loc, padOp.getSource(), i);
       auto lb = getAsIndexValue(lowPads[i], rewriter, loc);
-      auto ub = rewriter.create<affine::AffineApplyOp>(
-          loc, addMap, ValueRange{lb, srcDimSize});
+      auto ub = affine::AffineApplyOp::create(rewriter, loc, addMap,
+                                              ValueRange{lb, srcDimSize});
       paddedDimLBs[i] = lb;
       paddedDimUBs[i] = ub;
     }
@@ -198,31 +198,32 @@ struct VectorizePadWithConditions final
 
       // Need to subtract the low padding to get the index into the source.
       for (int dim : paddedDimIndices) {
-        readIndices[dim] = rewriter.create<affine::AffineApplyOp>(
-            loc, subMap, ValueRange{valueIndices[dim], paddedDimLBs[dim]});
+        readIndices[dim] = affine::AffineApplyOp::create(
+            rewriter, loc, subMap,
+            ValueRange{valueIndices[dim], paddedDimLBs[dim]});
       }
 
-      auto ifOp = rewriter.create<scf::IfOp>(
-          loc, condition,
+      auto ifOp = scf::IfOp::create(
+          rewriter, loc, condition,
           [&](OpBuilder builder, Location Loc) {
-            Value read = builder.create<vector::TransferReadOp>(
-                loc, sliceVectorType, padOp.getSource(), readIndices,
+            Value read = vector::TransferReadOp::create(
+                builder, loc, sliceVectorType, padOp.getSource(), readIndices,
                 paddingValue, llvm::ArrayRef(inBounds));
-            builder.create<scf::YieldOp>(loc, read);
+            scf::YieldOp::create(builder, loc, read);
           },
           [&](OpBuilder builder, Location Loc) {
-            builder.create<scf::YieldOp>(loc, cstSliceVector);
+            scf::YieldOp::create(builder, loc, cstSliceVector);
           });
 
       // Insert this slice back to the full vector.
-      fullVector = rewriter.create<vector::InsertStridedSliceOp>(
-          loc, ifOp.getResult(0), fullVector,
+      fullVector = vector::InsertStridedSliceOp::create(
+          rewriter, loc, ifOp.getResult(0), fullVector,
           llvm::ArrayRef(staticIndices).take_back(fullVectorType.getRank()),
           staticStrides);
     }
 
-    Value fullTensor = rewriter.create<tensor::EmptyOp>(
-        loc, paddedTensorShape, elementType, ValueRange());
+    Value fullTensor = tensor::EmptyOp::create(rewriter, loc, paddedTensorShape,
+                                               elementType, ValueRange());
     valueIndices.assign(tensorRank, zeroIndex);
     rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
         padOp, fullVector, fullTensor, valueIndices);
