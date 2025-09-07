@@ -130,9 +130,10 @@ getContractionLayout(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
   subgroupSize[innerKDim] = kSize;
 
   SmallVector<int64_t> batchCounts(rank);
-  for (auto i : llvm::seq<int64_t>(rank)) {
-    int64_t workgroupDimSize = subgroupCounts[i] * subgroupSize[i];
-    batchCounts[i] = llvm::divideCeil(bounds[i], workgroupDimSize);
+  for (auto [batchCount, subgroupCount, subgroupSize, bound] :
+       llvm::zip_equal(batchCounts, subgroupCounts, subgroupSize, bounds)) {
+    int64_t workgroupDimSize = subgroupCount * subgroupSize;
+    batchCount = llvm::divideCeil(bound, workgroupDimSize);
   }
 
   // MMA intrinsics can be weird and usually don't have a single subgroup
