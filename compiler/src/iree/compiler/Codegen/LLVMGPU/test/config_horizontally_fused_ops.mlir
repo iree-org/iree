@@ -78,8 +78,7 @@ func.func @fused_contraction_1(%arg0: tensor<2x4096x640xf16>,
 // GFX950-SAME:      mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16
 //  CHECK-SAME:       promote_operands = [0, 1, 2, 3]
 //  CHECK-SAME:       reduction = [0, 0, 0, 0, 128]
-//  CHECK-SAME:       subgroup_m_count = 2
-//  CHECK-SAME:       subgroup_n_count = 2
+//  CHECK-SAME{LITERAL}: subgroup_basis = [[1, 1, 2, 2, 1], [0, 1, 2, 3, 4]]
 //  CHECK-SAME:       workgroup = [1, 1, 32, 32, 0]
 
 // -----
@@ -130,8 +129,7 @@ func.func @fused_contraction_2(%arg0: tensor<4096x640xf32>,
 // GFX950-SAME:      mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32
 //  CHECK-SAME:       promote_operands = [0, 1, 2, 3]
 //  CHECK-SAME:       reduction = [0, 0, 16]
-//  CHECK-SAME:       subgroup_m_count = 2
-//  CHECK-SAME:       subgroup_n_count = 2
+//  CHECK-SAME{LITERAL}: subgroup_basis = [[2, 2, 1], [0, 1, 2]]
 //  CHECK-SAME:       workgroup = [32, 64, 0]
 
 // -----
@@ -196,8 +194,7 @@ func.func @fused_contraction_3(%arg0 : tensor<2x4096x640xi8>,
 // GFX950-SAME:      mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x64_I8
 //  CHECK-SAME:       promote_operands = [0, 1, 2]
 //  CHECK-SAME:       reduction = [0, 0, 0, 128]
-//  CHECK-SAME:       subgroup_m_count = 2
-//  CHECK-SAME:       subgroup_n_count = 2
+//  CHECK-SAME{LITERAL}: subgroup_basis = [[1, 2, 2, 1], [0, 1, 2, 3]]
 //  CHECK-SAME:       workgroup = [1, 64, 64, 0]
 
 // -----
@@ -283,6 +280,5 @@ func.func @fused_contraction_4(%arg0: tensor<2x4096x640xf16>,
 // GFX950-SAME:       mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16
 //  CHECK-SAME:       promote_operands = [0, 1, 2, 3]
 //  CHECK-SAME:       reduction = [0, 0, 0, 0, 128]
-//  CHECK-SAME:       subgroup_m_count = 2
-//  CHECK-SAME:       subgroup_n_count = 2
+//  CHECK-SAME{LITERAL}: subgroup_basis = [[1, 1, 2, 2, 1], [0, 1, 2, 3, 4]]
 //  CHECK-SAME:       workgroup = [1, 1, 32, 32, 0]
