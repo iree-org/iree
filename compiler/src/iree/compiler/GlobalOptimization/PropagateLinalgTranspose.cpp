@@ -59,7 +59,7 @@ static Value createTransposeInit(OpBuilder &builder, Value source,
   applyPermutationToVector(mixedSizes, perm);
   Type elemType = cast<RankedTensorType>(source.getType()).getElementType();
   Value empty =
-      builder.create<tensor::EmptyOp>(source.getLoc(), mixedSizes, elemType)
+      tensor::EmptyOp::create(builder, source.getLoc(), mixedSizes, elemType)
           .getResult();
   return empty;
 }
@@ -72,8 +72,8 @@ static Value createTranspose(OpBuilder &builder, Value source,
     Type elementType = empty.getType().getElementType();
     SmallVector<OpFoldResult> mixedSizes = empty.getMixedSizes();
     applyPermutationToVector(mixedSizes, perm);
-    return builder.create<tensor::EmptyOp>(empty.getLoc(), mixedSizes,
-                                           elementType);
+    return tensor::EmptyOp::create(builder, empty.getLoc(), mixedSizes,
+                                   elementType);
   }
   Value empty = createTransposeInit(builder, source, perm);
   return builder
@@ -253,9 +253,9 @@ public:
     newIndexingMaps[genericOp.getNumDpsInputs() + resultIndex] = transposedMap;
 
     // 3. Create the new generic with the same iteration order.
-    auto newGenericOp = rewriter.create<linalg::GenericOp>(
-        genericOp.getLoc(), resultTypes, genericOp.getDpsInputs(), newInit,
-        newIndexingMaps, genericOp.getIteratorTypesArray(),
+    auto newGenericOp = linalg::GenericOp::create(
+        rewriter, genericOp.getLoc(), resultTypes, genericOp.getDpsInputs(),
+        newInit, newIndexingMaps, genericOp.getIteratorTypesArray(),
         /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(genericOp));
     rewriter.cloneRegionBefore(genericOp.getRegion(), newGenericOp.getRegion(),
                                newGenericOp.getRegion().begin());
@@ -355,9 +355,9 @@ public:
 
     Value newTranspose =
         createTranspose(rewriter, collapseOp.getSrc(), newPerm);
-    Value newReshape = rewriter.create<tensor::CollapseShapeOp>(
-        collapseOp.getLoc(), transposeOp.getResultTypes()[0], newTranspose,
-        newReassociations);
+    Value newReshape = tensor::CollapseShapeOp::create(
+        rewriter, collapseOp.getLoc(), transposeOp.getResultTypes()[0],
+        newTranspose, newReassociations);
     rewriter.replaceOp(transposeOp, newReshape);
     return success();
   }
@@ -488,9 +488,9 @@ public:
 
     RankedTensorType sliceType = getPermutedTensorType(
         cast<RankedTensorType>(extractOp.getType()), rankReducedInvPerm);
-    Value slice = rewriter.create<tensor::ExtractSliceOp>(
-        extractOp.getLoc(), sliceType, transposeOp.getInput(), offsets, sizes,
-        strides);
+    Value slice = tensor::ExtractSliceOp::create(
+        rewriter, extractOp.getLoc(), sliceType, transposeOp.getInput(),
+        offsets, sizes, strides);
     // Transpose back to the original slice.
     if (!isIdentityPermutation(rankReducedPerm)) {
       slice = createTranspose(rewriter, slice, rankReducedPerm);
@@ -555,8 +555,8 @@ public:
 
     RankedTensorType expandedType = getPermutedTensorType(
         cast<RankedTensorType>(expandOp.getType()), newInvPerm);
-    Value transposedReshape = rewriter.create<tensor::ExpandShapeOp>(
-        expandOp.getLoc(), expandedType, transposeOp.getInput(),
+    Value transposedReshape = tensor::ExpandShapeOp::create(
+        rewriter, expandOp.getLoc(), expandedType, transposeOp.getInput(),
         newReassociations);
     Value originalReshape =
         createTranspose(rewriter, transposedReshape, newPerm);

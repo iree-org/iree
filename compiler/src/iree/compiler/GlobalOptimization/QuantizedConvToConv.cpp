@@ -33,18 +33,18 @@ Value emptyCopy(ImplicitLocOpBuilder &rewriter, Value value) {
   Type eTy = getElementTypeOrSelf(value.getType());
   SmallVector<OpFoldResult> mixedSizes =
       tensor::getMixedSizes(rewriter, rewriter.getLoc(), value);
-  return rewriter.create<tensor::EmptyOp>(mixedSizes, eTy);
+  return tensor::EmptyOp::create(rewriter, mixedSizes, eTy);
 }
 
 // Creates an zero initialized tensor of given shape and type.
 Value emptyZero(ImplicitLocOpBuilder &builder, RankedTensorType ty,
                 llvm::SmallVector<Value> dyn) {
   Value empty =
-      builder.create<tensor::EmptyOp>(ty.getShape(), ty.getElementType(), dyn);
+      tensor::EmptyOp::create(builder, ty.getShape(), ty.getElementType(), dyn);
 
   TypedAttr attr = builder.getZeroAttr(ty.getElementType());
-  Value cnst = builder.create<arith::ConstantOp>(attr);
-  return builder.create<linalg::FillOp>(ValueRange{cnst}, ValueRange{empty})
+  Value cnst = arith::ConstantOp::create(builder, attr);
+  return linalg::FillOp::create(builder, ValueRange{cnst}, ValueRange{empty})
       .result();
 }
 
@@ -74,9 +74,9 @@ Value applyZeroPoint(ImplicitLocOpBuilder &builder, Value conv, Value sum,
           init.getType(), ValueRange{conv, sum}, ValueRange{init}, affineMaps,
           iterators,
           [=](OpBuilder &b, Location loc, ValueRange args) {
-            Value mul = b.create<arith::MulIOp>(loc, args[1], zp);
-            Value sum = b.create<arith::SubIOp>(loc, args[0], mul);
-            b.create<linalg::YieldOp>(loc, sum);
+            Value mul = arith::MulIOp::create(b, loc, args[1], zp);
+            Value sum = arith::SubIOp::create(b, loc, args[0], mul);
+            linalg::YieldOp::create(b, loc, sum);
           })
       .getResult(0);
 }
@@ -93,8 +93,8 @@ Value addScalar(ImplicitLocOpBuilder &builder, Value value, Value scalar) {
           init.getType(), ValueRange{value}, ValueRange{init},
           ArrayRef<AffineMap>{map, map}, iterators,
           [=](OpBuilder &b, Location loc, ValueRange args) {
-            Value add = b.create<arith::AddIOp>(loc, args[0], scalar);
-            b.create<linalg::YieldOp>(loc, add);
+            Value add = arith::AddIOp::create(b, loc, args[0], scalar);
+            linalg::YieldOp::create(b, loc, add);
           })
       .getResult(0);
 }
@@ -106,16 +106,16 @@ void GetDynamicDym(ImplicitLocOpBuilder &builder,
   ShapedType ty = llvm::cast<ShapedType>(value.getType());
   dims.push_back(ty.getDimSize(dim));
   if (ty && ty.isDynamicDim(dim))
-    dynDims.push_back(builder.create<tensor::DimOp>(value, dim));
+    dynDims.push_back(tensor::DimOp::create(builder, value, dim));
 }
 
 Value multiplyDims(ImplicitLocOpBuilder &builder, Value value,
                    llvm::ArrayRef<int64_t> dims) {
-  Value count = builder.create<tensor::DimOp>(value, dims.front());
+  Value count = tensor::DimOp::create(builder, value, dims.front());
 
   for (auto d : dims.drop_front()) {
-    Value dim = builder.create<tensor::DimOp>(value, d);
-    count = builder.create<arith::MulIOp>(count, dim);
+    Value dim = tensor::DimOp::create(builder, value, d);
+    count = arith::MulIOp::create(builder, count, dim);
   }
 
   return count;
@@ -189,8 +189,8 @@ struct QuantizedConvToConv
           RankedTensorType::get({inputTy.getDimSize(0), inputTy.getDimSize(1),
                                  inputTy.getDimSize(2), 1},
                                 accETy);
-      inputSum = builder.create<tensor::ExpandShapeOp>(expandTy, inputSum,
-                                                       reassociationMap);
+      inputSum = tensor::ExpandShapeOp::create(builder, expandTy, inputSum,
+                                               reassociationMap);
 
       llvm::SmallVector<int64_t> poolDims;
       llvm::SmallVector<Value> poolDynDims;
@@ -208,7 +208,7 @@ struct QuantizedConvToConv
       llvm::SmallVector<Value> kDyn;
       GetDynamicDym(builder, kDims, kDyn, filter, 0);
       GetDynamicDym(builder, kDims, kDyn, filter, 1);
-      Value poolInit = builder.create<tensor::EmptyOp>(kDims, accETy, kDyn);
+      Value poolInit = tensor::EmptyOp::create(builder, kDims, accETy, kDyn);
 
       inputSum = builder
                      .create<linalg::PoolingNhwcSumOp>(
@@ -219,8 +219,8 @@ struct QuantizedConvToConv
       // Collapse the length-1 ending dimension away.
       auto collapseTy =
           RankedTensorType::get(poolTy.getShape().drop_back(), accETy);
-      inputSum = builder.create<tensor::CollapseShapeOp>(collapseTy, inputSum,
-                                                         reassociationMap);
+      inputSum = tensor::CollapseShapeOp::create(builder, collapseTy, inputSum,
+                                                 reassociationMap);
 
       // Apply the zero-point update based on the input sum.
       newConv = applyZeroPoint(builder, newConv, inputSum, fZp, {0, 1, 2});
@@ -229,9 +229,9 @@ struct QuantizedConvToConv
     // Apply the final update that occurs when there are multiple zero-points.
     if (!iZpIsZero && !fZpIsZero) {
       Value count = multiplyDims(builder, filter, {0, 1, 2});
-      Value cast = builder.create<arith::IndexCastOp>(accETy, count);
-      Value ifZp = builder.create<arith::MulIOp>(iZp, fZp);
-      Value zpUpdate = builder.create<arith::MulIOp>(ifZp, cast);
+      Value cast = arith::IndexCastOp::create(builder, accETy, count);
+      Value ifZp = arith::MulIOp::create(builder, iZp, fZp);
+      Value zpUpdate = arith::MulIOp::create(builder, ifZp, cast);
 
       newConv = addScalar(builder, newConv, zpUpdate);
     }
@@ -308,7 +308,7 @@ struct QuantizedDepthwiseConvToDepthwiseConv
       llvm::SmallVector<Value> kDyn;
       GetDynamicDym(builder, kDims, kDyn, filter, 0);
       GetDynamicDym(builder, kDims, kDyn, filter, 1);
-      Value poolInit = builder.create<tensor::EmptyOp>(kDims, accETy, kDyn);
+      Value poolInit = tensor::EmptyOp::create(builder, kDims, accETy, kDyn);
 
       Value inputSum =
           builder
@@ -324,10 +324,10 @@ struct QuantizedDepthwiseConvToDepthwiseConv
     // Apply the final update that occurs when there are multiple zero-points.
     if (!iZpIsZero && !fZpIsZero) {
       Value count = multiplyDims(builder, filter, {0, 1});
-      Value cast = builder.create<arith::IndexCastOp>(accETy, count);
+      Value cast = arith::IndexCastOp::create(builder, accETy, count);
 
-      Value ifZp = builder.create<arith::MulIOp>(iZp, fZp);
-      Value zpUpdate = builder.create<arith::MulIOp>(ifZp, cast);
+      Value ifZp = arith::MulIOp::create(builder, iZp, fZp);
+      Value zpUpdate = arith::MulIOp::create(builder, ifZp, cast);
 
       newConv = addScalar(builder, newConv, zpUpdate);
     }

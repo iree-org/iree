@@ -65,17 +65,17 @@ struct DemoteContractionInputsToBF16Pattern
             inputType.getRank(), utils::IteratorType::parallel);
         SmallVector<OpFoldResult> mixedSizes =
             tensor::getMixedSizes(rewriter, loc, input);
-        Value empty = rewriter.create<tensor::EmptyOp>(loc, mixedSizes,
-                                                       rewriter.getBF16Type());
+        Value empty = tensor::EmptyOp::create(rewriter, loc, mixedSizes,
+                                              rewriter.getBF16Type());
         demotedInputs.push_back(
             rewriter
                 .create<linalg::GenericOp>(
                     loc, TypeRange{demotedInputType}, ValueRange{input},
                     ValueRange{empty}, maps, iteratorTypes,
                     [&](OpBuilder &b, Location loc, ValueRange args) {
-                      Value result = b.create<arith::TruncFOp>(
-                          loc, rewriter.getBF16Type(), args[0]);
-                      b.create<linalg::YieldOp>(loc, result);
+                      Value result = arith::TruncFOp::create(
+                          b, loc, rewriter.getBF16Type(), args[0]);
+                      linalg::YieldOp::create(b, loc, result);
                     })
                 ->getResults()[0]);
       }

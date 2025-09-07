@@ -87,8 +87,8 @@ static ExpandedGlobalMap expandGlobalTensorDims(Operation *rootOp,
         auto dimName =
             (global.tensorOp.getName() + "__d" + std::to_string(it.index()))
                 .str();
-        auto dimOp = builder.create<IREE::Util::GlobalOp>(
-            global.tensorOp.getLoc(), dimName,
+        auto dimOp = IREE::Util::GlobalOp::create(
+            builder, global.tensorOp.getLoc(), dimName,
             /*isMutable=*/true, indexType);
         dimOp.setVisibility(global.tensorOp.getVisibility());
         symbolTable.insert(dimOp);
@@ -234,9 +234,9 @@ static void expandRegion(Region &region, SymbolTable &symbolTable,
     // Insert shape ties that we've sunk from callers.
     auto builder = OpBuilder::atBlockBegin(&block);
     for (auto &expansion : llvm::reverse(expansions)) {
-      auto tieShapeOp = builder.create<IREE::Flow::TensorTieShapeOp>(
-          region.getLoc(), expansion.tensor.getType(), expansion.tensor,
-          expansion.dynamicDims);
+      auto tieShapeOp = IREE::Flow::TensorTieShapeOp::create(
+          builder, region.getLoc(), expansion.tensor.getType(),
+          expansion.tensor, expansion.dynamicDims);
       expansion.tensor.replaceAllUsesExcept(tieShapeOp.getResult(), tieShapeOp);
     }
   }
@@ -283,9 +283,9 @@ static void retieResults(Operation *op, Operation *newOp,
         newOp->getResults().slice(newIdx, tensorType.getNumDynamicDims());
     newIdx += expandedValue.dynamicDims.size();
     tensorDimMap[expandedValue.tensor] = expandedValue;
-    auto tieShapeOp = builder.create<IREE::Flow::TensorTieShapeOp>(
-        op->getLoc(), expandedValue.tensor.getType(), expandedValue.tensor,
-        expandedValue.dynamicDims);
+    auto tieShapeOp = IREE::Flow::TensorTieShapeOp::create(
+        builder, op->getLoc(), expandedValue.tensor.getType(),
+        expandedValue.tensor, expandedValue.dynamicDims);
     oldResult.replaceAllUsesExcept(tieShapeOp.getResult(), tieShapeOp);
   }
 }
@@ -315,9 +315,9 @@ static void expandGlobalLoadOp(IREE::Util::GlobalLoadOpInterface op,
         dimOp.createLoadOp(op.getLoc(), builder).getLoadedGlobalValue());
   }
   tensorDimMap[op.getLoadedGlobalValue()] = expandedValue;
-  auto tieShapeOp = builder.create<IREE::Flow::TensorTieShapeOp>(
-      op.getLoc(), expandedValue.tensor.getType(), expandedValue.tensor,
-      expandedValue.dynamicDims);
+  auto tieShapeOp = IREE::Flow::TensorTieShapeOp::create(
+      builder, op.getLoc(), expandedValue.tensor.getType(),
+      expandedValue.tensor, expandedValue.dynamicDims);
   op.getLoadedGlobalValue().replaceAllUsesExcept(tieShapeOp.getResult(),
                                                  tieShapeOp);
 }
@@ -436,7 +436,7 @@ static void expandReturnOp(IREE::Util::ReturnOp op, IndexSet &indexSet,
   OpBuilder builder(op);
   auto operands = expandOperands(op.getLoc(), op.getOperands(), tensorDimMap,
                                  indexSet, builder);
-  builder.create<IREE::Util::ReturnOp>(op.getLoc(), operands);
+  IREE::Util::ReturnOp::create(builder, op.getLoc(), operands);
   op.erase();
 }
 
@@ -456,7 +456,7 @@ static void expandBranchOp(mlir::cf::BranchOp op, IndexSet &indexSet,
   OpBuilder builder(op);
   auto operands = expandOperands(op.getLoc(), op.getDestOperands(),
                                  tensorDimMap, indexSet, builder);
-  builder.create<mlir::cf::BranchOp>(op.getLoc(), op.getDest(), operands);
+  mlir::cf::BranchOp::create(builder, op.getLoc(), op.getDest(), operands);
   op.erase();
 }
 
@@ -465,8 +465,8 @@ static void expandCondBranchOp(mlir::cf::CondBranchOp op, IndexSet &indexSet,
   if (!usesDynamicTensors(op))
     return;
   OpBuilder builder(op);
-  builder.create<mlir::cf::CondBranchOp>(
-      op.getLoc(), op.getCondition(), op.getTrueDest(),
+  mlir::cf::CondBranchOp::create(
+      builder, op.getLoc(), op.getCondition(), op.getTrueDest(),
       expandOperands(op.getLoc(), op.getTrueDestOperands(), tensorDimMap,
                      indexSet, builder),
       op.getFalseDest(),
@@ -496,8 +496,9 @@ static void expandSelectOp(mlir::arith::SelectOp op, IndexSet &indexSet,
   auto falseValue = consumeExpandedValue(op.getLoc(), op.getFalseValue(),
                                          tensorDimMap, indexSet, builder);
 
-  auto selectOp = builder.create<mlir::arith::SelectOp>(
-      op.getLoc(), op.getCondition(), op.getTrueValue(), op.getFalseValue());
+  auto selectOp =
+      mlir::arith::SelectOp::create(builder, op.getLoc(), op.getCondition(),
+                                    op.getTrueValue(), op.getFalseValue());
 
   SmallVector<Value> selectedDims;
   for (auto [trueDynamicDims, falseDynamicDims] :
@@ -508,9 +509,9 @@ static void expandSelectOp(mlir::arith::SelectOp op, IndexSet &indexSet,
                                      trueDynamicDims, falseDynamicDims)
             .getResult());
   }
-  auto tieShapeOp = builder.create<IREE::Flow::TensorTieShapeOp>(
-      selectOp.getLoc(), selectOp.getResult().getType(), selectOp.getResult(),
-      selectedDims);
+  auto tieShapeOp = IREE::Flow::TensorTieShapeOp::create(
+      builder, selectOp.getLoc(), selectOp.getResult().getType(),
+      selectOp.getResult(), selectedDims);
 
   op.getResult().replaceAllUsesExcept(tieShapeOp.getResult(), tieShapeOp);
   op.erase();
@@ -524,9 +525,9 @@ static void expandWhileOp(mlir::scf::WhileOp op, SymbolTable &symbolTable,
                                  indexSet, builder);
   auto resultTypes = expandTypes(op.getResultTypes());
 
-  auto newOp = builder.create<scf::WhileOp>(op.getLoc(), resultTypes, operands,
-                                            /*beforeBody*/ nullptr,
-                                            /*afterBody*/ nullptr);
+  auto newOp = scf::WhileOp::create(builder, op.getLoc(), resultTypes, operands,
+                                    /*beforeBody*/ nullptr,
+                                    /*afterBody*/ nullptr);
 
   newOp.getBefore().takeBody(op.getBefore());
   newOp.getAfter().takeBody(op.getAfter());
@@ -545,8 +546,8 @@ static void expandIfOp(mlir::scf::IfOp op, SymbolTable &symbolTable,
   OpBuilder builder(op);
   auto resultTypes = expandTypes(op.getResultTypes());
 
-  auto newOp = builder.create<scf::IfOp>(
-      op.getLoc(), resultTypes, op.getOperand(), op.elseBlock() != nullptr);
+  auto newOp = scf::IfOp::create(builder, op.getLoc(), resultTypes,
+                                 op.getOperand(), op.elseBlock() != nullptr);
 
   newOp.getBodyRegion().takeBody(op.getBodyRegion());
   expandRegion(newOp.getBodyRegion(), symbolTable, globalMap, indexSet,
@@ -566,7 +567,7 @@ static void expandScfYieldOp(mlir::scf::YieldOp op, IndexSet &indexSet,
   OpBuilder builder(op);
   auto operands = expandOperands(op.getLoc(), op.getOperands(), tensorDimMap,
                                  indexSet, builder);
-  builder.create<mlir::scf::YieldOp>(op.getLoc(), operands);
+  mlir::scf::YieldOp::create(builder, op.getLoc(), operands);
   op.erase();
 }
 
@@ -575,8 +576,8 @@ static void expandScfConditionOp(mlir::scf::ConditionOp op, IndexSet &indexSet,
   OpBuilder builder(op);
   auto operands = expandOperands(op.getLoc(), op.getArgs(), tensorDimMap,
                                  indexSet, builder);
-  builder.create<mlir::scf::ConditionOp>(op.getLoc(), op.getCondition(),
-                                         operands);
+  mlir::scf::ConditionOp::create(builder, op.getLoc(), op.getCondition(),
+                                 operands);
   op.erase();
 }
 
