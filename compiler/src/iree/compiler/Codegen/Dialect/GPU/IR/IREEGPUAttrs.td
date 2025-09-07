@@ -415,28 +415,6 @@ def IREEGPU_ScaledMMAAttr :
 }
 
 //===----------------------------------------------------------------------===//
-// MMA schedule
-//===----------------------------------------------------------------------===//
-
-def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
-  let mnemonic = "mma_schedule";
-  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
-
-  string description = [{
-    A schedule of MMA intrinsic instruction and various levels of tile sizes
-    to solve a specific contraction problem.
-  }];
-
-  let parameters = (ins
-    "::mlir::iree_compiler::IREE::Codegen::InnerTileDescAttrInterface":$intrinsic,
-    "int64_t":$subgroup_m_count,
-    "int64_t":$subgroup_n_count
-  );
-
-  let assemblyFormat = "`<` struct(params) `>`";
-}
-
-//===----------------------------------------------------------------------===//
 // iree_gpu.gpu_encoding_resolver
 //===----------------------------------------------------------------------===//
 
