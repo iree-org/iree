@@ -1,4 +1,5 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-and-fuse-producer-consumer{tiling-level=vector_common_parallel anchor-on-root-op=false}), cse)" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-and-fuse-producer-consumer{tiling-level=vector_inner_parallel anchor-on-root-op=false}, cse))" --split-input-file %s | FileCheck %s --check-prefix=INNER-PARALLEL
 
 #config = #iree_cpu.lowering_config<vector_common_parallel = [10, 20, 0]>
 func.func @matmul_bias_add(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : tensor<?xf32>) -> tensor<?x?xf32> {
@@ -222,3 +223,57 @@ func.func @tile_linalg_ext_scan(%arg0: tensor<128x2xf32>) -> tensor<128x2xi64> {
 // CHECK:           linalg.fill
 // CHECK:           iree_linalg_ext.scan
 // CHECK:         scf.forall.in_parallel
+
+// -----
+
+// Check that the tiling here does not create an SSA violation error. See #21828
+
+func.func @inner_parallel_SSA_violation_error(%3 : tensor<123x456xf32>) -> (tensor<123x456xf32>, tensor<123x456xf32>)  {
+  %c0 = arith.constant 0 : index
+  %4 = tensor.empty() : tensor<123x456xf32>
+  %5:2 = scf.forall (%arg0) = (0) to (123) step (3) shared_outs(%arg1 = %4, %arg2 = %4) -> (tensor<123x456xf32>, tensor<123x456xf32>) {
+    %extracted_slice = tensor.extract_slice %3[%arg0, 0] [3, 456] [1, 1] : tensor<123x456xf32> to tensor<3x456xf32>
+    %6 = tensor.empty() : tensor<3x456xf32>
+    %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%extracted_slice : tensor<3x456xf32>) outs(%6 : tensor<3x456xf32>) attrs =  {lowering_config = #iree_cpu.lowering_config<vector_common_parallel = [4, 0], vector_inner_parallel = [0, 16]>} {
+    ^bb0(%in: f32, %out: f32):
+      %14 = arith.addf %in, %in : f32
+      linalg.yield %14 : f32
+    } -> tensor<3x456xf32>
+    %extracted_slice_0 = tensor.extract_slice %arg1[%arg0, 0] [3, 456] [1, 1] : tensor<123x456xf32> to tensor<3x456xf32>
+    %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%extracted_slice : tensor<3x456xf32>) outs(%extracted_slice_0 : tensor<3x456xf32>) attrs =  {lowering_config = #iree_cpu.lowering_config<vector_common_parallel = [4, 0], vector_inner_parallel = [0, 16]>} {
+    ^bb0(%in: f32, %out: f32):
+      %14 = arith.addf %in, %in : f32
+      linalg.yield %14 : f32
+    } -> tensor<3x456xf32>
+    %9 = tensor.empty() : tensor<3xf32>
+    %10 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%8 : tensor<3x456xf32>) outs(%9 : tensor<3xf32>) attrs =  {lowering_config = #iree_cpu.lowering_config<vector_common_parallel = [4, 0], vector_reduction = [0, 16]>} {
+    ^bb0(%in: f32, %out: f32):
+      %14 = arith.addf %in, %in : f32
+      linalg.yield %14 : f32
+    } -> tensor<3xf32>
+    %11 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%7, %10 : tensor<3x456xf32>, tensor<3xf32>) outs(%9 : tensor<3xf32>) attrs =  {lowering_config = #iree_cpu.lowering_config<distribution = [3, 0], vector_common_parallel = [4, 0], vector_reduction = [0, 16]>} {
+    ^bb0(%in: f32, %in_2: f32, %out: f32):
+      %14 = arith.addf %in, %in_2 : f32
+      linalg.yield %14 : f32
+    } -> tensor<3xf32>
+    %12 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%7 : tensor<3x456xf32>) outs(%9 : tensor<3xf32>) attrs =  {lowering_config = #iree_cpu.lowering_config<vector_common_parallel = [4, 0], vector_reduction = [0, 16]>} {
+    ^bb0(%in: f32, %out: f32):
+      %14 = arith.addf %in, %in : f32
+      linalg.yield %14 : f32
+    } -> tensor<3xf32>
+    %extracted_slice_1 = tensor.extract_slice %arg2[%arg0, 0] [3, 456] [1, 1] : tensor<123x456xf32> to tensor<3x456xf32>
+    %13 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%8, %12, %11 : tensor<3x456xf32>, tensor<3xf32>, tensor<3xf32>) outs(%extracted_slice_1 : tensor<3x456xf32>) attrs =  {lowering_config = #iree_cpu.lowering_config<vector_common_parallel = [4, 0], vector_inner_parallel = [0, 16]>} {
+    ^bb0(%in: f32, %in_2: f32, %in_3: f32, %out: f32):
+      %14 = arith.addf %in, %in_2 : f32
+      %15 = arith.mulf %14, %in_3 : f32
+      linalg.yield %15 : f32
+    } -> tensor<3x456xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %8 into %arg1[%arg0, 0] [3, 456] [1, 1] : tensor<3x456xf32> into tensor<123x456xf32>
+      tensor.parallel_insert_slice %13 into %arg2[%arg0, 0] [3, 456] [1, 1] : tensor<3x456xf32> into tensor<123x456xf32>
+    }
+  } {mapping = [#iree_codegen.workgroup_mapping<x>]}
+  return %5#0, %5#1 : tensor<123x456xf32>, tensor<123x456xf32>
+}
+// Just checking that there is no failure here.
+// INNER-PARALLEL-LABEL: func @inner_parallel_SSA_violation_error
