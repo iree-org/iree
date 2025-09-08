@@ -262,21 +262,18 @@ static std::string translateModuleToISA(llvm::Module &module,
   return targetISA;
 }
 
-static void checkRegisterSpilling(OpBuilder &builder, StringRef obj) {
-  uint16_t abi_version;
+static void checkRegisterSpilling(IREE::HAL::ExecutableVariantOp &variantOp,
+                                  StringRef obj) {
+  uint16_t abiVersion;
   llvm::StringMap<llvm::offloading::amdgpu::AMDGPUKernelMetaData> infoMap;
 
   if (!llvm::offloading::amdgpu::getAMDGPUMetaDataFromImage(
-          llvm::MemoryBufferRef(obj, ""), infoMap, abi_version)) {
-    for (llvm::StringMapEntry<llvm::offloading::amdgpu::AMDGPUKernelMetaData>
-             &entry : infoMap) {
-      StringRef kernelName = entry.getKey();
-      llvm::offloading::amdgpu::AMDGPUKernelMetaData &metaData =
-          entry.getValue();
+          llvm::MemoryBufferRef(obj, ""), infoMap, abiVersion)) {
+    for (const auto &[_, metaData] : infoMap) {
       if (metaData.SGPRSpillCount > 0 || metaData.VGPRSpillCount > 0) {
-        emitWarning(builder.getUnknownLoc())
-            << "Register spill on kernel " << kernelName << ": "
-            << "VGPRSpillCount : " << metaData.VGPRSpillCount
+        emitWarning(variantOp.getLoc())
+            << "Register spill : " << "VGPRSpillCount : "
+            << metaData.VGPRSpillCount
             << " / SGPRSpillCount : " << metaData.SGPRSpillCount;
       }
     }
@@ -806,7 +803,7 @@ public:
       if (targetHSACO.empty())
         return failure();
 
-      checkRegisterSpilling(executableBuilder, targetObj);
+      checkRegisterSpilling(variantOp, targetObj);
     }
 
     if (!serializationOptions.dumpBinariesPath.empty()) {
