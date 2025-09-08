@@ -204,19 +204,13 @@ populatePDLModuleFromBuiltin(MLIRContext *context, RewritePatternSet &patterns,
 
 namespace {
 
-SmallVector<llvm::StringRef>
-filterUkernelPatternsByTarget(const SmallVector<llvm::StringRef> &names,
-                              StringRef target) {
-  SmallVector<llvm::StringRef> results;
+SmallVector<StringRef> filterUkernelPatternsByTarget(ArrayRef<StringRef> names,
+                                                     StringRef target) {
   std::string pattern =
       "ukernel_patterns(_.*)*" + target.str() + "(_.*)*\\.mlir";
   llvm::Regex regex(pattern);
-  for (auto name : names) {
-    if (regex.match(name)) {
-      results.push_back(name);
-    }
-  }
-  return results;
+  return llvm::filter_to_vector(
+      names, [&regex](StringRef name) { return regex.match(name); });
 }
 class ApplyBuiltinPDLPatternsPass
     : public iree_compiler::IREE::ROCM::impl::ApplyBuiltinPDLPatternsPassBase<
@@ -247,12 +241,11 @@ public:
     }
     if (enableTensorUKernels) {
       for (std::string target : targets) {
-        SmallVector<llvm::StringRef> allBuiltinNames =
-            rocmDialect->getBuiltinNames();
-        SmallVector<llvm::StringRef> builtinNames =
+        SmallVector<StringRef> allBuiltinNames = rocmDialect->getBuiltinNames();
+        SmallVector<StringRef> builtinNames =
             filterUkernelPatternsByTarget(allBuiltinNames, target);
         std::string builtinSrc;
-        for (auto builtinName : builtinNames) {
+        for (StringRef builtinName : builtinNames) {
           std::optional<StringRef> maybeBuiltin =
               rocmDialect->getBuiltin(builtinName);
           if (maybeBuiltin) {
