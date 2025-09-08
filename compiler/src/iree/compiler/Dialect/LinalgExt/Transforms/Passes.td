@@ -69,6 +69,11 @@ def DecomposeMapScatterPass :
     "::mlir::vector::VectorDialect",
     "::mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect"
   ];
+  let options = [
+    Option<"testMapScatterCleanup", "test-map-scatter-cleanup", "bool",
+           /*default=*/"false",
+           "Test only map_scatter cleanup patterns.">,
+  ];
 }
 
 def DecomposeWinogradTransformPass :

@@ -1,4 +1,7 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-linalg-ext-decompose-map-scatter,cse))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-linalg-ext-decompose-map-scatter,cse))" \
+// RUN:   --split-input-file %s | FileCheck --check-prefix=CHECK %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-linalg-ext-decompose-map-scatter{test-map-scatter-cleanup=true},cse))" \
+// RUN:   --split-input-file %s | FileCheck --check-prefix=CLEANUP %s
 
 func.func @identity_map_scatter(
     %input: vector<4x16xf32>, %output: memref<4x16xf32>
@@ -56,3 +59,41 @@ func.func @map_scatter_with_mask(
 // CHECK-LABEL: func.func @map_scatter_with_mask(
 //   CHECK-NOT:   iree_linalg_ext.map_scatter
 //       CHECK:   vector.scatter
+
+// -----
+
+func.func @cleanup_map_scatter_into_subview(
+    %input: vector<4x16xf32>, %output: memref<8x32xf32>
+) {
+  %subview = memref.subview %output[2, 7][4, 16][1, 1] : memref<8x32xf32> to memref<4x16xf32, strided<[32, 1], offset: 71>>
+  iree_linalg_ext.map_scatter %input into %subview {
+    ^bb0(%idx0: index, %idx1: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %idx1, %mask : index, index, i1
+  } : vector<4x16xf32> into memref<4x16xf32, strided<[32, 1], offset: 71>>
+  return
+}
+// CHECK-LABEL: func.func @cleanup_map_scatter_into_subview(
+//  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:     %[[OUTPUT:[a-zA-Z0-9_]+]]
+//   CHECK-NOT:   memref.subview
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[FLAT_OUTPUT:.+]] = memref.collapse_shape %[[OUTPUT]] {{.*}} memref<8x32xf32> into memref<256xf32>
+//   CHECK-DAG:   %[[FLAT_INDICES:.+]] = vector.shape_cast{{.*}} : vector<4x16xindex> to vector<64xindex>
+//   CHECK-DAG:   %[[FLAT_MASK:.+]] = vector.shape_cast{{.*}} : vector<4x16xi1> to vector<64xi1>
+//   CHECK-DAG:   %[[FLAT_INPUT:.+]] = vector.shape_cast %[[INPUT]] : vector<4x16xf32> to vector<64xf32>
+//       CHECK:   vector.scatter %[[FLAT_OUTPUT]][%[[C0]]]
+//  CHECK-SAME:     [%[[FLAT_INDICES]]], %[[FLAT_MASK]], %[[FLAT_INPUT]]
+
+// CLEANUP-LABEL: func.func @cleanup_map_scatter_into_subview(
+//  CLEANUP-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]
+//  CLEANUP-SAME:     %[[OUTPUT:[a-zA-Z0-9_]+]]
+//   CLEANUP-DAG:   %[[C2:.+]] = arith.constant 2 : index
+//   CLEANUP-DAG:   %[[C7:.+]] = arith.constant 7 : index
+//   CLEANUP-NOT:   memref.subview
+//       CLEANUP:   iree_linalg_ext.map_scatter %[[INPUT]] into %[[OUTPUT]] {
+//       CLEANUP:     ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index):
+//       CLEANUP:       %[[OUT_IDX0:.+]] = arith.addi %[[IDX0]], %[[C2]]
+//       CLEANUP:       %[[OUT_IDX1:.+]] = arith.addi %[[IDX1]], %[[C7]]
+//       CLEANUP:       iree_linalg_ext.yield %[[OUT_IDX0]], %[[OUT_IDX1]]
+//       CLEANUP:   } : vector<4x16xf32> into memref<8x32xf32>
