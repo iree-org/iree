@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -250,12 +251,12 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
     // Transpose operands to [red..., par...].
     Value lhs = op.getLhs();
     if (!isIdentityPermutation(lhsPerm)) {
-      lhs = rewriter.create<vector::TransposeOp>(loc, lhs, lhsPerm);
+      lhs = vector::TransposeOp::create(rewriter, loc, lhs, lhsPerm);
     }
 
     Value rhs = op.getRhs();
     if (!isIdentityPermutation(rhsPerm)) {
-      rhs = rewriter.create<vector::TransposeOp>(loc, rhs, rhsPerm);
+      rhs = vector::TransposeOp::create(rewriter, loc, rhs, rhsPerm);
     }
 
     const size_t numRed = redDims.size();
@@ -269,9 +270,9 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
     int64_t parSize = lhsParSize;
     VectorType flattened2DType = VectorType::get({redSize, parSize}, elemTy);
     Value lhs2D =
-        rewriter.create<vector::ShapeCastOp>(loc, flattened2DType, lhs);
+        vector::ShapeCastOp::create(rewriter, loc, flattened2DType, lhs);
     Value rhs2D =
-        rewriter.create<vector::ShapeCastOp>(loc, flattened2DType, rhs);
+        vector::ShapeCastOp::create(rewriter, loc, flattened2DType, rhs);
 
     Value flattenedAcc;
     VectorType flatAccVecType = VectorType::get({parSize}, elemTy);
@@ -281,15 +282,15 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
       Value acc = op.getAcc();
 
       if (!isIdentityPermutation(accPerm)) {
-        acc = rewriter.create<vector::TransposeOp>(loc, acc, accPerm);
+        acc = vector::TransposeOp::create(rewriter, loc, acc, accPerm);
         preFlattenVecType = cast<VectorType>(acc.getType());
       }
 
       flattenedAcc =
-          rewriter.create<vector::ShapeCastOp>(loc, flatAccVecType, acc);
+          vector::ShapeCastOp::create(rewriter, loc, flatAccVecType, acc);
     } else {
-      flattenedAcc = rewriter.create<vector::BroadcastOp>(loc, flatAccVecType,
-                                                          op.getAcc());
+      flattenedAcc = vector::BroadcastOp::create(rewriter, loc, flatAccVecType,
+                                                 op.getAcc());
     }
 
     constexpr int64_t chunkSize = 2;
@@ -299,18 +300,18 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
     // Restore result to original form.
     Value result;
     if (accVecType) {
-      Value reshaped = rewriter.create<vector::ShapeCastOp>(
-          loc, preFlattenVecType, resultFlat);
+      Value reshaped = vector::ShapeCastOp::create(
+          rewriter, loc, preFlattenVecType, resultFlat);
 
       if (!isIdentityPermutation(accPerm)) {
-        result = rewriter.create<vector::TransposeOp>(loc, accVecType, reshaped,
-                                                      invert(accPerm));
+        result = vector::TransposeOp::create(rewriter, loc, accVecType,
+                                             reshaped, invert(accPerm));
       } else {
         result = reshaped;
       }
 
     } else {
-      result = rewriter.create<vector::ExtractOp>(loc, resultFlat, 0);
+      result = vector::ExtractOp::create(rewriter, loc, resultFlat, 0);
     }
 
     rewriter.replaceOp(op, result);
@@ -398,17 +399,17 @@ private:
                                int64_t offset, int64_t chunkSize) {
     int64_t stride = 1;
 
-    Value a = rewriter.create<vector::ExtractStridedSliceOp>(
-        loc, lhsRow, offset, chunkSize, stride);
-    Value b = rewriter.create<vector::ExtractStridedSliceOp>(
-        loc, rhsRow, offset, chunkSize, stride);
-    Value c = rewriter.create<vector::ExtractStridedSliceOp>(loc, acc, offset,
-                                                             chunkSize, stride);
+    Value a = vector::ExtractStridedSliceOp::create(rewriter, loc, lhsRow,
+                                                    offset, chunkSize, stride);
+    Value b = vector::ExtractStridedSliceOp::create(rewriter, loc, rhsRow,
+                                                    offset, chunkSize, stride);
+    Value c = vector::ExtractStridedSliceOp::create(rewriter, loc, acc, offset,
+                                                    chunkSize, stride);
 
-    Value fma = rewriter.create<math::FmaOp>(loc, a, b, c);
+    Value fma = math::FmaOp::create(rewriter, loc, a, b, c);
 
-    return rewriter.create<vector::InsertStridedSliceOp>(loc, fma, acc, offset,
-                                                         stride);
+    return vector::InsertStridedSliceOp::create(rewriter, loc, fma, acc, offset,
+                                                stride);
   }
 
   static Value buildFMAChain(PatternRewriter &rewriter, Location loc,
@@ -417,8 +418,8 @@ private:
     Value current = accFlat;
 
     for (int64_t k = K - 1; k >= 0; --k) {
-      Value lhsRow = rewriter.create<vector::ExtractOp>(loc, lhs2D, k);
-      Value rhsRow = rewriter.create<vector::ExtractOp>(loc, rhs2D, k);
+      Value lhsRow = vector::ExtractOp::create(rewriter, loc, lhs2D, k);
+      Value rhsRow = vector::ExtractOp::create(rewriter, loc, rhs2D, k);
 
       // Process full chunks.
       int64_t p = 0;
