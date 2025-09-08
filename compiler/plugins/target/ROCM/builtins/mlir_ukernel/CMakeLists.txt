@@ -59,7 +59,8 @@ iree_lit_test_suite(
   SRCS
     "iree_uk_amdgpu_matmul_bf16.mlir"
     "iree_uk_amdgpu_matmul_f16.mlir"
-    "iree_uk_amdgpu_matmul_f8.mlir"
+    "iree_uk_amdgpu_matmul_f8E4M3FN.mlir"
+    "iree_uk_amdgpu_matmul_f8E4M3FNUZ.mlir"
   TOOLS
     iree-opt
 )
