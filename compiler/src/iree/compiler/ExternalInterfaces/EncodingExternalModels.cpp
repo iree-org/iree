@@ -18,8 +18,8 @@
 namespace mlir::iree_compiler {
 namespace {
 
-struct ContractionAttrPropagationInterface
-    : public IREE::Encoding::EncodingPropagationAttrInterface::ExternalModel<
+struct ContractionAttrPropagationInterface final
+    : IREE::Encoding::EncodingPropagationAttrInterface::ExternalModel<
           ContractionAttrPropagationInterface, IREE::Encoding::MatmulKAttr> {
   bool isPropagableUp(Attribute attr, OpResult target) const {
     auto encoding = cast<IREE::Encoding::MatmulKAttr>(attr);
@@ -75,8 +75,8 @@ struct ContractionAttrPropagationInterface
   }
 };
 
-struct ContractionOpPropagationInterface
-    : public IREE::Encoding::EncodingPropagationOpInterface::ExternalModel<
+struct ContractionOpPropagationInterface final
+    : IREE::Encoding::EncodingPropagationOpInterface::ExternalModel<
           ContractionOpPropagationInterface, tensor::CollapseShapeOp> {
   FailureOr<IREE::Encoding::PropagationResult>
   propagateEncoding(Operation *op, RewriterBase &builder,
@@ -92,13 +92,13 @@ struct ContractionOpPropagationInterface
           RankedTensorType operandEncodingType =
               collapseOp.getSrcType().cloneWithEncoding(
                   operandEncodings.front());
-          Value newEncodingOp = builder.create<IREE::Encoding::SetEncodingOp>(
-              loc, operandEncodingType, collapseOp.getSrc());
+          Value newEncodingOp = IREE::Encoding::SetEncodingOp::create(
+              builder, loc, operandEncodingType, collapseOp.getSrc());
           auto resultEncodingType =
               dyn_cast<RankedTensorType>(opResult.getType())
                   .cloneWithEncoding(resultEncodings.front());
-          Value newCollapseOp = builder.create<tensor::CollapseShapeOp>(
-              loc, resultEncodingType, newEncodingOp,
+          Value newCollapseOp = tensor::CollapseShapeOp::create(
+              builder, loc, resultEncodingType, newEncodingOp,
               collapseOp.getReassociationIndices());
           IREE::Encoding::PropagationResult result;
           result.replacements = {newCollapseOp};
@@ -109,8 +109,8 @@ struct ContractionOpPropagationInterface
   }
 };
 
-struct EncodingAttrPropagationInterface
-    : public IREE::Encoding::EncodingPropagationAttrInterface::ExternalModel<
+struct EncodingAttrPropagationInterface final
+    : IREE::Encoding::EncodingPropagationAttrInterface::ExternalModel<
           EncodingAttrPropagationInterface, IREE::Encoding::EncodingAttr> {
   bool isPropagableDown(Attribute attr, OpOperand *target) const {
     return TypeSwitch<Operation *, bool>(target->getOwner())
@@ -185,8 +185,8 @@ struct EncodingAttrPropagationInterface
   }
 };
 
-struct GenericOpPropagationInterface
-    : public IREE::Encoding::EncodingPropagationOpInterface::ExternalModel<
+struct GenericOpPropagationInterface final
+    : IREE::Encoding::EncodingPropagationOpInterface::ExternalModel<
           GenericOpPropagationInterface, linalg::GenericOp> {
   FailureOr<IREE::Encoding::PropagationResult>
   propagateEncoding(Operation *op, RewriterBase &rewriter,
@@ -208,7 +208,7 @@ struct GenericOpPropagationInterface
               SmallVector<Value> encodedOperands;
               encodedOperands.reserve(operandEncodings.size() +
                                       resultEncodings.size());
-              for (auto &&[operand, encoding] : llvm::zip(
+              for (auto [operand, encoding] : llvm::zip(
                        genericOp.getDpsInputOperands(), operandEncodings)) {
                 // If the source op is the encoding op, we can just add the
                 // source to new operands vector and continue.
@@ -219,13 +219,17 @@ struct GenericOpPropagationInterface
                 }
 
                 auto operandType =
-                    cast<RankedTensorType>(operand->get().getType());
+                    dyn_cast<RankedTensorType>(operand->get().getType());
+                if (!operandType) {
+                  // Scalar types do not need encodings.
+                  encodedOperands.push_back(operand->get());
+                  continue;
+                }
                 auto resType = RankedTensorType::get(
                     operandType.getShape(), operandType.getElementType(),
                     encoding);
-                Value encodedInput =
-                    rewriter.create<IREE::Encoding::SetEncodingOp>(
-                        loc, resType, operand->get());
+                Value encodedInput = IREE::Encoding::SetEncodingOp::create(
+                    rewriter, loc, resType, operand->get());
                 result.generatedEncodingOps.push_back(
                     encodedInput.getDefiningOp());
                 encodedOperands.push_back(encodedInput);
@@ -233,9 +237,12 @@ struct GenericOpPropagationInterface
 
               SmallVector<Type> resultEncodingTypes;
               resultEncodingTypes.reserve(resultEncodings.size());
-              for (auto &&[operand, encoding] :
+              for (auto [operand, encoding] :
                    llvm::zip_equal(genericOp.getDpsInits(), resultEncodings)) {
-                auto emptyOp = operand.getDefiningOp<tensor::EmptyOp>();
+                // Manually cast to work around a gcc bug with type deduction in
+                // lambdas.
+                auto emptyOp =
+                    dyn_cast_or_null<tensor::EmptyOp>(operand.getDefiningOp());
                 if (!emptyOp) {
                   return failure();
                 }
@@ -245,8 +252,8 @@ struct GenericOpPropagationInterface
 
                 // Create encoded generic op.
                 rewriter.setInsertionPointAfter(emptyOp);
-                Value encodedInit = rewriter.create<tensor::EmptyOp>(
-                    loc, emptyOp.getType().getShape(),
+                Value encodedInit = tensor::EmptyOp::create(
+                    rewriter, loc, emptyOp.getType().getShape(),
                     resultEncodingType.getElementType(),
                     emptyOp.getDynamicSizes(), encoding);
                 resultEncodingTypes.push_back(resultEncodingType);
@@ -263,10 +270,9 @@ struct GenericOpPropagationInterface
                 auto resultType =
                     cast<RankedTensorType>(genericResult.getType())
                         .dropEncoding();
-                auto newUnsetEncoding =
-                    rewriter.create<IREE::Encoding::UnsetEncodingOp>(
-                        encodingOp.getLoc(), resultType, genericResult,
-                        encodingOp.getResultDims());
+                auto newUnsetEncoding = IREE::Encoding::UnsetEncodingOp::create(
+                    rewriter, encodingOp.getLoc(), resultType, genericResult,
+                    encodingOp.getResultDims());
                 result.replacements.push_back(newUnsetEncoding.getResult());
                 result.generatedEncodingOps.push_back(newUnsetEncoding);
               }

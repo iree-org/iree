@@ -135,6 +135,7 @@ iree_cc_library(
     MLIRCAPIIR
     MLIRIR
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Codegen::Utils
     iree::compiler::bindings::c::headers
   PUBLIC
 )

@@ -400,9 +400,9 @@ declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
       // Check if workgroup size is set externally.
       ArrayAttr workgroupSize;
       for (auto attr : exportOp->getAttrs()) {
-        if (isa<IREE::Codegen::ExportConfigAttr>(attr.getValue())) {
-          workgroupSize = cast<IREE::Codegen::ExportConfigAttr>(attr.getValue())
-                              .getWorkgroupSizeIndexArray();
+        if (auto exportConfig =
+                dyn_cast<IREE::Codegen::ExportConfigAttr>(attr.getValue())) {
+          workgroupSize = exportConfig.getWorkgroupSizeIndexArray();
           if (workgroupSize.size() < 3) {
             SmallVector<Attribute> workgroupSizeVals =
                 llvm::to_vector(workgroupSize);
@@ -433,7 +433,7 @@ declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
       auto newRefAttr =
           makeExportSymbolRefAttr(targetExecutableOp, variantOp, newExportOp);
       exportExpansions[oldRefAttr].push_back(
-          std::make_pair(newRefAttr, variantOp.getTargetAttr()));
+          {newRefAttr, variantOp.getTargetAttr()});
 
       // Clone the workgroup count calculation function.
       if (!exportOp.getWorkgroupCount().empty()) {
@@ -499,7 +499,7 @@ declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
 namespace {
 
 struct ConvertReturnPattern : public OpRewritePattern<IREE::Stream::ReturnOp> {
-  using OpRewritePattern<IREE::Stream::ReturnOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Stream::ReturnOp op,
                                 PatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::HAL::ReturnOp>(op, op.getOperands());
@@ -522,7 +522,7 @@ struct ConvertDispatchWorkgroupInfoPattern final
 
 struct InlineConstantWorkgroupSizePattern
     : public OpRewritePattern<IREE::HAL::InterfaceWorkgroupSizeOp> {
-  using OpRewritePattern<IREE::HAL::InterfaceWorkgroupSizeOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::HAL::InterfaceWorkgroupSizeOp sizeOp,
                                 PatternRewriter &rewriter) const override {
     // Lookup the entry point matching the parent.

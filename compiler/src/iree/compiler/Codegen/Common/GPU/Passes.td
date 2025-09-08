@@ -140,6 +140,13 @@ def GPUFuseAndHoistParallelLoopsPass :
 def GPUGeneralizeNamedOpsPass :
     InterfacePass<"iree-codegen-gpu-generalize-named-ops", "mlir::FunctionOpInterface"> {
   let summary = "Convert named Linalg ops to linalg.generic ops";
+
+  let description = [{
+    Convert a subset of named Linalg ops to linalg.generics. The subset does not
+    contain all named ops. The rule-of-thumb is that named ops whose operand
+    maps are projections are in the subset. For example convolutions and pooling ops
+    are not generalized by this pass, but matmuls are.
+  }];
 }
 
 def GPUGreedilyDistributeToThreadsPass :
@@ -310,6 +317,17 @@ def GPUTensorTilePass :
     Option<"distributeToSubgroup", "distribute-to-subgroup", "bool",
            /*default=*/"false",
            "Distribute the workloads to subgroup if true, otherwise distribute to threads.">,
+  ];
+}
+
+def GPUTileAndConvertConvToMatmulPass :
+    InterfacePass<"iree-codegen-gpu-tile-and-convert-conv-to-matmul", "mlir::FunctionOpInterface"> {
+  let summary = "Convert convolution to matmul using tiling.";
+  let dependentDialects = [
+    "::mlir::tensor::TensorDialect",
+    "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+    "::mlir::scf::SCFDialect",
   ];
 }
 

@@ -46,11 +46,11 @@ Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
     return nullptr;
 
   if (inputETy.getIntOrFloatBitWidth() > eTy.getIntOrFloatBitWidth()) {
-    return builder.create<arith::TruncFOp>(loc, type, inputs[0]);
+    return arith::TruncFOp::create(builder, loc, type, inputs[0]);
   }
 
   if (inputETy.getIntOrFloatBitWidth() < eTy.getIntOrFloatBitWidth()) {
-    return builder.create<arith::ExtFOp>(loc, type, inputs[0]);
+    return arith::ExtFOp::create(builder, loc, type, inputs[0]);
   }
 
   return nullptr;
@@ -68,15 +68,15 @@ Value convertRankedInteger(OpBuilder &builder, Type type, ValueRange inputs,
   int64_t outBitwidth = eTy.getIntOrFloatBitWidth();
 
   if (inBitwidth > outBitwidth) {
-    return builder.create<arith::TruncIOp>(loc, type, inputs[0]);
+    return arith::TruncIOp::create(builder, loc, type, inputs[0]);
   }
 
   if (inBitwidth < outBitwidth && isUnsigned) {
-    return builder.create<arith::ExtUIOp>(loc, type, inputs[0]);
+    return arith::ExtUIOp::create(builder, loc, type, inputs[0]);
   }
 
   if (inBitwidth < outBitwidth && !isUnsigned) {
-    return builder.create<arith::ExtSIOp>(loc, type, inputs[0]);
+    return arith::ExtSIOp::create(builder, loc, type, inputs[0]);
   }
 
   return nullptr;

@@ -22,6 +22,7 @@ LLVM_SRCS = enforce_glob(
     # keep sorted
     [
         "conv2d.mlir",
+        "fp4_f32_conversion.mlir",
         "fp_to_subbyte.mlir",
         "narrow_n_matmuls.mlir",
         "pack.mlir",
@@ -51,6 +52,23 @@ iree_check_single_backend_test_suite(
     target_backend = "llvm-cpu",
 )
 
+# TODO(#19378): Delete the test suite once data-tiling fusion is default on.
+iree_check_single_backend_test_suite(
+    name = "check_llvm-cpu_dt_fusion_local-task",
+    srcs = ["narrow_n_matmuls.mlir"],
+    compiler_flags = [
+        "--iree-dispatch-creation-data-tiling",
+        "--iree-llvmcpu-target-cpu=generic",
+        "--iree-opt-data-tiling=false",
+    ],
+    driver = "local-task",
+    tags = [
+        # subbyte support for wasm is not on priorities.
+        "nowasm",
+    ],
+    target_backend = "llvm-cpu",
+)
+
 VMVX_SRCS = enforce_glob(
     # keep sorted
     [
@@ -65,6 +83,7 @@ VMVX_SRCS = enforce_glob(
     include = ["*.mlir"],
     exclude = [
         "fp_to_subbyte.mlir",
+        "fp4_f32_conversion.mlir",
         "large_linalg_matmul.mlir",
         "subbyte_to_fp.mlir",
         "index.mlir",
@@ -111,6 +130,7 @@ VULKAN_SRCS = enforce_glob(
     include = ["*.mlir"],
     exclude = [
         "fp_to_subbyte.mlir",
+        "fp4_f32_conversion.mlir",
         "index.mlir",
         "large_linalg_matmul.mlir",
         "pack.mlir",
@@ -168,6 +188,7 @@ CUDA_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
+        "fp4_f32_conversion.mlir",
         "index.mlir",
         # https://github.com/llvm/llvm-project/issues/131386 causes
         # See bug #20294
@@ -204,6 +225,7 @@ ROCM_SRCS = enforce_glob(
     exclude = [
         "conv2d.mlir",
         "fp_to_subbyte.mlir",
+        "fp4_f32_conversion.mlir",
         "index.mlir",
         "large_linalg_matmul.mlir",
         "narrow_n_matmuls.mlir",

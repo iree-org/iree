@@ -90,7 +90,7 @@ inferCollapsedShape(RewriterBase &rewriter, Location loc,
 ///       tensor<864xf32>
 struct FoldCollapseShapeIntoInterfaceTensorLoad
     : OpRewritePattern<tensor::CollapseShapeOp> {
-  using OpRewritePattern<tensor::CollapseShapeOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tensor::CollapseShapeOp reshapeOp,
                                 PatternRewriter &rewriter) const override {
@@ -128,8 +128,8 @@ struct FoldCollapseShapeIntoInterfaceTensorLoad
     auto newSubspanType = IREE::TensorExt::DispatchTensorType::get(
         tensorAccess, reshapeOp.getResultType());
 
-    Value newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
+    Value newSubspanOp = IREE::HAL::InterfaceBindingSubspanOp::create(
+        rewriter, subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
         subspanOp.getBinding(), subspanOp.getByteOffset(),
         collapsedDynamicShape, subspanOp.getAlignmentAttr(),
         subspanOp.getDescriptorFlagsAttr());
@@ -166,7 +166,7 @@ struct FoldCollapseShapeIntoInterfaceTensorLoad
 ///       tensor<864xf32>
 struct FoldExpandShapeIntoInterfaceTensorLoad
     : OpRewritePattern<tensor::ExpandShapeOp> {
-  using OpRewritePattern<tensor::ExpandShapeOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tensor::ExpandShapeOp reshapeOp,
                                 PatternRewriter &rewriter) const override {
@@ -229,8 +229,8 @@ struct FoldExpandShapeIntoInterfaceTensorLoad
                                expandedStaticDims);
 
     Value newSubspanOp;
-    newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
+    newSubspanOp = IREE::HAL::InterfaceBindingSubspanOp::create(
+        rewriter, subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
         subspanOp.getBinding(), subspanOp.getByteOffset(), expandedDynamicDims,
         subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
 
@@ -313,8 +313,8 @@ struct FoldExpandShapeIntoInterfaceTensorStore
     auto newSubspanType = IREE::TensorExt::DispatchTensorType::get(
         tensorAccess, reshapeSrc.getType());
 
-    Value newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
+    Value newSubspanOp = IREE::HAL::InterfaceBindingSubspanOp::create(
+        rewriter, subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
         subspanOp.getBinding(), subspanOp.getByteOffset(),
         collapsedDynamicShape, subspanOp.getAlignmentAttr(),
         subspanOp.getDescriptorFlagsAttr());
@@ -497,8 +497,8 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
     auto newSubspanType = IREE::TensorExt::DispatchTensorType::get(
         tensorAccess, reshapeSrcType.cloneWith(
                           newSubspanShape, reshapeSrcType.getElementType()));
-    auto newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
+    auto newSubspanOp = IREE::HAL::InterfaceBindingSubspanOp::create(
+        rewriter, subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
         subspanOp.getBinding(), subspanOp.getByteOffset(), expandedDynamicShape,
         subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
 
@@ -795,8 +795,8 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
     {
       OpBuilder::InsertionGuard guard(rewriter);
       rewriter.setInsertionPointAfter(subspanOp);
-      newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-          subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
+      newSubspanOp = IREE::HAL::InterfaceBindingSubspanOp::create(
+          rewriter, subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
           subspanOp.getBinding(), subspanOp.getByteOffset(),
           newSubspanDynamicDims, subspanOp.getAlignmentAttr(),
           subspanOp.getDescriptorFlagsAttr());
@@ -820,7 +820,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
 /// the source hal.interface.binding.subspan
 struct FoldInnerBitcastIntoInterfaceTensorLoad
     : OpRewritePattern<IREE::TensorExt::BitCastOp> {
-  using OpRewritePattern<IREE::TensorExt::BitCastOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(IREE::TensorExt::BitCastOp bitcastOp,
                                 PatternRewriter &rewriter) const override {
@@ -872,8 +872,8 @@ struct FoldInnerBitcastIntoInterfaceTensorLoad
     // Byte offset and byte alignment remain the same after folding the cast.
     // Simply create a new binding with the new type.
     rewriter.setInsertionPoint(subspanOp);
-    Value newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
+    Value newSubspanOp = IREE::HAL::InterfaceBindingSubspanOp::create(
+        rewriter, subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
         subspanOp.getBinding(), subspanOp.getByteOffset(),
         subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
         subspanOp.getDescriptorFlagsAttr());
@@ -942,8 +942,8 @@ struct FoldInnerBitcastIntoInterfaceTensorStore
         subspanType.getAccess(), newSubspanTensorType);
 
     rewriter.setInsertionPointAfter(subspanOp);
-    Value newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
+    Value newSubspanOp = IREE::HAL::InterfaceBindingSubspanOp::create(
+        rewriter, subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
         subspanOp.getBinding(), subspanOp.getByteOffset(),
         subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
         subspanOp.getDescriptorFlagsAttr());
@@ -983,7 +983,7 @@ collapseMemrefOperand(RewriterBase &rewriter, OpTy tensorToMemrefOp,
   rewriter.setInsertionPointAfterValue(memref);
   Location loc = tensorToMemrefOp.getLoc();
   Value collapsedMemref =
-      rewriter.create<memref::CollapseShapeOp>(loc, memref, reassociations);
+      memref::CollapseShapeOp::create(rewriter, loc, memref, reassociations);
   rewriter.modifyOpInPlace(tensorToMemrefOp, [&]() {
     tensorToMemrefOp.getBufferMutable().assign(collapsedMemref);
   });
@@ -1018,8 +1018,9 @@ expandMemrefOperand(RewriterBase &rewriter, OpTy tensorToMemrefOp,
   OpBuilder::InsertionGuard g(rewriter);
   dynamicValues.push_back(memref);
   setInsertionPointAfterLastValue(rewriter, dynamicValues);
-  Value expandedMemref = rewriter.create<memref::ExpandShapeOp>(
-      loc, *expandedMemrefType, memref, reassociations, mixedOutputShape);
+  Value expandedMemref =
+      memref::ExpandShapeOp::create(rewriter, loc, *expandedMemrefType, memref,
+                                    reassociations, mixedOutputShape);
   rewriter.modifyOpInPlace(tensorToMemrefOp, [&]() {
     tensorToMemrefOp.getBufferMutable().assign(expandedMemref);
   });
@@ -1031,7 +1032,7 @@ expandMemrefOperand(RewriterBase &rewriter, OpTy tensorToMemrefOp,
 /// tensor operand with the source of the expand_shape.
 struct FoldExpandShapeIntoStoreToBuffer
     : OpRewritePattern<IREE::Codegen::StoreToBufferOp> {
-  using OpRewritePattern<IREE::Codegen::StoreToBufferOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(IREE::Codegen::StoreToBufferOp storeOp,
                                 PatternRewriter &rewriter) const override {
@@ -1055,7 +1056,7 @@ struct FoldExpandShapeIntoStoreToBuffer
 /// tensor operand with the source of the collapse_shape.
 struct FoldCollapseShapeIntoStoreToBuffer
     : OpRewritePattern<IREE::Codegen::StoreToBufferOp> {
-  using OpRewritePattern<IREE::Codegen::StoreToBufferOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(IREE::Codegen::StoreToBufferOp storeOp,
                                 PatternRewriter &rewriter) const override {
@@ -1083,7 +1084,7 @@ struct FoldCollapseShapeIntoStoreToBuffer
 /// the collapse_shape with the collapsed load_from_buffer op.
 struct FoldCollapseShapeIntoLoadFromBuffer
     : OpRewritePattern<IREE::Codegen::LoadFromBufferOp> {
-  using OpRewritePattern<IREE::Codegen::LoadFromBufferOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(IREE::Codegen::LoadFromBufferOp loadOp,
                                 PatternRewriter &rewriter) const override {
@@ -1112,7 +1113,7 @@ struct FoldCollapseShapeIntoLoadFromBuffer
 /// expand_shape with the expanded load_from_buffer op.
 struct FoldExpandShapeIntoLoadFromBuffer
     : OpRewritePattern<IREE::Codegen::LoadFromBufferOp> {
-  using OpRewritePattern<IREE::Codegen::LoadFromBufferOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(IREE::Codegen::LoadFromBufferOp loadOp,
                                 PatternRewriter &rewriter) const override {

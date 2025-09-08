@@ -38,8 +38,8 @@ static Value getBufferizedSubspanOrSubview(
   MemRefType subviewMemRefType = memref::SubViewOp::inferRankReducedResultType(
       tensorType.getShape(), cast<MemRefType>(subspanMemref.getType()), offsets,
       sizes, strides);
-  return rewriter.create<memref::SubViewOp>(
-      loc, subviewMemRefType, subspanMemref, offsets, sizes, strides);
+  return memref::SubViewOp::create(rewriter, loc, subviewMemRefType,
+                                   subspanMemref, offsets, sizes, strides);
 }
 
 static void

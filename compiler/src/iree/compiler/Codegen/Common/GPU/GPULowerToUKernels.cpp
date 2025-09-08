@@ -56,7 +56,7 @@ matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
   // Tiling argmax ukernel is also set to enforce this structure.
   const int kReductionDim = op.getNumLoops() - 1;
   Value reductionDimSize =
-      rewriter.create<tensor::DimOp>(loc, input, kReductionDim);
+      tensor::DimOp::create(rewriter, loc, input, kReductionDim);
   bool isPureArgmax = op.getResults()[0].use_empty();
   StringRef kernelName = ukernelAttr.getName();
   SmallVector<Type> resultTypes;
@@ -65,11 +65,11 @@ matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
   Type valType = val.getType();
   outputs = {val, index};
   resultTypes = {valType, indexType};
-  Value writeMaxValueFlag = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getI1Type(), rewriter.getBoolAttr(!isPureArgmax));
+  Value writeMaxValueFlag = arith::ConstantOp::create(
+      rewriter, loc, rewriter.getI1Type(), rewriter.getBoolAttr(!isPureArgmax));
 
-  auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, resultTypes, kernelName, ValueRange{input}, outputs,
+  auto genericMicroKernelOp = IREE::Codegen::UKernelGenericOp::create(
+      rewriter, loc, resultTypes, kernelName, ValueRange{input}, outputs,
       ValueRange{reductionDimSize, writeMaxValueFlag},
       ukernelAttr.getDefAttrs(), /*num_strided_outer_dims=*/0);
   return cast<IREE::Codegen::UKernelOpInterface>(
@@ -122,10 +122,10 @@ static Value createSharedMemory(PatternRewriter &rewriter, Location loc,
   if (!sharedMemoryBytes) {
     IREE::Codegen::NullPointerType nullPointerType =
         IREE::Codegen::NullPointerType::get(rewriter.getContext());
-    return rewriter.create<IREE::Codegen::NullPointerOp>(loc, nullPointerType);
+    return IREE::Codegen::NullPointerOp::create(rewriter, loc, nullPointerType);
   }
   auto allocOp =
-      rewriter.create<bufferization::AllocTensorOp>(loc, tensorType, dynSizes);
+      bufferization::AllocTensorOp::create(rewriter, loc, tensorType, dynSizes);
   Attribute sharedAddrSpace = gpu::AddressSpaceAttr::get(
       rewriter.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
   allocOp.setMemorySpaceAttr(sharedAddrSpace);
@@ -195,15 +195,15 @@ struct LowerInnerTiledMmaToUKernelPattern
     Location loc = op->getLoc();
     Type I32Type = rewriter.getI32Type();
     auto castIndexToI32 = [&](Value val) {
-      return rewriter.create<arith::IndexCastOp>(loc, I32Type, val);
+      return arith::IndexCastOp::create(rewriter, loc, I32Type, val);
     };
     auto constI32 = [&](int val) {
-      return rewriter.create<arith::ConstantIntOp>(loc, I32Type, val);
+      return arith::ConstantIntOp::create(rewriter, loc, I32Type, val);
     };
     int64_t sharedMemoryBytes = ukernelAttr.getSharedMemoryBytes();
     auto sharedMemory = createSharedMemory(rewriter, loc, sharedMemoryBytes);
     Value k = castIndexToI32(
-        rewriter.create<tensor::DimOp>(op.getLoc(), op.getInputs()[0], 1));
+        tensor::DimOp::create(rewriter, op.getLoc(), op.getInputs()[0], 1));
     Value intrinsicsM = constI32(mma.getIntrinsicsM());
     Value subgroupsM = constI32(mma.getSubgroupsM());
     Value intrinsicsN = constI32(mma.getIntrinsicsN());

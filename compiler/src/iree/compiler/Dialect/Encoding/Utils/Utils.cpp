@@ -62,17 +62,30 @@ MatmulNarrowDim getPo2MatmulNarrowDim(EncodingAttr encoding) {
   // and vecmat, so set to 1 if empty.
   const int64_t m = cDims.m.empty() ? 1 : iterationSizes[cDims.m[0]];
   const int64_t n = cDims.n.empty() ? 1 : iterationSizes[cDims.n[0]];
+
+  // If both dimensions are dynamic, return empty.
   if (ShapedType::isDynamic(m) && ShapedType::isDynamic(n)) {
     return {};
   }
-  if (ShapedType::isDynamic(n) || m < n) {
-    return {MatmulNarrowDim::Dim::M,
-            static_cast<int64_t>(llvm::PowerOf2Ceil(m))};
-  }
-  if (ShapedType::isDynamic(m) || n < m) {
+  // If only one dimension is dynamic, pick the other as the narrow dimension.
+  if (ShapedType::isDynamic(m)) {
     return {MatmulNarrowDim::Dim::N,
             static_cast<int64_t>(llvm::PowerOf2Ceil(n))};
   }
+  if (ShapedType::isDynamic(n)) {
+    return {MatmulNarrowDim::Dim::M,
+            static_cast<int64_t>(llvm::PowerOf2Ceil(m))};
+  }
+  // If Both dimensions are static, pick the smaller one.
+  if (n < m) {
+    return {MatmulNarrowDim::Dim::N,
+            static_cast<int64_t>(llvm::PowerOf2Ceil(n))};
+  }
+  if (m < n) {
+    return {MatmulNarrowDim::Dim::M,
+            static_cast<int64_t>(llvm::PowerOf2Ceil(m))};
+  }
+  // If dimensions are static and equal, return empty.
   return {};
 }
 

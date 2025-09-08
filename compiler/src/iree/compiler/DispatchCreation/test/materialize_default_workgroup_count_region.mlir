@@ -17,7 +17,7 @@ util.func @test_simple_creation(%arg0 : index, %arg1 : index) {
 }
 // CHECK-LABEL: @test_simple_creation
 //       CHECK:   count(%[[WL0:[a-zA-Z0-9_]+]]: index, %[[WL1:[a-zA-Z0-9_]+]]: index)
-//       CHECK:     %[[X:[a-zA-Z0-9_]+]], %[[Y:[a-zA-Z0-9_]+]], %[[Z:[a-zA-Z0-9_]+]] = iree_tensor_ext.dispatch.workgroup_count_from_slice %[[WL0]], %[[WL1]]
+//       CHECK:     %[[X:[a-zA-Z0-9_]+]], %[[Y:[a-zA-Z0-9_]+]], %[[Z:[a-zA-Z0-9_]+]] = iree_tensor_ext.dispatch.workgroup_count_from_slice(%[[WL0]], %[[WL1]])
 //       CHECK:     flow.return %[[X]], %[[Y]], %[[Z]]
 
 // -----
@@ -74,8 +74,8 @@ util.func @test_split_reduction_modified(%arg0 : index, %arg1 : index, %arg2 : i
 }
 // CHECK-LABEL: @test_split_reduction_modified
 //       CHECK:   count(%[[WL0:[a-zA-Z0-9_]+]]: index, %[[WL1:[a-zA-Z0-9_]+]]: index, %[[WL2:[a-zA-Z0-9_]+]]: index)
-//       CHECK:     %[[X0:[a-zA-Z0-9_]+]], %[[Y0:[a-zA-Z0-9_]+]], %[[Z0:[a-zA-Z0-9_]+]] = iree_tensor_ext.dispatch.workgroup_count_from_slice %[[WL0]], %[[WL1]], %[[WL2]]
-//       CHECK:     %[[X1:[a-zA-Z0-9_]+]], %[[Y1:[a-zA-Z0-9_]+]], %[[Z1:[a-zA-Z0-9_]+]] = iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier(%[[X0]], %[[Y0]], %[[Z0]]), %[[WL0]], %[[WL1]], %[[WL2]]
+//       CHECK:     %[[X0:[a-zA-Z0-9_]+]], %[[Y0:[a-zA-Z0-9_]+]], %[[Z0:[a-zA-Z0-9_]+]] = iree_tensor_ext.dispatch.workgroup_count_from_slice(%[[WL0]], %[[WL1]], %[[WL2]])
+//       CHECK:     %[[X1:[a-zA-Z0-9_]+]], %[[Y1:[a-zA-Z0-9_]+]], %[[Z1:[a-zA-Z0-9_]+]] = iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier workgroups(%[[X0]], %[[Y0]], %[[Z0]]) workload(%[[WL0]], %[[WL1]], %[[WL2]])
 //       CHECK:     flow.return %[[X1]], %[[Y1]], %[[Z1]]
 
 // -----

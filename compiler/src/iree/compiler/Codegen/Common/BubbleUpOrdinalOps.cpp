@@ -56,11 +56,10 @@ struct BubbleUpAcrossCastOp
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(sourceCastOp);
     Location loc = ordinalOp.getLoc();
-    Value reverseCastOp = rewriter.create<CastOpTy>(
-        loc, rewriter.getIndexType(), sourceCastOp.getIn());
-    Value newOrdinalOp =
-        rewriter.create<IREE::TensorExt::DispatchWorkloadOrdinalOp>(
-            loc, reverseCastOp, ordinalOp.getOrdinal());
+    Value reverseCastOp = CastOpTy::create(
+        rewriter, loc, rewriter.getIndexType(), sourceCastOp.getIn());
+    Value newOrdinalOp = IREE::TensorExt::DispatchWorkloadOrdinalOp::create(
+        rewriter, loc, reverseCastOp, ordinalOp.getOrdinal());
     rewriter.replaceOp(sourceCastOp, newOrdinalOp);
     rewriter.replaceOp(ordinalOp, newOrdinalOp);
     return success();

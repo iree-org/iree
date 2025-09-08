@@ -55,7 +55,11 @@ func.func @relayout_ops_with_compute_between() {
 // CHECK:        iree_codegen.store_to_buffer %[[MAP_SCATTER]], %[[DEST_BUFFER]]
 // CHECK:        scf.forall
 // CHECK:          scf.forall
-// CHECK:            scf.if
-// CHECK-NEXT:         memref.store %[[PAD_VAL]], %[[DEST_BUFFER]]
+// CHECK:            memref.store %[[PAD_VAL]], %[[DEST_BUFFER]]
+// CHECK:          } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+// CHECK:        } {mapping = [#iree_codegen.workgroup_mapping<x>, #iree_codegen.workgroup_mapping<y>]}
+// CHECK:        scf.forall
+// CHECK:          scf.forall
+// CHECK:            memref.store %[[PAD_VAL]], %[[DEST_BUFFER]]
 // CHECK:          } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
 // CHECK:        } {mapping = [#iree_codegen.workgroup_mapping<x>, #iree_codegen.workgroup_mapping<y>]}

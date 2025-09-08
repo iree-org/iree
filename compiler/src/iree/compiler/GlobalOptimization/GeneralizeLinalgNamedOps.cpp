@@ -35,50 +35,6 @@ struct GeneralizeLinalgNamedOpsPass
 };
 } // namespace
 
-/// Returns true if `linalgOp` can be simplified to a basic GEMM.
-static bool isConvFoldableToContraction(linalg::LinalgOp linalgOp) {
-  auto convDimsOrFailure = linalg::inferConvolutionDims(linalgOp);
-  if (failed(convDimsOrFailure)) {
-    return false;
-  }
-  auto &convDims = *convDimsOrFailure;
-
-  if (!llvm::all_of(convDims.strides,
-                    [](int64_t element) { return element == 1; })) {
-    LDBG("conv not foldable: non-unit strides");
-    return false;
-  }
-
-  // Dont generalize pooling operations or depthwise convolutions. For pooling
-  // ops, the input/output channel size will be categorized as the additional
-  // batch dimension.
-  if (convDims.outputChannel.empty() || convDims.inputChannel.empty()) {
-    LDBG("conv not foldable: missing input or output channel dims");
-    return false;
-  }
-
-  // Check if all filter dimensions are size 1.
-  const int64_t kFilterInputIdx = 1;
-  auto filterShapeType = llvm::dyn_cast<RankedTensorType>(
-      linalgOp.getDpsInputOperand(kFilterInputIdx)->get().getType());
-  if (!filterShapeType) {
-    LDBG("conv not foldable: filter shape not ranked tensor");
-    return false;
-  }
-  auto filterShape = filterShapeType.getShape();
-  AffineMap filterMap = linalgOp.getIndexingMapsArray()[kFilterInputIdx];
-  for (auto filterLoop : convDims.filterLoop) {
-    std::optional<int64_t> maybeDim = filterMap.getResultPosition(
-        getAffineDimExpr(filterLoop, filterMap.getContext()));
-    if (!maybeDim || filterShape[*maybeDim] != 1) {
-      LDBG("conv not foldable: non-unit filter dim");
-      return false;
-    }
-  }
-
-  return true;
-}
-
 void GeneralizeLinalgNamedOpsPass::runOnOperation() {
   auto funcOp = getOperation();
   SmallVector<linalg::LinalgOp> namedOpCandidates;
@@ -98,7 +54,7 @@ void GeneralizeLinalgNamedOpsPass::runOnOperation() {
                         linalg::MulOp, linalg::NegFOp, linalg::ReduceOp,
                         linalg::SubOp, linalg::TransposeOp>(
             linalgOp.getOperation()) ||
-        isConvFoldableToContraction(linalgOp)) {
+        linalg::isaConvolutionOpInterface(linalgOp)) {
       namedOpCandidates.push_back(linalgOp);
     }
   });

@@ -6,6 +6,7 @@
 
 #include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/ConstEval/Runtime.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetOptions.h"
 #include "iree/compiler/Dialect/Util/Analysis/Constant/ConstExpr.h"
 #include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
@@ -79,6 +80,13 @@ struct CompileOptions {
   IREEVMPipelineHooks hooks;
 };
 
+static inline bool isAttrParameterized(Attribute attr) {
+  if (!attr)
+    return false;
+  return !isa<IntegerAttr>(attr) && !isa<FloatAttr>(attr) &&
+         !isa<IREE::Util::SerializableAttrInterface>(attr);
+}
+
 template <typename AccessorTy>
 static inline bool isAccessorParameterized(const SymbolTable &moduleSymbols,
                                            AccessorTy op) {
@@ -86,12 +94,7 @@ static inline bool isAccessorParameterized(const SymbolTable &moduleSymbols,
       moduleSymbols.lookup<IREE::Util::GlobalOpInterface>(op.getGlobalName());
   if (!global)
     return true;
-  auto attr = global.getGlobalInitialValue();
-  if (!attr)
-    return false;
-  return !isa<IntegerAttr>(attr) && !isa<FloatAttr>(attr) &&
-         !isa<IREE::Util::SerializableAttrInterface>(
-             global.getGlobalInitialValue());
+  return isAttrParameterized(global.getGlobalInitialValue());
 }
 
 // Today the only way to interact with a global is with loads, stores, and
@@ -108,6 +111,9 @@ static bool isParameterized(const SymbolTable &moduleSymbols,
             })
             .Case([=](IREE::Util::GlobalStoreOpInterface accessor) {
               return isAccessorParameterized(moduleSymbols, accessor);
+            })
+            .Case([=](IREE::Flow::TensorConstantOp accessor) {
+              return isAttrParameterized(accessor.getValueAttr());
             })
             .Default([=](auto) { return false; });
     if (parameterized)

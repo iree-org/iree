@@ -71,9 +71,9 @@ struct UpcastContractOutput final : OpRewritePattern<vector::ContractionOp> {
     Location loc = contractOp.getLoc();
     auto dstCType = srcCType.clone(dstCElemFType);
     auto extOp =
-        rewriter.create<arith::ExtFOp>(loc, dstCType, contractOp.getAcc());
-    auto newContractOp = rewriter.create<vector::ContractionOp>(
-        loc, contractOp.getLhs(), contractOp.getRhs(), extOp,
+        arith::ExtFOp::create(rewriter, loc, dstCType, contractOp.getAcc());
+    auto newContractOp = vector::ContractionOp::create(
+        rewriter, loc, contractOp.getLhs(), contractOp.getRhs(), extOp,
         contractOp.getIndexingMaps(), contractOp.getIteratorTypes());
     newContractOp->setDiscardableAttrs(
         contractOp->getDiscardableAttrDictionary());

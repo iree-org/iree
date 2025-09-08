@@ -120,9 +120,8 @@ static TypedAttr createAttributeFromRawData(Location loc,
   if (elementType.isInteger(1)) {
     // Note: cannot use std::vector because it specializes bool in a way
     // that is not compatible with ArrayRef.
-    llvm::SmallVector<bool> boolVector(rawBuffer.begin(), rawBuffer.end());
-    ArrayRef<bool> boolArray(boolVector.data(), boolVector.size());
-    return DenseElementsAttr::get(tensorType, boolArray);
+    SmallVector<bool> boolVector(rawBuffer);
+    return DenseElementsAttr::get(tensorType, boolVector);
   }
 
   emitError(loc) << "unhandled case when converting raw buffer of "

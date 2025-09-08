@@ -30,11 +30,13 @@ class IREEEncoding_EnumAttr<EnumAttrInfo enumInfo, string name = "">
 
 // Enums for tagging operand operation in an EncodingAttr
 def MATMUL : I32EnumAttrCase<"matmul", 0>;
-def CONV   : I32EnumAttrCase<"conv", 1>;
+def SCALED_MATMUL : I32EnumAttrCase<"scaled_matmul", 1>;
+def CONV   : I32EnumAttrCase<"conv", 2>;
 
 def EncodingOpType : IREEEncoding_I32EnumAttr<"EncodingOpType",
     "Tracks the type of operation of the operand.", [
       MATMUL,
+      SCALED_MATMUL,
       CONV,
     ]>;
 

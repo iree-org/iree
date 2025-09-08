@@ -9,9 +9,10 @@
 
 #include <cstdint>
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Sequence.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
@@ -176,11 +177,8 @@ static FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
     llvm::function_ref<bool(const GPUMMASchedule &schedule)> isScheduleValid) {
 
   while (!isScheduleValid(schedule)) {
-    LLVM_DEBUG({
-      llvm::dbgs() << "Chosen schedule is invalid:\n";
-      llvm::dbgs() << schedule << "\n";
-      llvm::dbgs() << "Shrinking schedule...\n";
-    });
+    LDBG() << "Chosen schedule is invalid:\n"
+           << schedule << "\nShrinking schedule...";
 
     auto decrementIfPossible =
         [](SmallVector<int64_t> &sizes) -> LogicalResult {
@@ -218,10 +216,7 @@ static FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
     return failure();
   }
 
-  LLVM_DEBUG({
-    llvm::dbgs() << "Chosen schedule is valid:\n";
-    llvm::dbgs() << schedule << "\n";
-  });
+  LDBG() << "Chosen schedule is valid:\n" << schedule;
 
   return schedule;
 }
@@ -317,6 +312,72 @@ getBestKTileSizes(const GPUMatmulShapeType &problem,
   return kTileSizes;
 }
 
+/// Distributes tilesToDistribute to totalTiles using their GCD. Both
+/// totalTiles and tilesToDistribute are updated to reflect the remaining
+/// tiles to distribute. The return value is the number of tiles distributed.
+static int64_t distributeTilesUsingGCD(int64_t &totalTiles,
+                                       int64_t &tilesToDistribute) {
+  APInt gcd = GreatestCommonDivisor(APInt(64, tilesToDistribute),
+                                    APInt(64, totalTiles));
+  int64_t distributeTileCount = gcd.getSExtValue();
+  totalTiles /= distributeTileCount;
+  tilesToDistribute /= distributeTileCount;
+
+  return distributeTileCount;
+}
+
+/// Distributes the square root of the subgroup and tile counts to both M and N
+/// dimensions. The first argument servers as a flag to indicate whether the
+/// distribution is for the M or N dimension. Both total tiles and remaining
+/// tiles are updated to reflect the remaining tiles to distribute. Note: This
+/// function should only be used for primary distribution as it assigns the sqrt
+/// directly to the dimension.
+static void distributeSqrtForDim(
+    bool isMDim, int64_t subgroupSqrt, int64_t tileSqrt,
+    int64_t &mTotalTileToDistribute, int64_t &nTotalTileToDistribute,
+    int64_t &mSubgroupDistributed, int64_t &nSubgroupDistributed,
+    int64_t &mTileSizeDistributed, int64_t &nTileSizeDistributed,
+    int64_t &remainingSubgroups, int64_t &remainingTiles) {
+  if (isMDim) {
+    mSubgroupDistributed = subgroupSqrt;
+    mTileSizeDistributed = tileSqrt;
+    mTotalTileToDistribute /= (subgroupSqrt * tileSqrt);
+  } else {
+    nSubgroupDistributed = subgroupSqrt;
+    nTileSizeDistributed = tileSqrt;
+    nTotalTileToDistribute /= (subgroupSqrt * tileSqrt);
+  }
+
+  remainingSubgroups /= subgroupSqrt;
+  remainingTiles /= tileSqrt;
+}
+
+/// Distributes tiles and subgroups to both M and N dimensions using their GCD.
+/// The first argument servers as a flag to indicate whether the distribution is
+/// for the M or N dimension. Both total tiles and remaining tiles are updated
+/// to reflect the remaining tiles to distribute.
+static void distributeGCDForDim(bool isMDim, int64_t &mTotalTileToDistribute,
+                                int64_t &nTotalTileToDistribute,
+                                int64_t &mSubgroupDistributed,
+                                int64_t &nSubgroupDistributed,
+                                int64_t &mTileSizeDistributed,
+                                int64_t &nTileSizeDistributed,
+                                int64_t &remainingSubgroups,
+                                int64_t &remainingTiles) {
+
+  int64_t &totalTilesToDistribute =
+      isMDim ? mTotalTileToDistribute : nTotalTileToDistribute;
+  int64_t &subgroupDistributed =
+      isMDim ? mSubgroupDistributed : nSubgroupDistributed;
+  int64_t &tileDistributed =
+      isMDim ? mTileSizeDistributed : nTileSizeDistributed;
+
+  subgroupDistributed =
+      distributeTilesUsingGCD(totalTilesToDistribute, remainingSubgroups);
+  tileDistributed =
+      distributeTilesUsingGCD(totalTilesToDistribute, remainingTiles);
+}
+
 /// Choose an optimal mma schedule with the heuristic that minimized the total
 /// amount of data read from global memory, per workgroup, respecting the
 /// heuristic seeds.
@@ -338,75 +399,111 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
       llvm::divideCeil(problem.mSizes.back(), intrinsic.mSizes[0]);
   nTotalTileCounts.back() =
       llvm::divideCeil(problem.nSizes.back(), intrinsic.nSizes[0]);
+  int64_t mTotalTileToDistribute = prod(mTotalTileCounts);
+  int64_t nTotalTileToDistribute = prod(nTotalTileCounts);
 
   int64_t remainingSubgroups = seeds.bestSubgroupCountPerWorkgroup;
   int64_t remainingTiles = seeds.bestMNTileCountPerSubgroup;
-  // Assign more subgroups to the M dimension (used later) to balance thread
-  // counts along X and Y dimensions.
-  int mDim = problem.mSizes.size() - 1;
-  int nDim = problem.nSizes.size() - 1;
-  SmallVector<int64_t> mTileSizes(problem.mSizes.size(), 0),
-      nTileSizes(problem.nSizes.size(), 0),
-      mSubgroupCounts(problem.mSizes.size(), 0),
-      nSubgroupCounts(problem.nSizes.size(), 0);
-  // Start at the innermost nDim and mDim, and try to distribute evenly to M and
-  // N for each pair of M and N dims. Otherwise, distribute to N and then M.
-  while (mDim >= 0 || nDim >= 0) {
-    int64_t subgroupSqrt =
-        1ull << (llvm::divideCeil(llvm::Log2_64(remainingSubgroups), 2));
-    int64_t tileSqrt = 1ull << (llvm::Log2_64(remainingTiles) / 2);
 
-    // See if the square root can divide mTotalTileCount. If so it means we can
-    // distribute to both dimensions evenly to minimize the number of global
-    // loads. Otherwise, try to distribute to N and then M.
-    if (mDim >= 0 && nDim >= 0 &&
-        mTotalTileCounts[mDim] > (subgroupSqrt * tileSqrt) &&
-        mTotalTileCounts[mDim] % (subgroupSqrt * tileSqrt) == 0) {
-      mSubgroupCounts[mDim] = subgroupSqrt;
-      mTileSizes[mDim] = tileSqrt;
+  // Initial collapsed subgroup counts and tile sizes. Distribute to collapsed M
+  // and N dimensions to avoid starving either dimension. Once the collapsed
+  // distribution is determined, it will be distributed to individual dimensions
+  // of M and N.
+  int64_t mSubgroupDistributed = 1;
+  int64_t nSubgroupDistributed = 1;
+  int64_t mTileSizeDistributed = 1;
+  int64_t nTileSizeDistributed = 1;
 
-      remainingSubgroups /= subgroupSqrt;
-      remainingTiles /= tileSqrt;
+  LDBG() << "Starting MMA schedule distribution";
+  LDBG() << "mTotalTileCounts: " << mTotalTileCounts
+         << ", nTotalTileCounts: " << nTotalTileCounts
+         << ", remainingSubgroups: " << remainingSubgroups
+         << ", remainingTiles: " << remainingTiles;
 
-      APInt nGCD = GreatestCommonDivisor(APInt(64, nTotalTileCounts[nDim]),
-                                         APInt(64, remainingSubgroups));
-      nSubgroupCounts[nDim] = nGCD.getSExtValue();
-      nTotalTileCounts[nDim] /= nSubgroupCounts[nDim];
-      remainingSubgroups /= nSubgroupCounts[nDim];
+  // This aims to be generous on subgroup splitting, produce the smallest
+  // power-of-two that is >= sqrt(remainingSubgroups)
+  int64_t subgroupSqrt =
+      1ull << (llvm::divideCeil(llvm::Log2_64(remainingSubgroups), 2));
+  // This aims to be conservative on tile splitting, produce the largest
+  // power-of-two that is <= sqrt(remainingTiles)
+  int64_t tileSqrt = 1ull << (llvm::Log2_64(remainingTiles) / 2);
+  int64_t splitFactor = subgroupSqrt * tileSqrt;
 
-      nGCD = GreatestCommonDivisor(APInt(64, nTotalTileCounts[nDim]),
-                                   APInt(64, remainingTiles));
-      nTileSizes[nDim] = nGCD.getSExtValue();
-      remainingTiles /= nTileSizes[nDim];
-    } else {
-      if (nDim >= 0) {
-        APInt nGCD = GreatestCommonDivisor(APInt(64, nTotalTileCounts[nDim]),
-                                           APInt(64, remainingSubgroups));
-        nSubgroupCounts[nDim] = nGCD.getSExtValue();
-        nTotalTileCounts[nDim] /= nSubgroupCounts[nDim];
-        remainingSubgroups /= nSubgroupCounts[nDim];
+  LDBG() << "splitFactor: " << splitFactor << ", subgroupSqrt: " << subgroupSqrt
+         << ", tileSqrt: " << tileSqrt;
 
-        nGCD = GreatestCommonDivisor(APInt(64, nTotalTileCounts[nDim]),
-                                     APInt(64, remainingTiles));
-        nTileSizes[nDim] = nGCD.getSExtValue();
-        remainingTiles /= nTileSizes[nDim];
-      }
+  // See if the square root can divide total tile count. If so it means we can
+  // distribute to a dimensions evenly to minimize the number of global
+  // loads. Or else fall back to GCD distribution.
+  bool canMDistributeEvenly = mTotalTileToDistribute > splitFactor &&
+                              mTotalTileToDistribute % splitFactor == 0;
+  bool canNDistributeEvenly = nTotalTileToDistribute > splitFactor &&
+                              nTotalTileToDistribute % splitFactor == 0;
+  if (canMDistributeEvenly) {
+    LDBG() << "Distributing seed evenly to M dim";
+    distributeSqrtForDim(true, subgroupSqrt, tileSqrt, mTotalTileToDistribute,
+                         nTotalTileToDistribute, mSubgroupDistributed,
+                         nSubgroupDistributed, mTileSizeDistributed,
+                         nTileSizeDistributed, remainingSubgroups,
+                         remainingTiles);
+    distributeGCDForDim(false, mTotalTileToDistribute, nTotalTileToDistribute,
+                        mSubgroupDistributed, nSubgroupDistributed,
+                        mTileSizeDistributed, nTileSizeDistributed,
+                        remainingSubgroups, remainingTiles);
+  } else if (canNDistributeEvenly) {
+    LDBG() << "Distributing seed evenly to N dim";
+    distributeSqrtForDim(false, subgroupSqrt, tileSqrt, mTotalTileToDistribute,
+                         nTotalTileToDistribute, mSubgroupDistributed,
+                         nSubgroupDistributed, mTileSizeDistributed,
+                         nTileSizeDistributed, remainingSubgroups,
+                         remainingTiles);
+    distributeGCDForDim(true, mTotalTileToDistribute, nTotalTileToDistribute,
+                        mSubgroupDistributed, nSubgroupDistributed,
+                        mTileSizeDistributed, nTileSizeDistributed,
+                        remainingSubgroups, remainingTiles);
+  } else {
+    LDBG() << "Distributing seed using GCD";
+    distributeGCDForDim(false, mTotalTileToDistribute, nTotalTileToDistribute,
+                        mSubgroupDistributed, nSubgroupDistributed,
+                        mTileSizeDistributed, nTileSizeDistributed,
+                        remainingSubgroups, remainingTiles);
+    distributeGCDForDim(true, mTotalTileToDistribute, nTotalTileToDistribute,
+                        mSubgroupDistributed, nSubgroupDistributed,
+                        mTileSizeDistributed, nTileSizeDistributed,
+                        remainingSubgroups, remainingTiles);
+  }
 
-      if (mDim >= 0) {
-        APInt mGCD = GreatestCommonDivisor(APInt(64, mTotalTileCounts[mDim]),
-                                           APInt(64, remainingSubgroups));
-        mSubgroupCounts[mDim] = mGCD.getSExtValue();
-        mTotalTileCounts[mDim] /= mSubgroupCounts[mDim];
-        remainingSubgroups /= mSubgroupCounts[mDim];
+  // Note: Experimentation has proved that leaving the leftover factors
+  // unassigned is better than greedily assigning them to the larger collapsed
+  // dimension. This is likely because assigning leftover factors often results
+  // in overly aggressive tiling that ended up reducing occupancy and increasing
+  // shared memory usage.
+  LDBG() << "Leftover factors: subgroups: " << remainingSubgroups
+         << ", tiles: " << remainingTiles;
+  LDBG() << "Collapsed subgroup counts: M: " << mSubgroupDistributed
+         << ", N: " << nSubgroupDistributed;
+  LDBG() << "Collapsed tile sizes: M: " << mTileSizeDistributed
+         << ", N: " << nTileSizeDistributed;
 
-        mGCD = GreatestCommonDivisor(APInt(64, mTotalTileCounts[mDim]),
-                                     APInt(64, remainingTiles));
-        mTileSizes[mDim] = mGCD.getSExtValue();
-        remainingTiles /= mTileSizes[mDim];
-      }
-    }
-    --mDim;
-    --nDim;
+  SmallVector<int64_t> mSubgroupCounts(problem.mSizes.size(), 0),
+      nSubgroupCounts(problem.nSizes.size(), 0),
+      mTileSizes(problem.mSizes.size(), 0),
+      nTileSizes(problem.nSizes.size(), 0);
+
+  // Distribute collapsed tile to M dims from inner -> outer.
+  for (size_t e = problem.mSizes.size(), i = e - 1; i < e; --i) {
+    mSubgroupCounts[i] =
+        distributeTilesUsingGCD(mTotalTileCounts[i], mSubgroupDistributed);
+    mTileSizes[i] =
+        distributeTilesUsingGCD(mTotalTileCounts[i], mTileSizeDistributed);
+  }
+
+  // Distribute collapsed tile to N dims from inner -> outer.
+  for (size_t e = problem.nSizes.size(), i = e - 1; i < e; --i) {
+    nSubgroupCounts[i] =
+        distributeTilesUsingGCD(nTotalTileCounts[i], nSubgroupDistributed);
+    nTileSizes[i] =
+        distributeTilesUsingGCD(nTotalTileCounts[i], nTileSizeDistributed);
   }
 
   SmallVector<int64_t> kTileSizes =
@@ -478,11 +575,60 @@ sortMMAIntrinsics(GPUMatmulShapeType problem,
   return sortedIntrinsics;
 }
 
+static int64_t adjustSeedsForWgpCount(const GPUMatmulShapeType &problem,
+                                      const GPUIntrinsicType &intrinsic,
+                                      std::optional<int64_t> wgpCount,
+                                      int64_t bestSubgroupCountPerWorkgroup,
+                                      int64_t bestMNTileCountPerSubgroup) {
+  if (!wgpCount.has_value()) {
+    LDBG() << "WGP count is not available,"
+           << "Skipping adjustment of seeds for workgroup count.";
+    return bestMNTileCountPerSubgroup;
+  }
+
+  if (problem.gemmSize == GemmSize::NotSet ||
+      problem.gemmSize == GemmSize::SmallGemm) {
+    LDBG() << "Arithmetic intensity is too low, "
+           << "skipping adjustment of seeds for workgroup count.";
+    return bestMNTileCountPerSubgroup;
+  }
+  int64_t mSize = ShapedType::getNumElements(problem.mSizes);
+  int64_t nSize = ShapedType::getNumElements(problem.nSizes);
+  auto computeWorkgroupCount = [&] {
+    // Compute the number of workgroups needed to cover the problem size.
+    // This number tends to be lower than actual workgroup count, since:
+    // 1) It assumes tile and subgroup seeds are all allocated.
+    // 2) It assumes shared memory usage does not exceed hardware limits.
+    int64_t mnTileSizePerSubgroup =
+        bestMNTileCountPerSubgroup * intrinsic.mSizes[0] * intrinsic.nSizes[0];
+    int64_t workgroupSize =
+        mnTileSizePerSubgroup * bestSubgroupCountPerWorkgroup;
+    return mSize * nSize / workgroupSize;
+  };
+  int64_t numWorkgroups = computeWorkgroupCount();
+  LDBG() << "Estimated number of workgroups: " << numWorkgroups
+         << ", WGP count: " << wgpCount;
+
+  while (numWorkgroups < wgpCount) {
+    if (bestMNTileCountPerSubgroup <= 1) {
+      LDBG() << "Cannot decrease tile size further, "
+                "bestMNTileCountPerSubgroup is already 1.";
+      break;
+    }
+    bestMNTileCountPerSubgroup /= 2;
+    LDBG() << "Decreasing bestMNTileCountPerSubgroup to "
+           << bestMNTileCountPerSubgroup;
+    numWorkgroups = computeWorkgroupCount();
+  }
+  return bestMNTileCountPerSubgroup;
+}
+
 FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMatmulShapeType &problem, ArrayRef<GPUIntrinsicType> intrinsics,
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
-    int64_t subgroupSize, bool transposedLhs, bool transposedRhs,
-    bool canUpcastAcc, bool mustBeAligned, bool doCPromotion) {
+    int64_t subgroupSize, std::optional<int64_t> wgpCount, bool transposedLhs,
+    bool transposedRhs, bool canUpcastAcc, bool mustBeAligned,
+    bool doCPromotion) {
 
   sortMMAIntrinsics(problem, intrinsics);
 
@@ -492,12 +638,17 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
       continue;
     }
 
-    GPUMMASchedule schedule = getOptimalMMASchedule(problem, intrinsic, seeds);
+    // Note: don't amend the original seeds, as deduceMMASchedule can be called
+    // more than once in a row, and we want to keep the original seeds intact
+    // for the next call.
+    GPUMMAHeuristicSeeds localSeeds = seeds;
+    localSeeds.bestMNTileCountPerSubgroup = adjustSeedsForWgpCount(
+        problem, intrinsic, wgpCount, seeds.bestSubgroupCountPerWorkgroup,
+        seeds.bestMNTileCountPerSubgroup);
+    GPUMMASchedule schedule =
+        getOptimalMMASchedule(problem, intrinsic, localSeeds);
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "chosen MMA schedule:\n";
-      llvm::dbgs() << "  " << schedule << "\n";
-    });
+    LDBG() << "Chosen MMA schedule:\n" << schedule;
 
     auto isValidSchedule = [&](const GPUMMASchedule &schedule) -> bool {
       int64_t lhsBitwidth = intrinsic.aType.getIntOrFloatBitWidth();
@@ -513,13 +664,9 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
             calculateResultSharedMemoryUsedInBytes(schedule, resultBitwidth);
       }
 
-      LLVM_DEBUG({
-        llvm::dbgs() << "Available Shared Memory: ";
-        llvm::dbgs() << sharedMemLimitInBytes << " bytes\n";
-        llvm::dbgs() << "Predicted Shared Memory Used by Schedule: ";
-        llvm::dbgs() << sharedMemoryUsed << " bytes\n";
-      });
-
+      LDBG() << "Available Shared Memory: " << sharedMemLimitInBytes << " bytes"
+             << "Predicted Shared Memory Used by Schedule: " << sharedMemoryUsed
+             << " bytes";
       return isAligned && sharedMemoryUsed <= sharedMemLimitInBytes;
     };
     return fitScheduleInSharedMemory(schedule, isValidSchedule);
@@ -608,6 +755,13 @@ struct ChainedMMAIntrinsics {
   bool canReuseAOutputForB;
 };
 
+static bool matchLayout(IREE::GPU::MMASingleSubgroupLayout layoutA,
+                        IREE::GPU::MMASingleSubgroupLayout layoutB) {
+  return (layoutA.element == layoutB.element) &&
+         (layoutA.thread == layoutB.thread) &&
+         (layoutA.tstrides == layoutB.tstrides);
+};
+
 FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
     const GPUMatmulShapeType &qkMatmul, const GPUMatmulShapeType &pvMatmul,
     ArrayRef<GPUIntrinsicType> intrinsics,
@@ -619,28 +773,33 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
          qkMatmul.nSizes.size() == 1 && qkMatmul.kSizes.size() == 1 &&
          "unimplemented: multi M/N/K attention schedule");
 
+  SmallVector<uint64_t> qkViableIntrinsicIndices;
+  SmallVector<uint64_t> pvViableIntrinsicIndices;
+  for (const auto &[index, intrinsic] : llvm::enumerate(intrinsics)) {
+    if (!failed(canTargetIntrinsic(qkMatmul, intrinsic, subgroupSize,
+                                   canUpcastAcc, mustBeAligned))) {
+      qkViableIntrinsicIndices.push_back(index);
+    }
+    if (!failed(canTargetIntrinsic(pvMatmul, intrinsic, subgroupSize,
+                                   canUpcastAcc, mustBeAligned))) {
+      pvViableIntrinsicIndices.push_back(index);
+    }
+  }
+
   std::vector<ChainedMMAIntrinsics> intrinsicPairs;
-
-  for (const GPUIntrinsicType &intrinsicA : intrinsics) {
-    for (const GPUIntrinsicType &intrinsicB : intrinsics) {
-      if (failed(canTargetIntrinsic(qkMatmul, intrinsicA, subgroupSize,
-                                    canUpcastAcc, mustBeAligned))) {
+  for (unsigned qkIndex : qkViableIntrinsicIndices) {
+    for (unsigned pvIndex : pvViableIntrinsicIndices) {
+      const GPUIntrinsicType &intrinsicA = intrinsics[qkIndex];
+      const GPUIntrinsicType &intrinsicB = intrinsics[pvIndex];
+      if (!matchLayout(getSingleSubgroupLayout(intrinsicA.mmaKind,
+                                               IREE::GPU::MMAFragment::Acc),
+                       getSingleSubgroupLayout(intrinsicB.mmaKind,
+                                               IREE::GPU::MMAFragment::Acc))) {
         continue;
       }
 
-      if (failed(canTargetIntrinsic(pvMatmul, intrinsicB, subgroupSize,
-                                    canUpcastAcc, mustBeAligned))) {
-        continue;
-      }
       // Check if we can reuse the output of intrinsicA for lhs/rhs of
       // intrinsicB.
-      auto matchLayout =
-          [](IREE::GPU::MMASingleSubgroupLayout layoutA,
-             IREE::GPU::MMASingleSubgroupLayout layoutB) -> bool {
-        return (layoutA.element == layoutB.element) &&
-               (layoutA.thread == layoutB.thread) &&
-               (layoutA.tstrides == layoutB.tstrides);
-      };
       bool canReuseAOutForBLhs =
           matchLayout(getSingleSubgroupLayout(intrinsicA.mmaKind,
                                               IREE::GPU::MMAFragment::Acc),
@@ -680,10 +839,7 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
     GPUMMASchedule schedule =
         getOptimalAttentionPVSchedule(pvMatmul, intrinsicB, pvMatmulSeeds);
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "chosen MMA schedule:\n";
-      llvm::dbgs() << "  " << schedule << "\n";
-    });
+    LDBG() << "Chosen MMA schedule:\n" << schedule;
     int64_t intrinsicAK = intrinsicA.kSizes[0];
     auto isValidSchedule = [&](const GPUMMASchedule &schedule) -> bool {
       // Create a mma schedule for qkMatmul in attention.
@@ -722,12 +878,9 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
                                  calculateOperandsSharedMemoryUsedInBytes(
                                      schedule, lhsBBitwidth, rhsBBitwidth);
 
-      LLVM_DEBUG({
-        llvm::dbgs() << "Available Shared Memory: ";
-        llvm::dbgs() << sharedMemLimitInBytes << " bytes\n";
-        llvm::dbgs() << "Predicted Shared Memory Used by Schedule: ";
-        llvm::dbgs() << sharedMemoryUsed << " bytes\n";
-      });
+      LDBG() << "Available Shared Memory: " << sharedMemLimitInBytes << " bytes"
+             << "Predicted Shared Memory Used by Schedule: " << sharedMemoryUsed
+             << " bytes";
 
       return isQKAligned && isPVAligned &&
              sharedMemoryUsed <= sharedMemLimitInBytes;

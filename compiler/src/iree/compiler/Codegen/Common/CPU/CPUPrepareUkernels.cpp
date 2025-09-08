@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
-#include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -151,11 +150,10 @@ static LogicalResult reduceDefiningOp(PatternRewriter &rewriter, Value input) {
 
 /// Drops the first element from all the tile sizes list. The first element is
 /// for the batch dimension.
-static IREE::Codegen::LoweringConfigAttrInterface
-dropBatchTileSize(IREE::Codegen::LoweringConfigAttrInterface config) {
-  std::unique_ptr<TilingConfig> tilingConfig = TilingConfig::create(config);
+static IREE::CPU::LoweringConfigAttr
+dropBatchTileSize(IREE::CPU::LoweringConfigAttr config) {
   SmallVector<IREE::CPU::LoweringConfigLevelInfo> tilingInfo =
-      tilingConfig->getTilingLevelInfo();
+      config.getAvailableTilingInfo();
   SmallVector<NamedAttribute> newItems;
   for (auto [level, tileSizes, scalableTileFlags] : tilingInfo) {
     tileSizes.erase(tileSizes.begin());
@@ -173,7 +171,7 @@ dropBatchTileSize(IREE::Codegen::LoweringConfigAttrInterface config) {
 /// Pattern to convert linalg.batch_mmt4d with batch dim = 1 into mmt4d.
 struct ConvertBatchMmt4DtoMmt4DPattern
     : public OpRewritePattern<linalg::BatchMmt4DOp> {
-  using OpRewritePattern<linalg::BatchMmt4DOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::BatchMmt4DOp op,
                                 PatternRewriter &rewriter) const override {
@@ -204,8 +202,7 @@ struct ConvertBatchMmt4DtoMmt4DPattern
               .result();
 
       auto loweringConfig =
-          getLoweringConfig<IREE::Codegen::LoweringConfigAttrInterface>(
-              oldFillOp);
+          getLoweringConfig<IREE::CPU::LoweringConfigAttr>(oldFillOp);
       if (loweringConfig) {
         auto config = dropBatchTileSize(loweringConfig);
         setLoweringConfig(reducedOut.getDefiningOp(), config);
@@ -236,12 +233,11 @@ struct ConvertBatchMmt4DtoMmt4DPattern
           rhs.getLoc(), "rhs producer should be reduced, but reduction failed");
     }
 
-    auto mmt4DOp = rewriter.create<linalg::Mmt4DOp>(
-        loc, reducedOut.getType(), ValueRange{reducedLhs, reducedRhs},
-        ValueRange{reducedOut});
+    auto mmt4DOp = linalg::Mmt4DOp::create(rewriter, loc, reducedOut.getType(),
+                                           ValueRange{reducedLhs, reducedRhs},
+                                           ValueRange{reducedOut});
 
-    auto loweringConfig =
-        getLoweringConfig<IREE::Codegen::LoweringConfigAttrInterface>(op);
+    auto loweringConfig = getLoweringConfig<IREE::CPU::LoweringConfigAttr>(op);
     if (loweringConfig) {
       auto config = dropBatchTileSize(loweringConfig);
       setLoweringConfig(mmt4DOp, config);
@@ -255,7 +251,7 @@ struct ConvertBatchMmt4DtoMmt4DPattern
 };
 
 struct Convert3DPackto2DPackPattern : public OpRewritePattern<linalg::PackOp> {
-  using OpRewritePattern<linalg::PackOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::PackOp packOp,
                                 PatternRewriter &rewriter) const override {
@@ -312,9 +308,9 @@ struct Convert3DPackto2DPackPattern : public OpRewritePattern<linalg::PackOp> {
     auto reducedDest = tensor::createCanonicalRankReducingExtractSliceOp(
         rewriter, loc, packOp.getDest(), reducedDestType);
 
-    auto newPackOp = rewriter.create<linalg::PackOp>(
-        loc, reducedSrc, reducedDest, newInnerDimsPos, packOp.getMixedTiles(),
-        packOp.getPaddingValue(), newOuterDimsPerm);
+    auto newPackOp = linalg::PackOp::create(
+        rewriter, loc, reducedSrc, reducedDest, newInnerDimsPos,
+        packOp.getMixedTiles(), packOp.getPaddingValue(), newOuterDimsPerm);
 
     auto insertSliceOp = tensor::createCanonicalRankReducingInsertSliceOp(
         rewriter, loc, newPackOp.getResult(), packOp.getDest());
@@ -325,7 +321,7 @@ struct Convert3DPackto2DPackPattern : public OpRewritePattern<linalg::PackOp> {
 
 struct Convert5DUnPackto4DUnPackPattern
     : public OpRewritePattern<linalg::UnPackOp> {
-  using OpRewritePattern<linalg::UnPackOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::UnPackOp unpackOp,
                                 PatternRewriter &rewriter) const override {
@@ -390,9 +386,9 @@ struct Convert5DUnPackto4DUnPackPattern
     auto reducedDest = tensor::createCanonicalRankReducingExtractSliceOp(
         rewriter, loc, unpackOp.getDest(), reducedDestType);
 
-    auto newUnpackOp = rewriter.create<linalg::UnPackOp>(
-        loc, reducedSrc, reducedDest, newInnerDimsPos, unpackOp.getMixedTiles(),
-        newOuterDimsPerm);
+    auto newUnpackOp = linalg::UnPackOp::create(
+        rewriter, loc, reducedSrc, reducedDest, newInnerDimsPos,
+        unpackOp.getMixedTiles(), newOuterDimsPerm);
 
     auto insertSliceOp = tensor::createCanonicalRankReducingInsertSliceOp(
         rewriter, loc, newUnpackOp.getResult(), unpackOp.getDest());
@@ -420,15 +416,15 @@ void CPUPrepareUkernelsPass::runOnOperation() {
   IRRewriter rewriter(ctx);
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
 
-  if (hasUkernel(targetAttr, "mmt4d")) {
+  if (targetAttr && hasUkernel(targetAttr.getConfiguration(), "mmt4d")) {
     tileBatchDimsForBatchMmt4dOp(rewriter, funcOp);
     patterns.add<ConvertBatchMmt4DtoMmt4DPattern>(ctx);
   }
-  if (hasUkernel(targetAttr, "pack")) {
+  if (targetAttr && hasUkernel(targetAttr.getConfiguration(), "pack")) {
     tileNonPackedDimsFor3DPackOps(rewriter, funcOp);
     patterns.add<Convert3DPackto2DPackPattern>(ctx);
   }
-  if (hasUkernel(targetAttr, "unpack")) {
+  if (targetAttr && hasUkernel(targetAttr.getConfiguration(), "unpack")) {
     tileNonPackedDimsFor5DPUnpackOps(rewriter, funcOp);
     patterns.add<Convert5DUnPackto4DUnPackPattern>(ctx);
   }

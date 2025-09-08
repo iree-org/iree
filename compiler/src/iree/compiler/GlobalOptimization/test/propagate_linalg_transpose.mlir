@@ -123,9 +123,16 @@ util.func public @propagate_to_matmul_ops(%lhs: tensor<16x16xf32>,
                             outs(%empty : tensor<16x16xf32>) -> tensor<16x16xf32>
   util.return %second_mm : tensor<16x16xf32>
 }
+//   CHECK-DAG: #[[$MAP0:.*]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+//   CHECK-DAG: #[[$MAP1:.*]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+//   CHECK-DAG: #[[$MAP2:.*]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+//   CHECK-DAG: #[[$MAP3:.*]] = affine_map<(d0, d1, d2) -> (d2, d0)>
+//   CHECK-DAG: #[[$MAP4:.*]] = affine_map<(d0, d1, d2) -> (d2, d1)>
 // CHECK-LABEL: util.func public @propagate_to_matmul_ops
-//       CHECK:   linalg.matmul_transpose_b
-//       CHECK:   %[[SECOND_MM:.+]] = linalg.matmul_transpose_a
+//       CHECK:   linalg.matmul
+//  CHECK-SAME:     indexing_maps = [#[[$MAP0]], #[[$MAP1]], #[[$MAP2]]]
+//       CHECK:   %[[SECOND_MM:.+]] = linalg.matmul
+//  CHECK-SAME:     indexing_maps = [#[[$MAP3]], #[[$MAP4]], #[[$MAP2]]]
 //       CHECK:   util.return %[[SECOND_MM]]
 
 // -----
@@ -136,13 +143,25 @@ util.func public @propagate_to_transposed_matmul_ops(%lhs: tensor<16x16xf32>,
   %empty = tensor.empty(): tensor<16x16xf32>
   %transpose_b = linalg.transpose ins(%rhs : tensor<16x16xf32>)
       outs(%empty : tensor<16x16xf32>) permutation = [1, 0]
-  %first_mm = linalg.matmul_transpose_b ins(%lhs, %transpose_b : tensor<16x16xf32>, tensor<16x16xf32>)
-                                        outs(%empty : tensor<16x16xf32>) -> tensor<16x16xf32>
+  %first_mm = linalg.matmul
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d2)>,
+      affine_map<(d0, d1, d2) -> (d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ]
+    ins(%lhs, %transpose_b : tensor<16x16xf32>, tensor<16x16xf32>)
+    outs(%empty : tensor<16x16xf32>) -> tensor<16x16xf32>
 
   %transpose_a = linalg.transpose ins(%second_lhs : tensor<16x16xf32>)
       outs(%empty : tensor<16x16xf32>) permutation = [1, 0]
-  %second_mm = linalg.matmul_transpose_a ins(%transpose_a, %first_mm : tensor<16x16xf32>, tensor<16x16xf32>)
-                                         outs(%empty : tensor<16x16xf32>) -> tensor<16x16xf32>
+  %second_mm = linalg.matmul
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d2, d0)>,
+      affine_map<(d0, d1, d2) -> (d2, d1)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ]
+    ins(%transpose_a, %first_mm : tensor<16x16xf32>, tensor<16x16xf32>)
+    outs(%empty : tensor<16x16xf32>) -> tensor<16x16xf32>
   util.return %second_mm : tensor<16x16xf32>
 }
 // CHECK-LABEL: util.func public @propagate_to_transposed_matmul_ops
@@ -167,9 +186,16 @@ util.func public @propagate_to_bmm_ops(%lhs: tensor<2x16x16xf32>,
                             outs(%empty : tensor<2x16x16xf32>) -> tensor<2x16x16xf32>
   util.return %second_bmm : tensor<2x16x16xf32>
 }
+//   CHECK-DAG: #[[$MAP0:.*]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+//   CHECK-DAG: #[[$MAP1:.*]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+//   CHECK-DAG: #[[$MAP2:.*]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+//   CHECK-DAG: #[[$MAP3:.*]] = affine_map<(d0, d1, d2, d3) -> (d0, d3, d1)>
+//   CHECK-DAG: #[[$MAP4:.*]] = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 // CHECK-LABEL: util.func public @propagate_to_bmm_ops
-//       CHECK:   linalg.batch_matmul_transpose_b
-//       CHECK:   %[[SECOND_MM:.+]] = linalg.batch_matmul_transpose_a
+//       CHECK:   linalg.batch_matmul
+//  CHECK-SAME:     indexing_maps = [#[[$MAP0]], #[[$MAP1]], #[[$MAP2]]]
+//       CHECK:   %[[SECOND_MM:.+]] = linalg.batch_matmul
+//  CHECK-SAME:     indexing_maps = [#[[$MAP3]], #[[$MAP4]], #[[$MAP2]]]
 //       CHECK:   util.return %[[SECOND_MM]]
 
 // -----
@@ -180,13 +206,25 @@ util.func public @propagate_to_transposed_bmm_ops(%lhs: tensor<2x16x16xf32>,
   %empty = tensor.empty(): tensor<2x16x16xf32>
   %transpose_b = linalg.transpose ins(%rhs : tensor<2x16x16xf32>)
       outs(%empty : tensor<2x16x16xf32>) permutation = [0, 2, 1]
-  %first_bmm = linalg.batch_matmul_transpose_b ins(%lhs, %transpose_b : tensor<2x16x16xf32>, tensor<2x16x16xf32>)
-                                        outs(%empty : tensor<2x16x16xf32>) -> tensor<2x16x16xf32>
+  %first_bmm = linalg.batch_matmul
+    indexing_maps = [
+      affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+      affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+      affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+    ]
+    ins(%lhs, %transpose_b : tensor<2x16x16xf32>, tensor<2x16x16xf32>)
+    outs(%empty : tensor<2x16x16xf32>) -> tensor<2x16x16xf32>
 
   %transpose_a = linalg.transpose ins(%second_lhs : tensor<2x16x16xf32>)
       outs(%empty : tensor<2x16x16xf32>) permutation = [0, 2, 1]
-  %second_bmm = linalg.batch_matmul_transpose_a ins(%transpose_a, %first_bmm : tensor<2x16x16xf32>, tensor<2x16x16xf32>)
-                                         outs(%empty : tensor<2x16x16xf32>) -> tensor<2x16x16xf32>
+  %second_bmm = linalg.batch_matmul
+    indexing_maps = [
+      affine_map<(d0, d1, d2, d3) -> (d0, d3, d1)>,
+      affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>,
+      affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+    ]
+    ins(%transpose_a, %first_bmm : tensor<2x16x16xf32>, tensor<2x16x16xf32>)
+    outs(%empty : tensor<2x16x16xf32>) -> tensor<2x16x16xf32>
   util.return %second_bmm : tensor<2x16x16xf32>
 }
 // CHECK-LABEL: util.func public @propagate_to_transposed_bmm_ops

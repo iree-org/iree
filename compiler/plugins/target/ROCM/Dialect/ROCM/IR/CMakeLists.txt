@@ -30,11 +30,14 @@ iree_cc_library(
     ::ROCMDialectGen
     LLVMSupport
     MLIRIR
+    MLIRLinalgDialect
     MLIRParser
     MLIRSupport
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
+    iree::compiler::plugins::target::ROCM::builtins::mlir_ukernel::iree_mlir_ukernel_patterns_amdgpu
+    iree::compiler::plugins::target::ROCM::builtins::mlir_ukernel::iree_mlir_ukernels_amdgpu
     iree::compiler::plugins::target::ROCM::builtins::specialization::iree_specialization_patterns_amdgpu
     iree::compiler::plugins::target::ROCM::builtins::tuning::iree_default_tuning_specs_amdgpu
   PUBLIC

@@ -42,6 +42,11 @@
 
 #define DEBUG_TYPE "iree-codegen-utils"
 
+constexpr char kCpuFeaturesAttrName[] = "cpu_features";
+constexpr char kDataLayoutAttrName[] = "data_layout";
+constexpr char kTargetInfoAttrName[] = "iree_codegen.target_info";
+constexpr char kTargetTripleAttrName[] = "target_triple";
+
 namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
@@ -67,74 +72,59 @@ bool isEntryPoint(mlir::FunctionOpInterface func) {
   return func.isPublic() && getEntryPoint(func);
 }
 
-std::optional<StringAttr> getConfigStringAttr(Attribute srcAttr,
-                                              StringRef stringAttr) {
-  if (!srcAttr) {
-    return std::nullopt;
+std::optional<StringRef> getConfigCpuFeatures(DictionaryAttr targetConfig) {
+  auto attr = targetConfig.getAs<StringAttr>(kCpuFeaturesAttrName);
+  if (attr) {
+    return attr.getValue();
   }
-  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(srcAttr);
-  DictionaryAttr config;
-  if (targetAttr) {
-    config = targetAttr.getConfiguration();
-  } else {
-    config = dyn_cast<DictionaryAttr>(srcAttr);
-  }
-  if (!config) {
-    return std::nullopt;
-  }
-  auto attr = config.getAs<StringAttr>(stringAttr);
-  if (!attr) {
-    return std::nullopt;
-  }
-  return attr;
+  return std::nullopt;
+}
+void addConfigCpuFeatures(MLIRContext *context, StringRef cpuFeaturesStr,
+                          SmallVectorImpl<NamedAttribute> &config) {
+  config.emplace_back(StringAttr::get(context, kCpuFeaturesAttrName),
+                      StringAttr::get(context, cpuFeaturesStr));
 }
 
-std::optional<IntegerAttr> getConfigIntegerAttr(Attribute srcAttr,
-                                                StringRef integerAttr) {
-  if (!srcAttr) {
-    return std::nullopt;
+std::optional<StringRef> getConfigDataLayout(DictionaryAttr targetConfig) {
+  auto attr = targetConfig.getAs<StringAttr>(kDataLayoutAttrName);
+  if (attr) {
+    return attr.getValue();
   }
-  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(srcAttr);
-  DictionaryAttr config;
-  if (targetAttr) {
-    config = targetAttr.getConfiguration();
-  } else {
-    config = dyn_cast<DictionaryAttr>(srcAttr);
-  }
-  if (!config) {
-    return std::nullopt;
-  }
-  auto attr = config.getAs<IntegerAttr>(integerAttr);
-  if (!attr) {
-    return std::nullopt;
-  }
-  return attr;
+  return std::nullopt;
+}
+void addConfigDataLayout(MLIRContext *context, StringRef dataLayoutStr,
+                         SmallVectorImpl<NamedAttribute> &config) {
+  config.emplace_back(StringAttr::get(context, kDataLayoutAttrName),
+                      StringAttr::get(context, dataLayoutStr));
 }
 
-std::optional<BoolAttr> getConfigBoolAttr(Attribute srcAttr,
-                                          StringRef boolAttr) {
-  if (!srcAttr) {
-    return std::nullopt;
-  }
-  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(srcAttr);
-  DictionaryAttr config;
-  if (targetAttr) {
-    config = targetAttr.getConfiguration();
-  } else {
-    config = dyn_cast<DictionaryAttr>(srcAttr);
-  }
-  if (!config) {
-    return std::nullopt;
-  }
-  auto attr = config.getAs<BoolAttr>(boolAttr);
-  if (!attr) {
-    return std::nullopt;
-  }
-  return attr;
+IREE::Codegen::TargetInfoAttrInterface
+getConfigTargetInfo(DictionaryAttr targetConfig) {
+  return targetConfig.getAs<IREE::Codegen::TargetInfoAttrInterface>(
+      kTargetInfoAttrName);
+}
+void addConfigTargetInfo(MLIRContext *context,
+                         IREE::Codegen::TargetInfoAttrInterface targetAttr,
+                         SmallVectorImpl<NamedAttribute> &config) {
+  config.emplace_back(StringAttr::get(context, kTargetInfoAttrName),
+                      targetAttr);
 }
 
-std::optional<llvm::Triple> getTargetTriple(Attribute attr) {
-  auto triple = getConfigStringAttr(attr, "target_triple");
+std::optional<StringRef> getConfigTargetTriple(DictionaryAttr targetConfig) {
+  auto attr = targetConfig.getAs<StringAttr>(kTargetTripleAttrName);
+  if (attr) {
+    return attr.getValue();
+  }
+  return std::nullopt;
+}
+void addConfigTargetTriple(MLIRContext *context, StringRef targetTripleStr,
+                           SmallVectorImpl<NamedAttribute> &config) {
+  config.emplace_back(StringAttr::get(context, kTargetTripleAttrName),
+                      StringAttr::get(context, targetTripleStr));
+}
+
+std::optional<llvm::Triple> getTargetTriple(DictionaryAttr attr) {
+  auto triple = getConfigTargetTriple(attr);
   if (!triple) {
     return std::nullopt;
   }
@@ -179,35 +169,29 @@ bool isWebGPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return targetAttr && targetAttr.getBackend().getValue().starts_with("webgpu");
 }
 
-static const char *getDefaultEnabledUkernels(Attribute attr) {
+static const char *getDefaultEnabledUkernels(DictionaryAttr targetConfig) {
   const char *kNone = "none";
-  if (!attr) {
-    return kNone;
-  }
-  auto targetAttr = dyn_cast<IREE::HAL::ExecutableTargetAttr>(attr);
-  if (!targetAttr) {
-    return kNone;
-  }
-  if (isX86_64(targetAttr)) {
+  if (isX86_64(targetConfig)) {
     return "mmt4d";
   }
-  if (isAArch64(targetAttr)) {
+  if (isAArch64(targetConfig)) {
     return "mmt4d";
   }
   return kNone;
 }
 
-bool hasUkernel(Attribute attr, StringRef ukernelName) {
-  auto enabledUkernels = getConfigStringAttr(attr, "ukernels");
+bool hasUkernel(DictionaryAttr targetConfig, StringRef ukernelName) {
+  auto enabledUkernels = targetConfig.getAs<StringAttr>("ukernels");
+
   StringRef enabledUkernelsStr;
   if (enabledUkernels) {
-    enabledUkernelsStr = enabledUkernels->getValue();
+    enabledUkernelsStr = enabledUkernels.getValue();
   } else {
     enabledUkernelsStr = "default";
   }
   // Resolve `default`.
   if (enabledUkernelsStr == "default") {
-    enabledUkernelsStr = getDefaultEnabledUkernels(attr);
+    enabledUkernelsStr = getDefaultEnabledUkernels(targetConfig);
   }
   // Resolve `none`.
   if (enabledUkernelsStr == "none") {
@@ -232,20 +216,12 @@ bool hasUkernel(Attribute attr, StringRef ukernelName) {
   return false;
 }
 
-std::optional<StringRef> getCpuFeatures(Attribute attr) {
-  auto cpuFeatures = getConfigStringAttr(attr, "cpu_features");
-  if (!cpuFeatures) {
-    return std::nullopt;
-  }
-  return cpuFeatures->getValue();
-}
-
 // TODO(dcaballe): If we have to check for a significantly large number of
 // features in the future, we may want to consider a persistent state to carry
 // over processed HAL information or keeping the TTI instance alive and query
 // subtarget features data structure.
-bool hasFeature(Attribute attr, StringRef feature) {
-  std::optional<StringRef> features = getCpuFeatures(attr);
+bool hasFeature(DictionaryAttr targetConfig, StringRef feature) {
+  std::optional<StringRef> features = getConfigCpuFeatures(targetConfig);
   if (!features) {
     return false;
   }
@@ -263,34 +239,52 @@ bool hasFeature(Attribute attr, StringRef feature) {
   return false;
 }
 
-bool isX86(Attribute attr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(attr);
+bool isX86(DictionaryAttr targetConfig) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
   return triple && triple.value().isX86();
 }
 
-bool isX86_64(Attribute attr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(attr);
+bool isX86_64(DictionaryAttr targetConfig) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
   return triple && triple.value().getArch() == llvm::Triple::x86_64;
 }
 
-bool isAArch64(Attribute attr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(attr);
+bool isAArch64(DictionaryAttr targetConfig) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
   return triple && triple.value().isAArch64();
 }
 
-bool isRISCV(Attribute attr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(attr);
+bool isRISCV(DictionaryAttr targetConfig) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
   return triple && triple.value().isRISCV();
 }
 
-bool isRISCV32(Attribute attr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(attr);
+bool isRISCV32(DictionaryAttr targetConfig) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
   return triple && triple.value().isRISCV32();
 }
 
-bool isRISCV64(Attribute attr) {
-  std::optional<llvm::Triple> triple = getTargetTriple(attr);
+bool isRISCV64(DictionaryAttr targetConfig) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
   return triple && triple.value().isRISCV64();
+}
+
+std::array<int64_t, 3> getMaxWorkgroupCount(DictionaryAttr targetConfig) {
+  // TODO(MaheshRavishankar): For now the target info is only available for
+  // GPUs, and is recorded in the configuration with the name `iree.gpu.target`.
+  // Fix this to be `iree.codegen.target`.
+  IREE::Codegen::TargetInfoAttrInterface targetInfo =
+      getConfigTargetInfo(targetConfig);
+  if (!targetInfo) {
+    return {ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
+  }
+  return targetInfo.getMaximumWorkgroupCount();
+}
+std::array<int64_t, 3> getMaxWorkgroupCount(Operation *op) {
+  if (auto target = IREE::HAL::ExecutableTargetAttr::lookup(op)) {
+    return getMaxWorkgroupCount(target.getConfiguration());
+  }
+  return {ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
 }
 
 bool isReadOnly(Value v) {
@@ -454,8 +448,8 @@ LogicalResult setDefaultCustomOpLoweringConfig(
       FunctionType::get(context, operandTypes, customOp->getResultTypes());
   std::string dummyFuncName =
       std::string("__") + funcOp.getName().str() + "_config_setting__";
-  auto dummyFuncOp = rewriter.create<func::FuncOp>(
-      customOp.getLoc(), dummyFuncName, dummyFuncType);
+  auto dummyFuncOp = func::FuncOp::create(rewriter, customOp.getLoc(),
+                                          dummyFuncName, dummyFuncType);
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
   if (targetAttr) {
     dummyFuncOp->setAttr(IREE::HAL::ExecutableTargetAttr::name, targetAttr);
@@ -481,8 +475,8 @@ LogicalResult setDefaultCustomOpLoweringConfig(
   }
   auto clonedCustomOp = cast<IREE::LinalgExt::CustomOp>(
       rewriter.clone(*customOp.getOperation(), map));
-  rewriter.create<func::ReturnOp>(customOp.getLoc(),
-                                  clonedCustomOp->getResults());
+  func::ReturnOp::create(rewriter, customOp.getLoc(),
+                         clonedCustomOp->getResults());
   CustomOpConfigListener customOpConfigListener(customOp, clonedCustomOp);
 
   // 4. Inline the cloned custom op.
@@ -969,10 +963,10 @@ void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface op,
               llvm::zip(fixedTileSizes, fixedTileScalableFlags),
               [&](auto pair) -> OpFoldResult {
                 auto [t, isScalable] = pair;
-                Value size = b.create<arith::ConstantIndexOp>(loc, t);
+                Value size = arith::ConstantIndexOp::create(b, loc, t);
                 if (isScalable) {
-                  Value vscale = b.create<vector::VectorScaleOp>(loc);
-                  size = b.create<arith::MulIOp>(loc, size, vscale);
+                  Value vscale = vector::VectorScaleOp::create(b, loc);
+                  size = arith::MulIOp::create(b, loc, size, vscale);
                 }
                 return size;
               });
@@ -998,14 +992,14 @@ Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
       AffineMap::getMultiDimIdentityMap(memrefTypeTo.getRank(), b.getContext());
   SmallVector<utils::IteratorType> iteratorTypes(memrefTypeTo.getRank(),
                                                  utils::IteratorType::parallel);
-  return b.create<linalg::GenericOp>(
-      loc,
+  return linalg::GenericOp::create(
+      b, loc,
       /*inputs=*/from,
       /*outputs=*/to,
       /*indexingMaps=*/llvm::ArrayRef({id, id}),
       /*iteratorTypes=*/iteratorTypes,
       [](OpBuilder &b, Location loc, ValueRange args) {
-        b.create<linalg::YieldOp>(loc, args.front());
+        linalg::YieldOp::create(b, loc, args.front());
       },
       attributes);
 }
@@ -1054,8 +1048,8 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
     }
     if (splitDim) {
       std::reverse(splitNumTiles.begin(), splitNumTiles.end());
-      auto delinearized = builder.create<affine::AffineDelinearizeIndexOp>(
-          loc, *splitDim, splitNumTiles, /*hasOuterBound=*/true);
+      auto delinearized = affine::AffineDelinearizeIndexOp::create(
+          builder, loc, *splitDim, splitNumTiles, /*hasOuterBound=*/true);
       for (auto [i, id, numTiles] :
            llvm::enumerate(delinearized.getResults(), splitNumTiles)) {
         // We iterate the delinearize results from slowest up to fastest, and
@@ -1231,14 +1225,14 @@ Value findOrCreateSubspanBuffer(
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(subspanOp);
   // Just change the result type of the InterfaceBindingSubspanOp.
-  Value buffer = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-      subspanOp->getLoc(), memRefType, subspanOp.getLayout(),
+  Value buffer = IREE::HAL::InterfaceBindingSubspanOp::create(
+      rewriter, subspanOp->getLoc(), memRefType, subspanOp.getLayout(),
       subspanOp.getBinding(), subspanOp.getByteOffset(),
       subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
       subspanOp.getDescriptorFlagsAttr());
   if (useRocdlBuffers) {
-    buffer = rewriter.create<amdgpu::FatRawBufferCastOp>(
-        subspanOp->getLoc(), buffer, /*validBytes=*/Value{},
+    buffer = amdgpu::FatRawBufferCastOp::create(
+        rewriter, subspanOp->getLoc(), buffer, /*validBytes=*/Value{},
         /*cacheSwizzleStride=*/Value{}, /*boundsCheck=*/true,
         /*resetOffset=*/true);
   }
@@ -1339,7 +1333,7 @@ OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
         {byteOffset, rewriter.getIndexAttr(typeBitWidth)});
   } else {
     OpFoldResult elementByteSize =
-        rewriter.create<IREE::Util::SizeOfOp>(loc, elementType).getResult();
+        IREE::Util::SizeOfOp::create(rewriter, loc, elementType).getResult();
     AffineExpr s0, s1;
     bindSymbols(rewriter.getContext(), s0, s1);
     return affine::makeComposedFoldedAffineApply(rewriter, loc, s0.floorDiv(s1),
@@ -1387,7 +1381,7 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
         currentResultType.getShape(), currentResultType.getElementType(),
         replacementType.getLayout(), replacementType.getMemorySpace());
     auto newCastOp =
-        rewriter.create<memref::CastOp>(loc, newResultType, replacement);
+        memref::CastOp::create(rewriter, loc, newResultType, replacement);
     LDBG() << "\t\tNew user : " << *newCastOp;
     return SmallVector<Value>(newCastOp->result_begin(),
                               newCastOp->result_end());
@@ -1406,8 +1400,8 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
                        currResultType.getShape(), newSourceType, offsets, sizes,
                        strides))
              : nullptr);
-    auto newSubviewOp = rewriter.create<memref::SubViewOp>(
-        loc, newResultType, replacement, offsets, sizes, strides);
+    auto newSubviewOp = memref::SubViewOp::create(
+        rewriter, loc, newResultType, replacement, offsets, sizes, strides);
 
     LDBG() << "\t\tNew user : " << *newSubviewOp;
     return llvm::to_vector_of<Value>(newSubviewOp->getResults());
@@ -1425,8 +1419,8 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
       return std::nullopt;
     }
 
-    auto newExpandOp = rewriter.create<memref::ExpandShapeOp>(
-        loc, *newResultType, replacement, expandOp.getReassociation(),
+    auto newExpandOp = memref::ExpandShapeOp::create(
+        rewriter, loc, *newResultType, replacement, expandOp.getReassociation(),
         expandOp.getOutputShape(), expandOp.getStaticOutputShape());
     LDBG() << "\t\tNew user : " << *newExpandOp;
     return llvm::to_vector_of<Value>(newExpandOp->getResults());
@@ -1440,8 +1434,9 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
       return std::nullopt;
     }
 
-    auto newCollapseOp = rewriter.create<memref::CollapseShapeOp>(
-        loc, *newResultType, replacement, collapseOp.getReassociation());
+    auto newCollapseOp = memref::CollapseShapeOp::create(
+        rewriter, loc, *newResultType, replacement,
+        collapseOp.getReassociation());
     LDBG() << "\t\tNew user : " << *newCollapseOp;
     return llvm::to_vector_of<Value>(newCollapseOp->getResults());
   }
@@ -1588,7 +1583,7 @@ bool hasFusedLeadingOp(linalg::LinalgOp rootOp) {
 
 std::optional<vector::VscaleRange>
 getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  if (isAArch64(targetAttr)) {
+  if (targetAttr && isAArch64(targetAttr.getConfiguration())) {
     // On AArch64 the scalable vector length will always be between 128-bit and
     // 2048-bit. This works out as a vscale range of 1 to 16. See:
     // https://developer.arm.com/Architectures/Scalable%20Vector%20Extensions
@@ -1788,6 +1783,56 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::PackOp op) {
   return result;
 }
 
+std::optional<SizesAndScalableFlags>
+getVectorInputSizesFromDestTiles(linalg::UnPackOp op,
+                                 ArrayRef<int64_t> writeVectorSizes,
+                                 ArrayRef<bool> scalableFlags) {
+  assert(writeVectorSizes.size() == op.getDestRank());
+  if (llvm::any_of(scalableFlags, [](bool val) { return val == true; })) {
+    return std::nullopt;
+  }
+
+  ArrayRef<int64_t> innerDimPos = op.getInnerDimsPos();
+  ArrayRef<int64_t> innerTiles = op.getStaticInnerTiles();
+  ArrayRef<int64_t> sourceShape = op.getSourceType().getShape();
+  ArrayRef<int64_t> outerDimsPerm = op.getOuterDimsPerm();
+
+  // readVectorSizes is the size of tensor used to read and apply mask. It is
+  // set like this: Let's say the vectorSize (VS) array is size 'N' and
+  // the sourceShape(SS) is 'M' where M >= N and InnerTileSizes (IT) of
+  // size M-N
+  // Thus:
+  // - initially: readVectorSizes = vectorInputSizes
+  // - Divide all the readMaskShape locations pointed by innerDimPos
+  //   by the innerTileSize attribute value.
+  // - if outer_dims_perms is present: do that permutation on readVectorSizes.
+  // - Append the remaining shape from SS
+  // E.g. let's say let's say unpackTensorType.getShape() = <8x8x32x16>
+  // inner Dim Pos = [0, 1] and Inner Tiles = [32, 16], vector_sizes are [512,
+  // 128] and outer_dims_perm is [1, 0] then read shape is:
+  //   ReadVectorSizes(initial): [512, 128]
+  //   Final Value(after innerDim Adjustment): [512/32, 128/16]
+  //                                           = [16, 8]
+  //   After applying outer_dims_perm: [8, 16]
+  //   After appending the rest of the sourceShape: [8, 16, 32, 16]
+  SmallVector<int64_t> vectorSizes(writeVectorSizes);
+  for (auto [index, size] : enumerate(innerTiles)) {
+    vectorSizes[innerDimPos[index]] =
+        llvm::divideCeil(vectorSizes[innerDimPos[index]], size);
+  }
+  if (!outerDimsPerm.empty()) {
+    applyPermutationToVector(vectorSizes, outerDimsPerm);
+  }
+  vectorSizes.append(sourceShape.begin() + vectorSizes.size(),
+                     sourceShape.end());
+
+  SizesAndScalableFlags result;
+  result.first.assign(vectorSizes.begin(), vectorSizes.end());
+  result.second.resize(result.first.size(), false);
+
+  return result;
+}
+
 std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::UnPackOp op) {
   LDBG() << "Inferring dest sizes for: " << op;
 
@@ -1819,6 +1864,21 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::UnPackOp op) {
 
   LLVM_DEBUG({
     LDBG() << "After adjustment with inner tiles and outer_dims_perm:";
+    for (auto [idx, val] : llvm::enumerate(result.vectorSizes)) {
+      LDBG() << "Dim #" << idx << ": " << val;
+    }
+  });
+
+  std::optional<SizesAndScalableFlags> maybeInputVectorSizes =
+      getVectorInputSizesFromDestTiles(op, result.vectorSizes,
+                                       result.vectorScalableFlags);
+  if (!maybeInputVectorSizes) {
+    return std::nullopt;
+  }
+  std::tie(result.vectorSizes, result.vectorScalableFlags) =
+      maybeInputVectorSizes.value();
+  LLVM_DEBUG({
+    LDBG() << "After infer read vector sizes from dest shape:";
     for (auto [idx, val] : llvm::enumerate(result.vectorSizes)) {
       LDBG() << "Dim #" << idx << ": " << val;
     }

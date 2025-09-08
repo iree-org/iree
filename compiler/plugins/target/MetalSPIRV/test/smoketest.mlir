@@ -4,8 +4,8 @@ module attributes {
   hal.device.targets = [
     #hal.device.target<"metal", [
       #hal.executable.target<"metal-spirv", "metal-msl-fb", {
-        iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.3,cap:Shader", wgp = <
-          compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [], scaled_mma = [], subgroup_size_choices = [32],
+        iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.3,cap:Shader", wgp = <
+          compute = fp32|int32, storage = b32, subgroup = none, subgroup_size_choices = [32],
           max_workgroup_sizes = [128, 128, 64], max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
           max_workgroup_counts = [65535, 65535, 65535]>>
       }>
@@ -15,7 +15,7 @@ module attributes {
 
 stream.executable public @reduce_dispatch {
   stream.executable.export @reduce_dispatch workgroups(%arg0 : index) -> (index, index, index) {
-    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root %arg0
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
     stream.return %x, %y, %z : index, index, index
   }
   builtin.module {

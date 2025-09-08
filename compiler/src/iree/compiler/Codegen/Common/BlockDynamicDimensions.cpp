@@ -167,14 +167,14 @@ blockDynamicDimensionsOfValue(RewriterBase &rewriter,
   auto outputType = RankedTensorType::get(
       staticOutputShape, tensorType.getElementType(), tensorType.getEncoding());
 
-  auto expandShapeOp = rewriter.create<tensor::ExpandShapeOp>(
-      loc, outputType, v, reassociation, outputShape);
+  auto expandShapeOp = tensor::ExpandShapeOp::create(
+      rewriter, loc, outputType, v, reassociation, outputShape);
   Value barrier = rewriter
                       .create<IREE::Util::OptimizationBarrierOp>(
                           loc, expandShapeOp.getResult())
                       .getResult(0);
-  auto collapseShapeOp = rewriter.create<tensor::CollapseShapeOp>(
-      loc, tensorType, barrier, reassociation);
+  auto collapseShapeOp = tensor::CollapseShapeOp::create(
+      rewriter, loc, tensorType, barrier, reassociation);
   return ReshapeOps{expandShapeOp, collapseShapeOp};
 }
 

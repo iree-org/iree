@@ -21,8 +21,6 @@
 
 namespace mlir::iree_compiler {
 
-class TilingConfig;
-
 //------------------------------------------------------------------------------
 // Wrappers that not use tablegen options.
 //------------------------------------------------------------------------------
@@ -41,14 +39,15 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUTilePass(int64_t tilingLevel, bool skipRootOp);
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUTileAndFusePass(int64_t tilingLevel);
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUTileRootAndFuseProducerConsumerPass(
+createLLVMCPUTileAndFuseProducerConsumerPass(
     IREE::CPU::TilingLevel tilingLevel);
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUTileRootAndFuseInputOperandsPass(
+    IREE::CPU::TilingLevel tilingLevel);
+
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMCPUTileLastOpAndFuseProducerConsumerPass(
     IREE::CPU::TilingLevel tilingLevel);
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
@@ -89,53 +88,33 @@ struct LLVMCPUPipelineOptions {
 /// pipeline is only used for dispatches that just copy data from input
 /// interfaces to output interface.
 void addCPUBufferOpsTileAndVectorizePipeline(
-    OpPassManager &funcPassManager, LLVMCPUPipelineOptions &pipelineOpt);
+    OpPassManager &funcPassManager, const LLVMCPUPipelineOptions &pipelineOpt);
 
 /// Populates the passes to lower ops through data tiling transformations.
 void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
-                              LLVMCPUPipelineOptions &pipelineOpt);
+                              const LLVMCPUPipelineOptions &pipelineOpt);
 
 void addCPULinalgExtTileAndVectorizePipeline(
-    OpPassManager &funcPassManager, LLVMCPUPipelineOptions &pipelineOpt);
+    OpPassManager &funcPassManager, const LLVMCPUPipelineOptions &pipelineOpt);
 
 /// Populates the passes to lower scalars and unknown tensor op (i.e. linalg op
 /// that is not specialized by any pipeline). Adds an additional level of tiling
 /// and converts to memrefs.
 void addCPUDefaultPassPipeline(OpPassManager &funcPassManager,
-                               LLVMCPUPipelineOptions &pipelineOpt);
+                               const LLVMCPUPipelineOptions &pipelineOpt);
 
 void addConvTileAndDecomposeExpertPassPipeline(
-    OpPassManager &funcPassManager, LLVMCPUPipelineOptions &pipelineOpt);
+    OpPassManager &funcPassManager, const LLVMCPUPipelineOptions &pipelineOpt);
 
 /// Populates the passes needed to multi level tile, fuse and vectorize
 /// lowering of linalg ops on tensors to vectors operations.
-void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
-                                      LLVMCPUPipelineOptions &pipelineOpt);
+void addMmt4dTilingExpertPassPipeline(
+    OpPassManager &funcPassManager, const LLVMCPUPipelineOptions &pipelineOpt);
 
 void addMultiTilingExpertPassPipeline(
     OpPassManager &funcPassManager,
     IREE::Codegen::LoweringConfigAttrInterface loweringConfig,
-    LLVMCPUPipelineOptions &pipelineOpt);
-
-void addTensorToVectorsPassPipeline(OpPassManager &funcPassManager,
-                                    bool lowerToVectors = true);
-
-/// Verifies that the given `loweringConfig` can decompose convolution ops to
-/// lower dim ops. It requires {Distribution, VectorCommonParallel,
-/// VectorReduction} tiling levels.
-LogicalResult verifyConvTileAndDecomposeExpertConfig(
-    Operation *op, IREE::CPU::LoweringConfigAttr loweringConfig);
-
-/// Verifies if the tile sizes from `loweringConfig` are valid for each level.
-LogicalResult verifyMultiTilingExpertPassPipelineConfig(
-    Operation *op, IREE::CPU::LoweringConfigAttr loweringConfig);
-
-/// Populates the passes needed to multi level tile and lowering of linalg ops
-/// on tensors to vectors operations.
-LogicalResult verifyTensorToVectorsPassPipelineConfig(
-    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
-    IREE::Codegen::TranslationInfoAttr translationInfo,
-    ArrayRef<int64_t> workgroupSize = {});
+    const LLVMCPUPipelineOptions &pipelineOpt);
 
 //----------------------------------------------------------------------------//
 // LLVMCPU Pass Pipelines for lowering to LLVM dialect.
@@ -146,9 +125,9 @@ LogicalResult verifyTensorToVectorsPassPipelineConfig(
 void buildLLVMCPUCodegenConfigurationPassPipeline(
     OpPassManager &variantPassManager);
 
-/// Populates passes needed to lower a XLA HLO op to LLVM dialect via the
-/// structured ops path. The pass manager `pm` in here should operate on the
-/// module within the IREE::HAL::ExecutableOp.
+/// Populates passes needed to lower high level ops, e.g., linalg, vector, etc,
+/// to LLVM dialect via the structured ops path. The  `variantPassManager`
+/// should operate on the module within the IREE::HAL::ExecutableOp.
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
                                      bool enableAArch64SME = false);
 

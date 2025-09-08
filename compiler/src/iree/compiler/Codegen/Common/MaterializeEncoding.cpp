@@ -8,7 +8,6 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
-#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
@@ -44,6 +43,22 @@ using namespace IREE::Encoding;
 
 namespace {
 
+static void
+updateFuncSignature(FunctionOpInterface funcOp,
+                    const MaterializeEncodingTypeConverter &typeConverter) {
+  // Do not convert the type if the type converter does not understand the
+  // conversion. E.g., `!hal.buffer_view` type.
+  auto convertType = [&](Type t) {
+    Type newType = typeConverter.convertType(t);
+    return newType ? newType : t;
+  };
+  SmallVector<Type> newInputs =
+      llvm::map_to_vector(funcOp.getArgumentTypes(), convertType);
+  SmallVector<Type> newResults =
+      llvm::map_to_vector(funcOp.getResultTypes(), convertType);
+  funcOp.setType(FunctionType::get(funcOp.getContext(), newInputs, newResults));
+}
+
 static LogicalResult
 materializeFuncOpEncodings(FunctionOpInterface funcOp,
                            IREE::HAL::ExecutableTargetAttr targetAttr,
@@ -71,11 +86,15 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
       if (testCLGPUTarget) {
         LDBG() << "Select GPUEncodingResolverAttr attribute as the layout "
                   "attribute. (testCLGPUTarget)";
+        SmallVector<NamedAttribute> configItems;
+        // Setting a nullptr to `target` below returns the target from command
+        // line.
+        IREE::GPU::TargetAttr targetAttr =
+            getGPUTargetAttr(ctx, /*target=*/nullptr);
+        addConfigGPUTarget(ctx, targetAttr, configItems);
         return cast<IREE::Encoding::LayoutMaterializerAttr>(
             IREE::GPU::GPUEncodingResolverAttr::get(
-                ctx,
-                DictionaryAttr::get(ctx, NamedAttribute(kGPUTargetAttrName,
-                                                        getCLGPUTarget(ctx)))));
+                ctx, DictionaryAttr::get(ctx, configItems)));
       }
       LDBG() << "Select EncodingNopLayoutAttr attribute as the layout "
                 "attribute (Encoding resolver unknown or unsupported).";
@@ -113,9 +132,12 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     populateMaterializeEncodingPatterns(patterns, target, typeConverter);
 
     if (failed(applyPartialConversion(funcOp, target, std::move(patterns)))) {
-      funcOp.emitOpError("materialization failed");
-      return failure();
+      return funcOp.emitOpError("materialization failed");
     }
+
+    // The update is required for testing purposes, which results in fewer IRs.
+    // We do not expect inputs and outputs from `funcOp` in practice.
+    updateFuncSignature(funcOp, typeConverter);
   }
 
   // Run patterns to fold pack/unpack ops with pad/extract_slice ops, resolve
@@ -146,8 +168,7 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
         });
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
-      funcOp.emitOpError("folding patterns failed");
-      return failure();
+      return funcOp.emitOpError("folding patterns failed");
     }
 
     IRRewriter rewriter(ctx);

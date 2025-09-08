@@ -70,10 +70,10 @@ static LogicalResult forallToForLoop(RewriterBase &rewriter,
       auto strides =
           llvm::map_to_vector(parallelInsert.getStrides(),
                               [&](Value v) { return map.lookupOrDefault(v); });
-      auto insertSlice = builder.create<tensor::InsertSliceOp>(
-          parallelInsert.getLoc(), source, dest, offsets, sizes, strides,
-          parallelInsert.getStaticOffsets(), parallelInsert.getStaticSizes(),
-          parallelInsert.getStaticStrides());
+      auto insertSlice = tensor::InsertSliceOp::create(
+          builder, parallelInsert.getLoc(), source, dest, offsets, sizes,
+          strides, parallelInsert.getStaticOffsets(),
+          parallelInsert.getStaticSizes(), parallelInsert.getStaticStrides());
       yieldedValues.push_back(insertSlice.getResult());
     }
     return yieldedValues;

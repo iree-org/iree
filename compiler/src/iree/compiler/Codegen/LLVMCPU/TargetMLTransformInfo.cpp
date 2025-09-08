@@ -24,7 +24,7 @@ struct RISCVTargetMLTransformInfo : TargetMLTransformInfo {
 
 const TargetMLTransformInfo TargetMLTransformInfo::getTargetMLTransformInfo(
     IREE::HAL::ExecutableTargetAttr targetAttr) {
-  if (isRISCV(targetAttr)) {
+  if (isRISCV(targetAttr.getConfiguration())) {
     return RISCVTargetMLTransformInfo();
   }
 

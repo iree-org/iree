@@ -12,7 +12,6 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
-#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/IR/Dominance.h"
@@ -283,7 +282,7 @@ struct CastLikeInsertSliceOpFolder final
 /// write to memory.
 // TODO: Consider upstreaming
 struct FoldMaskedTransferRAW : OpRewritePattern<vector::TransferReadOp> {
-  using OpRewritePattern<vector::TransferReadOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::TransferReadOp op,
                                 PatternRewriter &rewriter) const override {
@@ -337,15 +336,9 @@ struct FoldMaskedTransferRAW : OpRewritePattern<vector::TransferReadOp> {
            "search `NOTE[FoldMaskedTransferRAW]` in "
            "GenericVectorization.cpp::FoldMaskedTransferRAW for information");
 
-    // Fold to the stored value if the padding value is poison
-    if (isa_and_present<ub::PoisonOp>(rPad.getDefiningOp())) {
-      rewriter.replaceOp(op, valToStore);
-      return success();
-    }
-
     // Materialize the padding with a constant.
-    auto padVal = rewriter.create<vector::BroadcastOp>(
-        rPad.getLoc(), valToStore.getType(), rPad);
+    auto padVal = vector::BroadcastOp::create(rewriter, rPad.getLoc(),
+                                              valToStore.getType(), rPad);
     rewriter.replaceOpWithNewOp<arith::SelectOp>(op, wMask, valToStore, padVal);
     return success();
   }

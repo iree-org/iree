@@ -43,7 +43,8 @@ namespace {
 /// ```
 /// Here the `linalg.generic` cannot be vectorized with 2D scalable vectors.
 ///
-/// After `tile-and-fuse` (which requires consistent lowering configs):
+/// After `tile-and-fuse` (which requires consistent lowering configs) and
+/// `iree-codegen-forall-to-for`:
 /// ```mlir
 /// scf.for i in range(0, 1000) step 4 x vscale {
 ///   scf.for j in range(0, 2000) step 4 x vscale {
@@ -156,7 +157,8 @@ dropScalabilityFromUnsupportedOperations(mlir::FunctionOpInterface funcOp,
   // ArmSME. The rest of this rewrite could be generic (though currently
   // there's no other targets that support > 1D scalability).
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
-  bool isArmSME = assumeArmSME || hasSMEFeature(targetAttr);
+  bool isArmSME = assumeArmSME ||
+                  (targetAttr && hasSMEFeature(targetAttr.getConfiguration()));
   if (!isArmSME) {
     return success();
   }

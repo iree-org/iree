@@ -21,6 +21,7 @@
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/file_registry.h"
 #include "iree/hal/utils/file_transfer.h"
+#include "iree/hal/utils/queue_emulation.h"
 
 typedef struct iree_hal_task_device_t {
   iree_hal_resource_t resource;
@@ -295,7 +296,8 @@ static iree_status_t iree_hal_task_device_create_command_buffer(
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
-  if (binding_capacity > 0) {
+  if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT) ||
+      binding_capacity > 0) {
     // TODO(indirect-cmd): natively support reusable task command buffers. For
     // now we emulate by recording into a deferred command buffer and
     // recording/issuing at submission time. The task system needs some
@@ -352,8 +354,9 @@ static iree_status_t iree_hal_task_device_import_file(
 }
 
 static iree_status_t iree_hal_task_device_create_semaphore(
-    iree_hal_device_t* base_device, uint64_t initial_value,
-    iree_hal_semaphore_flags_t flags, iree_hal_semaphore_t** out_semaphore) {
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    uint64_t initial_value, iree_hal_semaphore_flags_t flags,
+    iree_hal_semaphore_t** out_semaphore) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   return iree_hal_task_semaphore_create(
       iree_hal_task_device_shared_event_pool(device), initial_value,
@@ -383,8 +386,9 @@ static iree_status_t iree_hal_task_device_queue_alloca(
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   // TODO(benvanik): queue-ordered allocations.
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(wait_semaphore_list,
-                                                    iree_infinite_timeout()));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
+                                   IREE_HAL_WAIT_FLAG_DEFAULT));
   IREE_RETURN_IF_ERROR(
       iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
                                          params, allocation_size, out_buffer));
@@ -446,6 +450,20 @@ static iree_status_t iree_hal_task_device_queue_write(
   return loop_status;
 }
 
+static iree_status_t iree_hal_task_device_queue_host_call(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_host_call_t call, const uint64_t args[4],
+    iree_hal_host_call_flags_t flags) {
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
+  const iree_host_size_t queue_index = iree_hal_task_device_select_queue(
+      device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
+  return iree_hal_task_queue_submit_host_call(
+      &device->queues[queue_index], base_device, 1ull << queue_index,
+      wait_semaphore_list, signal_semaphore_list, call, args, flags);
+}
+
 static iree_status_t iree_hal_task_device_queue_execute(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -455,7 +473,7 @@ static iree_status_t iree_hal_task_device_queue_execute(
     iree_hal_execute_flags_t flags) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   // NOTE: today we are not discriminating queues based on command type.
-  iree_host_size_t queue_index = iree_hal_task_device_select_queue(
+  const iree_host_size_t queue_index = iree_hal_task_device_select_queue(
       device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
   if (command_buffer == NULL) {
     // Fast-path for barriers (fork/join/sequence).
@@ -481,10 +499,11 @@ static iree_status_t iree_hal_task_device_queue_flush(
 
 static iree_status_t iree_hal_task_device_wait_semaphores(
     iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout) {
+    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
+    iree_hal_wait_flags_t flags) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   return iree_hal_task_semaphore_multi_wait(
-      wait_mode, semaphore_list, timeout,
+      wait_mode, semaphore_list, timeout, flags,
       iree_hal_task_device_shared_event_pool(device),
       &device->large_block_pool);
 }
@@ -539,6 +558,8 @@ static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
     .queue_copy = iree_hal_device_queue_emulated_copy,
     .queue_read = iree_hal_task_device_queue_read,
     .queue_write = iree_hal_task_device_queue_write,
+    .queue_host_call = iree_hal_task_device_queue_host_call,
+    .queue_dispatch = iree_hal_device_queue_emulated_dispatch,
     .queue_execute = iree_hal_task_device_queue_execute,
     .queue_flush = iree_hal_task_device_queue_flush,
     .wait_semaphores = iree_hal_task_device_wait_semaphores,

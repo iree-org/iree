@@ -631,7 +631,7 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
                          Value rhs, Value acc, bool colMajor = false) {
   auto getVecOrSingleElem = [&](Value vec) -> Value {
     bool one = llvm::cast<VectorType>(vec.getType()).getNumElements() == 1;
-    return one ? builder.create<vector::ExtractOp>(loc, vec, 0) : vec;
+    return one ? vector::ExtractOp::create(builder, loc, vec, 0) : vec;
   };
   auto layout = getOpaqueMMALayout(builder.getContext(), intrinsic);
   if (is_AMD_MFMA(intrinsic)) {
@@ -652,7 +652,7 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
         .getResult();
   }
   if (is_AMD_WMMA(intrinsic)) {
-    return builder.create<amdgpu::WMMAOp>(loc, resultType, lhs, rhs, acc)
+    return amdgpu::WMMAOp::create(builder, loc, resultType, lhs, rhs, acc)
         .getResult();
   }
   return {};
@@ -709,7 +709,7 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
 
   OpFoldResult zero = builder.getIndexAttr(0);
   OpFoldResult one = builder.getIndexAttr(1);
-  Value cZero = builder.create<arith::ConstantIndexOp>(loc, 0);
+  Value cZero = arith::ConstantIndexOp::create(builder, loc, 0);
   canonicalStrides.append(rankReducedShape.size(), one);
 
   SmallVector<Value> vtids;
@@ -720,8 +720,8 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
                                    dimToVtid))) {
     return failure();
   }
-  auto splitLaneId = builder.create<affine::AffineDelinearizeIndexOp>(
-      loc, laneId, vtidBasis, /*hasOuterBound=*/false);
+  auto splitLaneId = affine::AffineDelinearizeIndexOp::create(
+      builder, loc, laneId, vtidBasis, /*hasOuterBound=*/false);
 
   // Each thread grabs `element` contiguous data, so the vtid needs to be
   // multiplied by `element` to get the next bunch of data.
@@ -737,8 +737,9 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
     Value vtid = splitLaneId.getResult(splitResultIdx);
     int64_t vtidLen = vtidBasis[splitResultIdx - 1];
     if (element != 1) {
-      vtid = builder.create<affine::AffineLinearizeIndexOp>(
-          loc, ValueRange{vtid, cZero}, ArrayRef<int64_t>{vtidLen, element},
+      vtid = affine::AffineLinearizeIndexOp::create(
+          builder, loc, ValueRange{vtid, cZero},
+          ArrayRef<int64_t>{vtidLen, element},
           /*disjoint=*/true);
     }
     vtids.push_back(vtid);
@@ -884,14 +885,25 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
   // Normally, that distinction is irrelevant here: we just delinearize the
   // thread-id over all cross-thread dimensions.
   //
-  // There is one case that makes things more complicated, encountered so far
-  // only on RDNA3. That is when some intrinsic has multiple (so far, 2) threads
-  // reading the same data. This redundancy is not encoded in the TileSwizzle
-  // structures that we are using here. Instead, in that case, the thread grid
-  // (as encoded in the TileSwizzle) is smaller than the subgroup size. In that
-  // case, there is an implied thread-distribution-only dimension along which
-  // multiple threads read exactly the same data.
-  // So we need to distinguish layoutThreadSizes vs. distributionThreadSizes.
+  // There are, however, two special cases that require inserting dummy
+  // dimensions into the delinearization index list, which are later
+  // removed when constructing tile offsets:
+  //
+  // 1. On RDNA3 only: some intrinsics use multiple threads (currently 2)
+  //    to read the same data. This redundancy is not represented in the
+  //    TileSwizzle structures we rely on. In these cases, the thread grid
+  //    encoded by TileSwizzle is *smaller* than the subgroup size, and an
+  //    implicit "distribution-only" dimension exists where multiple threads
+  //    map to identical data. To handle this, we distinguish between
+  //    layoutThreadSizes and distributionThreadSizes.
+  //
+  // 2. LHS delinearization when both subGroupsM and subGroupsN > 1.
+  //    Although subGroupsN is not part of the LHS swizzle, we must still
+  //    delinearize over the combined subGroupsM × subGroupsN space. By
+  //    contrast, RHS does *not* need special handling, since subGroupsM can be
+  //    treated as an implicit leading dimension and omitted anyway.
+
+  // Handle the RDNA3 special case.
   SmallVector<int64_t> layoutThreadSizes =
       sliceSwizzledShape(swizzle, [](TileSwizzle::Dim d) {
         return d.kind == TileSwizzle::Dim::Kind::CrossThread;
@@ -920,6 +932,17 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
         getSubgroupSize() / intrinsicLayoutThreadBound);
   }
 
+  // Handle the subgroupsM/N special case.
+  int64_t subgroupsM = getSubgroupsM();
+  int64_t subgroupsN = getSubgroupsN();
+  bool needsLhsSubgroupNDim = (fragment == IREE::GPU::MMAFragment::Lhs) &&
+                              subgroupsM > 1 && subgroupsN > 1;
+  const int lhsSubgroupNDimIdx = 1;
+  if (needsLhsSubgroupNDim) {
+    distributionThreadSizes.insert(
+        distributionThreadSizes.begin() + lhsSubgroupNDimIdx, subgroupsN);
+  }
+
   // Obtain the offsets from delinearization along the distributionThreadSizes.
   // Use a delinearize without outer bound and throw away its initial result
   // to get clamping behavior.
@@ -931,12 +954,15 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
           ->getResults()
           .drop_front();
 
+  // Erase the delinearized index that corresponds to the dummy
+  // dimension that we had inserted above. This is what causes multiple
+  // threads (which only differed in the index being discarded here) to read
+  // exactly the same data.
   if (hasDistributionOnlyDim) {
-    // Erase the delinearized index that corresponds to the extra distribution
-    // dimension that we had inserted above. This is what causes multiple
-    // threads (which only differed in the index being discarded here) to read
-    // exactly the same data.
     tileOffsets.erase(tileOffsets.begin() + distributionOnlyDimIdx);
+  }
+  if (needsLhsSubgroupNDim) {
+    tileOffsets.erase(tileOffsets.begin() + lhsSubgroupNDimIdx);
   }
 
   // Strides are trivial: each slice is contiguous along the *expanded* dims
@@ -977,7 +1003,7 @@ static Value flattenVector(OpBuilder &builder, Location loc, Value value) {
   }
   auto flatVectorType = VectorType::get({vectorType.getNumElements()},
                                         vectorType.getElementType());
-  return builder.create<vector::ShapeCastOp>(loc, flatVectorType, value);
+  return vector::ShapeCastOp::create(builder, loc, flatVectorType, value);
 }
 
 /// Returns intrinsic-level slices tiling the input multi-MMA-level tile
@@ -998,8 +1024,8 @@ distributeMmaFragmentToIntrinsics(OpBuilder &builder, Location loc, Value value,
   SmallVector<int64_t> strides(rank, 1);
   SmallVector<Value> distributedValues;
   do {
-    Value extract = builder.create<vector::ExtractStridedSliceOp>(
-        loc, value, indices, internalShape, strides);
+    Value extract = vector::ExtractStridedSliceOp::create(
+        builder, loc, value, indices, internalShape, strides);
     distributedValues.push_back(flattenVector(builder, loc, extract));
   } while (incrementIndices(indices, crossIntrinsicShape));
   return distributedValues;
@@ -1076,14 +1102,14 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
   SmallVector<int64_t> indices(dstRank, 0);
   Value acc = outputs[0];
   for (Value intrAcc : intrinsicsAcc) {
-    auto expandedAcc = builder.create<vector::ShapeCastOp>(
-        loc,
+    auto expandedAcc = vector::ShapeCastOp::create(
+        builder, loc,
         VectorType::get(
             accInternalShape,
             cast<VectorType>(outputs[0].getType()).getElementType()),
         intrAcc);
-    acc = builder.create<vector::InsertStridedSliceOp>(loc, expandedAcc, acc,
-                                                       indices, strides);
+    acc = vector::InsertStridedSliceOp::create(builder, loc, expandedAcc, acc,
+                                               indices, strides);
     incrementIndices(indices, accCrossIntrinsicShape);
   }
   results.push_back(acc);
@@ -1274,11 +1300,11 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
     Value acc = outputs[0];
     for (int i = 0; i < unrollKFactor; i++) {
       int64_t offset = vectorWidth * i;
-      Value sliced_lhs = builder.create<vector::ExtractStridedSliceOp>(
-          loc, inputs[0], ArrayRef<int64_t>{offset},
+      Value sliced_lhs = vector::ExtractStridedSliceOp::create(
+          builder, loc, inputs[0], ArrayRef<int64_t>{offset},
           ArrayRef<int64_t>{vectorWidth}, ArrayRef<int64_t>{1});
-      Value sliced_rhs = builder.create<vector::ExtractStridedSliceOp>(
-          loc, inputs[1], ArrayRef<int64_t>{offset},
+      Value sliced_rhs = vector::ExtractStridedSliceOp::create(
+          builder, loc, inputs[1], ArrayRef<int64_t>{offset},
           ArrayRef<int64_t>{vectorWidth}, ArrayRef<int64_t>{1});
       if (getColMajor()) {
         std::swap(sliced_lhs, sliced_rhs);
@@ -1615,13 +1641,14 @@ LogicalResult ScaledMMAAttr::buildUnderlyingOperations(
   // instead of clamping to scalars here.
 
   FloatType f8E8M0 = builder.getF8E8M0Type();
-  Value zeroScales = builder.create<arith::ConstantOp>(
-      loc, SplatElementsAttr::get(
-               VectorType::get({4}, f8E8M0),
-               llvm::APFloat::getSmallest(f8E8M0.getFloatSemantics())));
+  Value zeroScales = arith::ConstantOp::create(
+      builder, loc,
+      SplatElementsAttr::get(
+          VectorType::get({4}, f8E8M0),
+          llvm::APFloat::getSmallest(f8E8M0.getFloatSemantics())));
   auto padScales = [&](Value scales) {
-    Value scale = builder.create<vector::ExtractOp>(loc, scales, 0);
-    Value padded = builder.create<vector::InsertOp>(loc, scale, zeroScales, 0);
+    Value scale = vector::ExtractOp::create(builder, loc, scales, 0);
+    Value padded = vector::InsertOp::create(builder, loc, scale, zeroScales, 0);
     return padded;
   };
 
@@ -1647,9 +1674,10 @@ LogicalResult ScaledMMAAttr::buildUnderlyingOperations(
     std::swap(n, m);
   }
 
-  Value result = builder.create<amdgpu::ScaledMFMAOp>(
-      loc, m, n, k, lhs, rhs, acc, lhsScales, rhsScales, /*scalesIdxA=*/0,
-      /*scalesIdxB=*/0);
+  Value result =
+      amdgpu::ScaledMFMAOp::create(builder, loc, m, n, k, lhs, rhs, acc,
+                                   lhsScales, rhsScales, /*scalesIdxA=*/0,
+                                   /*scalesIdxB=*/0);
   results.push_back(result);
   return success();
 }
@@ -1681,6 +1709,17 @@ bool TargetAttr::supportsSyncMMAOps() const {
   if (auto cc = getCUDAComputeCapability())
     return cc >= 80;
   return false;
+}
+
+std::array<int64_t, 3> TargetAttr::getMaximumWorkgroupCount() const {
+  DenseI32ArrayAttr maxWgpCount = getWgp().getMaxWorkgroupCounts();
+  assert(maxWgpCount.size() <= 3 && "expected only workgroup count for x,y,z");
+  std::array<int64_t, 3> maxWorkgroupCount = {
+      ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
+  for (auto [index, value] : llvm::enumerate(maxWgpCount.asArrayRef())) {
+    maxWorkgroupCount[index] = value;
+  }
+  return maxWorkgroupCount;
 }
 
 //===----------------------------------------------------------------------===//

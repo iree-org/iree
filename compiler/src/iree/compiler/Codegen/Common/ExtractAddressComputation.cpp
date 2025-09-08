@@ -37,8 +37,8 @@ static memref::LoadOp rebuildLoadOp(RewriterBase &rewriter,
                                     memref::LoadOp loadOp, Value srcMemRef,
                                     ArrayRef<Value> indices) {
   Location loc = loadOp.getLoc();
-  return rewriter.create<memref::LoadOp>(loc, srcMemRef, indices,
-                                         loadOp.getNontemporal());
+  return memref::LoadOp::create(rewriter, loc, srcMemRef, indices,
+                                loadOp.getNontemporal());
 }
 
 SmallVector<OpFoldResult> getLoadOpViewSizeForEachDim(RewriterBase &rewriter,
@@ -65,9 +65,8 @@ static memref::StoreOp rebuildStoreOp(RewriterBase &rewriter,
                                       memref::StoreOp storeOp, Value srcMemRef,
                                       ArrayRef<Value> indices) {
   Location loc = storeOp.getLoc();
-  return rewriter.create<memref::StoreOp>(loc, storeOp.getValueToStore(),
-                                          srcMemRef, indices,
-                                          storeOp.getNontemporal());
+  return memref::StoreOp::create(rewriter, loc, storeOp.getValueToStore(),
+                                 srcMemRef, indices, storeOp.getNontemporal());
 }
 
 SmallVector<OpFoldResult>

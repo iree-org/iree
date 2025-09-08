@@ -44,8 +44,17 @@ OpFoldResult mulOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
                      OpFoldResult b) {
   AffineExpr d0, d1;
   bindDims(builder.getContext(), d0, d1);
-  auto addMap = AffineMap::get(2, 0, {d0 * d1});
-  return affine::makeComposedFoldedAffineApply(builder, loc, addMap, {a, b});
+  auto mulMap = AffineMap::get(2, 0, {d0 * d1});
+  return affine::makeComposedFoldedAffineApply(builder, loc, mulMap, {a, b});
+}
+
+OpFoldResult mulAddOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
+                        OpFoldResult b, OpFoldResult c) {
+  AffineExpr d0, d1, d2;
+  bindDims(builder.getContext(), d0, d1, d2);
+  auto mulAddMap = AffineMap::get(3, 0, {d0 * d1 + d2});
+  return affine::makeComposedFoldedAffineApply(builder, loc, mulAddMap,
+                                               {a, b, c});
 }
 
 Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim) {
@@ -575,12 +584,17 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   auto inputMapGEMM =
       AffineMap::get(numParallelDims + numKDims, 0, inputDims, ctx);
 
-  // Prepare filter map.
+  // Prepare filter map and add mapping for reduction dimensions.
   int64_t currKPos = numParallelDims;
   SmallVector<AffineExpr> filterDims;
   for (const auto &[iter, indices] :
        llvm::zip_equal(filterIterators, filterReassocIndices)) {
     if (iter == reduction) {
+      for (int64_t reInd : indices) {
+        int64_t convDimIdx =
+            cast<AffineDimExpr>(filterMap.getResult(reInd)).getPosition();
+        convToIgemmDimMap[convDimIdx] = dims[currKPos];
+      }
       filterDims.push_back(dims[currKPos++]);
     } else {
       assert(iter == parallel && "expected a parallel dim");
@@ -937,6 +951,18 @@ bool hasOnlyScalarInputs(linalg::GenericOp linalgOp) {
   });
 
   return !foundNonScalar;
+}
+
+bool isPureMatmul(Operation *op) {
+  auto matmulOp = dyn_cast_or_null<linalg::MatmulOp>(op);
+  return matmulOp &&
+         linalg::MatmulOp::isDefaultIndexingMaps(matmulOp.getIndexingMaps());
+}
+
+bool isPureBatchMatmul(Operation *op) {
+  auto batchMatmulOp = dyn_cast_or_null<linalg::BatchMatmulOp>(op);
+  return batchMatmulOp && linalg::BatchMatmulOp::isDefaultIndexingMaps(
+                              batchMatmulOp.getIndexingMaps());
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

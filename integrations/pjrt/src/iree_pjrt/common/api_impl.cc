@@ -535,7 +535,8 @@ iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
 
   iree::vm::ref<iree_hal_semaphore_t> semaphore;
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(
-      device_.device(), 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &semaphore));
+      device_.device(), IREE_HAL_QUEUE_AFFINITY_ANY, 0ull,
+      IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &semaphore));
 
   // Signaled when `dst_buffer` is ready to be consumed.
   iree::vm::ref<iree_hal_fence_t> dst_buffer_ready_fence;
@@ -818,9 +819,11 @@ iree_status_t DeviceInstance::OpenDevice() {
       /*param_count=*/0, /*params=*/nullptr, client_.host_allocator(),
       &device_));
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(
-      device(), 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &main_timeline_));
+      device(), IREE_HAL_QUEUE_AFFINITY_ANY, 0ull,
+      IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &main_timeline_));
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(
-      device(), 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &transfer_timeline_));
+      device(), IREE_HAL_QUEUE_AFFINITY_ANY, 0ull,
+      IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &transfer_timeline_));
 
   return iree_ok_status();
 }
@@ -1714,8 +1717,8 @@ EventInstance::EventInstance(iree::vm::ref<iree_hal_fence_t> fence)
     signal_thread_ = std::make_unique<std::thread>(
         [](EventInstance* event_instance,
            iree::vm::ref<iree_hal_fence_t> fence) {
-          iree_status_t wait_status =
-              iree_hal_fence_wait(fence.get(), iree_infinite_timeout());
+          iree_status_t wait_status = iree_hal_fence_wait(
+              fence.get(), iree_infinite_timeout(), IREE_HAL_WAIT_FLAG_DEFAULT);
           event_instance->SignalReady(wait_status);
         },
         this, std::move(fence));

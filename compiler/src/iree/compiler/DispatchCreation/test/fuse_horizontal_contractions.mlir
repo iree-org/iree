@@ -142,7 +142,12 @@ util.func @horizontal_fusion_i8(%arg0: tensor<2x4096x640xi8>,
     ^bb0(%in: i8, %out: i8):
       linalg.yield %in : i8
   } -> tensor<2x640x640xi8>
-  %5 = linalg.batch_matmul_transpose_b
+  %5 = linalg.batch_matmul
+      indexing_maps = [
+        affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+        affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+      ]
       ins(%arg0, %rhs0 : tensor<2x4096x640xi8>, tensor<2x640x640xi8>)
       outs(%2 : tensor<2x4096x640xi32>) -> tensor<2x4096x640xi32>
   %6 = linalg.generic {
@@ -182,7 +187,12 @@ util.func @horizontal_fusion_i8(%arg0: tensor<2x4096x640xi8>,
     ^bb0(%in: i8, %out: i8):
       linalg.yield %in : i8
   } -> tensor<2x640x640xi8>
-  %8 = linalg.batch_matmul_transpose_b
+  %8 = linalg.batch_matmul
+      indexing_maps = [
+        affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+        affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+      ]
       ins(%arg0, %rhs1 : tensor<2x4096x640xi8>, tensor<2x640x640xi8>)
       outs(%2 : tensor<2x4096x640xi32>) -> tensor<2x4096x640xi32>
   %9 = linalg.generic {
@@ -234,8 +244,20 @@ util.func public @fusion_same_trunc_op(%arg0: tensor<2x4096x640xi8>, %arg1: tens
   %0 = tensor.empty() : tensor<2x4096x640xf16>
   %1 = tensor.empty() : tensor<2x4096x640xi32>
   %2 = linalg.fill ins(%c0_i32 : i32) outs(%1 : tensor<2x4096x640xi32>) -> tensor<2x4096x640xi32>
-  %3 = linalg.batch_matmul_transpose_b ins(%arg0, %arg1 : tensor<2x4096x640xi8>, tensor<2x640x640xi8>) outs(%2 : tensor<2x4096x640xi32>) -> tensor<2x4096x640xi32>
-  %4 = linalg.batch_matmul_transpose_b ins(%arg0, %arg4 : tensor<2x4096x640xi8>, tensor<2x640x640xi8>) outs(%2 : tensor<2x4096x640xi32>) -> tensor<2x4096x640xi32>
+  %3 = linalg.batch_matmul
+      indexing_maps = [
+        affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+        affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+      ]
+      ins(%arg0, %arg1 : tensor<2x4096x640xi8>, tensor<2x640x640xi8>) outs(%2 : tensor<2x4096x640xi32>) -> tensor<2x4096x640xi32>
+  %4 = linalg.batch_matmul
+      indexing_maps = [
+        affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+        affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+      ]
+      ins(%arg0, %arg4 : tensor<2x4096x640xi8>, tensor<2x640x640xi8>) outs(%2 : tensor<2x4096x640xi32>) -> tensor<2x4096x640xi32>
   %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%4, %3 : tensor<2x4096x640xi32>, tensor<2x4096x640xi32>) outs(%0 : tensor<2x4096x640xf16>) {
   ^bb0(%in: i32, %in_0: i32, %out: f16):
     %6 = arith.sitofp %in : i32 to f32

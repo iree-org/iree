@@ -12,39 +12,52 @@
 
 namespace mlir::iree_compiler {
 
-bool preferIntrinsicsOverAsm(IREE::HAL::ExecutableTargetAttr targetAttr);
+/// Methods to retrieve information association with `configuration` field
+/// of `hal.executable.target` attribute used commonly in CPU codegen pipelines.
+std::optional<int64_t>
+getConfigMaxStackAllocationSize(DictionaryAttr targetConfig);
+std::optional<int64_t> getConfigNativeVectorSize(DictionaryAttr targetConfig);
+
+/// Methods to add attributes to the `config` list.
+void addConfigMaxStackAllocationSize(MLIRContext *context,
+                                     int64_t maxStackAllocationSize,
+                                     SmallVectorImpl<NamedAttribute> &config);
+void addConfigNativeVectorSize(MLIRContext *context, int64_t nativeVectorSize,
+                               SmallVectorImpl<NamedAttribute> &config);
+
+bool preferIntrinsicsOverAsm(DictionaryAttr targetConfig);
 
 /// Returns true if the 'targetAttr' contains '+avx2' in its cpu features.
-bool hasAVX2Feature(IREE::HAL::ExecutableTargetAttr targetAttr);
+bool hasAVX2Feature(DictionaryAttr targetConfig);
 
 /// Returns true if the 'targetAttr' contains '+avx512f' in its cpu features.
-bool hasAVX512fFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
+bool hasAVX512fFeature(DictionaryAttr targetConfig);
 
 /// Returns true if the 'targetAttr' contains '+v' in its cpu features.
-bool hasVFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
+bool hasVFeature(DictionaryAttr targetConfig);
 
 /// Returns true if the 'targetAttr' contains '+zve32x' in its cpu features.
-bool hasZve32xFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
+bool hasZve32xFeature(DictionaryAttr targetConfig);
 
 /// Returns true if the 'targetAttr' contains '+zve32f' in its cpu features.
-bool hasZve32fFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
+bool hasZve32fFeature(DictionaryAttr targetConfig);
 
 /// Returns true if the 'targetAttr' contains '+zve64x' in its cpu features.
-bool hasZve64xFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
+bool hasZve64xFeature(DictionaryAttr targetConfig);
 
 /// Returns true if the 'targetAttr' contains any riscv vector feature in its
 /// cpu features.
-bool hasAnyVFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
+bool hasAnyVFeature(DictionaryAttr targetConfig);
 
 /// Returns true if the 'targetAttr' contains '+sve' or '+sve2' in its cpu
 /// features or any other feature flag that includes them.
-bool hasAnySVEFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
+bool hasAnySVEFeature(DictionaryAttr targetConfig);
 
 /// Returns true if the 'targetAttr' contains '+sme' in its cpu features.
-bool hasSMEFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
+bool hasSMEFeature(DictionaryAttr targetConfig);
 
 /// Returns true if the 'targetAttr' contains '+i8mm' in its cpu features.
-bool hasI8mmFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
+bool hasI8mmFeature(DictionaryAttr targetConfig);
 
 /// Returns true if the `genericOp` is a simple 2D transpose, i.e.,
 ///

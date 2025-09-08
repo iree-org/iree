@@ -79,7 +79,7 @@ util.func public @split_reduction_static(%arg0: tensor<64x4096xf32>) -> tensor<6
 // Check that count region contains splitk modifier.
 // WORKGROUP-LABEL:   @split_reduction_static
 //       WORKGROUP:     count(
-//       WORKGROUP:       iree_tensor_ext.dispatch.workgroup_count_from_slice
+//       WORKGROUP:       iree_tensor_ext.dispatch.workgroup_count_from_slice()
 //       WORKGROUP:       iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier
 
 // -----

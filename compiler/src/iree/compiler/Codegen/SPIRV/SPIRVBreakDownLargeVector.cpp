@@ -101,33 +101,33 @@ struct BreakDownCastExtractExtend final : OpRewritePattern<arith::ExtUIOp> {
     int64_t srcElemIndex = extractBitOffset / srcElemBitwidth;
     int64_t srcElemOffset = extractBitOffset % srcElemBitwidth;
 
-    Value srcElement = rewriter.create<vector::ExtractOp>(
-        extractOp.getLoc(), bitCastOp.getSource(),
+    Value srcElement = vector::ExtractOp::create(
+        rewriter, extractOp.getLoc(), bitCastOp.getSource(),
         ArrayRef<int64_t>{srcElemIndex});
 
-    Value result = rewriter.create<arith::ConstantOp>(
-        extractOp.getLoc(), extOp.getType(),
-        rewriter.getZeroAttr(extOp.getType()));
+    Value result =
+        arith::ConstantOp::create(rewriter, extractOp.getLoc(), extOp.getType(),
+                                  rewriter.getZeroAttr(extOp.getType()));
 
     // Extract each elements assuming little-endian style encoding--lower bits
     // corresponds to earlier elements.
     auto dstElemType = cast<VectorType>(extOp.getType()).getElementType();
-    auto mask = rewriter.create<arith::ConstantOp>(
-        extOp.getLoc(), dstElemType,
+    auto mask = arith::ConstantOp::create(
+        rewriter, extOp.getLoc(), dstElemType,
         rewriter.getIntegerAttr(dstElemType, (1u << midElemBitwidth) - 1));
     int64_t shrSize = srcElemOffset;
     for (int i = 0; i < extractDstType.getNumElements(); ++i) {
       // Each time we extract midElemBitwidth bits from srcElement. We do that
       // by shift right first and then and a mask.
-      Value shrVal = rewriter.create<arith::ConstantOp>(
-          extractOp.getLoc(), dstElemType,
+      Value shrVal = arith::ConstantOp::create(
+          rewriter, extractOp.getLoc(), dstElemType,
           rewriter.getIntegerAttr(dstElemType, shrSize));
-      Value shr = rewriter.create<arith::ShRUIOp>(extractOp.getLoc(),
-                                                  srcElement, shrVal);
+      Value shr = arith::ShRUIOp::create(rewriter, extractOp.getLoc(),
+                                         srcElement, shrVal);
       Value elem =
-          rewriter.create<arith::AndIOp>(extractOp.getLoc(), shr, mask);
-      result = rewriter.create<vector::InsertOp>(extractOp.getLoc(), elem,
-                                                 result, i);
+          arith::AndIOp::create(rewriter, extractOp.getLoc(), shr, mask);
+      result = vector::InsertOp::create(rewriter, extractOp.getLoc(), elem,
+                                        result, i);
       shrSize += midElemBitwidth;
     }
 

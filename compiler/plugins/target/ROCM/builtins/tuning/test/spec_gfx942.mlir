@@ -11,7 +11,11 @@
 // RUN:   --verify-diagnostics %s | FileCheck %s --check-prefix=MI300X
 
 // Check that the default configuration for mmt_2048x1280x5120_f16_f16_f32
-// applies to the `linalg.matmul_transpose_b` below.
+// applies to the `matmul_transpose_b`, i.e., a `linalg.matmul` with the
+// following indexing maps:
+//   affine_map<(d0, d1, d2) -> (d0, d2)>
+//   affine_map<(d0, d1, d2) -> (d1, d2)>
+//   affine_map<(d0, d1, d2) -> (d0, d1)>
 
 // CHECK-LABEL:  func.func @mmt_2048x1280x5120_f16_f16_f32
 // CHECK:          linalg.generic
@@ -31,7 +35,7 @@ hal.executable public @main {
     iree_codegen.default_tuning_spec = #rocm.builtin.tuning_module<"iree_default_tuning_spec_gfx942.mlir">
   }>) {
     hal.executable.export public @matmul_transpose_b ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -46,7 +50,12 @@ hal.executable public @main {
         %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1280, 5120], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1280x5120xf16>> -> tensor<1280x5120xf16>
         %5 = tensor.empty() : tensor<2048x1280xf32>
         %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<2048x1280xf32>) -> tensor<2048x1280xf32>
-        %7 = linalg.matmul_transpose_b
+        %7 = linalg.matmul
+          indexing_maps = [
+            affine_map<(d0, d1, d2) -> (d0, d2)>,
+            affine_map<(d0, d1, d2) -> (d1, d2)>,
+            affine_map<(d0, d1, d2) -> (d0, d1)>
+          ]
           ins(%3, %4 : tensor<2048x5120xf16>, tensor<1280x5120xf16>)
           outs(%6 : tensor<2048x1280xf32>) -> tensor<2048x1280xf32>
         iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [2048, 1280], strides = [1, 1] : tensor<2048x1280xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2048x1280xf32>>
@@ -82,7 +91,7 @@ hal.executable public @main {
     iree_codegen.default_tuning_spec = #rocm.builtin.tuning_module<"iree_default_tuning_spec_gfx942.mlir">
   }>) {
     hal.executable.export public @attention ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -138,7 +147,7 @@ hal.executable public @main {
     iree_codegen.default_tuning_spec = #rocm.builtin.tuning_module<"iree_default_tuning_spec_gfx942.mlir">
   }>) {
     hal.executable.export public @attention ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {

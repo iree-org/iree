@@ -172,8 +172,8 @@ struct FoldAttentionAndTranspose
         getIndexingMap(6, {d0, d2, d1, d5})};
     ArrayAttr newIndexingMapsAttr =
         rewriter.getAffineMapArrayAttr(newIndexingMaps);
-    auto newAttentionOp = rewriter.create<IREE::LinalgExt::AttentionOp>(
-        attentionOp.getLoc(), expandedInit.getType(), expandedQuery,
+    auto newAttentionOp = IREE::LinalgExt::AttentionOp::create(
+        rewriter, attentionOp.getLoc(), expandedInit.getType(), expandedQuery,
         expandedKey, expandedValue, attentionOp.getScale(), expandedInit,
         newIndexingMapsAttr);
     rewriter.replaceOp(transposeLikeOp, newAttentionOp);

@@ -47,7 +47,7 @@ createFunctionCall(RewriterBase &rewriter, Operation *op, StringRef fnName,
   if (!fnDecl) {
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPointToStart(&moduleOp->getRegion(0).front());
-    fnDecl = rewriter.create<func::FuncOp>(loc, fnName, functionType);
+    fnDecl = func::FuncOp::create(rewriter, loc, fnName, functionType);
     SymbolTable::setSymbolVisibility(fnDecl, SymbolTable::Visibility::Private);
     for (auto attr : fnDefAttrs) {
       fnDecl->setAttr(attr.getName(), attr.getValue());
@@ -61,7 +61,7 @@ createFunctionCall(RewriterBase &rewriter, Operation *op, StringRef fnName,
   }
 
   // Insert the function call.
-  auto callOp = rewriter.create<func::CallOp>(loc, fnDecl, callOperands);
+  auto callOp = func::CallOp::create(rewriter, loc, fnDecl, callOperands);
   if (op->hasAttr("hal.executable.objects")) {
     callOp->setAttr("hal.executable.objects",
                     op->getAttr("hal.executable.objects"));
@@ -118,7 +118,7 @@ static LogicalResult lowerToCallOperands(Location loc, RewriterBase &rewriter,
       })
       .Case<MemRefType>([&](MemRefType memrefType) {
         auto extractStridedMetadataOp =
-            rewriter.create<memref::ExtractStridedMetadataOp>(loc, operand);
+            memref::ExtractStridedMetadataOp::create(rewriter, loc, operand);
         // Base ptr.
         callOperands.push_back(extractStridedMetadataOp.getBaseBuffer());
         // Offset.
@@ -132,7 +132,8 @@ static LogicalResult lowerToCallOperands(Location loc, RewriterBase &rewriter,
       })
       .Case<NullPointerType>([&](NullPointerType /*unused*/) {
         callOperands.push_back(operand);
-        callOperands.push_back(rewriter.create<arith::ConstantIndexOp>(loc, 0));
+        callOperands.push_back(
+            arith::ConstantIndexOp::create(rewriter, loc, 0));
         return success();
       })
       .Default([](Type) { return failure(); });
@@ -334,8 +335,8 @@ struct UKernelOpsBufferizationInterface
       nonTensorResultValues.push_back(result);
     }
 
-    auto bufferOp = rewriter.create<OpTy>(op->getLoc(), nonTensorResultTypes,
-                                          bufferOpOperands, op->getAttrs());
+    auto bufferOp = OpTy::create(rewriter, op->getLoc(), nonTensorResultTypes,
+                                 bufferOpOperands, op->getAttrs());
     SmallVector<Value> bufferizedResults =
         cast<DestinationStyleOpInterface>(bufferOp.getOperation())
             .getDpsInits();

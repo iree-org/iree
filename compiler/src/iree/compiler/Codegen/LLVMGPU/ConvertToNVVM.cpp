@@ -106,6 +106,7 @@ struct ConvertToNVVMPass final
           patterns, options.vectorContractLowering);
       vector::populateVectorGatherLoweringPatterns(patterns);
       vector::populateVectorMaskOpLoweringPatterns(patterns);
+      vector::populateVectorFromElementsLoweringPatterns(patterns);
       // We currently always use 64 bit indices, thus ensure the bit width of
       // the mask compare is consistent.
       vector::populateVectorMaskMaterializationPatterns(

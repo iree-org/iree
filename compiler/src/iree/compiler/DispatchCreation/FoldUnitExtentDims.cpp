@@ -11,6 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
@@ -86,9 +87,10 @@ struct DropUnitDimsFromCollapseOfExpand
           continue;
         }
 
-        // If we are collapsing multiple unit dims together, at least 1 must be
-        // kept (prefer the first).
-        if (outShape[outDim] == 1 && innerIdx != 0) {
+        // If outShape[outDim] == 1, we must preserve 1 unit dim,
+        // so we drop the first. If the first is the only unit dim,
+        // we can't drop it anyway.
+        if (outShape[outDim] == 1 && innerIdx == 0) {
           continue;
         }
         toDrop.insert(inDim);
@@ -98,8 +100,13 @@ struct DropUnitDimsFromCollapseOfExpand
     // Remove dimensions from `toDrop` that weren't introduced by the
     // `expandOp` op.
     const auto expandReassoc = expandOp.getReassociationIndices();
-    for (const auto &[inDim, indices] : llvm::enumerate(expandReassoc)) {
-      if (indices.size() == 1) {
+    for (const auto &indices : expandReassoc) {
+      // If all of indices are in `toDrop`, we must preserve at least one
+      // to avoid an empty reassociation map during expansion.
+      // This can happen when outShape does not have a unit dimension
+      // corresponding to the unit dimensions being dropped here.
+      if (llvm::all_of(indices,
+                       [&](int64_t idx) { return toDrop.contains(idx); })) {
         toDrop.erase(indices[0]);
       }
     }
@@ -252,8 +259,16 @@ foldUnitDimsOnGlobal(IRRewriter &rewriter, IREE::Util::GlobalOpInterface global,
                                                       newGlobalType);
           })
           .Case<IREE::Stream::NamedParameterAttr>(
+              // TODO: Remove this case once frontends have caught up, we should
+              // not have stream.parameter.named at this level.
               [&](IREE::Stream::NamedParameterAttr attr) {
                 return IREE::Stream::NamedParameterAttr::get(
+                    rewriter.getContext(), newGlobalType, attr.getScope(),
+                    attr.getKey(), attr.getConfig());
+              })
+          .Case<IREE::Flow::NamedParameterAttr>(
+              [&](IREE::Flow::NamedParameterAttr attr) {
+                return IREE::Flow::NamedParameterAttr::get(
                     rewriter.getContext(), newGlobalType, attr.getScope(),
                     attr.getKey(), attr.getConfig());
               })

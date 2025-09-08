@@ -18,6 +18,7 @@
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -226,6 +227,7 @@ public:
     registry.insert<IREE::Codegen::IREECodegenDialect,
                     IREE::CPU::IREECPUDialect,
                     IREE::LinalgExt::IREELinalgExtDialect,
+                    IREE::VectorExt::IREEVectorExtDialect,
                     mlir::transform::TransformDialect,
                     pdl::PDLDialect,
                     pdl_interp::PDLInterpDialect,
@@ -243,7 +245,8 @@ public:
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) override {
-    bool enableAArch64SME = isAArch64(targetAttr) && hasSMEFeature(targetAttr);
+    bool enableAArch64SME = isAArch64(targetAttr.getConfiguration()) &&
+                            hasSMEFeature(targetAttr.getConfiguration());
     buildLLVMCPUCodegenPassPipeline(passManager, enableAArch64SME);
   }
 
@@ -554,7 +557,7 @@ public:
 
     if (target.linkUkernelBitcode) {
       // Link in ukernel bitcode.
-      if (hasUkernel(variantOp.getTarget())) {
+      if (hasUkernel(variantOp.getTarget().getConfiguration())) {
         llvm::Expected<std::unique_ptr<llvm::Module>> bitcode =
             loadUKernelBitcode(targetMachine.get(), context);
         if (!bitcode) {

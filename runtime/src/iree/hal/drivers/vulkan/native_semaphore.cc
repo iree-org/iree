@@ -203,7 +203,7 @@ static void iree_hal_vulkan_native_semaphore_fail(
 iree_status_t iree_hal_vulkan_native_semaphore_multi_wait(
     iree::hal::vulkan::VkDeviceHandle* logical_device,
     const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout,
-    VkSemaphoreWaitFlags wait_flags) {
+    iree_hal_wait_flags_t flags, VkSemaphoreWaitFlags wait_flags) {
   if (semaphore_list->count == 0) return iree_ok_status();
 
   iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
@@ -254,13 +254,34 @@ iree_status_t iree_hal_vulkan_native_semaphore_multi_wait(
   // TODO(benvanik): on success optimize this to notify of reaching the new
   // values instead of a full poll; it'll avoid a bunch of additional API
   // queries.
+  bool any_failed = false;
   for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
+    // Query from Vulkan source-of-truth.
+    iree_hal_vulkan_native_semaphore_t* semaphore =
+        iree_hal_vulkan_native_semaphore_cast(semaphore_list->semaphores[i]);
+
     uint64_t value = 0;
-    iree_status_ignore(iree_hal_vulkan_native_semaphore_query(
-        semaphore_list->semaphores[i], &value));
+    IREE_RETURN_IF_ERROR(VK_RESULT_TO_STATUS(
+        semaphore->logical_device->syms()->vkGetSemaphoreCounterValue(
+            *semaphore->logical_device, semaphore->handle, &value),
+        "vkGetSemaphoreCounterValue"));
+    if (value >= IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
+      any_failed = true;
+    }
+
+    // Notify timepoints on the query as we aren't notified by Vulkan when a
+    // device-side signal occurs. This helps us keep latencies lower by flushing
+    // timepoints without needing waits at the risk of making queries slower.
+    iree_hal_semaphore_notify(&semaphore->base, value,
+                              value < IREE_HAL_SEMAPHORE_FAILURE_VALUE
+                                  ? IREE_STATUS_OK
+                                  : IREE_STATUS_ABORTED);
   }
 
-  if (result == VK_SUCCESS) {
+  if (any_failed) {
+    return iree_make_status(IREE_STATUS_ABORTED,
+                            "one or more semaphores have failed");
+  } else if (result == VK_SUCCESS) {
     return iree_ok_status();
   } else if (result == VK_ERROR_DEVICE_LOST) {
     // Nothing we do now matters.
@@ -273,7 +294,7 @@ iree_status_t iree_hal_vulkan_native_semaphore_multi_wait(
 
 static iree_status_t iree_hal_vulkan_native_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_timeout_t timeout) {
+    iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
   iree_hal_vulkan_native_semaphore_t* semaphore =
       iree_hal_vulkan_native_semaphore_cast(base_semaphore);
   iree_hal_semaphore_list_t semaphore_list = {
@@ -282,7 +303,7 @@ static iree_status_t iree_hal_vulkan_native_semaphore_wait(
       /*.payload_values=*/&value,
   };
   return iree_hal_vulkan_native_semaphore_multi_wait(
-      semaphore->logical_device, &semaphore_list, timeout, 0);
+      semaphore->logical_device, &semaphore_list, timeout, flags, 0);
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_vulkan_semaphore_handle(

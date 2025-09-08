@@ -26,7 +26,6 @@
 static const char kTranslationInfoAttrName[] = "translation_info";
 static const char kCompilationInfoAttrName[] = "compilation_info";
 static const char kRootOpInfoAttrName[] = "root_op";
-static const char kUKernelProviderName[] = "iree_codegen.ukernel_provider";
 static const char kUKernelDescriptorName[] = "iree_codegen.ukernel";
 
 namespace mlir::iree_compiler {
@@ -466,6 +465,32 @@ int64_t WorkgroupMappingAttr::getRelativeIndex() const {
   return getMappingId();
 }
 
+//===----------------------------------------------------------------------===//
+// iree_codegen.simple_target
+//===----------------------------------------------------------------------===//
+
+LogicalResult
+SimpleTargetAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                         ArrayRef<int64_t> maxWorkgroupCount) {
+  if (maxWorkgroupCount.size() > 3) {
+    return emitError()
+           << "expected `max_workgroup_count` to have atmost 3 entries";
+  }
+  return success();
+}
+
+std::array<int64_t, 3> SimpleTargetAttr::getMaximumWorkgroupCount() const {
+  std::array<int64_t, 3> maxWorkgroupCount = {
+      ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
+  ArrayRef<int64_t> givenMaxWorkgroupCount = getMaxWorkgroupCount();
+  assert(givenMaxWorkgroupCount.size() <= 3 &&
+         "expected `max_workgroup_count` to have atmost 3 entries");
+  for (auto [index, value] : llvm::enumerate(givenMaxWorkgroupCount)) {
+    maxWorkgroupCount[index] = value;
+  }
+  return maxWorkgroupCount;
+}
+
 //===---------------------------------------------------------------------===//
 // iree_codegen.rotate_rows
 //===---------------------------------------------------------------------===//
@@ -499,7 +524,7 @@ static OpFoldResult getMinimumConstantOffsetValue(OpBuilder &b, Location loc,
   if (baseMod == constantOffset)
     return offset;
 
-  Value modOffset = b.create<arith::ConstantIndexOp>(loc, baseMod);
+  Value modOffset = arith::ConstantIndexOp::create(b, loc, baseMod);
   // If the original add is nsw/nuw, then the new add must also be given we're
   // adding a smaller value.
   return b
@@ -523,30 +548,30 @@ OpFoldResult RotateRowsAttr::swizzleOffset(OpBuilder &b, Location loc,
       getMinimumConstantOffsetValue(b, loc, offset, rotationInvariant);
 
   // Number of elements per row.
-  Value rowAlignmentVal = b.create<arith::ConstantIndexOp>(loc, getRowWidth());
+  Value rowAlignmentVal = arith::ConstantIndexOp::create(b, loc, getRowWidth());
   // Number of contiguous groups of elements per row (swizzled together).
   Value rowAccessAlignmentVal =
-      b.create<arith::ConstantIndexOp>(loc, getRowWidth() / getAccessWidth());
+      arith::ConstantIndexOp::create(b, loc, getRowWidth() / getAccessWidth());
   // Number of elements per group.
   Value accessWidthVal =
-      b.create<arith::ConstantIndexOp>(loc, getAccessWidth());
+      arith::ConstantIndexOp::create(b, loc, getAccessWidth());
 
   Value idVal = getValueOrCreateConstantIndexOp(b, loc, id);
   // i = row # = |offset| floordiv |Num elements per row|
-  Value i = b.create<arith::DivUIOp>(loc, idVal, rowAlignmentVal);
+  Value i = arith::DivUIOp::create(b, loc, idVal, rowAlignmentVal);
   // jByte = element column # = |offset| % |Num elements per row|
-  Value jElem = b.create<arith::RemUIOp>(loc, idVal, rowAlignmentVal);
+  Value jElem = arith::RemUIOp::create(b, loc, idVal, rowAlignmentVal);
   // j = group column # = jElem / |Num elements per group|
-  Value j = b.create<arith::DivUIOp>(loc, jElem, accessWidthVal);
+  Value j = arith::DivUIOp::create(b, loc, jElem, accessWidthVal);
 
   // New j = ((i + j) % |Num groups per row|) * |Num elements per group|
-  Value sum = b.create<arith::AddIOp>(loc, i, j);
-  Value modByte = b.create<arith::RemUIOp>(loc, sum, rowAccessAlignmentVal);
-  Value mod = b.create<arith::MulIOp>(loc, modByte, accessWidthVal);
+  Value sum = arith::AddIOp::create(b, loc, i, j);
+  Value modByte = arith::RemUIOp::create(b, loc, sum, rowAccessAlignmentVal);
+  Value mod = arith::MulIOp::create(b, loc, modByte, accessWidthVal);
 
   // Recompute the swizzled offset `(i * row width) + |new j|`
-  Value mul = b.create<arith::MulIOp>(loc, i, rowAlignmentVal);
-  Value swizzledId = b.create<arith::AddIOp>(loc, mod, mul);
+  Value mul = arith::MulIOp::create(b, loc, i, rowAlignmentVal);
+  Value swizzledId = arith::AddIOp::create(b, loc, mod, mul);
 
   // |swizzledId| is the new offset modulo the swizzle invariant, meaning to
   // get the true swizzled offset take the difference between |swizzledId| and
@@ -555,7 +580,7 @@ OpFoldResult RotateRowsAttr::swizzleOffset(OpBuilder &b, Location loc,
   // This increases the chance of being able to CSE the offset calculation. When
   // multiple accesses to a memref only differ by a constant value (very common
   // when working with statically shaped memrefs like shared/scratch memory).
-  Value diff = b.create<arith::SubIOp>(loc, swizzledId, idVal);
+  Value diff = arith::SubIOp::create(b, loc, swizzledId, idVal);
   return b
       .create<arith::AddIOp>(
           loc, getValueOrCreateConstantIndexOp(b, loc, offset), diff)
@@ -585,6 +610,117 @@ SymbolicUKernelProviderAttr::getMLIRUKernel(StringRef name, DictionaryAttr,
   auto *symbolTableOp = SymbolTable::getNearestSymbolTable(annotationSite);
   SymbolTable symbolTable(symbolTableOp);
   return symbolTable.lookup(name);
+}
+
+//===---------------------------------------------------------------------===//
+// iree_codegen.xor_shuffle
+//===---------------------------------------------------------------------===//
+
+/// Extract column index for XOR swizzling.
+/// ((id%rowStride) / accessWidth)
+static Value extractCol(OpBuilder &builder, Location loc, OpFoldResult id,
+                        OpFoldResult rowAlignment, OpFoldResult accessWidth) {
+  AffineExpr d0, s0, s1;
+  bindDims(builder.getContext(), d0);
+  bindSymbols(builder.getContext(), s0, s1);
+  AffineExpr result = (d0 % s0).floorDiv(s1);
+  return getValueOrCreateConstantIndexOp(
+      builder, loc,
+      affine::makeComposedFoldedAffineApply(builder, loc, result,
+                                            {id, rowAlignment, accessWidth}));
+}
+
+/// Extract row index for XOR swizzling.
+/// row = ((id/rowStride) / perPhase ) % rowAccessAlignment
+static Value extractRow(OpBuilder &builder, Location loc, OpFoldResult id,
+                        OpFoldResult rowStride, OpFoldResult perPhase,
+                        OpFoldResult rowAccessAlignment) {
+  AffineExpr d0, s0, s1, s2;
+  bindDims(builder.getContext(), d0);
+  bindSymbols(builder.getContext(), s0, s1, s2);
+  AffineExpr result = (d0.floorDiv(s0).floorDiv(s1)) % s2;
+  return getValueOrCreateConstantIndexOp(
+      builder, loc,
+      affine::makeComposedFoldedAffineApply(
+          builder, loc, result, {id, rowStride, perPhase, rowAccessAlignment}));
+}
+
+/// Swizzle column on id.
+/// new_id = id-id%rowAlignmentVal+colSwizzled*accessWidthVal
+static Value updateCol(OpBuilder &builder, Location loc, OpFoldResult id,
+                       Value colSwizzled, OpFoldResult rowAlignment,
+                       OpFoldResult accessWidth) {
+  AffineExpr d0, d1, s0, s1;
+  bindDims(builder.getContext(), d0, d1);
+  bindSymbols(builder.getContext(), s0, s1);
+  AffineExpr result = d0 - d0 % s0 + d1 * s1;
+  return getValueOrCreateConstantIndexOp(
+      builder, loc,
+      affine::makeComposedFoldedAffineApply(
+          builder, loc, result, {id, colSwizzled, rowAlignment, accessWidth}));
+}
+
+OpFoldResult XORShuffleAttr::swizzleOffset(OpBuilder &b, Location loc,
+                                           OpFoldResult offset,
+                                           Value src) const {
+  int64_t rotationInvariant =
+      getRowWidth() * (getRowWidth() / getAccessWidth());
+  int64_t rowStride =
+      getRowStride() != int64_t() ? getRowStride() : getRowWidth();
+  int64_t perPhase = getPerPhase() != int64_t() ? getPerPhase() : 1;
+
+  OpFoldResult id =
+      getMinimumConstantOffsetValue(b, loc, offset, rotationInvariant);
+  Value idVal = getValueOrCreateConstantIndexOp(b, loc, id);
+
+  // Number of elements per row.
+  Value rowAlignmentVal = arith::ConstantIndexOp::create(b, loc, getRowWidth());
+  // Number of elements per group.
+  Value accessWidthVal =
+      arith::ConstantIndexOp::create(b, loc, getAccessWidth());
+  // Number of rows per phase.
+  Value perPhaseVal = arith::ConstantIndexOp::create(b, loc, perPhase);
+  // Buffer stride.
+  Value rowStrideVal = arith::ConstantIndexOp::create(b, loc, rowStride);
+  // Number of contiguous groups of elements per row (swizzled together).
+  Value rowAccessAlignmentVal =
+      arith::ConstantIndexOp::create(b, loc, getRowWidth() / getAccessWidth());
+
+  Value colVal = extractCol(b, loc, idVal, rowAlignmentVal, accessWidthVal);
+  Value rowVal = extractRow(b, loc, idVal, rowStrideVal, perPhaseVal,
+                            rowAccessAlignmentVal);
+  auto colSwizzled = arith::XOrIOp::create(b, loc, rowVal, colVal);
+
+  // Update colSwizzled to initial id
+  Value swizzledIdVal =
+      updateCol(b, loc, idVal, colSwizzled, rowAlignmentVal, accessWidthVal);
+  Value diff = arith::SubIOp::create(b, loc, swizzledIdVal, idVal);
+  return b
+      .create<arith::AddIOp>(
+          loc, getValueOrCreateConstantIndexOp(b, loc, offset), diff)
+      .getResult();
+}
+
+int64_t XORShuffleAttr::getAccessElementCount() const {
+  return getAccessWidth();
+}
+
+LogicalResult
+XORShuffleAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                       int64_t rowWidth, int64_t accessWidth, int64_t rowStride,
+                       int64_t perPhase) {
+  if (rowWidth % accessWidth != 0) {
+    return emitError() << "expected access width to divide row width";
+  }
+  int64_t maxPhase = rowWidth / accessWidth;
+  if (perPhase > maxPhase) {
+    return emitError() << "per_phase must be smaller than max_phase";
+  }
+  if (rowStride % rowWidth != 0) {
+    return emitError() << "expected row width to divide row stride";
+  }
+
+  return success();
 }
 
 //===----------------------------------------------------------------------===//

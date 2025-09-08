@@ -266,12 +266,12 @@ func.func @matmul_4x4x4_i8_to_i32(%lhs: tensor<4x4xi8>, %rhs : tensor<4x4xi8>) -
 // the target env. We expect the matmul to follow the inner product lowering.
 
 func.func @matmul_4x4x4_i8_to_i32_dot_prod(%lhs: tensor<4x4xi8>, %rhs : tensor<4x4xi8>) -> tensor<4x4xi32> attributes {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32|int16|int8, storage = b32|b16|b8, subgroup = none, dot = dp4xi8toi32, mma = [], scaled_mma = [],
+  hal.executable.target = #hal.executable.target<"", "", {iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32|int16|int8, storage = b32|b16|b8, subgroup = none, dot = dp4xi8toi32,
     subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [65535, 65535, 65535]>>
-} {
+}>} {
   %c0 = arith.constant 0 : i32
   %i0 = arith.constant 0 : index
   %init = tensor.empty() : tensor<4x4xi32>
@@ -285,9 +285,7 @@ func.func @matmul_4x4x4_i8_to_i32_dot_prod(%lhs: tensor<4x4xi8>, %rhs : tensor<4
 // CHECK-SAME:    (%[[LHS:.+]]: tensor<4x4xi8>, %[[RHS:.+]]: tensor<4x4xi8>)
 // CHECK-DAG:     %[[PV:.+]]   = ub.poison : i8
 // CHECK-DAG:     %[[C0I32:.+]]  = arith.constant 0 : i32
-// CHECK-DAG:     %[[V4I8:.+]]   = ub.poison : vector<4xi8>
 // CHECK-DAG:     %[[V4I32:.+]]  = arith.constant dense<0> : vector<4xi32>
-// CHECK-DAG:     %[[V1I32:.+]]  = arith.constant dense<0> : vector<1xi32>
 // CHECK-DAG:     %[[IDX0:.+]]   = arith.constant 0 : index
 // CHECK-DAG:     %[[IDX1:.+]]   = arith.constant 1 : index
 // CHECK-DAG:     %[[IDX2:.+]]   = arith.constant 2 : index
@@ -301,15 +299,11 @@ func.func @matmul_4x4x4_i8_to_i32_dot_prod(%lhs: tensor<4x4xi8>, %rhs : tensor<4
 // CHECK-NEXT:    %[[RHS2:.+]]   = vector.transfer_read %[[RHS]][%[[IDX2]], %[[IDX0]]], %[[PV]]
 // CHECK-NEXT:    %[[RHS3:.+]]   = vector.transfer_read %[[RHS]][%[[IDX3]], %[[IDX0]]], %[[PV]]
 // CHECK:         %[[EXTR0:.+]]  = vector.extract %[[RHS0]][0]
-// CHECK-NEXT:    %[[INS0:.+]]   = vector.insert %[[EXTR0]], %[[V4I8]] [0]
 // CHECK-NEXT:    %[[EXTR1:.+]]  = vector.extract %[[RHS1]][0]
-// CHECK-NEXT:    %[[INS1:.+]]   = vector.insert %[[EXTR1]], %[[INS0]] [1]
 // CHECK-NEXT:    %[[EXTR2:.+]]  = vector.extract %[[RHS2]][0]
-// CHECK-NEXT:    %[[INS2:.+]]   = vector.insert %[[EXTR2]], %[[INS1]] [2]
 // CHECK-NEXT:    %[[EXTR3:.+]]  = vector.extract %[[RHS3]][0]
-// CHECK-NEXT:    %[[COL0:.+]]   = vector.insert %[[EXTR3]], %[[INS2]] [3]
+// CHECK:         %[[COL0:.+]]    = vector.from_elements %[[EXTR0]], %[[EXTR1]], %[[EXTR2]], %[[EXTR3]] : vector<4xi8>
 // CHECK:         %[[DOT0:.+]]   = spirv.SDotAccSat %[[LHS0]], %[[COL0]], %[[C0I32]]
-// CHECK-NEXT:    %[[RES0:.+]]   = vector.insert %[[DOT0]], %[[V1I32]] [0]
 // CHECK-COUNT-15:                 spirv.SDotAccSat
 //
 // CHECK-COUNT-16:                 vector.insert_strided_slice {{.+}} : vector<1xi32> into vector<4xi32>
@@ -326,12 +320,12 @@ func.func @matmul_4x4x4_i8_to_i32_dot_prod(%lhs: tensor<4x4xi8>, %rhs : tensor<4
 // the target env. We expect the matmul to follow the inner product lowering.
 
 func.func @matmul_4x16x4_i8_to_i32_dot_prod(%lhs: tensor<4x16xi8>, %rhs : tensor<16x4xi8>) -> tensor<4x4xi32> attributes {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32|int16|int8, storage = b32|b16|b8, subgroup = none, dot = dp4xi8toi32, mma = [], scaled_mma = [],
+  hal.executable.target = #hal.executable.target<"", "", {iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32|int16|int8, storage = b32|b16|b8, subgroup = none, dot = dp4xi8toi32,
     subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [65535, 65535, 65535]>>
-} {
+}>} {
   %c0 = arith.constant 0 : i32
   %i0 = arith.constant 0 : index
   %init = tensor.empty() : tensor<4x4xi32>

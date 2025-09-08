@@ -24,9 +24,9 @@ struct ConvertLinalgCopyToMemrefCopy final : OpRewritePattern<linalg::CopyOp> {
     if (copyOp.hasPureTensorSemantics()) {
       return failure();
     }
-    rewriter.create<memref::CopyOp>(copyOp.getLoc(),
-                                    copyOp.getDpsInputOperand(0)->get(),
-                                    copyOp.getDpsInitOperand(0)->get());
+    memref::CopyOp::create(rewriter, copyOp.getLoc(),
+                           copyOp.getDpsInputOperand(0)->get(),
+                           copyOp.getDpsInitOperand(0)->get());
     rewriter.eraseOp(copyOp);
     return success();
   }

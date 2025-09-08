@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 
-#include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenEnums.h"
@@ -20,6 +19,8 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -27,6 +28,7 @@
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "llvm/Support/MathExtras.h"
+#include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -40,6 +42,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Interfaces/IndexingMapOpInterface.h"
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -243,7 +246,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
   bool isLinalgGeneric = isa<linalg::GenericOp>(linalgOp.getOperation());
 
   // Default X86 specific strategy.
-  if (isX86(targetAttr)) {
+  if (targetAttr && isX86(targetAttr.getConfiguration())) {
     if (isLinalgGeneric) {
       return VectorPreProcStrategy::Masking;
     }
@@ -254,7 +257,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
   }
 
   // Default RISC-V specific strategies.
-  if (isRISCV(targetAttr)) {
+  if (targetAttr && isRISCV(targetAttr.getConfiguration())) {
     if (isLinalgGeneric) {
       return VectorPreProcStrategy::Masking;
     }
@@ -265,8 +268,9 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
   }
 
   // Default AArch64 specific strategies.
-  if (isAArch64(targetAttr)) {
-    if (isScalableVectorizationEnabled() && hasAnySVEFeature(targetAttr)) {
+  if (targetAttr && isAArch64(targetAttr.getConfiguration())) {
+    if (isScalableVectorizationEnabled() &&
+        hasAnySVEFeature(targetAttr.getConfiguration())) {
       return VectorPreProcStrategy::Masking;
     }
 
@@ -299,10 +303,10 @@ getPipelineConfWithDecompositionAttr(MLIRContext *context) {
 static int64_t
 getNativeVectorSizeInBytes(mlir::FunctionOpInterface entryPointFn) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-  auto nativeVectorSizeAttr =
-      getConfigIntegerAttr(targetAttr, "native_vector_size");
-  if (nativeVectorSizeAttr) {
-    int64_t nativeVectorSizeVal = nativeVectorSizeAttr->getInt();
+  std::optional<int64_t> nativeVectorSize =
+      getConfigNativeVectorSize(targetAttr.getConfiguration());
+  if (nativeVectorSize) {
+    int64_t nativeVectorSizeVal = nativeVectorSize.value();
     if (nativeVectorSizeVal) {
       return nativeVectorSizeVal;
     }
@@ -814,15 +818,20 @@ static void limitVectorTileSizes(Operation *inputOp,
 // Returns the size in bits of SIMD register space, or 0 if it can't be
 // determined (e.g. Arm SVE).
 static int getRegisterSpaceBitsIfKnown(IREE::HAL::ExecutableTargetAttr target) {
-  if (isX86(target)) {
-    if (hasFeature(target, "+avx512f")) {
+  if (!target) {
+    return 0;
+  }
+  DictionaryAttr targetConfig = target.getConfiguration();
+  if (isX86(targetConfig)) {
+    if (hasFeature(targetConfig, "+avx512f")) {
       return 32 * 512;
-    } else if (hasFeature(target, "+avx") || hasFeature(target, "+avx2")) {
+    } else if (hasFeature(targetConfig, "+avx") ||
+               hasFeature(targetConfig, "+avx2")) {
       return 16 * 256;
     } else {
       return 16 * 128;
     }
-  } else if (isAArch64(target)) {
+  } else if (isAArch64(targetConfig)) {
     // 32 NEON/SVE registers (at least 128-bit each, returns the base size for
     // SVE).
     return 32 * 128;
@@ -1062,31 +1071,226 @@ private:
   SmallVector<bool> vectorScalableFlags;
 };
 
-/// Returns the same lowering_config attribute with the updated tile sizes and
-/// scalable tile flags. The `setDistrubtionConfig` flag is only available when
-/// `origLoweringConfig is a IREE::CPU::LoweringConfigAttr. The distribution
-/// tiling sizes is not set if it is false.
-/// See `Codegen/Common/TileSizeSelection.h` for the convention of mapping
-/// between tiling levels.
-static IREE::Codegen::LoweringConfigAttrInterface getNewLoweringConfig(
-    IREE::Codegen::LoweringConfigAttrInterface origLoweringConfig,
-    ArrayRef<IREE::CPU::LoweringConfigLevelInfo> tilingInfo,
-    bool setDistributionConfig) {
-  assert((isa<IREE::Codegen::LoweringConfigAttr, IREE::CPU::LoweringConfigAttr>(
-      origLoweringConfig)));
-  MLIRContext *ctx = origLoweringConfig.getContext();
-  if (isa<IREE::Codegen::LoweringConfigAttr>(origLoweringConfig)) {
-    TileSizesListType tileSizesList;
-    ScalableTileFlagsListType scalableTileFlagsList;
-    for (auto [level, tileSizes, scalableFlags] : tilingInfo) {
-      (void)level;
-      tileSizesList.push_back(tileSizes);
-      scalableTileFlagsList.push_back(scalableFlags);
-    }
-    return IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizesList,
-                                                  scalableTileFlagsList);
+/// A helper class that tracks dimension mappings both within individual
+/// operations and across multiple operations by analyzing the producer-consumer
+/// relationships of SSA values. This tracking is established by assigning a
+/// global dimension index to all loop dimensions encountered. Dimensions
+/// sharing the same global index are considered equivalent.
+class IterationDimTracker {
+public:
+  explicit IterationDimTracker(ArrayRef<Operation *> operations)
+      : operations(operations.begin(), operations.end()) {
+    // Ensure operations are processed in topological order.
+    mlir::computeTopologicalSorting(this->operations);
+    buildDimMapping();
   }
 
+  /// Returns true if the given dimension of `op` is common across all
+  /// operations.
+  bool isCommonDim(Operation *op, unsigned pos) {
+    assert(operationToGlobalDimMaps.contains(op));
+    int64_t dim = operationToGlobalDimMaps[op][pos];
+    for ([[maybe_unused]] auto &[_, dims] : operationToGlobalDimMaps) {
+      if (!llvm::is_contained(dims, dim)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+private:
+  /// Builds and unifies dimension index mappings for all operations,
+  /// using producer–consumer SSA value relationships.
+  void buildDimMapping() {
+    // Tracks equivalent global dimension indices.
+    llvm::EquivalenceClasses<int64_t> indicesEquivalence;
+    // For each SSA value, maps its local dimension index to a global index.
+    // Value -> (local dim index -> global dim index)
+    llvm::SmallDenseMap<Value, SmallVector<int64_t>> valueToGlobalDimMaps;
+
+    for (Operation *op : operations) {
+      auto tilingOp = cast<TilingInterface>(op);
+      int64_t numLoops = tilingOp.getLoopIteratorTypes().size();
+      // Unconditionally assign new global indices, to be unified later.
+      for (int64_t i = 0; i < numLoops; ++i) {
+        int64_t globalIndex = totalLoopNum++;
+        indicesEquivalence.insert(globalIndex);
+        operationToGlobalDimMaps[op].push_back(globalIndex);
+      }
+      // The assigned global dimension indices are now unified based on
+      // producer–consumer SSA value relationships:
+      // - For operations implementing `IndexingMapOpInterface`, unify
+      // dimensions by iterating over their indexing maps.
+      // - For pack/unpack operations, use an identity mapping, since tiling
+      // applies to the outer (unpacked) dimensions.
+      // - For all other (unknown) operations, assume an identity mapping for
+      // any value whose rank matches the operation’s loop count.
+      TypeSwitch<Operation *>(op)
+          .Case<IndexingMapOpInterface>([&](auto op) {
+            propagateOnIndexingMapOp(op, indicesEquivalence,
+                                     valueToGlobalDimMaps);
+          })
+          .Case<linalg::PackOp, linalg::UnPackOp>([&](auto op) {
+            propagateOnPackUnpackOp(op, indicesEquivalence,
+                                    valueToGlobalDimMaps, numLoops);
+          })
+          .Default([&](auto op) {
+            propagateOnUnknownOp(op, indicesEquivalence, valueToGlobalDimMaps,
+                                 numLoops);
+          });
+    }
+
+    // Remap the global dimension indices in two steps:
+    // 1. Assign the same temporary index to all equivalent dimensions.
+    // 2. Convert these temporary indices to a compact, zero-based range.
+    auto applyReplaceMap = [&](llvm::SmallDenseMap<int64_t, int64_t> &map) {
+      for (auto &opEntry : operationToGlobalDimMaps) {
+        for (auto &dim : opEntry.second) {
+          dim = map.lookup(dim);
+        }
+      }
+    };
+    llvm::SmallDenseMap<int64_t, int64_t> replaceMap0, replaceMap1;
+    int64_t tempDimIndex = totalLoopNum;
+    totalLoopNum = 0;
+    for (auto it = indicesEquivalence.begin(); it != indicesEquivalence.end();
+         ++it) {
+      if (!(*it)->isLeader()) {
+        continue;
+      }
+      for (auto mit = indicesEquivalence.member_begin(**it);
+           mit != indicesEquivalence.member_end(); ++mit) {
+        replaceMap0[*mit] = tempDimIndex;
+      }
+      replaceMap1[tempDimIndex] = totalLoopNum;
+      tempDimIndex++;
+      totalLoopNum++;
+    }
+    applyReplaceMap(replaceMap0);
+    applyReplaceMap(replaceMap1);
+  }
+
+  /// Ties loop dimensions together based on the operation’s indexing maps,
+  /// considering only simple result dimension expressions (`AffineDimExpr`).
+  ///
+  /// Complex expressions (e.g., `affine_map<(d0, d1, d2, d3) -> (d0 * 2 + d2,
+  /// d1 * 3 + d3)>`) are ignored because they fall outside the "loop dimension"
+  /// concept. Such expressions describe how indices are computed within the
+  /// innermost loop body, but they do not directly identify which loop
+  /// dimensions correspond or should be tied.
+  void propagateOnIndexingMapOp(
+      IndexingMapOpInterface indexingMapOp,
+      llvm::EquivalenceClasses<int64_t> &indicesEquivalence,
+      llvm::SmallDenseMap<Value, SmallVector<int64_t>> &valueToGlobalDimMaps) {
+    Operation *op = indexingMapOp.getOperation();
+    for (OpOperand &operand : op->getOpOperands()) {
+      Value value = operand.get();
+      // Skip operands that have no known mapping from their producers.
+      if (!valueToGlobalDimMaps.contains(value)) {
+        continue;
+      }
+      AffineMap map = indexingMapOp.getMatchingIndexingMap(&operand);
+      for (auto [dim, expr] : llvm::enumerate(map.getResults())) {
+        // Stop if the current dimension exceeds the number of mapped ones.
+        if (dim >= valueToGlobalDimMaps[value].size()) {
+          break;
+        }
+        // Skip on complex expressions.
+        auto dimExpr = dyn_cast<AffineDimExpr>(expr);
+        if (!dimExpr) {
+          continue;
+        }
+        int64_t pos = dimExpr.getPosition();
+        // Unify the dimension index between the producer and the current op.
+        indicesEquivalence.unionSets(valueToGlobalDimMaps[value][dim],
+                                     operationToGlobalDimMaps[op][pos]);
+      }
+    }
+    // Propogate to results.
+    auto dsOp = cast<DestinationStyleOpInterface>(op);
+    for (OpResult result : op->getResults()) {
+      OpOperand *operand = dsOp.getTiedOpOperand(result);
+      AffineMap map = indexingMapOp.getMatchingIndexingMap(operand);
+      for (auto [dim, expr] : llvm::enumerate(map.getResults())) {
+        // Skip on complex expressions.
+        auto dimExpr = dyn_cast<AffineDimExpr>(expr);
+        if (!dimExpr) {
+          continue;
+        }
+        int64_t pos = dimExpr.getPosition();
+        valueToGlobalDimMaps[result].push_back(
+            operationToGlobalDimMaps[op][pos]);
+      }
+    }
+  }
+
+  /// Ties the dimensions of pack and unpack operations with their operands in
+  /// the outer (unpacked) dimensions.
+  void propagateOnPackUnpackOp(
+      Operation *op, llvm::EquivalenceClasses<int64_t> &indicesEquivalence,
+      llvm::SmallDenseMap<Value, SmallVector<int64_t>> &valueToGlobalDimMaps,
+      int64_t numLoops) {
+    for (OpOperand &operand : op->getOpOperands()) {
+      Value value = operand.get();
+      if (!valueToGlobalDimMaps.contains(value)) {
+        continue;
+      }
+      int64_t rank = cast<ShapedType>(value.getType()).getRank();
+      int64_t outDimSize = std::min(rank, numLoops);
+      for (int64_t i = 0; i < outDimSize; ++i) {
+        indicesEquivalence.unionSets(valueToGlobalDimMaps[value][i],
+                                     operationToGlobalDimMaps[op][i]);
+      }
+    }
+    // Propagate to results.
+    for (Value result : op->getResults()) {
+      valueToGlobalDimMaps[result] = operationToGlobalDimMaps[op];
+    }
+  }
+
+  /// Ties the dimensions of operations with their operands, if the operand rank
+  /// matches the operation’s loop count.
+  void propagateOnUnknownOp(
+      Operation *op, llvm::EquivalenceClasses<int64_t> &indicesEquivalence,
+      llvm::SmallDenseMap<Value, SmallVector<int64_t>> &valueToGlobalDimMaps,
+      int64_t numLoops) {
+    for (OpOperand &operand : op->getOpOperands()) {
+      Value value = operand.get();
+      if (!valueToGlobalDimMaps.contains(value) ||
+          numLoops != cast<ShapedType>(value.getType()).getRank()) {
+        continue;
+      }
+      for (int64_t i = 0; i < numLoops; ++i) {
+        indicesEquivalence.unionSets(valueToGlobalDimMaps[value][i],
+                                     operationToGlobalDimMaps[op][i]);
+      }
+    }
+    // Propagate to results.
+    for (Value result : op->getResults()) {
+      if (numLoops == cast<ShapedType>(result.getType()).getRank()) {
+        valueToGlobalDimMaps[result] = operationToGlobalDimMaps[op];
+      }
+    }
+  }
+
+  SmallVector<Operation *> operations;
+  // Tracks the total number of unique loop dimensions among the given set of
+  // operations.
+  int64_t totalLoopNum = 0;
+  // For each compute operation, maps its local loop dimension index to the
+  // global index. Operation -> (local dim index -> global dim
+  // index)
+  llvm::SmallDenseMap<Operation *, SmallVector<int64_t>>
+      operationToGlobalDimMaps;
+};
+
+/// Returns the same lowering_config attribute with the updated tile sizes and
+/// scalable tile flags. The distribution tiling sizes is not set if it is
+/// false.
+static IREE::Codegen::LoweringConfigAttrInterface
+getNewLoweringConfig(MLIRContext *ctx,
+                     ArrayRef<IREE::CPU::LoweringConfigLevelInfo> tilingInfo,
+                     bool setDistributionConfig) {
   SmallVector<NamedAttribute> newItems;
   for (auto [level, tileSizes, scalableFlags] : tilingInfo) {
     if (!setDistributionConfig && level == TilingLevel::DistributionTiles) {
@@ -1120,7 +1324,7 @@ static SmallVector<int64_t> getDefaultMatmulCacheSizes(linalg::LinalgOp op,
   }
 
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
-  if (isX86(targetAttr)) {
+  if (targetAttr && isX86(targetAttr.getConfiguration())) {
     if (isQuantized) {
       return noCacheLevelTiling;
     }
@@ -1229,8 +1433,8 @@ getDefaultMatmulVectorSizes(linalg::LinalgOp op, int64_t vectorSize,
                             SmallVectorImpl<int64_t> &sizes,
                             SmallVectorImpl<bool> &scalableSizeFlags) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
-  if (isX86(targetAttr)) {
-    if (hasAVX512fFeature(targetAttr)) {
+  if (targetAttr && isX86(targetAttr.getConfiguration())) {
+    if (hasAVX512fFeature(targetAttr.getConfiguration())) {
       sizes.append({8, 32, 16});
     } else {
       sizes.append({1, 1, vectorSize});
@@ -1238,18 +1442,19 @@ getDefaultMatmulVectorSizes(linalg::LinalgOp op, int64_t vectorSize,
     return;
   }
 
-  if (isAArch64(targetAttr)) {
+  if (targetAttr && isAArch64(targetAttr.getConfiguration())) {
     sizes.append({8, 16, 1});
 
     // Specialisation for scalable vectorization.
-    if (isScalableVectorizationEnabled() && hasAnySVEFeature(targetAttr)) {
+    if (isScalableVectorizationEnabled() &&
+        hasAnySVEFeature(targetAttr.getConfiguration())) {
       // Mark middle dimensions as scalable, so sizes are (8, [16], 1).
       scalableSizeFlags.append({false, true, false});
     }
     return;
   }
 
-  if (isRISCV(targetAttr)) {
+  if (targetAttr && isRISCV(targetAttr.getConfiguration())) {
     // RISC-V natively supports scalar x vector operations so we don't have to
     // vectorize dimension k. Vectorizing dimension k results in a vector load
     // and a sequence of vrgather ops to implemement the broadcast explicitly.
@@ -1391,7 +1596,9 @@ getMatmulAArch64SMEVectorSizes(linalg::LinalgOp op,
                                SmallVectorImpl<int64_t> &sizes,
                                SmallVectorImpl<bool> &scalableSizeFlags) {
   // Double-check the operation is one that is supported for lowering to ArmSME.
-  if (!llvm::isa<linalg::MatmulOp, linalg::MatmulTransposeAOp>(op))
+  Operation *rawOp = op.getOperation();
+  if (!(IREE::LinalgExt::isPureMatmul(rawOp) ||
+        isa<linalg::MatmulTransposeAOp>(rawOp)))
     return;
 
   auto elementType = nonWideningLinalgElementType(op);
@@ -1431,9 +1638,9 @@ getMatmulVectorSizes(mlir::FunctionOpInterface entryPointFn,
 
   // TODO: Compute vector tile sizes using heuristics.
 
-  if (isAArch64(targetAttr)) {
+  if (targetAttr && isAArch64(targetAttr.getConfiguration())) {
     if (isScalableVectorizationEnabled() && !clDisableArmSMETiling &&
-        hasSMEFeature(targetAttr)) {
+        hasSMEFeature(targetAttr.getConfiguration())) {
       // Note: This may not pick any sizes (which will fallback to the scalable
       // vectorization heuristics below).
       getMatmulAArch64SMEVectorSizes(op, matmulTileSizes, matmulScalableFlags);
@@ -1447,10 +1654,12 @@ getMatmulVectorSizes(mlir::FunctionOpInterface entryPointFn,
     }
   }
 
-  if (isRISCV(targetAttr) && hasAnyVFeature(targetAttr)) {
+  if (targetAttr && isRISCV(targetAttr.getConfiguration()) &&
+      hasAnyVFeature(targetAttr.getConfiguration())) {
     // Use default tile size for matmul_transpose_b &
     // batch_matmul_transpose_b to avoid performance drop.
-    if (!isa<linalg::MatmulTransposeBOp, linalg::BatchMatmulTransposeBOp>(op)) {
+    if (!isa<linalg::MatmulTransposeBOp, linalg::BatchMatmulTransposeBOp>(
+            op.getOperation())) {
       // Try to maximize the vector register utilization rate for matmul.
       getMatmulRISCVVectorSizes(entryPointFn, op, vectorSize, matmulTileSizes,
                                 matmulScalableFlags);
@@ -1597,7 +1806,8 @@ setRootConfig(mlir::FunctionOpInterface entryPointFn,
   }
   // FIXME: Apply maxTileSize modification for all targets.
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-  if (isRISCV(targetAttr) && hasAnyVFeature(targetAttr)) {
+  if (targetAttr && isRISCV(targetAttr.getConfiguration()) &&
+      hasAnyVFeature(targetAttr.getConfiguration())) {
     LDBG() << "RISC-V Aggressive Distribution: " << clEnableRiscvAggressiveDist;
     for (auto loopNum :
          llvm::seq<unsigned>(static_cast<unsigned>(isBM), numLoops)) {
@@ -1751,7 +1961,8 @@ getPackVectorTileSizes(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> tileSizes(op.getSourceRank(), 1);
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   int64_t vectorSize = getVectorSize(entryPointFn, op.getSourceType());
-  if (!hasAVX512fFeature(targetAttr) || !isPackMatmulLHS(op)) {
+  if (!targetAttr || !hasAVX512fFeature(targetAttr.getConfiguration()) ||
+      !isPackMatmulLHS(op)) {
     return tileSizes;
   }
   if (op.getSourceType().getElementType().isF32()) {
@@ -1800,9 +2011,11 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   // backends prefer to not decompose the ops.
   DictionaryAttr pipelineConfig;
   auto target = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  DictionaryAttr targetConfig = target ? target.getConfiguration() : nullptr;
   bool hasDynamicInnerTile =
       llvm::any_of(op.getMixedTiles(), llvm::IsaPred<Value>);
-  if (!hasDynamicInnerTile && !isX86(target) && !isRISCV(target)) {
+  if (!hasDynamicInnerTile && targetConfig && !isX86(targetConfig) &&
+      !isRISCV(targetConfig)) {
     pipelineConfig = getPipelineConfWithDecompositionAttr(op.getContext());
   }
 
@@ -1846,7 +2059,8 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   auto target = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   bool hasDynamicInnerTile =
       llvm::any_of(op.getMixedTiles(), llvm::IsaPred<Value>);
-  if (!hasDynamicInnerTile && !isX86(target) && !isRISCV(target)) {
+  if (!hasDynamicInnerTile && target && !isX86(target.getConfiguration()) &&
+      !isRISCV(target.getConfiguration())) {
     pipelineConfig = getPipelineConfWithDecompositionAttr(op.getContext());
   }
   LoweringConfigGenerator generator(op);
@@ -1949,7 +2163,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     }
 
     // Limit vector sizes based on large vector sizes check.
-    {
+    if (targetAttr) {
       int64_t maxVectorSizeBits =
           getMaxVectorSizeForLargeVectorCheck(targetAttr) * 8;
       SmallVector<Type> operandTypes;
@@ -2145,7 +2359,7 @@ setDefaultGenericOpRootConfig(mlir::FunctionOpInterface entryPointFn,
 static void getTransposeX86VectorSizes(
     linalg::GenericOp genericOp, IREE::HAL::ExecutableTargetAttr targetAttr,
     ArrayRef<int64_t> minTileSizes, SmallVectorImpl<int64_t> &sizes) {
-  if (!hasAVX2Feature(targetAttr) ||
+  if (!targetAttr || !hasAVX2Feature(targetAttr.getConfiguration()) ||
       !x86TransposeLoweringPrecondition(genericOp))
     return;
 
@@ -2167,7 +2381,7 @@ static void getTransposeX86VectorSizes(
 
   // Target 16x16 tile sizes if there are AVX512 features and all the tile sizes
   // are greater than or equal to 16.
-  if (hasAVX512fFeature(targetAttr) &&
+  if (hasAVX512fFeature(targetAttr.getConfiguration()) &&
       llvm::all_of(minTileSizes, [](int64_t tileSize) {
         return tileSize == 1 || tileSize >= 16;
       })) {
@@ -2187,15 +2401,15 @@ static void getTransposeX86VectorSizes(
 static void getTransposeAArch64VectorSizes(
     linalg::GenericOp genericOp, IREE::HAL::ExecutableTargetAttr targetAttr,
     SmallVectorImpl<int64_t> &sizes, SmallVectorImpl<bool> &scalableFlags) {
-  if (!isLinalgGeneric2DTranspose(genericOp))
+  if (!targetAttr || !isLinalgGeneric2DTranspose(genericOp))
     return;
 
   auto elementType = nonWideningLinalgElementType(genericOp);
   if (failed(elementType))
     return;
 
-  if (hasSMEFeature(targetAttr) && isScalableVectorizationEnabled() &&
-      !clDisableArmSMETiling) {
+  if (hasSMEFeature(targetAttr.getConfiguration()) &&
+      isScalableVectorizationEnabled() && !clDisableArmSMETiling) {
     if (elementType->isF32()) {
       sizes.append({4, 4});
     } else if (elementType->isF64()) {
@@ -2216,11 +2430,11 @@ getTransposeVectorSizes(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> tileSizes;
   SmallVector<bool> scalableFlags;
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-  if (isX86(targetAttr)) {
+  if (targetAttr && isX86(targetAttr.getConfiguration())) {
     SmallVector<int64_t> minTileSizes = getMinTilingSizesForEachDim(
         entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
     getTransposeX86VectorSizes(genericOp, targetAttr, minTileSizes, tileSizes);
-  } else if (isAArch64(targetAttr)) {
+  } else if (targetAttr && isAArch64(targetAttr.getConfiguration())) {
     getTransposeAArch64VectorSizes(genericOp, targetAttr, tileSizes,
                                    scalableFlags);
   }
@@ -2474,7 +2688,8 @@ setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
   int64_t numTilingDims = vecTileSizes.size();
   SmallVector<bool> vecScalableFlags(numTilingDims, false);
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-  if (isAArch64(targetAttr) && hasAnySVEFeature(targetAttr) &&
+  if (targetAttr && isAArch64(targetAttr.getConfiguration()) &&
+      hasAnySVEFeature(targetAttr.getConfiguration()) &&
       isScalableVectorizationEnabled() &&
       isa<linalg::DepthwiseConv2DNhwcHwcOp>(convOp)) {
     auto dims = linalg::inferConvolutionDims(convOp);
@@ -2511,32 +2726,35 @@ getNhwcConvVectorSizes(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> tileSizes;
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
 
-  if (isX86(targetAttr)) {
-    if (is2DConvOp(op))
-      return {1, 1, 8, vectorSize, 1, 1, 8};
-    if (is2DDepthConvOp(op))
-      return {1, 1, 8, vectorSize, 1, 3};
-    if (is2DPoolingOp(op))
-      return {1, 1, 8, vectorSize, 1, 8};
-    llvm_unreachable("unsupported conv");
-  }
-  if (isRISCV(targetAttr)) {
-    if (is2DConvOp(op))
-      return {1, 1, 8, vectorSize * 2, 1, 1, 8};
-    if (is2DDepthConvOp(op))
-      return {1, 1, 8, vectorSize, 1, 3};
-    if (is2DPoolingOp(op))
-      return {1, 1, 8, vectorSize * 2, 1, 8};
-    llvm_unreachable("unsupported conv");
-  }
-  if (isAArch64(targetAttr)) {
-    if (is2DConvOp(op))
-      return {1, 1, 32, 64, 1, 1, 16};
-    if (is2DDepthConvOp(op))
-      return {1, 1, 4, 4, 1, 4};
-    if (is2DPoolingOp(op))
-      return {1, 1, 32, 64, 1, 16};
-    llvm_unreachable("unsupported conv");
+  if (targetAttr) {
+    DictionaryAttr targetConfig = targetAttr.getConfiguration();
+    if (isX86(targetConfig)) {
+      if (is2DConvOp(op))
+        return {1, 1, 8, vectorSize, 1, 1, 8};
+      if (is2DDepthConvOp(op))
+        return {1, 1, 8, vectorSize, 1, 3};
+      if (is2DPoolingOp(op))
+        return {1, 1, 8, vectorSize, 1, 8};
+      llvm_unreachable("unsupported conv");
+    }
+    if (isRISCV(targetConfig)) {
+      if (is2DConvOp(op))
+        return {1, 1, 8, vectorSize * 2, 1, 1, 8};
+      if (is2DDepthConvOp(op))
+        return {1, 1, 8, vectorSize, 1, 3};
+      if (is2DPoolingOp(op))
+        return {1, 1, 8, vectorSize * 2, 1, 8};
+      llvm_unreachable("unsupported conv");
+    }
+    if (isAArch64(targetConfig)) {
+      if (is2DConvOp(op))
+        return {1, 1, 32, 64, 1, 1, 16};
+      if (is2DDepthConvOp(op))
+        return {1, 1, 4, 4, 1, 4};
+      if (is2DPoolingOp(op))
+        return {1, 1, 32, 64, 1, 16};
+      llvm_unreachable("unsupported conv");
+    }
   }
 
   // Get default hard-coded tile sizes if we couldn't compute anything
@@ -2751,13 +2969,16 @@ static LogicalResult
 adjustTileSizesForUnPackOp(mlir::FunctionOpInterface entryPointFn,
                            Operation *rootOp) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
-  if (!linalgOp)
+  if (!linalgOp) {
     return success();
-  IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
-      getLoweringConfig(linalgOp);
-  std::unique_ptr<TilingConfig> tilingConfig =
-      TilingConfig::create(loweringConfig);
-  TileSizesListType tileSizesList = tilingConfig->getTileSizes();
+  }
+  auto loweringConfig =
+      getLoweringConfig<IREE::CPU::LoweringConfigAttr>(linalgOp);
+  if (!loweringConfig) {
+    // Tile size adjustment is only available when the rootOp uses
+    // IREE::CPU::LoweringConfigAttr.
+    return success();
+  }
 
   bool foundUnPackOp = false;
   SmallVector<int64_t> alignedSizes(linalgOp.getNumLoops(), 1);
@@ -2792,7 +3013,7 @@ adjustTileSizesForUnPackOp(mlir::FunctionOpInterface entryPointFn,
 
   // Fixup for making tileSizes be multiple of inner_tile_sizes.
   SmallVector<IREE::CPU::LoweringConfigLevelInfo> tilingInfo =
-      tilingConfig->getTilingLevelInfo();
+      loweringConfig.getAvailableTilingInfo();
   for (IREE::CPU::LoweringConfigLevelInfo &info : tilingInfo) {
     SmallVector<int64_t> &tileSizes = info.sizes;
     for (auto idx : llvm::seq<int64_t>(0, tileSizes.size())) {
@@ -2824,7 +3045,7 @@ adjustTileSizesForUnPackOp(mlir::FunctionOpInterface entryPointFn,
   }
 
   IREE::Codegen::LoweringConfigAttrInterface newLoweringConfig =
-      getNewLoweringConfig(loweringConfig, tilingInfo,
+      getNewLoweringConfig(rootOp->getContext(), tilingInfo,
                            /*setDistributionConfig=*/true);
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, rootOp, newLoweringConfig, pipeline, /*workgroupSize=*/{},
@@ -2947,7 +3168,13 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
     return success();
   }
 
-  auto rootLoweringConfig = getLoweringConfig(rootOperation);
+  auto rootLoweringConfig =
+      getLoweringConfig<IREE::CPU::LoweringConfigAttr>(rootOperation);
+  if (!rootLoweringConfig) {
+    // Propagation is only available for IREE::CPU::LoweringConfigAttr.
+    return success();
+  }
+
   SmallVector<int64_t> distTileSizes, parallelVecTileSizes;
   SmallVector<bool> distScalableTileSizes, parallelVecScalableTileSizes;
   assert(rootLoweringConfig.hasWorkgroupTilingLevel());
@@ -3047,10 +3274,12 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
   SmallVector<bool> commonVecScalableTileFlags = parallelVecScalableTileSizes;
   SmallVector<int64_t> innerVecTileSizes(maxLoopNums, 0);
   SmallVector<bool> innerVecScalableTileFlags(maxLoopNums, false);
+  IterationDimTracker dimTracker(computeOps);
   for (auto op : computeOps) {
     auto iterTypes = cast<TilingInterface>(op).getLoopIteratorTypes();
     for (auto [idx, iterType] : llvm::enumerate(iterTypes)) {
-      if (iterType == utils::IteratorType::reduction) {
+      if (iterType == utils::IteratorType::reduction ||
+          !dimTracker.isCommonDim(op, idx)) {
         innerVecTileSizes[idx] = parallelVecTileSizes[idx];
         innerVecScalableTileFlags[idx] = parallelVecScalableTileSizes[idx];
         commonVecTileSizes[idx] = 0;
@@ -3084,19 +3313,17 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
   }
 
   // Set the lowering configs with new tile sizes.
-  // TODO(hanchung): Deprecate TilingConfig from the file.
-  std::unique_ptr<TilingConfig> tilingConfig =
-      TilingConfig::create(rootLoweringConfig);
   for (auto op : computeOps) {
     int numLoops = cast<TilingInterface>(op).getLoopIteratorTypes().size();
     SmallVector<IREE::CPU::LoweringConfigLevelInfo> newTilingInfo;
     // For root op, we patch the adjusted tile sizes on its original tiling
     // config.
     if (op == rootOperation) {
-      newTilingInfo = tilingConfig->getTilingLevelInfo();
+      newTilingInfo = rootLoweringConfig.getAvailableTilingInfo();
       updateOrAddTilingLevelInfo(newTilingInfo, IREE::CPU::DistributionTiles,
                                  distTileSizes, distScalableTileSizes);
-      if (tilingConfig->getNumTilingLevels() > 1) {
+      if (rootLoweringConfig.hasTilingLevel(
+              IREE::CPU::VectorCommonParallelTiles)) {
         updateOrAddTilingLevelInfo(
             newTilingInfo, IREE::CPU::VectorCommonParallelTiles,
             commonVecTileSizes, commonVecScalableTileFlags);
@@ -3110,15 +3337,19 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
                                  distTileSizes, falseVec);
       // The cache level tiling sizes are not adjusted, so we use the
       // config from the rootOp directly.
-      if (tilingConfig->isValidLevel(IREE::CPU::CacheParallelTiles)) {
-        updateOrAddTilingLevelInfo(newTilingInfo, IREE::CPU::CacheParallelTiles,
-                                   tilingConfig->getCacheParallelSizes(),
-                                   falseVec);
+      if (rootLoweringConfig.hasTilingLevel(IREE::CPU::CacheParallelTiles)) {
+        updateOrAddTilingLevelInfo(
+            newTilingInfo, IREE::CPU::CacheParallelTiles,
+            rootLoweringConfig.getStaticTilingLevelSizes(
+                IREE::CPU::CacheParallelTiles, rootOperation),
+            falseVec);
       }
-      if (tilingConfig->isValidLevel(IREE::CPU::CacheReductionTiles)) {
+      if (rootLoweringConfig.hasTilingLevel(IREE::CPU::CacheReductionTiles)) {
         updateOrAddTilingLevelInfo(
             newTilingInfo, IREE::CPU::CacheReductionTiles,
-            tilingConfig->getCacheReductionSizes(), falseVec);
+            rootLoweringConfig.getStaticTilingLevelSizes(
+                IREE::CPU::CacheReductionTiles, rootOperation),
+            falseVec);
       }
       updateOrAddTilingLevelInfo(
           newTilingInfo, IREE::CPU::VectorCommonParallelTiles,
@@ -3126,11 +3357,10 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
       bool setUpOK =
           TypeSwitch<Operation *, bool>(op)
               .Case<linalg::PackOp>([&](auto packOp) {
-                for (ArrayRef<bool> flags :
-                     tilingConfig->getScalableTileFlags()) {
-                  // TODO: Handle scalable flags
-                  if (llvm::any_of(flags, [&](bool flag) { return flag; }))
-                    return false;
+                // TODO: Handle scalable flags
+                if (llvm::any_of(rootLoweringConfig.getVectorScalableFlags(),
+                                 [&](bool flag) { return flag; })) {
+                  return false;
                 }
                 updateOrAddTilingLevelInfo(newTilingInfo,
                                            IREE::CPU::VectorReductionTiles,
@@ -3202,7 +3432,7 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
                 return lhs.level < rhs.level;
               });
     IREE::Codegen::LoweringConfigAttrInterface config =
-        getNewLoweringConfig(rootLoweringConfig, newTilingInfo,
+        getNewLoweringConfig(rootOperation->getContext(), newTilingInfo,
                              /*setDistributionConfig=*/op == rootOperation);
     setLoweringConfig(op, config);
   }
@@ -3222,6 +3452,29 @@ lowerUsingDefaultPipeline(mlir::FunctionOpInterface entryPointFn) {
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       entryPointFn->getContext(), DispatchLoweringPassPipeline::CPUDefault);
   return setTranslationInfo(entryPointFn, translationInfo);
+}
+
+/// Returns true if the given operation should have a lowering config set.
+///
+/// This predicate excludes:
+///   - Ops inside a `CustomOp` that already have a lowering config.
+///   - `linalg.pack` ops whose producer is a `tensor.collapse_shape`,
+///     as they will be lowered together into a `map_scatter` later in the
+///     pipeline.
+static bool shouldSetLoweringConfig(Operation *op) {
+  if (isa_and_nonnull<IREE::LinalgExt::CustomOp>(op->getParentOp()) &&
+      getLoweringConfig(op) != nullptr) {
+    return false;
+  }
+
+  if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
+    if (isa_and_nonnull<tensor::CollapseShapeOp>(
+            packOp.getSource().getDefiningOp())) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /// Sets the translation information to use for a dispatch region.
@@ -3262,14 +3515,8 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
       return failure();
     }
 
-    // Avoid this for ops within a custom_op since those ops have already their
-    // configuration set.
-    auto prunedComputeOps =
-        llvm::to_vector(llvm::make_filter_range(computeOps, [](Operation *op) {
-          return !isa_and_nonnull<IREE::LinalgExt::CustomOp>(
-                     op->getParentOp()) ||
-                 getLoweringConfig(op) == nullptr;
-        }));
+    auto prunedComputeOps = llvm::to_vector(
+        llvm::make_filter_range(computeOps, shouldSetLoweringConfig));
     if (failed(setLoweringConfigForComputeOps(entryPointFn, prunedComputeOps,
                                               rootOperation))) {
       return failure();

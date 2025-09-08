@@ -326,9 +326,23 @@ def PropagateEncodingsPass :
   ];
 }
 
+def AnnotateDataTilingHintsPass :
+    InterfacePass<"iree-dispatch-creation-annotate-data-tiling-hints", "mlir::FunctionOpInterface"> {
+  let summary = "Adds data-tiling hint attribute to linalg operations.";
+  let description = [{
+    The pass does nothing, if any operation already has the data-tiling hint
+    attribute. Otherwise, it aggressively filters linalg ops and adds the
+    data-tiling hint attribute to the operations.
+  }];
+}
+
 def SetEncodingPass : InterfacePass<"iree-dispatch-creation-set-encoding",
                                     "mlir::FunctionOpInterface"> {
   let summary = "Introduces tensor encoding for flow dispatch regions.";
+  let description = [{
+    Sets the encoding for compute operations to allow execution of the
+    operations in tiled/padded layouts.
+  }];
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
     "IREE::Flow::FlowDialect",

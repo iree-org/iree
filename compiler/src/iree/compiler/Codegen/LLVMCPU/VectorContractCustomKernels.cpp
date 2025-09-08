@@ -174,8 +174,8 @@ static Value extract1DSlice(PatternRewriter &rewriter, Location loc,
   assert(dstVecType.getRank() == 1);
   std::array<int64_t, 1> offsets{position};
   std::array<int64_t, 1> strides{1};
-  return rewriter.create<vector::ExtractStridedSliceOp>(
-      loc, input, offsets, dstVecType.getShape(), strides);
+  return vector::ExtractStridedSliceOp::create(rewriter, loc, input, offsets,
+                                               dstVecType.getShape(), strides);
 }
 
 // Helper to extract an element of a 1D vector.
@@ -185,7 +185,7 @@ static Value extract(PatternRewriter &rewriter, Location loc, Value input,
   assert(vectorType.getRank() == 1);
   (void)vectorType;
   std::array<int64_t, 1> offsets{position};
-  return rewriter.create<vector::ExtractOp>(loc, input, offsets);
+  return vector::ExtractOp::create(rewriter, loc, input, offsets);
 }
 
 // Helper to flatten a N-dimensional vector to a 1D vector.
@@ -193,7 +193,7 @@ static Value flatten(PatternRewriter &rewriter, Location loc, Value vector) {
   VectorType inputVecType = llvm::cast<VectorType>(vector.getType());
   VectorType dstType = VectorType::get(inputVecType.getNumElements(),
                                        inputVecType.getElementType());
-  return rewriter.create<vector::ShapeCastOp>(loc, dstType, vector);
+  return vector::ShapeCastOp::create(rewriter, loc, dstType, vector);
 }
 
 // Describes a kernel. This struct is kept small to separate the kernels
@@ -756,7 +756,7 @@ private:
   }
   // Helper for generateAsmCodeAndConstraints
   std::string getConstraintCode() const {
-    if (isAArch64(target)) {
+    if (isAArch64(target.getConfiguration())) {
       return "w";
     }
     assert(false && "what constraint code to use on this arch?");
@@ -870,8 +870,8 @@ private:
     std::string code;
     std::string constraints;
     generateAsmCodeAndConstraints(code, constraints);
-    LLVM::InlineAsmOp asmOp = rewriter.create<LLVM::InlineAsmOp>(
-        loc, returnType, inputs, code, constraints,
+    LLVM::InlineAsmOp asmOp = LLVM::InlineAsmOp::create(
+        rewriter, loc, returnType, inputs, code, constraints,
         /*has_side_effects=*/false, /*is_align_stack=*/false,
         LLVM::TailCallKind::None, dialectAttr,
         /*operand_attrs=*/ArrayAttr());
@@ -879,8 +879,8 @@ private:
     SmallVector<Value> resVec;
     for (int i = 0; i < kernel.accRegs; ++i) {
       SmallVector<int64_t, 1> position = {i};
-      resVec.push_back(
-          rewriter.create<LLVM::ExtractValueOp>(loc, asmOp.getRes(), position));
+      resVec.push_back(LLVM::ExtractValueOp::create(rewriter, loc,
+                                                    asmOp.getRes(), position));
     }
     return resVec;
   }
@@ -985,12 +985,12 @@ public:
         rewriter, loc, lhsRegVectors, rhsRegVectors, accRegVectors);
     // Insert the result vectors of size 4 into the overall result vector of
     // size 64, still 1D.
-    Value result = rewriter.create<arith::ConstantOp>(loc, flatAccVectorType,
-                                                      resultInitializer);
+    Value result = arith::ConstantOp::create(rewriter, loc, flatAccVectorType,
+                                             resultInitializer);
     int accRegNumElements = accRegVectorType.getNumElements();
     for (int i = 0; i < kernel.accRegs; ++i) {
-      result = rewriter.create<vector::InsertStridedSliceOp>(
-          loc, resRegVectors[i], result,
+      result = vector::InsertStridedSliceOp::create(
+          rewriter, loc, resRegVectors[i], result,
           std::array<int64_t, 1>{accRegNumElements * i},
           std::array<int64_t, 1>{1});
     }
@@ -1020,7 +1020,7 @@ public:
 struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
     : public OpRewritePattern<vector::ContractionOp> {
 public:
-  using OpRewritePattern<vector::ContractionOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::ContractionOp contractionOp,
                                 PatternRewriter &rewriter) const override {
@@ -1052,12 +1052,12 @@ public:
     {
       int idx = 0;
       for (int row = 0; row < 8; ++row) {
-        auto accRow = rewriter.create<vector::ExtractOp>(
-            loc, acc, ArrayRef<int64_t>{row});
+        auto accRow = vector::ExtractOp::create(rewriter, loc, acc,
+                                                ArrayRef<int64_t>{row});
         for (int col = 0; col < 8; col += 4) {
-          auto accChunk = rewriter.create<vector::ExtractStridedSliceOp>(
-              loc, accRow, ArrayRef<int64_t>{col}, ArrayRef<int64_t>{4},
-              ArrayRef<int64_t>{1});
+          auto accChunk = vector::ExtractStridedSliceOp::create(
+              rewriter, loc, accRow, ArrayRef<int64_t>{col},
+              ArrayRef<int64_t>{4}, ArrayRef<int64_t>{1});
           assert(accChunk.getType() == int32x4VType);
           accChunks[idx++] = accChunk;
         }
@@ -1066,8 +1066,8 @@ public:
 
     auto int8x4x4VType = VectorType::get({4, 4}, rewriter.getIntegerType(8));
     auto extract4x4 = [&](Value in, int rowOffset, int colOffset) {
-      auto chunk = rewriter.create<vector::ExtractStridedSliceOp>(
-          loc, in, ArrayRef<int64_t>{rowOffset, colOffset},
+      auto chunk = vector::ExtractStridedSliceOp::create(
+          rewriter, loc, in, ArrayRef<int64_t>{rowOffset, colOffset},
           ArrayRef<int64_t>{4, 4}, ArrayRef<int64_t>{1, 1});
       assert(chunk.getType() == int8x4x4VType);
       return chunk;
@@ -1078,14 +1078,15 @@ public:
     std::array<Value, 2> rhsHalves = {extract4x4(inRhs, 0, 0),
                                       extract4x4(inRhs, 4, 0)};
 
-    auto int8Zero4x4 = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(int8x4x4VType));
+    auto int8Zero4x4 = arith::ConstantOp::create(
+        rewriter, loc, rewriter.getZeroAttr(int8x4x4VType));
     auto sdot = [&](Value acc, Value a, Value b, int64_t lane) -> Value {
-      auto bReplicatedLane = rewriter.create<vector::ShuffleOp>(
-          loc, b, int8Zero4x4, ArrayRef<int64_t>{lane, lane, lane, lane});
+      auto bReplicatedLane =
+          vector::ShuffleOp::create(rewriter, loc, b, int8Zero4x4,
+                                    ArrayRef<int64_t>{lane, lane, lane, lane});
 
-      return rewriter.create<arm_neon::Sdot2dOp>(loc, int32x4VType, acc, a,
-                                                 bReplicatedLane);
+      return arm_neon::Sdot2dOp::create(rewriter, loc, int32x4VType, acc, a,
+                                        bReplicatedLane);
     };
 
     std::array<Value, 16> dstChunks;
@@ -1106,8 +1107,8 @@ public:
       int idx = 0;
       for (int row = 0; row < 8; ++row) {
         for (int col = 0; col < 8; col += 4) {
-          acc = rewriter.create<vector::InsertStridedSliceOp>(
-              loc, dstChunks[idx++], acc, ArrayRef<int64_t>{row, col},
+          acc = vector::InsertStridedSliceOp::create(
+              rewriter, loc, dstChunks[idx++], acc, ArrayRef<int64_t>{row, col},
               ArrayRef<int64_t>{1});
         }
       }
@@ -1142,7 +1143,11 @@ public:
 void populateVectorContractCustomKernelsPatterns(
     IREE::HAL::ExecutableTargetAttr target, RewritePatternSet &patterns) {
   MLIRContext *context = patterns.getContext();
-  if (isAArch64(target)) {
+  if (!target) {
+    return;
+  }
+  DictionaryAttr targetConfig = target.getConfiguration();
+  if (isAArch64(targetConfig)) {
     // TODO: add a "kernel benefit" system whereby if two kernels are available
     // for the same shape and same data types, the fastest one (ie the one
     // using the most powerful available SIMD instructions) is selected.
@@ -1156,8 +1161,8 @@ void populateVectorContractCustomKernelsPatterns(
         context, MMTKernel_8x1x8_i8i8i32_Aarch64_Baseline_InlineAsm());
     patterns.add<MMTCustomKernelPattern>(
         context, MMTKernel_8x8x1_i8i8i32_Aarch64_Baseline_InlineAsm());
-    if (hasFeature(target, "+dotprod")) {
-      if (preferIntrinsicsOverAsm(target)) {
+    if (hasFeature(targetConfig, "+dotprod")) {
+      if (preferIntrinsicsOverAsm(targetConfig)) {
         patterns.add<MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics>(context);
       } else {
         patterns.add<MMTCustomKernelPattern>(
@@ -1166,7 +1171,7 @@ void populateVectorContractCustomKernelsPatterns(
             context, MMTKernel_8x4x1_i8i8i32_Aarch64Dotprod_InlineAsm());
       }
     }
-    if (hasFeature(target, "+i8mm")) {
+    if (hasFeature(targetConfig, "+i8mm")) {
       patterns.add<MMTCustomKernelPattern>(
           context, MMTKernel_8x8x8_i8i8i32_Aarch64I8mm_InlineAsm());
     }

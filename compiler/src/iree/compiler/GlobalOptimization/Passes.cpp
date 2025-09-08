@@ -115,7 +115,7 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(createRemoveZeroExtentTensorsPass)
       .addPass(createDetachElementwiseFromNamedOpsPass)
-      .addPass(mlir::createLinalgNamedOpConversionPass);
+      .addPass(mlir::createSimplifyDepthwiseConvPass);
   mainPassManager.addPass(createEraseUnusedLinalgOperandsPass());
 
   // Expand tensor shapes into SSA values and optimize the whole program.
@@ -181,12 +181,12 @@ void buildGlobalOptimizationPassPipeline(
 
   // Enable data tiling after they are in a canonical form.
   if (transformOptions.options.dataTiling) {
-    FunctionLikeNest(mainPassManager).addPass([&]() {
-      return DispatchCreation::createSetEncodingPass(
-          DispatchCreation::SetEncodingPassOptions{clSetEncodingStrategy});
-    });
-    // TODO(hanchung): Make data-tiling passes be FunctionOpInterface pass, so
-    // we can use `FunctionLikNest` here.
+    FunctionLikeNest(mainPassManager)
+        .addPass(DispatchCreation::createAnnotateDataTilingHintsPass)
+        .addPass([&]() {
+          return DispatchCreation::createSetEncodingPass(
+              DispatchCreation::SetEncodingPassOptions{clSetEncodingStrategy});
+        });
     if (clEnableEarlyMaterialization) {
       mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
     }

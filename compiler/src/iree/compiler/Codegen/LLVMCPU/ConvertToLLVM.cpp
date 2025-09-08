@@ -146,8 +146,8 @@ struct ConvertHALEntryPointFuncOp
     // Clone the function as an LLVMFuncOp and convert all interior types.
     auto int32Type = IntegerType::get(rewriter.getContext(), 32);
     auto llvmFuncType = LLVM::LLVMFunctionType::get(int32Type, abiInputTypes);
-    auto llvmFuncOp = rewriter.create<LLVM::LLVMFuncOp>(
-        stdFuncOp.getLoc(), stdFuncOp.getName(), llvmFuncType,
+    auto llvmFuncOp = LLVM::LLVMFuncOp::create(
+        rewriter, stdFuncOp.getLoc(), stdFuncOp.getName(), llvmFuncType,
         LLVM::Linkage::External, /*dsoLocal=*/false, /*cconv=*/LLVM::CConv::C,
         /*comdat=*/nullptr, funcAttrs);
     rewriter.inlineRegionBefore(stdFuncOp.getFunctionBody(),
@@ -347,20 +347,21 @@ acquireInstrumentationEntry(Location loc, Value buffer, Value bufferPtr,
   Value basePtr = MemRefDescriptor(bufferPtr).alignedPtr(builder, loc);
 
   Value offsetIndex =
-      builder.create<LLVM::ConstantOp>(loc, i64Type, headOffset);
+      LLVM::ConstantOp::create(builder, loc, i64Type, headOffset);
   auto i8Type = builder.getI8Type();
-  Value offsetPtr = builder.create<LLVM::GEPOp>(
-      loc, basePtr.getType(), i8Type, basePtr, offsetIndex,
+  Value offsetPtr = LLVM::GEPOp::create(
+      builder, loc, basePtr.getType(), i8Type, basePtr, offsetIndex,
       /*noWrapFlags =*/LLVM::GEPNoWrapFlags::inbounds);
-  Value rawOffset = builder.create<LLVM::AtomicRMWOp>(
-      loc, LLVM::AtomicBinOp::add, offsetPtr, entrySize,
-      LLVM::AtomicOrdering::monotonic);
+  Value rawOffset =
+      LLVM::AtomicRMWOp::create(builder, loc, LLVM::AtomicBinOp::add, offsetPtr,
+                                entrySize, LLVM::AtomicOrdering::monotonic);
   Value offsetMask =
-      builder.create<LLVM::ConstantOp>(loc, i64Type, ringSize - 1);
-  Value wrappedOffset = builder.create<LLVM::AndOp>(loc, rawOffset, offsetMask);
+      LLVM::ConstantOp::create(builder, loc, i64Type, ringSize - 1);
+  Value wrappedOffset =
+      LLVM::AndOp::create(builder, loc, rawOffset, offsetMask);
 
-  Value entryPtr = builder.create<LLVM::GEPOp>(loc, basePtr.getType(), i8Type,
-                                               basePtr, wrappedOffset);
+  Value entryPtr = LLVM::GEPOp::create(builder, loc, basePtr.getType(), i8Type,
+                                       basePtr, wrappedOffset);
 
   return {basePtr, entryPtr, wrappedOffset};
 }
@@ -370,22 +371,22 @@ static InstrumentationEntry appendInstrumentationEntry(
     ArrayRef<Value> entryValues, DataLayout &dataLayout, OpBuilder &builder) {
   auto i64Type = builder.getI64Type();
 
-  Value entrySize = builder.create<LLVM::ConstantOp>(
-      loc, i64Type, dataLayout.getTypeSize(entryType));
+  Value entrySize = LLVM::ConstantOp::create(builder, loc, i64Type,
+                                             dataLayout.getTypeSize(entryType));
   auto entry =
       acquireInstrumentationEntry(loc, buffer, bufferPtr, entrySize, builder);
 
-  Value entryStruct = builder.create<LLVM::UndefOp>(loc, entryType);
+  Value entryStruct = LLVM::UndefOp::create(builder, loc, entryType);
   for (auto entryValue : llvm::enumerate(entryValues)) {
-    entryStruct = builder.create<LLVM::InsertValueOp>(
-        loc, entryStruct, entryValue.value(), entryValue.index());
+    entryStruct = LLVM::InsertValueOp::create(
+        builder, loc, entryStruct, entryValue.value(), entryValue.index());
   }
 
-  builder.create<LLVM::StoreOp>(
-      loc, entryStruct,
-      builder.create<LLVM::BitcastOp>(
-          loc, LLVM::LLVMPointerType::get(builder.getContext()),
-          entry.entryPtr),
+  LLVM::StoreOp::create(
+      builder, loc, entryStruct,
+      LLVM::BitcastOp::create(builder, loc,
+                              LLVM::LLVMPointerType::get(builder.getContext()),
+                              entry.entryPtr),
       /*alignment=*/16);
 
   return entry;
@@ -429,9 +430,9 @@ struct ConvertHALInstrumentWorkgroupOp
     // NOTE: we could pre-shift this to avoid needing to do it in each group.
     // We just need to do the shift - the bottom two bits will be the 00 tag.
     Value rawDispatchId = instrumentOp.getDispatchId();
-    Value header = rewriter.create<LLVM::ShlOp>(
-        loc, i32Type, rawDispatchId,
-        rewriter.create<LLVM::ConstantOp>(loc, i32Type, 8)); // | 8bit tag
+    Value header = LLVM::ShlOp::create(
+        rewriter, loc, i32Type, rawDispatchId,
+        LLVM::ConstantOp::create(rewriter, loc, i32Type, 8)); // | 8bit tag
 
     auto entry = appendInstrumentationEntry(
         loc, instrumentOp.getBuffer(), operands.getBuffer(), entryType,
@@ -450,12 +451,12 @@ struct ConvertHALInstrumentWorkgroupOp
     // Prepare the 40-bit key used by all accesses - we do this once so that we
     // can ensure it's hoisted.
     // Consumers expect 40 bits of offset << 24 bits.
-    Value workgroupKey = rewriter.create<LLVM::ShlOp>(
-        loc,
-        rewriter.create<LLVM::AndOp>(
-            loc, entry.offset,
-            rewriter.create<LLVM::ConstantOp>(loc, i64Type, 0xFFFFFFFFFFll)),
-        rewriter.create<LLVM::ConstantOp>(loc, i64Type, 24));
+    Value workgroupKey = LLVM::ShlOp::create(
+        rewriter, loc,
+        LLVM::AndOp::create(
+            rewriter, loc, entry.offset,
+            LLVM::ConstantOp::create(rewriter, loc, i64Type, 0xFFFFFFFFFFll)),
+        LLVM::ConstantOp::create(rewriter, loc, i64Type, 24));
 
     rewriter.replaceOp(instrumentOp, workgroupKey);
     return success();
@@ -551,19 +552,19 @@ struct ConvertHALInstrumentValueOp
     // 8 bit type
     // 8 bit ordinal
     // 40 bit workgroup offset
-    Value header = rewriter.create<LLVM::OrOp>(
-        loc, operands.getWorkgroupKey(),
-        rewriter.create<LLVM::ConstantOp>(
-            loc, i64Type,
+    Value header = LLVM::OrOp::create(
+        rewriter, loc, operands.getWorkgroupKey(),
+        LLVM::ConstantOp::create(
+            rewriter, loc, i64Type,
             (instrumentOp.getOrdinal().getZExtValue() << 16) |
                 (valueType.value() << 8) |
                 IREE_INSTRUMENT_DISPATCH_TYPE_VALUE));
 
     // Bitcast to an integer and widen to 64 bits.
-    Value bits = rewriter.create<LLVM::ZExtOp>(
-        loc, i64Type,
-        rewriter.create<LLVM::BitcastOp>(
-            loc,
+    Value bits = LLVM::ZExtOp::create(
+        rewriter, loc, i64Type,
+        LLVM::BitcastOp::create(
+            rewriter, loc,
             rewriter.getIntegerType(
                 instrumentOp.getType().getIntOrFloatBitWidth()),
             operands.getOperand()));
@@ -604,16 +605,17 @@ struct ConvertHALInstrumentMemoryLoadOp
     // 40 bit workgroup offset
     int64_t loadSize = getMemoryAccessByteSize(instrumentOp.getType());
     assert(loadSize <= UINT16_MAX && "16-bit length maximum");
-    Value header = rewriter.create<LLVM::OrOp>(
-        loc, operands.getWorkgroupKey(),
-        rewriter.create<LLVM::ConstantOp>(
-            loc, i64Type,
+    Value header = LLVM::OrOp::create(
+        rewriter, loc, operands.getWorkgroupKey(),
+        LLVM::ConstantOp::create(
+            rewriter, loc, i64Type,
             (loadSize << 8) | IREE_INSTRUMENT_DISPATCH_TYPE_MEMORY_LOAD));
 
     Value loadPtr = getStridedElementPtr(
         rewriter, loc, llvm::cast<MemRefType>(instrumentOp.getBase().getType()),
         operands.getBase(), operands.getIndices());
-    Value addressI64 = rewriter.create<LLVM::PtrToIntOp>(loc, i64Type, loadPtr);
+    Value addressI64 =
+        LLVM::PtrToIntOp::create(rewriter, loc, i64Type, loadPtr);
 
     appendInstrumentationEntry(loc, instrumentOp.getBuffer(),
                                operands.getBuffer(), entryType,
@@ -651,17 +653,17 @@ struct ConvertHALInstrumentMemoryStoreOp
     // 40 bit workgroup offset
     int64_t storeSize = getMemoryAccessByteSize(instrumentOp.getType());
     assert(storeSize <= UINT16_MAX && "16-bit length maximum");
-    Value header = rewriter.create<LLVM::OrOp>(
-        loc, operands.getWorkgroupKey(),
-        rewriter.create<LLVM::ConstantOp>(
-            loc, i64Type,
+    Value header = LLVM::OrOp::create(
+        rewriter, loc, operands.getWorkgroupKey(),
+        LLVM::ConstantOp::create(
+            rewriter, loc, i64Type,
             (storeSize << 8) | IREE_INSTRUMENT_DISPATCH_TYPE_MEMORY_STORE));
 
     Value storePtr = getStridedElementPtr(
         rewriter, loc, llvm::cast<MemRefType>(instrumentOp.getBase().getType()),
         operands.getBase(), operands.getIndices());
     Value addressI64 =
-        rewriter.create<LLVM::PtrToIntOp>(loc, i64Type, storePtr);
+        LLVM::PtrToIntOp::create(rewriter, loc, i64Type, storePtr);
 
     appendInstrumentationEntry(loc, instrumentOp.getBuffer(),
                                operands.getBuffer(), entryType,
@@ -744,8 +746,8 @@ struct RewriteFuncOpABI : public OpRewritePattern<LLVM::LLVMFuncOp> {
         return llvm::cast<DictionaryAttr>(attr);
       });
     }
-    rewriter.create<LLVM::LLVMFuncOp>(
-        funcOp.getLoc(), funcOp.getName(), expectedType.value(),
+    LLVM::LLVMFuncOp::create(
+        rewriter, funcOp.getLoc(), funcOp.getName(), expectedType.value(),
         funcOp.getLinkage(), funcOp.getDsoLocal(), funcOp.getCConv(),
         /*comdat=*/nullptr, attrs, argAttrs, funcOp.getFunctionEntryCount());
     rewriter.eraseOp(funcOp);
@@ -885,7 +887,7 @@ struct RewriteExternCallOpToDynamicImportCallOp
 /// vectorized.
 class ExpandMulSIExtended : public OpRewritePattern<arith::MulSIExtendedOp> {
 public:
-  using OpRewritePattern<arith::MulSIExtendedOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(arith::MulSIExtendedOp op,
                                 PatternRewriter &rewriter) const override {
@@ -904,18 +906,18 @@ public:
       shiftValAttr =
           SplatElementsAttr::get(cast<ShapedType>(wideType), shiftValAttr);
     }
-    Value shiftVal = rewriter.create<arith::ConstantOp>(loc, shiftValAttr);
+    Value shiftVal = arith::ConstantOp::create(rewriter, loc, shiftValAttr);
 
-    Value lhsExt = rewriter.create<arith::ExtSIOp>(loc, wideType, op.getLhs());
-    Value rhsExt = rewriter.create<arith::ExtSIOp>(loc, wideType, op.getRhs());
+    Value lhsExt = arith::ExtSIOp::create(rewriter, loc, wideType, op.getLhs());
+    Value rhsExt = arith::ExtSIOp::create(rewriter, loc, wideType, op.getRhs());
     Value mulExt =
-        rewriter.create<arith::MulIOp>(loc, wideType, lhsExt, rhsExt);
-    Value low = rewriter.create<arith::MulIOp>(loc, resultType, op.getLhs(),
-                                               op.getRhs());
+        arith::MulIOp::create(rewriter, loc, wideType, lhsExt, rhsExt);
+    Value low = arith::MulIOp::create(rewriter, loc, resultType, op.getLhs(),
+                                      op.getRhs());
 
     // Produce two 32-bit results.
-    Value highExt = rewriter.create<arith::ShRUIOp>(loc, mulExt, shiftVal);
-    Value high = rewriter.create<arith::TruncIOp>(loc, resultType, highExt);
+    Value highExt = arith::ShRUIOp::create(rewriter, loc, mulExt, shiftVal);
+    Value high = arith::TruncIOp::create(rewriter, loc, resultType, highExt);
 
     rewriter.replaceOp(op, {low, high});
     return success();
@@ -941,22 +943,42 @@ public:
 
 } // namespace
 
-static std::string getStringAttrFromTargetAttr(ModuleOp module,
-                                               StringRef attrName) {
+static std::string getDataLayoutString(ModuleOp module) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(module);
-  auto stringAttr = getConfigStringAttr(targetAttr, attrName);
+  if (!targetAttr) {
+    return "";
+  }
+  std::optional<StringRef> stringAttr =
+      getConfigDataLayout(targetAttr.getConfiguration());
   return stringAttr ? stringAttr.value().str() : std::string("");
 }
+
+static std::string getTargetTripleString(ModuleOp module) {
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(module);
+  if (!targetAttr) {
+    return "";
+  }
+  std::optional<StringRef> stringAttr =
+      getConfigTargetTriple(targetAttr.getConfiguration());
+  return stringAttr ? stringAttr.value().str() : std::string("");
+}
+
+static void populateTanhPatterns(RewritePatternSet &p) {
+  StringRef fname = math::TanhOp::getOperationName();
+  StringRef opName =
+      fname.drop_front(math::MathDialect::getDialectNamespace().size() + 1);
+  math::populateExpansionPatterns(p, /*OpMnemonics=*/{opName});
+};
 
 void ConvertToLLVMPass::runOnOperation() {
   auto module = getOperation();
   std::string dataLayoutStr = targetDataLayout;
   if (targetDataLayout.empty()) {
-    dataLayoutStr = getStringAttrFromTargetAttr(module, "data_layout");
+    dataLayoutStr = getDataLayoutString(module);
   }
   std::string targetTripleStr = targetTriple;
   if (targetTripleStr.empty()) {
-    targetTripleStr = getStringAttrFromTargetAttr(module, "target_triple");
+    targetTripleStr = getTargetTripleString(module);
   }
   // Add required attributes to the module so that the lowering knows how to
   // handle structs and data layouts.
@@ -982,6 +1004,7 @@ void ConvertToLLVMPass::runOnOperation() {
         patterns, /*force32BitVectorIndices=*/false);
     vector::populateVectorMaskOpLoweringPatterns(patterns);
     vector::populateVectorShapeCastLoweringPatterns(patterns);
+    vector::populateVectorFromElementsLoweringPatterns(patterns);
     // TODO: doubtful that the "default" does what one want here, it is likely
     // better to use shuffle.
     vector::populateVectorTransposeLoweringPatterns(
@@ -1019,13 +1042,15 @@ void ConvertToLLVMPass::runOnOperation() {
   // TODO(bjacob): Use a lowering that uses specific ARM/X86 intrinsics.
   bool use32BitImpl = false;
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(module);
-  if (isRISCV(targetAttr)) {
+  DictionaryAttr targetConfig =
+      targetAttr ? targetAttr.getConfiguration() : nullptr;
+  if (targetConfig && isRISCV(targetConfig)) {
     // Use the 32-bit lowering for RISC-V if 'zve32*' is specified and there is
     // no 64-bit integer vector support.
     // TODO(#9440) Simplify logic when 'cpu_features' is simplified.
     use32BitImpl =
-        (hasZve32xFeature(targetAttr) || hasZve32fFeature(targetAttr)) &&
-        !hasVFeature(targetAttr) && !hasZve64xFeature(targetAttr);
+        (hasZve32xFeature(targetConfig) || hasZve32fFeature(targetConfig)) &&
+        !hasVFeature(targetConfig) && !hasZve64xFeature(targetConfig);
   }
   tosa::populateTosaRescaleToArithConversionPatterns(&patterns, use32BitImpl);
 
@@ -1034,12 +1059,11 @@ void ConvertToLLVMPass::runOnOperation() {
   if (use32BitImpl) {
     patterns.add<ExpandMulSIExtended>(patterns.getContext(), /*benefit=*/1024);
   }
-
   LLVMConversionTarget target(getContext());
   populateAffineToStdConversionPatterns(patterns);
   populateSCFToControlFlowConversionPatterns(patterns);
   cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
-  populateExpandTanhPattern(patterns);
+  populateTanhPatterns(patterns);
 
   populateComplexToLLVMConversionPatterns(typeConverter, patterns);
   populateMathToLLVMConversionPatterns(typeConverter, patterns);
@@ -1059,11 +1083,12 @@ void ConvertToLLVMPass::runOnOperation() {
   vector::populateVectorStepLoweringPatterns(patterns);
   populateVectorToLLVMConversionPatterns(typeConverter, patterns,
                                          reassociateFpReductions);
+  vector::populateVectorFromElementsLoweringPatterns(patterns);
   ub::populateUBToLLVMConversionPatterns(typeConverter, patterns);
   vector::populateVectorTransferLoweringPatterns(patterns,
                                                  /*maxTransferRank=*/1);
-  if (isAArch64(targetAttr) &&
-      (hasAnySVEFeature(targetAttr) || hasSMEFeature(targetAttr))) {
+  if (targetConfig && isAArch64(targetConfig) &&
+      (hasAnySVEFeature(targetConfig) || hasSMEFeature(targetConfig))) {
     populateArmSVELegalizeForLLVMExportPatterns(typeConverter, patterns);
     configureArmSVELegalizeForExportTarget(target);
   }

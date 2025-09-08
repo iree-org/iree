@@ -114,38 +114,11 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWinogradVectorize:
     addGPUWinogradVectorizePassPipeline(pipeline);
     break;
-  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore: {
-    FailureOr<int64_t> maybeDepth =
-        getSoftwarePipelineDepth(translationInfo.getConfiguration());
-    if (failed(maybeDepth)) {
-      funcOp.emitOpError(
-          "invalid matmul configuration without software pipelining config");
-      return signalPassFailure();
-    }
-    addGPUMatmulTensorCorePassPipeline(pipeline, pipelineOptions, *maybeDepth);
-    break;
-  }
-  case IREE::Codegen::DispatchLoweringPassPipeline::
-      LLVMGPUMatmulTensorCoreMmaSync: {
-    FailureOr<int64_t> maybeDepth =
-        getSoftwarePipelineDepth(translationInfo.getConfiguration());
-    if (failed(maybeDepth)) {
-      funcOp.emitOpError(
-          "invalid matmul configuration without software pipelining config");
-      return signalPassFailure();
-    }
-    addGPUMatmulTensorCoreMmaSyncPassPipeline(pipeline, pipelineOptions,
-                                              *maybeDepth);
-    break;
-  }
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTransposeSharedMem:
     addGPUTransposePassPipeline(pipeline, pipelineOptions);
     break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute:
     addGPUVectorDistributePassPipeline(pipeline, pipelineOptions, forROCDL);
-    break;
-  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction:
-    addGPUWarpReductionPassPipeline(pipeline, forROCDL);
     break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse:
     addGPUTileAndFusePassPipeline(pipeline, pipelineOptions, forROCDL);

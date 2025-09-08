@@ -25,8 +25,9 @@ iree_status_t iree_tooling_append_async_fences(
   // Create the signal fence as a 0->1 transition. The caller will wait on that.
   iree_hal_semaphore_t* semaphore = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_semaphore_create(device, 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE,
-                                    &semaphore));
+      z0,
+      iree_hal_semaphore_create(device, IREE_HAL_QUEUE_AFFINITY_ANY, 0ull,
+                                IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &semaphore));
   iree_hal_fence_t* signal_fence = NULL;
   iree_status_t status = iree_hal_fence_create_at(
       semaphore, 1ull, iree_hal_device_host_allocator(device), &signal_fence);
@@ -111,8 +112,9 @@ static iree_status_t iree_tooling_submit_transfer(
   if (needs_wait) {
     iree_hal_semaphore_t* semaphore = NULL;
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_hal_semaphore_create(
-                device, 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &semaphore));
+        z0,
+        iree_hal_semaphore_create(device, IREE_HAL_QUEUE_AFFINITY_ANY, 0ull,
+                                  IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &semaphore));
     status = iree_hal_fence_create_at(
         semaphore, 1ull, iree_hal_device_host_allocator(device), &signal_fence);
     iree_hal_semaphore_release(semaphore);
@@ -128,7 +130,8 @@ static iree_status_t iree_tooling_submit_transfer(
   }
 
   if (iree_status_is_ok(status) && needs_wait) {
-    status = iree_hal_fence_wait(signal_fence, iree_infinite_timeout());
+    status = iree_hal_fence_wait(signal_fence, iree_infinite_timeout(),
+                                 IREE_HAL_WAIT_FLAG_DEFAULT);
   }
 
   iree_hal_fence_release(signal_fence);

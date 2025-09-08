@@ -7,15 +7,26 @@
 #include "compiler/plugins/target/ROCM/Dialect/ROCM/Transforms/Passes.h"
 
 #include "compiler/plugins/target/ROCM/Dialect/ROCM/IR/ROCMDialect.h"
+#include "iree/compiler/Codegen/Common/PassUtils.h"
+#include "iree/compiler/Codegen/Common/UserConfig.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Utils/ShapeUtils.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/Regex.h"
+#include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -27,9 +38,12 @@ using namespace mlir::iree_compiler;
 namespace mlir::iree_compiler::IREE::ROCM {
 
 #define GEN_PASS_DEF_APPLYBUILTINPDLPATTERNSPASS
+#define GEN_PASS_DEF_APPLYBUILTINPDLPATTERNSDRIVERPASS
 #include "compiler/plugins/target/ROCM/Dialect/ROCM/Transforms/Passes.h.inc" // IWYU pragma: export
 
 } // namespace mlir::iree_compiler::IREE::ROCM
+
+static const char kBuiltinName[] = "rocm.builtin_name";
 
 static LogicalResult hasAttr(PatternRewriter &rewriter, Operation *rootOp,
                              Attribute attrName) {
@@ -49,7 +63,8 @@ static LogicalResult annotateOperation(PatternRewriter &rewriter,
     return rewriter.notifyMatchFailure(rootOp,
                                        "expected StringAttr for attr name.");
   }
-  rootOp->setAttr(strName.strref(), annotation);
+  rewriter.modifyOpInPlace(
+      rootOp, [&]() { rootOp->setAttr(strName.strref(), annotation); });
   return success();
 }
 
@@ -63,7 +78,6 @@ static LogicalResult matchContraction(PatternRewriter &rewriter,
     return rewriter.notifyMatchFailure(rootOp,
                                        "not a contraction like linalg op");
   }
-
   if (linalgOp.getIndexingMaps() != indexingMaps) {
     return rewriter.notifyMatchFailure(rootOp, "indexing maps mismatch");
   }
@@ -74,6 +88,89 @@ static LogicalResult matchContraction(PatternRewriter &rewriter,
       });
   if (rewriter.getArrayAttr(opElemTypes) != elementTypes) {
     return rewriter.notifyMatchFailure(rootOp, "element types mismatch");
+  }
+  return success();
+}
+
+/// PDL utility that checks whether the size of the dimension of the provided
+/// value is a multiple of the divisor.
+static LogicalResult dimIsMultipleOf(PatternRewriter &rewriter, Value value,
+                                     Attribute dim, Attribute divisor) {
+  auto shapedType = dyn_cast<mlir::ShapedType>(value.getType());
+  if (!shapedType) {
+    return failure();
+  }
+  auto dimInt = dyn_cast<IntegerAttr>(dim);
+  if (!dim) {
+    return failure();
+  }
+  if (dimInt.getInt() >= shapedType.getRank()) {
+    return failure();
+  }
+  auto divisorInt = dyn_cast<IntegerAttr>(divisor);
+  if (!divisor) {
+    return failure();
+  }
+  ValueBoundsConstraintSet::Variable dimVar(value, dimInt.getInt());
+
+  // Check if value[dim] % size == 0. There are a couple of options for how
+  // to do this (e.g. mul(floordiv)). Affine map canonicalizations are good
+  // at dropping terms that statically divide the mod RHS so we go with this
+  // one.
+  MLIRContext *ctx = value.getContext();
+  AffineMap modMap =
+      AffineMap::get(/*dimCount=*/0, /*symbolCount=*/1,
+                     getAffineSymbolExpr(0, ctx) %
+                         getAffineConstantExpr(divisorInt.getInt(), ctx));
+  ValueBoundsConstraintSet::Variable modVar(modMap, {dimVar});
+  Builder b(ctx);
+  FailureOr<bool> maybeFailed = ValueBoundsConstraintSet::areEqual(
+      modVar, OpFoldResult{b.getIndexAttr(0)});
+  if (failed(maybeFailed) || !maybeFailed.value()) {
+    return failure();
+  }
+  return success();
+}
+
+/// PDL utility that checks whether the size of the dimension of the provided
+/// value is within the specified range.
+static LogicalResult dimIsBound(PatternRewriter &rewriter, Value value,
+                                Attribute dim, Attribute lowerBound,
+                                Attribute upperBound) {
+  auto shapedType = dyn_cast<mlir::ShapedType>(value.getType());
+  if (!shapedType) {
+    return failure();
+  }
+  auto dimInt = dyn_cast<IntegerAttr>(dim);
+  if (!dimInt) {
+    return failure();
+  }
+  if (dimInt.getInt() >= shapedType.getRank()) {
+    return failure();
+  }
+  if (auto lowerBoundInt = dyn_cast<IntegerAttr>(lowerBound)) {
+    FailureOr<int64_t> constantLb =
+        ValueBoundsConstraintSet::computeConstantBound(
+            presburger::BoundType::LB, {value, /*dim=*/dimInt.getInt()},
+            /*stopCondition=*/nullptr, /*closedLB=*/true);
+    if (failed(constantLb)) {
+      return failure();
+    }
+    if (lowerBoundInt.getInt() > constantLb.value()) {
+      return failure();
+    }
+  }
+  if (auto upperBoundInt = dyn_cast<IntegerAttr>(upperBound)) {
+    FailureOr<int64_t> constantUb =
+        ValueBoundsConstraintSet::computeConstantBound(
+            presburger::BoundType::UB, {value, /*dim=*/dimInt.getInt()},
+            /*stopCondition=*/nullptr, /*closedUB=*/true);
+    if (failed(constantUb)) {
+      return failure();
+    }
+    if (upperBoundInt.getInt() < constantUb.value()) {
+      return failure();
+    }
   }
   return success();
 }
@@ -97,6 +194,8 @@ populatePDLModuleFromBuiltin(MLIRContext *context, RewritePatternSet &patterns,
   // Constraints are registered to the PDL module, and linking the modules
   // together is likely slower than just registering a few redundant functions.
   pdlModule.registerConstraintFunction("hasAttr", hasAttr);
+  pdlModule.registerConstraintFunction("dimIsBound", dimIsBound);
+  pdlModule.registerConstraintFunction("dimIsMultipleOf", dimIsMultipleOf);
   pdlModule.registerConstraintFunction("matchContraction", matchContraction);
   pdlModule.registerRewriteFunction("annotateOperation", annotateOperation);
   patterns.insert(std::move(pdlModule));
@@ -105,6 +204,14 @@ populatePDLModuleFromBuiltin(MLIRContext *context, RewritePatternSet &patterns,
 
 namespace {
 
+SmallVector<StringRef> filterUkernelPatternsByTarget(ArrayRef<StringRef> names,
+                                                     StringRef target) {
+  std::string pattern =
+      "ukernel_patterns(_.*)*" + target.str() + "(_.*)*\\.mlir";
+  llvm::Regex regex(pattern);
+  return llvm::filter_to_vector(
+      names, [&regex](StringRef name) { return regex.match(name); });
+}
 class ApplyBuiltinPDLPatternsPass
     : public iree_compiler::IREE::ROCM::impl::ApplyBuiltinPDLPatternsPassBase<
           ApplyBuiltinPDLPatternsPass> {
@@ -116,18 +223,40 @@ public:
     // Populate the specialization patterns from the list of targets.
     auto rocmDialect = context->getOrLoadDialect<IREE::ROCM::ROCMDialect>();
     RewritePatternSet tmpPatterns(context);
-    for (std::string target : targets) {
-      std::string builtinName =
-          llvm::formatv("specialization_patterns_{}.mlir", target);
-      std::optional<StringRef> maybeBuiltin =
-          rocmDialect->getBuiltin(builtinName);
-      if (!maybeBuiltin) {
-        // Skip when no patterns are present.
-        continue;
+    if (enableSpecialization) {
+      for (std::string target : targets) {
+        std::string builtinName =
+            llvm::formatv("specialization_patterns_{}.mlir", target);
+        std::optional<StringRef> maybeBuiltin =
+            rocmDialect->getBuiltin(builtinName);
+        if (!maybeBuiltin) {
+          // Skip when no patterns are present.
+          continue;
+        }
+        if (failed(populatePDLModuleFromBuiltin(context, tmpPatterns,
+                                                maybeBuiltin.value()))) {
+          return failure();
+        }
       }
-      if (failed(populatePDLModuleFromBuiltin(context, tmpPatterns,
-                                              maybeBuiltin.value()))) {
-        return failure();
+    }
+    if (enableTensorUKernels) {
+      for (std::string target : targets) {
+        SmallVector<StringRef> allBuiltinNames = rocmDialect->getBuiltinNames();
+        SmallVector<StringRef> builtinNames =
+            filterUkernelPatternsByTarget(allBuiltinNames, target);
+        std::string builtinSrc;
+        for (StringRef builtinName : builtinNames) {
+          std::optional<StringRef> maybeBuiltin =
+              rocmDialect->getBuiltin(builtinName);
+          if (!maybeBuiltin) {
+            // Skip when no patterns are present.
+            continue;
+          }
+          if (failed(populatePDLModuleFromBuiltin(context, tmpPatterns,
+                                                  maybeBuiltin.value()))) {
+            return failure();
+          }
+        }
       }
     }
     patterns = std::move(tmpPatterns);
@@ -141,9 +270,9 @@ public:
     }
 
     // Apply the patterns.
-    auto operation = getOperation();
-    if (failed(applyPatternsGreedily(operation, patterns))) {
-      operation->emitOpError("failed to apply builtin specialization patterns");
+    FunctionOpInterface funcOp = getOperation();
+    if (failed(applyPatternsGreedily(funcOp, patterns))) {
+      funcOp->emitOpError("failed to apply builtin specialization patterns");
       return signalPassFailure();
     }
   }
@@ -151,6 +280,88 @@ public:
 private:
   /// Loaded PDL patterns
   FrozenRewritePatternSet patterns;
+};
+
+class ApplyBuiltinPDLPatternsDriverPass final
+    : public mlir::iree_compiler::IREE::ROCM::impl::
+          ApplyBuiltinPDLPatternsDriverPassBase<
+              ApplyBuiltinPDLPatternsDriverPass> {
+public:
+  using Base::Base;
+
+  void runOnOperation() override {
+    ModuleOp moduleOp = getOperation();
+    IREE::GPU::TargetAttr targetAttr = getGPUTargetAttr(moduleOp);
+    if (!targetAttr) {
+      moduleOp->emitOpError() << "no executable target attribute found.";
+      return signalPassFailure();
+    }
+
+    IREE::ROCM::ApplyBuiltinPDLPatternsPassOptions options;
+    options.enableTensorUKernels = true;
+    options.targets.push_back(targetAttr.getArch().str());
+    OpPassManager passManager(moduleOp.getOperationName());
+    FunctionLikeNest(passManager).addPass([&]() {
+      return createApplyBuiltinPDLPatternsPass(options);
+    });
+    if (failed(runPipeline(passManager, moduleOp))) {
+      signalPassFailure();
+    }
+
+    // Parse the required builtin ukernels and embed them into the module.
+    MLIRContext *ctx = moduleOp.getContext();
+    auto rocmDialect = ctx->getOrLoadDialect<IREE::ROCM::ROCMDialect>();
+    SmallVector<FunctionOpInterface> ukernelFunctions;
+    llvm::SmallDenseSet<StringRef> ukernelSymbols;
+    auto res = moduleOp.walk([&](Operation *op) {
+      auto builtinName =
+          dyn_cast_or_null<StringAttr>(op->getAttr(kBuiltinName));
+      auto ukernelDesc = getUKernelDescriptor(op);
+      if (!builtinName || !ukernelDesc) {
+        return WalkResult::advance();
+      }
+      if (ukernelSymbols.contains(ukernelDesc.getUkernelName())) {
+        return WalkResult::advance();
+      }
+      std::optional<StringRef> maybeBuiltin =
+          rocmDialect->getBuiltin(builtinName.str());
+      if (!maybeBuiltin) {
+        moduleOp.emitOpError()
+            << "could not find builtin with name " << builtinName.str();
+        return WalkResult::interrupt();
+      }
+      OwningOpRef<ModuleOp> builtinModule =
+          parseSourceString<ModuleOp>(*maybeBuiltin, ctx);
+      Operation *symbolTableOp =
+          SymbolTable::getNearestSymbolTable(builtinModule.get());
+      SymbolTable symbolTable(symbolTableOp);
+      auto funcOp = dyn_cast_if_present<FunctionOpInterface>(
+          symbolTable.lookup(ukernelDesc.getUkernelName()));
+      if (!funcOp) {
+        moduleOp.emitOpError()
+            << "could not find a `util.func` ukernel function with name "
+            << ukernelDesc.getUkernelName();
+        return WalkResult::interrupt();
+      }
+      // Remove the function from its parent module and add it to the set of
+      // ukernel functions to be attached to this module later.
+      funcOp->remove();
+      ukernelFunctions.push_back(funcOp);
+      op->removeAttr(kBuiltinName);
+      ukernelSymbols.insert(ukernelDesc.getUkernelName());
+      return WalkResult::advance();
+    });
+    if (res.wasInterrupted()) {
+      moduleOp.emitOpError() << "could not embed ukernel";
+      return signalPassFailure();
+    }
+    // Add the ukernel functions to the module.
+    for (FunctionOpInterface funcOp : ukernelFunctions) {
+      moduleOp.push_back(funcOp);
+      SymbolTable::setSymbolVisibility(funcOp,
+                                       SymbolTable::Visibility::Private);
+    }
+  }
 };
 
 } // namespace

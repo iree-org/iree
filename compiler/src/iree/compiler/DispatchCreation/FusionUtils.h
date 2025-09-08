@@ -28,8 +28,8 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *operand,
 
 /// Returns the closest producer dispatch region op result and the chain of
 /// operations being looked past during the traversal to find the producer
-/// dispatch. Returns std::nullopt if the dispatch or any ops in the chain have
-/// multiple uses.
+/// dispatch. Returns std::nullopt if the dispatch can not be found in the
+/// chain or any op in the chain is not a reshape-like op.
 std::optional<std::pair<OpResult, SmallVector<Operation *>>>
 getProducerDispatchValueAndOpChain(Value operand);
 

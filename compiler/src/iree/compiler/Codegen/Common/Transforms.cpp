@@ -5,7 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Common/CombineLayoutTransformation.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
@@ -74,6 +76,10 @@ struct FuseTilableForallConsumers final
     // The `tileAndFuseConsumerOfSlices` transform will fail if there are any
     // users of the loop that do not dominate the `tilableOp`, so we move the
     // `tilableOp` and any producers needed for dominance right after the loop.
+    // TODO(Max191): Refactor `tileAndFuseConsumerOfSlices` upstream to properly
+    // support forall ops with multiple results. The other results of the loop
+    // can block fusion because of the dominance issue. Once this is refactored,
+    // we should remove this workaround.
     llvm::SetVector<Operation *> slice;
     BackwardSliceOptions options;
     DominanceInfo domInfo;
@@ -85,7 +91,13 @@ struct FuseTilableForallConsumers final
     options.omitBlockArguments = true;
     if (succeeded(getBackwardSlice(tilableOp, &slice, options))) {
       for (Operation *op : llvm::reverse(slice)) {
-        rewriter.moveOpAfter(op, sliceOwner);
+        // Don't use the rewriter here because it will notify the Listener, and
+        // can add the operations back on the worklist. If the fusion fails
+        // after this, then the ops might get continuously added to the
+        // worklist.
+        Block *block = sliceOwner->getBlock();
+        Block::iterator iterator = std::next(sliceOwner->getIterator());
+        op->moveBefore(block, iterator);
       }
     }
 
@@ -109,96 +121,65 @@ void populateFuseTilableForallConsumersPattern(RewritePatternSet &patterns) {
 // Combining Layout Transformation Ops
 //===----------------------------------------------------------------------===//
 
-/// Fold a tensor::ExpandShapeOp or tensor::CollapseShapeOp into a consumer
-/// `mapScatterOp`, by linearizing and then delinearizing the source indices
-/// of the `mapScatterOp`s index transformation.
-template <typename ReshapeOpTy>
-static IREE::LinalgExt::MapScatterOp
-foldReshapeIntoMapScatter(RewriterBase &rewriter, ReshapeOpTy reshapeOp,
-                          IREE::LinalgExt::MapScatterOp mapScatterOp) {
-  assert(mapScatterOp.getInput() == reshapeOp->getResult(0) &&
-         "expected reshapeOp to be the producer of mapScatterOp");
-  Location loc = reshapeOp->getLoc();
-  OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPointAfter(reshapeOp);
-  SmallVector<OpFoldResult> srcDims =
-      tensor::getMixedSizes(rewriter, loc, reshapeOp.getSrc());
-  // There can be leftover tensor.dim ops consuming the result of the reshape,
-  // but they are expected to be folded into some affine.apply ops on the source
-  // sizes by later cleanup patterns.
-  SmallVector<OpFoldResult> resultDims =
-      tensor::getMixedSizes(rewriter, loc, reshapeOp.getResult());
-
-  auto indexTransformBuilder =
-      [&](ArrayRef<BlockArgument> srcIndices) -> SmallVector<Value> {
-    auto linearizeIndexOp = rewriter.create<affine::AffineLinearizeIndexOp>(
-        mapScatterOp->getLoc(), srcIndices, srcDims, /*disjoint=*/true);
-    auto delinearizeIndexOp = rewriter.create<affine::AffineDelinearizeIndexOp>(
-        mapScatterOp->getLoc(), linearizeIndexOp.getResult(), resultDims,
-        /*hasOuterBound=*/true);
-    return delinearizeIndexOp->getResults();
-  };
-  rewriter.modifyOpInPlace(mapScatterOp, [&]() {
-    mapScatterOp.insertTransformationAtStart(rewriter, indexTransformBuilder,
-                                             srcDims.size());
-    mapScatterOp.getInputMutable().assign(reshapeOp->getOperand(0));
-  });
-  return mapScatterOp;
-}
-
-IREE::LinalgExt::MapScatterOp
-foldExpandShapeIntoMapScatter(RewriterBase &rewriter,
-                              tensor::ExpandShapeOp expandShapeOp,
-                              IREE::LinalgExt::MapScatterOp mapScatterOp) {
-  return foldReshapeIntoMapScatter(rewriter, expandShapeOp, mapScatterOp);
-}
-
-IREE::LinalgExt::MapScatterOp
-foldCollapseShapeIntoMapScatter(RewriterBase &rewriter,
-                                tensor::CollapseShapeOp collapseShapeOp,
-                                IREE::LinalgExt::MapScatterOp mapScatterOp) {
-  return foldReshapeIntoMapScatter(rewriter, collapseShapeOp, mapScatterOp);
-}
-
 namespace {
 
-struct FoldExpandShapeIntoMapScatterPattern
+struct FoldRelayoutOpIntoMapScatterPattern
     : public OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
-  using OpRewritePattern<IREE::LinalgExt::MapScatterOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
                                 PatternRewriter &rewriter) const override {
-    auto expandOp =
-        mapScatterOp.getInput().getDefiningOp<tensor::ExpandShapeOp>();
-    if (!expandOp) {
+    Operation *op = mapScatterOp.getInput().getDefiningOp();
+    if (!op) {
       return failure();
     }
-    (void)foldExpandShapeIntoMapScatter(rewriter, expandOp, mapScatterOp);
+    // Folding tensor.pad is handled by a separate pattern.
+    if (!isSupportedRelayoutOp(op) || isa<tensor::PadOp>(op)) {
+      return failure();
+    }
+    if (failed(foldIntoMapScatter(rewriter, op, mapScatterOp))) {
+      return failure();
+    }
     return success();
   }
 };
 
-struct FoldCollapseShapeIntoMapScatterPattern
+struct FoldPadOpIntoMapScatterPattern
     : public OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
-  using OpRewritePattern<IREE::LinalgExt::MapScatterOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
+  FoldPadOpIntoMapScatterPattern(MLIRContext *context,
+                                 PadDistributionConfigFn configFn,
+                                 PatternBenefit benefit = 1)
+      : OpRewritePattern<IREE::LinalgExt::MapScatterOp>(context, benefit),
+        padDistributionConfigFn(std::move(configFn)) {}
 
   LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
                                 PatternRewriter &rewriter) const override {
-    auto collapseOp =
-        mapScatterOp.getInput().getDefiningOp<tensor::CollapseShapeOp>();
-    if (!collapseOp) {
+    auto padOp = mapScatterOp.getInput().getDefiningOp<tensor::PadOp>();
+    if (!padOp) {
       return failure();
     }
-    (void)foldCollapseShapeIntoMapScatter(rewriter, collapseOp, mapScatterOp);
+    if (failed(foldPadIntoMapScatter(rewriter, padOp, mapScatterOp,
+                                     padDistributionConfigFn))) {
+      return failure();
+    }
     return success();
   }
+
+private:
+  PadDistributionConfigFn padDistributionConfigFn;
 };
 
 } // namespace
 
-void populateCombineRelayoutOpPatterns(RewritePatternSet &patterns) {
-  patterns.add<FoldCollapseShapeIntoMapScatterPattern,
-               FoldExpandShapeIntoMapScatterPattern>(patterns.getContext());
+void populateCombineRelayoutOpPatterns(
+    RewritePatternSet &patterns,
+    PadDistributionConfigFn padDistributionConfigFn) {
+  patterns.add<FoldRelayoutOpIntoMapScatterPattern>(patterns.getContext());
+  if (padDistributionConfigFn) {
+    patterns.add<FoldPadOpIntoMapScatterPattern>(patterns.getContext(),
+                                                 padDistributionConfigFn);
+  }
 }
 
 /// Converts `tensor.extract_slice(tensor.expand_shape)` to
@@ -344,11 +325,12 @@ swapExpandShapeWithSlice(RewriterBase &rewriter,
       shape, expandShapeOp.getResultType().getElementType());
 
   // Create a new ExtractSliceOp and ExpandShapeOp.
-  Value newSliceOp = rewriter.create<tensor::ExtractSliceOp>(
-      loc, expandShapeOp.getSrc(), newOffsets, newLengths, newStrides);
-  auto newExpandShapeOp = rewriter.create<tensor::ExpandShapeOp>(
-      loc, resultType, newSliceOp, expandShapeOp.getReassociationIndices(),
-      sizes);
+  Value newSliceOp =
+      tensor::ExtractSliceOp::create(rewriter, loc, expandShapeOp.getSrc(),
+                                     newOffsets, newLengths, newStrides);
+  auto newExpandShapeOp = tensor::ExpandShapeOp::create(
+      rewriter, loc, resultType, newSliceOp,
+      expandShapeOp.getReassociationIndices(), sizes);
   rewriter.replaceOp(sliceOp, newExpandShapeOp);
   return success();
 }
@@ -357,7 +339,7 @@ namespace {
 
 struct SwapExpandShapeWithSlicePattern
     : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
@@ -461,6 +443,17 @@ static LogicalResult
 swapCollapseShapeWithSlice(RewriterBase &rewriter,
                            tensor::CollapseShapeOp collapseShapeOp,
                            tensor::ExtractSliceOp sliceOp) {
+  // FIXME: this is a workaround for the fact that this inf loops due to the
+  // creation of `affine::AffineDelinearizeIndexOp` but still returns failure.
+  SmallVector<Operation *> createdOps;
+  auto scope = llvm::make_scope_exit([&]() {
+    for (Operation *op : createdOps) {
+      if (op->use_empty()) {
+        rewriter.eraseOp(op);
+      }
+    }
+  });
+
   // The tensor.extract_slice before applying the pattern works on the result
   // of the tensor.collapse_shape, so variables (i.e. inputs for
   // ExtractSliceOp) referring to the state before applying the pattern are
@@ -496,41 +489,53 @@ swapCollapseShapeWithSlice(RewriterBase &rewriter,
       // IGEMM, while the offset is dynamic and the size is static.
       if (isa<Attribute>(collapsedSize) && isa<Value>(collapsedOffset) &&
           reassocIndices.size() != 1) {
-        // Check if offset is from affine.apply of form (d0 * K) or (K * d0).
-        auto applyOp = collapsedOffset.dyn_cast<Value>()
-                           .getDefiningOp<affine::AffineApplyOp>();
-        if (!applyOp) {
-          return rewriter.notifyMatchFailure(sliceOp,
-                                             "offset is not from affine.apply");
-        }
-
-        AffineMap map = applyOp.getAffineMap();
-        if (map.getNumResults() != 1) {
-          return rewriter.notifyMatchFailure(
-              sliceOp, "affine.apply must have only one result");
-        }
-
         auto maybeStaticSize = getConstantIntValue(collapsedSize);
         if (!maybeStaticSize) {
           return rewriter.notifyMatchFailure(sliceOp,
                                              "collapsed size must be static");
         }
+        auto staticSize = maybeStaticSize.value();
 
-        // Compose all nested affine.apply chains and check if the offset is
-        // multiple of collapsed size.
-        SmallVector<Value> operands(applyOp.getOperands());
-        affine::fullyComposeAffineMapAndOperands(&map, &operands);
-        map = simplifyAffineMap(map);
-        if (!map.getResult(0).isMultipleOf(maybeStaticSize.value())) {
-          return rewriter.notifyMatchFailure(
-              sliceOp, "offset multiplier must be multiple of collapsed size");
-        }
+        // Check if offset is from a block argument or an affine.apply op of
+        // form (d0 * K) or (K * d0).
+        auto offsetVal = cast<Value>(collapsedOffset);
+        auto collapseDefOp = offsetVal.getDefiningOp();
+        if (isa<BlockArgument>(offsetVal)) {
+          // The loop is already normalized.
+          if (staticSize != 1) {
+            return rewriter.notifyMatchFailure(
+                sliceOp, "collapsed size must be 1 when the collapsed offset "
+                         "is a block argument");
+          }
+        } else if (auto applyOp =
+                       dyn_cast<affine::AffineApplyOp>(collapseDefOp)) {
+          AffineMap map = applyOp.getAffineMap();
+          if (map.getNumResults() != 1) {
+            return rewriter.notifyMatchFailure(
+                sliceOp, "affine.apply must have only one result");
+          }
 
-        unsigned lastReassocSize = srcShape[reassocIndices.back()];
-        if (lastReassocSize % maybeStaticSize.value() != 0) {
+          // Compose all nested affine.apply chains and check if the offset is
+          // multiple of collapsed size.
+          SmallVector<Value> operands(applyOp.getOperands());
+          affine::fullyComposeAffineMapAndOperands(&map, &operands);
+          map = simplifyAffineMap(map);
+          if (!map.getResult(0).isMultipleOf(staticSize)) {
+            return rewriter.notifyMatchFailure(
+                sliceOp,
+                "offset multiplier must be multiple of collapsed size");
+          }
+
+          unsigned lastReassocSize = srcShape[reassocIndices.back()];
+          if (lastReassocSize % staticSize != 0) {
+            return rewriter.notifyMatchFailure(
+                sliceOp,
+                "the last expanded size is not divisible by collapse size");
+          }
+        } else {
           return rewriter.notifyMatchFailure(
               sliceOp,
-              "the last expanded size is not divisible by collapse size");
+              "offset is not from a block argument or affine.apply op");
         }
 
         // Calculate expanded offsets and sizes.
@@ -538,8 +543,10 @@ swapCollapseShapeWithSlice(RewriterBase &rewriter,
         for (auto dimIdx : reassocIndices) {
           expandedBasis.push_back(rewriter.getIndexAttr(srcShape[dimIdx]));
         }
-        auto delinearizeOp = rewriter.create<affine::AffineDelinearizeIndexOp>(
-            sliceOp.getLoc(), cast<Value>(collapsedOffset), expandedBasis);
+        auto delinearizeOp = affine::AffineDelinearizeIndexOp::create(
+            rewriter, sliceOp.getLoc(), cast<Value>(collapsedOffset),
+            expandedBasis);
+        createdOps.push_back(delinearizeOp);
         ValueRange offsets = delinearizeOp.getResults();
         expandedOffsets.append(offsets.begin(), offsets.end());
 
@@ -661,9 +668,9 @@ swapCollapseShapeWithSlice(RewriterBase &rewriter,
                            groupExpandedOffsets.rend());
   }
 
-  Value newSliceOp = rewriter.create<tensor::ExtractSliceOp>(
-      collapseShapeOp->getLoc(), collapseShapeOp.getSrc(), expandedOffsets,
-      expandedSizes, expandedStrides);
+  Value newSliceOp = tensor::ExtractSliceOp::create(
+      rewriter, collapseShapeOp->getLoc(), collapseShapeOp.getSrc(),
+      expandedOffsets, expandedSizes, expandedStrides);
   rewriter.replaceOpWithNewOp<tensor::CollapseShapeOp>(
       sliceOp, sliceOp.getResultType(), newSliceOp,
       collapseShapeOp.getReassociationIndices());
@@ -675,7 +682,7 @@ namespace {
 
 struct SwapCollapseShapeWithSlicePattern
     : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {

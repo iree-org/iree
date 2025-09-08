@@ -123,15 +123,17 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
         llvm::cast<MemRefType>(memref::SubViewOp::inferRankReducedResultType(
             vectorShapeCollapse, sourceType, subViewOffsets, subViewSizes,
             subViewStrides));
-    Value subView = rewriter.create<memref::SubViewOp>(
-        loc, resultType, source, subViewOffsets, subViewSizes, subViewStrides);
-    Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    Value readCollapse = rewriter.create<vector::TransferReadOp>(
-        loc, vectorTypeCollapse, subView, ValueRange{c0, c0}, newidentityMap,
-        transferReadOp.getPadding(), transferReadOp.getMask(), newInBoundsAttr);
+    Value subView =
+        memref::SubViewOp::create(rewriter, loc, resultType, source,
+                                  subViewOffsets, subViewSizes, subViewStrides);
+    Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    Value readCollapse = vector::TransferReadOp::create(
+        rewriter, loc, vectorTypeCollapse, subView, ValueRange{c0, c0},
+        newidentityMap, transferReadOp.getPadding(), transferReadOp.getMask(),
+        newInBoundsAttr);
 
-    Value readBroadcast = rewriter.create<vector::BroadcastOp>(
-        loc, vectorTypeBroadcast, readCollapse);
+    Value readBroadcast = vector::BroadcastOp::create(
+        rewriter, loc, vectorTypeBroadcast, readCollapse);
     SmallVector<int64_t> transposePermutation;
     for (int i = 0; i < vectorType.getRank(); i++) {
       if (i == vectorType.getRank() - 2)
@@ -151,7 +153,7 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
 // MMA types but MMA load can transpose the matrix when loading.
 struct CombineTransferReadOpBroadcast final
     : public OpRewritePattern<vector::BroadcastOp> {
-  using OpRewritePattern<vector::BroadcastOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::BroadcastOp op,
                                 PatternRewriter &rewriter) const override {

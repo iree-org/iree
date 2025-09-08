@@ -36,15 +36,6 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
     return true;
   }
 
-  // Don't fuse if all of the consumer maps aren't projected permutations.
-  if (auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp)) {
-    if (!llvm::all_of(
-            linalgConsumerOp.getIndexingMapsArray(),
-            [](AffineMap map) { return map.isProjectedPermutation(); })) {
-      return false;
-    }
-  }
-
   // If the generic op is "just" copy, then fuse always.
   Block &body = producerOp->getRegion(0).front();
   if (std::begin(body)->hasTrait<OpTrait::IsTerminator>())
@@ -154,13 +145,8 @@ getProducerDispatchValueAndOpChain(Value operand) {
 
   auto producerDispatch =
       dyn_cast<IREE::Flow::DispatchRegionOp>(producerValue.getOwner());
-  // TODO(MaheshRavishankar): Multi-result producer dispatches can be supported.
-  // Will require to move the consumer dispatch immediately after the producer
-  // instead of what is done below and move other operands of the consumer
-  // dispatch before the producer dispatch.
   if (!producerDispatch ||
-      !llvm::hasSingleElement(producerDispatch.getBody()) ||
-      producerDispatch->getNumResults() != 1) {
+      !llvm::hasSingleElement(producerDispatch.getBody())) {
     return std::nullopt;
   }
   if (!llvm::hasSingleElement(producerValue.getUses())) {

@@ -86,11 +86,10 @@ func.func @conv_nhwc() {
 #target = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
   compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
   subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
-  mma = [], scaled_mma = [],
   subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
   max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
   max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #target}>
 func.func @matmul_256x256x256() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index

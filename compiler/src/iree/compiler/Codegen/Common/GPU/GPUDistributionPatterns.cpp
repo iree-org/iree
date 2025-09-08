@@ -4,19 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <numeric>
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
-#include "iree/compiler/Codegen/Utils/GPUUtils.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
+#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Rewrite/PatternApplicator.h"
 
@@ -48,10 +45,34 @@ struct DistributeConstants final : OpDistributionPattern<arith::ConstantOp> {
     Type elementType = constant.getType().getElementType();
     auto vectorType =
         VectorType::get(layout.getDistributedShape(), elementType);
-    auto distributedOp = rewriter.create<arith::ConstantOp>(
-        constantOp.getLoc(), vectorType,
+    auto distributedOp = arith::ConstantOp::create(
+        rewriter, constantOp.getLoc(), vectorType,
         SplatElementsAttr::get(vectorType, attr.getSplatValue<Attribute>()));
     replaceOpWithDistributedValues(rewriter, constantOp,
+                                   distributedOp->getResult(0));
+    return success();
+  }
+};
+
+struct DistributePoison final : OpDistributionPattern<ub::PoisonOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  LogicalResult matchAndRewrite(ub::PoisonOp poisonOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+
+    auto poisonVal = dyn_cast<VectorValue>(poisonOp.getResult());
+    if (!poisonVal)
+      return failure();
+
+    SmallVector<int64_t> distributedShape =
+        signature[poisonVal].getDistributedShape();
+
+    Type elementType = poisonVal.getType().getElementType();
+    auto vectorType = VectorType::get(distributedShape, elementType);
+    auto distributedOp =
+        ub::PoisonOp::create(rewriter, poisonVal.getLoc(), vectorType);
+    replaceOpWithDistributedValues(rewriter, poisonOp,
                                    distributedOp->getResult(0));
     return success();
   }
@@ -155,9 +176,9 @@ struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
       newInitArgs.push_back(initArg);
     }
 
-    auto newForOp = rewriter.create<scf::ForOp>(
-        forOp.getLoc(), forOp.getLowerBound(), forOp.getUpperBound(),
-        forOp.getStep(), newInitArgs);
+    auto newForOp =
+        scf::ForOp::create(rewriter, forOp.getLoc(), forOp.getLowerBound(),
+                           forOp.getUpperBound(), forOp.getStep(), newInitArgs);
     newForOp->setAttrs(forOp->getAttrs());
     Block *loopBody = newForOp.getBody();
 
@@ -204,7 +225,7 @@ struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
     // Since this operation has no results, we can directly replace it using
     // the standard API.
     auto distributedYieldOp =
-        rewriter.create<scf::YieldOp>(yieldOp.getLoc(), operands);
+        scf::YieldOp::create(rewriter, yieldOp.getLoc(), operands);
     rewriter.replaceOp(yieldOp, distributedYieldOp);
     return success();
   }
@@ -219,8 +240,8 @@ struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
     for (auto [bbArg, oldInit] : llvm::zip_equal(bbArgs, oldInits)) {
       Value val = bbArg;
       if (auto oldVectorInit = dyn_cast<VectorValue>(oldInit)) {
-        val = rewriter.create<IREE::VectorExt::ToSIMDOp>(
-            oldVectorInit.getLoc(), oldVectorInit.getType(), val);
+        val = IREE::VectorExt::ToSIMDOp::create(
+            rewriter, oldVectorInit.getLoc(), oldVectorInit.getType(), val);
       }
       replacements.push_back(val);
     }
@@ -265,7 +286,7 @@ struct DistributeGather final : OpDistributionPattern<vector::GatherOp> {
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
     VectorValue result = gatherOp.getResult();
-    VectorValue indexVec = gatherOp.getIndexVec();
+    VectorValue indexVec = gatherOp.getIndices();
     VectorValue mask = gatherOp.getMask();
     VectorValue passThru = gatherOp.getPassThru();
 
@@ -295,9 +316,9 @@ struct DistributeGather final : OpDistributionPattern<vector::GatherOp> {
     VectorType distributedType = VectorType::get(distributedShape, elementType);
 
     // Simply distribute all operands and results.
-    VectorValue distributed = rewriter.create<vector::GatherOp>(
-        gatherOp.getLoc(), distributedType, gatherOp.getBase(),
-        gatherOp.getIndices(),
+    VectorValue distributed = vector::GatherOp::create(
+        rewriter, gatherOp.getLoc(), distributedType, gatherOp.getBase(),
+        gatherOp.getOffsets(),
         getDistributed(rewriter, indexVec, indicesLayout),
         getDistributed(rewriter, mask, maskLayout),
         getDistributed(rewriter, passThru, passThruLayout));
@@ -323,9 +344,9 @@ struct DistributeTrivialExtract final
     VectorValue source = extractOp.getVector();
     VectorLayoutInterface sourceLayout = signature[source];
 
-    Value distributed = rewriter.create<vector::ExtractOp>(
-        extractOp.getLoc(), getDistributed(rewriter, source, sourceLayout),
-        ArrayRef<int64_t>{});
+    Value distributed = vector::ExtractOp::create(
+        rewriter, extractOp.getLoc(),
+        getDistributed(rewriter, source, sourceLayout), ArrayRef<int64_t>{});
 
     replaceOpWithDistributedValues(rewriter, extractOp, distributed);
 
@@ -336,8 +357,8 @@ struct DistributeTrivialExtract final
 } // namespace
 
 void populateGPUDistributionPatterns(RewritePatternSet &patterns) {
-  patterns.add<DistributeConstants, DistributeScfFor, DistributeTrivialExtract>(
-      patterns.getContext());
+  patterns.add<DistributeConstants, DistributePoison, DistributeScfFor,
+               DistributeTrivialExtract>(patterns.getContext());
   // Elementwise patterns.
   patterns.add<DistributeElementwise>(patterns.getContext());
   patterns.add<DistributeTrivialLayoutConversions>(patterns.getContext());

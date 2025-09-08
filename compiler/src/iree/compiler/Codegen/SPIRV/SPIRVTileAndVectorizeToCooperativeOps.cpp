@@ -150,7 +150,7 @@ static LogicalResult tileToSubgroup(mlir::FunctionOpInterface funcOp,
     tileSizes.resize(
         std::min(cast<linalg::LinalgOp>(op).getNumParallelLoops(), 3u));
     return llvm::map_to_vector(tileSizes, [&](int64_t v) -> Value {
-      return builder.create<arith::ConstantIndexOp>(op->getLoc(), v);
+      return arith::ConstantIndexOp::create(builder, op->getLoc(), v);
     });
   };
   auto tilingOptions = linalg::LinalgTilingOptions()
@@ -279,7 +279,7 @@ void populateVectorUnrollPatterns(ArrayRef<int64_t> cooperativeOpSize,
 class CombineContractTranspose final
     : public OpRewritePattern<vector::ContractionOp> {
 public:
-  using OpRewritePattern<vector::ContractionOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::ContractionOp op,
                                 PatternRewriter &rewriter) const override {
@@ -312,8 +312,8 @@ public:
     if (!foundTranspose)
       return failure();
 
-    Value res = rewriter.create<vector::ContractionOp>(
-        loc, newSources[0], newSources[1], newSources[2],
+    Value res = vector::ContractionOp::create(
+        rewriter, loc, newSources[0], newSources[1], newSources[2],
         rewriter.getAffineMapArrayAttr(newMaps), op.getIteratorTypes());
     rewriter.replaceOp(op, res);
     return success();

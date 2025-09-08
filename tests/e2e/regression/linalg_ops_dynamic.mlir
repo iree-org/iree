@@ -66,3 +66,67 @@ func.func @dynamic_matmul_dynamic_reduction_size_B2_M1_N3_K5() {
   check.expect_almost_eq(%observed, %expected, atol 1.0e-04) : tensor<2x1x3xf16>
   return
 }
+
+
+// Softmax operation with dynamic reduction size.
+// Number of samples: 2. Size of reduction dimension: 4.
+func.func @softmax_dynamic_reduction_N2_K4(){
+
+  // Computed with numpy, values of ln([[3, 2, 4, 1.],[1, 7, 1, 1]]).
+  %input = flow.tensor.dynamic_constant dense<
+            [[1.09861229, 0.69314718, 1.38629436, 0. ],
+             [0.        , 1.94591015, 0.        , 0. ]]> : tensor<2x4xf32> -> tensor<2x?xf32>
+
+  %expected = flow.tensor.dynamic_constant dense<
+               [[0.3, 0.2, 0.4, 0.1],
+                [0.1, 0.7, 0.1, 0.1]]> : tensor<2x4xf32> -> tensor<2x?xf32>
+
+  %c_1_index = arith.constant 1 : index
+  %dim_0 = tensor.dim %input, %c_1_index : tensor<2x?xf32>
+  %output = tensor.empty(%dim_0) : tensor<2x?xf32>
+
+  %sm = linalg.softmax dimension(1) ins(%input : tensor<2x?xf32>)
+                                    outs(%output : tensor<2x?xf32>) -> tensor<2x?xf32>
+
+  check.expect_almost_eq(%sm, %expected, atol 1.0e-04) : tensor<2x?xf32>
+  return
+}
+
+// Softmax operation with dynamic reduction size.
+// Number of samples: 1. Size of reduction dimension: 1.
+func.func @softmax_dynamic_reduction_N1_K1(){
+
+  %input = flow.tensor.dynamic_constant dense<[[-77.7]]> : tensor<1x1xf32> -> tensor<1x?xf32>
+  %expected = flow.tensor.dynamic_constant dense<[[1.0]]> : tensor<1x1xf32> -> tensor<1x?xf32>
+  %c_1_index = arith.constant 1 : index
+  %dim_0 = tensor.dim %input, %c_1_index : tensor<1x?xf32>
+  %output = tensor.empty(%dim_0) : tensor<1x?xf32>
+  %sm = linalg.softmax dimension(1) ins(%input : tensor<1x?xf32>)
+                                    outs(%output : tensor<1x?xf32>) -> tensor<1x?xf32>
+
+  check.expect_almost_eq(%sm, %expected, atol 1.0e-04) : tensor<1x?xf32>
+  return
+}
+
+
+// Softmax operation with dynamic reduction size.
+// Number of samples: 65. Size of reduction dimension: 1531.
+func.func @softmax_dynamic_reduction_N65_K1531(){
+
+  %input = flow.tensor.dynamic_constant dense<-3.1415> :
+     tensor<65x1531xf32> -> tensor<65x?xf32>
+
+  // 1/1531 is 0.0006531678641410843
+  %expected = flow.tensor.dynamic_constant dense<0.0006531678641410843> :
+     tensor<65x1531xf32> -> tensor<65x?xf32>
+
+  %c_1_index = arith.constant 1 : index
+  %dim_0 = tensor.dim %input, %c_1_index : tensor<65x?xf32>
+  %output = tensor.empty(%dim_0) : tensor<65x?xf32>
+
+  %sm = linalg.softmax dimension(1) ins(%input : tensor<65x?xf32>)
+                                       outs(%output : tensor<65x?xf32>) -> tensor<65x?xf32>
+
+  check.expect_almost_eq(%sm, %expected, atol 1.0e-04) : tensor<65x?xf32>
+  return
+}

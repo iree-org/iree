@@ -50,7 +50,7 @@ emitNormalizedLoopBounds(RewriterBase &rewriter, Location loc, Block *body,
   SmallVector<OpFoldResult> newLbs;
   SmallVector<OpFoldResult> newUbs;
   SmallVector<OpFoldResult> newSteps;
-  for (auto &&[iv, lb, ub, step] : llvm::zip(ivs, lbs, ubs, steps)) {
+  for (auto [iv, lb, ub, step] : llvm::zip_equal(ivs, lbs, ubs, steps)) {
     std::optional<int64_t> stepInt = getConstantIntValue(step);
     // Bail out on negative steps.
     if (!stepInt || stepInt.value() <= 0) {
@@ -154,8 +154,8 @@ LogicalResult normalizeLoopBounds(RewriterBase &rewriter,
   }
 
   rewriter.setInsertionPointAfter(forallOp);
-  auto newLoop = rewriter.create<scf::ForallOp>(
-      rewriter.getUnknownLoc(), newLoopParams->lowerBounds,
+  auto newLoop = scf::ForallOp::create(
+      rewriter, rewriter.getUnknownLoc(), newLoopParams->lowerBounds,
       newLoopParams->upperBounds, newLoopParams->steps, forallOp.getOutputs(),
       forallOp.getMapping());
   rewriter.eraseOp(newLoop.getTerminator());

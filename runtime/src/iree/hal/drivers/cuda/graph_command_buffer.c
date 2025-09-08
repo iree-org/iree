@@ -204,8 +204,11 @@ iree_status_t iree_hal_cuda_graph_command_buffer_create(
   command_buffer->cu_barrier_node = NULL;
   command_buffer->graph_node_count = 0;
 
-  iree_status_t status =
-      iree_hal_resource_set_allocate(block_pool, &command_buffer->resource_set);
+  iree_status_t status = iree_ok_status();
+  if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED)) {
+    status = iree_hal_resource_set_allocate(block_pool,
+                                            &command_buffer->resource_set);
+  }
 
   if (iree_status_is_ok(status)) {
     iree_hal_collective_batch_initialize(&command_buffer->arena,
@@ -714,10 +717,21 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_collective(
 static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
-    const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
+    const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
+
+  if (iree_hal_dispatch_uses_custom_arguments(flags)) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "direct/indirect arguments are not supported in CUDA graphs");
+  } else if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "indirect parameters are not supported in CUDA graphs");
+  }
+
   IREE_TRACE_ZONE_BEGIN(z0);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -800,12 +814,15 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch(
 
   CUDA_KERNEL_NODE_PARAMS params = {
       .func = kernel_params->function,
-      .blockDimX = kernel_params->block_dims[0],
-      .blockDimY = kernel_params->block_dims[1],
-      .blockDimZ = kernel_params->block_dims[2],
-      .gridDimX = workgroup_count[0],
-      .gridDimY = workgroup_count[1],
-      .gridDimZ = workgroup_count[2],
+      .blockDimX = config.workgroup_size[0] ? config.workgroup_size[0]
+                                            : kernel_params->block_dims[0],
+      .blockDimY = config.workgroup_size[1] ? config.workgroup_size[1]
+                                            : kernel_params->block_dims[1],
+      .blockDimZ = config.workgroup_size[2] ? config.workgroup_size[2]
+                                            : kernel_params->block_dims[2],
+      .gridDimX = config.workgroup_count[0],
+      .gridDimY = config.workgroup_count[1],
+      .gridDimZ = config.workgroup_count[2],
       .kernelParams = params_ptr,
       .sharedMemBytes = kernel_params->block_shared_memory_size,
   };
@@ -831,15 +848,6 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch_indirect(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_buffer_ref_t workgroups_ref, iree_const_byte_span_t constants,
-    iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "indirect dispatch not yet implemented");
-}
-
 static const iree_hal_command_buffer_vtable_t
     iree_hal_cuda_graph_command_buffer_vtable = {
         .destroy = iree_hal_cuda_graph_command_buffer_destroy,
@@ -859,6 +867,4 @@ static const iree_hal_command_buffer_vtable_t
         .copy_buffer = iree_hal_cuda_graph_command_buffer_copy_buffer,
         .collective = iree_hal_cuda_graph_command_buffer_collective,
         .dispatch = iree_hal_cuda_graph_command_buffer_dispatch,
-        .dispatch_indirect =
-            iree_hal_cuda_graph_command_buffer_dispatch_indirect,
 };

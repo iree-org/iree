@@ -157,9 +157,9 @@ struct BarrierRegionOpBufferizationInterface
     }
 
     rewriter.setInsertionPoint(barrierOp);
-    rewriter.create<gpu::BarrierOp>(barrierOp.getLoc());
+    gpu::BarrierOp::create(rewriter, barrierOp.getLoc());
     rewriter.setInsertionPointAfter(barrierOp);
-    auto afterBarrier = rewriter.create<gpu::BarrierOp>(barrierOp.getLoc());
+    auto afterBarrier = gpu::BarrierOp::create(rewriter, barrierOp.getLoc());
 
     rewriter.inlineBlockBefore(barrierOp.getBody(), afterBarrier,
                                tensorizedOperands);
@@ -220,7 +220,7 @@ struct ValueBarrierOpBufferizationInterface
       return failure();
     }
 
-    rewriter.create<gpu::BarrierOp>(barrierOp.getLoc());
+    gpu::BarrierOp::create(rewriter, barrierOp.getLoc());
 
     SmallVector<Value> buffers;
     buffers.reserve(barrierOp.getNumOperands());
@@ -386,8 +386,8 @@ struct BufferResourceCastOpBufferizationInterface
         // FatRawBufferCast's lowering handles this for us. Just truncate to 14
         // bits.
         Type i14Type = rewriter.getIntegerType(14);
-        cacheSwizzleStride = rewriter.create<arith::IndexCastOp>(
-            loc, i14Type, maybeIndexCacheSwizzle);
+        cacheSwizzleStride = arith::IndexCastOp::create(rewriter, loc, i14Type,
+                                                        maybeIndexCacheSwizzle);
       }
       buffer = rewriter
                    .create<amdgpu::FatRawBufferCastOp>(

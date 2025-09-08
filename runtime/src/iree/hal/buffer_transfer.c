@@ -63,7 +63,8 @@ static iree_status_t iree_hal_device_transfer_and_wait(
   // idle.
   iree_hal_semaphore_t* fence_semaphore = NULL;
   iree_status_t status = iree_hal_semaphore_create(
-      device, 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &fence_semaphore);
+      device, IREE_HAL_QUEUE_AFFINITY_ANY, 0ull,
+      IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &fence_semaphore);
   uint64_t signal_value = 1ull;
   if (iree_status_is_ok(status)) {
     iree_hal_semaphore_list_t wait_semaphores = {
@@ -82,7 +83,8 @@ static iree_status_t iree_hal_device_transfer_and_wait(
         IREE_HAL_EXECUTE_FLAG_NONE);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_semaphore_wait(fence_semaphore, signal_value, timeout);
+    status = iree_hal_semaphore_wait(fence_semaphore, signal_value, timeout,
+                                     IREE_HAL_WAIT_FLAG_DEFAULT);
   }
 
   iree_hal_command_buffer_release(command_buffer);

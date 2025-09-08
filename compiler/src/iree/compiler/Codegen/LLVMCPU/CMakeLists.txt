@@ -66,8 +66,7 @@ iree_cc_library(
     "LLVMCPUSplitReduction.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
     "LLVMCPUTile.cpp"
-    "LLVMCPUTileAndFuse.cpp"
-    "LLVMCPUTileRootAndFuseProducerConsumer.cpp"
+    "LLVMCPUTileAndFuseProducerConsumer.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
     "LLVMCPUVectorShapeCastLowering.cpp"
     "LLVMCPUVectorTransposeLowering.cpp"
@@ -114,6 +113,7 @@ iree_cc_library(
     MLIRFunctionInterfaces
     MLIRIR
     MLIRIndexToLLVM
+    MLIRIndexingMapOpInterface
     MLIRLLVMCommonConversion
     MLIRLLVMDialect
     MLIRLinalgDialect
