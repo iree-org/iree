@@ -698,8 +698,8 @@ public:
     iree_hal_cuda_ExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
-    executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        variantOp.getLoc(), variantOp.getSymName(),
+    IREE::HAL::ExecutableBinaryOp::create(
+        executableBuilder, variantOp.getLoc(), variantOp.getSymName(),
         variantOp.getTarget().getFormat(),
         builder.getBufferAttr(executableBuilder.getContext()));
 

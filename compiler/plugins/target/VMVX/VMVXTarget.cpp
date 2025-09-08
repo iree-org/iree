@@ -206,8 +206,8 @@ public:
     // Add the binary data to the target executable.
     // NOTE: this snapshots the FlatBuffer builder data at the time it is called
     // and future changes to the target op will not be observed.
-    auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        variantOp.getLoc(), variantOp.getSymName(),
+    auto binaryOp = IREE::HAL::ExecutableBinaryOp::create(
+        executableBuilder, variantOp.getLoc(), variantOp.getSymName(),
         variantOp.getTarget().getFormat(), bufferAttr);
     binaryOp.setMimeTypeAttr(
         executableBuilder.getStringAttr("application/x-flatbuffers"));

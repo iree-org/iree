@@ -42,27 +42,27 @@ struct ConvertComplexDot final : OpRewritePattern<mlir::stablehlo::DotOp> {
     }
 
     Location loc = dot.getLoc();
-    Value lhsReal = rewriter.create<mlir::stablehlo::RealOp>(loc, lhs);
-    Value lhsImag = rewriter.create<mlir::stablehlo::ImagOp>(loc, lhs);
-    Value rhsReal = rewriter.create<mlir::stablehlo::RealOp>(loc, rhs);
-    Value rhsImag = rewriter.create<mlir::stablehlo::ImagOp>(loc, rhs);
+    Value lhsReal = mlir::stablehlo::RealOp::create(rewriter, loc, lhs);
+    Value lhsImag = mlir::stablehlo::ImagOp::create(rewriter, loc, lhs);
+    Value rhsReal = mlir::stablehlo::RealOp::create(rewriter, loc, rhs);
+    Value rhsImag = mlir::stablehlo::ImagOp::create(rewriter, loc, rhs);
     TensorType resultType = dot.getType();
     Type newType = mlir::hlo::createRealType(resultType);
 
-    Value realComponent = rewriter.create<mlir::stablehlo::SubtractOp>(
-        loc,
-        rewriter.create<mlir::stablehlo::DotOp>(loc, newType, lhsReal, rhsReal,
-                                                precision),
-        rewriter.create<mlir::stablehlo::DotOp>(loc, newType, lhsImag, rhsImag,
-                                                precision));
-    Value imagComponent = rewriter.create<mlir::stablehlo::AddOp>(
-        loc,
-        rewriter.create<mlir::stablehlo::DotOp>(loc, newType, lhsReal, rhsImag,
-                                                precision),
-        rewriter.create<mlir::stablehlo::DotOp>(loc, newType, lhsImag, rhsReal,
-                                                precision));
-    Value result = rewriter.create<mlir::stablehlo::ComplexOp>(
-        loc, resultType, realComponent, imagComponent);
+    Value realComponent = mlir::stablehlo::SubtractOp::create(
+        rewriter, loc,
+        mlir::stablehlo::DotOp::create(rewriter, loc, newType, lhsReal, rhsReal,
+                                       precision),
+        mlir::stablehlo::DotOp::create(rewriter, loc, newType, lhsImag, rhsImag,
+                                       precision));
+    Value imagComponent = mlir::stablehlo::AddOp::create(
+        rewriter, loc,
+        mlir::stablehlo::DotOp::create(rewriter, loc, newType, lhsReal, rhsImag,
+                                       precision),
+        mlir::stablehlo::DotOp::create(rewriter, loc, newType, lhsImag, rhsReal,
+                                       precision));
+    Value result = mlir::stablehlo::ComplexOp::create(
+        rewriter, loc, resultType, realComponent, imagComponent);
     rewriter.replaceOp(dot, result);
     return success();
   }

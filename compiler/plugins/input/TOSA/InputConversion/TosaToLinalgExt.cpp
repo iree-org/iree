@@ -61,8 +61,8 @@ public:
         builder.getAffineDimExpr(2),
     });
 
-    indices = builder.create<tensor::ExpandShapeOp>(
-        indicesTy.clone(expandIndShape), indices, expandIndMap);
+    indices = tensor::ExpandShapeOp::create(
+        builder, indicesTy.clone(expandIndShape), indices, expandIndMap);
     indicesTy = llvm::dyn_cast<RankedTensorType>(indices.getType());
 
     // Materialize the batch indice as LinalgExt scatter is not batched.
@@ -70,17 +70,17 @@ public:
       llvm::SmallVector<Value> dynDims;
       for (int i = 0, s = indicesTy.getRank(); i < s; ++i)
         if (indicesTy.isDynamicDim(i))
-          dynDims.push_back(builder.create<tensor::DimOp>(indices, i));
+          dynDims.push_back(tensor::DimOp::create(builder, indices, i));
 
-      Value empty = builder.create<tensor::EmptyOp>(
-          indicesTy.getShape(), indicesTy.getElementType(), dynDims);
+      Value empty = tensor::EmptyOp::create(
+          builder, indicesTy.getShape(), indicesTy.getElementType(), dynDims);
 
       Value batchIdx = nullptr;
 
       if (indicesTy.getDimSize(0) == 1) {
-        Value zero = builder.create<arith::ConstantOp>(
-            rewriter.getZeroAttr(indicesTy.getElementType()));
-        batchIdx = builder.create<linalg::FillOp>(zero, empty).getResult(0);
+        Value zero = arith::ConstantOp::create(
+            builder, rewriter.getZeroAttr(indicesTy.getElementType()));
+        batchIdx = linalg::FillOp::create(builder, zero, empty).getResult(0);
       } else {
         SmallVector<utils::IteratorType> iterators(
             indicesTy.getRank(), utils::IteratorType::parallel);
@@ -90,10 +90,10 @@ public:
         auto blockBuilder = [&](OpBuilder &nestedBuilder, Location nestedLoc,
                                 ValueRange blockArgs) {
           ImplicitLocOpBuilder b(op.getLoc(), nestedBuilder);
-          auto index = b.create<linalg::IndexOp>(0);
+          auto index = linalg::IndexOp::create(b, 0);
           auto cast =
-              b.create<arith::IndexCastOp>(indicesTy.getElementType(), index);
-          b.create<linalg::YieldOp>(cast.getResult());
+              arith::IndexCastOp::create(b, indicesTy.getElementType(), index);
+          linalg::YieldOp::create(b, cast.getResult());
         };
         batchIdx = builder
                        .create<linalg::GenericOp>(indicesTy, indices, empty,
@@ -104,9 +104,9 @@ public:
 
       indicesTy = llvm::cast<RankedTensorType>(indicesTy.clone(
           {indicesTy.getDimSize(0), indicesTy.getDimSize(1), 2}));
-      indices = builder.create<tosa::ConcatOp>(indicesTy,
-                                               ValueRange{batchIdx, indices},
-                                               rewriter.getI32IntegerAttr(2));
+      indices = tosa::ConcatOp::create(builder, indicesTy,
+                                       ValueRange{batchIdx, indices},
+                                       rewriter.getI32IntegerAttr(2));
     }
 
     auto collapseBatch = [](Value value, ImplicitLocOpBuilder &b) -> Value {
@@ -125,16 +125,16 @@ public:
       collapseShape[0] =
           (batchDyn || rowsDyn) ? ShapedType::kDynamic : batch * rows;
 
-      return b.create<tensor::CollapseShapeOp>(valueTy.clone(collapseShape),
-                                               value, collapseMap);
+      return tensor::CollapseShapeOp::create(b, valueTy.clone(collapseShape),
+                                             value, collapseMap);
     };
 
     indices = collapseBatch(indices, builder);
     updates = collapseBatch(updates, builder);
 
     // Create the LinalgExt scatter operation.
-    auto scatter = builder.create<IREE::LinalgExt::ScatterOp>(
-        TypeRange{values.getType()}, ValueRange{updates, indices},
+    auto scatter = IREE::LinalgExt::ScatterOp::create(
+        builder, TypeRange{values.getType()}, ValueRange{updates, indices},
         ValueRange{values}, builder.getDenseI64ArrayAttr({0, 1}),
         builder.getBoolAttr(true));
 
@@ -143,7 +143,7 @@ public:
         builder.createBlock(&scatter.getRegion(), {}, args,
                             llvm::SmallVector<Location>(2, op.getLoc()));
     builder.setInsertionPointToStart(scatterBody);
-    builder.create<IREE::LinalgExt::YieldOp>(scatterBody->getArgument(0));
+    IREE::LinalgExt::YieldOp::create(builder, scatterBody->getArgument(0));
     rewriter.replaceOp(op, scatter.getResult(0));
     return success();
   }

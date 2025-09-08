@@ -599,7 +599,8 @@ struct ConvertOpCanon final : OpRewritePattern<mlir::stablehlo::ConvertOp> {
 template <typename OpTy, typename... Args>
 static OpTy refineOpWithNewOp(PatternRewriter &rewriter, Operation *op,
                               Args &&...args) {
-  auto newOp = rewriter.create<OpTy>(op->getLoc(), std::forward<Args>(args)...);
+  auto newOp =
+      OpTy::create(rewriter, op->getLoc(), std::forward<Args>(args)...);
 
   llvm::SmallVector<Value> replacementResults;
   assert(op->getNumResults() == newOp->getNumResults() &&
@@ -610,8 +611,8 @@ static OpTy refineOpWithNewOp(PatternRewriter &rewriter, Operation *op,
     if (llvm::any_of(opResult.getUsers(), [&](Operation *user) {
           return user->getDialect() != op->getDialect();
         })) {
-      replacementResult = rewriter.create<mlir::tensor::CastOp>(
-          op->getLoc(), opResult.getType(), newOpResult);
+      replacementResult = mlir::tensor::CastOp::create(
+          rewriter, op->getLoc(), opResult.getType(), newOpResult);
     }
     replacementResults.push_back(replacementResult);
   }
@@ -767,8 +768,8 @@ struct EmptyReduceOpCanon final : OpRewritePattern<mlir::stablehlo::ReduceOp> {
       SmallVector<Value> broadcasts(op.getNumResults());
       for (auto [bcast, init, outTy] : llvm::zip_equal(
                broadcasts, op.getInitValues(), op.getResultTypes())) {
-        bcast = rewriter.create<mlir::stablehlo::BroadcastInDimOp>(loc, outTy,
-                                                                   init, empty);
+        bcast = mlir::stablehlo::BroadcastInDimOp::create(rewriter, loc, outTy,
+                                                          init, empty);
       }
       rewriter.replaceOp(op, broadcasts);
       return success();
@@ -782,8 +783,8 @@ struct EmptyReduceOpCanon final : OpRewritePattern<mlir::stablehlo::ReduceOp> {
     SmallVector<Value> broadcasts(op.getNumResults());
     for (auto [bcast, init, shape, outTy] : llvm::zip_equal(
              broadcasts, op.getInitValues(), shapes, op.getResultTypes())) {
-      bcast = rewriter.create<mlir::stablehlo::DynamicBroadcastInDimOp>(
-          loc, outTy, init, shape, empty);
+      bcast = mlir::stablehlo::DynamicBroadcastInDimOp::create(
+          rewriter, loc, outTy, init, shape, empty);
     }
     rewriter.replaceOp(op, broadcasts);
     return success();
@@ -926,8 +927,8 @@ struct GatherOpCanon final : OpRewritePattern<mlir::stablehlo::GatherOp> {
 
     Type elementType = gather.getType().getElementType();
     auto sliceType = RankedTensorType::get(sliceShape, elementType);
-    Value result = rewriter.create<mlir::stablehlo::SliceOp>(
-        gather.getLoc(), sliceType, gather.getOperand(),
+    Value result = mlir::stablehlo::SliceOp::create(
+        rewriter, gather.getLoc(), sliceType, gather.getOperand(),
         rewriter.getDenseI64ArrayAttr(sliceStart),
         rewriter.getDenseI64ArrayAttr(sliceEnd),
         rewriter.getDenseI64ArrayAttr(sliceStride));
@@ -941,8 +942,8 @@ struct GatherOpCanon final : OpRewritePattern<mlir::stablehlo::GatherOp> {
         }
       }
       auto reshapeType = RankedTensorType::get(reshapeShape, elementType);
-      result = rewriter.create<mlir::stablehlo::ReshapeOp>(gather.getLoc(),
-                                                           reshapeType, result);
+      result = mlir::stablehlo::ReshapeOp::create(rewriter, gather.getLoc(),
+                                                  reshapeType, result);
     }
 
     result.setType(gather.getType());
@@ -1081,9 +1082,9 @@ struct ZeroExtentTensorCanon final : RewritePattern {
       if (!resultType || result.use_empty()) {
         continue;
       }
-      rewriter.replaceAllUsesWith(result, rewriter.create<tensor::EmptyOp>(
-                                              loc, resultType->getShape(),
-                                              resultType->getElementType()));
+      rewriter.replaceAllUsesWith(
+          result, tensor::EmptyOp::create(rewriter, loc, resultType->getShape(),
+                                          resultType->getElementType()));
       didUpdate = true;
     }
 
@@ -1096,8 +1097,9 @@ struct ZeroExtentTensorCanon final : RewritePattern {
       }
       Operation *owner = operand.getOwner();
       int operandNum = operand.getOperandNumber();
-      auto emptyTensorOp = rewriter.create<tensor::EmptyOp>(
-          loc, operandType->getShape(), operandType->getElementType());
+      auto emptyTensorOp =
+          tensor::EmptyOp::create(rewriter, loc, operandType->getShape(),
+                                  operandType->getElementType());
       rewriter.modifyOpInPlace(
           owner, [&]() { owner->setOperand(operandNum, emptyTensorOp); });
       didUpdate = true;

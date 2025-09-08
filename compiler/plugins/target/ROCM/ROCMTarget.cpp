@@ -816,8 +816,8 @@ public:
     }
 
     // Add the binary data to the target executable.
-    executableBuilder.create<iree_compiler::IREE::HAL::ExecutableBinaryOp>(
-        variantOp.getLoc(), variantOp.getSymName(),
+    iree_compiler::IREE::HAL::ExecutableBinaryOp::create(
+        executableBuilder, variantOp.getLoc(), variantOp.getSymName(),
         variantOp.getTarget().getFormat(), binaryContainer.value());
 
     return success();

@@ -134,7 +134,7 @@ class BindSymbolicShapesPass final
       OpBuilder::InsertionGuard guard(builder);
       builder.setInsertionPointAfterValue(producer);
       Value dimValue =
-          builder.create<tensor::DimOp>(producer.getLoc(), producer, position);
+          tensor::DimOp::create(builder, producer.getLoc(), producer, position);
       return dimValue;
     }
 
@@ -197,11 +197,11 @@ class BindSymbolicShapesPass final
         // is already guaranteed to be topologically legal) stays so.
         OpBuilder::InsertionGuard guard(builder);
         builder.setInsertionPointAfterValue(annotatesValue);
-        builtinConversion = builder.create<TorchConversion::ToBuiltinTensorOp>(
-            bindOp->getLoc(), builtinTensorType, annotatesValue);
+        builtinConversion = TorchConversion::ToBuiltinTensorOp::create(
+            builder, bindOp->getLoc(), builtinTensorType, annotatesValue);
       }
-      rewrittenTorchOp = builder.create<TorchConversion::FromBuiltinTensorOp>(
-          bindOp->getLoc(), torchType, builtinConversion.getResult());
+      rewrittenTorchOp = TorchConversion::FromBuiltinTensorOp::create(
+          builder, bindOp->getLoc(), torchType, builtinConversion.getResult());
       annotatesValue.replaceAllUsesExcept(rewrittenTorchOp.getResult(),
                                           builtinConversion);
       annotatesValue = builtinConversion.getResult();
@@ -277,15 +277,15 @@ class BindSymbolicShapesPass final
 
         switch (binaryExpr.getKind()) {
         case AffineExprKind::Add:
-          return builder.create<arith::AddIOp>(loc, lhs, rhs);
+          return arith::AddIOp::create(builder, loc, lhs, rhs);
         case AffineExprKind::Mul:
-          return builder.create<arith::MulIOp>(loc, lhs, rhs);
+          return arith::MulIOp::create(builder, loc, lhs, rhs);
         case AffineExprKind::Mod:
-          return builder.create<arith::RemSIOp>(loc, lhs, rhs);
+          return arith::RemSIOp::create(builder, loc, lhs, rhs);
         case AffineExprKind::FloorDiv:
-          return builder.create<arith::DivSIOp>(loc, lhs, rhs);
+          return arith::DivSIOp::create(builder, loc, lhs, rhs);
         case AffineExprKind::CeilDiv:
-          return builder.create<arith::CeilDivSIOp>(loc, lhs, rhs);
+          return arith::CeilDivSIOp::create(builder, loc, lhs, rhs);
         default:
           break;
         }
@@ -293,9 +293,10 @@ class BindSymbolicShapesPass final
 
       switch (genericExpr.getKind()) {
       case AffineExprKind::Constant:
-        return builder.create<arith::ConstantOp>(
-            loc, builder.getIndexAttr(
-                     llvm::cast<AffineConstantExpr>(genericExpr).getValue()));
+        return arith::ConstantOp::create(
+            builder, loc,
+            builder.getIndexAttr(
+                llvm::cast<AffineConstantExpr>(genericExpr).getValue()));
       case AffineExprKind::DimId:
         // Unsupported.
         break;
@@ -335,8 +336,8 @@ class BindSymbolicShapesPass final
           // Certain classes of symbolic expressions may not terminate on
           // distinct dimensions (i.e. `s0 * 4` with no symbol that corresponds)
           // to `s0`. In this case, we just do runtime resolution of the symbol.
-          dimValue = builder.create<tensor::DimOp>(bindOp->getLoc(),
-                                                   annotatesValue, index);
+          dimValue = tensor::DimOp::create(builder, bindOp->getLoc(),
+                                           annotatesValue, index);
         }
 
         // Add optimization assumptions if the divisor or bounds are known.
@@ -386,8 +387,9 @@ class BindSymbolicShapesPass final
       }
 
       OpBuilder builder(anchorOp);
-      Value tieShape = builder.create<IREE::Flow::TensorTieShapeOp>(
-          bindOp->getLoc(), builtinTensorType, annotatesValue, dynamicDims);
+      Value tieShape = IREE::Flow::TensorTieShapeOp::create(
+          builder, bindOp->getLoc(), builtinTensorType, annotatesValue,
+          dynamicDims);
       rewrittenTorchOp.setOperand(tieShape);
     }
   };
