@@ -5439,7 +5439,7 @@ tested in the IREE repo itself are stored in
 For example, here is part of a config file for running ONNX operator tests on
 CPU:</p>
 <!-- markdownlint-disable-next-line -->
-<div class="highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">tests/external/iree-test-suites/onnx_ops/onnx_ops_cpu_llvm_sync_O0.json</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 1</span>
+<div class="highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">tests/external/iree-test-suites/onnx_ops/onnx_ops_cpu_llvm_sync.json</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 1</span>
 <span class="normal"> 2</span>
 <span class="normal"> 3</span>
 <span class="normal"> 4</span>
@@ -5463,8 +5463,7 @@ CPU:</p>
 <span class="w">  </span><span class="nt">&quot;iree_compile_flags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">    </span><span class="s2">&quot;--iree-hal-target-device=local&quot;</span><span class="p">,</span>
 <span class="w">    </span><span class="s2">&quot;--iree-hal-local-target-device-backends=llvm-cpu&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="s2">&quot;--iree-input-demote-f64-to-f32=false&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="s2">&quot;--iree-opt-level=O0&quot;</span>
+<span class="w">    </span><span class="s2">&quot;--iree-input-demote-f64-to-f32=false&quot;</span>
 <span class="w">  </span><span class="p">],</span>
 <span class="w">  </span><span class="nt">&quot;iree_run_module_flags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">    </span><span class="s2">&quot;--device=local-sync&quot;</span>
@@ -5478,6 +5477,7 @@ CPU:</p>
 <span class="w">  </span><span class="p">],</span>
 <span class="w">  </span><span class="nt">&quot;skip_run_tests&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">    </span><span class="s2">&quot;onnx/node/generated/test_gridsample_zeros_padding&quot;</span>
+<span class="w">  </span><span class="p">],</span>
 </code></pre></div></td></tr></table></div>
 <h5 id="updating-config-files">Updating config files<a class="headerlink" href="#updating-config-files" title="Permanent link">link</a></h5>
 <p>If the ONNX operator tests fail on a GitHub Actions workflow, check the logs
