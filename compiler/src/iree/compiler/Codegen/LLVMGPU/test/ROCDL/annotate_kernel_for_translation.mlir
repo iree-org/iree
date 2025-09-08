@@ -117,7 +117,7 @@ builtin.module {
 
 // -----
 
-// Check that denormal and waves_per_eu are set.
+// Check that denormal is set.
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
     denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">,
@@ -129,8 +129,7 @@ builtin.module {
                                       max_thread_count_per_workgroup = 1024,
                                       max_workgroup_memory_bytes = 65536,
                                       max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>,
-    ukernels = "none",
-    waves_per_eu = 2 : i64
+    ukernels = "none"
   }>
 #pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>],
                                         flags = Indirect>
@@ -144,7 +143,6 @@ builtin.module {
       builtin.module {
         // CHECK-LABEL: llvm.func @test_rocdl_attrs
         // CHECK: denormal_fp_math_f32 = "preserve-sign"
-        // CHECK: rocdl.waves_per_eu = 2 : i64
         llvm.func @test_rocdl_attrs(%arg0: i32) {
           llvm.return
         }
@@ -155,7 +153,7 @@ builtin.module {
 
 // -----
 
-// Check that denormal and waves_per_eu are set.
+// Check that denormal is set.
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
     denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"positive-zero">,
@@ -167,8 +165,7 @@ builtin.module {
                                       max_thread_count_per_workgroup = 1024,
                                       max_workgroup_memory_bytes = 65536,
                                       max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>,
-    ukernels = "none",
-    waves_per_eu = 1 : i64
+    ukernels = "none"
   }>
 #pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>],
                                         flags = Indirect>
@@ -182,7 +179,6 @@ builtin.module {
       builtin.module {
         // CHECK-LABEL: llvm.func @test_rocdl_attrs
         // CHECK: denormal_fp_math_f32 = "positive-zero"
-        // CHECK: rocdl.waves_per_eu = 1 : i64
         llvm.func @test_rocdl_attrs(%arg0: i32) {
           llvm.return
         }
