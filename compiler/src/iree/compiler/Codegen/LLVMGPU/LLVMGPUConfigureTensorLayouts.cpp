@@ -199,23 +199,24 @@ SmallVector<int64_t> getIterationSpaceBounds(linalg::LinalgOp linalgOp) {
   return bounds;
 }
 
-static LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
+struct MMASchedule {
+  IREE::Codegen::InnerTileDescAttrInterface intrinsic;
+  int64_t subgroupMCount;
+  int64_t subgroupNCount;
+};
+
+static LogicalResult setContractionAnchor(MMASchedule &schedule,
                                           SmallVector<bool> promotedOperands,
                                           RewriterBase &rewriter,
                                           linalg::LinalgOp contract) {
-  // TODO: Add SIMT fallback.
-  if (!schedule) {
-    return contract->emitError("missing mma schedule for contraction");
-  }
-
   // This function should have only be called on a contraction op.
   assert(linalg::isaContractionOpInterface(contract) &&
          "cannot set contraction anchor on non contraction op");
 
   SmallVector<int64_t> bounds = getIterationSpaceBounds(contract);
   auto layouts = getContractionLayout(
-      schedule.getIntrinsic(), schedule.getSubgroupMCount(),
-      schedule.getSubgroupNCount(), bounds, contract.getIndexingMapsArray());
+      schedule.intrinsic, schedule.subgroupMCount, schedule.subgroupNCount,
+      bounds, contract.getIndexingMapsArray());
   if (failed(layouts)) {
     return contract->emitError("cannot get concrete layout for contraction");
   }
@@ -230,11 +231,11 @@ static LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
   // Set layouts for lhs, rhs and acc.
   rewriter.setInsertionPoint(contract);
   auto layoutedLhs =
-      ToLayoutOp::create(rewriter, loc, lhs, aLayout, schedule.getIntrinsic());
+      rewriter.create<ToLayoutOp>(loc, lhs, aLayout, schedule.intrinsic);
   auto layoutedRhs =
-      ToLayoutOp::create(rewriter, loc, rhs, bLayout, schedule.getIntrinsic());
+      rewriter.create<ToLayoutOp>(loc, rhs, bLayout, schedule.intrinsic);
   auto layoutedAcc =
-      ToLayoutOp::create(rewriter, loc, acc, cLayout, schedule.getIntrinsic());
+      rewriter.create<ToLayoutOp>(loc, acc, cLayout, schedule.intrinsic);
 
   // Promote matmul lhs and rhs.
   // TODO: This is a hack until layout analysis is improved. The layout analysis
@@ -257,23 +258,18 @@ static LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
 
   // Set layout for result.
   rewriter.setInsertionPointAfter(contract);
-  auto toLayout = ToLayoutOp::create(rewriter, loc, contract->getResult(0),
-                                     cLayout, schedule.getIntrinsic());
+  auto toLayout = rewriter.create<ToLayoutOp>(loc, contract->getResult(0),
+                                              cLayout, schedule.intrinsic);
   rewriter.replaceAllUsesExcept(contract->getResult(0), toLayout.getResult(),
                                 toLayout);
 
   return success();
 }
 
-static LogicalResult setConvolutionAnchor(IREE::GPU::MMAScheduleAttr schedule,
+static LogicalResult setConvolutionAnchor(MMASchedule schedule,
                                           SmallVector<bool> promotedOperands,
                                           RewriterBase &rewriter,
                                           linalg::LinalgOp conv) {
-  // TODO: Add SIMT fallback.
-  if (!schedule) {
-    return conv->emitError("missing mma schedule for convolution");
-  }
-
   // This function should have only be called on a convolution op.
   FailureOr<linalg::ConvolutionDimensions> convDims =
       linalg::inferConvolutionDims(conv);
@@ -298,9 +294,9 @@ static LogicalResult setConvolutionAnchor(IREE::GPU::MMAScheduleAttr schedule,
   }
 
   SmallVector<int64_t> bounds = getIterationSpaceBounds(conv);
-  auto layouts = getContractionLayout(
-      schedule.getIntrinsic(), schedule.getSubgroupMCount(),
-      schedule.getSubgroupNCount(), bounds, maps);
+  FailureOr<ContractionLayout> layouts =
+      getContractionLayout(schedule.intrinsic, schedule.subgroupMCount,
+                           schedule.subgroupNCount, bounds, maps);
 
   auto [aLayout, bLayout, cLayout] = *layouts;
   Location loc = conv.getLoc();
@@ -312,11 +308,11 @@ static LogicalResult setConvolutionAnchor(IREE::GPU::MMAScheduleAttr schedule,
   // Set layouts for lhs, rhs and acc.
   rewriter.setInsertionPoint(conv);
   auto layoutedLhs =
-      ToLayoutOp::create(rewriter, loc, lhs, aLayout, schedule.getIntrinsic());
+      rewriter.create<ToLayoutOp>(loc, lhs, aLayout, schedule.intrinsic);
   auto layoutedRhs =
-      ToLayoutOp::create(rewriter, loc, rhs, bLayout, schedule.getIntrinsic());
+      rewriter.create<ToLayoutOp>(loc, rhs, bLayout, schedule.intrinsic);
   auto layoutedAcc =
-      ToLayoutOp::create(rewriter, loc, acc, cLayout, schedule.getIntrinsic());
+      rewriter.create<ToLayoutOp>(loc, acc, cLayout, schedule.intrinsic);
 
   // Promote matmul lhs and rhs.
   // TODO: This is a hack until layout analysis is improved. The layout analysis
@@ -339,8 +335,8 @@ static LogicalResult setConvolutionAnchor(IREE::GPU::MMAScheduleAttr schedule,
 
   // Set layout for result.
   rewriter.setInsertionPointAfter(conv);
-  auto toLayout = ToLayoutOp::create(rewriter, loc, conv->getResult(0), cLayout,
-                                     schedule.getIntrinsic());
+  auto toLayout = rewriter.create<ToLayoutOp>(loc, conv->getResult(0), cLayout,
+                                              schedule.intrinsic);
   rewriter.replaceAllUsesExcept(conv->getResult(0), toLayout.getResult(),
                                 toLayout);
 
@@ -401,26 +397,14 @@ static void swapOperandsToTransposeIntrinsic(RewriterBase &rewriter,
   contractOp->setOperand(1, lhs);
 }
 
-static IREE::GPU::MMAScheduleAttr
-transposeSchedule(RewriterBase &rewriter, IREE::GPU::MMAScheduleAttr schedule) {
-  return rewriter.getAttr<IREE::GPU::MMAScheduleAttr>(
-      schedule.getIntrinsic(), schedule.getSubgroupNCount(),
-      schedule.getSubgroupMCount());
-}
-
 static LogicalResult setAttentionMatmulAnchor(RewriterBase &rewriter,
                                               linalg::LinalgOp qkMatmul,
                                               linalg::LinalgOp pvMatmul) {
 
-  IREE::GPU::MMAScheduleAttr qkSchedule =
-      rewriter.getAttr<IREE::GPU::MMAScheduleAttr>(getIntrinsic(qkMatmul),
-                                                   getSubgroupMCount(qkMatmul),
-                                                   getSubgroupNCount(qkMatmul));
-
-  IREE::GPU::MMAScheduleAttr pvSchedule =
-      rewriter.getAttr<IREE::GPU::MMAScheduleAttr>(getIntrinsic(pvMatmul),
-                                                   getSubgroupMCount(pvMatmul),
-                                                   getSubgroupNCount(pvMatmul));
+  MMASchedule qkSchedule = {getIntrinsic(qkMatmul), getSubgroupMCount(qkMatmul),
+                            getSubgroupNCount(qkMatmul)};
+  MMASchedule pvSchedule = {getIntrinsic(pvMatmul), getSubgroupMCount(pvMatmul),
+                            getSubgroupNCount(pvMatmul)};
 
   // Check if the intrinsic output for qkMatmul can be reused for pvMatmul.
   // We know that pvMatmul takes result of qkMatmul as it's lhs.
@@ -429,10 +413,10 @@ static LogicalResult setAttentionMatmulAnchor(RewriterBase &rewriter,
   bool reuseIntrinsicOutput = false;
   bool transposeIntrinsic = false;
 
-  auto qkIntrinsic = cast<IREE::Codegen::InnerTileDescAttrInterface>(
-      qkSchedule.getIntrinsic());
-  auto pvIntrinsic = cast<IREE::Codegen::InnerTileDescAttrInterface>(
-      pvSchedule.getIntrinsic());
+  auto qkIntrinsic =
+      cast<IREE::Codegen::InnerTileDescAttrInterface>(qkSchedule.intrinsic);
+  auto pvIntrinsic =
+      cast<IREE::Codegen::InnerTileDescAttrInterface>(pvSchedule.intrinsic);
   IREE::GPU::MMASingleSubgroupLayout lhsLayout =
       getSingleSubgroupLayout(pvIntrinsic, IREE::GPU::MMAFragment::Lhs);
   IREE::GPU::MMASingleSubgroupLayout rhsLayout =
@@ -475,8 +459,8 @@ static LogicalResult setAttentionMatmulAnchor(RewriterBase &rewriter,
     }
     swapOperandsToTransposeIntrinsic(rewriter, qkGeneric);
     swapOperandsToTransposeIntrinsic(rewriter, pvGeneric);
-    qkSchedule = transposeSchedule(rewriter, qkSchedule);
-    pvSchedule = transposeSchedule(rewriter, pvSchedule);
+    std::swap(qkSchedule.subgroupMCount, qkSchedule.subgroupNCount);
+    std::swap(pvSchedule.subgroupMCount, pvSchedule.subgroupNCount);
 
     // Swap promoted operands.
     std::swap(promotedQKOperands[0], promotedQKOperands[1]);
@@ -581,9 +565,8 @@ static LogicalResult setIntrinsicLoweringConfigLayout(
     ArrayRef<int64_t> workgroupSize, RewriterBase &rewriter) {
 
   SmallVector<bool> promotedOperands = getPromotedOperands(candidate);
-  auto schedule = rewriter.getAttr<IREE::GPU::MMAScheduleAttr>(
-      getIntrinsic(candidate), getSubgroupMCount(candidate),
-      getSubgroupNCount(candidate));
+  MMASchedule schedule = {getIntrinsic(candidate), getSubgroupMCount(candidate),
+                          getSubgroupNCount(candidate)};
 
   if (linalg::isaContractionOpInterface(candidate)) {
     if (succeeded(setContractionAnchor(schedule, promotedOperands, rewriter,
