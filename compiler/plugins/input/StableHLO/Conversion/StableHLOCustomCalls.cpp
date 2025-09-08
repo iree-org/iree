@@ -44,7 +44,7 @@ static Value computeHouseholder(Value v, Value tau, Value k,
   hShape.push_back(hShape.back());
 
   auto hTy = RankedTensorType::get(hShape, vTy.getElementType());
-  Value empty = b.create<tensor::EmptyOp>(hShape, vTy.getElementType());
+  Value empty = tensor::EmptyOp::create(b, hShape, vTy.getElementType());
 
   auto outMap = b.getMultiDimIdentityMap(hShape.size());
 
@@ -63,9 +63,10 @@ static Value computeHouseholder(Value v, Value tau, Value k,
   SmallVector<utils::IteratorType> iterTypes(hShape.size(),
                                              utils::IteratorType::parallel);
 
-  Value zero = b.create<arith::ConstantOp>(b.getZeroAttr(vTy.getElementType()));
+  Value zero =
+      arith::ConstantOp::create(b, b.getZeroAttr(vTy.getElementType()));
   Value one =
-      b.create<arith::ConstantOp>(b.getFloatAttr(vTy.getElementType(), 1.0));
+      arith::ConstantOp::create(b, b.getFloatAttr(vTy.getElementType(), 1.0));
 
   return b
       .create<linalg::GenericOp>(
@@ -74,37 +75,37 @@ static Value computeHouseholder(Value v, Value tau, Value k,
             ImplicitLocOpBuilder b(loc, bb);
             SmallVector<Value> indices;
             for (int i = 0, s = hTy.getRank(); i < s; ++i) {
-              indices.push_back(b.create<linalg::IndexOp>(loc, i));
+              indices.push_back(linalg::IndexOp::create(b, loc, i));
             }
 
             SmallVector<Value> tauIndices(indices.begin(), indices.end() - 2);
             tauIndices.push_back(k);
-            Value t = b.create<tensor::ExtractOp>(tau, tauIndices);
+            Value t = tensor::ExtractOp::create(b, tau, tauIndices);
 
             // Generates the lower triangularization of the matrix with
             // one values on the diagonal.
             auto tri = [&](Value v, Value i) {
               Value eq =
-                  b.create<arith::CmpIOp>(arith::CmpIPredicate::eq, i, k);
+                  arith::CmpIOp::create(b, arith::CmpIPredicate::eq, i, k);
               Value lt =
-                  b.create<arith::CmpIOp>(arith::CmpIPredicate::ult, i, k);
-              Value sel = b.create<arith::SelectOp>(eq, one, v);
-              return b.create<arith::SelectOp>(lt, zero, sel);
+                  arith::CmpIOp::create(b, arith::CmpIPredicate::ult, i, k);
+              Value sel = arith::SelectOp::create(b, eq, one, v);
+              return arith::SelectOp::create(b, lt, zero, sel);
             };
 
             Value v = tri(args[0], indices[indices.size() - 2]);
             Value vT = tri(args[1], indices[indices.size() - 1]);
 
-            Value h = b.create<arith::MulFOp>(v, vT);
-            h = b.create<arith::MulFOp>(h, t);
+            Value h = arith::MulFOp::create(b, v, vT);
+            h = arith::MulFOp::create(b, h, t);
 
-            Value isDiag = b.create<arith::CmpIOp>(arith::CmpIPredicate::eq,
-                                                   indices[indices.size() - 2],
-                                                   indices[indices.size() - 1]);
-            Value diag = b.create<arith::SelectOp>(isDiag, one, zero);
-            Value sub = b.create<arith::SubFOp>(diag, h);
+            Value isDiag = arith::CmpIOp::create(b, arith::CmpIPredicate::eq,
+                                                 indices[indices.size() - 2],
+                                                 indices[indices.size() - 1]);
+            Value diag = arith::SelectOp::create(b, isDiag, one, zero);
+            Value sub = arith::SubFOp::create(b, diag, h);
 
-            b.create<linalg::YieldOp>(sub);
+            linalg::YieldOp::create(b, sub);
           })
       .getResult(0);
 }
@@ -129,8 +130,8 @@ static Value computeHouseholderSlice(Value matrix, Value tau, Value k,
   }
 
   auto sliceTy = RankedTensorType::get(vShape, matrixTy.getElementType());
-  Value v = b.create<tensor::ExtractSliceOp>(sliceTy, matrix, vOffsets, vSizes,
-                                             vStrides);
+  Value v = tensor::ExtractSliceOp::create(b, sliceTy, matrix, vOffsets, vSizes,
+                                           vStrides);
 
   SmallVector<ReassociationIndices> reass;
   for (int i = 0; i < rank - 2; ++i) {
@@ -141,7 +142,7 @@ static Value computeHouseholderSlice(Value matrix, Value tau, Value k,
   ArrayRef<int64_t> collapseVShape(vShape.begin(), vShape.end() - 1);
   auto collapseVTy =
       RankedTensorType::get(collapseVShape, matrixTy.getElementType());
-  Value collapseV = b.create<tensor::CollapseShapeOp>(collapseVTy, v, reass);
+  Value collapseV = tensor::CollapseShapeOp::create(b, collapseVTy, v, reass);
 
   Value householder = computeHouseholder(collapseV, tau, k, b);
   return householder;
@@ -181,12 +182,12 @@ struct HouseholderReflectorRewriter final
                                          "not supported for dynamic shapes");
     }
 
-    Value zero = b.create<arith::ConstantIndexOp>(0);
-    Value one = b.create<arith::ConstantIndexOp>(1);
-    Value k = b.create<arith::ConstantIndexOp>(tauTy.getShape().back());
+    Value zero = arith::ConstantIndexOp::create(b, 0);
+    Value one = arith::ConstantIndexOp::create(b, 1);
+    Value k = arith::ConstantIndexOp::create(b, tauTy.getShape().back());
     Value householder0 = computeHouseholderSlice(matrix, tau, zero, b);
-    auto scf = b.create<scf::ForOp>(
-        one, k, one, ValueRange{householder0},
+    auto scf = scf::ForOp::create(
+        b, one, k, one, ValueRange{householder0},
         [&](OpBuilder &bb, Location loc, Value iv, ValueRange args) {
           ImplicitLocOpBuilder b(loc, bb);
           Value householder = computeHouseholderSlice(matrix, tau, iv, b);
@@ -199,10 +200,10 @@ struct HouseholderReflectorRewriter final
 
           auto dotNums = mlir::stablehlo::DotDimensionNumbersAttr::get(
               b.getContext(), batch, batch, lhsContract, rhsContract);
-          Value dot = b.create<mlir::stablehlo::DotGeneralOp>(
-              householder0.getType(), args[0], householder, dotNums, nullptr,
+          Value dot = mlir::stablehlo::DotGeneralOp::create(
+              b, householder0.getType(), args[0], householder, dotNums, nullptr,
               mlir::stablehlo::DotAlgorithmAttr{});
-          b.create<scf::YieldOp>(loc, dot);
+          scf::YieldOp::create(b, loc, dot);
         });
 
     SmallVector<OpFoldResult> vOffsets(rank, b.getIndexAttr(0));
@@ -214,8 +215,8 @@ struct HouseholderReflectorRewriter final
     }
 
     auto sliceTy = RankedTensorType::get(vShape, matrixTy.getElementType());
-    Value v = b.create<tensor::ExtractSliceOp>(sliceTy, scf.getResult(0),
-                                               vOffsets, vSizes, vStrides);
+    Value v = tensor::ExtractSliceOp::create(b, sliceTy, scf.getResult(0),
+                                             vOffsets, vSizes, vStrides);
 
     rewriter.replaceOp(op, v);
     return success();

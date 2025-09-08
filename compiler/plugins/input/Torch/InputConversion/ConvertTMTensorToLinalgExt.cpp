@@ -82,14 +82,15 @@ struct ScatterOpConversion
         return rewriter.notifyMatchFailure(
             op, "failed to compute reassociation indices");
       }
-      updateVal = rewriter.create<tensor::CollapseShapeOp>(
-          op.getLoc(), updateVal, reassocIndices.value());
+      updateVal = tensor::CollapseShapeOp::create(
+          rewriter, op.getLoc(), updateVal, reassocIndices.value());
     }
 
     Value indicesVal = op.indices();
-    auto scatterOp = rewriter.create<IREE::LinalgExt::ScatterOp>(
-        op.getLoc(), op->getResultTypes(), ValueRange{updateVal, indicesVal},
-        op.getOutputs(), dimMap, op.getUniqueIndices());
+    auto scatterOp = IREE::LinalgExt::ScatterOp::create(
+        rewriter, op.getLoc(), op->getResultTypes(),
+        ValueRange{updateVal, indicesVal}, op.getOutputs(), dimMap,
+        op.getUniqueIndices());
     rewriter.inlineRegionBefore(op.getRegion(), scatterOp.getRegion(),
                                 scatterOp.getRegion().begin());
     rewriter.replaceOp(op, scatterOp->getResults());
@@ -133,17 +134,18 @@ struct AttentionOpConversion
     SmallVector<Value> dynSizes;
     for (int i = 0, s = outputType.getRank() - 1; i < s; ++i) {
       if (outputType.isDynamicDim(i)) {
-        dynSizes.push_back(rewriter.create<tensor::DimOp>(loc, query, i));
+        dynSizes.push_back(tensor::DimOp::create(rewriter, loc, query, i));
       }
     }
 
     if (outputType.getShape().back() == ShapedType::kDynamic) {
-      dynSizes.push_back(
-          rewriter.create<tensor::DimOp>(loc, value, outputType.getRank() - 1));
+      dynSizes.push_back(tensor::DimOp::create(rewriter, loc, value,
+                                               outputType.getRank() - 1));
     }
 
-    Value result = rewriter.create<tensor::EmptyOp>(
-        loc, outputType.getShape(), outputType.getElementType(), dynSizes);
+    Value result =
+        tensor::EmptyOp::create(rewriter, loc, outputType.getShape(),
+                                outputType.getElementType(), dynSizes);
 
     // TODO: This is a hack. This should be replaced with a simple getScale()
     // when support for scaling is plumbed to TMTensor on the torch-mlir side.
@@ -170,8 +172,8 @@ struct AttentionOpConversion
 
     double dk = static_cast<double>(headDim);
     dk = 1.0 / std::sqrt(dk);
-    Value scale = rewriter.create<arith::ConstantOp>(
-        loc, targetType, rewriter.getFloatAttr(targetType, dk));
+    Value scale = arith::ConstantOp::create(
+        rewriter, loc, targetType, rewriter.getFloatAttr(targetType, dk));
 
     // Add batches to standard attention indexing maps.
     SmallVector<AffineMap> indexingMaps =
@@ -187,8 +189,8 @@ struct AttentionOpConversion
       }
     }
 
-    auto attention = rewriter.create<IREE::LinalgExt::AttentionOp>(
-        loc, result.getType(), query, key, value, scale, result,
+    auto attention = IREE::LinalgExt::AttentionOp::create(
+        rewriter, loc, result.getType(), query, key, value, scale, result,
         rewriter.getAffineMapArrayAttr(indexingMaps), optionalMask);
 
     {
@@ -197,7 +199,7 @@ struct AttentionOpConversion
       block->addArgument(rewriter.getF32Type(), loc);
       rewriter.setInsertionPoint(block, block->begin());
 
-      rewriter.create<IREE::LinalgExt::YieldOp>(loc, block->getArgument(0));
+      IREE::LinalgExt::YieldOp::create(rewriter, loc, block->getArgument(0));
     }
 
     rewriter.replaceOp(op, attention.getResult(0));

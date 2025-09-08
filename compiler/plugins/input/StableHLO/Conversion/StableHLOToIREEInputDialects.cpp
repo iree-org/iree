@@ -72,13 +72,13 @@ struct ConcatenateOpConversion final
     SmallVector<Value, 3> strides;
 
     for (int64_t i = 0; i < rank; ++i) {
-      offsets.push_back(rewriter.create<arith::ConstantIndexOp>(loc, 0));
+      offsets.push_back(arith::ConstantIndexOp::create(rewriter, loc, 0));
       sizes.push_back(rewriter.createOrFold<tensor::DimOp>(
           loc, adaptor.getOperands()[0], i));
-      strides.push_back(rewriter.create<arith::ConstantIndexOp>(loc, 1));
+      strides.push_back(arith::ConstantIndexOp::create(rewriter, loc, 1));
     }
 
-    Value resultDimSize = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    Value resultDimSize = arith::ConstantIndexOp::create(rewriter, loc, 0);
     for (Value arg : adaptor.getOperands()) {
       auto size = rewriter.createOrFold<tensor::DimOp>(loc, arg, dim);
       resultDimSize =
@@ -86,8 +86,8 @@ struct ConcatenateOpConversion final
     }
     sizes[dim] = resultDimSize;
 
-    Value result = rewriter.create<tensor::EmptyOp>(
-        loc, resultType.getShape(), resultType.getElementType());
+    Value result = tensor::EmptyOp::create(rewriter, loc, resultType.getShape(),
+                                           resultType.getElementType());
 
     auto toOpFoldResult = [](Value v) -> OpFoldResult {
       auto op = v.getDefiningOp<arith::ConstantIndexOp>();
@@ -96,15 +96,16 @@ struct ConcatenateOpConversion final
       return op.getValue();
     };
 
-    Value accBound = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    Value accBound = arith::ConstantIndexOp::create(rewriter, loc, 0);
     for (Value arg : adaptor.getOperands()) {
       offsets[dim] = accBound;
       sizes[dim] = rewriter.createOrFold<tensor::DimOp>(loc, arg, dim);
-      result = rewriter.create<tensor::InsertSliceOp>(
-          loc, arg, result, llvm::map_to_vector(offsets, toOpFoldResult),
+      result = tensor::InsertSliceOp::create(
+          rewriter, loc, arg, result,
+          llvm::map_to_vector(offsets, toOpFoldResult),
           llvm::map_to_vector(sizes, toOpFoldResult),
           llvm::map_to_vector(strides, toOpFoldResult));
-      accBound = rewriter.create<arith::AddIOp>(loc, accBound, sizes[dim]);
+      accBound = arith::AddIOp::create(rewriter, loc, accBound, sizes[dim]);
     }
     rewriter.replaceOp(op, result);
     return success();
@@ -131,20 +132,20 @@ Value getDFTMatmulCoeff(OpBuilder b, Location loc, RankedTensorType matrixType,
       values.push_back(b.getF32FloatAttr(v));
     }
   }
-  return b.create<arith::ConstantOp>(
-      loc, matrixType, DenseFPElementsAttr::get(matrixType, values));
+  return arith::ConstantOp::create(
+      b, loc, matrixType, DenseFPElementsAttr::get(matrixType, values));
 }
 
 Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
                                   RankedTensorType resultType, Value lhs,
                                   Value rhs) {
-  Value zero = b.create<arith::ConstantOp>(
-      loc, b.getZeroAttr(resultType.getElementType()));
-  Value emptyTensor = b.create<mlir::tensor::EmptyOp>(
-      loc, resultType.getShape(), resultType.getElementType(),
+  Value zero = arith::ConstantOp::create(
+      b, loc, b.getZeroAttr(resultType.getElementType()));
+  Value emptyTensor = mlir::tensor::EmptyOp::create(
+      b, loc, resultType.getShape(), resultType.getElementType(),
       /*dyn_size=*/ValueRange{});
   Value zeroTensor =
-      b.create<linalg::FillOp>(loc, zero, emptyTensor).getResult(0);
+      linalg::FillOp::create(b, loc, zero, emptyTensor).getResult(0);
 
   switch (llvm::cast<RankedTensorType>(lhs.getType()).getRank()) {
   case 1:

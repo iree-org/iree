@@ -114,8 +114,8 @@ Value convertToBuiltinTensor(OpBuilder &builder, Value possibleTorchTensor) {
         builtinTy.clone(builder.getIntegerType(intTy.getIntOrFloatBitWidth()));
   }
 
-  return builder.create<TorchConversion::ToBuiltinTensorOp>(
-      possibleTorchTensor.getLoc(), builtinTy, possibleTorchTensor);
+  return TorchConversion::ToBuiltinTensorOp::create(
+      builder, possibleTorchTensor.getLoc(), builtinTy, possibleTorchTensor);
 }
 
 enum class TypeDisposition {
@@ -213,15 +213,15 @@ LogicalResult ConvertedAsyncFunctionInfo::postProcess() {
       Value convertResult;
       if (isa<Torch::BoolType>(torchType)) {
         convertUser =
-            preambleBuilder.create<TorchConversion::FromI1Op>(loc, argValue);
+            TorchConversion::FromI1Op::create(preambleBuilder, loc, argValue);
         convertResult = convertUser->getResult(0);
       } else if (isa<Torch::FloatType>(torchType)) {
         convertUser =
-            preambleBuilder.create<TorchConversion::FromF64Op>(loc, argValue);
+            TorchConversion::FromF64Op::create(preambleBuilder, loc, argValue);
         convertResult = convertUser->getResult(0);
       } else if (isa<Torch::IntType>(torchType)) {
         convertUser =
-            preambleBuilder.create<TorchConversion::FromI64Op>(loc, argValue);
+            TorchConversion::FromI64Op::create(preambleBuilder, loc, argValue);
         convertResult = convertUser->getResult(0);
       } else {
         emitError(loc) << "unhandled torch primitive materialization: "
@@ -266,17 +266,16 @@ LogicalResult ConvertedAsyncFunctionInfo::postProcess() {
       Location loc = returnValue.getLoc();
       if (isa<Torch::BoolType>(torchType)) {
         newReturnOperands.back() =
-            postambleBuilder.create<TorchConversion::ToI1Op>(loc, returnValue);
+            TorchConversion::ToI1Op::create(postambleBuilder, loc, returnValue);
       } else if (isa<Torch::FloatType>(torchType)) {
-        newReturnOperands.back() =
-            postambleBuilder.create<TorchConversion::ToF64Op>(loc, returnValue);
+        newReturnOperands.back() = TorchConversion::ToF64Op::create(
+            postambleBuilder, loc, returnValue);
       } else if (isa<Torch::IntType>(torchType)) {
-        newReturnOperands.back() =
-            postambleBuilder.create<TorchConversion::ToI64Op>(loc, returnValue);
+        newReturnOperands.back() = TorchConversion::ToI64Op::create(
+            postambleBuilder, loc, returnValue);
       } else if (isa<Torch::GeneratorType>(torchType)) {
-        newReturnOperands.back() =
-            postambleBuilder.create<TorchConversion::GeneratorToI64Op>(
-                loc, returnValue);
+        newReturnOperands.back() = TorchConversion::GeneratorToI64Op::create(
+            postambleBuilder, loc, returnValue);
       } else {
         emitError(loc) << "unhandled torch primitive materialization: "
                        << torchType;
@@ -296,8 +295,8 @@ LogicalResult ConvertedAsyncFunctionInfo::postProcess() {
   Value coarseSignalFence =
       entryBlock->getArgument(entryBlock->getNumArguments() - 1);
   if (barrierInputs.empty()) {
-    postambleBuilder.create<IREE::HAL::FenceSignalOp>(funcOp.getLoc(),
-                                                      coarseSignalFence);
+    IREE::HAL::FenceSignalOp::create(postambleBuilder, funcOp.getLoc(),
+                                     coarseSignalFence);
   } else {
     SmallVector<Value> aliasedResults;
     for (auto [barrierInput, meta] :
@@ -313,17 +312,16 @@ LogicalResult ConvertedAsyncFunctionInfo::postProcess() {
         Value waitFence = waitSignalFences->first;
         auto barrierInputDims = IREE::Util::buildDynamicDimsForValue(
             barrierInput.getLoc(), barrierInput, postambleBuilder);
-        aliasedResults.push_back(
-            postambleBuilder.create<IREE::HAL::TensorAliasOp>(
-                barrierInput.getLoc(), barrierInput.getType(), barrierInput,
-                barrierInputDims, meta.storage, waitFence,
-                storageAffinityAttr));
+        aliasedResults.push_back(IREE::HAL::TensorAliasOp::create(
+            postambleBuilder, barrierInput.getLoc(), barrierInput.getType(),
+            barrierInput, barrierInputDims, meta.storage, waitFence,
+            storageAffinityAttr));
       } else {
         aliasedResults.push_back(barrierInput);
       }
     }
-    auto barrierOp = postambleBuilder.create<IREE::HAL::TensorBarrierOp>(
-        funcOp.getLoc(), aliasedResults, coarseSignalFence);
+    auto barrierOp = IREE::HAL::TensorBarrierOp::create(
+        postambleBuilder, funcOp.getLoc(), aliasedResults, coarseSignalFence);
     for (auto [barrierResult, meta] :
          llvm::zip_equal(barrierOp.getResults(), barrierResultMeta)) {
       Attribute exportAffinityAttr;
@@ -333,8 +331,8 @@ LogicalResult ConvertedAsyncFunctionInfo::postProcess() {
         exportAffinityAttr =
             getTorchResultAttr(meta.returnIndex, "iree.abi.affinity");
       }
-      Value exportedValue = postambleBuilder.create<IREE::HAL::TensorExportOp>(
-          funcOp.getLoc(),
+      Value exportedValue = IREE::HAL::TensorExportOp::create(
+          postambleBuilder, funcOp.getLoc(),
           postambleBuilder.getType<IREE::HAL::BufferViewType>(), barrierResult,
           TypeAttr::get(barrierResult.getType()), /*name=*/nullptr,
           exportAffinityAttr);
@@ -410,13 +408,13 @@ LogicalResult ConvertedAsyncFunctionInfo::convertImmutableTensorArg(
   auto waitSignalFences = getEnclosingWaitSignalFences(argValue);
   assert(waitSignalFences && "async function missing fences");
   Value waitFence = waitSignalFences->first;
-  Value importedTensor = builder.create<IREE::HAL::TensorImportOp>(
-      loc, builtinTensorType, argValue, TypeAttr::get(builtinTensorType),
-      consume, waitFence,
+  Value importedTensor = IREE::HAL::TensorImportOp::create(
+      builder, loc, builtinTensorType, argValue,
+      TypeAttr::get(builtinTensorType), consume, waitFence,
       /*name=*/nullptr, affinityAttr);
   if (builtinTensorType != torchType) {
-    importedTensor = builder.create<TorchConversion::FromBuiltinTensorOp>(
-        loc, torchType, importedTensor);
+    importedTensor = TorchConversion::FromBuiltinTensorOp::create(
+        builder, loc, torchType, importedTensor);
   }
 
   originalUses.assign(importedTensor);
@@ -447,8 +445,8 @@ LogicalResult ConvertedAsyncFunctionInfo::convertMutableTensorArg(
     IRRewriter rewriter(loc.getContext());
     rewriter.setInsertionPoint(userOp);
     if (auto copyToVtOp = dyn_cast<Torch::CopyToValueTensorOp>(userOp)) {
-      Value imported = rewriter.create<IREE::HAL::TensorImportOp>(
-          loc, builtinTensorType, argValue,
+      Value imported = IREE::HAL::TensorImportOp::create(
+          rewriter, loc, builtinTensorType, argValue,
           /*target_encoding=*/TypeAttr::get(builtinTensorType),
           /*consume=*/false,
           /*wait_fence*/ fences->first,
@@ -502,8 +500,8 @@ void createCoarseFencesSyncWrapper(StringRef syncFunctionName,
   auto syncFuncType = rewriter.getType<mlir::FunctionType>(
       inputTypes, asyncFuncType.getResults());
   auto syncFuncOp =
-      rewriter.create<IREE::Util::FuncOp>(loc, syncFunctionName, syncFuncType,
-                                          /*tiedOperandsAttr=*/nullptr);
+      IREE::Util::FuncOp::create(rewriter, loc, syncFunctionName, syncFuncType,
+                                 /*tiedOperandsAttr=*/nullptr);
   syncFuncOp.setSymVisibilityAttr(asyncFuncOp.getSymVisibilityAttr());
   retainFunctionAttributes(asyncFuncOp, syncFuncOp);
   syncFuncOp->setAttr("iree.abi.stub", rewriter.getUnitAttr());
@@ -521,12 +519,12 @@ void createCoarseFencesSyncWrapper(StringRef syncFunctionName,
   // TODO(multi-device): emit get with derived ordinal or lookup with attr. We
   // could always say device 0 for now but could instead look for an
   // iree.abi.affinity/iree.abi.device/etc.
-  Value timeoutMillis = rewriter.create<arith::ConstantIntOp>(loc, -1, 32);
+  Value timeoutMillis = arith::ConstantIntOp::create(rewriter, loc, -1, 32);
   Value device = IREE::HAL::DeviceType::resolveAny(loc, rewriter);
-  Value waitFence = rewriter.create<IREE::Util::NullOp>(
-      loc, rewriter.getType<IREE::HAL::FenceType>());
-  Value signalFence = rewriter.create<IREE::HAL::FenceCreateOp>(
-      loc, rewriter.getType<IREE::HAL::FenceType>(), device,
+  Value waitFence = IREE::Util::NullOp::create(
+      rewriter, loc, rewriter.getType<IREE::HAL::FenceType>());
+  Value signalFence = IREE::HAL::FenceCreateOp::create(
+      rewriter, loc, rewriter.getType<IREE::HAL::FenceType>(), device,
       IREE::HAL::FenceFlagBitfield::None);
 
   SmallVector<Value> callOperands(entryBlock->getArguments());
@@ -541,11 +539,11 @@ void createCoarseFencesSyncWrapper(StringRef syncFunctionName,
           .getResults();
 
   // Wait forever for signal.
-  rewriter.create<IREE::HAL::FenceAwaitOp>(
-      loc, rewriter.getI32Type(), timeoutMillis,
+  IREE::HAL::FenceAwaitOp::create(
+      rewriter, loc, rewriter.getI32Type(), timeoutMillis,
       IREE::HAL::WaitFlagBitfield::None, signalFence);
 
-  rewriter.create<IREE::Util::ReturnOp>(loc, callResults);
+  IREE::Util::ReturnOp::create(rewriter, loc, callResults);
 }
 
 } // namespace
@@ -674,8 +672,9 @@ public:
     // Create new func.
     FunctionType asyncFuncType =
         FunctionType::get(loc.getContext(), ireeInputTypes, ireeResultTypes);
-    auto asyncFuncOp = rewriter.create<IREE::Util::FuncOp>(
-        torchFunc.getLoc(), asyncFunctionName, asyncFuncType, tiedOperandsAttr);
+    auto asyncFuncOp = IREE::Util::FuncOp::create(
+        rewriter, torchFunc.getLoc(), asyncFunctionName, asyncFuncType,
+        tiedOperandsAttr);
     convertedFuncInfo.funcOp = asyncFuncOp;
     asyncFuncOp.setSymVisibilityAttr(torchFunc.getSymVisibilityAttr());
     // Handle defacto attrs to specialized ones.

@@ -61,7 +61,7 @@ Value processTuple(Type type, Location loc, Block &block, OpBuilder &builder) {
     values.push_back(processTuple(subtype, loc, block, builder));
   }
 
-  return builder.create<mlir::stablehlo::TupleOp>(loc, tupleType, values);
+  return mlir::stablehlo::TupleOp::create(builder, loc, tupleType, values);
 }
 
 void copyOperationAttrs(Operation *oldOp, Operation *newOp) {
@@ -86,8 +86,8 @@ void recursiveUntuple(Value value, Location loc, OpBuilder &builder,
   }
 
   for (auto [idx, subType] : llvm::enumerate(tupleType.getTypes())) {
-    auto elementOp = builder.create<mlir::stablehlo::GetTupleElementOp>(
-        loc, subType, value, builder.getI32IntegerAttr(idx));
+    auto elementOp = mlir::stablehlo::GetTupleElementOp::create(
+        builder, loc, subType, value, builder.getI32IntegerAttr(idx));
     recursiveUntuple(elementOp.getResult(), loc, builder, newValues);
   }
 }
@@ -106,7 +106,7 @@ Value recursiveRetuple(Type oldType, Operation::result_range *values,
     subValues.push_back(recursiveRetuple(subType, values, builder, loc));
   }
 
-  return builder.create<mlir::stablehlo::TupleOp>(loc, tupleType, subValues)
+  return mlir::stablehlo::TupleOp::create(builder, loc, tupleType, subValues)
       .getResult();
 }
 
@@ -136,7 +136,7 @@ class DetupleReturnOp : public OpRewritePattern<func::ReturnOp> {
       return builder.notifyMatchFailure(op, "failed to untuple");
     }
 
-    builder.create<mlir::func::ReturnOp>(op->getLoc(), newOperands);
+    mlir::func::ReturnOp::create(builder, op->getLoc(), newOperands);
     builder.eraseOp(op);
     return success();
   }
@@ -158,8 +158,8 @@ class DetupleCallOp : public OpRewritePattern<func::CallOp> {
 
     SmallVector<Type> resultTypes;
     untupleTypes(oldOp.getResultTypes(), resultTypes);
-    auto newOp = builder.create<func::CallOp>(
-        oldOp->getLoc(), oldOp.getCallee(), resultTypes, newArgs);
+    auto newOp = func::CallOp::create(builder, oldOp->getLoc(),
+                                      oldOp.getCallee(), resultTypes, newArgs);
     copyOperationAttrs(oldOp, newOp);
 
     auto newResults = newOp.getResults();
@@ -189,8 +189,8 @@ class DetupleIndirectCallOp : public OpRewritePattern<func::CallIndirectOp> {
       return builder.notifyMatchFailure(oldOp, "failed to untuple values");
     }
 
-    auto newOp = builder.create<func::CallIndirectOp>(
-        oldOp.getLoc(), oldOp.getCallee(), newArgs);
+    auto newOp = func::CallIndirectOp::create(builder, oldOp.getLoc(),
+                                              oldOp.getCallee(), newArgs);
     copyOperationAttrs(oldOp, newOp);
     builder.replaceOp(oldOp, newOp.getResults());
     return success();
@@ -212,7 +212,7 @@ class DetupleBranchOp : public OpRewritePattern<cf::BranchOp> {
     }
 
     auto newOp =
-        builder.create<cf::BranchOp>(oldOp.getLoc(), oldOp.getDest(), newArgs);
+        cf::BranchOp::create(builder, oldOp.getLoc(), oldOp.getDest(), newArgs);
 
     copyOperationAttrs(oldOp, newOp);
     builder.eraseOp(oldOp);
@@ -240,9 +240,9 @@ class DetupleConditionOp : public OpRewritePattern<cf::CondBranchOp> {
       return builder.notifyMatchFailure(oldOp, "Failed to detuple false args");
     }
 
-    auto newOp = builder.create<cf::CondBranchOp>(
-        oldOp.getLoc(), oldOp.getCondition(), oldOp.getTrueDest(), trueArgs,
-        oldOp.getFalseDest(), falseArgs);
+    auto newOp = cf::CondBranchOp::create(
+        builder, oldOp.getLoc(), oldOp.getCondition(), oldOp.getTrueDest(),
+        trueArgs, oldOp.getFalseDest(), falseArgs);
 
     copyOperationAttrs(oldOp, newOp);
 

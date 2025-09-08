@@ -83,7 +83,7 @@ Value materializeCast(OpBuilder &builder, Type toType, ValueRange inputs,
 
     if (castType != fromType) {
       fromValue =
-          builder.create<UnrealizedConversionCastOp>(loc, castType, fromValue)
+          UnrealizedConversionCastOp::create(builder, loc, castType, fromValue)
               ->getResult(0);
     }
   }
@@ -177,8 +177,8 @@ struct SortOpConversion final : OpConversionPattern<mlir::stablehlo::SortOp> {
                                                 resultTypes))) {
       return failure();
     };
-    auto sortOp = rewriter.create<IREE::LinalgExt::SortOp>(
-        loc, resultTypes,
+    auto sortOp = IREE::LinalgExt::SortOp::create(
+        rewriter, loc, resultTypes,
         /*inputs=*/ValueRange{}, adaptor.getOperands(), op.getDimensionAttr());
     rewriter.inlineRegionBefore(op.getComparator(), sortOp.getRegion(),
                                 sortOp.getRegion().begin());
@@ -268,8 +268,8 @@ struct ScatterOpConversion final
       scatterDimMap.push_back(dim);
     }
 
-    auto scatterOp = rewriter.create<IREE::LinalgExt::ScatterOp>(
-        op.getLoc(), originalType, ValueRange{updates, indices},
+    auto scatterOp = IREE::LinalgExt::ScatterOp::create(
+        rewriter, op.getLoc(), originalType, ValueRange{updates, indices},
         ValueRange{original}, scatterDimMap, op.getUniqueIndices());
 
     rewriter.inlineRegionBefore(op.getUpdateComputation(),
@@ -348,8 +348,8 @@ struct ReverseOpConversion final
     // First fill the output buffer with the init value.
     SmallVector<OpFoldResult> inputMixedSizes =
         tensor::getMixedSizes(rewriter, loc, input);
-    auto emptyTensor = rewriter.create<tensor::EmptyOp>(
-        loc, inputMixedSizes, inputTy.getElementType());
+    auto emptyTensor = tensor::EmptyOp::create(rewriter, loc, inputMixedSizes,
+                                               inputTy.getElementType());
     SmallVector<AffineMap> affineMaps = {
         rewriter.getMultiDimIdentityMap(resultTy.getRank())};
 
@@ -360,22 +360,23 @@ struct ReverseOpConversion final
           llvm::SmallVector<Value> indices;
           for (unsigned int i = 0; i < inputTyRank; i++) {
             Value index =
-                rewriter.create<linalg::IndexOp>(nestedLoc, i).getResult();
+                linalg::IndexOp::create(rewriter, nestedLoc, i).getResult();
             if (std::find(dims.begin(), dims.end(), i) != dims.end()) {
-              auto one = rewriter.create<arith::ConstantIndexOp>(nestedLoc, 1);
-              Value axisDimSize = rewriter.create<tensor::DimOp>(loc, input, i);
+              auto one = arith::ConstantIndexOp::create(rewriter, nestedLoc, 1);
+              Value axisDimSize =
+                  tensor::DimOp::create(rewriter, loc, input, i);
               auto sizeMinusOne =
-                  rewriter.create<arith::SubIOp>(nestedLoc, axisDimSize, one);
-              index = rewriter.create<arith::SubIOp>(nestedLoc, sizeMinusOne,
-                                                     index);
+                  arith::SubIOp::create(rewriter, nestedLoc, axisDimSize, one);
+              index = arith::SubIOp::create(rewriter, nestedLoc, sizeMinusOne,
+                                            index);
             }
             indices.push_back(index);
           }
 
-          auto extract = nestedBuilder.create<tensor::ExtractOp>(
-              nestedLoc, input, indices);
-          nestedBuilder.create<linalg::YieldOp>(op.getLoc(),
-                                                extract.getResult());
+          auto extract = tensor::ExtractOp::create(nestedBuilder, nestedLoc,
+                                                   input, indices);
+          linalg::YieldOp::create(nestedBuilder, op.getLoc(),
+                                  extract.getResult());
         });
     return success();
   }
@@ -492,12 +493,12 @@ struct ScanOpConversion final
       }
     }
 
-    outputs.push_back(rewriter.create<tensor::EmptyOp>(
-        op.getLoc(), input0Ty.getShape(), input0Ty.getElementType(),
-        outputDynDims));
+    outputs.push_back(
+        tensor::EmptyOp::create(rewriter, op.getLoc(), input0Ty.getShape(),
+                                input0Ty.getElementType(), outputDynDims));
 
-    Value newInit = rewriter.create<tensor::EmptyOp>(
-        op.getLoc(), initDims, init0Ty.getElementType(), initDynDims);
+    Value newInit = tensor::EmptyOp::create(
+        rewriter, op.getLoc(), initDims, init0Ty.getElementType(), initDynDims);
 
     SmallVector<AffineMap> indexingMaps{
         AffineMap::get(initDims.size(), /*symbolCount=*/0, {},
@@ -511,7 +512,7 @@ struct ScanOpConversion final
                       op.getLoc(), init0Ty.clone(initDims), ValueRange{init0},
                       ValueRange{newInit}, indexingMaps, iterators,
                       [&](OpBuilder &b, Location loc, ValueRange args) {
-                        b.create<linalg::YieldOp>(loc, args[0]);
+                        linalg::YieldOp::create(b, loc, args[0]);
                       })
                   .getResult(0);
     outputs.push_back(newInit);
@@ -521,8 +522,8 @@ struct ScanOpConversion final
       outputTys.push_back(output.getType());
     }
 
-    auto scanOp = rewriter.create<IREE::LinalgExt::ScanOp>(
-        op.getLoc(), outputTys, inputs, outputs,
+    auto scanOp = IREE::LinalgExt::ScanOp::create(
+        rewriter, op.getLoc(), outputTys, inputs, outputs,
         rewriter.getI64IntegerAttr(reduceAxis), rewriter.getBoolAttr(1));
 
     rewriter.inlineRegionBefore(op.getRegion(), scanOp.getRegion(),
@@ -575,10 +576,10 @@ struct TopkOpConversion final : OpConversionPattern<chlo::TopKOp> {
     SmallVector<OpFoldResult> mixedSizes =
         tensor::getMixedSizes(rewriter, loc, adaptor.getOperand());
     mixedSizes.back() = rewriter.getIndexAttr(adaptor.getK());
-    Value emptyTensorOutputValues = rewriter.create<mlir::tensor::EmptyOp>(
-        loc, mixedSizes, valueElementType);
-    Value emptyTensorOutputIndices = rewriter.create<mlir::tensor::EmptyOp>(
-        loc, mixedSizes, indicesElementType);
+    Value emptyTensorOutputValues = mlir::tensor::EmptyOp::create(
+        rewriter, loc, mixedSizes, valueElementType);
+    Value emptyTensorOutputIndices = mlir::tensor::EmptyOp::create(
+        rewriter, loc, mixedSizes, indicesElementType);
     // Initialize indices to 0 and values to negative infinity
     TypedAttr negInfAttr;
     if (auto intType = llvm::dyn_cast<IntegerType>(valueElementType)) {
@@ -590,15 +591,15 @@ struct TopkOpConversion final : OpConversionPattern<chlo::TopKOp> {
           /*Negative=*/true);
       negInfAttr = rewriter.getFloatAttr(valueElementType, negApFloat);
     }
-    Value negInf = rewriter.create<arith::ConstantOp>(loc, negInfAttr);
+    Value negInf = arith::ConstantOp::create(rewriter, loc, negInfAttr);
     TypedAttr posInfAttr = rewriter.getIntegerAttr(
         indicesElementType, APInt::getSignedMaxValue(32));
-    Value posInf = rewriter.create<arith::ConstantOp>(loc, posInfAttr);
+    Value posInf = arith::ConstantOp::create(rewriter, loc, posInfAttr);
     Value negInfTensor =
-        rewriter.create<linalg::FillOp>(loc, negInf, emptyTensorOutputValues)
+        linalg::FillOp::create(rewriter, loc, negInf, emptyTensorOutputValues)
             .result();
     Value posInfTensor =
-        rewriter.create<linalg::FillOp>(loc, posInf, emptyTensorOutputIndices)
+        linalg::FillOp::create(rewriter, loc, posInf, emptyTensorOutputIndices)
             .result();
 
     // Replace the CHLO TopK with LinalgExt TopK
@@ -625,13 +626,13 @@ struct TopkOpConversion final : OpConversionPattern<chlo::TopKOp> {
       Value rhs = block->getArgument(1);
       Value condition;
       if (llvm::isa<IntegerType>(valueElementType)) {
-        condition = rewriter.create<arith::CmpIOp>(
-            loc, arith::CmpIPredicate::sge, lhs, rhs);
+        condition = arith::CmpIOp::create(rewriter, loc,
+                                          arith::CmpIPredicate::sge, lhs, rhs);
       } else {
-        condition = rewriter.create<arith::CmpFOp>(
-            loc, arith::CmpFPredicate::OGT, lhs, rhs);
+        condition = arith::CmpFOp::create(rewriter, loc,
+                                          arith::CmpFPredicate::OGT, lhs, rhs);
       }
-      rewriter.create<IREE::LinalgExt::YieldOp>(loc, condition);
+      IREE::LinalgExt::YieldOp::create(rewriter, loc, condition);
     }
 
     return success();
