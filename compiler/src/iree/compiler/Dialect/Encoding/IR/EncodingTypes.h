@@ -25,6 +25,12 @@ static constexpr char kEncodingResolverAttrName[] = "iree.encoding.resolver";
 const int64_t MATMUL_LHS = 0;
 const int64_t MATMUL_RHS = 1;
 const int64_t MATMUL_RESULT = 2;
+/// Scaled matmul
+const int64_t SCALED_MATMUL_LHS = 0;
+const int64_t SCALED_MATMUL_RHS = 1;
+const int64_t SCALED_MATMUL_LHS_SCALES = 2;
+const int64_t SCALED_MATMUL_RHS_SCALES = 3;
+const int64_t SCALED_MATMUL_RESULT = 4;
 
 /// Convert operand index to strings for printing
 std::string stringifyOperandIndex(IntegerAttr);

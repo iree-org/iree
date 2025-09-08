@@ -81,7 +81,7 @@ combineValueBarrierOps(RewriterBase &rewriter, Location loc,
                            barrierOp.getInputs().end());
   }
   auto combinedBarrierOp =
-      rewriter.create<IREE::GPU::ValueBarrierOp>(loc, barrierOperands);
+      IREE::GPU::ValueBarrierOp::create(rewriter, loc, barrierOperands);
 
   // Replace all uses of the previous barrier with new barrier.
   int resultNumber = 0;
@@ -194,8 +194,8 @@ combineValueBarrierPair(RewriterBase &rewriter,
   barrierOperands.append(barrierB.getOperands().begin(),
                          barrierB.getOperands().end());
 
-  auto combinedBarrierOp = rewriter.create<IREE::GPU::ValueBarrierOp>(
-      barrierB.getLoc(), barrierOperands);
+  auto combinedBarrierOp = IREE::GPU::ValueBarrierOp::create(
+      rewriter, barrierB.getLoc(), barrierOperands);
 
   int numOperandsA = barrierA.getNumOperands();
   int numOperandsB = barrierB.getNumOperands();

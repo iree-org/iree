@@ -31,12 +31,13 @@ namespace mlir::iree_compiler::DispatchCreation {
 namespace {
 
 /// Return true if the op is fusable with a SetEncodingOp consumer. The op's
-/// containing dispatch must contain only reshape ops, encoding ops, linalg ops,
-/// and attention ops. Non ShapedType ops (like arith ops, dim ops, etc.) are
-/// also allowed.
-/// TODO(#20179): It should be done by interface methods.
-static bool isFusableWithSetEncoding(Operation *op) {
-  auto parentRegion = op->getParentOfType<IREE::Flow::DispatchRegionOp>();
+/// containing dispatch must contain only:
+///   - Reshape ops, encoding ops, linalg ops, gather ops, and attention ops.
+///   - Non ShapedType ops, e.g., like arith ops, dim ops, etc.
+///   - tensor::ExtractSliceOp is allowed as they can be folded into dispatch
+///     tensor load ops.
+static bool isFusableWithSetEncoding(Operation *target) {
+  auto parentRegion = target->getParentOfType<IREE::Flow::DispatchRegionOp>();
   // Make sure the dispatch region has only one block.
   if (!llvm::hasSingleElement(parentRegion.getBody())) {
     return false;
@@ -49,8 +50,9 @@ static bool isFusableWithSetEncoding(Operation *op) {
       continue;
     }
     if (!isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp, tensor::EmptyOp,
-             IREE::Encoding::SetEncodingOp, IREE::Encoding::UnsetEncodingOp,
-             linalg::LinalgOp, IREE::LinalgExt::AttentionOp>(op)) {
+             tensor::ExtractSliceOp, IREE::Encoding::SetEncodingOp,
+             IREE::Encoding::UnsetEncodingOp, linalg::LinalgOp,
+             IREE::LinalgExt::AttentionOp, IREE::LinalgExt::GatherOp>(op)) {
       return false;
     }
   }

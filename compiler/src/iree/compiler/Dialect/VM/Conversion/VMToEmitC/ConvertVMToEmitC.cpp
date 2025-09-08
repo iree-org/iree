@@ -207,8 +207,8 @@ createVmTypeDefPtr(ConversionPatternRewriter &rewriter, Location loc,
                 ArrayAttr::get(
                     ctx, {emitc::OpaqueAttr::get(ctx, ptr->second.first)}))
             .getResult(0);
-  } else if (llvm::isa<IREE::VM::RefType>(elementType)) {
-    Type objType = llvm::cast<IREE::VM::RefType>(elementType).getObjectType();
+  } else if (auto elemRefType = dyn_cast<IREE::VM::RefType>(elementType)) {
+    Type objType = elemRefType.getObjectType();
 
     Type typeRefType = emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t");
     Type typeRefArrayType = emitc::PointerType::get(typeRefType);
@@ -2282,13 +2282,14 @@ private:
     auto ctx = builder.getContext();
 
     // byteSpan = call.<memberName>;
-    auto byteSpan = builder
-                        .create<emitc::MemberOp>(
-                            loc,
-                            emitc::LValueType::get(emitc::OpaqueType::get(
-                                ctx, "iree_byte_span_t")),
-                            memberName, call)
-                        .getResult();
+    TypedValue<mlir::Type> byteSpan =
+        builder
+            .create<emitc::MemberOp>(
+                loc,
+                emitc::LValueType::get(
+                    emitc::OpaqueType::get(ctx, "iree_byte_span_t")),
+                memberName, call)
+            .getResult();
 
     // alloca_(0) returns NULL in some configurations on Windows. Make sure to
     // allocate at least one byte to get a valid pointer.
@@ -2500,25 +2501,32 @@ private:
     auto ctx = builder.getContext();
 
     // RETURN_IF_ERROR(import->module->begin_call(import->module, stack, call));
-    auto importModule = builder.create<emitc::MemberOfPtrOp>(
+    auto im = builder.create<emitc::MemberOfPtrOp>(
         loc,
         /*type=*/
         emitc::LValueType::get(emitc::PointerType::get(
             emitc::OpaqueType::get(ctx, "iree_vm_module_t"))),
         /*memberName=*/"module",
         /*operand=*/import);
+    auto importModule = dyn_cast<TypedValue<emitc::LValueType>>(im.getResult());
+    if (!importModule) {
+      return failure();
+    }
 
     // EmitC can't emit function pointers, so we need to fallback to a typedef
     // currently. This and the `EMITC_CALL_INDIRECT` macro can be replaced with
     // a new `emitc.call_indirect` op once it has been added upstream.
     emitc::OpaqueType type = emitc::OpaqueType::get(ctx, "begin_call_t");
 
-    auto beginCall =
+    auto bc =
         builder
             .create<emitc::MemberOfPtrOp>(loc, emitc::LValueType::get(type),
                                           "begin_call", importModule)
             .getResult();
-
+    auto beginCall = dyn_cast<TypedValue<emitc::LValueType>>(bc);
+    if (!beginCall) {
+      return failure();
+    }
     returnIfError(
         /*rewriter=*/builder,
         /*location=*/loc,
@@ -2735,7 +2743,6 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
         importOp ? importOp.getFunctionType().getNumInputs() : operands.size();
     for (int i = 0; i < numInputs; i++) {
       if (importOp && importOp.isFuncArgumentVariadic(i)) {
-        assert(isa<IREE::VM::CallVariadicOp>(op));
         auto variadicCallOp = cast<IREE::VM::CallVariadicOp>(op);
         APInt segment = *(variadicCallOp.getSegmentSizes().begin() + i);
         int64_t size = segment.getSExtValue();

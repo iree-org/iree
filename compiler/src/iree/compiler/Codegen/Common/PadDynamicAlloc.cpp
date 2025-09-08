@@ -95,11 +95,11 @@ static LogicalResult padAlloc(MLIRContext *context, AllocLikeOp allocOp,
   MemRefType allocType = MemRefType::get(shape, elType, AffineMap(),
                                          allocOp.getType().getMemorySpace());
   Location loc = allocOp.getLoc();
-  Value paddedAlloc = rewriter.create<AllocLikeOp>(loc, allocType);
+  Value paddedAlloc = AllocLikeOp::create(rewriter, loc, allocType);
   SmallVector<OpFoldResult> offsets(shape.size(), rewriter.getIndexAttr(0));
   SmallVector<OpFoldResult> strides(shape.size(), rewriter.getIndexAttr(1));
-  Value subview = rewriter.create<memref::SubViewOp>(loc, paddedAlloc, offsets,
-                                                     sizes, strides);
+  Value subview = memref::SubViewOp::create(rewriter, loc, paddedAlloc, offsets,
+                                            sizes, strides);
   replaceMemrefUsesAndPropagateType(rewriter, loc, allocOp, subview);
   rewriter.eraseOp(allocOp);
   return success();

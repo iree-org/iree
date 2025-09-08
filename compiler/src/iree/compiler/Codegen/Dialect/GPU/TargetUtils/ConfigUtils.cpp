@@ -240,8 +240,8 @@ static GemmCutoff computeGemmCutoffsForAI(IREE::GPU::TargetAttr target,
 /// problem based on the available mma intrinsics.
 static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     IREE::GPU::TargetAttr target, GPUMatmulShapeType problem,
-    bool transposedLhs, bool transposedRhs, bool mustBeAligned = true,
-    bool doCPromotion = false, bool scaled = false) {
+    bool transposedLhs, bool transposedRhs, bool isGemm,
+    bool mustBeAligned = true, bool doCPromotion = false, bool scaled = false) {
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
   SmallVector<GPUIntrinsicType> intrinsics;
   if (scaled) {
@@ -307,19 +307,40 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     // bestMNTileCountPerSubgroup and small bestKTileCountPerSubgroup to
     // amortize launch/memory costs and maximize throughput.
     problem.gemmSize = GemmSize::LargeGemm;
-    seeds = {/*bestSubgroupCountPerWorkgroup=*/8,
-             /*bestMNTileCountPerSubgroup=*/8,
-             /*bestKTileCountPerSubgroup=*/2,
-             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / 2 /
-                 inBitWidth};
+    if (isGemm) {
+      seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
+               /*bestMNTileCountPerSubgroup=*/16,
+               /*bestKTileCountPerSubgroup=*/2,
+               /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / 2 /
+                   inBitWidth};
+    } else {
+      // Favor more subgroups for convolution to help latency hiding from global
+      // loads.
+      seeds = {/*bestSubgroupCountPerWorkgroup=*/8,
+               /*bestMNTileCountPerSubgroup=*/8,
+               /*bestKTileCountPerSubgroup=*/2,
+               /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / 2 /
+                   inBitWidth};
+    }
   } else {
     // Choose balanced tile shapes. Empirically, medium-AI workloads can favor
     // either small or large tiles depending on kernel details.
     problem.gemmSize = GemmSize::MediumGemm;
-    seeds = {/*bestSubgroupCountPerWorkgroup=*/8,
-             /*bestMNTileCountPerSubgroup=*/4,
-             /*bestKTileCountPerSubgroup=*/4,
-             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
+    if (isGemm) {
+      seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
+               /*bestMNTileCountPerSubgroup=*/8,
+               /*bestKTileCountPerSubgroup=*/4,
+               /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits /
+                   inBitWidth};
+    } else {
+      // Favor more subgroups for convolution to help latency hiding from global
+      // loads.
+      seeds = {/*bestSubgroupCountPerWorkgroup=*/8,
+               /*bestMNTileCountPerSubgroup=*/4,
+               /*bestKTileCountPerSubgroup=*/4,
+               /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits /
+                   inBitWidth};
+    }
   }
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
@@ -336,24 +357,32 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   return schedule;
 }
 
+struct ConvToIgemmInfo {
+  bool isInputChannelLast;
+  linalg::ConvolutionDimensions convDims;
+  DenseMap<int64_t, AffineExpr> convToIgemmDimMap;
+  DenseMap<int64_t, int64_t> inputChannelDimToSize;
+};
+
 /// Helper function to get convolution padding sizes if possible.
-static std::optional<ArrayAttr> getPaddingConvSizes(
-    Builder &b, const SmallVector<int64_t> &bounds,
-    const SmallVector<int64_t> &paddingSizes,
-    const SmallVector<int64_t> &workgroupTileSizes,
-    const SmallVector<int64_t> &reductionTileSizes,
-    std::optional<DenseMap<int64_t, AffineExpr>> &convToIgemmDimMap,
-    std::optional<mlir::linalg::ConvolutionDimensions> &convDims) {
-  if (!convToIgemmDimMap.has_value() || !convDims.has_value())
+static std::optional<ArrayAttr>
+getPaddingConvSizes(Builder &b, const SmallVector<int64_t> &bounds,
+                    const SmallVector<int64_t> &paddingSizes,
+                    const SmallVector<int64_t> &workgroupTileSizes,
+                    const SmallVector<int64_t> &reductionTileSizes,
+                    std::optional<ConvToIgemmInfo> &convToIgemmInfo) {
+  if (!convToIgemmInfo.has_value())
     return std::nullopt;
 
-  DenseMap<int64_t, AffineExpr> convToIgemmMap = convToIgemmDimMap.value();
+  DenseMap<int64_t, AffineExpr> convToIgemmMap =
+      convToIgemmInfo->convToIgemmDimMap;
   // Padding sizes for parallel dimensions are the same as workgroup tile
   // sizes.
   DenseSet<int64_t> paddedIGEMMDims;
   DenseMap<int64_t, SmallVector<int64_t>> paddedReductionConvDims;
-  SetVector<int64_t> inputChannelDims(convDims->inputChannel.begin(),
-                                      convDims->inputChannel.end());
+  linalg::ConvolutionDimensions convDims = convToIgemmInfo->convDims;
+  SetVector<int64_t> inputChannelDims(convDims.inputChannel.begin(),
+                                      convDims.inputChannel.end());
   SmallVector<int64_t> paddingConvSizes(convToIgemmMap.size(), 0);
   for (auto [convDim, IGEMMExpr] : convToIgemmMap) {
     auto IGEMMDimExpr = cast<AffineDimExpr>(IGEMMExpr);
@@ -370,8 +399,16 @@ static std::optional<ArrayAttr> getPaddingConvSizes(
       // Only pad input channel dims. If we need to pad filter dims, then we
       // would rather just do padding on the GEMM instead.
       if (inputChannelDims.contains(convDim)) {
-        // Multiple input channel dims for a single IGEMMPos is not supported.
-        if (paddedIGEMMDims.contains(IGEMMPos)) {
+        int64_t inputChannelSize =
+            convToIgemmInfo->inputChannelDimToSize[convDim];
+        bool isInputChannelSizeSmall =
+            (paddingSizes[IGEMMPos] / inputChannelSize > 2);
+        // The following cases are not supported:
+        // 1) Input channel is not the innermost dimension;
+        // 2) Input channel size is too small compared to padding size;
+        // 3) Multiple input channel dims for a single IGEMMPos.
+        if (!convToIgemmInfo->isInputChannelLast || isInputChannelSizeSmall ||
+            paddedIGEMMDims.contains(IGEMMPos)) {
           return std::nullopt;
         }
         paddingConvSizes[convDim] = paddingSizes[IGEMMPos];
@@ -407,10 +444,8 @@ static FailureOr<std::pair<LoweringConfigAttr, int64_t>>
 getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     SmallVector<int64_t> bounds, ArrayRef<AffineMap> maps,
     ArrayRef<Value> operands, IREE::GPU::TargetAttr target, bool useDirectLoad,
-    bool scaled,
-    std::optional<DenseMap<int64_t, AffineExpr>> convToIgemmDimMap =
-        std::nullopt,
-    std::optional<linalg::ConvolutionDimensions> convDims = std::nullopt) {
+    bool isGemm, bool scaled,
+    std::optional<ConvToIgemmInfo> convToIgemmInfo = std::nullopt) {
   if (target.getWgp().getMma().empty()) {
     return failure();
   }
@@ -537,7 +572,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   bool mustBeAligned = true;
   bool doCPromotion = false;
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
-      target, problem, transposedLhs, transposedRhs, /*mustBeAligned*/ true,
+      target, problem, transposedLhs, transposedRhs, isGemm,
+      /*mustBeAligned*/ true,
       /*doCPromotion*/ false, scaled);
 
   // TODO (nirvedhmeshram, qedawkins): The performance with this will be bad if
@@ -549,7 +585,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     mustBeAligned = false;
     doCPromotion = true;
     schedule = getMmaScheduleFromProblemAndTarget(
-        target, problem, transposedLhs, transposedRhs, mustBeAligned,
+        target, problem, transposedLhs, transposedRhs, isGemm, mustBeAligned,
         doCPromotion, scaled);
   }
 
@@ -656,9 +692,9 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
 
     // Create `padding_conv` attribute when padding convolutions before IGEMM is
     // possible, otherwise fallback to pad IGEMM.
-    if (auto attr = getPaddingConvSizes(b, bounds, paddingTileSizes,
-                                        workgroupTileSizes, reductionTileSizes,
-                                        convToIgemmDimMap, convDims)) {
+    if (auto attr =
+            getPaddingConvSizes(b, bounds, paddingTileSizes, workgroupTileSizes,
+                                reductionTileSizes, convToIgemmInfo)) {
       attrs.emplace_back(StringAttr::get(context, "padding_conv"), *attr);
     } else {
       attrs.emplace_back(StringAttr::get(context, "padding"),
@@ -693,24 +729,39 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
     LDBG() << "Unsupported convolution type";
     return failure();
   }
+
+  ConvToIgemmInfo convToIgemmInfo;
+  if (padConv) {
+    auto inputType = llvm::cast<ShapedType>(op->getOperands()[0].getType());
+    ArrayRef<int64_t> inputShape = inputType.getShape();
+    AffineMap inputMap = linalgOp.getIndexingMapsArray()[0];
+    SmallVector<int64_t> inputChannelPos;
+    for (auto dim : igemmGenericConvDetails->convDims.inputChannel) {
+      for (auto [idx, e] : llvm::enumerate(inputMap.getResults())) {
+        if (e.isFunctionOfDim(dim)) {
+          convToIgemmInfo.inputChannelDimToSize[dim] = inputShape[idx];
+          inputChannelPos.push_back(idx);
+        }
+      }
+    }
+    llvm::sort(inputChannelPos);
+    convToIgemmInfo.isInputChannelLast =
+        inputChannelPos.back() == inputShape.size() - 1;
+    convToIgemmInfo.convDims = igemmGenericConvDetails->convDims;
+    convToIgemmInfo.convToIgemmDimMap =
+        igemmGenericConvDetails->convToIgemmDimMap;
+  }
+
   SmallVector<AffineMap> igemmContractionMaps =
       igemmGenericConvDetails->igemmContractionMaps;
   SmallVector<int64_t> igemmLoopBounds =
       igemmGenericConvDetails->igemmLoopBounds;
   SmallVector<Value> igemmOperands = igemmGenericConvDetails->igemmOperands;
-
-  std::optional<DenseMap<int64_t, AffineExpr>> convToIgemmDimMap;
-  std::optional<linalg::ConvolutionDimensions> convDims;
-  if (padConv) {
-    convDims = igemmGenericConvDetails->convDims;
-    convToIgemmDimMap = igemmGenericConvDetails->convToIgemmDimMap;
-  }
-
-  SmallVector<int64_t> bounds = igemmLoopBounds;
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
       getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
-          bounds, igemmContractionMaps, igemmOperands, target, useDirectLoad,
-          /*scaled*/ false, convToIgemmDimMap, convDims);
+          igemmLoopBounds, igemmContractionMaps, igemmOperands, target,
+          useDirectLoad, /*isGemm=*/false,
+          /*scaled*/ false, convToIgemmInfo);
   if (failed(configAndWgSize)) {
     return failure();
   }
@@ -756,7 +807,8 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
 
   FailureOr<std::pair<LoweringConfigAttr, int64_t>> configAndWgSize =
       getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
-          bounds, maps, operands, target, useDirectLoad, /*scaled*/ false);
+          bounds, maps, operands, target, useDirectLoad, /*isGemm=*/true,
+          /*scaled*/ false);
 
   // TODO (muzasyed) : add generalization for scaled and nonscaled versions of
   // matmul lowering.
@@ -765,7 +817,8 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
     // conflicts when dealing with scaled matmuls. For now it is disabled.
     useDirectLoad = true;
     configAndWgSize = getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
-        bounds, maps, operands, target, useDirectLoad, /*scaled*/ true);
+        bounds, maps, operands, target, useDirectLoad, /*isGemm=*/true,
+        /*scaled*/ true);
   }
 
   if (failed(configAndWgSize)) {

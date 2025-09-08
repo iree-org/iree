@@ -67,8 +67,8 @@ static FailureOr<Value> gpuAllocateWorkgroupMemoryFn(OpBuilder &builder,
   MemRefType allocType =
       MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
                       AffineMap(), workgroupSpace);
-  auto allocOp = builder.create<memref::AllocOp>(
-      loc, allocType, dynamicSizes, builder.getI64IntegerAttr(alignment));
+  auto allocOp = memref::AllocOp::create(builder, loc, allocType, dynamicSizes,
+                                         builder.getI64IntegerAttr(alignment));
   return allocOp.getResult();
 }
 
@@ -81,8 +81,9 @@ static FailureOr<Value> gpuAllocateFunctionMemoryFn(OpBuilder &builder,
       spirv::mapVulkanStorageClassToMemorySpace(spirv::StorageClass::Function);
   MemRefType allocType = MemRefType::get(
       memRefType.getShape(), memRefType.getElementType(), {}, *space);
-  auto allocaOp = builder.create<memref::AllocaOp>(
-      loc, allocType, dynamicSizes, builder.getI64IntegerAttr(alignment));
+  auto allocaOp =
+      memref::AllocaOp::create(builder, loc, allocType, dynamicSizes,
+                               builder.getI64IntegerAttr(alignment));
   return allocaOp.getResult();
 }
 
@@ -94,11 +95,11 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
   bool needsBarrier = hasSharedMemoryAddressSpace(fromType) ||
                       hasSharedMemoryAddressSpace(toType);
   if (needsBarrier)
-    builder.create<gpu::BarrierOp>(loc);
-  Operation *copy = builder.create<memref::CopyOp>(loc, from, to);
+    gpu::BarrierOp::create(builder, loc);
+  Operation *copy = memref::CopyOp::create(builder, loc, from, to);
   if (needsBarrier) {
     setMarker(copy, getCopyToWorkgroupMemoryMarker());
-    builder.create<gpu::BarrierOp>(loc);
+    gpu::BarrierOp::create(builder, loc);
   }
   return success();
 }

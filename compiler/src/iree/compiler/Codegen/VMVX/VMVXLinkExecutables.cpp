@@ -34,8 +34,8 @@ struct VMVXLinkExecutablesPass
     // Create our new "linked" hal.executable.
     std::string linkedExecutableName =
         llvm::formatv("{}_linked_{}", moduleName, "vmvx");
-    auto linkedExecutableOp = moduleBuilder.create<IREE::HAL::ExecutableOp>(
-        moduleOp.getLoc(), linkedExecutableName);
+    auto linkedExecutableOp = IREE::HAL::ExecutableOp::create(
+        moduleBuilder, moduleOp.getLoc(), linkedExecutableName);
     linkedExecutableOp.setVisibility(
         sourceExecutableOps.front().getVisibility());
     auto executableBuilder =
@@ -50,16 +50,15 @@ struct VMVXLinkExecutablesPass
               ? targetAttr.getSymbolNameFragment()
               : llvm::formatv("{}_{}", targetAttr.getSymbolNameFragment(),
                               index);
-      auto linkedTargetOp =
-          executableBuilder.create<IREE::HAL::ExecutableVariantOp>(
-              moduleOp.getLoc(), linkedVariantName, targetAttr);
+      auto linkedTargetOp = IREE::HAL::ExecutableVariantOp::create(
+          executableBuilder, moduleOp.getLoc(), linkedVariantName, targetAttr);
       auto targetBuilder = OpBuilder::atBlockBegin(&linkedTargetOp.getBlock());
-      auto linkedModuleOp = targetBuilder.create<ModuleOp>(moduleOp.getLoc());
+      auto linkedModuleOp = ModuleOp::create(targetBuilder, moduleOp.getLoc());
 
       // Add an empty vm.module to that module as our vm.funcs must live in it.
       auto nestedBuilder = OpBuilder::atBlockBegin(linkedModuleOp.getBody());
-      nestedBuilder.create<IREE::VM::ModuleOp>(moduleOp.getLoc(),
-                                               "linked_module");
+      IREE::VM::ModuleOp::create(nestedBuilder, moduleOp.getLoc(),
+                                 "linked_module");
 
       auto mergeModuleFn = [](mlir::ModuleOp sourceInnerModule,
                               mlir::ModuleOp linkedInnerModule,

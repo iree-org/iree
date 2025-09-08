@@ -36,8 +36,8 @@ static void distributeCopyToSingleThread(RewriterBase &rewriter,
                                          memref::CopyOp copy) {
   SmallVector<Attribute> mapping = {gpu::GPUThreadMappingAttr::get(
       rewriter.getContext(), gpu::MappingId::LinearDim0)};
-  scf::ForallOp newForallOp = rewriter.create<scf::ForallOp>(
-      copy.getLoc(), ArrayRef<OpFoldResult>{rewriter.getIndexAttr(0)},
+  scf::ForallOp newForallOp = scf::ForallOp::create(
+      rewriter, copy.getLoc(), ArrayRef<OpFoldResult>{rewriter.getIndexAttr(0)},
       ArrayRef<OpFoldResult>{rewriter.getIndexAttr(1)},
       ArrayRef<OpFoldResult>{rewriter.getIndexAttr(1)},
       /*outputs=*/ValueRange(), /*mapping=*/rewriter.getArrayAttr(mapping));
@@ -73,8 +73,8 @@ static void distributeCopyToThreads(RewriterBase &rewriter, memref::CopyOp copy,
   }
   mapping = llvm::to_vector(llvm::reverse(mapping));
 
-  scf::ForallOp newForallOp = rewriter.create<scf::ForallOp>(
-      copy.getLoc(), lowerBounds, upperBounds, tileSizes,
+  scf::ForallOp newForallOp = scf::ForallOp::create(
+      rewriter, copy.getLoc(), lowerBounds, upperBounds, tileSizes,
       /*outputs=*/ValueRange(), /*mapping=*/rewriter.getArrayAttr(mapping));
 
   rewriter.setInsertionPointToStart(newForallOp.getBody());
@@ -108,10 +108,10 @@ static void distributeCopyToThreads(RewriterBase &rewriter, memref::CopyOp copy,
   SmallVector<OpFoldResult> offsets =
       getAsOpFoldResult(newForallOp.getInductionVars());
   SmallVector<OpFoldResult> strides(rank, rewriter.getIndexAttr(1));
-  Value sourceTile = rewriter.create<memref::SubViewOp>(
-      loc, copy.getSource(), offsets, sizes, strides);
-  Value targetTile = rewriter.create<memref::SubViewOp>(
-      loc, copy.getTarget(), offsets, sizes, strides);
+  Value sourceTile = memref::SubViewOp::create(rewriter, loc, copy.getSource(),
+                                               offsets, sizes, strides);
+  Value targetTile = memref::SubViewOp::create(rewriter, loc, copy.getTarget(),
+                                               offsets, sizes, strides);
   rewriter.replaceOpWithNewOp<memref::CopyOp>(copy, sourceTile, targetTile);
 }
 

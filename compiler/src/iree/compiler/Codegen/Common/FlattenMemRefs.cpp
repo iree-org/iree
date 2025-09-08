@@ -57,7 +57,7 @@ static OpFoldResult computeProduct(Location loc, OpBuilder &builder,
   }
   if (auto constant = dyn_cast<AffineConstantExpr>(result))
     return getAsIndexOpFoldResult(builder.getContext(), constant.getValue());
-  return builder.create<affine::AffineApplyOp>(loc, result, dynamicPart)
+  return affine::AffineApplyOp::create(builder, loc, result, dynamicPart)
       .getResult();
 }
 
@@ -74,7 +74,7 @@ getFlatOffsetAndStrides(OpBuilder &rewriter, Location loc, Value source,
     OpBuilder::InsertionGuard g(rewriter);
     setInsertionPointToStart(rewriter, source);
     newExtractStridedMetadata =
-        rewriter.create<memref::ExtractStridedMetadataOp>(loc, source);
+        memref::ExtractStridedMetadataOp::create(rewriter, loc, source);
   }
 
   auto &&[sourceStrides, sourceOffset] = sourceType.getStridesAndOffset();
@@ -127,8 +127,8 @@ getFlatOffsetAndStrides(OpBuilder &rewriter, Location loc, Value source,
 static Value getValueFromOpFoldResult(OpBuilder &rewriter, Location loc,
                                       OpFoldResult in) {
   if (Attribute offsetAttr = dyn_cast<Attribute>(in)) {
-    return rewriter.create<arith::ConstantIndexOp>(
-        loc, cast<IntegerAttr>(offsetAttr).getInt());
+    return arith::ConstantIndexOp::create(
+        rewriter, loc, cast<IntegerAttr>(offsetAttr).getInt());
   }
   return cast<Value>(in);
 }
@@ -144,8 +144,8 @@ static std::pair<Value, Value> getFlattenMemrefAndOffset(OpBuilder &rewriter,
                               getAsOpFoldResult(indices));
 
   return std::make_pair(
-      rewriter.create<memref::ReinterpretCastOp>(
-          loc, source,
+      memref::ReinterpretCastOp::create(
+          rewriter, loc, source,
           /* offset = */ offset,
           /* shapes = */ ArrayRef<OpFoldResult>{collapsedShape},
           /* strides = */ ArrayRef<OpFoldResult>{strides.back()}),
@@ -190,45 +190,47 @@ template <typename T>
 static void replaceOp(T op, PatternRewriter &rewriter, Value flatMemref,
                       Value offset) {
   if constexpr (std::is_same_v<T, memref::LoadOp>) {
-    auto newLoad = rewriter.create<memref::LoadOp>(
-        op->getLoc(), op->getResultTypes(), flatMemref, ValueRange{offset});
+    auto newLoad =
+        memref::LoadOp::create(rewriter, op->getLoc(), op->getResultTypes(),
+                               flatMemref, ValueRange{offset});
     newLoad->setAttrs(op->getAttrs());
     rewriter.replaceOp(op, newLoad.getResult());
   } else if constexpr (std::is_same_v<T, vector::LoadOp>) {
-    auto newLoad = rewriter.create<vector::LoadOp>(
-        op->getLoc(), op->getResultTypes(), flatMemref, ValueRange{offset});
+    auto newLoad =
+        vector::LoadOp::create(rewriter, op->getLoc(), op->getResultTypes(),
+                               flatMemref, ValueRange{offset});
     newLoad->setAttrs(op->getAttrs());
     rewriter.replaceOp(op, newLoad.getResult());
   } else if constexpr (std::is_same_v<T, memref::StoreOp>) {
-    auto newStore = rewriter.create<memref::StoreOp>(
-        op->getLoc(), op->getOperands().front(), flatMemref,
-        ValueRange{offset});
+    auto newStore = memref::StoreOp::create(rewriter, op->getLoc(),
+                                            op->getOperands().front(),
+                                            flatMemref, ValueRange{offset});
     newStore->setAttrs(op->getAttrs());
     rewriter.replaceOp(op, newStore);
   } else if constexpr (std::is_same_v<T, vector::StoreOp>) {
-    auto newStore = rewriter.create<vector::StoreOp>(
-        op->getLoc(), op->getOperands().front(), flatMemref,
-        ValueRange{offset});
+    auto newStore = vector::StoreOp::create(rewriter, op->getLoc(),
+                                            op->getOperands().front(),
+                                            flatMemref, ValueRange{offset});
     newStore->setAttrs(op->getAttrs());
     rewriter.replaceOp(op, newStore);
   } else if constexpr (std::is_same_v<T, vector::TransferReadOp>) {
-    auto newTransferRead = rewriter.create<vector::TransferReadOp>(
-        op->getLoc(), op.getType(), flatMemref, ValueRange{offset},
+    auto newTransferRead = vector::TransferReadOp::create(
+        rewriter, op->getLoc(), op.getType(), flatMemref, ValueRange{offset},
         op.getPadding());
     rewriter.replaceOp(op, newTransferRead.getResult());
   } else if constexpr (std::is_same_v<T, vector::TransferWriteOp>) {
-    auto newTransferWrite = rewriter.create<vector::TransferWriteOp>(
-        op->getLoc(), op.getVector(), flatMemref, ValueRange{offset});
+    auto newTransferWrite = vector::TransferWriteOp::create(
+        rewriter, op->getLoc(), op.getVector(), flatMemref, ValueRange{offset});
     rewriter.replaceOp(op, newTransferWrite);
   } else if constexpr (std::is_same_v<T, vector::MaskedLoadOp>) {
-    auto newMaskedLoad = rewriter.create<vector::MaskedLoadOp>(
-        op->getLoc(), op.getType(), flatMemref, ValueRange{offset},
+    auto newMaskedLoad = vector::MaskedLoadOp::create(
+        rewriter, op->getLoc(), op.getType(), flatMemref, ValueRange{offset},
         op.getMask(), op.getPassThru());
     newMaskedLoad->setAttrs(op->getAttrs());
     rewriter.replaceOp(op, newMaskedLoad.getResult());
   } else if constexpr (std::is_same_v<T, vector::MaskedStoreOp>) {
-    auto newMaskedStore = rewriter.create<vector::MaskedStoreOp>(
-        op->getLoc(), flatMemref, ValueRange{offset}, op.getMask(),
+    auto newMaskedStore = vector::MaskedStoreOp::create(
+        rewriter, op->getLoc(), flatMemref, ValueRange{offset}, op.getMask(),
         op.getValueToStore());
     newMaskedStore->setAttrs(op->getAttrs());
     rewriter.replaceOp(op, newMaskedStore);

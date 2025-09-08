@@ -20,6 +20,7 @@ iree_lit_test_suite(
         "default_tuning_specs_amdgpu.mlir",
         "enable_tensor_ukernels.mlir",
         "gpu_encoding_attrs.mlir",
+        "lower_rocm_ukernel_descriptor.mlir",
         "lowering_strategy_from_tuning_spec.mlir",
         "ukernel_pipeline_transform.mlir",
     ],

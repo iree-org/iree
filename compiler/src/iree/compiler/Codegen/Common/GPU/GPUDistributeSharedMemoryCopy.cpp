@@ -77,10 +77,10 @@ static LogicalResult tileCopyToWorkgroupMem(mlir::FunctionOpInterface funcOp,
         for (unsigned i = 0; i < rank - 1; i++) {
           int64_t t = (rank - i) <= kNumGPUDims ? 1 : 0;
           tileSizesVal.push_back(
-              builder.create<arith::ConstantIndexOp>(operation->getLoc(), t));
+              arith::ConstantIndexOp::create(builder, operation->getLoc(), t));
         }
-        tileSizesVal.push_back(builder.create<arith::ConstantIndexOp>(
-            operation->getLoc(), copyTileSize));
+        tileSizesVal.push_back(arith::ConstantIndexOp::create(
+            builder, operation->getLoc(), copyTileSize));
         return tileSizesVal;
       };
   auto getCopyThreadProcInfoFn =
@@ -167,8 +167,8 @@ static LogicalResult tileToUnroll(mlir::FunctionOpInterface funcOp,
         std::optional<SmallVector<int64_t>> staticSize =
             getTileToDistributableSize(copyOp, flatWorkgroupSize);
         for (int64_t dim : *staticSize) {
-          tileSizesVal.push_back(
-              builder.create<arith::ConstantIndexOp>(operation->getLoc(), dim));
+          tileSizesVal.push_back(arith::ConstantIndexOp::create(
+              builder, operation->getLoc(), dim));
         }
         return tileSizesVal;
       };
@@ -201,13 +201,13 @@ SmallVector<linalg::ProcInfo> getIds(OpBuilder &b, Location loc,
     delinSizes.push_back(numThreadsDim);
   }
   ValueRange dims =
-      b.create<affine::AffineDelinearizeIndexOp>(loc, flatThreadId, delinSizes)
+      affine::AffineDelinearizeIndexOp::create(b, loc, flatThreadId, delinSizes)
           .getResults();
 
   for (auto [dimId, numThreadsDim] : llvm::zip_equal(dims, delinSizes)) {
     linalg::ProcInfo info;
     info.procId = dimId;
-    info.nprocs = b.create<arith::ConstantIndexOp>(loc, numThreadsDim);
+    info.nprocs = arith::ConstantIndexOp::create(b, loc, numThreadsDim);
     info.distributionMethod =
         linalg::DistributionMethod::CyclicNumProcsEqNumIters;
     infos.push_back(info);
@@ -239,8 +239,8 @@ static LogicalResult tileAndDistribute(mlir::FunctionOpInterface funcOp,
           return tileSizesVal;
         SmallVector<int64_t> staticSize = getNativeDstShape(copyOp);
         for (int64_t dim : staticSize) {
-          tileSizesVal.push_back(
-              builder.create<arith::ConstantIndexOp>(operation->getLoc(), dim));
+          tileSizesVal.push_back(arith::ConstantIndexOp::create(
+              builder, operation->getLoc(), dim));
         }
         return tileSizesVal;
       };
@@ -292,13 +292,13 @@ static Value createFlatId(mlir::FunctionOpInterface funcOp,
   OpBuilder b(funcOp.getFunctionBody());
   Type indexType = b.getIndexType();
   Value threadX =
-      b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType, gpu::Dimension::x);
+      gpu::ThreadIdOp::create(b, funcOp.getLoc(), indexType, gpu::Dimension::x);
   Value threadY =
-      b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType, gpu::Dimension::y);
+      gpu::ThreadIdOp::create(b, funcOp.getLoc(), indexType, gpu::Dimension::y);
   Value threadZ =
-      b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType, gpu::Dimension::z);
-  Value flatThreadId = b.create<affine::AffineLinearizeIndexOp>(
-      funcOp.getLoc(), ValueRange{threadZ, threadY, threadX},
+      gpu::ThreadIdOp::create(b, funcOp.getLoc(), indexType, gpu::Dimension::z);
+  Value flatThreadId = affine::AffineLinearizeIndexOp::create(
+      b, funcOp.getLoc(), ValueRange{threadZ, threadY, threadX},
       ArrayRef<int64_t>{workgroupSize[2], workgroupSize[1], workgroupSize[0]},
       /*disjoint=*/true);
   return flatThreadId;

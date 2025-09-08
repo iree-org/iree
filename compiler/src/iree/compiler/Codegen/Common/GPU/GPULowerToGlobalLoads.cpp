@@ -95,37 +95,37 @@ distributeLinalgCopyToThreads(RewriterBase &rewriter, linalg::CopyOp copy,
         copy, "Cannot proceed: cannot handle copying residual elements.");
   }
 
-  Value subgroupId = rewriter.create<gpu::SubgroupIdOp>(loc, nullptr);
-  Value laneId = rewriter.create<gpu::LaneIdOp>(loc, nullptr);
+  Value subgroupId = gpu::SubgroupIdOp::create(rewriter, loc, nullptr);
+  Value laneId = gpu::LaneIdOp::create(rewriter, loc, nullptr);
 
   auto sourceType = cast<MemRefType>(copy.getOperand(0).getType());
   auto localType = cast<MemRefType>(copy.getOutputs().front().getType());
 
   auto getGlobalGatherIndex = [&](Value sgIdVal, Value lIdVal,
                                   Value indVar) -> Value {
-    auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    return rewriter.create<affine::AffineLinearizeIndexOp>(
-        loc, ValueRange{sgIdVal, indVar, lIdVal, zero},
+    auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    return affine::AffineLinearizeIndexOp::create(
+        rewriter, loc, ValueRange{sgIdVal, indVar, lIdVal, zero},
         ArrayRef<int64_t>{numSubgroups, numCopiesPerThread, subgroupSize,
                           elementsPerCopy},
         /*disjoint=*/true);
   };
 
   auto getSubgroupStoreBaseIndex = [&](Value sgIdVal, Value indVar) -> Value {
-    auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
     return getGlobalGatherIndex(sgIdVal, zero, indVar);
   };
 
   // Build a for loop skeleton:
-  auto lowerBound = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  auto lowerBound = arith::ConstantIndexOp::create(rewriter, loc, 0);
   auto upperBound =
-      rewriter.create<arith::ConstantIndexOp>(loc, numCopiesPerThread);
-  auto step = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+      arith::ConstantIndexOp::create(rewriter, loc, numCopiesPerThread);
+  auto step = arith::ConstantIndexOp::create(rewriter, loc, 1);
   scf::ForOp forOp =
-      rewriter.create<scf::ForOp>(loc, lowerBound, upperBound, step);
+      scf::ForOp::create(rewriter, loc, lowerBound, upperBound, step);
 
   auto delinearizeIndex = [&](Value index, ArrayRef<int64_t> shape) {
-    return rewriter.create<affine::AffineDelinearizeIndexOp>(loc, index, shape)
+    return affine::AffineDelinearizeIndexOp::create(rewriter, loc, index, shape)
         .getMultiIndex();
   };
 
@@ -142,8 +142,8 @@ distributeLinalgCopyToThreads(RewriterBase &rewriter, linalg::CopyOp copy,
         getSubgroupStoreBaseIndex(subgroupId, inductionVar);
     ValueRange delinearizedLocalIndices =
         delinearizeIndex(linearizedBaseIndices, localType.getShape());
-    rewriter.create<IREE::GPU::GlobalLoadDMAOp>(
-        loc, copy.getOperand(0), delinearizedGlobalIndices,
+    IREE::GPU::GlobalLoadDMAOp::create(
+        rewriter, loc, copy.getOperand(0), delinearizedGlobalIndices,
         copy.getOutputs()[0], delinearizedLocalIndices);
   }
 

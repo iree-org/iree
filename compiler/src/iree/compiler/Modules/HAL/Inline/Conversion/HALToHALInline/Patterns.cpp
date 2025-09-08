@@ -110,8 +110,8 @@ struct BufferLoadOpPattern
     Value storageBuffer =
         rewriter.createOrFold<IREE::HAL::Inline::BufferStorageOp>(
             op.getLoc(), adaptor.getSourceBuffer());
-    Value storageSize = rewriter.create<IREE::HAL::Inline::BufferLengthOp>(
-        op.getLoc(), adaptor.getSourceBuffer());
+    Value storageSize = IREE::HAL::Inline::BufferLengthOp::create(
+        rewriter, op.getLoc(), adaptor.getSourceBuffer());
     auto loadType = getTypeConverter()->convertType(op.getResult().getType());
     auto elementSize =
         rewriter.createOrFold<IREE::Util::SizeOfOp>(op.getLoc(), loadType);
@@ -131,8 +131,8 @@ struct BufferStoreOpPattern
     Value storageBuffer =
         rewriter.createOrFold<IREE::HAL::Inline::BufferStorageOp>(
             op.getLoc(), adaptor.getTargetBuffer());
-    Value storageSize = rewriter.create<IREE::HAL::Inline::BufferLengthOp>(
-        op.getLoc(), adaptor.getTargetBuffer());
+    Value storageSize = IREE::HAL::Inline::BufferLengthOp::create(
+        rewriter, op.getLoc(), adaptor.getTargetBuffer());
     auto elementSize = rewriter.createOrFold<IREE::Util::SizeOfOp>(
         op.getLoc(), adaptor.getValue().getType());
     rewriter.replaceOpWithNewOp<IREE::Util::BufferStoreOp>(

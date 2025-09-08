@@ -195,7 +195,7 @@ func.func @conv_nhwc_fhwc_unaligned_channel(%arg0: tensor<16x26x19x287xf16>, %ar
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d1 + d5 * 2, d2 + d6 * 2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d0)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
-func.func @conv_chwn_chwf_unaligned(%arg0: tensor<16x193x129x40xbf16>, %arg1: tensor<16x96x64x40xbf16>, %arg2: tensor<40x3x3x40xf32>) -> tensor<40x3x3x40xf32> {
+func.func @conv_chwn_chwf_unaligned_batch(%arg0: tensor<16x193x129x40xbf16>, %arg1: tensor<16x96x64x40xbf16>, %arg2: tensor<40x3x3x40xf32>) -> tensor<40x3x3x40xf32> {
   %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<16x193x129x40xbf16>, tensor<16x96x64x40xbf16>) outs(%arg2 : tensor<40x3x3x40xf32>) {
   ^bb0(%in: bf16, %in_0: bf16, %out: f32):
     %1 = arith.extf %in : bf16 to f32
@@ -207,7 +207,7 @@ func.func @conv_chwn_chwf_unaligned(%arg0: tensor<16x193x129x40xbf16>, %arg1: te
   return %0 : tensor<40x3x3x40xf32>
 }
 
-// CHECK-LABEL: func.func @conv_chwn_chwf_unaligned
+// CHECK-LABEL: func.func @conv_chwn_chwf_unaligned_batch
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
@@ -227,7 +227,7 @@ func.func @conv_chwn_chwf_unaligned(%arg0: tensor<16x193x129x40xbf16>, %arg1: te
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0 + d4, d1 + d5, d2, d6)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d2, d3, d4, d5, d6)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
-func.func @group_conv_unaligned(%arg0: tensor<61x93x16x56xbf16>, %arg1: tensor<16x56x3x3x56xbf16>, %arg2: tensor<59x91x16x56xf32>) -> tensor<59x91x16x56xf32> {
+func.func @group_conv_hwgc_gfhwc_unaligned(%arg0: tensor<61x93x16x56xbf16>, %arg1: tensor<16x56x3x3x56xbf16>, %arg2: tensor<59x91x16x56xf32>) -> tensor<59x91x16x56xf32> {
   %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<61x93x16x56xbf16>, tensor<16x56x3x3x56xbf16>) outs(%arg2 : tensor<59x91x16x56xf32>) {
     ^bb0(%in: bf16, %in_4: bf16, %out: f32):
       %10 = arith.extf %in : bf16 to f32
@@ -239,7 +239,7 @@ func.func @group_conv_unaligned(%arg0: tensor<61x93x16x56xbf16>, %arg1: tensor<1
   return %0 : tensor<59x91x16x56xf32>
 }
 
-// CHECK-LABEL: func.func @group_conv_unaligned
+// CHECK-LABEL: func.func @group_conv_hwgc_gfhwc_unaligned
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = true
@@ -299,3 +299,45 @@ module {
 // MI300X-SAME:     workgroup = [1, 2, 32, 32, 0]
 
 // PAD-CONV-GFX942:     padding_conv = [2, 2, 32, 64, 0, 0]
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d1 + d5 * 2, d2 + d6 * 2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d0)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+func.func @conv_chwn_chwf_no_pad_conv(%arg0: tensor<2x192x128x40xbf16>, %arg1: tensor<2x95x63x40xbf16>, %arg2: tensor<40x3x3x40xf32>) -> tensor<40x3x3x40xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<2x192x128x40xbf16>, tensor<2x95x63x40xbf16>) outs(%arg2 : tensor<40x3x3x40xf32>) {
+  ^bb0(%in: bf16, %in_0: bf16, %out: f32):
+    %1 = arith.extf %in : bf16 to f32
+    %2 = arith.extf %in_0 : bf16 to f32
+    %3 = arith.mulf %1, %2 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<40x3x3x40xf32>
+  return %0 : tensor<40x3x3x40xf32>
+}
+
+//         CHECK-LABEL:  func.func @conv_chwn_chwf_no_pad_conv
+//     PAD-CONV-GFX942:     padding = [16, 1, 1, 16, 16]
+// PAD-CONV-GFX942-NOT:     padding_conv
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d3, d4, d5, d6)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+func.func @conv_nhwc_small_channel_no_pad_conv(%arg0: tensor<16x26x19x3xf16>, %arg1: tensor<287x3x3x3xf16>, %arg2: tensor<16x24x17x287xf32>) -> tensor<16x24x17x287xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<16x26x19x3xf16>, tensor<287x3x3x3xf16>) outs(%arg2 : tensor<16x24x17x287xf32>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f32):
+    %1 = arith.extf %in : f16 to f32
+    %2 = arith.extf %in_0 : f16 to f32
+    %3 = arith.mulf %1, %2 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<16x24x17x287xf32>
+  return %0 : tensor<16x24x17x287xf32>
+}
+
+//         CHECK-LABEL:  func.func @conv_nhwc_small_channel_no_pad_conv
+//     PAD-CONV-GFX942:     padding = [1, 4, 32, 32, 32]
+// PAD-CONV-GFX942-NOT:     padding_conv

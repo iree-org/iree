@@ -82,8 +82,8 @@ void static removeUnitExtentDimsfromMaps(linalg::LinalgOp linalgOp,
   newIndexingMaps.push_back(filterMap);
   newIndexingMaps.push_back(indexingMaps[2]);
   // Create the new contraction op and replace the old convolution op.
-  auto newOp = rewriter.create<linalg::GenericOp>(
-      linalgOp.getLoc(), linalgOp.getDpsInits().getType(),
+  auto newOp = linalg::GenericOp::create(
+      rewriter, linalgOp.getLoc(), linalgOp.getDpsInits().getType(),
       linalgOp.getDpsInputs(), linalgOp.getDpsInits(), newIndexingMaps,
       linalgOp.getIteratorTypesArray(), /*bodyBuild=*/nullptr,
       getPrunedAttributeList(linalgOp));

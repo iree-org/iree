@@ -19,6 +19,7 @@
 #include "iree/compiler/Utils/ShapeUtils.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/Regex.h"
 #include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
@@ -203,6 +204,14 @@ populatePDLModuleFromBuiltin(MLIRContext *context, RewritePatternSet &patterns,
 
 namespace {
 
+SmallVector<StringRef> filterUkernelPatternsByTarget(ArrayRef<StringRef> names,
+                                                     StringRef target) {
+  std::string pattern =
+      "ukernel_patterns(_.*)*" + target.str() + "(_.*)*\\.mlir";
+  llvm::Regex regex(pattern);
+  return llvm::filter_to_vector(
+      names, [&regex](StringRef name) { return regex.match(name); });
+}
 class ApplyBuiltinPDLPatternsPass
     : public iree_compiler::IREE::ROCM::impl::ApplyBuiltinPDLPatternsPassBase<
           ApplyBuiltinPDLPatternsPass> {
@@ -232,17 +241,21 @@ public:
     }
     if (enableTensorUKernels) {
       for (std::string target : targets) {
-        std::string builtinName =
-            llvm::formatv("ukernel_patterns_{}.mlir", target);
-        std::optional<StringRef> maybeBuiltin =
-            rocmDialect->getBuiltin(builtinName);
-        if (!maybeBuiltin) {
-          // Skip when no patterns are present.
-          continue;
-        }
-        if (failed(populatePDLModuleFromBuiltin(context, tmpPatterns,
-                                                maybeBuiltin.value()))) {
-          return failure();
+        SmallVector<StringRef> allBuiltinNames = rocmDialect->getBuiltinNames();
+        SmallVector<StringRef> builtinNames =
+            filterUkernelPatternsByTarget(allBuiltinNames, target);
+        std::string builtinSrc;
+        for (StringRef builtinName : builtinNames) {
+          std::optional<StringRef> maybeBuiltin =
+              rocmDialect->getBuiltin(builtinName);
+          if (!maybeBuiltin) {
+            // Skip when no patterns are present.
+            continue;
+          }
+          if (failed(populatePDLModuleFromBuiltin(context, tmpPatterns,
+                                                  maybeBuiltin.value()))) {
+            return failure();
+          }
         }
       }
     }

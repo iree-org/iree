@@ -19,7 +19,7 @@ struct ExpectEqConstOpToExpectEqOp : public OpRewritePattern<ExpectEqConstOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(ExpectEqConstOp op,
                                 PatternRewriter &rewriter) const override {
-    auto rhs = rewriter.create<arith::ConstantOp>(op.getLoc(), op.getValue());
+    auto rhs = arith::ConstantOp::create(rewriter, op.getLoc(), op.getValue());
     rewriter.replaceOpWithNewOp<ExpectEqOp>(op, op.getDevice(), op.getLhs(),
                                             rhs);
     return success();
@@ -32,7 +32,7 @@ struct ExpectAlmostEqConstOpToExpectAlmostEqOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(ExpectAlmostEqConstOp op,
                                 PatternRewriter &rewriter) const override {
-    auto rhs = rewriter.create<arith::ConstantOp>(op.getLoc(), op.getValue());
+    auto rhs = arith::ConstantOp::create(rewriter, op.getLoc(), op.getValue());
     rewriter.replaceOpWithNewOp<ExpectAlmostEqOp>(
         op, op.getDevice(), op.getLhs(), rhs, op.getAtolAttr(),
         op.getRtolAttr());

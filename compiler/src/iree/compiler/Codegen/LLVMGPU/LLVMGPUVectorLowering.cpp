@@ -49,9 +49,9 @@ struct PromoteContractOperands final
     Value rhs =
         promoteToElementType(loc, rewriter, contractOp.getRhs(), resultElType);
 
-    auto replacement = rewriter.create<vector::ContractionOp>(
-        loc, lhs, rhs, contractOp.getAcc(), contractOp.getIndexingMaps(),
-        contractOp.getIteratorTypes());
+    auto replacement = vector::ContractionOp::create(
+        rewriter, loc, lhs, rhs, contractOp.getAcc(),
+        contractOp.getIndexingMaps(), contractOp.getIteratorTypes());
 
     if (!maskOp) {
       return replacement.getResult();
@@ -77,10 +77,10 @@ struct PromoteContractOperands final
       promotedType = vecType.clone(promotedType);
 
     if (isa<FloatType>(dstElementType))
-      return rewriter.create<arith::ExtFOp>(loc, promotedType, v);
+      return arith::ExtFOp::create(rewriter, loc, promotedType, v);
     // For integer types, vector.contract only supports signless integer types
     // and promotion happens via sign extension.
-    return rewriter.create<arith::ExtSIOp>(loc, promotedType, v);
+    return arith::ExtSIOp::create(rewriter, loc, promotedType, v);
   }
 };
 

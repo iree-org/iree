@@ -113,8 +113,8 @@ static FailureOr<Value> createSharedAllocDestination(RewriterBase &rewriter,
   rewriter.setInsertionPoint(empty);
   Attribute sharedMemoryAddrSpace = gpu::AddressSpaceAttr::get(
       rewriter.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
-  auto allocTensor = rewriter.create<bufferization::AllocTensorOp>(
-      empty->getLoc(), cast<TensorType>(empty.getResult().getType()),
+  auto allocTensor = bufferization::AllocTensorOp::create(
+      rewriter, empty->getLoc(), cast<TensorType>(empty.getResult().getType()),
       empty.getDynamicSizes(),
       /*copy=*/Value(), /*size_hint=*/Value(),
       /*memory_space=*/sharedMemoryAddrSpace);
@@ -166,8 +166,8 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
   }
 
   // Step 3. Create the `iree_gpu.barrier_region` to wrap the fused producer.
-  auto barrierOp = rewriter.create<IREE::GPU::BarrierRegionOp>(
-      producer.getLoc(), sharedDest.getType(), sharedDest);
+  auto barrierOp = IREE::GPU::BarrierRegionOp::create(
+      rewriter, producer.getLoc(), sharedDest.getType(), sharedDest);
   rewriter.setInsertionPointToStart(barrierOp.getBody());
 
   // Step 4. Compute the producer IDs in terms of the consumer IDs.
@@ -232,14 +232,14 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
   // Step 5. Create the `scf.for` loop for the producer.
   // If the consumer worker count perfectly divides the producer worker count,
   // then we can use a lower bound of 0 and keep the loop bounds static.
-  Value lb = perfectlyDivides ? rewriter.create<arith::ConstantIndexOp>(loc, 0)
+  Value lb = perfectlyDivides ? arith::ConstantIndexOp::create(rewriter, loc, 0)
                               : linearConsumerIdVal;
   Value ub =
       getValueOrCreateConstantIndexOp(rewriter, loc, producerWorkerCount);
   Value step =
       getValueOrCreateConstantIndexOp(rewriter, loc, consumerWorkerCount);
-  auto newProducer = rewriter.create<scf::ForOp>(
-      loc, lb, ub, step, barrierOp.getBody()->getArgument(0));
+  auto newProducer = scf::ForOp::create(rewriter, loc, lb, ub, step,
+                                        barrierOp.getBody()->getArgument(0));
   setLoopUnrollMarker(newProducer);
   Block *loopBody = newProducer.getBody();
 
@@ -255,8 +255,8 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
   // We require a descending relative mapping and scf.forall loop ranges are
   // listed from outer most to inner most, so we can use the ranges directly
   // for the delinearization basis.
-  auto delinearize = rewriter.create<affine::AffineDelinearizeIndexOp>(
-      loc, newFlatProducerId, llvm::to_vector(producerRanges));
+  auto delinearize = affine::AffineDelinearizeIndexOp::create(
+      rewriter, loc, newFlatProducerId, llvm::to_vector(producerRanges));
 
   SmallVector<Value> newBlockArgs = delinearize.getResults();
   newBlockArgs.append(newProducer.getRegionIterArgs().begin(),
@@ -274,18 +274,18 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
   SmallVector<OpFoldResult, 4> sourceOffsets = parallelInsert.getMixedOffsets();
   SmallVector<OpFoldResult, 4> sourceSizes = parallelInsert.getMixedSizes();
   SmallVector<OpFoldResult, 4> sourceStrides = parallelInsert.getMixedStrides();
-  Value insertedSlice = rewriter.create<tensor::InsertSliceOp>(
-      loc, parallelInsert.getSource(), parallelInsert.getDest(),
+  Value insertedSlice = tensor::InsertSliceOp::create(
+      rewriter, loc, parallelInsert.getSource(), parallelInsert.getDest(),
       parallelInsert.getMixedOffsets(), parallelInsert.getMixedSizes(),
       parallelInsert.getMixedStrides());
-  rewriter.create<scf::YieldOp>(loc, insertedSlice);
+  scf::YieldOp::create(rewriter, loc, insertedSlice);
   rewriter.eraseOp(parallelInsert);
   rewriter.eraseOp(terminator);
 
   // Step 7. Yield the result of the loop from the barrier op and replace the
   // producer.
   rewriter.setInsertionPointToEnd(barrierOp.getBody());
-  rewriter.create<IREE::GPU::YieldOp>(loc, newProducer.getResults());
+  IREE::GPU::YieldOp::create(rewriter, loc, newProducer.getResults());
 
   rewriter.replaceOp(producer, barrierOp);
   return success();
@@ -395,8 +395,9 @@ fuseNestedLaneAndWarpForalls(RewriterBase &rewriter, scf::ForallOp warpForallOp,
                                   rewriter.getIndexAttr(1));
   SmallVector<OpFoldResult> ubs = llvm::to_vector(llvm::concat<OpFoldResult>(
       warpForallOp.getMixedUpperBound(), laneForallOp.getMixedUpperBound()));
-  scf::ForallOp threadForallOp = rewriter.create<scf::ForallOp>(
-      warpForallOp.getLoc(), lbs, ubs, steps, warpForallOp.getOutputs(),
+  scf::ForallOp threadForallOp = scf::ForallOp::create(
+      rewriter, warpForallOp.getLoc(), lbs, ubs, steps,
+      warpForallOp.getOutputs(),
       ArrayAttr::get(rewriter.getContext(), threadMappings));
 
   // Collect pairs of combining ops to compose after inlining everything.
@@ -592,8 +593,8 @@ collapseParallelInsertOp(RewriterBase &rewriter,
   // Collapse the slice source.
   loc = parallelInsertOp.getParallelCombiningParent()->getLoc();
   rewriter.setInsertionPoint(parallelInsertOp.getParallelCombiningParent());
-  auto newCollapse = rewriter.create<tensor::CollapseShapeOp>(
-      loc, parallelInsertOp.getSource(), reassociations);
+  auto newCollapse = tensor::CollapseShapeOp::create(
+      rewriter, loc, parallelInsertOp.getSource(), reassociations);
 
   // Collapse the parallel insert slice.
   rewriter.setInsertionPoint(parallelInsertOp);
@@ -651,8 +652,8 @@ fuseCollapseShapeIntoProducerForall(RewriterBase &rewriter,
       tensor::getMixedSizes(rewriter, loc, forallOutput);
   loc = initArg.getLoc();
   rewriter.setInsertionPointToStart(forallOp.getBody());
-  auto expandedInitArg = rewriter.create<tensor::ExpandShapeOp>(
-      loc, initArg.getType(), initArg, reassociations, initSizes);
+  auto expandedInitArg = tensor::ExpandShapeOp::create(
+      rewriter, loc, initArg.getType(), initArg, reassociations, initSizes);
 
   // The new parallel insert slice is collapsed, so don't use the expanded init.
   // Also don't replace the expand shape src with its own result.
@@ -666,13 +667,15 @@ fuseCollapseShapeIntoProducerForall(RewriterBase &rewriter,
   loc = forallOp->getLoc();
   rewriter.setInsertionPoint(forallOp);
   SmallVector<Value> newForallOutputs(forallOp.getOutputs());
-  Value collapsedLoopInit = rewriter.create<tensor::CollapseShapeOp>(
-      loc, newForallOutputs[forallResult.getResultNumber()], reassociations);
+  Value collapsedLoopInit = tensor::CollapseShapeOp::create(
+      rewriter, loc, newForallOutputs[forallResult.getResultNumber()],
+      reassociations);
   newForallOutputs[forallResult.getResultNumber()] = collapsedLoopInit;
 
-  scf::ForallOp newForallOp = rewriter.create<scf::ForallOp>(
-      loc, forallOp.getMixedLowerBound(), forallOp.getMixedUpperBound(),
-      forallOp.getMixedStep(), newForallOutputs, forallOp.getMappingAttr());
+  scf::ForallOp newForallOp = scf::ForallOp::create(
+      rewriter, loc, forallOp.getMixedLowerBound(),
+      forallOp.getMixedUpperBound(), forallOp.getMixedStep(), newForallOutputs,
+      forallOp.getMappingAttr());
 
   SmallVector<Value> argReplacements(newForallOp.getInductionVars());
   argReplacements.append(newForallOp.getRegionIterArgs().begin(),
@@ -787,8 +790,8 @@ clampParallelInsertSliceOp(RewriterBase &rewriter,
       parallelInsertOp.getParallelCombiningParent().getOperation();
   rewriter.setInsertionPoint(combiningOp);
   loc = combiningOp->getLoc();
-  auto extractOp = rewriter.create<tensor::ExtractSliceOp>(
-      loc, clampedType, parallelInsertOp.getSource(), zeros,
+  auto extractOp = tensor::ExtractSliceOp::create(
+      rewriter, loc, clampedType, parallelInsertOp.getSource(), zeros,
       rankReducedClampedSizes, ones);
 
   // Replace the parallel insert op with the clamped version, and return the
@@ -903,9 +906,10 @@ fuseExtractSliceIntoProducerForall(RewriterBase &rewriter,
   // operand.
   Value forallInit = forallOp.getOutputs()[resultIdx];
   rewriter.setInsertionPoint(forallOp);
-  auto extractedInit = rewriter.create<tensor::ExtractSliceOp>(
-      forallOp->getLoc(), forallInit, extractSliceOp.getMixedOffsets(),
-      extractSliceOp.getMixedSizes(), extractSliceOp.getMixedStrides());
+  auto extractedInit = tensor::ExtractSliceOp::create(
+      rewriter, forallOp->getLoc(), forallInit,
+      extractSliceOp.getMixedOffsets(), extractSliceOp.getMixedSizes(),
+      extractSliceOp.getMixedStrides());
 
   // Clone the forall op with the extracted init operand to replace the
   // original forall op.
@@ -914,9 +918,10 @@ fuseExtractSliceIntoProducerForall(RewriterBase &rewriter,
   SmallVector<Value> newForallOutputs(forallOp.getOutputs());
   newForallOutputs[resultIdx] = extractedInit.getResult();
 
-  scf::ForallOp newForallOp = rewriter.create<scf::ForallOp>(
-      loc, forallOp.getMixedLowerBound(), forallOp.getMixedUpperBound(),
-      forallOp.getMixedStep(), newForallOutputs, forallOp.getMappingAttr());
+  scf::ForallOp newForallOp = scf::ForallOp::create(
+      rewriter, loc, forallOp.getMixedLowerBound(),
+      forallOp.getMixedUpperBound(), forallOp.getMixedStep(), newForallOutputs,
+      forallOp.getMappingAttr());
 
   SmallVector<Value> argReplacements(newForallOp.getInductionVars());
   argReplacements.append(newForallOp.getRegionIterArgs().begin(),
@@ -939,8 +944,8 @@ fuseExtractSliceIntoProducerForall(RewriterBase &rewriter,
     reassociations.push_back(reassociation);
     reassociation = {};
   }
-  auto collapseShape = rewriter.create<tensor::CollapseShapeOp>(
-      extractSliceOp->getLoc(), extractedResult, reassociations);
+  auto collapseShape = tensor::CollapseShapeOp::create(
+      rewriter, extractSliceOp->getLoc(), extractedResult, reassociations);
 
   // Replace forall and extract_slice ops with the new operations.
   rewriter.replaceAllOpUsesWith(extractSliceOp, collapseShape);
@@ -975,8 +980,8 @@ struct LowerInnerTiledPattern
 
     for (auto [operand, regType] : llvm::zip_equal(operands, regTypes)) {
       if (operand.getType() != regType) {
-        operand = rewriter.create<vector::ShapeCastOp>(tiledOp.getLoc(),
-                                                       regType, operand);
+        operand = vector::ShapeCastOp::create(rewriter, tiledOp.getLoc(),
+                                              regType, operand);
       }
     }
 
@@ -992,8 +997,8 @@ struct LowerInnerTiledPattern
     }
     for (auto [result, externalShape] :
          llvm::zip_equal(concreteResults, tiledOp.getResultTypes())) {
-      result = rewriter.create<vector::ShapeCastOp>(tiledOp.getLoc(),
-                                                    externalShape, result);
+      result = vector::ShapeCastOp::create(rewriter, tiledOp.getLoc(),
+                                           externalShape, result);
     }
     rewriter.replaceOp(tiledOp, concreteResults);
     return success();
@@ -1344,8 +1349,8 @@ distributeInnerTiledOp(RewriterBase &rewriter,
                                "forall it's to be distributed into.");
   }
 
-  auto newForallOp = rewriter.create<scf::ForallOp>(
-      loc, ArrayRef<OpFoldResult>{zero}, ArrayRef<OpFoldResult>{ub},
+  auto newForallOp = scf::ForallOp::create(
+      rewriter, loc, ArrayRef<OpFoldResult>{zero}, ArrayRef<OpFoldResult>{ub},
       ArrayRef<OpFoldResult>{one}, tiledOp.getOutputs(),
       ArrayAttr::get(context, {mappingType}));
 
@@ -1387,21 +1392,21 @@ distributeInnerTiledOp(RewriterBase &rewriter,
     // variable, since the accumulator operand has been used to create the
     // forall.
     if (opIndex >= firstOutIdx) {
-      auto sliceOp = rewriter.create<tensor::ExtractSliceOp>(
-          loc, newForallOp.getRegionIterArgs()[opIndex - firstOutIdx], offsets,
-          sizes, strides);
+      auto sliceOp = tensor::ExtractSliceOp::create(
+          rewriter, loc, newForallOp.getRegionIterArgs()[opIndex - firstOutIdx],
+          offsets, sizes, strides);
       initSliceOps.push_back(sliceOp);
       initSlices.push_back(sliceOp);
     } else {
-      Value slice = rewriter.create<tensor::ExtractSliceOp>(
-          loc, operand, offsets, sizes, strides);
+      Value slice = tensor::ExtractSliceOp::create(rewriter, loc, operand,
+                                                   offsets, sizes, strides);
       inputSlices.push_back(slice);
     }
   }
 
   // Step 3. Create the new inner_tiled op.
-  auto newTiledOp = rewriter.create<IREE::Codegen::InnerTiledOp>(
-      loc, inputSlices, initSlices, tiledOp.getIndexingMaps(),
+  auto newTiledOp = IREE::Codegen::InnerTiledOp::create(
+      rewriter, loc, inputSlices, initSlices, tiledOp.getIndexingMaps(),
       tiledOp.getIteratorTypes(), tiledOp.getKind());
 
   newTiledOp->setDiscardableAttrs(tiledOp->getDiscardableAttrDictionary());
@@ -1412,9 +1417,10 @@ distributeInnerTiledOp(RewriterBase &rewriter,
   rewriter.setInsertionPointToStart(terminator.getBody());
   for (auto [newResult, extractOp] :
        llvm::zip_equal(newTiledOp.getResults(), initSliceOps)) {
-    rewriter.create<tensor::ParallelInsertSliceOp>(
-        loc, newResult, extractOp.getSource(), extractOp.getMixedOffsets(),
-        extractOp.getMixedSizes(), extractOp.getMixedStrides());
+    tensor::ParallelInsertSliceOp::create(
+        rewriter, loc, newResult, extractOp.getSource(),
+        extractOp.getMixedOffsets(), extractOp.getMixedSizes(),
+        extractOp.getMixedStrides());
   }
 
   rewriter.replaceOp(tiledOp, newForallOp);
@@ -1460,14 +1466,15 @@ struct DropInnerTiledUnitDimsPattern
       }
       SmallVector<int64_t> droppedDimIndices(outerRank, 0);
       Value slice =
-          rewriter.create<vector::ExtractOp>(loc, operand, droppedDimIndices);
+          vector::ExtractOp::create(rewriter, loc, operand, droppedDimIndices);
       newOperands.push_back(slice);
     }
 
     SmallVector<AffineMap> emptyMaps(tiledOp.getNumOperands(),
                                      AffineMap::get(rewriter.getContext()));
-    auto newTiledOp = rewriter.create<IREE::Codegen::InnerTiledOp>(
-        loc, ValueRange{newOperands}.take_front(tiledOp.getNumInputs()),
+    auto newTiledOp = IREE::Codegen::InnerTiledOp::create(
+        rewriter, loc,
+        ValueRange{newOperands}.take_front(tiledOp.getNumInputs()),
         ValueRange{newOperands}.drop_front(tiledOp.getNumInputs()),
         rewriter.getAffineMapArrayAttr(emptyMaps), rewriter.getArrayAttr({}),
         tiledOp.getKind());
@@ -1476,7 +1483,7 @@ struct DropInnerTiledUnitDimsPattern
     for (auto [newResult, externalShape] :
          llvm::zip_equal(newResults, tiledOp.getResultTypes())) {
       newResult =
-          rewriter.create<vector::BroadcastOp>(loc, externalShape, newResult);
+          vector::BroadcastOp::create(rewriter, loc, externalShape, newResult);
     }
     rewriter.replaceOp(tiledOp, newResults);
     return success();
@@ -1599,8 +1606,9 @@ struct UnrollInnerTiledPattern
         SmallVector<int64_t> operandShape = applyPermutationMap(
             permutationMap, ArrayRef<int64_t>(*targetShape));
         SmallVector<int64_t> operandStrides(operandOffets.size(), 1);
-        slicesOperands[index] = rewriter.create<vector::ExtractStridedSliceOp>(
-            loc, operand, operandOffets, operandShape, operandStrides);
+        slicesOperands[index] = vector::ExtractStridedSliceOp::create(
+            rewriter, loc, operand, operandOffets, operandShape,
+            operandStrides);
       };
       // Extract the new input operands.
       for (auto [inputIndex, input] : llvm::enumerate(tiledOp.getInputs())) {
@@ -1638,14 +1646,14 @@ struct UnrollInnerTiledPattern
       accCache[dstOffets] = newOp.getResults().front();
     }
     // Assemble back the accumulator into a single vector.
-    Value result = rewriter.create<arith::ConstantOp>(
-        loc, dstVecType, rewriter.getZeroAttr(dstVecType));
+    Value result = arith::ConstantOp::create(rewriter, loc, dstVecType,
+                                             rewriter.getZeroAttr(dstVecType));
     for (const auto &[offsets, partialResult] : accCache) {
       SmallVector<int64_t> dstStrides(offsets.size() + innerAccShape.size(), 1);
       SmallVector<int64_t> fullOffsets(offsets);
       fullOffsets.append(innerAccShape.size(), 0);
-      result = rewriter.create<vector::InsertStridedSliceOp>(
-          loc, partialResult, result, fullOffsets, dstStrides);
+      result = vector::InsertStridedSliceOp::create(
+          rewriter, loc, partialResult, result, fullOffsets, dstStrides);
     }
     rewriter.replaceOp(tiledOp, result);
     return success();
@@ -1753,13 +1761,14 @@ static void rewriteForallToLanes(RewriterBase &rewriter, scf::ForallOp forallOp,
       upperBound = dyn_cast<IntegerAttr>(upperBoundAttr);
     }
   }
-  Value laneId = rewriter.create<gpu::LaneIdOp>(
-      loc, upperBound ? rewriter.getIndexAttr(upperBound->getInt()) : nullptr);
+  Value laneId = gpu::LaneIdOp::create(
+      rewriter, loc,
+      upperBound ? rewriter.getIndexAttr(upperBound->getInt()) : nullptr);
   rewriter.eraseOp(forallOp.getTerminator());
   rewriter.setInsertionPoint(forallOp);
   rewriter.inlineBlockBefore(forallOp.getBody(), forallOp, {laneId});
   if (insertBarrier) {
-    rewriter.create<gpu::BarrierOp>(loc);
+    gpu::BarrierOp::create(rewriter, loc);
   }
   rewriter.eraseOp(forallOp);
 }
@@ -1792,8 +1801,8 @@ struct LowerBarrierRegion
     Location loc = barrierRegionOp.getLoc();
 
     // Step 1. Synchronize the workers on the shared dest.
-    auto writeBarrier = rewriter.create<IREE::GPU::ValueBarrierOp>(
-        loc, barrierRegionOp.getInputs());
+    auto writeBarrier = IREE::GPU::ValueBarrierOp::create(
+        rewriter, loc, barrierRegionOp.getInputs());
 
     // Step 2. Inline the barrier op region.
     auto terminator = barrierRegionOp.getBody()->getTerminator();
@@ -1802,8 +1811,8 @@ struct LowerBarrierRegion
     rewriter.setInsertionPoint(terminator);
 
     // Step 3. Synchronize the result value.
-    auto barrier = rewriter.create<IREE::GPU::ValueBarrierOp>(
-        loc, terminator->getOperands());
+    auto barrier = IREE::GPU::ValueBarrierOp::create(rewriter, loc,
+                                                     terminator->getOperands());
     rewriter.replaceAllUsesWith(barrierRegionOp.getResults(),
                                 barrier.getResults());
     rewriter.eraseOp(terminator);
@@ -1840,8 +1849,8 @@ vectorizeStaticInnerTiledOp(RewriterBase &rewriter,
   // Construct the (never used) zero padding value for each operand.
   SmallVector<Value> padValues =
       llvm::map_to_vector(argTypes, [&](ShapedType argType) -> Value {
-        return rewriter.create<arith::ConstantOp>(
-            loc, rewriter.getZeroAttr(argType.getElementType()));
+        return arith::ConstantOp::create(
+            rewriter, loc, rewriter.getZeroAttr(argType.getElementType()));
       });
 
   SmallVector<Value> newOperands = tiledOp.getOperands();
@@ -1851,19 +1860,19 @@ vectorizeStaticInnerTiledOp(RewriterBase &rewriter,
         rewriter, loc, operand, type.getShape(), padValue,
         /*useInBoundsInsteadOfMasking=*/true);
   }
-  auto newTiledOp = rewriter.create<IREE::Codegen::InnerTiledOp>(
-      loc, ValueRange{newOperands}.take_front(tiledOp.getNumInputs()),
+  auto newTiledOp = IREE::Codegen::InnerTiledOp::create(
+      rewriter, loc, ValueRange{newOperands}.take_front(tiledOp.getNumInputs()),
       ValueRange{newOperands}.take_back(tiledOp.getNumOutputs()),
       tiledOp.getIndexingMaps(), tiledOp.getIteratorTypes(), tiledOp.getKind());
 
-  auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
   SmallVector<Value> transferWrites;
   for (auto [result, tensorAcc] :
        llvm::zip_equal(newTiledOp.getResults(), tiledOp.getOutputs())) {
     // Create the write back to a tensor.
     int64_t rank = cast<RankedTensorType>(tensorAcc.getType()).getRank();
-    auto write = rewriter.create<vector::TransferWriteOp>(
-        loc,
+    auto write = vector::TransferWriteOp::create(
+        rewriter, loc,
         /*vector=*/result,
         /*source=*/tensorAcc,
         /*indices=*/SmallVector<Value>(rank, zero),
@@ -1902,7 +1911,7 @@ struct LowerValueBarrierPattern
     if (barrier.hasTensorSemantics()) {
       return failure();
     }
-    rewriter.create<gpu::BarrierOp>(barrier.getLoc());
+    gpu::BarrierOp::create(rewriter, barrier.getLoc());
     for (auto [result, input] :
          llvm::zip_equal(barrier.getResults(), barrier.getInputs())) {
       rewriter.replaceAllUsesWith(result, input);

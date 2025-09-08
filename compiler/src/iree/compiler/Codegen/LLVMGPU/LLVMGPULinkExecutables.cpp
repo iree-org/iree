@@ -74,8 +74,8 @@ struct LLVMGPULinkExecutablesPass
     // Create our new "linked" hal.executable.
     SymbolTable moduleTable(moduleOp);
     std::string linkedExecutableName = llvm::formatv("{}_linked", moduleName);
-    auto linkedExecutableOp = moduleBuilder.create<IREE::HAL::ExecutableOp>(
-        moduleOp.getLoc(), linkedExecutableName);
+    auto linkedExecutableOp = IREE::HAL::ExecutableOp::create(
+        moduleBuilder, moduleOp.getLoc(), linkedExecutableName);
     linkedExecutableOp.setVisibility(
         sourceExecutableOps.front().getVisibility());
     moduleTable.insert(linkedExecutableOp);
@@ -96,11 +96,10 @@ struct LLVMGPULinkExecutablesPass
               ? targetAttr.getSymbolNameFragment()
               : llvm::formatv("{}_{}", targetAttr.getSymbolNameFragment(),
                               index);
-      auto linkedTargetOp =
-          executableBuilder.create<IREE::HAL::ExecutableVariantOp>(
-              moduleOp.getLoc(), linkedVariantName, targetAttr);
+      auto linkedTargetOp = IREE::HAL::ExecutableVariantOp::create(
+          executableBuilder, moduleOp.getLoc(), linkedVariantName, targetAttr);
       auto targetBuilder = OpBuilder::atBlockBegin(&linkedTargetOp.getBlock());
-      targetBuilder.create<mlir::ModuleOp>(moduleOp.getLoc());
+      mlir::ModuleOp::create(targetBuilder, moduleOp.getLoc());
 
       auto mergeModuleFn = [](mlir::ModuleOp sourceInnerModule,
                               mlir::ModuleOp linkedInnerModule,

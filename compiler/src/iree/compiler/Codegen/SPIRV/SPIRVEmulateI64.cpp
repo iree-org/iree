@@ -104,8 +104,8 @@ struct ConvertUtilAssumeIntOp final
     }
 
     if (!newArgs.empty()) {
-      auto newOp = rewriter.create<IREE::Util::AssumeIntOp>(
-          op.getLoc(), newArgs, newAssumptions);
+      auto newOp = IREE::Util::AssumeIntOp::create(rewriter, op.getLoc(),
+                                                   newArgs, newAssumptions);
       LLVM_DEBUG(llvm::dbgs()
                  << "WideIntegerEmulation: new op: " << newOp << "\n");
 
@@ -117,10 +117,10 @@ struct ConvertUtilAssumeIntOp final
         Type newType = getTypeConverter()->convertType(
             op.getResult(replacementLoc).getType());
         if (auto vecType = dyn_cast_if_present<VectorType>(newType)) {
-          Value zeros = rewriter.create<arith::ConstantOp>(
-              op.getLoc(), newType, rewriter.getZeroAttr(newType));
-          replacement = rewriter.create<vector::InsertOp>(
-              op.getLoc(), result, zeros, ArrayRef<int64_t>{0});
+          Value zeros = arith::ConstantOp::create(
+              rewriter, op.getLoc(), newType, rewriter.getZeroAttr(newType));
+          replacement = vector::InsertOp::create(rewriter, op.getLoc(), result,
+                                                 zeros, ArrayRef<int64_t>{0});
         }
         replacements[replacementLoc] = replacement;
       }
@@ -195,8 +195,8 @@ struct FlattenElementwisePattern final : RewritePattern {
     // Shape cast results.
     for (auto [oldResult, newResult] :
          llvm::zip_equal(op->getResults(), newOp->getResults())) {
-      Value cast = rewriter.create<vector::ShapeCastOp>(
-          loc, oldResult.getType(), newResult);
+      Value cast = vector::ShapeCastOp::create(rewriter, loc,
+                                               oldResult.getType(), newResult);
       rewriter.replaceAllUsesWith(oldResult, cast);
     }
     return success();

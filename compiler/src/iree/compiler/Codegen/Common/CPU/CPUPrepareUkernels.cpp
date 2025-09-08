@@ -233,9 +233,9 @@ struct ConvertBatchMmt4DtoMmt4DPattern
           rhs.getLoc(), "rhs producer should be reduced, but reduction failed");
     }
 
-    auto mmt4DOp = rewriter.create<linalg::Mmt4DOp>(
-        loc, reducedOut.getType(), ValueRange{reducedLhs, reducedRhs},
-        ValueRange{reducedOut});
+    auto mmt4DOp = linalg::Mmt4DOp::create(rewriter, loc, reducedOut.getType(),
+                                           ValueRange{reducedLhs, reducedRhs},
+                                           ValueRange{reducedOut});
 
     auto loweringConfig = getLoweringConfig<IREE::CPU::LoweringConfigAttr>(op);
     if (loweringConfig) {
@@ -308,9 +308,9 @@ struct Convert3DPackto2DPackPattern : public OpRewritePattern<linalg::PackOp> {
     auto reducedDest = tensor::createCanonicalRankReducingExtractSliceOp(
         rewriter, loc, packOp.getDest(), reducedDestType);
 
-    auto newPackOp = rewriter.create<linalg::PackOp>(
-        loc, reducedSrc, reducedDest, newInnerDimsPos, packOp.getMixedTiles(),
-        packOp.getPaddingValue(), newOuterDimsPerm);
+    auto newPackOp = linalg::PackOp::create(
+        rewriter, loc, reducedSrc, reducedDest, newInnerDimsPos,
+        packOp.getMixedTiles(), packOp.getPaddingValue(), newOuterDimsPerm);
 
     auto insertSliceOp = tensor::createCanonicalRankReducingInsertSliceOp(
         rewriter, loc, newPackOp.getResult(), packOp.getDest());
@@ -386,9 +386,9 @@ struct Convert5DUnPackto4DUnPackPattern
     auto reducedDest = tensor::createCanonicalRankReducingExtractSliceOp(
         rewriter, loc, unpackOp.getDest(), reducedDestType);
 
-    auto newUnpackOp = rewriter.create<linalg::UnPackOp>(
-        loc, reducedSrc, reducedDest, newInnerDimsPos, unpackOp.getMixedTiles(),
-        newOuterDimsPerm);
+    auto newUnpackOp = linalg::UnPackOp::create(
+        rewriter, loc, reducedSrc, reducedDest, newInnerDimsPos,
+        unpackOp.getMixedTiles(), newOuterDimsPerm);
 
     auto insertSliceOp = tensor::createCanonicalRankReducingInsertSliceOp(
         rewriter, loc, newUnpackOp.getResult(), unpackOp.getDest());

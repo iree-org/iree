@@ -127,6 +127,7 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
       result = rewriter.create<arith::SelectOp>(loc, cmp, result1, result2);
     }
 
+
     // Restore the sign
     Value finalResult = rewriter.create<math::CopySignOp>(loc, result, input);
     rewriter.replaceOp(op, finalResult);

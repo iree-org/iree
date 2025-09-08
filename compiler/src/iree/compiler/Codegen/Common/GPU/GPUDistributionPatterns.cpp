@@ -45,8 +45,8 @@ struct DistributeConstants final : OpDistributionPattern<arith::ConstantOp> {
     Type elementType = constant.getType().getElementType();
     auto vectorType =
         VectorType::get(layout.getDistributedShape(), elementType);
-    auto distributedOp = rewriter.create<arith::ConstantOp>(
-        constantOp.getLoc(), vectorType,
+    auto distributedOp = arith::ConstantOp::create(
+        rewriter, constantOp.getLoc(), vectorType,
         SplatElementsAttr::get(vectorType, attr.getSplatValue<Attribute>()));
     replaceOpWithDistributedValues(rewriter, constantOp,
                                    distributedOp->getResult(0));
@@ -176,9 +176,9 @@ struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
       newInitArgs.push_back(initArg);
     }
 
-    auto newForOp = rewriter.create<scf::ForOp>(
-        forOp.getLoc(), forOp.getLowerBound(), forOp.getUpperBound(),
-        forOp.getStep(), newInitArgs);
+    auto newForOp =
+        scf::ForOp::create(rewriter, forOp.getLoc(), forOp.getLowerBound(),
+                           forOp.getUpperBound(), forOp.getStep(), newInitArgs);
     newForOp->setAttrs(forOp->getAttrs());
     Block *loopBody = newForOp.getBody();
 
@@ -225,7 +225,7 @@ struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
     // Since this operation has no results, we can directly replace it using
     // the standard API.
     auto distributedYieldOp =
-        rewriter.create<scf::YieldOp>(yieldOp.getLoc(), operands);
+        scf::YieldOp::create(rewriter, yieldOp.getLoc(), operands);
     rewriter.replaceOp(yieldOp, distributedYieldOp);
     return success();
   }
@@ -240,8 +240,8 @@ struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
     for (auto [bbArg, oldInit] : llvm::zip_equal(bbArgs, oldInits)) {
       Value val = bbArg;
       if (auto oldVectorInit = dyn_cast<VectorValue>(oldInit)) {
-        val = rewriter.create<IREE::VectorExt::ToSIMDOp>(
-            oldVectorInit.getLoc(), oldVectorInit.getType(), val);
+        val = IREE::VectorExt::ToSIMDOp::create(
+            rewriter, oldVectorInit.getLoc(), oldVectorInit.getType(), val);
       }
       replacements.push_back(val);
     }
@@ -316,8 +316,8 @@ struct DistributeGather final : OpDistributionPattern<vector::GatherOp> {
     VectorType distributedType = VectorType::get(distributedShape, elementType);
 
     // Simply distribute all operands and results.
-    VectorValue distributed = rewriter.create<vector::GatherOp>(
-        gatherOp.getLoc(), distributedType, gatherOp.getBase(),
+    VectorValue distributed = vector::GatherOp::create(
+        rewriter, gatherOp.getLoc(), distributedType, gatherOp.getBase(),
         gatherOp.getOffsets(),
         getDistributed(rewriter, indexVec, indicesLayout),
         getDistributed(rewriter, mask, maskLayout),
@@ -344,9 +344,9 @@ struct DistributeTrivialExtract final
     VectorValue source = extractOp.getVector();
     VectorLayoutInterface sourceLayout = signature[source];
 
-    Value distributed = rewriter.create<vector::ExtractOp>(
-        extractOp.getLoc(), getDistributed(rewriter, source, sourceLayout),
-        ArrayRef<int64_t>{});
+    Value distributed = vector::ExtractOp::create(
+        rewriter, extractOp.getLoc(),
+        getDistributed(rewriter, source, sourceLayout), ArrayRef<int64_t>{});
 
     replaceOpWithDistributedValues(rewriter, extractOp, distributed);
 

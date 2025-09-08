@@ -247,8 +247,8 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
       assert(succeeded(reductionDimInfo) &&
              "obtained with confirmation earlier");
       for (auto &&dimInfo : reductionDimInfo.value()) {
-        Value redDimSize = rewriter.create<tensor::DimOp>(
-            paddedOp.getLoc(), dimInfo.operand, dimInfo.operandDim);
+        Value redDimSize = tensor::DimOp::create(
+            rewriter, paddedOp.getLoc(), dimInfo.operand, dimInfo.operandDim);
         reductionDimSizes.push_back({dimInfo.loopIndex, redDimSize});
       }
 
@@ -264,12 +264,13 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
                                            redDimIndex, redDimSize);
         conds.push_back(cond);
       }
-      Value reductionIdentityValue = rewriter.create<arith::ConstantOp>(
-          paddedOp.getLoc(), reductionIdentity.value());
+      Value reductionIdentityValue = arith::ConstantOp::create(
+          rewriter, paddedOp.getLoc(), reductionIdentity.value());
       assert(conds.size() > 0);
       Value cond = conds[0];
       for (Value nxtCond : llvm::drop_begin(conds, 1)) {
-        cond = rewriter.create<arith::AndIOp>(paddedOp.getLoc(), cond, nxtCond);
+        cond =
+            arith::AndIOp::create(rewriter, paddedOp.getLoc(), cond, nxtCond);
       }
 
       // Find the reduction op operand that is reduced with the carried output.
@@ -310,10 +311,10 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
         sizes[i] = getAsOpFoldResult(v);
     }
 
-    Value out = rewriter.create<tensor::EmptyOp>(
-        paddedOp.getLoc(), sizes, getElementTypeOrSelf(tensorTy));
-    auto copied = rewriter.create<linalg::CopyOp>(paddedOp.getLoc(),
-                                                  padOp.getResult(), out);
+    Value out = tensor::EmptyOp::create(rewriter, paddedOp.getLoc(), sizes,
+                                        getElementTypeOrSelf(tensorTy));
+    auto copied = linalg::CopyOp::create(rewriter, paddedOp.getLoc(),
+                                         padOp.getResult(), out);
     rewriter.replaceUsesWithIf(padOp.getResult(), copied.getResult(0),
                                [&](OpOperand &opOperand) {
                                  return users.contains(opOperand.getOwner());

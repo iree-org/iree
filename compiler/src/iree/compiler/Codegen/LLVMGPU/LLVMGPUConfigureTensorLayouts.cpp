@@ -189,11 +189,11 @@ static LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
   // Set layouts for lhs, rhs and acc.
   rewriter.setInsertionPoint(contract);
   auto layoutedLhs =
-      rewriter.create<ToLayoutOp>(loc, lhs, aLayout, schedule.getIntrinsic());
+      ToLayoutOp::create(rewriter, loc, lhs, aLayout, schedule.getIntrinsic());
   auto layoutedRhs =
-      rewriter.create<ToLayoutOp>(loc, rhs, bLayout, schedule.getIntrinsic());
+      ToLayoutOp::create(rewriter, loc, rhs, bLayout, schedule.getIntrinsic());
   auto layoutedAcc =
-      rewriter.create<ToLayoutOp>(loc, acc, cLayout, schedule.getIntrinsic());
+      ToLayoutOp::create(rewriter, loc, acc, cLayout, schedule.getIntrinsic());
 
   // Promote matmul lhs and rhs.
   // TODO: This is a hack until layout analysis is improved. The layout analysis
@@ -216,8 +216,8 @@ static LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
 
   // Set layout for result.
   rewriter.setInsertionPointAfter(contract);
-  auto toLayout = rewriter.create<ToLayoutOp>(loc, contract->getResult(0),
-                                              cLayout, schedule.getIntrinsic());
+  auto toLayout = ToLayoutOp::create(rewriter, loc, contract->getResult(0),
+                                     cLayout, schedule.getIntrinsic());
   rewriter.replaceAllUsesExcept(contract->getResult(0), toLayout.getResult(),
                                 toLayout);
 
@@ -276,11 +276,11 @@ static LogicalResult setConvolutionAnchor(IREE::GPU::MMAScheduleAttr schedule,
   // Set layouts for lhs, rhs and acc.
   rewriter.setInsertionPoint(conv);
   auto layoutedLhs =
-      rewriter.create<ToLayoutOp>(loc, lhs, aLayout, schedule.getIntrinsic());
+      ToLayoutOp::create(rewriter, loc, lhs, aLayout, schedule.getIntrinsic());
   auto layoutedRhs =
-      rewriter.create<ToLayoutOp>(loc, rhs, bLayout, schedule.getIntrinsic());
+      ToLayoutOp::create(rewriter, loc, rhs, bLayout, schedule.getIntrinsic());
   auto layoutedAcc =
-      rewriter.create<ToLayoutOp>(loc, acc, cLayout, schedule.getIntrinsic());
+      ToLayoutOp::create(rewriter, loc, acc, cLayout, schedule.getIntrinsic());
 
   // Promote matmul lhs and rhs.
   // TODO: This is a hack until layout analysis is improved. The layout analysis
@@ -303,8 +303,8 @@ static LogicalResult setConvolutionAnchor(IREE::GPU::MMAScheduleAttr schedule,
 
   // Set layout for result.
   rewriter.setInsertionPointAfter(conv);
-  auto toLayout = rewriter.create<ToLayoutOp>(loc, conv->getResult(0), cLayout,
-                                              schedule.getIntrinsic());
+  auto toLayout = ToLayoutOp::create(rewriter, loc, conv->getResult(0), cLayout,
+                                     schedule.getIntrinsic());
   rewriter.replaceAllUsesExcept(conv->getResult(0), toLayout.getResult(),
                                 toLayout);
 
@@ -553,7 +553,7 @@ static LogicalResult setDerivedThreadConfigLayout(
   for (OpResult result : linalgOp->getResults()) {
     VectorLayoutInterface resultLayout =
         getLayoutForMap(layout, linalgOp.getIndexingMapMatchingResult(result));
-    auto toLayout = rewriter.create<ToLayoutOp>(loc, result, resultLayout);
+    auto toLayout = ToLayoutOp::create(rewriter, loc, result, resultLayout);
     rewriter.replaceAllUsesExcept(result, toLayout, toLayout);
   }
 
@@ -725,7 +725,7 @@ static LogicalResult setGPULoweringConfigLayout(
     VectorLayoutInterface operandLayout =
         getLayoutForMap(layout, candidate.getMatchingIndexingMap(&operand));
     auto toLayout =
-        rewriter.create<ToLayoutOp>(loc, operand.get(), operandLayout);
+        ToLayoutOp::create(rewriter, loc, operand.get(), operandLayout);
     // Set shared memory promotion if requested.
     toLayout.setSharedMemoryConversion(
         promotedOperands[operand.getOperandNumber()]);
@@ -736,7 +736,7 @@ static LogicalResult setGPULoweringConfigLayout(
   for (OpResult result : candidate->getResults()) {
     VectorLayoutInterface resultLayout =
         getLayoutForMap(layout, candidate.getIndexingMapMatchingResult(result));
-    auto toLayout = rewriter.create<ToLayoutOp>(loc, result, resultLayout);
+    auto toLayout = ToLayoutOp::create(rewriter, loc, result, resultLayout);
     rewriter.replaceAllUsesExcept(result, toLayout, toLayout);
   }
 

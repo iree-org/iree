@@ -53,9 +53,9 @@ static Value convertElementType(OpBuilder &b, Location loc, Type targetType,
     unsigned sourceBitWidth = sourceType.getIntOrFloatBitWidth();
     unsigned destBitWidth = targetType.getIntOrFloatBitWidth();
     if (sourceBitWidth > destBitWidth) {
-      return b.create<arith::TruncIOp>(loc, targetType, source);
+      return arith::TruncIOp::create(b, loc, targetType, source);
     } else {
-      return b.create<arith::ExtUIOp>(loc, targetType, source);
+      return arith::ExtUIOp::create(b, loc, targetType, source);
     }
   }
   return nullptr;
@@ -310,8 +310,8 @@ struct TensorExtractTypePropagation
   matchAndRewrite(tensor::ExtractOp extractOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
     Location loc = extractOp.getLoc();
-    Value newExtract = rewriter.create<tensor::ExtractOp>(
-        loc, adaptor.getTensor(), adaptor.getIndices());
+    Value newExtract = tensor::ExtractOp::create(
+        rewriter, loc, adaptor.getTensor(), adaptor.getIndices());
     Value replacement = convertElementType(
         rewriter, loc, extractOp.getResult().getType(), newExtract);
     rewriter.replaceOp(extractOp, replacement);

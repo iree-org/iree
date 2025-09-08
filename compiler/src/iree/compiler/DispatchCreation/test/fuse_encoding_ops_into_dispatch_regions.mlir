@@ -281,6 +281,24 @@ util.func public @encoding_fusion(%arg0: tensor<128xf32, #encoding0>) -> tensor<
 // -----
 
 #encoding = #iree_encoding.testing<>
+util.func public @extract_slice_fusion(%arg0: tensor<192x1024x64xf32>) -> tensor<96x512x32xf32, #encoding> {
+  %0 = flow.dispatch.region -> (tensor<96x512x32xf32>) {
+    %1 = tensor.extract_slice %arg0[0, 0, 0] [96, 512, 32] [1, 1, 1] : tensor<192x1024x64xf32> to tensor<96x512x32xf32>
+    flow.return %1 : tensor<96x512x32xf32>
+  }
+  %2 = iree_encoding.set_encoding %0 : tensor<96x512x32xf32> -> tensor<96x512x32xf32, #encoding>
+  util.return %2 : tensor<96x512x32xf32, #encoding>
+}
+// CHECK-LABEL: @extract_slice_fusion
+// CHECK:       %[[DISPATCH0:.+]] = flow.dispatch.region
+// CHECK:         tensor.extract_slice
+// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding
+// CHECK:         flow.return %[[SET_ENCODING]] :
+// CHECK:       util.return %[[DISPATCH0]]
+
+// -----
+
+#encoding = #iree_encoding.testing<>
 util.func public @attention_fusion(
     %query: tensor<192x1024x64xf32>, %key: tensor<192x1024x64xf32>,
     %value: tensor<192x1024x64xf32>, %scale: f32) -> tensor<192x1024x64xf32, #encoding> {
@@ -309,3 +327,55 @@ util.func public @attention_fusion(
 // CHECK:         flow.return %[[SET_ENCODING]] :
 // CHECK:       }
 // CHECK:       util.return %[[DISPATCH0]]
+
+// -----
+
+#encoding = #iree_encoding.testing<>
+util.func public @gather_fusion(
+    %source: tensor<10x10xi32>, %indices: tensor<1xi32>) -> tensor<1x10xi32, #encoding> {
+  %empty = tensor.empty() : tensor<1x10xi32>
+  %1 = flow.dispatch.region -> (tensor<1x10xi32>) {
+    %3 = iree_linalg_ext.gather dimension_map = [0]
+           ins(%source, %indices : tensor<10x10xi32>, tensor<1xi32>)
+           outs(%empty : tensor<1x10xi32>) -> tensor<1x10xi32>
+    flow.return %3 : tensor<1x10xi32>
+  }
+  %2 = iree_encoding.set_encoding %1 : tensor<1x10xi32> -> tensor<1x10xi32, #encoding>
+  util.return %2 : tensor<1x10xi32, #encoding>
+}
+// CHECK-LABEL: @gather_fusion
+// CHECK:       %[[DISPATCH0:.+]] = flow.dispatch.region
+// CHECK:         iree_linalg_ext.gather
+// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding
+// CHECK:         flow.return %[[SET_ENCODING]] :
+// CHECK:       util.return %[[DISPATCH0]]
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#encoding = #iree_encoding.testing<>
+util.func public @multi_result_fusion(%arg0: tensor<123x456xf32>) -> (tensor<123x456xf32>, tensor<123x456xf32, #encoding>) {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<123x456xf32>
+  %1:2 = flow.dispatch.region -> (tensor<123x456xf32>, tensor<123x456xf32>) {
+    %3:2 = linalg.generic {
+        indexing_maps = [#map, #map, #map, #map],
+        iterator_types = ["parallel", "parallel"]}
+        ins(%arg0, %arg0 : tensor<123x456xf32>, tensor<123x456xf32>)
+        outs(%0, %0 : tensor<123x456xf32>, tensor<123x456xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32, %out2: f32):
+      %4 = arith.addf %in, %in_0 : f32
+      %5 = arith.mulf %in, %in_0 : f32
+      linalg.yield %4, %5 : f32, f32
+    } -> (tensor<123x456xf32>, tensor<123x456xf32>)
+    flow.return %3#0, %3#1 : tensor<123x456xf32>, tensor<123x456xf32>
+  }
+  %2 = iree_encoding.set_encoding %1#1 : tensor<123x456xf32> -> tensor<123x456xf32, #encoding>
+  util.return %1#0, %2 : tensor<123x456xf32>, tensor<123x456xf32, #encoding>
+}
+// CHECK-LABEL: @multi_result_fusion
+// CHECK:       %[[DISPATCH0:.+]]:2 = flow.dispatch.region
+// CHECK:         %[[ELEM:.+]]:2 = linalg.generic
+// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[ELEM]]#1
+// CHECK:         flow.return %[[ELEM]]#0, %[[SET_ENCODING]]
+// CHECK:       util.return %[[DISPATCH0]]#0, %[[DISPATCH0]]#1
