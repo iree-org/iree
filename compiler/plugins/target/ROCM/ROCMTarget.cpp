@@ -262,17 +262,18 @@ static std::string translateModuleToISA(llvm::Module &module,
   return targetISA;
 }
 
-void checkRegisterSpilling(OpBuilder &builder, const std::string obj) {
+static void checkRegisterSpilling(OpBuilder &builder, StringRef obj) {
   uint16_t abi_version;
-  llvm::StringMap<llvm::offloading::amdgpu::AMDGPUKernelMetaData> info_map;
+  llvm::StringMap<llvm::offloading::amdgpu::AMDGPUKernelMetaData> infoMap;
 
   if (!llvm::offloading::amdgpu::getAMDGPUMetaDataFromImage(
-          llvm::MemoryBufferRef(obj, ""), info_map, abi_version)) {
-    for (auto &entry : info_map) {
-      llvm::StringRef kernelName = entry.getKey();
+          llvm::MemoryBufferRef(obj, ""), infoMap, abi_version)) {
+    for (llvm::StringMapEntry<llvm::offloading::amdgpu::AMDGPUKernelMetaData>
+             &entry : infoMap) {
+      StringRef kernelName = entry.getKey();
       llvm::offloading::amdgpu::AMDGPUKernelMetaData &metaData =
           entry.getValue();
-      if (metaData.SGPRSpillCount > 0 || metaData.VGPRSpillCount) {
+      if (metaData.SGPRSpillCount > 0 || metaData.VGPRSpillCount > 0) {
         emitWarning(builder.getUnknownLoc())
             << "Register spill on kernel " << kernelName << ": "
             << "VGPRSpillCount : " << metaData.VGPRSpillCount
