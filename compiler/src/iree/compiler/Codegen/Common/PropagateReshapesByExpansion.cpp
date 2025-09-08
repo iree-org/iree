@@ -260,17 +260,20 @@ struct ExpandDestinationForallOp final
     auto expandedDestType =
         cast<RankedTensorType>(forallOutputs[tiedResultIdx].getType())
             .clone(expandedDestShape);
-    auto expandedDest = rewriter.create<tensor::ExpandShapeOp>(
-        loc, expandedDestType, forallOutputs[tiedResultIdx], reIndices);
+    auto expandedDest =
+        tensor::ExpandShapeOp::create(rewriter, loc, expandedDestType,
+                                      forallOutputs[tiedResultIdx], reIndices);
 
     forallOutputs[tiedResultIdx] = expandedDest;
 
-    scf::ForallOp newForallOp = rewriter.create<scf::ForallOp>(
-        loc, forallOp.getMixedLowerBound(), forallOp.getMixedUpperBound(),
-        forallOp.getMixedStep(), forallOutputs, forallOp.getMappingAttr());
+    scf::ForallOp newForallOp = scf::ForallOp::create(
+        rewriter, loc, forallOp.getMixedLowerBound(),
+        forallOp.getMixedUpperBound(), forallOp.getMixedStep(), forallOutputs,
+        forallOp.getMappingAttr());
 
-    auto collapsedResultOp = rewriter.create<tensor::CollapseShapeOp>(
-        loc, cast<ShapedType>(forallOp->getResult(tiedResultIdx).getType()),
+    auto collapsedResultOp = tensor::CollapseShapeOp::create(
+        rewriter, loc,
+        cast<ShapedType>(forallOp->getResult(tiedResultIdx).getType()),
         newForallOp->getResult(tiedResultIdx), reIndices);
 
     // Merge the old scf.forall block which has the expanded users into the new
@@ -353,8 +356,8 @@ struct SwapInnerBitcastWithExtractSlice
     dispatchIndexOpFoldResults(newMixedSizes, sliceSourceDynamicSizes,
                                sliceSourceStaticSizes);
 
-    Value newBitcast = rewriter.create<IREE::TensorExt::BitCastOp>(
-        bitcastOp.getLoc(), newBitcastType, sliceOp.getSource(),
+    Value newBitcast = IREE::TensorExt::BitCastOp::create(
+        rewriter, bitcastOp.getLoc(), newBitcastType, sliceOp.getSource(),
         sliceSourceDynamicSizes, sliceSourceDynamicSizes);
     SmallVector<int64_t> newSizes(sliceOp.getStaticSizes());
     newSizes.back() = newInnerSize;

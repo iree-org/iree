@@ -199,7 +199,7 @@ static LogicalResult lowerDispatchWorkgroupCountForDagRootOp(
     }
     numWorkgroups.push_back(numTileAlongDim);
   }
-  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  Value one = arith::ConstantIndexOp::create(rewriter, loc, 1);
   numWorkgroups.resize(workgroupCountOp.getNumResults(), one);
   rewriter.replaceOp(workgroupCountOp, numWorkgroups);
   return success();
@@ -366,7 +366,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     // Check if tile sizes are deduced from the configuration. If so use
     // those.
     return llvm::map_to_vector(tileSizes, [&](int64_t ts) -> Value {
-      return builder.create<arith::ConstantIndexOp>(op->getLoc(), ts);
+      return arith::ConstantIndexOp::create(builder, op->getLoc(), ts);
     });
   };
 

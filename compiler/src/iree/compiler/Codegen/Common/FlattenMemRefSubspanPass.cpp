@@ -126,7 +126,7 @@ static Value createTotalElementCountValue(ShapedType type,
                                           OpBuilder &builder) {
   if (type.hasStaticShape()) {
     assert(dynamicDims.empty());
-    return builder.create<arith::ConstantIndexOp>(loc, type.getNumElements());
+    return arith::ConstantIndexOp::create(builder, loc, type.getNumElements());
   }
 
   int64_t numSymbols = 0;
@@ -289,9 +289,9 @@ struct FlattenBindingSubspan final
         MemRefType::get(staticShape, oldType.getElementType(),
                         MemRefLayoutAttrInterface(), oldType.getMemorySpace());
 
-    auto newOffset = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    auto newOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newType, subspanOp.getLayout(),
+    auto newOffset = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    auto newOp = IREE::HAL::InterfaceBindingSubspanOp::create(
+        rewriter, subspanOp.getLoc(), newType, subspanOp.getLayout(),
         subspanOp.getBinding(), newOffset, dynamicShape,
         subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
 
@@ -305,9 +305,9 @@ struct FlattenBindingSubspan final
                         {}, newType, elementOffset, linearShapeWithoutOffset,
                         stride))
               : nullptr;
-      replacement = rewriter.create<memref::SubViewOp>(
-          loc, returnType, newOp, elementOffset, linearShapeWithoutOffset,
-          OpFoldResult(rewriter.getIndexAttr(1)));
+      replacement = memref::SubViewOp::create(
+          rewriter, loc, returnType, newOp, elementOffset,
+          linearShapeWithoutOffset, OpFoldResult(rewriter.getIndexAttr(1)));
     }
 
     rewriter.replaceOp(subspanOp, replacement);
@@ -395,7 +395,8 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
         if (ShapedType::isDynamic(shape[i])) {
           dims.push_back(dynamicDims[dynamicDimIndex++]);
         } else {
-          dims.push_back(builder.create<arith::ConstantIndexOp>(loc, shape[i]));
+          dims.push_back(
+              arith::ConstantIndexOp::create(builder, loc, shape[i]));
         }
       }
     };
@@ -409,7 +410,7 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
     } else {
       if (sourceType.hasStaticShape()) {
         for (int64_t dim : sourceType.getShape()) {
-          dims.push_back(builder.create<arith::ConstantIndexOp>(loc, dim));
+          dims.push_back(arith::ConstantIndexOp::create(builder, loc, dim));
         }
       } else {
         return nullptr;
@@ -424,8 +425,8 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
 
   Value linearIndex = indices.front();
   for (int i = 1; i < indices.size(); ++i) {
-    linearIndex = builder.create<affine::AffineApplyOp>(
-        loc, mulAddMap, ValueRange{linearIndex, dims[i], indices[i]});
+    linearIndex = affine::AffineApplyOp::create(
+        builder, loc, mulAddMap, ValueRange{linearIndex, dims[i], indices[i]});
   }
   return linearIndex;
 }
@@ -451,9 +452,9 @@ struct FlattenSubView final : public OpConversionPattern<memref::SubViewOp> {
         rewriter, op.getLoc(), op.getMixedOffsets());
     Value linearOffset =
         linearizeIndices(op.getSource(), offsets, op.getLoc(), rewriter);
-    Value stride = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 1);
-    Value newSubView = rewriter.create<memref::SubViewOp>(
-        op.getLoc(), adaptor.getSource(), ValueRange({linearOffset}),
+    Value stride = arith::ConstantIndexOp::create(rewriter, op.getLoc(), 1);
+    Value newSubView = memref::SubViewOp::create(
+        rewriter, op.getLoc(), adaptor.getSource(), ValueRange({linearOffset}),
         ValueRange({size}), ValueRange({stride}));
     rewriter.replaceOpWithNewOp<memref::CastOp>(op, neededResultType,
                                                 newSubView);

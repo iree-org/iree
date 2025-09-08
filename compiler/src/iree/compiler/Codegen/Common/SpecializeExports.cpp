@@ -289,7 +289,7 @@ static void specializeExportedFunction(
       builder.setInsertionPointToStart(newCondition);
 
       Value exportCondition =
-          builder.create<arith::ConstantIntOp>(loc, builder.getI1Type(), 1);
+          arith::ConstantIntOp::create(builder, loc, builder.getI1Type(), 1);
 
       for (auto [range, assumedSize] :
            llvm::zip(specializationRange, workloadMapping)) {
@@ -300,32 +300,32 @@ static void specializeExportedFunction(
         // +1 for the device.
         Value workload =
             newCondition->getArgument(assumedSize.workloadOrdinal + 1);
-        Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+        Value zero = arith::ConstantIndexOp::create(builder, loc, 0);
 
         if (range.getUmin().has_value()) {
-          Value uminVal = builder.create<arith::ConstantIndexOp>(
-              loc, range.getUmin().value());
-          Value cmp = builder.create<arith::CmpIOp>(
-              loc, arith::CmpIPredicate::ule, uminVal, workload);
+          Value uminVal = arith::ConstantIndexOp::create(
+              builder, loc, range.getUmin().value());
+          Value cmp = arith::CmpIOp::create(
+              builder, loc, arith::CmpIPredicate::ule, uminVal, workload);
           exportCondition =
-              builder.create<arith::AndIOp>(loc, cmp, exportCondition);
+              arith::AndIOp::create(builder, loc, cmp, exportCondition);
         }
         if (range.getUmax().has_value()) {
-          Value umaxVal = builder.create<arith::ConstantIndexOp>(
-              loc, range.getUmax().value());
-          Value cmp = builder.create<arith::CmpIOp>(
-              loc, arith::CmpIPredicate::uge, umaxVal, workload);
+          Value umaxVal = arith::ConstantIndexOp::create(
+              builder, loc, range.getUmax().value());
+          Value cmp = arith::CmpIOp::create(
+              builder, loc, arith::CmpIPredicate::uge, umaxVal, workload);
           exportCondition =
-              builder.create<arith::AndIOp>(loc, cmp, exportCondition);
+              arith::AndIOp::create(builder, loc, cmp, exportCondition);
         }
         if (range.getUdiv().has_value()) {
-          Value udivVal = builder.create<arith::ConstantIndexOp>(
-              loc, range.getUdiv().value());
-          Value rem = builder.create<arith::RemUIOp>(loc, workload, udivVal);
-          Value cmp = builder.create<arith::CmpIOp>(
-              loc, arith::CmpIPredicate::eq, rem, zero);
+          Value udivVal = arith::ConstantIndexOp::create(
+              builder, loc, range.getUdiv().value());
+          Value rem = arith::RemUIOp::create(builder, loc, workload, udivVal);
+          Value cmp = arith::CmpIOp::create(
+              builder, loc, arith::CmpIPredicate::eq, rem, zero);
           exportCondition =
-              builder.create<arith::AndIOp>(loc, cmp, exportCondition);
+              arith::AndIOp::create(builder, loc, cmp, exportCondition);
         }
 
         if (auto originalAssumeOp = llvm::dyn_cast<IREE::Util::AssumeIntOp>(
@@ -364,7 +364,7 @@ static void specializeExportedFunction(
         }
       }
 
-      builder.create<IREE::HAL::ReturnOp>(loc, exportCondition);
+      IREE::HAL::ReturnOp::create(builder, loc, exportCondition);
     }
     // Current function is still the original function, just with a new symbol
     // name.

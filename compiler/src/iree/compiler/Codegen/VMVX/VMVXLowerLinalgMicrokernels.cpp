@@ -50,7 +50,7 @@ SmallVector<Value> permuteStrides(Location loc, AffineMap indexingMap,
   for (Value &stride : strides) {
     if (!stride) {
       if (!zero) {
-        zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+        zero = arith::ConstantIndexOp::create(builder, loc, 0);
       }
       stride = zero;
     }
@@ -65,7 +65,7 @@ void leftPadToRank(Location loc, SmallVectorImpl<Value> &indices,
   Value padValue;
   while (indices.size() < minRank) {
     if (!padValue) {
-      padValue = builder.create<arith::ConstantIndexOp>(loc, padIndex);
+      padValue = arith::ConstantIndexOp::create(builder, loc, padIndex);
     }
     indices.insert(indices.begin(), padValue);
   }
@@ -195,9 +195,9 @@ public:
       sizeStrideTypes.push_back(indexType);
     }
 
-    auto op = builder.create<IREE::VMVX::GetBufferDescriptorOp>(
-        loc, builder.getType<IREE::Util::BufferType>(), builder.getIndexType(),
-        sizeStrideTypes, sizeStrideTypes, buffer);
+    auto op = IREE::VMVX::GetBufferDescriptorOp::create(
+        builder, loc, builder.getType<IREE::Util::BufferType>(),
+        builder.getIndexType(), sizeStrideTypes, sizeStrideTypes, buffer);
 
     desc->baseBuffer = op.getBaseBuffer();
     desc->offset = op.getOffset();
@@ -308,8 +308,8 @@ struct BinaryEmitter {
 
     switch (selection.opType) {
     case OpType::GenericBinary: {
-      rewriter.create<IREE::VMVX::BinaryOp>(
-          loc, rewriter.getStringAttr(selection.opcode),
+      IREE::VMVX::BinaryOp::create(
+          rewriter, loc, rewriter.getStringAttr(selection.opcode),
           // LHS
           params.in0Buffer, operands.first.bufferDesc->offset,
           params.in0Strides,
@@ -411,8 +411,8 @@ struct UnaryEmitter {
 
     switch (selection.opType) {
     case OpType::GenericUnary: {
-      rewriter.create<IREE::VMVX::UnaryOp>(
-          loc, rewriter.getStringAttr(selection.opcode),
+      IREE::VMVX::UnaryOp::create(
+          rewriter, loc, rewriter.getStringAttr(selection.opcode),
           // IN
           params.inBuffer, operand.bufferDesc->offset, params.inStrides,
           // OUT
@@ -508,16 +508,15 @@ struct CopyEmitter {
     leftPadToRank(loc, outStrides, 2, 0, rewriter);
     leftPadToRank(loc, sizes, 2, 1, rewriter);
 
-    rewriter.create<IREE::VMVX::CopyOp>(
-        loc,
-        // IN
-        inBuffer, in.bufferDesc->offset, inStrides,
-        // OUT
-        outBuffer, out.bufferDesc->offset, outStrides,
-        // Sizes
-        sizes,
-        // Element type.
-        in.bufferDesc->getElementTypeAttr());
+    IREE::VMVX::CopyOp::create(rewriter, loc,
+                               // IN
+                               inBuffer, in.bufferDesc->offset, inStrides,
+                               // OUT
+                               outBuffer, out.bufferDesc->offset, outStrides,
+                               // Sizes
+                               sizes,
+                               // Element type.
+                               in.bufferDesc->getElementTypeAttr());
   }
 };
 

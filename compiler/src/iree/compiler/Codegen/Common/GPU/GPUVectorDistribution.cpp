@@ -139,8 +139,8 @@ DistributionPattern::getDistributed(RewriterBase &rewriter, VectorValue value,
   SmallVector<int64_t> distributedShape = layout.getDistributedShape();
   VectorType distributedType =
       VectorType::get(distributedShape, value.getType().getElementType());
-  auto toSIMT = rewriter.create<IREE::VectorExt::ToSIMTOp>(
-      value.getLoc(), distributedType, value);
+  auto toSIMT = IREE::VectorExt::ToSIMTOp::create(rewriter, value.getLoc(),
+                                                  distributedType, value);
   return toSIMT.getResult();
 }
 
@@ -154,8 +154,8 @@ SmallVector<Value> DistributionPattern::getOpDistributedReplacements(
       auto oldResult = cast<VectorValue>(opResult);
       // Create a toSIMD op to convert the value back to the simd.
       rewriter.setInsertionPointAfterValue(oldResult);
-      Value toSIMD = rewriter.create<IREE::VectorExt::ToSIMDOp>(
-          oldResult.getLoc(), oldResult.getType(), replacement);
+      Value toSIMD = IREE::VectorExt::ToSIMDOp::create(
+          rewriter, oldResult.getLoc(), oldResult.getType(), replacement);
       // Add to replacements.
       replacement = toSIMD;
     }

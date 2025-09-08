@@ -32,45 +32,45 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
 
     // Create constants.
     Type f32Type = rewriter.getF32Type();
-    auto oneF = rewriter.create<arith::ConstantOp>(
-        loc, f32Type, rewriter.getF32FloatAttr(1.0f));
+    auto oneF = arith::ConstantOp::create(rewriter, loc, f32Type,
+                                          rewriter.getF32FloatAttr(1.0f));
 
     // Get abs value.
-    Value ax = rewriter.create<math::AbsFOp>(loc, input);
+    Value ax = math::AbsFOp::create(rewriter, loc, input);
 
     // Create comparison for |x| < 1.0.
-    Value cmp = rewriter.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OLT,
-                                               ax, oneF);
+    Value cmp = arith::CmpFOp::create(rewriter, loc, arith::CmpFPredicate::OLT,
+                                      ax, oneF);
 
     // Create if statement.
-    auto ifOp = rewriter.create<scf::IfOp>(loc, resultType, cmp, true);
+    auto ifOp = scf::IfOp::create(rewriter, loc, resultType, cmp, true);
 
     // --- Then region (|x| < 1.0) ---
     {
       OpBuilder::InsertionGuard guard(rewriter);
       rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
       // Define polynomial coefficients for |x| < 1.0.
-      auto c1_0 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(-0x1.268bc2p-11f));
-      auto c1_1 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(0x1.420828p-8f));
-      auto c1_2 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(-0x1.b5937p-6f));
-      auto c1_3 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(0x1.ce077cp-4f));
-      auto c1_4 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(-0x1.81266p-2f));
-      auto c1_5 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(0x1.06eba0p-3f));
+      auto c1_0 = arith::ConstantOp::create(
+          rewriter, loc, f32Type, rewriter.getF32FloatAttr(-0x1.268bc2p-11f));
+      auto c1_1 = arith::ConstantOp::create(
+          rewriter, loc, f32Type, rewriter.getF32FloatAttr(0x1.420828p-8f));
+      auto c1_2 = arith::ConstantOp::create(
+          rewriter, loc, f32Type, rewriter.getF32FloatAttr(-0x1.b5937p-6f));
+      auto c1_3 = arith::ConstantOp::create(
+          rewriter, loc, f32Type, rewriter.getF32FloatAttr(0x1.ce077cp-4f));
+      auto c1_4 = arith::ConstantOp::create(
+          rewriter, loc, f32Type, rewriter.getF32FloatAttr(-0x1.81266p-2f));
+      auto c1_5 = arith::ConstantOp::create(
+          rewriter, loc, f32Type, rewriter.getF32FloatAttr(0x1.06eba0p-3f));
 
-      Value t = rewriter.create<arith::MulFOp>(loc, ax, ax);
-      Value mad1 = rewriter.create<math::FmaOp>(loc, t, c1_0, c1_1);
-      Value mad2 = rewriter.create<math::FmaOp>(loc, t, mad1, c1_2);
-      Value mad3 = rewriter.create<math::FmaOp>(loc, t, mad2, c1_3);
-      Value mad4 = rewriter.create<math::FmaOp>(loc, t, mad3, c1_4);
-      Value p = rewriter.create<math::FmaOp>(loc, t, mad4, c1_5);
-      Value result = rewriter.create<math::FmaOp>(loc, ax, p, ax);
-      rewriter.create<scf::YieldOp>(loc, result);
+      Value t = arith::MulFOp::create(rewriter, loc, ax, ax);
+      Value mad1 = math::FmaOp::create(rewriter, loc, t, c1_0, c1_1);
+      Value mad2 = math::FmaOp::create(rewriter, loc, t, mad1, c1_2);
+      Value mad3 = math::FmaOp::create(rewriter, loc, t, mad2, c1_3);
+      Value mad4 = math::FmaOp::create(rewriter, loc, t, mad3, c1_4);
+      Value p = math::FmaOp::create(rewriter, loc, t, mad4, c1_5);
+      Value result = math::FmaOp::create(rewriter, loc, ax, p, ax);
+      scf::YieldOp::create(rewriter, loc, result);
     } // End then region.
 
     // --- Else region (|x| >= 1.0) ---
@@ -79,38 +79,38 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
       rewriter.setInsertionPointToStart(&ifOp.getElseRegion().front());
 
       // Define polynomial coefficients for |x| >= 1.0
-      auto c2_0 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(0x1.1d3156p-16f));
-      auto c2_1 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(-0x1.8d129p-12f));
-      auto c2_2 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(0x1.f9a6d2p-9f));
-      auto c2_3 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(-0x1.8c3164p-6f));
-      auto c2_4 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(0x1.b4e9c8p-4f));
-      auto c2_5 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(0x1.4515fap-1f));
-      auto c2_6 = rewriter.create<arith::ConstantOp>(
-          loc, f32Type, rewriter.getF32FloatAttr(0x1.078e50p-3f));
+      auto c2_0 = arith::ConstantOp::create(
+          rewriter, loc, f32Type, rewriter.getF32FloatAttr(0x1.1d3156p-16f));
+      auto c2_1 = arith::ConstantOp::create(
+          rewriter, loc, f32Type, rewriter.getF32FloatAttr(-0x1.8d129p-12f));
+      auto c2_2 = arith::ConstantOp::create(
+          rewriter, loc, f32Type, rewriter.getF32FloatAttr(0x1.f9a6d2p-9f));
+      auto c2_3 = arith::ConstantOp::create(
+          rewriter, loc, f32Type, rewriter.getF32FloatAttr(-0x1.8c3164p-6f));
+      auto c2_4 = arith::ConstantOp::create(
+          rewriter, loc, f32Type, rewriter.getF32FloatAttr(0x1.b4e9c8p-4f));
+      auto c2_5 = arith::ConstantOp::create(
+          rewriter, loc, f32Type, rewriter.getF32FloatAttr(0x1.4515fap-1f));
+      auto c2_6 = arith::ConstantOp::create(
+          rewriter, loc, f32Type, rewriter.getF32FloatAttr(0x1.078e50p-3f));
 
-      Value mad5 = rewriter.create<math::FmaOp>(loc, ax, c2_0, c2_1);
-      Value mad6 = rewriter.create<math::FmaOp>(loc, ax, mad5, c2_2);
-      Value mad7 = rewriter.create<math::FmaOp>(loc, ax, mad6, c2_3);
-      Value mad8 = rewriter.create<math::FmaOp>(loc, ax, mad7, c2_4);
-      Value mad9 = rewriter.create<math::FmaOp>(loc, ax, mad8, c2_5);
-      Value mad10 = rewriter.create<math::FmaOp>(loc, ax, mad9, c2_6);
+      Value mad5 = math::FmaOp::create(rewriter, loc, ax, c2_0, c2_1);
+      Value mad6 = math::FmaOp::create(rewriter, loc, ax, mad5, c2_2);
+      Value mad7 = math::FmaOp::create(rewriter, loc, ax, mad6, c2_3);
+      Value mad8 = math::FmaOp::create(rewriter, loc, ax, mad7, c2_4);
+      Value mad9 = math::FmaOp::create(rewriter, loc, ax, mad8, c2_5);
+      Value mad10 = math::FmaOp::create(rewriter, loc, ax, mad9, c2_6);
       // In the C code, there's an extra fma(ax, p, ax) here, which seems
       // incorrect based on the standard erf approximation formula and leads to
       // values > 1. The typical approximation leads directly to the exponent
-      // term. Value p2 = rewriter.create<math::FmaOp>(loc, ax, mad10, ax); //
+      // term. Value p2 = math::FmaOp::create(rewriter, loc, ax, mad10, ax); //
       // Original line based on C code.
       Value p2 = mad10; // Corrected based on typical erf formula structure for
                         // |x| >= 1
-      Value negP2 = rewriter.create<arith::NegFOp>(loc, p2);
-      Value expNegP2 = rewriter.create<math::ExpOp>(loc, negP2);
-      Value result2 = rewriter.create<arith::SubFOp>(loc, oneF, expNegP2);
-      rewriter.create<scf::YieldOp>(loc, result2);
+      Value negP2 = arith::NegFOp::create(rewriter, loc, p2);
+      Value expNegP2 = math::ExpOp::create(rewriter, loc, negP2);
+      Value result2 = arith::SubFOp::create(rewriter, loc, oneF, expNegP2);
+      scf::YieldOp::create(rewriter, loc, result2);
     } // End else region
 
     // Set insertion point after the if.
@@ -118,7 +118,7 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
 
     // Restore the sign: BUILTIN_COPYSIGN_F32(ret, x)
     Value finalResult =
-        rewriter.create<math::CopySignOp>(loc, ifOp.getResult(0), input);
+        math::CopySignOp::create(rewriter, loc, ifOp.getResult(0), input);
     // Replace the original op with our implementation.
     rewriter.replaceOp(op, finalResult);
 

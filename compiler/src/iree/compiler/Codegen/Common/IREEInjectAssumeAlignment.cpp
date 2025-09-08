@@ -41,8 +41,8 @@ LogicalResult InjectAssumeAlignmentForSubspanOp::matchAndRewrite(
   }
   Location loc = op.getLoc();
   rewriter.setInsertionPointAfter(op);
-  auto alignOp = rewriter.create<memref::AssumeAlignmentOp>(
-      loc, op.getResult(), op.calculateAlignment().value());
+  auto alignOp = memref::AssumeAlignmentOp::create(
+      rewriter, loc, op.getResult(), op.calculateAlignment().value());
   rewriter.replaceAllUsesExcept(op.getResult(), alignOp.getResult(), alignOp);
   return success();
 }

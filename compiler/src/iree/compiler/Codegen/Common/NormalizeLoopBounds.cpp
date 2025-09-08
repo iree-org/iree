@@ -154,8 +154,8 @@ LogicalResult normalizeLoopBounds(RewriterBase &rewriter,
   }
 
   rewriter.setInsertionPointAfter(forallOp);
-  auto newLoop = rewriter.create<scf::ForallOp>(
-      rewriter.getUnknownLoc(), newLoopParams->lowerBounds,
+  auto newLoop = scf::ForallOp::create(
+      rewriter, rewriter.getUnknownLoc(), newLoopParams->lowerBounds,
       newLoopParams->upperBounds, newLoopParams->steps, forallOp.getOutputs(),
       forallOp.getMapping());
   rewriter.eraseOp(newLoop.getTerminator());

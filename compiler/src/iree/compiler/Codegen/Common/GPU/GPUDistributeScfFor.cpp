@@ -63,14 +63,14 @@ struct DistributeLoop final : OpRewritePattern<scf::ForOp> {
     const std::array<gpu::Dimension, 3> symDims = {
         gpu::Dimension::x, gpu::Dimension::y, gpu::Dimension::z};
     gpu::Dimension symDim = symDims[numDimAttr.getInt()];
-    auto idOp = rewriter.create<gpu::ThreadIdOp>(loc, indexType, symDim);
-    Value count = useBlockDims
-                      ? rewriter.create<gpu::BlockDimOp>(loc, indexType, symDim)
-                            .getResult()
-                      : rewriter
-                            .create<arith::ConstantIndexOp>(
-                                loc, workgroupSize[numDimAttr.getInt()])
-                            .getResult();
+    auto idOp = gpu::ThreadIdOp::create(rewriter, loc, indexType, symDim);
+    Value count =
+        useBlockDims ? gpu::BlockDimOp::create(rewriter, loc, indexType, symDim)
+                           .getResult()
+                     : rewriter
+                           .create<arith::ConstantIndexOp>(
+                               loc, workgroupSize[numDimAttr.getInt()])
+                           .getResult();
 
     MLIRContext *context = getContext();
     AffineExpr sym0, sym1, sym2;
@@ -78,11 +78,11 @@ struct DistributeLoop final : OpRewritePattern<scf::ForOp> {
     auto mulAddMap = AffineMap::get(0, 3, {sym0 * sym1 + sym2}, context);
     auto mulMap = AffineMap::get(0, 2, {sym0 * sym1}, context);
 
-    auto newLb = rewriter.create<affine::AffineApplyOp>(
-        loc, mulAddMap,
+    auto newLb = affine::AffineApplyOp::create(
+        rewriter, loc, mulAddMap,
         ValueRange{idOp, forOp.getStep(), forOp.getLowerBound()});
-    auto newStep = rewriter.create<affine::AffineApplyOp>(
-        loc, mulMap, ValueRange{count, forOp.getStep()});
+    auto newStep = affine::AffineApplyOp::create(
+        rewriter, loc, mulMap, ValueRange{count, forOp.getStep()});
 
     forOp.getLowerBoundMutable().assign(newLb);
     forOp.getStepMutable().assign(newStep);

@@ -128,8 +128,8 @@ struct FoldCollapseShapeIntoInterfaceTensorLoad
     auto newSubspanType = IREE::TensorExt::DispatchTensorType::get(
         tensorAccess, reshapeOp.getResultType());
 
-    Value newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
+    Value newSubspanOp = IREE::HAL::InterfaceBindingSubspanOp::create(
+        rewriter, subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
         subspanOp.getBinding(), subspanOp.getByteOffset(),
         collapsedDynamicShape, subspanOp.getAlignmentAttr(),
         subspanOp.getDescriptorFlagsAttr());
@@ -229,8 +229,8 @@ struct FoldExpandShapeIntoInterfaceTensorLoad
                                expandedStaticDims);
 
     Value newSubspanOp;
-    newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
+    newSubspanOp = IREE::HAL::InterfaceBindingSubspanOp::create(
+        rewriter, subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
         subspanOp.getBinding(), subspanOp.getByteOffset(), expandedDynamicDims,
         subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
 
@@ -313,8 +313,8 @@ struct FoldExpandShapeIntoInterfaceTensorStore
     auto newSubspanType = IREE::TensorExt::DispatchTensorType::get(
         tensorAccess, reshapeSrc.getType());
 
-    Value newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
+    Value newSubspanOp = IREE::HAL::InterfaceBindingSubspanOp::create(
+        rewriter, subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
         subspanOp.getBinding(), subspanOp.getByteOffset(),
         collapsedDynamicShape, subspanOp.getAlignmentAttr(),
         subspanOp.getDescriptorFlagsAttr());
@@ -497,8 +497,8 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
     auto newSubspanType = IREE::TensorExt::DispatchTensorType::get(
         tensorAccess, reshapeSrcType.cloneWith(
                           newSubspanShape, reshapeSrcType.getElementType()));
-    auto newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
+    auto newSubspanOp = IREE::HAL::InterfaceBindingSubspanOp::create(
+        rewriter, subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
         subspanOp.getBinding(), subspanOp.getByteOffset(), expandedDynamicShape,
         subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
 
@@ -795,8 +795,8 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
     {
       OpBuilder::InsertionGuard guard(rewriter);
       rewriter.setInsertionPointAfter(subspanOp);
-      newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-          subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
+      newSubspanOp = IREE::HAL::InterfaceBindingSubspanOp::create(
+          rewriter, subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
           subspanOp.getBinding(), subspanOp.getByteOffset(),
           newSubspanDynamicDims, subspanOp.getAlignmentAttr(),
           subspanOp.getDescriptorFlagsAttr());
@@ -872,8 +872,8 @@ struct FoldInnerBitcastIntoInterfaceTensorLoad
     // Byte offset and byte alignment remain the same after folding the cast.
     // Simply create a new binding with the new type.
     rewriter.setInsertionPoint(subspanOp);
-    Value newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
+    Value newSubspanOp = IREE::HAL::InterfaceBindingSubspanOp::create(
+        rewriter, subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
         subspanOp.getBinding(), subspanOp.getByteOffset(),
         subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
         subspanOp.getDescriptorFlagsAttr());
@@ -942,8 +942,8 @@ struct FoldInnerBitcastIntoInterfaceTensorStore
         subspanType.getAccess(), newSubspanTensorType);
 
     rewriter.setInsertionPointAfter(subspanOp);
-    Value newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
+    Value newSubspanOp = IREE::HAL::InterfaceBindingSubspanOp::create(
+        rewriter, subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
         subspanOp.getBinding(), subspanOp.getByteOffset(),
         subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
         subspanOp.getDescriptorFlagsAttr());
@@ -983,7 +983,7 @@ collapseMemrefOperand(RewriterBase &rewriter, OpTy tensorToMemrefOp,
   rewriter.setInsertionPointAfterValue(memref);
   Location loc = tensorToMemrefOp.getLoc();
   Value collapsedMemref =
-      rewriter.create<memref::CollapseShapeOp>(loc, memref, reassociations);
+      memref::CollapseShapeOp::create(rewriter, loc, memref, reassociations);
   rewriter.modifyOpInPlace(tensorToMemrefOp, [&]() {
     tensorToMemrefOp.getBufferMutable().assign(collapsedMemref);
   });
@@ -1018,8 +1018,9 @@ expandMemrefOperand(RewriterBase &rewriter, OpTy tensorToMemrefOp,
   OpBuilder::InsertionGuard g(rewriter);
   dynamicValues.push_back(memref);
   setInsertionPointAfterLastValue(rewriter, dynamicValues);
-  Value expandedMemref = rewriter.create<memref::ExpandShapeOp>(
-      loc, *expandedMemrefType, memref, reassociations, mixedOutputShape);
+  Value expandedMemref =
+      memref::ExpandShapeOp::create(rewriter, loc, *expandedMemrefType, memref,
+                                    reassociations, mixedOutputShape);
   rewriter.modifyOpInPlace(tensorToMemrefOp, [&]() {
     tensorToMemrefOp.getBufferMutable().assign(expandedMemref);
   });

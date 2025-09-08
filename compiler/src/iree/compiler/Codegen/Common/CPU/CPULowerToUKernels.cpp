@@ -239,26 +239,26 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
   flags |= IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION;
 
   Location loc = op.getLoc();
-  Value m = rewriter.create<tensor::DimOp>(loc, lhs, 0);
-  Value n = rewriter.create<tensor::DimOp>(loc, rhs, 0);
-  Value k = rewriter.create<tensor::DimOp>(loc, rhs, 1);
+  Value m = tensor::DimOp::create(rewriter, loc, lhs, 0);
+  Value n = tensor::DimOp::create(rewriter, loc, rhs, 0);
+  Value k = tensor::DimOp::create(rewriter, loc, rhs, 1);
 
   auto getDimAsI32 = [](RewriterBase &rewriter, Location loc, Value value,
                         int dim) -> Value {
-    return rewriter.create<arith::IndexCastOp>(
-        loc, rewriter.getI32Type(),
-        rewriter.create<tensor::DimOp>(loc, value, dim));
+    return arith::IndexCastOp::create(
+        rewriter, loc, rewriter.getI32Type(),
+        tensor::DimOp::create(rewriter, loc, value, dim));
   };
   Value m0 = getDimAsI32(rewriter, loc, lhs, 2);
   Value n0 = getDimAsI32(rewriter, loc, rhs, 2);
   Value k0 = getDimAsI32(rewriter, loc, rhs, 3);
-  Value flagsVal = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getI32IntegerAttr(flags));
+  Value flagsVal = arith::ConstantOp::create(rewriter, loc,
+                                             rewriter.getI32IntegerAttr(flags));
   auto fn = getFnNameAndDefAttrs(ukernelName, rewriter, targetAttr);
   SmallVector<Type> returnTypes =
       getUKernelGenericReturnTypes(targetAttr, outType);
-  auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, returnTypes, fn.name, ValueRange{lhs, rhs}, out,
+  auto genericMicroKernelOp = IREE::Codegen::UKernelGenericOp::create(
+      rewriter, loc, returnTypes, fn.name, ValueRange{lhs, rhs}, out,
       ValueRange{m, n, k, m0, n0, k0, flagsVal},
       /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
       /*num_strided_outer_dims=*/1);
@@ -344,8 +344,8 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::PackOp op,
   Value paddingVal = op.getPaddingValue();
   // If the pack op didn't have a padding_value attribute, default to 0.
   if (!paddingVal) {
-    paddingVal =
-        rewriter.create<arith::ConstantOp>(loc, i64, rewriter.getZeroAttr(i64));
+    paddingVal = arith::ConstantOp::create(rewriter, loc, i64,
+                                           rewriter.getZeroAttr(i64));
   }
   int paddingValBitWidth = paddingVal.getType().getIntOrFloatBitWidth();
   // Non-integer element types get bitcast to integer of same bit width.
@@ -355,7 +355,7 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::PackOp op,
       return rewriter.notifyMatchFailure(op, "no integer type with this width");
     }
     paddingVal =
-        rewriter.create<arith::BitcastOp>(loc, sameWidthIntType, paddingVal);
+        arith::BitcastOp::create(rewriter, loc, sameWidthIntType, paddingVal);
   }
   // Element types > 64bits could be supported, when the padding value is a
   // repeating 64-bit pattern. For now, we leave this as not-yet-implemented.
@@ -366,21 +366,21 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::PackOp op,
   // Integers narrower than 64 bit get extended to 64 bits, it doesn't matter
   // how, as the high bits are unused.
   if (paddingValBitWidth < 64) {
-    paddingVal = rewriter.create<arith::ExtUIOp>(loc, i64, paddingVal);
+    paddingVal = arith::ExtUIOp::create(rewriter, loc, i64, paddingVal);
   }
-  Value in_size0 = rewriter.create<tensor::DimOp>(loc, in, 0);
-  Value in_size1 = rewriter.create<tensor::DimOp>(loc, in, 1);
-  Value out_size0 = rewriter.create<tensor::DimOp>(loc, out, 0);
-  Value out_size1 = rewriter.create<tensor::DimOp>(loc, out, 1);
-  Value out_size2 = rewriter.create<tensor::DimOp>(loc, out, 2);
-  Value out_size3 = rewriter.create<tensor::DimOp>(loc, out, 3);
-  Value flagsVal = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getI32IntegerAttr(flags));
+  Value in_size0 = tensor::DimOp::create(rewriter, loc, in, 0);
+  Value in_size1 = tensor::DimOp::create(rewriter, loc, in, 1);
+  Value out_size0 = tensor::DimOp::create(rewriter, loc, out, 0);
+  Value out_size1 = tensor::DimOp::create(rewriter, loc, out, 1);
+  Value out_size2 = tensor::DimOp::create(rewriter, loc, out, 2);
+  Value out_size3 = tensor::DimOp::create(rewriter, loc, out, 3);
+  Value flagsVal = arith::ConstantOp::create(rewriter, loc,
+                                             rewriter.getI32IntegerAttr(flags));
   auto fn = getFnNameAndDefAttrs(ukernelName, rewriter, targetAttr);
   SmallVector<Type> returnTypes =
       getUKernelGenericReturnTypes(targetAttr, outType);
-  auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, returnTypes, fn.name, in, out,
+  auto genericMicroKernelOp = IREE::Codegen::UKernelGenericOp::create(
+      rewriter, loc, returnTypes, fn.name, in, out,
       ValueRange{in_size0, in_size1, out_size0, out_size1, out_size2, out_size3,
                  paddingVal, flagsVal},
       /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
@@ -456,19 +456,19 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::UnPackOp op,
   }
 
   Location loc = op.getLoc();
-  Value in_size0 = rewriter.create<tensor::DimOp>(loc, in, 0);
-  Value in_size1 = rewriter.create<tensor::DimOp>(loc, in, 1);
-  Value in_size2 = rewriter.create<tensor::DimOp>(loc, in, 2);
-  Value in_size3 = rewriter.create<tensor::DimOp>(loc, in, 3);
-  Value out_size0 = rewriter.create<tensor::DimOp>(loc, out, 0);
-  Value out_size1 = rewriter.create<tensor::DimOp>(loc, out, 1);
-  Value flagsVal = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getI32IntegerAttr(flags));
+  Value in_size0 = tensor::DimOp::create(rewriter, loc, in, 0);
+  Value in_size1 = tensor::DimOp::create(rewriter, loc, in, 1);
+  Value in_size2 = tensor::DimOp::create(rewriter, loc, in, 2);
+  Value in_size3 = tensor::DimOp::create(rewriter, loc, in, 3);
+  Value out_size0 = tensor::DimOp::create(rewriter, loc, out, 0);
+  Value out_size1 = tensor::DimOp::create(rewriter, loc, out, 1);
+  Value flagsVal = arith::ConstantOp::create(rewriter, loc,
+                                             rewriter.getI32IntegerAttr(flags));
   auto fn = getFnNameAndDefAttrs(ukernelName, rewriter, targetAttr);
   SmallVector<Type> returnTypes =
       getUKernelGenericReturnTypes(targetAttr, outType);
-  auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, returnTypes, fn.name, in, out,
+  auto genericMicroKernelOp = IREE::Codegen::UKernelGenericOp::create(
+      rewriter, loc, returnTypes, fn.name, in, out,
       ValueRange{in_size0, in_size1, in_size2, in_size3, out_size0, out_size1,
                  flagsVal},
       /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
@@ -577,7 +577,7 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
   SmallVector<Value> inputValues;
   Location loc = op.getLoc();
   for (int64_t i : tensorType.getShape()) {
-    inputValues.push_back(rewriter.create<arith::ConstantIndexOp>(loc, i));
+    inputValues.push_back(arith::ConstantIndexOp::create(rewriter, loc, i));
   }
   uint32_t flagForUserAndOperandTypes =
       getFlagForUserAndOperandTypes(encoding, encoding.getElementTypesArray());
@@ -586,11 +586,11 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
   if (!flagForUserAndOperandTypes || !flagForIndex) {
     return rewriter.notifyMatchFailure(op, "unhandled encoding");
   }
-  inputValues.push_back(rewriter.create<arith::ConstantIntOp>(
-      loc, flagForUserAndOperandTypes | flagForIndex, 32));
+  inputValues.push_back(arith::ConstantIntOp::create(
+      rewriter, loc, flagForUserAndOperandTypes | flagForIndex, 32));
   auto fn = getFnNameAndDefAttrs(ukernelName, rewriter, targetAttr);
-  auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, resultTypes, fn.name, inputValues, /*outs=*/ValueRange{},
+  auto genericMicroKernelOp = IREE::Codegen::UKernelGenericOp::create(
+      rewriter, loc, resultTypes, fn.name, inputValues, /*outs=*/ValueRange{},
       /*other_operands=*/ValueRange{},
       /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
       /*strided_dims=*/nullptr);
