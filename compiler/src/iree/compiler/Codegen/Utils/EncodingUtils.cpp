@@ -63,13 +63,13 @@ FailureOr<SmallVector<OpFoldResult>> getInnerTileSizesOfrImpl(
     // necessary vscale operation and the corresponding static_size * vscale
     // values.
     SmallVector<OpFoldResult> result(staticTileSizes.size());
-    auto vscale = rewriter.create<vector::VectorScaleOp>(loc);
+    auto vscale = vector::VectorScaleOp::create(rewriter, loc);
     for (size_t i = 0; i < result.size(); i++) {
       if (materializeEncodingInfo.scalableTiles.value()[i]) {
         auto staticTileSize =
-            rewriter.create<arith::ConstantIndexOp>(loc, staticTileSizes[i]);
+            arith::ConstantIndexOp::create(rewriter, loc, staticTileSizes[i]);
         auto scalableInnerTileSize =
-            rewriter.create<arith::MulIOp>(loc, staticTileSize, vscale);
+            arith::MulIOp::create(rewriter, loc, staticTileSize, vscale);
         result[i] = scalableInnerTileSize.getResult();
       } else {
         result[i] = rewriter.getI64IntegerAttr(staticTileSizes[i]);
@@ -85,8 +85,8 @@ FailureOr<SmallVector<OpFoldResult>> getInnerTileSizesOfrImpl(
     return failure();
   }
   SmallVector<Type> resultTypes(tensorType.getRank(), rewriter.getIndexType());
-  auto op = rewriter.create<IREE::Codegen::QueryTileSizesOp>(
-      loc, resultTypes, TypeAttr::get(tensorType));
+  auto op = IREE::Codegen::QueryTileSizesOp::create(rewriter, loc, resultTypes,
+                                                    TypeAttr::get(tensorType));
   SmallVector<Value> innerTileSizeValues = op.getResults();
 
   SmallVector<OpFoldResult> result(staticTileSizes.size());
@@ -95,7 +95,7 @@ FailureOr<SmallVector<OpFoldResult>> getInnerTileSizesOfrImpl(
       result[i] = innerTileSizeValues[i];
     } else if (tensorType.isDynamicDim(i)) {
       result[i] =
-          rewriter.create<arith::ConstantIndexOp>(loc, staticTileSizes[i])
+          arith::ConstantIndexOp::create(rewriter, loc, staticTileSizes[i])
               .getResult();
     } else {
       result[i] = rewriter.getI64IntegerAttr(staticTileSizes[i]);

@@ -44,11 +44,11 @@ static void replaceForWithIf(PatternRewriter &rewriter, scf::ForOp op,
   Block *block = op.getBody();
   ValueRange initArgs = op.getInitArgs();
   Value count =
-      rewriter.create<arith::CmpIOp>(op->getLoc(), arith::CmpIPredicate::sgt,
-                                     op.getUpperBound(), op.getLowerBound());
+      arith::CmpIOp::create(rewriter, op->getLoc(), arith::CmpIPredicate::sgt,
+                            op.getUpperBound(), op.getLowerBound());
   auto ifOp =
-      rewriter.create<scf::IfOp>(op->getLoc(), op.getResultTypes(), count,
-                                 /*withElseRegion=*/initArgs.size() != 0);
+      scf::IfOp::create(rewriter, op->getLoc(), op.getResultTypes(), count,
+                        /*withElseRegion=*/initArgs.size() != 0);
   Operation *terminator = block->getTerminator();
   rewriter.inlineBlockBefore(block, &ifOp.getThenRegion().front(),
                              ifOp.getThenRegion().front().begin(), blockArgs);
@@ -56,7 +56,7 @@ static void replaceForWithIf(PatternRewriter &rewriter, scf::ForOp op,
     rewriter.eraseOp(terminator);
   } else {
     rewriter.setInsertionPointToStart(&ifOp.getElseRegion().front());
-    rewriter.create<scf::YieldOp>(ifOp.getLoc(), initArgs);
+    scf::YieldOp::create(rewriter, ifOp.getLoc(), initArgs);
   }
   rewriter.replaceOp(op, ifOp);
 }

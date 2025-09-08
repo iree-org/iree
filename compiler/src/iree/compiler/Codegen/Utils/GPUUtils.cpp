@@ -64,9 +64,9 @@ getGPUThreadIdsAndCounts(mlir::OpBuilder &builder, mlir::Location loc,
   mlir::Type indexType = builder.getIndexType();
   for (unsigned i = 0; i < numDims; ++i) {
     procInfo[numDims - 1 - i] = {
-        builder.create<mlir::gpu::ThreadIdOp>(loc, indexType, dimAttr[i]),
-        builder.create<mlir::arith::ConstantOp>(
-            loc, builder.getIndexAttr(workgroupSize[i])),
+        mlir::gpu::ThreadIdOp::create(builder, loc, indexType, dimAttr[i]),
+        mlir::arith::ConstantOp::create(builder, loc,
+                                        builder.getIndexAttr(workgroupSize[i])),
         linalg::DistributionMethod::Cyclic};
   }
   return procInfo;
@@ -83,7 +83,7 @@ getSubgroupIdsAndCounts(mlir::OpBuilder &builder, mlir::Location loc,
   mlir::Type indexType = builder.getIndexType();
   for (unsigned i = 0; i < numDims; ++i) {
     mlir::Value subgroupId =
-        builder.create<mlir::gpu::ThreadIdOp>(loc, indexType, dimAttr[i]);
+        mlir::gpu::ThreadIdOp::create(builder, loc, indexType, dimAttr[i]);
     if (i == 0) {
       subgroupId =
           builder
@@ -93,8 +93,8 @@ getSubgroupIdsAndCounts(mlir::OpBuilder &builder, mlir::Location loc,
     }
     procInfo[numDims - 1 - i] = {
         subgroupId,
-        builder.create<mlir::arith::ConstantOp>(
-            loc, builder.getIndexAttr(numSubgroups[i])),
+        mlir::arith::ConstantOp::create(builder, loc,
+                                        builder.getIndexAttr(numSubgroups[i])),
         linalg::DistributionMethod::Cyclic};
   }
   return procInfo;
@@ -250,7 +250,7 @@ std::optional<Value> allocateWorkgroupMemory(OpBuilder &builder,
       shape, subview.getType().getElementType(), MemRefLayoutAttrInterface{},
       gpu::AddressSpaceAttr::get(builder.getContext(),
                                  gpu::GPUDialect::getWorkgroupAddressSpace()));
-  Value buffer = builder.create<memref::AllocOp>(funcOp.getLoc(), type);
+  Value buffer = memref::AllocOp::create(builder, funcOp.getLoc(), type);
   return buffer;
 }
 
@@ -259,7 +259,7 @@ LogicalResult deallocateWorkgroupMemory(OpBuilder &, Value /*buffer*/) {
 }
 
 LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
-  Operation *copyOp = b.create<memref::CopyOp>(src.getLoc(), src, dst);
+  Operation *copyOp = memref::CopyOp::create(b, src.getLoc(), src, dst);
   setMarker(copyOp, getCopyToWorkgroupMemoryMarker());
   return success();
 }
@@ -304,8 +304,8 @@ static void insertInputValueIntoGeneric(Value source, linalg::GenericOp op) {
   SmallVector<utils::IteratorType> iterTypes(op.getNumLoops(),
                                              utils::IteratorType::parallel);
   OpBuilder builder(op);
-  auto newOp = builder.create<linalg::GenericOp>(
-      loc, newOperands, outOperand->get(), maps, iterTypes);
+  auto newOp = linalg::GenericOp::create(builder, loc, newOperands,
+                                         outOperand->get(), maps, iterTypes);
   newOp.getRegion().getBlocks().splice(newOp.getRegion().begin(),
                                        op.getRegion().getBlocks());
 
@@ -365,12 +365,12 @@ void insertBarriersAroundSharedMemoryCopy(mlir::FunctionOpInterface funcOp) {
       Operation *prevOp = copyOp->getPrevNode();
       if (!prevOp || !hasMarker(prevOp, getCopyToWorkgroupMemoryMarker())) {
         builder.setInsertionPoint(copyOp);
-        builder.create<gpu::BarrierOp>(copyOp->getLoc());
+        gpu::BarrierOp::create(builder, copyOp->getLoc());
       }
       Operation *nextOp = copyOp->getNextNode();
       if (!nextOp || !hasMarker(nextOp, getCopyToWorkgroupMemoryMarker())) {
         builder.setInsertionPointAfter(copyOp);
-        builder.create<gpu::BarrierOp>(copyOp->getLoc());
+        gpu::BarrierOp::create(builder, copyOp->getLoc());
       }
     }
   });
@@ -386,7 +386,7 @@ static Value promoteElementToVector(Location loc, OpBuilder &builder,
                                     Value input) {
   VectorType vectorTypeBroadcast = VectorType::get({1}, input.getType());
   Value vectorInput =
-      builder.create<vector::BroadcastOp>(loc, vectorTypeBroadcast, input);
+      vector::BroadcastOp::create(builder, loc, vectorTypeBroadcast, input);
   return vectorInput;
 }
 
@@ -403,8 +403,9 @@ Value packVectorToSupportedWidth(Location loc, OpBuilder &builder,
   });
   VectorType packed32Type = VectorType::get({1}, builder.getI32Type());
   Value packedInputVec =
-      builder.create<vector::BitCastOp>(loc, packed32Type, input);
-  Value packedInput = builder.create<vector::ExtractOp>(loc, packedInputVec, 0);
+      vector::BitCastOp::create(builder, loc, packed32Type, input);
+  Value packedInput =
+      vector::ExtractOp::create(builder, loc, packedInputVec, 0);
   return packedInput;
 }
 
@@ -420,7 +421,7 @@ Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
   });
   Value packedVector = promoteElementToVector(loc, builder, packedInput);
   Value unpackedVector =
-      builder.create<vector::BitCastOp>(loc, targetVecType, packedVector);
+      vector::BitCastOp::create(builder, loc, targetVecType, packedVector);
   return unpackedVector;
 }
 
@@ -450,11 +451,11 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
     // SPIRV currently doesn't have a lowering for clustered reduction,
     // so if possible avoid adding problematic attribute until it is supported.
     if (numLaneToReduce == warpSize) {
-      return builder.create<gpu::SubgroupReduceOp>(loc, input, gpuReduceKind,
-                                                   /*uniform=*/false);
+      return gpu::SubgroupReduceOp::create(builder, loc, input, gpuReduceKind,
+                                           /*uniform=*/false);
     }
-    return builder.create<gpu::SubgroupReduceOp>(
-        loc, input, gpuReduceKind, /*uniform=*/false, numLaneToReduce);
+    return gpu::SubgroupReduceOp::create(builder, loc, input, gpuReduceKind,
+                                         /*uniform=*/false, numLaneToReduce);
   }
 
   // Otherwise, perform the shuffles over the supported scalar type. For inputs
@@ -464,8 +465,8 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
                  origInputType](Value packedVal) -> Value {
     if (!needsPacking)
       return packedVal;
-    auto asInt = builder.create<arith::TruncIOp>(loc, equivIntType, packedVal);
-    return builder.create<arith::BitcastOp>(loc, origInputType, asInt);
+    auto asInt = arith::TruncIOp::create(builder, loc, equivIntType, packedVal);
+    return arith::BitcastOp::create(builder, loc, origInputType, asInt);
   };
 
   auto pack = [loc, &builder, needsPacking, equivIntType,
@@ -473,8 +474,8 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
     if (!needsPacking)
       return unpackedVal;
     auto asInt =
-        builder.create<arith::BitcastOp>(loc, equivIntType, unpackedVal);
-    return builder.create<arith::ExtUIOp>(loc, shuffleIntType, asInt);
+        arith::BitcastOp::create(builder, loc, equivIntType, unpackedVal);
+    return arith::ExtUIOp::create(builder, loc, shuffleIntType, asInt);
   };
 
   // Lane value always stays in the original type. We use it to perform arith
@@ -557,7 +558,7 @@ Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
   }
   assert(identityAttr && "Unknown identity value for the reduction");
   Value identity =
-      builder.create<arith::ConstantOp>(loc, identityType, identityAttr);
+      arith::ConstantOp::create(builder, loc, identityType, identityAttr);
   return identity;
 }
 
@@ -597,7 +598,7 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
       "Group reduction only support for sizes aligned on warp size for now.");
 
   // First reduce on a single thread to get per lane reduction value.
-  Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
+  Value laneVal = vector::ReductionOp::create(builder, loc, kind, input);
   laneVal = warpReduction(loc, builder, laneVal, kind, warpSize, warpSize,
                           expandSubgroupReduce);
   // Simple case -- emit `gpu.subgroup_reduce` directly.
@@ -618,37 +619,38 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
     MemRefType memrefType =
         MemRefType::get(numWarp, laneVal.getType(), MemRefLayoutAttrInterface{},
                         addressSpaceAttr);
-    Value alloc = builder.create<memref::AllocOp>(loc, memrefType);
-    Value threadX = builder.create<gpu::ThreadIdOp>(loc, builder.getIndexType(),
-                                                    gpu::Dimension::x);
-    Value cstWarpSize = builder.create<arith::ConstantIndexOp>(loc, warpSize);
-    Value warpId = builder.create<arith::DivUIOp>(loc, threadX, cstWarpSize);
-    Value laneId = builder.create<arith::RemUIOp>(loc, threadX, cstWarpSize);
-    Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-    Value lane0 = builder.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
-                                                laneId, zero);
+    Value alloc = memref::AllocOp::create(builder, loc, memrefType);
+    Value threadX = gpu::ThreadIdOp::create(
+        builder, loc, builder.getIndexType(), gpu::Dimension::x);
+    Value cstWarpSize = arith::ConstantIndexOp::create(builder, loc, warpSize);
+    Value warpId = arith::DivUIOp::create(builder, loc, threadX, cstWarpSize);
+    Value laneId = arith::RemUIOp::create(builder, loc, threadX, cstWarpSize);
+    Value zero = arith::ConstantIndexOp::create(builder, loc, 0);
+    Value lane0 = arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::eq,
+                                        laneId, zero);
     // Store the reduction for each warp.
     SmallVector<Value> indices = {warpId};
-    builder.create<scf::IfOp>(loc, lane0, [&](OpBuilder &b, Location l) {
-      b.create<memref::StoreOp>(l, laneVal, alloc, indices);
-      b.create<scf::YieldOp>(l);
+    scf::IfOp::create(builder, loc, lane0, [&](OpBuilder &b, Location l) {
+      memref::StoreOp::create(b, l, laneVal, alloc, indices);
+      scf::YieldOp::create(b, l);
     });
-    builder.create<gpu::BarrierOp>(loc);
+    gpu::BarrierOp::create(builder, loc);
     // Further reduce the outputs from each warps with a single warp reduce.
-    Value memrefSize = builder.create<arith::ConstantIndexOp>(loc, numWarp - 1);
+    Value memrefSize =
+        arith::ConstantIndexOp::create(builder, loc, numWarp - 1);
     Value laneIdInBounds =
-        builder.create<arith::MinUIOp>(loc, laneId, memrefSize);
-    Value loadVal = builder.create<memref::LoadOp>(loc, alloc, laneIdInBounds);
-    Value cstNumWarp = builder.create<arith::ConstantIndexOp>(loc, numWarp);
+        arith::MinUIOp::create(builder, loc, laneId, memrefSize);
+    Value loadVal = memref::LoadOp::create(builder, loc, alloc, laneIdInBounds);
+    Value cstNumWarp = arith::ConstantIndexOp::create(builder, loc, numWarp);
     if (!llvm::isPowerOf2_32(numWarp)) {
       // Pad with identity element if numel < warpSize for valid warp reduction.
-      Value useIdentityElement = builder.create<arith::CmpIOp>(
-          loc, arith::CmpIPredicate::sge, laneId, cstNumWarp);
+      Value useIdentityElement = arith::CmpIOp::create(
+          builder, loc, arith::CmpIPredicate::sge, laneId, cstNumWarp);
       numWarp = llvm::PowerOf2Ceil(numWarp);
       Value identity =
           getCombiningIdentityValue(loc, builder, kind, loadVal.getType());
-      loadVal = builder.create<arith::SelectOp>(loc, useIdentityElement,
-                                                identity, loadVal);
+      loadVal = arith::SelectOp::create(builder, loc, useIdentityElement,
+                                        identity, loadVal);
     }
     laneVal = warpReduction(loc, builder, loadVal, kind, warpSize, numWarp,
                             /*expandSubgroupReduce=*/true);
