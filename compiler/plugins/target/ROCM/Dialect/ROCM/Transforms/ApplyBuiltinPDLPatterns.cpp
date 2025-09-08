@@ -248,17 +248,14 @@ public:
         for (StringRef builtinName : builtinNames) {
           std::optional<StringRef> maybeBuiltin =
               rocmDialect->getBuiltin(builtinName);
-          if (maybeBuiltin) {
-            builtinSrc += maybeBuiltin.value().str() + "\n";
+          if (!maybeBuiltin) {
+            // Skip when no patterns are present.
+            continue;
           }
-        }
-        if (builtinSrc.empty()) {
-          // Skip when no patterns are present.
-          continue;
-        }
-        if (failed(populatePDLModuleFromBuiltin(context, tmpPatterns,
-                                                builtinSrc))) {
-          return failure();
+          if (failed(populatePDLModuleFromBuiltin(context, tmpPatterns,
+                                                  maybeBuiltin.value()))) {
+            return failure();
+          }
         }
       }
     }
