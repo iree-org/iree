@@ -35,8 +35,7 @@ public:
   explicit DistributionLayout(Value val) : AnalysisState(val) {}
 
   TypedValue<VectorType> getValue() const {
-    auto anchor = getAnchor();
-    assert(isa<Value>(anchor) && "expected anchor to be a value");
+    LatticeAnchor anchor = getAnchor();
     Value val = cast<Value>(anchor);
     assert(isa<VectorType>(val.getType()) &&
            "expected value to be of vector type");
@@ -239,7 +238,7 @@ ChangeResult DistributionLayout::resolveWithPossibleConflict(
   // Resolve conflict by create an operation that takes the input the conflicted
   // value and returns the resolved value.
   Value input = opOperand.get();
-  // Create a resolution operation. This conflict should be handeled later by
+  // Create a resolution operation. This conflict should be handled later by
   // someone else, not this analysis.
   Operation *resolveOp =
       builder.create<IREE::VectorExt::ToLayoutOp>(input.getLoc(), input, rhs);
@@ -336,7 +335,7 @@ void DistributionLayout::onUpdate(DataFlowSolver *solver) const {
       solver->enqueue({solver->getProgramPointAfter(definingOp), enforcement});
     } else {
       // TODO: This is not always correct. Ideally, we should enqueue all
-      // predecessors of these block arguements.
+      // predecessors of these block arguments.
       solver->enqueue(
           {solver->getProgramPointAfter(value.getParentBlock()->getParentOp()),
            enforcement});
@@ -390,10 +389,10 @@ getAgreedLayout(ArrayRef<const DistributionLayout *> layouts) {
   return initializedLayouts[0];
 }
 
-/// Hueristic to use to choose the best layout when enforcing the same layout
-/// to all operands. Current hueristic is to simply choose the first operand
+/// Heuristic to use to choose the best layout when enforcing the same layout
+/// to all operands. Current heuristic is to simply choose the first operand
 /// which has a layout.
-/// TODO: Use a better hueristic.
+/// TODO: Use a better heuristic.
 static DistributionLayout *
 enforceSameLayoutHueristic(ArrayRef<DistributionLayout *> operands) {
   DistributionLayout *chosenOperandLayout = nullptr;
@@ -756,7 +755,7 @@ static void enforceLayoutToBroadcastOp(
   // Ensure that there are no broadcasted unit dims as we do not know how to
   // handle them as of now.
   assert(broadcast.computeBroadcastedUnitDims().empty() &&
-         "Streching in broadcasting not implemented yet.");
+         "Stretching in broadcasting not implemented yet.");
   // The starting k dimensions of the result are the ones that need to be
   // projected out.
 

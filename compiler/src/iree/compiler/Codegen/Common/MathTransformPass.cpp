@@ -34,7 +34,7 @@ static void populateMathFunctionsRewritePatterns(
                      math::Exp2Op::getOperationName(),
                      math::RoundEvenOp::getOperationName()};
   size_t prefix = math::MathDialect::getDialectNamespace().size() + 1;
-  for (auto name : opFullNames) {
+  for (StringRef name : opFullNames) {
     if (predicate(name)) {
       opNames.push_back(name.drop_front(prefix));
     }

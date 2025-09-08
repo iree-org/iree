@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/PatternMatch.h"
@@ -32,11 +33,17 @@ static memref::AllocaOp createAlloca(IRRewriter &rewriter,
                                      vector::TransferReadOp readOp,
                                      scf::ForOp forOp) {
   auto loc = forOp.getLoc();
-  auto allocaSize = rewriter.create<arith::CeilDivUIOp>(
-      loc,
-      rewriter.create<arith::SubIOp>(loc, forOp.getUpperBound(),
-                                     forOp.getLowerBound()),
-      forOp.getStep());
+  // We use an affine map to calculate the size of the alloca rather
+  // than arith ops directly due to an issue with finding the static upper bound
+  // when using arith.ceildivui described in
+  // https://github.com/iree-org/iree/issues/21872
+  AffineExpr lb, ub, step;
+  bindSymbols(rewriter.getContext(), lb, ub, step);
+  AffineMap sizeMap = AffineMap::get(0, 3, (ub - lb).ceilDiv(step));
+  auto allocaSize = affine::makeComposedFoldedAffineApply(
+      rewriter, loc, sizeMap,
+      getAsOpFoldResult(ValueRange{forOp.getLowerBound(), forOp.getUpperBound(),
+                                   forOp.getStep()}));
 
   auto vectorType = cast<VectorType>(readOp.getVectorType());
   SmallVector<int64_t> memrefShape(vectorType.getShape());
@@ -46,8 +53,9 @@ static memref::AllocaOp createAlloca(IRRewriter &rewriter,
   auto memrefType = MemRefType::get(memrefShape, vectorType.getElementType(),
                                     AffineMap{}, privateAddrSpaceAttr);
 
-  return rewriter.create<memref::AllocaOp>(loc, memrefType,
-                                           ValueRange{allocaSize});
+  return rewriter.create<memref::AllocaOp>(
+      loc, memrefType,
+      ValueRange{getValueOrCreateConstantIndexOp(rewriter, loc, allocaSize)});
 }
 
 /// Creates an index for accessing the memref in the loop. This index is

@@ -70,9 +70,9 @@ struct GPUCombineLayoutTransformationPass final
     // Workgroup scope.
     CombineRelayoutOpsControlFn controlFn = getCombineRelayoutOpsControlFn(
         IREE::Codegen::RelayoutCombinationScope::Dispatch);
-    if (failed(combineLayoutTransformation(&getContext(), getOperation(),
-                                           gpuPadDistributionConfigFn,
-                                           controlFn))) {
+    if (failed(combineLayoutTransformation(
+            &getContext(), getOperation(), gpuPadDistributionConfigFn,
+            /*doReshapeByExpansion=*/true, controlFn))) {
       return signalPassFailure();
     }
   }

@@ -90,6 +90,9 @@ void populateAffineMinSCFCanonicalizationPattern(RewritePatternSet &patterns);
 /// scf.for ops.
 void populateForallLoopHoistingPattern(RewritePatternSet &patterns);
 
+/// Populate pattern that folds fill into pad ops.
+void populateFoldFillIntoPadPattern(RewritePatternSet &patterns);
+
 using GetMinMaxExprFn =
     std::function<std::optional<std::pair<AffineExpr, AffineExpr>>(
         Value value, SmallVectorImpl<Value> &dims,
