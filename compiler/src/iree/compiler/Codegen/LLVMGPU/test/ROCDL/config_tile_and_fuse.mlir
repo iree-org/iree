@@ -328,14 +328,14 @@ func.func @unaligned_matmul_with_two_reduce_dim(%arg0: tensor<196x9x4xf32>, %arg
 }
 
 // CHECK-LABEL: func.func @unaligned_matmul_with_two_reduce_dim
-// CHECK-SAME:  {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+// CHECK-SAME:  {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64
 // CHECK:       linalg.generic
 // CHECK-SAME:  {lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
-// CHECK-SAME:  padding = [16, 1, 16, 4]
+// CHECK-SAME:  padding = [64, 1, 16, 4]
 // CHECK-SAME:  promote_operands = [0, 1]
 // CHECK-SAME:  reduction = [0, 1, 0, 1],
-// CHECK-SAME:  subgroup = [1, 0, 1, 0],
-// CHECK-SAME:  workgroup = [16, 0, 16, 0]}
+// CHECK-SAME:  subgroup = [2, 0, 1, 0],
+// CHECK-SAME:  workgroup = [64, 0, 16, 0]}
 
 // -----
 
