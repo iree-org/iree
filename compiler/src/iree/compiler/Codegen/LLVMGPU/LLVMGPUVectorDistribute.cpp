@@ -96,8 +96,8 @@ struct LLVMGPUVectorDistributePass final
                                          func.getLoc(), gpu::Dimension::x)};
     std::reverse(workgroupSize.begin(), workgroupSize.end());
 
-    Value linearThreadIdVal = rewriter.create<affine::AffineLinearizeIndexOp>(
-        func.getLoc(), threadGrid, workgroupSize, /*disjoint=*/true);
+    Value linearThreadIdVal = affine::AffineLinearizeIndexOp::create(
+        rewriter, func.getLoc(), threadGrid, workgroupSize, /*disjoint=*/true);
 
     std::optional<int64_t> subgroupSize = getSubgroupSize(func);
     if (!subgroupSize) {

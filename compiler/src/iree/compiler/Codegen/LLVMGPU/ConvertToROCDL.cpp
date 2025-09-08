@@ -184,8 +184,8 @@ struct LowerToElementsPattern : public OpRewritePattern<vector::ToElementsOp> {
     }
     auto vec1DType =
         VectorType::get({vecType.getNumElements()}, vecType.getElementType());
-    Value shapeCast = rewriter.create<vector::ShapeCastOp>(
-        op.getLoc(), vec1DType, op.getSource());
+    Value shapeCast = vector::ShapeCastOp::create(rewriter, op.getLoc(),
+                                                  vec1DType, op.getSource());
     rewriter.replaceOpWithNewOp<vector::ToElementsOp>(op, op.getResultTypes(),
                                                       shapeCast);
     return success();

@@ -46,9 +46,9 @@ void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
   builder.setInsertionPoint(&moduleOp.front());
   auto type =
       LLVM::LLVMArrayType::get(IntegerType::get(builder.getContext(), 8), 0);
-  LLVM::GlobalOp global = builder.create<LLVM::GlobalOp>(
-      moduleOp.getLoc(), type, /*isConstant=*/false, LLVM::Linkage::External,
-      "__dynamic_shared_memory__", Attribute(),
+  LLVM::GlobalOp global = LLVM::GlobalOp::create(
+      builder, moduleOp.getLoc(), type, /*isConstant=*/false,
+      LLVM::Linkage::External, "__dynamic_shared_memory__", Attribute(),
       /*alignment=*/16, /*addr_space=*/3);
   uint32_t numberOfBytes = 0;
   // Replace the addressOfOps with correctly offseted pointers to dynamic
@@ -72,16 +72,16 @@ void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
     auto loc = addressOfOp.getLoc();
     builder.setInsertionPoint(addressOfOp);
     LLVM::AddressOfOp globalPtr =
-        builder.create<LLVM::AddressOfOp>(loc, global);
-    Value zero = builder.create<LLVM::ConstantOp>(
-        loc, IntegerType::get(builder.getContext(), 64),
+        LLVM::AddressOfOp::create(builder, loc, global);
+    Value zero = LLVM::ConstantOp::create(
+        builder, loc, IntegerType::get(builder.getContext(), 64),
         builder.getI64IntegerAttr(0));
-    Value offsetValue = builder.create<LLVM::ConstantOp>(
-        loc, IntegerType::get(builder.getContext(), 64),
+    Value offsetValue = LLVM::ConstantOp::create(
+        builder, loc, IntegerType::get(builder.getContext(), 64),
         builder.getI64IntegerAttr(offset));
-    Value shiftedPtr = builder.create<LLVM::GEPOp>(
-        loc, globalPtr.getType(), global.getGlobalType(), globalPtr,
-        ValueRange({zero, offsetValue}));
+    Value shiftedPtr = LLVM::GEPOp::create(builder, loc, globalPtr.getType(),
+                                           global.getGlobalType(), globalPtr,
+                                           ValueRange({zero, offsetValue}));
     addressOfOp.replaceAllUsesWith(shiftedPtr);
     addressOfOp.erase();
   }
@@ -121,8 +121,8 @@ struct ScalarizeMathOp : public OpRewritePattern<MathOpTy> {
     if (!vecType)
       return failure();
     Location loc = mathOp.getLoc();
-    Value newVector = rewriter.create<arith::ConstantOp>(
-        loc, vecType, rewriter.getZeroAttr(vecType));
+    Value newVector = arith::ConstantOp::create(rewriter, loc, vecType,
+                                                rewriter.getZeroAttr(vecType));
 
     for (int64_t element : llvm::seq(int64_t(0), vecType.getNumElements())) {
       llvm::SmallVector<int64_t> indices;
@@ -135,11 +135,11 @@ struct ScalarizeMathOp : public OpRewritePattern<MathOpTy> {
       SmallVector<Value> newOperands;
       for (Value operand : mathOp->getOperands()) {
         newOperands.push_back(
-            rewriter.create<vector::ExtractOp>(loc, operand, indices));
+            vector::ExtractOp::create(rewriter, loc, operand, indices));
       }
-      Value scalarOp = rewriter.create<MathOpTy>(loc, newOperands);
+      Value scalarOp = MathOpTy::create(rewriter, loc, newOperands);
       newVector =
-          rewriter.create<vector::InsertOp>(loc, scalarOp, newVector, indices);
+          vector::InsertOp::create(rewriter, loc, scalarOp, newVector, indices);
     }
     rewriter.replaceOp(mathOp, newVector);
     return success();
@@ -181,8 +181,8 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
     SymbolTable symbolTable(moduleOp);
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPoint(&moduleOp.front());
-    auto global = rewriter.create<memref::GlobalOp>(
-        funcOp.getLoc(), "__shared_memory__",
+    auto global = memref::GlobalOp::create(
+        rewriter, funcOp.getLoc(), "__shared_memory__",
         /*sym_visibility=*/rewriter.getStringAttr("private"),
         /*type=*/allocType,
         /*initial_value=*/ElementsAttr(),
@@ -324,8 +324,8 @@ public:
 
     auto llvmFuncType = LLVM::LLVMFunctionType::get(
         LLVM::LLVMVoidType::get(rewriter.getContext()), llvmInputTypes);
-    auto newFuncOp = rewriter.create<LLVM::LLVMFuncOp>(
-        funcOp.getLoc(), funcOp.getName(), llvmFuncType,
+    auto newFuncOp = LLVM::LLVMFuncOp::create(
+        rewriter, funcOp.getLoc(), funcOp.getName(), llvmFuncType,
         LLVM::Linkage::External, /*dsoLocal=*/false, /*cconv=*/LLVM::CConv::C,
         /*comdat=*/nullptr, funcAttrs);
 
@@ -421,13 +421,13 @@ struct ConvertIREEBindingSubspanOp final
       if (ShapedType::isDynamic(offset)) {
         int32_t elementBitWidth =
             IREE::Util::getTypeBitWidth(memrefType.getElementType());
-        Value elementBitWidthVal = rewriter.create<LLVM::ConstantOp>(
-            loc, llvmIndexType, elementBitWidth);
-        Value eight = rewriter.create<LLVM::ConstantOp>(loc, llvmIndexType, 8);
+        Value elementBitWidthVal = LLVM::ConstantOp::create(
+            rewriter, loc, llvmIndexType, elementBitWidth);
+        Value eight = LLVM::ConstantOp::create(rewriter, loc, llvmIndexType, 8);
         Value bitOffset =
-            rewriter.create<LLVM::MulOp>(loc, baseOffsetValue, eight);
+            LLVM::MulOp::create(rewriter, loc, baseOffsetValue, eight);
         Value elementOffsetVal =
-            rewriter.create<LLVM::UDivOp>(loc, bitOffset, elementBitWidthVal);
+            LLVM::UDivOp::create(rewriter, loc, bitOffset, elementBitWidthVal);
         desc.setOffset(rewriter, loc, elementOffsetVal);
       } else {
         desc.setConstantOffset(rewriter, loc, offset);
@@ -458,13 +458,13 @@ struct ConvertIREEBindingSubspanOp final
             Value currentStrideVal;
             if (std::optional<int64_t> currentStrideInt =
                     getConstantIntValue(currentStride)) {
-              currentStrideVal = rewriter.create<LLVM::ConstantOp>(
-                  loc, llvmIndexType, currentStrideInt.value());
+              currentStrideVal = LLVM::ConstantOp::create(
+                  rewriter, loc, llvmIndexType, currentStrideInt.value());
             } else {
               currentStrideVal = cast<Value>(currentStride);
             }
             currentStride =
-                rewriter.create<LLVM::MulOp>(loc, currentStrideVal, dim)
+                LLVM::MulOp::create(rewriter, loc, currentStrideVal, dim)
                     .getResult();
             desc.setStride(rewriter, loc, i - 1, cast<Value>(currentStride));
           } else {
@@ -525,9 +525,9 @@ struct ConvertIREEConstantOp final
         auto divisibility = assumeOp.getUnionedUnsignedDivisor(opIdx);
 
         auto makeI32Const = [&](uint32_t val) -> Value {
-          return rewriter.create<LLVM::ConstantOp>(
-              assumeOp.getLoc(), rewriter.getI32Type(),
-              rewriter.getI32IntegerAttr(val));
+          return LLVM::ConstantOp::create(rewriter, assumeOp.getLoc(),
+                                          rewriter.getI32Type(),
+                                          rewriter.getI32IntegerAttr(val));
         };
         if (divisibility.has_value() && *divisibility > 1) {
           Location loc = assumeOp.getLoc();
@@ -536,12 +536,12 @@ struct ConvertIREEConstantOp final
                  "it can't hold");
           Value knownDivisibleBy = makeI32Const(*divisibility);
           // This'll almost always become an and
-          Value lowPart = rewriter.create<LLVM::URemOp>(loc, llvmBufferArg,
-                                                        knownDivisibleBy);
+          Value lowPart = LLVM::URemOp::create(rewriter, loc, llvmBufferArg,
+                                               knownDivisibleBy);
           Value zero = makeI32Const(0);
-          Value isEvenlyDivided = rewriter.create<LLVM::ICmpOp>(
-              loc, LLVM::ICmpPredicate::eq, lowPart, zero);
-          rewriter.create<LLVM::AssumeOp>(loc, isEvenlyDivided);
+          Value isEvenlyDivided = LLVM::ICmpOp::create(
+              rewriter, loc, LLVM::ICmpPredicate::eq, lowPart, zero);
+          LLVM::AssumeOp::create(rewriter, loc, isEvenlyDivided);
         }
       }
     }
@@ -610,7 +610,7 @@ struct ConvertIREEUtilAssumeIntOp final
       if (!conds)
         conds = cond;
       else
-        conds = rewriter.create<LLVM::AndOp>(loc, *conds, cond);
+        conds = LLVM::AndOp::create(rewriter, loc, *conds, cond);
     };
     // Materialize the assumptions that aren't atteched directly to arguments
     // in order to account for the fact that i64 inputs get passed in as a pair
@@ -625,14 +625,14 @@ struct ConvertIREEUtilAssumeIntOp final
       // This should be a range() bundle but LLVM doesn't understand those yet.
       if (min.has_value() && *min > 0) {
         Value minConst = createIndexAttrConstant(rewriter, loc, type, *min);
-        Value minCond = rewriter.create<LLVM::ICmpOp>(
-            loc, LLVM::ICmpPredicate::uge, llvmVal, minConst);
+        Value minCond = LLVM::ICmpOp::create(
+            rewriter, loc, LLVM::ICmpPredicate::uge, llvmVal, minConst);
         updateConds(conds, minCond);
       }
       if (max.has_value()) {
         Value maxConst = createIndexAttrConstant(rewriter, loc, type, *max);
-        Value maxCond = rewriter.create<LLVM::ICmpOp>(
-            loc, LLVM::ICmpPredicate::ule, llvmVal, maxConst);
+        Value maxCond = LLVM::ICmpOp::create(
+            rewriter, loc, LLVM::ICmpPredicate::ule, llvmVal, maxConst);
         updateConds(conds, maxCond);
       }
       std::optional<uint64_t> divisor = op.getUnionedUnsignedDivisor(idx);
@@ -640,15 +640,15 @@ struct ConvertIREEUtilAssumeIntOp final
         Value divisorConst =
             createIndexAttrConstant(rewriter, loc, type, *divisor);
         Value remainder =
-            rewriter.create<LLVM::URemOp>(loc, llvmVal, divisorConst);
+            LLVM::URemOp::create(rewriter, loc, llvmVal, divisorConst);
         Value zero = createIndexAttrConstant(rewriter, loc, type, 0);
-        Value divisorCond = rewriter.create<LLVM::ICmpOp>(
-            loc, LLVM::ICmpPredicate::eq, remainder, zero);
+        Value divisorCond = LLVM::ICmpOp::create(
+            rewriter, loc, LLVM::ICmpPredicate::eq, remainder, zero);
         updateConds(conds, divisorCond);
       }
 
       if (conds.has_value()) {
-        rewriter.create<LLVM::AssumeOp>(loc, *conds);
+        LLVM::AssumeOp::create(rewriter, loc, *conds);
       }
     }
     rewriter.replaceOp(op, adaptor.getOperands());
