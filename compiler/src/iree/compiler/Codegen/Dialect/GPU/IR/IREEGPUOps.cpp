@@ -165,11 +165,11 @@ struct FoldBufferCastOfTensorCast final
     if (newSource.getType() != maxStaticType) {
       // Cast to the type with maximum static information if the input and
       // result types contain different static info.
-      newSource = rewriter.create<tensor::CastOp>(castOp.getLoc(),
-                                                  maxStaticType, newSource);
+      newSource = tensor::CastOp::create(rewriter, castOp.getLoc(),
+                                         maxStaticType, newSource);
     }
-    auto newBufferCast = rewriter.create<IREE::GPU::BufferResourceCastOp>(
-        castOp.getLoc(), maxStaticType, newSource,
+    auto newBufferCast = IREE::GPU::BufferResourceCastOp::create(
+        rewriter, castOp.getLoc(), maxStaticType, newSource,
         castOp.getCacheSwizzleStride());
     newBufferCast->setDiscardableAttrs(castOp->getDiscardableAttrDictionary());
 

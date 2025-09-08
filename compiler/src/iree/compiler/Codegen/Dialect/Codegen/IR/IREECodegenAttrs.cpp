@@ -524,7 +524,7 @@ static OpFoldResult getMinimumConstantOffsetValue(OpBuilder &b, Location loc,
   if (baseMod == constantOffset)
     return offset;
 
-  Value modOffset = b.create<arith::ConstantIndexOp>(loc, baseMod);
+  Value modOffset = arith::ConstantIndexOp::create(b, loc, baseMod);
   // If the original add is nsw/nuw, then the new add must also be given we're
   // adding a smaller value.
   return b
@@ -548,30 +548,30 @@ OpFoldResult RotateRowsAttr::swizzleOffset(OpBuilder &b, Location loc,
       getMinimumConstantOffsetValue(b, loc, offset, rotationInvariant);
 
   // Number of elements per row.
-  Value rowAlignmentVal = b.create<arith::ConstantIndexOp>(loc, getRowWidth());
+  Value rowAlignmentVal = arith::ConstantIndexOp::create(b, loc, getRowWidth());
   // Number of contiguous groups of elements per row (swizzled together).
   Value rowAccessAlignmentVal =
-      b.create<arith::ConstantIndexOp>(loc, getRowWidth() / getAccessWidth());
+      arith::ConstantIndexOp::create(b, loc, getRowWidth() / getAccessWidth());
   // Number of elements per group.
   Value accessWidthVal =
-      b.create<arith::ConstantIndexOp>(loc, getAccessWidth());
+      arith::ConstantIndexOp::create(b, loc, getAccessWidth());
 
   Value idVal = getValueOrCreateConstantIndexOp(b, loc, id);
   // i = row # = |offset| floordiv |Num elements per row|
-  Value i = b.create<arith::DivUIOp>(loc, idVal, rowAlignmentVal);
+  Value i = arith::DivUIOp::create(b, loc, idVal, rowAlignmentVal);
   // jByte = element column # = |offset| % |Num elements per row|
-  Value jElem = b.create<arith::RemUIOp>(loc, idVal, rowAlignmentVal);
+  Value jElem = arith::RemUIOp::create(b, loc, idVal, rowAlignmentVal);
   // j = group column # = jElem / |Num elements per group|
-  Value j = b.create<arith::DivUIOp>(loc, jElem, accessWidthVal);
+  Value j = arith::DivUIOp::create(b, loc, jElem, accessWidthVal);
 
   // New j = ((i + j) % |Num groups per row|) * |Num elements per group|
-  Value sum = b.create<arith::AddIOp>(loc, i, j);
-  Value modByte = b.create<arith::RemUIOp>(loc, sum, rowAccessAlignmentVal);
-  Value mod = b.create<arith::MulIOp>(loc, modByte, accessWidthVal);
+  Value sum = arith::AddIOp::create(b, loc, i, j);
+  Value modByte = arith::RemUIOp::create(b, loc, sum, rowAccessAlignmentVal);
+  Value mod = arith::MulIOp::create(b, loc, modByte, accessWidthVal);
 
   // Recompute the swizzled offset `(i * row width) + |new j|`
-  Value mul = b.create<arith::MulIOp>(loc, i, rowAlignmentVal);
-  Value swizzledId = b.create<arith::AddIOp>(loc, mod, mul);
+  Value mul = arith::MulIOp::create(b, loc, i, rowAlignmentVal);
+  Value swizzledId = arith::AddIOp::create(b, loc, mod, mul);
 
   // |swizzledId| is the new offset modulo the swizzle invariant, meaning to
   // get the true swizzled offset take the difference between |swizzledId| and
@@ -580,7 +580,7 @@ OpFoldResult RotateRowsAttr::swizzleOffset(OpBuilder &b, Location loc,
   // This increases the chance of being able to CSE the offset calculation. When
   // multiple accesses to a memref only differ by a constant value (very common
   // when working with statically shaped memrefs like shared/scratch memory).
-  Value diff = b.create<arith::SubIOp>(loc, swizzledId, idVal);
+  Value diff = arith::SubIOp::create(b, loc, swizzledId, idVal);
   return b
       .create<arith::AddIOp>(
           loc, getValueOrCreateConstantIndexOp(b, loc, offset), diff)
@@ -674,27 +674,27 @@ OpFoldResult XORShuffleAttr::swizzleOffset(OpBuilder &b, Location loc,
   Value idVal = getValueOrCreateConstantIndexOp(b, loc, id);
 
   // Number of elements per row.
-  Value rowAlignmentVal = b.create<arith::ConstantIndexOp>(loc, getRowWidth());
+  Value rowAlignmentVal = arith::ConstantIndexOp::create(b, loc, getRowWidth());
   // Number of elements per group.
   Value accessWidthVal =
-      b.create<arith::ConstantIndexOp>(loc, getAccessWidth());
+      arith::ConstantIndexOp::create(b, loc, getAccessWidth());
   // Number of rows per phase.
-  Value perPhaseVal = b.create<arith::ConstantIndexOp>(loc, perPhase);
+  Value perPhaseVal = arith::ConstantIndexOp::create(b, loc, perPhase);
   // Buffer stride.
-  Value rowStrideVal = b.create<arith::ConstantIndexOp>(loc, rowStride);
+  Value rowStrideVal = arith::ConstantIndexOp::create(b, loc, rowStride);
   // Number of contiguous groups of elements per row (swizzled together).
   Value rowAccessAlignmentVal =
-      b.create<arith::ConstantIndexOp>(loc, getRowWidth() / getAccessWidth());
+      arith::ConstantIndexOp::create(b, loc, getRowWidth() / getAccessWidth());
 
   Value colVal = extractCol(b, loc, idVal, rowAlignmentVal, accessWidthVal);
   Value rowVal = extractRow(b, loc, idVal, rowStrideVal, perPhaseVal,
                             rowAccessAlignmentVal);
-  auto colSwizzled = b.create<arith::XOrIOp>(loc, rowVal, colVal);
+  auto colSwizzled = arith::XOrIOp::create(b, loc, rowVal, colVal);
 
   // Update colSwizzled to initial id
   Value swizzledIdVal =
       updateCol(b, loc, idVal, colSwizzled, rowAlignmentVal, accessWidthVal);
-  Value diff = b.create<arith::SubIOp>(loc, swizzledIdVal, idVal);
+  Value diff = arith::SubIOp::create(b, loc, swizzledIdVal, idVal);
   return b
       .create<arith::AddIOp>(
           loc, getValueOrCreateConstantIndexOp(b, loc, offset), diff)

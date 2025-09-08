@@ -50,11 +50,11 @@ Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
 
     if (type.isDynamicDim(dim)) {
       dim = type.getDynamicDimIndex(dim);
-      auto alignment = builder.create<arith::ConstantIndexOp>(loc, size);
-      paddedDynamicDims[dim] = builder.create<arith::CeilDivSIOp>(
-          loc, paddedDynamicDims[dim], alignment);
-      paddedDynamicDims[dim] =
-          builder.create<arith::MulIOp>(loc, paddedDynamicDims[dim], alignment);
+      auto alignment = arith::ConstantIndexOp::create(builder, loc, size);
+      paddedDynamicDims[dim] = arith::CeilDivSIOp::create(
+          builder, loc, paddedDynamicDims[dim], alignment);
+      paddedDynamicDims[dim] = arith::MulIOp::create(
+          builder, loc, paddedDynamicDims[dim], alignment);
     } else {
       paddedShape[dim] = llvm::alignTo(paddedShape[dim], size);
     }
@@ -75,9 +75,9 @@ Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
   }
 
   Value result =
-      builder.create<arith::ConstantIndexOp>(loc, staticCount).getResult();
+      arith::ConstantIndexOp::create(builder, loc, staticCount).getResult();
   for (auto dim : paddedDynamicDims) {
-    result = builder.create<arith::MulIOp>(loc, result, dim);
+    result = arith::MulIOp::create(builder, loc, result, dim);
   }
 
   // Always pack the elements back-to-back for subtypes.
@@ -86,9 +86,9 @@ Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
       assert(false && "unsupported subtype");
       return Value();
     }
-    Value divisor = builder.create<arith::ConstantIndexOp>(
-        loc, kNumBitsInByte / elementBits);
-    result = builder.create<arith::CeilDivUIOp>(loc, result, divisor);
+    Value divisor = arith::ConstantIndexOp::create(
+        builder, loc, kNumBitsInByte / elementBits);
+    result = arith::CeilDivUIOp::create(builder, loc, result, divisor);
   }
 
   return result;
