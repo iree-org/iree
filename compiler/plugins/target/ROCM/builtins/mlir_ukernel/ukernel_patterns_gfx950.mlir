@@ -1,11 +1,11 @@
 // RUN: iree-opt -allow-unregistered-dialect %s
 
-// f8E4M3FNUZ Patterns
+// f8E4M3FN Patterns
 
 // This pattern matches a medium-sized expanded matmul-like operation and
 // annotates it with ukernel descriptor and configuration attributes.
-pdl.pattern @annotate_matmul_like_f8E4M3FNUZ_medium_expanded : benefit(1) {
-  %elemtypes = pdl.attribute = [f8E4M3FNUZ, f8E4M3FNUZ, f32]
+pdl.pattern @annotate_matmul_like_f8E4M3FN_medium_expanded : benefit(1) {
+  %elemtypes = pdl.attribute = [f8E4M3FN, f8E4M3FN, f32]
   %imaps = pdl.attribute = [
     affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
     affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
@@ -58,7 +58,7 @@ pdl.pattern @annotate_matmul_like_f8E4M3FNUZ_medium_expanded : benefit(1) {
     // Call the C++ "annotateOperation" utility to add the attributes to the matched linalg.generic op.
     // This modifies the operation in-place.
 
-    %annotation = pdl.attribute = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
+    %annotation = pdl.attribute = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FN_expanded", tensor>
     pdl.apply_native_rewrite "annotateOperation"(%generic_op, %attr_name, %annotation : !pdl.operation, !pdl.attribute, !pdl.attribute)
 
     %config_name = pdl.attribute = "compilation_info"
@@ -69,7 +69,7 @@ pdl.pattern @annotate_matmul_like_f8E4M3FNUZ_medium_expanded : benefit(1) {
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
         // This strategy uses the maximum amount of possible shared memory on
-        // all gfx942 architectures so shared memory padding to reduce bank
+        // all gfx9 architectures so shared memory padding to reduce bank
         // conflicts must be disabled. Also prefetching is done manually in the
         // above and is disabled here as well.
         {gpu_pipeline_options =
@@ -82,7 +82,7 @@ pdl.pattern @annotate_matmul_like_f8E4M3FNUZ_medium_expanded : benefit(1) {
     pdl.apply_native_rewrite "annotateOperation"(%generic_op, %config_name, %config : !pdl.operation, !pdl.attribute, !pdl.attribute)
 
     %builtin_attr = pdl.attribute = "rocm.builtin_name"
-    %builtin_annotation = pdl.attribute = "iree_uk_amdgpu_matmul_f8E4M3FNUZ.mlir"
+    %builtin_annotation = pdl.attribute = "iree_uk_amdgpu_matmul_f8E4M3FN.mlir"
     pdl.apply_native_rewrite "annotateOperation"(%generic_op, %builtin_attr, %builtin_annotation : !pdl.operation, !pdl.attribute, !pdl.attribute)
   }
 }
@@ -90,8 +90,8 @@ pdl.pattern @annotate_matmul_like_f8E4M3FNUZ_medium_expanded : benefit(1) {
 // This pattern matches a large expanded f8 matmul-like operation and annotates it
 // with ukernel descriptor and configuration attributes. This is preferred over the
 // medium-sized ukernel.
-pdl.pattern @annotate_matmul_like_f8E4M3FNUZ_large_expanded : benefit(2) {
-  %elemtypes = pdl.attribute = [f8E4M3FNUZ, f8E4M3FNUZ, f32]
+pdl.pattern @annotate_matmul_like_f8E4M3FN_large_expanded : benefit(2) {
+  %elemtypes = pdl.attribute = [f8E4M3FN, f8E4M3FN, f32]
   %imaps = pdl.attribute = [
     affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
     affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
@@ -150,7 +150,7 @@ pdl.pattern @annotate_matmul_like_f8E4M3FNUZ_large_expanded : benefit(2) {
     // Call the C++ "annotateOperation" utility to add the attributes to the matched linalg.generic op.
     // This modifies the operation in-place.
 
-    %annotation = pdl.attribute = #iree_codegen.ukernel_descriptor<"pingpong_large_f8E4M3FNUZ_expanded", tensor>
+    %annotation = pdl.attribute = #iree_codegen.ukernel_descriptor<"pingpong_large_f8E4M3FN_expanded", tensor>
     pdl.apply_native_rewrite "annotateOperation"(%generic_op, %attr_name, %annotation : !pdl.operation, !pdl.attribute, !pdl.attribute)
 
     %config_name = pdl.attribute = "compilation_info"
@@ -161,7 +161,7 @@ pdl.pattern @annotate_matmul_like_f8E4M3FNUZ_large_expanded : benefit(2) {
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
         // This strategy uses the maximum amount of possible shared memory on
-        // all gfx942 architectures so shared memory padding to reduce bank
+        // all gfx9 architectures so shared memory padding to reduce bank
         // conflicts must be disabled. Also prefetching is done manually in the
         // above and is disabled here as well.
         {gpu_pipeline_options =
@@ -174,7 +174,7 @@ pdl.pattern @annotate_matmul_like_f8E4M3FNUZ_large_expanded : benefit(2) {
     pdl.apply_native_rewrite "annotateOperation"(%generic_op, %config_name, %config : !pdl.operation, !pdl.attribute, !pdl.attribute)
 
     %builtin_attr = pdl.attribute = "rocm.builtin_name"
-    %builtin_annotation = pdl.attribute = "iree_uk_amdgpu_matmul_f8E4M3FNUZ.mlir"
+    %builtin_annotation = pdl.attribute = "iree_uk_amdgpu_matmul_f8E4M3FN.mlir"
     pdl.apply_native_rewrite "annotateOperation"(%generic_op, %builtin_attr, %builtin_annotation : !pdl.operation, !pdl.attribute, !pdl.attribute)
   }
 }

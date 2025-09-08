@@ -47,7 +47,7 @@ module attributes {
     return %2 : tensor<1x128x1024xf32>
   }
 }
-// CHECK-LABEL: util.func private @pingpong_medium_f8_expanded
+// CHECK-LABEL: util.func private @pingpong_medium_f8E4M3FNUZ_expanded
 // CHECK:         iree_codegen.inner_tiled
 
 // -----
@@ -88,8 +88,8 @@ module attributes {
 // CHECK-SAME:      compilation_info = #iree_codegen.compilation_info
 // CHECK-SAME:      lowering_config =
 // CHECK-SAME:      translation_info =
-// CHECK-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_large_f8_expanded", tensor>
-// CHECK-LABEL: util.func private @pingpong_large_f8_expanded
+// CHECK-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_large_f8E4M3FNUZ_expanded", tensor>
+// CHECK-LABEL: util.func private @pingpong_large_f8E4M3FNUZ_expanded
 // CHECK:         iree_codegen.inner_tiled
 
 // -----
