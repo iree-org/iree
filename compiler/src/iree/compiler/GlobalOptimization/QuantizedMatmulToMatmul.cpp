@@ -78,8 +78,9 @@ struct QuantizedMatmulToMatmul
     }
     // Create the result. No need to zero-fill it as we will overwrite it.
     ShapedType accType = llvm::cast<ShapedType>(acc.getType());
-    Value initResult = builder.create<tensor::EmptyOp>(
-        tensor::getMixedSizes(builder, loc, acc), accType.getElementType());
+    Value initResult = tensor::EmptyOp::create(
+        builder, tensor::getMixedSizes(builder, loc, acc),
+        accType.getElementType());
     // Create the indexing maps for the generic.
     MLIRContext *context = rewriter.getContext();
     AffineExpr b, m, n;
@@ -124,12 +125,13 @@ struct QuantizedMatmulToMatmul
       indexOfLhsZpInput = addInput(lhsZp, mapToNone);
     }
     if (!lhsZpIsConstantZero && !rhsZpIsConstantZero) {
-      Value lhsZpTimesRhsZp = builder.create<arith::MulIOp>(lhsZp, rhsZp);
+      Value lhsZpTimesRhsZp = arith::MulIOp::create(builder, lhsZp, rhsZp);
 
-      Value kSize = rewriter.create<arith::IndexCastOp>(
-          loc, accElTy, builder.create<tensor::DimOp>(lhs, batch ? 2 : 1));
+      Value kSize = arith::IndexCastOp::create(
+          rewriter, loc, accElTy,
+          tensor::DimOp::create(builder, lhs, batch ? 2 : 1));
       Value lhsZpTimesRhsZpTimesKSize =
-          builder.create<arith::MulIOp>(lhsZpTimesRhsZp, kSize);
+          arith::MulIOp::create(builder, lhsZpTimesRhsZp, kSize);
       indexOfLhsZpTimesRhsZpTimesKSizeInput =
           addInput(lhsZpTimesRhsZpTimesKSize, mapToNone);
     }
@@ -153,22 +155,22 @@ struct QuantizedMatmulToMatmul
           // times the sums along rows of lhs.
           if (!rhsZpIsConstantZero) {
             Value lhsSumsElTimesRhsZp =
-                b.create<arith::MulIOp>(loc, lhsSumsEl, rhsZp);
-            result = b.create<arith::SubIOp>(loc, result, lhsSumsElTimesRhsZp);
+                arith::MulIOp::create(b, loc, lhsSumsEl, rhsZp);
+            result = arith::SubIOp::create(b, loc, result, lhsSumsElTimesRhsZp);
           }
           // If the lhs zero-point is not a constant zero, we need to add it
           // times the sums along columns of rhs.
           if (!lhsZpIsConstantZero) {
             Value rhsSumsElTimesLhsZp =
-                b.create<arith::MulIOp>(loc, rhsSumsEl, lhsZp);
-            result = b.create<arith::SubIOp>(loc, result, rhsSumsElTimesLhsZp);
+                arith::MulIOp::create(b, loc, rhsSumsEl, lhsZp);
+            result = arith::SubIOp::create(b, loc, result, rhsSumsElTimesLhsZp);
           }
           // Add the final correction term, if neither zero-point is cst zero.
           if (!lhsZpIsConstantZero && !rhsZpIsConstantZero) {
-            result =
-                b.create<arith::AddIOp>(loc, result, lhsZpTimesRhsZpTimesKSize);
+            result = arith::AddIOp::create(b, loc, result,
+                                           lhsZpTimesRhsZpTimesKSize);
           }
-          b.create<linalg::YieldOp>(loc, result);
+          linalg::YieldOp::create(b, loc, result);
         });
 
     return success();

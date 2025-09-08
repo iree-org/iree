@@ -85,11 +85,11 @@ struct DetachElementwisePattern
     SmallVector<OpFoldResult> mixedSizes =
         tensor::getMixedSizes(rewriter, loc, outputOperand);
     auto initOp =
-        rewriter.create<tensor::EmptyOp>(loc, mixedSizes, elementType);
-    Value zero = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(elementType));
-    Value fill =
-        rewriter.create<linalg::FillOp>(loc, zero, initOp.getResult()).result();
+        tensor::EmptyOp::create(rewriter, loc, mixedSizes, elementType);
+    Value zero = arith::ConstantOp::create(rewriter, loc,
+                                           rewriter.getZeroAttr(elementType));
+    Value fill = linalg::FillOp::create(rewriter, loc, zero, initOp.getResult())
+                     .result();
 
     // Update the contraction op to use the new zero tensor as output operand.
     rewriter.modifyOpInPlace(linalgOp,
@@ -97,17 +97,17 @@ struct DetachElementwisePattern
 
     // Create a generic op to add back the original output tensor operand.
     rewriter.setInsertionPointAfter(linalgOp);
-    auto genericOp = rewriter.create<linalg::GenericOp>(
-        loc, outputType, ValueRange{linalgOp->getResult(0), outputOperand},
-        fill, maps, iterators,
-        [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
+    auto genericOp = linalg::GenericOp::create(
+        rewriter, loc, outputType,
+        ValueRange{linalgOp->getResult(0), outputOperand}, fill, maps,
+        iterators, [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
           Value result;
           if (llvm::isa<FloatType>(elementType)) {
-            result = b.create<arith::AddFOp>(nestedLoc, args[0], args[1]);
+            result = arith::AddFOp::create(b, nestedLoc, args[0], args[1]);
           } else {
-            result = b.create<arith::AddIOp>(nestedLoc, args[0], args[1]);
+            result = arith::AddIOp::create(b, nestedLoc, args[0], args[1]);
           }
-          b.create<linalg::YieldOp>(nestedLoc, result);
+          linalg::YieldOp::create(b, nestedLoc, result);
         });
     linalgOp->getResult(0).replaceAllUsesExcept(genericOp->getResult(0),
                                                 genericOp);
@@ -153,8 +153,8 @@ struct DetachSplatConstantOutsOperands
 
       Location loc = constOp.getLoc();
       Type elementType = resultType.getElementType();
-      Value emptyTensorOp = rewriter.create<tensor::EmptyOp>(
-          loc, resultType.getShape(), elementType);
+      Value emptyTensorOp = tensor::EmptyOp::create(
+          rewriter, loc, resultType.getShape(), elementType);
       TypedAttr constValue;
       if (llvm::isa<IntegerType>(elementType)) {
         constValue = rewriter.getIntegerAttr(
@@ -164,7 +164,7 @@ struct DetachSplatConstantOutsOperands
             elementType, attr.template getSplatValue<APFloat>());
       }
       Value scalarConstantOp =
-          rewriter.create<arith::ConstantOp>(loc, elementType, constValue);
+          arith::ConstantOp::create(rewriter, loc, elementType, constValue);
 
       Value fillOp = rewriter
                          .create<linalg::FillOp>(

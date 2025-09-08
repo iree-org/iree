@@ -384,15 +384,15 @@ QuantizedMatmulRewriter::getGroupReductionMapsAndIterators(
 Value QuantizedMatmulRewriter::getGroupReductionInit(Value input) {
   RankedTensorType inputType = llvm::cast<RankedTensorType>(input.getType());
   assert(isa<FloatType>(inputType.getElementType()) && "expected float type");
-  Value zero = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getFloatAttr(inputType.getElementType(), 0.0));
+  Value zero = arith::ConstantOp::create(
+      rewriter, loc, rewriter.getFloatAttr(inputType.getElementType(), 0.0));
   SmallVector<int64_t> inputShape(inputType.getShape());
   SmallVector<int64_t> outputShape(llvm::drop_end(inputShape));
   RankedTensorType outputType =
       RankedTensorType::get(outputShape, inputType.getElementType());
-  Value emptyOut = rewriter.create<tensor::EmptyOp>(
-      loc, outputType.getShape(), outputType.getElementType());
-  return rewriter.create<linalg::FillOp>(loc, zero, emptyOut).result();
+  Value emptyOut = tensor::EmptyOp::create(rewriter, loc, outputType.getShape(),
+                                           outputType.getElementType());
+  return linalg::FillOp::create(rewriter, loc, zero, emptyOut).result();
 }
 
 // Creates a generic that computes the absolute max along the group
@@ -405,12 +405,12 @@ Value QuantizedMatmulRewriter::generateGroupMaxGeneric() {
   auto iterators = mapsAndIterators.second;
   Value input = inputOperand->get();
   Value output = getGroupReductionInit(input);
-  auto groupMaxOp = rewriter.create<linalg::GenericOp>(
-      loc, output.getType(), input, output, maps, iterators,
+  auto groupMaxOp = linalg::GenericOp::create(
+      rewriter, loc, output.getType(), input, output, maps, iterators,
       [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
-        Value abs = b.create<math::AbsFOp>(nestedLoc, args[0]);
-        Value max = b.create<arith::MaximumFOp>(nestedLoc, abs, args[1]);
-        b.create<linalg::YieldOp>(nestedLoc, max);
+        Value abs = math::AbsFOp::create(b, nestedLoc, args[0]);
+        Value max = arith::MaximumFOp::create(b, nestedLoc, abs, args[1]);
+        linalg::YieldOp::create(b, nestedLoc, max);
       });
   LLVM_DEBUG(DBGS() << "groupMaxOp:   " << groupMaxOp << "\n");
   return groupMaxOp.getResult(0);
@@ -422,19 +422,20 @@ Value QuantizedMatmulRewriter::generateScalesGeneric(Value groupMax) {
   auto groupMaxType = llvm::cast<RankedTensorType>(groupMax.getType());
   assert(isa<FloatType>(groupMaxType.getElementType()) &&
          "expected float type");
-  Value cst = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getFloatAttr(groupMaxType.getElementType(),
-                                 (1 << (quantizedBitWidth - 1)) - 1));
-  Value output = rewriter.create<tensor::EmptyOp>(
-      loc, groupMaxType.getShape(), groupMaxType.getElementType());
+  Value cst = arith::ConstantOp::create(
+      rewriter, loc,
+      rewriter.getFloatAttr(groupMaxType.getElementType(),
+                            (1 << (quantizedBitWidth - 1)) - 1));
+  Value output = tensor::EmptyOp::create(rewriter, loc, groupMaxType.getShape(),
+                                         groupMaxType.getElementType());
   SmallVector<AffineMap> maps(
       2, rewriter.getMultiDimIdentityMap(groupMaxType.getShape().size()));
-  auto scalesOp = rewriter.create<linalg::GenericOp>(
-      loc, output.getType(), groupMax, output, maps,
+  auto scalesOp = linalg::GenericOp::create(
+      rewriter, loc, output.getType(), groupMax, output, maps,
       getParallelAndReductionIterators(groupMaxType.getRank(), 0),
       [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
-        Value scale = b.create<arith::DivFOp>(nestedLoc, args[0], cst);
-        b.create<linalg::YieldOp>(nestedLoc, scale);
+        Value scale = arith::DivFOp::create(b, nestedLoc, args[0], cst);
+        linalg::YieldOp::create(b, nestedLoc, scale);
       });
   LLVM_DEBUG(DBGS() << "scalesOp:   " << scalesOp << "\n");
   return scalesOp.getResult(0);
@@ -450,11 +451,11 @@ Value QuantizedMatmulRewriter::generateGroupSumsGeneric() {
   auto iterators = mapsAndIterators.second;
   Value input = inputOperand->get();
   Value output = getGroupReductionInit(input);
-  auto groupSumsOp = rewriter.create<linalg::GenericOp>(
-      loc, output.getType(), input, output, maps, iterators,
+  auto groupSumsOp = linalg::GenericOp::create(
+      rewriter, loc, output.getType(), input, output, maps, iterators,
       [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
-        Value sum = b.create<arith::AddFOp>(nestedLoc, args[0], args[1]);
-        b.create<linalg::YieldOp>(nestedLoc, sum);
+        Value sum = arith::AddFOp::create(b, nestedLoc, args[0], args[1]);
+        linalg::YieldOp::create(b, nestedLoc, sum);
       });
   LLVM_DEBUG(DBGS() << "groupSumsOp:   " << groupSumsOp << "\n");
   return groupSumsOp.getResult(0);
@@ -476,22 +477,23 @@ SmallVector<Value> QuantizedMatmulRewriter::generateQuantizationGenerics() {
   Value scales = generateScalesGeneric(groupMax);
   Value groupSums = generateGroupSumsGeneric();
 
-  Value output = rewriter.create<tensor::EmptyOp>(loc, unquantizedShape,
-                                                  quantizedElementType);
+  Value output = tensor::EmptyOp::create(rewriter, loc, unquantizedShape,
+                                         quantizedElementType);
   AffineMap inputMap = rewriter.getMultiDimIdentityMap(unquantizedShape.size());
   AffineMap scalesMap = rewriter.getMultiDimIdentityMap(unquantizedShape.size())
                             .getMajorSubMap(unquantizedShape.size() - 1);
   AffineMap outputMap =
       rewriter.getMultiDimIdentityMap(unquantizedShape.size());
   SmallVector<AffineMap> maps{inputMap, scalesMap, outputMap};
-  auto quantizeOp = rewriter.create<linalg::GenericOp>(
-      loc, output.getType(), ValueRange{unquantizedInput, scales}, output, maps,
+  auto quantizeOp = linalg::GenericOp::create(
+      rewriter, loc, output.getType(), ValueRange{unquantizedInput, scales},
+      output, maps,
       getParallelAndReductionIterators(unquantizedShape.size(), 0),
       [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
-        Value scaled = b.create<arith::DivFOp>(nestedLoc, args[0], args[1]);
+        Value scaled = arith::DivFOp::create(b, nestedLoc, args[0], args[1]);
         Value quant =
-            b.create<arith::FPToSIOp>(nestedLoc, quantizedElementType, scaled);
-        b.create<linalg::YieldOp>(nestedLoc, quant);
+            arith::FPToSIOp::create(b, nestedLoc, quantizedElementType, scaled);
+        linalg::YieldOp::create(b, nestedLoc, quant);
       });
   LLVM_DEBUG(DBGS() << "quantizeOp:   " << quantizeOp << "\n");
   Value newQuantizedInput = quantizeOp.getResult(0);
@@ -535,31 +537,31 @@ linalg::GenericOp QuantizedMatmulRewriter::generateQuantizedMatmulGeneric(
           .getShape());
   outputShape.push_back(
       newQuantizedInputShape[newQuantizedInputShape.size() - 2]);
-  Value zero = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getIntegerAttr(accType, 0.0));
-  Value emptyOut = rewriter.create<tensor::EmptyOp>(loc, outputShape, accType);
-  Value output = rewriter.create<linalg::FillOp>(loc, zero, emptyOut).result();
-  auto integerMatmulOp = rewriter.create<linalg::GenericOp>(
-      loc, output.getType(), ValueRange{newQuantizedInput, quantizedInput},
-      output, maps, iterators,
+  Value zero = arith::ConstantOp::create(rewriter, loc,
+                                         rewriter.getIntegerAttr(accType, 0.0));
+  Value emptyOut = tensor::EmptyOp::create(rewriter, loc, outputShape, accType);
+  Value output = linalg::FillOp::create(rewriter, loc, zero, emptyOut).result();
+  auto integerMatmulOp = linalg::GenericOp::create(
+      rewriter, loc, output.getType(),
+      ValueRange{newQuantizedInput, quantizedInput}, output, maps, iterators,
       [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
         Value mul;
         if (quantType == mulType) {
-          Value ext1 = b.create<arith::ExtUIOp>(nestedLoc, mulType, args[1]);
-          mul = b.create<arith::MulIOp>(nestedLoc, args[0], ext1);
+          Value ext1 = arith::ExtUIOp::create(b, nestedLoc, mulType, args[1]);
+          mul = arith::MulIOp::create(b, nestedLoc, args[0], ext1);
         } else {
-          Value ext0 = b.create<arith::ExtSIOp>(nestedLoc, mulType, args[0]);
-          Value ext1 = b.create<arith::ExtUIOp>(nestedLoc, mulType, args[1]);
-          mul = b.create<arith::MulIOp>(nestedLoc, ext0, ext1);
+          Value ext0 = arith::ExtSIOp::create(b, nestedLoc, mulType, args[0]);
+          Value ext1 = arith::ExtUIOp::create(b, nestedLoc, mulType, args[1]);
+          mul = arith::MulIOp::create(b, nestedLoc, ext0, ext1);
         }
         Value sum;
         if (mulType == accType) {
-          sum = b.create<arith::AddIOp>(nestedLoc, mul, args[2]);
+          sum = arith::AddIOp::create(b, nestedLoc, mul, args[2]);
         } else {
-          Value extMul = b.create<arith::ExtSIOp>(nestedLoc, accType, mul);
-          sum = b.create<arith::AddIOp>(nestedLoc, extMul, args[2]);
+          Value extMul = arith::ExtSIOp::create(b, nestedLoc, accType, mul);
+          sum = arith::AddIOp::create(b, nestedLoc, extMul, args[2]);
         }
-        b.create<linalg::YieldOp>(nestedLoc, sum);
+        linalg::YieldOp::create(b, nestedLoc, sum);
       });
   LLVM_DEBUG(DBGS() << "integerMatmulOp:   " << integerMatmulOp << "\n");
   return integerMatmulOp;
@@ -626,20 +628,20 @@ QuantizedMatmulRewriter::generateReassociatedDequantizationGeneric(
 
   Type floatType = getElementTypeOrSelf(scales);
   Value output = matmulOutputOperand->get();
-  auto reassociatedDequantizationOp = rewriter.create<linalg::GenericOp>(
-      loc, output.getType(),
+  auto reassociatedDequantizationOp = linalg::GenericOp::create(
+      rewriter, loc, output.getType(),
       ValueRange{quantizedIntegerMatmul, newScales, groupSums, scales, zps},
       output, maps, iterators,
       [&](OpBuilder &b, Location loc, ValueRange args) {
         Value dq;
-        dq = b.create<arith::SIToFPOp>(loc, floatType, args[0]);
-        Value scaledRes0 = b.create<arith::MulFOp>(loc, dq, args[1]);
-        Value scaledRes1 = b.create<arith::MulFOp>(loc, scaledRes0, args[3]);
-        Value scaledZp0 = b.create<arith::MulFOp>(loc, args[4], args[3]);
-        Value scaledZp1 = b.create<arith::MulFOp>(loc, scaledZp0, args[2]);
-        Value groupRes = b.create<arith::SubFOp>(loc, scaledRes1, scaledZp1);
-        Value sum = b.create<arith::AddFOp>(loc, groupRes, args[5]);
-        b.create<linalg::YieldOp>(loc, sum);
+        dq = arith::SIToFPOp::create(b, loc, floatType, args[0]);
+        Value scaledRes0 = arith::MulFOp::create(b, loc, dq, args[1]);
+        Value scaledRes1 = arith::MulFOp::create(b, loc, scaledRes0, args[3]);
+        Value scaledZp0 = arith::MulFOp::create(b, loc, args[4], args[3]);
+        Value scaledZp1 = arith::MulFOp::create(b, loc, scaledZp0, args[2]);
+        Value groupRes = arith::SubFOp::create(b, loc, scaledRes1, scaledZp1);
+        Value sum = arith::AddFOp::create(b, loc, groupRes, args[5]);
+        linalg::YieldOp::create(b, loc, sum);
       });
   LLVM_DEBUG(DBGS() << "reassociatedDequantizationOp:   "
                     << reassociatedDequantizationOp << "\n");

@@ -117,8 +117,8 @@ public:
       }
       vSizes.push_back(rewriter.createOrFold<tensor::DimOp>(loc, input, i));
     }
-    Value extractedSlice = rewriter.create<tensor::ExtractSliceOp>(
-        loc, sliceTy, input, vOffset, vSizes, vStride);
+    Value extractedSlice = tensor::ExtractSliceOp::create(
+        rewriter, loc, sliceTy, input, vOffset, vSizes, vStride);
     rewriter.startOpModification(op);
     op.setIndexingMapsAttr(rewriter.getAffineMapArrayAttr(mapRange));
     op.setOperand(0, extractedSlice);

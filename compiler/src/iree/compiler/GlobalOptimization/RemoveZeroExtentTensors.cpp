@@ -51,8 +51,8 @@ struct ReplaceZeroExtentOperands : public RewritePattern {
       Operation *owner = operand.getOwner();
       int operandNum = operand.getOperandNumber();
       auto shape = tensor::getMixedSizes(rewriter, loc, operand.get());
-      auto emptyTensorOp = rewriter.create<tensor::EmptyOp>(
-          loc, shape, operandType->getElementType());
+      auto emptyTensorOp = tensor::EmptyOp::create(
+          rewriter, loc, shape, operandType->getElementType());
       rewriter.modifyOpInPlace(
           owner, [&]() { owner->setOperand(operandNum, emptyTensorOp); });
       didUpdate = true;

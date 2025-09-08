@@ -28,7 +28,7 @@ static Value createTranspose(OpBuilder &builder, Value source,
   applyPermutationToVector(mixedSizes, perm);
   Type elemType = cast<RankedTensorType>(source.getType()).getElementType();
   Value empty =
-      builder.create<tensor::EmptyOp>(source.getLoc(), mixedSizes, elemType)
+      tensor::EmptyOp::create(builder, source.getLoc(), mixedSizes, elemType)
           .getResult();
   return builder
       .create<linalg::TransposeOp>(source.getLoc(), source, empty, perm)
@@ -75,9 +75,9 @@ struct TransposeInnerConcatenation : public OpRewritePattern<tensor::ConcatOp> {
     SmallVector<int64_t> newShape = applyPermutation(concatShape, permutation);
     auto newConcatType = RankedTensorType::get(
         newShape, concatOp.getResultType().getElementType());
-    Value newConcat = rewriter.create<tensor::ConcatOp>(
-        concatOp.getLoc(), newConcatType, /*dim=*/outerMostNonUnitDim,
-        transposedInputs);
+    Value newConcat =
+        tensor::ConcatOp::create(rewriter, concatOp.getLoc(), newConcatType,
+                                 /*dim=*/outerMostNonUnitDim, transposedInputs);
     auto invPerm = invertPermutationVector(permutation);
     Value transposedConcat = createTranspose(rewriter, newConcat, invPerm);
     rewriter.replaceOp(concatOp, transposedConcat);
