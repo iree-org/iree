@@ -80,14 +80,18 @@ static int64_t getSubgroupNCount(Operation *op) {
   return getSubgroupNCount(config).value();
 }
 
+struct ContractionLayout {
+  VectorLayoutInterface lhs;
+  VectorLayoutInterface rhs;
+  VectorLayoutInterface acc;
+};
+
 // Get the layouts to use for the contraction given the intrinsic to use and
 // number of subgroups on the M and N dimension.
 //
 // The contraction is expected to have 3 operands: lhs, rhs and acc of the
 // contraction and a single accumulator.
-static ::mlir::FailureOr<::std::tuple<IREE::VectorExt::VectorLayoutInterface,
-                                      IREE::VectorExt::VectorLayoutInterface,
-                                      IREE::VectorExt::VectorLayoutInterface>>
+static FailureOr<ContractionLayout>
 getContractionLayout(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                      int64_t subgroupMCount, int64_t subgroupNCount,
                      ArrayRef<int64_t> bounds,
@@ -180,7 +184,7 @@ getContractionLayout(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
       getFragmentLayout(IREE::GPU::MMAFragment::Acc, innerMDim, innerNDim,
                         contractIndexingMaps[2]);
 
-  return std::tuple{lhs, rhs, acc};
+  return ContractionLayout{lhs, rhs, acc};
 }
 
 SmallVector<int64_t> getIterationSpaceBounds(linalg::LinalgOp linalgOp) {
