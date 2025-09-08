@@ -635,8 +635,8 @@ func.func @negative_matmul_bf16_expanded_large_no_zero_fill(%arg0: tensor<1x256x
   return %2 : tensor<1x256x1024xf32>
 }
 // GFX942-LABEL: @negative_matmul_bf16_expanded_large_no_zero_fill
-// GFX942K-NOT:     compilation_info = #iree_codegen.compilation_info
-// GFX942K-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
+// GFX942-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX942-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
 // GFX950-LABEL: @negative_matmul_bf16_expanded_large_no_zero_fill
-// GFX950K-NOT:     compilation_info = #iree_codegen.compilation_info
-// GFX950K-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
+// GFX950-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX950-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
