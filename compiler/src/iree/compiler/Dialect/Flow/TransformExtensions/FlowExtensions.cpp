@@ -101,7 +101,7 @@ static void rewriteParallelInsertSlices(RewriterBase &rewriter,
            "expected that dest is an output bbArg");
     Value dest = forallOp.getTiedOpOperand(destBbArg)->get();
     // clang-format off
-    IREE::TensorExt::DispatchTensorStoreOp::create(rewriter, 
+    IREE::TensorExt::DispatchTensorStoreOp::create(rewriter,
         loc,
         parallelInsertOp.getSource(),
         tensorToFlowBvm.lookup(dest),
@@ -144,7 +144,7 @@ static void rewriteExtractSlices(RewriterBase &rewriter, scf::ForallOp forallOp,
     auto dynamicDims = IREE::Util::findDynamicDimsInList(index, tensorOperands,
                                                          tensorDynamicDims);
     // clang-format off
-    Value load = IREE::TensorExt::DispatchTensorLoadOp::create(rewriter, 
+    Value load = IREE::TensorExt::DispatchTensorLoadOp::create(rewriter,
         loc,
         sourceFlow,
         dynamicDims,
@@ -330,7 +330,7 @@ rewriteForeachThreadToFlowDispatchWorkgroups(scf::ForallOp forallOp,
   SmallVector<Value> allTensorDynamicDims = tensorDynamicDims;
   llvm::append_range(allTensorDynamicDims, resultTensorsDynamicDims);
   // clang-format off
-  auto dispatchOp = IREE::Flow::DispatchWorkgroupsOp::create(rewriter, 
+  auto dispatchOp = IREE::Flow::DispatchWorkgroupsOp::create(rewriter,
       loc,
       /*workload=*/ValueRange{},
       /*resultTypes=*/forallOp.getResultTypes(),
