@@ -66,11 +66,11 @@ struct ResourceAllocOpPattern
 
     // For now we don't have this information and assume something conservative.
     Value minAlignment =
-        rewriter.create<arith::ConstantIndexOp>(allocOp.getLoc(), 64);
+        arith::ConstantIndexOp::create(rewriter, allocOp.getLoc(), 64);
 
-    auto allocateOp = rewriter.create<IREE::HAL::Inline::BufferAllocateOp>(
-        allocOp.getLoc(), deviceBufferType, hostBufferType, minAlignment,
-        adaptor.getStorageSize());
+    auto allocateOp = IREE::HAL::Inline::BufferAllocateOp::create(
+        rewriter, allocOp.getLoc(), deviceBufferType, hostBufferType,
+        minAlignment, adaptor.getStorageSize());
     rewriter.replaceOp(allocOp, allocateOp.getResult());
 
     return success();
@@ -88,13 +88,13 @@ struct ResourceAllocaOpPattern
 
     // For now we don't have this information and assume something conservative.
     Value minAlignment =
-        rewriter.create<arith::ConstantIndexOp>(allocaOp.getLoc(), 64);
-    auto allocateOp = rewriter.create<IREE::HAL::Inline::BufferAllocateOp>(
-        allocaOp.getLoc(), deviceBufferType, hostBufferType, minAlignment,
-        adaptor.getStorageSize());
+        arith::ConstantIndexOp::create(rewriter, allocaOp.getLoc(), 64);
+    auto allocateOp = IREE::HAL::Inline::BufferAllocateOp::create(
+        rewriter, allocaOp.getLoc(), deviceBufferType, hostBufferType,
+        minAlignment, adaptor.getStorageSize());
 
     auto resolvedTimepoint =
-        rewriter.create<arith::ConstantIntOp>(allocaOp.getLoc(), 0, 64)
+        arith::ConstantIntOp::create(rewriter, allocaOp.getLoc(), 0, 64)
             .getResult();
 
     rewriter.replaceOp(allocaOp, {allocateOp.getResult(), resolvedTimepoint});
@@ -111,7 +111,7 @@ struct ResourceDeallocaOpPattern
                   ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): discard op?
     auto resolvedTimepoint =
-        rewriter.create<arith::ConstantIntOp>(deallocaOp.getLoc(), 0, 64)
+        arith::ConstantIntOp::create(rewriter, deallocaOp.getLoc(), 0, 64)
             .getResult();
     rewriter.replaceOp(deallocaOp, {resolvedTimepoint});
     return success();
@@ -177,12 +177,12 @@ struct ResourceTryMapOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceTryMapOp tryMapOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    Value subspan = rewriter.create<IREE::Util::BufferSubspanOp>(
-        tryMapOp.getLoc(), adaptor.getSource(),
+    Value subspan = IREE::Util::BufferSubspanOp::create(
+        rewriter, tryMapOp.getLoc(), adaptor.getSource(),
         getResourceSize(tryMapOp.getLoc(), adaptor.getSource(), rewriter),
         adaptor.getSourceOffset(), adaptor.getResultSize());
     Value didMap =
-        rewriter.create<arith::ConstantIntOp>(tryMapOp.getLoc(), 1, 1);
+        arith::ConstantIntOp::create(rewriter, tryMapOp.getLoc(), 1, 1);
     rewriter.replaceOp(tryMapOp, {didMap, subspan});
     return success();
   }
@@ -267,17 +267,17 @@ struct FileReadOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::FileReadOp readOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    Value sourceSize = rewriter.create<IREE::Util::BufferSizeOp>(
-        readOp.getLoc(), adaptor.getSource());
-    rewriter.create<IREE::Util::BufferCopyOp>(
-        readOp.getLoc(), adaptor.getSource(), sourceSize,
+    Value sourceSize = IREE::Util::BufferSizeOp::create(
+        rewriter, readOp.getLoc(), adaptor.getSource());
+    IREE::Util::BufferCopyOp::create(
+        rewriter, readOp.getLoc(), adaptor.getSource(), sourceSize,
         rewriter.createOrFold<arith::IndexCastOp>(readOp.getLoc(),
                                                   rewriter.getIndexType(),
                                                   adaptor.getSourceOffset()),
         adaptor.getTarget(), adaptor.getTargetSize(), adaptor.getTargetOffset(),
         adaptor.getLength());
     auto resolvedTimepoint =
-        rewriter.create<arith::ConstantIntOp>(readOp.getLoc(), 0, 64)
+        arith::ConstantIntOp::create(rewriter, readOp.getLoc(), 0, 64)
             .getResult();
     rewriter.replaceOp(readOp, resolvedTimepoint);
     return success();
@@ -290,17 +290,18 @@ struct FileWriteOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::FileWriteOp writeOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    Value targetSize = rewriter.create<IREE::Util::BufferSizeOp>(
-        writeOp.getLoc(), adaptor.getTarget());
-    rewriter.create<IREE::Util::BufferCopyOp>(
-        writeOp.getLoc(), adaptor.getSource(), adaptor.getSourceSize(),
-        adaptor.getSourceOffset(), adaptor.getTarget(), targetSize,
+    Value targetSize = IREE::Util::BufferSizeOp::create(
+        rewriter, writeOp.getLoc(), adaptor.getTarget());
+    IREE::Util::BufferCopyOp::create(
+        rewriter, writeOp.getLoc(), adaptor.getSource(),
+        adaptor.getSourceSize(), adaptor.getSourceOffset(), adaptor.getTarget(),
+        targetSize,
         rewriter.createOrFold<arith::IndexCastOp>(writeOp.getLoc(),
                                                   rewriter.getIndexType(),
                                                   adaptor.getTargetOffset()),
         adaptor.getLength());
     auto resolvedTimepoint =
-        rewriter.create<arith::ConstantIntOp>(writeOp.getLoc(), 0, 64)
+        arith::ConstantIntOp::create(rewriter, writeOp.getLoc(), 0, 64)
             .getResult();
     rewriter.replaceOp(writeOp, resolvedTimepoint);
     return success();
@@ -376,10 +377,10 @@ struct TensorExportBufferViewOpPattern
 
     // NOTE: we should have verified supported encodings/types at entry into the
     // HAL pipeline.
-    auto encodingType = rewriter.create<IREE::HAL::EncodingTypeOp>(
-        loc, tensorType.getEncoding());
-    auto elementType = rewriter.create<IREE::HAL::ElementTypeOp>(
-        loc, tensorType.getElementType());
+    auto encodingType = IREE::HAL::EncodingTypeOp::create(
+        rewriter, loc, tensorType.getEncoding());
+    auto elementType = IREE::HAL::ElementTypeOp::create(
+        rewriter, loc, tensorType.getElementType());
 
     // Flatten static + dynamic shape dimensions.
     SmallVector<Value> dims;
@@ -388,14 +389,14 @@ struct TensorExportBufferViewOpPattern
       if (tensorType.isDynamicDim(idx)) {
         dims.push_back(dynamicDims[dynamicIdx++]);
       } else {
-        dims.push_back(rewriter.create<arith::ConstantIndexOp>(
-            loc, tensorType.getDimSize(idx)));
+        dims.push_back(arith::ConstantIndexOp::create(
+            rewriter, loc, tensorType.getDimSize(idx)));
       }
     }
 
     rewriter.replaceOpWithNewOp<IREE::HAL::Inline::BufferViewCreateOp>(
         exportOp, adaptor.getSource(),
-        rewriter.create<arith::ConstantIndexOp>(loc, 0),
+        arith::ConstantIndexOp::create(rewriter, loc, 0),
         adaptor.getSourceSize(), elementType, encodingType, dims);
     return success();
   }
@@ -409,22 +410,23 @@ struct TensorTraceOpPattern
                   ConversionPatternRewriter &rewriter) const override {
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
     auto bufferViewType = rewriter.getType<IREE::HAL::BufferViewType>();
-    auto zero = rewriter.create<arith::ConstantIndexOp>(traceOp.getLoc(), 0);
+    auto zero = arith::ConstantIndexOp::create(rewriter, traceOp.getLoc(), 0);
     auto resourceEncodingDims = adaptor.getResourceEncodingDims();
     SmallVector<Value> bufferViews;
     for (auto [resource, resourceSize, resourceEncoding] : llvm::zip_equal(
              adaptor.getResources(), adaptor.getResourceSizes(),
              adaptor.getResourceEncodings().getAsRange<TypeAttr>())) {
-      Value resourceBuffer = rewriter.create<IREE::HAL::Inline::BufferWrapOp>(
-          traceOp.getLoc(), bufferType, resource,
+      Value resourceBuffer = IREE::HAL::Inline::BufferWrapOp::create(
+          rewriter, traceOp.getLoc(), bufferType, resource,
           /*offset=*/
           zero,
           /*length=*/resourceSize);
       int64_t dynamicDimCount =
           cast<ShapedType>(resourceEncoding.getValue()).getNumDynamicDims();
-      bufferViews.push_back(rewriter.create<IREE::Stream::TensorExportOp>(
-          traceOp.getLoc(), bufferViewType, resourceBuffer, resourceEncoding,
-          resourceEncodingDims.take_front(dynamicDimCount), resourceSize,
+      bufferViews.push_back(IREE::Stream::TensorExportOp::create(
+          rewriter, traceOp.getLoc(), bufferViewType, resourceBuffer,
+          resourceEncoding, resourceEncodingDims.take_front(dynamicDimCount),
+          resourceSize,
           /*affinity=*/IREE::Stream::AffinityAttr{}));
       resourceEncodingDims = resourceEncodingDims.drop_front(dynamicDimCount);
     }
@@ -620,7 +622,7 @@ struct CmdExecuteOpPattern
                                adaptor.getResourceOperands());
     // Immediately resolve the timepoint.
     auto resolvedTimepoint =
-        rewriter.create<arith::ConstantIntOp>(executeOp.getLoc(), 0, 64)
+        arith::ConstantIntOp::create(rewriter, executeOp.getLoc(), 0, 64)
             .getResult();
     rewriter.replaceOp(executeOp, resolvedTimepoint);
     return success();
@@ -740,8 +742,8 @@ struct TimepointBarrierOpPattern
                   ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOp(barrierOp, {
                                       adaptor.getResource(),
-                                      rewriter.create<arith::ConstantIntOp>(
-                                          barrierOp.getLoc(), 0, 64),
+                                      arith::ConstantIntOp::create(
+                                          rewriter, barrierOp.getLoc(), 0, 64),
                                   });
     return success();
   }
