@@ -614,20 +614,20 @@ def IREECodegen_XORShuffleAttr  :
 // iree_codegen.denormal_mode
 //===---------------------------------------------------------------------===//
 
+// Do not add any denormal mode.
 def DenormalMode_None : I32EnumCase<"None", 0, "none">;
-def DenormalMode_IEEE : I32EnumCase<"IEEE", 1, "ieee">;
-def DenormalMode_PreserveSign : I32EnumCase<"PreserveSign", 2, "preserve-sign">;
-def DenormalMode_PositiveZero : I32EnumCase<"PositiveZero", 3, "positive-zero">;
-def DenormalMode_Dynamic : I32EnumCase<"Dynamic", 4, "dynamic">;
+// Convert denormals to zero while preserving sign.
+def DenormalMode_PreserveSign : I32EnumCase<"PreserveSign", 1, "preserve-sign">;
+// Convert denormals to positive zero.
+def DenormalMode_PositiveZero : I32EnumCase<"PositiveZero", 2, "positive-zero">;
 
+// Denormal fp mode.
 def DenormalFpMathEnum : I32Enum<
   "DenormalFpMath",
   "Denormal mode for fp math", [
     DenormalMode_None,
-    DenormalMode_IEEE,
     DenormalMode_PreserveSign,
-    DenormalMode_PositiveZero,
-    DenormalMode_Dynamic
+    DenormalMode_PositiveZero
   ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
 }

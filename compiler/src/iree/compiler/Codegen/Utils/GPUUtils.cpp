@@ -1065,7 +1065,7 @@ getConfigDenormalFpMathF32(DictionaryAttr targetConfig) {
 void addConfigDenormalFpMathF32(MLIRContext *context,
                                 IREE::Codegen::DenormalFpMath mode,
                                 SmallVectorImpl<NamedAttribute> &config) {
-  config.emplace_back(StringAttr::get(context, kDenormalFpMathF32AttrName),
+  config.emplace_back(kDenormalFpMathF32AttrName,
                       IREE::Codegen::DenormalFpMathAttr::get(context, mode));
 }
 

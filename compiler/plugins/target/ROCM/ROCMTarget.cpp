@@ -166,15 +166,11 @@ struct ROCMOptions {
         "iree-hip-denormal-fp-math-f32", denormalFpMathF32, cl::cat(category),
         cl::desc("Denormal floating point math mode for f32"),
         cl::values(
-            clEnumValN(IREE::Codegen::DenormalFpMath::IEEE, "ieee",
-                       "Use IEEE 754-2008 denormal behavior"),
             clEnumValN(IREE::Codegen::DenormalFpMath::PreserveSign,
                        "preserve-sign",
                        "Convert denormals to zero while preserving sign"),
             clEnumValN(IREE::Codegen::DenormalFpMath::PositiveZero,
-                       "positive-zero", "Convert denormals to positive zero"),
-            clEnumValN(IREE::Codegen::DenormalFpMath::Dynamic, "dynamic",
-                       "Let runtime decide denormal behavior")));
+                       "positive-zero", "Convert denormals to positive zero")));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {

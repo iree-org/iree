@@ -117,7 +117,7 @@ builtin.module {
 
 // -----
 
-// Check that denormal and waves_per_eu are set
+// Check that denormal and waves_per_eu are set.
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
     denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">,
@@ -155,10 +155,10 @@ builtin.module {
 
 // -----
 
-// Check that denormal and waves_per_eu are set
+// Check that denormal and waves_per_eu are set.
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
-    denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<ieee>,
+    denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"positive-zero">,
     iree_codegen.target_info = #iree_gpu.target<arch = "gfx942", features = "",
                                       wgp = <compute = int32, storage =  b32,
                                       subgroup =  none,
@@ -181,7 +181,7 @@ builtin.module {
       } attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]}
       builtin.module {
         // CHECK-LABEL: llvm.func @test_rocdl_attrs
-        // CHECK: denormal_fp_math_f32 = "ieee"
+        // CHECK: denormal_fp_math_f32 = "positive-zero"
         // CHECK: rocdl.waves_per_eu = 1 : i64
         llvm.func @test_rocdl_attrs(%arg0: i32) {
           llvm.return
