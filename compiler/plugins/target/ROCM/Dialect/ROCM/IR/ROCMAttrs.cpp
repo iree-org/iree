@@ -137,9 +137,9 @@ static Value createSharedMemory(RewriterBase &rewriter, Location loc,
   return allocOp;
 }
 
-/// Returns the index of the innermost CrossIntrinsic dimension of the C matrix,
-/// if it is static, and std::nullopt if it is dynamic or if there are no
-/// CrossIntrinsic dims.
+// Returns the index of the innermost CrossIntrinsic dimension of the C matrix,
+// if it is static, and std::nullopt if it is dynamic or if there are no
+// CrossIntrinsic dims.
 static std::optional<unsigned>
 getCInnermostStaticCrossIntrinsicDim(IREE::Codegen::InnerTiledOp op) {
   auto outputType = dyn_cast<ShapedType>(op.getResultTypes()[0]);
@@ -287,14 +287,14 @@ static std::optional<int64_t> expensivelyEvaluateSharedMemoryBytes(
     v.IntVal = APInt(32, val);
     return v;
   };
-  SmallVector<llvm::GenericValue> args{
+  llvm::GenericValue args[] = {
       constI32(mma.getIntrinsicsM()), constI32(mma.getSubgroupsM()),
       constI32(mma.getIntrinsicsN()), constI32(mma.getSubgroupsN()),
       constI32(mma.getIntrinsicsK())};
-  if (func->arg_size() != args.size()) {
-    op.emitWarning(
-        llvm::formatv("Bitcode function {} takes {} arguments. Expected {}.",
-                      queryFuncName, func->arg_size(), args.size()));
+  if (func->arg_size() != /*total elements in 'args'=*/5) {
+    op.emitWarning(llvm::formatv(
+        "Bitcode function {} takes {} arguments. Expected {}.", queryFuncName,
+        func->arg_size(), /*total elements in 'args'=*/5));
     return {};
   }
   llvm::GenericValue interpreterResult = interpreter->runFunction(func, args);
@@ -379,7 +379,7 @@ getSharedMemoryBytes(MLIRContext *context, IREE::Codegen::InnerTiledOp op,
   return entryPtr->sharedMemoryBytes;
 }
 
-/// Utility function to help create and replace argmax linalg with a ukernel.
+/// Utility function to help create and replace inner_tiled with a ukernel.
 static LogicalResult handleInnerTiledMmaUkernel(
     RewriterBase &rewriter, StringRef name, DictionaryAttr targetConfiguration,
     Operation *contextualOp, ArrayRef<Value> inputs, ArrayRef<Value> outputs,
