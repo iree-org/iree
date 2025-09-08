@@ -160,9 +160,9 @@ resolveMemoryPropertiesOp(AllocatorResolveMemoryPropertiesOp op,
     // If we don't have an optimal attribute, we just set the default
     // memory types and buffer usage.
     auto memoryTypeOp =
-        builder.create<IREE::HAL::MemoryTypeOp>(loc, memoryTypes);
+        IREE::HAL::MemoryTypeOp::create(builder, loc, memoryTypes);
     auto bufferUsageOp =
-        builder.create<IREE::HAL::BufferUsageOp>(loc, bufferUsage);
+        IREE::HAL::BufferUsageOp::create(builder, loc, bufferUsage);
     op.replaceAllUsesWith(ValueRange{memoryTypeOp, bufferUsageOp});
     op.erase();
     LLVM_DEBUG(llvm::dbgs()
@@ -192,9 +192,10 @@ resolveMemoryPropertiesOp(AllocatorResolveMemoryPropertiesOp op,
                              "with shared usage bits\n");
 
   // Create the resolved memory type and buffer usage ops.
-  auto memoryTypeOp = builder.create<IREE::HAL::MemoryTypeOp>(loc, memoryTypes);
+  auto memoryTypeOp =
+      IREE::HAL::MemoryTypeOp::create(builder, loc, memoryTypes);
   auto bufferUsageOp =
-      builder.create<IREE::HAL::BufferUsageOp>(loc, bufferUsage);
+      IREE::HAL::BufferUsageOp::create(builder, loc, bufferUsage);
   op.replaceAllUsesWith(ValueRange{memoryTypeOp, bufferUsageOp});
   op.erase();
 

@@ -75,8 +75,8 @@ static void convertAndDecomposeToI32s(
   // Complex types are decomposed into real/imaginary components and processed
   // as if they were independent.
   if (auto complexType = dyn_cast<ComplexType>(operand.getType())) {
-    auto real = builder.create<complex::ReOp>(loc, operand);
-    auto imag = builder.create<complex::ImOp>(loc, operand);
+    auto real = complex::ReOp::create(builder, loc, operand);
+    auto imag = complex::ImOp::create(builder, loc, operand);
     convertAndDecomposeToI32s(loc, real, newOperands, resourceConfig, builder);
     convertAndDecomposeToI32s(loc, imag, newOperands, resourceConfig, builder);
     return;
@@ -145,7 +145,7 @@ static void convertAndDecomposeToI32s(
         loc, builder.getI32Type(),
         builder.createOrFold<arith::ShRUIOp>(
             loc, builder.getI64Type(), operand,
-            builder.create<arith::ConstantIntOp>(loc, 32, 64)));
+            arith::ConstantIntOp::create(builder, loc, 32, 64)));
     newOperands.push_back(lo);
     newOperands.push_back(hi);
   } else {
@@ -194,7 +194,7 @@ static Value recomposeFromI32sAndConvert(
     Value imag = recomposeFromI32sAndConvert(
         entryBlock, loc, complexType.getElementType(), oldArgAttr, newArgTypes,
         newArgAttrs, resourceConfig, builder);
-    return builder.create<complex::CreateOp>(loc, oldArgType, real, imag);
+    return complex::CreateOp::create(builder, loc, oldArgType, real, imag);
   }
 
   // Pass through/no change other types (!stream.binding, probably).
@@ -216,12 +216,13 @@ static Value recomposeFromI32sAndConvert(
     auto hiArg = entryBlock->addArgument(builder.getI32Type(), loc);
     newArgTypes.push_back(hiArg.getType());
     // i64(lo) | (i64(hi) << 32)
-    value = builder.create<arith::OrIOp>(
-        loc, builder.create<arith::ExtUIOp>(loc, builder.getI64Type(), loArg),
-        builder.create<arith::ShLIOp>(
-            loc,
-            builder.create<arith::ExtUIOp>(loc, builder.getI64Type(), hiArg),
-            builder.create<arith::ConstantIntOp>(loc, 32, 64)));
+    value = arith::OrIOp::create(
+        builder, loc,
+        arith::ExtUIOp::create(builder, loc, builder.getI64Type(), loArg),
+        arith::ShLIOp::create(
+            builder, loc,
+            arith::ExtUIOp::create(builder, loc, builder.getI64Type(), hiArg),
+            arith::ConstantIntOp::create(builder, loc, 32, 64)));
   } else {
     // Forced bitcast.
     value = entryBlock->addArgument(builder.getI32Type(), loc);
@@ -230,20 +231,21 @@ static Value recomposeFromI32sAndConvert(
 
   // i32 or i64 -> index
   if (oldArgType.isIndex()) {
-    value = builder.create<arith::IndexCastUIOp>(loc, builder.getIndexType(),
-                                                 value);
+    value = arith::IndexCastUIOp::create(builder, loc, builder.getIndexType(),
+                                         value);
   }
 
   // Truncate back to original bit width.
   // i32 -> i16, i64 -> i48, ...
   if (oldArgType.isIntOrFloat() && oldArgType.getIntOrFloatBitWidth() < 32) {
-    value = builder.create<arith::TruncIOp>(
-        loc, builder.getIntegerType(oldArgType.getIntOrFloatBitWidth()), value);
+    value = arith::TruncIOp::create(
+        builder, loc,
+        builder.getIntegerType(oldArgType.getIntOrFloatBitWidth()), value);
   }
 
   // i16 -> bf16, i32 -> f32, i64 -> f64 ...
   if (auto floatType = llvm::dyn_cast<FloatType>(oldArgType)) {
-    value = builder.create<arith::BitcastOp>(loc, oldArgType, value);
+    value = arith::BitcastOp::create(builder, loc, oldArgType, value);
   }
 
   // Preserve the arg attrs on either the final op or the function argument

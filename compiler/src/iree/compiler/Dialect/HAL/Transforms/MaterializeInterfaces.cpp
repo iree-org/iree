@@ -178,8 +178,8 @@ static void materializeExecutableFromSourceOp(
 
   // Create the op that will contain the translated executable.
   OpBuilder moduleBuilder(sourceOp);
-  auto executableOp = moduleBuilder.create<IREE::HAL::ExecutableOp>(
-      sourceOp.getLoc(), sourceOp.getName());
+  auto executableOp = IREE::HAL::ExecutableOp::create(
+      moduleBuilder, sourceOp.getLoc(), sourceOp.getName());
   executableOp.setVisibility(sourceOp.getVisibility());
 
   // With this hand-authored path all variants have the same layout and entry
@@ -193,8 +193,9 @@ static void materializeExecutableFromSourceOp(
   OpBuilder targetBuilder(&executableOp.getBlock().back());
   for (auto targetAttr : targetAttrs) {
     // Create new variant and clone the exports.
-    auto targetVariantOp = targetBuilder.create<IREE::HAL::ExecutableVariantOp>(
-        sourceOp->getLoc(), targetAttr.getSymbolNameFragment(), targetAttr);
+    auto targetVariantOp = IREE::HAL::ExecutableVariantOp::create(
+        targetBuilder, sourceOp->getLoc(), targetAttr.getSymbolNameFragment(),
+        targetAttr);
     targetSymbolTable.insert(targetVariantOp);
     OpBuilder variantBuilder(&targetVariantOp.getBlock().back());
     for (auto sourceExportOp : sourceExportOps) {
@@ -282,8 +283,8 @@ convertOperandUsage(mlir::FunctionOpInterface sourceFuncOp, BlockArgument arg,
       arg.getArgNumber(), "stream.alignment");
   auto valuesAttr = sourceFuncOp.getArgAttrOfType<ArrayAttr>(arg.getArgNumber(),
                                                              "stream.values");
-  auto loadOp = builder.create<IREE::HAL::InterfaceConstantLoadOp>(
-      arg.getLoc(), arg.getType(), pipelineLayoutAttr,
+  auto loadOp = IREE::HAL::InterfaceConstantLoadOp::create(
+      builder, arg.getLoc(), arg.getType(), pipelineLayoutAttr,
       builder.getIndexAttr(pushConstantIdx), alignmentAttr, valuesAttr);
   arg.replaceAllUsesWith(loadOp);
 }
@@ -302,8 +303,8 @@ convertBindingUsage(mlir::FunctionOpInterface sourceFuncOp, BlockArgument arg,
     OpBuilder builder(oldOp);
     auto alignmentAttr = sourceFuncOp.getArgAttrOfType<IntegerAttr>(
         arg.getArgNumber(), "stream.alignment");
-    auto newOp = builder.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        oldOp.getLoc(), oldOp.getType(), pipelineLayoutAttr,
+    auto newOp = IREE::HAL::InterfaceBindingSubspanOp::create(
+        builder, oldOp.getLoc(), oldOp.getType(), pipelineLayoutAttr,
         APInt(64, bindingOrdinal), oldOp.getByteOffset(),
         oldOp.getDynamicDims(), alignmentAttr, bindingAttr.getFlags());
     oldOp.replaceAllUsesWith(newOp.getResult());
@@ -419,8 +420,8 @@ declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
                            : makePipelineLayoutAttr(pipelineLayout,
                                                     variantOp.getTargetAttr(),
                                                     targetBuilder);
-      auto newExportOp = targetBuilder.create<IREE::HAL::ExecutableExportOp>(
-          exportOp.getLoc(),
+      auto newExportOp = IREE::HAL::ExecutableExportOp::create(
+          targetBuilder, exportOp.getLoc(),
           targetBuilder.getStringAttr(exportOp.getFunctionRef()),
           targetBuilder.getIndexAttr(ordinal), variantLayoutAttr, workgroupSize,
           /*subgroup_size=*/IntegerAttr{},
@@ -632,8 +633,8 @@ struct MaterializeInterfacesPass
       // Create the op that will contain the translated executable.
       OpBuilder builder = OpBuilder::atBlockEnd(moduleOp.getBody());
       builder.setInsertionPointAfter(sourceOp);
-      auto executableOp = builder.create<IREE::HAL::ExecutableOp>(
-          sourceOp.getLoc(), sourceOp.getName());
+      auto executableOp = IREE::HAL::ExecutableOp::create(
+          builder, sourceOp.getLoc(), sourceOp.getName());
       executableOp.setVisibility(sourceOp.getVisibility());
 
       // Materialize all of the hal.executable.variant ops for all backends we
@@ -641,15 +642,14 @@ struct MaterializeInterfacesPass
       SymbolTable targetSymbolTable(executableOp);
       OpBuilder targetBuilder(&executableOp.getBlock().back());
       for (auto targetAttr : targetAttrs) {
-        auto targetContainerOp =
-            targetBuilder.create<IREE::HAL::ExecutableVariantOp>(
-                sourceOp->getLoc(), targetAttr.getSymbolNameFragment(),
-                targetAttr);
+        auto targetContainerOp = IREE::HAL::ExecutableVariantOp::create(
+            targetBuilder, sourceOp->getLoc(),
+            targetAttr.getSymbolNameFragment(), targetAttr);
         setApplicableObjects(sourceOp, targetContainerOp);
         targetSymbolTable.insert(targetContainerOp);
         if (sourceOp.getInnerModule()) {
           OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
-          containerBuilder.create<mlir::ModuleOp>(sourceOp->getLoc());
+          mlir::ModuleOp::create(containerBuilder, sourceOp->getLoc());
         }
       }
 

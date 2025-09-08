@@ -36,9 +36,9 @@ appendOrCreateInitFuncOp(IREE::VM::ModuleOp moduleOp, StringRef name,
   OpBuilder funcBuilder(moduleOp.getContext());
   if (!funcOp) {
     // Create a new empty function.
-    funcOp = moduleBuilder.create<IREE::VM::FuncOp>(
-        moduleBuilder.getUnknownLoc(), name,
-        moduleBuilder.getFunctionType({}, {}));
+    funcOp =
+        IREE::VM::FuncOp::create(moduleBuilder, moduleBuilder.getUnknownLoc(),
+                                 name, moduleBuilder.getFunctionType({}, {}));
     funcBuilder = OpBuilder::atBlockEnd(funcOp.addEntryBlock());
     return std::make_tuple(funcOp, funcBuilder);
   }
@@ -80,7 +80,7 @@ static void exportFuncIfNeeded(IREE::VM::ModuleOp moduleOp,
 
   // Add vm.export if needed.
   OpBuilder moduleBuilder(funcOp);
-  moduleBuilder.create<IREE::VM::ExportOp>(funcOp.getLoc(), funcOp);
+  IREE::VM::ExportOp::create(moduleBuilder, funcOp.getLoc(), funcOp);
 }
 
 // Updates the mutability of globals based on whether they are stored anywhere
@@ -185,8 +185,8 @@ class GlobalInitializationPass
     }
 
     // Add returns to the initializers.
-    initBuilder.create<IREE::VM::ReturnOp>(initBuilder.getUnknownLoc());
-    deinitBuilder.create<IREE::VM::ReturnOp>(deinitBuilder.getUnknownLoc());
+    IREE::VM::ReturnOp::create(initBuilder, initBuilder.getUnknownLoc());
+    IREE::VM::ReturnOp::create(deinitBuilder, deinitBuilder.getUnknownLoc());
 
     // Correct mutability of all globals.
     fixupGlobalMutability(moduleOp, symbolTable);
@@ -265,10 +265,10 @@ class GlobalInitializationPass
     if (auto integerType = llvm::dyn_cast<IntegerType>(value.getType())) {
       switch (integerType.getIntOrFloatBitWidth()) {
       case 32:
-        builder.create<IREE::VM::GlobalStoreI32Op>(loc, value, symName);
+        IREE::VM::GlobalStoreI32Op::create(builder, loc, value, symName);
         return success();
       case 64:
-        builder.create<IREE::VM::GlobalStoreI64Op>(loc, value, symName);
+        IREE::VM::GlobalStoreI64Op::create(builder, loc, value, symName);
         return success();
       default:
         return failure();
@@ -276,10 +276,10 @@ class GlobalInitializationPass
     } else if (auto floatType = llvm::dyn_cast<FloatType>(value.getType())) {
       switch (floatType.getIntOrFloatBitWidth()) {
       case 32:
-        builder.create<IREE::VM::GlobalStoreF32Op>(loc, value, symName);
+        IREE::VM::GlobalStoreF32Op::create(builder, loc, value, symName);
         return success();
       case 64:
-        builder.create<IREE::VM::GlobalStoreF64Op>(loc, value, symName);
+        IREE::VM::GlobalStoreF64Op::create(builder, loc, value, symName);
         return success();
       default:
         return failure();

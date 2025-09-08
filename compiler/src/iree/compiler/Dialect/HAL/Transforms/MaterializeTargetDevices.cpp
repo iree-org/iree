@@ -64,8 +64,8 @@ static FailureOr<FlatSymbolRefAttr>
 createDeviceGlobal(Location loc, StringAttr name, Attribute targetAttr,
                    OpBuilder &moduleBuilder) {
   auto deviceType = moduleBuilder.getType<IREE::HAL::DeviceType>();
-  auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
-      loc, name, /*isMutable=*/false, deviceType);
+  auto globalOp = IREE::Util::GlobalOp::create(moduleBuilder, loc, name,
+                                               /*isMutable=*/false, deviceType);
   globalOp.setPrivate();
 
   TypedAttr attrValue;

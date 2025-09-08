@@ -236,8 +236,8 @@ struct GlobalOpExpansion
     // is constant and will fold throughout the program. Global optimizations
     // such as same-value deduplication will also take effect.
     auto indexType = rewriter.getIndexType();
-    auto resourceSizeOp = rewriter.create<IREE::Util::GlobalOp>(
-        globalOp.getLoc(), (globalOp.getName() + "__size").str(),
+    auto resourceSizeOp = IREE::Util::GlobalOp::create(
+        rewriter, globalOp.getLoc(), (globalOp.getName() + "__size").str(),
         globalOp.getIsMutable(), indexType, std::optional<TypedAttr>{});
     resourceSizeOp.setVisibility(globalOp.getVisibility());
 
@@ -249,32 +249,32 @@ struct GlobalOpExpansion
     // Materialize the initializer if we need to setup a tensor-like constant.
     if (tensorInitializerRequired) {
       auto initializerOp =
-          rewriter.create<IREE::Util::InitializerOp>(globalOp.getLoc());
+          IREE::Util::InitializerOp::create(rewriter, globalOp.getLoc());
       auto *entryBlock = rewriter.createBlock(&initializerOp.getBody());
       rewriter.setInsertionPointToStart(entryBlock);
       Value initialValue, initialValueSize;
       if (isa<IREE::Util::UninitializedAttr>(initialValueAttr)) {
-        initialValueSize = rewriter.create<IREE::Stream::TensorSizeOfOp>(
-            globalOp.getLoc(), TypeAttr::get(globalOp.getType()),
+        initialValueSize = IREE::Stream::TensorSizeOfOp::create(
+            rewriter, globalOp.getLoc(), TypeAttr::get(globalOp.getType()),
             /*result_encoding_dims=*/ValueRange{}, affinityAttr);
-        initialValue = rewriter.create<IREE::Stream::TensorEmptyOp>(
-            globalOp.getLoc(), resourceOp.getType(),
+        initialValue = IREE::Stream::TensorEmptyOp::create(
+            rewriter, globalOp.getLoc(), resourceOp.getType(),
             TypeAttr::get(globalOp.getType()),
             /*result_encoding_dims=*/ValueRange{}, initialValueSize,
             affinityAttr);
       } else {
-        initialValue = rewriter.create<IREE::Stream::TensorConstantOp>(
-            globalOp.getLoc(), resourceOp.getType(),
+        initialValue = IREE::Stream::TensorConstantOp::create(
+            rewriter, globalOp.getLoc(), resourceOp.getType(),
             convertAttributeToStream(initialValueAttr),
             TypeAttr::get(globalOp.getType()),
             /*result_encoding_dims=*/ValueRange{}, affinityAttr);
-        initialValueSize = rewriter.create<IREE::Stream::ResourceSizeOp>(
-            globalOp.getLoc(), indexType, initialValue);
+        initialValueSize = IREE::Stream::ResourceSizeOp::create(
+            rewriter, globalOp.getLoc(), indexType, initialValue);
       }
       resourceOp.createStoreOp(globalOp.getLoc(), initialValue, rewriter);
       resourceSizeOp.createStoreOp(globalOp.getLoc(), initialValueSize,
                                    rewriter);
-      rewriter.create<IREE::Util::ReturnOp>(globalOp.getLoc());
+      IREE::Util::ReturnOp::create(rewriter, globalOp.getLoc());
     }
 
     expansionState->globalMap[globalOp.getSymName()] = ExpandedGlobalResource{
@@ -317,8 +317,9 @@ struct GlobalLoadOpExpansion
                                 loadOp.getLoc(), rewriter.getIndexType(),
                                 expandedGlobal.resourceSizeOp.getSymName())
                             .getResult();
-    auto transferOp = rewriter.create<IREE::Stream::AsyncTransferOp>(
-        loadOp.getLoc(), unknownType, resource, resourceSize, resourceSize,
+    auto transferOp = IREE::Stream::AsyncTransferOp::create(
+        rewriter, loadOp.getLoc(), unknownType, resource, resourceSize,
+        resourceSize,
         /*source_affinity=*/expandedGlobal.affinityAttr,
         /*result_affinity=*/expandedGlobal.affinityAttr);
     rewriter.replaceOpWithMultiple(loadOp,
@@ -350,16 +351,16 @@ struct GlobalStoreOpExpansion
         resolveTensorOperands(storeOp.getLoc(), storeOp.getValue(),
                               adaptor.getValue(), affinityAnalysis, rewriter);
     assert(expandedGlobal.resourceOp && "Missing resource op");
-    auto transferOp = rewriter.create<IREE::Stream::AsyncTransferOp>(
-        storeOp.getLoc(), expandedGlobal.resourceOp.getType(), value.resource,
-        value.resourceSize, value.resourceSize,
+    auto transferOp = IREE::Stream::AsyncTransferOp::create(
+        rewriter, storeOp.getLoc(), expandedGlobal.resourceOp.getType(),
+        value.resource, value.resourceSize, value.resourceSize,
         /*source_affinity=*/value.affinity,
         /*result_affinity=*/expandedGlobal.affinityAttr);
     rewriter.replaceOpWithNewOp<IREE::Util::GlobalStoreOp>(
         storeOp, transferOp.getResult(),
         expandedGlobal.resourceOp.getSymName());
-    rewriter.create<IREE::Util::GlobalStoreOp>(
-        storeOp.getLoc(), value.resourceSize,
+    IREE::Util::GlobalStoreOp::create(
+        rewriter, storeOp.getLoc(), value.resourceSize,
         expandedGlobal.resourceSizeOp.getSymName());
 
     return success();
@@ -388,8 +389,8 @@ struct OptimizationBarrierOpConversion
         operandSizes.push_back(nullptr);
       }
     }
-    auto barrierOp = rewriter.create<IREE::Util::OptimizationBarrierOp>(
-        op.getLoc(), newOperands);
+    auto barrierOp = IREE::Util::OptimizationBarrierOp::create(
+        rewriter, op.getLoc(), newOperands);
     replaceOpWithMultiple(op, barrierOp->getResults(), operandSizes, rewriter);
     return success();
   }

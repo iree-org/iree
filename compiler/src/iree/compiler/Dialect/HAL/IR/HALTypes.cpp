@@ -84,9 +84,9 @@ Value BufferViewType::inferSizeFromValue(Location loc, Value value,
 
 // static
 Value DeviceType::resolveAny(Location loc, OpBuilder &builder) {
-  Value deviceIndex = builder.create<arith::ConstantIndexOp>(loc, 0);
-  return builder.create<IREE::HAL::DevicesGetOp>(
-      loc, builder.getType<IREE::HAL::DeviceType>(), deviceIndex);
+  Value deviceIndex = arith::ConstantIndexOp::create(builder, loc, 0);
+  return IREE::HAL::DevicesGetOp::create(
+      builder, loc, builder.getType<IREE::HAL::DeviceType>(), deviceIndex);
 }
 
 //===----------------------------------------------------------------------===//

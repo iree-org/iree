@@ -42,9 +42,9 @@ class HoistInlinedRodataPass
       } else {
         moduleBuilder.setInsertionPointToStart(&moduleOp.getBlock());
       }
-      auto rodataOp = moduleBuilder.create<IREE::VM::RodataOp>(
-          inlineOp.getLoc(), inferConstantName(parentOp, inlineOp),
-          inlineOp.getValue());
+      auto rodataOp = IREE::VM::RodataOp::create(
+          moduleBuilder, inlineOp.getLoc(),
+          inferConstantName(parentOp, inlineOp), inlineOp.getValue());
       if (auto alignmentAttr = inlineOp.getAlignmentAttr()) {
         rodataOp.setAlignmentAttr(alignmentAttr);
       }
@@ -83,8 +83,8 @@ private:
   void replaceInlineOpWithRodataRef(IREE::VM::RodataInlineOp inlineOp,
                                     IREE::VM::RodataOp rodataOp) {
     OpBuilder builder(inlineOp);
-    auto refOp =
-        builder.create<IREE::VM::ConstRefRodataOp>(inlineOp.getLoc(), rodataOp);
+    auto refOp = IREE::VM::ConstRefRodataOp::create(builder, inlineOp.getLoc(),
+                                                    rodataOp);
     inlineOp.replaceAllUsesWith(refOp.getValue());
     inlineOp.erase();
   }

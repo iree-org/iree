@@ -78,8 +78,8 @@ static void processBufferGlobal(Explorer &explorer,
     for (auto loadOp : globalInfo->getLoads()) {
       OpBuilder builder(loadOp);
       auto loadedValue = loadOp.getLoadedGlobalValue();
-      auto zeroRefOp = builder.create<IREE::VM::ConstRefZeroOp>(
-          loadOp.getLoc(), loadedValue.getType());
+      auto zeroRefOp = IREE::VM::ConstRefZeroOp::create(
+          builder, loadOp.getLoc(), loadedValue.getType());
       loadedValue.replaceAllUsesWith(zeroRefOp.getResult());
       deadOps.insert(loadOp);
     }
@@ -99,7 +99,7 @@ static void processBufferGlobal(Explorer &explorer,
   for (auto loadOp : globalInfo->getLoads()) {
     OpBuilder builder(loadOp);
     auto rodataRefOp =
-        builder.create<IREE::VM::ConstRefRodataOp>(loadOp.getLoc(), rodataOp);
+        IREE::VM::ConstRefRodataOp::create(builder, loadOp.getLoc(), rodataOp);
     auto loadedValue = loadOp.getLoadedGlobalValue();
     loadedValue.replaceAllUsesWith(rodataRefOp.getResult());
     deadOps.insert(loadOp);

@@ -67,8 +67,8 @@ ConvertedTensor transferTensorOperands(
   bool isBarrier = resource.getDefiningOp() &&
                    isa<IREE::Stream::AsyncBarrierOp>(resource.getDefiningOp());
   if (affinityAttr != requiredAffinityAttr && !isBarrier) {
-    resource = builder.create<IREE::Stream::AsyncTransferOp>(
-        loc, resource.getType(), resource, resourceSize, resourceSize,
+    resource = IREE::Stream::AsyncTransferOp::create(
+        builder, loc, resource.getType(), resource, resourceSize, resourceSize,
         affinityAttr, requiredAffinityAttr);
   }
   return {requiredAffinityAttr, resource, resourceSize};

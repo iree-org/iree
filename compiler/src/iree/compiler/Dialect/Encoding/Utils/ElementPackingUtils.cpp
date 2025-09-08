@@ -114,7 +114,7 @@ Value calculateStorageElementCountInBytes(Location loc,
   }
   // Scale by dynamic dims, if present.
   auto value =
-      builder.create<arith::ConstantIndexOp>(loc, staticCount).getResult();
+      arith::ConstantIndexOp::create(builder, loc, staticCount).getResult();
   for (auto dim : dynamicDims) {
     value = builder.createOrFold<arith::MulIOp>(loc, value, dim);
   }
@@ -124,7 +124,7 @@ Value calculateStorageElementCountInBytes(Location loc,
     unsigned byteElements = 8 / elementBits;
     // TODO(antiagainst): We may want to emit runtime check to make sure this is
     // divisible.
-    auto divisor = builder.create<arith::ConstantIndexOp>(loc, byteElements);
+    auto divisor = arith::ConstantIndexOp::create(builder, loc, byteElements);
     if (!isPackedStorage && dynamicDims.empty() &&
         (staticCount * elementBits) % 8 != 0) {
       return nullptr;
@@ -148,15 +148,15 @@ Value calculateStorageElementOffsetInBytes(Location loc,
   // Sub-byte packing requires putting multiple elements in the same byte.
   if (needToPackSubByteElementBitWidthImpl(elementBits, isPackedStorage)) {
     Value byteElements =
-        builder.create<arith::ConstantIndexOp>(loc, 8 / elementBits);
+        arith::ConstantIndexOp::create(builder, loc, 8 / elementBits);
     // TODO(antiagainst): We may want to emit runtime check to make sure this is
     // divisible.
     return builder.createOrFold<arith::DivUIOp>(loc, linearizedIndex,
                                                 byteElements);
   }
 
-  Value elementBytes = builder.create<arith::ConstantIndexOp>(
-      loc, IREE::Util::getRoundedElementByteWidth(alignedElementType));
+  Value elementBytes = arith::ConstantIndexOp::create(
+      builder, loc, IREE::Util::getRoundedElementByteWidth(alignedElementType));
   return builder.createOrFold<arith::MulIOp>(loc, linearizedIndex,
                                              elementBytes);
 }

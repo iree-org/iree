@@ -171,10 +171,10 @@ struct BubbleTransposeVFromAttentionOp
         tensor::getMixedSizes(rewriter, loc, value);
     applyPermutationToVector(transVShape, perm);
     Value initTransV =
-        rewriter.create<tensor::EmptyOp>(loc, transVShape, valueElType)
+        tensor::EmptyOp::create(rewriter, loc, transVShape, valueElType)
             .getResult();
     Value transposeV =
-        rewriter.create<linalg::TransposeOp>(loc, value, initTransV, perm)
+        linalg::TransposeOp::create(rewriter, loc, value, initTransV, perm)
             ->getResult(0);
 
     // Generate transpose V map.

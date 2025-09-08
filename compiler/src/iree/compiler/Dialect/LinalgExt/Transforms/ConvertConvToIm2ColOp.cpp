@@ -28,15 +28,15 @@ static bool hasAllOneValues(ArrayRef<int64_t> attr) {
 static Value createAdd(Location loc, Value x, Value y, OpBuilder &builder) {
   bool isInt = llvm::isa<IntegerType>(x.getType());
   if (isInt)
-    return builder.create<arith::AddIOp>(loc, x, y);
-  return builder.create<arith::AddFOp>(loc, x, y);
+    return arith::AddIOp::create(builder, loc, x, y);
+  return arith::AddFOp::create(builder, loc, x, y);
 }
 
 static Value createMul(Location loc, Value x, Value y, OpBuilder &builder) {
   bool isInt = llvm::isa<IntegerType>(x.getType());
   if (isInt)
-    return builder.create<arith::MulIOp>(loc, x, y);
-  return builder.create<arith::MulFOp>(loc, x, y);
+    return arith::MulIOp::create(builder, loc, x, y);
+  return arith::MulFOp::create(builder, loc, x, y);
 }
 
 // TODO : Upstream utility that does this pruning is broken for LinalgOp. Drop
@@ -263,8 +263,8 @@ public:
     }
     colTensorShape.append(mShape);
     colTensorShape.append(kShape);
-    Value colTensor = rewriter.create<tensor::EmptyOp>(
-        loc, colTensorShape, inputType.getElementType());
+    Value colTensor = tensor::EmptyOp::create(rewriter, loc, colTensorShape,
+                                              inputType.getElementType());
     Value img2ColTensor =
         rewriter
             .create<IREE::LinalgExt::Im2colOp>(
@@ -273,11 +273,11 @@ public:
                 kBasis, batchPos, mPos, kPos, inputKPerm)
             .getResult(0);
 
-    Value reshapedFilter = rewriter.create<tensor::CollapseShapeOp>(
-        loc, filter, filterReassocIndices);
+    Value reshapedFilter = tensor::CollapseShapeOp::create(
+        rewriter, loc, filter, filterReassocIndices);
 
-    auto genericGEMMOp = rewriter.create<linalg::GenericOp>(
-        loc, outputType,
+    auto genericGEMMOp = linalg::GenericOp::create(
+        rewriter, loc, outputType,
         /*inputs=*/
         isOutputChannelFirst ? ValueRange{reshapedFilter, img2ColTensor}
                              : ValueRange{img2ColTensor, reshapedFilter},
@@ -292,7 +292,7 @@ public:
                                            /*isUnsignedCast=*/false);
           Value mul = createMul(nestedLoc, lhs, rhs, nestedBuilder);
           Value add = createAdd(nestedLoc, mul, args[2], nestedBuilder);
-          nestedBuilder.create<linalg::YieldOp>(nestedLoc, add);
+          linalg::YieldOp::create(nestedBuilder, nestedLoc, add);
         });
     genericGEMMOp->setDiscardableAttrs(getPrunedAttributeList(linalgOp));
     Value result = genericGEMMOp.getResults().front();

@@ -124,10 +124,10 @@ static LogicalResult canonicalizeAssumeIntOp(AssumeIntOp op,
       Value constantValue;
       if (result.getType().isIndex()) {
         constantValue =
-            rewriter.create<arith::ConstantIndexOp>(op.getLoc(), *fixedValue);
+            arith::ConstantIndexOp::create(rewriter, op.getLoc(), *fixedValue);
       } else {
-        constantValue = rewriter.create<arith::ConstantIntOp>(
-            op.getLoc(), result.getType(), *fixedValue);
+        constantValue = arith::ConstantIntOp::create(
+            rewriter, op.getLoc(), result.getType(), *fixedValue);
       }
       rewriter.replaceAllUsesWith(result, constantValue);
       madeChange = true;
@@ -147,7 +147,7 @@ static LogicalResult canonicalizeAssumeIntOp(AssumeIntOp op,
 
   if (!newOperands.empty()) {
     auto newOp =
-        rewriter.create<AssumeIntOp>(op.getLoc(), newOperands, newAssumptions);
+        AssumeIntOp::create(rewriter, op.getLoc(), newOperands, newAssumptions);
     rewriter.replaceAllUsesWith(retainedResults, newOp.getResults());
   }
 
@@ -253,7 +253,7 @@ struct DeduplicateOperands : public OpRewritePattern<AssumeIntOp> {
     }
 
     auto newOp =
-        rewriter.create<AssumeIntOp>(op.getLoc(), newOperands, newRanges);
+        AssumeIntOp::create(rewriter, op.getLoc(), newOperands, newRanges);
     rewriter.replaceAllUsesWith(valuesToReplace, newOp.getResults());
     rewriter.eraseOp(op);
     return success();
@@ -493,8 +493,8 @@ struct SimplifyUniformRangeOp : public OpRewritePattern<OpT> {
       return failure();
     }
     if (constantValue != initialValue) {
-      operands.insert(rewriter.create<arith::ConstantOp>(
-          op.getLoc(), op.getResult().getType(),
+      operands.insert(arith::ConstantOp::create(
+          rewriter, op.getLoc(), op.getResult().getType(),
           rewriter.getIntegerAttr(op.getResult().getType(), constantValue)));
     }
     rewriter.replaceOpWithNewOp<OpT>(op, op.getResult().getType(),
@@ -523,15 +523,15 @@ void RangeMaxOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 static Value makeRangeEnd(Location loc, Value offset, Value length, Value one,
                           OpBuilder &builder) {
-  return builder.create<arith::SubIOp>(
-      loc, builder.create<arith::AddIOp>(loc, offset, length), one);
+  return arith::SubIOp::create(
+      builder, loc, arith::AddIOp::create(builder, loc, offset, length), one);
 }
 static Value makeRangeEnd(Location loc, Value offset, Value length,
                           OpBuilder &builder) {
   return makeRangeEnd(
       loc, offset, length,
-      builder.create<arith::ConstantOp>(
-          loc, offset.getType(), builder.getIntegerAttr(offset.getType(), 1)),
+      arith::ConstantOp::create(builder, loc, offset.getType(),
+                                builder.getIntegerAttr(offset.getType(), 1)),
       builder);
 }
 
@@ -570,28 +570,30 @@ struct FoldConstantRanges : public OpRewritePattern<RangeExtentsOp> {
     Value min;
     Value max;
     if (!offsets.empty()) {
-      auto newOp = rewriter.create<RangeExtentsOp>(
-          op.getLoc(), op.getMin().getType(), op.getMax().getType(), offsets,
-          lengths);
+      auto newOp =
+          RangeExtentsOp::create(rewriter, op.getLoc(), op.getMin().getType(),
+                                 op.getMax().getType(), offsets, lengths);
       min = newOp.getMin();
       max = newOp.getMax();
     }
 
     // Min/max with constant ranges. This allows for normal folding to happen
     // downstream of the op.
-    auto constantMinOp = rewriter.create<arith::ConstantOp>(
-        op.getLoc(), op.getMin().getType(),
+    auto constantMinOp = arith::ConstantOp::create(
+        rewriter, op.getLoc(), op.getMin().getType(),
         rewriter.getIntegerAttr(op.getMin().getType(), constantMin));
-    auto constantMaxOp = rewriter.create<arith::ConstantOp>(
-        op.getLoc(), op.getMax().getType(),
+    auto constantMaxOp = arith::ConstantOp::create(
+        rewriter, op.getLoc(), op.getMax().getType(),
         rewriter.getIntegerAttr(op.getMax().getType(),
                                 constantMax - constantMin + 1));
-    min = min ? rewriter.create<arith::MinUIOp>(op.getLoc(), min, constantMinOp)
-                    .getResult()
-              : constantMinOp.getResult();
-    max = max ? rewriter.create<arith::MaxUIOp>(op.getLoc(), max, constantMaxOp)
-                    .getResult()
-              : constantMaxOp.getResult();
+    min =
+        min ? arith::MinUIOp::create(rewriter, op.getLoc(), min, constantMinOp)
+                  .getResult()
+            : constantMinOp.getResult();
+    max =
+        max ? arith::MaxUIOp::create(rewriter, op.getLoc(), max, constantMaxOp)
+                  .getResult()
+            : constantMaxOp.getResult();
 
     rewriter.replaceOp(op, {min, max});
     return success();
@@ -611,16 +613,16 @@ struct ExpandSimpleRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
                               op.getLengths().front(), rewriter);
     } else if (op.getOffsets().size() == 2) {
       // Two ranges turn into min/max.
-      minValue = rewriter.create<arith::MinUIOp>(loc, op.getOffsets().front(),
-                                                 op.getOffsets().back());
-      auto one = rewriter.create<arith::ConstantOp>(
-          loc, op.getMin().getType(),
+      minValue = arith::MinUIOp::create(rewriter, loc, op.getOffsets().front(),
+                                        op.getOffsets().back());
+      auto one = arith::ConstantOp::create(
+          rewriter, loc, op.getMin().getType(),
           rewriter.getIntegerAttr(op.getMin().getType(), 1));
       auto endLhs = makeRangeEnd(loc, op.getOffsets().front(),
                                  op.getLengths().front(), one, rewriter);
       auto endRhs = makeRangeEnd(loc, op.getOffsets().back(),
                                  op.getLengths().back(), one, rewriter);
-      maxValue = rewriter.create<arith::MaxUIOp>(loc, endLhs, endRhs);
+      maxValue = arith::MaxUIOp::create(rewriter, loc, endLhs, endRhs);
     }
     if (!minValue || !maxValue)
       return failure();
@@ -827,8 +829,8 @@ struct ExpandUnfoldableConstantOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(UnfoldableConstantOp op,
                                 PatternRewriter &rewriter) const override {
-    auto stdConst = rewriter.create<arith::ConstantOp>(
-        op.getLoc(), cast<TypedAttr>(op.getValue()));
+    auto stdConst = arith::ConstantOp::create(rewriter, op.getLoc(),
+                                              cast<TypedAttr>(op.getValue()));
     rewriter.replaceOpWithNewOp<OptimizationBarrierOp>(op,
                                                        stdConst.getResult());
     return success();
@@ -993,9 +995,9 @@ struct FoldBufferSubspanOps : public OpRewritePattern<BufferSubspanOp> {
     auto fusedLoc = rewriter.getFusedLoc({parentOp.getLoc(), op.getLoc()});
     auto newOffset = rewriter.createOrFold<arith::AddIOp>(
         fusedLoc, parentOp.getSourceOffset(), op.getSourceOffset());
-    auto newOp = rewriter.create<BufferSubspanOp>(
-        fusedLoc, parentOp.getSource(), parentOp.getSourceSize(), newOffset,
-        op.getResultSize());
+    auto newOp = BufferSubspanOp::create(
+        rewriter, fusedLoc, parentOp.getSource(), parentOp.getSourceSize(),
+        newOffset, op.getResultSize());
     rewriter.replaceOp(op, newOp.getResult());
     return success();
   }
@@ -1065,8 +1067,8 @@ struct SinkSubspanAcrossSelectOps
         trueSubspan.getResultSize() != falseSubspan.getResultSize()) {
       return failure();
     }
-    auto offsetSelectOp = rewriter.create<mlir::arith::SelectOp>(
-        op.getLoc(), op.getCondition(), trueSubspan.getSourceOffset(),
+    auto offsetSelectOp = mlir::arith::SelectOp::create(
+        rewriter, op.getLoc(), op.getCondition(), trueSubspan.getSourceOffset(),
         falseSubspan.getSourceOffset());
     rewriter.replaceOpWithNewOp<IREE::Util::BufferSubspanOp>(
         op, op.getResult().getType(), trueSubspan.getSource(),

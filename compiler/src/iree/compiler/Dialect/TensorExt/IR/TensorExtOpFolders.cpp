@@ -85,9 +85,9 @@ struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
     auto newType =
         RankedTensorType::get(newResultSizes, resTensorType.getElementType(),
                               resTensorType.getEncoding());
-    Value newBitcast = rewriter.create<BitCastOp>(
-        bitcastOp.getLoc(), newType, tensorCastOp.getOperand(), newDynamicDims,
-        newDynamicDims);
+    Value newBitcast = BitCastOp::create(rewriter, bitcastOp.getLoc(), newType,
+                                         tensorCastOp.getOperand(),
+                                         newDynamicDims, newDynamicDims);
     // We create a new cast to continue propagating static information.
     rewriter.replaceOpWithNewOp<tensor::CastOp>(bitcastOp, resTensorType,
                                                 newBitcast);
@@ -260,12 +260,12 @@ struct DispatchTensorLoadOpWithOffsetSizesAndStridesConstantArgumentFolder final
 
     // We need to resolve the new inferred type with the specified type.
     Location loc = loadOp.getLoc();
-    Value replacement = rewriter.create<DispatchTensorLoadOp>(
-        loc, newResultType.value(), loadOp.getSource(), loadOp.getSourceDims(),
-        mixedOffsets, mixedSizes, mixedStrides);
+    Value replacement = DispatchTensorLoadOp::create(
+        rewriter, loc, newResultType.value(), loadOp.getSource(),
+        loadOp.getSourceDims(), mixedOffsets, mixedSizes, mixedStrides);
     if (newResultType.value() != resultType) {
       replacement =
-          rewriter.create<tensor::CastOp>(loc, resultType, replacement);
+          tensor::CastOp::create(rewriter, loc, resultType, replacement);
     }
     rewriter.replaceOp(loadOp, replacement);
     return success();
@@ -361,7 +361,8 @@ struct DispatchTensorStoreOpWithOffsetSizesAndStridesConstantArgumentFolder
     Value value = storeOp.getValue();
     Location loc = storeOp.getLoc();
     if (newValueType.value() != valueType) {
-      value = rewriter.create<tensor::CastOp>(loc, newValueType.value(), value);
+      value =
+          tensor::CastOp::create(rewriter, loc, newValueType.value(), value);
     }
     rewriter.replaceOpWithNewOp<DispatchTensorStoreOp>(
         storeOp, value, storeOp.getTarget(), storeOp.getTargetDims(),
@@ -412,8 +413,8 @@ struct BubbleUpOrdinalOp : public OpRewritePattern<DispatchWorkloadOrdinalOp> {
       }
       break;
     }
-    auto newOrdinalOp = rewriter.create<DispatchWorkloadOrdinalOp>(
-        ordinalOp.getLoc(), blockArg, ordinalOp.getOrdinalAttr());
+    auto newOrdinalOp = DispatchWorkloadOrdinalOp::create(
+        rewriter, ordinalOp.getLoc(), blockArg, ordinalOp.getOrdinalAttr());
     rewriter.replaceAllUsesExcept(blockArg, newOrdinalOp, newOrdinalOp);
     rewriter.replaceOp(ordinalOp, newOrdinalOp.getResult());
     return success();

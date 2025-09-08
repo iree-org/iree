@@ -57,8 +57,8 @@ getInRowMajorLayout(OpBuilder &builder, SmallVector<TensorValue> tensorValues,
     }
     OpBuilder::InsertionGuard g(builder);
     builder.setInsertionPointAfterValue(v.value);
-    Value rowMajorTensor = builder.create<IREE::Flow::TensorEncodeOp>(
-        v.value.getLoc(), rankedTensorType.dropEncoding(), v.value,
+    Value rowMajorTensor = IREE::Flow::TensorEncodeOp::create(
+        builder, v.value.getLoc(), rankedTensorType.dropEncoding(), v.value,
         /*operand_dims=*/v.dynamicDims, /*result_dims=*/v.dynamicDims);
     rowMajorTensors.push_back(rowMajorTensor);
     decodedIndices.push_back(idx);
@@ -96,8 +96,8 @@ struct InjectDispatchTracingPass
       std::string inputsLabelStr = appendDecodedValuesToLabel(
           entryPointName + " inputs", decodedInputIndices);
       StringAttr inputsLabel = builder.getStringAttr(inputsLabelStr);
-      builder.create<IREE::Flow::TensorTraceOp>(
-          dispatchOp.getLoc(), inputsLabel, decodedInputValues);
+      IREE::Flow::TensorTraceOp::create(builder, dispatchOp.getLoc(),
+                                        inputsLabel, decodedInputValues);
 
       // Output tensors:
       SmallVector<TensorValue> resultTensorValues = filterTensorValues(
@@ -119,8 +119,8 @@ struct InjectDispatchTracingPass
         }
       }
       builder.setInsertionPointAfter(lastResult);
-      builder.create<IREE::Flow::TensorTraceOp>(
-          dispatchOp.getLoc(), outputsLabel, decodedResultValues);
+      IREE::Flow::TensorTraceOp::create(builder, dispatchOp.getLoc(),
+                                        outputsLabel, decodedResultValues);
     }
   }
 };

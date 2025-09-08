@@ -413,8 +413,8 @@ static void replaceValueWithConstant(Value value, LocAttr constantValue,
 
   // Immutable global loads are represented as constant symbol refs.
   if (auto globalRef = dyn_cast<SymbolRefAttr>(constantValue.attr)) {
-    op = builder.create<IREE::Util::GlobalLoadOp>(
-        constantValue.loc.value(), constantValue.type,
+    op = IREE::Util::GlobalLoadOp::create(
+        builder, constantValue.loc.value(), constantValue.type,
         globalRef.getLeafReference().getValue(),
         /*is_immutable=*/true);
   }
@@ -423,9 +423,9 @@ static void replaceValueWithConstant(Value value, LocAttr constantValue,
   // themselves.
   if (arith::ConstantOp::isBuildableWith(constantValue.attr,
                                          constantValue.type)) {
-    op = builder.create<arith::ConstantOp>(constantValue.loc.value(),
-                                           constantValue.type,
-                                           cast<TypedAttr>(constantValue.attr));
+    op = arith::ConstantOp::create(builder, constantValue.loc.value(),
+                                   constantValue.type,
+                                   cast<TypedAttr>(constantValue.attr));
   }
 
   // Try the attr and type dialects to see if they can materialize.

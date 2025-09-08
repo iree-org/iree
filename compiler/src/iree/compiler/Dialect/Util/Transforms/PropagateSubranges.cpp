@@ -78,24 +78,24 @@ static ExpandedGlobalMap expandResourceGlobals(Operation *rootOp,
     builder.setInsertionPointAfter(global.resourceOp);
 
     auto sizeName = (global.resourceOp.getName() + "__storage_size").str();
-    auto sizeOp = builder.create<IREE::Util::GlobalOp>(
-        global.resourceOp.getLoc(), sizeName,
+    auto sizeOp = IREE::Util::GlobalOp::create(
+        builder, global.resourceOp.getLoc(), sizeName,
         /*isMutable=*/true, indexType);
     sizeOp.setVisibility(global.resourceOp.getVisibility());
     symbolTable.insert(sizeOp);
     global.resourceSizeOp = sizeOp;
 
     auto offsetName = (global.resourceOp.getName() + "__offset").str();
-    auto offsetOp = builder.create<IREE::Util::GlobalOp>(
-        global.resourceOp.getLoc(), offsetName,
+    auto offsetOp = IREE::Util::GlobalOp::create(
+        builder, global.resourceOp.getLoc(), offsetName,
         /*isMutable=*/true, indexType);
     offsetOp.setVisibility(global.resourceOp.getVisibility());
     symbolTable.insert(offsetOp);
     global.subrangeOffsetOp = offsetOp;
 
     auto lengthName = (global.resourceOp.getName() + "__length").str();
-    auto lengthOp = builder.create<IREE::Util::GlobalOp>(
-        global.resourceOp.getLoc(), lengthName,
+    auto lengthOp = IREE::Util::GlobalOp::create(
+        builder, global.resourceOp.getLoc(), lengthName,
         /*isMutable=*/true, indexType);
     lengthOp.setVisibility(global.resourceOp.getVisibility());
     symbolTable.insert(lengthOp);
@@ -383,17 +383,16 @@ static void expandGlobalStoreOp(IREE::Util::GlobalStoreOpInterface op,
   auto subrange = consumeSubrange(op.getLoc(), op.getStoredGlobalValue(),
                                   subrangeMap, indexSet, builder);
   auto &expandedGlobal = globalMap[op.getGlobalName()];
-  builder.create<IREE::Util::GlobalStoreOp>(
-      op.getLoc(), subrange.resource, expandedGlobal.resourceOp.getName());
-  builder.create<IREE::Util::GlobalStoreOp>(
-      op.getLoc(), subrange.resourceSize,
-      expandedGlobal.resourceSizeOp.getName());
-  builder.create<IREE::Util::GlobalStoreOp>(
-      op.getLoc(), subrange.subrangeOffset,
-      expandedGlobal.subrangeOffsetOp.getName());
-  builder.create<IREE::Util::GlobalStoreOp>(
-      op.getLoc(), subrange.subrangeLength,
-      expandedGlobal.subrangeLengthOp.getName());
+  IREE::Util::GlobalStoreOp::create(builder, op.getLoc(), subrange.resource,
+                                    expandedGlobal.resourceOp.getName());
+  IREE::Util::GlobalStoreOp::create(builder, op.getLoc(), subrange.resourceSize,
+                                    expandedGlobal.resourceSizeOp.getName());
+  IREE::Util::GlobalStoreOp::create(builder, op.getLoc(),
+                                    subrange.subrangeOffset,
+                                    expandedGlobal.subrangeOffsetOp.getName());
+  IREE::Util::GlobalStoreOp::create(builder, op.getLoc(),
+                                    subrange.subrangeLength,
+                                    expandedGlobal.subrangeLengthOp.getName());
   op.erase();
 }
 
@@ -516,7 +515,7 @@ static void expandReturnOp(IREE::Util::ReturnOp op, IndexSet &indexSet,
   OpBuilder builder(op);
   auto operands = expandOperands(op.getLoc(), op.getOperands(), subrangeMap,
                                  indexSet, builder);
-  builder.create<IREE::Util::ReturnOp>(op.getLoc(), operands);
+  IREE::Util::ReturnOp::create(builder, op.getLoc(), operands);
   op.erase();
 }
 
@@ -536,7 +535,7 @@ static void expandBranchOp(mlir::cf::BranchOp op, IndexSet &indexSet,
   OpBuilder builder(op);
   auto operands = expandOperands(op.getLoc(), op.getDestOperands(), subrangeMap,
                                  indexSet, builder);
-  builder.create<mlir::cf::BranchOp>(op.getLoc(), op.getDest(), operands);
+  mlir::cf::BranchOp::create(builder, op.getLoc(), op.getDest(), operands);
   op.erase();
 }
 
@@ -545,8 +544,8 @@ static void expandCondBranchOp(mlir::cf::CondBranchOp op, IndexSet &indexSet,
   if (!usesResources(op))
     return;
   OpBuilder builder(op);
-  builder.create<mlir::cf::CondBranchOp>(
-      op.getLoc(), op.getCondition(), op.getTrueDest(),
+  mlir::cf::CondBranchOp::create(
+      builder, op.getLoc(), op.getCondition(), op.getTrueDest(),
       expandOperands(op.getLoc(), op.getTrueDestOperands(), subrangeMap,
                      indexSet, builder),
       op.getFalseDest(),
@@ -567,8 +566,8 @@ static void expandSwitchOp(mlir::cf::SwitchOp op, IndexSet &indexSet,
         return expandOperands(op.getLoc(), operands, subrangeMap, indexSet,
                               builder);
       }));
-  builder.create<mlir::cf::SwitchOp>(
-      op.getLoc(), op.getFlag(), op.getDefaultDestination(),
+  mlir::cf::SwitchOp::create(
+      builder, op.getLoc(), op.getFlag(), op.getDefaultDestination(),
       expandOperands(op.getLoc(), op.getDefaultOperands(), subrangeMap,
                      indexSet, builder),
       op.getCaseValuesAttr(), op.getCaseDestinations(),

@@ -304,8 +304,8 @@ static Value buildParameterLoad(Value awaitTimepoint,
 
   // Load all in a batch. One resource is returned per parameter but they may
   // alias depending on the runtime implementation.
-  auto loadOp = builder.create<IREE::Stream::ParameterLoadOp>(
-      builder.getFusedLoc(spanLocs), targetTypes,
+  auto loadOp = IREE::Stream::ParameterLoadOp::create(
+      builder, builder.getFusedLoc(spanLocs), targetTypes,
       builder.getType<IREE::Stream::TimepointType>(), scope,
       builder.getArrayAttr(sourceKeys), sourceOffsets, targetLengths,
       awaitTimepoint, affinityAttr);
@@ -315,10 +315,10 @@ static Value buildParameterLoad(Value awaitTimepoint,
   unsigned resultIndex = 0;
   for (auto *storageResource : storageResources) {
     for (auto &packedSpan : storageResource->spans) {
-      auto subviewOp = builder.create<IREE::Stream::ResourceSubviewOp>(
-          packedSpan.slice.result.getLoc(), loadOp.getResult(resultIndex),
-          loadOp.getResultSize(resultIndex), indexSet.get(packedSpan.offset),
-          packedSpan.slice.resultSize);
+      auto subviewOp = IREE::Stream::ResourceSubviewOp::create(
+          builder, packedSpan.slice.result.getLoc(),
+          loadOp.getResult(resultIndex), loadOp.getResultSize(resultIndex),
+          indexSet.get(packedSpan.offset), packedSpan.slice.resultSize);
       packedSpan.slice.result.replaceAllUsesWith(subviewOp.getResult());
       ++resultIndex;
     }
@@ -332,8 +332,8 @@ static TimepointResource buildParameterGather(
     Type targetType, Value targetSize, MutableArrayRef<PackedSpan> packedSpans,
     IntegerSet<int64_t> &i64Set, IndexSet &indexSet, OpBuilder &builder) {
   // Allocate the resulting storage resource of the final resource type.
-  auto allocOp = builder.create<IREE::Stream::ResourceAllocOp>(
-      loc, targetType, targetSize,
+  auto allocOp = IREE::Stream::ResourceAllocOp::create(
+      builder, loc, targetType, targetSize,
       /*uninitialized=*/builder.getUnitAttr(), affinityAttr);
 
   // Parameters may be from multiple scopes - bucket by scope and gather from
@@ -361,8 +361,8 @@ static TimepointResource buildParameterGather(
       targetOffsets.push_back(indexSet.get(packedSpan.offset));
       targetLengths.push_back(indexSet.get(packedSpan.length));
     }
-    auto gatherOp = builder.create<IREE::Stream::ParameterGatherOp>(
-        loc, builder.getType<IREE::Stream::TimepointType>(), scope,
+    auto gatherOp = IREE::Stream::ParameterGatherOp::create(
+        builder, loc, builder.getType<IREE::Stream::TimepointType>(), scope,
         builder.getArrayAttr(sourceKeys), sourceOffsets, allocOp.getResult(),
         allocOp.getResultSize(0), targetOffsets, targetLengths, awaitTimepoint,
         affinityAttr);
@@ -372,8 +372,8 @@ static TimepointResource buildParameterGather(
   // Slice out each span from the allocation.
   // Note that access must be guarded by the final ready timepoint.
   for (auto &packedSpan : packedSpans) {
-    auto subviewOp = builder.create<IREE::Stream::ResourceSubviewOp>(
-        packedSpan.slice.result.getLoc(), allocOp.getResult(),
+    auto subviewOp = IREE::Stream::ResourceSubviewOp::create(
+        builder, packedSpan.slice.result.getLoc(), allocOp.getResult(),
         allocOp.getResultSize(0), indexSet.get(packedSpan.offset),
         packedSpan.slice.resultSize);
     packedSpan.slice.result.replaceAllUsesWith(subviewOp.getResult());
@@ -392,19 +392,19 @@ static TimepointResource buildFileRead(
     Value storageBuffer, Value storageBufferSize, IntegerSet<int64_t> &i64Set,
     IndexSet &indexSet, OpBuilder &builder) {
   // Allocate the resulting storage resource of the final resource type.
-  auto allocOp = builder.create<IREE::Stream::ResourceAllocOp>(
-      loc, resourceType, storageResourceSize,
+  auto allocOp = IREE::Stream::ResourceAllocOp::create(
+      builder, loc, resourceType, storageResourceSize,
       /*uninitialized=*/builder.getUnitAttr(), affinityAttr);
 
   // Create the file backed by the constant resource buffer.
-  auto fileOp = builder.create<IREE::Stream::FileConstantOp>(
-      loc, storageBuffer, storageBufferSize, indexSet.get(0),
+  auto fileOp = IREE::Stream::FileConstantOp::create(
+      builder, loc, storageBuffer, storageBufferSize, indexSet.get(0),
       storageResourceSize, affinityAttr);
 
   // Issue asynchronous file read into the buffer.
   auto zeroI64 = i64Set.get(0);
-  auto readOp = builder.create<IREE::Stream::FileReadOp>(
-      loc, fileOp.getResult(), zeroI64, allocOp.getResult(),
+  auto readOp = IREE::Stream::FileReadOp::create(
+      builder, loc, fileOp.getResult(), zeroI64, allocOp.getResult(),
       allocOp.getResultSize(0), indexSet.get(0), storageResourceSize,
       awaitTimepoint, affinityAttr);
 
@@ -423,31 +423,33 @@ static TimepointResource buildTryMapConstantResource(
     IndexSet &indexSet, OpBuilder &builder) {
   // Try mapping; this may fail if the device can't use the storage buffer as
   // the type of resource requested.
-  auto tryMapOp = builder.create<IREE::Stream::ResourceTryMapOp>(
-      loc, builder.getI1Type(), resourceType, storageBuffer, indexSet.get(0),
-      storageResourceSize, affinityAttr);
+  auto tryMapOp = IREE::Stream::ResourceTryMapOp::create(
+      builder, loc, builder.getI1Type(), resourceType, storageBuffer,
+      indexSet.get(0), storageResourceSize, affinityAttr);
 
   // If we are able to directly map the resources then we don't need to wait.
   // Otherwise we need to stage the storage buffer into memory via the file
   // streaming API.
-  auto ifOp = builder.create<scf::IfOp>(
-      loc, tryMapOp.getDidMap(),
+  auto ifOp = scf::IfOp::create(
+      builder, loc, tryMapOp.getDidMap(),
       [&](OpBuilder &thenBuilder, Location loc) {
         // Just return the resources + an immediate timepoint.
-        thenBuilder.create<scf::YieldOp>(loc, ValueRange{
-                                                  awaitTimepoint,
-                                                  tryMapOp.getResult(),
-                                              });
+        scf::YieldOp::create(thenBuilder, loc,
+                             ValueRange{
+                                 awaitTimepoint,
+                                 tryMapOp.getResult(),
+                             });
       },
       [&](OpBuilder &elseBuilder, Location loc) {
         auto readResult =
             buildFileRead(loc, awaitTimepoint, affinityAttr, resourceType,
                           storageResourceSize, storageBuffer, storageBufferSize,
                           i64Set, indexSet, elseBuilder);
-        elseBuilder.create<scf::YieldOp>(loc, ValueRange{
-                                                  readResult.timepoint,
-                                                  readResult.resource,
-                                              });
+        scf::YieldOp::create(elseBuilder, loc,
+                             ValueRange{
+                                 readResult.timepoint,
+                                 readResult.resource,
+                             });
       });
   auto ifTimepoint = ifOp.getResults().front();
   auto ifResource = ifOp.getResults().back();
@@ -479,8 +481,9 @@ static Value generateSerializedUpload(
   Value currentTimepoint = awaitTimepoint;
   for (auto &storageResource : storageResources) {
     // Serialized resources are stored as packed host data.
-    Value storageBuffer = builder.create<IREE::Util::BufferConstantOp>(
-        storageResource.loc, /*name=*/nullptr, storageResource.packedData,
+    Value storageBuffer = IREE::Util::BufferConstantOp::create(
+        builder, storageResource.loc, /*name=*/nullptr,
+        storageResource.packedData,
         builder.getIndexAttr(resourceConfig.getMinBufferOffsetAlignment()),
         /*mimeType=*/nullptr);
 
@@ -501,9 +504,10 @@ static Value generateSerializedUpload(
 
     for (auto &span : storageResource.spans) {
       auto loc = span.slice.result.getLoc();
-      auto subviewOp = builder.create<IREE::Stream::ResourceSubviewOp>(
-          loc, uploadedResource.resource, uploadedResource.resourceSize,
-          indexSet.get(span.offset), span.slice.resultSize);
+      auto subviewOp = IREE::Stream::ResourceSubviewOp::create(
+          builder, loc, uploadedResource.resource,
+          uploadedResource.resourceSize, indexSet.get(span.offset),
+          span.slice.resultSize);
       span.slice.result.replaceAllUsesWith(subviewOp.getResult());
     }
 
@@ -672,8 +676,8 @@ struct PackConstantsPass
       indexSet.populate(constantsOp.getResultSizes());
 
       // Perform upload/processing for immutable and mutable constants.
-      Value awaitTimepoint = builder.create<IREE::Stream::TimepointImmediateOp>(
-          constantsOp.getLoc());
+      Value awaitTimepoint = IREE::Stream::TimepointImmediateOp::create(
+          builder, constantsOp.getLoc());
       auto uploadTimepoint =
           generateUploads(awaitTimepoint, constantsOp, resourceConfig, i64Set,
                           indexSet, builder);

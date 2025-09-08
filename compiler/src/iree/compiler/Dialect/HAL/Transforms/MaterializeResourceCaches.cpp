@@ -92,7 +92,8 @@ static void declareDeviceExecutable(IREE::Util::GlobalOpInterface deviceOp,
                     << deviceOp.getGlobalName().getValue()
                     << "` executable global `" << symbolName << "`\n");
   auto executableType = moduleBuilder.getType<IREE::HAL::ExecutableType>();
-  auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
+  auto globalOp = IREE::Util::GlobalOp::create(
+      moduleBuilder,
       moduleBuilder.getFusedLoc(llvm::to_vector(executable.locs)), symbolName,
       /*isMutable=*/false, executableType);
   globalOp.setPrivate();
@@ -123,8 +124,8 @@ static SmallVector<Value> inlineConstantBlockOp(
   LLVM_DEBUG(DBGS() << "- inlining constant block `" << funcName << "`\n");
 
   // Create the function with the region contents of the constant block.
-  auto funcOp = moduleBuilder.create<IREE::Util::FuncOp>(
-      blockOp.getLoc(), funcName, blockOp.getFunctionType());
+  auto funcOp = IREE::Util::FuncOp::create(moduleBuilder, blockOp.getLoc(),
+                                           funcName, blockOp.getFunctionType());
   funcOp.setPrivate();
   IRMapping mapping;
   blockOp.getRegion().cloneInto(&funcOp.getRegion(), mapping);
@@ -142,8 +143,8 @@ static SmallVector<Value> inlineConstantBlockOp(
   if (funcOp.getNumArguments() > 0) {
     callOperands.push_back(callerDevice);
   }
-  auto callOp = callerBuilder.create<IREE::Util::CallOp>(blockOp.getLoc(),
-                                                         funcOp, callOperands);
+  auto callOp = IREE::Util::CallOp::create(callerBuilder, blockOp.getLoc(),
+                                           funcOp, callOperands);
   return llvm::to_vector_of<Value>(callOp.getResults());
 }
 
@@ -175,8 +176,9 @@ initializeExecutable(DeviceResources &deviceResources, Executable &executable,
       initializerBuilder);
 
   // Allow each variant to define how it is loaded and what pipeline it has.
-  auto switchOp = initializerBuilder.create<scf::IndexSwitchOp>(
-      loc, executableType, selectedIndex, caseIndices, caseIndices.size());
+  auto switchOp = scf::IndexSwitchOp::create(initializerBuilder, loc,
+                                             executableType, selectedIndex,
+                                             caseIndices, caseIndices.size());
   for (auto [i, variantOp] : llvm::enumerate(caseVariantOps)) {
     auto &caseBlock = switchOp.getCaseRegions()[i].emplaceBlock();
     auto caseBuilder = OpBuilder::atBlockBegin(&caseBlock);
@@ -202,14 +204,15 @@ initializeExecutable(DeviceResources &deviceResources, Executable &executable,
                 {SymbolRefAttr::get(variantOp.getSymNameAttr())}),
             constantValues);
 
-    caseBuilder.create<scf::YieldOp>(loc, executableValue);
+    scf::YieldOp::create(caseBuilder, loc, executableValue);
   }
 
   // Fallback for no available variant.
   auto &defaultBlock = switchOp.getDefaultRegion().emplaceBlock();
   auto defaultBuilder = OpBuilder::atBlockBegin(&defaultBlock);
-  Value status = defaultBuilder.create<arith::ConstantIntOp>(
-      loc, static_cast<int>(IREE::Util::StatusCode::Unavailable), 32);
+  Value status = arith::ConstantIntOp::create(
+      defaultBuilder, loc,
+      static_cast<int>(IREE::Util::StatusCode::Unavailable), 32);
   {
     std::string errorStr;
     llvm::raw_string_ostream errorStream(errorStr);
@@ -222,11 +225,11 @@ initializeExecutable(DeviceResources &deviceResources, Executable &executable,
       errorStream << variantOp.getTargetAttr().getFormat().getValue();
     });
     errorStream << "]";
-    defaultBuilder.create<IREE::Util::StatusCheckOkOp>(loc, status, errorStr);
+    IREE::Util::StatusCheckOkOp::create(defaultBuilder, loc, status, errorStr);
   }
   auto nullValue =
       defaultBuilder.createOrFold<IREE::Util::NullOp>(loc, executableType);
-  defaultBuilder.create<scf::YieldOp>(loc, nullValue);
+  scf::YieldOp::create(defaultBuilder, loc, nullValue);
 
   return switchOp.getResult(0);
 }
@@ -270,7 +273,7 @@ static void reuseFallbackDeviceResources(DeviceResources &deviceResources,
 static void buildDeviceResourceInitializer(DeviceResources &deviceResources,
                                            OpBuilder &moduleBuilder) {
   auto loc = deviceResources.deviceOp.getLoc();
-  auto initializerOp = moduleBuilder.create<IREE::Util::InitializerOp>(loc);
+  auto initializerOp = IREE::Util::InitializerOp::create(moduleBuilder, loc);
   OpBuilder initializerBuilder =
       OpBuilder::atBlockEnd(initializerOp.addEntryBlock());
   Value initializerDevice =
@@ -281,7 +284,7 @@ static void buildDeviceResourceInitializer(DeviceResources &deviceResources,
   // any queue will have execution scheduled but if we know that it won't (such
   // as when sharding) we can reduce runtime load overhead.
   Value initializerAffinity =
-      initializerBuilder.create<arith::ConstantIntOp>(loc, -1, 64);
+      arith::ConstantIntOp::create(initializerBuilder, loc, -1, 64);
 
   // If there are any fallbacks then we need to handle referencing their
   // resources and otherwise will initialize our own.
@@ -298,12 +301,13 @@ static void buildDeviceResourceInitializer(DeviceResources &deviceResources,
           Value fallbackDevice =
               fallbackResources->deviceOp.createLoadOp(loc, caseBuilder)
                   .getLoadedGlobalValue();
-          return caseBuilder.create<IREE::Util::CmpEQOp>(loc, initializerDevice,
-                                                         fallbackDevice);
+          return IREE::Util::CmpEQOp::create(caseBuilder, loc,
+                                             initializerDevice, fallbackDevice);
         },
         initializerBuilder);
-    auto switchOp = initializerBuilder.create<scf::IndexSwitchOp>(
-        loc, TypeRange{}, selectedIndex, caseIndices, caseIndices.size());
+    auto switchOp = scf::IndexSwitchOp::create(initializerBuilder, loc,
+                                               TypeRange{}, selectedIndex,
+                                               caseIndices, caseIndices.size());
     for (auto [fallbackResources, caseRegion] :
          llvm::zip_equal(deviceResources.fallbackDeviceResources,
                          switchOp.getCaseRegions())) {
@@ -311,16 +315,16 @@ static void buildDeviceResourceInitializer(DeviceResources &deviceResources,
       auto caseBuilder = OpBuilder::atBlockBegin(&caseBlock);
       reuseFallbackDeviceResources(deviceResources, *fallbackResources,
                                    initializerDevice, caseBuilder);
-      caseBuilder.create<scf::YieldOp>(loc);
+      scf::YieldOp::create(caseBuilder, loc);
     }
     auto &defaultBlock = switchOp.getDefaultRegion().emplaceBlock();
     auto defaultBuilder = OpBuilder::atBlockBegin(&defaultBlock);
     initializeDeviceResources(deviceResources, moduleBuilder, initializerDevice,
                               initializerAffinity, defaultBuilder);
-    defaultBuilder.create<scf::YieldOp>(loc);
+    scf::YieldOp::create(defaultBuilder, loc);
   }
 
-  initializerBuilder.create<IREE::Util::ReturnOp>(loc);
+  IREE::Util::ReturnOp::create(initializerBuilder, loc);
 }
 
 // Returns zero or more devices globals that may act as fallbacks for the

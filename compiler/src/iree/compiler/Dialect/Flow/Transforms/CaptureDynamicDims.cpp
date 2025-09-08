@@ -105,8 +105,9 @@ static void captureDims(IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
     }
 
     // Insert a shape tie op into the region to associate the dims.
-    auto tieOp = entryBuilder.create<IREE::Flow::DispatchTieShapeOp>(
-        internalValue.getLoc(), tensorType, internalValue, capturedDims);
+    auto tieOp = IREE::Flow::DispatchTieShapeOp::create(
+        entryBuilder, internalValue.getLoc(), tensorType, internalValue,
+        capturedDims);
     internalValue.replaceAllUsesExcept(tieOp.getResult(), tieOp);
   };
 
@@ -195,9 +196,9 @@ static void captureDims(scf::ForOp forOp) {
   llvm::append_range(
       newInits, llvm::map_range(newIterables, std::mem_fn(&Iterable::init)));
   OpBuilder builder(forOp);
-  auto newForOp = builder.create<scf::ForOp>(
-      forOp->getLoc(), forOp.getLowerBound(), forOp.getUpperBound(),
-      forOp.getStep(), newInits);
+  auto newForOp =
+      scf::ForOp::create(builder, forOp->getLoc(), forOp.getLowerBound(),
+                         forOp.getUpperBound(), forOp.getStep(), newInits);
   newForOp.getRegion().takeBody(forOp.getRegion());
 
   // Adjust the loop body taken from the old 'scf.for' to account for the new
@@ -225,8 +226,8 @@ static void captureDims(scf::ForOp forOp) {
     if (dims.empty())
       continue;
 
-    Value tied = builder.create<Flow::TensorTieShapeOp>(
-        forOp.getLoc(), tensor.bbArg,
+    Value tied = Flow::TensorTieShapeOp::create(
+        builder, forOp.getLoc(), tensor.bbArg,
         llvm::map_to_vector(dims, std::mem_fn(&Iterable::bbArg)));
     tensor.bbArg.replaceAllUsesExcept(tied,
                                       /*exceptedUser=*/tied.getDefiningOp());
@@ -245,8 +246,8 @@ static void captureDims(scf::ForOp forOp) {
       continue;
 
     Value &replacement = results[tensor.result.getResultNumber()];
-    replacement = builder.create<Flow::TensorTieShapeOp>(
-        forOp.getLoc(), replacement,
+    replacement = Flow::TensorTieShapeOp::create(
+        builder, forOp.getLoc(), replacement,
         llvm::to_vector_of<Value>(
             llvm::map_range(dims, std::mem_fn(&Iterable::result))));
   }

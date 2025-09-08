@@ -139,8 +139,8 @@ struct GenericResourcePattern : public ConversionPattern {
     auto externalType = builder.getType<IREE::Stream::ResourceType>(
         IREE::Stream::Lifetime::External);
     if (source.resource.getType() != externalType) {
-      source.resource = builder.create<IREE::Stream::AsyncTransferOp>(
-          loc, externalType, source.resource, source.resourceSize,
+      source.resource = IREE::Stream::AsyncTransferOp::create(
+          builder, loc, externalType, source.resource, source.resourceSize,
           source.resourceSize,
           /*source_affinity=*/source.affinity,
           /*result_affinity=*/executionAffinityAttr);
@@ -148,8 +148,8 @@ struct GenericResourcePattern : public ConversionPattern {
 
     // Associate the stream resource and external encoding and shape
     // information.
-    auto newOp = builder.create<IREE::Stream::TensorExportOp>(
-        loc, targetType, source.resource, TypeAttr::get(targetType),
+    auto newOp = IREE::Stream::TensorExportOp::create(
+        builder, loc, targetType, source.resource, TypeAttr::get(targetType),
         dynamicDims, source.resourceSize, executionAffinityAttr);
     return newOp.getResult();
   }
@@ -169,18 +169,19 @@ struct GenericResourcePattern : public ConversionPattern {
     // Compute the size of the tensor once in the stream resource.
     // This may differ from the external encoding of the tensor as imports are
     // a transfer operation that may need to reformat the tensor.
-    Value resultSize = builder.create<IREE::Stream::TensorSizeOfOp>(
-        loc, builder.getIndexType(), TypeAttr::get(sourceTensor.getType()),
-        dynamicDims, executionAffinityAttr);
+    Value resultSize = IREE::Stream::TensorSizeOfOp::create(
+        builder, loc, builder.getIndexType(),
+        TypeAttr::get(sourceTensor.getType()), dynamicDims,
+        executionAffinityAttr);
 
     // Associate the external SSA value, encoding, and shape information with
     // the stream resource. When lowering we'll then have all the metadata
     // required even after erasing it all on the resource.
     auto externalType = builder.getType<IREE::Stream::ResourceType>(
         IREE::Stream::Lifetime::External);
-    auto importOp = builder.create<IREE::Stream::TensorImportOp>(
-        loc, externalType, sourceTensor, sourceTensor.getType(), dynamicDims,
-        resultSize,
+    auto importOp = IREE::Stream::TensorImportOp::create(
+        builder, loc, externalType, sourceTensor, sourceTensor.getType(),
+        dynamicDims, resultSize,
         /*consume=*/true, executionAffinityAttr);
     consumingOps.insert(importOp);
 
@@ -195,8 +196,8 @@ struct GenericResourcePattern : public ConversionPattern {
                    .getResult();
     }
 
-    auto castOp = builder.create<mlir::UnrealizedConversionCastOp>(
-        loc, sourceTensor.getType(), ValueRange{result, resultSize});
+    auto castOp = mlir::UnrealizedConversionCastOp::create(
+        builder, loc, sourceTensor.getType(), ValueRange{result, resultSize});
     consumingOps.insert(castOp);
     return castOp.getResult(0);
   }
@@ -276,7 +277,7 @@ struct ConvertToStreamPass final
                            /*source_affinity=*/nullptr,
                            /*result_affinity=*/nullptr)
                        .getResult();
-      return builder.create<UnrealizedConversionCastOp>(loc, resultType, cast)
+      return UnrealizedConversionCastOp::create(builder, loc, resultType, cast)
           .getResult(0);
     });
 

@@ -249,8 +249,8 @@ struct FromMemRefSubView : public OpRewritePattern<GetBufferDescriptorOp> {
     for (int i = 0; i < sourceRank; i++) {
       sizeStrideTypes.push_back(indexType);
     }
-    auto sourceDesc = rewriter.create<GetBufferDescriptorOp>(
-        loc, op.getBaseBuffer().getType(), indexType, sizeStrideTypes,
+    auto sourceDesc = GetBufferDescriptorOp::create(
+        rewriter, loc, op.getBaseBuffer().getType(), indexType, sizeStrideTypes,
         sizeStrideTypes, source);
 
     FailureOr<DescriptorInfo> resultDescriptor =

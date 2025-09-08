@@ -70,21 +70,20 @@ static LogicalResult memoizeAllocatorSelectOp(
   std::string globalNamePrefix = "__allocator_select";
 
   // Insert globals for query results.
-  auto selectedDeviceGlobalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
-      fusedLoc, globalNamePrefix + "_device", /*isMutable=*/false,
-      moduleBuilder.getType<IREE::HAL::DeviceType>());
+  auto selectedDeviceGlobalOp = IREE::Util::GlobalOp::create(
+      moduleBuilder, fusedLoc, globalNamePrefix + "_device",
+      /*isMutable=*/false, moduleBuilder.getType<IREE::HAL::DeviceType>());
   symbolTable.insert(selectedDeviceGlobalOp);
   selectedDeviceGlobalOp.setPrivate();
-  auto selectedQueueAffinityGlobalOp =
-      moduleBuilder.create<IREE::Util::GlobalOp>(
-          fusedLoc, globalNamePrefix + "_affinity", /*isMutable=*/false,
-          moduleBuilder.getIntegerType(64));
+  auto selectedQueueAffinityGlobalOp = IREE::Util::GlobalOp::create(
+      moduleBuilder, fusedLoc, globalNamePrefix + "_affinity",
+      /*isMutable=*/false, moduleBuilder.getIntegerType(64));
   symbolTable.insert(selectedQueueAffinityGlobalOp);
   selectedQueueAffinityGlobalOp.setPrivate();
 
   // Build initializer for the globals.
   auto initializerOp =
-      moduleBuilder.create<IREE::Util::InitializerOp>(fusedLoc);
+      IREE::Util::InitializerOp::create(moduleBuilder, fusedLoc);
   {
     auto initializerBuilder =
         OpBuilder::atBlockBegin(initializerOp.addEntryBlock());
@@ -101,28 +100,27 @@ static LogicalResult memoizeAllocatorSelectOp(
           deviceGlobalOp.createLoadOp(fusedLoc, initializerBuilder)
               .getLoadedGlobalValue();
       deviceValues.push_back(deviceValue);
-      queueAffinityValues.push_back(
-          initializerBuilder.create<arith::ConstantOp>(fusedLoc,
-                                                       queueAffinity));
+      queueAffinityValues.push_back(arith::ConstantOp::create(
+          initializerBuilder, fusedLoc, queueAffinity));
     }
 
-    Value memoryTypeValue = initializerBuilder.create<IREE::HAL::MemoryTypeOp>(
-        fusedLoc, cast<MemoryTypeBitfieldAttr>(selectOpOperands.memoryType));
+    Value memoryTypeValue = IREE::HAL::MemoryTypeOp::create(
+        initializerBuilder, fusedLoc,
+        cast<MemoryTypeBitfieldAttr>(selectOpOperands.memoryType));
 
-    Value bufferUsageValue =
-        initializerBuilder.create<IREE::HAL::BufferUsageOp>(
-            fusedLoc,
-            cast<BufferUsageBitfieldAttr>(selectOpOperands.bufferUsage));
+    Value bufferUsageValue = IREE::HAL::BufferUsageOp::create(
+        initializerBuilder, fusedLoc,
+        cast<BufferUsageBitfieldAttr>(selectOpOperands.bufferUsage));
 
-    auto newSelectOp = initializerBuilder.create<IREE::HAL::AllocatorSelectOp>(
-        fusedLoc, deviceValues, queueAffinityValues, memoryTypeValue,
-        bufferUsageValue);
+    auto newSelectOp = IREE::HAL::AllocatorSelectOp::create(
+        initializerBuilder, fusedLoc, deviceValues, queueAffinityValues,
+        memoryTypeValue, bufferUsageValue);
 
     selectedDeviceGlobalOp.createStoreOp(
         fusedLoc, newSelectOp.getSelectedDevice(), initializerBuilder);
     selectedQueueAffinityGlobalOp.createStoreOp(
         fusedLoc, newSelectOp.getSelectedQueueAffinity(), initializerBuilder);
-    initializerBuilder.create<IREE::Util::ReturnOp>(fusedLoc);
+    IREE::Util::ReturnOp::create(initializerBuilder, fusedLoc);
   }
 
   // Replace all select ops with global loads.

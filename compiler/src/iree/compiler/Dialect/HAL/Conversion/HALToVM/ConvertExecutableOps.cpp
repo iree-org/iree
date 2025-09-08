@@ -35,7 +35,7 @@ Value createPackedConstantBuffer(Location loc, ValueRange constantValues,
   size_t constantCount = constantValues.size();
   if (constantValues.empty()) {
     // No constants; pass a null buffer.
-    return builder.create<IREE::VM::ConstRefZeroOp>(loc, bufferRefType);
+    return IREE::VM::ConstRefZeroOp::create(builder, loc, bufferRefType);
   }
 
   // Create the constant storage buffer.
@@ -45,11 +45,11 @@ Value createPackedConstantBuffer(Location loc, ValueRange constantValues,
     constantLocs.push_back(constantValue.getLoc());
   }
   auto constantBufferLoc = builder.getFusedLoc(constantLocs);
-  auto constantBuffer = builder.create<IREE::VM::BufferAllocOp>(
-      constantBufferLoc, bufferRefType,
-      builder.create<IREE::VM::ConstI64Op>(constantBufferLoc,
-                                           constantCount * sizeof(uint32_t)),
-      builder.create<IREE::VM::ConstI32Op>(constantBufferLoc, 16));
+  auto constantBuffer = IREE::VM::BufferAllocOp::create(
+      builder, constantBufferLoc, bufferRefType,
+      IREE::VM::ConstI64Op::create(builder, constantBufferLoc,
+                                   constantCount * sizeof(uint32_t)),
+      IREE::VM::ConstI32Op::create(builder, constantBufferLoc, 16));
 
   // Store each constant into it.
   // TODO(#8477): better ops for this pattern; this creates a lot of
@@ -59,10 +59,10 @@ Value createPackedConstantBuffer(Location loc, ValueRange constantValues,
     if (mlir::matchPattern(constantValue.value(), m_Zero()))
       continue;
     auto constantLoc = constantValue.value().getLoc();
-    builder.create<IREE::VM::BufferStoreI32Op>(
-        constantLoc, constantBuffer,
-        builder.create<IREE::VM::ConstI64Op>(constantLoc,
-                                             constantValue.index()),
+    IREE::VM::BufferStoreI32Op::create(
+        builder, constantLoc, constantBuffer,
+        IREE::VM::ConstI64Op::create(builder, constantLoc,
+                                     constantValue.index()),
         constantValue.value());
   }
 
@@ -106,15 +106,15 @@ public:
                             ->getParentOfType<IREE::HAL::ExecutableOp>();
     std::string rodataName = sanitizeSymbolName(
         (executableOp.getName() + "_" + executableBinaryOp.getName()).str());
-    auto rodataOp = rewriter.create<IREE::VM::RodataInlineOp>(
-        executableBinaryOp.getLoc(),
+    auto rodataOp = IREE::VM::RodataInlineOp::create(
+        rewriter, executableBinaryOp.getLoc(),
         IREE::VM::RefType::get(rewriter.getType<IREE::VM::BufferType>()),
         rewriter.getStringAttr(rodataName), executableBinaryOp.getData(),
         rewriter.getI64IntegerAttr(16), executableBinaryOp.getMimeTypeAttr());
 
     // Get format string as a rodata blob.
-    auto executableFormatStr = rewriter.create<IREE::VM::RodataInlineOp>(
-        createOp.getLoc(), executableBinaryOp.getFormatAttr());
+    auto executableFormatStr = IREE::VM::RodataInlineOp::create(
+        rewriter, createOp.getLoc(), executableBinaryOp.getFormatAttr());
 
     // Pack constants, if any.
     auto constantBuffer = createPackedConstantBuffer(

@@ -105,9 +105,9 @@ struct WavePartitionBuilder {
 
     // TODO(benvanik): tie operands, or leave to canonicalization.
     SmallVector<int64_t> tiedOperands;
-    concurrentOp = parentBuilder.create<IREE::Stream::AsyncConcurrentOp>(
-        fusedLoc, resultTypes, resultSizes, operands, operandSizes,
-        tiedOperands);
+    concurrentOp = IREE::Stream::AsyncConcurrentOp::create(
+        parentBuilder, fusedLoc, resultTypes, resultSizes, operands,
+        operandSizes, tiedOperands);
 
     // Add entry block and arguments.
     auto &entryBlock = concurrentOp.getBody().emplaceBlock();
@@ -162,8 +162,8 @@ struct WavePartitionBuilder {
       if (resultSize)
         resultSizes.push_back(resultSize);
     }
-    builder.create<IREE::Stream::YieldOp>(concurrentOp.getLoc(), results,
-                                          resultSizes);
+    IREE::Stream::YieldOp::create(builder, concurrentOp.getLoc(), results,
+                                  resultSizes);
   }
 
   size_t ordinal = -1;
