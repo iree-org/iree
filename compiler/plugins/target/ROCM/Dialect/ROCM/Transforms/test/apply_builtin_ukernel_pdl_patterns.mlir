@@ -1,5 +1,3 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-rocm-apply-builtin-pdl-patterns{targets=gfx942,gfx950 enable-tensor-ukernels=true}))' \
-// RUN:   --mlir-print-local-scope --split-input-file %s | FileCheck %s
 // RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-rocm-apply-builtin-pdl-patterns{targets=gfx942 enable-tensor-ukernels=true}))' \
 // RUN:   --mlir-print-local-scope --split-input-file %s | FileCheck %s --check-prefix=GFX942
 // RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-rocm-apply-builtin-pdl-patterns{targets=gfx950 enable-tensor-ukernels=true}))' \
@@ -28,7 +26,10 @@ func.func @matmul_f8_gfx942(%arg0: tensor<1x128x4096xf8E4M3FNUZ>, %arg1: tensor<
 // GFX942-SAME:      lowering_config =
 // GFX942-SAME:      translation_info =
 // GFX942-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
-
+// GFX950-LABEL: @matmul_f8_gfx942
+// GFX950:         linalg.generic
+// GFX942-NOT:      compilation_info = #iree_codegen.compilation_info
+// GFX942-NOT:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
 // -----
 
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
@@ -208,7 +209,10 @@ func.func @matmul_f8_gfx950(%arg0: tensor<1x128x4096xf8E4M3FN>, %arg1: tensor<10
 // GFX950-SAME:      lowering_config =
 // GFX950-SAME:      translation_info =
 // GFX950-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FN_expanded", tensor>
-
+// GFX942-LABEL: @matmul_f8_gfx950
+// GFX942:         linalg.generic
+// GFX942-NOT:      compilation_info = #iree_codegen.compilation_info
+// GFX942-NOT:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FN_expanded", tensor>
 // -----
 
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
@@ -384,9 +388,12 @@ func.func @negative_matmul_f16(%arg0: tensor<256x4096xf16>, %arg1: tensor<1024x4
     } -> tensor<256x1024xf32>
   return %2 : tensor<256x1024xf32>
 }
-// CHECK-LABEL: @negative_matmul_f16
-// CHECK-NOT:     compilation_info = #iree_codegen.compilation_info
-// CHECK-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
+// GFX942-LABEL: @negative_matmul_f16
+// GFX942-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX942-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
+// GFX950-LABEL: @negative_matmul_f16
+// GFX950-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX950-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
 
 // -----
 
@@ -407,9 +414,12 @@ func.func @negative_matmul_f16_no_zero_fill(%arg0: tensor<1024x4096xf16>, %arg1:
     } -> tensor<1024x1024xf32>
   return %2 : tensor<1024x1024xf32>
 }
-// CHECK-LABEL: @negative_matmul_f16_no_zero_fill
-// CHECK-NOT:     compilation_info = #iree_codegen.compilation_info
-// CHECK-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
+// GFX942-LABEL: @negative_matmul_f16_no_zero_fill
+// GFX942-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX942-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
+// GFX950-LABEL: @negative_matmul_f16_no_zero_fill
+// GFX950-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX950-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
 
 // -----
 
@@ -430,9 +440,12 @@ func.func @negative_matmul_f16_medium_expanded_no_zero_fill(%arg0: tensor<1x128x
     } -> tensor<1x128x1024xf32>
   return %2 : tensor<1x128x1024xf32>
 }
-// CHECK-LABEL: @negative_matmul_f16_medium_expanded_no_zero_fill
-// CHECK-NOT:     compilation_info = #iree_codegen.compilation_info
-// CHECK-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
+// GFX942-LABEL: @negative_matmul_f16_medium_expanded_no_zero_fill
+// GFX942-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX942-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
+// GFX950-LABEL: @negative_matmul_f16_medium_expanded_no_zero_fill
+// GFX950-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX950-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
 
 // -----
 
@@ -453,9 +466,12 @@ func.func @negative_matmul_f16_large_expanded_no_zero_fill(%arg0: tensor<1x256x4
     } -> tensor<1x256x1024xf32>
   return %2 : tensor<1x256x1024xf32>
 }
-// CHECK-LABEL: @negative_matmul_f16_large_expanded_no_zero_fill
-// CHECK-NOT:     compilation_info = #iree_codegen.compilation_info
-// CHECK-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
+// GFX942-LABEL: @negative_matmul_f16_large_expanded_no_zero_fill
+// GFX942-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX942-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
+// GFX950-LABEL: @negative_matmul_f16_large_expanded_no_zero_fill
+// GFX950-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX950-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
 
 // -----
 
@@ -476,9 +492,12 @@ func.func @negative_matmul_bf16(%arg0: tensor<256x4096xbf16>, %arg1: tensor<1024
     } -> tensor<256x1024xf32>
   return %2 : tensor<256x1024xf32>
 }
-// CHECK-LABEL: @negative_matmul_bf16
-// CHECK-NOT:     compilation_info = #iree_codegen.compilation_info
-// CHECK-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
+// GFX942-LABEL: @negative_matmul_bf16
+// GFX942-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX942-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
+// GFX950-LABEL: @negative_matmul_bf16
+// GFX950-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX950-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
 
 // -----
 
@@ -499,9 +518,12 @@ func.func @negative_matmul_bf16_large_no_zero_fill(%arg0: tensor<1024x4096xbf16>
     } -> tensor<1024x1024xf32>
   return %2 : tensor<1024x1024xf32>
 }
-// CHECK-LABEL: @negative_matmul_bf16_large_no_zero_fill
-// CHECK-NOT:     compilation_info = #iree_codegen.compilation_info
-// CHECK-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
+// GFX942-LABEL: @negative_matmul_bf16_large_no_zero_fill
+// GFX942-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX942-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
+// GFX950-LABEL: @negative_matmul_bf16_large_no_zero_fill
+// GFX950-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX950-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
 
 // -----
 
@@ -527,9 +549,12 @@ func.func @negative_matmul_bf16_dynamic_lower_bound(%arg0: index) -> tensor<1x25
   } -> tensor<1x256x1024xf32>
   return %5 : tensor<1x256x1024xf32>
 }
-// CHECK-LABEL: @negative_matmul_bf16_dynamic_lower_bound
-// CHECK-NOT:     compilation_info = #iree_codegen.compilation_info
-// CHECK-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_large_bf16_expanded", tensor>
+// GFX942-LABEL: @negative_matmul_bf16_dynamic_lower_bound
+// GFX942-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX942-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_large_bf16_expanded", tensor>
+// GFX950-LABEL: @negative_matmul_bf16_dynamic_lower_bound
+// GFX950-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX950-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_large_bf16_expanded", tensor>
 
 // -----
 
@@ -550,9 +575,12 @@ func.func @negative_matmul_bf16_expanded_medium_no_zero_fill(%arg0: tensor<1x128
     } -> tensor<1x128x1024xf32>
   return %2 : tensor<1x128x1024xf32>
 }
-// CHECK-LABEL: @negative_matmul_bf16_expanded_medium_no_zero_fill
-// CHECK-NOT:     compilation_info = #iree_codegen.compilation_info
-// CHECK-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
+// GFX942-LABEL: @negative_matmul_bf16_expanded_medium_no_zero_fill
+// GFX942-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX942-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
+// GFX950-LABEL: @negative_matmul_bf16_expanded_medium_no_zero_fill
+// GFX950-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX950-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
 
 // -----
 
@@ -573,6 +601,9 @@ func.func @negative_matmul_bf16_expanded_large_no_zero_fill(%arg0: tensor<1x256x
     } -> tensor<1x256x1024xf32>
   return %2 : tensor<1x256x1024xf32>
 }
-// CHECK-LABEL: @negative_matmul_bf16_expanded_large_no_zero_fill
-// CHECK-NOT:     compilation_info = #iree_codegen.compilation_info
-// CHECK-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
+// GFX942-LABEL: @negative_matmul_bf16_expanded_large_no_zero_fill
+// GFX942K-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX942K-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
+// GFX950-LABEL: @negative_matmul_bf16_expanded_large_no_zero_fill
+// GFX950K-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX950K-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
