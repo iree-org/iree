@@ -6,8 +6,10 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
 namespace mlir::iree_compiler {
@@ -72,6 +74,12 @@ struct GPUPadConvsPass final : impl::GPUPadConvsPassBase<GPUPadConvsPass> {
         return signalPassFailure();
       }
     });
+    MLIRContext *context = &getContext();
+    RewritePatternSet cleanupPatterns(context);
+    populateFoldFillIntoPadPattern(cleanupPatterns);
+    if (failed(applyPatternsGreedily(funcOp, std::move(cleanupPatterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 

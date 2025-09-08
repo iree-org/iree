@@ -2185,16 +2185,15 @@ getAttentionIterationDomain(Location loc, OpBuilder &b, int64_t domainRank,
   OpFoldResult zero = b.getIndexAttr(0);
   OpFoldResult one = b.getIndexAttr(1);
 
-  for (auto dim : llvm::seq<int64_t>(0, domainRank)) {
-    loopBounds[dim].offset = zero;
-    loopBounds[dim].stride = one;
+  for (Range &bound : loopBounds) {
+    bound.offset = zero;
+    bound.stride = one;
   }
 
   SmallVector<bool> dimsFound(domainRank, false);
   auto fillSizes = [&](Value val, AffineMap indexingMap) {
     for (auto [idx, dimExpr] : llvm::enumerate(indexingMap.getResults())) {
-      assert(isa<AffineDimExpr>(dimExpr));
-      AffineDimExpr dim = cast<AffineDimExpr>(dimExpr);
+      auto dim = cast<AffineDimExpr>(dimExpr);
       int64_t pos = dim.getPosition();
       if (dimsFound[pos]) {
         continue;

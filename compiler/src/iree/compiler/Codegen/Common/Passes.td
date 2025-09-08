@@ -370,7 +370,8 @@ def FissionTransferOpsInControlFlowPass : InterfacePass<"iree-codegen-fission-tr
   let summary =
       "Fission transfer read and write ops in control flow to allow prefetching.";
   let dependentDialects = [
-      "memref::MemRefDialect"
+      "memref::MemRefDialect",
+      "affine::AffineDialect"
   ];
   let options = [
     Option<"FissionMultiTrip", "fission-multi-trip",

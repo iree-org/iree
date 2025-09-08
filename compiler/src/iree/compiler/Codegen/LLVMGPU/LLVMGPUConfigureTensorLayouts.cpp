@@ -29,6 +29,7 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_LLVMGPUCONFIGURETENSORLAYOUTSPASS
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
+using IREE::GPU::MMASingleSubgroupLayout;
 using IREE::VectorExt::NestedLayoutAttr;
 using IREE::VectorExt::ToLayoutOp;
 using IREE::VectorExt::VectorLayoutInterface;
@@ -79,81 +80,123 @@ static int64_t getSubgroupNCount(Operation *op) {
   return getSubgroupNCount(config).value();
 }
 
-/// Gets a unit vector of the given rank, but fills in the given dimensions
-/// from the 2 element array |counts|. |dim0| is the position in the returned
-/// vector to put the first element of |counts|, and |dim1| is the position to
-/// put the second element. For example,
-///
-/// rank = 3, counts = [5, 7], dim0 = 2, dim1 = 1
-/// returns [1, 5, 7]
-static SmallVector<int64_t> getUnitOfRankWithDims(int64_t rank,
-                                                  ArrayRef<int64_t> counts,
-                                                  int64_t dim0, int64_t dim1) {
-  assert(counts.size() == 2 &&
-         "Unexpected non-rank 2 single subgroup dimension counts");
-  SmallVector<int64_t> res(rank, 1);
-  res[dim0] = counts[0];
-  res[dim1] = counts[1];
-  return res;
+struct ContractionLayout {
+  VectorLayoutInterface lhs;
+  VectorLayoutInterface rhs;
+  VectorLayoutInterface acc;
+};
+
+// Get the layouts to use for the contraction given the intrinsic to use and
+// number of subgroups on the M and N dimension.
+//
+// The contraction is expected to have 3 operands: lhs, rhs and acc of the
+// contraction and a single accumulator.
+static FailureOr<ContractionLayout>
+getContractionLayout(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+                     int64_t subgroupMCount, int64_t subgroupNCount,
+                     ArrayRef<int64_t> bounds,
+                     ArrayRef<AffineMap> contractIndexingMaps) {
+  auto mmaIntrinsic = dyn_cast<IREE::GPU::MmaInterfaceAttr>(intrinsic);
+  if (!mmaIntrinsic) {
+    return failure();
+  }
+
+  int64_t rank = bounds.size();
+  FailureOr<VectorContractOpInfo> maybeOpInfo =
+      VectorContractOpInfo::inferFromIndexingMaps(contractIndexingMaps);
+  if (failed(maybeOpInfo)) {
+    return failure();
+  }
+  VectorContractOpInfo opInfo = maybeOpInfo.value();
+  // Get the inner dimensions.
+  int64_t innerMDim = opInfo.getMDims().back();
+  int64_t innerNDim = opInfo.getNDims().back();
+  int64_t innerKDim = opInfo.getKDims().back();
+  // Find the number Of subgroups being used from subgroupMCount/subgroupNCount.
+  // Just assign them to the inner-most dimension for now.
+  // TODO: Use subgroup_basis to get this instead and allow distributing
+  // subgroups on multiple dimensions.
+  SmallVector<int64_t> subgroupCounts(rank, 1);
+  SmallVector<int64_t> subgroupStrides(rank, 0);
+  subgroupCounts[innerMDim] = subgroupMCount;
+  subgroupCounts[innerNDim] = subgroupNCount;
+  // Distribute on M and then N.
+  // TODO: Use subgroup_basis to get the strides.
+  subgroupStrides[innerMDim] = 1;
+  subgroupStrides[innerNDim] = subgroupMCount;
+
+  // Since these MMA intrinsics have a given tile size for each subgroup, we can
+  // calculate the batch dimensions without looking at the subgroup layout.
+  SmallVector<int64_t> subgroupSize(rank, 1);
+  auto [mSize, nSize, kSize] = mmaIntrinsic.getMNKShape();
+  subgroupSize[innerMDim] = mSize;
+  subgroupSize[innerNDim] = nSize;
+  subgroupSize[innerKDim] = kSize;
+
+  SmallVector<int64_t> batchCounts(rank);
+  for (auto [batchCount, subgroupCount, subgroupSize, bound] :
+       llvm::zip_equal(batchCounts, subgroupCounts, subgroupSize, bounds)) {
+    int64_t workgroupDimSize = subgroupCount * subgroupSize;
+    batchCount = llvm::divideCeil(bound, workgroupDimSize);
+  }
+
+  // MMA intrinsics can be weird and usually don't have a single subgroup
+  // iteration space, so we need to find their value subgroup iteration space
+  // indvidually.
+  auto getFragmentLayout = [&](IREE::GPU::MMAFragment fragment,
+                               int64_t outerDim, int64_t innerDim,
+                               AffineMap map) -> VectorLayoutInterface {
+    // Note that the struct MMASingleSubgroupLayout contains the partial layout
+    // for the canonical (M, K) x (K, N) -> (M, N) matmul form. We treat the
+    // concrete nested layout as the layout for the innermost M, N, K
+    // dimensions.
+    SmallVector<int64_t> outerCounts(rank, 1);
+    SmallVector<int64_t> elementCounts(rank, 1);
+    SmallVector<int64_t> threadCounts(rank, 1);
+    SmallVector<int64_t> threadStrides(rank, 0);
+
+    MMASingleSubgroupLayout subgroupLayout =
+        IREE::GPU::getSingleSubgroupLayout(intrinsic, fragment);
+    outerCounts[outerDim] = subgroupLayout.outer[0];
+    outerCounts[innerDim] = subgroupLayout.outer[1];
+    threadCounts[outerDim] = subgroupLayout.thread[0];
+    threadCounts[innerDim] = subgroupLayout.thread[1];
+    threadStrides[outerDim] = subgroupLayout.tstrides[0];
+    threadStrides[innerDim] = subgroupLayout.tstrides[1];
+    elementCounts[outerDim] = subgroupLayout.element[0];
+    elementCounts[innerDim] = subgroupLayout.element[1];
+    // Get the fragment layout for the entire iteration space and then project
+    // it. This is significantly easier than trying to create a layout for each
+    // fragment itself.
+    auto fragmentSpaceLayout = NestedLayoutAttr::get(
+        map.getContext(), subgroupCounts, batchCounts, outerCounts,
+        threadCounts, elementCounts, subgroupStrides, threadStrides);
+    return fragmentSpaceLayout.apply(map);
+  };
+
+  VectorLayoutInterface lhs =
+      getFragmentLayout(IREE::GPU::MMAFragment::Lhs, innerMDim, innerKDim,
+                        contractIndexingMaps[0]);
+  VectorLayoutInterface rhs =
+      getFragmentLayout(IREE::GPU::MMAFragment::Rhs, innerKDim, innerNDim,
+                        contractIndexingMaps[1]);
+  VectorLayoutInterface acc =
+      getFragmentLayout(IREE::GPU::MMAFragment::Acc, innerMDim, innerNDim,
+                        contractIndexingMaps[2]);
+
+  return ContractionLayout{lhs, rhs, acc};
 }
 
-/// Constructs the nested layout given the layout for a single subgroup and the
-/// subgroup/batch counts and orders, as well as the dimensions along which to
-/// distribute the intrinsic's layout.
-///
-/// |outerDim| and |innerDim| refer to which dimensions are the outermost and
-/// innermost for a canonical MK_KN_MN matrix multiply, for a particular
-/// fragment. For example, for the B matrix of an MK_NK_MN matrix multiply,
-/// we would have:
-///   outerDim = 1 for the K dim
-///   innerDim = 0 for the N dim
-///
-/// For something like MK_NKN_MN with multiple N dims, it would typically be:
-///   outerDim = 1 for K
-///   innerDim = 2 for the second N dim
-///
-/// Importantly these two dimensions always refer to the actual dimension
-/// positions in the undistributed vector. For each fragment, this means:
-///   A: [outerDim, innerDim] = [innerMostMDim, innerMostKDim]
-///   B: [outerDim, innerDim] = [innerMostKDim, innerMostNDim]
-///   C: [outerDim, innerDim] = [innerMostMDim, innerMostNDim]
-///
-/// And here inner most is referential to the iteration order, not the order
-/// they appear per fragment (because there is no relationship between the
-/// dimension order of M in A and in C, for example).
-static NestedLayoutAttr createNestedLayout(
-    MLIRContext *context, int64_t rank, int64_t outerDim, int64_t innerDim,
-    ArrayRef<int64_t> subgroupSizes, ArrayRef<int64_t> subgroupStrides,
-    ArrayRef<int64_t> batchCount, IREE::GPU::MMASingleSubgroupLayout counts) {
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "Creating Nested Layout for::" << "\n    outerDim = "
-                 << outerDim << "\n    innerDim = " << innerDim
-                 << "\n    subgroupSizes: " << llvm::interleaved(subgroupSizes)
-                 << "\n    subgroupStrides: "
-                 << llvm::interleaved(subgroupStrides)
-                 << "\n    batchCount: " << llvm::interleaved(batchCount)
-                 << "\n    counts.outer: " << llvm::interleaved(counts.outer)
-                 << "\n    counts.thread: " << llvm::interleaved(counts.thread)
-                 << "\n    counts.element: "
-                 << llvm::interleaved(counts.element)
-                 << "\n    counts.tstrides: "
-                 << llvm::interleaved(counts.tstrides) << "\n";
-  });
-
-  SmallVector<int64_t> outerCount =
-      getUnitOfRankWithDims(rank, counts.outer, outerDim, innerDim);
-  SmallVector<int64_t> threadCount =
-      getUnitOfRankWithDims(rank, counts.thread, outerDim, innerDim);
-  SmallVector<int64_t> threadStrides =
-      getUnitOfRankWithDims(rank, counts.tstrides, outerDim, innerDim);
-  SmallVector<int64_t> elementCount =
-      getUnitOfRankWithDims(rank, counts.element, outerDim, innerDim);
-
-  auto layoutAttr = NestedLayoutAttr::get(context, subgroupSizes, batchCount,
-                                          outerCount, threadCount, elementCount,
-                                          subgroupStrides, threadStrides);
-  return layoutAttr;
+SmallVector<int64_t> getIterationSpaceBounds(linalg::LinalgOp linalgOp) {
+  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
+  std::optional<VectorizationTileSizes> sizes =
+      inferSizesFromIR(linalgOp, std::nullopt);
+  // Even though the opShape could be dynamic, we could potentially
+  // infer the vector shape
+  if (sizes.has_value()) {
+    bounds = sizes.value().vectorSizes;
+  }
+  return bounds;
 }
 
 static LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
@@ -169,12 +212,10 @@ static LogicalResult setContractionAnchor(IREE::GPU::MMAScheduleAttr schedule,
   assert(linalg::isaContractionOpInterface(contract) &&
          "cannot set contraction anchor on non contraction op");
 
-  FailureOr<VectorContractOpInfo> opInfo =
-      VectorContractOpInfo::inferFromIndexingMaps(
-          contract.getIndexingMapsArray());
-  assert(succeeded(opInfo) && "contraction should have been inferred");
-
-  auto layouts = getContractionLayout(schedule, opInfo.value(), contract);
+  SmallVector<int64_t> bounds = getIterationSpaceBounds(contract);
+  auto layouts = getContractionLayout(
+      schedule.getIntrinsic(), schedule.getSubgroupMCount(),
+      schedule.getSubgroupNCount(), bounds, contract.getIndexingMapsArray());
   if (failed(layouts)) {
     return contract->emitError("cannot get concrete layout for contraction");
   }
@@ -256,15 +297,10 @@ static LogicalResult setConvolutionAnchor(IREE::GPU::MMAScheduleAttr schedule,
     map = projectDims(map, filterDims, /*compressDimsFlag=*/false);
   }
 
-  FailureOr<VectorContractOpInfo> opInfo =
-      VectorContractOpInfo::inferFromIndexingMaps(maps);
-  assert(succeeded(opInfo) &&
-         "unit filter dim convolution should have been infered");
-
-  auto layouts = getContractionLayout(schedule, opInfo.value(), conv);
-  if (failed(layouts)) {
-    return conv->emitError("cannot get concrete layout for convolution");
-  }
+  SmallVector<int64_t> bounds = getIterationSpaceBounds(conv);
+  auto layouts = getContractionLayout(
+      schedule.getIntrinsic(), schedule.getSubgroupMCount(),
+      schedule.getSubgroupNCount(), bounds, maps);
 
   auto [aLayout, bLayout, cLayout] = *layouts;
   Location loc = conv.getLoc();
@@ -456,26 +492,6 @@ static LogicalResult setAttentionMatmulAnchor(RewriterBase &rewriter,
                               pvMatmul);
 }
 
-// Apply the permuted projection map to the layout.
-static IREE::VectorExt::VectorLayoutInterface
-getLayoutForMap(VectorLayoutInterface layout, AffineMap map) {
-  // Project out unusued dims in layout.
-  SmallVector<bool> projectedDims(layout.getRank(), false);
-  llvm::SmallBitVector unusedBits = getUnusedDimsBitVector(map);
-  for (int dim : unusedBits.set_bits()) {
-    projectedDims[dim] = true;
-  }
-  IREE::VectorExt::VectorLayoutInterface projectedLayout =
-      layout.project(projectedDims);
-
-  // Transpose dims in layout.
-  AffineMap permMap = compressUnusedDims(map);
-  SmallVector<int64_t> identity =
-      llvm::to_vector(llvm::seq<int64_t>(permMap.getNumDims()));
-  SmallVector<int64_t> perm = applyPermutationMap<int64_t>(permMap, identity);
-  return projectedLayout.permute(perm);
-}
-
 static LogicalResult setDerivedThreadConfigLayout(
     IREE::GPU::DerivedThreadConfigAttr config, linalg::LinalgOp linalgOp,
     ArrayRef<int64_t> workgroupSize, RewriterBase &rewriter) {
@@ -552,7 +568,7 @@ static LogicalResult setDerivedThreadConfigLayout(
   rewriter.setInsertionPointAfter(linalgOp);
   for (OpResult result : linalgOp->getResults()) {
     VectorLayoutInterface resultLayout =
-        getLayoutForMap(layout, linalgOp.getIndexingMapMatchingResult(result));
+        layout.apply(linalgOp.getIndexingMapMatchingResult(result));
     auto toLayout = rewriter.create<ToLayoutOp>(loc, result, resultLayout);
     rewriter.replaceAllUsesExcept(result, toLayout, toLayout);
   }
@@ -675,14 +691,7 @@ static LogicalResult setGPULoweringConfigLayout(
   MLIRContext *context = config.getContext();
   Location loc = candidate.getLoc();
 
-  SmallVector<int64_t> bounds = candidate.getStaticLoopRanges();
-  std::optional<VectorizationTileSizes> sizes =
-      inferSizesFromIR(candidate, std::nullopt);
-  // Even though the opShape could be dynamic, we could potentially
-  // infer the vector shape
-  if (sizes.has_value()) {
-    bounds = sizes.value().vectorSizes;
-  }
+  SmallVector<int64_t> bounds = getIterationSpaceBounds(candidate);
 
   // Subgroup distribution layouts.
   SmallVector<int64_t> subgroupSizes, subgroupStrides;
@@ -723,7 +732,7 @@ static LogicalResult setGPULoweringConfigLayout(
   rewriter.setInsertionPoint(candidate);
   for (OpOperand &operand : candidate->getOpOperands()) {
     VectorLayoutInterface operandLayout =
-        getLayoutForMap(layout, candidate.getMatchingIndexingMap(&operand));
+        layout.apply(candidate.getMatchingIndexingMap(&operand));
     auto toLayout =
         rewriter.create<ToLayoutOp>(loc, operand.get(), operandLayout);
     // Set shared memory promotion if requested.
@@ -735,7 +744,7 @@ static LogicalResult setGPULoweringConfigLayout(
   rewriter.setInsertionPointAfter(candidate);
   for (OpResult result : candidate->getResults()) {
     VectorLayoutInterface resultLayout =
-        getLayoutForMap(layout, candidate.getIndexingMapMatchingResult(result));
+        layout.apply(candidate.getIndexingMapMatchingResult(result));
     auto toLayout = rewriter.create<ToLayoutOp>(loc, result, resultLayout);
     rewriter.replaceAllUsesExcept(result, toLayout, toLayout);
   }

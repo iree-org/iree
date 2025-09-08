@@ -92,8 +92,7 @@ static std::optional<unsigned> getBitWidth(Type type) {
   if (type.isIntOrFloat()) {
     return type.getIntOrFloatBitWidth();
   }
-  if (llvm::isa<VectorType>(type)) {
-    auto vecType = cast<VectorType>(type);
+  if (auto vecType = dyn_cast<VectorType>(type)) {
     auto elementType = vecType.getElementType();
     return elementType.getIntOrFloatBitWidth() * vecType.getNumElements();
   }

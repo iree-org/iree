@@ -176,8 +176,6 @@ MlirAttribute ireeGPUVirtualMMAIntrinsicAttrGet(MlirContext mlirCtx,
 }
 
 mma_intrinsic_enum_t ireeGPUMMAIntrinsicAttrGetValue(MlirAttribute attr) {
-  assert(ireeAttributeIsAGPUMMAIntrinsicAttr(attr) &&
-         "attr is not a GPUMMAIntrinsicAttr");
   return static_cast<mma_intrinsic_enum_t>(
       llvm::cast<mlir::iree_compiler::IREE::GPU::MMAIntrinsicAttr>(unwrap(attr))
           .getValue());
@@ -185,8 +183,6 @@ mma_intrinsic_enum_t ireeGPUMMAIntrinsicAttrGetValue(MlirAttribute attr) {
 
 mma_intrinsic_enum_t
 ireeGPUVirtualMMAIntrinsicAttrGetValue(MlirAttribute attr) {
-  assert(ireeAttributeIsAGPUVirtualMMAIntrinsicAttr(attr) &&
-         "attr is not a GPUVirtualMMAIntrinsicAttr");
   return static_cast<mma_intrinsic_enum_t>(
       llvm::cast<mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsicAttr>(
           unwrap(attr))
@@ -252,7 +248,6 @@ ireeGPUMMAInfo ireeGPUMMAAttrGetInfo(MlirAttribute attr) {
 }
 
 MlirAttribute ireeGPUMMAAttrGetVirtualMMAIntrinsic(MlirAttribute attr) {
-  assert(ireeAttributeIsAGPUMMAAttr(attr) && "attr is not a MMAAttr");
   auto mma = llvm::cast<mlir::iree_compiler::IREE::GPU::MMAAttr>(unwrap(attr));
   llvm::SmallVector<mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic>
       virtualIntrinsics = mma.getVirtualIntrinsics();
@@ -278,7 +273,6 @@ MlirTypeID ireeGPULoweringConfigAttrGetTypeID() {
 
 MlirAttribute ireeGPULoweringConfigAttrGet(MlirContext mlirCtx,
                                            MlirAttribute attributesDictionary) {
-  assert(mlirAttributeIsADictionary(attributesDictionary));
   auto attributes =
       llvm::cast<mlir::DictionaryAttr>(unwrap(attributesDictionary));
   mlir::MLIRContext *ctx = unwrap(mlirCtx);
@@ -320,7 +314,6 @@ ireeGPUTileSizes ireeGPULoweringConfigAttrGetTileSizes(MlirAttribute attr) {
 
 ireeGPUSubgroupCountInfo
 ireeGPULoweringConfigAttrGetSubgroupCount(MlirAttribute attr) {
-  assert(ireeAttributeIsAGPULoweringConfigAttr(attr));
   auto loweringConfigAttr =
       llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
           unwrap(attr));
@@ -346,7 +339,6 @@ ireeGPULoweringConfigAttrGetSubgroupCount(MlirAttribute attr) {
 }
 
 MlirAttribute ireeGPULoweringConfigAttrGetMmaKind(MlirAttribute attr) {
-  assert(ireeAttributeIsAGPULoweringConfigAttr(attr));
   auto loweringConfigAttr =
       llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
           unwrap(attr));
@@ -396,7 +388,6 @@ ireeGPUGetSingleSubgroupLayout(MlirAttribute attr, uint32_t fragment) {
 
 ireeGPUTargetInfo
 ireeHALExecutableTargetAttrGetGPUTargetInfo(MlirAttribute attr) {
-  assert(!mlirAttributeIsNull(attr) && "attr cannot be null");
   auto executableTargetAttr =
       llvm::cast<mlir::iree_compiler::IREE::HAL::ExecutableTargetAttr>(
           unwrap(attr));
