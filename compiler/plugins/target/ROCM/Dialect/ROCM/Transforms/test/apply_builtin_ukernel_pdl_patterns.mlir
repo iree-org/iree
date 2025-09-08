@@ -28,8 +28,8 @@ func.func @matmul_f8_gfx942(%arg0: tensor<1x128x4096xf8E4M3FNUZ>, %arg1: tensor<
 // GFX942-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
 // GFX950-LABEL: @matmul_f8_gfx942
 // GFX950:         linalg.generic
-// GFX942-NOT:      compilation_info = #iree_codegen.compilation_info
-// GFX942-NOT:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
+// GFX950-NOT:      compilation_info = #iree_codegen.compilation_info
+// GFX950-NOT:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
 // -----
 
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
@@ -52,6 +52,9 @@ func.func @negative_matmul_f8_gfx942(%arg0: tensor<1x128x256xf8E4M3FNUZ>, %arg1:
 // GFX942-LABEL: @negative_matmul_f8_gfx942
 // GFX942-NOT:     compilation_info = #iree_codegen.compilation_info
 // GFX942-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
+// GFX950-LABEL: @negative_matmul_f8_gfx942
+// GFX950-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX950-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
 
 // -----
 
@@ -75,6 +78,9 @@ func.func @negative_matmul_f8_medium_no_zero_fill_gfx942(%arg0: tensor<1x128x409
 // GFX942-LABEL: @negative_matmul_f8_medium_no_zero_fill_gfx942
 // GFX942-NOT:     compilation_info = #iree_codegen.compilation_info
 // GFX942-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
+// GFX950-LABEL: @negative_matmul_f8_medium_no_zero_fill_gfx942
+// GFX950-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX950-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
 
 // -----
 
@@ -106,6 +112,10 @@ func.func @matmul_f8_dynamic_gfx942(%arg0: index) -> tensor<1x128x1024xf32> {
 // GFX942-SAME:      lowering_config =
 // GFX942-SAME:      translation_info =
 // GFX942-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
+// GFX950-LABEL: @matmul_f8_dynamic_gfx942
+// GFX950:         linalg.generic
+// GFX950-NOT:      compilation_info = #iree_codegen.compilation_info
+// GFX950-NOT:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
 
 // -----
 
@@ -133,6 +143,9 @@ func.func @negative_matmul_f8_dynamic_multiple_of_gfx942(%arg0: tensor<1024x512x
 // GFX942-LABEL: @negative_matmul_f8_dynamic_multiple_of_gfx942
 // GFX942-NOT:     compilation_info = #iree_codegen.compilation_info
 // GFX942-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
+// GFX950-LABEL: @negative_matmul_f8_dynamic_multiple_of_gfx942
+// GFX950-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX950-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
 
 // -----
 
@@ -161,6 +174,9 @@ func.func @negative_matmul_f8_dynamic_lower_bound_gfx942(%arg0: index) -> tensor
 // GFX942-LABEL: @negative_matmul_f8_dynamic_lower_bound_gfx942
 // GFX942-NOT:     compilation_info = #iree_codegen.compilation_info
 // GFX942-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
+// GFX950-LABEL: @negative_matmul_f8_dynamic_lower_bound_gfx942
+// GFX950-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX950-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
 
 // -----
 
@@ -184,6 +200,9 @@ func.func @negative_matmul_f8_large_no_zero_fill_gfx942(%arg0: tensor<1x256x4096
 // GFX942-LABEL: @negative_matmul_f8_large_no_zero_fill_gfx942
 // GFX942-NOT:     compilation_info = #iree_codegen.compilation_info
 // GFX942-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
+// GFX950-LABEL: @negative_matmul_f8_large_no_zero_fill_gfx942
+// GFX950-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX950-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
 
 // -----
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
@@ -235,6 +254,9 @@ func.func @negative_matmul_f8_gfx950(%arg0: tensor<1x128x256xf8E4M3FN>, %arg1: t
 // GFX950-LABEL: @negative_matmul_f8_gfx950
 // GFX950-NOT:     compilation_info = #iree_codegen.compilation_info
 // GFX950-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FN_expanded", tensor>
+// GFX942-LABEL: @negative_matmul_f8_gfx950
+// GFX942-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX942-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FN_expanded", tensor>
 
 // -----
 
@@ -258,7 +280,9 @@ func.func @negative_matmul_f8_medium_no_zero_fill_gfx950(%arg0: tensor<1x128x409
 // GFX950-LABEL: @negative_matmul_f8_medium_no_zero_fill_gfx950
 // GFX950-NOT:     compilation_info = #iree_codegen.compilation_info
 // GFX950-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
-
+// GFX942-LABEL: @negative_matmul_f8_medium_no_zero_fill_gfx950
+// GFX942-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX942-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
 // -----
 
 // Through a constraint, the inner dimension is known to be a multiple of 128 and has a lower bound of 512, so should be matched.
@@ -289,7 +313,10 @@ func.func @matmul_f8_dynamic_gfx950(%arg0: index) -> tensor<1x128x1024xf32> {
 // GFX950-SAME:      lowering_config =
 // GFX950-SAME:      translation_info =
 // GFX950-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FN_expanded", tensor>
-
+// GFX942-LABEL: @matmul_f8_dynamic_gfx950
+// GFX942:         linalg.generic
+// GFX942-NOT:      compilation_info = #iree_codegen.compilation_info
+// GFX942-NOT:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FN_expanded", tensor>
 // -----
 
 // The dynamic dimension is not a multiple of 128.
@@ -316,7 +343,9 @@ func.func @negative_matmul_f8_dynamic_multiple_of_gfx950(%arg0: tensor<1024x512x
 // GFX950-LABEL: @negative_matmul_f8_dynamic_multiple_of_gfx950
 // GFX950-NOT:     compilation_info = #iree_codegen.compilation_info
 // GFX950-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FN_expanded", tensor>
-
+// GFX942-LABEL: @negative_matmul_f8_dynamic_multiple_of_gfx950
+// GFX942-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX942-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FN_expanded", tensor>
 // -----
 
 // The dynamic dimension is a multiple of 128, but doesn't have a lower bound of 512.
@@ -344,7 +373,9 @@ func.func @negative_matmul_f8_dynamic_lower_bound_gfx950(%arg0: index) -> tensor
 // GFX950-LABEL: @negative_matmul_f8_dynamic_lower_bound_gfx950
 // GFX950-NOT:     compilation_info = #iree_codegen.compilation_info
 // GFX950-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FN_expanded", tensor>
-
+// GFX942-LABEL: @negative_matmul_f8_dynamic_lower_bound_gfx950
+// GFX942-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX942-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FN_expanded", tensor>
 // -----
 
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
@@ -367,7 +398,9 @@ func.func @negative_matmul_f8_large_no_zero_fill_gfx950(%arg0: tensor<1x256x4096
 // GFX950-LABEL: @negative_matmul_f8_large_no_zero_fill_gfx950
 // GFX950-NOT:     compilation_info = #iree_codegen.compilation_info
 // GFX950-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
-
+// GFX942-LABEL: @negative_matmul_f8_large_no_zero_fill_gfx950
+// GFX942-NOT:     compilation_info = #iree_codegen.compilation_info
+// GFX942-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
 // -----
 
 
