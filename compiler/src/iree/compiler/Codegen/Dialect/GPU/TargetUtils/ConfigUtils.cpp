@@ -401,9 +401,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   Value init = operands[2];
   if (scaled) {
     init = operands[4];
-    assert(llvm::all_of(
-               operands,
-               [](Value a) { return llvm::isa<ShapedType>(a.getType()); }) &&
+    assert(llvm::all_of(operands,
+                        [](Value a) { return isa<ShapedType>(a.getType()); }) &&
            "All operands must be a shaped type");
     assert(*getRank(lhs) > *getRank(operands[3]) &&
            *getRank(rhs) > *getRank(operands[4]) &&
