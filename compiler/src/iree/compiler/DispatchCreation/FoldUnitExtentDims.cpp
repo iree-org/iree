@@ -185,8 +185,8 @@ struct DropUnitDimsFromCollapseOfExpand
     Value newExpanded = expandOp.getSrc();
     if (!llvm::all_of(newExpandReassoc,
                       llvm::hasSingleElement<ReassociationIndicesRef>)) {
-      newExpanded = rewriter.create<tensor::ExpandShapeOp>(
-          expandOp.getLoc(),
+      newExpanded = tensor::ExpandShapeOp::create(
+          rewriter, expandOp.getLoc(),
           RankedTensorType::get(newInterShape,
                                 expandOp.getType().getElementType()),
           expandOp.getSrc(), newExpandReassoc, newInterSizes);
@@ -195,9 +195,9 @@ struct DropUnitDimsFromCollapseOfExpand
     Value result = newExpanded;
     if (!llvm::all_of(newCollapseReassoc,
                       llvm::hasSingleElement<ReassociationIndicesRef>)) {
-      result = rewriter.create<tensor::CollapseShapeOp>(
-          collapseOp.getLoc(), collapseOp.getType(), newExpanded,
-          newCollapseReassoc);
+      result = tensor::CollapseShapeOp::create(rewriter, collapseOp.getLoc(),
+                                               collapseOp.getType(),
+                                               newExpanded, newCollapseReassoc);
     }
     rewriter.replaceOp(collapseOp, result);
     return success();
@@ -299,8 +299,8 @@ foldUnitDimsOnGlobal(IRRewriter &rewriter, IREE::Util::GlobalOpInterface global,
   }
   for (auto store : storeOps) {
     rewriter.setInsertionPoint(store);
-    Value collapse = rewriter.create<tensor::CollapseShapeOp>(
-        store.getLoc(), newGlobalType, store->getOperand(0),
+    Value collapse = tensor::CollapseShapeOp::create(
+        rewriter, store.getLoc(), newGlobalType, store->getOperand(0),
         expandShapeReInds.value());
     auto newStore =
         clone(rewriter, store, store->getResultTypes(), store->getOperands());

@@ -123,8 +123,8 @@ private:
     dynamicDims.tensorType = tensorType;
     for (unsigned i = 0; i < tensorType.getRank(); ++i) {
       if (tensorType.isDynamicDim(i)) {
-        auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
-            loc, (namePrefix + "_dim" + std::to_string(i)).str(),
+        auto globalOp = IREE::Util::GlobalOp::create(
+            moduleBuilder, loc, (namePrefix + "_dim" + std::to_string(i)).str(),
             /*isMutable=*/true, moduleBuilder.getIndexType());
         globalOp.setPrivate();
         dynamicDims.globalOps.push_back(globalOp);
@@ -206,8 +206,8 @@ private:
         dirtyGlobalOp.createLoadOp(loc, entryBuilder).getLoadedGlobalValue();
     auto *recalculateBlock = calcFuncOp.addBlock();
     auto *returnBlock = calcFuncOp.addBlock();
-    entryBuilder.create<mlir::cf::CondBranchOp>(loc, dirtyValue,
-                                                recalculateBlock, returnBlock);
+    mlir::cf::CondBranchOp::create(entryBuilder, loc, dirtyValue,
+                                   recalculateBlock, returnBlock);
     auto *followBlock = entryBlock.splitBlock(entryBuilder.getInsertionPoint());
 
     auto bufferType = entryBuilder.getType<IREE::HAL::BufferType>();
@@ -225,9 +225,10 @@ private:
       auto inputPlaceholder =
           recalculateBuilder.createOrFold<IREE::Util::NullOp>(loc, bufferType);
       auto dynamicDims = inputDynamicDims.loadDynamicDims(recalculateBuilder);
-      auto castOp = recalculateBuilder.create<IREE::HAL::TensorImportOp>(
-          loc, inputValue.getType(), inputPlaceholder, inputValue.getType(),
-          dynamicDims, /*consume=*/false, /*wait_fence=*/Value{},
+      auto castOp = IREE::HAL::TensorImportOp::create(
+          recalculateBuilder, loc, inputValue.getType(), inputPlaceholder,
+          inputValue.getType(), dynamicDims, /*consume=*/false,
+          /*wait_fence=*/Value{},
           /*name=*/nullptr,
           /*affinity=*/nullptr);
       inputValue.replaceAllUsesWith(castOp.getTarget());
@@ -235,7 +236,7 @@ private:
     while (entryBlock.getNumArguments() > 0) {
       entryBlock.eraseArgument(entryBlock.getNumArguments() - 1);
     }
-    recalculateBuilder.create<mlir::cf::BranchOp>(loc, followBlock);
+    mlir::cf::BranchOp::create(recalculateBuilder, loc, followBlock);
     recalculateBlock->moveBefore(followBlock);
 
     // Replace each exit from the function with a storage back to the shape
@@ -263,7 +264,7 @@ private:
       auto falseValue =
           exitBuilder.createOrFold<arith::ConstantIntOp>(exitLoc, 0, 1);
       dirtyGlobalOp.createStoreOp(exitLoc, falseValue, exitBuilder);
-      exitBuilder.create<IREE::Util::ReturnOp>(exitLoc);
+      IREE::Util::ReturnOp::create(exitBuilder, exitLoc);
       returnOp.erase();
     }
 
@@ -283,7 +284,7 @@ private:
     auto *exitBlock = builder.createBlock(entryBlock->getParent(),
                                           ++Region::iterator(entryBlock));
     if (caseCount == 0) {
-      builder.create<mlir::cf::BranchOp>(loc, exitBlock);
+      mlir::cf::BranchOp::create(builder, loc, exitBlock);
       return exitBlock;
     }
     SmallVector<Block *> compareBlocks;
@@ -293,20 +294,20 @@ private:
       caseBlocks.push_back(builder.createBlock(exitBlock));
     }
     builder.restoreInsertionPoint(ip);
-    builder.create<mlir::cf::BranchOp>(loc, compareBlocks[0]);
+    mlir::cf::BranchOp::create(builder, loc, compareBlocks[0]);
     for (size_t i = 0; i < caseCount; ++i) {
       auto compareBuilder = OpBuilder::atBlockBegin(compareBlocks[i]);
       auto caseValue =
           compareBuilder.createOrFold<arith::ConstantIndexOp>(loc, i);
       auto eqValue = compareBuilder.createOrFold<arith::CmpIOp>(
           loc, arith::CmpIPredicate::eq, indexValue, caseValue);
-      compareBuilder.create<mlir::cf::CondBranchOp>(
-          loc, eqValue, caseBlocks[i],
+      mlir::cf::CondBranchOp::create(
+          compareBuilder, loc, eqValue, caseBlocks[i],
           i < caseCount - 1 ? compareBlocks[i + 1] : exitBlock);
 
       auto caseBuilder = OpBuilder::atBlockBegin(caseBlocks[i]);
       caseGenerator(i, caseBuilder);
-      caseBuilder.create<mlir::cf::BranchOp>(loc, exitBlock);
+      mlir::cf::BranchOp::create(caseBuilder, loc, exitBlock);
     }
     builder = OpBuilder::atBlockBegin(exitBlock);
     return exitBlock;
@@ -316,8 +317,8 @@ private:
   void packShape(Location loc, const DynamicDims &dynamicDims, Value listValue,
                  OpBuilder &builder) {
     auto shapeType = dynamicDims.tensorType;
-    builder.create<IREE::Util::ListResizeOp>(
-        loc, listValue,
+    IREE::Util::ListResizeOp::create(
+        builder, loc, listValue,
         builder.createOrFold<arith::ConstantIndexOp>(loc, shapeType.getRank()));
     unsigned dynamicDimIdx = 0;
     for (unsigned i = 0; i < shapeType.getRank(); ++i) {
@@ -330,9 +331,9 @@ private:
         dimValue = builder.createOrFold<arith::ConstantIndexOp>(
             loc, shapeType.getDimSize(i));
       }
-      builder.create<IREE::Util::ListSetOp>(
-          loc, listValue, builder.createOrFold<arith::ConstantIndexOp>(loc, i),
-          dimValue);
+      IREE::Util::ListSetOp::create(
+          builder, loc, listValue,
+          builder.createOrFold<arith::ConstantIndexOp>(loc, i), dimValue);
     }
   }
 
@@ -362,8 +363,8 @@ private:
   void createQueryInputShapeFunc(Location loc, StringRef namePrefix,
                                  ArrayRef<DynamicDims> inputDynamicDims,
                                  OpBuilder &moduleBuilder) {
-    auto queryFuncOp = moduleBuilder.create<IREE::Util::FuncOp>(
-        loc, namePrefix.str() + "_query_input_shape",
+    auto queryFuncOp = IREE::Util::FuncOp::create(
+        moduleBuilder, loc, namePrefix.str() + "_query_input_shape",
         moduleBuilder.getFunctionType(/*inputs=*/
                                       TypeRange{
                                           moduleBuilder.getIndexType(),
@@ -384,7 +385,7 @@ private:
         entryBuilder);
 
     auto exitBuilder = OpBuilder::atBlockBegin(exitBlock);
-    exitBuilder.create<IREE::Util::ReturnOp>(loc);
+    IREE::Util::ReturnOp::create(exitBuilder, loc);
   }
 
   // Creates a function to resize |inputGlobalOps| and sets the |dirtyGlobalOp|
@@ -395,8 +396,8 @@ private:
                                   ArrayRef<DynamicDims> inputDynamicDims,
                                   IREE::Util::GlobalOp dirtyGlobalOp,
                                   OpBuilder &moduleBuilder) {
-    auto resizeFuncOp = moduleBuilder.create<IREE::Util::FuncOp>(
-        loc, namePrefix.str() + "_resize_input_shape",
+    auto resizeFuncOp = IREE::Util::FuncOp::create(
+        moduleBuilder, loc, namePrefix.str() + "_resize_input_shape",
         moduleBuilder.getFunctionType(/*inputs=*/
                                       TypeRange{
                                           moduleBuilder.getIndexType(),
@@ -420,7 +421,7 @@ private:
     auto exitBuilder = OpBuilder::atBlockBegin(exitBlock);
     auto trueValue = exitBuilder.createOrFold<arith::ConstantIntOp>(loc, 1, 1);
     dirtyGlobalOp.createStoreOp(loc, trueValue, exitBuilder);
-    exitBuilder.create<IREE::Util::ReturnOp>(loc);
+    IREE::Util::ReturnOp::create(exitBuilder, loc);
   }
 
   // Creates a function to query the |outputGlobalOps| at runtime by the
@@ -431,8 +432,8 @@ private:
                                   ArrayRef<DynamicDims> outputDynamicDims,
                                   IREE::Util::FuncOp calculateShapeFuncOp,
                                   OpBuilder &moduleBuilder) {
-    auto queryFuncOp = moduleBuilder.create<IREE::Util::FuncOp>(
-        loc, namePrefix.str() + "_query_output_shape",
+    auto queryFuncOp = IREE::Util::FuncOp::create(
+        moduleBuilder, loc, namePrefix.str() + "_query_output_shape",
         moduleBuilder.getFunctionType(/*inputs=*/
                                       TypeRange{
                                           moduleBuilder.getIndexType(),
@@ -447,8 +448,8 @@ private:
 
     // Always call the recalculation function - it checks for whether it needs
     // to run based on the dirty flag value.
-    entryBuilder.create<IREE::Util::CallOp>(loc, calculateShapeFuncOp,
-                                            ValueRange{});
+    IREE::Util::CallOp::create(entryBuilder, loc, calculateShapeFuncOp,
+                               ValueRange{});
 
     auto *exitBlock = buildSwitch(
         loc, entryBlock->getArgument(0), outputDynamicDims.size(),
@@ -458,7 +459,7 @@ private:
         entryBuilder);
 
     auto exitBuilder = OpBuilder::atBlockBegin(exitBlock);
-    exitBuilder.create<IREE::Util::ReturnOp>(loc);
+    IREE::Util::ReturnOp::create(exitBuilder, loc);
   }
 
   // Creates the corresponding wrapper function for the given entry point.
@@ -487,8 +488,8 @@ private:
     auto wrapperFuncType =
         moduleBuilder.getFunctionType(inputTypes, outputTypes);
 
-    auto wrapperFuncOp = moduleBuilder.create<IREE::Util::FuncOp>(
-        entryFuncOp.getLoc(), "_tflite_main", wrapperFuncType);
+    auto wrapperFuncOp = IREE::Util::FuncOp::create(
+        moduleBuilder, entryFuncOp.getLoc(), "_tflite_main", wrapperFuncType);
     wrapperFuncOp.setPublic();
     wrapperFuncOp.getOperation()->setAttr("iree.abi.stub",
                                           moduleBuilder.getUnitAttr());
@@ -524,16 +525,16 @@ private:
         dynamicDims.push_back(globalOp.createLoadOp(arg.getLoc(), entryBuilder)
                                   .getLoadedGlobalValue());
       }
-      callOperands.push_back(entryBuilder.create<IREE::HAL::TensorImportOp>(
-          arg.getLoc(), inputDynamicDims.tensorType, arg,
+      callOperands.push_back(IREE::HAL::TensorImportOp::create(
+          entryBuilder, arg.getLoc(), inputDynamicDims.tensorType, arg,
           TypeAttr::get(inputDynamicDims.tensorType), dynamicDims,
           /*consume=*/UnitAttr{},
           /*wait_fence=*/Value{},
           /*name=*/nullptr,
           /*affinity=*/nullptr));
     }
-    auto callOp = entryBuilder.create<IREE::Util::CallOp>(
-        entryFuncOp.getLoc(), entryFuncOp, callOperands);
+    auto callOp = IREE::Util::CallOp::create(entryBuilder, entryFuncOp.getLoc(),
+                                             entryFuncOp, callOperands);
     SmallVector<Value> callResults;
     for (auto [result, outputDynamicDims] :
          llvm::zip_equal(callOp.getResults(), outputDynamicDims)) {
@@ -541,12 +542,13 @@ private:
       for (unsigned i = 0; i < outputDynamicDims.tensorType.getRank(); ++i) {
         if (outputDynamicDims.tensorType.isDynamicDim(i)) {
           dynamicDims.push_back(
-              entryBuilder.create<tensor::DimOp>(result.getLoc(), result, i));
+              tensor::DimOp::create(entryBuilder, result.getLoc(), result, i));
         }
       }
-      callResults.push_back(entryBuilder.create<IREE::HAL::TensorExportOp>(
-          result.getLoc(), bufferType, result, outputDynamicDims.tensorType,
-          dynamicDims, /*name=*/nullptr, /*affinity=*/nullptr));
+      callResults.push_back(IREE::HAL::TensorExportOp::create(
+          entryBuilder, result.getLoc(), bufferType, result,
+          outputDynamicDims.tensorType, dynamicDims, /*name=*/nullptr,
+          /*affinity=*/nullptr));
       for (auto [dynamicDim, globalOp] :
            llvm::zip_equal(dynamicDims, outputDynamicDims.globalOps)) {
         globalOp.createStoreOp(result.getLoc(), dynamicDim, entryBuilder);
@@ -556,11 +558,11 @@ private:
     // We recomputed the shapes of the outputs and can clear the dirty flag.
     dirtyGlobalOp.createStoreOp(
         entryFuncOp.getLoc(),
-        entryBuilder.create<arith::ConstantIntOp>(entryFuncOp.getLoc(), 0, 1),
+        arith::ConstantIntOp::create(entryBuilder, entryFuncOp.getLoc(), 0, 1),
         entryBuilder);
 
-    entryBuilder.create<IREE::Util::ReturnOp>(entryFuncOp.getLoc(),
-                                              callResults);
+    IREE::Util::ReturnOp::create(entryBuilder, entryFuncOp.getLoc(),
+                                 callResults);
   }
 
   void wrapEntryPoint(IREE::Util::FuncOp funcOp) {
@@ -577,8 +579,8 @@ private:
 
     // Create internal shape calculation function that updates output shapes if
     // needed. This is only required if there are dynamic shapes.
-    auto dirtyGlobalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
-        loc, namePrefix + "_shapes_dirty",
+    auto dirtyGlobalOp = IREE::Util::GlobalOp::create(
+        moduleBuilder, loc, namePrefix + "_shapes_dirty",
         /*isMutable=*/true, moduleBuilder.getI1Type(),
         moduleBuilder.getIntegerAttr(moduleBuilder.getI1Type(), 1));
     dirtyGlobalOp.setPrivate();

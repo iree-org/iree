@@ -285,10 +285,10 @@ void FormScalarDispatchesPass::runOnOperation() {
     Block *countBody = rewriter.createBlock(&countRegion, countRegion.begin());
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPointToStart(countBody);
-    auto one = rewriter.create<arith::ConstantIndexOp>(
-        dispatchRegionOp.value()->getLoc(), 1);
-    rewriter.create<IREE::Flow::ReturnOp>(dispatchRegionOp.value()->getLoc(),
-                                          ValueRange{one, one, one});
+    auto one = arith::ConstantIndexOp::create(
+        rewriter, dispatchRegionOp.value()->getLoc(), 1);
+    IREE::Flow::ReturnOp::create(rewriter, dispatchRegionOp.value()->getLoc(),
+                                 ValueRange{one, one, one});
   }
 }
 

@@ -424,8 +424,8 @@ fuseContractionsHorizontally(RewriterBase &rewriter, Location loc,
 
   SmallVector<AffineMap> fusedIndexingMaps = std::move(fusedInsIndexingMaps);
   fusedIndexingMaps.append(fusedOutsIndexingMaps);
-  auto fusedOp = rewriter.create<linalg::GenericOp>(
-      loc, fusedResultTypes, fusedIns, fusedOuts, fusedIndexingMaps,
+  auto fusedOp = linalg::GenericOp::create(
+      rewriter, loc, fusedResultTypes, fusedIns, fusedOuts, fusedIndexingMaps,
       fusedIteratorTypes, [](OpBuilder &, Location, ValueRange) {});
 
   Block *fusedBody = fusedOp.getBlock();
@@ -461,7 +461,7 @@ fuseContractionsHorizontally(RewriterBase &rewriter, Location loc,
   }
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointToEnd(fusedBody);
-  rewriter.create<linalg::YieldOp>(loc, yieldVals);
+  linalg::YieldOp::create(rewriter, loc, yieldVals);
 
   unsigned resultsIndex = 0;
   for (auto linalgOp : linalgOps) {

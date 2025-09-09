@@ -235,9 +235,9 @@ convertStreamableFunc(mlir::ModuleOp moduleOp, IREE::Util::FuncOp funcOp,
       anyTiedOperands
           ? moduleBuilder.getIndexArrayAttr(streamableFunc.tiedOperands)
           : ArrayAttr{};
-  streamableFunc.funcOp = moduleBuilder.create<IREE::Flow::FuncOp>(
-      funcOp.getLoc(), funcOp.getName(), functionType, tiedOperandsAttr,
-      funcAttrs, funcArgAttrs, funcResAttrs);
+  streamableFunc.funcOp = IREE::Flow::FuncOp::create(
+      moduleBuilder, funcOp.getLoc(), funcOp.getName(), functionType,
+      tiedOperandsAttr, funcAttrs, funcArgAttrs, funcResAttrs);
 
   // Swap out the symbol in the symbol table.
   symbolTable.erase(funcOp);
@@ -266,8 +266,8 @@ static LogicalResult convertStreamableCall(StreamableFunc &streamableFunc,
     // It should return the required number of dynamic dimensions.
     SmallVector<Type> resultDimTypes(streamableFunc.requiredResultDims,
                                      builder.getIndexType());
-    auto calculateCallOp = builder.create<IREE::Util::CallOp>(
-        callOp.getLoc(), resultDimTypes,
+    auto calculateCallOp = IREE::Util::CallOp::create(
+        builder, callOp.getLoc(), resultDimTypes,
         streamableFunc.resultDimsFunc.getLeafReference().getValue(),
         callOp.getOperands(), /*tied_operands=*/ArrayAttr{},
         callOp.getArgAttrsAttr(), callOp.getResAttrsAttr());
@@ -302,8 +302,8 @@ static LogicalResult convertStreamableCall(StreamableFunc &streamableFunc,
   }
 
   // Replace the original func.call with the new flow.call.
-  auto streamableCallOp = builder.create<IREE::Flow::CallOp>(
-      callOp.getLoc(), callOp.getCalleeAttr(), callOp.getResultTypes(),
+  auto streamableCallOp = IREE::Flow::CallOp::create(
+      builder, callOp.getLoc(), callOp.getCalleeAttr(), callOp.getResultTypes(),
       resultDims, callOp.getOperands(), argDims,
       streamableFunc.funcOp.getTiedOperandsAttr());
   streamableCallOp->setDialectAttrs(callOp->getDialectAttrs());

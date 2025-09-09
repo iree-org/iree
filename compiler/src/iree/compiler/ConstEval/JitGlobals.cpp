@@ -473,8 +473,8 @@ public:
                                 targetSymbolTable, moduleBuilder)))
       return failure();
 
-    auto funcOp = moduleBuilder.create<IREE::Util::FuncOp>(
-        initializerOp.getLoc(), "jit_eval",
+    auto funcOp = IREE::Util::FuncOp::create(
+        moduleBuilder, initializerOp.getLoc(), "jit_eval",
         moduleBuilder.getFunctionType({}, {}));
     targetSymbolTable.insert(funcOp);
     IRMapping unusedMapping;
@@ -489,7 +489,7 @@ public:
 private:
   static ModuleOp createInnerModule(ModuleOp sourceModuleOp) {
     OpBuilder builder = OpBuilder::atBlockEnd(sourceModuleOp.getBody());
-    auto m = builder.create<ModuleOp>(sourceModuleOp.getLoc());
+    auto m = ModuleOp::create(builder, sourceModuleOp.getLoc());
     m->setAttr("iree.consteval", builder.getUnitAttr());
     return m;
   }
@@ -583,7 +583,7 @@ private:
     // Rewrite the terminator and the function type.
     entryBlock->getTerminator()->erase();
     OpBuilder termBuilder = OpBuilder::atBlockEnd(entryBlock);
-    termBuilder.create<IREE::Util::ReturnOp>(funcOp.getLoc(), returns);
+    IREE::Util::ReturnOp::create(termBuilder, funcOp.getLoc(), returns);
     funcOp.setType(termBuilder.getFunctionType(argumentTypes, returnTypes));
 
     jitFunctions.push_back(std::move(desc));

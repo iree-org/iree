@@ -72,8 +72,8 @@ static LogicalResult createDefaultWorkgroupCountRegion(
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointToStart(block);
   Operation *defaultCountOp =
-      rewriter.create<IREE::TensorExt::DispatchWorkgroupCountFromSliceOp>(
-          loc, block->getArguments());
+      IREE::TensorExt::DispatchWorkgroupCountFromSliceOp::create(
+          rewriter, loc, block->getArguments());
 
   // Check for presence of `scf.forall` operations created by partial reduction
   // tiling.
@@ -98,7 +98,7 @@ static LogicalResult createDefaultWorkgroupCountRegion(
         IREE::TensorExt::DispatchWorkgroupCountSplitReductionModifierOp>(
         loc, defaultCountOp->getResults(), block->getArguments());
   }
-  rewriter.create<IREE::Flow::ReturnOp>(loc, defaultCountOp->getResults());
+  IREE::Flow::ReturnOp::create(rewriter, loc, defaultCountOp->getResults());
 
   // Update the `workgroupsOp` region.
   rewriter.modifyOpInPlace(workgroupsOp, [&]() {
@@ -117,9 +117,8 @@ static LogicalResult createDefaultWorkgroupCountRegion(
       if (!llvm::isa<IndexType>(operand.getType()))
         continue;
       BlockArgument arg = workgroupsOp.getInputBlockArgument(index);
-      auto ordinalOp =
-          rewriter.create<IREE::TensorExt::DispatchWorkloadOrdinalOp>(
-              loc, arg, rewriter.getIndexAttr(ordinalNumber++));
+      auto ordinalOp = IREE::TensorExt::DispatchWorkloadOrdinalOp::create(
+          rewriter, loc, arg, rewriter.getIndexAttr(ordinalNumber++));
       rewriter.replaceAllUsesExcept(arg, ordinalOp, ordinalOp);
     }
   });
