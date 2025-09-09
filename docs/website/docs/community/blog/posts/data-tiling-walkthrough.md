@@ -59,7 +59,7 @@ iree-compile matmul.mlir -o /tmp/matmul.mlir \
   --iree-llvmgpu-test-combine-layout-transformation=true
 ```
 
-Test source program: matmul.mlir:
+Test source program, matmul.mlir:
 
 ```mlir
 func.func @matmul_f32f32f32(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> {
@@ -76,6 +76,24 @@ func.func @matmul_f32f32f32(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>) -> t
   return %2 : tensor<?x?xf32>
 }
 ```
+
+<!-- markdownlint-disable -->
+<details><summary>Compilation command that targets host CPU</summary>
+
+Below is the compilation command that targets your host CPU. The IR dumps are
+different from what the post shows, but they follow the same mechanism.
+
+```bash
+iree-compile matmul.mlir -o /tmp/matmul.mlir \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=llvm-cpu \
+  --iree-llvmcpu-target-cpu-features=host \
+  --iree-opt-data-tiling=false \
+  --iree-dispatch-creation-data-tiling
+```
+
+</details>
+<!-- markdownlint-restore -->
 
 ## Target-Independent Optimizations
 
