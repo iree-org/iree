@@ -397,6 +397,7 @@ void addMmt4dTilingExpertPassPipeline(
   funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperandsPass(
       IREE::CPU::TilingLevel::VectorReductionTiles));
   funcPassManager.addPass(iree_compiler::createForallToForPass());
+  funcPassManager.addPass(createLLVMCPUTileToVectorSizePass());
 
   {
     GenericVectorizationPassOptions options;
@@ -663,12 +664,12 @@ void buildLLVMCPUCodegenConfigurationPassPipelineImpl(
   }
   modulePassManager.addPass(createMaterializeUserConfigsPass());
   FunctionLikeNest(modulePassManager)
+      .addPass(createMaterializeDeviceEncodingPass)
+      .addPass(createCPUPropagateDataLayoutPass)
       .addPass(createRematerializeParallelOpsPass)
       // TODO(#13888): This(createExpandF16OpToF32Pass()) pass is being added
       // way to late and should insted be be done during lowering to LLVM.
       .addPass(createExpandF16OpToF32Pass)
-      .addPass(createMaterializeDeviceEncodingPass)
-      .addPass(createCPUPropagateDataLayoutPass)
       .addPass(createConvertAccGEMMToGEMMPass)
       // TODO: Remove the following pass the plumb support for
       // #hal.descriptor_type memory space through the stack.
