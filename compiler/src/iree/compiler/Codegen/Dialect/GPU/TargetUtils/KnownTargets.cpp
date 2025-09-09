@@ -1046,6 +1046,14 @@ StringRef normalizeHIPTarget(StringRef target) {
   return normalizeAMDGPUTarget(target);
 }
 
+StringRef normalizeVulkanAMDGPUTarget(StringRef target) {
+  // We cannot accept rdnaN as a target for LLVM AMDGPU backend; so the
+  // following is only meant for Vulkan but not HIP.
+  if (target.starts_with("rdna"))
+    return target;
+  return normalizeAMDGPUTarget(target);
+}
+
 TargetAttr getVulkanTargetDetails(llvm::StringRef target,
                                   MLIRContext *context) {
   // Go through each vendor's target details. This assumes we won't have
@@ -1055,7 +1063,7 @@ TargetAttr getVulkanTargetDetails(llvm::StringRef target,
   // TODO: Add feature bits for physical storage buffer.
 
   if (std::optional<TargetDetails> details = getAMDGPUTargetDetails(target)) {
-    return createTargetAttr(*details, normalizeAMDGPUTarget(target),
+    return createTargetAttr(*details, normalizeVulkanAMDGPUTarget(target),
                             /*features=*/"spirv:v1.6,cap:Shader", context);
   }
   if (std::optional<TargetDetails> details = getARMGPUTargetDetails(target)) {
