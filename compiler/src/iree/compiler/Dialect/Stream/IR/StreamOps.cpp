@@ -1408,9 +1408,9 @@ ResourceAllocOp::createSuballocations(
   if (locs.empty())
     return {};
   if (locs.size() == 1) {
-    auto allocOp = builder.create<IREE::Stream::ResourceAllocOp>(
-        locs.front(), resourceType, storageSizes.front(), uninitialized,
-        affinityAttr);
+    auto allocOp = IREE::Stream::ResourceAllocOp::create(
+        builder, locs.front(), resourceType, storageSizes.front(),
+        uninitialized, affinityAttr);
     return {allocOp, {allocOp.getResult()}};
   }
   auto fusedLoc = builder.getFusedLoc(locs);
@@ -1430,13 +1430,13 @@ ResourceAllocOp::createSuballocations(
   // pack op.
   auto indexType = builder.getIndexType();
   SmallVector<Type> packedOffsetTypes(sliceCount, indexType);
-  auto packOp = builder.create<IREE::Stream::ResourcePackOp>(
-      fusedLoc, indexType, packedOffsetTypes, /*offset=*/nullptr,
+  auto packOp = IREE::Stream::ResourcePackOp::create(
+      builder, fusedLoc, indexType, packedOffsetTypes, /*offset=*/nullptr,
       builder.getIndexArrayAttr(lifetimeIntervals), storageSizes, affinityAttr);
 
   // Create the new alloca based on the total required size.
-  auto allocOp = builder.create<IREE::Stream::ResourceAllocOp>(
-      fusedLoc, resourceType, packOp.getTotalLength(), uninitialized,
+  auto allocOp = IREE::Stream::ResourceAllocOp::create(
+      builder, fusedLoc, resourceType, packOp.getTotalLength(), uninitialized,
       affinityAttr);
   auto slab = allocOp.getResult();
   auto slabSize = packOp.getTotalLength();
@@ -1470,8 +1470,9 @@ ResourceAllocaOp::createSuballocations(Type timepointType, Type resourceType,
   if (locs.empty())
     return {};
   if (locs.size() == 1) {
-    auto allocaOp = builder.create<IREE::Stream::ResourceAllocaOp>(
-        locs.front(), resourceType, timepointType, storageSizes.front(),
+    auto allocaOp = IREE::Stream::ResourceAllocaOp::create(
+        builder, locs.front(), resourceType, timepointType,
+        storageSizes.front(),
         /*indeterminate_lifetime=*/UnitAttr{}, awaitTimepoint, affinityAttr);
     return {allocaOp, {allocaOp.getResult()}};
   }
@@ -1495,13 +1496,13 @@ ResourceAllocaOp::createSuballocations(Type timepointType, Type resourceType,
   // pack op.
   auto indexType = builder.getIndexType();
   SmallVector<Type> packedOffsetTypes(sliceCount, indexType);
-  auto packOp = builder.create<IREE::Stream::ResourcePackOp>(
-      fusedLoc, indexType, packedOffsetTypes, /*offset=*/nullptr,
+  auto packOp = IREE::Stream::ResourcePackOp::create(
+      builder, fusedLoc, indexType, packedOffsetTypes, /*offset=*/nullptr,
       builder.getIndexArrayAttr(lifetimeIntervals), storageSizes, affinityAttr);
 
   // Create the new alloca based on the total required size.
-  auto allocaOp = builder.create<IREE::Stream::ResourceAllocaOp>(
-      fusedLoc, resourceType, timepointType, packOp.getTotalLength(),
+  auto allocaOp = IREE::Stream::ResourceAllocaOp::create(
+      builder, fusedLoc, resourceType, timepointType, packOp.getTotalLength(),
       /*indeterminate_lifetime=*/UnitAttr{}, awaitTimepoint, affinityAttr);
   auto slab = allocaOp.getResult();
   auto slabSize = packOp.getTotalLength();
@@ -3176,8 +3177,8 @@ AsyncExecuteOp::cloneReplacementExcludingOperandsAndResults(
   assert(getTiedOperandsIndexAndLength().first == 0 &&
          "operands must be the first ODS group");
 
-  auto newOp = rewriter.create<AsyncExecuteOp>(
-      getLoc(), newResultTypes, newResultSizes, getAwaitTimepoint(),
+  auto newOp = AsyncExecuteOp::create(
+      rewriter, getLoc(), newResultTypes, newResultSizes, getAwaitTimepoint(),
       newOperandsValues, newOperandSizes, newTiedOperandIndices,
       getOperation()->getAttrs());
   auto &newBody = newOp.getClosureBodyRegion();
@@ -3297,8 +3298,8 @@ AsyncConcurrentOp::cloneReplacementExcludingOperandsAndResults(
   assert(getTiedOperandsIndexAndLength().first == 0 &&
          "operands must be the first ODS group");
 
-  auto newOp = rewriter.create<AsyncConcurrentOp>(
-      getLoc(), newResultTypes, newResultSizes, newOperandsValues,
+  auto newOp = AsyncConcurrentOp::create(
+      rewriter, getLoc(), newResultTypes, newResultSizes, newOperandsValues,
       newOperandSizes, newTiedOperandIndices, getOperation()->getAttrs());
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
@@ -4092,9 +4093,9 @@ CmdExecuteOp::cloneReplacementExcludingOperandsAndResults(
       newOperandsValues, newOperandSizes, excludedOperandIndices,
       newResultTypes, newResultSizes, excludedResultIndices);
 
-  auto newOp = rewriter.create<CmdExecuteOp>(getLoc(), getAwaitTimepoint(),
-                                             newOperandsValues, newOperandSizes,
-                                             getOperation()->getAttrs());
+  auto newOp = CmdExecuteOp::create(rewriter, getLoc(), getAwaitTimepoint(),
+                                    newOperandsValues, newOperandSizes,
+                                    getOperation()->getAttrs());
   newOp.setOnce(getOnce());
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
@@ -4173,8 +4174,8 @@ Value TimepointJoinOp::join(Location loc, ValueRange timepoints,
   assert(!timepoints.empty() && "must have at least one timepoint");
   if (timepoints.size() == 1)
     return timepoints.front();
-  return builder.create<IREE::Stream::TimepointJoinOp>(
-      loc, builder.getType<IREE::Stream::TimepointType>(), timepoints);
+  return IREE::Stream::TimepointJoinOp::create(
+      builder, loc, builder.getType<IREE::Stream::TimepointType>(), timepoints);
 }
 
 // static

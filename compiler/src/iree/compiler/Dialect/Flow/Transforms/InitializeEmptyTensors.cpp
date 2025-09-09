@@ -58,7 +58,7 @@ struct RewriteTensorEmptyToSplat : public OpRewritePattern<tensor::EmptyOp> {
           emptyTensorOp, "unable to get zero value for element type");
     }
     Value value =
-        rewriter.create<arith::ConstantOp>(loc, elementType, zero.value());
+        arith::ConstantOp::create(rewriter, loc, elementType, zero.value());
     rewriter.replaceOpWithNewOp<TensorSplatOp>(emptyTensorOp, resultType, value,
                                                emptyTensorOp.getDynamicSizes());
     return success();

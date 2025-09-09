@@ -38,7 +38,7 @@ static void initializeDeviceGlobal(
   // Build a new util.initializer.
   OpBuilder moduleBuilder(globalOp);
   moduleBuilder.setInsertionPointAfter(globalOp);
-  auto initializerOp = moduleBuilder.create<IREE::Util::InitializerOp>(loc);
+  auto initializerOp = IREE::Util::InitializerOp::create(moduleBuilder, loc);
   auto *block = moduleBuilder.createBlock(&initializerOp.getBody());
   auto initializerBuilder = OpBuilder::atBlockBegin(block);
 
@@ -60,15 +60,16 @@ static void initializeDeviceGlobal(
   // the compiler today and may never want to. If selecting from multiple
   // devices queries can be used to detect what the selected device was and
   // those will be memoized.
-  Value nullDevice = initializerBuilder.create<IREE::Util::NullOp>(
-      loc, enumeratedDevice.getType());
-  Value isNull = initializerBuilder.create<IREE::Util::CmpEQOp>(
-      loc, enumeratedDevice, nullDevice);
-  initializerBuilder.create<scf::IfOp>(
-      loc, isNull, [&](OpBuilder &thenBuilder, Location thenLoc) {
-        Value status = thenBuilder.create<arith::ConstantIntOp>(
-            thenLoc, static_cast<int64_t>(IREE::Util::StatusCode::Incompatible),
-            32);
+  Value nullDevice = IREE::Util::NullOp::create(initializerBuilder, loc,
+                                                enumeratedDevice.getType());
+  Value isNull = IREE::Util::CmpEQOp::create(initializerBuilder, loc,
+                                             enumeratedDevice, nullDevice);
+  scf::IfOp::create(
+      initializerBuilder, loc, isNull,
+      [&](OpBuilder &thenBuilder, Location thenLoc) {
+        Value status = arith::ConstantIntOp::create(
+            thenBuilder, thenLoc,
+            static_cast<int64_t>(IREE::Util::StatusCode::Incompatible), 32);
         std::string str;
         {
           llvm::raw_string_ostream os(str);
@@ -76,13 +77,13 @@ static void initializeDeviceGlobal(
              << "` not found or unavailable: ";
           initialValue.printStatusDescription(os);
         }
-        thenBuilder.create<IREE::Util::StatusCheckOkOp>(thenLoc, status, str);
-        thenBuilder.create<scf::YieldOp>(thenLoc);
+        IREE::Util::StatusCheckOkOp::create(thenBuilder, thenLoc, status, str);
+        scf::YieldOp::create(thenBuilder, thenLoc);
       });
 
   // Store the device back to the global to complete initialization.
   globalOp.createStoreOp(loc, enumeratedDevice, initializerBuilder);
-  initializerBuilder.create<IREE::Util::ReturnOp>(loc);
+  IREE::Util::ReturnOp::create(initializerBuilder, loc);
 }
 
 //===----------------------------------------------------------------------===//

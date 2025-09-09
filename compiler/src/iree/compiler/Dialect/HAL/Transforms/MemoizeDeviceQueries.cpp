@@ -139,14 +139,14 @@ struct MemoizeDeviceQueriesPass
             getDeviceNamePrefix(deviceOp) + "_query_" + std::to_string(i) +
             "_" + sanitizeSymbolName(anyQueryOp.getCategory()) + "_" +
             sanitizeSymbolName(anyQueryOp.getKey());
-        auto okGlobalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
-            queryLoc, variableName + "_ok",
+        auto okGlobalOp = IREE::Util::GlobalOp::create(
+            moduleBuilder, queryLoc, variableName + "_ok",
             /*isMutable=*/false, moduleBuilder.getI1Type());
         symbolTable.insert(okGlobalOp);
         okGlobalOp.setPrivate();
-        auto valueGlobalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
-            queryLoc, variableName,
-            /*isMutable=*/false, queryType);
+        auto valueGlobalOp =
+            IREE::Util::GlobalOp::create(moduleBuilder, queryLoc, variableName,
+                                         /*isMutable=*/false, queryType);
         symbolTable.insert(valueGlobalOp);
         valueGlobalOp.setPrivate();
 
@@ -178,21 +178,21 @@ struct MemoizeDeviceQueriesPass
       auto fusedLoc = moduleBuilder.getFusedLoc(
           llvm::map_to_vector(queries, [&](auto &query) { return query.loc; }));
       auto initializerOp =
-          moduleBuilder.create<IREE::Util::InitializerOp>(fusedLoc);
+          IREE::Util::InitializerOp::create(moduleBuilder, fusedLoc);
       auto funcBuilder = OpBuilder::atBlockBegin(initializerOp.addEntryBlock());
       Value device =
           deviceOp.createLoadOp(fusedLoc, funcBuilder).getLoadedGlobalValue();
       for (auto [i, queryKey] : llvm::enumerate(deviceQueries.queryKeys)) {
         auto &query = queries[i];
-        auto queryOp = funcBuilder.create<IREE::HAL::DeviceQueryOp>(
-            fusedLoc, funcBuilder.getI1Type(),
+        auto queryOp = IREE::HAL::DeviceQueryOp::create(
+            funcBuilder, fusedLoc, funcBuilder.getI1Type(),
             query.valueGlobalOp.getGlobalType(), device, query.categoryAttr,
             query.keyAttr, query.defaultValueAttr);
         query.okGlobalOp.createStoreOp(fusedLoc, queryOp.getOk(), funcBuilder);
         query.valueGlobalOp.createStoreOp(fusedLoc, queryOp.getValue(),
                                           funcBuilder);
       }
-      funcBuilder.create<IREE::Util::ReturnOp>(fusedLoc);
+      IREE::Util::ReturnOp::create(funcBuilder, fusedLoc);
     }
   }
 };

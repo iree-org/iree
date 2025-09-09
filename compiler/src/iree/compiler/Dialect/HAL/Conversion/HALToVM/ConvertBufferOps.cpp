@@ -44,45 +44,49 @@ public:
     // 32-bit values are loaded directly, 64-bit are combined from 32 | 32.
     Value value;
     if (validByteWidth <= 4) {
-      auto byteWidth = rewriter.create<arith::ConstantIntOp>(
-          op.getLoc(), validByteWidth, 32);
-      auto callOp = rewriter.create<IREE::VM::CallOp>(
-          op.getLoc(), SymbolRefAttr::get(importOp), importType.getResults(),
+      auto byteWidth = arith::ConstantIntOp::create(rewriter, op.getLoc(),
+                                                    validByteWidth, 32);
+      auto callOp = IREE::VM::CallOp::create(
+          rewriter, op.getLoc(), SymbolRefAttr::get(importOp),
+          importType.getResults(),
           ArrayRef<Value>{adaptor.getSourceBuffer(), sourceOffset, byteWidth});
       copyImportAttrs(importOp, callOp);
       value = callOp.getResult(0);
     } else {
       auto halfByteWidth =
-          rewriter.create<arith::ConstantIntOp>(op.getLoc(), 4, 32);
+          arith::ConstantIntOp::create(rewriter, op.getLoc(), 4, 32);
 
       // value = (i64(hi) << 32) | i64(lo)
       auto hiOffset = rewriter.createOrFold<arith::AddIOp>(
           op.getLoc(), sourceOffset,
-          rewriter.create<IREE::VM::ConstI64Op>(op.getLoc(), 4));
-      auto hiCallOp = rewriter.create<IREE::VM::CallOp>(
-          op.getLoc(), SymbolRefAttr::get(importOp), importType.getResults(),
+          IREE::VM::ConstI64Op::create(rewriter, op.getLoc(), 4));
+      auto hiCallOp = IREE::VM::CallOp::create(
+          rewriter, op.getLoc(), SymbolRefAttr::get(importOp),
+          importType.getResults(),
           ArrayRef<Value>{adaptor.getSourceBuffer(), hiOffset, halfByteWidth});
-      auto hi = rewriter.create<arith::ShLIOp>(
-          op.getLoc(),
-          rewriter.create<arith::ExtUIOp>(
-              op.getLoc(), rewriter.getIntegerType(targetBitwidth),
-              hiCallOp.getResult(0)),
-          rewriter.create<arith::ConstantIntOp>(op.getLoc(), 32, 32));
+      auto hi = arith::ShLIOp::create(
+          rewriter, op.getLoc(),
+          arith::ExtUIOp::create(rewriter, op.getLoc(),
+                                 rewriter.getIntegerType(targetBitwidth),
+                                 hiCallOp.getResult(0)),
+          arith::ConstantIntOp::create(rewriter, op.getLoc(), 32, 32));
 
-      auto loCallOp = rewriter.create<IREE::VM::CallOp>(
-          op.getLoc(), SymbolRefAttr::get(importOp), importType.getResults(),
+      auto loCallOp = IREE::VM::CallOp::create(
+          rewriter, op.getLoc(), SymbolRefAttr::get(importOp),
+          importType.getResults(),
           ArrayRef<Value>{adaptor.getSourceBuffer(), sourceOffset,
                           halfByteWidth});
-      auto lo = rewriter.create<arith::ExtUIOp>(
-          op.getLoc(), rewriter.getIntegerType(targetBitwidth),
-          loCallOp.getResult(0));
+      auto lo = arith::ExtUIOp::create(rewriter, op.getLoc(),
+                                       rewriter.getIntegerType(targetBitwidth),
+                                       loCallOp.getResult(0));
 
-      value = rewriter.create<arith::OrIOp>(op.getLoc(), lo, hi);
+      value = arith::OrIOp::create(rewriter, op.getLoc(), lo, hi);
     }
 
     // i32 -> f32, etc
     if (llvm::isa<FloatType>(targetType)) {
-      value = rewriter.create<arith::BitcastOp>(op.getLoc(), targetType, value);
+      value =
+          arith::BitcastOp::create(rewriter, op.getLoc(), targetType, value);
     }
 
     rewriter.replaceOp(op, {value});
@@ -131,8 +135,8 @@ public:
 
     // 32-bit values are stored directly, 64-bit are split into 32 | 32.
     if (validByteWidth <= 4) {
-      auto byteWidth = rewriter.create<arith::ConstantIntOp>(
-          op.getLoc(), validByteWidth, 32);
+      auto byteWidth = arith::ConstantIntOp::create(rewriter, op.getLoc(),
+                                                    validByteWidth, 32);
       auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
           op, SymbolRefAttr::get(importOp), importType.getResults(),
           ArrayRef<Value>{value, adaptor.getTargetBuffer(), targetOffset,
@@ -140,13 +144,14 @@ public:
       copyImportAttrs(importOp, callOp);
     } else {
       auto halfByteWidth =
-          rewriter.create<arith::ConstantIntOp>(op.getLoc(), 4, 32);
+          arith::ConstantIntOp::create(rewriter, op.getLoc(), 4, 32);
 
       auto lo = rewriter.createOrFold<arith::TruncIOp>(
           op.getLoc(), rewriter.getI32Type(), value);
       auto loOffset = targetOffset;
-      auto loCallOp = rewriter.create<IREE::VM::CallOp>(
-          op.getLoc(), SymbolRefAttr::get(importOp), importType.getResults(),
+      auto loCallOp = IREE::VM::CallOp::create(
+          rewriter, op.getLoc(), SymbolRefAttr::get(importOp),
+          importType.getResults(),
           ArrayRef<Value>{lo, adaptor.getTargetBuffer(), loOffset,
                           halfByteWidth});
       copyImportAttrs(importOp, loCallOp);
@@ -155,10 +160,10 @@ public:
           op.getLoc(), rewriter.getI32Type(),
           rewriter.createOrFold<arith::ShRUIOp>(
               op.getLoc(), value,
-              rewriter.create<arith::ConstantIntOp>(op.getLoc(), 32, 64)));
+              arith::ConstantIntOp::create(rewriter, op.getLoc(), 32, 64)));
       auto hiOffset = rewriter.createOrFold<arith::AddIOp>(
           op.getLoc(), targetOffset,
-          rewriter.create<IREE::VM::ConstI64Op>(op.getLoc(), 4));
+          IREE::VM::ConstI64Op::create(rewriter, op.getLoc(), 4));
       auto hiCallOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
           op, SymbolRefAttr::get(importOp), importType.getResults(),
           ArrayRef<Value>{hi, adaptor.getTargetBuffer(), hiOffset,

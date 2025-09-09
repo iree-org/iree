@@ -43,9 +43,9 @@ createPrimitiveDefaultGlobalOp(std::string name, Location loc, Type type,
   }
 
   // Global with initializer; tensors will get turned into buffers eventually.
-  auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
-      loc, name,
-      /*isMutable=*/false, type, initialValue);
+  auto globalOp =
+      IREE::Util::GlobalOp::create(moduleBuilder, loc, name,
+                                   /*isMutable=*/false, type, initialValue);
   globalOp.setPrivate();
   globalOp.setGlobalInliningPolicy(
       moduleBuilder.getAttr<IREE::Util::InlineNeverAttr>());
@@ -60,9 +60,8 @@ createBufferLikeGlobalOp(std::string name, Location loc, Type globalType,
                          TensorType tensorType, SymbolTable &symbolTable,
                          OpBuilder &moduleBuilder) {
   // Create !hal.buffer global for the storage buffer or buffer view.
-  auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
-      loc, name,
-      /*isMutable=*/false, globalType);
+  auto globalOp = IREE::Util::GlobalOp::create(moduleBuilder, loc, name,
+                                               /*isMutable=*/false, globalType);
   globalOp.setPrivate();
   globalOp.setGlobalInliningPolicy(
       moduleBuilder.getAttr<IREE::Util::InlineNeverAttr>());
@@ -71,25 +70,26 @@ createBufferLikeGlobalOp(std::string name, Location loc, Type globalType,
   // Create an initializer that allocates the buffer storage.
   // We do this by splatting and exporting to a buffer so that it looks like it
   // was created by the user.
-  auto initializerOp = moduleBuilder.create<IREE::Util::InitializerOp>(loc);
+  auto initializerOp = IREE::Util::InitializerOp::create(moduleBuilder, loc);
   auto initializerBuilder =
       OpBuilder::atBlockBegin(initializerOp.addEntryBlock());
   auto zeroAttr = moduleBuilder.getZeroAttr(tensorType.getElementType());
-  auto zeroOp = initializerBuilder.create<arith::ConstantOp>(loc, zeroAttr);
+  auto zeroOp = arith::ConstantOp::create(initializerBuilder, loc, zeroAttr);
   // flow.tensor.splat 0
-  auto splatOp = initializerBuilder.create<IREE::Flow::TensorSplatOp>(
-      loc, tensorType, zeroOp, /*result_dims=*/ValueRange{});
+  auto splatOp =
+      IREE::Flow::TensorSplatOp::create(initializerBuilder, loc, tensorType,
+                                        zeroOp, /*result_dims=*/ValueRange{});
   // hal.tensor.export
-  auto bufferExportOp = initializerBuilder.create<IREE::HAL::TensorExportOp>(
-      loc, globalOp.getType(), splatOp.getResult(),
+  auto bufferExportOp = IREE::HAL::TensorExportOp::create(
+      initializerBuilder, loc, globalOp.getType(), splatOp.getResult(),
       TypeAttr::get(splatOp.getType()), /*name=*/nullptr,
       /*affinity=*/nullptr);
   // util.optimization_barrier (try to prevent optimizations across the export)
-  auto barrierOp = initializerBuilder.create<IREE::Util::OptimizationBarrierOp>(
-      loc, bufferExportOp.getTarget());
+  auto barrierOp = IREE::Util::OptimizationBarrierOp::create(
+      initializerBuilder, loc, bufferExportOp.getTarget());
   // util.global.store
   globalOp.createStoreOp(loc, barrierOp.getResult(0), initializerBuilder);
-  initializerBuilder.create<IREE::Util::ReturnOp>(loc);
+  IREE::Util::ReturnOp::create(initializerBuilder, loc);
 
   return globalOp;
 }
@@ -230,8 +230,8 @@ createEntryPointBenchmarkFunc(mlir::ModuleOp moduleOp,
 
   // Create a `() -> ()` entry point op the benchmark tool can run.
   Location loc = entryFuncOp.getLoc();
-  auto funcOp = moduleBuilder.create<IREE::Util::FuncOp>(
-      loc, funcName, moduleBuilder.getFunctionType({}, {}));
+  auto funcOp = IREE::Util::FuncOp::create(
+      moduleBuilder, loc, funcName, moduleBuilder.getFunctionType({}, {}));
   funcOp.setPublic();
   funcOp->setAttr("iree.abi.stub", moduleBuilder.getUnitAttr());
   NamedAttribute reflectionAttr("iree.benchmark",
@@ -248,14 +248,15 @@ createEntryPointBenchmarkFunc(mlir::ModuleOp moduleOp,
                        .createLoadOp(loc, blockBuilder)
                        .getLoadedGlobalValue());
   }
-  auto callOp = blockBuilder.create<IREE::Util::CallOp>(loc, entryFuncOp, args);
+  auto callOp =
+      IREE::Util::CallOp::create(blockBuilder, loc, entryFuncOp, args);
 
   // Sink all results with a barrier to ensure that DCE does not remove the
   // call.
   for (auto result : callOp.getResults()) {
-    blockBuilder.create<IREE::Util::OptimizationBarrierOp>(loc, result);
+    IREE::Util::OptimizationBarrierOp::create(blockBuilder, loc, result);
   }
-  blockBuilder.create<IREE::Util::ReturnOp>(loc);
+  IREE::Util::ReturnOp::create(blockBuilder, loc);
 
   // Ensure the original function is not exported and not inlined.
   entryFuncOp->setAttr("noinline", moduleBuilder.getUnitAttr());

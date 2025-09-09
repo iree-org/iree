@@ -43,8 +43,8 @@ class ListCreateOpConversion
     if (initialCapacity) {
       initialCapacity = castToI32(initialCapacity, rewriter);
     } else {
-      initialCapacity = rewriter.create<IREE::VM::ConstI32Op>(
-          srcOp.getLoc(), rewriter.getI32IntegerAttr(0));
+      initialCapacity = IREE::VM::ConstI32Op::create(
+          rewriter, srcOp.getLoc(), rewriter.getI32IntegerAttr(0));
     }
     rewriter.replaceOpWithNewOp<IREE::VM::ListAllocOp>(
         srcOp, typeConverter->convertType(srcOp.getResult().getType()),
@@ -59,8 +59,8 @@ class ListSizeOpConversion
   LogicalResult
   matchAndRewrite(IREE::Util::ListSizeOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    Value size = rewriter.create<IREE::VM::ListSizeOp>(
-        srcOp.getLoc(), rewriter.getI32Type(), adaptor.getList());
+    Value size = IREE::VM::ListSizeOp::create(
+        rewriter, srcOp.getLoc(), rewriter.getI32Type(), adaptor.getList());
     rewriter.replaceOp(srcOp, castToIndex(size, rewriter));
     return success();
   }

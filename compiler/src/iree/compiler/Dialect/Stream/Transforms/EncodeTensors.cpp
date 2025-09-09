@@ -77,8 +77,8 @@ static Value makeTensorDim(Location loc, RankedTensorType tensorType,
                            PatternRewriter &rewriter) {
   // Static dimension early-out:
   if (!tensorType.isDynamicDim(i)) {
-    return rewriter.create<arith::ConstantIndexOp>(loc,
-                                                   tensorType.getDimSize(i));
+    return arith::ConstantIndexOp::create(rewriter, loc,
+                                          tensorType.getDimSize(i));
   }
 
   // Map from absolute dimension index to the compact dynamic index.
@@ -148,7 +148,7 @@ static Value canonicalizeFillPattern(Value pattern, OpBuilder &builder) {
         complexType.getElementType().getIntOrFloatBitWidth();
     assert(elementBitWidth <= 32 && "unsupported complex<f64>");
     Type bwType = builder.getIntegerType(elementBitWidth * 2);
-    return builder.create<complex::BitcastOp>(loc, bwType, pattern);
+    return complex::BitcastOp::create(builder, loc, bwType, pattern);
   }
 
   // Get floats into integer form first; may need additional processing below.
@@ -551,13 +551,13 @@ struct EncodeTensorLoadOp
     // Dense:
     auto sourceOffset = calculateElementByteOffset(
         op.getLoc(), sourceType, sourceDims, op.getIndices(), rewriter);
-    Value load = rewriter.create<IREE::Stream::AsyncLoadOp>(
-        op.getLoc(), loadType, op.getSource(), op.getSourceSize(),
+    Value load = IREE::Stream::AsyncLoadOp::create(
+        rewriter, op.getLoc(), loadType, op.getSource(), op.getSourceSize(),
         sourceOffset);
 
     if (loadType != op.getType()) {
       load =
-          rewriter.create<complex::BitcastOp>(op.getLoc(), op.getType(), load);
+          complex::BitcastOp::create(rewriter, op.getLoc(), op.getType(), load);
     }
 
     rewriter.replaceOp(op, load);
@@ -608,7 +608,7 @@ struct EncodeTensorDispatchOp
     // we changed the tensor dispatch op to accept indices and lengths for
     // offsetting we would need to account for that here but today we require
     // that to happen on slices/updates instead.
-    Value zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
+    Value zeroOffset = arith::ConstantIndexOp::create(rewriter, op.getLoc(), 0);
     SmallVector<Value> operandOffsets;
     SmallVector<Value> operandEnds;
     SmallVector<Value> operandLengths;
@@ -726,7 +726,7 @@ struct EncodeDispatchTensorLoadOp
     auto loadedValue = op.getResult();
     rewriter.setInsertionPointAfterValue(loadedValue);
     auto truncOp =
-        rewriter.create<arith::TruncIOp>(op.getLoc(), targetType, loadedValue);
+        arith::TruncIOp::create(rewriter, op.getLoc(), targetType, loadedValue);
     rewriter.modifyOpInPlace(op, [&]() {
       loadedValue.replaceAllUsesExcept(truncOp, truncOp);
       loadedValue.setType(alignedType);
@@ -757,8 +757,8 @@ struct EncodeDispatchTensorStoreOp
            "stores must extend");
 
     // Extend the sub-byte -> byte type; e.g. i1 -> i8.
-    auto extOp = rewriter.create<arith::ExtUIOp>(op.getLoc(), alignedType,
-                                                 op.getValue());
+    auto extOp = arith::ExtUIOp::create(rewriter, op.getLoc(), alignedType,
+                                        op.getValue());
     rewriter.modifyOpInPlace(
         op, [&]() { op.getValueMutable().assign(extOp.getResult()); });
     return success();

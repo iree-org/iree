@@ -22,7 +22,7 @@ struct InitializerOpConversion
   LogicalResult
   matchAndRewrite(IREE::Util::InitializerOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto newOp = rewriter.create<IREE::VM::InitializerOp>(op.getLoc());
+    auto newOp = IREE::VM::InitializerOp::create(rewriter, op.getLoc());
     rewriter.cloneRegionBefore(op.getBody(), newOp.getBody(),
                                newOp.getBody().begin());
 
@@ -103,8 +103,8 @@ class FuncOpConversion : public OpConversionPattern<IREE::Util::FuncOp> {
 
     // Create new function with converted argument and result types.
     // Note that attributes are dropped. Consider preserving some if needed.
-    auto newFuncOp = rewriter.create<IREE::VM::FuncOp>(
-        srcOp.getLoc(), srcOp.getName(), *newFuncType);
+    auto newFuncOp = IREE::VM::FuncOp::create(rewriter, srcOp.getLoc(),
+                                              srcOp.getName(), *newFuncType);
     rewriter.inlineRegionBefore(srcOp.getBody(), newFuncOp.getFunctionBody(),
                                 newFuncOp.end());
 
@@ -124,8 +124,8 @@ class FuncOpConversion : public OpConversionPattern<IREE::Util::FuncOp> {
     // materialize high level API-friendly wrappers.
     if (srcOp.isPublic()) {
       StringRef exportName = newFuncOp.getName();
-      auto exportOp = rewriter.create<IREE::VM::ExportOp>(
-          srcOp.getLoc(), newFuncOp, exportName);
+      auto exportOp = IREE::VM::ExportOp::create(rewriter, srcOp.getLoc(),
+                                                 newFuncOp, exportName);
       exportOp->setDialectAttrs(srcOp->getDialectAttrs());
     }
 
@@ -194,8 +194,8 @@ class ExternalFuncOpConversion
 
     // Create new function with converted argument and result types.
     // Note that attributes are dropped. Consider preserving some if needed.
-    auto importOp = rewriter.create<IREE::VM::ImportOp>(
-        srcOp.getLoc(), srcOp.getName(), newSignature);
+    auto importOp = IREE::VM::ImportOp::create(rewriter, srcOp.getLoc(),
+                                               srcOp.getName(), newSignature);
     importOp.setSymVisibilityAttr(srcOp.getSymVisibilityAttr());
 
     // If there is a fallback then the import is optional.
@@ -266,8 +266,8 @@ struct CallOpConversion : public OpConversionPattern<IREE::Util::CallOp> {
     }
 
     // Otherwise this is a direct call to an internal function.
-    auto newOp = rewriter.create<IREE::VM::CallOp>(loc, calleeName, resultTypes,
-                                                   operands);
+    auto newOp = IREE::VM::CallOp::create(rewriter, loc, calleeName,
+                                          resultTypes, operands);
     return llvm::to_vector_of<Value>(newOp.getResults());
   }
 
@@ -298,8 +298,8 @@ struct CallOpConversion : public OpConversionPattern<IREE::Util::CallOp> {
       StringRef fallbackName, ConversionPatternRewriter &rewriter) const {
     // Check whether the import resolved and if so call it. Otherwise we call
     // the fallback which should not require any conversion.
-    Value resolved = rewriter.create<IREE::VM::ImportResolvedOp>(
-        loc, rewriter.getI32Type(), calleeName);
+    Value resolved = IREE::VM::ImportResolvedOp::create(
+        rewriter, loc, rewriter.getI32Type(), calleeName);
 
     // We'll be making the call via two blocks and then joining again on a block
     // that takes the results in target form.
@@ -315,16 +315,15 @@ struct CallOpConversion : public OpConversionPattern<IREE::Util::CallOp> {
 
     // Insert the branch to each block.
     rewriter.setInsertionPointAfterValue(resolved);
-    rewriter.create<IREE::VM::CondBranchOp>(loc, resolved, resolvedBlock,
-                                            ValueRange{}, fallbackBlock,
-                                            ValueRange{});
+    IREE::VM::CondBranchOp::create(rewriter, loc, resolved, resolvedBlock,
+                                   ValueRange{}, fallbackBlock, ValueRange{});
 
     // Resolved: make call to the import as normal.
     rewriter.setInsertionPointToStart(resolvedBlock);
     auto importResults =
         convertMandatoryImportCallOp(rootOp, loc, calleeName, operands,
                                      resultTypes, importSignature, rewriter);
-    rewriter.create<IREE::VM::BranchOp>(loc, exitBlock, importResults);
+    IREE::VM::BranchOp::create(rewriter, loc, exitBlock, importResults);
 
     // Not resolved: call fallback as a normal function.
     rewriter.setInsertionPointToStart(fallbackBlock);
@@ -332,7 +331,7 @@ struct CallOpConversion : public OpConversionPattern<IREE::Util::CallOp> {
                                          resultTypes, rewriter);
     if (failed(fallbackResults))
       return failure();
-    rewriter.create<IREE::VM::BranchOp>(loc, exitBlock, *fallbackResults);
+    IREE::VM::BranchOp::create(rewriter, loc, exitBlock, *fallbackResults);
 
     return exitResults;
   }
@@ -353,8 +352,8 @@ struct CallOpConversion : public OpConversionPattern<IREE::Util::CallOp> {
     }
 
     // Direct call to mandatory import.
-    auto newOp = rewriter.create<IREE::VM::CallOp>(
-        loc, calleeName, importSignature.getResults(), importArgs);
+    auto newOp = IREE::VM::CallOp::create(
+        rewriter, loc, calleeName, importSignature.getResults(), importArgs);
 
     // Marshal results from import types.
     SmallVector<Value> callResults;

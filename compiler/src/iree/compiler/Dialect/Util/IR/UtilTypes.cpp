@@ -48,8 +48,8 @@ Value BufferType::createSubrangeOp(Location loc, Value resource,
                                    Value resourceSize, Value subrangeOffset,
                                    Value subrangeLength,
                                    OpBuilder &builder) const {
-  return builder.create<IREE::Util::BufferSubspanOp>(
-      loc, resource, resourceSize, subrangeOffset, subrangeLength);
+  return IREE::Util::BufferSubspanOp::create(
+      builder, loc, resource, resourceSize, subrangeOffset, subrangeLength);
 }
 
 //===----------------------------------------------------------------------===//
@@ -839,7 +839,7 @@ static SmallVector<Value> buildShape(Location loc, ShapedType type,
     if (ShapedType::isDynamic(dim)) {
       dims.push_back(dynamicDims[dynamicIdx++]);
     } else {
-      dims.push_back(builder.create<arith::ConstantIndexOp>(loc, dim));
+      dims.push_back(arith::ConstantIndexOp::create(builder, loc, dim));
     }
   }
   return dims;

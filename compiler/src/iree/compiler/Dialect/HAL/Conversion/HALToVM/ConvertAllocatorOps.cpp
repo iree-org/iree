@@ -111,8 +111,8 @@ public:
   LogicalResult
   matchAndRewrite(IREE::HAL::AllocatorImportOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto callOp = rewriter.create<IREE::VM::CallOp>(
-        op.getLoc(), importOp.getName(),
+    auto callOp = IREE::VM::CallOp::create(
+        rewriter, op.getLoc(), importOp.getName(),
         ArrayRef<Type>{
             getTypeConverter()->convertType(op.getResult().getType()),
         },
@@ -133,8 +133,8 @@ public:
         });
     copyImportAttrs(importOp, callOp);
     auto result = callOp.getResults().front();
-    auto didImport = rewriter.create<IREE::VM::CmpNZRefOp>(
-        op.getLoc(), rewriter.getI32Type(), result);
+    auto didImport = IREE::VM::CmpNZRefOp::create(
+        rewriter, op.getLoc(), rewriter.getI32Type(), result);
     rewriter.replaceOp(op, {didImport, result});
     return success();
   }

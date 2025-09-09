@@ -662,10 +662,10 @@ static void processFuncOp(FunctionOpInterface funcOp) {
           lastTimepoint.printAsOperand(llvm::dbgs(), *asmState);
           llvm::dbgs() << " directly\n";
         });
-        auto deallocaOp = builder.create<IREE::Stream::ResourceDeallocaOp>(
-            timepointsLoc, builder.getType<IREE::Stream::TimepointType>(),
-            resource, resourceSize, preferOrigin, lastTimepoint,
-            resourceAffinity);
+        auto deallocaOp = IREE::Stream::ResourceDeallocaOp::create(
+            builder, timepointsLoc,
+            builder.getType<IREE::Stream::TimepointType>(), resource,
+            resourceSize, preferOrigin, lastTimepoint, resourceAffinity);
         lastTimepoint.replaceAllUsesExcept(deallocaOp.getResultTimepoint(),
                                            deallocaOp);
       } else if (timepoints.size() > 1) {
@@ -685,13 +685,15 @@ static void processFuncOp(FunctionOpInterface funcOp) {
           lastTimepoint.printAsOperand(llvm::dbgs(), *asmState);
           llvm::dbgs() << " as a join\n";
         });
-        auto joinOp = builder.create<IREE::Stream::TimepointJoinOp>(
-            timepointsLoc, builder.getType<IREE::Stream::TimepointType>(),
+        auto joinOp = IREE::Stream::TimepointJoinOp::create(
+            builder, timepointsLoc,
+            builder.getType<IREE::Stream::TimepointType>(),
             llvm::map_to_vector(timepoints,
                                 [](Value timepoint) { return timepoint; }));
-        auto deallocaOp = builder.create<IREE::Stream::ResourceDeallocaOp>(
-            timepointsLoc, builder.getType<IREE::Stream::TimepointType>(),
-            resource, resourceSize, preferOrigin, joinOp.getResultTimepoint(),
+        auto deallocaOp = IREE::Stream::ResourceDeallocaOp::create(
+            builder, timepointsLoc,
+            builder.getType<IREE::Stream::TimepointType>(), resource,
+            resourceSize, preferOrigin, joinOp.getResultTimepoint(),
             resourceAffinity);
         lastTimepoint.replaceAllUsesExcept(deallocaOp.getResultTimepoint(),
                                            joinOp);

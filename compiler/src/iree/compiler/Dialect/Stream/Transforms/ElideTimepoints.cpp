@@ -703,8 +703,8 @@ static bool tryElideTimepointsInRegion(Region &region,
     if (existingReplacement != pendingReplacements.end()) {
       return existingReplacement->second;
     }
-    return builder.create<IREE::Stream::TimepointImmediateOp>(
-        elidedTimepoint.getLoc());
+    return IREE::Stream::TimepointImmediateOp::create(builder,
+                                                      elidedTimepoint.getLoc());
   };
 
   // Elides |elidedTimepoint| by replacing all its uses by |op| with an
@@ -746,9 +746,8 @@ static bool tryElideTimepointsInRegion(Region &region,
       return; // already immediate
     OpBuilder afterBuilder(op);
     afterBuilder.setInsertionPointAfterValue(elidedTimepoint);
-    Value immediateTimepoint =
-        afterBuilder.create<IREE::Stream::TimepointImmediateOp>(
-            elidedTimepoint.getLoc());
+    Value immediateTimepoint = IREE::Stream::TimepointImmediateOp::create(
+        afterBuilder, elidedTimepoint.getLoc());
     // Defer actually swapping until later.
     pendingReplacements.insert(
         std::make_pair(elidedTimepoint, immediateTimepoint));

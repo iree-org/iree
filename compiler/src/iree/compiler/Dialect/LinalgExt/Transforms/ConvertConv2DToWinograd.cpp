@@ -71,8 +71,8 @@ createCollapse(Value tensor, Location loc, PatternRewriter &rewriter,
   auto tensorType = cast<ShapedType>(tensor.getType());
   auto elementTy = tensorType.getElementType();
   auto resultType = RankedTensorType::get(outputShape, elementTy);
-  return rewriter.create<tensor::CollapseShapeOp>(loc, resultType, tensor,
-                                                  reassociations);
+  return tensor::CollapseShapeOp::create(rewriter, loc, resultType, tensor,
+                                         reassociations);
 }
 
 static Value
@@ -82,8 +82,8 @@ createExpand(Value tensor, Location loc, PatternRewriter &rewriter,
   auto tensorType = cast<ShapedType>(tensor.getType());
   auto elementTy = tensorType.getElementType();
   auto resultType = RankedTensorType::get(outputShape, elementTy);
-  return rewriter.create<tensor::ExpandShapeOp>(loc, resultType, tensor,
-                                                reassociations);
+  return tensor::ExpandShapeOp::create(rewriter, loc, resultType, tensor,
+                                       reassociations);
 }
 
 namespace {
@@ -204,7 +204,7 @@ public:
     filterResultShape[2] = isNchwFchw ? kernelShape[1] : kernelShape[2];
     filterResultShape[3] = isNchwFchw ? kernelShape[0] : kernelShape[3];
     Value kernelInit =
-        rewriter.create<tensor::EmptyOp>(loc, filterResultShape, inElemType);
+        tensor::EmptyOp::create(rewriter, loc, filterResultShape, inElemType);
     const std::array<int64_t, 2> kernelDims =
         isNchwFchw ? fchwKernelDims : hwcfKernelDims;
     Value winogradFilter =
@@ -256,7 +256,7 @@ public:
       }
     }
     Value inputTfInit =
-        rewriter.create<tensor::EmptyOp>(loc, resultShape, inElemType);
+        tensor::EmptyOp::create(rewriter, loc, resultShape, inElemType);
     const std::array<int64_t, 2> imageDims =
         isNchwFchw ? nchwImageDims : nhwcImageDims;
     Value winogradInput =
@@ -283,13 +283,13 @@ public:
     bmmShape[2] = outputShape[3];
     auto bmmOutputType = RankedTensorType::get(bmmShape, outElemType);
     Value bmmInit =
-        rewriter.create<tensor::EmptyOp>(loc, bmmShape, outElemType);
-    Value zero = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(outElemType));
-    auto fillOp = rewriter.create<linalg::FillOp>(loc, ValueRange{zero},
-                                                  ValueRange{bmmInit});
-    auto bmmOp = rewriter.create<linalg::BatchMatmulOp>(
-        loc, bmmOutputType,
+        tensor::EmptyOp::create(rewriter, loc, bmmShape, outElemType);
+    Value zero = arith::ConstantOp::create(rewriter, loc,
+                                           rewriter.getZeroAttr(outElemType));
+    auto fillOp = linalg::FillOp::create(rewriter, loc, ValueRange{zero},
+                                         ValueRange{bmmInit});
+    auto bmmOp = linalg::BatchMatmulOp::create(
+        rewriter, loc, bmmOutputType,
         ValueRange({collapsedWinogradInput, collapsedWinogradFilter}),
         ValueRange({fillOp.result()}));
     Value bmmResult = bmmOp.getResult(0);
@@ -315,7 +315,7 @@ public:
       permute<IREE::LinalgExt::Permutation::NHWC_TO_NCHW>(paddedResultShape);
     }
     Value outputTfInit =
-        rewriter.create<tensor::EmptyOp>(loc, paddedResultShape, outElemType);
+        tensor::EmptyOp::create(rewriter, loc, paddedResultShape, outElemType);
     Value paddedOutput =
         rewriter
             .create<IREE::LinalgExt::WinogradOutputTransformOp>(
@@ -330,8 +330,8 @@ public:
                                       rewriter.getIndexAttr(1));
     SmallVector<OpFoldResult> sizes =
         getAsIndexOpFoldResult(rewriter.getContext(), outputType.getShape());
-    auto winogradOutput = rewriter.create<tensor::ExtractSliceOp>(
-        loc, outputType, paddedOutput, offsets, sizes, strides);
+    auto winogradOutput = tensor::ExtractSliceOp::create(
+        rewriter, loc, outputType, paddedOutput, offsets, sizes, strides);
 
     rewriter.replaceOp(convOp, winogradOutput);
     return success();

@@ -60,18 +60,18 @@ static void reifyRodataTable(RewriterBase &rewriter,
       IREE::VM::RefType::get(rewriter.getType<IREE::VM::BufferType>());
   IREE::VM::RodataInlineOp tableRodata;
   if constexpr (std::is_same<IntTy, int32_t>()) {
-    tableRodata = rewriter.create<IREE::VM::RodataInlineOp>(
-        tableOp.getLoc(), refType, rewriter.getI32VectorAttr(table));
+    tableRodata = IREE::VM::RodataInlineOp::create(
+        rewriter, tableOp.getLoc(), refType, rewriter.getI32VectorAttr(table));
   } else {
-    tableRodata = rewriter.create<IREE::VM::RodataInlineOp>(
-        tableOp.getLoc(), refType, rewriter.getI64VectorAttr(table));
+    tableRodata = IREE::VM::RodataInlineOp::create(
+        rewriter, tableOp.getLoc(), refType, rewriter.getI64VectorAttr(table));
   }
   if (auto tableNameAttr = tableOp.getTableNameAttr()) {
     tableRodata.setNameAttr(tableNameAttr);
   }
 
-  auto dataRodata = rewriter.create<IREE::VM::RodataInlineOp>(
-      tableOp.getLoc(), refType,
+  auto dataRodata = IREE::VM::RodataInlineOp::create(
+      rewriter, tableOp.getLoc(), refType,
       IREE::Util::CompositeAttr::get(rewriter.getContext(), dataAttrs));
   if (auto dataNameAttr = tableOp.getDataNameAttr()) {
     dataRodata.setNameAttr(dataNameAttr);

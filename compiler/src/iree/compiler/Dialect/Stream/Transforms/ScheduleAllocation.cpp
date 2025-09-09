@@ -517,8 +517,8 @@ static LogicalResult applyAsyncSplatOp(IREE::Stream::AsyncSplatOp asyncOp,
                                        AllocationScope &scope,
                                        OpBuilder builder) {
   auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
-  builder.create<IREE::Stream::CmdFillOp>(
-      asyncOp.getLoc(), targetRange.resource, targetRange.resourceSize,
+  IREE::Stream::CmdFillOp::create(
+      builder, asyncOp.getLoc(), targetRange.resource, targetRange.resourceSize,
       targetRange.offset, targetRange.length, asyncOp.getValue());
   asyncOp.erase();
   return success();
@@ -529,8 +529,8 @@ static LogicalResult applyAsyncCloneOp(IREE::Stream::AsyncCloneOp asyncOp,
                                        OpBuilder builder) {
   auto sourceRange = scope.lookupResourceRange(asyncOp.getSource());
   auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
-  builder.create<IREE::Stream::CmdCopyOp>(
-      asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
+  IREE::Stream::CmdCopyOp::create(
+      builder, asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
       sourceRange.offset, targetRange.resource, targetRange.resourceSize,
       targetRange.offset, targetRange.length);
   asyncOp.erase();
@@ -544,8 +544,8 @@ static LogicalResult applyAsyncSliceOp(IREE::Stream::AsyncSliceOp asyncOp,
   auto sourceOffset = scope.add(asyncOp.getLoc(), sourceRange.offset,
                                 asyncOp.getSourceOffset());
   auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
-  builder.create<IREE::Stream::CmdCopyOp>(
-      asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
+  IREE::Stream::CmdCopyOp::create(
+      builder, asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
       sourceOffset, targetRange.resource, targetRange.resourceSize,
       targetRange.offset, asyncOp.getResultSize());
   asyncOp.erase();
@@ -558,8 +558,8 @@ static LogicalResult applyAsyncFillOp(IREE::Stream::AsyncFillOp asyncOp,
   auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
   auto targetOffset = scope.add(asyncOp.getLoc(), targetRange.offset,
                                 asyncOp.getTargetOffset());
-  builder.create<IREE::Stream::CmdFillOp>(
-      asyncOp.getLoc(), targetRange.resource, targetRange.resourceSize,
+  IREE::Stream::CmdFillOp::create(
+      builder, asyncOp.getLoc(), targetRange.resource, targetRange.resourceSize,
       targetOffset, asyncOp.getTargetLength(), asyncOp.getValue());
   asyncOp.erase();
   return success();
@@ -573,8 +573,8 @@ static LogicalResult applyAsyncUpdateOp(IREE::Stream::AsyncUpdateOp asyncOp,
   auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
   auto targetOffset = scope.add(asyncOp.getLoc(), targetRange.offset,
                                 asyncOp.getTargetOffset());
-  builder.create<IREE::Stream::CmdCopyOp>(
-      asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
+  IREE::Stream::CmdCopyOp::create(
+      builder, asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
       sourceOffset, targetRange.resource, targetRange.resourceSize,
       targetOffset, asyncOp.getUpdateSize());
   asyncOp.erase();
@@ -590,8 +590,8 @@ static LogicalResult applyAsyncCopyOp(IREE::Stream::AsyncCopyOp asyncOp,
   auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
   auto targetOffset = scope.add(asyncOp.getLoc(), targetRange.offset,
                                 asyncOp.getTargetOffset());
-  builder.create<IREE::Stream::CmdCopyOp>(
-      asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
+  IREE::Stream::CmdCopyOp::create(
+      builder, asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
       sourceOffset, targetRange.resource, targetRange.resourceSize,
       targetOffset, asyncOp.getLength());
   asyncOp.erase();
@@ -632,8 +632,8 @@ applyAsyncCollectiveOp(IREE::Stream::AsyncCollectiveOp asyncOp,
   newResourceAccesses.push_back(IREE::Stream::ResourceAccessBitfieldAttr::get(
       builder.getContext(), IREE::Stream::ResourceAccessBitfield::Write));
 
-  builder.create<IREE::Stream::CmdCollectiveOp>(
-      asyncOp.getLoc(), asyncOp.getOp(), asyncOp.getChannel(),
+  IREE::Stream::CmdCollectiveOp::create(
+      builder, asyncOp.getLoc(), asyncOp.getOp(), asyncOp.getChannel(),
       asyncOp.getElementCount(), asyncOp.getParam(), newResources,
       newResourceSizes, newResourceOffsets, newResourceLengths,
       builder.getArrayAttr(newResourceAccesses));
@@ -650,10 +650,10 @@ static LogicalResult applyAsyncBarrierOp(IREE::Stream::AsyncBarrierOp barrierOp,
   auto targetRange = scope.lookupResourceRange(barrierOp.getResult());
 
   // Perform the copy.
-  builder.create<IREE::Stream::CmdCopyOp>(
-      barrierOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
-      sourceRange.offset, targetRange.resource, targetRange.resourceSize,
-      targetRange.offset, sourceRange.length);
+  IREE::Stream::CmdCopyOp::create(
+      builder, barrierOp.getLoc(), sourceRange.resource,
+      sourceRange.resourceSize, sourceRange.offset, targetRange.resource,
+      targetRange.resourceSize, targetRange.offset, sourceRange.length);
 
   barrierOp.erase();
   return success();
@@ -684,23 +684,23 @@ static LogicalResult applyAsyncTransferOp(IREE::Stream::AsyncTransferOp asyncOp,
 
   // Incoming transfers need invalidation.
   if (transferIn) {
-    builder.create<IREE::Stream::CmdInvalidateOp>(
-        asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
-        sourceRange.offset, sourceRange.length,
+    IREE::Stream::CmdInvalidateOp::create(
+        builder, asyncOp.getLoc(), sourceRange.resource,
+        sourceRange.resourceSize, sourceRange.offset, sourceRange.length,
         asyncOp.getSourceAffinityAttr());
   }
 
   // Perform the copy.
-  builder.create<IREE::Stream::CmdCopyOp>(
-      asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
+  IREE::Stream::CmdCopyOp::create(
+      builder, asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
       sourceRange.offset, targetRange.resource, targetRange.resourceSize,
       targetRange.offset, sourceRange.length);
 
   // Outgoing transfers need flushes.
   if (transferOut) {
-    builder.create<IREE::Stream::CmdFlushOp>(
-        asyncOp.getLoc(), targetRange.resource, targetRange.resourceSize,
-        targetRange.offset, targetRange.length,
+    IREE::Stream::CmdFlushOp::create(
+        builder, asyncOp.getLoc(), targetRange.resource,
+        targetRange.resourceSize, targetRange.offset, targetRange.length,
         asyncOp.getResultAffinityAttr());
   }
 
@@ -768,10 +768,11 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
     newResourceAccesses.push_back(resourceAccess);
   }
 
-  auto newOp = builder.create<IREE::Stream::CmdDispatchOp>(
-      asyncOp.getLoc(), asyncOp.getWorkload(), asyncOp.getEntryPointsAttr(),
-      newOperands, newResources, newResourceSizes, newResourceOffsets,
-      newResourceLengths, builder.getArrayAttr(newResourceAccesses));
+  auto newOp = IREE::Stream::CmdDispatchOp::create(
+      builder, asyncOp.getLoc(), asyncOp.getWorkload(),
+      asyncOp.getEntryPointsAttr(), newOperands, newResources, newResourceSizes,
+      newResourceOffsets, newResourceLengths,
+      builder.getArrayAttr(newResourceAccesses));
   newOp->setDialectAttrs(asyncOp->getDialectAttrs());
   asyncOp.erase();
   return success();
@@ -826,9 +827,9 @@ static void convertAsyncFuncOp(IREE::Stream::AsyncFuncOp asyncOp) {
       FunctionType::get(asyncOp.getContext(), newInputs, newResults);
 
   OpBuilder builder(asyncOp);
-  auto cmdOp = builder.create<IREE::Stream::CmdFuncOp>(
-      asyncOp.getLoc(), asyncOp.getName(), newFunctionType, newArgAttrs,
-      newResultAttrs);
+  auto cmdOp = IREE::Stream::CmdFuncOp::create(
+      builder, asyncOp.getLoc(), asyncOp.getName(), newFunctionType,
+      newArgAttrs, newResultAttrs);
   cmdOp->setDialectAttrs(asyncOp->getDialectAttrs());
   asyncOp.erase();
 }
@@ -898,8 +899,8 @@ static LogicalResult applyAsyncCallOp(IREE::Stream::AsyncCallOp asyncOp,
     newResourceAccesses.push_back(resourceAccess);
   }
 
-  auto newOp = builder.create<IREE::Stream::CmdCallOp>(
-      asyncOp.getLoc(), newResultTypes, asyncOp.getCalleeAttr(),
+  auto newOp = IREE::Stream::CmdCallOp::create(
+      builder, asyncOp.getLoc(), newResultTypes, asyncOp.getCalleeAttr(),
       newResourceOperands, newResourceSizes, newResourceOffsets,
       newResourceLengths,
       /*result_sizes=*/ValueRange{},
@@ -936,7 +937,7 @@ applyAsyncConcurrentOp(IREE::Stream::AsyncConcurrentOp asyncOp,
   block.eraseArguments([&](auto arg) { return true; });
 
   // Rewrite wave op to remove results.
-  auto newOp = builder.create<IREE::Stream::CmdConcurrentOp>(asyncOp.getLoc());
+  auto newOp = IREE::Stream::CmdConcurrentOp::create(builder, asyncOp.getLoc());
   newOp.getBody().takeBody(asyncOp.getBody());
   asyncOp.erase();
   return success();
@@ -1086,8 +1087,8 @@ allocateLocalTransients(IREE::Stream::AsyncExecuteOp executeOp,
   auto fusedLoc = externalBuilder.getFusedLoc(locs);
   auto indexType = externalBuilder.getIndexType();
   SmallVector<Type> packedOffsetTypes(dynamicSliceSizes.size(), indexType);
-  auto packOp = externalBuilder.create<IREE::Stream::ResourcePackOp>(
-      fusedLoc, indexType, packedOffsetTypes,
+  auto packOp = IREE::Stream::ResourcePackOp::create(
+      externalBuilder, fusedLoc, indexType, packedOffsetTypes,
       /*offset=*/nullptr, externalBuilder.getIndexArrayAttr(lifetimeIntervals),
       dynamicSliceSizes, executeOp.getAffinityAttr());
 
@@ -1095,8 +1096,9 @@ allocateLocalTransients(IREE::Stream::AsyncExecuteOp executeOp,
   auto transientType = externalBuilder.getType<IREE::Stream::ResourceType>(
       IREE::Stream::Lifetime::Transient);
   auto timepointType = externalBuilder.getType<IREE::Stream::TimepointType>();
-  auto allocaOp = externalBuilder.create<IREE::Stream::ResourceAllocaOp>(
-      fusedLoc, transientType, timepointType, packOp.getTotalLength(),
+  auto allocaOp = IREE::Stream::ResourceAllocaOp::create(
+      externalBuilder, fusedLoc, transientType, timepointType,
+      packOp.getTotalLength(),
       /*indeterminate_lifetime=*/UnitAttr{}, executeOp.getAwaitTimepoint(),
       executeOp.getAffinityAttr());
   TransientAllocation allocation;
@@ -1286,11 +1288,10 @@ allocateConstantBatch(IREE::Stream::AsyncExecuteOp executeOp,
   }
   auto timepointType = externalBuilder.getType<IREE::Stream::TimepointType>();
   ConstantAllocation allocation;
-  allocation.constantsOp =
-      externalBuilder.create<IREE::Stream::ResourceConstantsOp>(
-          externalBuilder.getFusedLoc(locs), resultTypes, timepointType,
-          externalBuilder.getArrayAttr(initialValues), resultSizes,
-          affinityAttr);
+  allocation.constantsOp = IREE::Stream::ResourceConstantsOp::create(
+      externalBuilder, externalBuilder.getFusedLoc(locs), resultTypes,
+      timepointType, externalBuilder.getArrayAttr(initialValues), resultSizes,
+      affinityAttr);
 
   // Remap original constants to reservations.
   auto &entryBlock = executeOp.getBody().front();
@@ -1779,10 +1780,10 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
                                                          externalBuilder);
       scope.mapResourceRange(yieldValue, resourceRange, asmState.get());
       if (resourceRange.offset) {
-        auto resultSubviewOp =
-            externalBuilder.create<IREE::Stream::ResourceSubviewOp>(
-                yieldValue.getLoc(), tiedOperand, resourceRange.resourceSize,
-                resourceRange.offset, resourceRange.length);
+        auto resultSubviewOp = IREE::Stream::ResourceSubviewOp::create(
+            externalBuilder, yieldValue.getLoc(), tiedOperand,
+            resourceRange.resourceSize, resourceRange.offset,
+            resourceRange.length);
         resultReplacements.push_back(
             std::make_pair(resultValue, resultSubviewOp.getResult()));
       } else {
@@ -1922,8 +1923,9 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
 
   // Recreate the execution op with all the new arguments. Note that we drop
   // the results (besides the timepoint) as they are all aliased.
-  auto newExecuteOp = executeBuilder.create<IREE::Stream::CmdExecuteOp>(
-      executeOp.getLoc(), newAwaitTimepoint, newOperands, newOperandSizes);
+  auto newExecuteOp = IREE::Stream::CmdExecuteOp::create(
+      executeBuilder, executeOp.getLoc(), newAwaitTimepoint, newOperands,
+      newOperandSizes);
   newExecuteOp.setOnce(isExecutedOnce(executeOp));
   if (executeOp.getAffinity().has_value()) {
     newExecuteOp.setAffinityAttr(executeOp.getAffinityAttr());
@@ -2008,8 +2010,8 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
   for (auto &release : pendingReleases) {
     auto reservation = release.first;
     auto reservationSize = release.second;
-    auto deallocaOp = builder.create<IREE::Stream::ResourceDeallocaOp>(
-        reservation.getLoc(), reservation, reservationSize,
+    auto deallocaOp = IREE::Stream::ResourceDeallocaOp::create(
+        builder, reservation.getLoc(), reservation, reservationSize,
         /*prefer_origin=*/false, newExecuteOp.getResultTimepoint(),
         newExecuteOp.getAffinityAttr());
     joinTimepoints.push_back(deallocaOp.getResultTimepoint());
@@ -2023,8 +2025,9 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
     joinTimepoints.push_back(newExecuteOp.getResultTimepoint());
     auto fusedLoc = builder.getFusedLoc(llvm::map_to_vector(
         joinTimepoints, [](auto timepoint) { return timepoint.getLoc(); }));
-    auto joinOp = builder.create<IREE::Stream::TimepointJoinOp>(
-        fusedLoc, newExecuteOp.getResultTimepoint().getType(), joinTimepoints);
+    auto joinOp = IREE::Stream::TimepointJoinOp::create(
+        builder, fusedLoc, newExecuteOp.getResultTimepoint().getType(),
+        joinTimepoints);
     executeTimepointUsers.insert(joinOp);
     newExecuteOp.getResultTimepoint().replaceUsesWithIf(
         joinOp.getResultTimepoint(), [&](OpOperand &operand) {

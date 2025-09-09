@@ -49,11 +49,11 @@ Value buildIfElseTree(
   for (size_t i = 0; i < count; ++i) {
     caseValues.push_back(caseBuilder(loc, i, builder));
   }
-  Value result = builder.create<arith::ConstantIndexOp>(loc, -1);
+  Value result = arith::ConstantIndexOp::create(builder, loc, -1);
   for (int i = count - 1; i >= 0; --i) {
-    result = builder.create<arith::SelectOp>(
-        loc, caseValues[i], builder.create<arith::ConstantIndexOp>(loc, i),
-        result);
+    result = arith::SelectOp::create(
+        builder, loc, caseValues[i],
+        arith::ConstantIndexOp::create(builder, loc, i), result);
   }
   return result;
 }
@@ -1911,10 +1911,10 @@ IREE::Util::CallOp IREE::Util::CallOp::cloneAndExpand(
                            IREE::Util::TiedOpInterface::kUntiedIndex);
   }
 
-  return builder.create<IREE::Util::CallOp>(
-      getLoc(), newResultTypes, getCallee(), newOperands,
-      builder.getIndexArrayAttr(newTiedOperands), getArgAttrsAttr(),
-      getResAttrsAttr());
+  return IREE::Util::CallOp::create(builder, getLoc(), newResultTypes,
+                                    getCallee(), newOperands,
+                                    builder.getIndexArrayAttr(newTiedOperands),
+                                    getArgAttrsAttr(), getResAttrsAttr());
 }
 
 //===----------------------------------------------------------------------===//
@@ -2013,12 +2013,13 @@ IREE::Util::GlobalLoadOpInterface GlobalOp::createLoadOp(Location loc,
   // TODO(benvanik): create with the immutable flag if the global is immutable.
   // Today we avoid this and let analysis add the immutable flag when safe
   // (not in initializers/etc).
-  return builder.create<IREE::Util::GlobalLoadOp>(loc, getType(), getSymName());
+  return IREE::Util::GlobalLoadOp::create(builder, loc, getType(),
+                                          getSymName());
 }
 
 IREE::Util::GlobalStoreOpInterface
 GlobalOp::createStoreOp(Location loc, Value value, OpBuilder &builder) {
-  return builder.create<IREE::Util::GlobalStoreOp>(loc, value, getSymName());
+  return IREE::Util::GlobalStoreOp::create(builder, loc, value, getSymName());
 }
 
 void GlobalAddressOp::getAsmResultNames(

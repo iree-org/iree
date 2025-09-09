@@ -86,8 +86,8 @@ struct CaptureExecutableSourcesPass
             &clonedExecutableOp.getBody().emplaceBlock());
         auto clonedVariantOp = cast<IREE::HAL::ExecutableVariantOp>(
             clonedBuilder.clone(*variantOp));
-        clonedBuilder.create<IREE::HAL::ExecutableEndOp>(
-            clonedBuilder.getUnknownLoc());
+        IREE::HAL::ExecutableEndOp::create(clonedBuilder,
+                                           clonedBuilder.getUnknownLoc());
 
         // Capture the source contents and update the locations in the IR to
         // reference it.

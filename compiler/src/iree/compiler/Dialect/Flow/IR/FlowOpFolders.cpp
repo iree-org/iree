@@ -216,8 +216,8 @@ struct ReplaceDispatchResultIfZeroElements
         continue;
       if (isTensorResultZeroElements(result)) {
         auto dynamicDims = op.getResultDynamicDims(result.getResultNumber());
-        auto emptyOp = rewriter.create<IREE::Flow::TensorEmptyOp>(
-            result.getLoc(), result.getType(), dynamicDims);
+        auto emptyOp = IREE::Flow::TensorEmptyOp::create(
+            rewriter, result.getLoc(), result.getType(), dynamicDims);
         rewriter.replaceAllUsesWith(result, emptyOp);
         didReplaceAny = true;
       }
@@ -243,8 +243,8 @@ struct ElideRedundantWorkloadValues
 
     // Create a new flow.dispatch.workgroup op with new workloads.
     Location loc = op.getLoc();
-    auto newWorkgroupsOp = rewriter.create<DispatchWorkgroupsOp>(
-        loc, newWorkload, op.getResultTypes(), op.getResultDims(),
+    auto newWorkgroupsOp = DispatchWorkgroupsOp::create(
+        rewriter, loc, newWorkload, op.getResultTypes(), op.getResultDims(),
         op.getArguments(), op.getArgumentDims(),
         op.getTiedOperandsAsIntegerList(),
         getPrunedAttributeList(op, /*elidedAttrs=*/{}));
@@ -452,8 +452,8 @@ struct ExpandDynamicShapeConstant
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorDynamicConstantOp op,
                                 PatternRewriter &rewriter) const override {
-    auto constantOp = rewriter.create<IREE::Flow::TensorConstantOp>(
-        op.getLoc(), op.getValue());
+    auto constantOp = IREE::Flow::TensorConstantOp::create(
+        rewriter, op.getLoc(), op.getValue());
     auto dynamicType = op.getType();
     auto staticType = cast<ShapedType>(op.getValue().getType());
     SmallVector<Value> dynamicDims;
@@ -837,8 +837,7 @@ struct SinkCastLikeOpAcrossTransfer final : OpRewritePattern<TransferOpT> {
     }
     Value originValue = sourceOp.getSource();
     ValueRange originDims = sourceOp.getSourceDims();
-    auto newOp =
-        rewriter.create<TransferOpT>(transferOp.getLoc(), originValue,
+    auto newOp = TransferOpT::create(rewriter, transferOp.getLoc(), originValue,
                                      originDims, transferOp.getTargetAttr());
     IRMapping mapper;
     mapper.map(originValue, newOp.getResult());
@@ -1080,8 +1079,8 @@ struct FoldTensorUpdateOpWithCasts : public OpRewritePattern<TensorUpdateOp> {
                                  : cast<Value>(updateOp.getTarget()));
     Value update = (updateCastOp ? cast<Value>(updateCastOp.getSource())
                                  : cast<Value>(updateOp.getUpdate()));
-    auto newOp = rewriter.create<TensorUpdateOp>(
-        updateOp.getLoc(), target.getType(), target,
+    auto newOp = TensorUpdateOp::create(
+        rewriter, updateOp.getLoc(), target.getType(), target,
         refreshDimsOnTypeChange(updateOp, updateOp.getTarget().getType(),
                                 target.getType(), updateOp.getTargetDims(),
                                 rewriter),

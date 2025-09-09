@@ -65,8 +65,9 @@ struct FuncFuncOpPattern : public OpConversionPattern<func::FuncOp> {
     auto newFuncType = mlir::FunctionType::get(
         srcOp.getContext(), signatureConversion.getConvertedTypes(),
         convertedResultTypes);
-    auto newFuncOp = rewriter.create<IREE::Util::FuncOp>(
-        srcOp.getLoc(), srcOp.getName(), newFuncType, tiedOperandsAttr);
+    auto newFuncOp =
+        IREE::Util::FuncOp::create(rewriter, srcOp.getLoc(), srcOp.getName(),
+                                   newFuncType, tiedOperandsAttr);
     newFuncOp.setSymVisibilityAttr(srcOp.getSymVisibilityAttr());
     rewriter.inlineRegionBefore(srcOp.getBody(), newFuncOp.getFunctionBody(),
                                 newFuncOp.end());

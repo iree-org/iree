@@ -85,7 +85,7 @@ Value LayoutAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
       res = requestedSize;
       continue;
     }
-    res = builder.create<arith::MaxUIOp>(loc, res, requestedSize);
+    res = arith::MaxUIOp::create(builder, loc, res, requestedSize);
   }
   return res;
 }
@@ -457,7 +457,7 @@ Value PaddingAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
 
   const int64_t elementSize = getRoundedElementByteWidth(type.getElementType());
   int64_t staticProduct = elementSize;
-  Value dynamicProduct = builder.create<arith::ConstantIndexOp>(loc, 1);
+  Value dynamicProduct = arith::ConstantIndexOp::create(builder, loc, 1);
 
   size_t dynamicDimIdx = 0;
   for (auto [dimSize, padValue] : llvm::zip_equal(type.getShape(), padding)) {
@@ -470,9 +470,9 @@ Value PaddingAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
     ++dynamicDimIdx;
 
     if (padValue != 0) {
-      dynamicDimSize = builder.create<arith::AddIOp>(
-          loc, dynamicDimSize,
-          builder.create<arith::ConstantIndexOp>(loc, padValue),
+      dynamicDimSize = arith::AddIOp::create(
+          builder, loc, dynamicDimSize,
+          arith::ConstantIndexOp::create(builder, loc, padValue),
           arith::IntegerOverflowFlags::nsw);
     }
     dynamicProduct = builder.createOrFold<arith::MulIOp>(
@@ -480,7 +480,7 @@ Value PaddingAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
   }
 
   return builder.createOrFold<arith::MulIOp>(
-      loc, builder.create<arith::ConstantIndexOp>(loc, staticProduct),
+      loc, arith::ConstantIndexOp::create(builder, loc, staticProduct),
       dynamicProduct, arith::IntegerOverflowFlags::nsw);
 }
 
@@ -506,7 +506,7 @@ Value IdentityAttr::calculateStorageSizeInBytes(Location loc,
                                                 ValueRange dynamicDims) const {
   const int64_t elementSize = getRoundedElementByteWidth(type.getElementType());
   int64_t staticProduct = elementSize;
-  Value dynamicProduct = builder.create<arith::ConstantIndexOp>(loc, 1);
+  Value dynamicProduct = arith::ConstantIndexOp::create(builder, loc, 1);
 
   size_t dynamicDimIdx = 0;
   for (int64_t dimSize : type.getShape()) {
@@ -521,7 +521,7 @@ Value IdentityAttr::calculateStorageSizeInBytes(Location loc,
         loc, dynamicProduct, dynamicDimSize, arith::IntegerOverflowFlags::nsw);
   }
   return builder.createOrFold<arith::MulIOp>(
-      loc, builder.create<arith::ConstantIndexOp>(loc, staticProduct),
+      loc, arith::ConstantIndexOp::create(builder, loc, staticProduct),
       dynamicProduct, arith::IntegerOverflowFlags::nsw);
 }
 

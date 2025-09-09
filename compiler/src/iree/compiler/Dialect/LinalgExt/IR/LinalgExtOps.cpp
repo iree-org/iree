@@ -316,7 +316,7 @@ static void createNewOperandWithStaticSizes(
     changeNeeded = true;
     // Get the new operand value given its size and element type by
     // casting it.
-    Value newOperand = rewriter.create<tensor::CastOp>(loc, resultType, src);
+    Value newOperand = tensor::CastOp::create(rewriter, loc, resultType, src);
     unsigned index = opOperand->getOperandNumber();
     newOperands[index] = newOperand;
   }
@@ -375,10 +375,10 @@ struct StaticizeLinalgExtOp : public OpRewritePattern<OpTy> {
          llvm::zip_equal(op->getResults(), newOp->getResults())) {
       Type newType = newResult.getType();
       Type oldType = oldResult.getType();
-      replacements.push_back((newType != oldType)
-                                 ? rewriter.create<tensor::CastOp>(
-                                       loc, oldType, cast<Value>(newResult))
-                                 : cast<Value>(newResult));
+      replacements.push_back(
+          (newType != oldType) ? tensor::CastOp::create(rewriter, loc, oldType,
+                                                        cast<Value>(newResult))
+                               : cast<Value>(newResult));
     }
     rewriter.replaceOp(op, replacements);
     return success();
@@ -515,13 +515,13 @@ struct ConvertGatherToExtract
     }
 
     // Get all `indexDepth` indices as scalars.
-    SmallVector<Value> indices(indicesShape.size(),
-                               rewriter.create<arith::ConstantIndexOp>(loc, 0));
+    SmallVector<Value> indices(
+        indicesShape.size(), arith::ConstantIndexOp::create(rewriter, loc, 0));
     SmallVector<OpFoldResult> offsets(gatherOp.getIndexDepth());
     for (int64_t i = 0; i < gatherOp.getIndexDepth(); ++i) {
-      indices.back() = rewriter.create<arith::ConstantIndexOp>(loc, i);
-      Value elem = rewriter.create<tensor::ExtractOp>(
-          loc, gatherOp.getIndices(), indices);
+      indices.back() = arith::ConstantIndexOp::create(rewriter, loc, i);
+      Value elem = tensor::ExtractOp::create(rewriter, loc,
+                                             gatherOp.getIndices(), indices);
       offsets[i] =
           rewriter
               .create<arith::IndexCastOp>(loc, rewriter.getIndexType(), elem)
@@ -544,8 +544,9 @@ struct ConvertGatherToExtract
     }
     auto resultType =
         cast<RankedTensorType>(gatherOp.getSourceType()).clone(resultShape);
-    auto sliceOp = rewriter.create<tensor::ExtractSliceOp>(
-        loc, resultType, gatherOp.getSource(), offsets, sizes, strides);
+    auto sliceOp = tensor::ExtractSliceOp::create(rewriter, loc, resultType,
+                                                  gatherOp.getSource(), offsets,
+                                                  sizes, strides);
 
     // `sliceOp` may differ from the expected result type by leading unit
     // dimensions. Reshape so that the types match.
@@ -596,7 +597,7 @@ MapScatterOp MapScatterOp::createIdentityMapScatter(OpBuilder &builder,
     resultType.push_back(output.getType());
   }
   auto mapScatterOp =
-      builder.create<MapScatterOp>(loc, resultType, input, output);
+      MapScatterOp::create(builder, loc, resultType, input, output);
 
   // Add the transformation block with an identity transformation.
   Region &region = mapScatterOp.getTransformationRegion();
@@ -607,10 +608,10 @@ MapScatterOp MapScatterOp::createIdentityMapScatter(OpBuilder &builder,
   Block *block =
       builder.createBlock(&region, region.end(), indexTypes, blockArgLocs);
   SmallVector<Value> yieldedValues(block->getArguments());
-  Value mask = builder.create<arith::ConstantIntOp>(loc, /*value=*/1,
-                                                    /*width=*/1);
+  Value mask = arith::ConstantIntOp::create(builder, loc, /*value=*/1,
+                                            /*width=*/1);
   yieldedValues.push_back(mask);
-  builder.create<IREE::LinalgExt::YieldOp>(loc, yieldedValues);
+  IREE::LinalgExt::YieldOp::create(builder, loc, yieldedValues);
   return mapScatterOp;
 }
 
@@ -874,8 +875,8 @@ struct RemoveUnusedSortOpResults
 
     // Create new op using only operands associated to used results or block
     // args.
-    auto newSortOp = rewriter.create<IREE::LinalgExt::SortOp>(
-        loc, usedResultTypes,
+    auto newSortOp = IREE::LinalgExt::SortOp::create(
+        rewriter, loc, usedResultTypes,
         /*inputs=*/ValueRange{}, usedOperands, sortOp.getDimension());
     newSortOp.getRegion().takeBody(sortOp.getRegion());
     newSortOp.getRegion().front().eraseArguments(eraseArg);

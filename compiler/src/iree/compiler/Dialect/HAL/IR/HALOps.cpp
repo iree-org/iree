@@ -1767,7 +1767,7 @@ Value ExecutableExportOp::calculateCondition(Location loc, Value device,
   // Always evaluate to true if no region is present.
   auto *body = getConditionBody();
   if (!body) {
-    return builder.create<arith::ConstantIntOp>(loc, 1, 1);
+    return arith::ConstantIntOp::create(builder, loc, 1, 1);
   }
 
   // TODO(benvanik): replace with region inlining util.
@@ -1933,7 +1933,8 @@ Value ExecutableVariantOp::createConditionOp(OpBuilder &builder) {
   assert(!getConditionOp() && "condition op already exists");
 
   builder.setInsertionPointToStart(&getRegion().front());
-  auto conditionOp = builder.create<IREE::HAL::ExecutableConditionOp>(getLoc());
+  auto conditionOp =
+      IREE::HAL::ExecutableConditionOp::create(builder, getLoc());
   Block *entryPoint = conditionOp.addEntryBlock();
   Value device = entryPoint->getArgument(0);
 
@@ -1950,8 +1951,8 @@ Value ExecutableVariantOp::buildCondition(Value device, OpBuilder &builder) {
   // Factor in variant condition region, if any.
   auto conditionOp = getConditionOp();
   if (conditionOp) {
-    auto regionOp = builder.create<scf::ExecuteRegionOp>(conditionOp.getLoc(),
-                                                         builder.getI1Type());
+    auto regionOp = scf::ExecuteRegionOp::create(builder, conditionOp.getLoc(),
+                                                 builder.getI1Type());
 
     IRMapping mapper;
     mapper.map(conditionOp.getRegion().getArgument(0), device);
@@ -1964,8 +1965,8 @@ Value ExecutableVariantOp::buildCondition(Value device, OpBuilder &builder) {
       returnOp.erase();
     }
 
-    selected = builder.create<arith::AndIOp>(getLoc(), selected,
-                                             regionOp.getResult(0));
+    selected = arith::AndIOp::create(builder, getLoc(), selected,
+                                     regionOp.getResult(0));
   }
 
   return selected;

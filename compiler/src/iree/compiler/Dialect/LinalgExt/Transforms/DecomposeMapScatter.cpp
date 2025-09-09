@@ -40,13 +40,13 @@ static LogicalResult decomposeMapScatter(MapScatterOp mapScatterOp,
   Location loc = mapScatterOp.getLoc();
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(mapScatterOp);
-  Value flatOutputBuffer = rewriter.create<memref::CollapseShapeOp>(
-      loc, mapScatterOp.getOutput(), reassociations);
+  Value flatOutputBuffer = memref::CollapseShapeOp::create(
+      rewriter, loc, mapScatterOp.getOutput(), reassociations);
 
-  auto idxInit = rewriter.create<tensor::EmptyOp>(loc, inputType.getShape(),
-                                                  rewriter.getIndexType());
-  auto maskInit = rewriter.create<tensor::EmptyOp>(loc, inputType.getShape(),
-                                                   rewriter.getIntegerType(1));
+  auto idxInit = tensor::EmptyOp::create(rewriter, loc, inputType.getShape(),
+                                         rewriter.getIndexType());
+  auto maskInit = tensor::EmptyOp::create(rewriter, loc, inputType.getShape(),
+                                          rewriter.getIntegerType(1));
   SmallVector<OpFoldResult> outputSizes =
       memref::getMixedSizes(rewriter, loc, mapScatterOp.getOutput());
 
@@ -55,14 +55,15 @@ static LogicalResult decomposeMapScatter(MapScatterOp mapScatterOp,
                                  ArrayRef<Value> yieldedValues) {
       SmallVector<Value> outputIndices(yieldedValues);
       Value mask = outputIndices.pop_back_val();
-      Value linearIdx = inlineBuilder.create<affine::AffineLinearizeIndexOp>(
-          inlineLoc, outputIndices, outputSizes, /*disjoint=*/true);
-      inlineBuilder.create<linalg::YieldOp>(inlineLoc,
-                                            ValueRange{linearIdx, mask});
+      Value linearIdx = affine::AffineLinearizeIndexOp::create(
+          inlineBuilder, inlineLoc, outputIndices, outputSizes,
+          /*disjoint=*/true);
+      linalg::YieldOp::create(inlineBuilder, inlineLoc,
+                              ValueRange{linearIdx, mask});
     };
     SmallVector<Value> indices = llvm::map_to_vector(
         llvm::seq<int64_t>(inputType.getRank()), [&](int64_t dim) -> Value {
-          return b.create<linalg::IndexOp>(nestedLoc, b.getIndexType(), dim);
+          return linalg::IndexOp::create(b, nestedLoc, b.getIndexType(), dim);
         });
     mapScatterOp.inlineMapScatterBody(b, nestedLoc, indices, inlineBodyBuilder);
   };
@@ -71,8 +72,9 @@ static LogicalResult decomposeMapScatter(MapScatterOp mapScatterOp,
   SmallVector<utils::IteratorType> iterTypes(inputType.getRank(),
                                              utils::IteratorType::parallel);
   SmallVector<Value> outs = {idxInit.getResult(), maskInit.getResult()};
-  auto genericOp = rewriter.create<linalg::GenericOp>(
-      loc, TypeRange(outs), ValueRange(), outs, maps, iterTypes, bodyBuilder);
+  auto genericOp =
+      linalg::GenericOp::create(rewriter, loc, TypeRange(outs), ValueRange(),
+                                outs, maps, iterTypes, bodyBuilder);
 
   // Lower linearize and delinearize ops before vectorizing, because the
   // vectorizer can't hendle them.
@@ -125,18 +127,18 @@ static LogicalResult decomposeMapScatter(MapScatterOp mapScatterOp,
   auto flatIndexType =
       VectorType::get({flatVectorSize}, rewriter.getIndexType());
   indexVector =
-      rewriter.create<vector::ShapeCastOp>(loc, flatIndexType, indexVector);
+      vector::ShapeCastOp::create(rewriter, loc, flatIndexType, indexVector);
   auto flatMaskType =
       VectorType::get({flatVectorSize}, rewriter.getIntegerType(1));
   maskVector =
-      rewriter.create<vector::ShapeCastOp>(loc, flatMaskType, maskVector);
+      vector::ShapeCastOp::create(rewriter, loc, flatMaskType, maskVector);
   auto flatInputType =
       VectorType::get({flatVectorSize}, inputType.getElementType());
-  Value inputVector = rewriter.create<vector::ShapeCastOp>(
-      loc, flatInputType, mapScatterOp.getInput());
+  Value inputVector = vector::ShapeCastOp::create(rewriter, loc, flatInputType,
+                                                  mapScatterOp.getInput());
 
   SmallVector<Value> offsets = {
-      rewriter.create<arith::ConstantIndexOp>(loc, 0)};
+      arith::ConstantIndexOp::create(rewriter, loc, 0)};
   rewriter.replaceOpWithNewOp<vector::ScatterOp>(mapScatterOp, flatOutputBuffer,
                                                  offsets, indexVector,
                                                  maskVector, inputVector);

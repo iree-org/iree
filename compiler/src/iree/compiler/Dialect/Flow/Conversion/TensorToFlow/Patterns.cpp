@@ -164,11 +164,11 @@ struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
                                 ? inputType.getDimSize(position)
                                 : resultType.getDimSize(position);
           dimSizes[position] =
-              rewriter.create<arith::ConstantIndexOp>(loc, dimSize);
+              arith::ConstantIndexOp::create(rewriter, loc, dimSize);
         } else {
           // Dynamic dim.
           dimSizes[position] =
-              rewriter.create<tensor::DimOp>(loc, input, position);
+              tensor::DimOp::create(rewriter, loc, input, position);
         }
       }
 
@@ -249,14 +249,14 @@ struct ConvertTensorConcatPattern : public OpRewritePattern<tensor::ConcatOp> {
       inputShapes.emplace_back(std::move(inputShape));
     }
 
-    Value replacement = rewriter.create<tensor::EmptyOp>(
-        loc, outputShape, concatOp.getType().getElementType());
+    Value replacement = tensor::EmptyOp::create(
+        rewriter, loc, outputShape, concatOp.getType().getElementType());
 
     SmallVector<int64_t> resultStaticDims;
     SmallVector<Value> resultDynamicDims;
     dispatchIndexOpFoldResults(outputShape, resultDynamicDims,
                                resultStaticDims);
-    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
     // Generate the `flow.tensor.update` operations for the concat.
     for (auto [index, input] : llvm::enumerate(concatOp.getInputs())) {
       SmallVector<int64_t> inputStaticShape;
@@ -266,9 +266,9 @@ struct ConvertTensorConcatPattern : public OpRewritePattern<tensor::ConcatOp> {
       SmallVector<Value> offsets(inputStaticShape.size(), zero);
       offsets[0] =
           getValueOrCreateConstantIndexOp(rewriter, loc, concatOffsets[index]);
-      replacement = rewriter.create<IREE::Flow::TensorUpdateOp>(
-          loc, replacement.getType(), replacement, resultDynamicDims, offsets,
-          input, inputDynamicShape);
+      replacement = IREE::Flow::TensorUpdateOp::create(
+          rewriter, loc, replacement.getType(), replacement, resultDynamicDims,
+          offsets, input, inputDynamicShape);
     }
     rewriter.replaceOp(concatOp, replacement);
     return success();
@@ -299,19 +299,20 @@ struct ConvertTensorFromElementsPattern
     }
 
     const int64_t rank = tensorType.getRank();
-    Value result = rewriter.create<tensor::EmptyOp>(
-        op.getLoc(), tensorType.getShape(), tensorType.getElementType());
+    Value result =
+        tensor::EmptyOp::create(rewriter, op.getLoc(), tensorType.getShape(),
+                                tensorType.getElementType());
     SmallVector<Value> ivs(rank);
     for (int i = 0, s = op.getNumOperands(); i < s; ++i) {
       int64_t index = i;
       for (int j = rank - 1; j >= 0; --j) {
         int64_t iv = index % tensorType.getDimSize(j);
         index = index / tensorType.getDimSize(j);
-        ivs[j] = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), iv);
+        ivs[j] = arith::ConstantIndexOp::create(rewriter, op.getLoc(), iv);
       }
 
-      result = rewriter.create<Flow::TensorStoreOp>(
-          op.getLoc(), op.getOperand(i), result, ivs);
+      result = Flow::TensorStoreOp::create(rewriter, op.getLoc(),
+                                           op.getOperand(i), result, ivs);
     }
 
     rewriter.replaceOp(op, result);
@@ -327,7 +328,7 @@ static SmallVector<Value> getDynamicTensorSizes(OpBuilder &builder,
   SmallVector<Value> sizes;
   for (const auto [idx, size] : enumerate(type.getShape())) {
     if (type.isDynamicDim(idx)) {
-      Value dim = builder.create<tensor::DimOp>(loc, tensor, idx);
+      Value dim = tensor::DimOp::create(builder, loc, tensor, idx);
       sizes.push_back(dim);
     }
   }
@@ -360,14 +361,14 @@ struct ConvertTensorDialectReshapeOpPattern
     // (ignore static dimensions)
     SmallVector<Value> destSizes;
     for (int i = 0; i < shapeOperandType.getShape()[0]; i++) {
-      Value idx = rewriter.create<arith::ConstantIndexOp>(loc, i);
-      Value element = rewriter.create<tensor::ExtractOp>(loc, op.getShape(),
-                                                         ValueRange({idx}));
+      Value idx = arith::ConstantIndexOp::create(rewriter, loc, i);
+      Value element = tensor::ExtractOp::create(rewriter, loc, op.getShape(),
+                                                ValueRange({idx}));
       if (ShapedType::isDynamic(resultType.getShape()[i])) {
         auto elementTy = element.getType();
         if (isa<IntegerType>(elementTy)) {
-          element = rewriter.create<arith::IndexCastOp>(
-              loc, rewriter.getIndexType(), element);
+          element = arith::IndexCastOp::create(
+              rewriter, loc, rewriter.getIndexType(), element);
         }
         destSizes.push_back(element);
       }

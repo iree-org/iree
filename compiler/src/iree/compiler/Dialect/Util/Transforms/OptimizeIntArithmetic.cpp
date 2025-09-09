@@ -174,8 +174,8 @@ struct ConvertUnsignedI64IndexCastProducerToIndex
       for (auto &operand : producer->getOpOperands()) {
         if (operand.get().getType() != inType)
           continue;
-        Value newOperand = rewriter.create<arith::IndexCastUIOp>(
-            producer->getLoc(), outType, operand.get());
+        Value newOperand = arith::IndexCastUIOp::create(
+            rewriter, producer->getLoc(), outType, operand.get());
         operand.set(newOperand);
       }
       producer->getResult(0).setType(outType);
@@ -229,15 +229,15 @@ struct RemoveIndexCastForAssumeOfI32
       newArgs.push_back(arg.getDefiningOp<arith::IndexCastUIOp>().getIn());
     }
     ArrayAttr assumptions = op.getAssumptionsAttr();
-    auto newOp = rewriter.create<Util::AssumeIntOp>(
-        op.getLoc(), ValueTypeRange<ArrayRef<Value>>{newArgs}, newArgs,
-        assumptions);
+    auto newOp = Util::AssumeIntOp::create(
+        rewriter, op.getLoc(), ValueTypeRange<ArrayRef<Value>>{newArgs},
+        newArgs, assumptions);
     SmallVector<Value> replacements(newOp.getResults());
     for (auto [newRes, oldRes] :
          llvm::zip_equal(replacements, op.getResults())) {
       if (newRes.getType() != oldRes.getType()) {
-        newRes = rewriter.create<arith::IndexCastUIOp>(
-            op.getLoc(), oldRes.getType(), newRes);
+        newRes = arith::IndexCastUIOp::create(rewriter, op.getLoc(),
+                                              oldRes.getType(), newRes);
       }
       // Preserve assumption state.
       auto *oldState = solver.lookupState<IntegerValueRangeLattice>(oldRes);
@@ -280,9 +280,9 @@ struct NarrowSCFForIvToI32 : public OpRewritePattern<scf::ForOp> {
     Type i32 = rewriter.getI32Type();
     auto doCastDown = [&](Value v) -> Value {
       if (srcType.isIndex())
-        return rewriter.create<arith::IndexCastUIOp>(loc, i32, v);
+        return arith::IndexCastUIOp::create(rewriter, loc, i32, v);
       else
-        return rewriter.create<arith::TruncIOp>(loc, i32, v);
+        return arith::TruncIOp::create(rewriter, loc, i32, v);
     };
     Value newLb = doCastDown(forOp.getLowerBound());
     Value newUb = doCastDown(forOp.getUpperBound());
@@ -293,9 +293,9 @@ struct NarrowSCFForIvToI32 : public OpRewritePattern<scf::ForOp> {
       Value castBackOp;
       if (srcType.isIndex()) {
         castBackOp =
-            rewriter.create<arith::IndexCastUIOp>(iv.getLoc(), srcType, iv);
+            arith::IndexCastUIOp::create(rewriter, iv.getLoc(), srcType, iv);
       } else {
-        castBackOp = rewriter.create<arith::ExtUIOp>(iv.getLoc(), srcType, iv);
+        castBackOp = arith::ExtUIOp::create(rewriter, iv.getLoc(), srcType, iv);
       }
       (void)solver.getOrCreateState<IntegerValueRangeLattice>(castBackOp)
           ->join(*ivState);

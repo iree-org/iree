@@ -13,8 +13,8 @@ namespace mlir::iree_compiler {
 
 Value lookupDeviceFor(Operation *op, OpBuilder &builder) {
   auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
-  auto resolveOp = builder.create<IREE::Stream::ContextResolveOp>(
-      op->getLoc(),
+  auto resolveOp = IREE::Stream::ContextResolveOp::create(
+      builder, op->getLoc(),
       TypeRange{
           builder.getType<IREE::HAL::DeviceType>(),
       },
@@ -24,8 +24,8 @@ Value lookupDeviceFor(Operation *op, OpBuilder &builder) {
 
 static std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(
     Location loc, IREE::Stream::AffinityAttr affinityAttr, OpBuilder &builder) {
-  auto resolveOp = builder.create<IREE::Stream::ContextResolveOp>(
-      loc,
+  auto resolveOp = IREE::Stream::ContextResolveOp::create(
+      builder, loc,
       TypeRange{
           builder.getType<IREE::HAL::DeviceType>(),
           builder.getI64Type(),
@@ -74,15 +74,16 @@ std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(Operation *op,
   }
   // Emit a select op to let the runtime decide which device/queue affinity to
   // use, if required.
-  auto selectOp = builder.create<IREE::HAL::AllocatorSelectOp>(
-      op->getLoc(), devices, queueAffinities, memoryTypes, bufferUsage);
+  auto selectOp = IREE::HAL::AllocatorSelectOp::create(
+      builder, op->getLoc(), devices, queueAffinities, memoryTypes,
+      bufferUsage);
   return {selectOp.getResult(0), selectOp.getResult(1)};
 }
 
 Value lookupAllocatorFor(Operation *op, OpBuilder &builder) {
   auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
-  auto resolveOp = builder.create<IREE::Stream::ContextResolveOp>(
-      op->getLoc(),
+  auto resolveOp = IREE::Stream::ContextResolveOp::create(
+      builder, op->getLoc(),
       TypeRange{
           builder.getType<IREE::HAL::AllocatorType>(),
       },
@@ -96,7 +97,7 @@ lookupAllocatorAndQueueAffinityFor(Operation *op, Value memoryTypes,
   auto [device, queueAffinity] =
       lookupDeviceAndQueueAffinityFor(op, memoryTypes, bufferUsage, builder);
   Value allocator =
-      builder.create<IREE::HAL::DeviceAllocatorOp>(op->getLoc(), device);
+      IREE::HAL::DeviceAllocatorOp::create(builder, op->getLoc(), device);
   return {allocator, queueAffinity};
 }
 
@@ -104,8 +105,8 @@ Value getOrCreateWaitFence(Location loc, Value timepointFence,
                            PatternRewriter &rewriter) {
   if (timepointFence)
     return timepointFence;
-  return rewriter.create<IREE::Util::NullOp>(
-      loc, rewriter.getType<IREE::HAL::FenceType>());
+  return IREE::Util::NullOp::create(rewriter, loc,
+                                    rewriter.getType<IREE::HAL::FenceType>());
 }
 
 // Finds a !hal.fence bound to |timepoint| via a chain op and returns it if
@@ -148,8 +149,8 @@ Value getOrCreateSignalFence(Location loc, Value device, Value timepoint,
   // Check to see if anyone is consuming the timepoint - if not then we don't
   // need create a fence.
   if (timepoint.use_empty()) {
-    return rewriter.create<IREE::Util::NullOp>(
-        loc, rewriter.getType<IREE::HAL::FenceType>());
+    return IREE::Util::NullOp::create(rewriter, loc,
+                                      rewriter.getType<IREE::HAL::FenceType>());
   }
 
   // Check to see if the timepoint is associated with a fence. In common cases
@@ -159,8 +160,8 @@ Value getOrCreateSignalFence(Location loc, Value device, Value timepoint,
     return fence;
 
   // Create a new fence.
-  return rewriter.create<IREE::HAL::FenceCreateOp>(
-      loc, rewriter.getType<IREE::HAL::FenceType>(), device,
+  return IREE::HAL::FenceCreateOp::create(
+      rewriter, loc, rewriter.getType<IREE::HAL::FenceType>(), device,
       IREE::HAL::FenceFlagBitfield::None);
 }
 

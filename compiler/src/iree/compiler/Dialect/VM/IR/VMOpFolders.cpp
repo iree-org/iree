@@ -2800,7 +2800,7 @@ struct RewritePseudoCmpNZToNE : public OpRewritePattern<T> {
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<U>(op, op.getType(), op.getOperand(),
-                                   rewriter.create<CZ>(op.getLoc()));
+                                   CZ::create(rewriter, op.getLoc()));
     return success();
   }
 };
@@ -2903,7 +2903,7 @@ struct NullCheckCmpEQRefToCmpNZRef : public OpRewritePattern<CmpEQRefOp> {
     Attribute rhs;
     if (matchPattern(op.getRhs(), m_Constant(&rhs))) {
       auto cmpNz =
-          rewriter.create<CmpNZRefOp>(op.getLoc(), op.getType(), op.getLhs());
+          CmpNZRefOp::create(rewriter, op.getLoc(), op.getType(), op.getLhs());
       rewriter.replaceOpWithNewOp<XorI32Op>(
           op, op.getType(), cmpNz,
           rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(), 1));
@@ -3204,8 +3204,8 @@ struct RewriteCondFailToBranchFail : public OpRewritePattern<CondFailOp> {
         rewriter.createBlock(block, {op.getStatus().getType()}, {op.getLoc()});
     block->moveBefore(failBlock);
     rewriter.setInsertionPointToStart(failBlock);
-    rewriter.create<FailOp>(op.getLoc(), failBlock->getArgument(0),
-                            op.getMessage().value_or(""));
+    FailOp::create(rewriter, op.getLoc(), failBlock->getArgument(0),
+                   op.getMessage().value_or(""));
 
     // Replace the original cond_fail with our cond_branch, splitting the block
     // and continuing if the condition is not taken.

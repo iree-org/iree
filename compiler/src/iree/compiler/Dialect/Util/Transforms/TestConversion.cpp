@@ -26,7 +26,7 @@ namespace {
 
 static Value buildUnrealizedConversionCastOp(OpBuilder &builder, Type toType,
                                              ValueRange inputs, Location loc) {
-  return builder.create<UnrealizedConversionCastOp>(loc, toType, inputs)
+  return UnrealizedConversionCastOp::create(builder, loc, toType, inputs)
       .getResult(0);
 }
 

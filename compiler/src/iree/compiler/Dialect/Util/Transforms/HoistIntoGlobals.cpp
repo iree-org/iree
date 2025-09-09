@@ -187,8 +187,8 @@ public:
 
     // No existing mapping - create a new global.
     OpBuilder moduleBuilder(topLevelOp);
-    auto initializerOp =
-        moduleBuilder.create<IREE::Util::InitializerOp>(originalValue.getLoc());
+    auto initializerOp = IREE::Util::InitializerOp::create(
+        moduleBuilder, originalValue.getLoc());
     initializerOp->setDialectAttrs(dialectAttrs);
     auto initializerBuilder =
         OpBuilder::atBlockEnd(initializerOp.addEntryBlock());
@@ -288,8 +288,8 @@ public:
         // Allow the storage type of the global to differ from the local type.
         globalType = hoistableType.getPreferredStorageType();
       }
-      auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
-          loc, getHoistedName(globalType), false, globalType);
+      auto globalOp = IREE::Util::GlobalOp::create(
+          moduleBuilder, loc, getHoistedName(globalType), false, globalType);
       moduleSymbols.insert(globalOp);
       SymbolTable::setSymbolVisibility(globalOp,
                                        SymbolTable::Visibility::Private);
@@ -319,7 +319,7 @@ public:
       globalOp.createStoreOp(loc, clonedResult, initializerBuilder);
     }
 
-    initializerBuilder.create<IREE::Util::ReturnOp>(loc);
+    IREE::Util::ReturnOp::create(initializerBuilder, loc);
     return success();
   }
 

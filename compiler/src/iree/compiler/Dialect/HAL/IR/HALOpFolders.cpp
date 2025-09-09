@@ -98,8 +98,8 @@ struct DeduplicateTensorBarrierSources
     if (orderedSources.size() == op.getSources().size()) {
       return failure();
     }
-    auto newOp = rewriter.create<TensorBarrierOp>(op.getLoc(), orderedSources,
-                                                  op.getSignalFence());
+    auto newOp = TensorBarrierOp::create(rewriter, op.getLoc(), orderedSources,
+                                         op.getSignalFence());
     SmallVector<Value> newResults;
     newResults.reserve(newOp.getNumResults());
     for (unsigned newIndex : resultMapping) {
@@ -844,8 +844,8 @@ struct MergeExecutableConstantBlocks
     // about making that work.
     rewriter.setInsertionPoint(blockOps.front());
     auto fusedLoc = rewriter.getFusedLoc(blockLocs);
-    auto newBlockOp = rewriter.create<ExecutableConstantBlockOp>(
-        fusedLoc, rewriter.getFunctionType(inputTypes, resultTypes),
+    auto newBlockOp = ExecutableConstantBlockOp::create(
+        rewriter, fusedLoc, rewriter.getFunctionType(inputTypes, resultTypes),
         rewriter.getArrayAttr(resultKeys), /*arg_attrs=*/ArrayAttr(),
         /*res_attrs=*/ArrayAttr());
 
@@ -1129,8 +1129,8 @@ struct ElideSignaledFence : public OpRewritePattern<FenceSignalOp> {
     }
 
     // Safe to elide.
-    Value nullFence = rewriter.create<IREE::Util::NullOp>(
-        rewriter.getFusedLoc({createOp.getLoc(), signalOp.getLoc()}),
+    Value nullFence = IREE::Util::NullOp::create(
+        rewriter, rewriter.getFusedLoc({createOp.getLoc(), signalOp.getLoc()}),
         fence.getType());
     rewriter.replaceAllUsesWith(fence, nullFence);
     rewriter.eraseOp(signalOp);

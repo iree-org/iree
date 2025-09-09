@@ -298,9 +298,9 @@ struct ConvertIfOp : public OpConversionPattern<scf::IfOp> {
         llvm::map_to_vector(ifOp.getResultTypes(), [&](Type type) {
           return getTypeConverter()->convertType(type);
         });
-    auto newOp = rewriter.create<scf::IfOp>(ifOp.getLoc(), resultTypes,
-                                            adaptor.getCondition(),
-                                            ifOp.elseBlock() != nullptr);
+    auto newOp =
+        scf::IfOp::create(rewriter, ifOp.getLoc(), resultTypes,
+                          adaptor.getCondition(), ifOp.elseBlock() != nullptr);
     rewriter.inlineRegionBefore(ifOp.getThenRegion(), newOp.getThenRegion(),
                                 newOp.getThenRegion().end());
     rewriter.eraseBlock(&newOp.getThenRegion().front());

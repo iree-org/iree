@@ -26,8 +26,8 @@ static Operation *sliceTensor(Location loc, Value expanded, Value original,
       tensor::getMixedSizes(builder, loc, original);
   SmallVector<OpFoldResult> offsets(sizes.size(), builder.getI64IntegerAttr(0));
   SmallVector<OpFoldResult> strides(sizes.size(), builder.getI64IntegerAttr(1));
-  return builder.create<tensor::ExtractSliceOp>(loc, expanded, offsets, sizes,
-                                                strides);
+  return tensor::ExtractSliceOp::create(builder, loc, expanded, offsets, sizes,
+                                        strides);
 }
 
 static bool padTensor(Location loc, OpOperand *operand,
@@ -61,9 +61,9 @@ static bool padTensor(Location loc, OpOperand *operand,
       needsPad = true;
     } else {
       // Dynamic dim.
-      Value inputDimValue = builder.create<tensor::DimOp>(loc, original, i);
+      Value inputDimValue = tensor::DimOp::create(builder, loc, original, i);
       Value alignedDim =
-          builder.create<IREE::Util::AlignOp>(loc, inputDimValue, alignment);
+          IREE::Util::AlignOp::create(builder, loc, inputDimValue, alignment);
       newPaddingSizes[i] = alignedDim;
       needsPad = true;
     }
@@ -73,14 +73,14 @@ static bool padTensor(Location loc, OpOperand *operand,
   }
 
   auto resultType = RankedTensorType::get(newStaticDims, type.getElementType());
-  Value zeroConstant = builder.create<arith::ConstantOp>(
-      loc, builder.getZeroAttr(type.getElementType()));
+  Value zeroConstant = arith::ConstantOp::create(
+      builder, loc, builder.getZeroAttr(type.getElementType()));
   SmallVector<OpFoldResult> zeroStaticLow(shape.size(),
                                           builder.getI64IntegerAttr(0));
   SmallVector<Value> nullLow;
-  Value padded = builder.create<tensor::PadOp>(loc, resultType, operand->get(),
-                                               zeroStaticLow, newPaddingSizes,
-                                               zeroConstant);
+  Value padded =
+      tensor::PadOp::create(builder, loc, resultType, operand->get(),
+                            zeroStaticLow, newPaddingSizes, zeroConstant);
   operand->set(padded);
   return true;
 }

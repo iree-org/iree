@@ -43,15 +43,15 @@ static Value elementwiseValueInPlace(OpBuilder &builder, Location loc,
   SmallVector<utils::IteratorType> iteratorTypes(inputMap.getNumDims(),
                                                  utils::IteratorType::parallel);
 
-  auto genericOp = builder.create<linalg::GenericOp>(
-      loc, value.getType(), scale, value,
+  auto genericOp = linalg::GenericOp::create(
+      builder, loc, value.getType(), scale, value,
       SmallVector<AffineMap>{scaleMap, inputMap}, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
         // Convert scale to the same datatype as input.
         Value scale = convertScalarToDtype(b, loc, args[0], args[1].getType(),
                                            /*isUnsignedCast=*/false);
-        Value result = b.create<T>(loc, scale, args[1]);
-        b.create<linalg::YieldOp>(loc, result);
+        Value result = T::create(b, loc, scale, args[1]);
+        linalg::YieldOp::create(b, loc, result);
       });
   return genericOp.getResult(0);
 }
@@ -64,16 +64,16 @@ static Value reciprocalValue(OpBuilder &b, Location loc, Value input,
 
   SmallVector<utils::IteratorType> iteratorTypes(rank,
                                                  utils::IteratorType::parallel);
-  auto genericOp = b.create<linalg::GenericOp>(
-      loc, output.getType(), ValueRange{input}, output, maps, iteratorTypes,
+  auto genericOp = linalg::GenericOp::create(
+      b, loc, output.getType(), ValueRange{input}, output, maps, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
         Value in = convertScalarToDtype(b, loc, args[0], args[1].getType(),
                                         /*isUnsignedCast=*/false);
         // Convert scale to the same datatype as input.
-        Value one =
-            b.create<arith::ConstantOp>(loc, b.getFloatAttr(in.getType(), 1.0));
-        Value result = b.create<arith::DivFOp>(loc, one, in);
-        b.create<linalg::YieldOp>(loc, result);
+        Value one = arith::ConstantOp::create(
+            b, loc, b.getFloatAttr(in.getType(), 1.0));
+        Value result = arith::DivFOp::create(b, loc, one, in);
+        linalg::YieldOp::create(b, loc, result);
       });
   return genericOp.getResult(0);
 }
@@ -88,8 +88,8 @@ static Value truncateFloat(OpBuilder &builder, Location loc, AffineMap inputMap,
 
   SmallVector<utils::IteratorType> iteratorTypes(inputMap.getNumDims(),
                                                  utils::IteratorType::parallel);
-  auto genericOp = builder.create<linalg::GenericOp>(
-      loc, output.getType(), value, output,
+  auto genericOp = linalg::GenericOp::create(
+      builder, loc, output.getType(), value, output,
       SmallVector<AffineMap>{inputMap, outputMap}, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
         auto srcTy = cast<FloatType>(args[0].getType());
@@ -105,15 +105,15 @@ static Value truncateFloat(OpBuilder &builder, Location loc, AffineMap inputMap,
           // Clamp input to dstTy(usually `fp8`) MAX value to prevent NaNs.
           // We do not clamp for `-MAX` because this function meant to only be
           // used by attention's exp2 who's value is always > 0.
-          Value mx = builder.create<arith::ConstantOp>(
-              loc, builder.getFloatAttr(srcTy, mxDbl));
-          input = b.create<arith::MinimumFOp>(loc, mx, input);
+          Value mx = arith::ConstantOp::create(
+              builder, loc, builder.getFloatAttr(srcTy, mxDbl));
+          input = arith::MinimumFOp::create(b, loc, mx, input);
         }
 
         // Convert scale to the same datatype as input.
         Value trunc = convertScalarToDtype(b, loc, input, dstTy,
                                            /*isUnsignedCast=*/false);
-        b.create<linalg::YieldOp>(loc, trunc);
+        linalg::YieldOp::create(b, loc, trunc);
       });
   return genericOp.getResult(0);
 }
@@ -134,15 +134,15 @@ static Value reduce(OpBuilder &builder, Location loc, AffineMap inputMap,
     iteratorTypes[pos] = utils::IteratorType::parallel;
   }
 
-  auto genericOp = builder.create<linalg::GenericOp>(
-      loc, output.getType(), input, output,
+  auto genericOp = linalg::GenericOp::create(
+      builder, loc, output.getType(), input, output,
       SmallVector<AffineMap>{inputMap, outputMap}, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
         // Convert input to the same datatype as acc.
         Value in = convertScalarToDtype(b, loc, args[0], args[1].getType(),
                                         /*isUnsignedCast=*/false);
-        Value result = b.create<T>(loc, in, args[1]);
-        b.create<linalg::YieldOp>(loc, result);
+        Value result = T::create(b, loc, in, args[1]);
+        linalg::YieldOp::create(b, loc, result);
       });
 
   return genericOp.getResult(0);
@@ -166,8 +166,8 @@ static Value computeMatmul(OpBuilder &builder, Location loc, AffineMap lhsMap,
     iteratorTypes[pos] = utils::IteratorType::parallel;
   }
 
-  auto genericOp = builder.create<linalg::GenericOp>(
-      loc, acc.getType(), SmallVector<Value>{lhs, rhs}, acc,
+  auto genericOp = linalg::GenericOp::create(
+      builder, loc, acc.getType(), SmallVector<Value>{lhs, rhs}, acc,
       SmallVector<AffineMap>{lhsMap, rhsMap, accMap}, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
         // Cast inputs to match output datatype.
@@ -175,9 +175,9 @@ static Value computeMatmul(OpBuilder &builder, Location loc, AffineMap lhsMap,
                                          /*isUnsignedCast=*/false);
         Value rhs = convertScalarToDtype(b, loc, args[1], args[2].getType(),
                                          /*isUnsignedCast=*/false);
-        Value mul = b.create<arith::MulFOp>(loc, lhs, rhs);
-        Value add = b.create<arith::AddFOp>(loc, mul, args[2]);
-        b.create<linalg::YieldOp>(loc, add);
+        Value mul = arith::MulFOp::create(b, loc, lhs, rhs);
+        Value add = arith::AddFOp::create(b, loc, mul, args[2]);
+        linalg::YieldOp::create(b, loc, add);
       });
 
   return genericOp.getResult(0);
@@ -191,15 +191,16 @@ static Value applyPostQKMatmulElementwise(OpBuilder &builder, Location loc,
   SmallVector<AffineMap> indexingMaps{identityMap};
   SmallVector<utils::IteratorType> iteratorTypes(rank,
                                                  utils::IteratorType::parallel);
-  auto genericOp = builder.create<linalg::GenericOp>(
-      loc, value.getType(), ValueRange{}, value, indexingMaps, iteratorTypes);
+  auto genericOp =
+      linalg::GenericOp::create(builder, loc, value.getType(), ValueRange{},
+                                value, indexingMaps, iteratorTypes);
   auto &dstRegion = genericOp.getRegion();
   builder.cloneRegionBefore(region, dstRegion, dstRegion.end());
   {
     OpBuilder::InsertionGuard withinRegion(builder);
     builder.setInsertionPoint(dstRegion.back().getTerminator());
-    builder.create<linalg::YieldOp>(
-        loc, dstRegion.back().getTerminator()->getOperands());
+    linalg::YieldOp::create(builder, loc,
+                            dstRegion.back().getTerminator()->getOperands());
     dstRegion.back().getTerminator()->erase();
   }
   return genericOp.getResult(0);
@@ -216,13 +217,15 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
   SmallVector<utils::IteratorType> iteratorTypes(qkMap.getNumDims(),
                                                  utils::IteratorType::parallel);
 
-  Value zero = builder.create<arith::ConstantOp>(
-      loc, builder.getFloatAttr(getElementTypeOrSelf(qk.getType()), 0.0));
-  Value negInf = builder.create<arith::ConstantOp>(
-      loc, builder.getFloatAttr(getElementTypeOrSelf(qk.getType()),
-                                -std::numeric_limits<double>::infinity()));
-  auto genericOp = builder.create<linalg::GenericOp>(
-      loc, qk.getType(), SmallVector<Value>{mask}, qk,
+  Value zero = arith::ConstantOp::create(
+      builder, loc,
+      builder.getFloatAttr(getElementTypeOrSelf(qk.getType()), 0.0));
+  Value negInf = arith::ConstantOp::create(
+      builder, loc,
+      builder.getFloatAttr(getElementTypeOrSelf(qk.getType()),
+                           -std::numeric_limits<double>::infinity()));
+  auto genericOp = linalg::GenericOp::create(
+      builder, loc, qk.getType(), SmallVector<Value>{mask}, qk,
       SmallVector<AffineMap>{maskMap, qkMap}, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
         Value qkVal = args[1];
@@ -233,23 +236,23 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
         if (maskValType.isInteger()) {
           if (maskValType.getIntOrFloatBitWidth() != 1) {
             maskVal =
-                b.create<arith::TruncIOp>(loc, builder.getI1Type(), maskVal);
+                arith::TruncIOp::create(b, loc, builder.getI1Type(), maskVal);
           }
-          maskVal = b.create<arith::SelectOp>(loc, maskVal, zero, negInf);
+          maskVal = arith::SelectOp::create(b, loc, maskVal, zero, negInf);
         } else {
           maskVal = convertScalarToDtype(b, loc, maskVal, qkVal.getType(),
                                          /*isUnsignedCast=*/false);
           // Scaling to compensate for base-2 softmax
-          Value log2e = b.create<arith::ConstantOp>(
-              loc, b.getFloatAttr(qkVal.getType(), M_LOG2E));
-          maskVal = b.create<arith::MulFOp>(loc, maskVal, log2e);
+          Value log2e = arith::ConstantOp::create(
+              b, loc, b.getFloatAttr(qkVal.getType(), M_LOG2E));
+          maskVal = arith::MulFOp::create(b, loc, maskVal, log2e);
         }
         // Finally, set the returned value to the qk element plus the mask
         // element (or 0/-infinity if bool mask). We opt for a AddFOp (instead
         // of a SelectFOp to stay consistent with the additive definition of
         // attention masking)
-        Value add = b.create<arith::AddFOp>(loc, qkVal, maskVal);
-        b.create<linalg::YieldOp>(loc, add);
+        Value add = arith::AddFOp::create(b, loc, qkVal, maskVal);
+        linalg::YieldOp::create(b, loc, add);
       });
 
   return genericOp.getResult(0);
@@ -266,16 +269,16 @@ static Value computeSubAndExp2(OpBuilder &builder, Location loc,
 
   SmallVector<utils::IteratorType> iteratorTypes(inputMap.getNumDims(),
                                                  utils::IteratorType::parallel);
-  auto genericOp = builder.create<linalg::GenericOp>(
-      loc, output.getType(), input, output,
+  auto genericOp = linalg::GenericOp::create(
+      builder, loc, output.getType(), input, output,
       SmallVector<AffineMap>{inputMap, outputMap}, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
         // Convert input to the same datatype as output.
         Value in = convertScalarToDtype(b, loc, args[0], args[1].getType(),
                                         /*isUnsignedCast=*/false);
-        Value diff = b.create<arith::SubFOp>(loc, args[1], in);
-        Value weight = b.create<math::Exp2Op>(loc, diff);
-        b.create<linalg::YieldOp>(loc, weight);
+        Value diff = arith::SubFOp::create(b, loc, args[1], in);
+        Value weight = math::Exp2Op::create(b, loc, diff);
+        linalg::YieldOp::create(b, loc, weight);
       });
   return genericOp.getResult(0);
 }
@@ -317,9 +320,9 @@ Value computeQKAndElementwise(Location loc, OpBuilder &b, Value query,
   // multiply the scale by log2(e). We use exp2 instead of exp as most platforms
   // have better support for exp2 (we verified that we gain some speedup on
   // some GPUs).
-  Value log2e = b.create<arith::ConstantOp>(
-      loc, b.getFloatAttr(scale.getType(), M_LOG2E));
-  scale = b.create<arith::MulFOp>(loc, scale, log2e);
+  Value log2e = arith::ConstantOp::create(
+      b, loc, b.getFloatAttr(scale.getType(), M_LOG2E));
+  scale = arith::MulFOp::create(b, loc, scale, log2e);
 
   auto qETy = getElementTypeOrSelf(query.getType());
 
@@ -350,9 +353,9 @@ Value computeQKAndElementwise(Location loc, OpBuilder &b, Value query,
 
   // S = Q @ K
   // SMap = QMap @ KMap
-  Value emptyS = b.create<tensor::EmptyOp>(loc, sSizes, sElementType);
-  Value sZero = b.create<arith::ConstantOp>(loc, b.getZeroAttr(sElementType));
-  Value s = b.create<linalg::FillOp>(loc, sZero, emptyS).getResult(0);
+  Value emptyS = tensor::EmptyOp::create(b, loc, sSizes, sElementType);
+  Value sZero = arith::ConstantOp::create(b, loc, b.getZeroAttr(sElementType));
+  Value s = linalg::FillOp::create(b, loc, sZero, emptyS).getResult(0);
 
   s = computeMatmul(b, loc, qMap, kMap, sMap, query, key, s);
   if (qkAttrs) {
@@ -379,8 +382,8 @@ Value computeQKAndElementwise(Location loc, OpBuilder &b, Value query,
     double mx =
         APFloat::getLargest(fpTy.getFloatSemantics(), /*Negative=*/false)
             .convertToDouble();
-    Value offset = b.create<arith::ConstantOp>(
-        loc, b.getFloatAttr(sElementType, clAttentionSoftmaxMax / mx));
+    Value offset = arith::ConstantOp::create(
+        b, loc, b.getFloatAttr(sElementType, clAttentionSoftmaxMax / mx));
     s = elementwiseValueInPlace<arith::AddFOp>(b, loc, sMap, scaleMap, s,
                                                offset);
   }
@@ -450,7 +453,7 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
   SmallVector<OpFoldResult> rowRedSize =
       applyPermutationMap<OpFoldResult>(maxMap, sizes);
 
-  Value rowRedEmpty = b.create<tensor::EmptyOp>(loc, rowRedSize, f32Type);
+  Value rowRedEmpty = tensor::EmptyOp::create(b, loc, rowRedSize, f32Type);
 
   Value accInit = arith::getIdentityValue(arith::AtomicRMWKind::addf,
                                           getElementTypeOrSelf(output), b, loc,
@@ -462,12 +465,12 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
       arith::getIdentityValue(arith::AtomicRMWKind::addf, f32Type, b, loc);
 
   Value accFill =
-      b.create<linalg::FillOp>(loc, ValueRange{accInit}, output).getResult(0);
+      linalg::FillOp::create(b, loc, ValueRange{accInit}, output).getResult(0);
   Value maxFill =
-      b.create<linalg::FillOp>(loc, ValueRange{maxInit}, rowRedEmpty)
+      linalg::FillOp::create(b, loc, ValueRange{maxInit}, rowRedEmpty)
           .getResult(0);
   Value sumFill =
-      b.create<linalg::FillOp>(loc, ValueRange{sumInit}, rowRedEmpty)
+      linalg::FillOp::create(b, loc, ValueRange{sumInit}, rowRedEmpty)
           .getResult(0);
 
   // max = rowMax(S)
@@ -493,7 +496,7 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
   auto pETy = getElementTypeOrSelf(p.getType());
   auto vETy = getElementTypeOrSelf(value.getType());
   if (pETy != vETy && isa<FloatType>(vETy)) {
-    Value convertP = b.create<tensor::EmptyOp>(loc, sSizes, vETy);
+    Value convertP = tensor::EmptyOp::create(b, loc, sSizes, vETy);
     p = truncateFloat(b, loc, pMap, pMap, p, convertP, lowPrecision);
   }
 
@@ -589,7 +592,7 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   auto pETy = getElementTypeOrSelf(p.getType());
   auto vETy = getElementTypeOrSelf(value.getType());
   if (pETy != vETy && isa<FloatType>(vETy)) {
-    Value convertP = b.create<tensor::EmptyOp>(loc, sSizes, vETy);
+    Value convertP = tensor::EmptyOp::create(b, loc, sSizes, vETy);
     p = truncateFloat(b, loc, pMap, pMap, p, convertP, lowPrecision);
   }
 
@@ -812,9 +815,9 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
     kIndex = addOfrs(b, nestedLoc, kIndex, ivOffset);
   }
   ValueRange delinKOffset =
-      b.create<affine::AffineDelinearizeIndexOp>(
-           nestedLoc, getValueOrCreateConstantIndexOp(b, loc, kIndex), kBasis,
-           /*hasOuterBound=*/true)
+      affine::AffineDelinearizeIndexOp::create(
+          b, nestedLoc, getValueOrCreateConstantIndexOp(b, loc, kIndex), kBasis,
+          /*hasOuterBound=*/true)
           .getResults();
   // Split the delinearized offsets into the window offsets (for M offsets)
   // and the K offsets for the input tensor based on the layout.
@@ -852,10 +855,10 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   // `mBasis` contains the basis for the iteration space of result of the
   // convolution op (i.e., basis for result H and W dims).
   ValueRange delinMOffset =
-      b.create<affine::AffineDelinearizeIndexOp>(
-           nestedLoc, getValueOrCreateConstantIndexOp(b, loc, linearMOffset),
-           mBasis,
-           /*hasOuterBound=*/true)
+      affine::AffineDelinearizeIndexOp::create(
+          b, nestedLoc, getValueOrCreateConstantIndexOp(b, loc, linearMOffset),
+          mBasis,
+          /*hasOuterBound=*/true)
           .getResults();
 
   // Compute the final offsets into the input tensor.
@@ -927,8 +930,8 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   dispatchIndexOpFoldResults(inputTileSizes, tileSizeDynamic, tileSizeStatic);
   auto extractType = cast<RankedTensorType>(outputType.clone(tileSizeStatic));
   auto extract =
-      b.create<tensor::ExtractSliceOp>(nestedLoc, extractType, inputSlice,
-                                       sliceOffsets, sliceSizes, sliceStrides);
+      tensor::ExtractSliceOp::create(b, nestedLoc, extractType, inputSlice,
+                                     sliceOffsets, sliceSizes, sliceStrides);
 
   // Insert the slice into the destination tensor.
   sliceOffsets = SmallVector<OpFoldResult>(outputRank, zero);
@@ -957,10 +960,10 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
     ArrayRef<int64_t> extractShape = extractType.getShape();
     SmallVector<int64_t> emptyShape =
         applyPermutation(extractShape, transposePerm);
-    auto empty = b.create<tensor::EmptyOp>(nestedLoc, emptyShape,
-                                           outputType.getElementType());
-    auto transposeOp =
-        b.create<linalg::TransposeOp>(nestedLoc, extract, empty, transposePerm);
+    auto empty = tensor::EmptyOp::create(b, nestedLoc, emptyShape,
+                                         outputType.getElementType());
+    auto transposeOp = linalg::TransposeOp::create(b, nestedLoc, extract, empty,
+                                                   transposePerm);
     inputForInsert = transposeOp->getResult(0);
   } else {
     // Insert a `linalg.copy` so there is something to vectorize in the
@@ -968,16 +971,16 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
     // do not get vectorized, and the sequence becomes a scalar memref.copy.
     // This memref.copy could be vectorized after bufferization, but it is
     // probably better to vectorize during generic vectorization.
-    Value copyDest = b.create<tensor::ExtractSliceOp>(
-        nestedLoc, extractType, loopNest.loops.back().getRegionIterArg(0),
+    Value copyDest = tensor::ExtractSliceOp::create(
+        b, nestedLoc, extractType, loopNest.loops.back().getRegionIterArg(0),
         sliceOffsets, sliceSizes, sliceStrides);
     auto copiedSlice =
-        b.create<linalg::CopyOp>(nestedLoc, extract.getResult(), copyDest);
+        linalg::CopyOp::create(b, nestedLoc, extract.getResult(), copyDest);
     inputForInsert = copiedSlice.getResult(0);
   }
 
-  auto insert = b.create<tensor::InsertSliceOp>(
-      nestedLoc, inputForInsert, loopNest.loops.back().getRegionIterArg(0),
+  auto insert = tensor::InsertSliceOp::create(
+      b, nestedLoc, inputForInsert, loopNest.loops.back().getRegionIterArg(0),
       sliceOffsets, sliceSizes, sliceStrides);
   auto yieldOp =
       cast<scf::YieldOp>(loopNest.loops.back().getBody()->getTerminator());
@@ -1006,7 +1009,7 @@ FailureOr<SmallVector<Value>> CustomOp::decomposeOperation(OpBuilder &builder) {
              isa<RankedTensorType>(argument.getType()) &&
              "expected operand and arguments to be `RankedTensorType`");
       Value cast =
-          builder.create<tensor::CastOp>(loc, argument.getType(), operand);
+          tensor::CastOp::create(builder, loc, argument.getType(), operand);
       argReplacements.push_back(cast);
     } else {
       argReplacements.push_back(operand);
@@ -1029,7 +1032,7 @@ FailureOr<SmallVector<Value>> CustomOp::decomposeOperation(OpBuilder &builder) {
              isa<RankedTensorType>(result.getType()) &&
              "expected yielded value and result to be `RankedTensorType`");
       Value cast =
-          builder.create<tensor::CastOp>(loc, result.getType(), yieldedVal);
+          tensor::CastOp::create(builder, loc, result.getType(), yieldedVal);
       customOpReplacements.push_back(cast);
     } else {
       customOpReplacements.push_back(yieldedVal);

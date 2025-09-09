@@ -66,7 +66,7 @@ static Value getByteOffsetForIndices(OpBuilder &builder, Location loc,
 
   // Rank 1 memrefs are just offset by their element width by the offset.
   auto elementCount = indices[0];
-  return builder.create<arith::MulIOp>(loc, elementTypeByteSize, elementCount);
+  return arith::MulIOp::create(builder, loc, elementTypeByteSize, elementCount);
 }
 
 static Value getByteLength(OpBuilder &builder, Location loc,
@@ -79,7 +79,7 @@ static Value getByteLength(OpBuilder &builder, Location loc,
     emitError(loc, "memrefs should have been flattened");
     return {};
   }
-  Value size = builder.create<memref::DimOp>(loc, memrefValue, 0);
+  Value size = memref::DimOp::create(builder, loc, memrefValue, 0);
   Value elementTypeByteSize = getElementTypeByteSize(builder, loc, memrefValue);
   return getByteOffsetForIndices(builder, loc, memrefValue, {size},
                                  elementTypeByteSize);
@@ -135,19 +135,19 @@ struct ConvertMemRefGlobalOp : public OpConversionPattern<memref::GlobalOp> {
     newOp.setPrivate();
 
     auto initializerOp =
-        rewriter.create<IREE::Util::InitializerOp>(globalOp.getLoc());
+        IREE::Util::InitializerOp::create(rewriter, globalOp.getLoc());
     auto initializerBuilder =
         OpBuilder::atBlockBegin(initializerOp.addEntryBlock());
     auto alignmentAttr = globalOp.getAlignmentAttr()
                              ? initializerBuilder.getIndexAttr(
                                    globalOp.getAlignmentAttr().getInt())
                              : IntegerAttr{};
-    auto constantOp = initializerBuilder.create<IREE::Util::BufferConstantOp>(
-        globalOp.getLoc(), /*name=*/nullptr, globalOp.getInitialValueAttr(),
-        alignmentAttr, /*mimeType=*/nullptr);
+    auto constantOp = IREE::Util::BufferConstantOp::create(
+        initializerBuilder, globalOp.getLoc(), /*name=*/nullptr,
+        globalOp.getInitialValueAttr(), alignmentAttr, /*mimeType=*/nullptr);
     newOp.createStoreOp(globalOp.getLoc(), constantOp.getResult(),
                         initializerBuilder);
-    initializerBuilder.create<IREE::Util::ReturnOp>(globalOp.getLoc());
+    IREE::Util::ReturnOp::create(initializerBuilder, globalOp.getLoc());
 
     return success();
   }
@@ -197,8 +197,8 @@ struct ConvertMemRefDimOp : public OpConversionPattern<memref::DimOp> {
         llvm::cast<MemRefType>(dimOp.getSource().getType()).getElementType();
     Value elementSize = rewriter.createOrFold<IREE::Util::SizeOfOp>(
         dimOp.getLoc(), elementType);
-    Value bufferSize = rewriter.create<IREE::Util::BufferSizeOp>(
-        dimOp.getLoc(), rewriter.getIndexType(), adaptor.getSource());
+    Value bufferSize = IREE::Util::BufferSizeOp::create(
+        rewriter, dimOp.getLoc(), rewriter.getIndexType(), adaptor.getSource());
     rewriter.replaceOpWithNewOp<arith::FloorDivSIOp>(dimOp, bufferSize,
                                                      elementSize);
     return success();
@@ -225,8 +225,8 @@ struct ConvertMemRefLoadOp : public OpConversionPattern<memref::LoadOp> {
     auto byteOffset =
         getByteOffsetForIndices(rewriter, loc, loadOp.getMemref(),
                                 loadOp.getIndices(), elementTypeByteSize);
-    Value loaded = rewriter.create<IREE::Util::BufferLoadOp>(
-        loc, oldType, adaptor.getMemref(), memRefSize, byteOffset,
+    Value loaded = IREE::Util::BufferLoadOp::create(
+        rewriter, loc, oldType, adaptor.getMemref(), memRefSize, byteOffset,
         elementTypeByteSize);
     if (newType != oldType) {
       // Since the BufferLoadOp semantics include its result type (i.e. a load
@@ -235,8 +235,9 @@ struct ConvertMemRefLoadOp : public OpConversionPattern<memref::LoadOp> {
       // conversion cast for downstreams. In this case, further legalizations
       // will be required to resolve it. This comes up in A->B->C lowerings
       // where the BufferLoad is an intermediate stage.
-      loaded = rewriter.create<UnrealizedConversionCastOp>(loc, newType, loaded)
-                   .getResult(0);
+      loaded =
+          UnrealizedConversionCastOp::create(rewriter, loc, newType, loaded)
+              .getResult(0);
     }
     rewriter.replaceOp(loadOp, loaded);
     return success();

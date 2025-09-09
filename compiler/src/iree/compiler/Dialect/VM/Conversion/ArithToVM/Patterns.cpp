@@ -537,14 +537,14 @@ struct SignExtendIOpConversion : public OpConversionPattern<arith::ExtSIOp> {
       if (dstType.isInteger(32)) {
         rewriter.replaceOpWithNewOp<IREE::VM::SelectI32Op>(
             srcOp, dstType, adaptor.getIn(),
-            rewriter.create<IREE::VM::ConstI32Op>(srcOp.getLoc(), 0xFFFFFFFFu),
-            rewriter.create<IREE::VM::ConstI32ZeroOp>(srcOp.getLoc()));
+            IREE::VM::ConstI32Op::create(rewriter, srcOp.getLoc(), 0xFFFFFFFFu),
+            IREE::VM::ConstI32ZeroOp::create(rewriter, srcOp.getLoc()));
       } else if (dstType.isInteger(64)) {
         rewriter.replaceOpWithNewOp<IREE::VM::SelectI64Op>(
             srcOp, dstType, adaptor.getIn(),
-            rewriter.create<IREE::VM::ConstI64Op>(srcOp.getLoc(),
-                                                  0xFFFFFFFFFFFFFFFFull),
-            rewriter.create<IREE::VM::ConstI64ZeroOp>(srcOp.getLoc()));
+            IREE::VM::ConstI64Op::create(rewriter, srcOp.getLoc(),
+                                         0xFFFFFFFFFFFFFFFFull),
+            IREE::VM::ConstI64ZeroOp::create(rewriter, srcOp.getLoc()));
       } else {
         return rewriter.notifyMatchFailure(srcOp,
                                            "unsupported i1 sign extension");
@@ -672,8 +672,9 @@ struct SIToFPOpConversion : public OpConversionPattern<arith::SIToFPOp> {
     }
 
     if (srcType.getIntOrFloatBitWidth() < 32) {
-      input = rewriter.create<arith::ExtSIOp>(
-          srcOp.getLoc(), IntegerType::get(this->getContext(), 32), input);
+      input = arith::ExtSIOp::create(rewriter, srcOp.getLoc(),
+                                     IntegerType::get(this->getContext(), 32),
+                                     input);
     }
 
     rewriter.replaceOpWithNewOp<IREE::VM::CastSI32F32Op>(srcOp, resultType,
@@ -719,8 +720,9 @@ struct UIToFPOpConversion : public OpConversionPattern<arith::UIToFPOp> {
     }
 
     if (srcType.getIntOrFloatBitWidth() < 32) {
-      input = rewriter.create<arith::ExtUIOp>(
-          srcOp.getLoc(), IntegerType::get(this->getContext(), 32), input);
+      input = arith::ExtUIOp::create(rewriter, srcOp.getLoc(),
+                                     IntegerType::get(this->getContext(), 32),
+                                     input);
     }
 
     rewriter.replaceOpWithNewOp<IREE::VM::CastUI32F32Op>(srcOp, resultType,
