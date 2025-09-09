@@ -53,7 +53,7 @@ getTileSizesForEachDims(linalg::LinalgOp op) {
     return std::nullopt;
   }
 
-  unsigned int numLoops = op.getNumLoops();
+  unsigned numLoops = op.getNumLoops();
   std::optional<SmallVector<int64_t>> vectorSizes =
       loweringConfig.getVectorSizes();
   if (!vectorSizes || vectorSizes->size() != numLoops) {
@@ -63,7 +63,7 @@ getTileSizesForEachDims(linalg::LinalgOp op) {
          << llvm::interleaved_array(vectorSizes.value());
 
   SmallVector<int64_t> result(numLoops, 0);
-  for (unsigned int dim = 0; dim < numLoops; ++dim) {
+  for (unsigned dim = 0; dim < numLoops; ++dim) {
     SmallVector<std::pair<Value, unsigned>> operandDimPairs;
     op.mapIterationSpaceDimToAllOperandDims(dim, operandDimPairs);
     if (operandDimPairs.empty()) {

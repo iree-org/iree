@@ -152,7 +152,7 @@ def LLVMCPUTileToVectorSizePass :
     target vector sizes, if the lowering config is present and the dimension is
     known as greater than the vector size.
 
-    It is intended to be used before vectorization that aoivds big vectors and
+    It is intended to be used before vectorization that avoids big vectors and
     stack buffers.
   }];
 }
