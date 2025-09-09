@@ -3115,6 +3115,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-llvmcpu-tile-to-vector-size" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-llvmcpu-tile-to-vector-size
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-llvmcpu-unfuse-fma-pass" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-llvmcpu-unfuse-fma-pass
@@ -5184,6 +5193,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-llvmcpu-tile-to-vector-size" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-llvmcpu-tile-to-vector-size
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-llvmcpu-unfuse-fma-pass" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-llvmcpu-unfuse-fma-pass
@@ -5376,6 +5394,13 @@ given level is found in the operation's lowering config.</p>
 -only-fuse-producer-input-operands : Specifies if we only want to fuse producer&#39;s input operands. This is helpful to tile&amp;fuse in case of reduction dimensions.
 -anchor-on-root-op                 : Anchor on the root op to start the tiling. Otherwise, find the last operation after the root op that contains the `tilingLevel` config.
 </code></pre></div>
+<h3 id="-iree-llvmcpu-tile-to-vector-size"><code>-iree-llvmcpu-tile-to-vector-size</code><a class="headerlink" href="#-iree-llvmcpu-tile-to-vector-size" title="Permanent link">link</a></h3>
+<p><em>Tile TilingInterface operations to target vector size.</em></p>
+<p>Walk through all the TilingInterface operations and tiling the dimensions to
+target vector sizes, if the lowering config is present and the dimension is
+known as greater than the vector size.</p>
+<p>It is intended to be used before vectorization that avoids big vectors and
+stack buffers.</p>
 <h3 id="-iree-llvmcpu-unfuse-fma-pass"><code>-iree-llvmcpu-unfuse-fma-pass</code><a class="headerlink" href="#-iree-llvmcpu-unfuse-fma-pass" title="Permanent link">link</a></h3>
 <p><em>Convert llvm.fma into unfused mulf and addf ops</em></p>
 <h3 id="-iree-llvmcpu-vector-contract-custom-kernels"><code>-iree-llvmcpu-vector-contract-custom-kernels</code><a class="headerlink" href="#-iree-llvmcpu-vector-contract-custom-kernels" title="Permanent link">link</a></h3>
