@@ -88,6 +88,7 @@ struct ROCMOptions {
 
   bool specializeDispatches = false;
   bool enableTensorUKernels = false;
+  bool disableRegSpillWarning = false;
 
   void bindOptions(OptionsBinder &binder) {
     using namespace llvm;
@@ -162,6 +163,10 @@ struct ROCMOptions {
     binder.opt<bool>("iree-hip-enable-tensor-ukernels", enableTensorUKernels,
                      cl::cat(category),
                      cl::desc("Enable MLIR-based ukernels."));
+
+    binder.opt<bool>("iree-hip-disable-register-spill-warning",
+                     disableRegSpillWarning, cl::cat(category),
+                     cl::desc("Do not report register spilling for AMD GPUs"));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
@@ -784,7 +789,9 @@ public:
       if (targetHSACO.empty())
         return failure();
 
-      checkRegisterSpilling(variantOp, targetObj);
+      if (!options.disableRegSpillWarning) {
+        checkRegisterSpilling(variantOp, targetObj);
+      }
     }
 
     if (!serializationOptions.dumpBinariesPath.empty()) {
