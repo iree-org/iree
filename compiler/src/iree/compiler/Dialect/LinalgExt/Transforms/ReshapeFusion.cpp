@@ -29,7 +29,7 @@ namespace {
 /// Represents the size of a dimension of some ShapedType value in the IR. This
 /// is used instead of OpFoldResult when modifying the IR is illegal. This can
 /// still be constructed from an OpFoldResult in cases where the value can be
-/// obtained without ir modification.
+/// obtained without IR modification.
 class DimSize {
 public:
   DimSize(TypedValue<ShapedType> val, int64_t dim)
@@ -132,7 +132,8 @@ public:
             return size.materialize(rewriter);
           }));
     }
-    auto [staticShape, _] = decomposeMixedValues(outputShape);
+    auto [staticShape, dynamicShape] = decomposeMixedValues(outputShape);
+    (void)dynamicShape;
     auto oldType = cast<ShapedType>(operand->get().getType());
     auto newType = RankedTensorType::get(staticShape, oldType.getElementType());
     if (failed(reshapeLikeShapesAreCompatible(
@@ -276,14 +277,13 @@ LogicalResult ExpansionInfo::compute(
   for (const ReshapeOperandInfo &info : infos) {
     for (auto [operandIdx, loopIdx] :
          llvm::enumerate(info.operandToIterationSpace)) {
-      if (loopIdx == ReshapeOperandInfo::kNoMapping) {
+      if (loopIdx == ReshapeOperandInfo::kNoMapping ||
+          !this->loopShapeMap[loopIdx].empty()) {
         continue;
       }
 
-      if (this->loopShapeMap[loopIdx].empty()) {
-        this->loopShapeMap[loopIdx] =
-            SmallVector<DimSize>{info.originalShape[operandIdx]};
-      }
+      this->loopShapeMap[loopIdx] =
+          SmallVector<DimSize>{info.originalShape[operandIdx]};
     }
   }
 
