@@ -484,6 +484,9 @@ swapCollapseShapeWithSlice(RewriterBase &rewriter,
        llvm::zip_equal(collapsedSizes, collapsedOffsets,
                        collapseShapeOp.getReassociationIndices())) {
     // CASE #1 - size and/or offset are dynamic.
+    // TODO(vivian): For some special case, running this pattern with dynamic
+    // `collapsedSize` may cause a dynamic allocation in workgroup which blocks
+    // `GPUReduceBankConflictsPass`.
     if (isa<Value>(collapsedSize) || isa<Value>(collapsedOffset)) {
       // Special case especially for collapse shape of convolution filter in
       // IGEMM, while the offset is dynamic and the size is static.

@@ -161,6 +161,8 @@ hal.executable private @main {
 //          CHECK:        memref.copy {{.*}}#gpu.address_space<workgroup>> to {{.*}}#amdgpu.address_space<fat_raw_buffer>
 //          CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
+// TODO(vivian): This test doesn't have reduce bank conflicts taken effect because of collapsing a dynamic allocation. Try to fix it.
+
 // -----
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
