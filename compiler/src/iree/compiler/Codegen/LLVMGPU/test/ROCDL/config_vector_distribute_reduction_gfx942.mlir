@@ -201,13 +201,13 @@ func.func @test_dyn_reduction(%arg0: !iree_tensor_ext.dispatch.tensor<readwrite:
   iree_tensor_ext.dispatch.tensor.store %5, %arg0, offsets = [0, 0], sizes = [128, 128], strides = [1, 1] : tensor<128x128xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<128x128xf32>>
   return
 }
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [2, 1, 1] subgroup_size = 64
-//       CHECK: func.func @test_dyn_reduction
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+// CHECK-LABEL: func.func @test_dyn_reduction
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:      attrs =  {lowering_config = #iree_gpu.lowering_config<{
-//  CHECK-SAME:               lane_basis = {{\[}}[1, 1, 1, 2], [0, 1, 2, 3]],
-//  CHECK-SAME:               partial_reduction = [0, 0, 1, 32],
+//  CHECK-SAME:               lane_basis = {{\[}}[1, 1, 1, 64], [0, 1, 2, 3]],
+//  CHECK-SAME:               partial_reduction = [0, 0, 1, 1024],
 //  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1, 1], [0, 1, 2, 3]],
 //  CHECK-SAME:               thread = [0, 0, 1, 16],
 //  CHECK-SAME:               workgroup = [1, 1, 0, 0]
@@ -286,16 +286,16 @@ func.func @test_gather_config(%arg0: !iree_tensor_ext.dispatch.tensor<readonly:t
   iree_tensor_ext.dispatch.tensor.store %3, %arg2, offsets = [0], sizes = [4096], strides = [1] : tensor<4096xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4096xf32>>
   return
 }
-//      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [16, 1, 1] subgroup_size = 64
-//      CHECK: func.func @test_gather_config
+//      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+//CHECK-LABEL: func.func @test_gather_config
 // CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //      CHECK:   linalg.generic
 //  CHECK-NOT:      attrs =  {lowering_config = #iree_gpu.lowering_config<{
 //      CHECK:    linalg.yield
 //      CHECK:   linalg.generic
 // CHECK-SAME:      attrs =  {lowering_config = #iree_gpu.lowering_config<{
-// CHECK-SAME:               lane_basis = {{\[}}[1, 16], [0, 1]],
-// CHECK-SAME:               partial_reduction = [0, 64],
+// CHECK-SAME:               lane_basis = {{\[}}[1, 64], [0, 1]],
+// CHECK-SAME:               partial_reduction = [0, 256],
 // CHECK-SAME:               subgroup_basis = {{\[}}[1, 1], [0, 1]],
 // CHECK-SAME:               thread = [0, 4],
 // CHECK-SAME:               workgroup = [1, 0]
@@ -331,7 +331,7 @@ func.func @split_reduction_config(%arg0 : tensor<?x131072xf32>,
       : tensor<?x1024xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x1024xf32>>{%1}
   return
 }
-//      CHECK:       #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [32, 1, 1] subgroup_size = 64
+//      CHECK:       #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
 //      CHECK-LABEL: func @split_reduction_config
 //      CHECK:       linalg.generic
 // CHECK-SAME:       lowering_config = #iree_gpu.lowering_config
