@@ -40,7 +40,8 @@ static Value setEncoding(OpBuilder &builder, Location loc, Value source,
                          Attribute encodingAttr) {
   auto resultType =
       cast<RankedTensorType>(source.getType()).cloneWithEncoding(encodingAttr);
-  return builder.create<IREE::Encoding::SetEncodingOp>(loc, resultType, source);
+  return IREE::Encoding::SetEncodingOp::create(builder, loc, resultType,
+                                               source);
 };
 
 static Value unsetEncoding(OpBuilder &builder, Location loc, Value source,
@@ -52,8 +53,8 @@ static Value unsetEncoding(OpBuilder &builder, Location loc, Value source,
   auto sourceType = cast<RankedTensorType>(source.getType());
   auto unsetEncodingReturnType =
       RankedTensorType::get(sourceType.getShape(), sourceType.getElementType());
-  return builder.create<IREE::Encoding::UnsetEncodingOp>(
-      loc, unsetEncodingReturnType, source, dynamicSizesVec);
+  return IREE::Encoding::UnsetEncodingOp::create(
+      builder, loc, unsetEncodingReturnType, source, dynamicSizesVec);
 }
 
 /// Given a LinalgOp and one of its OpOperands, return the element type,
@@ -255,9 +256,9 @@ struct FoldFillWithSetEncoding final
     Location loc = fillOp.getLoc();
     SmallVector<OpFoldResult> dimValues =
         tensor::getMixedSizes(rewriter, loc, fillOp.getOutputs()[0]);
-    auto newEmptyOp = rewriter.create<tensor::EmptyOp>(
-        loc, dimValues, encodingType.getElementType(),
-        encodingType.getEncoding());
+    auto newEmptyOp = tensor::EmptyOp::create(rewriter, loc, dimValues,
+                                              encodingType.getElementType(),
+                                              encodingType.getEncoding());
     rewriter.replaceOpWithNewOp<linalg::FillOp>(encodingOp, fillOp.getInputs(),
                                                 ValueRange{newEmptyOp});
     return success();
@@ -330,9 +331,9 @@ static std::optional<PaddedValue> padProducerOfValue(RewriterBase &rewriter,
     llvm::append_range(newResultDynamicDims, operandDynamicDims);
   }
 
-  auto newDispatchOp = rewriter.create<IREE::Flow::DispatchRegionOp>(
-      producerDispatch->getLoc(), newResultTypes, newResultDynamicDims,
-      producerDispatch.getWorkload());
+  auto newDispatchOp = IREE::Flow::DispatchRegionOp::create(
+      rewriter, producerDispatch->getLoc(), newResultTypes,
+      newResultDynamicDims, producerDispatch.getWorkload());
 
   // Move over the body of the old dispatch.
   Region &newBody = newDispatchOp.getBody();
@@ -362,8 +363,8 @@ static std::optional<PaddedValue> padProducerOfValue(RewriterBase &rewriter,
   }
   // Find the new value to yield.
   Value newYieldedVal = map.lookup(operand);
-  auto encodingOp = rewriter.create<IREE::Encoding::SetEncodingOp>(
-      returnOp->getLoc(), newResultType, newYieldedVal);
+  auto encodingOp = IREE::Encoding::SetEncodingOp::create(
+      rewriter, returnOp->getLoc(), newResultType, newYieldedVal);
   rewriter.modifyOpInPlace(
       returnOp, [&]() { returnOp.setOperand(resultNumber, encodingOp); });
 
@@ -395,8 +396,8 @@ static SmallVector<unsigned> padOperandsOfOp(RewriterBase &rewriter,
       OpBuilder::InsertionGuard g2(rewriter);
       rewriter.setInsertionPoint(op);
       Type operandType = operand.get().getType();
-      auto unsetEncodignOp = rewriter.create<IREE::Encoding::UnsetEncodingOp>(
-          op->getLoc(), operandType, paddedVal->paddedValue,
+      auto unsetEncodignOp = IREE::Encoding::UnsetEncodingOp::create(
+          rewriter, op->getLoc(), operandType, paddedVal->paddedValue,
           paddedVal->dynamicDims);
       op->setOperand(operandNum, unsetEncodignOp.getResult());
     });

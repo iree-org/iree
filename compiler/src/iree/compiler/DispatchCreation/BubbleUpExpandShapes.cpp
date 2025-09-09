@@ -149,10 +149,10 @@ struct SwapExtractSliceOfFill final
     if (!fillOp)
       return failure();
 
-    auto newExtractOp = rewriter.create<tensor::ExtractSliceOp>(
-        extractOp.getLoc(), extractOp.getType(), fillOp.getOutputs()[0],
-        extractOp.getMixedOffsets(), extractOp.getMixedSizes(),
-        extractOp.getMixedStrides());
+    auto newExtractOp = tensor::ExtractSliceOp::create(
+        rewriter, extractOp.getLoc(), extractOp.getType(),
+        fillOp.getOutputs()[0], extractOp.getMixedOffsets(),
+        extractOp.getMixedSizes(), extractOp.getMixedStrides());
     rewriter.replaceOpWithNewOp<linalg::FillOp>(
         extractOp, fillOp.getInputs(), ValueRange{newExtractOp.getResult()});
     return success();
@@ -258,8 +258,8 @@ struct BubbleExpandThroughExtract final
         RankedTensorType::get(newExpandShape, expandedType.getElementType());
     // The builder can't fail to infer the output_shape because none of
     // the dynamic dimensions are expanded.
-    auto newExpand = rewriter.create<tensor::ExpandShapeOp>(
-        expandOp.getLoc(), newExpandType, extractOp.getSource(),
+    auto newExpand = tensor::ExpandShapeOp::create(
+        rewriter, expandOp.getLoc(), newExpandType, extractOp.getSource(),
         newReassociation);
 
     rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
@@ -363,13 +363,14 @@ struct BubbleExpandThroughConcat final
       auto newType =
           RankedTensorType::get(staticOutputShape, inputType.getElementType());
       Value newExpand;
-      newExpand = rewriter.create<tensor::ExpandShapeOp>(
-          expandOp.getLoc(), newType, input, reassoc, mixedOutputShape);
+      newExpand =
+          tensor::ExpandShapeOp::create(rewriter, expandOp.getLoc(), newType,
+                                        input, reassoc, mixedOutputShape);
       newInputs.push_back(newExpand);
     }
     // Create new concat op on expanded inputs.
-    auto newConcat = rewriter.create<tensor::ConcatOp>(concatOp.getLoc(),
-                                                       newConcatDim, newInputs);
+    auto newConcat = tensor::ConcatOp::create(rewriter, concatOp.getLoc(),
+                                              newConcatDim, newInputs);
     rewriter.replaceOp(expandOp, newConcat.getResult());
     return success();
   }

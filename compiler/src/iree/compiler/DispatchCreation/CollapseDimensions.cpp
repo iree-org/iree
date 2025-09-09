@@ -92,8 +92,8 @@ collapseExtractSlice(tensor::ExtractSliceOp sliceOp,
   }
 
   RankedTensorType resultType = sliceOp.getResultType();
-  Value collapseOp = rewriter.create<tensor::CollapseShapeOp>(
-      loc, sliceOp.getSource(), reassociation);
+  Value collapseOp = tensor::CollapseShapeOp::create(
+      rewriter, loc, sliceOp.getSource(), reassociation);
   Value newSliceOp = tensor::ExtractSliceOp::create(
       rewriter, loc, collapseOp, collapsedOffsets, collapsedSizes,
       collapsedStrides);
@@ -867,8 +867,8 @@ hoistTensorReshapesOutOfDispatchRegion(
   }
 
   // 5. Create the new dispatch op.
-  auto newDispatchOp = rewriter.create<IREE::Flow::DispatchRegionOp>(
-      loc, newReturnTypes, newDynamicDims, dispatchOp.getWorkload());
+  auto newDispatchOp = IREE::Flow::DispatchRegionOp::create(
+      rewriter, loc, newReturnTypes, newDynamicDims, dispatchOp.getWorkload());
 
   // 5a. Move the body over, but replace the `flow.return` to use the new yield
   // values.
@@ -908,8 +908,8 @@ hoistTensorReshapesOutOfDispatchRegion(
     SmallVector<OpFoldResult> outputShape =
         mlir::getMixedValues(shapedType.getShape(), dynamicDims, rewriter);
 
-    auto newExpandShapeOp = rewriter.create<tensor::ExpandShapeOp>(
-        loc, origResult.getType(), returnValue,
+    auto newExpandShapeOp = tensor::ExpandShapeOp::create(
+        rewriter, loc, origResult.getType(), returnValue,
         allReassociationIndicesRef.front(), outputShape);
     allReassociationIndicesRef = allReassociationIndicesRef.drop_front();
     rewriter.replaceAllUsesWith(origResult, newExpandShapeOp.getResult());

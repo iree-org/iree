@@ -110,16 +110,16 @@ bubbleUpSetEncodingThroughGenericOp(RewriterBase &rewriter,
     auto operandType = cast<RankedTensorType>(operand->get().getType());
     auto resType = RankedTensorType::get(
         operandType.getShape(), operandType.getElementType(), newEncoding);
-    Value encodedInput = rewriter.create<IREE::Encoding::SetEncodingOp>(
-        loc, resType, operand->get());
+    Value encodedInput = IREE::Encoding::SetEncodingOp::create(
+        rewriter, loc, resType, operand->get());
     encodedOperands.push_back(encodedInput);
   }
 
   // Create encoded generic op.
   SmallVector<OpFoldResult> mixedSizes =
       tensor::getMixedSizes(rewriter, loc, encodingOp.getSource());
-  Value encodedInit = rewriter.create<tensor::EmptyOp>(
-      loc, mixedSizes, encodedType.getElementType(), encoding);
+  Value encodedInit = tensor::EmptyOp::create(
+      rewriter, loc, mixedSizes, encodedType.getElementType(), encoding);
   encodedOperands.push_back(encodedInit);
   auto encodedGenericOp =
       clone(rewriter, genericOp, encodingOp.getResultType(), encodedOperands);

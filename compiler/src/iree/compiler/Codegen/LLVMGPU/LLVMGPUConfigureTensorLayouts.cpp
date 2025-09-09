@@ -231,11 +231,11 @@ static LogicalResult setContractionAnchor(MMASchedule &schedule,
   // Set layouts for lhs, rhs and acc.
   rewriter.setInsertionPoint(contract);
   auto layoutedLhs =
-      rewriter.create<ToLayoutOp>(loc, lhs, aLayout, schedule.intrinsic);
+      ToLayoutOp::create(rewriter, loc, lhs, aLayout, schedule.intrinsic);
   auto layoutedRhs =
-      rewriter.create<ToLayoutOp>(loc, rhs, bLayout, schedule.intrinsic);
+      ToLayoutOp::create(rewriter, loc, rhs, bLayout, schedule.intrinsic);
   auto layoutedAcc =
-      rewriter.create<ToLayoutOp>(loc, acc, cLayout, schedule.intrinsic);
+      ToLayoutOp::create(rewriter, loc, acc, cLayout, schedule.intrinsic);
 
   // Promote matmul lhs and rhs.
   // TODO: This is a hack until layout analysis is improved. The layout analysis
@@ -258,8 +258,8 @@ static LogicalResult setContractionAnchor(MMASchedule &schedule,
 
   // Set layout for result.
   rewriter.setInsertionPointAfter(contract);
-  auto toLayout = rewriter.create<ToLayoutOp>(loc, contract->getResult(0),
-                                              cLayout, schedule.intrinsic);
+  auto toLayout = ToLayoutOp::create(rewriter, loc, contract->getResult(0),
+                                     cLayout, schedule.intrinsic);
   rewriter.replaceAllUsesExcept(contract->getResult(0), toLayout.getResult(),
                                 toLayout);
 
@@ -308,11 +308,11 @@ static LogicalResult setConvolutionAnchor(MMASchedule schedule,
   // Set layouts for lhs, rhs and acc.
   rewriter.setInsertionPoint(conv);
   auto layoutedLhs =
-      rewriter.create<ToLayoutOp>(loc, lhs, aLayout, schedule.intrinsic);
+      ToLayoutOp::create(rewriter, loc, lhs, aLayout, schedule.intrinsic);
   auto layoutedRhs =
-      rewriter.create<ToLayoutOp>(loc, rhs, bLayout, schedule.intrinsic);
+      ToLayoutOp::create(rewriter, loc, rhs, bLayout, schedule.intrinsic);
   auto layoutedAcc =
-      rewriter.create<ToLayoutOp>(loc, acc, cLayout, schedule.intrinsic);
+      ToLayoutOp::create(rewriter, loc, acc, cLayout, schedule.intrinsic);
 
   // Promote matmul lhs and rhs.
   // TODO: This is a hack until layout analysis is improved. The layout analysis
@@ -335,8 +335,8 @@ static LogicalResult setConvolutionAnchor(MMASchedule schedule,
 
   // Set layout for result.
   rewriter.setInsertionPointAfter(conv);
-  auto toLayout = rewriter.create<ToLayoutOp>(loc, conv->getResult(0), cLayout,
-                                              schedule.intrinsic);
+  auto toLayout = ToLayoutOp::create(rewriter, loc, conv->getResult(0), cLayout,
+                                     schedule.intrinsic);
   rewriter.replaceAllUsesExcept(conv->getResult(0), toLayout.getResult(),
                                 toLayout);
 
@@ -553,7 +553,7 @@ static LogicalResult setDerivedThreadConfigLayout(
   for (OpResult result : linalgOp->getResults()) {
     VectorLayoutInterface resultLayout =
         layout.apply(linalgOp.getIndexingMapMatchingResult(result));
-    auto toLayout = rewriter.create<ToLayoutOp>(loc, result, resultLayout);
+    auto toLayout = ToLayoutOp::create(rewriter, loc, result, resultLayout);
     rewriter.replaceAllUsesExcept(result, toLayout, toLayout);
   }
 
@@ -728,7 +728,7 @@ static LogicalResult setGPULoweringConfigLayout(
   for (OpResult result : candidate->getResults()) {
     VectorLayoutInterface resultLayout =
         layout.apply(candidate.getIndexingMapMatchingResult(result));
-    auto toLayout = rewriter.create<ToLayoutOp>(loc, result, resultLayout);
+    auto toLayout = ToLayoutOp::create(rewriter, loc, result, resultLayout);
     rewriter.replaceAllUsesExcept(result, toLayout, toLayout);
   }
 
