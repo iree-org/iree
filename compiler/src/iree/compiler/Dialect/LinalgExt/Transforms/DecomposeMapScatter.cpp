@@ -21,9 +21,11 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 
 /// Fold a subview op into the output of a map_scatter op. The offsets of the
 /// subview op are folded into the body of the map_scatter, and each offset is
-/// added to the corresponding yielded index. The map_scatter op must be
-/// vectorized and bufferized, because this is a cleanup pattern for the vector
-/// decomposition of map_scatter.
+/// added to the corresponding yielded index. For this pattern to apply, the
+/// map_scatter op must be vectorized and bufferized, and the subview must be
+/// non-rank reducing with unit strides. The subview's result also should not
+/// be collapsible, because the decomposition will work for collapsable memrefs,
+/// and there is no need to fold the subview.
 struct FoldSubViewIntoMapScatter final : OpRewritePattern<MapScatterOp> {
   using OpRewritePattern<MapScatterOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(MapScatterOp mapScatterOp,
@@ -49,6 +51,15 @@ struct FoldSubViewIntoMapScatter final : OpRewritePattern<MapScatterOp> {
     if (!areAllConstantIntValue(strides, 1)) {
       return rewriter.notifyMatchFailure(subViewOp,
                                          "subview op has non-unit strides");
+    }
+    MemRefType subViewType = subViewOp.getType();
+    SmallVector<ReassociationIndices> reassociations;
+    reassociations.push_back(
+        llvm::to_vector(llvm::seq<int64_t>(subViewType.getRank())));
+    if (memref::CollapseShapeOp::isGuaranteedCollapsible(subViewType,
+                                                         reassociations)) {
+      return rewriter.notifyMatchFailure(subViewOp,
+                                         "subview op is collapsible");
     }
     auto mapScatterBodyYield = cast<IREE::LinalgExt::YieldOp>(
         mapScatterOp.getTransformationRegion().front().getTerminator());
@@ -220,7 +231,7 @@ struct DecomposeMapScatterPass final
       return signalPassFailure();
     }
 
-    if (testMapScatterCleanup) {
+    if (testPreprocessingPatterns) {
       return;
     }
 

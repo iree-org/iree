@@ -70,9 +70,9 @@ def DecomposeMapScatterPass :
     "::mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect"
   ];
   let options = [
-    Option<"testMapScatterCleanup", "test-map-scatter-cleanup", "bool",
+    Option<"testPreprocessingPatterns", "test-preprocessing-patterns", "bool",
            /*default=*/"false",
-           "Test only map_scatter cleanup patterns.">,
+           "Test only map_scatter decomposition preprocessing patterns.">,
   ];
 }
 
