@@ -2230,10 +2230,10 @@ void OnlineAttentionOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
 LogicalResult ExpReductionOp::verify() {
   Operation *op = getOperation();
   if (getNumDpsInputs() == 0) {
-    return op->emitOpError("expected at least one input operand to reduce");
+    return op->emitOpError("expected at least one input operand to reduce.");
   }
   if (getNumDpsInits() == 0) {
-    return op->emitOpError("expected at least one output operand to reduce");
+    return op->emitOpError("expected at least one output operand to reduce.");
   }
 
   for (int64_t reducedOperand : getExpReducedOperands()) {

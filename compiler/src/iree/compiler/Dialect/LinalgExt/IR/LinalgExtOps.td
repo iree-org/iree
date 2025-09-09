@@ -1053,17 +1053,7 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
 def IREELinalgExt_ExpReductionOp : IREELinalgExt_PureOp<"exp_reduction",
     [ AttrSizedOperandSegments,
       Pure,
-      DestinationStyleOpInterface,
-      DeclareOpInterfaceMethods<LinalgStructuredInterface,
-        ["getLibraryCallName",
-        "getIteratorTypesArray"]>,
-      SingleBlockImplicitTerminator<"::mlir::linalg::YieldOp">,
-      DeclareOpInterfaceMethods<TilingInterface,
-          [ "getIterationDomain",
-            "getLoopIteratorTypes",
-            "getResultTilePosition",
-            "getTiledImplementation",
-            "generateResultTileValue" ]>]> {
+      DestinationStyleOpInterface]> {
 
   let summary = [{A linalg.generic extension with support for exponential reduction.}];
   let description = [{
