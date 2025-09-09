@@ -22,7 +22,7 @@
 
 namespace mlir::iree_compiler {
 
-const std::string kIreeCodegenUkernelAttrName = "iree_codegen.ukernel";
+constexpr char kCodegenUkernelAttrName[] = "iree_codegen.ukernel";
 
 /// Typedef for tile sizes to use at different levels of tiling.
 using TileSizesListType = SmallVector<SmallVector<int64_t>>;
