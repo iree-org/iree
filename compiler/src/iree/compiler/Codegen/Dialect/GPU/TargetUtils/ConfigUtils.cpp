@@ -582,7 +582,6 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
       llvm::cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
 
   bool mustBeAligned = true;
-  bool doCPromotion = false;
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
       target, problem, transposedLhs, transposedRhs, isGemm,
       /*mustBeAligned*/ true,
@@ -595,10 +594,9 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   if (!schedule && canSupportUnaligned) {
     LDBG() << "Attempting to deduce unaligned TileAndFuse MMA schedulee";
     mustBeAligned = false;
-    doCPromotion = true;
     schedule = getMmaScheduleFromProblemAndTarget(
         target, problem, transposedLhs, transposedRhs, isGemm, mustBeAligned,
-        doCPromotion, scaled);
+        /*doCPromotion=*/false, scaled);
   }
 
   if (!schedule) {
@@ -674,27 +672,19 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   attrs.emplace_back(StringAttr::get(context, "subgroup"),
                      b.getI64ArrayAttr(subgroupTileSizes));
   attrs.emplace_back(StringAttr::get(context, "mma_kind"), kind);
-  if (mustBeAligned) {
-    Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
-    SmallVector<Attribute> promotionArray = {useGlobalDma, useGlobalDma};
-    SmallVector<int64_t> promotionList = {0, 1};
-    if (scaled) {
-      promotionArray.append({useGlobalDma, useGlobalDma});
-      promotionList.append({2, 3});
-    }
-    ArrayRef<Attribute> promotionTypes =
-        useDirectLoad ? ArrayRef<Attribute>(promotionArray)
-                      : ArrayRef<Attribute>{};
-    GPU::appendPromotedOperandsList(context, attrs, promotionList,
-                                    promotionTypes);
-  } else {
-    // TODO (nirvedhmeshram, Max191, jerryyin) : Add support so that unaligned
-    // shapes do not require c promotion.
-    SmallVector<int64_t> promotionList = {0, 1, 2};
-    if (scaled) {
-      promotionList.append({3, 4});
-    }
-    GPU::appendPromotedOperandsList(context, attrs, promotionList);
+  Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
+  SmallVector<Attribute> promotionArray = {useGlobalDma, useGlobalDma};
+  SmallVector<int64_t> promotionList = {0, 1};
+  if (scaled) {
+    promotionArray.append({useGlobalDma, useGlobalDma});
+    promotionList.append({2, 3});
+  }
+  ArrayRef<Attribute> promotionTypes = useDirectLoad
+                                           ? ArrayRef<Attribute>(promotionArray)
+                                           : ArrayRef<Attribute>{};
+  GPU::appendPromotedOperandsList(context, attrs, promotionList,
+                                  promotionTypes);
+  if (!mustBeAligned) {
     SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
 
     // Initialize inner and outer padding sizes from reductionTileSizes.
@@ -712,8 +702,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     }
     paddingTileSizes[innerKDim] *= kPackFactor;
 
-    // Create `padding_conv` attribute when padding convolutions before IGEMM is
-    // possible, otherwise fallback to pad IGEMM.
+    // Create `padding_conv` attribute when padding convolutions before IGEMM
+    // is possible, otherwise fallback to pad IGEMM.
     if (auto attr =
             getPaddingConvSizes(b, bounds, paddingTileSizes, workgroupTileSizes,
                                 reductionTileSizes, convToIgemmInfo)) {

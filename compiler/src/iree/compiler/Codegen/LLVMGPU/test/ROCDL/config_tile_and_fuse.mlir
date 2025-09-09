@@ -330,7 +330,7 @@ func.func @unaligned_to_intrinsic_batched_matmul(%lhs : tensor<12x2x577xf32>, %r
 // LATE-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
 //      LATE:    linalg.batch_matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  LATE-SAME:     padding = [1, 16, 16, 4]
-//  LATE-SAME:     promote_operands = [0, 1, 2]
+//  LATE-SAME:     promote_operands = [0, 1]
 //  LATE-SAME:     reduction = [0, 0, 0, 1]
 //  LATE-SAME:     subgroup = [0, 1, 1, 0]
 //  LATE-SAME:     workgroup = [1, 16, 16, 0]
@@ -357,7 +357,7 @@ func.func @unaligned_matmul_with_two_reduce_dim(%arg0: tensor<196x9x4xf32>, %arg
 // LATE:       linalg.generic
 // LATE-SAME:  {lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
 // LATE-SAME:  padding = [16, 1, 16, 4]
-// LATE-SAME:  promote_operands = [0, 1, 2]
+// LATE-SAME:  promote_operands = [0, 1]
 // LATE-SAME:  reduction = [0, 1, 0, 1],
 // LATE-SAME:  subgroup = [1, 0, 1, 0],
 // LATE-SAME:  workgroup = [16, 0, 16, 0]}
@@ -437,7 +437,7 @@ func.func @unaligned_to_intrinsic_batched_matmul_tiling_check(%lhs : tensor<12x5
 // LATE-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
 //      LATE:    linalg.batch_matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  LATE-SAME:     padding = [1, 16, 64, 4]
-//  LATE-SAME:     promote_operands = [0, 1, 2]
+//  LATE-SAME:     promote_operands = [0, 1]
 //  LATE-SAME:     reduction = [0, 0, 0, 1]
 //  LATE-SAME:     subgroup = [0, 1, 2, 0]
 //  LATE-SAME:     workgroup = [1, 16, 64, 0]
