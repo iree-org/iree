@@ -12,11 +12,81 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
 #define GEN_PASS_DEF_DECOMPOSEMAPSCATTERPASS
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h.inc"
+
+/// Fold a subview op into the output of a map_scatter op. The offsets of the
+/// subview op are folded into the body of the map_scatter, and each offset is
+/// added to the corresponding yielded index. For this pattern to apply, the
+/// map_scatter op must be vectorized and bufferized, and the subview must be
+/// non-rank reducing with unit strides. The subview's result also should not
+/// be collapsible, because the decomposition will work for collapsable memrefs,
+/// and there is no need to fold the subview.
+struct FoldSubViewIntoMapScatter final : OpRewritePattern<MapScatterOp> {
+  using OpRewritePattern<MapScatterOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(MapScatterOp mapScatterOp,
+                                PatternRewriter &rewriter) const override {
+    if (!mapScatterOp.isVectorized()) {
+      return rewriter.notifyMatchFailure(mapScatterOp,
+                                         "map_scatter op is not vectorized");
+    }
+    if (!mapScatterOp.hasPureBufferSemantics()) {
+      return rewriter.notifyMatchFailure(
+          mapScatterOp, "map_scatter op has non-buffer semantics");
+    }
+    auto subViewOp =
+        mapScatterOp.getOutput().getDefiningOp<memref::SubViewOp>();
+    if (!subViewOp) {
+      return failure();
+    }
+    if (subViewOp.getSourceType().getRank() != subViewOp.getType().getRank()) {
+      return rewriter.notifyMatchFailure(subViewOp,
+                                         "subview op is rank reducing");
+    }
+    SmallVector<OpFoldResult> strides = subViewOp.getMixedStrides();
+    if (!areAllConstantIntValue(strides, 1)) {
+      return rewriter.notifyMatchFailure(subViewOp,
+                                         "subview op has non-unit strides");
+    }
+    MemRefType subViewType = subViewOp.getType();
+    SmallVector<ReassociationIndices> reassociations;
+    reassociations.push_back(
+        llvm::to_vector(llvm::seq<int64_t>(subViewType.getRank())));
+    if (memref::CollapseShapeOp::isGuaranteedCollapsible(subViewType,
+                                                         reassociations)) {
+      return rewriter.notifyMatchFailure(subViewOp,
+                                         "subview op is collapsible");
+    }
+    auto mapScatterBodyYield = cast<IREE::LinalgExt::YieldOp>(
+        mapScatterOp.getTransformationRegion().front().getTerminator());
+    SmallVector<Value> yieldedIndices = mapScatterBodyYield.getOperands();
+    Value yieldedMask = yieldedIndices.pop_back_val();
+    rewriter.setInsertionPoint(mapScatterBodyYield);
+    for (auto [yieldedIdx, subViewOffset] :
+         llvm::zip_equal(yieldedIndices, subViewOp.getMixedOffsets())) {
+      Value subViewOffsetVal = getValueOrCreateConstantIndexOp(
+          rewriter, subViewOp.getLoc(), subViewOffset);
+      Value yieldedIdxVal = getValueOrCreateConstantIndexOp(
+          rewriter, mapScatterBodyYield.getLoc(), yieldedIdx);
+      yieldedIdx = rewriter.create<arith::AddIOp>(
+          subViewOp.getLoc(), yieldedIdxVal, subViewOffsetVal);
+    }
+    SmallVector<Value> newYieldedValues(yieldedIndices);
+    newYieldedValues.push_back(yieldedMask);
+    rewriter.modifyOpInPlace(mapScatterBodyYield, [&]() {
+      mapScatterBodyYield.getOperandsMutable().assign(newYieldedValues);
+    });
+    Value subViewSource = subViewOp.getSource();
+    rewriter.modifyOpInPlace(subViewOp, [&]() {
+      mapScatterOp.getOutputMutable().assign(subViewSource);
+    });
+    return success();
+  }
+};
 
 /// Decompose an iree_linalg_ext.map_scatter op with a vector input, and a
 /// memref output. The map_scatter op is lowered into a sequence of vector ops
@@ -154,6 +224,16 @@ struct DecomposeMapScatterPass final
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     auto funcOp = getOperation();
+
+    RewritePatternSet patterns(context);
+    patterns.add<FoldSubViewIntoMapScatter>(context);
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+
+    if (testPreprocessingPatterns) {
+      return;
+    }
 
     // Decomposition is only supported for map_scatter ops that are both
     // vectorized and bufferized. Bufferization is a requirement because
