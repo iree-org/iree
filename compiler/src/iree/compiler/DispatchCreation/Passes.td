@@ -277,18 +277,24 @@ def FormScalarDispatchesPass :
   ];
 }
 
-def FormSplitReductionDispatchesPass :
-    InterfacePass<"iree-dispatch-creation-form-split-reduction-dispatches", "mlir::FunctionOpInterface"> {
-  let summary = "Partially tile reduction operations and place into dispatches";
+def SetSplitReductionSizesPass :
+    Pass<"iree-dispatch-creation-set-split-reduction-sizes"> {
+  let summary = "Set 'iree_linalg_ext.split_reduction' attribute on ops";
   let options = [
     Option<"targetSplitReductionSize", "target-split-reduction-size", "int64_t", "0",
            "Target tile size for split reduction. Inner reduction "
            "dimensions are tiled first, with the tile size rounded "
-           "up until it evenly divides the iteration domain.">,
+           "up until it evenly divides the iteration domain.">
+  ];
+  let dependentDialects = [];
+}
+
+def FormSplitReductionDispatchesPass :
+    InterfacePass<"iree-dispatch-creation-form-split-reduction-dispatches", "mlir::FunctionOpInterface"> {
+  let summary = "Partially tile reduction operations and place into dispatches";
+  let options = [
     ListOption<"splitSize", "split-size", "int",
-        "Tile sizes for split reduction (innermost first)">,
-    Option<"emitRemarks", "emit-remarks", "bool", "false",
-        "Emit remarks (used for testing)">
+        "Tile sizes for split reduction (innermost first)">
   ];
   let dependentDialects = [
     "IREE::Flow::FlowDialect",
