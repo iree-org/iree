@@ -28,5 +28,3 @@ func.func @argmax_2d_f32i64(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes
 // CHECK-LABEL: func @argmax_2d_f32i64(
 //       CHECK: linalg.generic
 //   CHECK-NOT: iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
-
-// TODO(avarma): In current setup it works by creating a descriptor and later on avoiding uk setup.

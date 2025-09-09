@@ -91,9 +91,7 @@ LogicalResult setDataTiledMultiMmaLoweringConfig(
   attrs.emplace_back(b.getStringAttr("reduction"),
                      b.getI64ArrayAttr(reductionTileSizes));
   if (ukernelConfig) {
-    // TODO(avarma): Better to keep "iree_codegen.ukernel" as a global static
-    // string.
-    op->setAttr("iree_codegen.ukernel", ukernelConfig);
+    op->setAttr(kIreeCodegenUkernelAttrName, ukernelConfig);
   } else {
     // Promote operands to use shared memory for LHS and RHS.
     // Don't do that with ukernels: their untiled reduction dimension is too

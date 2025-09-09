@@ -24,8 +24,8 @@ func.func @argmax_2d_f32i64(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes
 // CHECK-LABEL: func @argmax_2d_f32i64(
 //       CHECK: linalg.generic
 //  CHECK-SAME: hal.executable.objects = [
-//  CEHCK-SAME:   #hal.executable.object<{path = "iree_uk_amdgpu_argmax_f32i64.gfx942.bc", data = dense_resource<iree_uk_amdgpu_argmax_f32i64.gfx942.bc> : vector<{{[0-9]+}}xi8>}>]
-//  CEHCK-SAME:   iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"iree_uk_amdgpu_argmax_f32i64", bitcode>
+//  CHECK-SAME:   #hal.executable.object<{path = "iree_uk_amdgpu_argmax_f32i64.gfx942.bc", data = dense_resource<iree_uk_amdgpu_argmax_f32i64.gfx942.bc> : vector<{{[0-9]+}}xi8>}>]
+//  CHECK-SAME:   iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"iree_uk_amdgpu_argmax_f32i64", bitcode>
 
 // -----
 
@@ -53,7 +53,7 @@ func.func @argmax_4d_unit_parallel_f32i64(%arg0 : tensor<1x1x1x?xf32>) -> tensor
 // CHECK-LABEL: func @argmax_4d_unit_parallel_f32i64(
 //       CHECK: linalg.generic
 //  CHECK-SAME: hal.executable.objects = [
-//  CEHCK-SAME:   #hal.executable.object<{path = "iree_uk_amdgpu_argmax_f32i64.gfx942.bc", data = dense_resource<iree_uk_amdgpu_argmax_f32i64.gfx942.bc> : vector<{{[0-9]+}}xi8>}>]
+//  CHECK-SAME:   #hal.executable.object<{path = "iree_uk_amdgpu_argmax_f32i64.gfx942.bc", data = dense_resource<iree_uk_amdgpu_argmax_f32i64.gfx942.bc> : vector<{{[0-9]+}}xi8>}>]
 //  CHECK-SAME:   iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"iree_uk_amdgpu_argmax_f32i64", bitcode>
 
 // -----

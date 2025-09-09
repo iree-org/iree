@@ -2628,7 +2628,7 @@ static LogicalResult setArgmaxUkernelConfig(
       NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
       NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
   if (ukernelConfig) {
-    op->setAttr("iree_codegen.ukernel", ukernelConfig);
+    op->setAttr(kIreeCodegenUkernelAttrName, ukernelConfig);
   }
   IREE::GPU::appendPromotedOperandsList(context, attrs, {0, 1});
   auto configDict = DictionaryAttr::get(context, attrs);
