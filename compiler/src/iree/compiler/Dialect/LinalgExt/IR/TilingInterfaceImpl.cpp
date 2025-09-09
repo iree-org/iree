@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
@@ -1456,25 +1457,22 @@ ArgCompareOp::generateInitialTensorForPartialReduction(
   // Create tensors with the partial result shape.
   Type valueElTy = getElementTypeOrSelf(valueInit.getType());
   Type indexElTy = getElementTypeOrSelf(indexInit.getType());
-  SmallVector<OpFoldResult> partialResultShape(sizes.begin(), sizes.end());
+  SmallVector<OpFoldResult> partialResultShape(sizes);
   Value emptyValueTensor =
-      b.create<tensor::EmptyOp>(loc, partialResultShape, valueElTy);
+      tensor::EmptyOp::create(b, loc, partialResultShape, valueElTy);
   Value emptyIndexTensor =
-      b.create<tensor::EmptyOp>(loc, partialResultShape, indexElTy);
+      tensor::EmptyOp::create(b, loc, partialResultShape, indexElTy);
 
   // Broadcast init values to partial result shape for slicing inside
   // scf.forall. Each tile in the parallel loop will extract slices from
   // these broadcasted tensors to get initialized values for the ArgCompareOp.
   // Example: tensor<64xf32> -> tensor<64x32xf32> for 32 reduction tiles along
   // dim 1.
-  SmallVector<int64_t> broadcastDims;
-  for (unsigned dim : reductionDims) {
-    broadcastDims.push_back(static_cast<int64_t>(dim));
-  }
-  Operation *valueBroadcastOp = b.create<linalg::BroadcastOp>(
-      loc, valueInit, emptyValueTensor, broadcastDims);
-  Operation *indexBroadcastOp = b.create<linalg::BroadcastOp>(
-      loc, indexInit, emptyIndexTensor, broadcastDims);
+  auto broadcastDims = llvm::to_vector_of<int64_t>(reductionDims);
+  Operation *valueBroadcastOp = linalg::BroadcastOp::create(
+      b, loc, valueInit, emptyValueTensor, broadcastDims);
+  Operation *indexBroadcastOp = linalg::BroadcastOp::create(
+      b, loc, indexInit, emptyIndexTensor, broadcastDims);
 
   return SmallVector<Value>{valueBroadcastOp->getResult(0),
                             indexBroadcastOp->getResult(0)};
@@ -1486,8 +1484,9 @@ FailureOr<TilingResult> ArgCompareOp::tileToPartialReduction(
     ArrayRef<OpFoldResult> sizes,
     const llvm::SetVector<unsigned> &reductionDims,
     ArrayRef<OpFoldResult> splitReductionIvs) {
-  assert(strategy == ReductionTilingStrategy::PartialReductionOuterParallel &&
-         "Requires PartialReductionOuterParallel strategy");
+  if (strategy != ReductionTilingStrategy::PartialReductionOuterParallel) {
+    return failure();
+  }
   OpBuilder::InsertionGuard guard(b);
 
   int64_t rank = getInputRank();
@@ -1507,9 +1506,8 @@ FailureOr<TilingResult> ArgCompareOp::tileToPartialReduction(
   tiledOperands.push_back(inputSlice->getResult(0));
   slices.push_back(inputSlice);
 
-  // Extract slices of the init operands (partial results).
-  // For split-reduction, we need to slice the init values along
-  // the reduction dimension to get the appropriate chunk.
+  // Extract slices of the init operands (partial results). For split-reduction,
+  // slice along the reduction dimension to get extra parallelism.
   SmallVector<OpFoldResult> initOffsets, initSizes, initStrides;
   for (int64_t i = 0; i < rank; ++i) {
     if (i == reductionDim) {
@@ -1523,12 +1521,11 @@ FailureOr<TilingResult> ArgCompareOp::tileToPartialReduction(
     initStrides.push_back(b.getIndexAttr(1));
   }
 
-  const ShapedType &initValType = getOutputValueType();
-  const ShapedType &initIdxType = getOutputIndexType();
   SmallVector<int64_t> resultValShape, resultIdxShape;
   for (int64_t i = 0; i < rank; ++i) {
-    if (i == reductionDim)
+    if (i == reductionDim) {
       continue;
+    }
 
     if (auto sizeAttr = dyn_cast<Attribute>(initSizes[i])) {
       int64_t size = (cast<IntegerAttr>(sizeAttr)).getInt();
@@ -1541,12 +1538,12 @@ FailureOr<TilingResult> ArgCompareOp::tileToPartialReduction(
     resultIdxShape.push_back(ShapedType::kDynamic);
   }
 
-  RankedTensorType sliceValResultType =
-      RankedTensorType::get(resultValShape, initValType.getElementType(),
-                            cast<RankedTensorType>(initValType).getEncoding());
-  RankedTensorType sliceIdxResultType =
-      RankedTensorType::get(resultIdxShape, initIdxType.getElementType(),
-                            cast<RankedTensorType>(initIdxType).getEncoding());
+  auto sliceValResultType = RankedTensorType::get(
+      resultValShape, getOutputValueType().getElementType(),
+      cast<RankedTensorType>(getOutputValueType()).getEncoding());
+  auto sliceIdxResultType = RankedTensorType::get(
+      resultIdxShape, getOutputIndexType().getElementType(),
+      cast<RankedTensorType>(getOutputIndexType()).getEncoding());
 
   auto initValSlice = tensor::ExtractSliceOp::create(
       b, loc, sliceValResultType, init[0], initOffsets, initSizes, initStrides);
@@ -1562,34 +1559,33 @@ FailureOr<TilingResult> ArgCompareOp::tileToPartialReduction(
   Value tileIndex =
       getValueOrCreateConstantIndexOp(b, loc, splitReductionIvs[0]);
   Value tileSize = getValueOrCreateConstantIndexOp(b, loc, sizes[reductionDim]);
-  Value tileStartIndex = b.create<arith::MulIOp>(loc, tileIndex, tileSize);
+  Value tileStartIndex = arith::MulIOp::create(b, loc, tileIndex, tileSize);
 
   Value newIndexBase;
   if (Value globalIndexBase = getIndexBase()) {
     // Add chunk start to existing index_base.
     newIndexBase =
-        b.create<arith::AddIOp>(loc, globalIndexBase, tileStartIndex);
+        arith::AddIOp::create(b, loc, globalIndexBase, tileStartIndex);
   } else {
     // Use chunk start as index_base.
     newIndexBase = tileStartIndex;
   }
 
-  SmallVector<Type> resultTypes;
+  SmallVector<Type, 2> resultTypes;
   if (hasPureTensorSemantics()) {
-    resultTypes.push_back(initValSlice->getResult(0).getType());
-    resultTypes.push_back(initIdxSlice->getResult(0).getType());
+    resultTypes = {initValSlice->getResult(0).getType(),
+                   initIdxSlice->getResult(0).getType()};
   }
 
   // Create the tiled operation with adjusted index_base.
   SmallVector<Value> operands = std::move(tiledOperands);
   operands.push_back(newIndexBase);
-  Operation *tiledArgmaxOp = b.create<ArgCompareOp>(
-      loc, resultTypes,
-      operands[0],                          // input slice.
-      ValueRange{operands[1], operands[2]}, // init slices.
-      operands[3],                          // index_base.
-      reductionDim                          // dimension.
-  );
+  Operation *tiledArgmaxOp = ArgCompareOp::create(
+      /*builder=*/b, /*location=*/loc, /*results=*/resultTypes,
+      /*inputs=*/operands[0],
+      /*outputs=*/ValueRange{operands[1], operands[2]},
+      /*indexBase=*/operands[3],
+      /*dimension=*/reductionDim);
 
   // Copy the region.
   Region &targetRegion = tiledArgmaxOp->getRegion(0);
@@ -1604,8 +1600,7 @@ FailureOr<MergeResult>
 ArgCompareOp::mergeReductions(OpBuilder &b, Location loc,
                               ValueRange partialReduce,
                               const llvm::SetVector<unsigned> &reductionDims) {
-  SmallVector<int64_t> mergeReductionDims(reductionDims.begin(),
-                                          reductionDims.end());
+  auto mergeReductionDims = llvm::to_vector_of<int64_t>(reductionDims);
   // Create linalg.reduce to perform final merge of partial results.
   auto reduction = linalg::ReduceOp::create(
       b, loc, partialReduce, getDpsInits(), mergeReductionDims,
@@ -1628,9 +1623,9 @@ ArgCompareOp::mergeReductions(OpBuilder &b, Location loc,
         Value predicate =
             mapper.lookup(originalBlock.getTerminator()->getOperand(0));
         Value selectedVal =
-            b.create<arith::SelectOp>(loc, predicate, inputs[0], inputs[2]);
+            arith::SelectOp::create(b, loc, predicate, inputs[0], inputs[2]);
         Value selectedIdx =
-            b.create<arith::SelectOp>(loc, predicate, inputs[1], inputs[3]);
+            arith::SelectOp::create(b, loc, predicate, inputs[1], inputs[3]);
         linalg::YieldOp::create(b, loc, ValueRange{selectedVal, selectedIdx});
       });
 

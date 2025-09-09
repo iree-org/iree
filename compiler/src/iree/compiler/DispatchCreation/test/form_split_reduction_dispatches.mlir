@@ -158,7 +158,7 @@ util.func public @arg_compare_split_reduction_dynamic(%arg0: tensor<?x?xf32>) ->
       iree_linalg_ext.split_reduction = [128]}
       dimension(1)
       ins(%arg0 : tensor<?x?xf32>) outs(%2, %3 : tensor<?xf32>, tensor<?xi32>) {
-    ^bb0(%in: f32, %out_val: f32):  // Only 2 arguments: input and output value
+    ^bb0(%in: f32, %out_val: f32):  // Only 2 arguments: input and init value.
       %cmp = arith.cmpf ogt, %in, %out_val : f32
       iree_linalg_ext.yield %cmp : i1
   } -> tensor<?xf32>, tensor<?xi32>
@@ -225,7 +225,7 @@ util.func public @arg_compare_split_reduction_static(%arg0: tensor<64x4096xf32>)
       iree_linalg_ext.split_reduction = [128]}
       dimension(1)
       ins(%arg0 : tensor<64x4096xf32>) outs(%2, %3 : tensor<64xf32>, tensor<64xi32>) {
-    ^bb0(%in: f32, %out_val: f32):  // Only 2 arguments: input and output value
+    ^bb0(%in: f32, %out_val: f32):  // Only 2 arguments: input and init value.
       %cmp = arith.cmpf ogt, %in, %out_val : f32
       iree_linalg_ext.yield %cmp : i1
   } -> tensor<64xf32>, tensor<64xi32>
