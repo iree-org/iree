@@ -193,8 +193,7 @@ static void buildChannelInitializer(shard::GridOp grid,
                                     ArrayRef<shard::GridAxis> gridAxes,
                                     bool useNamedDefaultChannels,
                                     ImplicitLocOpBuilder &builder) {
-  IREE::Util::InitializerOp initOp =
-      IREE::Util::InitializerOp::create(builder, );
+  auto initOp = IREE::Util::InitializerOp::create(builder);
   Block *block = builder.createBlock(&initOp.getBody());
   ImplicitLocOpBuilder::InsertionGuard insertionGuard(builder);
   builder.setInsertionPointToStart(block);
@@ -202,7 +201,7 @@ static void buildChannelInitializer(shard::GridOp grid,
       buildChannelCreation(grid, gridAxes, useNamedDefaultChannels, builder);
   IREE::Util::GlobalStoreOp::create(builder, channel,
                                     getGridChannelName(grid, gridAxes));
-  IREE::Util::ReturnOp::create(builder, );
+  IREE::Util::ReturnOp::create(builder);
 }
 
 // Construct a Flow channel inside `module` using
