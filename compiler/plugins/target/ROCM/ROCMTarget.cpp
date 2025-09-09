@@ -272,9 +272,9 @@ static void checkRegisterSpilling(IREE::HAL::ExecutableVariantOp &variantOp,
     for (const auto &[_, metaData] : infoMap) {
       if (metaData.SGPRSpillCount > 0 || metaData.VGPRSpillCount > 0) {
         emitWarning(variantOp.getLoc())
-            << "Register spill : " << "VGPRSpillCount : "
+            << "Register spill: " << "VGPRSpillCount: "
             << metaData.VGPRSpillCount
-            << " / SGPRSpillCount : " << metaData.SGPRSpillCount;
+            << " / SGPRSpillCount: " << metaData.SGPRSpillCount;
       }
     }
   }
