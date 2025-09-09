@@ -89,6 +89,7 @@ struct ROCMOptions {
   bool enableTensorUKernels = false;
   IREE::Codegen::DenormalFpMath denormalFpMathF32 =
       IREE::Codegen::DenormalFpMath::None;
+  bool disableRegSpillWarning = false;
 
   void bindOptions(OptionsBinder &binder) {
     using namespace llvm;
@@ -172,6 +173,10 @@ struct ROCMOptions {
                        "Convert denormals to zero while preserving sign"),
             clEnumValN(IREE::Codegen::DenormalFpMath::PositiveZero,
                        "positive-zero", "Convert denormals to positive zero")));
+
+    binder.opt<bool>("iree-hip-disable-register-spill-warning",
+                     disableRegSpillWarning, cl::cat(category),
+                     cl::desc("Do not report register spilling for AMD GPUs"));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
@@ -803,7 +808,9 @@ public:
       if (targetHSACO.empty())
         return failure();
 
-      checkRegisterSpilling(variantOp, targetObj);
+      if (!options.disableRegSpillWarning) {
+        checkRegisterSpilling(variantOp, targetObj);
+      }
     }
 
     if (!serializationOptions.dumpBinariesPath.empty()) {
