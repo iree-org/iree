@@ -61,6 +61,7 @@ iree_lit_test_suite(
             "tile.mlir",
             "tile_and_fuse_producer_consumer_anchoring_last_op.mlir",
             "tile_and_fuse_producer_consumer_anchoring_root_op.mlir",
+            "tile_to_vector_size.mlir",
             "unfused_fma.mlir",
             "vector_contract_to_arm_asm.mlir",
             "vector_contract_to_arm_intrinsics.mlir",

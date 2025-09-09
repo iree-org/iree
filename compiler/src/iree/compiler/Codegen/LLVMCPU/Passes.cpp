@@ -293,6 +293,7 @@ void addMultiTilingExpertPassPipeline(
       funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
       funcPassManager.addPass(createCSEPass());
     }
+    funcPassManager.addPass(createLLVMCPUTileToVectorSizePass());
 
     GenericVectorizationPassOptions options;
     options.useConfiguredVectorSizes = pipelineOpt.useConfiguredVectorSizes;

@@ -144,6 +144,19 @@ def LLVMCPUTilePass :
   ];
 }
 
+def LLVMCPUTileToVectorSizePass :
+    InterfacePass<"iree-llvmcpu-tile-to-vector-size", "mlir::FunctionOpInterface"> {
+  let summary = "Tile TilingInterface operations to target vector size.";
+  let description = [{
+    Walk through all the TilingInterface operations and tiling the dimensions to
+    target vector sizes, if the lowering config is present and the dimension is
+    known as greater than the vector size.
+
+    It is intended to be used before vectorization that avoids big vectors and
+    stack buffers.
+  }];
+}
+
 def LLVMCPUTileAndFuseProducerConsumerPass
     : InterfacePass<"iree-llvmcpu-tile-and-fuse-producer-consumer",
                     "mlir::FunctionOpInterface"> {
