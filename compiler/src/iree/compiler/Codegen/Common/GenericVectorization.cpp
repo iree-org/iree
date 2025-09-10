@@ -178,7 +178,7 @@ void GenericVectorizationPass::runOnOperation() {
       // Do not vectorize the op if the vector size is greater than or equal
       // to limit.
       if (enableVectorMasking) {
-        if (std::accumulate(vectorSizes.begin(), vectorSizes.end(), 1,
+        if (std::accumulate(vectorSizes.begin(), vectorSizes.end(), 1LL,
                             std::multiplies<int64_t>()) >= maxVectorSize)
           continue;
       } else {

@@ -778,3 +778,36 @@ func.func @linalg_ext_gather(%source : tensor<1024x128xi32>, %indices : tensor<1
 
 // CHECK-LABEL: @linalg_ext_gather
 //       CHECK:   transfer_gather
+
+// -----
+
+func.func @negative_no_vectorize_large_vector(%arg0 : tensor<1x9007199254740991x1xf16>, %output : tensor<1x9007199254740991xf32>) -> tensor<1x9007199254740991xf32> {
+  %cst_2 = arith.constant 0.000000e+00 : f32
+  %cst_0 = arith.constant 8.000000e+00 : f16
+  %r = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0 : tensor<1x9007199254740991x1xf16>) outs(%output : tensor<1x9007199254740991xf32>) {
+  ^bb0(%in: f16, %out: f32):
+    %76 = arith.truncf %cst_2 : f32 to f16
+    %77 = arith.divf %in, %cst_0 : f16
+    %78 = arith.addf %77, %76 : f16
+    %79 = arith.extf %78 : f16 to f32
+    %80 = arith.maxnumf %79, %out : f32
+    linalg.yield %80 : f32
+  } -> tensor<1x9007199254740991xf32>
+  return %r : tensor<1x9007199254740991xf32>
+}
+
+// CHECK-MASK-LABEL:   func.func @negative_no_vectorize_large_vector(
+// CHECK-MASK-SAME:      %[[ARG0:.*]]: tensor<1x9007199254740991x1xf16>,
+// CHECK-MASK-SAME:      %[[ARG1:.*]]: tensor<1x9007199254740991xf32>) -> tensor<1x9007199254740991xf32> {
+// CHECK-MASK:           %[[VAL_0:.*]] = arith.constant 0.000000e+00 : f16
+// CHECK-MASK:           %[[VAL_1:.*]] = arith.constant 8.000000e+00 : f16
+// CHECK-MASK:           %[[VAL_2:.*]] = linalg.generic {indexing_maps = [#{{.*}}, #{{.*}}], iterator_types = ["parallel", "parallel", "reduction"]} ins(%[[ARG0]] : tensor<1x9007199254740991x1xf16>) outs(%[[ARG1]] : tensor<1x9007199254740991xf32>) {
+// CHECK-MASK:           ^bb0(%[[VAL_3:.*]]: f16, %[[VAL_4:.*]]: f32):
+// CHECK-MASK:             %[[VAL_5:.*]] = arith.divf %[[VAL_3]], %[[VAL_1]] : f16
+// CHECK-MASK:             %[[VAL_6:.*]] = arith.addf %[[VAL_5]], %[[VAL_0]] : f16
+// CHECK-MASK:             %[[VAL_7:.*]] = arith.extf %[[VAL_6]] : f16 to f32
+// CHECK-MASK:             %[[VAL_8:.*]] = arith.maxnumf %[[VAL_7]], %[[VAL_4]] : f32
+// CHECK-MASK:             linalg.yield %[[VAL_8]] : f32
+// CHECK-MASK:           } -> tensor<1x9007199254740991xf32>
+// CHECK-MASK:           return %[[VAL_2]] : tensor<1x9007199254740991xf32>
+// CHECK-MASK:         }
