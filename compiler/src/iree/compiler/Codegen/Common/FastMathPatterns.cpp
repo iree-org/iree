@@ -66,16 +66,16 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
 
     // Coefficients for |x| < 1.0.
     SmallVector<Value, 6> coeffs1 = {
-      createConst(-0x1.268bc2p-11f), createConst(0x1.420828p-8f),
-      createConst(-0x1.b5937p-6f),   createConst(0x1.ce077cp-4f),
-      createConst(-0x1.81266p-2f),   createConst(0x1.06eba0p-3f)};
-  // Coefficients for |x| >= 1.0.
-  SmallVector<Value, 7> coeffs2 = {
-      createConst(0x1.1d3156p-16f), createConst(-0x1.8d129p-12f),
-      createConst(0x1.f9a6d2p-9f),  createConst(-0x1.8c3164p-6f),
-      createConst(0x1.b4e9c8p-4f),  createConst(0x1.4515fap-1f),
-      createConst(0x1.078e50p-3f)};
-  
+        createConst(-0x1.268bc2p-11f), createConst(0x1.420828p-8f),
+        createConst(-0x1.b5937p-6f),   createConst(0x1.ce077cp-4f),
+        createConst(-0x1.81266p-2f),   createConst(0x1.06eba0p-3f)};
+    // Coefficients for |x| >= 1.0.
+    SmallVector<Value, 7> coeffs2 = {
+        createConst(0x1.1d3156p-16f), createConst(-0x1.8d129p-12f),
+        createConst(0x1.f9a6d2p-9f),  createConst(-0x1.8c3164p-6f),
+        createConst(0x1.b4e9c8p-4f),  createConst(0x1.4515fap-1f),
+        createConst(0x1.078e50p-3f)};
+
     // Select between the two results using scf.if.
     Value result;
     if (resultType.isF32()) {
