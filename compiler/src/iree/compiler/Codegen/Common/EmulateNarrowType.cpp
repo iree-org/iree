@@ -616,6 +616,11 @@ LogicalResult emulateNarrowType(
       affine::AffineDialect, IREE::HAL::HALDialect>(opLegalCallback);
 
   RewritePatternSet patterns(ctx);
+
+  // Try to flatten memrefs as a prerequiste for narrow type emulation,
+  // so we can have simplified checks in the emulation patterns.
+  memref::populateFlattenMemrefsPatterns(patterns);
+
   patterns.insert<IREEConvertVectorStore>(ctx, /*disableAtomicRMW=*/false,
                                           /*benefit=*/100);
   arith::populateArithNarrowTypeEmulationPatterns(typeConverter, patterns);
