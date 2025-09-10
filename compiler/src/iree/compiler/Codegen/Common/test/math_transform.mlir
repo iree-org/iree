@@ -73,7 +73,7 @@ func.func @erf_fastmath(%arg0: f32) -> f32 attributes {
   // CHECK-DAG: arith.constant -0.0241816975 : f32
   // CHECK-DAG: arith.constant 0.00385781587 : f32
   // CHECK-DAG: arith.constant -3.78677854E-4 : f32
-  
+
   // Else region coefficients (|x| >= 1.0)
   // CHECK-DAG: arith.constant 1.69988107E-5 : f32
   // CHECK-DAG: arith.constant 0.128379107 : f32
