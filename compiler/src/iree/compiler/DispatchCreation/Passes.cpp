@@ -398,11 +398,18 @@ void registerDispatchCreationPipelines() {
         llvm::cl::desc("Enable data-tiling for dispatch creation pipeline"),
         llvm::cl::init(false),
     };
+    Option<int64_t> splitReductionTargetSize{
+        *this,
+        "split-reduction-target-size",
+        llvm::cl::desc("Target tile size for split reduction"),
+        llvm::cl::init(0),
+    };
 
     std::unique_ptr<TransformOptions> toTransformOptions() const {
       auto options = std::make_unique<TransformOptions>();
       options->options.enableAggressiveFusion = aggressiveFusion;
       options->options.dataTiling = dataTiling;
+      options->options.splitReductionTargetSize = splitReductionTargetSize;
       return options;
     }
   };
