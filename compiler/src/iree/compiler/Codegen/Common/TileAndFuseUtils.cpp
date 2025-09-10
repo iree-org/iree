@@ -128,11 +128,8 @@ fuseConsumersIntoForall(RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
   SmallVector<ConsumerFusionQueueEntry> candidates;
   llvm::SmallDenseSet<tensor::ParallelInsertSliceOp> allCandidates;
   auto addCandidateSlices = [&candidates, &allCandidates,
-                             &filterFn](Operation *fusedOp) {
-    // Dominance info recreated since op creation/movement in the fusion logic
-    // invalidates it anyway.
-    DominanceInfo dominanceInfo;
-
+                             &filterFn](Operation *fusedOp,
+                                        DominanceInfo &dominanceInfo) {
     for (auto *userOp : fusedOp->getResults().getUsers()) {
       auto sliceOp = dyn_cast<tensor::ParallelInsertSliceOp>(userOp);
       if (!sliceOp || allCandidates.contains(sliceOp)) {
@@ -194,8 +191,10 @@ fuseConsumersIntoForall(RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
   };
 
   // Add slices from all tiled ops, not only the "main" one.
-  for (Operation *tiledOp : tiledOps)
-    addCandidateSlices(tiledOp);
+  DominanceInfo dominanceInfo;
+  for (Operation *tiledOp : tiledOps) {
+    addCandidateSlices(tiledOp, dominanceInfo);
+  }
 
   std::queue<Operation *> newFusionOpportunities;
   while (!candidates.empty()) {
@@ -215,8 +214,10 @@ fuseConsumersIntoForall(RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
     // The result of the fused consumers might themselves be slices of
     // values produced by operations that implement the `TilingInterface`.
     // Add these operations to the worklist.
+    DominanceInfo dominanceInfo;
     addCandidateSlices(
-        fusedResult->tiledAndFusedConsumerOperands.front()->getOwner());
+        fusedResult->tiledAndFusedConsumerOperands.front()->getOwner(),
+        dominanceInfo);
 
     // Add the list of new producer fusion opportunities.
     for (auto tiledOp : fusedResult.value().tiledOps) {
