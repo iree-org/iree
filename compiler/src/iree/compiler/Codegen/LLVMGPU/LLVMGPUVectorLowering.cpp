@@ -189,7 +189,8 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
 
   LogicalResult matchAndRewrite(vector::ContractionOp op,
                                 PatternRewriter &rewriter) const override {
-    // TODO: Add a rewrite to support relevant contractions nested in vector.mask
+    // TODO: Add a rewrite to support relevant contractions nested in
+    // vector.mask
     if (op.isMasked()) {
       return failure();
     }
