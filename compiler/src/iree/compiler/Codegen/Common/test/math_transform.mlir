@@ -128,7 +128,7 @@ func.func @erf_fastmath_vector(%arg0: vector<4xf32>) -> vector<4xf32> attributes
   // CHECK-DAG: arith.constant dense<-0.0241816975> : vector<4xf32>
   // CHECK-DAG: arith.constant dense<0.00385781587> : vector<4xf32>
   // CHECK-DAG: arith.constant dense<-3.78677854E-4> : vector<4xf32>
-  
+
   // Else region coefficients (|x| >= 1.0)
   // CHECK-DAG: arith.constant dense<1.69988107E-5> : vector<4xf32>
   // CHECK-DAG: arith.constant dense<0.128379107> : vector<4xf32>
