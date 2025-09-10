@@ -113,10 +113,9 @@ public:
   };
 
   SmallVector<Operation *> getFusedOperations() const {
-    SmallVector<Operation *> ops;
-    ops.push_back(rootOp);
-    llvm::append_range(ops, fusedOps.getArrayRef());
-    return ops;
+    return llvm::map_to_vector(
+        loopMaps.getArrayRef(),
+        [](std::pair<Operation *, AffineMap> pair) { return pair.first; });
   }
 
   Operation *getRoot() const { return rootOp; }
@@ -141,13 +140,12 @@ private:
   Operation *rootOp;
   // All operations to be fused with the root op. This does not include
   // `rootOp`.
-  SetVector<Operation *> fusedOps;
-  DenseMap<Operation *, AffineMap> loopMaps;
+  llvm::MapVector<Operation *, AffineMap> loopMaps;
 };
 } // namespace
 
 void FusionGroup::insert(Operation *op) {
-  assert(!fusedOps.contains(op) && "op already fused");
+  assert(!contains(op) && "op already fused");
   FailureOr<AffineMap> map = getRootParallelLoopToOpMap(op);
   if (succeeded(map)) {
     loopMaps.insert({op, map.value()});
@@ -164,7 +162,6 @@ void FusionGroup::insert(Operation *op) {
     map = inverseAndBroadcastProjectedPermutation(map);
     loopMaps.insert({op, map});
   }
-  fusedOps.insert(op);
 }
 
 FailureOr<AffineMap>
@@ -183,6 +180,36 @@ FusionGroup::getRootParallelLoopToOpMap(Operation *op) const {
                           [this](Operation *op) { return contains(op); }) &&
          "op must be not be a producer and consumer");
 
+  /// Computes the mapping from the root ops outer parallel loops to `op`'s
+  /// iteration space via a direct producer/consumer of `op` that is already in
+  /// the fusion group.
+  auto getMapFromOpInFusionGroup =
+      [&](AffineMap otherToOperand, AffineMap thisToOperand,
+          AffineMap otherMap) -> FailureOr<AffineMap> {
+    if (!otherToOperand || !thisToOperand ||
+        !otherToOperand.isProjectedPermutation() ||
+        !thisToOperand.isProjectedPermutation()) {
+      return failure();
+    }
+
+    // `thisToOperand` is a mapping from the iteration space of `op` to the
+    // operand's data space.
+    // `inverseMap` is the  mapping from the operand data space to `op`'s
+    // iteration space.
+    AffineMap inverseMap =
+        inverseAndBroadcastProjectedPermutation(thisToOperand);
+
+    // `otherToOperand` maps "other's" (an op in the fusion group) iteration
+    // space to the same operand's data space. Composing the two yields a
+    // mapping from other's iteration space to `op`'s iteration space.
+    AffineMap composedMap = inverseMap.compose(otherToOperand);
+
+    // `otherMap` is other's mapping from the root's outer parallel loops to
+    // other's iteration space. `composedMap.compose(otherMap)` computes the
+    // mapping from the root's outer parallel loops to `op`'s iteration space.
+    return composedMap.compose(otherMap);
+  };
+
   AffineMap newMap;
   if (isConsumer) {
     for (OpOperand &operand : op->getOpOperands()) {
@@ -190,7 +217,6 @@ FusionGroup::getRootParallelLoopToOpMap(Operation *op) const {
       if (!contains(definingOp)) {
         continue;
       }
-
       auto fusionProducer =
           operand.get()
               .getDefiningOp<IREE::LinalgExt::LinalgFusionOpInterface>();
@@ -203,29 +229,19 @@ FusionGroup::getRootParallelLoopToOpMap(Operation *op) const {
       AffineMap producerResultMap = fusionProducer.getIndexingMapMatchingResult(
           cast<OpResult>(operand.get()));
       AffineMap consumerOperandMap = fusionOp.getMatchingIndexingMap(&operand);
-      if (!producerResultMap || !consumerOperandMap ||
-          !producerResultMap.isProjectedPermutation() ||
-          !consumerOperandMap.isProjectedPermutation()) {
-        return failure();
-      }
-      AffineMap inverseMap =
-          inverseAndBroadcastProjectedPermutation(consumerOperandMap);
-      AffineMap composedMap = inverseMap.compose(producerResultMap);
-      auto &producerMap = it->getSecond();
-      composedMap = composedMap.compose(producerMap);
-
+      FailureOr<AffineMap> composedMap = getMapFromOpInFusionGroup(
+          producerResultMap, consumerOperandMap, it->second);
       // Mapping must be the same for all operands.
-      if (newMap && composedMap != newMap) {
+      if (failed(composedMap) || (newMap && composedMap != newMap)) {
         return failure();
       }
-      newMap = composedMap;
+      newMap = composedMap.value();
     }
   } else {
     for (OpOperand &operand : op->getUses()) {
       if (!contains(operand.getOwner())) {
         continue;
       }
-
       auto fusionConsumer = dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(
           operand.getOwner());
       if (!fusionConsumer) {
@@ -238,26 +254,16 @@ FusionGroup::getRootParallelLoopToOpMap(Operation *op) const {
           fusionConsumer.getMatchingIndexingMap(&operand);
       AffineMap producerResultMap =
           fusionOp.getIndexingMapMatchingResult(cast<OpResult>(operand.get()));
-      if (!producerResultMap || !consumerOperandMap ||
-          !producerResultMap.isProjectedPermutation() ||
-          !consumerOperandMap.isProjectedPermutation()) {
+      FailureOr<AffineMap> composedMap = getMapFromOpInFusionGroup(
+          consumerOperandMap, producerResultMap, it->second);
+      // Mapping must be the same for all operands.
+      if (failed(composedMap) || (newMap && composedMap != newMap)) {
         return failure();
       }
-      AffineMap inverseMap =
-          inverseAndBroadcastProjectedPermutation(producerResultMap);
-      AffineMap composedMap = inverseMap.compose(consumerOperandMap);
-      auto &consumerParallelMap = it->getSecond();
-      composedMap = composedMap.compose(consumerParallelMap);
-
-      // Mapping must be the same for all uses.
-      if (newMap && composedMap != newMap) {
-        return failure();
-      }
-      newMap = composedMap;
+      newMap = composedMap.value();
 
       // Producers cannot be more parallel than consumers.
-      if (compressUnusedDims(newMap).getNumDims() !=
-          consumerParallelMap.getNumDims()) {
+      if (compressUnusedDims(newMap).getNumDims() != it->second.getNumDims()) {
         return failure();
       }
     }
