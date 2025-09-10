@@ -72,7 +72,7 @@ private:
       return std::nullopt;
     }
 
-    if (targetSplitReductionSize <= 0) {
+    if (splitReductionTargetSize <= 0) {
       return std::nullopt;
     }
     std::optional<SmallVector<int64_t>> opReductionSizes =
@@ -103,7 +103,7 @@ private:
     // we prefer tiling those.
     for (int64_t i = tileSizes.size() - 1; i >= 0; i--) {
       int64_t remainingSize =
-          llvm::divideCeil(targetSplitReductionSize, currentSplitReductionSize);
+          llvm::divideCeil(splitReductionTargetSize, currentSplitReductionSize);
       int64_t dimSize = (*opReductionSizes)[i];
       if (dimSize == ShapedType::kDynamic) {
         return std::nullopt;

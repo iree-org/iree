@@ -316,8 +316,8 @@ void DispatchCreationOptions::bindOptions(OptionsBinder &binder) {
                    llvm::cl::desc("Enables data tiling path."),
                    llvm::cl::cat(category));
   binder.opt<int64_t>(
-      "iree-dispatch-creation-target-split-reduction-size",
-      targetSplitReductionSize,
+      "iree-dispatch-creation-split-reduction-target-size",
+      splitReductionTargetSize,
       llvm::cl::desc("Target tile size for split reduction. Inner reduction "
                      "dimensions are tiled first, with the tile size rounded "
                      "up until it evenly divides the iteration domain."));

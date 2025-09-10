@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-set-split-reduction-sizes{target-split-reduction-size=1024}))" --split-input-file > %t
+// RUN: iree-opt %s --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-set-split-reduction-sizes{split-reduction-target-size=1024}))" --split-input-file > %t
 // RUN: FileCheck %s < %t
 
 // CHECK-LABEL: @basic

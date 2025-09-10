@@ -180,8 +180,8 @@ static void addDispatchRegionCreationPreprocessingPasses(
       .addPass([&]() {
         return DispatchCreation::createSetSplitReductionSizesPass(
             SetSplitReductionSizesPassOptions{
-                /*targetSplitReductionSize=*/
-                dispatchOptions.targetSplitReductionSize});
+                /*splitReductionTargetSize=*/
+                dispatchOptions.splitReductionTargetSize});
       })
       .addPass(DispatchCreation::createFormSplitReductionDispatchesPass)
       //     c. Transpose generic ops to
