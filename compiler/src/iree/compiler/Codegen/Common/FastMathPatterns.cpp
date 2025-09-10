@@ -23,14 +23,13 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
 
   // Helper to evaluate a polynomial using FMA chains for both scalar and vector
   // types.
-  template <typename ValueT>
-  static ValueT evalErfPolynomial(ValueT ax, ValueT t, ArrayRef<ValueT> coeffs,
-                                  PatternRewriter &rewriter, Location loc) {
-    ValueT acc = coeffs[0];
+  static Value evalErfPolynomial(Value x, Value t, ArrayRef<Value> coeffs,
+                                 RewriterBase &rewriter, Location loc) {
+    Value acc = coeffs[0];
     for (size_t i = 1; i < coeffs.size(); ++i) {
-      acc = rewriter.create<math::FmaOp>(loc, acc, t, coeffs[i]);
+      acc = rewriter.create<math::FmaOp>(loc, t, acc, coeffs[i]);
     }
-    return rewriter.create<math::FmaOp>(loc, ax, acc, ax);
+    return rewriter.create<math::FmaOp>(loc, x, acc, x);
   }
 
   LogicalResult matchAndRewrite(math::ErfOp op,
@@ -39,21 +38,21 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
     Value input = op.getOperand();
     Type resultType = op.getType();
 
-    // Only support f32 and vector<f32> types.
+    // Only support f32 and vector types with f32 element type.
+    VectorType resVecType = llvm::dyn_cast<VectorType>(resultType);
     if (!(resultType.isF32() ||
-          (llvm::isa<VectorType>(resultType) &&
-           llvm::cast<VectorType>(resultType).getElementType().isF32()))) {
+          (resVecType && resVecType.getElementType().isF32()))) {
       return rewriter.notifyMatchFailure(
-          op, "Result only supports f32 or vector<f32>");
+          op, "Result only supports f32 or vector types with f32 element type");
     }
 
     // Helper to create constants for both scalar and vector types.
     auto createConst = [&](float v) -> Value {
-      if (auto vecType = llvm::dyn_cast<VectorType>(resultType)) {
-        SmallVector<float> values(vecType.getNumElements(), v);
+      if (resVecType) {
+        SmallVector<float> values(resVecType.getNumElements(), v);
         return rewriter.create<arith::ConstantOp>(
-            loc, vecType,
-            DenseElementsAttr::get(vecType, ArrayRef<float>(values)));
+            loc, resVecType,
+            DenseElementsAttr::get(resVecType, ArrayRef<float>(values)));
       } else {
         return rewriter.create<arith::ConstantOp>(loc, rewriter.getF32Type(),
                                                   rewriter.getF32FloatAttr(v));
@@ -67,16 +66,16 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
 
     // Coefficients for |x| < 1.0.
     SmallVector<Value, 6> coeffs1 = {
-        createConst(-0x1.268bc2p-11f), createConst(0x1.420828p-8f),
-        createConst(-0x1.b5937p-6f),   createConst(0x1.ce077cp-4f),
-        createConst(-0x1.81266p-2f),   createConst(0x1.06eba0p-3f)};
-    // Coefficients for |x| >= 1.0.
-    SmallVector<Value, 7> coeffs2 = {
-        createConst(0x1.1d3156p-16f), createConst(-0x1.8d129p-12f),
-        createConst(0x1.f9a6d2p-9f),  createConst(-0x1.8c3164p-6f),
-        createConst(0x1.b4e9c8p-4f),  createConst(0x1.4515fap-1f),
-        createConst(0x1.078e50p-3f)};
-
+      createConst(-0x1.268bc2p-11f), createConst(0x1.420828p-8f),
+      createConst(-0x1.b5937p-6f),   createConst(0x1.ce077cp-4f),
+      createConst(-0x1.81266p-2f),   createConst(0x1.06eba0p-3f)};
+  // Coefficients for |x| >= 1.0.
+  SmallVector<Value, 7> coeffs2 = {
+      createConst(0x1.1d3156p-16f), createConst(-0x1.8d129p-12f),
+      createConst(0x1.f9a6d2p-9f),  createConst(-0x1.8c3164p-6f),
+      createConst(0x1.b4e9c8p-4f),  createConst(0x1.4515fap-1f),
+      createConst(0x1.078e50p-3f)};
+  
     // Select between the two results using scf.if.
     Value result;
     if (resultType.isF32()) {
@@ -127,7 +126,7 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
       result = rewriter.create<arith::SelectOp>(loc, cmp, result1, result2);
     }
 
-    // Restore the sign
+    // Restore the sign.
     Value finalResult = rewriter.create<math::CopySignOp>(loc, result, input);
     rewriter.replaceOp(op, finalResult);
     return success();
