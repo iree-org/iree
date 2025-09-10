@@ -83,3 +83,46 @@ func.func @interleave_and_bitcast_lowering() {
 // 2D vector.bitcast tha followed should be replaced with 1D vector.bitcast
 //       CHECK:   llvm.bitcast {{.*}} : vector<4xi8> to vector<8xi4>
 //   CHECK-NOT:   vector.bitcast %{{.*}} : vector<4x4xi8> to vector<4x8xi4>
+
+// -----
+
+module attributes {
+    hal.executable.target = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {target_triple="riscv64-unknown-elf"}>
+} {
+  func.func private @gather_lowering(%buffer : memref<2048xf32>, %index : vector<64xindex>, %mask : vector<64xi1>) -> vector<64xf32> {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant dense<0.000000e+00> : vector<64xf32>
+    %r = vector.gather %buffer[%c0] [%index], %mask, %cst : memref<2048xf32>, vector<64xindex>, vector<64xi1>, vector<64xf32> into vector<64xf32>
+    return %r : vector<64xf32>
+  }
+}
+
+// CHECK-LABEL:   llvm.func @gather_lowering(
+// CHECK-NOT: llvm.intr.masked.gather
+
+// -----
+
+module attributes {
+    hal.executable.target = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {target_triple="riscv64-unknown-elf", cpu_features ="+v"}>
+} {
+  func.func private @negative_no_gather_lowering(%buffer : memref<2048xf32>, %index : vector<64xindex>, %mask : vector<64xi1>) -> vector<64xf32> {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant dense<0.000000e+00> : vector<64xf32>
+    %r = vector.gather %buffer[%c0] [%index], %mask, %cst : memref<2048xf32>, vector<64xindex>, vector<64xi1>, vector<64xf32> into vector<64xf32>
+    return %r : vector<64xf32>
+  }
+}
+
+// CHECK-LABEL:   llvm.func @negative_no_gather_lowering(
+// CHECK-SAME:                                           %[[VAL_0:[0-9]+|[a-zA-Z$._-][a-zA-Z0-9$._-]*]]: !llvm.ptr,
+// CHECK-SAME:                                           %[[VAL_1:[0-9]+|[a-zA-Z$._-][a-zA-Z0-9$._-]*]]: !llvm.ptr,
+// CHECK-SAME:                                           %[[VAL_2:[0-9]+|[a-zA-Z$._-][a-zA-Z0-9$._-]*]]: i64,
+// CHECK-SAME:                                           %[[VAL_3:[0-9]+|[a-zA-Z$._-][a-zA-Z0-9$._-]*]]: i64,
+// CHECK-SAME:                                           %[[VAL_4:[0-9]+|[a-zA-Z$._-][a-zA-Z0-9$._-]*]]: i64,
+// CHECK-SAME:                                           %[[VAL_5:[0-9]+|[a-zA-Z$._-][a-zA-Z0-9$._-]*]]: vector<64xi64>,
+// CHECK-SAME:                                           %[[VAL_6:[0-9]+|[a-zA-Z$._-][a-zA-Z0-9$._-]*]]: vector<64xi1>) -> vector<64xf32> attributes {sym_visibility = "private"} {
+// CHECK:           %[[VAL_7:.*]] = llvm.mlir.constant(dense<0.000000e+00> : vector<64xf32>) : vector<64xf32>
+// CHECK:           %[[VAL_8:.*]] = llvm.getelementptr %[[VAL_1]]{{\[}}%[[VAL_5]]] : (!llvm.ptr, vector<64xi64>) -> vector<64x!llvm.ptr>, f32
+// CHECK:           %[[VAL_9:.*]] = llvm.intr.masked.gather %[[VAL_8]], %[[VAL_6]], %[[VAL_7]] {alignment = 4 : i32} : (vector<64x!llvm.ptr>, vector<64xi1>, vector<64xf32>) -> vector<64xf32>
+// CHECK:           llvm.return %[[VAL_9]] : vector<64xf32>
+// CHECK:         }

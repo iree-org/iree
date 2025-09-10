@@ -211,3 +211,56 @@ func.func @scalable_transpose_store(%vec: vector<4x[4]xf32>, %dest: memref<?x?xf
 // CHECK-NOT: vector.transpose
 // CHECK: vector.store {{.*}} : memref<?x?xf32>, vector<4xf32>
 // CHECK-NOT: vector.transpose
+
+// -----
+
+// Make sure RISC-V by default (without V extension) lowers vector.gather into branches.
+
+module attributes {
+    hal.executable.target = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {target_triple="riscv64-unknown-elf"}>
+} {
+  func.func private @gather_lowering(%buffer : memref<32000x2048xf32>, %index : vector<2x64xindex>, %mask : vector<2x64xi1>) -> vector<2x64xf32> {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant dense<0.000000e+00> : vector<2x64xf32>
+    %r = vector.gather %buffer[%c0, %c0] [%index], %mask, %cst : memref<32000x2048xf32>, vector<2x64xindex>, vector<2x64xi1>, vector<2x64xf32> into vector<2x64xf32>
+    return %r : vector<2x64xf32>
+  }
+}
+
+// CHECK-LABEL:   func.func private @gather_lowering(
+// CHECK-NOT: vector.gather
+
+// -----
+
+// Make sure RISC-V with V extension (i.e. RVV) does not break vector.gather
+// into conditional branches (but still lower into 1-D vector.gather).
+
+module attributes {
+    hal.executable.target = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {target_triple="riscv64-unknown-elf", cpu_features ="+v"}>
+} {
+  func.func private @negative_no_gather_lowering(%buffer : memref<32000x2048xf32>, %index : vector<2x64xindex>, %mask : vector<2x64xi1>) -> vector<2x64xf32> {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant dense<0.000000e+00> : vector<2x64xf32>
+    %r = vector.gather %buffer[%c0, %c0] [%index], %mask, %cst : memref<32000x2048xf32>, vector<2x64xindex>, vector<2x64xi1>, vector<2x64xf32> into vector<2x64xf32>
+    return %r : vector<2x64xf32>
+  }
+}
+
+// CHECK: #[[$ATTR_79:.+]] = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {cpu_features = "+v", target_triple = "riscv64-unknown-elf"}>
+// CHECK-LABEL:   func.func private @negative_no_gather_lowering(
+// CHECK-SAME:      %[[ARG0:.*]]: memref<32000x2048xf32>,
+// CHECK-SAME:      %[[ARG1:.*]]: vector<2x64xindex>,
+// CHECK-SAME:      %[[ARG2:.*]]: vector<2x64xi1>) -> vector<2x64xf32> {
+// CHECK:           %[[VAL_0:.*]] = arith.constant dense<0.000000e+00> : vector<64xf32>
+// CHECK:           %[[VAL_1:.*]] = arith.constant 0 : index
+// CHECK:           %[[VAL_2:.*]] = vector.extract %[[ARG1]][0] : vector<64xindex> from vector<2x64xindex>
+// CHECK:           %[[VAL_3:.*]] = vector.extract %[[ARG2]][0] : vector<64xi1> from vector<2x64xi1>
+// CHECK:           %[[VAL_4:.*]] = vector.gather %[[ARG0]]{{\[}}%[[VAL_1]], %[[VAL_1]]] {{\[}}%[[VAL_2]]], %[[VAL_3]], %[[VAL_0]] : memref<32000x2048xf32>, vector<64xindex>, vector<64xi1>, vector<64xf32> into vector<64xf32>
+// CHECK:           %[[VAL_5:.*]] = vector.extract %[[ARG1]][1] : vector<64xindex> from vector<2x64xindex>
+// CHECK:           %[[VAL_6:.*]] = vector.extract %[[ARG2]][1] : vector<64xi1> from vector<2x64xi1>
+// CHECK:           %[[VAL_7:.*]] = vector.gather %[[ARG0]]{{\[}}%[[VAL_1]], %[[VAL_1]]] {{\[}}%[[VAL_5]]], %[[VAL_6]], %[[VAL_0]] : memref<32000x2048xf32>, vector<64xindex>, vector<64xi1>, vector<64xf32> into vector<64xf32>
+// CHECK:           %[[VAL_8:.*]]:64 = vector.to_elements %[[VAL_4]] : vector<64xf32>
+// CHECK:           %[[VAL_9:.*]]:64 = vector.to_elements %[[VAL_7]] : vector<64xf32>
+// CHECK:           %[[VAL_10:.*]] = vector.from_elements %[[VAL_8]]#0, %[[VAL_8]]#1, %[[VAL_8]]#2, %[[VAL_8]]#3, %[[VAL_8]]#4, %[[VAL_8]]#5, %[[VAL_8]]#6, %[[VAL_8]]#7, %[[VAL_8]]#8, %[[VAL_8]]#9, %[[VAL_8]]#10, %[[VAL_8]]#11, %[[VAL_8]]#12, %[[VAL_8]]#13, %[[VAL_8]]#14, %[[VAL_8]]#15, %[[VAL_8]]#16, %[[VAL_8]]#17, %[[VAL_8]]#18, %[[VAL_8]]#19, %[[VAL_8]]#20, %[[VAL_8]]#21, %[[VAL_8]]#22, %[[VAL_8]]#23, %[[VAL_8]]#24, %[[VAL_8]]#25, %[[VAL_8]]#26, %[[VAL_8]]#27, %[[VAL_8]]#28, %[[VAL_8]]#29, %[[VAL_8]]#30, %[[VAL_8]]#31, %[[VAL_8]]#32, %[[VAL_8]]#33, %[[VAL_8]]#34, %[[VAL_8]]#35, %[[VAL_8]]#36, %[[VAL_8]]#37, %[[VAL_8]]#38, %[[VAL_8]]#39, %[[VAL_8]]#40, %[[VAL_8]]#41, %[[VAL_8]]#42, %[[VAL_8]]#43, %[[VAL_8]]#44, %[[VAL_8]]#45, %[[VAL_8]]#46, %[[VAL_8]]#47, %[[VAL_8]]#48, %[[VAL_8]]#49, %[[VAL_8]]#50, %[[VAL_8]]#51, %[[VAL_8]]#52, %[[VAL_8]]#53, %[[VAL_8]]#54, %[[VAL_8]]#55, %[[VAL_8]]#56, %[[VAL_8]]#57, %[[VAL_8]]#58, %[[VAL_8]]#59, %[[VAL_8]]#60, %[[VAL_8]]#61, %[[VAL_8]]#62, %[[VAL_8]]#63, %[[VAL_9]]#0, %[[VAL_9]]#1, %[[VAL_9]]#2, %[[VAL_9]]#3, %[[VAL_9]]#4, %[[VAL_9]]#5, %[[VAL_9]]#6, %[[VAL_9]]#7, %[[VAL_9]]#8, %[[VAL_9]]#9, %[[VAL_9]]#10, %[[VAL_9]]#11, %[[VAL_9]]#12, %[[VAL_9]]#13, %[[VAL_9]]#14, %[[VAL_9]]#15, %[[VAL_9]]#16, %[[VAL_9]]#17, %[[VAL_9]]#18, %[[VAL_9]]#19, %[[VAL_9]]#20, %[[VAL_9]]#21, %[[VAL_9]]#22, %[[VAL_9]]#23, %[[VAL_9]]#24, %[[VAL_9]]#25, %[[VAL_9]]#26, %[[VAL_9]]#27, %[[VAL_9]]#28, %[[VAL_9]]#29, %[[VAL_9]]#30, %[[VAL_9]]#31, %[[VAL_9]]#32, %[[VAL_9]]#33, %[[VAL_9]]#34, %[[VAL_9]]#35, %[[VAL_9]]#36, %[[VAL_9]]#37, %[[VAL_9]]#38, %[[VAL_9]]#39, %[[VAL_9]]#40, %[[VAL_9]]#41, %[[VAL_9]]#42, %[[VAL_9]]#43, %[[VAL_9]]#44, %[[VAL_9]]#45, %[[VAL_9]]#46, %[[VAL_9]]#47, %[[VAL_9]]#48, %[[VAL_9]]#49, %[[VAL_9]]#50, %[[VAL_9]]#51, %[[VAL_9]]#52, %[[VAL_9]]#53, %[[VAL_9]]#54, %[[VAL_9]]#55, %[[VAL_9]]#56, %[[VAL_9]]#57, %[[VAL_9]]#58, %[[VAL_9]]#59, %[[VAL_9]]#60, %[[VAL_9]]#61, %[[VAL_9]]#62, %[[VAL_9]]#63 : vector<2x64xf32>
+// CHECK:           return %[[VAL_10]] : vector<2x64xf32>
+// CHECK:         }
