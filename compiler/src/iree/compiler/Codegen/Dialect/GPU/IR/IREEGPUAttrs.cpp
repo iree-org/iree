@@ -1644,7 +1644,7 @@ LogicalResult ScaledMMAAttr::buildUnderlyingOperations(
   Value zeroScales = arith::ConstantOp::create(
       builder, loc,
       SplatElementsAttr::get(
-          VectorType::get({4}, f8E8M0),
+          VectorType::get({getScalesVectorSize()}, f8E8M0),
           llvm::APFloat::getSmallest(f8E8M0.getFloatSemantics())));
   auto padScales = [&](Value scales) {
     Value scale = vector::ExtractOp::create(builder, loc, scales, 0);
