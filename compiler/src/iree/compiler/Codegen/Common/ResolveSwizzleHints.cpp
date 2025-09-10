@@ -37,14 +37,15 @@ static Value createOrFoldNewStaticAdd(RewriterBase &rewriter, Value v,
   if (auto add = v.getDefiningOp<arith::AddIOp>()) {
     llvm::APInt constant;
     if (matchPattern(add.getRhs(), m_ConstantInt(&constant))) {
-      Value combined = rewriter.create<arith::ConstantIndexOp>(
-          add.getLoc(), offset + constant.getSExtValue());
-      return rewriter.create<arith::AddIOp>(add.getLoc(), add.getLhs(),
-                                            combined, add.getOverflowFlags());
+      Value combined = arith::ConstantIndexOp::create(
+          rewriter, add.getLoc(), offset + constant.getSExtValue());
+      return arith::AddIOp::create(rewriter, add.getLoc(), add.getLhs(),
+                                   combined, add.getOverflowFlags());
     }
   }
-  Value offsetVal = rewriter.create<arith::ConstantIndexOp>(v.getLoc(), offset);
-  return rewriter.create<arith::AddIOp>(v.getLoc(), v, offsetVal);
+  Value offsetVal =
+      arith::ConstantIndexOp::create(rewriter, v.getLoc(), offset);
+  return arith::AddIOp::create(rewriter, v.getLoc(), v, offsetVal);
 }
 
 /// Swizzles vector.load(iree_codegen.swizzle_hint, offset). The
@@ -75,8 +76,8 @@ static void swizzleLoad(RewriterBase &rewriter, vector::LoadOp load,
       VectorType::get({accessWidth}, type.getElementType());
 
   // ~ vector.undef, overwritten by unrolling.
-  Value replacement = rewriter.create<arith::ConstantOp>(
-      hintLoc, type, rewriter.getZeroAttr(type));
+  Value replacement = arith::ConstantOp::create(rewriter, hintLoc, type,
+                                                rewriter.getZeroAttr(type));
 
   // Load type = vector<C>, k = accessWidth
   // i = 0 -> C += k is the offset into the vector of a contiguous group of
@@ -87,11 +88,11 @@ static void swizzleLoad(RewriterBase &rewriter, vector::LoadOp load,
         rewriter, hintLoc,
         hintOp.getSwizzle().swizzleOffset(rewriter, hintOp.getLoc(),
                                           newBaseOffset, hintOp.getOperand()));
-    auto subLoad = rewriter.create<vector::LoadOp>(
-        load.getLoc(), swizzledLoadType, load.getBase(), newOffset);
+    auto subLoad = vector::LoadOp::create(
+        rewriter, load.getLoc(), swizzledLoadType, load.getBase(), newOffset);
 
-    replacement = rewriter.create<vector::InsertStridedSliceOp>(
-        load.getLoc(), subLoad, replacement, ArrayRef<int64_t>{i},
+    replacement = vector::InsertStridedSliceOp::create(
+        rewriter, load.getLoc(), subLoad, replacement, ArrayRef<int64_t>{i},
         ArrayRef<int64_t>{1});
   }
   rewriter.replaceOp(load, replacement);
@@ -121,8 +122,8 @@ static void swizzleStore(RewriterBase &rewriter, vector::StoreOp store,
   // i = 0 -> C += k is the offset into the vector of a contiguous group of
   // swizzled elements.
   for (int64_t i = 0; i < storeWidth; i += accessWidth) {
-    Value subVec = rewriter.create<vector::ExtractStridedSliceOp>(
-        store.getLoc(), store.getValueToStore(), ArrayRef<int64_t>{i},
+    Value subVec = vector::ExtractStridedSliceOp::create(
+        rewriter, store.getLoc(), store.getValueToStore(), ArrayRef<int64_t>{i},
         ArrayRef<int64_t>{accessWidth}, ArrayRef<int64_t>{1});
     Value newBaseOffset = createOrFoldNewStaticAdd(rewriter, memrefOffset, i);
 
@@ -130,8 +131,8 @@ static void swizzleStore(RewriterBase &rewriter, vector::StoreOp store,
         rewriter, hintLoc,
         hintOp.getSwizzle().swizzleOffset(rewriter, hintOp.getLoc(),
                                           newBaseOffset, hintOp.getOperand()));
-    rewriter.create<vector::StoreOp>(store.getLoc(), subVec, store.getBase(),
-                                     newOffset);
+    vector::StoreOp::create(rewriter, store.getLoc(), subVec, store.getBase(),
+                            newOffset);
   }
   rewriter.eraseOp(store);
 }

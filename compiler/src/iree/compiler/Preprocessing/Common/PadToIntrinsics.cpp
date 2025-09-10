@@ -51,11 +51,11 @@ static Value getPaddedValue(RewriterBase &rewriter, Location loc,
       });
   auto paddedResultType =
       RankedTensorType::get(paddedShape, sourceType.getElementType());
-  Value paddingValue = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getZeroAttr(sourceType.getElementType()));
+  Value paddingValue = arith::ConstantOp::create(
+      rewriter, loc, rewriter.getZeroAttr(sourceType.getElementType()));
   SmallVector<OpFoldResult> low(padding.size(), rewriter.getIndexAttr(0));
-  Value paddedResult = rewriter.create<tensor::PadOp>(
-      loc, paddedResultType, padSource, low, padding, paddingValue);
+  Value paddedResult = tensor::PadOp::create(
+      rewriter, loc, paddedResultType, padSource, low, padding, paddingValue);
   return paddedResult;
 }
 
@@ -97,8 +97,8 @@ getExpandedValue(RewriterBase &rewriter, Location loc, Value expandSource,
     }
   }
 
-  return rewriter.create<tensor::ExpandShapeOp>(
-      loc, RankedTensorType::Builder(srcType).setShape(expandedShape),
+  return tensor::ExpandShapeOp::create(
+      rewriter, loc, RankedTensorType::Builder(srcType).setShape(expandedShape),
       expandSource, reassoc);
 }
 
@@ -408,7 +408,7 @@ static void padContractionLikeOp(
         if (!mOperandDimPair)
           return;
         auto [mOperand, mOperandDim] = mOperandDimPair.value();
-        mSizeExpr = rewriter.create<tensor::DimOp>(loc, mOperand, mOperandDim)
+        mSizeExpr = tensor::DimOp::create(rewriter, loc, mOperand, mOperandDim)
                         .getResult();
         dimsToExpandCandidate.emplace_back(mDim, intrinsic.mSizes[0]);
       }
@@ -422,7 +422,7 @@ static void padContractionLikeOp(
         if (!nOperandDimPair)
           return;
         auto [nOperand, nOperandDim] = nOperandDimPair.value();
-        nSizeExpr = rewriter.create<tensor::DimOp>(loc, nOperand, nOperandDim)
+        nSizeExpr = tensor::DimOp::create(rewriter, loc, nOperand, nOperandDim)
                         .getResult();
         dimsToExpandCandidate.emplace_back(nDim, intrinsic.nSizes[0]);
       }
@@ -436,7 +436,7 @@ static void padContractionLikeOp(
         if (!kOperandDimPair)
           return;
         auto [kOperand, kOperandDim] = kOperandDimPair.value();
-        kSizeExpr = rewriter.create<tensor::DimOp>(loc, kOperand, kOperandDim)
+        kSizeExpr = tensor::DimOp::create(rewriter, loc, kOperand, kOperandDim)
                         .getResult();
         dimsToExpandCandidate.emplace_back(kDim, intrinsic.kSizes[0]);
       }
@@ -518,17 +518,17 @@ static void padContractionLikeOp(
     newOuts = getExpandedValue(rewriter, loc, newOuts, outsMap, dimsToExpand);
 
     // Create expanded contractionOp.
-    auto expandedMatmulOp = rewriter.create<linalg::GenericOp>(
-        loc, newOuts.getType(), ValueRange{newLhs, newRhs}, ValueRange{newOuts},
-        expandedMaps, expandedIterators);
+    auto expandedMatmulOp = linalg::GenericOp::create(
+        rewriter, loc, newOuts.getType(), ValueRange{newLhs, newRhs},
+        ValueRange{newOuts}, expandedMaps, expandedIterators);
     expandedMatmulOp.getRegion().takeBody(linalgOp->getRegion(0));
     paddedCompute = expandedMatmulOp.getResults()[0];
 
     // Collapse back to non expanded shape if required.
     if (auto expandOutsOp =
             dyn_cast<tensor::ExpandShapeOp>(newOuts.getDefiningOp())) {
-      paddedCompute = rewriter.create<tensor::CollapseShapeOp>(
-          loc, expandOutsOp.getSrcType(), paddedCompute,
+      paddedCompute = tensor::CollapseShapeOp::create(
+          rewriter, loc, expandOutsOp.getSrcType(), paddedCompute,
           expandOutsOp.getReassociationIndices());
     }
   }

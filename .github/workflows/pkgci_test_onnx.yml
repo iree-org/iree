@@ -26,33 +26,41 @@ jobs:
       matrix:
         include:
           # CPU
-          - name: cpu_llvm_sync
-            config-file: onnx_ops_cpu_llvm_sync.json
+          - name: cpu_llvm_sync_O0
+            config-file: onnx_ops_cpu_llvm_sync_O0.json
+            numprocesses: auto
+            runs-on: ubuntu-24.04
+          - name: cpu_llvm_sync_O2
+            config-file: onnx_ops_cpu_llvm_sync_O2.json
             numprocesses: auto
             runs-on: ubuntu-24.04
 
           # AMD GPU
-          - name: amdgpu_hip_rdna3
+          - name: amdgpu_hip_rdna3_O0
             numprocesses: 1
-            config-file: onnx_ops_gpu_hip_rdna3.json
+            config-file: onnx_ops_gpu_hip_rdna3_O0.json
             runs-on: nodai-amdgpu-w7900-x86-64
-          - name: amdgpu_vulkan
+          - name: amdgpu_hip_rdna3_O3
+            numprocesses: 1
+            config-file: onnx_ops_gpu_hip_rdna3_O3.json
+            runs-on: nodai-amdgpu-w7900-x86-64
+          - name: amdgpu_vulkan_O0
             numprocesses: 4
-            config-file: onnx_ops_gpu_vulkan.json
+            config-file: onnx_ops_gpu_vulkan_O0.json
             runs-on: nodai-amdgpu-w7900-x86-64
 
           # NVIDIA GPU
           # TODO(#18238): migrate to new runner cluster
-          # - name: nvidiagpu_cuda
-          #   config-file: onnx_ops_gpu_cuda.json
+          # - name: nvidiagpu_cuda_O0
+          #   config-file: onnx_ops_gpu_cuda_O0.json
           #   numprocesses: 4
           #   runs-on:
           #     - self-hosted # must come first
           #     - environment=prod
           #     - gpu # TODO(scotttodd): qualify further with vendor/model
           #     - os-family=Linux
-          # - name: nvidiagpu_vulkan
-          #   config-file: onnx_ops_gpu_vulkan.json
+          # - name: nvidiagpu_vulkan_O0
+          #   config-file: onnx_ops_gpu_vulkan_O0.json
           #   numprocesses: 4
           #   runs-on:
           #     - self-hosted # must come first

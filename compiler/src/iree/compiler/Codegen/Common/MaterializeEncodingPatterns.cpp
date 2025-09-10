@@ -61,15 +61,15 @@ FailureOr<Value> lowerSetEncodingOpToPackOp(
     return rewriter.notifyMatchFailure(
         encodingOp, "failed to generate runtime tile size query");
   }
-  Value paddingValue = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getZeroAttr(resultType.getElementType()));
+  Value paddingValue = arith::ConstantOp::create(
+      rewriter, loc, rewriter.getZeroAttr(resultType.getElementType()));
   SmallVector<OpFoldResult> sourceDims =
       tensor::getMixedSizes(rewriter, loc, source);
   SmallVector<OpFoldResult> resultDims = linalg::PackOp::getResultShape(
       rewriter, loc, sourceDims, *innerTileSizesOfr, encodingInfo.innerDimsPos,
       encodingInfo.outerDimsPerm);
-  auto emptyOp = rewriter.create<tensor::EmptyOp>(loc, resultDims,
-                                                  resultType.getElementType());
+  auto emptyOp = tensor::EmptyOp::create(rewriter, loc, resultDims,
+                                         resultType.getElementType());
   return rewriter
       .create<linalg::PackOp>(loc, source, emptyOp, encodingInfo.innerDimsPos,
                               *innerTileSizesOfr, paddingValue,
@@ -94,8 +94,8 @@ FailureOr<Value> lowerUnsetEncodingToUnpackOp(
   SmallVector<OpFoldResult> resultDims =
       getMixedValues(encodingOp.getResultType().getShape(),
                      encodingOp.getResultDims(), rewriter);
-  auto emptyOp = rewriter.create<tensor::EmptyOp>(loc, resultDims,
-                                                  sourceType.getElementType());
+  auto emptyOp = tensor::EmptyOp::create(rewriter, loc, resultDims,
+                                         sourceType.getElementType());
   FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr =
       typeConverter.getInnerTileSizesOfr(rewriter, loc, sourceType,
                                          encodingInfo);
@@ -141,8 +141,8 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
       rewriter, loc, sourceDims, *innerTileSizesOfr, encodingInfo.innerDimsPos,
       encodingInfo.outerDimsPerm);
   newShape = getSwizzledShape(newShape, encodingInfo);
-  Operation *newEmptyOp = rewriter.create<tensor::EmptyOp>(
-      loc, newShape, emptyType.getElementType());
+  Operation *newEmptyOp = tensor::EmptyOp::create(rewriter, loc, newShape,
+                                                  emptyType.getElementType());
   return newEmptyOp;
 }
 
@@ -415,9 +415,10 @@ static FailureOr<Operation *> lowerGenericOpWithEncoding(
             convertedResultType.getShape(),
             cast<RankedTensorType>(t).getElementType());
       });
-  auto materializedGenericOp = rewriter.create<linalg::GenericOp>(
-      genericOp.getLoc(), convertedResultTypes, convertedInputOperands,
-      convertedOutputOperands, packedIndexingMaps, iteratorTypes,
+  auto materializedGenericOp = linalg::GenericOp::create(
+      rewriter, genericOp.getLoc(), convertedResultTypes,
+      convertedInputOperands, convertedOutputOperands, packedIndexingMaps,
+      iteratorTypes,
       /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(genericOp));
   rewriter.inlineRegionBefore(genericOp.getRegion(),
                               materializedGenericOp.getRegion(),
@@ -447,8 +448,8 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
   return TypeSwitch<Operation *, FailureOr<Operation *>>(linalgOp)
       .Case<linalg::FillOp>(
           [&](linalg::FillOp fillOp) -> FailureOr<Operation *> {
-            Operation *materializedFillOp = rewriter.create<linalg::FillOp>(
-                fillOp.getLoc(), convertedOutputOperands[0].getType(),
+            Operation *materializedFillOp = linalg::FillOp::create(
+                rewriter, fillOp.getLoc(), convertedOutputOperands[0].getType(),
                 convertedInputOperands, convertedOutputOperands);
             return materializedFillOp;
           })
@@ -755,8 +756,8 @@ struct SetEncodingOpLoweringConversion
 
     SmallVector<ReassociationIndices> reassociation =
         getReassociationIndices(origRank, encodingInfo.swizzle->expandShape);
-    auto expandShapeOp = rewriter.create<tensor::ExpandShapeOp>(
-        loc, expandShapeType, packedValue.value(), reassociation);
+    auto expandShapeOp = tensor::ExpandShapeOp::create(
+        rewriter, loc, expandShapeType, packedValue.value(), reassociation);
 
     SmallVector<int64_t> transposePerm =
         llvm::to_vector(llvm::seq<int64_t>(0, origRank));
@@ -767,10 +768,11 @@ struct SetEncodingOpLoweringConversion
         tensor::getMixedSizes(rewriter, loc, expandShapeOp.getResult());
     applyPermutationToVector(transposeResultDims, transposePerm);
 
-    auto emptyTensor = rewriter.create<tensor::EmptyOp>(
-        loc, transposeResultDims, encodingOp.getSourceType().getElementType());
-    auto transposeOp = rewriter.create<linalg::TransposeOp>(
-        loc, expandShapeOp, emptyTensor, transposePerm);
+    auto emptyTensor =
+        tensor::EmptyOp::create(rewriter, loc, transposeResultDims,
+                                encodingOp.getSourceType().getElementType());
+    auto transposeOp = linalg::TransposeOp::create(rewriter, loc, expandShapeOp,
+                                                   emptyTensor, transposePerm);
     rewriter.replaceOp(encodingOp, transposeOp->getResult(0));
 
     return success();
@@ -808,8 +810,9 @@ struct UnsetEncodingOpLoweringConversion
       for (auto i : getExpandedTileShape(encodingInfo.swizzle->expandShape)) {
         emptyShape.push_back(rewriter.getIndexAttr(i));
       }
-      auto emptyTensor = rewriter.create<tensor::EmptyOp>(
-          loc, emptyShape, unsetEncodingOp.getSourceType().getElementType());
+      auto emptyTensor = tensor::EmptyOp::create(
+          rewriter, loc, emptyShape,
+          unsetEncodingOp.getSourceType().getElementType());
 
       SmallVector<int64_t> transposePerm =
           llvm::to_vector(llvm::seq<int64_t>(0, targetRank));
@@ -817,8 +820,9 @@ struct UnsetEncodingOpLoweringConversion
         transposePerm.push_back(targetRank + perm);
       }
       auto invertedTransposePerm = invertPermutationVector(transposePerm);
-      auto transposeOp = rewriter.create<linalg::TransposeOp>(
-          loc, adaptor.getSource(), emptyTensor, invertedTransposePerm);
+      auto transposeOp =
+          linalg::TransposeOp::create(rewriter, loc, adaptor.getSource(),
+                                      emptyTensor, invertedTransposePerm);
 
       SmallVector<ReassociationIndices> reassociation = getReassociationIndices(
           targetRank, encodingInfo.swizzle->expandShape);
@@ -828,8 +832,9 @@ struct UnsetEncodingOpLoweringConversion
                             encodingInfo.innerTileSizes.end());
       RankedTensorType unpackSrcType =
           unsetEncodingOp.getResultType().clone(unpackSrcShape);
-      unpackSrc = rewriter.create<tensor::CollapseShapeOp>(
-          loc, unpackSrcType, transposeOp->getResult(0), reassociation);
+      unpackSrc = tensor::CollapseShapeOp::create(rewriter, loc, unpackSrcType,
+                                                  transposeOp->getResult(0),
+                                                  reassociation);
     }
 
     auto unpackedValue = lowerUnsetEncodingToUnpackOp(rewriter, unsetEncodingOp,

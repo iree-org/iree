@@ -23,15 +23,7 @@ endif()
     inline = True,
 )
 
-# Target archs for specialization patternsets. https://llvm.org/docs/AMDGPUUsage.html#processors
-gpu_archs = [
-    "gfx942",
-]
-
-ukernel_patterns_mlir_files = [
-    "ukernel_patterns_%s.mlir" % gpu_arch
-    for gpu_arch in gpu_archs
-]
+ukernel_patterns_mlir_files = glob(["ukernel_patterns_*.mlir"])
 
 iree_c_embed_data(
     name = "iree_mlir_ukernel_patterns_amdgpu",
@@ -57,7 +49,8 @@ iree_c_embed_data(
     srcs = [
         "iree_uk_amdgpu_matmul_bf16.mlir",
         "iree_uk_amdgpu_matmul_f16.mlir",
-        "iree_uk_amdgpu_matmul_f8.mlir",
+        "iree_uk_amdgpu_matmul_f8E4M3FN.mlir",
+        "iree_uk_amdgpu_matmul_f8E4M3FNUZ.mlir",
     ],
     c_file_output = "iree_mlir_ukernels_amdgpu.c",
     flatten = True,
@@ -71,7 +64,8 @@ iree_lit_test_suite(
     srcs = [
         "iree_uk_amdgpu_matmul_bf16.mlir",
         "iree_uk_amdgpu_matmul_f16.mlir",
-        "iree_uk_amdgpu_matmul_f8.mlir",
+        "iree_uk_amdgpu_matmul_f8E4M3FN.mlir",
+        "iree_uk_amdgpu_matmul_f8E4M3FNUZ.mlir",
     ],
     cfg = "//compiler:lit.cfg.py",
     tools = [

@@ -409,7 +409,7 @@ def gpu_target_info_attribute_parsing():
                     storage = b64,
                     subgroup = none,
                     dot = none,
-                    mma = [<MFMA_F32_16x16x4_F32>],
+                    mma = [<MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>],
                     subgroup_size_choices = [32, 64],
                     max_workgroup_sizes = [256, 512, 1024],
                     max_thread_count_per_workgroup = 1024,
@@ -429,7 +429,7 @@ def gpu_target_info_attribute_parsing():
     variant_op = variant_op_list[0]
     executable_variant_op = variant_op.opview
     target = executable_variant_op.target
-    gpu_target_info = iree_gpu.get_gpu_target_info(target)
+    gpu_target_info = iree_gpu.TargetInfo.get_gpu_target_info(target)
 
     arch = gpu_target_info.arch
     assert arch == "gfx942", f"Expected arch 'gfx942', got '{arch}'"
@@ -456,3 +456,147 @@ def gpu_target_info_attribute_parsing():
         512,
         1024,
     ], f"Expected max_workgroup_sizes [256, 512, 1024], got {max_workgroup_sizes}"
+
+    mma_intrinsics = gpu_target_info.mma_intrinsics
+    assert mma_intrinsics == [
+        iree_gpu.MMAIntrinsic.MFMA_F32_16x16x4_F32,
+        iree_gpu.MMAIntrinsic.MFMA_F32_16x16x16_F16,
+        iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_16x16x32_F16,
+    ], f"Expected mma_intrinsics [MFMA_F32_16x16x4_F32, MFMA_F32_16x16x16_F16, VMFMA_F32_16x16x32_F16], got {mma_intrinsics}"
+
+
+@run
+def gpu_target_info_constructor():
+    context = ir.Context()
+
+    target_info = iree_gpu.TargetInfo(
+        context=context,
+        arch="gfx942",
+        subgroup_size_choices=[32, 64],
+        max_workgroup_sizes=[256, 512, 1024],
+        max_thread_count_per_workgroup=1024,
+        max_workgroup_memory_bytes=65536,
+        mma_intrinsics=[
+            iree_gpu.MMAIntrinsic.MFMA_F32_16x16x4_F32,
+            iree_gpu.MMAIntrinsic.MFMA_F32_16x16x16_F16,
+            iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_16x16x32_F16,
+        ],
+    )
+
+    assert (
+        target_info.arch == "gfx942"
+    ), f"Expected arch 'gfx942', got '{target_info.arch}'"
+    assert target_info.subgroup_size_choices == [
+        32,
+        64,
+    ], f"Expected subgroup_size_choices [32, 64], got {target_info.subgroup_size_choices}"
+    assert target_info.max_workgroup_sizes == [
+        256,
+        512,
+        1024,
+    ], f"Expected max_workgroup_sizes [256, 512, 1024], got {target_info.max_workgroup_sizes}"
+    assert (
+        target_info.max_thread_count_per_workgroup == 1024
+    ), f"Expected max_thread_count_per_workgroup 1024, got {target_info.max_thread_count_per_workgroup}"
+    assert (
+        target_info.max_workgroup_memory_bytes == 65536
+    ), f"Expected max_workgroup_memory_bytes 65536, got {target_info.max_workgroup_memory_bytes}"
+    mma_intrinsics = target_info.mma_intrinsics
+    assert mma_intrinsics == [
+        iree_gpu.MMAIntrinsic.MFMA_F32_16x16x4_F32,
+        iree_gpu.MMAIntrinsic.MFMA_F32_16x16x16_F16,
+        iree_gpu.VirtualMMAIntrinsic.VMFMA_F32_16x16x32_F16,
+    ], f"Expected mma_intrinsics [MFMA_F32_16x16x4_F32, MFMA_F32_16x16x16_F16, VMFMA_F32_16x16x32_F16], got {mma_intrinsics}"
+
+    assert isinstance(mma_intrinsics[0], iree_gpu.MMAIntrinsic)
+    assert isinstance(mma_intrinsics[1], iree_gpu.MMAIntrinsic)
+    assert isinstance(mma_intrinsics[2], iree_gpu.VirtualMMAIntrinsic)
+
+
+@run
+def gpu_target_info_constructor_error_cases():
+    context = ir.Context()
+
+    try:
+        iree_gpu.TargetInfo(
+            context=context,
+            arch=123,  # should be string.
+            subgroup_size_choices=[32, 64],
+            max_workgroup_sizes=[256, 512, 1024],
+            max_thread_count_per_workgroup=1024,
+            max_workgroup_memory_bytes=65536,
+            mma_intrinsics=[],
+        )
+        assert False, "Expected TypeError for wrong arch type"
+    except TypeError:
+        pass
+
+    try:
+        iree_gpu.TargetInfo(
+            context=context,
+            arch="gfx942",
+            subgroup_size_choices=[64.0],  # should be list of int.
+            max_workgroup_sizes=[256, 512, 1024],
+            max_thread_count_per_workgroup=1024,
+            max_workgroup_memory_bytes=65536,
+            mma_intrinsics=[],
+        )
+        assert False, "Expected TypeError for wrong subgroup_size_choices type"
+    except TypeError:
+        pass
+
+    try:
+        iree_gpu.TargetInfo(
+            context=context,
+            arch="gfx942",
+            subgroup_size_choices=[32, 64],
+            max_workgroup_sizes=[256.0, 512, 1024],  # should be list of int.
+            max_thread_count_per_workgroup=1024,
+            max_workgroup_memory_bytes=65536,
+            mma_intrinsics=[],
+        )
+        assert False, "Expected TypeError for wrong max_workgroup_sizes type"
+    except TypeError:
+        pass
+
+    try:
+        iree_gpu.TargetInfo(
+            context=context,
+            arch="gfx942",
+            subgroup_size_choices=[32, 64],
+            max_workgroup_sizes=[256, 512, 1024],
+            max_thread_count_per_workgroup=1024.0,  # should be int.
+            max_workgroup_memory_bytes=65536,
+            mma_intrinsics=[],
+        )
+        assert False, "Expected TypeError for wrong max_thread_count_per_workgroup type"
+    except TypeError:
+        pass
+
+    try:
+        iree_gpu.TargetInfo(
+            context=context,
+            arch="gfx942",
+            subgroup_size_choices=[32, 64],
+            max_workgroup_sizes=[256, 512, 1024],
+            max_thread_count_per_workgroup=1024,
+            max_workgroup_memory_bytes=65536.0,  # should be int.
+            mma_intrinsics=[],
+        )
+        assert False, "Expected TypeError for wrong max_workgroup_memory_bytes type"
+    except TypeError:
+        pass
+
+    try:
+        iree_gpu.TargetInfo(
+            context=context,
+            arch="gfx942",
+            subgroup_size_choices=[32, 64],
+            max_workgroup_sizes=[256, 512, 1024],
+            max_thread_count_per_workgroup=1024,
+            max_workgroup_memory_bytes=65536,
+            mma_intrinsics=[123],  # should be MMA intrinsic objects.
+        )
+        assert False, "Expected TypeError for wrong MMA intrinsic object type"
+    except TypeError:
+        pass

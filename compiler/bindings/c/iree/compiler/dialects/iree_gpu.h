@@ -14,6 +14,11 @@
 extern "C" {
 #endif
 
+// This typedef ensures consistency between the C API, C++ implementation, and
+// Python bindings. Update both this typedef and the static assertions if the
+// enum underlying types change.
+typedef uint32_t mma_intrinsic_enum_t;
+
 // The following C API is **NOT STABLE** and likely to change in the future.
 // It mirrors the IREE GPU Dialect which is not stable itself.
 
@@ -56,35 +61,37 @@ MLIR_CAPI_EXPORTED bool ireeAttributeIsAGPUMMAIntrinsicAttr(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED MlirTypeID ireeGPUMMAIntrinsicAttrGetTypeID(void);
 
-MLIR_CAPI_EXPORTED MlirAttribute ireeGPUMMAIntrinsicAttrGet(MlirContext mlirCtx,
-                                                            uint32_t value);
+MLIR_CAPI_EXPORTED MlirAttribute
+ireeGPUMMAIntrinsicAttrGet(MlirContext mlirCtx, mma_intrinsic_enum_t value);
 
-MLIR_CAPI_EXPORTED uint32_t ireeGPUMMAIntrinsicAttrGetValue(MlirAttribute attr);
+MLIR_CAPI_EXPORTED mma_intrinsic_enum_t
+ireeGPUMMAIntrinsicAttrGetValue(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED bool ireeAttributeIsAGPUMMAAttr(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED MlirTypeID ireeGPUMMAAttrGetTypeID(void);
 
 MLIR_CAPI_EXPORTED MlirAttribute ireeGPUMMAAttrGet(MlirContext mlirCtx,
-                                                   uint32_t value);
+                                                   mma_intrinsic_enum_t value);
 
 MLIR_CAPI_EXPORTED bool
 ireeAttributeIsAGPUVirtualMMAIntrinsicAttr(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED MlirTypeID ireeGPUVirtualMMAIntrinsicAttrGetTypeID(void);
 
-MLIR_CAPI_EXPORTED MlirAttribute
-ireeGPUVirtualMMAIntrinsicAttrGet(MlirContext mlirCtx, uint32_t value);
+MLIR_CAPI_EXPORTED MlirAttribute ireeGPUVirtualMMAIntrinsicAttrGet(
+    MlirContext mlirCtx, mma_intrinsic_enum_t value);
 
-MLIR_CAPI_EXPORTED uint32_t
+MLIR_CAPI_EXPORTED mma_intrinsic_enum_t
 ireeGPUVirtualMMAIntrinsicAttrGetValue(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED bool ireeAttributeIsAGPUVirtualMMAAttr(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED MlirTypeID ireeGPUVirtualMMAAttrGetTypeID(void);
 
-MLIR_CAPI_EXPORTED MlirAttribute ireeGPUVirtualMMAAttrGet(MlirContext mlirCtx,
-                                                          uint32_t value);
+MLIR_CAPI_EXPORTED MlirAttribute
+ireeGPUVirtualMMAAttrGet(MlirContext mlirCtx, mma_intrinsic_enum_t value);
+
 struct ireeGPUMMAInfo {
   MlirType aElementType;
   MlirType bElementType;
@@ -148,13 +155,31 @@ struct ireeGPUTargetInfo {
   MlirIdentifier arch;                // E.g., "gfx942".
   MlirAttribute subgroupSizeChoices;  // Subgroup size choices.
   MlirAttribute maxWorkgroupSizes;    // Max threads per X/Y/Z dimension.
-  int64_t maxThreadCountPerWorkgroup; // Max threads per workgroup.
-  int64_t maxWorkgroupMemoryBytes;    // Max workgroup memory.
+  int32_t maxThreadCountPerWorkgroup; // Max threads per workgroup.
+  int32_t maxWorkgroupMemoryBytes;    // Max workgroup memory.
+  MlirAttribute mmaIntrinsics;        // MMA Intrinsics.
 };
 
 // Queries GPU target info from the given `ExecutableTargetAttr` attribute.
 MLIR_CAPI_EXPORTED ireeGPUTargetInfo
 ireeHALExecutableTargetAttrGetGPUTargetInfo(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED ireeGPUTargetInfo ireeGPUTargetInfoGet(
+    MlirContext mlirCtx, const char *arch, const int32_t *subgroupChoices,
+    size_t numSubgroupChoices, const int32_t *workgroupSizes,
+    size_t numWorkgroupSizes, int32_t threadCount, int32_t memoryBytes,
+    const mma_intrinsic_enum_t *mmaIntrinsics, size_t numMmaIntrinsics);
+
+// Extracts MMA intrinsic values and their virtual status from an ArrayAttr.
+//
+// mmaIntrinsics: Array attribute containing MMA intrinsic attributes.
+// mmaIntrinsicVals: Output array for MMA intrinsic enum values.
+// virtualMmaIntrinsicTags: Output array - 1 if VirtualMMAIntrinsic, 0 if
+// MMAIntrinsic.
+MLIR_CAPI_EXPORTED void
+ireeGPUTargetInfoGetMMAIntrinsics(MlirAttribute mmaIntrinsics,
+                                  mma_intrinsic_enum_t *mmaIntrinsicVals,
+                                  uint8_t *virtualMmaIntrinsicTags);
 
 #ifdef __cplusplus
 }

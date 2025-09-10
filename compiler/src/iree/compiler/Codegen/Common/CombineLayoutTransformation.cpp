@@ -134,10 +134,12 @@ foldReshapeIntoMapScatter(RewriterBase &rewriter, ReshapeOpTy reshapeOp,
 
   auto indexTransformBuilder =
       [&](ArrayRef<BlockArgument> srcIndices) -> SmallVector<Value> {
-    auto linearizeIndexOp = rewriter.create<affine::AffineLinearizeIndexOp>(
-        mapScatterOp->getLoc(), srcIndices, srcDims, /*disjoint=*/true);
-    auto delinearizeIndexOp = rewriter.create<affine::AffineDelinearizeIndexOp>(
-        mapScatterOp->getLoc(), linearizeIndexOp.getResult(), resultDims,
+    auto linearizeIndexOp = affine::AffineLinearizeIndexOp::create(
+        rewriter, mapScatterOp->getLoc(), srcIndices, srcDims,
+        /*disjoint=*/true);
+    auto delinearizeIndexOp = affine::AffineDelinearizeIndexOp::create(
+        rewriter, mapScatterOp->getLoc(), linearizeIndexOp.getResult(),
+        resultDims,
         /*hasOuterBound=*/true);
     return delinearizeIndexOp->getResults();
   };
@@ -221,7 +223,7 @@ foldExtractSliceIntoMapScatter(RewriterBase &rewriter,
             .create<arith::CmpIOp>(loc, arith::CmpIPredicate::ult, srcIdx,
                                    boundValue)
             ->getResult(0);
-    mask = rewriter.create<arith::AndIOp>(loc, mask, isOutOfBounds);
+    mask = arith::AndIOp::create(rewriter, loc, mask, isOutOfBounds);
   }
   rewriter.modifyOpInPlace(yieldOp, [&]() {
     yieldOp->setOperand(yieldOp->getNumOperands() - 1, mask);
@@ -240,8 +242,8 @@ static void buildNestedDistributionLoops(
   DistributionConfig distConfig = distConfigs[distributionLevel];
   SmallVector<OpFoldResult> steps =
       getAsIndexOpFoldResult(rewriter.getContext(), distConfig.tileSizes);
-  rewriter.create<scf::ForallOp>(
-      loc, lbs, ubs, steps, /*outputs=*/ValueRange(),
+  scf::ForallOp::create(
+      rewriter, loc, lbs, ubs, steps, /*outputs=*/ValueRange(),
       rewriter.getArrayAttr(distConfig.mapping),
       /*bodyBuilder=*/[&](OpBuilder &b, Location nestedLoc, ValueRange ivs) {
         SmallVector<OpFoldResult> nestedLbs(ivs);
@@ -260,7 +262,7 @@ static void buildNestedDistributionLoops(
           buildNestedDistributionLoops(
               rewriter, nestedLoc, distributionLevel + 1, nestedLbs, nestedUbs,
               distConfigs, innerLoopBuilder);
-          b.create<scf::InParallelOp>(nestedLoc);
+          scf::InParallelOp::create(b, nestedLoc);
           return;
         }
         // Otherwise, tile to one, and generate the inner loop body.
@@ -268,11 +270,11 @@ static void buildNestedDistributionLoops(
             getValueOrCreateConstantIndexOp(b, nestedLoc, nestedLbs);
         SmallVector<Value> nestedUbVals =
             getValueOrCreateConstantIndexOp(b, nestedLoc, nestedUbs);
-        Value one = rewriter.create<arith::ConstantIndexOp>(nestedLoc, 1);
+        Value one = arith::ConstantIndexOp::create(rewriter, nestedLoc, 1);
         SmallVector<Value> unitSteps(nestedLbs.size(), one);
         scf::buildLoopNest(rewriter, nestedLoc, nestedLbVals, nestedUbVals,
                            unitSteps, innerLoopBuilder);
-        b.create<scf::InParallelOp>(nestedLoc);
+        scf::InParallelOp::create(b, nestedLoc);
       });
 }
 
@@ -324,11 +326,12 @@ foldPadIntoMapScatter(RewriterBase &rewriter, tensor::PadOp padOp,
     Value mask = storeIndices.pop_back_val();
     // Create the store to the outputBuffer.
     auto thenBuilder = [&](OpBuilder &nestedBuilder, Location ifLoc) {
-      nestedBuilder.create<memref::StoreOp>(
-          ifLoc, padOp.getConstantPaddingValue(), outputBuffer, storeIndices);
-      nestedBuilder.create<scf::YieldOp>(ifLoc);
+      memref::StoreOp::create(nestedBuilder, ifLoc,
+                              padOp.getConstantPaddingValue(), outputBuffer,
+                              storeIndices);
+      scf::YieldOp::create(nestedBuilder, ifLoc);
     };
-    b.create<scf::IfOp>(loopLoc, mask, thenBuilder);
+    scf::IfOp::create(b, loopLoc, mask, thenBuilder);
   };
 
   // Distribute the padding of each dimension separately. This causes some
@@ -439,7 +442,7 @@ static MapScatterOp insertIdentityMapScatter(RewriterBase &rewriter,
   Type elementType = cast<RankedTensorType>(root.getType()).getElementType();
   SmallVector<OpFoldResult> sizes = tensor::getMixedSizes(rewriter, loc, root);
   Value mapScatterDest =
-      rewriter.create<tensor::EmptyOp>(loc, sizes, elementType);
+      tensor::EmptyOp::create(rewriter, loc, sizes, elementType);
   auto mapScatterOp = MapScatterOp::createIdentityMapScatter(
       rewriter, loc, root, mapScatterDest);
   rewriter.replaceUsesWithIf(
@@ -453,6 +456,15 @@ bool isSupportedRelayoutOp(Operation *op) {
   return isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp,
              tensor::ExtractSliceOp, tensor::PadOp, linalg::CopyOp,
              linalg::TransposeOp>(op);
+}
+
+// This is only desirable in the dispatch scope but not in the workgroup scope.
+static bool
+shouldDoReshapesByExpansion(IREE::Codegen::RelayoutCombinationScope scope) {
+  if (scope == IREE::Codegen::RelayoutCombinationScope::Dispatch) {
+    return true;
+  }
+  return false;
 }
 
 /// Insert identity map_scatter ops after the given operation if it is a valid
@@ -497,6 +509,7 @@ private:
 LogicalResult
 combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
                             PadDistributionConfigFn padDistributionConfigFn,
+                            bool doReshapeByExpansion,
                             CombineRelayoutOpsControlFnRef controlFn) {
   // Sink relayout operations to the end of the funcOp.
   RewritePatternSet propagationPatterns(ctx);
@@ -504,13 +517,16 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
   tensor::ExpandShapeOp::getCanonicalizationPatterns(propagationPatterns, ctx);
   tensor::CollapseShapeOp::getCanonicalizationPatterns(propagationPatterns,
                                                        ctx);
-  // Only sink reshape ops, so bail if the consumer operation is a reshape.
-  auto controlSinkReshapesFn = [](OpOperand *operand) -> bool {
-    Operation *consumer = operand->getOwner();
-    return !llvm::isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp>(consumer);
-  };
-  linalg::populateFoldReshapeOpsByExpansionPatterns(propagationPatterns,
-                                                    controlSinkReshapesFn);
+  if (doReshapeByExpansion) {
+    // Only sink reshape ops, so bail if the consumer operation is a reshape.
+    auto controlSinkReshapesFn = [](OpOperand *operand) -> bool {
+      Operation *consumer = operand->getOwner();
+      return !llvm::isa<tensor::ExpandShapeOp, tensor::CollapseShapeOp>(
+          consumer);
+    };
+    linalg::populateFoldReshapeOpsByExpansionPatterns(propagationPatterns,
+                                                      controlSinkReshapesFn);
+  }
   // Only sink unpack ops, so bail if the producer operation is not an unpack.
   // Also only sink unpack ops when new pack operations will not be created.
   // This means the consumer op must have at most one additional destination
@@ -671,9 +687,11 @@ struct CombineLayoutTransformationPass final
   void runOnOperation() override {
     CombineRelayoutOpsControlFn controlFn =
         getCombineRelayoutOpsControlFn(this->scope);
-    if (failed(combineLayoutTransformation(
-            &getContext(), getOperation(),
-            defaultPadWorkgroupDistributionConfigFn, controlFn))) {
+    bool doReshapesByExpansion = shouldDoReshapesByExpansion(this->scope);
+    if (failed(
+            combineLayoutTransformation(&getContext(), getOperation(),
+                                        defaultPadWorkgroupDistributionConfigFn,
+                                        doReshapesByExpansion, controlFn))) {
       return signalPassFailure();
     }
 

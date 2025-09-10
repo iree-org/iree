@@ -121,12 +121,12 @@ static Value getMaskValue(RewriterBase &rewriter, Operation *op) {
     int64_t sliceNum = maybeExtractOp.getStaticPosition()[0];
     // TODO: to support >2-D mask + extract, and all the cmp.
     Location loc = op->getLoc();
-    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    Value cmp = rewriter.create<arith::CmpIOp>(
-        loc, arith::CmpIPredicate::slt,
-        rewriter.create<arith::ConstantIndexOp>(loc, sliceNum),
+    Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    Value cmp = arith::CmpIOp::create(
+        rewriter, loc, arith::CmpIPredicate::slt,
+        arith::ConstantIndexOp::create(rewriter, loc, sliceNum),
         maskResult.maskOp->getOperands().front());
-    count = rewriter.create<arith::SelectOp>(loc, cmp, count, zero);
+    count = arith::SelectOp::create(rewriter, loc, cmp, count, zero);
   }
   return count;
 }
@@ -300,8 +300,8 @@ void createAsyncGroups(RewriterBase &rewriter, mlir::FunctionOpInterface funcOp,
           (dstMemref.getElementTypeBitWidth() * numElements) / 8;
       UnitAttr bypassL1 =
           useMMASync && sizeInBytes == 16 ? rewriter.getUnitAttr() : UnitAttr();
-      Value token = rewriter.create<nvgpu::DeviceAsyncCopyOp>(
-          writeOp->getLoc(),
+      Value token = nvgpu::DeviceAsyncCopyOp::create(
+          rewriter, writeOp->getLoc(),
           nvgpu::DeviceAsyncTokenType::get(funcOp.getContext()), storeBase,
           getIndices(writeOp), loadBase, getIndices(readOp),
           rewriter.getIndexAttr(numElements), mask,
@@ -309,11 +309,11 @@ void createAsyncGroups(RewriterBase &rewriter, mlir::FunctionOpInterface funcOp,
       tokens.push_back(token);
     }
     // Create the group and wait for it right after.
-    Value groupToken = rewriter.create<nvgpu::DeviceAsyncCreateGroupOp>(
-        funcOp.getLoc(), nvgpu::DeviceAsyncTokenType::get(funcOp.getContext()),
-        tokens);
-    rewriter.create<nvgpu::DeviceAsyncWaitOp>(funcOp.getLoc(), groupToken,
-                                              nullptr);
+    Value groupToken = nvgpu::DeviceAsyncCreateGroupOp::create(
+        rewriter, funcOp.getLoc(),
+        nvgpu::DeviceAsyncTokenType::get(funcOp.getContext()), tokens);
+    nvgpu::DeviceAsyncWaitOp::create(rewriter, funcOp.getLoc(), groupToken,
+                                     nullptr);
     // Clean up old stores.
     for (Operation *writeOp : group)
       rewriter.eraseOp(writeOp);
@@ -341,7 +341,7 @@ void reorderTranspose(RewriterBase &rewriter,
     SmallVector<Value> transposedOperands;
     for (auto operand : op->getOperands()) {
       Value transposed =
-          rewriter.create<vector::TransposeOp>(op->getLoc(), operand, perm);
+          vector::TransposeOp::create(rewriter, op->getLoc(), operand, perm);
       transposedOperands.push_back(transposed);
     }
     SmallVector<Type> resultTypes{transposedOperands.front().getType()};
@@ -377,13 +377,14 @@ void addBarrier(mlir::FunctionOpInterface funcOp, Operation *alloc,
   OpBuilder builder(alloc);
   // TODO: make it a option if needed.
   if (hasAsyncCopies) {
-    Value groupToken = builder.create<nvgpu::DeviceAsyncCreateGroupOp>(
-        funcOp.getLoc(), nvgpu::DeviceAsyncTokenType::get(funcOp.getContext()),
+    Value groupToken = nvgpu::DeviceAsyncCreateGroupOp::create(
+        builder, funcOp.getLoc(),
+        nvgpu::DeviceAsyncTokenType::get(funcOp.getContext()),
         SmallVector<Value>());
-    builder.create<nvgpu::DeviceAsyncWaitOp>(funcOp.getLoc(), groupToken,
-                                             builder.getI32IntegerAttr(0));
+    nvgpu::DeviceAsyncWaitOp::create(builder, funcOp.getLoc(), groupToken,
+                                     builder.getI32IntegerAttr(0));
   }
-  builder.create<gpu::BarrierOp>(alloc->getLoc());
+  gpu::BarrierOp::create(builder, alloc->getLoc());
 }
 
 void packSharedMemoryAlloc(mlir::FunctionOpInterface funcOp) {

@@ -167,8 +167,8 @@ static Value staticallyInsertSubvector(OpBuilder &rewriter, Location loc,
 
   auto offsets = rewriter.getI64ArrayAttr({offset});
   auto strides = rewriter.getI64ArrayAttr({1});
-  return rewriter.create<vector::InsertStridedSliceOp>(loc, destVecTy, src,
-                                                       dest, offsets, strides);
+  return vector::InsertStridedSliceOp::create(rewriter, loc, destVecTy, src,
+                                              dest, offsets, strides);
 }
 
 /// Extract `sliceNumElements` from source `vector` at `extractOffset`,
@@ -195,8 +195,9 @@ static Value extractSliceIntoByte(ConversionPatternRewriter &rewriter,
   assert(8 % vectorElementType.getIntOrFloatBitWidth() == 0 &&
          "vector element must be a valid sub-byte type");
   auto emulatedPerContainerElem = 8 / vectorElementType.getIntOrFloatBitWidth();
-  auto emptyByteVector = rewriter.create<arith::ConstantOp>(
-      loc, VectorType::get({emulatedPerContainerElem}, vectorElementType),
+  auto emptyByteVector = arith::ConstantOp::create(
+      rewriter, loc,
+      VectorType::get({emulatedPerContainerElem}, vectorElementType),
       rewriter.getZeroAttr(
           VectorType::get({emulatedPerContainerElem}, vectorElementType)));
   auto extracted = staticallyExtractSubvector(rewriter, loc, vector,
@@ -216,16 +217,17 @@ static Value downcastSelectAndUpcast(OpBuilder &builder, Location loc,
           upcastType.getNumElements() * upcastType.getElementTypeBitWidth() &&
       "expected input and output number of bits to match");
   if (trueValue.getType() != downcastType) {
-    trueValue = builder.create<vector::BitCastOp>(loc, downcastType, trueValue);
+    trueValue =
+        vector::BitCastOp::create(builder, loc, downcastType, trueValue);
   }
   if (falseValue.getType() != downcastType) {
     falseValue =
-        builder.create<vector::BitCastOp>(loc, downcastType, falseValue);
+        vector::BitCastOp::create(builder, loc, downcastType, falseValue);
   }
   Value selectedType =
-      builder.create<arith::SelectOp>(loc, mask, trueValue, falseValue);
+      arith::SelectOp::create(builder, loc, mask, trueValue, falseValue);
   // Upcast the selected value to the new type.
-  return builder.create<vector::BitCastOp>(loc, upcastType, selectedType);
+  return vector::BitCastOp::create(builder, loc, upcastType, selectedType);
 }
 
 /// Emits `memref.generic_atomic_rmw` op to store a subbyte-sized value to a
@@ -248,8 +250,8 @@ static void atomicRMW(OpBuilder &builder, Location loc,
 
   // Create an atomic load-modify-write region using
   // `memref.generic_atomic_rmw`.
-  auto atomicOp = builder.create<memref::GenericAtomicRMWOp>(
-      loc, linearizedMemref, ValueRange{storeIdx});
+  auto atomicOp = memref::GenericAtomicRMWOp::create(
+      builder, loc, linearizedMemref, ValueRange{storeIdx});
   Value origValue = atomicOp.getCurrentValue();
 
   OpBuilder::InsertionGuard guard(builder);
@@ -258,16 +260,16 @@ static void atomicRMW(OpBuilder &builder, Location loc,
   // Load the original value from memory, and cast it to the original element
   // type.
   auto oneElemVecType = VectorType::get({1}, origValue.getType());
-  Value origVecValue = builder.create<vector::FromElementsOp>(
-      loc, oneElemVecType, ValueRange{origValue});
+  Value origVecValue = vector::FromElementsOp::create(
+      builder, loc, oneElemVecType, ValueRange{origValue});
 
   // Construct the final masked value and yield it.
   Value maskedValue =
       downcastSelectAndUpcast(builder, loc, valueToStore.getType(),
                               oneElemVecType, mask, valueToStore, origVecValue);
   auto scalarMaskedValue =
-      builder.create<vector::ExtractOp>(loc, maskedValue, 0);
-  builder.create<memref::AtomicYieldOp>(loc, scalarMaskedValue);
+      vector::ExtractOp::create(builder, loc, maskedValue, 0);
+  memref::AtomicYieldOp::create(builder, loc, scalarMaskedValue);
 }
 
 /// Generate a non-atomic read-modify-write sequence for storing to the emulated
@@ -279,16 +281,17 @@ static void nonAtomicRMW(OpBuilder &builder, Location loc,
 
   auto oneElemVecType =
       VectorType::get({1}, linearizedMemref.getType().getElementType());
-  Value origVecValue = builder.create<vector::LoadOp>(
-      loc, oneElemVecType, linearizedMemref, ValueRange{linearizedIndex});
-  origVecValue = builder.create<vector::BitCastOp>(loc, valueToStore.getType(),
-                                                   origVecValue);
+  Value origVecValue =
+      vector::LoadOp::create(builder, loc, oneElemVecType, linearizedMemref,
+                             ValueRange{linearizedIndex});
+  origVecValue = vector::BitCastOp::create(builder, loc, valueToStore.getType(),
+                                           origVecValue);
 
   Value maskedValue =
       downcastSelectAndUpcast(builder, loc, valueToStore.getType(),
                               oneElemVecType, mask, valueToStore, origVecValue);
-  builder.create<vector::StoreOp>(loc, maskedValue, linearizedMemref,
-                                  linearizedIndex);
+  vector::StoreOp::create(builder, loc, maskedValue, linearizedMemref,
+                          linearizedIndex);
 }
 
 // Emulate `vector.store` using a multi-byte container type.
@@ -382,7 +385,7 @@ struct IREEConvertVectorStore final : OpConversionPattern<vector::StoreOp> {
     bool isDivisibleInSize = origElements % emulatedPerContainerElem == 0;
 
     auto stridedMetadata =
-        rewriter.create<memref::ExtractStridedMetadataOp>(loc, op.getBase());
+        memref::ExtractStridedMetadataOp::create(rewriter, loc, op.getBase());
 
     OpFoldResult linearizedIndices;
     memref::LinearizedMemRefInfo linearizedInfo;
@@ -418,8 +421,8 @@ struct IREEConvertVectorStore final : OpConversionPattern<vector::StoreOp> {
     if (!emulationRequiresPartialStores) {
       // Basic case: storing full bytes.
       auto numElements = origElements / emulatedPerContainerElem;
-      auto bitCast = rewriter.create<vector::BitCastOp>(
-          loc, VectorType::get(numElements, containerElemTy),
+      auto bitCast = vector::BitCastOp::create(
+          rewriter, loc, VectorType::get(numElements, containerElemTy),
           op.getValueToStore());
       rewriter.replaceOpWithNewOp<vector::StoreOp>(
           op, bitCast.getResult(), memrefBase,
@@ -486,8 +489,9 @@ struct IREEConvertVectorStore final : OpConversionPattern<vector::StoreOp> {
         std::fill_n(frontMaskValues.end() - frontSubWidthStoreElem,
                     *foldedNumFrontPadElems, true);
       }
-      auto frontMask = rewriter.create<arith::ConstantOp>(
-          loc, DenseElementsAttr::get(subWidthStoreMaskType, frontMaskValues));
+      auto frontMask = arith::ConstantOp::create(
+          rewriter, loc,
+          DenseElementsAttr::get(subWidthStoreMaskType, frontMaskValues));
 
       currentSourceIndex = emulatedPerContainerElem - (*foldedNumFrontPadElems);
       auto value =
@@ -505,9 +509,9 @@ struct IREEConvertVectorStore final : OpConversionPattern<vector::StoreOp> {
 
     // Increment the destination index by 1 to align to the emulated width
     // boundary.
-    auto constantOne = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-    currentDestIndex = rewriter.create<arith::AddIOp>(
-        loc, rewriter.getIndexType(), currentDestIndex, constantOne);
+    auto constantOne = arith::ConstantIndexOp::create(rewriter, loc, 1);
+    currentDestIndex = arith::AddIOp::create(
+        rewriter, loc, rewriter.getIndexType(), currentDestIndex, constantOne);
 
     // 2. Full width store for the inner output bytes.
     // After the previous step, the store address is aligned to the emulated
@@ -526,15 +530,15 @@ struct IREEConvertVectorStore final : OpConversionPattern<vector::StoreOp> {
       auto storeType = VectorType::get(
           {originType.getNumElements() / emulatedPerContainerElem},
           memrefElemType);
-      auto bitCast = rewriter.create<vector::BitCastOp>(loc, storeType,
-                                                        fullWidthStorePart);
-      rewriter.create<vector::StoreOp>(loc, bitCast.getResult(), memrefBase,
-                                       currentDestIndex);
+      auto bitCast = vector::BitCastOp::create(rewriter, loc, storeType,
+                                               fullWidthStorePart);
+      vector::StoreOp::create(rewriter, loc, bitCast.getResult(), memrefBase,
+                              currentDestIndex);
 
       currentSourceIndex += numNonFullWidthElements;
-      currentDestIndex = rewriter.create<arith::AddIOp>(
-          loc, rewriter.getIndexType(), currentDestIndex,
-          rewriter.create<arith::ConstantIndexOp>(loc, fullWidthStoreSize));
+      currentDestIndex = arith::AddIOp::create(
+          rewriter, loc, rewriter.getIndexType(), currentDestIndex,
+          arith::ConstantIndexOp::create(rewriter, loc, fullWidthStoreSize));
     }
 
     // 3. Partial width store for the trailing output byte.
@@ -549,8 +553,9 @@ struct IREEConvertVectorStore final : OpConversionPattern<vector::StoreOp> {
       // Generate back mask.
       auto maskValues = SmallVector<bool>(emulatedPerContainerElem, 0);
       std::fill_n(maskValues.begin(), remainingElements, 1);
-      auto backMask = rewriter.create<arith::ConstantOp>(
-          loc, DenseElementsAttr::get(subWidthStoreMaskType, maskValues));
+      auto backMask = arith::ConstantOp::create(
+          rewriter, loc,
+          DenseElementsAttr::get(subWidthStoreMaskType, maskValues));
 
       storeFunc(rewriter, loc, memrefBase, currentDestIndex,
                 cast<VectorValue>(subWidthStorePart), backMask.getResult());

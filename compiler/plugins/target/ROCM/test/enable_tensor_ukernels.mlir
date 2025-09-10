@@ -48,7 +48,7 @@ hal.executable public @main {
 // CHECK:      func.func @matmul_f8
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK:        linalg.generic
-// CHECK-SAME:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8_expanded", tensor>
+// CHECK-SAME:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
 // CHECK-SAME:     lowering_config = #iree_gpu.lowering_config
-// CHECK:        util.func private @pingpong_medium_f8_expanded
+// CHECK:        util.func private @pingpong_medium_f8E4M3FNUZ_expanded
 // CHECK:          iree_codegen.inner_tiled

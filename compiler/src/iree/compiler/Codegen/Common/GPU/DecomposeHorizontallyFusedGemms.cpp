@@ -147,9 +147,9 @@ decomposeHorizontallyFusedGemmOperations(RewriterBase &rewriter,
         inputs, [](OpOperand *operand) { return operand->get(); });
     SmallVector<Value> initVals = llvm::map_to_vector(
         inits, [](OpOperand *operand) { return operand->get(); });
-    auto newOp = rewriter.create<linalg::GenericOp>(
-        linalgOp.getLoc(), TypeRange{inits[0]->get().getType()}, inputVals,
-        initVals, indexingMaps, iteratorTypes,
+    auto newOp = linalg::GenericOp::create(
+        rewriter, linalgOp.getLoc(), TypeRange{inits[0]->get().getType()},
+        inputVals, initVals, indexingMaps, iteratorTypes,
         [&](OpBuilder &b, Location loc, ValueRange blockArgs) {
           Block *oldBody = linalgOp.getBlock();
           usedInputs.insert(resultNumber + linalgOp.getNumDpsInputs());
@@ -166,7 +166,7 @@ decomposeHorizontallyFusedGemmOperations(RewriterBase &rewriter,
             b.clone(*usedOperation, regionMapping);
           }
 
-          b.create<linalg::YieldOp>(loc, regionMapping.lookup(result));
+          linalg::YieldOp::create(b, loc, regionMapping.lookup(result));
         });
 
     // If on decomposition any dims are unused propagating lowering config isnt

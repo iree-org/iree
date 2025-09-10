@@ -72,22 +72,22 @@ static FailureOr<Value> allocateTensorForVector(OpBuilder &b, Location loc,
       RankedTensorType::get(vectorType.getShape(), vectorType.getElementType(),
                             sharedMemoryAddrSpace);
   // Vectors are always statically shaped.
-  auto allocTensorOp = b.create<bufferization::AllocTensorOp>(
-      loc, tensorType, ValueRange{}, Value());
+  auto allocTensorOp = bufferization::AllocTensorOp::create(
+      b, loc, tensorType, ValueRange{}, Value());
   allocTensorOp.setMemorySpaceAttr(sharedMemoryAddrSpace);
 
-  Value c0 = b.create<arith::ConstantIndexOp>(loc, 0);
+  Value c0 = arith::ConstantIndexOp::create(b, loc, 0);
   SmallVector<Value> indices(vectorType.getRank(), c0);
   SmallVector<bool> inBounds(vectorType.getRank(), true);
-  Value copied = b.create<vector::TransferWriteOp>(loc, vector, allocTensorOp,
-                                                   indices, inBounds)
+  Value copied = vector::TransferWriteOp::create(b, loc, vector, allocTensorOp,
+                                                 indices, inBounds)
                      .getResult();
   return copied;
 }
 
 static Value readVectorFromTensor(OpBuilder &b, VectorType vectorType,
                                   Value tensor) {
-  Value c0 = b.create<arith::ConstantIndexOp>(tensor.getLoc(), 0);
+  Value c0 = arith::ConstantIndexOp::create(b, tensor.getLoc(), 0);
   SmallVector<Value> indices(vectorType.getRank(), c0);
   SmallVector<bool> inBounds(vectorType.getRank(), true);
   return b
@@ -119,7 +119,7 @@ struct GPUVectorAllocPass final
       // reads in the previous iteration of a loop. We set this barrier
       // at the start of this block.
       builder.setInsertionPointToStart(op->getBlock());
-      builder.create<gpu::BarrierOp>(op->getLoc());
+      gpu::BarrierOp::create(builder, op->getLoc());
 
       // Promote both of the input operands, excluding the accumulator.
       builder.setInsertionPoint(op);
@@ -132,7 +132,7 @@ struct GPUVectorAllocPass final
 
       // Synchronize after the write to shared memory before we read from it.
       auto synced =
-          builder.create<IREE::GPU::ValueBarrierOp>(op->getLoc(), *ret);
+          IREE::GPU::ValueBarrierOp::create(builder, op->getLoc(), *ret);
 
       VectorType inputTy = cast<VectorType>(op.getType());
       Value read = readVectorFromTensor(builder, inputTy, synced.getResult(0));

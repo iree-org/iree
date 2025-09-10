@@ -35,8 +35,8 @@ module {
 
 // CHECK-LABEL:     func.func @aligned_generic_pack
 // CHECK:             %[[IN_0:.+]] = vector.broadcast %{{.+}} : vector<16xf32> to vector<16x16xf32>
-// CHECK-COUNT-15:    %{{.+}} = vector.insert {{.+}} : vector<16xf32> into vector<16x16xf32>
-// CHECK:             %[[IN_1:.+]] = vector.insert {{.+}} : vector<16xf32> into vector<16x16xf32>
+// CHECK-COUNT-16:    %{{.+}} = vector.to_elements {{.+}} : vector<16xf32>
+// CHECK:             %[[IN_1:.+]] = vector.from_elements {{.+}} : vector<16x16xf32>
 // CHECK:             %[[T0:.+]] = arith.addf %[[IN_0]], %[[IN_1]] : vector<16x16xf32>
 // CHECK:             %[[T1:.+]] = arith.minimumf %[[T0]], %{{.+}} : vector<16x16xf32>
 // CHECK:             %[[T2:.+]] = arith.maximumf %[[T1]], %{{.+}} : vector<16x16xf32>

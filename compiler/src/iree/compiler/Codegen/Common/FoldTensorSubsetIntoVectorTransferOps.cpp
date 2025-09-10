@@ -105,10 +105,10 @@ public:
     for (const auto &it : llvm::enumerate(xferOp.getIndices())) {
       OpFoldResult offset =
           extractOp.getMixedOffsets()[it.index() + rankReduced];
-      newIndices.push_back(rewriter.create<arith::AddIOp>(
-          xferOp->getLoc(), it.value(),
-          getValueOrCreateConstantIndexOp(rewriter, extractOp.getLoc(),
-                                          offset)));
+      newIndices.push_back(
+          arith::AddIOp::create(rewriter, xferOp->getLoc(), it.value(),
+                                getValueOrCreateConstantIndexOp(
+                                    rewriter, extractOp.getLoc(), offset)));
     }
     SmallVector<bool> inBounds(xferOp.getTransferRank(), true);
     rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
@@ -316,8 +316,8 @@ public:
 
     Location loc = extractSliceOp.getLoc();
     SmallVector<OpFoldResult> mixedSizes = extractSliceOp.getMixedSizes();
-    auto init = rewriter.create<tensor::EmptyOp>(
-        loc, mixedSizes, extractSliceOp.getType().getElementType());
+    auto init = tensor::EmptyOp::create(
+        rewriter, loc, mixedSizes, extractSliceOp.getType().getElementType());
 
     auto indices = xferOp.getIndices();
 

@@ -78,8 +78,8 @@ static Value getTensorLoadOpForTensorStoreOp(
     OpBuilder &b, IREE::TensorExt::DispatchTensorStoreOp storeOp) {
   // Clone the offset, size and stride values. They will be CSE-ed later.
   SliceAndDynamicDims clonedVals = cloneOffsetsSizesAndStrides(b, storeOp);
-  Value tensorLoadOp = b.create<IREE::TensorExt::DispatchTensorLoadOp>(
-      storeOp.getLoc(),
+  Value tensorLoadOp = IREE::TensorExt::DispatchTensorLoadOp::create(
+      b, storeOp.getLoc(),
       llvm::cast<RankedTensorType>(storeOp.getValue().getType()),
       storeOp.getTarget(), clonedVals.dynamicDims, clonedVals.offsets,
       clonedVals.sizes, clonedVals.strides);
@@ -95,17 +95,17 @@ static Value getReverseOfReshapeOp(OpBuilder &b, TensorReshapeOpTy reshapeOp,
   using ReverseReshapeOpTy = typename std::conditional<
       std::is_same<TensorReshapeOpTy, tensor::CollapseShapeOp>::value,
       tensor::ExpandShapeOp, tensor::CollapseShapeOp>::type;
-  return b.create<ReverseReshapeOpTy>(reshapeOp.getLoc(),
-                                      reshapeOp.getSrcType(), resultBuffer,
-                                      reshapeOp.getReassociationIndices());
+  return ReverseReshapeOpTy::create(b, reshapeOp.getLoc(),
+                                    reshapeOp.getSrcType(), resultBuffer,
+                                    reshapeOp.getReassociationIndices());
 }
 
 /// Gets the reverse of a `tensor.cast` op to get a memref type that
 /// can be used for in-place computation of the result of a disaptch region.
 static Value getReverseOfCastOp(OpBuilder &b, tensor::CastOp castOp,
                                 Value resultBuffer) {
-  return b.create<tensor::CastOp>(castOp.getLoc(), castOp.getSource().getType(),
-                                  resultBuffer);
+  return tensor::CastOp::create(b, castOp.getLoc(),
+                                castOp.getSource().getType(), resultBuffer);
 }
 
 /// Returns a tied result value give the operand. If no such result exists,
@@ -400,8 +400,8 @@ static LogicalResult modifyUseToGetValueIntoStoreSet(RewriterBase &rewriter,
   Location loc = genericOp.getLoc();
   SmallVector<utils::IteratorType> iterTypes(genericOp.getNumLoops(),
                                              utils::IteratorType::parallel);
-  auto newOp = rewriter.create<linalg::GenericOp>(
-      loc, newResultTypes, newInputs, newOutputs, maps, iterTypes,
+  auto newOp = linalg::GenericOp::create(
+      rewriter, loc, newResultTypes, newInputs, newOutputs, maps, iterTypes,
       /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(genericOp));
   rewriter.inlineRegionBefore(genericOp.getRegion(), newOp.getRegion(),
                               newOp.getRegion().begin());
@@ -492,8 +492,8 @@ replaceUnpackEmptyWithAllocTensor(OpBuilder &b,
 
     OpBuilder::InsertionGuard g(b);
     b.setInsertionPointAfter(emptyOp);
-    auto allocTensor = b.create<bufferization::AllocTensorOp>(
-        emptyOp.getLoc(), emptyOp.getType(), emptyOp.getDynamicSizes());
+    auto allocTensor = bufferization::AllocTensorOp::create(
+        b, emptyOp.getLoc(), emptyOp.getType(), emptyOp.getDynamicSizes());
     emptyOp.replaceAllUsesWith(allocTensor.getResult());
   });
 
@@ -522,11 +522,11 @@ struct RemoveCstOutsDependency
       TypedAttr scalarAttr = attr.getValues<TypedAttr>()[0];
 
       modifiedOutput = true;
-      Value emptyTensor = rewriter.create<tensor::EmptyOp>(
-          loc, type.getShape(), type.getElementType());
-      Value cstOp = rewriter.create<arith::ConstantOp>(loc, scalarAttr);
+      Value emptyTensor = tensor::EmptyOp::create(
+          rewriter, loc, type.getShape(), type.getElementType());
+      Value cstOp = arith::ConstantOp::create(rewriter, loc, scalarAttr);
       Value fillOp =
-          rewriter.create<linalg::FillOp>(loc, cstOp, emptyTensor).result();
+          linalg::FillOp::create(rewriter, loc, cstOp, emptyTensor).result();
       op->setOperand(opOperand.getOperandNumber(), fillOp);
     }
     if (!modifiedOutput) {
@@ -583,8 +583,8 @@ struct SwitchStoreOfIfResultValue
       auto yieldedVal = yieldOp.getOperand(resultNumber);
       SliceAndDynamicDims sliceAndDynamicDims =
           cloneOffsetsSizesAndStrides(rewriter, storeOp);
-      rewriter.create<IREE::TensorExt::DispatchTensorStoreOp>(
-          storeOp.getLoc(), yieldedVal, storeOp.getTarget(),
+      IREE::TensorExt::DispatchTensorStoreOp::create(
+          rewriter, storeOp.getLoc(), yieldedVal, storeOp.getTarget(),
           sliceAndDynamicDims.dynamicDims, sliceAndDynamicDims.offsets,
           sliceAndDynamicDims.sizes, sliceAndDynamicDims.strides);
     };
