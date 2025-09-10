@@ -274,9 +274,7 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
       IREE::VectorExt::createVectorizeIREEVectorExtOpsPass());
   // Vectorize.
   GenericVectorizationPassOptions options;
-  options.vectorizePadding = true;
   options.vectorizeCopies = vectorizeCopies;
-  options.vectorizeGatherAccesses = true;
   options.enableCleanup = false;
   options.foldCastIntoContract = true;
   options.enableVectorMasking = enableMasking;
