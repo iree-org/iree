@@ -114,3 +114,92 @@ builtin.module {
 
 // CHECK-LABEL: llvm.func @test_no_kern_arg
 // CHECK-SAME:    (%{{.+}}: i32)
+
+// -----
+
+// Check that we handle the `func_attrs` appropriately
+
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb",
+  {iree_codegen.target_info = #iree_gpu.target<arch = "gfx942", features = "",
+                                      wgp = <compute = int32, storage =  b32,
+                                      subgroup =  none,
+                                      subgroup_size_choices = [64],
+                                      max_workgroup_sizes = [1024, 1024, 1024],
+                                      max_thread_count_per_workgroup = 1024,
+                                      max_workgroup_memory_bytes = 65536,
+                                      max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>,
+   ukernels = "none"}>
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>],
+                                        flags = Indirect>
+builtin.module {
+  hal.executable public @test_kern_arg {
+    hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
+      hal.executable.export public @test_kern_arg ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+        %c128 = arith.constant 128 : index
+        %c2 = arith.constant 2 : index
+        %c1 = arith.constant 1 : index
+        hal.return %c128, %c2, %c1 : index, index, index
+      } attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]}
+      builtin.module {
+        llvm.func @test_kern_arg(%arg0: i32) attributes {
+            func_attrs = {denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">,
+                          gpu_optimize_occupancy = #iree_gpu.optimize_occupancy},
+            llvm_func_attrs = {check_attr}
+          } {
+          llvm.return
+        }
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: llvm.func @test_kern_arg
+// CHECK:       denormal_fp_math_f32 = "preserve-sign"
+// CHECK-NOT:   func_attrs
+// CHECK:       llvm_func_attrs = {check_attr
+// CHECK-NOT:   gpu_optimize_occupancy = #iree_gpu.optimize_occupancy
+// CHECK:       rocdl.waves_per_eu = 2 : i64
+
+
+// -----
+
+// Check that we handle the `func_attrs` appropriately
+
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb",
+  {iree_codegen.target_info = #iree_gpu.target<arch = "gfx942", features = "",
+                                      wgp = <compute = int32, storage =  b32,
+                                      subgroup =  none,
+                                      subgroup_size_choices = [64],
+                                      max_workgroup_sizes = [1024, 1024, 1024],
+                                      max_thread_count_per_workgroup = 1024,
+                                      max_workgroup_memory_bytes = 65536,
+                                      max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>,
+   ukernels = "none"}>
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>],
+                                        flags = Indirect>
+builtin.module {
+  hal.executable public @test_kern_arg {
+    hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
+      hal.executable.export public @test_kern_arg ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+        %c128 = arith.constant 128 : index
+        %c2 = arith.constant 2 : index
+        %c1 = arith.constant 1 : index
+        hal.return %c128, %c2, %c1 : index, index, index
+      } attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]}
+      builtin.module {
+        llvm.func @test_kern_arg(%arg0: i32) attributes {
+            func_attrs = {denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<none>},
+            llvm_func_attrs = {check_attr}
+          } {
+          llvm.return
+        }
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: llvm.func @test_kern_arg
+// CHECK-NOT:   denormal_fp_math_f32
+// CHECK-NOT:   func_attrs
+// CHECK:       llvm_func_attrs = {check_attr
+// CHECK-NOT:       rocdl.waves_per_eu = 2 : i64

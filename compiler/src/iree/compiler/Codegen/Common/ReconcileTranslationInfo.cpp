@@ -701,12 +701,13 @@ static FailureOr<int64_t> reconcileSubgroupSize(
 /// Helper function to retrieve the target-func-attrs value from translation
 /// info.
 static DictionaryAttr
-getTargetFuncAttrs(IREE::Codegen::TranslationInfoAttr translationInfo) {
+getTargetFuncAttrs(IREE::Codegen::TranslationInfoAttr translationInfo,
+                   StringRef key) {
   auto translationConfig = translationInfo.getConfiguration();
   if (!translationConfig) {
     return nullptr;
   }
-  auto attr = translationConfig.getAs<DictionaryAttr>("llvm_func_attrs");
+  auto attr = translationConfig.getAs<DictionaryAttr>(key);
   if (!attr) {
     return nullptr;
   }
@@ -801,9 +802,14 @@ void ReconcileTranslationInfoPass::runOnOperation() {
       // translation info into the func-like op. This is not the best
       // place to do this, but the intent is after this pass all the
       // lowering configs and translation infos will be deleted.
-      DictionaryAttr targetFuncAttrs = getTargetFuncAttrs(translationInfo);
+      DictionaryAttr targetFuncAttrs =
+          getTargetFuncAttrs(translationInfo, "llvm_func_attrs");
       if (targetFuncAttrs) {
         funcOp->setAttr("llvm_func_attrs", targetFuncAttrs);
+      }
+      if (DictionaryAttr targetFuncAttrs =
+              getTargetFuncAttrs(translationInfo, kFuncAttrsName)) {
+        funcOp->setAttr(kFuncAttrsName, targetFuncAttrs);
       }
     }
 

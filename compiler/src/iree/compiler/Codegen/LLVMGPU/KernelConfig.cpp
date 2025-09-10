@@ -1326,6 +1326,25 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
       targetSubgroupSize, pipelineConfig);
 }
 
+/// Sets attention specific pipeline attributes. Currently, this only affects
+/// AMD targets.
+static void
+setAttentionPipelineAttributes(IREE::GPU::TargetAttr target,
+                               SmallVectorImpl<NamedAttribute> &pipelineAttrs) {
+  if (!target.isAMD()) {
+    return;
+  }
+  Builder b(target.getContext());
+  NamedAttrList funcAttrs;
+  funcAttrs.append(IREE::GPU::OptimizeOccupancyAttr::getDictKeyName(),
+                   b.getAttr<IREE::GPU::OptimizeOccupancyAttr>());
+  funcAttrs.append(IREE::Codegen::DenormalFpMathAttr::getFP32DictKeyName(),
+                   b.getAttr<IREE::Codegen::DenormalFpMathAttr>(
+                       IREE::Codegen::DenormalFpMath::PreserveSign));
+  pipelineAttrs.emplace_back(kFuncAttrsName,
+                             funcAttrs.getDictionary(b.getContext()));
+}
+
 static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
     IREE::LinalgExt::AttentionOp op) {
@@ -1576,6 +1595,8 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
   SmallVector<NamedAttribute, 1> pipelineAttrs;
+
+  setAttentionPipelineAttributes(target, pipelineAttrs);
 
   // TODO: We do not turn prefetching on even when requested by the prefetching
   // flag because there is a shared memory allocation the two matmuls, which

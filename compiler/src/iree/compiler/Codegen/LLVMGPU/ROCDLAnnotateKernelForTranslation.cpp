@@ -6,6 +6,7 @@
 
 #include <cassert>
 #include "iree/compiler/Codegen/Common/PassUtils.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -73,6 +74,27 @@ annotateKernelForTranslation(LLVM::LLVMFuncOp funcOp,
   if (IntegerAttr attr =
           getConfigWavesPerEuAttr(targetAttr.getConfiguration())) {
     rocdlDialect->getWavesPerEuAttrHelper().setAttr(funcOp, attr);
+  }
+
+  // Check if the `func_attrs` dictionary is set and proccess it.
+  if (auto dict = cast_or_null<DictionaryAttr>(
+          funcOp->getDiscardableAttr(kFuncAttrsName))) {
+    if (dict.getAs<IREE::GPU::OptimizeOccupancyAttr>(
+            IREE::GPU::OptimizeOccupancyAttr::getDictKeyName())) {
+      // TODO: use a heuristic to compute the value.
+      rocdlDialect->getWavesPerEuAttrHelper().setAttr(
+          funcOp, builder.getI64IntegerAttr(2));
+    }
+
+    if (auto attr = dict.getAs<IREE::Codegen::DenormalFpMathAttr>(
+            IREE::Codegen::DenormalFpMathAttr::getFP32DictKeyName());
+        attr && attr.getValue() != IREE::Codegen::DenormalFpMath::None) {
+      funcOp.setDenormalFpMathF32(
+          IREE::Codegen::stringifyDenormalFpMath(attr.getValue()));
+    }
+
+    // Update the function, discarding any unhandled attributes.
+    funcOp->removeDiscardableAttr(kFuncAttrsName);
   }
 
   // Kernel argument preloading is only supported on gfx942 and newer targets
