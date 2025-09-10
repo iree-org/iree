@@ -40,10 +40,17 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
   Block &body = producerOp->getRegion(0).front();
   if (std::begin(body)->hasTrait<OpTrait::IsTerminator>())
     return true;
+
+  auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp);
+  if (!linalgConsumerOp) {
+    return false;
+  }
   if (llvm::all_of(body.getArguments(),
                    [](BlockArgument arg) { return arg.use_empty(); })) {
-    // The operands aren't used, its just an `linalg.index` op.
-    return true;
+    // The operands aren't used, its just an `linalg.index` or `tensor.extract`
+    // op. Fuse with all non-reduction ops.
+    return linalgConsumerOp.getNumParallelLoops() ==
+           linalgConsumerOp.getNumLoops();
   }
 
   // If producer does not have a single user, dont fuse.
@@ -59,11 +66,6 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
   // fusion is fine since cloning wont result in redundant computation of the
   // producer. (Also note that the producer is always an elementwise operation).
   if (IREE::LinalgExt::isBitExtendOp(consumerOp) && !consumerOp->hasOneUse()) {
-    return false;
-  }
-
-  auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp);
-  if (!linalgConsumerOp) {
     return false;
   }
 
