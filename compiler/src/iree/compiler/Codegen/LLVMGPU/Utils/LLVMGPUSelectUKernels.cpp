@@ -75,7 +75,7 @@ static int64_t getSharedMemoryBytes(IREE::GPU::TargetAttr gpuTarget) {
 }
 
 // Returns an initial UKernelDescriptorAttr containing the ukernel name and
-// ukernel kind. Returns {} if no ukernel.
+// ukernel kind. Returns nullptr if no ukernel.
 static IREE::Codegen::UKernelDescriptorAttr
 getInitialUKernelConfig(Operation *op) {
   MLIRContext *context = op->getContext();
@@ -90,9 +90,8 @@ getInitialUKernelConfig(Operation *op) {
   if (isROCMBackend(execTarget)) {
     auto nameAttr = StringAttr::get(
         context, llvm::formatv("iree_uk_amdgpu_{}_{}", name, suffix));
-    auto defsAttr = IREE::Codegen::UKernelArgumentKind::Bitcode;
-    return IREE::Codegen::UKernelDescriptorAttr::get(context, nameAttr,
-                                                     defsAttr);
+    return IREE::Codegen::UKernelDescriptorAttr::get(
+        context, nameAttr, IREE::Codegen::UKernelArgumentKind::Bitcode);
   }
   return {};
 }

@@ -2627,7 +2627,7 @@ static LogicalResult setArgmaxUkernelConfig(
   SmallVector<NamedAttribute, 3> attrs = {
       NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
       NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
-  op->setAttr(kCodegenUkernelAttrName, ukernelConfig);
+  op->setAttr(kUkernelAttrName, ukernelConfig);
   IREE::GPU::appendPromotedOperandsList(context, attrs, {0, 1});
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);

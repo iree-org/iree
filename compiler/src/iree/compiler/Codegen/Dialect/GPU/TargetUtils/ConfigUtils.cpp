@@ -91,7 +91,7 @@ LogicalResult setDataTiledMultiMmaLoweringConfig(
   attrs.emplace_back(b.getStringAttr("reduction"),
                      b.getI64ArrayAttr(reductionTileSizes));
   if (ukernelConfig) {
-    op->setAttr(kCodegenUkernelAttrName, ukernelConfig);
+    op->setAttr(kUkernelAttrName, ukernelConfig);
   } else {
     // Promote operands to use shared memory for LHS and RHS.
     // Don't do that with ukernels: their untiled reduction dimension is too
