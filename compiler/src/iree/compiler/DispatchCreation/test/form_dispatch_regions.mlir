@@ -1709,3 +1709,57 @@ util.func public @dont_fuse_use_consumer_transposed_use_of_producer(%arg0 : tens
 //       CHECK:     linalg.generic
 //       CHECK:   flow.dispatch.region
 //       CHECK:     linalg.generic
+
+// -----
+
+util.func public @unpack_multi_elementwise_fusion(
+    %arg0: tensor<?x?x?x?xf32>,
+    %arg1: tensor<?xf32>) -> tensor<?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?x?x?xf32>
+  %d1 = tensor.dim %arg0, %c1 : tensor<?x?x?x?xf32>
+  %d2 = tensor.dim %arg0, %c2 : tensor<?x?x?x?xf32>
+  %d3 = tensor.dim %arg0, %c3 : tensor<?x?x?x?xf32>
+  %folded_dim0 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%d0, %d2]
+  %folded_dim1 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%d1, %d3]
+  %dest = tensor.empty(%folded_dim0, %folded_dim1) : tensor<?x?xf32>
+  %0 = linalg.unpack %arg0 inner_dims_pos = [0, 1] inner_tiles = [%d2, %d3]
+      into %dest : tensor<?x?x?x?xf32> -> tensor<?x?xf32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%0, %arg1 : tensor<?x?xf32>, tensor<?xf32>)
+      outs(%dest : tensor<?x?xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32, %b2 : f32):
+      %2 = arith.addf %b0, %b1 : f32
+      linalg.yield %2 : f32
+    } -> tensor<?x?xf32>
+  %2 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>,
+                       affine_map<(d0, d1) -> (d0)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%1, %arg1 : tensor<?x?xf32>, tensor<?xf32>)
+      outs(%dest : tensor<?x?xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32, %b2 : f32):
+      %2 = arith.addf %b0, %b1 : f32
+      linalg.yield %2 : f32
+    } -> tensor<?x?xf32>
+  util.return %2 : tensor<?x?xf32>
+}
+// CHECK-LABEL: util.func public @unpack_multi_elementwise_fusion(
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?x?x?xf32>
+//  CHECK-SAME:     %[[ARG1:.+]]: tensor<?xf32>)
+//       CHECK:   %[[RESULT:.+]] = flow.dispatch.region
+//       CHECK:     %[[UNPACK:.+]] = linalg.unpack %[[ARG0]]
+//       CHECK:     %[[GENERIC0:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[UNPACK]], %[[ARG1]]
+//       CHECK:     %[[GENERIC1:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[GENERIC0]], %[[ARG1]]
+//       CHECK:     flow.return %[[GENERIC1]]
+//       CHECK:   util.return %[[RESULT]]

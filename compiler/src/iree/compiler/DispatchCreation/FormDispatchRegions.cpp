@@ -153,23 +153,35 @@ void FusionGroup::insert(Operation *op) {
     loopMaps.insert({op, map.value()});
   } else {
     // TODO(IanWood1): some ops can be fused but don't implement
-    // `LinalgFusionOpInterface` e.g. `tensor.insert_slice`. For now, use
-    // a null map. These ops are always at the edges of the dispatch which means
-    // they are the last to be added so a null map should be fine.
-    loopMaps.insert({op, AffineMap()});
+    // `LinalgFusionOpInterface` e.g. `tensor.insert_slice` or `linalg.unpack`.
+    // `getRootParallelLoopToOpMap` fails when `op` is trying to fuse with one
+    // of these ops. So, give `op` a root map.
+    llvm::SmallBitVector loops = getOuterParallelLoops(op);
+    auto map = AffineMap::getFilteredIdentityMap(
+        op->getContext(), loops.size(), [&](AffineDimExpr dimExpr) {
+          return loops.test(dimExpr.getPosition());
+        });
+    map = inverseAndBroadcastProjectedPermutation(map);
+    loopMaps.insert({op, map});
   }
   fusedOps.insert(op);
 }
 
 FailureOr<AffineMap>
 FusionGroup::getRootParallelLoopToOpMap(Operation *op) const {
+  assert(!contains(op) && "op cannot already be in group");
   auto fusionOp = dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(op);
   if (!fusionOp) {
     return failure();
   }
 
-  bool isConsumer = llvm::any_of(
-      op->getOperands(), [&](Value v) { return contains(v.getDefiningOp()); });
+  bool isConsumer = llvm::any_of(op->getOperands(), [this](Value v) {
+    return contains(v.getDefiningOp());
+  });
+  assert(isConsumer !=
+             llvm::any_of(op->getUsers(),
+                          [this](Operation *op) { return contains(op); }) &&
+         "op must be not be a producer and consumer");
 
   AffineMap newMap;
   if (isConsumer) {
