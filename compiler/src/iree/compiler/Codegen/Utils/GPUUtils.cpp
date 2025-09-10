@@ -35,7 +35,6 @@
 #define DBGSNL() (llvm::dbgs() << "\n")
 
 constexpr unsigned kShuffleBitWidth = 32;
-constexpr char kDenormalFpMathF32AttrName[] = "denormal_fp_math_f32";
 // TODO: These are AMD GPU specific. These need to find a better home.
 constexpr char kWavesPerEuAttrName[] = "waves_per_eu";
 
@@ -1042,31 +1041,6 @@ void addConfigWavesPerEu(MLIRContext *context, int64_t wavesPerEu,
   config.emplace_back(
       StringAttr::get(context, kWavesPerEuAttrName),
       IntegerAttr::get(IntegerType::get(context, 64), wavesPerEu));
-}
-
-IREE::Codegen::DenormalFpMathAttr
-getConfigDenormalFpMathF32Attr(DictionaryAttr targetConfig) {
-  if (!targetConfig) {
-    return {};
-  }
-
-  return targetConfig.getAs<IREE::Codegen::DenormalFpMathAttr>(
-      kDenormalFpMathF32AttrName);
-}
-std::optional<IREE::Codegen::DenormalFpMath>
-getConfigDenormalFpMathF32(DictionaryAttr targetConfig) {
-  IREE::Codegen::DenormalFpMathAttr attr =
-      getConfigDenormalFpMathF32Attr(targetConfig);
-  if (!attr) {
-    return std::nullopt;
-  }
-  return attr.getValue();
-}
-void addConfigDenormalFpMathF32(MLIRContext *context,
-                                IREE::Codegen::DenormalFpMath mode,
-                                SmallVectorImpl<NamedAttribute> &config) {
-  config.emplace_back(kDenormalFpMathF32AttrName,
-                      IREE::Codegen::DenormalFpMathAttr::get(context, mode));
 }
 
 std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func) {

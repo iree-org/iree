@@ -635,6 +635,13 @@ def DenormalFpMathEnum : I32Enum<
 def DenormalFpMathAttr :
   EnumAttr<IREECodegen_Dialect, DenormalFpMathEnum, "denormal_fp_math"> {
   let assemblyFormat = "`<` $value `>`";
+
+  let extraClassDeclaration = [{
+    /// Returns the key name for fp32 DenormalFpMathAttr in a DictionaryAttr.
+    static StringRef getFP32DictKeyName() {
+      return "iree_codegen.denormal_fp_math_f32";
+    }
+  }];
 }
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS

@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 #define IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -298,6 +299,21 @@ computeDimUpperBound(Value shapedValue, unsigned dimNum,
 bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
                  IREE::TensorExt::DispatchTensorType tensorType,
                  ValueRange dynamicDims);
+
+/// Retrieves the DenormalFpMathAttr for F32 values from the given target
+/// configuration. This attribute specifies how denormal floating-point values
+/// are handled in F32 operations.
+IREE::Codegen::DenormalFpMathAttr
+getConfigDenormalFpMathF32Attr(DictionaryAttr targetConfig);
+std::optional<IREE::Codegen::DenormalFpMath>
+getConfigDenormalFpMathF32(DictionaryAttr targetConfig);
+
+/// Adds a denormal floating-point math configuration for F32 values to the
+/// configuration list. This configures how denormal floating-point values are
+/// handled in F32 operations.
+void addConfigDenormalFpMathF32(MLIRContext *context,
+                                IREE::Codegen::DenormalFpMath mode,
+                                SmallVectorImpl<NamedAttribute> &config);
 
 //===----------------------------------------------------------------------===//
 // Utility functions for vector size inference for dynamic shapes

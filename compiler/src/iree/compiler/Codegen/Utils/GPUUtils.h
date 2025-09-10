@@ -208,19 +208,11 @@ IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op);
 std::optional<int64_t> getConfigWavesPerEu(DictionaryAttr targetAttr);
 IntegerAttr getConfigWavesPerEuAttr(DictionaryAttr targetAttr);
 
-IREE::Codegen::DenormalFpMathAttr
-getConfigDenormalFpMathF32Attr(DictionaryAttr targetConfig);
-std::optional<IREE::Codegen::DenormalFpMath>
-getConfigDenormalFpMathF32(DictionaryAttr targetConfig);
-
 /// Methods to add attributes to the `config` list.
 void addConfigGPUTarget(MLIRContext *context, IREE::GPU::TargetAttr,
                         SmallVectorImpl<NamedAttribute> &config);
 void addConfigWavesPerEu(MLIRContext *context, int64_t wavesPerEu,
                          SmallVectorImpl<NamedAttribute> &config);
-void addConfigDenormalFpMathF32(MLIRContext *context,
-                                IREE::Codegen::DenormalFpMath mode,
-                                SmallVectorImpl<NamedAttribute> &config);
 
 /// Returns the GPU subgroup size chosen for the current CodeGen pipeline if
 /// exists; otherwise returns the subgroup size from the GPU target description.

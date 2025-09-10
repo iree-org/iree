@@ -120,7 +120,7 @@ builtin.module {
 // Check that denormal is set.
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
-    denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">,
+    iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">,
     iree_codegen.target_info = #iree_gpu.target<arch = "gfx942", features = "",
                                       wgp = <compute = int32, storage =  b32,
                                       subgroup =  none,
@@ -156,7 +156,7 @@ builtin.module {
 // Check that denormal is set.
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
-    denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"positive-zero">,
+    iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"positive-zero">,
     iree_codegen.target_info = #iree_gpu.target<arch = "gfx942", features = "",
                                       wgp = <compute = int32, storage =  b32,
                                       subgroup =  none,
