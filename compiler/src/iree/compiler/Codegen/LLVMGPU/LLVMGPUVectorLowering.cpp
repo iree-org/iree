@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/AMDGPU/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -188,8 +189,8 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
 
   LogicalResult matchAndRewrite(vector::ContractionOp op,
                                 PatternRewriter &rewriter) const override {
-    // TODO: add rewrite to support relevant contractions nested in vector.mask
-    if (op->getParentOfType<vector::MaskOp>()) {
+    // TODO: Add a rewrite to support relevant contractions nested in vector.mask
+    if (op.isMasked()) {
       return failure();
     }
 
@@ -197,10 +198,9 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
       return failure();
     }
 
-    auto lhsVecType = dyn_cast<VectorType>(op.getLhsType());
-    auto rhsVecType = dyn_cast<VectorType>(op.getRhsType());
-    if (!lhsVecType || !rhsVecType || !lhsVecType.hasStaticShape() ||
-        !rhsVecType.hasStaticShape()) {
+    VectorType lhsVecType = op.getLhsType();
+    VectorType rhsVecType = op.getRhsType();
+    if (lhsVecType.isScalable() || rhsVecType.isScalable()) {
       return failure();
     }
 
@@ -210,7 +210,7 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
     }
 
     auto accVecType = dyn_cast<VectorType>(op.getAccType());
-    if (accVecType && !accVecType.hasStaticShape()) {
+    if (accVecType && accVecType.isScalable()) {
       return failure();
     }
 
@@ -220,10 +220,11 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
       return failure();
     }
 
-    // new indices: [reduction..., parallel...].
+    // New indices: [reduction..., parallel...].
     SmallVector<int64_t> indices;
-    indices.append(redDims.begin(), redDims.end());
-    indices.append(parDims.begin(), parDims.end());
+    indices.reserve(redDims.size() + parDims.size());
+    llvm::append_range(indices, redDims);
+    llvm::append_range(indices, parDims);
 
     SmallVector<AffineMap, 4> maps = op.getIndexingMapsArray();
 
@@ -274,7 +275,7 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
         vector::ShapeCastOp::create(rewriter, loc, flattened2DType, rhs);
 
     Value flattenedAcc;
-    VectorType flatAccVecType = VectorType::get({parSize}, elemTy);
+    auto flatAccVecType = VectorType::get({parSize}, elemTy);
     VectorType preFlattenVecType = accVecType;
 
     if (accVecType) {
@@ -292,6 +293,7 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
                                                  op.getAcc());
     }
 
+    // Form chain in 2-element chunks that we can map to one packed FMA.
     constexpr int64_t chunkSize = 2;
     Value resultFlat = buildFMAChain(rewriter, loc, lhs2D, rhs2D, flattenedAcc,
                                      redSize, parSize, chunkSize);
@@ -372,7 +374,7 @@ private:
   static SmallVector<int64_t>
   getPermutationFromIndexingMap(AffineMap map, ArrayRef<int64_t> indices) {
     SmallVector<int64_t> dimToRes(map.getNumDims());
-    for (int res = 0; res < map.getNumResults(); ++res) {
+    for (int res = 0, e = map.getNumResults(); res != e; ++res) {
       dimToRes[map.getDimPosition(res)] = res;
     }
 
