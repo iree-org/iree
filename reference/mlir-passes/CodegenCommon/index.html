@@ -7110,8 +7110,6 @@ scf.for loops.</p>
 <div class="highlight"><pre><span></span><code>-enable-vector-masking        : Enable vector masking during vectorization.
 -use-configured-vector-sizes  : Control whether the op lowering config represents a set of masked vector sizes
 -vectorize-copies             : Enable vectorization of linalg.copy operations.
--vectorize-padding            : Rewrite all tensor.pad ops in the function to vector form.
--vectorize-gather-accesses    : Enable vectorizaiton of operations that may generate vector.gather operations.
 -vectorize-to-transfer-gather : Enables vectorization of gather-like operations that may generate iree_vector_ext.transfer_gather
 -enable-cleanup               : Enable cleanups after vectorization. The patterns touch the structuregenerated from tiling so it affects later steps like bufferization and vector hoisting.
 -generate-contract            : Enable conversion for reduction ops to contraction ops.
