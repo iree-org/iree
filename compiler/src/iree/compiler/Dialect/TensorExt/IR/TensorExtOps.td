@@ -504,7 +504,7 @@ def IREETensorExt_CastToRaggedTensorOp :
   let arguments = (ins
     AnyRankedTensor:$source,
     IndexAttr:$raggedDim,
-    1DTensorOf<[Index]>:$columnLengths,
+    1DTensorOf<[AnySignlessIntegerOrIndex]>:$columnLengths,
     Optional<Index>:$numRaggedRows,
     Optional<Index>:$maxRaggedColumnLength,
     Variadic<Index>:$sourceDynamicDims
