@@ -127,7 +127,7 @@ static llvm::cl::opt<bool>
 llvm::cl::opt<bool> clGPUPadConvolution(
     "iree-codegen-llvmgpu-igemm-pad-convolution",
     llvm::cl::desc("enable pre-padding for convolutions in igemm path"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 static llvm::cl::opt<bool>
     clUseDirectLoad("iree-llvmgpu-use-direct-load",

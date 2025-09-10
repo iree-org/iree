@@ -143,9 +143,9 @@ hal.executable private @main {
 //      CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
 //      CHECK-DAG:   %[[ASSUMED_B2:.+]] = memref.assume_alignment %[[B2]], 64
 //      CHECK-DAG:   %[[BUF2:.+]] = amdgpu.fat_raw_buffer_cast %[[ASSUMED_B2]]
-//      CHECK-DAG:   memref.alloc() : memref<2x1x32x18xf32, #gpu.address_space<workgroup>>
-//      CHECK-DAG:   memref.alloc() : memref<16x20xf16, #gpu.address_space<workgroup>>
-//      CHECK-DAG:   memref.alloc() : memref<2x1x32x20xf16, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   memref.alloc() : memref<2x1x32x16xf32, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   memref.alloc() : memref<16x16xf16, #gpu.address_space<workgroup>>
+//      CHECK-DAG:   memref.alloc() : memref<2x1x32x16xf16, #gpu.address_space<workgroup>>
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK-DAG:   %[[C721:.+]] = arith.constant 721 : index
 //      CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
@@ -155,11 +155,13 @@ hal.executable private @main {
 //      CHECK-DAG:       %[[LHS_MM0:.+]] = vector.transfer_read {{.*}} vector<4xf16>
 //      CHECK-DAG:       %[[RHS_MM:.+]] = vector.transfer_read {{.*}} vector<4xf16>
 // CHECK-COUNT-1:       amdgpu.mfma {{.*}}blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32
-//          CHECK:     %[[LOOP_T:.+]] = vector.shape_cast %[[LOOP]] : vector<1x1x1x1x4x1xf32> to vector<4xf32>
+//          CHECK:     %[[LOOP_T:.+]] = vector.shape_cast %[[LOOP]] : vector<1x1x1x1x4x1xf32> to vector<4x1x1xf32>
 //          CHECK:     vector.transfer_write %[[LOOP_T]]
 // Note there is a writeback loop here that is skipped to simplify the test.
 //          CHECK:        memref.copy {{.*}}#gpu.address_space<workgroup>> to {{.*}}#amdgpu.address_space<fat_raw_buffer>
 //          CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+
+// TODO(vivian): This test doesn't have reduce bank conflicts taken effect because of collapsing a dynamic allocation. Try to fix it.
 
 // -----
 
