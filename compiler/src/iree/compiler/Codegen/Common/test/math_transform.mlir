@@ -58,6 +58,7 @@ func.func @rewrite_erf(%arg0: f16) -> f16 attributes {
 
 // -----
 
+
 // CHECK-LABEL: func.func @erf_fastmath
 func.func @erf_fastmath(%arg0: f32) -> f32 attributes {
   hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_triple = "amdgcn-amd-amdhsa"}>
@@ -90,14 +91,14 @@ func.func @erf_fastmath(%arg0: f32) -> f32 attributes {
 
   // Then region - verify we have exactly 6 FMA operations.
   // CHECK: %[[T:.*]] = arith.mulf %[[AX]], %[[AX]] : f32
-  // CHECK-COUNT-5: %{{.*}} = math.fma %{{.*}}, %[[T]], %{{.*}} : f32
+  // CHECK-COUNT-5: %{{.*}} = math.fma %[[T]], %{{.*}}, %{{.*}} : f32
   // CHECK: %{{.*}} = math.fma %[[AX]], %{{.*}}, %[[AX]] : f32
   // CHECK: scf.yield %{{.*}} : f32
 
   // CHECK: } else {
 
   // Else region - verify we have exactly 6 FMA operations.
-  // CHECK-COUNT-6: %{{.*}} = math.fma %{{.*}}, %[[AX]], %{{.*}} : f32
+  // CHECK-COUNT-6: %{{.*}} = math.fma %[[AX]], %{{.*}}, %{{.*}} : f32
   // CHECK: %{{.*}} = math.fma %[[AX]], %{{.*}}, %[[AX]] : f32
 
   // CHECK: %{{.*}} = arith.negf %{{.*}} : f32
@@ -144,11 +145,11 @@ func.func @erf_fastmath_vector(%arg0: vector<4xf32>) -> vector<4xf32> attributes
   // CHECK: %[[T:.*]] = arith.mulf %[[AX]], %[[AX]] : vector<4xf32>
 
   // First polynomial evaluation (using t = ax * ax).
-  // CHECK-COUNT-5: %{{.*}} = math.fma %{{.*}}, %[[T]], %{{.*}} : vector<4xf32>
+  // CHECK-COUNT-5: %{{.*}} = math.fma %[[T]], %{{.*}}, %{{.*}} : vector<4xf32>
   // CHECK: %{{.*}} = math.fma %[[AX]], %{{.*}}, %[[AX]] : vector<4xf32>
 
   // Second polynomial evaluation (using ax directly).
-  // CHECK-COUNT-6: %{{.*}} = math.fma %{{.*}}, %[[AX]], %{{.*}} : vector<4xf32>
+  // CHECK-COUNT-6: %{{.*}} = math.fma %[[AX]], %{{.*}}, %{{.*}} : vector<4xf32>
   // CHECK: %{{.*}} = math.fma %[[AX]], %{{.*}}, %[[AX]] : vector<4xf32>
 
   // CHECK: %{{.*}} = arith.negf %{{.*}} : vector<4xf32>
