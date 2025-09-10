@@ -697,7 +697,7 @@ func.func @matmul_accumulate_from_readonly(%M: index, %N: index, %K: index) attr
 // Verifies that the backend can handle broadcast/dequant op followed by a
 // matmul with encodings. We only check if the ukernel op is generated or not.
 // The test ensures that there are no big vectors and stack allocations when it
-// successes.
+// succeeds.
 
 #encoding = #iree_encoding.layout<[#iree_cpu.cpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [16, 2], outerDimsPerm = [0, 1]}}>]>
 #encoding1 = #iree_encoding.layout<[#iree_cpu.cpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0], innerTileSizes = [2], outerDimsPerm = [0]}}>]>
