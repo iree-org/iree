@@ -125,3 +125,34 @@ func.func @map_scatter_into_collapsible_subview(
 
 // PREPROCESSING-LABEL: func.func @map_scatter_into_collapsible_subview(
 //  PREPROCESSING:        memref.subview
+
+// -----
+
+func.func @map_scatter_into_strided_output(
+    %input: vector<4x16xf32>, %output: memref<?x?xf32, strided<[?, ?], offset: ?>>
+) {
+  iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index, %idx1: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %idx1, %mask : index, index, i1
+  } : vector<4x16xf32> into memref<?x?xf32, strided<[?, ?], offset: ?>>
+  return
+}
+//       CHECK: #[[$MAP:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
+// CHECK-LABEL: func.func @map_scatter_into_strided_output(
+//  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:     %[[OUTPUT:[a-zA-Z0-9_]+]]
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[D0:.+]] = memref.dim %[[OUTPUT]], %[[C0]]
+//   CHECK-DAG:   %[[D1:.+]] = memref.dim %[[OUTPUT]], %[[C1]]
+//   CHECK-DAG:   %{{.*}}, %[[OFFSET:.+]], %{{.*}}:2, %{{.*}} = memref.extract_strided_metadata %[[OUTPUT]]
+//   CHECK-DAG:   %[[FLAT_SIZE:.+]] = affine.apply #[[$MAP]]()[%[[D0]], %[[D1]]]
+//       CHECK:   %[[FLAT_OUTPUT:.+]] = memref.reinterpret_cast %[[OUTPUT]]
+//  CHECK-SAME:     to offset: [%[[OFFSET]]], sizes: [%[[FLAT_SIZE]]], strides: [1]
+//  CHECK-SAME:     : memref<?x?xf32, strided<[?, ?], offset: ?>> to memref<?xf32, strided<[1], offset: ?>>
+//   CHECK-DAG:   %[[FLAT_INDICES:.+]] = vector.shape_cast{{.*}} : vector<4x16xindex> to vector<64xindex>
+//   CHECK-DAG:   %[[FLAT_MASK:.+]] = vector.shape_cast{{.*}} : vector<4x16xi1> to vector<64xi1>
+//   CHECK-DAG:   %[[FLAT_INPUT:.+]] = vector.shape_cast %[[INPUT]] : vector<4x16xf32> to vector<64xf32>
+//       CHECK:   vector.scatter %[[FLAT_OUTPUT]][%[[C0]]]
+//  CHECK-SAME:     [%[[FLAT_INDICES]]], %[[FLAT_MASK]], %[[FLAT_INPUT]]
