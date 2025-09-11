@@ -650,23 +650,18 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
 }
 
 StringRef normalizeAMDGPUTarget(StringRef target) {
-  if (target.starts_with("gfx"))
-    return target;
-
-  // We cannot accept rdnaN as a target for LLVM AMDGPU backend; so the
-  // following is only meant for Vulkan but not HIP.
-  if (target.starts_with("rdna"))
-    return target;
-
   return llvm::StringSwitch<StringRef>(target.lower())
-      .Cases("mi350x", "mi355x", "gfx950")
-      .Cases("mi300a", "mi300x", "mi308x", "mi325x", "gfx942")
-      .Cases("mi250x", "mi250", "mi210", "cdna2", "gfx90a")
-      .Cases("mi100", "cdna1", "gfx908")
-      .Cases("rx9070xt", "rx9070", "r9700", "gfx1201")
-      .Case("rx9060xt", "gfx1200")
-      .Cases("rx7900xtx", "rx7900xt", "w7900", "w7800", "gfx1100")
-      .Cases("rx7800xt", "rx7700xt", "v710", "w7700", "gfx1101")
+      .Cases("mi350x", "mi355x", "gfx950", /*Value=*/"gfx950")
+      .Cases("mi300a", "mi300x", "mi308x", "mi325x", "gfx942",
+             /*Value=*/"gfx942")
+      .Cases("mi250x", "mi250", "mi210", "cdna2", "gfx90a", /*Value=*/"gfx90a")
+      .Cases("mi100", "cdna1", "gfx908", /*Value=*/"gfx908")
+      .Cases("rx9070xt", "rx9070", "r9700", "gfx1201", /*Value=*/"gfx1201")
+      .Cases("rx9060xt", "gfx1200", /*Value=*/"gfx1200")
+      .Cases("rx7900xtx", "rx7900xt", "w7900", "w7800", "gfx1100",
+             /*Value=*/"gfx1100")
+      .Cases("rx7800xt", "rx7700xt", "v710", "w7700", "gfx1101",
+             /*Value=*/"gfx1101")
       .Default("");
 }
 
@@ -1051,6 +1046,14 @@ StringRef normalizeHIPTarget(StringRef target) {
   return normalizeAMDGPUTarget(target);
 }
 
+StringRef normalizeVulkanAMDGPUTarget(StringRef target) {
+  // We cannot accept rdnaN as a target for LLVM AMDGPU backend; so the
+  // following is only meant for Vulkan but not HIP.
+  if (target.starts_with("rdna"))
+    return target;
+  return normalizeAMDGPUTarget(target);
+}
+
 TargetAttr getVulkanTargetDetails(llvm::StringRef target,
                                   MLIRContext *context) {
   // Go through each vendor's target details. This assumes we won't have
@@ -1060,7 +1063,7 @@ TargetAttr getVulkanTargetDetails(llvm::StringRef target,
   // TODO: Add feature bits for physical storage buffer.
 
   if (std::optional<TargetDetails> details = getAMDGPUTargetDetails(target)) {
-    return createTargetAttr(*details, normalizeAMDGPUTarget(target),
+    return createTargetAttr(*details, normalizeVulkanAMDGPUTarget(target),
                             /*features=*/"spirv:v1.6,cap:Shader", context);
   }
   if (std::optional<TargetDetails> details = getARMGPUTargetDetails(target)) {
