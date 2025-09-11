@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtAttrs.h"
+
 namespace mlir::iree_compiler::IREE::TensorExt {
 
 //===----------------------------------------------------------------------===//
@@ -380,6 +382,140 @@ void DispatchWorkloadOrdinalOp::inferResultRanges(
     ArrayRef<ConstantIntRanges> argRanges, SetIntRangeFn setResultRange) {
   assert(!argRanges.empty() && "expected range of input to be set");
   setResultRange(getResult(), argRanges[0]);
+}
+
+//===----------------------------------------------------------------------===//
+// iree_tensor_ext.dispatch.workload.ordinal
+//===----------------------------------------------------------------------===//
+
+LogicalResult CastToRaggedTensorOp::verify() {
+  // Check that the ragged row dimensions `raggedRowDim` < rank(`result`) - 1
+  int64_t raggedDim = getRaggedDim().getSExtValue();
+  RankedTensorType sourceType = getSourceType();
+  if (raggedDim >= sourceType.getRank()) {
+    return emitOpError("expected `ragged_dim` to be less than ")
+           << sourceType.getRank() << ", i.e the rank of source";
+  }
+
+  auto columnLengthsType = cast<RankedTensorType>(getColumnLengths().getType());
+  if (columnLengthsType.getRank() != 1) {
+    return emitOpError("expected `column_lengths` to be of rank 1");
+  }
+
+  RankedTensorType resultType = getResultType();
+  if (resultType.getRank() != sourceType.getRank() + 1) {
+    return emitOpError("expected result rank to be ")
+           << sourceType.getRank() + 1
+           << ", i.e. one more than the source rank, but got "
+           << resultType.getRank();
+  }
+  RaggedTensorAttr raggedTensorAttr = getResultSparseEncoding();
+  if (!raggedTensorAttr) {
+    return emitOpError(
+        "expected result type to have an encoding of type `RaggedTensorAttr`");
+  }
+  if (raggedTensorAttr.getRaggedRow() != raggedDim) {
+    return emitOpError("mismatch in specified `ragged_dim` value of ")
+           << raggedDim << " and `raggedRow` value in the sparse encoding "
+           << raggedTensorAttr.getRaggedRow();
+  }
+
+  if (Value numRaggedRows = getNumRaggedRows()) {
+    // If `num_ragged_rows` is dynamic, check that columnLengths shape is
+    // dynamic as well.
+    if (!columnLengthsType.isDynamicDim(0)) {
+      return emitOpError("invalid to have static dimensions for "
+                         "`column_lenghts` when `num_ragged_rows` is dynamic");
+    }
+
+    // Check that the result has the number of rows dynamic as well.
+    if (!resultType.isDynamicDim(raggedDim)) {
+      return emitOpError("invalid to have static value for dimension ")
+             << raggedDim
+             << " of result when `num_ragged_rows` is specified as dynamic "
+                "value";
+    }
+  } else {
+    // if `num_ragged_rows` is static, check that the `column_lengths` shape is
+    // static as well. This effectively where the number of rows is statically
+    // recorded.
+    if (columnLengthsType.isDynamicDim(0) ||
+        columnLengthsType.getDimSize(0) <= 1) {
+      return emitOpError(
+          "expected shape of `column_lengths` to be static and "
+          "greater than 1 when `num_ragged_rows` is unspecified, i.e. "
+          "number of ragged rows is statically known");
+    }
+
+    // Check that the size of `ragged_dim` dimension in result type is
+    // consistent with the shape of column_lengths`.
+    if (resultType.isDynamicDim(raggedDim) ||
+        resultType.getDimSize(raggedDim) !=
+            columnLengthsType.getDimSize(0) - 1) {
+      return emitOpError("expected shape of dimension ")
+             << raggedDim
+             << " of result, i.e. the `ragged_dim`, to be static and equal to "
+             << columnLengthsType.getDimSize(0) - 1
+             << " when `num_ragged_rows` is unspecified, i.e number of ragged "
+                "rows is "
+                "statically known";
+    }
+  }
+
+  if (Value maxRaggedColumnLength = getMaxRaggedColumnLength()) {
+    // If the maximum column length is dynamic, the corresponding dimension in
+    // the result tensor should also be dynamic.
+    if (!resultType.isDynamicDim(raggedDim + 1)) {
+      return emitOpError("expected dimension ")
+             << (raggedDim + 1)
+             << " of result, i.e. `ragged_dim` + 1, to be dynamic when "
+                "`max_ragged_column_length` is specified, i.e. "
+                "the maximum length is dynamic";
+    }
+  }
+
+  bool foundRaggedDim = false;
+  int expectedNumSourceDynamicDims = 0;
+  for (auto [index, sourceShape] : llvm::enumerate(sourceType.getShape())) {
+    if (index == raggedDim) {
+      foundRaggedDim = true;
+      if (ShapedType::isDynamic(sourceShape)) {
+        expectedNumSourceDynamicDims++;
+      }
+      continue;
+    }
+    int resultIndex = index + foundRaggedDim;
+    int64_t resultShape = resultType.getDimSize(resultIndex);
+    if (ShapedType::isDynamic(sourceShape)) {
+      if (!ShapedType::isDynamic(resultShape)) {
+        return emitOpError("expected dimension ")
+               << resultIndex
+               << " of result to be dynamic since the corresponding dimension "
+               << index << " in the source is dynamic";
+      }
+      expectedNumSourceDynamicDims++;
+      continue;
+    }
+
+    if (ShapedType::isDynamic(resultShape) || resultShape != sourceShape) {
+      return emitOpError("expected shape of dimension ")
+             << resultIndex << " of result to match the shape of dimension "
+             << index << " of source, but got "
+             << (ShapedType::isDynamic(resultShape)
+                     ? std::string("?")
+                     : std::to_string(resultShape))
+             << " and " << sourceShape << " respectively";
+    }
+  }
+
+  if (expectedNumSourceDynamicDims != getSourceDynamicDims().size()) {
+    return emitOpError("mismatch in number of dynamic dimensions specified for "
+                       "source, expected ")
+           << expectedNumSourceDynamicDims << " values, got "
+           << getSourceDynamicDims().size();
+  }
+
+  return success();
 }
 
 } // namespace mlir::iree_compiler::IREE::TensorExt

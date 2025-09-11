@@ -48,3 +48,84 @@ util.func public @tensorBitCastDynamic(%arg0: tensor<?x16xi32>, %arg1: index, %a
   %0 = iree_tensor_ext.bitcast %arg0 : tensor<?x16xi32>{%arg1} -> tensor<?x?x4x8xi16>{%arg2, %arg3}
   util.return %0 : tensor<?x?x4x8xi16>
 }
+
+// -----
+
+// Check RaggedTensorAttr
+
+util.func public @raggedTensorAttrTest(%arg0 : tensor<?x?xf32, #iree_tensor_ext.ragged_tensor<0>>) {
+  util.return
+}
+// CHECK-LABEL: @raggedTensorAttrTest
+
+// -----
+
+// Check static iree_tensor_ext.cast_to_ragged
+
+util.func public @castToRaggedStatic(%source : tensor<10x20x30xf32>,
+    %columnLengths : tensor<4xindex>) -> tensor<10x3x8x30xf32, #iree_tensor_ext.ragged_tensor<1>> {
+  %0 = iree_tensor_ext.cast_to_ragged_tensor %source ragged_dim(1) column_lengths(%columnLengths)
+      : (tensor<10x20x30xf32>, tensor<4xindex>) -> tensor<10x3x8x30xf32, #iree_tensor_ext.ragged_tensor<1>>
+  util.return %0 : tensor<10x3x8x30xf32, #iree_tensor_ext.ragged_tensor<1>>
+}
+// CHECK-LABEL: @castToRaggedStatic
+
+// -----
+
+// Check dynamic iree_tensor_ext.cast_to_ragged
+
+util.func public @castToRaggedDynamic(%source : tensor<?x?x?xf32>,
+    %columnLengths : tensor<?xindex>, %numRaggedRows : index)
+    -> tensor<?x?x?x?xf32, #iree_tensor_ext.ragged_tensor<1>> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %d0 = tensor.dim %source, %c0 : tensor<?x?x?xf32>
+  %d1 = tensor.dim %source, %c1 : tensor<?x?x?xf32>
+  %d2 = tensor.dim %source, %c2 : tensor<?x?x?xf32>
+  %0 = iree_tensor_ext.cast_to_ragged_tensor %source ragged_dim(1) column_lengths(%columnLengths)
+      num_ragged_rows(%numRaggedRows) : (tensor<?x?x?xf32>{%d0, %d1, %d2}, tensor<?xindex>)
+      -> tensor<?x?x?x?xf32, #iree_tensor_ext.ragged_tensor<1>>
+  util.return %0 : tensor<?x?x?x?xf32, #iree_tensor_ext.ragged_tensor<1>>
+}
+// CHECK-LABEL: @castToRaggedDynamic
+
+// -----
+
+// Check for static number of ragged rows
+
+util.func public @staticNumRaggedRows(%source : tensor<?x?x?xf32>,
+    %columnLengths : tensor<4xindex>, %maxColumnLength : index,
+    %d0 : index, %d1 : index, %d2 : index) -> tensor<?x3x?x?xf32, #iree_tensor_ext.ragged_tensor<1>> {
+  %0 = iree_tensor_ext.cast_to_ragged_tensor %source ragged_dim(1) column_lengths(%columnLengths)
+      : (tensor<?x?x?xf32>{%d0, %d1, %d2}, tensor<4xindex>) -> tensor<?x3x?x?xf32, #iree_tensor_ext.ragged_tensor<1>>
+  util.return %0 : tensor<?x3x?x?xf32, #iree_tensor_ext.ragged_tensor<1>>
+}
+// CHECK-LABEL: @staticNumRaggedRows
+
+// -----
+
+// Check for statically specified `max_ragged_column_length`
+
+util.func public @staticMaxRaggedColumnLengths(%source : tensor<?x?x?xf32>,
+    %columnLengths : tensor<4xindex>,
+    %d0 : index, %d1 : index, %d2 : index) -> tensor<?x3x4x?xf32, #iree_tensor_ext.ragged_tensor<1>> {
+  %0 = iree_tensor_ext.cast_to_ragged_tensor %source ragged_dim(1) column_lengths(%columnLengths)
+      : (tensor<?x?x?xf32>{%d0, %d1, %d2}, tensor<4xindex>) -> tensor<?x3x4x?xf32, #iree_tensor_ext.ragged_tensor<1>>
+  util.return %0 : tensor<?x3x4x?xf32, #iree_tensor_ext.ragged_tensor<1>>
+}
+// CHECK-LABEL: @staticMaxRaggedColumnLengths
+
+// -----
+
+// Check for dynamically specified `max_ragged_column_length`
+
+util.func public @dynamicMaxRaggedColumnLengths(%source : tensor<?x?x?xf32>,
+    %columnLengths : tensor<4xindex>, %maxColumnLength : index,
+    %d0 : index, %d1 : index, %d2 : index) -> tensor<?x3x?x?xf32, #iree_tensor_ext.ragged_tensor<1>> {
+  %0 = iree_tensor_ext.cast_to_ragged_tensor %source ragged_dim(1) column_lengths(%columnLengths)
+      max_ragged_column_length(%maxColumnLength)
+      : (tensor<?x?x?xf32>{%d0, %d1, %d2}, tensor<4xindex>) -> tensor<?x3x?x?xf32, #iree_tensor_ext.ragged_tensor<1>>
+  util.return %0 : tensor<?x3x?x?xf32, #iree_tensor_ext.ragged_tensor<1>>
+}
+// CHECK-LABEL: @dynamicMaxRaggedColumnLengths
