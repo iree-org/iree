@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/ADT/SmallVector.h"
@@ -369,6 +370,7 @@ struct FoldGlobalsPass : public impl::FoldGlobalsPassBase<FoldGlobalsPass> {
     auto moduleOp = getOperation();
     GlobalTable globalTable(moduleOp);
     beforeFoldingGlobals = globalTable.size();
+    bool didChangeAny = false;
     for (int i = 0; i < 10; ++i) {
       // TODO(benvanik): determine if we need this expensive folding.
       if (failed(applyPatternsGreedily(moduleOp, frozenPatterns))) {
@@ -421,10 +423,15 @@ struct FoldGlobalsPass : public impl::FoldGlobalsPassBase<FoldGlobalsPass> {
         // No changes; complete fixed-point iteration.
         break;
       }
+      didChangeAny = true;
     }
 
     afterFoldingGlobals =
         count(moduleOp.getOps<IREE::Util::GlobalOpInterface>());
+
+    if (didChangeAny) {
+      signalFixedPointModified(moduleOp);
+    }
   }
 };
 

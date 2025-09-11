@@ -122,6 +122,23 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   // Bring all initializers together so that we can schedule them.
   passManager.addPass(IREE::Util::createCombineInitializersPass());
 
+  // After combining initializers we can end up with a lot of redundant code
+  // internally and may be able to eliminate some globals entirely (by either
+  // fusing globals always set to the same values or by eliminating globals
+  // used only during initialization). This requires a full global cleanup.
+  //
+  // We run this cleanup under a fixed-point iteration such that we can perform
+  // inter-procedural, intra-procedural, and canonicalization as separably
+  // verifiable/reusable passes alongside the custom stream ones. IPO will
+  // fold duplicate arguments/results and inline constants to allow the local
+  // optimizations to work more effectively.
+  {
+    OpPassManager ipoPipeline(mlir::ModuleOp::getOperationName());
+    buildStreamCleanupPassPipeline(ipoPipeline, transformOptions);
+    passManager.addPass(
+        IREE::Util::createFixedPointIteratorPass(std::move(ipoPipeline)));
+  }
+
   //----------------------------------------------------------------------------
   // Stream affinity/assignment
   //----------------------------------------------------------------------------
