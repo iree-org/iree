@@ -277,7 +277,11 @@ void buildIREEVMTransformPassPipeline(
     break;
   default:
     DispatchCreation::TransformOptions dispatchTransformOptions;
-    dispatchTransformOptions.options = dispatchCreationOptions;
+    dispatchTransformOptions.enableAggressiveFusion =
+        dispatchCreationOptions.enableAggressiveFusion;
+    dispatchTransformOptions.enableFuseMultiUse =
+        dispatchCreationOptions.enableFuseMultiUse;
+    dispatchTransformOptions.dataTiling = dispatchCreationOptions.dataTiling;
     if (compileFrom < IREEVMPipelinePhase::DispatchCreation) { // late-entry
       IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "DispatchCreation");
       if (hooks.beforePhase)

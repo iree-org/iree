@@ -109,8 +109,7 @@ static void addCleanupPatterns(OpPassManager &passManager) {
 //===----------------------------------------------------------------------===//
 
 static void addDispatchRegionCreationPreprocessingPasses(
-    OpPassManager &passManager,
-    const DispatchCreationOptions &dispatchOptions) {
+    OpPassManager &passManager, const TransformOptions &dispatchOptions) {
   // 1. Do some simple elementwise op fusion. This could be skipped,
   //    but could reduce the surface area of ops to handle later.
   FunctionLikeNest(passManager)
@@ -203,9 +202,8 @@ static void addDispatchRegionCreationPreprocessingPasses(
 // Note that we should not hoist out small constants before the dispatch regions
 // are converted to workgroups. E.g., the `cseConstant` option needs to be false
 // in greedy pattern rewriting drivers.
-static void
-addDispatchRegionCreationPasses(OpPassManager &passManager,
-                                const DispatchCreationOptions &options) {
+static void addDispatchRegionCreationPasses(OpPassManager &passManager,
+                                            const TransformOptions &options) {
   FunctionLikeNest(passManager)
       // Create dispatches for scalar operations as roots.
       .addPass(DispatchCreation::createFormScalarDispatchesPass)
@@ -331,9 +329,8 @@ void buildDispatchCreationPassPipeline(
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass);
 
-  addDispatchRegionCreationPreprocessingPasses(passManager,
-                                               transformOptions.options);
-  addDispatchRegionCreationPasses(passManager, transformOptions.options);
+  addDispatchRegionCreationPreprocessingPasses(passManager, transformOptions);
+  addDispatchRegionCreationPasses(passManager, transformOptions);
 
   FunctionLikeNest(passManager)
       .addPass(DispatchCreation::createConvertDispatchRegionsToWorkgroupsPass)
@@ -377,40 +374,12 @@ void registerDispatchCreationPasses() {
 
 void registerDispatchCreationPipelines() {
 
-  /// Helper struct when registering pass pipeline options.
-  struct DispatchCreationPipelineOptions
-      : public PassPipelineOptions<DispatchCreationPipelineOptions> {
-    Option<bool> aggressiveFusion{
-        *this,
-        "aggressive-fusion",
-        llvm::cl::desc(
-            "Enable aggressive fusion for dispatch creation pipeline"),
-        llvm::cl::init(false),
-    };
-    Option<bool> dataTiling{
-        *this,
-        "data-tiling",
-        llvm::cl::desc("Enable data-tiling for dispatch creation pipeline"),
-        llvm::cl::init(false),
-    };
-
-    std::unique_ptr<TransformOptions> toTransformOptions() const {
-      auto options = std::make_unique<TransformOptions>();
-      options->options.enableAggressiveFusion = aggressiveFusion;
-      options->options.dataTiling = dataTiling;
-      return options;
-    }
-  };
-
-  PassPipelineRegistration<DispatchCreationPipelineOptions>
-      dispatchCreationPipeline(
-          "iree-dispatch-creation-pipeline",
-          "Flag used to run passes that form dispatch regions",
-          [](OpPassManager &passManager,
-             const DispatchCreationPipelineOptions &options) {
-            buildDispatchCreationPassPipeline(passManager,
-                                              *(options.toTransformOptions()));
-          });
+  PassPipelineRegistration<TransformOptions> dispatchCreationPipeline(
+      "iree-dispatch-creation-pipeline",
+      "Flag used to run passes that form dispatch regions",
+      [](OpPassManager &passManager, const TransformOptions &options) {
+        buildDispatchCreationPassPipeline(passManager, options);
+      });
 
   PassPipelineRegistration<TransformOptions>
       dispatchCreationPreprocessingPipeline(
@@ -419,8 +388,8 @@ void registerDispatchCreationPipelines() {
           "dispatch region formation. Used only for testing",
           [](OpPassManager &passManager,
              const TransformOptions &transformOptions) {
-            addDispatchRegionCreationPreprocessingPasses(
-                passManager, transformOptions.options);
+            addDispatchRegionCreationPreprocessingPasses(passManager,
+                                                         transformOptions);
           });
 }
 
