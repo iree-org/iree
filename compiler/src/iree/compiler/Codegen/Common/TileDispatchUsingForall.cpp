@@ -54,7 +54,34 @@ struct TilingInfo {
   Operation *tilableOp;
   SmallVector<OpFoldResult> tileSizes;
   SmallVector<int64_t> interchange;
+  scf::SCFTileDistributionFn tileDistributionFn;
 };
+
+static scf::SCFTileDistributionFn makeWorkgroupReorderingFunctor(
+    IREE::Codegen::WorkgroupReorderingAttrInterface attrInterface) {
+  return [attrInterface](RewriterBase &rewriter, Location loc,
+                         ArrayRef<Range> loopRanges,
+                         ArrayRef<OpFoldResult> tileSizes)
+             -> std::tuple<SmallVector<Range>, scf::SCFUpdateInductionVarFn> {
+    SmallVector<::mlir::Range> ranges;
+    scf::SCFUpdateInductionVarFn updateIndVarFn = nullptr;
+    // TODO. Error check/fallback
+    if (attrInterface) {
+      ranges = attrInterface.generateLoopBounds(rewriter, loc, loopRanges,
+                                                tileSizes);
+      using SCFUpdateInductionVarFn = std::function<SmallVector<Value>(
+          RewriterBase &, Location &, ValueRange ivs)>;
+      updateIndVarFn = [attrInterface, loopRanges,
+                        tileSizes](RewriterBase &rewriter, Location &loc,
+                                   ValueRange ivs) -> SmallVector<Value> {
+        return attrInterface.updateIds(rewriter, loc, loopRanges, tileSizes,
+                                       ivs);
+      };
+    }
+
+    return std::make_tuple(ranges, updateIndVarFn);
+  };
+}
 
 static FailureOr<TilingInfo>
 getTiledAndDistributionInfo(RewriterBase &rewriter,
@@ -88,6 +115,11 @@ getTiledAndDistributionInfo(RewriterBase &rewriter,
       [&](int64_t t) -> OpFoldResult { return rewriter.getIndexAttr(t); });
   SmallVector<int64_t> interchange = tilableOpConfig.getWorkgroupInterchange();
 
+  scf::SCFTileDistributionFn tileDistributionFn = nullptr;
+  auto dynamicTransposeAttr = tilableOpConfig.getWorkgroupOrderingStrategy();
+  if (dynamicTransposeAttr) {
+    tileDistributionFn = makeWorkgroupReorderingFunctor(dynamicTransposeAttr);
+  }
   // Avoid distributing unit-trip count loops.
 
   // Set tile sizes for non-partitioned loops to zero.
@@ -136,7 +168,7 @@ getTiledAndDistributionInfo(RewriterBase &rewriter,
     }
   }
 
-  return TilingInfo{tilableOp, tileSizes, interchange};
+  return TilingInfo{tilableOp, tileSizes, interchange, tileDistributionFn};
 }
 
 /// Helper function to return the mapping attribute to use given the tile sizes.
@@ -261,6 +293,8 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   tilingOptions.setTileSizes(tilingInfo->tileSizes);
   tilingOptions.setInterchange(tilingInfo->interchange);
   tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
+  tilingOptions.setTileDistributionFunction(tilingInfo->tileDistributionFn);
+
   SmallVector<Attribute> deviceMappingAttribute =
       getMapping(context, tilingInfo->tileSizes);
   if (failed(IREE::Codegen::WorkgroupMappingAttr::verifyAttrList(
@@ -366,9 +400,10 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
     // Reorder the workgroups if the strategy is set to `transpose`.
     // This just transposes the first two dimensions of the workgroup i.e., the
     // #iree.codegen.workgroup_id_x and #iree.codegen.workgroup_id_y.
-    // Only reorders if the loop bounds are static.
+    // Only reorders if the loop bounds are static and tileDistributionFunction
+    // disabled.
     auto forallOp = cast<scf::ForallOp>(tilingLoops[0]);
-    if (transposeWorkgroup) {
+    if (transposeWorkgroup && !tilingOptions.tileDistributionFunction) {
       SmallVector<Attribute> mappingAttrs(forallOp.getMappingAttr().getValue());
       int64_t mappingSize = mappingAttrs.size();
       if (areAllStaticLoopBounds(forallOp) && mappingSize >= 2) {

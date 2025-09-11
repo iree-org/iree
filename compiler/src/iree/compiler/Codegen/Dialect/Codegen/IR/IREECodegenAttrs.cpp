@@ -13,10 +13,14 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
+#include "mlir/IR/AffineExpr.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/StorageUniquerSupport.h"
 
 #define GET_ATTRDEF_CLASSES
@@ -599,6 +603,7 @@ RotateRowsAttr::verify(function_ref<InFlightDiagnostic()> emitError,
   }
   return success();
 }
+
 
 //===---------------------------------------------------------------------===//
 // iree_codegen.symbolic_ukernel_provider
