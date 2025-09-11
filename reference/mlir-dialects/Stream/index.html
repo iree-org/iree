@@ -8663,8 +8663,9 @@ value.</p>
 to a <code>local</code> lifetime) or different affinities. This is roughly equivalent
 to a cast but may have special semantics when later lowered to one or more
 devices with discrete memory spaces or pools.</p>
-<p>Traits: <code>Stream_AsyncPhaseOp</code></p>
-<p>Interfaces: <code>AffinityOpInterface</code>, <code>AsyncAccessOpInterface</code>, <code>Stream_StreamableOp</code>, <code>Util_SizeAwareOp</code></p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Stream_AsyncPhaseOp</code></p>
+<p>Interfaces: <code>AffinityOpInterface</code>, <code>AsyncAccessOpInterface</code>, <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_StreamableOp</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_14">Attributes:<a class="headerlink" href="#attributes_14" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
