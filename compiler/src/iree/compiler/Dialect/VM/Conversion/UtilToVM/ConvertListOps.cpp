@@ -53,6 +53,55 @@ class ListCreateOpConversion
   }
 };
 
+class ListConstructOpConversion
+    : public OpConversionPattern<IREE::Util::ListConstructOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Util::ListConstructOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Allocate list with exact capacity.
+    size_t valueCount = srcOp.getValues().size();
+    Value size = IREE::VM::ConstI32Op::create(
+        rewriter, srcOp.getLoc(), rewriter.getI32IntegerAttr(valueCount));
+    Value list = IREE::VM::ListAllocOp::create(
+        rewriter, srcOp.getLoc(),
+        typeConverter->convertType(srcOp.getResult().getType()), size);
+
+    // Resize to the count (if needed).
+    if (valueCount > 0) {
+      IREE::VM::ListResizeOp::create(rewriter, srcOp.getLoc(), list, size);
+    }
+
+    // Add all entries.
+    for (auto [i, value] : llvm::enumerate(adaptor.getValues())) {
+      Value index = IREE::VM::ConstI32Op::create(
+          rewriter, srcOp.getLoc(),
+          rewriter.getI32IntegerAttr(static_cast<int>(i)));
+      if (value.getType().isInteger(32)) {
+        IREE::VM::ListSetI32Op::create(rewriter, srcOp.getLoc(), list, index,
+                                       value);
+      } else if (value.getType().isInteger(64)) {
+        IREE::VM::ListSetI64Op::create(rewriter, srcOp.getLoc(), list, index,
+                                       value);
+      } else if (value.getType().isFloat(32)) {
+        IREE::VM::ListSetF32Op::create(rewriter, srcOp.getLoc(), list, index,
+                                       value);
+      } else if (value.getType().isFloat(64)) {
+        IREE::VM::ListSetF64Op::create(rewriter, srcOp.getLoc(), list, index,
+                                       value);
+      } else if (isa<IREE::VM::RefType>(value.getType())) {
+        IREE::VM::ListSetRefOp::create(rewriter, srcOp.getLoc(), list, index,
+                                       value);
+      } else {
+        return rewriter.notifyMatchFailure(srcOp, "invalid list element type");
+      }
+    }
+
+    rewriter.replaceOp(srcOp, list);
+    return success();
+  }
+};
+
 class ListSizeOpConversion
     : public OpConversionPattern<IREE::Util::ListSizeOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -156,14 +205,15 @@ void populateUtilListToVMPatterns(MLIRContext *context,
         return IREE::VM::RefType::get(IREE::VM::ListType::get(elementType));
       });
 
-  conversionTarget.addIllegalOp<
-      IREE::Util::ListCreateOp, IREE::Util::ListSizeOp,
-      IREE::Util::ListResizeOp, IREE::Util::ListGetOp, IREE::Util::ListSetOp>();
+  conversionTarget
+      .addIllegalOp<IREE::Util::ListCreateOp, IREE::Util::ListConstructOp,
+                    IREE::Util::ListSizeOp, IREE::Util::ListResizeOp,
+                    IREE::Util::ListGetOp, IREE::Util::ListSetOp>();
 
-  patterns
-      .insert<ListCreateOpConversion, ListSizeOpConversion,
-              ListResizeOpConversion, ListGetOpConversion, ListSetOpConversion>(
-          typeConverter, context);
+  patterns.insert<ListCreateOpConversion, ListConstructOpConversion,
+                  ListSizeOpConversion, ListResizeOpConversion,
+                  ListGetOpConversion, ListSetOpConversion>(typeConverter,
+                                                            context);
 }
 
 } // namespace mlir::iree_compiler

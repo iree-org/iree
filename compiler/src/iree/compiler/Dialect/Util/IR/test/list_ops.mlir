@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file --verify-diagnostics %s | FileCheck %s
 
 // CHECK-LABEL: @list_init_ops
 util.func public @list_init_ops() {
@@ -15,6 +15,36 @@ util.func public @list_init_ops() {
   // CHECK: util.list.resize %[[LIST]], %[[NEW_SIZE]] : !util.list<?>
   util.list.resize %list, %new_size : !util.list<?>
 
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @list_construct
+util.func public @list_construct() {
+  // CHECK-DAG: %[[C0:.+]] = arith.constant 0
+  %c0 = arith.constant 0 : i64
+  // CHECK-DAG: %[[C1:.+]] = arith.constant 1
+  %c1 = arith.constant 1 : i64
+
+  // CHECK: %[[EMPTY:.+]] = util.list.construct [] : !util.list<?>
+  %empty = util.list.construct [] : !util.list<?>
+
+  // CHECK: = util.list.construct [%[[C0]] : i64, %[[C1]] : i64] : !util.list<i64>
+  %list_i64 = util.list.construct [%c0 : i64, %c1 : i64] : !util.list<i64>
+
+  // CHECK: = util.list.construct [%[[C0]] : i64, %[[EMPTY]] : !util.list<?>] : !util.list<?>
+  %list_any = util.list.construct [%c0 : i64, %empty : !util.list<?>] : !util.list<?>
+
+  util.return
+}
+
+// -----
+
+util.func public @list_construct_type_mismatch() {
+  %c0 = arith.constant 0 : i64
+  // @expected-error@+1 {{list[0] type 'i64' cannot be be cast to list type 'i32'}}
+  util.list.construct [%c0 : i64] : !util.list<i32>
   util.return
 }
 
