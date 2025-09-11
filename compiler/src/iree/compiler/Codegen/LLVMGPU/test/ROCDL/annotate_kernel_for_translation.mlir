@@ -114,3 +114,75 @@ builtin.module {
 
 // CHECK-LABEL: llvm.func @test_no_kern_arg
 // CHECK-SAME:    (%{{.+}}: i32)
+
+// -----
+
+// Check that denormal is set.
+
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
+    iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">,
+    iree_codegen.target_info = #iree_gpu.target<arch = "gfx942", features = "",
+                                      wgp = <compute = int32, storage =  b32,
+                                      subgroup =  none,
+                                      subgroup_size_choices = [64],
+                                      max_workgroup_sizes = [1024, 1024, 1024],
+                                      max_thread_count_per_workgroup = 1024,
+                                      max_workgroup_memory_bytes = 65536,
+                                      max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>,
+    ukernels = "none"
+  }>
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>],
+                                        flags = Indirect>
+builtin.module {
+  hal.executable public @test_rocdl_attrs {
+    hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
+      hal.executable.export public @test_rocdl_attrs ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+        %c1 = arith.constant 1 : index
+        hal.return %c1, %c1, %c1 : index, index, index
+      } attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]}
+      builtin.module {
+        // CHECK-LABEL: llvm.func @test_rocdl_attrs
+        // CHECK: denormal_fp_math_f32 = "preserve-sign"
+        llvm.func @test_rocdl_attrs(%arg0: i32) {
+          llvm.return
+        }
+      }
+    }
+  }
+}
+
+// -----
+
+// Check that denormal is set.
+
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
+    iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"positive-zero">,
+    iree_codegen.target_info = #iree_gpu.target<arch = "gfx942", features = "",
+                                      wgp = <compute = int32, storage =  b32,
+                                      subgroup =  none,
+                                      subgroup_size_choices = [64],
+                                      max_workgroup_sizes = [1024, 1024, 1024],
+                                      max_thread_count_per_workgroup = 1024,
+                                      max_workgroup_memory_bytes = 65536,
+                                      max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>,
+    ukernels = "none"
+  }>
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>],
+                                        flags = Indirect>
+builtin.module {
+  hal.executable public @test_rocdl_attrs {
+    hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
+      hal.executable.export public @test_rocdl_attrs ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+        %c1 = arith.constant 1 : index
+        hal.return %c1, %c1, %c1 : index, index, index
+      } attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]}
+      builtin.module {
+        // CHECK-LABEL: llvm.func @test_rocdl_attrs
+        // CHECK: denormal_fp_math_f32 = "positive-zero"
+        llvm.func @test_rocdl_attrs(%arg0: i32) {
+          llvm.return
+        }
+      }
+    }
+  }
+}

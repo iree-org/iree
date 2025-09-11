@@ -74,6 +74,12 @@ annotateKernelForTranslation(LLVM::LLVMFuncOp funcOp,
           getConfigWavesPerEuAttr(targetAttr.getConfiguration())) {
     rocdlDialect->getWavesPerEuAttrHelper().setAttr(funcOp, attr);
   }
+  if (IREE::Codegen::DenormalFpMathAttr attr =
+          getConfigDenormalFpMathF32Attr(targetAttr.getConfiguration());
+      attr && attr.getValue() != IREE::Codegen::DenormalFpMath::None) {
+    funcOp.setDenormalFpMathF32(
+        IREE::Codegen::stringifyDenormalFpMath(attr.getValue()));
+  }
 
   // Kernel argument preloading is only supported on gfx942 and newer targets
   // from the CDNA family. This is enabled using the `inreg` function argument

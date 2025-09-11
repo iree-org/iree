@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_UTILS_GPUUTILS_H_
 #define IREE_COMPILER_CODEGEN_UTILS_GPUUTILS_H_
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"

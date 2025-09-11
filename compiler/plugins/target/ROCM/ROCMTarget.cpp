@@ -84,9 +84,10 @@ struct ROCMOptions {
   std::string encodingLayoutResolver = GPU::kNoEncodingLayoutResolverName;
   bool slpVectorization = true;
   bool globalISel = false;
-
   bool specializeDispatches = false;
   bool enableTensorUKernels = false;
+  IREE::Codegen::DenormalFpMath denormalFpMathF32 =
+      IREE::Codegen::DenormalFpMath::None;
 
   void bindOptions(OptionsBinder &binder) {
     using namespace llvm;
@@ -161,6 +162,15 @@ struct ROCMOptions {
     binder.opt<bool>("iree-hip-enable-tensor-ukernels", enableTensorUKernels,
                      cl::cat(category),
                      cl::desc("Enable MLIR-based ukernels."));
+    binder.opt<IREE::Codegen::DenormalFpMath>(
+        "iree-hip-denormal-fp-math-f32", denormalFpMathF32, cl::cat(category),
+        cl::desc("Denormal floating point math mode for f32"),
+        cl::values(
+            clEnumValN(IREE::Codegen::DenormalFpMath::PreserveSign,
+                       "preserve-sign",
+                       "Convert denormals to zero while preserving sign"),
+            clEnumValN(IREE::Codegen::DenormalFpMath::PositiveZero,
+                       "positive-zero", "Convert denormals to positive zero")));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
@@ -336,6 +346,10 @@ public:
     }
     if (options.wavesPerEu > 0) {
       addConfigWavesPerEu(b.getContext(), options.wavesPerEu, configItems);
+    }
+    if (options.denormalFpMathF32 != IREE::Codegen::DenormalFpMath::None) {
+      addConfigDenormalFpMathF32(b.getContext(), options.denormalFpMathF32,
+                                 configItems);
     }
 
     if (options.enableTensorUKernels) {

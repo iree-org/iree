@@ -1355,6 +1355,31 @@ Operation *dropEncodingAndCloneOp(OpBuilder &builder, Operation *op,
       operands);
 }
 
+IREE::Codegen::DenormalFpMathAttr
+getConfigDenormalFpMathF32Attr(DictionaryAttr targetConfig) {
+  if (!targetConfig) {
+    return {};
+  }
+
+  return targetConfig.getAs<IREE::Codegen::DenormalFpMathAttr>(
+      IREE::Codegen::DenormalFpMathAttr::getFP32DictKeyName());
+}
+std::optional<IREE::Codegen::DenormalFpMath>
+getConfigDenormalFpMathF32(DictionaryAttr targetConfig) {
+  IREE::Codegen::DenormalFpMathAttr attr =
+      getConfigDenormalFpMathF32Attr(targetConfig);
+  if (!attr) {
+    return std::nullopt;
+  }
+  return attr.getValue();
+}
+void addConfigDenormalFpMathF32(MLIRContext *context,
+                                IREE::Codegen::DenormalFpMath mode,
+                                SmallVectorImpl<NamedAttribute> &config) {
+  config.emplace_back(IREE::Codegen::DenormalFpMathAttr::getFP32DictKeyName(),
+                      IREE::Codegen::DenormalFpMathAttr::get(context, mode));
+}
+
 //===---------------------------------------------------------------------===//
 // Replace Memref users (transitively)
 //===---------------------------------------------------------------------===//
