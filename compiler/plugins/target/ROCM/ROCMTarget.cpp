@@ -36,6 +36,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
+#include "llvm/Frontend/Offloading/Utility.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
@@ -87,6 +88,7 @@ struct ROCMOptions {
 
   bool specializeDispatches = false;
   bool enableTensorUKernels = false;
+  bool disableRegSpillWarning = false;
 
   void bindOptions(OptionsBinder &binder) {
     using namespace llvm;
@@ -161,6 +163,10 @@ struct ROCMOptions {
     binder.opt<bool>("iree-hip-enable-tensor-ukernels", enableTensorUKernels,
                      cl::cat(category),
                      cl::desc("Enable MLIR-based ukernels."));
+
+    binder.opt<bool>("iree-hip-disable-register-spill-warning",
+                     disableRegSpillWarning, cl::cat(category),
+                     cl::desc("Do not report register spilling for AMD GPUs"));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
@@ -249,6 +255,24 @@ static std::string translateModuleToISA(llvm::Module &module,
     codegenPasses.run(module);
   }
   return targetISA;
+}
+
+static void checkRegisterSpilling(IREE::HAL::ExecutableVariantOp &variantOp,
+                                  StringRef obj) {
+  uint16_t abiVersion;
+  llvm::StringMap<llvm::offloading::amdgpu::AMDGPUKernelMetaData> infoMap;
+
+  if (!llvm::offloading::amdgpu::getAMDGPUMetaDataFromImage(
+          llvm::MemoryBufferRef(obj, ""), infoMap, abiVersion)) {
+    for (const auto &[_, metaData] : infoMap) {
+      if (metaData.SGPRSpillCount > 0 || metaData.VGPRSpillCount > 0) {
+        emitWarning(variantOp.getLoc())
+            << "Register spill: " << "VGPRSpillCount: "
+            << metaData.VGPRSpillCount
+            << " / SGPRSpillCount: " << metaData.SGPRSpillCount;
+      }
+    }
+  }
 }
 
 } // namespace
@@ -769,6 +793,10 @@ public:
       targetHSACO = createHsaco(variantOp.getLoc(), targetObj, libraryName);
       if (targetHSACO.empty())
         return failure();
+
+      if (!options.disableRegSpillWarning) {
+        checkRegisterSpilling(variantOp, targetObj);
+      }
     }
 
     if (!serializationOptions.dumpBinariesPath.empty()) {
