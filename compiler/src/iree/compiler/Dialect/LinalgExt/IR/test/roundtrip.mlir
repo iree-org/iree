@@ -1440,7 +1440,7 @@ func.func @exp_reduction(%S: tensor<2x3xf32>) -> tensor<2xf32> {
   {
   ^bb0(%s: f32, %m: f32, %o: f32):
     %add = arith.addf %s, %o: f32
-    linalg.yield %m, %add: f32, f32
+    iree_linalg_ext.yield %m, %add: f32, f32
   } -> tensor<2xf32>, tensor<2xf32>
   return %sum : tensor<2xf32>
 }
@@ -1456,7 +1456,7 @@ func.func @exp_reduction(%S: tensor<2x3xf32>) -> tensor<2xf32> {
 // CHECK-SAME:      iterator_types = [
 // CHECK-SAME:          #iree_linalg_ext.iterator_type<parallel>
 // CHECK-SAME:          #iree_linalg_ext.iterator_type<reduction>
-// CHECK-SAME:      exp_reduced_operands = [ 1
+// CHECK-SAME:      exp_reduced_operands = [1
 // CHECK-SAME:      ins(%[[ARG0]] : tensor<2x3xf32>)
 // CHECK-SAME:      outs(%[[D0]], %[[D1]] : tensor<2xf32>, tensor<2xf32>)
 // CHECK:         return %[[D2]]#1 : tensor<2xf32>
