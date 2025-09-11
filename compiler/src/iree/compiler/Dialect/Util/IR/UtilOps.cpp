@@ -2195,11 +2195,11 @@ LogicalResult ListConstructOp::verify() {
   Operation *op = getOperation();
   auto listType = cast<IREE::Util::ListType>(getResult().getType());
   Type elementType = listType.getElementType();
-  for (auto value : llvm::enumerate(getValues())) {
-    Type valueType = value.value().getType();
+  for (auto [idx, value] : llvm::enumerate(getValues())) {
+    Type valueType = value.getType();
     if (!ListType::canImplicitlyCast(valueType, elementType)) {
       return op->emitError()
-             << "list[" << value.index() << "] type " << valueType
+             << "list[" << idx << "] type " << valueType
              << " cannot be be cast to list type " << elementType;
     }
   }
