@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -206,6 +207,11 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
       return failure();
     }
 
+    Type elemTy = lhsVecType.getElementType();
+    if (!isa<FloatType>(elemTy)) {
+      return failure();
+    }
+
     SmallVector<int64_t> redDims, parDims;
     getReductionAndParallelLoopDims(op.getIteratorTypes(), redDims, parDims);
     if (redDims.empty()) {
@@ -260,7 +266,6 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
     // Shape-cast operands to 2D {reduction_size, parallel_size}.
     int64_t redSize = lhsRedSize;
     int64_t parSize = lhsParSize;
-    Type elemTy = lhsVecType.getElementType();
     VectorType flattened2DType = VectorType::get({redSize, parSize}, elemTy);
     Value lhs2D =
         vector::ShapeCastOp::create(rewriter, loc, flattened2DType, lhs);

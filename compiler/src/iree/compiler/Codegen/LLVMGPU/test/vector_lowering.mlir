@@ -223,3 +223,25 @@ func.func @general_contract_add_to_chain_fma(
 // CHECK:  %[[FMA1:.*]] = math.fma {{.*}}, {{.*}}, %[[FMA0]] : vector<6xf32>
 // CHECK:  %[[FMA2:.*]] = math.fma {{.*}}, {{.*}}, %[[FMA1]] : vector<6xf32>
 // CHECK:  return %{{.*}} : vector<3x2xf32>
+
+// -----
+
+#lhs = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
+#rhs = affine_map<(d0, d1, d2) -> (d2, d0, d1)>
+#res = affine_map<(d0, d1, d2) -> (d0, d1)>
+func.func @int_contract_add_no_chain_fma(
+    %A: vector<3x4x2xi32>,
+    %B: vector<4x3x2xi32>) -> vector<3x2xi32> {
+  %c0 = arith.constant dense<0> : vector<3x2xi32>
+  %out = vector.contract
+           { indexing_maps = [#lhs, #rhs, #res],
+             iterator_types = ["parallel","parallel","reduction"],
+             kind = #vector.kind<add> }
+           %A, %B, %c0
+         : vector<3x4x2xi32>, vector<4x3x2xi32> into vector<3x2xi32>
+  return %out : vector<3x2xi32>
+}
+
+// CHECK-LABEL: func.func @int_contract_no_chain_fma
+// CHECK-NOT:  math.fma 
+// CHECK:  return %{{.*}} : vector<3x2xi32>
