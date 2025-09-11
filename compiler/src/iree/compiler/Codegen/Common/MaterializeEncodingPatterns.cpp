@@ -907,7 +907,7 @@ public:
     IREE::Encoding::LayoutMaterializerAttr layoutAttr =
         converter->getLayoutAttr();
     SmallVector<Type> convertedResTypes;
-    for (auto init : op.getDpsInits()) {
+    for (Value init : op.getDpsInits()) {
       convertedResTypes.push_back(converter->convertType(init.getType()));
     }
     Operation *newOp =

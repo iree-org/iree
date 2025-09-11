@@ -69,13 +69,9 @@ static ScaledMMAAttr chooseScaledIntrinsicMMAAttr(TypeRange eTypes,
   ScaledMMAAttr candidateMma;
   for (ScaledMMAAttr mma : wgp.getScaledMma()) {
     // Filter out intrinsics that don't match the element types of this matmul.
-    SetVector<Type> supportedInTypes, supportedOutTypes;
-    supportedInTypes.insert_range(mma.getSupportedInputTypes(wgp.getContext()));
-    supportedOutTypes.insert_range(
-        mma.getSupportedOutputTypes(wgp.getContext()));
-    if (!supportedInTypes.contains(eTypes[0]) ||
-        !supportedInTypes.contains(eTypes[1]) ||
-        !supportedOutTypes.contains(eTypes[4])) {
+    if (mma.getLhsElemType() != eTypes[0] ||
+        mma.getRhsElemType() != eTypes[1] ||
+        mma.getAccElemType() != eTypes[4]) {
       continue;
     }
     candidateMma = mma;
@@ -359,8 +355,8 @@ static Operation *lowerScaledContractionOpToDataTiledOp(
     return nullptr;
   }
 
-  auto inputs = genericOp.getDpsInputOperands();
-  auto outputs = genericOp.getDpsInits();
+  SmallVector<OpOperand *> inputs = genericOp.getDpsInputOperands();
+  OperandRange outputs = genericOp.getDpsInits();
 
   auto lhsType = cast<RankedTensorType>(inputs[0]->get().getType());
   auto rhsType = cast<RankedTensorType>(inputs[1]->get().getType());
@@ -446,18 +442,21 @@ getScaledMatmulPackedLayoutEncodingInfo(IREE::Encoding::EncodingAttr encoding,
   SmallVector<AffineMap> maps = encoding.getRootMaps();
   FailureOr<IREE::LinalgExt::ScaledContractionDimensions> cDims =
       IREE::LinalgExt::inferScaledContractionDims(maps);
-  assert(!failed(cDims) && cDims->k.size() == 1 && cDims->kB.size() == 1 &&
-         "Unsupported: multiple k or kB dimension");
+  if (failed(cDims) || cDims->k.size() != 1 || cDims->kB.size() != 1) {
+    return info;
+  }
   IREE::GPU::TargetAttr gpuAttr = getGPUTargetAttr(config);
   if (!gpuAttr) {
     return info;
   }
   SmallVector<Type> elementTypes = encoding.getElementTypesArray();
-  assert(elementTypes.size() == 5 &&
-         "Scaled matmul expected to have 5 element types");
-  assert(elementTypes[2].getIntOrFloatBitWidth() ==
-             elementTypes[3].getIntOrFloatBitWidth() &&
-         "Scaled matmul expected to have scales of the same bit width");
+  if (elementTypes.size() != 5) {
+    return info;
+  }
+  if (elementTypes[2].getIntOrFloatBitWidth() !=
+      elementTypes[3].getIntOrFloatBitWidth()) {
+    return info;
+  }
   ScaledMMAAttr mmaAttr =
       chooseScaledIntrinsicMMAAttr(elementTypes, gpuAttr.getWgp());
   if (!mmaAttr) {
@@ -495,8 +494,8 @@ getScaledMatmulPackedLayoutEncodingInfo(IREE::Encoding::EncodingAttr encoding,
   auto internal = Codegen::TileSwizzle::Dim::Kind::Internal;
   auto crossIntrinsic = Codegen::TileSwizzle::Dim::Kind::CrossIntrinsic;
   expandShape.push_back(Codegen::TileSwizzle::ExpandShapeDimVectorType(
-      {Codegen::TileSwizzle::Dim(crossIntrinsic, 4),
-       Codegen::TileSwizzle::Dim(internal, 4)}));
+      {Codegen::TileSwizzle::Dim(crossIntrinsic, scalesVectorSize),
+       Codegen::TileSwizzle::Dim(internal, kIntrSize)}));
   swizzle.expandShape = expandShape;
   // Only scales will have a permutation, which is adjusted below. We want to
   // avoid complicated layout transformations on the LHS and RHS for simplicity,
@@ -514,7 +513,8 @@ getScaledMatmulPackedLayoutEncodingInfo(IREE::Encoding::EncodingAttr encoding,
     swizzle.permutation.push_back(2);
     swizzle.expandShape.push_back(
         Codegen::TileSwizzle::ExpandShapeDimVectorType(
-            {Codegen::TileSwizzle::Dim(crossIntrinsic, 32)}));
+            {Codegen::TileSwizzle::Dim(crossIntrinsic,
+                                       mmaAttr.getBlockSize())}));
   }
   int64_t encodingOperandIdx = encoding.getOperandIndex().getInt();
   if (encodingOperandIdx == IREE::Encoding::SCALED_MATMUL_LHS_SCALES ||
