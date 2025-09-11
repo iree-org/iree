@@ -604,7 +604,6 @@ RotateRowsAttr::verify(function_ref<InFlightDiagnostic()> emitError,
   return success();
 }
 
-
 //===---------------------------------------------------------------------===//
 // iree_codegen.symbolic_ukernel_provider
 //===---------------------------------------------------------------------===//
