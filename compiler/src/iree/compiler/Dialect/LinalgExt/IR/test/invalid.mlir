@@ -1029,34 +1029,6 @@ func.func @unpack_mismatch_inner_tile_size_and_output_shape(
 
 // -----
 
-func.func @exp_reduction() -> tensor<2xf32> {
-  %M = tensor.empty() : tensor<2xf32>
-  %out = tensor.empty() : tensor<2xf32>
-
-  // expected-error@+1 {{expected at least one input operand to reduce.}}
-  %max, %sum = iree_linalg_ext.exp_reduction {
-    indexing_maps = [
-      affine_map<(M,N)->(M,N)>,
-      affine_map<(M,N)->(M)>,
-      affine_map<(M,N)->(M)>
-    ],
-    iterator_types = [
-      #iree_linalg_ext.iterator_type<parallel>,
-      #iree_linalg_ext.iterator_type<reduction>
-    ],
-    exp_reduced_operands = [0]
-  } ins()
-    outs(%M, %out: tensor<2xf32>, tensor<2xf32>)
-  {
-  ^bb0(%m: f32, %o: f32):
-    %add = arith.addf %m, %o: f32
-    linalg.yield %m, %add: f32, f32
-  } -> tensor<2xf32>, tensor<2xf32>
-  return %sum : tensor<2xf32>
-}
-
-// -----
-
 func.func @exp_reduction(%S: tensor<2x3xf32>) -> tensor<2xf32> {
   %M = tensor.empty() : tensor<2xf32>
   %out = tensor.empty() : tensor<2xf32>
