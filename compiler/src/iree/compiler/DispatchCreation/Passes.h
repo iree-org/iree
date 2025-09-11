@@ -11,6 +11,7 @@
 
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
 #include "iree/compiler/Pipelines/Options.h"
+#include "iree/compiler/Pipelines/Pipelines.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
@@ -26,7 +27,7 @@ enum class EncodingOptions { Padding, MatmulK, Generic };
 
 /// This is a placeholder for future. We should pass all the options through the
 /// struct.
-struct TransformOptions : public PassPipelineOptions<TransformOptions> {
+struct TransformOptions : public IREEPipelineOptions<TransformOptions> {
   DispatchCreationOptions options;
 };
 

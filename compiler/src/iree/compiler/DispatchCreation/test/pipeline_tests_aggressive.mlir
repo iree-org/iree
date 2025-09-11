@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-dispatch-creation-pipeline{aggressive-fusion})" --mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-dispatch-creation-pipeline{--iree-dispatch-creation-enable-aggressive-fusion})" --mlir-print-local-scope %s | FileCheck %s
 
 util.func public @truncate_fusion(%arg0: tensor<2x64x64x320xi8>, %arg1: tensor<2x66x66x640xi8>, %arg2: tensor<3x3x640x640xi8>, %arg3: tensor<640xi32>, %arg4: tensor<640xf32>, %arg5: tensor<640x320xi8>, %arg6: tensor<640xi32>, %arg7: tensor<640xf32>) -> tensor<2x640x64x64xf16> {
   %c0_i32 = arith.constant 0 : i32

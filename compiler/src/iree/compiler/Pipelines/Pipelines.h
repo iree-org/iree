@@ -13,8 +13,25 @@
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/compiler/Pipelines/Options.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Pass/PassOptions.h"
 
 namespace mlir::iree_compiler {
+
+template <typename DerivedOptions>
+struct IREEPipelineOptions
+    : public PassPipelineOptions<IREEPipelineOptions<DerivedOptions>> {
+  LogicalResult parseFromString(StringRef optionsStr) {
+    OptionsBinder binder = OptionsBinder::local();
+    static_cast<DerivedOptions *>(this)->options.bindOptions(binder);
+    SmallVector<const char *, 16> argvStorage;
+    llvm::BumpPtrAllocator alloc;
+    llvm::StringSaver saver(alloc);
+    llvm::cl::TokenizeGNUCommandLine(optionsStr, saver, argvStorage);
+    return binder.parseArguments(
+        argvStorage.size(), argvStorage.data(),
+        [](StringRef s) { llvm::dbgs() << s << '\n'; });
+  }
+};
 
 class PipelineExtensions;
 
