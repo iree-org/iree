@@ -11,6 +11,8 @@ include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/DestinationStyleOpInterface.td"
+include "mlir/Interfaces/ParallelCombiningOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
@@ -247,6 +249,73 @@ def IREEGPU_GlobalLoadDMAOp : Op<IREEGPU_Dialect, "global_load_dma", [
   let assemblyFormat = [{
     $source`[` $sourceIndices `]` `->` $target `[` $targetIndices `]` attr-dict
       `:` type($source) `->` type($target)
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// CoalescedGatherDMAOp
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
+    DeclareOpInterfaceMethods<DestinationStyleOpInterface>,
+    DeclareOpInterfaceMethods<ParallelCombiningOpInterface,
+       ["getUpdatedDestinations", "getIteratingParent"]>]> {
+  let summary = "Coalesced gather DMA operation for efficient GPU memory access";
+  let description = [{
+    Performs a coalesced gather operation that reads elements from a source tensor
+    based on indices and produces a result tensor with the gathered data. The operation is
+    specifically designed for subgroup-level parallelism, where threads within a
+    subgroup cooperatively gather data with coalesced memory accesses. It implements
+    `ParallelCombiningOpInterface` and must live inside an op implementing
+    `InParallelOpInterface`, such as `scf.forall.in_parallel`.
+
+    ## Lowering Paths
+
+    Two lowering strategies are supported:
+    1. Lowers to `amdgpu.gather_to_lds` operations when lowering
+       requirements are met
+    2. Default lowering using `vector.gather` operations
+
+    ## Operands and Results
+
+    * `$indices`: Tensor of index type specifying gather locations in the source tensor
+    * `$source`: Source tensor containing the data to be gathered
+    * `$init`: Destination tensor receiving the gathered data (destination-passing style)
+    * `$result`: Output tensor with gathered data (same type as `$init`)
+
+    ## Example
+
+    ```mlir
+    %result = scf.forall (%i) in (%c1) shared_outs(%out = %dest) -> (tensor<64x32xf32>) {
+      scf.forall.in_parallel {
+        // Gather 64x32 elements from source based on indices, acting as parallel combining op
+        iree_gpu.coalesced_gather_dma %indices, %source into %out
+          : tensor<64x32xindex>, tensor<1024x64xf32>, tensor<64x32xf32> -> tensor<64x32xf32>
+      }
+    }
+    ```
+  }];
+
+  let arguments = (ins
+    RankedTensorOf<[Index]>:$indices,
+    AnyRankedTensor:$source,
+    AnyRankedTensor:$init
+  );
+
+  let results = (outs AnyRankedTensor:$result);
+
+  let assemblyFormat = [{
+    $indices `,` $source `into` $init attr-dict
+    `:` type($indices) `,` type($source) `,` type($init) `->` type($result)
+  }];
+
+  let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    // Get the rank of the result tensor
+    unsigned getResultRank() {
+      return ::llvm::cast<RankedTensorType>(getResult().getType()).getRank();
+    }
   }];
 }
 
