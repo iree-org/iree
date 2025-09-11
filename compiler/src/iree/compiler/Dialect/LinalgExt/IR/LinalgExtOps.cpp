@@ -739,6 +739,35 @@ bool MapScatterOp::isIdentity() {
   return true;
 }
 
+namespace {
+struct FoldMemRefCastIntoMapScatter
+    : public OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
+                                PatternRewriter &rewriter) const override {
+    auto castOp = mapScatterOp.getOutput().getDefiningOp<memref::CastOp>();
+    if (!castOp) {
+      return failure();
+    }
+    BaseMemRefType castInType = castOp.getSource().getType();
+    BaseMemRefType castOutType = castOp.getResult().getType();
+    if (!llvm::equal(castInType.getShape(), castOutType.getShape())) {
+      return rewriter.notifyMatchFailure(
+          castOp, "expected cast to not change the memref shape");
+    }
+    rewriter.modifyOpInPlace(mapScatterOp, [&]() {
+      mapScatterOp.getOutputMutable().assign(castOp.getSource());
+    });
+    return success();
+  }
+};
+} // namespace
+
+void MapScatterOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *ctx) {
+  results.add<FoldMemRefCastIntoMapScatter>(ctx);
+}
+
 //===----------------------------------------------------------------------===//
 // SortOp
 //===----------------------------------------------------------------------===//

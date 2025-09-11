@@ -353,6 +353,7 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region AnyRegion:$transformation_region);
   let hasVerifier = 1;
+  let hasCanonicalizer = 1;
   let assemblyFormat = [{
     attr-dict $input `into` $output
     $transformation_region
