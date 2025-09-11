@@ -4,7 +4,7 @@
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d3, d4, d5, d6)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
 #lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, padding_conv = [1, 8, 32, 32, 0, 0, 32]}>
-func.func @conv_2d_nhwc_fhwc(%arg0: tensor<16x26x19x287xf16>, %arg1: tensor<287x3x3x287xf16>) -> tensor<16x24x17x287xf32> {
+func.func @conv_2d_nhwc_fhwc(%arg0: tensor<16x26x19x287xf16>, %arg1: tensor<287x3x3x287xf16>) -> tensor<16x24x17x287xbf16> {
    %cst = arith.constant 0.000000e+00 : f32
   %empty = tensor.empty() : tensor<16x24x17x287xf32>
   %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<16x24x17x287xf32>) -> tensor<16x24x17x287xf32>
@@ -16,7 +16,13 @@ func.func @conv_2d_nhwc_fhwc(%arg0: tensor<16x26x19x287xf16>, %arg1: tensor<287x
     %4 = arith.addf %out, %3 : f32
     linalg.yield %4 : f32
   } -> tensor<16x24x17x287xf32>
-  return %0 : tensor<16x24x17x287xf32>
+  %empty2 = tensor.empty() : tensor<16x24x17x287xbf16>
+  %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%0 : tensor<16x24x17x287xf32>) outs(%empty2 : tensor<16x24x17x287xbf16>) {
+    ^bb0(%in: f32, %out: bf16):
+      %2 = arith.truncf %in : f32 to bf16
+      linalg.yield %2 : bf16
+    } -> tensor<16x24x17x287xbf16>
+  return %1 : tensor<16x24x17x287xbf16>
 }
 
 // CHECK-LABEL: func.func @conv_2d_nhwc_fhwc
@@ -28,9 +34,11 @@ func.func @conv_2d_nhwc_fhwc(%arg0: tensor<16x26x19x287xf16>, %arg1: tensor<287x
 //       CHECK:   %[[PADDED_RESULT:.+]] = linalg.generic
 //  CHECK-SAME:     ins(%[[PADDED_LHS]], %[[PADDED_RHS]] : tensor<16x26x34x288xf16>, tensor<288x3x3x288xf16>)
 //  CHECK-SAME:     outs(%[[FILL]] : tensor<16x24x32x288xf32>)
-//       CHECK:   %[[EXTRACT:.+]] = tensor.extract_slice %[[PADDED_RESULT]][0, 0, 0, 0] [16, 24, 17, 287] [1, 1, 1, 1]
-//  CHECK-SAME:     : tensor<16x24x32x288xf32> to tensor<16x24x17x287xf32>
-//       CHECK:   return %[[EXTRACT]] : tensor<16x24x17x287xf32>
+//       CHECK:   %[[TRUNCF:.+]] = linalg.generic
+//  CHECK-SAME:      ins(%[[PADDED_RESULT]]
+//       CHECK:   %[[EXTRACT:.+]] = tensor.extract_slice %[[TRUNCF]][0, 0, 0, 0] [16, 24, 17, 287] [1, 1, 1, 1]
+//  CHECK-SAME:     : tensor<16x24x32x288xbf16> to tensor<16x24x17x287xbf16>
+//       CHECK:   return %[[EXTRACT]] : tensor<16x24x17x287xbf16>
 
 // -----
 
