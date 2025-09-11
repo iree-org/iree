@@ -309,9 +309,11 @@ void DispatchCreationOptions::bindOptions(OptionsBinder &binder) {
       {init_at_opt(llvm::OptimizationLevel::O0, false),
        init_at_opt(llvm::OptimizationLevel::O2, true)},
       llvm::cl::desc("Aggressive fusion opportunities that are behind a flag "
-                     "since all backends dont support it yet"));
+                     "since all backends dont support it yet"),
+      llvm::cl::cat(category));
   binder.opt<bool>("iree-dispatch-creation-fuse-multi-use", enableFuseMultiUse,
-                   llvm::cl::desc("Fuse operations with multiple uses."));
+                   llvm::cl::desc("Fuse operations with multiple uses."),
+                   llvm::cl::cat(category));
   binder.opt<bool>("iree-dispatch-creation-data-tiling", dataTiling,
                    llvm::cl::desc("Enables data tiling path."),
                    llvm::cl::cat(category));
@@ -320,7 +322,8 @@ void DispatchCreationOptions::bindOptions(OptionsBinder &binder) {
       splitReductionTargetSize,
       llvm::cl::desc("Target tile size for split reduction. Inner reduction "
                      "dimensions are tiled first, with the tile size rounded "
-                     "up until it evenly divides the iteration domain."));
+                     "up until it evenly divides the iteration domain."),
+      llvm::cl::cat(category));
 }
 
 } // namespace mlir::iree_compiler
