@@ -213,3 +213,23 @@ func.func public @staticize_online_attention_from_cast(%arg0: tensor<?x4096x16xf
 //      CHECK:   %[[ATTENTION:.+]]:3 = iree_linalg_ext.online_attention
 // CHECK-SAME:       ins(%[[CAST]], %[[ARG1]], %[[ARG2]], %[[ARG3]] :
 //      CHECK:   return %[[ATTENTION]]#0
+
+// -----
+
+func.func public @fold_memref_cast_into_map_scatter(
+    %arg0: memref<?x?xf32>, %arg1: memref<?x?xf32>
+) {
+  %true = arith.constant true
+  %cast = memref.cast %arg1 : memref<?x?xf32> to memref<?x?xf32, strided<[?, 1]>>
+  iree_linalg_ext.map_scatter %arg0 into %cast {
+  ^bb0(%arg2: index, %arg3: index):
+    iree_linalg_ext.yield %arg2, %arg3, %true : index, index, i1
+  } : memref<?x?xf32> into memref<?x?xf32, strided<[?, 1]>>
+  return
+}
+//CHECK-LABEL: func public @fold_memref_cast_into_map_scatter(
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: memref<?x?xf32>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: memref<?x?xf32>
+//  CHECK-NOT:   memref.cast
+//      CHECK:   iree_linalg_ext.map_scatter %[[ARG0]] into %[[ARG1]]
+//      CHECK:   } : memref<?x?xf32> into memref<?x?xf32>
