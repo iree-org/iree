@@ -77,6 +77,8 @@ struct GPUPadConvsPass final : impl::GPUPadConvsPassBase<GPUPadConvsPass> {
     MLIRContext *context = &getContext();
     RewritePatternSet cleanupPatterns(context);
     populateFoldFillIntoPadPattern(cleanupPatterns);
+    linalg::populateExtractSliceSinkingPatterns(
+        cleanupPatterns, [](OpOperand *opOperand) { return true; });
     if (failed(applyPatternsGreedily(funcOp, std::move(cleanupPatterns)))) {
       return signalPassFailure();
     }
