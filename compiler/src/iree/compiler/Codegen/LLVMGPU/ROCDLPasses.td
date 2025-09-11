@@ -38,7 +38,7 @@ def ROCDLConfigureBufferInstructionsPass :
     whether
     - The size of the binding itself, taken as a region of memory, is under 2 GB
      (the limit for indexing a buffer descriptor is uint32_t max, but a lot of
-     intermediate code assumes indices are signed, se this limit is conservative) and
+     intermediate code assumes indices are signed, see this limit is conservative) and
     - That the offset argument to the subspan is workgroup-uniform, since it will
      be folded into the base offset of the descriptor.
 

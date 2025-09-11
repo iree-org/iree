@@ -84,10 +84,10 @@ func.func @const_size_i64_offset() {
   return
 }
 
-// CHECK-LABEL: @const_size_nonuniform_offset_workgroup_id
-// CHECK-NOT: iree_gpu.use_rocdl_buffer_instructions
+// CHECK-LABEL: @const_size_uniform_offset_workgroup_id
+// CHECK: iree_gpu.use_rocdl_buffer_instructions
 // CHECK: return
-func.func @const_size_nonuniform_offset_workgroup_id() {
+func.func @const_size_uniform_offset_workgroup_id() {
   %c8192 = arith.constant 8192 : index
   %wgid = hal.interface.workgroup.id[0] : index
   %off = arith.muli %wgid, %c8192 : index
@@ -121,5 +121,18 @@ func.func @assume_dyn_size() {
   %bind = hal.interface.binding.subspan layout(#pipeline_layout)
     binding(0) alignment(64) offset(%c0)
     : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x256xf32>>{%m.assume}
+  return
+}
+
+// CHECK-LABEL: @const_size_nonuniform_offset_thread_id
+// CHECK-NOT: iree_gpu.use_rocdl_buffer_instructions
+// CHECK: return
+func.func @const_size_nonuniform_offset_thread_id() {
+  %c8192 = arith.constant 8192 : index
+  %tid = gpu.thread_id x
+  %off = arith.muli %tid, %c8192 : index
+  %bind = hal.interface.binding.subspan layout(#pipeline_layout)
+    binding(0) alignment(64) offset(%off)
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x256xf32>>
   return
 }
