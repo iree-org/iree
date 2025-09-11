@@ -265,8 +265,9 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     Performs a coalesced gather operation that reads elements from a source tensor
     based on indices and produces a result tensor with the gathered data. The operation is
     specifically designed for subgroup-level parallelism, where threads within a
-    subgroup cooperatively gather data with coalesced memory accesses. It must be
-    nested inside an `scf.forall` operation that distributes work across subgroups.
+    subgroup cooperatively gather data with coalesced memory accesses. It implements
+    `ParallelCombiningOpInterface` and must live inside an op implementing
+    `InParallelOpInterface`, such as `scf.forall.in_parallel`.
 
     ## Lowering Paths
 
