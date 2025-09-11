@@ -15,6 +15,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/DestinationStyleOpInterface.h"
+#include "mlir/Interfaces/ParallelCombiningOpInterface.h"
 #include "mlir/Support/LLVM.h"
 
 // clang-format off
@@ -191,12 +192,29 @@ MutableOperandRange CoalescedGatherDMAOp::getDpsInitsMutable() {
   return getInitMutable();
 }
 
+// ParallelCombiningOpInterface implementation
+MutableOperandRange CoalescedGatherDMAOp::getUpdatedDestinations() {
+  // Return the init operand as the destination being updated
+  return getInitMutable();
+}
+
+Operation *CoalescedGatherDMAOp::getIteratingParent() {
+  // Return the parent scf.forall operation
+  return getOperation()->getParentOfType<scf::ForallOp>();
+}
+
 LogicalResult CoalescedGatherDMAOp::verify() {
   auto initType = cast<RankedTensorType>(getInit().getType());
   auto resultType = cast<RankedTensorType>(getResult().getType());
 
   if (initType != resultType) {
     return emitOpError("init and result types must match");
+  }
+
+  // Verify that this op is nested within an InParallelOpInterface op
+  if (!isa_and_nonnull<InParallelOpInterface>(getOperation()->getParentOp())) {
+    return emitOpError("must be nested within an operation implementing "
+                       "InParallelOpInterface");
   }
 
   return success();

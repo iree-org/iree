@@ -12,6 +12,7 @@ include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
+include "mlir/Interfaces/ParallelCombiningOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
@@ -256,21 +257,16 @@ def IREEGPU_GlobalLoadDMAOp : Op<IREEGPU_Dialect, "global_load_dma", [
 //===----------------------------------------------------------------------===//
 
 def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
-    DeclareOpInterfaceMethods<DestinationStyleOpInterface>]> {
+    DeclareOpInterfaceMethods<DestinationStyleOpInterface>,
+    DeclareOpInterfaceMethods<ParallelCombiningOpInterface,
+       ["getUpdatedDestinations", "getIteratingParent"]>]> {
   let summary = "Coalesced gather DMA operation for efficient GPU memory access";
   let description = [{
     Performs a coalesced gather operation that reads elements from a source tensor
-    based on indices and writes them to a destination tensor. This operation is
-    designed to maximize memory bandwidth utilization on GPU hardware through
-    coalesced memory access patterns. Conceptually:
-
-    for %dim_indices in dimension($init):
-      $result[%index] = $source[$indices[%dim_index]]
-
-    The operation is specifically designed for subgroup-level parallelism, where
-    threads within a subgroup cooperatively gather data with coalesced memory
-    accesses. It must be nested inside an `scf.forall` operation that distributes
-    work across subgroups.
+    based on indices and produces a result tensor with the gathered data. The operation is
+    specifically designed for subgroup-level parallelism, where threads within a
+    subgroup cooperatively gather data with coalesced memory accesses. It must be
+    nested inside an `scf.forall` operation that distributes work across subgroups.
 
     ## Lowering Paths
 
@@ -286,25 +282,14 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     * `$init`: Destination tensor receiving the gathered data (destination-passing style)
     * `$result`: Output tensor with gathered data (same type as `$init`)
 
-    ## Restrictions
-
-    1. **Nesting requirement**: Must be nested inside an `scf.forall` operation to
-       coordinate parallel execution across subgroups
-
-    2. **Index type**: Indices tensor must have `index` element type
-
-    3. **Destination-passing style**: Init and result tensors must have identical types
-
     ## Example
 
     ```mlir
     %result = scf.forall (%i) in (%c1) shared_outs(%out = %dest) -> (tensor<64x32xf32>) {
-      // Gather 64x32 elements from source based on indices
-      %gathered = iree_gpu.coalesced_gather_dma %indices, %source into %out
-        : tensor<64x32xindex>, tensor<1024x64xf32>, tensor<64x32xf32> -> tensor<64x32xf32>
       scf.forall.in_parallel {
-        tensor.parallel_insert_slice %gathered into %out[0, 0] [64, 32] [1, 1]
-          : tensor<64x32xf32> into tensor<64x32xf32>
+        // Gather 64x32 elements from source based on indices, acting as parallel combining op
+        iree_gpu.coalesced_gather_dma %indices, %source into %out
+          : tensor<64x32xindex>, tensor<1024x64xf32>, tensor<64x32xf32> -> tensor<64x32xf32>
       }
     }
     ```
