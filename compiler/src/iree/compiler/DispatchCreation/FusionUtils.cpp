@@ -45,12 +45,14 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
   if (!linalgConsumerOp) {
     return false;
   }
-  if (llvm::all_of(body.getArguments(),
+
+  // The operands aren't used, its just an `linalg.index` or `tensor.extract`
+  // op. Fuse with all non-reduction ops.
+  if (linalgConsumerOp.getNumParallelLoops() ==
+          linalgConsumerOp.getNumLoops() &&
+      llvm::all_of(body.getArguments(),
                    [](BlockArgument arg) { return arg.use_empty(); })) {
-    // The operands aren't used, its just an `linalg.index` or `tensor.extract`
-    // op. Fuse with all non-reduction ops.
-    return linalgConsumerOp.getNumParallelLoops() ==
-           linalgConsumerOp.getNumLoops();
+    return true;
   }
 
   // If producer does not have a single user, dont fuse.
