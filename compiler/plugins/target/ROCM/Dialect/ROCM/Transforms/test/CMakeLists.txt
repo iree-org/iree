@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "apply_builtin_pdl_patterns.mlir"
     "apply_builtin_ukernel_pdl_patterns.mlir"
     "apply_builtin_ukernel_pdl_patterns_driver.mlir"
   TOOLS
