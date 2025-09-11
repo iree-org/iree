@@ -7,6 +7,7 @@
 #include "iree/compiler/DispatchCreation/Passes.h"
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 
 #define DEBUG_TYPE "iree-dispatch-creation-set-split-reduction-sizes"
@@ -78,6 +79,7 @@ private:
     std::optional<SmallVector<int64_t>> opReductionSizes =
         getStaticReductionDimSizes(op);
     if (!opReductionSizes.has_value()) {
+      LDBG() << "skipping op; failed to get loop dim sizes";
       return std::nullopt;
     }
     auto findSmallestFactorWithLowerBound =
@@ -106,6 +108,7 @@ private:
           llvm::divideCeil(splitReductionTargetSize, currentSplitReductionSize);
       int64_t dimSize = (*opReductionSizes)[i];
       if (dimSize == ShapedType::kDynamic) {
+        LDBG() << "skipping op; has dynamic reduction dims";
         return std::nullopt;
       }
       int64_t tileSize =
