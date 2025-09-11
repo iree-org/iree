@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -189,23 +190,14 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
   LogicalResult matchAndRewrite(vector::ContractionOp op,
                                 PatternRewriter &rewriter) const override {
     // TODO: Add a rewrite to support relevant contractions nested in
-    // vector.mask
-    if (op.isMasked()) {
-      return failure();
-    }
-
-    if (op.getKind() != vector::CombiningKind::ADD) {
+    // vector.mask.
+    if (op.isMasked() || op.getKind() != vector::CombiningKind::ADD) {
       return failure();
     }
 
     VectorType lhsVecType = op.getLhsType();
     VectorType rhsVecType = op.getRhsType();
     if (lhsVecType.isScalable() || rhsVecType.isScalable()) {
-      return failure();
-    }
-
-    Type elemTy = lhsVecType.getElementType();
-    if (!isa<Float32Type, Float16Type>(elemTy)) {
       return failure();
     }
 
@@ -268,6 +260,7 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
     // Shape-cast operands to 2D {reduction_size, parallel_size}.
     int64_t redSize = lhsRedSize;
     int64_t parSize = lhsParSize;
+    Type elemTy = lhsVecType.getElementType();
     VectorType flattened2DType = VectorType::get({redSize, parSize}, elemTy);
     Value lhs2D =
         vector::ShapeCastOp::create(rewriter, loc, flattened2DType, lhs);
@@ -293,10 +286,8 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
                                                  op.getAcc());
     }
 
-    // Form chain in 2-element chunks that we can map to one packed FMA.
-    constexpr int64_t chunkSize = 2;
-    Value resultFlat = buildFMAChain(rewriter, loc, lhs2D, rhs2D, flattenedAcc,
-                                     redSize, parSize, chunkSize);
+    Value resultFlat =
+        buildFMAChain(rewriter, loc, lhs2D, rhs2D, flattenedAcc, redSize);
 
     // Restore result to original form.
     Value result;
@@ -395,46 +386,15 @@ private:
                         [](auto p) { return p.value() == p.index(); });
   }
 
-  static Value processFMAChunk(PatternRewriter &rewriter, Location loc,
-                               Value lhsRow, Value rhsRow, Value acc,
-                               int64_t offset, int64_t chunkSize) {
-    int64_t stride = 1;
-
-    Value a = vector::ExtractStridedSliceOp::create(rewriter, loc, lhsRow,
-                                                    offset, chunkSize, stride);
-    Value b = vector::ExtractStridedSliceOp::create(rewriter, loc, rhsRow,
-                                                    offset, chunkSize, stride);
-    Value c = vector::ExtractStridedSliceOp::create(rewriter, loc, acc, offset,
-                                                    chunkSize, stride);
-
-    Value fma = math::FmaOp::create(rewriter, loc, a, b, c);
-
-    return vector::InsertStridedSliceOp::create(rewriter, loc, fma, acc, offset,
-                                                stride);
-  }
-
   static Value buildFMAChain(PatternRewriter &rewriter, Location loc,
-                             Value lhs2D, Value rhs2D, Value accFlat, int64_t K,
-                             int64_t P, int64_t chunkSize) {
+                             Value lhs2D, Value rhs2D, Value accFlat,
+                             int64_t K) {
     Value current = accFlat;
 
     for (int64_t k = K - 1; k >= 0; --k) {
-      Value lhsRow = vector::ExtractOp::create(rewriter, loc, lhs2D, k);
-      Value rhsRow = vector::ExtractOp::create(rewriter, loc, rhs2D, k);
-
-      // Process full chunks.
-      int64_t p = 0;
-      for (; p + chunkSize <= P; p += chunkSize) {
-        current = processFMAChunk(rewriter, loc, lhsRow, rhsRow, current, p,
-                                  chunkSize);
-      }
-
-      // Process any remaining scalars.
-      int64_t tail = P - p;
-      if (tail > 0) {
-        current =
-            processFMAChunk(rewriter, loc, lhsRow, rhsRow, current, p, tail);
-      }
+      Value a = rewriter.create<vector::ExtractOp>(loc, lhs2D, k);
+      Value b = rewriter.create<vector::ExtractOp>(loc, rhs2D, k);
+      current = rewriter.create<math::FmaOp>(loc, a, b, current);
     }
     return current;
   }

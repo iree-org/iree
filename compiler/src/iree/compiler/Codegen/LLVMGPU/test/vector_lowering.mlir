@@ -188,17 +188,15 @@ func.func @multi_reduction_f32_to_double_chain_fma(%a: vector<4x1x8xf32>, %b: ve
 }
 
 // CHECK-LABEL: func.func @multi_reduction_f32_to_double_chain_fma
-// CHECK:  %[[C0:.+]]  = arith.constant dense<0.000000e+00> : vector<2xf32>
-// CHECK:  %[[SLICE0_A:.+]]  =  vector.extract_strided_slice {{.*}} {offsets = [0], sizes = [2], strides = [1]} : vector<4xf32> to vector<2xf32>
-// CHECK:  %[[SLICE0_B:.+]]  =  vector.extract_strided_slice {{.*}} {offsets = [0], sizes = [2], strides = [1]} : vector<4xf32> to vector<2xf32>
-// CHECK:  %[[SLICE0_FMA0:.*]] = math.fma %[[SLICE0_A]], %[[SLICE0_B]], %[[C0]] : vector<2xf32>
-// CHECK:  %[[SLICE1_A:.+]]  =  vector.extract_strided_slice {{.*}} {offsets = [2], sizes = [2], strides = [1]} : vector<4xf32> to vector<2xf32>
-// CHECK:  %[[SLICE1_B:.+]]  =  vector.extract_strided_slice {{.*}} {offsets = [2], sizes = [2], strides = [1]} : vector<4xf32> to vector<2xf32>
-// CHECK:  %[[SLICE1_FMA0:.*]] = math.fma %[[SLICE1_A]], %[[SLICE1_B]], %{{.*}} : vector<2xf32>
-// CHECK:  %[[SLICE0_FMA1:.*]] = math.fma {{.*}}, {{.*}}, %[[SLICE0_FMA0]] : vector<2xf32>
-// CHECK:  %[[SLICE1_FMA1:.*]] = math.fma {{.*}}, {{.*}}, %[[SLICE1_FMA0]] : vector<2xf32>
-// CHECK:  %[[SLICE0_FMA2:.*]] = math.fma {{.*}}, {{.*}}, %[[SLICE0_FMA1]] : vector<2xf32>
-// CHECK:  %[[SLICE1_FMA2:.*]] = math.fma {{.*}}, {{.*}}, %[[SLICE1_FMA1]] : vector<2xf32>
+// CHECK:  %[[C0:.+]]  = arith.constant dense<0.000000e+00> : vector<4xf32>
+// CHECK:  %[[FMA0:.*]] = math.fma %{{.*}}, %{{.*}}, %[[C0]] : vector<4xf32>
+// CHECK:  %[[FMA1:.*]] = math.fma %{{.*}}, %{{.*}}, %[[FMA0]] : vector<4xf32>
+// CHECK:  %[[FMA2:.*]] = math.fma %{{.*}}, %{{.*}}, %[[FMA1]] : vector<4xf32>
+// CHECK:  %[[FMA3:.*]] = math.fma %{{.*}}, %{{.*}}, %[[FMA2]] : vector<4xf32>
+// CHECK:  %[[FMA4:.*]] = math.fma %{{.*}}, %{{.*}}, %[[FMA3]] : vector<4xf32>
+// CHECK:  %[[FMA5:.*]] = math.fma %{{.*}}, %{{.*}}, %[[FMA4]] : vector<4xf32>
+// CHECK:  %[[FMA6:.*]] = math.fma %{{.*}}, %{{.*}}, %[[FMA5]] : vector<4xf32>
+// CHECK:  %[[FMA7:.*]] = math.fma %{{.*}}, %{{.*}}, %[[FMA6]] : vector<4xf32>
 // CHECK:  return %{{.*}} : vector<4x1xf32>
 
 // -----
@@ -220,17 +218,8 @@ func.func @general_contract_add_to_chain_fma(
 }
 
 // CHECK-LABEL: func.func @general_contract_add_to_chain_fma
-// CHECK:  %[[C0:.+]] = arith.constant dense<0.000000e+00> : vector<2xf32>
-// CHECK:  %[[SLICE0_FMA0:.*]] = math.fma {{.*}}, {{.*}}, %[[C0]] : vector<2xf32>
-// CHECK:  %[[SLICE1_FMA0:.*]] = math.fma {{.*}}, {{.*}}, {{.*}} : vector<2xf32>
-// CHECK:  %[[SLICE2_FMA0:.*]] = math.fma {{.*}}, {{.*}}, {{.*}} : vector<2xf32>
-// CHECK:  %[[SLICE0_FMA1:.*]] = math.fma {{.*}}, {{.*}}, %[[SLICE0_FMA0]] : vector<2xf32>
-// CHECK:  %[[SLICE1_FMA1:.*]] = math.fma {{.*}}, {{.*}}, %[[SLICE1_FMA0]] : vector<2xf32>
-// CHECK:  %[[SLICE2_FMA1:.*]] = math.fma {{.*}}, {{.*}}, %[[SLICE2_FMA0]] : vector<2xf32>
-// CHECK:  %[[SLICE0_FMA2:.*]] = math.fma {{.*}}, {{.*}}, %[[SLICE0_FMA1]] : vector<2xf32>
-// CHECK:  %[[SLICE1_FMA2:.*]] = math.fma {{.*}}, {{.*}}, %[[SLICE1_FMA1]] : vector<2xf32>
-// CHECK:  %[[SLICE2_FMA2:.*]] = math.fma {{.*}}, {{.*}}, %[[SLICE2_FMA1]] : vector<2xf32>
-// CHECK:  %[[SLICE0_FMA3:.*]] = math.fma {{.*}}, {{.*}}, %[[SLICE0_FMA2]] : vector<2xf32>
-// CHECK:  %[[SLICE1_FMA3:.*]] = math.fma {{.*}}, {{.*}}, %[[SLICE1_FMA2]] : vector<2xf32>
-// CHECK:  %[[SLICE2_FMA3:.*]] = math.fma {{.*}}, {{.*}}, %[[SLICE2_FMA2]] : vector<2xf32>
+// CHECK:  %[[C0:.+]] = arith.constant dense<0.000000e+00> : vector<6xf32>
+// CHECK:  %[[FMA0:.*]] = math.fma {{.*}}, {{.*}}, %[[C0]] : vector<6xf32>
+// CHECK:  %[[FMA1:.*]] = math.fma {{.*}}, {{.*}}, %[[FMA0]] : vector<6xf32>
+// CHECK:  %[[FMA2:.*]] = math.fma {{.*}}, {{.*}}, %[[FMA1]] : vector<6xf32>
 // CHECK:  return %{{.*}} : vector<3x2xf32>
