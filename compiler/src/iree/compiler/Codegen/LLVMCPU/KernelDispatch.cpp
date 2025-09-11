@@ -3493,11 +3493,11 @@ lowerUsingDefaultPipeline(mlir::FunctionOpInterface entryPointFn) {
 ///   - `linalg.pack` ops whose producer is a `tensor.collapse_shape`,
 ///     as they will be lowered together into a `map_scatter` later in the
 ///     pipeline.
-///   - `linalg.pack` ops whos producer is a `linalg.unpack`. It is hard to
+///   - `linalg.pack` ops whose producer is a `linalg.unpack`. It is hard to
 ///     propagate lowering configs because the tile size is scaled with
-///     UnPackOp's inner tile sizes. The current infra is hard to handle the
-///     case, so we ignore it for now. In practice, it is driven by mmt4d inner
-///     dimensions, so it is usually fine to not have the lowering config.
+///     UnPackOp's inner tile sizes. With the current infra it's hard to handle
+///     the case, so we ignore it for now. In practice, it is driven by mmt4d
+///     inner dimensions, so it is usually fine to not have the lowering config.
 ///     An exception may be that the pack op is for matvec/vecmat which chooses
 ///     larger inner tiles, but it is not a common case atm. The tile size
 ///     adjustment logic should be revisited anyway, so it is a fair stopgap
