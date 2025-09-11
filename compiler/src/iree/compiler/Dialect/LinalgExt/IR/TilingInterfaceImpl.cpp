@@ -1487,10 +1487,15 @@ FailureOr<TilingResult> ArgCompareOp::tileToPartialReduction(
   if (strategy != ReductionTilingStrategy::PartialReductionOuterParallel) {
     return failure();
   }
+
   OpBuilder::InsertionGuard guard(b);
 
   int64_t rank = getInputRank();
   int64_t reductionDim = getDimension();
+
+  if (reductionDims.size() != 1 || reductionDims[0] != reductionDim) {
+    return failure();
+  }
 
   assert(offsets.size() == static_cast<size_t>(rank) &&
          "Unexpected offsets size");
@@ -1538,12 +1543,10 @@ FailureOr<TilingResult> ArgCompareOp::tileToPartialReduction(
     resultIdxShape.push_back(ShapedType::kDynamic);
   }
 
-  auto sliceValResultType = RankedTensorType::get(
-      resultValShape, getOutputValueType().getElementType(),
-      cast<RankedTensorType>(getOutputValueType()).getEncoding());
-  auto sliceIdxResultType = RankedTensorType::get(
-      resultIdxShape, getOutputIndexType().getElementType(),
-      cast<RankedTensorType>(getOutputIndexType()).getEncoding());
+  RankedTensorType sliceValResultType =
+      cast<RankedTensorType>(getOutputValueType().clone(resultValShape));
+  RankedTensorType sliceIdxResultType =
+      cast<RankedTensorType>(getOutputIndexType().clone(resultIdxShape));
 
   auto initValSlice = tensor::ExtractSliceOp::create(
       b, loc, sliceValResultType, init[0], initOffsets, initSizes, initStrides);
@@ -1581,16 +1584,16 @@ FailureOr<TilingResult> ArgCompareOp::tileToPartialReduction(
   SmallVector<Value> operands = std::move(tiledOperands);
   operands.push_back(newIndexBase);
   Operation *tiledArgmaxOp = ArgCompareOp::create(
-      /*builder=*/b, /*location=*/loc, /*results=*/resultTypes,
+      b, loc, resultTypes,
       /*inputs=*/operands[0],
       /*outputs=*/ValueRange{operands[1], operands[2]},
-      /*indexBase=*/operands[3],
-      /*dimension=*/reductionDim);
+      /*indexBase=*/operands[3], /*dimension=*/reductionDim);
 
   // Copy the region.
   Region &targetRegion = tiledArgmaxOp->getRegion(0);
   Region &sourceRegion = getRegion();
-  targetRegion.takeBody(sourceRegion);
+  IRMapping mapper;
+  sourceRegion.cloneInto(&targetRegion, mapper);
 
   return TilingResult{
       {tiledArgmaxOp}, SmallVector<Value>(tiledArgmaxOp->getResults()), slices};
@@ -1642,10 +1645,8 @@ LogicalResult ArgCompareOp::getPartialResultTilePosition(
     SmallVector<OpFoldResult> &resultSizes) {
   int64_t reductionDim = getDimension();
   int64_t inputRank = getInputRank();
-
   resultOffsets.clear();
   resultSizes.clear();
-
   for (int64_t i = 0; i < inputRank; ++i) {
     if (i == reductionDim) {
       resultOffsets.push_back(splitReductionIvs[0]);
