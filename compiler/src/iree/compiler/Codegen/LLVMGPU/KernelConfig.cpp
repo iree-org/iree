@@ -1336,6 +1336,8 @@ setAttentionPipelineAttributes(IREE::GPU::TargetAttr target,
   }
   Builder b(target.getContext());
   NamedAttrList funcAttrs;
+  funcAttrs.append(IREE::GPU::OptimizeOccupancyAttr::getDictKeyName(),
+                   b.getAttr<IREE::GPU::OptimizeOccupancyAttr>());
   funcAttrs.append(IREE::Codegen::DenormalFpMathAttr::getFP32DictKeyName(),
                    b.getAttr<IREE::Codegen::DenormalFpMathAttr>(
                        IREE::Codegen::DenormalFpMath::PreserveSign));

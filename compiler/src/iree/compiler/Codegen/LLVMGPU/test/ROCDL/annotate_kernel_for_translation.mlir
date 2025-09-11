@@ -214,7 +214,7 @@ builtin.module {
       } attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]}
       builtin.module {
         llvm.func @test_kern_arg(%arg0: i32) attributes {
-            func_attrs = {iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">},
+            func_attrs = {iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">, iree_gpu.optimize_occupancy = #iree_gpu.optimize_occupancy},
             llvm_func_attrs = {check_attr}
           } {
           llvm.return
@@ -228,6 +228,7 @@ builtin.module {
 // CHECK:       denormal_fp_math_f32 = "preserve-sign"
 // CHECK-NOT:   func_attrs
 // CHECK:       llvm_func_attrs = {check_attr
+// CHECK:       rocdl.waves_per_eu = 2 : i64
 
 
 // -----
@@ -271,3 +272,4 @@ builtin.module {
 // CHECK-NOT:   denormal_fp_math_f32
 // CHECK-NOT:   func_attrs
 // CHECK:       llvm_func_attrs = {check_attr
+// CHECK-NOT:       rocdl.waves_per_eu = 2 : i64
