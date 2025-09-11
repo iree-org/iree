@@ -90,6 +90,12 @@ annotateKernelForTranslation(LLVM::LLVMFuncOp funcOp,
         attr && attr.getValue() != IREE::Codegen::DenormalFpMath::None) {
       funcOp.setDenormalFpMathF32(
           IREE::Codegen::stringifyDenormalFpMath(attr.getValue()));
+      if (dict.getAs<IREE::GPU::OptimizeOccupancyAttr>(
+              IREE::GPU::OptimizeOccupancyAttr::getDictKeyName())) {
+        // TODO: use a heuristic to compute the value.
+        rocdlDialect->getWavesPerEuAttrHelper().setAttr(
+            funcOp, builder.getI64IntegerAttr(2));
+      }
     }
 
     // Update the function, discarding any unhandled attributes.
