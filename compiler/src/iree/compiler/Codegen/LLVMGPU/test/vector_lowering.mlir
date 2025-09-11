@@ -242,6 +242,6 @@ func.func @int_contract_add_no_chain_fma(
   return %out : vector<3x2xi32>
 }
 
-// CHECK-LABEL: func.func @int_contract_no_chain_fma
+// CHECK-LABEL: func.func @int_contract_add_no_chain_fma
 // CHECK-NOT:  math.fma
 // CHECK:  return %{{.*}} : vector<3x2xi32>
