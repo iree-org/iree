@@ -38,13 +38,33 @@ getStaticReductionDimSizes(TilingInterface op) {
   return dimSizes;
 }
 
+static std::optional<int64_t>
+findSmallestFactorWithLowerBound(int64_t x, int64_t lowerBound) {
+  assert(x > 0);
+  assert(lowerBound > 0);
+  // We expect all numbers here to be relatively small, so just do trial
+  // division (with a limit just to be safe).
+  static constexpr int64_t kMaxIterations = 1 << 15;
+  int64_t upperBound = std::min(x, kMaxIterations);
+  for (int64_t i = lowerBound; i <= upperBound; i++) {
+    if (x % i == 0) {
+      return i;
+    }
+  }
+  return std::nullopt;
+};
+
 struct SetSplitReductionSizesPass final
     : public impl::SetSplitReductionSizesPassBase<SetSplitReductionSizesPass> {
   using Base::Base;
   void runOnOperation() override {
     getOperation()->walk([&](PartialReductionOpInterface tilingOp) {
+      // If the op already has its attribute set, don't change it.
+      if (IREE::LinalgExt::getSplitReductionSizes(tilingOp).has_value()) {
+        return;
+      }
       std::optional<SmallVector<int64_t>> tileSizes =
-          getUserSpecifiedTileSize(tilingOp);
+          getSplitReductionSizes(tilingOp);
       if (!tileSizes) {
         return;
       }
@@ -54,16 +74,7 @@ struct SetSplitReductionSizesPass final
 
 private:
   std::optional<SmallVector<int64_t>>
-  getUserSpecifiedTileSize(PartialReductionOpInterface op) const {
-    {
-      // First preference given to attribute set on the op.
-      std::optional<SmallVector<int64_t>> attributeTileSize =
-          IREE::LinalgExt::getSplitReductionSizes(op);
-      if (attributeTileSize) {
-        return attributeTileSize.value();
-      }
-    }
-
+  getSplitReductionSizes(PartialReductionOpInterface op) const {
     // Skip ops that aren't reductions.
     unsigned numReduction = llvm::count_if(
         op.getLoopIteratorTypes(), [](utils::IteratorType iteratorType) {
@@ -82,22 +93,6 @@ private:
       LDBG() << "skipping op; failed to get loop dim sizes";
       return std::nullopt;
     }
-    auto findSmallestFactorWithLowerBound =
-        [](int64_t x, int64_t lowerBound) -> std::optional<int64_t> {
-      assert(x > 0);
-      assert(lowerBound > 0);
-      // We expect all numbers here to be relatively small, so just do trial
-      // division (with a limit just to be safe).
-      static constexpr int64_t kMaxIterations = 1 << 15;
-      int64_t upperBound = std::min(x, kMaxIterations);
-      for (int64_t i = lowerBound; i <= upperBound; i++) {
-        if (x % i == 0) {
-          return i;
-        }
-      }
-      return std::nullopt;
-    };
-
     int64_t currentSplitReductionSize = 1;
     SmallVector<int64_t> tileSizes(opReductionSizes->size());
     // Tile dimensions until we reach or exceed the target. Tile sizes must
