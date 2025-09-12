@@ -2213,15 +2213,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#ukernelconfigattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      UKernelConfigAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#usegloballoaddmaattr" class="md-nav__link">
     <span class="md-ellipsis">
       UseGlobalLoadDMAAttr
@@ -5407,15 +5398,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#ukernelconfigattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      UKernelConfigAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#usegloballoaddmaattr" class="md-nav__link">
     <span class="md-ellipsis">
       UseGlobalLoadDMAAttr
@@ -5790,7 +5772,6 @@ SPIR-V/LLVM are handled separately.</p>
 <li><a href="#targetattr">TargetAttr</a></li>
 <li><a href="#targetchipattr">TargetChipAttr</a></li>
 <li><a href="#targetwgpattr">TargetWgpAttr</a></li>
-<li><a href="#ukernelconfigattr">UKernelConfigAttr</a></li>
 <li><a href="#usegloballoaddmaattr">UseGlobalLoadDMAAttr</a></li>
 <li><a href="#virtualmmaattr">VirtualMMAAttr</a></li>
 <li><a href="#virtualmmaintrinsicattr">VirtualMMAIntrinsicAttr</a></li>
@@ -6879,44 +6860,6 @@ NVIDIA GPUs.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="ukernelconfigattr">UKernelConfigAttr<a class="headerlink" href="#ukernelconfigattr" title="Permanent link">link</a></h3>
-<p><em>An attribute specifying a ukernel that an op can lower to.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.ukernel_config&lt;
-  StringAttr,   # name
-  DictionaryAttr,   # def_attrs
-  int64_t   # shared_memory_bytes
-&gt;
-</code></pre></div>
-<p>An attribute that can be applied to any operation to specify that it has
-been matched with a ukernel that is a legal lowering for it.</p>
-<h5 id="parameters_20">Parameters:<a class="headerlink" href="#parameters_20" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">name</td>
-<td style="text-align: center;"><code>StringAttr</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">def_attrs</td>
-<td style="text-align: center;"><code>DictionaryAttr</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">shared_memory_bytes</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td>Size in bytes of shared memory workspace</td>
-</tr>
-</tbody>
-</table>
 <h3 id="usegloballoaddmaattr">UseGlobalLoadDMAAttr<a class="headerlink" href="#usegloballoaddmaattr" title="Permanent link">link</a></h3>
 <p><em>Drive lowering of an operation by using global load DMA.</em></p>
 <p>Syntax: <code>#iree_gpu.use_global_load_dma</code></p>
@@ -6940,7 +6883,7 @@ in a chained-matmul operation.</p>
 is perfomed as below:</p>
 <div class="highlight"><pre><span></span><code>  C^T += B^T x A^T
 </code></pre></div>
-<h5 id="parameters_21">Parameters:<a class="headerlink" href="#parameters_21" title="Permanent link">link</a></h5>
+<h5 id="parameters_20">Parameters:<a class="headerlink" href="#parameters_20" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6969,7 +6912,7 @@ is perfomed as below:</p>
   ::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_22">Parameters:<a class="headerlink" href="#parameters_22" title="Permanent link">link</a></h5>
+<h5 id="parameters_21">Parameters:<a class="headerlink" href="#parameters_21" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
