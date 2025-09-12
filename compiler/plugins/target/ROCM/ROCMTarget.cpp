@@ -354,7 +354,7 @@ public:
 
     if (options.enableTensorUKernels) {
       addConfig(kUKernelProviderName,
-                IREE::Codegen::SymbolicUKernelProviderAttr::get(context));
+                IREE::ROCM::TensorUKernelProviderAttr::get(context));
     }
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(

@@ -53,4 +53,23 @@ def ROCM_UKernelProviderAttr  :
   let assemblyFormat = [{}];
 }
 
+//===---------------------------------------------------------------------===//
+// rocm.tensor_ukernel_provider
+//===---------------------------------------------------------------------===//
+
+def ROCM_TensorUKernelProviderAttr  :
+    AttrDef<ROCM_Dialect, "TensorUKernelProvider", [
+    DeclareAttrInterfaceMethods<IREECodegen_UKernelProviderInterface, [
+      "getDataLayoutForUKernel",
+      "getMLIRUKernel",
+      ]>
+    ]> {
+  let mnemonic = "tensor_ukernel_provider";
+  let summary = [{
+    An attribute that provides context specific tensor ukernel implementations for ROCM.
+  }];
+  let parameters = (ins);
+  let assemblyFormat = [{}];
+}
+
 #endif // IREE_PLUGINS_TARGET_ROCM_DIALECT_ROCMATTRS

@@ -38,6 +38,7 @@ iree_cc_library(
     MLIRGPUUtils
     MLIRIR
     MLIRLinalgDialect
+    MLIRLinalgInterfacesIncGenLib
     MLIRParser
     MLIRSupport
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
@@ -45,6 +46,7 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::Dialect::GPU::Transforms::GPUTransforms
     iree::compiler::Codegen::Utils
+    iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
