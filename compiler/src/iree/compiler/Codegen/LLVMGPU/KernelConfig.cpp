@@ -1326,19 +1326,14 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
       targetSubgroupSize, pipelineConfig);
 }
 
-/// Sets attention specific pipeline attributes. Currently, this only affects
-/// AMD targets.
+/// Sets attention specific pipeline attributes.
 static void
 setAttentionPipelineAttributes(IREE::GPU::TargetAttr target,
                                SmallVectorImpl<NamedAttribute> &pipelineAttrs) {
-  if (!target.isAMD()) {
-    return;
-  }
-  Builder b(target.getContext());
   pipelineAttrs.emplace_back(
       IREE::Codegen::DenormalFpMathAttr::getFP32DictKeyName(),
-      b.getAttr<IREE::Codegen::DenormalFpMathAttr>(
-          IREE::Codegen::DenormalFpMath::PreserveSign));
+      IREE::Codegen::DenormalFpMathAttr::get(
+          target.getContext(), IREE::Codegen::DenormalFpMath::PreserveSign));
 }
 
 static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
