@@ -307,5 +307,4 @@ hal.executable private @main {
 // CHECK-LABEL: func @conv_2d_input_backward_16x1x21x192_nhwc
 // CHECK-DAG: memref.alloc() : memref<64x68xbf16, #gpu.address_space<workgroup>>
 // CHECK-DAG: memref.alloc() : memref<2x32x68xbf16, #gpu.address_space<workgroup>>
-// CHECK-DAG: memref.alloca() : memref<2x2x4x1x1xbf16, #gpu.address_space<private>>
-// CHECK-NOT: memref.alloca() : memref<2x2x16x4x16xbf16, #gpu.address_space<private>>
+// CHECK-NOT: memref.alloca
