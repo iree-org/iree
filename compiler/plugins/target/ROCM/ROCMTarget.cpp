@@ -835,9 +835,11 @@ public:
     }
 
     // Add the binary data to the target executable.
-    iree_compiler::IREE::HAL::ExecutableBinaryOp::create(
+    auto binaryOp = IREE::HAL::ExecutableBinaryOp::create(
         executableBuilder, variantOp.getLoc(), variantOp.getSymName(),
         variantOp.getTarget().getFormat(), binaryContainer.value());
+    binaryOp.setMimeTypeAttr(
+        executableBuilder.getStringAttr("application/x-flatbuffers"));
 
     return success();
   }
