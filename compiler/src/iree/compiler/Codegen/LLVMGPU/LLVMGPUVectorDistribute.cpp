@@ -58,6 +58,7 @@ struct LLVMGPUVectorDistributePass final
     registry.insert<affine::AffineDialect>();
     registry.insert<amdgpu::AMDGPUDialect>();
     registry.insert<gpu::GPUDialect>();
+    registry.insert<scf::SCFDialect>();
   }
 
   void runOnOperation() override {

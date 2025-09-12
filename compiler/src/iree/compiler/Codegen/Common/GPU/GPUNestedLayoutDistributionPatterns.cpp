@@ -466,6 +466,23 @@ struct DistributeTransferWrite final
           writeOp, "warp or thread tiles have overlapping strides");
     }
 
+    // If the write op is not distributed to threads, modify the op to be
+    // guarded by a conditional to avoid multiple threads writing the same
+    // address.
+    // NOTE[1]: This makes the assumption that before distributing the `write`
+    // op, none of the indices of the op are thread dependent.
+    // NOTE[2]: Currently this assumes that all the fields in the layout have
+    // the same rank. This is ensured by the verifier of the attribute, but if
+    // that changes, this needs to be updated.
+    // NOTE[3]: This assumes that the value to be written is held by thread 0.
+    if (vectorLayout.getThreadTile().empty()) {
+      auto cmpOp = arith::CmpIOp::create(
+          rewriter, writeOp.getLoc(), arith::CmpIPredicate::eq, threadId,
+          arith::ConstantIndexOp::create(rewriter, writeOp.getLoc(), 0));
+      auto ifOp = scf::IfOp::create(rewriter, writeOp.getLoc(), cmpOp);
+      rewriter.setInsertionPoint(ifOp.thenYield());
+    }
+
     Value distributedVector =
         getDistributed(rewriter, writeOp.getValueToStore(), vectorLayout);
 
@@ -486,7 +503,6 @@ struct DistributeTransferWrite final
       SmallVector<Value> slicedIndices = getTransferIndicesFromNestedLayout(
           rewriter, indices, offsets, vectorLayout, permMap, warpIndices,
           threadIndices);
-
       // Extract the "element vector" from the inner most dimensions. All outer
       // dimensions are either unrolled or distributed such that this is a
       // contiguous slice.
