@@ -30,6 +30,7 @@
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -244,11 +245,13 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
   }
 
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(linalgOp);
-  bool isLinalgGeneric = isa<linalg::GenericOp>(linalgOp.getOperation());
+  bool isElementwiseOrReduction =
+      !linalg::isaContractionOpInterface(linalgOp) &&
+      isa<linalg::GenericOp>(linalgOp.getOperation());
 
   // Default X86 specific strategy.
   if (targetAttr && isX86(targetAttr.getConfiguration())) {
-    if (isLinalgGeneric) {
+    if (isElementwiseOrReduction) {
       return VectorPreProcStrategy::Masking;
     }
 
@@ -259,7 +262,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
 
   // Default RISC-V specific strategies.
   if (targetAttr && isRISCV(targetAttr.getConfiguration())) {
-    if (isLinalgGeneric) {
+    if (isElementwiseOrReduction) {
       return VectorPreProcStrategy::Masking;
     }
 
@@ -1338,11 +1341,12 @@ static SmallVector<int64_t> getDefaultMatmulCacheSizes(linalg::LinalgOp op,
   return noCacheLevelTiling;
 }
 
-static LogicalResult setMatmulPeelingRootConfig(
-    mlir::FunctionOpInterface entryPointFn, linalg::ContractionOpInterface op,
-    ArrayRef<int64_t> distTileSizes, ArrayRef<int64_t> cacheTileSizes,
-    ArrayRef<bool> inputVecScalableTileFlags, ArrayRef<int64_t> vecTileSizes,
-    int vectorSize) {
+static LogicalResult
+setMatmulPeelingRootConfig(mlir::FunctionOpInterface entryPointFn,
+                           linalg::LinalgOp op, ArrayRef<int64_t> distTileSizes,
+                           ArrayRef<int64_t> cacheTileSizes,
+                           ArrayRef<bool> inputVecScalableTileFlags,
+                           ArrayRef<int64_t> vecTileSizes, int vectorSize) {
 
   // 0. Preprocess for scalable vectors
   SmallVector<int64_t> roundedVecTileSizes(vecTileSizes);
@@ -1380,14 +1384,14 @@ static LogicalResult setMatmulPeelingRootConfig(
       /*workgroupSize=*/{}, /*subgroupSize=*/{}, pipelineConfig);
 }
 
-static LogicalResult setMatmulRootConfig(
-    mlir::FunctionOpInterface entryPointFn, linalg::ContractionOpInterface op,
-    ArrayRef<int64_t> distTileSizes, ArrayRef<bool> inputVecScalableDims,
-    ArrayRef<int64_t> inputVecTileSizes, int vectorSize,
-    VectorPreProcStrategy vecPreProcStrategy) {
+static LogicalResult
+setMatmulRootConfig(mlir::FunctionOpInterface entryPointFn,
+                    linalg::LinalgOp linalgOp, ArrayRef<int64_t> distTileSizes,
+                    ArrayRef<bool> inputVecScalableDims,
+                    ArrayRef<int64_t> inputVecTileSizes, int vectorSize,
+                    VectorPreProcStrategy vecPreProcStrategy) {
   assert(vecPreProcStrategy != VectorPreProcStrategy::Peeling &&
          "peeling should go to the setMatmulPeelingRootConfig method");
-  auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
   SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
 
   SmallVector<int64_t> vecTileSizes;
@@ -1412,9 +1416,9 @@ static LogicalResult setMatmulRootConfig(
     // fallback to fixed vectorization if they occur:
     vecScalableFlags.push_back(sz > 1 ? isScalable : false);
   }
-  limitVectorTileSizes(cast<linalg::LinalgOp>(op.getOperation()), vecTileSizes);
+  limitVectorTileSizes(linalgOp, vecTileSizes);
 
-  LoweringConfigGenerator generator(op);
+  LoweringConfigGenerator generator(linalgOp);
   generator.setDistributionTileSizes(distTileSizes);
   generator.setVectorTileSizes(vecTileSizes, vecScalableFlags);
   IREE::CPU::LoweringConfigAttr loweringConfig =
@@ -1423,8 +1427,8 @@ static LogicalResult setMatmulRootConfig(
          << loweringConfig;
 
   auto pipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
-  return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, loweringConfig,
-                                               pipeline);
+  return setOpConfigAndEntryPointFnTranslation(entryPointFn, linalgOp,
+                                               loweringConfig, pipeline);
 }
 
 /// Returns default hard-coded vector sizes for a give target. No smartness
@@ -1743,17 +1747,15 @@ getMatmulCacheTileSizesForShape(ArrayRef<int64_t> inputTileSizes,
 /// Sets the lowering configuration for dispatch region with root op that
 /// implements the contraction operation interface.
 static LogicalResult
-setRootConfig(mlir::FunctionOpInterface entryPointFn,
-              linalg::ContractionOpInterface contractionOp) {
-  assert(!getLoweringConfig(contractionOp) &&
-         "expected lowering_config is not set");
-  auto linalgOp = cast<linalg::LinalgOp>(contractionOp.getOperation());
+setContractionRootConfig(mlir::FunctionOpInterface entryPointFn,
+                         linalg::LinalgOp linalgOp) {
+  assert(!getLoweringConfig(linalgOp) && "expected lowering_config is not set");
   unsigned numLoops = linalgOp.getNumLoops();
   {
     SmallVector<unsigned> dims;
     linalgOp.getReductionDims(dims);
     if (dims.size() != 1 || dims[0] != numLoops - 1) {
-      return contractionOp.emitOpError(
+      return linalgOp.emitOpError(
           "expected to have exactly one reduction dim, and it is the innermost "
           "dim");
     }
@@ -1761,10 +1763,12 @@ setRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   // Consider all element types and use the smallest vector size. The tiling
   // sizes are chosen based on the vector size.
-  auto lhsShapedType = llvm::cast<ShapedType>(contractionOp.lhs().getType());
-  auto rhsShapedType = llvm::cast<ShapedType>(contractionOp.rhs().getType());
+  auto lhsShapedType =
+      cast<ShapedType>(linalgOp.getDpsInputOperand(0)->get().getType());
+  auto rhsShapedType =
+      cast<ShapedType>(linalgOp.getDpsInputOperand(1)->get().getType());
   auto resShapedType =
-      llvm::cast<ShapedType>(linalgOp.getDpsInitOperand(0)->get().getType());
+      cast<ShapedType>(linalgOp.getDpsInitOperand(0)->get().getType());
   int64_t vectorSize = getVectorSize(entryPointFn, lhsShapedType);
   vectorSize = std::min(vectorSize, getVectorSize(entryPointFn, rhsShapedType));
   vectorSize = std::min(vectorSize, getVectorSize(entryPointFn, resShapedType));
@@ -1785,7 +1789,7 @@ setRootConfig(mlir::FunctionOpInterface entryPointFn,
   distConfig.allowIncompleteTile =
       vecPreProcStrategy != VectorPreProcStrategy::None;
   distConfig.vectorSizeHints.resize(numLoops, vectorSize);
-  bool isBM = isa<linalg::BatchMatmulOp>(contractionOp.getOperation());
+  bool isBM = isa<linalg::BatchMatmulOp>(linalgOp.getOperation());
   if (isBM) {
     distConfig.maxTileSizes[0] = 1;
     distConfig.vectorSizeHints[0] = 1;
@@ -1843,12 +1847,12 @@ setRootConfig(mlir::FunctionOpInterface entryPointFn,
   LDBG() << "Vector size: " << vectorSize;
 
   if (usePeelingPipeline) {
-    return setMatmulPeelingRootConfig(
-        entryPointFn, contractionOp, distTileSizes, cacheTileSizes,
-        vecScalableFlags, vecTileSizes, vectorSize);
+    return setMatmulPeelingRootConfig(entryPointFn, linalgOp, distTileSizes,
+                                      cacheTileSizes, vecScalableFlags,
+                                      vecTileSizes, vectorSize);
   }
 
-  return setMatmulRootConfig(entryPointFn, contractionOp, distTileSizes,
+  return setMatmulRootConfig(entryPointFn, linalgOp, distTileSizes,
                              vecScalableFlags, vecTileSizes, vectorSize,
                              vecPreProcStrategy);
 }
@@ -2591,9 +2595,10 @@ static LogicalResult setElementwiseGenericOpRootConfig(
 /// Sets the lowering configuration for a generic op to use
 /// CPUDoubleTilingExpert pipeline.
 static LogicalResult
-setRootConfig(mlir::FunctionOpInterface entryPointFn,
-              linalg::GenericOp genericOp, const LinalgOpInfo &linalgOpInfo,
-              const TargetMLTransformInfo &targetMLTransInfo) {
+setGenericRootConfig(mlir::FunctionOpInterface entryPointFn,
+                     linalg::GenericOp genericOp,
+                     const LinalgOpInfo &linalgOpInfo,
+                     const TargetMLTransformInfo &targetMLTransInfo) {
   assert(!getLoweringConfig(genericOp) &&
          "expected lowering_config is not set");
 
@@ -2866,39 +2871,47 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 static LogicalResult
 setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
                   const TargetMLTransformInfo &targetMLTransInfo) {
-  auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
-    return TypeSwitch<Operation *, LogicalResult>(op)
-        .Case<linalg::GenericOp>([&](auto op) {
-          return setRootConfig(entryPointFn, op, LinalgOpInfo(op),
-                               targetMLTransInfo);
-        })
-        .Case<IREE::LinalgExt::CustomOp>([&](auto op) {
-          return setDefaultCustomOpLoweringConfig(entryPointFn, op,
-                                                  initCPULaunchConfig);
-        })
-        .Case<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::FftOp,
-              linalg::PackOp, tensor::PadOp, linalg::UnPackOp, linalg::Mmt4DOp,
-              linalg::BatchMmt4DOp>(
-            [&](auto op) { return setRootConfig(entryPointFn, op); })
-        .Case<IREE::LinalgExt::WinogradFilterTransformOp,
-              IREE::LinalgExt::WinogradInputTransformOp,
-              IREE::LinalgExt::WinogradOutputTransformOp>(
-            [&](auto op) { return setWinogradRootConfig(entryPointFn, op); })
-        .Case<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
-              linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
-              linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
-              linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
-              linalg::PoolingNchwMaxOp, linalg::DepthwiseConv2DNhwcHwcOp>(
-            [&](auto op) {
-              return setConvInterfaceRootConfig(entryPointFn, op);
-            })
-        .Case<linalg::ContractionOpInterface>(
-            [&](auto op) { return setRootConfig(entryPointFn, op); })
-        .Case<TilingInterface>(
-            [&](auto op) { return setRootConfig(entryPointFn, op); })
-        .Default([&](Operation *op) { return success(); });
-  };
-  return setRootConfigFn(op);
+  // These operations have their own logic of lowering config.
+  auto result =
+      TypeSwitch<Operation *, LogicalResult>(op)
+          .Case<IREE::LinalgExt::CustomOp>([&](auto op) {
+            return setDefaultCustomOpLoweringConfig(entryPointFn, op,
+                                                    initCPULaunchConfig);
+          })
+          .Case<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::FftOp,
+                linalg::PackOp, tensor::PadOp, linalg::UnPackOp,
+                linalg::Mmt4DOp, linalg::BatchMmt4DOp>(
+              [&](auto op) { return setRootConfig(entryPointFn, op); })
+          .Case<IREE::LinalgExt::WinogradFilterTransformOp,
+                IREE::LinalgExt::WinogradInputTransformOp,
+                IREE::LinalgExt::WinogradOutputTransformOp>(
+              [&](auto op) { return setWinogradRootConfig(entryPointFn, op); })
+          .Case<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
+                linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
+                linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
+                linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
+                linalg::PoolingNchwMaxOp, linalg::DepthwiseConv2DNhwcHwcOp>(
+              [&](auto op) {
+                return setConvInterfaceRootConfig(entryPointFn, op);
+              })
+          .Default([&](Operation *op) { return failure(); });
+  if (succeeded(result)) {
+    return result;
+  }
+
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+    if (linalg::isaContractionOpInterface(linalgOp)) {
+      return setContractionRootConfig(entryPointFn, linalgOp);
+    }
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+      return setGenericRootConfig(entryPointFn, genericOp,
+                                  LinalgOpInfo(linalgOp), targetMLTransInfo);
+    }
+  }
+  if (auto tilingInterface = dyn_cast<TilingInterface>(op)) {
+    return setRootConfig(entryPointFn, tilingInterface);
+  }
+  return failure();
 }
 
 /// Update the distribution tile sizes and parallel vector tile sizes to ensure:

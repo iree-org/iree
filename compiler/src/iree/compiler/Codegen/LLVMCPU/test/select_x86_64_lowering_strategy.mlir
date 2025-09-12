@@ -1,5 +1,8 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy)' --split-input-file %s | FileCheck %s
 
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d1)>
+#map2 = affine_map<(d0, d1) -> (d0)>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -16,7 +19,12 @@ func.func @matvec_static() attributes {hal.executable.target = #executable_targe
   %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0], sizes = [384], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<384xf32>> -> tensor<384xf32>
   %5 = tensor.empty() : tensor<128xf32>
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<128xf32>) -> tensor<128xf32>
-  %7 = linalg.matvec ins(%3, %4 : tensor<128x384xf32>, tensor<384xf32>) outs(%6 : tensor<128xf32>) -> tensor<128xf32>
+  %7 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "reduction"]} ins(%3, %4 : tensor<128x384xf32>, tensor<384xf32>) outs(%6 : tensor<128xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %8 = arith.mulf %in, %in_0 : f32
+      %9 = arith.addf %out, %8 : f32
+      linalg.yield %9 : f32
+    } -> tensor<128xf32>
   iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0], sizes = [128], strides = [1] : tensor<128xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128xf32>>
   return
 }
@@ -24,7 +32,7 @@ func.func @matvec_static() attributes {hal.executable.target = #executable_targe
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //       CHECK: func.func @matvec_static()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//       CHECK: linalg.matvec
+//       CHECK: linalg.generic
 //  CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
