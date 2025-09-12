@@ -29,10 +29,12 @@ gatherExecutableTargets(ArrayRef<IREE::HAL::ExecutableOp> executableOps) {
 }
 
 SmallVector<IREE::HAL::ExecutableOp>
-gatherExecutablesForTarget(mlir::ModuleOp moduleOp, StringRef targetName) {
+gatherExecutablesForTarget(mlir::ModuleOp moduleOp, StringRef targetName,
+                           bool lazy) {
   SmallVector<IREE::HAL::ExecutableOp> result;
   for (auto executableOp : moduleOp.getOps<IREE::HAL::ExecutableOp>()) {
-    if (llvm::any_of(executableOp.getOps<IREE::HAL::ExecutableVariantOp>(),
+    if (executableOp.getLazy() == lazy &&
+        llvm::any_of(executableOp.getOps<IREE::HAL::ExecutableVariantOp>(),
                      [&](IREE::HAL::ExecutableVariantOp variantOp) {
                        return variantOp.getTarget().getBackend().getValue() ==
                               targetName;

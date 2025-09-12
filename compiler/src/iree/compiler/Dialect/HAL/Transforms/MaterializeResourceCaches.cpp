@@ -75,8 +75,8 @@ static std::string getDeviceNamePrefix(IREE::Util::GlobalOpInterface deviceOp) {
     // Already prefixed.
     return deviceName.str();
   }
-  auto prefixedName = "__" + deviceName;
-  return prefixedName.str();
+  std::string prefixedName = ("__" + deviceName).str();
+  return prefixedName;
 }
 
 static void declareDeviceExecutable(IREE::Util::GlobalOpInterface deviceOp,
