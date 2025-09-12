@@ -74,9 +74,6 @@ IREE::GPU::LoweringConfigAttr setPromotedOperandsList(
 std::optional<SmallVector<int64_t>> getPaddingList(LoweringConfigAttr config,
                                                    bool paddingConv = false);
 
-IREE::GPU::UKernelConfigAttr
-getUkernelSpec(IREE::GPU::LoweringConfigAttr config);
-
 } // namespace mlir::iree_compiler::IREE::GPU
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IR_GPULOWERINGCONFIGUTILS_H_

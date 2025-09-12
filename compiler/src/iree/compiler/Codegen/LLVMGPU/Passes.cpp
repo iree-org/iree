@@ -500,7 +500,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(IREE::GPU::createDistributeInnerTiledToLanesPass());
 
   // Step 4.5. Things that need to happen right after distribution to threads.
-  funcPassManager.addPass(createGPULowerToUKernelsPass());
+  funcPassManager.addPass(createLowerBitcodeUKernelsPass());
 
   // Normalize loop bounds for later lowerings.
   funcPassManager.addPass(iree_compiler::createNormalizeLoopBoundsPass(
@@ -897,7 +897,7 @@ void addGPUDefaultPassPipeline(OpPassManager &funcPassManager,
   tileAndDistributeToWorkgroup(funcPassManager, /*useForall=*/true,
                                /*convertToDpsOptions=*/dpsOptions);
   if (options.enableUkernels) {
-    funcPassManager.addPass(createGPULowerToUKernelsPass());
+    funcPassManager.addPass(createLowerBitcodeUKernelsPass());
   }
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
