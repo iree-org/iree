@@ -354,9 +354,8 @@ struct ConvertToROCDLPass final
       populateFuncToLLVMConversionPatterns(converter, llvmPatterns);
       cf::populateControlFlowToLLVMConversionPatterns(converter, llvmPatterns);
       arith::populateArithToLLVMConversionPatterns(converter, llvmPatterns);
-      amdgpu::Chipset chipset =
-          amdgpu::Chipset::parse(targetArch).value_or(amdgpu::Chipset());
-      populateAMDGPUToROCDLConversionPatterns(converter, llvmPatterns, chipset);
+      populateAMDGPUToROCDLConversionPatterns(converter, llvmPatterns,
+                                              *maybeChipset);
       vector::populateVectorRankReducingFMAPattern(llvmPatterns);
       vector::populateVectorInsertExtractStridedSliceTransforms(llvmPatterns);
       vector::populateVectorStepLoweringPatterns(llvmPatterns);
