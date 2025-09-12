@@ -95,11 +95,10 @@ public:
               arith::IndexCastOp::create(b, indicesTy.getElementType(), index);
           linalg::YieldOp::create(b, cast.getResult());
         };
-        batchIdx = builder
-                       .create<linalg::GenericOp>(indicesTy, indices, empty,
-                                                  indexingMaps, iterators,
-                                                  blockBuilder)
-                       .getResult(0);
+        batchIdx =
+            linalg::GenericOp::create(builder, indicesTy, indices, empty,
+                                      indexingMaps, iterators, blockBuilder)
+                .getResult(0);
       }
 
       indicesTy = llvm::cast<RankedTensorType>(indicesTy.clone(

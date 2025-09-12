@@ -358,9 +358,8 @@ class BindSymbolicShapesPass final
               /*umin=*/optionalUmin,
               /*umax=*/optionalUmax,
               /*divisor=*/optionalDivisor);
-          dimValue = builder
-                         .create<IREE::Util::AssumeIntOp>(bindOp->getLoc(),
-                                                          dimValue, assumption)
+          dimValue = IREE::Util::AssumeIntOp::create(builder, bindOp->getLoc(),
+                                                     dimValue, assumption)
                          .getResult(0);
         }
 

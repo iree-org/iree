@@ -531,12 +531,10 @@ void createCoarseFencesSyncWrapper(StringRef syncFunctionName,
   callOperands.push_back(waitFence);
   callOperands.push_back(signalFence);
   std::optional<ArrayAttr> targetTiedOperands = asyncFuncOp.getTiedOperands();
-  auto callResults =
-      rewriter
-          .create<IREE::Util::CallOp>(loc, asyncFuncOp, callOperands,
-                                      targetTiedOperands ? *targetTiedOperands
-                                                         : ArrayAttr{})
-          .getResults();
+  auto callResults = IREE::Util::CallOp::create(
+                         rewriter, loc, asyncFuncOp, callOperands,
+                         targetTiedOperands ? *targetTiedOperands : ArrayAttr{})
+                         .getResults();
 
   // Wait forever for signal.
   IREE::HAL::FenceAwaitOp::create(
