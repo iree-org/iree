@@ -38,7 +38,7 @@ public:
   }
 
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     // Gather all of the initializers in the module.
     // Build a fused loc from all initializers we are combining.

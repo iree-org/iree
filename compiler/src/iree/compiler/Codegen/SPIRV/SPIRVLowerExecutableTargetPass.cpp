@@ -63,7 +63,7 @@ public:
 } // namespace
 
 void SPIRVLowerExecutableTargetPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   IREE::Codegen::TranslationInfoAttr translationInfo =
       getTranslationInfo(funcOp);

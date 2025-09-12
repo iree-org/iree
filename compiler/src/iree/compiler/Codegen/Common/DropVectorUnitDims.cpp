@@ -31,7 +31,7 @@ public:
 
 void DropVectorUnitDimsPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   // Apply transfer ops write to read forwarding and dead transfer write
   // optimizations.

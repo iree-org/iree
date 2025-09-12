@@ -171,7 +171,7 @@ public:
 
 void LLVMCPUSplitReductionPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   IRRewriter rewriter(context);
   SmallVector<linalg::GenericOp> candidates;

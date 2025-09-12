@@ -1009,7 +1009,7 @@ populateCommonCanonicalizationPatterns(MLIRContext *context,
 
 void PropagateLinalgTransposePass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   // First, specialize all transposes to `linalg.transpose`. This dramatically
   // simplifies all subsequent propagation patterns, both in matching and
   // rewriting.

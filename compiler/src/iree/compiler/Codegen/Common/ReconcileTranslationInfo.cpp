@@ -714,7 +714,7 @@ getTargetFuncAttrs(IREE::Codegen::TranslationInfoAttr translationInfo) {
 }
 
 void ReconcileTranslationInfoPass::runOnOperation() {
-  auto variantOp = getOperation();
+  IREE::HAL::ExecutableVariantOp variantOp = getOperation();
   auto innerModuleOp = variantOp.getInnerModule();
   MLIRContext *context = &getContext();
 

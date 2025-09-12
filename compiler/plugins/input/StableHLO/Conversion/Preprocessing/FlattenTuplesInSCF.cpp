@@ -243,8 +243,7 @@ struct FlattenTuplesInSCF final
   }
 
   void runOnOperation() override {
-    ModuleOp module = getOperation();
-    MLIRContext *ctx = module.getContext();
+    MLIRContext *ctx = &getContext();
     Builder b(ctx);
 
     // Run canonicalization patterns to cancel out remaining tuple ops. We need

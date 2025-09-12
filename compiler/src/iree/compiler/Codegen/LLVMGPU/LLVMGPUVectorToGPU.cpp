@@ -52,7 +52,7 @@ struct LLVMGPUVectorToGPUPass final
   }
 
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     bool targetMmaSync = tensorCoreType == GPUTensorCoreType::MMA_SYNC;
     RewritePatternSet flatternpatterns(funcOp.getContext());
     populateVectorTransferToGPUMMAPreparationPatterns(flatternpatterns);

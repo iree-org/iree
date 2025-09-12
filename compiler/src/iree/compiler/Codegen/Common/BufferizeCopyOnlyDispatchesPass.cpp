@@ -51,7 +51,7 @@ struct BufferizeCopyOnlyDispatchesPass final
 } // namespace
 
 void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   /// Check if the dispatch has all sources for
   /// `iree_tensor_ext.dispatch.tensor.store` operations coming from

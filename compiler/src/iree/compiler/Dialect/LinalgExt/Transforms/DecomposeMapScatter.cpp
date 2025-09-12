@@ -222,7 +222,7 @@ struct DecomposeMapScatterPass final
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
 
     RewritePatternSet patterns(context);
     patterns.add<FoldSubViewIntoMapScatter>(context);

@@ -209,7 +209,7 @@ resolveMemoryPropertiesOp(AllocatorResolveMemoryPropertiesOp op,
 struct ResolveTopologyQueriesPass
     : public impl::ResolveTopologyQueriesPassBase<ResolveTopologyQueriesPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     DeviceAnalysis deviceAnalysis(moduleOp);
     if (failed(deviceAnalysis.run())) {

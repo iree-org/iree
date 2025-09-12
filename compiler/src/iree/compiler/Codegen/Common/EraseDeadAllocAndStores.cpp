@@ -31,7 +31,7 @@ public:
 };
 
 void EraseDeadAllocAndStoresPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   IRRewriter rewriter(&getContext());
   memref::eraseDeadAllocAndStores(rewriter, funcOp);
 }

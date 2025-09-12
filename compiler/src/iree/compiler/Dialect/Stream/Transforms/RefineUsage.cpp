@@ -457,7 +457,7 @@ static void insertUsageRefinementPatterns(MLIRContext *context,
 struct RefineUsagePass
     : public IREE::Stream::impl::RefineUsagePassBase<RefineUsagePass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     if (moduleOp.getBody()->empty())
       return;
 

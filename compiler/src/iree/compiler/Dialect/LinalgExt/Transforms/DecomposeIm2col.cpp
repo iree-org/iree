@@ -76,7 +76,7 @@ struct DecomposeIm2colPass final
 
 void DecomposeIm2colPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   SmallVector<Im2colOp> candidates;
   funcOp->walk([&](Im2colOp op) { candidates.push_back(op); });

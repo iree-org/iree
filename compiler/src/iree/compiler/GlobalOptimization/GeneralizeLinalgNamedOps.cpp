@@ -44,7 +44,7 @@ struct GeneralizeLinalgNamedOpsPass
 } // namespace
 
 void GeneralizeLinalgNamedOpsPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   SmallVector<linalg::LinalgOp> namedOpCandidates;
   funcOp.walk([&](linalg::LinalgOp linalgOp) {
     if (!IREE::Flow::isNonNullAndOutsideDispatch(linalgOp) ||

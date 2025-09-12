@@ -599,7 +599,7 @@ struct SwitchStoreOfIfResultValue
 } // namespace
 
 void ConvertToDestinationPassingStylePass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   MLIRContext *context = &getContext();
 
   // Dont do anything for functions that have multiple blocks for now.

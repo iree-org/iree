@@ -34,7 +34,7 @@ public:
 
 void LLVMCPUVectorShapeCastLoweringPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   RewritePatternSet patterns(ctx);
   vector::populateVectorShapeCastLoweringPatterns(patterns);

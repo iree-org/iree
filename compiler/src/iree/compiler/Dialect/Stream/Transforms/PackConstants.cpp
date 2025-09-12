@@ -656,7 +656,7 @@ static Value generateUploads(Value awaitTimepoint,
 struct PackConstantsPass
     : public IREE::Stream::impl::PackConstantsPassBase<PackConstantsPass> {
   void runOnOperation() override {
-    auto parentOp = getOperation();
+    mlir::CallableOpInterface parentOp = getOperation();
     if (!parentOp || !parentOp.getCallableRegion() ||
         parentOp.getCallableRegion()->empty()) {
       return;

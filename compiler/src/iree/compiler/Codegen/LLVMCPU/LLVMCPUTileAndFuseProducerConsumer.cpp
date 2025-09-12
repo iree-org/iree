@@ -228,7 +228,7 @@ struct LLVMCPUTileAndFuseProducerConsumer
 
 void LLVMCPUTileAndFuseProducerConsumer::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   IRRewriter rewriter(funcOp);
 
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);

@@ -470,7 +470,7 @@ struct MaterializeResourceCachesPass
     : public IREE::HAL::impl::MaterializeResourceCachesPassBase<
           MaterializeResourceCachesPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     SymbolTable symbolTable(moduleOp);
 
     // Analyze the module to determine which devices are used where.

@@ -516,7 +516,7 @@ namespace {
 struct SetEncodingPass final : impl::SetEncodingPassBase<SetEncodingPass> {
   using Base::Base;
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     MLIRContext *context = &getContext();
     IRRewriter rewriter(context);
     RewritePatternSet postPatterns(context);

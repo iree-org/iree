@@ -216,7 +216,7 @@ public:
 };
 
 void HoistUnrolledVectorExtractInsertSlicePass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   IRRewriter rewriter(funcOp->getContext());
   funcOp.walk([&](scf::ForOp forOp) {
     hoistUnrolledVectorExtractInsert(rewriter, forOp);

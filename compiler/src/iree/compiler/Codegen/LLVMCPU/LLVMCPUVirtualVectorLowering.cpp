@@ -35,7 +35,7 @@ public:
 
 void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   auto vectorMultiReductionLowering =
       vector::VectorMultiReductionLowering::InnerReduction;

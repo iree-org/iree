@@ -115,7 +115,7 @@ class ResolveRodataLoadsPass
     : public IREE::VM::impl::ResolveRodataLoadsPassBase<
           ResolveRodataLoadsPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    IREE::VM::ModuleOp moduleOp = getOperation();
 
     Explorer explorer(moduleOp, TraversalAction::SHALLOW);
     explorer.setOpInterfaceAction<mlir::FunctionOpInterface>(

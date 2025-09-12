@@ -160,7 +160,7 @@ LogicalResult resolveGPUMappedForallOp(RewriterBase &rewriter,
 }
 
 void GPUDistributeForallPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   // First map all lane level forall loops to lanes.
   IRRewriter rewriter(funcOp->getContext());

@@ -36,7 +36,7 @@ struct MaterializeHomogeneousEncodingsPass final
   }
 
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     IREE::HAL::DeviceAnalysis deviceAnalysis(moduleOp);
     if (failed(deviceAnalysis.run()))
       return signalPassFailure();

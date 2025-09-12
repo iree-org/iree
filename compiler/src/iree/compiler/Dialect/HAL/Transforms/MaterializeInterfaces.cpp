@@ -572,7 +572,7 @@ struct MaterializeInterfacesPass
     : public IREE::HAL::impl::MaterializeInterfacesPassBase<
           MaterializeInterfacesPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     SymbolTable symbolTable(moduleOp);
     BindingLayoutAnalysis layoutAnalysis(moduleOp, symbolTable);
 

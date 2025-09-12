@@ -21,7 +21,7 @@ namespace {
 struct VMVXLinkExecutablesPass
     : public impl::VMVXLinkExecutablesPassBase<VMVXLinkExecutablesPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     auto moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
 
     auto sourceExecutableOps = gatherExecutablesForTarget(moduleOp, "vmvx");

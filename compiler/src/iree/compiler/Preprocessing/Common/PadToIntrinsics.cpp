@@ -565,7 +565,7 @@ void PadToIntrinsicsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
 
-  auto moduleOp = getOperation();
+  mlir::ModuleOp moduleOp = getOperation();
   IREE::Stream::AffinityAnalysis affinityAnalysis(moduleOp);
   if (failed(affinityAnalysis.run())) {
     return signalPassFailure();

@@ -365,7 +365,7 @@ static Operation *getEarliestInsertionPointInsideBlock(Block *block,
 }
 
 void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   IRRewriter rewriter(funcOp->getContext());
 
   // TODO: This is a temporary hack enabled for bufferization to

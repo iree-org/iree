@@ -84,7 +84,7 @@ LogicalResult fuseProducersGreedily(RewriterBase &rewriter,
 
 void DistributeInnerTiledToLanesPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   // Distribute inner_tiled ops to lanes where possible and greedily fuse
   // producers.

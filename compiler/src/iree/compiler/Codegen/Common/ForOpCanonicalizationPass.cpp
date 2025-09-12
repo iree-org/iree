@@ -313,7 +313,7 @@ struct ForOpCanonicalizationPass final
   }
 
   void runOnOperation() override {
-    auto fn = getOperation();
+    mlir::FunctionOpInterface fn = getOperation();
     // These patterns collide so we apply them one after another. The
     // canonicalization pattern will be blocked by the packing pattern
     // so we apply that first.

@@ -153,7 +153,7 @@ class DeduplicateExecutablesPass
           DeduplicateExecutablesPass> {
 
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     SmallVector<Operation *> allObjects;
     for (auto &op : moduleOp.getOps()) {
       if (op.hasTrait<OpTrait::IREE::Util::ObjectLike>())

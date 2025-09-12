@@ -138,7 +138,7 @@ public:
 
 void GenericVectorizationPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   IRRewriter rewriter(context);
   SmallVector<Operation *> candidates;

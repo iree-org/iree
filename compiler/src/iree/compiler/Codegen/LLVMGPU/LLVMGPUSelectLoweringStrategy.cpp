@@ -74,7 +74,7 @@ verifyEntryPoint(FunctionOpInterface funcOp,
 }
 
 void LLVMGPUSelectLoweringStrategyPass::runOnOperation() {
-  auto moduleOp = getOperation();
+  mlir::ModuleOp moduleOp = getOperation();
   for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
     if (failed(initGPULaunchConfig(funcOp))) {
       return signalPassFailure();

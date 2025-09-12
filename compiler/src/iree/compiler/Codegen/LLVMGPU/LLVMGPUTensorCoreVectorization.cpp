@@ -86,7 +86,7 @@ public:
     registry.insert<vector::VectorDialect>();
   }
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     LLVM_DEBUG({
       llvm::dbgs() << "LLVMGPUTensorCoreVectorizationPass runOnOperation():\n";
       funcOp->dump();
