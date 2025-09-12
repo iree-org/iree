@@ -500,6 +500,8 @@ Attribute TensorUKernelProviderAttr::getDataLayoutForUKernel(
   if (types.size() != 3 || iterationSizes.size() != 3) {
     return {};
   }
+  // Match the layouts based on UKernels implementation:
+  // https://github.com/iree-org/iree/tree/main/compiler/plugins/target/ROCM/builtins/mlir_ukernel
   Type f16 = Float16Type::get(encoding.getContext());
   Type f32 = Float32Type::get(encoding.getContext());
   Type f8E4M3FNUZ = Float8E4M3FNUZType::get(encoding.getContext());
