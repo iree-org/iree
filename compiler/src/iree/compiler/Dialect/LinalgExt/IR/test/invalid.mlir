@@ -1033,7 +1033,7 @@ func.func @exp_reduction(%S: tensor<2x3xf32>) -> tensor<2xf32> {
   %M = tensor.empty() : tensor<2xf32>
   %out = tensor.empty() : tensor<2xf32>
 
-  // expected-error@+1 {{Index of output operand in exp_reduced_operands cannot be 0.}}
+  // expected-error@+1 {{index of output operand in exp_reduced_operands cannot be 0}}
   %max, %sum = iree_linalg_ext.exp_reduction {
     indexing_maps = [
       affine_map<(M,N)->(M,N)>,
@@ -1061,7 +1061,7 @@ func.func @exp_reduction(%S: tensor<2x3xf32>) -> tensor<2xf32> {
   %M = tensor.empty() : tensor<2xf32>
   %out = tensor.empty() : tensor<2xf32>
 
-  // expected-error@+1 {{Index of output operand in exp_reduced_operands does not exist.}}
+  // expected-error@+1 {{index of output operand in exp_reduced_operands does not exist}}
   %max, %sum = iree_linalg_ext.exp_reduction {
     indexing_maps = [
       affine_map<(M,N)->(M,N)>,
