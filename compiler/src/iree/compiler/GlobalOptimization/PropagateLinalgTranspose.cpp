@@ -76,8 +76,8 @@ static Value createTranspose(OpBuilder &builder, Value source,
                                    elementType);
   }
   Value empty = createTransposeInit(builder, source, perm);
-  return builder
-      .create<linalg::TransposeOp>(source.getLoc(), source, empty, perm)
+  return linalg::TransposeOp::create(builder, source.getLoc(), source, empty,
+                                     perm)
       ->getResult(0);
 }
 

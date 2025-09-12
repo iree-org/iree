@@ -504,9 +504,8 @@ static void expandSelectOp(mlir::arith::SelectOp op, IndexSet &indexSet,
   for (auto [trueDynamicDims, falseDynamicDims] :
        llvm::zip_equal(trueValue.dynamicDims, falseValue.dynamicDims)) {
     selectedDims.push_back(
-        builder
-            .create<arith::SelectOp>(op.getLoc(), op.getCondition(),
-                                     trueDynamicDims, falseDynamicDims)
+        arith::SelectOp::create(builder, op.getLoc(), op.getCondition(),
+                                trueDynamicDims, falseDynamicDims)
             .getResult());
   }
   auto tieShapeOp = IREE::Flow::TensorTieShapeOp::create(

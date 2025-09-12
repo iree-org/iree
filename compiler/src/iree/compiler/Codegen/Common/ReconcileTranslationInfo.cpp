@@ -315,13 +315,11 @@ resolveWorkgroupForAll(RewriterBase &rewriter, scf::ForallOp forallOp,
   numWorkgroupsList.resize(forallOp.getRank());
   for (auto [index, mapping] : llvm::enumerate(workgroupMapping.value())) {
     int64_t mappingID = mapping.getMappingId();
-    OpFoldResult procId = rewriter
-                              .create<IREE::HAL::InterfaceWorkgroupIDOp>(
-                                  loc, static_cast<unsigned>(mappingID))
+    OpFoldResult procId = IREE::HAL::InterfaceWorkgroupIDOp::create(
+                              rewriter, loc, static_cast<unsigned>(mappingID))
                               .getResult();
-    OpFoldResult nprocs = rewriter
-                              .create<IREE::HAL::InterfaceWorkgroupCountOp>(
-                                  loc, static_cast<unsigned>(mappingID))
+    OpFoldResult nprocs = IREE::HAL::InterfaceWorkgroupCountOp::create(
+                              rewriter, loc, static_cast<unsigned>(mappingID))
                               .getResult();
 
     mappedProcIds.push_back(procId);
@@ -434,9 +432,8 @@ resolveWorkgroupForAll(RewriterBase &rewriter, FunctionOpInterface funcOp,
   for (SmallVector<OpFoldResult> numWorkgroupsList : numWorkgroupsLists) {
     for (auto [idx, numWorkgroups] : llvm::enumerate(numWorkgroupsList)) {
       maxNumWorkgroups[idx] =
-          rewriter
-              .create<arith::MaxUIOp>(loc, asValue(numWorkgroups),
-                                      asValue(maxNumWorkgroups[idx]))
+          arith::MaxUIOp::create(rewriter, loc, asValue(numWorkgroups),
+                                 asValue(maxNumWorkgroups[idx]))
               .getResult();
     }
   }

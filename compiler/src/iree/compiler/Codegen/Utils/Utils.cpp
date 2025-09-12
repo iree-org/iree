@@ -1006,7 +1006,7 @@ Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
 
 template <typename OpTy>
 static Value buildHALWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
-  return b.template create<OpTy>(b.getInsertionPoint()->getLoc(), dim);
+  return OpTy::create(b, b.getInsertionPoint()->getLoc(), dim);
 }
 
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(

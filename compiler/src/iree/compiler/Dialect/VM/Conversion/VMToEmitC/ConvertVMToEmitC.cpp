@@ -197,15 +197,15 @@ createVmTypeDefPtr(ConversionPatternRewriter &rewriter, Location loc,
   auto ptr = valueTypeMap.find((elementType));
   if (ptr != valueTypeMap.end()) {
     elementTypeValue =
-        rewriter
-            .create<emitc::CallOpaqueOp>(
-                /*location=*/loc,
-                /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t"),
-                /*callee=*/"iree_vm_make_value_type_def",
-                /*operands=*/ArrayRef<Value>{},
-                /*args=*/
-                ArrayAttr::get(
-                    ctx, {emitc::OpaqueAttr::get(ctx, ptr->second.first)}))
+        emitc::CallOpaqueOp::create(
+            rewriter,
+            /*location=*/loc,
+            /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t"),
+            /*callee=*/"iree_vm_make_value_type_def",
+            /*operands=*/ArrayRef<Value>{},
+            /*args=*/
+            ArrayAttr::get(ctx,
+                           {emitc::OpaqueAttr::get(ctx, ptr->second.first)}))
             .getResult(0);
   } else if (auto elemRefType = dyn_cast<IREE::VM::RefType>(elementType)) {
     Type objType = elemRefType.getObjectType();
@@ -228,21 +228,21 @@ createVmTypeDefPtr(ConversionPatternRewriter &rewriter, Location loc,
                                                  typeIndex.value(), typeArray);
 
     elementTypeValue =
-        rewriter
-            .create<emitc::CallOpaqueOp>(
-                /*location=*/loc,
-                /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t"),
-                /*callee=*/"iree_vm_make_ref_type_def",
-                /*operands=*/ArrayRef<Value>{refType})
+        emitc::CallOpaqueOp::create(
+            rewriter,
+            /*location=*/loc,
+            /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t"),
+            /*callee=*/"iree_vm_make_ref_type_def",
+            /*operands=*/ArrayRef<Value>{refType})
             .getResult(0);
   } else if (llvm::isa<IREE::VM::OpaqueType>(elementType)) {
     elementTypeValue =
-        rewriter
-            .create<emitc::CallOpaqueOp>(
-                /*location=*/loc,
-                /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t"),
-                /*callee=*/"iree_vm_make_undefined_type_def",
-                /*operands=*/ArrayRef<Value>{})
+        emitc::CallOpaqueOp::create(
+            rewriter,
+            /*location=*/loc,
+            /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t"),
+            /*callee=*/"iree_vm_make_undefined_type_def",
+            /*operands=*/ArrayRef<Value>{})
             .getResult(0);
   }
 
@@ -2086,11 +2086,11 @@ private:
         /*memberName=*/"module",
         /*operand=*/import);
 
-    auto conditionI1 = builder
-                           .create<emitc::LogicalNotOp>(
-                               /*location=*/location, /*type=*/boolType,
-                               /*operands=*/importModule)
-                           .getResult();
+    auto conditionI1 =
+        emitc::LogicalNotOp::create(builder,
+                                    /*location=*/location, /*type=*/boolType,
+                                    /*operands=*/importModule)
+            .getResult();
 
     // Start by splitting the block into two. The part before will contain the
     // condition, and the part after will contain the continuation point.
@@ -2251,23 +2251,22 @@ private:
 
     Type hostSizeType = emitc::OpaqueType::get(ctx, "iree_host_size_t");
 
-    Value result = builder
-                       .create<emitc::ConstantOp>(
-                           /*location=*/loc,
-                           /*resultType=*/hostSizeType,
-                           /*value=*/emitc::OpaqueAttr::get(ctx, "0"))
-                       .getResult();
+    Value result =
+        emitc::ConstantOp::create(builder,
+                                  /*location=*/loc,
+                                  /*resultType=*/hostSizeType,
+                                  /*value=*/emitc::OpaqueAttr::get(ctx, "0"))
+            .getResult();
     bool isZero = true;
     for (Type type : types) {
       Type valueType = typeConverter.convertTypeAsNonPointer(type);
       Value size =
           emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
 
-      result = builder
-                   .create<emitc::AddOp>(
-                       /*location=*/loc,
-                       /*type=*/hostSizeType,
-                       /*operands=*/ArrayRef<Value>{result, size})
+      result = emitc::AddOp::create(builder,
+                                    /*location=*/loc,
+                                    /*type=*/hostSizeType,
+                                    /*operands=*/ArrayRef<Value>{result, size})
                    .getResult();
       isZero = false;
     }
@@ -2308,12 +2307,10 @@ private:
 
     // byteSpan = call.<memberName>;
     TypedValue<mlir::Type> byteSpan =
-        builder
-            .create<emitc::MemberOp>(
-                loc,
-                emitc::LValueType::get(
-                    emitc::OpaqueType::get(ctx, "iree_byte_span_t")),
-                memberName, call)
+        emitc::MemberOp::create(builder, loc,
+                                emitc::LValueType::get(emitc::OpaqueType::get(
+                                    ctx, "iree_byte_span_t")),
+                                memberName, call)
             .getResult();
 
     // alloca_(0) returns NULL in some configurations on Windows. Make sure to
@@ -2322,34 +2319,33 @@ private:
     if (size.isZero) {
       Type hostSizeType = emitc::OpaqueType::get(ctx, "iree_host_size_t");
 
-      allocaSize = builder
-                       .create<emitc::ConstantOp>(
-                           /*location=*/loc,
-                           /*resultType=*/hostSizeType,
-                           /*value=*/emitc::OpaqueAttr::get(ctx, "1"))
-                       .getResult();
+      allocaSize =
+          emitc::ConstantOp::create(builder,
+                                    /*location=*/loc,
+                                    /*resultType=*/hostSizeType,
+                                    /*value=*/emitc::OpaqueAttr::get(ctx, "1"))
+              .getResult();
     } else {
       allocaSize = size.value;
     }
 
     // void *byteSpan_data_void = iree_alloca(size);
     auto byteSpanDataVoid =
-        builder
-            .create<emitc::CallOpaqueOp>(
-                /*location=*/loc,
-                /*type=*/
-                emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void")),
-                /*callee=*/"iree_alloca",
-                /*operands=*/ArrayRef<Value>{allocaSize})
+        emitc::CallOpaqueOp::create(
+            builder,
+            /*location=*/loc,
+            /*type=*/
+            emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void")),
+            /*callee=*/"iree_alloca",
+            /*operands=*/ArrayRef<Value>{allocaSize})
             .getResult(0);
 
     // uint8_t *byteSpan_data = (uint8_t*)byteSpan_data_void;
     Type bytePtr = emitc::PointerType::get(builder.getIntegerType(8, false));
-    auto byteSpanData = builder
-                            .create<emitc::CastOp>(
-                                /*location=*/loc,
-                                /*type=*/bytePtr,
-                                /*operand=*/byteSpanDataVoid)
+    auto byteSpanData = emitc::CastOp::create(builder,
+                                              /*location=*/loc,
+                                              /*type=*/bytePtr,
+                                              /*operand=*/byteSpanDataVoid)
                             .getResult();
 
     // byteSpan.data_length = SIZE;
@@ -2382,15 +2378,14 @@ private:
 
     size_t inputOffset = 2;
 
-    auto arguments = builder
-                         .create<emitc::MemberOp>(
-                             loc,
-                             /*type=*/
-                             emitc::LValueType::get(emitc::OpaqueType::get(
-                                 ctx, "iree_byte_span_t")),
-                             /*memberName=*/"arguments",
-                             /*operand=*/call)
-                         .getResult();
+    auto arguments =
+        emitc::MemberOp::create(builder, loc,
+                                /*type=*/
+                                emitc::LValueType::get(emitc::OpaqueType::get(
+                                    ctx, "iree_byte_span_t")),
+                                /*memberName=*/"arguments",
+                                /*operand=*/call)
+            .getResult();
 
     Type bytePtrType =
         emitc::PointerType::get(builder.getIntegerType(8, false));
@@ -2408,11 +2403,10 @@ private:
                          emitc::OpaqueType::get(ctx, "iree_vm_ref_t"))) {
         Type refPtrType = emitc::PointerType::get(
             emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
-        Value refPtr = builder
-                           .create<emitc::CastOp>(
-                               /*location=*/loc,
-                               /*type=*/refPtrType,
-                               /*operand=*/uint8Ptr)
+        Value refPtr = emitc::CastOp::create(builder,
+                                             /*location=*/loc,
+                                             /*type=*/refPtrType,
+                                             /*operand=*/uint8Ptr)
                            .getResult();
 
         emitc::CallOpaqueOp::create(builder,
@@ -2437,11 +2431,11 @@ private:
         Value size =
             emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
 
-        uint8Ptr = builder
-                       .create<emitc::AddOp>(
-                           /*location=*/loc, /*type=*/bytePtrType,
-                           /*operands=*/ArrayRef<Value>{uint8Ptr, size})
-                       .getResult();
+        uint8Ptr =
+            emitc::AddOp::create(builder,
+                                 /*location=*/loc, /*type=*/bytePtrType,
+                                 /*operands=*/ArrayRef<Value>{uint8Ptr, size})
+                .getResult();
       }
     }
     return success();
@@ -2483,11 +2477,10 @@ private:
                          emitc::OpaqueType::get(ctx, "iree_vm_ref_t"))) {
         Type refPtrType = emitc::PointerType::get(
             emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
-        Value refPtr = builder
-                           .create<emitc::CastOp>(
-                               /*location=*/loc,
-                               /*type=*/refPtrType,
-                               /*operand=*/uint8Ptr)
+        Value refPtr = emitc::CastOp::create(builder,
+                                             /*location=*/loc,
+                                             /*type=*/refPtrType,
+                                             /*operand=*/uint8Ptr)
                            .getResult();
 
         emitc::CallOpaqueOp::create(builder,
@@ -2509,12 +2502,12 @@ private:
         Type valueType = llvm::cast<emitc::PointerType>(argType).getPointee();
         Value size =
             emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
-        uint8Ptr = builder
-                       .create<emitc::AddOp>(
-                           /*location=*/loc,
-                           /*type=*/bytePtrType,
-                           /*operands=*/ArrayRef<Value>{uint8Ptr, size})
-                       .getResult();
+        uint8Ptr =
+            emitc::AddOp::create(builder,
+                                 /*location=*/loc,
+                                 /*type=*/bytePtrType,
+                                 /*operands=*/ArrayRef<Value>{uint8Ptr, size})
+                .getResult();
       }
     }
     return success();
@@ -2544,9 +2537,8 @@ private:
     emitc::OpaqueType type = emitc::OpaqueType::get(ctx, "begin_call_t");
 
     auto bc =
-        builder
-            .create<emitc::MemberOfPtrOp>(loc, emitc::LValueType::get(type),
-                                          "begin_call", importModule)
+        emitc::MemberOfPtrOp::create(builder, loc, emitc::LValueType::get(type),
+                                     "begin_call", importModule)
             .getResult();
     auto beginCall = dyn_cast<TypedValue<emitc::LValueType>>(bc);
     if (!beginCall) {
@@ -2772,11 +2764,11 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
         APInt segment = *(variadicCallOp.getSegmentSizes().begin() + i);
         int64_t size = segment.getSExtValue();
 
-        Value segmentSize = rewriter
-                                .create<emitc::ConstantOp>(
-                                    /*location=*/loc,
-                                    /*resultType=*/rewriter.getI32Type(),
-                                    /*value=*/rewriter.getI32IntegerAttr(size))
+        Value segmentSize = emitc::ConstantOp::create(
+                                rewriter,
+                                /*location=*/loc,
+                                /*resultType=*/rewriter.getI32Type(),
+                                /*value=*/rewriter.getI32IntegerAttr(size))
                                 .getResult();
         updatedOperands.push_back(segmentSize);
 
@@ -2968,12 +2960,12 @@ class SelectRefOpConversion
       return selectOp->emitError() << "generating iree_vm_type_def_t* failed";
     }
     auto resultTypeAsRef =
-        rewriter
-            .create<emitc::CallOpaqueOp>(
-                /*location=*/loc,
-                /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
-                /*callee=*/"iree_vm_type_def_as_ref",
-                /*operands=*/ArrayRef<Value>{resultTypePtr.value()})
+        emitc::CallOpaqueOp::create(
+            rewriter,
+            /*location=*/loc,
+            /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
+            /*callee=*/"iree_vm_type_def_as_ref",
+            /*operands=*/ArrayRef<Value>{resultTypePtr.value()})
             .getResult(0);
 
     bool moveTrue =
@@ -3458,17 +3450,15 @@ private:
         /*operand=*/importLValue);
 
     Type boolType = rewriter.getIntegerType(1);
-    auto conditionI1 = rewriter
-                           .create<emitc::LogicalNotOp>(
-                               /*location=*/loc,
-                               /*type=*/boolType,
-                               /*operands=*/importModule)
+    auto conditionI1 = emitc::LogicalNotOp::create(rewriter,
+                                                   /*location=*/loc,
+                                                   /*type=*/boolType,
+                                                   /*operands=*/importModule)
                            .getResult();
-    auto invConditionI1 = rewriter
-                              .create<emitc::LogicalNotOp>(
-                                  /*location=*/loc,
-                                  /*type=*/boolType,
-                                  /*operands=*/conditionI1)
+    auto invConditionI1 = emitc::LogicalNotOp::create(rewriter,
+                                                      /*location=*/loc,
+                                                      /*type=*/boolType,
+                                                      /*operands=*/conditionI1)
                               .getResult();
 
     auto i32Type = rewriter.getIntegerType(32);
@@ -3699,12 +3689,12 @@ class GlobalLoadStoreRefOpConversion : public EmitCConversionPattern<OpTy> {
     }
 
     auto typedefAsRef =
-        rewriter
-            .create<emitc::CallOpaqueOp>(
-                /*location=*/loc,
-                /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
-                /*callee=*/"iree_vm_type_def_as_ref",
-                /*operands=*/ArrayRef<Value>{elementTypePtr.value()})
+        emitc::CallOpaqueOp::create(
+            rewriter,
+            /*location=*/loc,
+            /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
+            /*callee=*/"iree_vm_type_def_as_ref",
+            /*operands=*/ArrayRef<Value>{elementTypePtr.value()})
             .getResult(0);
 
     Value srcRef = isLoad ? stateRef : localRef;
@@ -3996,12 +3986,12 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
     Value ref = this->getModuleAnalysis().lookupRef(op.getResult());
 
     Value refType =
-        rewriter
-            .create<emitc::CallOpaqueOp>(
-                /*location=*/loc,
-                /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
-                /*callee=*/cNames.value().typeId,
-                /*operands=*/ArrayRef<Value>{})
+        emitc::CallOpaqueOp::create(
+            rewriter,
+            /*location=*/loc,
+            /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
+            /*callee=*/cNames.value().typeId,
+            /*operands=*/ArrayRef<Value>{})
             .getResult(0);
 
     auto containerRValue = emitc_builders::asRValue(rewriter, loc, container);
@@ -4072,15 +4062,14 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
     Value access =
-        rewriter
-            .create<emitc::ConstantOp>(
-                /*location=*/loc,
-                /*resultType=*/
-                emitc::OpaqueType::get(ctx, "iree_vm_buffer_access_t"),
-                /*value=*/
-                emitc::OpaqueAttr::get(ctx,
-                                       "IREE_VM_BUFFER_ACCESS_MUTABLE | "
-                                       "IREE_VM_BUFFER_ACCESS_ORIGIN_GUEST"))
+        emitc::ConstantOp::create(
+            rewriter,
+            /*location=*/loc,
+            /*resultType=*/
+            emitc::OpaqueType::get(ctx, "iree_vm_buffer_access_t"),
+            /*value=*/
+            emitc::OpaqueAttr::get(ctx, "IREE_VM_BUFFER_ACCESS_MUTABLE | "
+                                        "IREE_VM_BUFFER_ACCESS_ORIGIN_GUEST"))
             .getResult();
     Value length = adaptor.getOperands()[0];
     Value alignment = adaptor.getOperands()[1];
@@ -4098,15 +4087,14 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
     auto loc = op.getLoc();
 
     Value access =
-        rewriter
-            .create<emitc::ConstantOp>(
-                /*location=*/loc,
-                /*resultType=*/
-                emitc::OpaqueType::get(ctx, "iree_vm_buffer_access_t"),
-                /*value=*/
-                emitc::OpaqueAttr::get(ctx,
-                                       "IREE_VM_BUFFER_ACCESS_MUTABLE | "
-                                       "IREE_VM_BUFFER_ACCESS_ORIGIN_GUEST"))
+        emitc::ConstantOp::create(
+            rewriter,
+            /*location=*/loc,
+            /*resultType=*/
+            emitc::OpaqueType::get(ctx, "iree_vm_buffer_access_t"),
+            /*value=*/
+            emitc::OpaqueAttr::get(ctx, "IREE_VM_BUFFER_ACCESS_MUTABLE | "
+                                        "IREE_VM_BUFFER_ACCESS_ORIGIN_GUEST"))
             .getResult();
 
     Value refPtr = adaptor.getOperands()[0];
@@ -4273,69 +4261,68 @@ class ListGetRefOpConversion
 
       // IREE_VM_REF_TYPE_NULL
       auto refTypeNull =
-          rewriter
-              .create<emitc::ConstantOp>(
-                  /*location=*/loc,
-                  /*resultType=*/
-                  emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
-                  /*value=*/
-                  emitc::OpaqueAttr::get(ctx, "IREE_VM_REF_TYPE_NULL"))
+          emitc::ConstantOp::create(
+              rewriter,
+              /*location=*/loc,
+              /*resultType=*/
+              emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
+              /*value=*/
+              emitc::OpaqueAttr::get(ctx, "IREE_VM_REF_TYPE_NULL"))
               .getResult();
 
       // ref->type != IREE_VM_REF_TYPE_NULL
-      auto refTypeIsNotNull = rewriter
-                                  .create<emitc::CmpOp>(
-                                      /*location=*/loc,
-                                      /*type=*/rewriter.getI1Type(),
-                                      /*predicate*/ emitc::CmpPredicate::ne,
-                                      /*lhs*/ refType,
-                                      /*rhs*/ refTypeNull)
-                                  .getResult();
+      auto refTypeIsNotNull =
+          emitc::CmpOp::create(rewriter,
+                               /*location=*/loc,
+                               /*type=*/rewriter.getI1Type(),
+                               /*predicate*/ emitc::CmpPredicate::ne,
+                               /*lhs*/ refType,
+                               /*rhs*/ refTypeNull)
+              .getResult();
 
       // (iree_vm_type_def_is_value(type_def)
       auto typedefIsValue =
-          rewriter
-              .create<emitc::CallOpaqueOp>(
-                  /*location=*/loc,
-                  /*type=*/rewriter.getI1Type(),
-                  /*callee=*/"iree_vm_type_def_is_value",
-                  /*operands=*/ArrayRef<Value>{elementTypePtr.value()})
+          emitc::CallOpaqueOp::create(
+              rewriter,
+              /*location=*/loc,
+              /*type=*/rewriter.getI1Type(),
+              /*callee=*/"iree_vm_type_def_is_value",
+              /*operands=*/ArrayRef<Value>{elementTypePtr.value()})
               .getResult(0);
 
       // iree_vm_type_def_as_ref(type_def)
       auto typedefAsRef =
-          rewriter
-              .create<emitc::CallOpaqueOp>(
-                  /*location=*/loc,
-                  /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
-                  /*callee=*/"iree_vm_type_def_as_ref",
-                  /*operands=*/ArrayRef<Value>{elementTypePtr.value()})
+          emitc::CallOpaqueOp::create(
+              rewriter,
+              /*location=*/loc,
+              /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
+              /*callee=*/"iree_vm_type_def_as_ref",
+              /*operands=*/ArrayRef<Value>{elementTypePtr.value()})
               .getResult(0);
 
       // ref->type != iree_vm_type_def_as_ref(type_def)
-      auto refTypesDontMatch = rewriter
-                                   .create<emitc::CmpOp>(
-                                       /*location=*/loc,
-                                       /*type=*/rewriter.getI1Type(),
-                                       /*predicate*/ emitc::CmpPredicate::ne,
-                                       /*lhs*/ refType,
-                                       /*rhs*/ typedefAsRef)
-                                   .getResult();
+      auto refTypesDontMatch =
+          emitc::CmpOp::create(rewriter,
+                               /*location=*/loc,
+                               /*type=*/rewriter.getI1Type(),
+                               /*predicate*/ emitc::CmpPredicate::ne,
+                               /*lhs*/ refType,
+                               /*rhs*/ typedefAsRef)
+              .getResult();
 
-      auto invalidRefType = rewriter
-                                .create<emitc::LogicalOrOp>(
-                                    /*location=*/loc,
-                                    /*type=*/rewriter.getI1Type(),
-                                    /*lhs*/ typedefIsValue,
-                                    /*rhs*/ refTypesDontMatch)
-                                .getResult();
+      auto invalidRefType =
+          emitc::LogicalOrOp::create(rewriter,
+                                     /*location=*/loc,
+                                     /*type=*/rewriter.getI1Type(),
+                                     /*lhs*/ typedefIsValue,
+                                     /*rhs*/ refTypesDontMatch)
+              .getResult();
 
-      invalidType = rewriter
-                        .create<emitc::LogicalAndOp>(
-                            /*location=*/loc,
-                            /*type=*/rewriter.getI1Type(),
-                            /*lhs*/ refTypeIsNotNull,
-                            /*rhs*/ invalidRefType)
+      invalidType = emitc::LogicalAndOp::create(rewriter,
+                                                /*location=*/loc,
+                                                /*type=*/rewriter.getI1Type(),
+                                                /*lhs*/ refTypeIsNotNull,
+                                                /*rhs*/ invalidRefType)
                         .getResult();
     }
 

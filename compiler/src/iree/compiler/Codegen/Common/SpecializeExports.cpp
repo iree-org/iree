@@ -355,11 +355,10 @@ static void specializeExportedFunction(
           auto ordinalOp = cast<IREE::TensorExt::DispatchWorkloadOrdinalOp>(
               mapping.lookup(assumedSize.assumptionOrOrdinal.getOwner()));
           builder.setInsertionPoint(ordinalOp);
-          Value assumedOperand =
-              builder
-                  .create<IREE::Util::AssumeIntOp>(loc, ordinalOp.getOperand(),
-                                                   builder.getArrayAttr(range))
-                  .getResult(0);
+          Value assumedOperand = IREE::Util::AssumeIntOp::create(
+                                     builder, loc, ordinalOp.getOperand(),
+                                     builder.getArrayAttr(range))
+                                     .getResult(0);
           ordinalOp.setOperand(assumedOperand);
         }
       }

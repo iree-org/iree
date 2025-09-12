@@ -577,9 +577,8 @@ collapseParallelInsertOp(RewriterBase &rewriter,
           return getValueOrCreateConstantIndexOp(rewriter, loc, ofr);
         });
     OpFoldResult collapsedOffset =
-        rewriter
-            .create<affine::AffineLinearizeIndexOp>(loc, offsetVals, basis,
-                                                    /*disjoint=*/true)
+        affine::AffineLinearizeIndexOp::create(rewriter, loc, offsetVals, basis,
+                                               /*disjoint=*/true)
             .getResult();
     ArrayRef<OpFoldResult> groupSizes(sizes.begin() + group.front(),
                                       sizes.begin() + group.back() + 1);

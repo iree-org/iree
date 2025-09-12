@@ -68,15 +68,14 @@ struct DemoteContractionInputsToBF16Pattern
         Value empty = tensor::EmptyOp::create(rewriter, loc, mixedSizes,
                                               rewriter.getBF16Type());
         demotedInputs.push_back(
-            rewriter
-                .create<linalg::GenericOp>(
-                    loc, TypeRange{demotedInputType}, ValueRange{input},
-                    ValueRange{empty}, maps, iteratorTypes,
-                    [&](OpBuilder &b, Location loc, ValueRange args) {
-                      Value result = arith::TruncFOp::create(
-                          b, loc, rewriter.getBF16Type(), args[0]);
-                      linalg::YieldOp::create(b, loc, result);
-                    })
+            linalg::GenericOp::create(
+                rewriter, loc, TypeRange{demotedInputType}, ValueRange{input},
+                ValueRange{empty}, maps, iteratorTypes,
+                [&](OpBuilder &b, Location loc, ValueRange args) {
+                  Value result = arith::TruncFOp::create(
+                      b, loc, rewriter.getBF16Type(), args[0]);
+                  linalg::YieldOp::create(b, loc, result);
+                })
                 ->getResults()[0]);
       }
       auto namedOp = cast<std::remove_pointer_t<decltype(typePtr)>>(

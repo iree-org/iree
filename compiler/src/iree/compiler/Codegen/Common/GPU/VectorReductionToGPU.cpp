@@ -192,9 +192,8 @@ static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
   Value srcIdxI32 = arith::IndexCastOp::create(builder, loc, i32Type, srcIdx);
   Value warpSzI32 = arith::ConstantOp::create(
       builder, loc, builder.getIntegerAttr(i32Type, warpSz));
-  Value result = builder
-                     .create<gpu::ShuffleOp>(loc, val, srcIdxI32, warpSzI32,
-                                             gpu::ShuffleMode::IDX)
+  Value result = gpu::ShuffleOp::create(builder, loc, val, srcIdxI32, warpSzI32,
+                                        gpu::ShuffleMode::IDX)
                      .getResult(0);
   return result;
 }

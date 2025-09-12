@@ -96,9 +96,8 @@ public:
       if (resultType.isDynamicDim(i)) {
         Value staticDim = arith::ConstantIndexOp::create(
             rewriter, constantOp.getLoc(), attrType.getDimSize(i));
-        Value dynamicDim = rewriter
-                               .create<IREE::Util::OptimizationBarrierOp>(
-                                   constantOp.getLoc(), staticDim)
+        Value dynamicDim = IREE::Util::OptimizationBarrierOp::create(
+                               rewriter, constantOp.getLoc(), staticDim)
                                .getResult(0);
         dynamicDims.push_back(dynamicDim);
       }

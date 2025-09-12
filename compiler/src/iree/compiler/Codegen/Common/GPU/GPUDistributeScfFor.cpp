@@ -67,9 +67,8 @@ struct DistributeLoop final : OpRewritePattern<scf::ForOp> {
     Value count =
         useBlockDims ? gpu::BlockDimOp::create(rewriter, loc, indexType, symDim)
                            .getResult()
-                     : rewriter
-                           .create<arith::ConstantIndexOp>(
-                               loc, workgroupSize[numDimAttr.getInt()])
+                     : arith::ConstantIndexOp::create(
+                           rewriter, loc, workgroupSize[numDimAttr.getInt()])
                            .getResult();
 
     MLIRContext *context = getContext();

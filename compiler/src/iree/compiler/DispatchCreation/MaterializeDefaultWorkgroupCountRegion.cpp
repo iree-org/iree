@@ -94,9 +94,9 @@ static LogicalResult createDefaultWorkgroupCountRegion(
             rewriter.getContext(), forallOp.getLoc(), mapping->getValue()))) {
       return failure();
     }
-    defaultCountOp = rewriter.create<
-        IREE::TensorExt::DispatchWorkgroupCountSplitReductionModifierOp>(
-        loc, defaultCountOp->getResults(), block->getArguments());
+    defaultCountOp =
+        IREE::TensorExt::DispatchWorkgroupCountSplitReductionModifierOp::create(
+            rewriter, loc, defaultCountOp->getResults(), block->getArguments());
   }
   IREE::Flow::ReturnOp::create(rewriter, loc, defaultCountOp->getResults());
 

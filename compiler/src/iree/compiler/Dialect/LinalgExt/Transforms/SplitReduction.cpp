@@ -213,23 +213,22 @@ Value offsetParallelIndices(Location loc, RewriterBase &rewriter,
                                              utils::IteratorType::parallel);
   Value mSplitVal = arith::ConstantIntOp::create(
       rewriter, loc, parallelIndicesType.getElementType(), kDimParallelSize);
-  return rewriter
-      .create<linalg::GenericOp>(
-          loc,
-          /*resultType=*/parallelIndicesType,
-          /*inputs=*/ValueRange{},
-          /*outputs=*/ValueRange{parallelIndices}, indexingMaps, iterators,
-          [&](OpBuilder &b, Location loc, ValueRange args) {
-            Value splitIndex =
-                linalg::IndexOp::create(b, loc, splitDimParallel);
-            Value splitIndexInt = arith::IndexCastOp::create(
-                b, loc, parallelIndicesType.getElementType(), splitIndex);
-            Value mOffset =
-                arith::MulIOp::create(b, loc, mSplitVal, splitIndexInt);
-            Value updatedParallelIndex =
-                arith::AddIOp::create(b, loc, mOffset, args[0]);
-            linalg::YieldOp::create(b, loc, updatedParallelIndex);
-          })
+  return linalg::GenericOp::create(
+             rewriter, loc,
+             /*resultType=*/parallelIndicesType,
+             /*inputs=*/ValueRange{},
+             /*outputs=*/ValueRange{parallelIndices}, indexingMaps, iterators,
+             [&](OpBuilder &b, Location loc, ValueRange args) {
+               Value splitIndex =
+                   linalg::IndexOp::create(b, loc, splitDimParallel);
+               Value splitIndexInt = arith::IndexCastOp::create(
+                   b, loc, parallelIndicesType.getElementType(), splitIndex);
+               Value mOffset =
+                   arith::MulIOp::create(b, loc, mSplitVal, splitIndexInt);
+               Value updatedParallelIndex =
+                   arith::AddIOp::create(b, loc, mOffset, args[0]);
+               linalg::YieldOp::create(b, loc, updatedParallelIndex);
+             })
       .getResult(0);
 }
 

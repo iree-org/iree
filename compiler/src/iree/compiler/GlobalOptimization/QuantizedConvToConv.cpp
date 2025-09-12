@@ -69,15 +69,14 @@ Value applyZeroPoint(ImplicitLocOpBuilder &builder, Value conv, Value sum,
   SmallVector<AffineMap> affineMaps{convMap, sumMap, convMap};
 
   Value init = emptyCopy(builder, conv);
-  return builder
-      .create<linalg::GenericOp>(
-          init.getType(), ValueRange{conv, sum}, ValueRange{init}, affineMaps,
-          iterators,
-          [=](OpBuilder &b, Location loc, ValueRange args) {
-            Value mul = arith::MulIOp::create(b, loc, args[1], zp);
-            Value sum = arith::SubIOp::create(b, loc, args[0], mul);
-            linalg::YieldOp::create(b, loc, sum);
-          })
+  return linalg::GenericOp::create(
+             builder, init.getType(), ValueRange{conv, sum}, ValueRange{init},
+             affineMaps, iterators,
+             [=](OpBuilder &b, Location loc, ValueRange args) {
+               Value mul = arith::MulIOp::create(b, loc, args[1], zp);
+               Value sum = arith::SubIOp::create(b, loc, args[0], mul);
+               linalg::YieldOp::create(b, loc, sum);
+             })
       .getResult(0);
 }
 
@@ -88,14 +87,13 @@ Value addScalar(ImplicitLocOpBuilder &builder, Value value, Value scalar) {
                                              utils::IteratorType::parallel);
   auto map = builder.getMultiDimIdentityMap(ty.getRank());
   Value init = emptyCopy(builder, value);
-  return builder
-      .create<linalg::GenericOp>(
-          init.getType(), ValueRange{value}, ValueRange{init},
-          ArrayRef<AffineMap>{map, map}, iterators,
-          [=](OpBuilder &b, Location loc, ValueRange args) {
-            Value add = arith::AddIOp::create(b, loc, args[0], scalar);
-            linalg::YieldOp::create(b, loc, add);
-          })
+  return linalg::GenericOp::create(
+             builder, init.getType(), ValueRange{value}, ValueRange{init},
+             ArrayRef<AffineMap>{map, map}, iterators,
+             [=](OpBuilder &b, Location loc, ValueRange args) {
+               Value add = arith::AddIOp::create(b, loc, args[0], scalar);
+               linalg::YieldOp::create(b, loc, add);
+             })
       .getResult(0);
 }
 
@@ -150,10 +148,9 @@ struct QuantizedConvToConv
                      fZpConst.getValue().isZero();
 
     // First implement the convolution without the zero point.
-    Value newConv = builder
-                        .create<linalg::Conv2DNhwcHwcfOp>(
-                            resultTy, ValueRange{input, filter},
-                            op.getOutputs(), strides, dilations)
+    Value newConv = linalg::Conv2DNhwcHwcfOp::create(
+                        builder, resultTy, ValueRange{input, filter},
+                        op.getOutputs(), strides, dilations)
                         .getResult(0);
 
     // If the zero pointer value is zero we can just replace.
@@ -210,11 +207,11 @@ struct QuantizedConvToConv
       GetDynamicDym(builder, kDims, kDyn, filter, 1);
       Value poolInit = tensor::EmptyOp::create(builder, kDims, accETy, kDyn);
 
-      inputSum = builder
-                     .create<linalg::PoolingNhwcSumOp>(
-                         ArrayRef<Type>{poolTy}, ValueRange{inputSum, poolInit},
-                         poolTensor, strides, dilations)
-                     .getResult(0);
+      inputSum =
+          linalg::PoolingNhwcSumOp::create(builder, ArrayRef<Type>{poolTy},
+                                           ValueRange{inputSum, poolInit},
+                                           poolTensor, strides, dilations)
+              .getResult(0);
 
       // Collapse the length-1 ending dimension away.
       auto collapseTy =
@@ -269,10 +266,9 @@ struct QuantizedDepthwiseConvToDepthwiseConv
                      fZpConst.getValue().isZero();
 
     // First implement the convolution without the zero point.
-    Value newConv = builder
-                        .create<linalg::DepthwiseConv2DNhwcHwcOp>(
-                            resultTy, ValueRange{input, filter},
-                            op.getOutputs(), strides, dilations)
+    Value newConv = linalg::DepthwiseConv2DNhwcHwcOp::create(
+                        builder, resultTy, ValueRange{input, filter},
+                        op.getOutputs(), strides, dilations)
                         .getResult(0);
 
     // If the zero pointer value is zero we can just replace.
@@ -311,10 +307,9 @@ struct QuantizedDepthwiseConvToDepthwiseConv
       Value poolInit = tensor::EmptyOp::create(builder, kDims, accETy, kDyn);
 
       Value inputSum =
-          builder
-              .create<linalg::PoolingNhwcSumOp>(ArrayRef<Type>{poolTy},
-                                                ValueRange{input, poolInit},
-                                                poolTensor, strides, dilations)
+          linalg::PoolingNhwcSumOp::create(builder, ArrayRef<Type>{poolTy},
+                                           ValueRange{input, poolInit},
+                                           poolTensor, strides, dilations)
               .getResult(0);
 
       // Apply the zero-point update based on the input sum.

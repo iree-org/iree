@@ -354,11 +354,10 @@ emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
 
     // Surpress silenceable errors so that failures to match in child tuning
     // specs can be ignored.
-    operand = builder
-                  .create<transform::IncludeOp>(
-                      loc, anyOpType, symbol,
-                      transform::FailurePropagationMode::Suppress, operand,
-                      /*arg_attrs=*/nullptr, /*res_attrs=*/nullptr)
+    operand = transform::IncludeOp::create(
+                  builder, loc, anyOpType, symbol,
+                  transform::FailurePropagationMode::Suppress, operand,
+                  /*arg_attrs=*/nullptr, /*res_attrs=*/nullptr)
                   .getResults()
                   .front();
   }

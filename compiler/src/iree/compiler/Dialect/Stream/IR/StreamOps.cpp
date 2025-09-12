@@ -1445,10 +1445,10 @@ ResourceAllocOp::createSuballocations(
   SmallVector<Value> results;
   for (auto [loc, subviewOffset, subviewLength] :
        llvm::zip_equal(locs, packOp.getPackedOffsets(), storageSizes)) {
-    results.push_back(builder
-                          .create<IREE::Stream::ResourceSubviewOp>(
-                              loc, slab, slabSize, subviewOffset, subviewLength)
-                          .getResult());
+    results.push_back(
+        IREE::Stream::ResourceSubviewOp::create(builder, loc, slab, slabSize,
+                                                subviewOffset, subviewLength)
+            .getResult());
   }
   return {allocOp, results};
 }
@@ -1511,10 +1511,10 @@ ResourceAllocaOp::createSuballocations(Type timepointType, Type resourceType,
   SmallVector<Value> results;
   for (auto [loc, subviewOffset, subviewLength] :
        llvm::zip_equal(locs, packOp.getPackedOffsets(), storageSizes)) {
-    results.push_back(builder
-                          .create<IREE::Stream::ResourceSubviewOp>(
-                              loc, slab, slabSize, subviewOffset, subviewLength)
-                          .getResult());
+    results.push_back(
+        IREE::Stream::ResourceSubviewOp::create(builder, loc, slab, slabSize,
+                                                subviewOffset, subviewLength)
+            .getResult());
   }
   return {allocaOp, results};
 }

@@ -270,9 +270,8 @@ struct ConvertMemRefStoreOp : public OpConversionPattern<memref::StoreOp> {
       // conversion target widens). Insert an unrealized conversion cast to
       // preserve the original semantic. Presumably, something will clear this
       // with additional lowering.
-      newValue = rewriter
-                     .create<UnrealizedConversionCastOp>(
-                         loc, storeOp.getValue().getType(), newValue)
+      newValue = UnrealizedConversionCastOp::create(
+                     rewriter, loc, storeOp.getValue().getType(), newValue)
                      .getResult(0);
     }
     rewriter.replaceOpWithNewOp<IREE::Util::BufferStoreOp>(
