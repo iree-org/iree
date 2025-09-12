@@ -1326,6 +1326,16 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
       targetSubgroupSize, pipelineConfig);
 }
 
+/// Sets attention specific pipeline attributes.
+static void
+setAttentionPipelineAttributes(IREE::GPU::TargetAttr target,
+                               SmallVectorImpl<NamedAttribute> &pipelineAttrs) {
+  pipelineAttrs.emplace_back(
+      IREE::Codegen::DenormalFpMathAttr::getFP32DictKeyName(),
+      IREE::Codegen::DenormalFpMathAttr::get(
+          target.getContext(), IREE::Codegen::DenormalFpMath::PreserveSign));
+}
+
 static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
     IREE::LinalgExt::AttentionOp op) {
@@ -1576,6 +1586,8 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
 
   SmallVector<NamedAttribute, 1> pipelineAttrs;
+
+  setAttentionPipelineAttributes(target, pipelineAttrs);
 
   // TODO: We do not turn prefetching on even when requested by the prefetching
   // flag because there is a shared memory allocation the two matmuls, which
