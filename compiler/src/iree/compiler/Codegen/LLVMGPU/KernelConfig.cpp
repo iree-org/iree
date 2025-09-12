@@ -1335,12 +1335,10 @@ setAttentionPipelineAttributes(IREE::GPU::TargetAttr target,
     return;
   }
   Builder b(target.getContext());
-  NamedAttrList funcAttrs;
-  funcAttrs.append(IREE::Codegen::DenormalFpMathAttr::getFP32DictKeyName(),
-                   b.getAttr<IREE::Codegen::DenormalFpMathAttr>(
-                       IREE::Codegen::DenormalFpMath::PreserveSign));
-  pipelineAttrs.emplace_back(kFuncAttrsName,
-                             funcAttrs.getDictionary(b.getContext()));
+  pipelineAttrs.emplace_back(
+      IREE::Codegen::DenormalFpMathAttr::getFP32DictKeyName(),
+      b.getAttr<IREE::Codegen::DenormalFpMathAttr>(
+          IREE::Codegen::DenormalFpMath::PreserveSign));
 }
 
 static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(

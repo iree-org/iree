@@ -82,18 +82,19 @@ annotateKernelForTranslation(LLVM::LLVMFuncOp funcOp,
         IREE::Codegen::stringifyDenormalFpMath(attr.getValue()));
   }
 
-  // Check if the `func_attrs` dictionary is set and proccess it.
-  if (auto dict = cast_or_null<DictionaryAttr>(
-          funcOp->getDiscardableAttr(kFuncAttrsName))) {
-    if (auto attr = dict.getAs<IREE::Codegen::DenormalFpMathAttr>(
-            IREE::Codegen::DenormalFpMathAttr::getFP32DictKeyName());
-        attr && attr.getValue() != IREE::Codegen::DenormalFpMath::None) {
+  // Check if the `denormal_fp_math_f32` dictionary is set and proccess it.
+  auto denormalFp32 = cast_or_null<IREE::Codegen::DenormalFpMathAttr>(
+      funcOp->getDiscardableAttr(
+          IREE::Codegen::DenormalFpMathAttr::getFP32DictKeyName()));
+  if (denormalFp32) {
+    if (denormalFp32.getValue() != IREE::Codegen::DenormalFpMath::None) {
       funcOp.setDenormalFpMathF32(
-          IREE::Codegen::stringifyDenormalFpMath(attr.getValue()));
+          IREE::Codegen::stringifyDenormalFpMath(denormalFp32.getValue()));
     }
 
-    // Update the function, discarding any unhandled attributes.
-    funcOp->removeDiscardableAttr(kFuncAttrsName);
+    // Discard the attribute.
+    funcOp->removeDiscardableAttr(
+        IREE::Codegen::DenormalFpMathAttr::getFP32DictKeyName());
   }
 
   // Kernel argument preloading is only supported on gfx942 and newer targets

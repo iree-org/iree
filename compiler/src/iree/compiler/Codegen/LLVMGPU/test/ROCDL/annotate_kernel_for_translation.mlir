@@ -189,7 +189,7 @@ builtin.module {
 
 // -----
 
-// Check that we handle the `func_attrs` appropriately
+// Check that we handle the `denormal_fp_math_f32` appropriately
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb",
   {iree_codegen.target_info = #iree_gpu.target<arch = "gfx942", features = "",
@@ -214,7 +214,7 @@ builtin.module {
       } attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]}
       builtin.module {
         llvm.func @test_kern_arg(%arg0: i32) attributes {
-            func_attrs = {iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">},
+            iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">,
             llvm_func_attrs = {check_attr}
           } {
           llvm.return
@@ -226,13 +226,13 @@ builtin.module {
 
 // CHECK-LABEL: llvm.func @test_kern_arg
 // CHECK:       denormal_fp_math_f32 = "preserve-sign"
-// CHECK-NOT:   func_attrs
+// CHECK-NOT:   iree_codegen.denormal_fp_math_f32
 // CHECK:       llvm_func_attrs = {check_attr
 
 
 // -----
 
-// Check that we handle the `func_attrs` appropriately
+// Check that we handle the `denormal_fp_math_f32` appropriately
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb",
   {iree_codegen.target_info = #iree_gpu.target<arch = "gfx942", features = "",
@@ -257,7 +257,7 @@ builtin.module {
       } attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]}
       builtin.module {
         llvm.func @test_kern_arg(%arg0: i32) attributes {
-            func_attrs = {iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<none>},
+            iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<none>,
             llvm_func_attrs = {check_attr}
           } {
           llvm.return
@@ -269,5 +269,5 @@ builtin.module {
 
 // CHECK-LABEL: llvm.func @test_kern_arg
 // CHECK-NOT:   denormal_fp_math_f32
-// CHECK-NOT:   func_attrs
+// CHECK-NOT:   iree_codegen.denormal_fp_math_f32
 // CHECK:       llvm_func_attrs = {check_attr
