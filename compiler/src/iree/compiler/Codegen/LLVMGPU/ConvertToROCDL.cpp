@@ -354,8 +354,8 @@ struct ConvertToROCDLPass final
       populateFuncToLLVMConversionPatterns(converter, llvmPatterns);
       cf::populateControlFlowToLLVMConversionPatterns(converter, llvmPatterns);
       arith::populateArithToLLVMConversionPatterns(converter, llvmPatterns);
-      populateAMDGPUToROCDLConversionPatterns(converter, llvmPatterns,
-                                              *maybeChipset);
+      amdgpu::Chipset chipset = maybeChipset.value_or(amdgpu::Chipset());
+      populateAMDGPUToROCDLConversionPatterns(converter, llvmPatterns, chipset);
       vector::populateVectorRankReducingFMAPattern(llvmPatterns);
       vector::populateVectorInsertExtractStridedSliceTransforms(llvmPatterns);
       vector::populateVectorStepLoweringPatterns(llvmPatterns);
@@ -363,8 +363,8 @@ struct ConvertToROCDLPass final
       populateVectorToLLVMConversionPatterns(converter, llvmPatterns);
       vector::populateVectorTransferLoweringPatterns(llvmPatterns,
                                                      /*maxTransferRank=*/1);
-      populateGpuToROCDLConversionPatterns(
-          converter, llvmPatterns, gpu::amd::Runtime::Unknown, *maybeChipset);
+      populateGpuToROCDLConversionPatterns(converter, llvmPatterns,
+                                           gpu::amd::Runtime::Unknown, chipset);
       LLVMConversionTarget target(getContext());
       populateFuncToLLVMFuncOpConversionPattern(converter, llvmPatterns);
       configureGpuToROCDLConversionLegality(target);
