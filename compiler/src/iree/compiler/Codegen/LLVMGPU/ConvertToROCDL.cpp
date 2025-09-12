@@ -204,8 +204,7 @@ struct LowerToElementsPattern : public OpRewritePattern<vector::ToElementsOp> {
 /// code.
 struct ConvertToROCDLPass final
     : impl::ConvertToROCDLPassBase<ConvertToROCDLPass> {
-  using impl::ConvertToROCDLPassBase<
-      ConvertToROCDLPass>::ConvertToROCDLPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::GPU::IREEGPUDialect, LLVM::LLVMDialect,

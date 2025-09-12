@@ -38,8 +38,7 @@ namespace {
 struct BufferizeCopyOnlyDispatchesPass final
     : impl::BufferizeCopyOnlyDispatchesPassBase<
           BufferizeCopyOnlyDispatchesPass> {
-  using impl::BufferizeCopyOnlyDispatchesPassBase<
-      BufferizeCopyOnlyDispatchesPass>::BufferizeCopyOnlyDispatchesPassBase;
+  using Base::Base;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<affine::AffineDialect, bufferization::BufferizationDialect,

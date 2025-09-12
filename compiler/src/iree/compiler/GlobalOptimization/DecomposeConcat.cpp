@@ -117,8 +117,7 @@ struct DecomposeNonOuterDimConcats : public OpRewritePattern<tensor::ConcatOp> {
 
 struct DecomposeConcatPass
     : public impl::DecomposeConcatPassBase<DecomposeConcatPass> {
-  using impl::DecomposeConcatPassBase<
-      DecomposeConcatPass>::DecomposeConcatPassBase;
+  using Base::Base;
   explicit DecomposeConcatPass(bool enableConcatTransposition) {
     this->enableConcatTransposition = enableConcatTransposition;
   }

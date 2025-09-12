@@ -29,8 +29,7 @@ class SPIRVSelectLoweringStrategyPass final
     : public impl::SPIRVSelectLoweringStrategyPassBase<
           SPIRVSelectLoweringStrategyPass> {
 public:
-  using impl::SPIRVSelectLoweringStrategyPassBase<
-      SPIRVSelectLoweringStrategyPass>::SPIRVSelectLoweringStrategyPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Codegen::IREECodegenDialect,

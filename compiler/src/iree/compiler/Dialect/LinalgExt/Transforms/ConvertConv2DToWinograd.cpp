@@ -407,8 +407,7 @@ private:
 /// ```
 struct ConvertConv2DToWinogradPass final
     : impl::ConvertConv2DToWinogradPassBase<ConvertConv2DToWinogradPass> {
-  using impl::ConvertConv2DToWinogradPassBase<
-      ConvertConv2DToWinogradPass>::ConvertConv2DToWinogradPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry

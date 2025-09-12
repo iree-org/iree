@@ -218,8 +218,7 @@ static LogicalResult decomposeMapScatter(MapScatterOp mapScatterOp,
 namespace {
 struct DecomposeMapScatterPass final
     : impl::DecomposeMapScatterPassBase<DecomposeMapScatterPass> {
-  using impl::DecomposeMapScatterPassBase<
-      DecomposeMapScatterPass>::DecomposeMapScatterPassBase;
+  using Base::Base;
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();

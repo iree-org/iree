@@ -126,8 +126,7 @@ static LogicalResult isWithinVectorSizeLimit(linalg::LinalgOp linalgOp,
 class GenericVectorizationPass final
     : public impl::GenericVectorizationPassBase<GenericVectorizationPass> {
 public:
-  using impl::GenericVectorizationPassBase<
-      GenericVectorizationPass>::GenericVectorizationPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry

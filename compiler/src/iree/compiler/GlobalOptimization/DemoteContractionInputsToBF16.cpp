@@ -140,8 +140,7 @@ class DemoteContractionInputsToBF16Pass
     : public impl::DemoteContractionInputsToBF16PassBase<
           DemoteContractionInputsToBF16Pass> {
 public:
-  using impl::DemoteContractionInputsToBF16PassBase<
-      DemoteContractionInputsToBF16Pass>::DemoteContractionInputsToBF16PassBase;
+  using Base::Base;
   explicit DemoteContractionInputsToBF16Pass(const DemotionOption &option) {
     this->demoteOnly = option;
   }

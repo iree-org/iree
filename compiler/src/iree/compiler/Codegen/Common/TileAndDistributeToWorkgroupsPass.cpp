@@ -268,8 +268,7 @@ namespace {
 struct TileAndDistributeToWorkgroupsPass final
     : impl::TileAndDistributeToWorkgroupsPassBase<
           TileAndDistributeToWorkgroupsPass> {
-  using impl::TileAndDistributeToWorkgroupsPassBase<
-      TileAndDistributeToWorkgroupsPass>::TileAndDistributeToWorkgroupsPassBase;
+  using Base::Base;
 
   TileAndDistributeToWorkgroupsPass(
       int32_t maxWorkgroupParallelDims,

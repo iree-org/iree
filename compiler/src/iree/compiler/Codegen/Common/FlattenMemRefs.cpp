@@ -342,8 +342,7 @@ struct FlattenSubview : public OpRewritePattern<memref::SubViewOp> {
 
 struct DecomposeMemrefsPass
     : public impl::DecomposeMemrefsPassBase<DecomposeMemrefsPass> {
-  using impl::DecomposeMemrefsPassBase<
-      DecomposeMemrefsPass>::DecomposeMemrefsPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, arith::ArithDialect,

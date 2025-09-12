@@ -62,8 +62,7 @@ static LogicalResult decomposeIm2col(Im2colOp im2colOp, RewriterBase &rewriter,
 namespace {
 struct DecomposeIm2colPass final
     : impl::DecomposeIm2colPassBase<DecomposeIm2colPass> {
-  using impl::DecomposeIm2colPassBase<
-      DecomposeIm2colPass>::DecomposeIm2colPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<

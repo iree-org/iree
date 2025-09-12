@@ -25,8 +25,7 @@ class LLVMCPUVirtualVectorLoweringPass
     : public impl::LLVMCPUVirtualVectorLoweringPassBase<
           LLVMCPUVirtualVectorLoweringPass> {
 public:
-  using impl::LLVMCPUVirtualVectorLoweringPassBase<
-      LLVMCPUVirtualVectorLoweringPass>::LLVMCPUVirtualVectorLoweringPassBase;
+  using Base::Base;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, vector::VectorDialect,
                     arm_neon::ArmNeonDialect>();

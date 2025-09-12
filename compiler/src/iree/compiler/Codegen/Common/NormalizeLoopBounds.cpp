@@ -169,8 +169,7 @@ LogicalResult normalizeLoopBounds(RewriterBase &rewriter,
 namespace {
 struct NormalizeLoopBoundsPass final
     : impl::NormalizeLoopBoundsPassBase<NormalizeLoopBoundsPass> {
-  using impl::NormalizeLoopBoundsPassBase<
-      NormalizeLoopBoundsPass>::NormalizeLoopBoundsPassBase;
+  using Base::Base;
 
   void runOnOperation() override {
     Operation *op = getOperation();

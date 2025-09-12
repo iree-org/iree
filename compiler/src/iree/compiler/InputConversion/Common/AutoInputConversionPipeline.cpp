@@ -22,8 +22,7 @@ class AutoInputConversionPipelinePass final
     : public impl::AutoInputConversionPipelinePassBase<
           AutoInputConversionPipelinePass> {
 public:
-  using impl::AutoInputConversionPipelinePassBase<
-      AutoInputConversionPipelinePass>::AutoInputConversionPipelinePassBase;
+  using Base::Base;
   AutoInputConversionPipelinePass(PipelineExtensions *pipelineExtensions)
       : pipelineExtensions(pipelineExtensions) {}
   void runOnOperation() override;
