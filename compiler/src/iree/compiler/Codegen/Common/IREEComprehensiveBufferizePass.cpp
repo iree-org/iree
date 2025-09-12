@@ -94,8 +94,7 @@ class IREEComprehensiveBufferizePass final
     : public impl::IREEComprehensiveBufferizePassBase<
           IREEComprehensiveBufferizePass> {
 public:
-  using impl::IREEComprehensiveBufferizePassBase<
-      IREEComprehensiveBufferizePass>::IREEComprehensiveBufferizePassBase;
+  using Base::Base;
   explicit IREEComprehensiveBufferizePass(
       BufferizationOptions::AllocationFn allocationFn,
       BufferizationOptions::MemCpyFn memCpyFn)
@@ -131,8 +130,7 @@ private:
 class IREEBufferizeConstantsPass final
     : public impl::IREEBufferizeConstantsPassBase<IREEBufferizeConstantsPass> {
 public:
-  using impl::IREEBufferizeConstantsPassBase<
-      IREEBufferizeConstantsPass>::IREEBufferizeConstantsPassBase;
+  using Base::Base;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, bufferization::BufferizationDialect,
                     memref::MemRefDialect>();

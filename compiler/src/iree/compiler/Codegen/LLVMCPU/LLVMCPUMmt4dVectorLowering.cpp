@@ -33,8 +33,7 @@ namespace {
 struct LLVMCPUMmt4dVectorLoweringPass
     : public impl::LLVMCPUMmt4dVectorLoweringPassBase<
           LLVMCPUMmt4dVectorLoweringPass> {
-  using impl::LLVMCPUMmt4dVectorLoweringPassBase<
-      LLVMCPUMmt4dVectorLoweringPass>::LLVMCPUMmt4dVectorLoweringPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect, LLVM::LLVMDialect>();

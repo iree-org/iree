@@ -25,8 +25,7 @@ namespace {
 class VectorTransferLoweringPass
     : public impl::VectorTransferLoweringPassBase<VectorTransferLoweringPass> {
 public:
-  using impl::VectorTransferLoweringPassBase<
-      VectorTransferLoweringPass>::VectorTransferLoweringPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, scf::SCFDialect,

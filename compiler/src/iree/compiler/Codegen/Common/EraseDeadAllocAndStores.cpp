@@ -22,8 +22,7 @@ class EraseDeadAllocAndStoresPass final
     : public impl::EraseDeadAllocAndStoresPassBase<
           EraseDeadAllocAndStoresPass> {
 public:
-  using impl::EraseDeadAllocAndStoresPassBase<
-      EraseDeadAllocAndStoresPass>::EraseDeadAllocAndStoresPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<scf::SCFDialect, vector::VectorDialect>();

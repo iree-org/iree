@@ -21,8 +21,7 @@ namespace {
 class DropVectorUnitDimsPass
     : public impl::DropVectorUnitDimsPassBase<DropVectorUnitDimsPass> {
 public:
-  using impl::DropVectorUnitDimsPassBase<
-      DropVectorUnitDimsPass>::DropVectorUnitDimsPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<memref::MemRefDialect, vector::VectorDialect>();

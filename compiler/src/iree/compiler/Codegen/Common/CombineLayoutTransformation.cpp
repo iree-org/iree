@@ -681,8 +681,7 @@ namespace {
 struct CombineLayoutTransformationPass final
     : impl::CombineLayoutTransformationPassBase<
           CombineLayoutTransformationPass> {
-  using impl::CombineLayoutTransformationPassBase<
-      CombineLayoutTransformationPass>::CombineLayoutTransformationPassBase;
+  using Base::Base;
 
   void runOnOperation() override {
     CombineRelayoutOpsControlFn controlFn =

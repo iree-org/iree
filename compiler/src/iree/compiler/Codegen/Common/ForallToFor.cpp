@@ -86,7 +86,7 @@ static LogicalResult forallToForLoop(RewriterBase &rewriter,
 
 namespace {
 struct ForallToForPass : impl::ForallToForPassBase<ForallToForPass> {
-  using impl::ForallToForPassBase<ForallToForPass>::ForallToForPassBase;
+  using Base::Base;
   void runOnOperation() override {
     auto funcOp = getOperation();
     IRRewriter rewriter(funcOp->getContext());

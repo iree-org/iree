@@ -25,8 +25,7 @@ class LLVMGPUSelectLoweringStrategyPass final
     : public impl::LLVMGPUSelectLoweringStrategyPassBase<
           LLVMGPUSelectLoweringStrategyPass> {
 public:
-  using impl::LLVMGPUSelectLoweringStrategyPassBase<
-      LLVMGPUSelectLoweringStrategyPass>::LLVMGPUSelectLoweringStrategyPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry

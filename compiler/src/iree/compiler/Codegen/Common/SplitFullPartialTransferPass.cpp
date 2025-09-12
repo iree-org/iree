@@ -22,8 +22,7 @@ namespace {
 
 struct SplitFullPartialTransferPass final
     : impl::SplitFullPartialTransferPassBase<SplitFullPartialTransferPass> {
-  using impl::SplitFullPartialTransferPassBase<
-      SplitFullPartialTransferPass>::SplitFullPartialTransferPassBase;
+  using Base::Base;
 
   void runOnOperation() override {
     MLIRContext *ctx = &getContext();

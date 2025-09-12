@@ -62,8 +62,7 @@ namespace {
 class CPULowerToUKernelsPass
     : public impl::CPULowerToUKernelsPassBase<CPULowerToUKernelsPass> {
 public:
-  using impl::CPULowerToUKernelsPassBase<
-      CPULowerToUKernelsPass>::CPULowerToUKernelsPassBase;
+  using Base::Base;
   explicit CPULowerToUKernelsPass(bool skipIntermediateRoundings) {
     this->skipIntermediateRoundings = skipIntermediateRoundings;
   }

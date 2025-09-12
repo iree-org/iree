@@ -60,8 +60,7 @@ struct ReplaceSlowWithFastReductionMinMaxOpPattern final
 struct ReplaceSlowMinMaxOpsPass final
     : impl::ReplaceSlowMinMaxOpsPassBase<ReplaceSlowMinMaxOpsPass> {
 public:
-  using impl::ReplaceSlowMinMaxOpsPassBase<
-      ReplaceSlowMinMaxOpsPass>::ReplaceSlowMinMaxOpsPassBase;
+  using Base::Base;
   void runOnOperation() override;
 };
 

@@ -42,8 +42,7 @@ static void swizzleSharedMemory(mlir::FunctionOpInterface funcOp) {
 namespace {
 struct LLVMGPUVectorToGPUPass final
     : impl::LLVMGPUVectorToGPUPassBase<LLVMGPUVectorToGPUPass> {
-  using impl::LLVMGPUVectorToGPUPassBase<
-      LLVMGPUVectorToGPUPass>::LLVMGPUVectorToGPUPassBase;
+  using Base::Base;
   LLVMGPUVectorToGPUPass(GPUTensorCoreType tensorCoreType)
       : tensorCoreType(tensorCoreType) {}
 

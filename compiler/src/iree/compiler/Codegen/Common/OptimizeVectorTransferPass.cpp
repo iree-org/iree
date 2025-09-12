@@ -62,8 +62,7 @@ static void loopInvariantCodeMotion(mlir::FunctionOpInterface funcOp) {
 
 struct OptimizeVectorTransferPass final
     : impl::OptimizeVectorTransferPassBase<OptimizeVectorTransferPass> {
-  using impl::OptimizeVectorTransferPassBase<
-      OptimizeVectorTransferPass>::OptimizeVectorTransferPassBase;
+  using Base::Base;
 
   void runOnOperation() override {
     auto funcOp = getOperation();

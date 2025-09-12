@@ -53,8 +53,7 @@ class LLVMGPULowerExecutableTargetPass final
     : public impl::LLVMGPULowerExecutableTargetPassBase<
           LLVMGPULowerExecutableTargetPass> {
 public:
-  using impl::LLVMGPULowerExecutableTargetPassBase<
-      LLVMGPULowerExecutableTargetPass>::LLVMGPULowerExecutableTargetPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off

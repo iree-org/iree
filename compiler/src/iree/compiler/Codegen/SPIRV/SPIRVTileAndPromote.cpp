@@ -111,8 +111,7 @@ namespace {
 class SPIRVTileAndPromotePass final
     : public impl::SPIRVTileAndPromotePassBase<SPIRVTileAndPromotePass> {
 public:
-  using impl::SPIRVTileAndPromotePassBase<
-      SPIRVTileAndPromotePass>::SPIRVTileAndPromotePassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<gpu::GPUDialect, IREE::GPU::IREEGPUDialect>();

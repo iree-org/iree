@@ -58,8 +58,7 @@ static bool allowRenamingPrivateLLVMSymbols(Operation *op) {
 
 struct LLVMGPULinkExecutablesPass
     : public impl::LLVMGPULinkExecutablesPassBase<LLVMGPULinkExecutablesPass> {
-  using impl::LLVMGPULinkExecutablesPassBase<
-      LLVMGPULinkExecutablesPass>::LLVMGPULinkExecutablesPassBase;
+  using Base::Base;
   void runOnOperation() override {
     auto moduleOp = getOperation();
     auto moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());

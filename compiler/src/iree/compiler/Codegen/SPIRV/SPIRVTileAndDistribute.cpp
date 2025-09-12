@@ -109,8 +109,7 @@ namespace {
 class SPIRVTileAndDistributePass final
     : public impl::SPIRVTileAndDistributePassBase<SPIRVTileAndDistributePass> {
 public:
-  using impl::SPIRVTileAndDistributePassBase<
-      SPIRVTileAndDistributePass>::SPIRVTileAndDistributePassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, gpu::GPUDialect,

@@ -159,8 +159,7 @@ LogicalResult splitReductionImpl(Operation *op, int64_t size,
 class LLVMCPUSplitReductionPass
     : public impl::LLVMCPUSplitReductionPassBase<LLVMCPUSplitReductionPass> {
 public:
-  using impl::LLVMCPUSplitReductionPassBase<
-      LLVMCPUSplitReductionPass>::LLVMCPUSplitReductionPassBase;
+  using Base::Base;
   explicit LLVMCPUSplitReductionPass(bool fpReductionReordering) {
     this->enableFpReductionReordering = fpReductionReordering;
   }

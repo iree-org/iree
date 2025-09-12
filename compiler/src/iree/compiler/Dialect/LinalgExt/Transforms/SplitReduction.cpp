@@ -297,8 +297,7 @@ void setSplitReductionDepth(TopkOp topkOp, RewriterBase &rewriter,
 namespace {
 struct TopkSplitReductionPass final
     : impl::TopkSplitReductionPassBase<TopkSplitReductionPass> {
-  using impl::TopkSplitReductionPassBase<
-      TopkSplitReductionPass>::TopkSplitReductionPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry

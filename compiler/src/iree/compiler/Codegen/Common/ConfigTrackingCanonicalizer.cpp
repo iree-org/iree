@@ -69,8 +69,7 @@ struct ConfigTrackingCanonicalizerPass final
     : impl::ConfigTrackingCanonicalizerPassBase<
           ConfigTrackingCanonicalizerPass> {
 public:
-  using impl::ConfigTrackingCanonicalizerPassBase<
-      ConfigTrackingCanonicalizerPass>::ConfigTrackingCanonicalizerPassBase;
+  using Base::Base;
   /// Initialize the canonicalizer by building the set of patterns used during
   /// execution.
   LogicalResult initialize(MLIRContext *context) override {

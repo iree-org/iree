@@ -927,7 +927,7 @@ public:
 class ConvertToLLVMPass
     : public impl::ConvertToLLVMPassBase<ConvertToLLVMPass> {
 public:
-  using impl::ConvertToLLVMPassBase<ConvertToLLVMPass>::ConvertToLLVMPassBase;
+  using Base::Base;
   explicit ConvertToLLVMPass(bool reassociateFpReductions) {
     this->reassociateFpReductions = reassociateFpReductions;
   }

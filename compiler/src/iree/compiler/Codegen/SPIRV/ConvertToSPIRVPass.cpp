@@ -533,8 +533,7 @@ struct RemoveIdentityConversionCast final
 class ConvertToSPIRVPass final
     : public impl::ConvertToSPIRVPassBase<ConvertToSPIRVPass> {
 public:
-  using impl::ConvertToSPIRVPassBase<
-      ConvertToSPIRVPass>::ConvertToSPIRVPassBase;
+  using Base::Base;
   explicit ConvertToSPIRVPass(unsigned indexBits) : indexBits(indexBits) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {

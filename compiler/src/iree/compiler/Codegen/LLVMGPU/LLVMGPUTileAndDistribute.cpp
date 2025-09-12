@@ -203,8 +203,7 @@ private:
   bool distributeToWarp = false;
 
 public:
-  using impl::LLVMGPUTileAndDistributePassBase<
-      LLVMGPUTileAndDistributePass>::LLVMGPUTileAndDistributePassBase;
+  using Base::Base;
   LLVMGPUTileAndDistributePass(bool distributeToWarp)
       : distributeToWarp(distributeToWarp) {}
 

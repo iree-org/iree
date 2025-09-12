@@ -46,8 +46,7 @@ class SPIRVLowerExecutableTargetPass final
     : public impl::SPIRVLowerExecutableTargetPassBase<
           SPIRVLowerExecutableTargetPass> {
 public:
-  using impl::SPIRVLowerExecutableTargetPassBase<
-      SPIRVLowerExecutableTargetPass>::SPIRVLowerExecutableTargetPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
