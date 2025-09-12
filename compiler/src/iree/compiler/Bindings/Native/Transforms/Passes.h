@@ -52,22 +52,15 @@ void registerTransformPassPipeline();
 // IREE native ABI bindings support
 //===----------------------------------------------------------------------===//
 
-// Converts streamable ops in input dialects into their IREE dialect forms.
-std::unique_ptr<OperationPass<ModuleOp>> createConvertStreamableOpsPass();
-
-// Wraps all entry points in a function that is compatible with the
-// expected invocation semantics of bindings following the native IREE ABI.
-std::unique_ptr<OperationPass<ModuleOp>> createWrapEntryPointsPass(
-    InvocationModel invocationModel = InvocationModel::Sync);
+#define GEN_PASS_DECL
+#include "iree/compiler/Bindings/Native/Transforms/Passes.h.inc"
 
 //===----------------------------------------------------------------------===//
 // Register all Passes
 //===----------------------------------------------------------------------===//
 
-inline void registerPasses() {
-  createConvertStreamableOpsPass();
-  createWrapEntryPointsPass();
-}
+#define GEN_PASS_REGISTRATION
+#include "iree/compiler/Bindings/Native/Transforms/Passes.h.inc"
 
 } // namespace mlir::iree_compiler::IREE::ABI
 

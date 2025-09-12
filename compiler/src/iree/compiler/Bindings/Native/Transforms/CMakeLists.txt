@@ -18,8 +18,10 @@ iree_cc_library(
   SRCS
     "ConvertStreamableOps.cpp"
     "Passes.cpp"
+    "Passes.h.inc"
     "WrapEntryPoints.cpp"
   DEPS
+    ::PassesIncGen
     LLVMSupport
     MLIRAffineUtils
     MLIRFunctionInterfaces
@@ -36,6 +38,15 @@ iree_cc_library(
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
   PUBLIC
+)
+
+iree_tablegen_library(
+  NAME
+    PassesIncGen
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-decls Passes.h.inc
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

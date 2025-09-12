@@ -28,15 +28,15 @@ void registerTransformPassPipeline();
 // TFLite bindings support
 //===----------------------------------------------------------------------===//
 
-// Wraps all model entry points in a function that is compatible with the
-// expected invocation semantics of the IREE TFLite bindings.
-std::unique_ptr<OperationPass<ModuleOp>> createWrapEntryPointsPass();
+#define GEN_PASS_DECL
+#include "iree/compiler/Bindings/TFLite/Transforms/Passes.h.inc"
 
 //===----------------------------------------------------------------------===//
 // Register all Passes
 //===----------------------------------------------------------------------===//
 
-inline void registerPasses() { createWrapEntryPointsPass(); }
+#define GEN_PASS_REGISTRATION
+#include "iree/compiler/Bindings/TFLite/Transforms/Passes.h.inc"
 
 } // namespace mlir::iree_compiler::IREE::TFLite
 
