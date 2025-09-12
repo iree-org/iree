@@ -180,7 +180,7 @@ struct MaterializeTargetDevicesPass
       MaterializeTargetDevicesPass>::MaterializeTargetDevicesPassBase;
 
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     // Only materialize devices if there's a module-level attribute specified.
     FlatSymbolRefAttr defaultDeviceRef;

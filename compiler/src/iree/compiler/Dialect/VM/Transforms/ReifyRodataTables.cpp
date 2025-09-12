@@ -91,7 +91,7 @@ static void reifyRodataTable(RewriterBase &rewriter,
 class ReifyRodataTablesPass
     : public IREE::VM::impl::ReifyRodataTablesPassBase<ReifyRodataTablesPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    IREE::VM::ModuleOp moduleOp = getOperation();
 
     // Walk all of the rodata table ops and convert to rodata.inline
     IRRewriter rewriter(moduleOp.getContext());

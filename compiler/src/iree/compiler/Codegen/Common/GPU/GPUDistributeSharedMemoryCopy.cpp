@@ -458,7 +458,7 @@ struct GPUDistributeSharedMemoryCopyPass final
     : impl::GPUDistributeSharedMemoryCopyPassBase<
           GPUDistributeSharedMemoryCopyPass> {
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     if (failed(gpuDistributeSharedMemoryCopy(funcOp))) {
       return signalPassFailure();
     }

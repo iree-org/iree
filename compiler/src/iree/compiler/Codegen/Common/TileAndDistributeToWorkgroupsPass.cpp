@@ -290,7 +290,7 @@ struct TileAndDistributeToWorkgroupsPass final
 void TileAndDistributeToWorkgroupsPass::runOnOperation() {
   MLIRContext *context = &getContext();
 
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   {
     RewritePatternSet patterns(context);

@@ -53,7 +53,7 @@ void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
 }
 
 void LLVMCPUUnfuseFMAOpsPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   auto context = funcOp.getContext();
   RewritePatternSet patterns(&getContext());
   populateUnfusedFMAOpsPassPatterns(context, patterns);

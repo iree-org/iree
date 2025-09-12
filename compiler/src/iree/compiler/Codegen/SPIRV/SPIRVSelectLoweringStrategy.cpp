@@ -87,7 +87,7 @@ verifyTranslationInfo(FunctionOpInterface funcOp,
 }
 
 void SPIRVSelectLoweringStrategyPass::runOnOperation() {
-  auto moduleOp = getOperation();
+  mlir::ModuleOp moduleOp = getOperation();
   for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
     if (failed(initSPIRVLaunchConfig(funcOp))) {
       funcOp.emitOpError("failed to set lowering configuration");

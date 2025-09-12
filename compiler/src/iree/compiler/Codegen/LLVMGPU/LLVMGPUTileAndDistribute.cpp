@@ -212,7 +212,7 @@ public:
   }
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
 
     // Promote C matrix and propagate the potential  fill producer into the temp
     // allocation. This needs to be done before reduction tiling.

@@ -181,7 +181,7 @@ eliminateEmptyTensors(RewriterBase &rewriter, Operation *op,
 }
 
 void EliminateEmptyTensorsPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   MLIRContext *context = &getContext();
 
   OpBuilder b(context);
@@ -230,7 +230,7 @@ runIREEOneShotBufferize(Operation *op,
 
 /// Run comprehensive bufferize.
 void IREEComprehensiveBufferizePass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   IREEOneShotBufferizationOptions options = getBufferizationOptions();
   options.testAnalysisOnly = testAnalysisOnly;
   options.printConflicts = printConflicts;

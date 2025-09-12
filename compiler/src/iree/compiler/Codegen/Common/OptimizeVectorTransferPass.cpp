@@ -65,7 +65,7 @@ struct OptimizeVectorTransferPass final
   using Base::Base;
 
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     LDBG() << "before optimize vector transfer\n" << funcOp;
     // Generate vector.shape_cast for dropping leading one dimensions in vector
     // ops. This increases the chance that we can forward more transfer writes

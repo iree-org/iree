@@ -888,7 +888,7 @@ static bool tryElideTimepointsInRegion(Region &region,
 struct ElideTimepointsPass
     : public IREE::Stream::impl::ElideTimepointsPassBase<ElideTimepointsPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     if (moduleOp.getBody()->empty())
       return;
 

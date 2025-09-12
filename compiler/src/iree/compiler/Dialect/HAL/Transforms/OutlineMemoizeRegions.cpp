@@ -576,7 +576,7 @@ struct OutlineMemoizeRegionsPass
     : public IREE::HAL::impl::OutlineMemoizeRegionsPassBase<
           OutlineMemoizeRegionsPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     // Analyze the module to determine which devices are used where.
     DeviceAnalysis deviceAnalysis(moduleOp);

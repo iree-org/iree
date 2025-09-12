@@ -36,7 +36,7 @@ public:
 
 void VectorTransferLoweringPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   RewritePatternSet patterns(ctx);
   // Explicitly materialize the mask on transfer_read/transfer_write.

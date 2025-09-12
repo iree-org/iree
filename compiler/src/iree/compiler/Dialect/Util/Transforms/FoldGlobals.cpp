@@ -367,7 +367,7 @@ struct FoldGlobalsPass : public impl::FoldGlobalsPassBase<FoldGlobalsPass> {
     }
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
 
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     GlobalTable globalTable(moduleOp);
     beforeFoldingGlobals = globalTable.size();
     bool didChangeAny = false;

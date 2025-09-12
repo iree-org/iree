@@ -22,7 +22,7 @@ public:
   using Base::Base;
 
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     SmallVector<scf::ForOp> forOps;
     funcOp.walk([&](scf::ForOp forOp) {
       if (!isTiledAndDistributedLoop(forOp))

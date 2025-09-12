@@ -42,7 +42,7 @@ struct DumpExecutableSourcesPass
   using IREE::HAL::impl::DumpExecutableSourcesPassBase<
       DumpExecutableSourcesPass>::DumpExecutableSourcesPassBase;
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     auto moduleName = moduleOp.getName().value_or("module");
 
     // Help people out and mkdir if needed.

@@ -22,7 +22,7 @@ struct LLVMCPULinkExecutablesPass
   using impl::LLVMCPULinkExecutablesPassBase<
       LLVMCPULinkExecutablesPass>::LLVMCPULinkExecutablesPassBase;
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     auto moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
 
     auto sourceExecutableOps = gatherExecutablesForTarget(moduleOp, target);

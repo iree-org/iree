@@ -181,7 +181,7 @@ struct ScheduleConcurrencyPass
     : public IREE::Stream::impl::ScheduleConcurrencyPassBase<
           ScheduleConcurrencyPass> {
   void runOnOperation() override {
-    auto parentOp = getOperation();
+    mlir::CallableOpInterface parentOp = getOperation();
     if (!parentOp.getCallableRegion() ||
         parentOp.getCallableRegion()->empty()) {
       return;

@@ -52,7 +52,7 @@ void LLVMCPUTilePass::runOnOperation() {
     return;
   }
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
   for (auto computeOp : computeOps) {

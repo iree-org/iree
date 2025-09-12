@@ -127,7 +127,7 @@ public:
 
 void SPIRVTileAndDistributePass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   if (!isEntryPoint(funcOp))
     return;
 

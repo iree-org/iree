@@ -1062,7 +1062,7 @@ private:
 void SPIRVVectorizeLoadStorePass::runOnOperation() {
   // Uses the signature conversion methodology of the dialect conversion
   // framework to implement the conversion.
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   MLIRContext *context = &getContext();
 
   // Prior pass should have unrolled and broken down vectors with rank > 1.

@@ -135,7 +135,7 @@ struct GPUDistributeCopyUsingForallPass final
           GPUDistributeCopyUsingForallPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
 
     SmallVector<memref::CopyOp> copies;
 

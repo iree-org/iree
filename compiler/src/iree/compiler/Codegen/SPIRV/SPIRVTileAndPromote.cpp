@@ -129,7 +129,7 @@ private:
 
 void SPIRVTileAndPromotePass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   auto threadTileComputeFn = getSPIRVTileSizeComputeFn(funcOp, 1);
   if (failed(threadTileComputeFn))

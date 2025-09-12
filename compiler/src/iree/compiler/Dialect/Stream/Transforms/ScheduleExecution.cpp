@@ -336,7 +336,7 @@ struct ScheduleExecutionPass
           ScheduleExecutionPass> {
   void runOnOperation() override {
     auto *context = &getContext();
-    auto parentOp = getOperation();
+    mlir::CallableOpInterface parentOp = getOperation();
     if (!parentOp.getCallableRegion() ||
         parentOp.getCallableRegion()->empty()) {
       return;

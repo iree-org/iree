@@ -25,7 +25,7 @@ class HoistInlinedRodataPass
     : public IREE::VM::impl::HoistInlinedRodataPassBase<
           HoistInlinedRodataPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    IREE::VM::ModuleOp moduleOp = getOperation();
     SymbolTable moduleSymbolTable(moduleOp);
 
     // Find all inline byte buffers in the module.

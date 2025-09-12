@@ -244,7 +244,7 @@ struct PackDestinationForOp final : OpRewritePattern<scf::YieldOp> {
 
 void GPUPackToIntrinsicsPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   // Step 1. Pack candidate linalg ops to specified shapes.
   IRRewriter rewriter(funcOp);

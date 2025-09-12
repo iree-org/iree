@@ -60,7 +60,7 @@ struct LLVMGPULinkExecutablesPass
     : public impl::LLVMGPULinkExecutablesPassBase<LLVMGPULinkExecutablesPass> {
   using Base::Base;
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     auto moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
 
     auto sourceExecutableOps = gatherExecutablesForTarget(moduleOp, target);

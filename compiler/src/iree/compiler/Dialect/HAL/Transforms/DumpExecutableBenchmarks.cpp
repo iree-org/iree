@@ -471,7 +471,7 @@ struct DumpExecutableBenchmarksPass
   using IREE::HAL::impl::DumpExecutableBenchmarksPassBase<
       DumpExecutableBenchmarksPass>::DumpExecutableBenchmarksPassBase;
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     auto moduleName = moduleOp.getName().value_or("module");
     SymbolTable symbolTable(moduleOp);
 

@@ -327,7 +327,7 @@ struct FoldUnitExtentDimsForFuncPass final
 } // namespace
 
 void FoldUnitExtentDimsPass::runOnOperation() {
-  auto moduleOp = getOperation();
+  mlir::ModuleOp moduleOp = getOperation();
   MLIRContext *context = &getContext();
 
   SymbolTable moduleSymbols(moduleOp);

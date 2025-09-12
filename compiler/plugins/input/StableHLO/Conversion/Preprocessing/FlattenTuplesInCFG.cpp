@@ -316,15 +316,15 @@ LogicalResult convertFunction(func::FuncOp oldFunction,
 struct FlattenTuplesInCFG final
     : impl::FlattenTuplesInCFGBase<FlattenTuplesInCFG> {
   void runOnOperation() override {
-    ModuleOp module = getOperation();
-    MLIRContext *ctx = module.getContext();
+    mlir::ModuleOp moduleOp = getOperation();
+    MLIRContext *ctx = moduleOp.getContext();
     Builder builder(ctx);
 
     // Build a list of (oldFunction, newFunction) for all functions we need to
     // replace. This will ensure that when we go to convert function bodies we
     // have only new functions defined.
     SmallVector<std::pair<func::FuncOp, func::FuncOp>> convertedFunctions;
-    for (auto oldFunction : module.getOps<func::FuncOp>()) {
+    for (auto oldFunction : moduleOp.getOps<func::FuncOp>()) {
       FunctionType oldFunctionType = oldFunction.getFunctionType();
 
       llvm::SmallVector<Type> newInputTypes;
@@ -349,7 +349,7 @@ struct FlattenTuplesInCFG final
     // Replace functions in the module.
     for (auto [oldFunction, newFunction] : convertedFunctions) {
       oldFunction.erase();
-      module.push_back(newFunction);
+      moduleOp.push_back(newFunction);
     }
 
     // Run canonicalization patterns to cancel out remaining tuple ops. We need

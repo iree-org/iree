@@ -636,7 +636,7 @@ public:
   }
 
   void runOnOperation() override {
-    auto rootOp = getOperation();
+    mlir::ModuleOp rootOp = getOperation();
     SymbolTable symbolTable(rootOp);
 
     // Expand all util.global ops holding tensor into tensor + dynamic dims.

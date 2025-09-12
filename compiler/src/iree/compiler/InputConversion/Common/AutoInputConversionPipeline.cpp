@@ -35,16 +35,16 @@ void AutoInputConversionPipelinePass::runOnOperation() {
   if (!pipelineExtensions)
     return;
 
-  ModuleOp module = getOperation();
+  mlir::ModuleOp moduleOp = getOperation();
   llvm::StringSet<> detectedTypeMnemonics;
   pipelineExtensions->populateDetectedCustomInputConversionTypes(
-      module, detectedTypeMnemonics);
+      moduleOp, detectedTypeMnemonics);
   if (detectedTypeMnemonics.empty())
     return;
 
   if (detectedTypeMnemonics.getNumItems() > 1) {
     // TODO(scotttodd): handle multiple typeMnemonics (use all?)
-    auto diag = module.emitError(
+    auto diag = moduleOp.emitError(
         "mixture of input types not yet implemented, set "
         "'--iree-input-type=[type]' explicitly instead of using 'auto' or "
         "audit the input program to understand why dialects are mixed");
@@ -57,18 +57,18 @@ void AutoInputConversionPipelinePass::runOnOperation() {
   }
 
   auto typeMnemonic = detectedTypeMnemonics.begin()->getKey();
-  OpPassManager passManager(module.getOperationName());
+  OpPassManager passManager(moduleOp.getOperationName());
   bool foundExtension =
       pipelineExtensions->extendCustomInputConversionPassPipeline(passManager,
                                                                   typeMnemonic);
   if (!foundExtension) {
     // We expect that callers properly validate supported extensions and
     // that if a plugin advertises support, it actually provides it.
-    module.emitError() << "custom input conversion for extension '"
-                       << typeMnemonic << "' not found";
+    moduleOp.emitError() << "custom input conversion for extension '"
+                         << typeMnemonic << "' not found";
     return signalPassFailure();
   }
-  if (failed(runPipeline(passManager, module))) {
+  if (failed(runPipeline(passManager, moduleOp))) {
     return signalPassFailure();
   }
 }

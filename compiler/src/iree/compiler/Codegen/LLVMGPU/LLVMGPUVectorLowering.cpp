@@ -193,7 +193,7 @@ struct LLVMGPUVectorLoweringPass final
     registry.insert<math::MathDialect>();
   }
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     MLIRContext *ctx = &getContext();
 
     // Uplift arith ops to math.fma before lowering high level vector ops.

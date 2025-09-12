@@ -44,7 +44,7 @@ struct LLVMCPUMmt4dVectorLoweringPass
 
 void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   std::optional<int64_t> numLoops;
   funcOp.walk([&](vector::ContractionOp op) {

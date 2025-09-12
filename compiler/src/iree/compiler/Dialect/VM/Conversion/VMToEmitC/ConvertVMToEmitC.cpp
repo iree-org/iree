@@ -4765,17 +4765,17 @@ public:
   }
 
   void runOnOperation() override {
-    IREE::VM::ModuleOp module = getOperation();
+    IREE::VM::ModuleOp moduleOp = getOperation();
 
     ConversionTarget target(getContext());
-    EmitCTypeConverter typeConverter(module);
+    EmitCTypeConverter typeConverter(moduleOp);
 
     // Convert vm.func ops to emitc.func with the calling convention used by
     // EmitC. We convert these upfront to make sure vm.call ops always
     // reference emitc.func ops with the correct calling convention during the
     // conversion.
     SmallVector<IREE::VM::FuncOp> funcsToRemove;
-    for (auto funcOp : module.getOps<IREE::VM::FuncOp>()) {
+    for (auto funcOp : moduleOp.getOps<IREE::VM::FuncOp>()) {
       if (failed(convertFuncOp(funcOp, typeConverter))) {
         return signalPassFailure();
       }
@@ -4792,7 +4792,7 @@ public:
     // import ops to be rewritten to compiler generated shim functions. To
     // ensure this we only rewrite `import` ops first.
     ImportOpConverter importOpConverter(typeConverter, importShims);
-    for (auto importOp : module.getOps<IREE::VM::ImportOp>()) {
+    for (auto importOp : moduleOp.getOps<IREE::VM::ImportOp>()) {
       if (failed(importOpConverter(importOp))) {
         return signalPassFailure();
       }
@@ -4818,11 +4818,11 @@ public:
     // This op is needed in the printer to emit an array holding the data.
     target.addLegalOp<IREE::VM::RodataOp>();
 
-    if (failed(applyFullConversion(module, target, std::move(patterns)))) {
+    if (failed(applyFullConversion(moduleOp, target, std::move(patterns)))) {
       return signalPassFailure();
     }
 
-    if (failed(createModuleStructure(module, typeConverter))) {
+    if (failed(createModuleStructure(moduleOp, typeConverter))) {
       return signalPassFailure();
     }
   }

@@ -157,9 +157,9 @@ public:
     target.addIllegalOp<tosa::ScatterOp>();
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
 
-    FunctionOpInterface func = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     mlir::iree_compiler::populateTosaToLinalgExtPatterns(&patterns);
-    if (failed(applyFullConversion(func, target, std::move(patterns))))
+    if (failed(applyFullConversion(funcOp, target, std::move(patterns))))
       signalPassFailure();
   }
 };

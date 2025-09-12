@@ -193,7 +193,7 @@ struct AssignTargetDevicesPass
       AssignTargetDevicesPass>::AssignTargetDevicesPassBase;
 
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     // If no targets are specified we can't do anything - another pass earlier
     // in the pipeline will have had to add the targets.

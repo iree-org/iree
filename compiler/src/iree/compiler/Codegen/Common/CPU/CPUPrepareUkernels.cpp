@@ -411,7 +411,7 @@ struct CPUPrepareUkernelsPass
 void CPUPrepareUkernelsPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
   RewritePatternSet patterns(ctx);
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   IRRewriter rewriter(ctx);
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
 
