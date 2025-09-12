@@ -23,6 +23,9 @@
 
 namespace mlir::iree_compiler::IREE::TFLite {
 
+#define GEN_PASS_DEF_WRAPENTRYPOINTSPASS
+#include "iree/compiler/Bindings/TFLite/Transforms/Passes.h.inc"
+
 // Wraps each model entry point in a "_tflite_xx" function that matches the
 // expectations of the IREE TFLite C bindings and materializes shape query and
 // calculation functions for dynamically shaped I/O.
@@ -42,21 +45,10 @@ namespace mlir::iree_compiler::IREE::TFLite {
 //   util.global private mutable @_tflite_xx_arg0_dim1 : index
 //   util.global private mutable @_tflite_xx_arg0_dim2 : index
 class WrapEntryPointsPass
-    : public PassWrapper<WrapEntryPointsPass, OperationPass<ModuleOp>> {
+    : public impl::WrapEntryPointsPassBase<WrapEntryPointsPass> {
 public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::arith::ArithDialect, mlir::tensor::TensorDialect,
-                    IREE::HAL::HALDialect, IREE::Util::UtilDialect>();
-  }
-
-  StringRef getArgument() const override {
-    return "iree-tflite-wrap-entry-points";
-  }
-
-  StringRef getDescription() const override {
-    return "Wraps model entry points in functions compatible with the tflite "
-           "bindings";
-  }
+  using impl::WrapEntryPointsPassBase<
+      WrapEntryPointsPass>::WrapEntryPointsPassBase;
 
   static StringAttr getArgId(IREE::Util::FuncOp funcOp, int i) {
     StringAttr id =
@@ -71,7 +63,7 @@ public:
   }
 
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     SmallVector<IREE::Util::FuncOp> entryFuncOps;
     for (auto funcOp : moduleOp.getOps<IREE::Util::FuncOp>()) {
@@ -643,11 +635,5 @@ private:
         StringAttr::get(&getContext(), llvm::join(pieces, ";"))};
   }
 };
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createWrapEntryPointsPass() {
-  return std::make_unique<WrapEntryPointsPass>();
-}
-
-static PassRegistration<WrapEntryPointsPass> pass;
 
 } // namespace mlir::iree_compiler::IREE::TFLite

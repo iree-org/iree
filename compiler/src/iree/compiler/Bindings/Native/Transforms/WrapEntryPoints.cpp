@@ -22,6 +22,9 @@
 
 namespace mlir::iree_compiler::IREE::ABI {
 
+#define GEN_PASS_DEF_WRAPENTRYPOINTSPASS
+#include "iree/compiler/Bindings/Native/Transforms/Passes.h.inc"
+
 // Returns the invocation model specified on |op| or the |defaultModel|.
 static IREE::ABI::InvocationModel
 getInvocationModel(Operation *op, IREE::ABI::InvocationModel defaultModel) {
@@ -739,31 +742,16 @@ static LogicalResult wrapExportFunc(IREE::ABI::InvocationModel invocationModel,
 // expected invocation semantics of bindings following the native IREE ABI.
 // Imports are also handled as they are entry points in another module.
 class WrapEntryPointsPass
-    : public PassWrapper<WrapEntryPointsPass, OperationPass<ModuleOp>> {
+    : public impl::WrapEntryPointsPassBase<WrapEntryPointsPass> {
 public:
-  WrapEntryPointsPass() = default;
-  WrapEntryPointsPass(const WrapEntryPointsPass &pass) {}
+  using Base::Base;
+
   WrapEntryPointsPass(IREE::ABI::InvocationModel invocationModel) {
     this->invocationModel = invocationModel;
   }
 
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::arith::ArithDialect, mlir::tensor::TensorDialect,
-                    IREE::HAL::HALDialect, IREE::Util::UtilDialect>();
-  }
-
-  StringRef getArgument() const override {
-    return "iree-abi-wrap-entry-points";
-  }
-
-  StringRef getDescription() const override {
-    return "Wraps all entry points in a function that is compatible with the "
-           "expected invocation semantics of bindings following the native "
-           "IREE ABI.";
-  }
-
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     // Gather functions that need wrapping.
     SmallVector<FunctionOpInterface> importOps;
@@ -806,27 +794,6 @@ public:
       }
     }
   }
-
-private:
-  Option<InvocationModel> invocationModel{
-      *this,
-      "invocation-model",
-      llvm::cl::desc("Specifies the execution model used for invocations."),
-      llvm::cl::init(IREE::ABI::InvocationModel::Sync),
-      llvm::cl::values(
-          clEnumValN(IREE::ABI::InvocationModel::Sync, "sync",
-                     "Fully synchronous behavior with no fences."),
-          clEnumValN(IREE::ABI::InvocationModel::CoarseFences, "coarse-fences",
-                     "Exposes one wait fence for all inputs and one signal "
-                     "fence for all outputs.")),
-  };
 };
-
-std::unique_ptr<OperationPass<ModuleOp>>
-createWrapEntryPointsPass(IREE::ABI::InvocationModel invocationModel) {
-  return std::make_unique<WrapEntryPointsPass>(invocationModel);
-}
-
-static PassRegistration<WrapEntryPointsPass> pass;
 
 } // namespace mlir::iree_compiler::IREE::ABI
