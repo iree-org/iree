@@ -686,8 +686,12 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
    "getTiledImplementation",
    "generateResultTileValue",
    "getIterationDomain"]
-  >
-]> {
+  >,
+  DeclareOpInterfaceMethods<PartialReductionOpInterface,
+   ["generateInitialTensorForPartialReduction",
+    "tileToPartialReduction",
+    "mergeReductions",
+    "getPartialResultTilePosition"]>]> {
   let summary = "Performs an arg-reduction using a user-defined comparator.";
   let description = [{
     The `arg_compare` op performs a reduction over a given dimension of a tensor,
