@@ -23,8 +23,9 @@
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
-// TODO: Adapts the transformations to work with linalg::LinalgOp, but not a
-// named op. E.g., DownscaleSizeOneWindowed2DConvolution patterns.
+// TODO(#21955): Adapts the convolution transformations to work with generalized
+// linalg.generic form, but not only when they are named ops. E.g.,
+// DownscaleSizeOneWindowed2DConvolution patterns.
 static llvm::cl::opt<bool> clDisableConvGeneralization(
     "iree-global-opt-experimental-disable-conv-generalization",
     llvm::cl::desc("Disable generalization for some conv ops (experimental)."),
