@@ -13,7 +13,7 @@ module {
     %tid = gpu.thread_id x
     %val = arith.index_castui %tid : index to i32
 
-    // Emits rocdl.permlane*.swap on gfx950
+    // Emits rocdl.permlane*.swap on gfx950.
     %p32 = amdgpu.permlane_swap %val 32 : i32
     %a32 = arith.addi %val, %p32 : i32
     %p16 = amdgpu.permlane_swap %a32 16 : i32
