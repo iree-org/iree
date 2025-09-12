@@ -158,7 +158,15 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
                    llvm::cl::desc("Transposes all concatenations to happen"
                                   "along the outer most dimension."),
                    llvm::cl::cat(category));
+  // Data-tiling is only enabled starting from O2 because it is not supported
+  // for all the backends. It is disabled in O3 because other aggressive
+  // transformations are applied, but data-tiling will handle all the possible
+  // ops by default. O3 users should understand what they want, and enable the
+  // data-tiling based on their needs.
   binder.opt<bool>("iree-opt-data-tiling", dataTiling,
+                   {init_at_opt(llvm::OptimizationLevel::O0, false),
+                    init_at_opt(llvm::OptimizationLevel::O2, true),
+                    init_at_opt(llvm::OptimizationLevel::O3, false)},
                    llvm::cl::desc("Enables data tiling path."),
                    llvm::cl::cat(category));
   binder.opt<bool>(
