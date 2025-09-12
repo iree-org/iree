@@ -496,15 +496,37 @@ Attribute TensorUKernelProviderAttr::getDataLayoutForUKernel(
     return {};
   }
   SmallVector<Type> types = encodingAttr.getElementTypesArray();
-  Type f16 = Float16Type::get(encoding.getContext());
-  Type f32 = Float32Type::get(encoding.getContext());
-  if (types.size() != 3 || types[0] != f16 || types[1] != f16 ||
-      types[2] != f32) {
+  SmallVector<int64_t> iterationSizes = encodingAttr.getIterationSizesArray();
+  if (types.size() != 3 || iterationSizes.size() != 3) {
     return {};
   }
-  return IREE::GPU::DataTiledMMAAttr::get(
-      encoding.getContext(), IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x16_F16, 8,
-      2, 4, 4, 1);
+  // Match the layouts based on UKernels implementation:
+  // https://github.com/iree-org/iree/tree/main/compiler/plugins/target/ROCM/builtins/mlir_ukernel
+  Type f16 = Float16Type::get(encoding.getContext());
+  Type f32 = Float32Type::get(encoding.getContext());
+  Type f8E4M3FNUZ = Float8E4M3FNUZType::get(encoding.getContext());
+  if (types[0] == f16 && types[1] == f16 && types[2] == f32) {
+    // UKernel: pingpong_dt_large_f16.
+    return IREE::GPU::DataTiledMMAAttr::get(
+        encoding.getContext(), IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x16_F16,
+        8, 2, 4, 4, 1);
+  }
+  if (types[0] == f8E4M3FNUZ && types[1] == f8E4M3FNUZ && types[2] == f32) {
+    /// TODO(#21865): Remove the upper bound (8192) once the scratch memory
+    /// issue is resolved.
+    if (iterationSizes[1] >= 2048 && iterationSizes[1] <= 8192) {
+      // UKernel: pingpong_dt_large_f8E4M3FNUZ.
+      return IREE::GPU::DataTiledMMAAttr::get(
+          encoding.getContext(),
+          IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ, 8, 2, 4, 4, 1);
+    } else {
+      // UKernel: pingpong_dt_medium_f8E4M3FNUZ.
+      return IREE::GPU::DataTiledMMAAttr::get(
+          encoding.getContext(),
+          IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ, 8, 1, 2, 8, 2);
+    }
+  }
+  return {};
 }
 
 //===----------------------------------------------------------------------===//
