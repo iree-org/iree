@@ -30,6 +30,34 @@ namespace mlir::iree_compiler::DispatchCreation {
 
 namespace {
 
+// struct SwapSetEncodingOpWithTensorCastOp
+//     : public OpRewritePattern<IREE::Encoding::SetEncodingOp> {
+//   using OpRewritePattern<IREE::Encoding::SetEncodingOp>::OpRewritePattern;
+//   LogicalResult matchAndRewrite(IREE::Encoding::SetEncodingOp setEncodingOp,
+//                                 PatternRewriter &rewriter) const override {
+//     auto castOp = setEncodingOp.getSource().getDefiningOp<tensor::CastOp>();
+//     if (!castOp) {
+//       return failure();
+//     }
+//     auto castSourceType =
+//         dyn_cast<RankedTensorType>(castOp.getSource().getType());
+//     if (!castSourceType) {
+//       return failure();
+//     }
+//     RankedTensorType encodedSourceType =
+//         castSourceType.cloneWithEncoding(
+//             setEncodingOp.getResultType().getEncoding());
+//     auto newSetEncodingOp = IREE::Encoding::SetEncodingOp::create(
+//         rewriter, setEncodingOp.getLoc(), encodedSourceType,
+//         castOp.getSource());
+//     auto newCastOp = tensor::CastOp::create(
+//         rewriter, castOp.getLoc(), setEncodingOp.getResultType(),
+//         newSetEncodingOp.getResult());
+//     rewriter.replaceOp(setEncodingOp, newCastOp);
+//     return success();
+//   }
+// };
+
 /// Return true if the op is fusable with a SetEncodingOp consumer. The op's
 /// containing dispatch must contain only:
 ///   - Reshape ops, encoding ops, linalg ops, gather ops, and attention ops.
@@ -70,6 +98,13 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
     // Run CSE to eliminate common encoding ops.
     DominanceInfo domInfo;
     mlir::eliminateCommonSubExpressions(rewriter, domInfo, funcOp);
+
+    // RewritePatternSet propagationPatterns(context);
+    // propagationPatterns.add<SwapSetEncodingOpWithTensorCastOp>(context);
+    // if (failed(applyPatternsGreedily(funcOp,
+    // std::move(propagationPatterns)))) {
+    //   return signalPassFailure();
+    // }
 
     SmallVector<IREE::Encoding::SetEncodingOp> encodingOps;
     funcOp->walk([&](IREE::Encoding::SetEncodingOp encodingOp) {
