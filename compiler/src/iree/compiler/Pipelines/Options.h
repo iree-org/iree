@@ -220,6 +220,7 @@ struct DispatchCreationOptions {
   llvm::OptimizationLevel optLevel;
 
   bool enableAggressiveFusion = false;
+  bool enablePadFusion = false;
   bool enableFuseMultiUse = true;
 
   // Enables data tiling in dispatch creation phase. There are two data-tiling

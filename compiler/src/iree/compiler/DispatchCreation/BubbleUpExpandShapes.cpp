@@ -71,6 +71,10 @@ struct BubbleUpExtract : OpRewritePattern<tensor::ExtractSliceOp> {
           "expected source to be dequantize-like op or have a single use");
     }
 
+    if (genericOp.getNumParallelLoops() != genericOp.getNumLoops()) {
+      return failure();
+    }
+
     if (!sliceOp.hasUnitStride()) {
       return rewriter.notifyMatchFailure(sliceOp, "expected unit stride");
     }
