@@ -47,8 +47,8 @@ DenseI64ArrayAttr make1DElementsAttr(OpBuilder &b, ArrayRef<int64_t> integers) {
 Value getF32Const(ImplicitLocOpBuilder b, ArrayRef<int64_t> shapes,
                   ArrayRef<float> values) {
   RankedTensorType ty = RankedTensorType::get(shapes, b.getF32Type());
-  return b
-      .create<mlir::stablehlo::ConstantOp>(DenseFPElementsAttr::get(ty, values))
+  return mlir::stablehlo::ConstantOp::create(
+             b, DenseFPElementsAttr::get(ty, values))
       .getResult();
 }
 
