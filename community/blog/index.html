@@ -4239,6 +4239,8 @@
       
         
       
+        
+      
     
     
       
@@ -4273,6 +4275,29 @@
             Archive
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    
+  
+  
+    <li class="md-nav__item">
+      <a href="archive/2025/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    2025
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -4520,6 +4545,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#data-tiling-walkthrough" class="md-nav__link">
+    <span class="md-ellipsis">
+      Data-Tiling Walkthrough
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#iree-mlir-linalg-tutorial" class="md-nav__link">
     <span class="md-ellipsis">
       IREE / MLIR / Linalg tutorial
@@ -4580,6 +4614,68 @@
 <p>Updates from the IREE team</p>
 <hr />
       </header>
+      
+        <article class="md-post md-post--excerpt">
+  <header class="md-post__header">
+    
+      <nav class="md-post__authors md-typeset">
+        
+          <span class="md-author">
+            <img src="https://github.com/hanhanW.png" alt="Han-Chung Wang">
+          </span>
+        
+      </nav>
+    
+    <div class="md-post__meta md-meta">
+      <ul class="md-meta__list">
+        <li class="md-meta__item">
+          <time datetime="2025-08-25 00:00:00+00:00">August 25, 2025</time></li>
+        
+          <li class="md-meta__item">
+            in
+            
+              <a href="category/performance/" class="md-meta__link">Performance</a></li>
+        
+        
+          
+          <li class="md-meta__item">
+            
+              30 min read
+            
+          </li>
+        
+      </ul>
+      
+    </div>
+  </header>
+  <div class="md-post__content md-typeset">
+    <h2 id="data-tiling-walkthrough"><a class="toclink" href="2025-08-25-data-tiling-walkthrough/">Data-Tiling Walkthrough</a></h2>
+<p>Data-tiling is the modification of data layout of operands of certain
+operations, such as matrix multiplication, that prefer specific layouts. These
+layout preferences depend on the operations and the target hardware. For
+example, matrix multiplications may need to use hardware matrix multiplication
+instructions that perform optimally with a specific matrix data layout.</p>
+<p>Layout changes may also be motivated by memory access performance, as
+data-tiling can result in improved locality of memory accesses, fewer cache
+lines being accessed, and generally simpler memory access patterns that are more
+likely to be handled performantly by the memory system.</p>
+<p>These layout changes can be propagated as far as possible across the workload,
+so the entire workload can use the updated layouts, as opposed to having to
+perform layout transformations at runtime. This may involve fusions or
+constant-evaluation that can amortize or remove layout-transformation overheads.</p>
+<p>The main conceptual difficulty in modeling this in tensor-level MLIR is that
+tensors don't have layouts: tensors are higher-level, abstract arrays. This is
+addressed by the concept of tensor encodings, which this document will explain.</p>
+
+    
+      <nav class="md-post__action">
+        <a href="2025-08-25-data-tiling-walkthrough/">
+          Continue reading
+        </a>
+      </nav>
+    
+  </div>
+</article>
       
         <article class="md-post md-post--excerpt">
   <header class="md-post__header">

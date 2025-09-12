@@ -37,6 +37,10 @@
          <lastmod>2025-09-12</lastmod>
     </url>
     <url>
+         <loc>https://iree.dev/community/blog/2025-08-25-data-tiling-walkthrough/</loc>
+         <lastmod>2025-09-12</lastmod>
+    </url>
+    <url>
          <loc>https://iree.dev/community/blog/2024-01-29-iree-mlir-linalg-tutorial/</loc>
          <lastmod>2025-09-12</lastmod>
     </url>
@@ -426,6 +430,10 @@
     </url>
     <url>
          <loc>https://iree.dev/reference/mlir-passes/VM/</loc>
+         <lastmod>2025-09-12</lastmod>
+    </url>
+    <url>
+         <loc>https://iree.dev/community/blog/archive/2025/</loc>
          <lastmod>2025-09-12</lastmod>
     </url>
     <url>
