@@ -21,6 +21,10 @@ def CombineInitializersPass : Pass<"iree-util-combine-initializers", "mlir::Modu
   let summary = "Combines global initializers into one.";
 }
 
+def CSEInitializersPass : Pass<"iree-util-cse-initializers", "mlir::ModuleOp"> {
+  let summary = "Remove the duplicate globals";
+}
+
 def DropCompilerHintsPass : Pass<"iree-util-drop-compiler-hints", ""> {
   let summary = "Deletes operations that have no runtime equivalent.";
   let description = [{

@@ -192,6 +192,7 @@ static void addDispatchRegionCreationPreprocessingPasses(
     registry.insert<IREE::TensorExt::IREETensorExtDialect>();
   };
   passManager.addPass(IREE::Util::createHoistIntoGlobalsPass(options));
+  passManager.addPass(IREE::Util::createCSEInitializersPass());
   FunctionLikeNest(passManager)
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass);
