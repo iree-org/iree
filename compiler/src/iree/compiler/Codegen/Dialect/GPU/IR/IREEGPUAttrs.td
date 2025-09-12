@@ -391,6 +391,13 @@ def IREEGPU_ScaledMMAAttr :
     static SmallVector<Type> getSupportedInputTypes(MLIRContext *ctx);
     static SmallVector<Type> getSupportedOutputTypes(MLIRContext *ctx);
 
+    /// For scaled MFMA intrinsics, the scales are packed into a 32 bit register.
+    /// Since scales are 8 bits, the intrinsic takes a vector of 4 scales, along
+    /// with a selector to indicate which scale is used.
+    int64_t getScalesVectorSize() const {
+      return 4;
+    }
+
     // Return the number of elements per shared scale.
     int64_t getBlockSize() const;
 
