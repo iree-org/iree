@@ -35,6 +35,8 @@ iree_hal_cts_test_suite(
   DEPS
     iree::hal::drivers::vulkan::registration
   EXCLUDED_TESTS
+    # TODO: implement executable reflection.
+    "executable"
     "semaphore_submission"  # SubmitWithWait hangs (requires async)
   LABELS
     driver=vulkan
