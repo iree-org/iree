@@ -70,10 +70,9 @@ FailureOr<Value> lowerSetEncodingOpToPackOp(
       encodingInfo.outerDimsPerm);
   auto emptyOp = tensor::EmptyOp::create(rewriter, loc, resultDims,
                                          resultType.getElementType());
-  return rewriter
-      .create<linalg::PackOp>(loc, source, emptyOp, encodingInfo.innerDimsPos,
-                              *innerTileSizesOfr, paddingValue,
-                              encodingInfo.outerDimsPerm)
+  return linalg::PackOp::create(rewriter, loc, source, emptyOp,
+                                encodingInfo.innerDimsPos, *innerTileSizesOfr,
+                                paddingValue, encodingInfo.outerDimsPerm)
       .getResult();
 }
 
@@ -103,10 +102,9 @@ FailureOr<Value> lowerUnsetEncodingToUnpackOp(
     return rewriter.notifyMatchFailure(
         encodingOp, "failed to generate runtime tile size query");
   }
-  return rewriter
-      .create<linalg::UnPackOp>(loc, packedValue, emptyOp,
-                                encodingInfo.innerDimsPos, *innerTileSizesOfr,
-                                encodingInfo.outerDimsPerm)
+  return linalg::UnPackOp::create(rewriter, loc, packedValue, emptyOp,
+                                  encodingInfo.innerDimsPos, *innerTileSizesOfr,
+                                  encodingInfo.outerDimsPerm)
       .getResult();
 }
 
@@ -121,9 +119,8 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
       typeConverter.getEncodingInfo(emptyType);
   Location loc = emptyOp.getLoc();
   if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
-    return rewriter
-        .create<tensor::EmptyOp>(loc, emptyOp.getMixedSizes(),
-                                 emptyType.getElementType())
+    return tensor::EmptyOp::create(rewriter, loc, emptyOp.getMixedSizes(),
+                                   emptyType.getElementType())
         .getOperation();
   }
 

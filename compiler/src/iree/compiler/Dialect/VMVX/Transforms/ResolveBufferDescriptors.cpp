@@ -312,12 +312,10 @@ struct FromHalInterfaceBindingSubspan
 
     // Base buffer.
     rewriter.replaceAllUsesWith(
-        op.getBaseBuffer(),
-        rewriter
-            .create<IREE::VMVX::GetRawInterfaceBindingBufferOp>(
-                loc, op.getBaseBuffer().getType(), binding.getLayout(),
-                binding.getBindingAttr())
-            .getResult());
+        op.getBaseBuffer(), IREE::VMVX::GetRawInterfaceBindingBufferOp::create(
+                                rewriter, loc, op.getBaseBuffer().getType(),
+                                binding.getLayout(), binding.getBindingAttr())
+                                .getResult());
 
     rewriter.eraseOp(op);
     return success();
@@ -330,9 +328,8 @@ static Value
 getBaseBufferReplacementForDescriptor(GetBufferDescriptorOp descriptorOp,
                                       RewriterBase &rewriter, Location loc,
                                       Value source) {
-  return rewriter
-      .create<UnrealizedConversionCastOp>(
-          loc, descriptorOp.getBaseBuffer().getType(), source)
+  return UnrealizedConversionCastOp::create(
+             rewriter, loc, descriptorOp.getBaseBuffer().getType(), source)
       .getResult(0);
 }
 
@@ -365,12 +362,10 @@ struct FromMemRefAssumeAlignment
 
     // Base buffer.
     rewriter.replaceAllUsesWith(
-        op.getBaseBuffer(),
-        rewriter
-            .create<IREE::VMVX::GetRawInterfaceBindingBufferOp>(
-                loc, op.getBaseBuffer().getType(), binding.getLayout(),
-                binding.getBindingAttr())
-            .getResult());
+        op.getBaseBuffer(), IREE::VMVX::GetRawInterfaceBindingBufferOp::create(
+                                rewriter, loc, op.getBaseBuffer().getType(),
+                                binding.getLayout(), binding.getBindingAttr())
+                                .getResult());
 
     rewriter.eraseOp(op);
     return success();

@@ -72,8 +72,8 @@ struct FoldSubViewIntoMapScatter final : OpRewritePattern<MapScatterOp> {
           rewriter, subViewOp.getLoc(), subViewOffset);
       Value yieldedIdxVal = getValueOrCreateConstantIndexOp(
           rewriter, mapScatterBodyYield.getLoc(), yieldedIdx);
-      yieldedIdx = rewriter.create<arith::AddIOp>(
-          subViewOp.getLoc(), yieldedIdxVal, subViewOffsetVal);
+      yieldedIdx = arith::AddIOp::create(rewriter, subViewOp.getLoc(),
+                                         yieldedIdxVal, subViewOffsetVal);
     }
     SmallVector<Value> newYieldedValues(yieldedIndices);
     newYieldedValues.push_back(yieldedMask);

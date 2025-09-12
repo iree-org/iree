@@ -208,10 +208,9 @@ public:
     const std::array<int64_t, 2> kernelDims =
         isNchwFchw ? fchwKernelDims : hwcfKernelDims;
     Value winogradFilter =
-        rewriter
-            .create<IREE::LinalgExt::WinogradFilterTransformOp>(
-                loc, kernelInit.getType(), ValueRange{kernel},
-                ValueRange{kernelInit}, outputTileSize, kernelSize, kernelDims)
+        IREE::LinalgExt::WinogradFilterTransformOp::create(
+            rewriter, loc, kernelInit.getType(), ValueRange{kernel},
+            ValueRange{kernelInit}, outputTileSize, kernelSize, kernelDims)
             .getResults()[0];
 
     // Add collapse shape
@@ -260,10 +259,9 @@ public:
     const std::array<int64_t, 2> imageDims =
         isNchwFchw ? nchwImageDims : nhwcImageDims;
     Value winogradInput =
-        rewriter
-            .create<IREE::LinalgExt::WinogradInputTransformOp>(
-                loc, inputTfInit.getType(), ValueRange{input},
-                ValueRange{inputTfInit}, outputTileSize, kernelSize, imageDims)
+        IREE::LinalgExt::WinogradInputTransformOp ::create(
+            rewriter, loc, inputTfInit.getType(), ValueRange{input},
+            ValueRange{inputTfInit}, outputTileSize, kernelSize, imageDims)
             .getResults()[0];
 
     // Add collapse shape
@@ -317,10 +315,10 @@ public:
     Value outputTfInit =
         tensor::EmptyOp::create(rewriter, loc, paddedResultShape, outElemType);
     Value paddedOutput =
-        rewriter
-            .create<IREE::LinalgExt::WinogradOutputTransformOp>(
-                loc, outputTfInit.getType(), ValueRange{expandedBmmResult},
-                ValueRange{outputTfInit}, outputTileSize, kernelSize, imageDims)
+        IREE::LinalgExt::WinogradOutputTransformOp::create(
+            rewriter, loc, outputTfInit.getType(),
+            ValueRange{expandedBmmResult}, ValueRange{outputTfInit},
+            outputTileSize, kernelSize, imageDims)
             .getResults()[0];
 
     // Extract slice

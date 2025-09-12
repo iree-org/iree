@@ -91,17 +91,16 @@ Value createGenericElementwiseCastOp(
                                                   elementType, *encoding)
                         : tensor::EmptyOp::create(builder, loc, inputMixedSizes,
                                                   elementType);
-  return builder
-      .create<linalg::GenericOp>(
-          loc, castedType, input, init, maps, iteratorTypes,
-          [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
-            Value castRes =
-                b.create(nestedLoc, castOp->getName().getIdentifier(), args[0],
-                         elementType)
-                    ->getResult(0);
-            linalg::YieldOp::create(b, nestedLoc, castRes);
-          },
-          attrs)
+  return linalg::GenericOp::create(
+             builder, loc, castedType, input, init, maps, iteratorTypes,
+             [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
+               Value castRes =
+                   b.create(nestedLoc, castOp->getName().getIdentifier(),
+                            args[0], elementType)
+                       ->getResult(0);
+               linalg::YieldOp::create(b, nestedLoc, castRes);
+             },
+             attrs)
       .getResult(0);
 }
 
@@ -155,15 +154,14 @@ Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,
       AffineMap::get(ty.getRank(), 0, filterExprs, context),
       AffineMap::get(ty.getRank(), 0, outputExprs, context)};
 
-  return rewriter
-      .create<linalg::GenericOp>(
-          zeroAcc.getType(), ValueRange{val}, ValueRange{zeroAcc}, affineMaps,
-          iterators,
-          [=](OpBuilder &b, Location loc, ValueRange args) {
-            Value ext = arith::ExtSIOp::create(b, loc, accETy, args[0]);
-            Value sum = arith::AddIOp::create(b, loc, ext, args[1]);
-            linalg::YieldOp::create(b, loc, sum);
-          })
+  return linalg::GenericOp::create(
+             rewriter, zeroAcc.getType(), ValueRange{val}, ValueRange{zeroAcc},
+             affineMaps, iterators,
+             [=](OpBuilder &b, Location loc, ValueRange args) {
+               Value ext = arith::ExtSIOp::create(b, loc, accETy, args[0]);
+               Value sum = arith::AddIOp::create(b, loc, ext, args[1]);
+               linalg::YieldOp::create(b, loc, sum);
+             })
       .getResult(0);
 }
 

@@ -166,9 +166,8 @@ struct DetachSplatConstantOutsOperands
       Value scalarConstantOp =
           arith::ConstantOp::create(rewriter, loc, elementType, constValue);
 
-      Value fillOp = rewriter
-                         .create<linalg::FillOp>(
-                             loc, resultType, scalarConstantOp, emptyTensorOp)
+      Value fillOp = linalg::FillOp::create(rewriter, loc, resultType,
+                                            scalarConstantOp, emptyTensorOp)
                          .getResult(0);
       rewriter.modifyOpInPlace(dpsInterfaceOp, [&]() {
         dpsInterfaceOp.setDpsInitOperand(outOperand.index(), fillOp);

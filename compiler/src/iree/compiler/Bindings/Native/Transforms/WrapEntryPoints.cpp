@@ -167,12 +167,11 @@ createImportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
     if (auto deviceAffinityAttr =
             dyn_cast_if_present<IREE::HAL::DeviceAffinityAttr>(
                 defaultAffinityAttr)) {
-      device = entryBuilder
-                   .create<IREE::HAL::DeviceResolveOp>(
-                       importOp.getLoc(),
-                       entryBuilder.getType<IREE::HAL::DeviceType>(),
-                       deviceAffinityAttr)
-                   .getResult(0);
+      device =
+          IREE::HAL::DeviceResolveOp::create(
+              entryBuilder, importOp.getLoc(),
+              entryBuilder.getType<IREE::HAL::DeviceType>(), deviceAffinityAttr)
+              .getResult(0);
     } else {
       // HACK: if no devices are available we get the first one available at
       // runtime. This is suboptimal but we expect most usage to have affinities

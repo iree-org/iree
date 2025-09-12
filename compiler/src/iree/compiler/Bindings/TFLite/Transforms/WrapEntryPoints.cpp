@@ -345,12 +345,10 @@ private:
     for (unsigned i = 0; i < shapeType.getRank(); ++i) {
       if (!shapeType.isDynamicDim(i))
         continue;
-      auto dimValue =
-          builder
-              .create<IREE::Util::ListGetOp>(
-                  loc, builder.getIndexType(), listValue,
-                  builder.createOrFold<arith::ConstantIndexOp>(loc, i))
-              .getResult();
+      auto dimValue = IREE::Util::ListGetOp::create(
+                          builder, loc, builder.getIndexType(), listValue,
+                          builder.createOrFold<arith::ConstantIndexOp>(loc, i))
+                          .getResult();
       dynamicDims.globalOps[dynamicDimIdx++].createStoreOp(loc, dimValue,
                                                            builder);
     }

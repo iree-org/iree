@@ -459,13 +459,11 @@ struct ExpandDynamicShapeConstant
     SmallVector<Value> dynamicDims;
     for (int64_t i = 0; i < dynamicType.getRank(); ++i) {
       if (dynamicType.isDynamicDim(i)) {
-        auto dimValue = rewriter
-                            .create<arith::ConstantIndexOp>(
-                                op.getLoc(), staticType.getDimSize(i))
+        auto dimValue = arith::ConstantIndexOp::create(rewriter, op.getLoc(),
+                                                       staticType.getDimSize(i))
                             .getResult();
-        dynamicDims.push_back(rewriter
-                                  .create<IREE::Util::OptimizationBarrierOp>(
-                                      op.getLoc(), dimValue)
+        dynamicDims.push_back(IREE::Util::OptimizationBarrierOp::create(
+                                  rewriter, op.getLoc(), dimValue)
                                   .getResult(0));
       }
     }

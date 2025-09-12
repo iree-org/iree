@@ -817,8 +817,8 @@ struct ScalarizeVectorTransferRead final
       }
 
       auto thenCond = [&](OpBuilder &b, Location loc) {
-        return b
-            .create<memref::LoadOp>(loc, readOp.getBase(), readOp.getIndices())
+        return memref::LoadOp::create(b, loc, readOp.getBase(),
+                                      readOp.getIndices())
             .getResult();
       };
       auto elseCond = [&](OpBuilder &b, Location loc) {

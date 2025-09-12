@@ -645,10 +645,9 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
     if (colMajor) {
       std::swap(lhs, rhs);
     }
-    return builder
-        .create<amdgpu::MFMAOp>(loc, resultType, layout.mSize, layout.nSize,
-                                layout.kSize, getBlockSize(intrinsic), lhs, rhs,
-                                acc)
+    return amdgpu::MFMAOp::create(builder, loc, resultType, layout.mSize,
+                                  layout.nSize, layout.kSize,
+                                  getBlockSize(intrinsic), lhs, rhs, acc)
         .getResult();
   }
   if (is_AMD_WMMA(intrinsic)) {
@@ -947,10 +946,9 @@ LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
   // Use a delinearize without outer bound and throw away its initial result
   // to get clamping behavior.
   SmallVector<OpFoldResult> tileOffsets =
-      builder
-          .create<affine::AffineDelinearizeIndexOp>(
-              loc, getValueOrCreateConstantIndexOp(builder, loc, threadId),
-              distributionThreadSizes, /*hasOuterBound=*/false)
+      affine::AffineDelinearizeIndexOp::create(
+          builder, loc, getValueOrCreateConstantIndexOp(builder, loc, threadId),
+          distributionThreadSizes, /*hasOuterBound=*/false)
           ->getResults()
           .drop_front();
 
@@ -1309,10 +1307,9 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
       if (getColMajor()) {
         std::swap(sliced_lhs, sliced_rhs);
       }
-      acc = builder
-                .create<amdgpu::MFMAOp>(loc, outputs[0].getType(), m, n,
-                                        nativeKSize, getBlockSize(), sliced_lhs,
-                                        sliced_rhs, acc)
+      acc = amdgpu::MFMAOp::create(builder, loc, outputs[0].getType(), m, n,
+                                   nativeKSize, getBlockSize(), sliced_lhs,
+                                   sliced_rhs, acc)
                 .getResult();
     }
     results.push_back(acc);

@@ -94,13 +94,11 @@ static void distributeCopyToThreads(RewriterBase &rewriter, memref::CopyOp copy,
       sizes.push_back(tileSize);
     } else {
       sizes.push_back(
-          rewriter
-              .create<affine::AffineMinOp>(
-                  loc, rewriter.getIndexType(), minMap,
-                  ValueRange{
-                      getValueOrCreateConstantIndexOp(rewriter, loc, tileSize),
-                      getValueOrCreateConstantIndexOp(rewriter, loc, ub),
-                      iterator})
+          affine::AffineMinOp::create(
+              rewriter, loc, rewriter.getIndexType(), minMap,
+              ValueRange{
+                  getValueOrCreateConstantIndexOp(rewriter, loc, tileSize),
+                  getValueOrCreateConstantIndexOp(rewriter, loc, ub), iterator})
               .getResult());
     }
   }

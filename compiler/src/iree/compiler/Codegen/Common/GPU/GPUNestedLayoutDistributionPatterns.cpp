@@ -1405,16 +1405,14 @@ struct DistributeContract final
       VectorValue interleavedMaskRhs =
           getInterleavedPackedForm(rewriter, maskRhs, rhsLayout);
 
-      disLhs = cast<VectorValue>(
-          rewriter
-              .create<arith::SelectOp>(loc, interleavedMaskLhs, disLhs,
-                                       passThruLhs)
-              .getResult());
-      disRhs = cast<VectorValue>(
-          rewriter
-              .create<arith::SelectOp>(loc, interleavedMaskRhs, disRhs,
-                                       passThruRhs)
-              .getResult());
+      disLhs = cast<VectorValue>(arith::SelectOp::create(rewriter, loc,
+                                                         interleavedMaskLhs,
+                                                         disLhs, passThruLhs)
+                                     .getResult());
+      disRhs = cast<VectorValue>(arith::SelectOp::create(rewriter, loc,
+                                                         interleavedMaskRhs,
+                                                         disRhs, passThruRhs)
+                                     .getResult());
     }
 
     Value acc = contractOp.getAcc();

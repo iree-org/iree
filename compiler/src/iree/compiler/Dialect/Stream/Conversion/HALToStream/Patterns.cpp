@@ -78,10 +78,9 @@ struct ConvertTensorImportOp
           rewriter, op.getLoc(),
           rewriter.getType<IREE::Stream::TimepointType>(),
           ValueRange{waitFence}, executionAffinityAttr);
-      resource = rewriter
-                     .create<IREE::Stream::TimepointAwaitOp>(
-                         op.getLoc(), ValueRange{resource},
-                         ValueRange{resultSize}, waitTimepoint)
+      resource = IREE::Stream::TimepointAwaitOp::create(
+                     rewriter, op.getLoc(), ValueRange{resource},
+                     ValueRange{resultSize}, waitTimepoint)
                      .getResult(0);
     }
 
@@ -231,10 +230,9 @@ struct ConvertTensorAliasOp
           rewriter, op.getLoc(),
           rewriter.getType<IREE::Stream::TimepointType>(),
           ValueRange{waitFence}, executionAffinityAttr);
-      storage = rewriter
-                    .create<IREE::Stream::TimepointAwaitOp>(
-                        op.getLoc(), ValueRange{storage},
-                        ValueRange{storageSize}, waitTimepoint)
+      storage = IREE::Stream::TimepointAwaitOp::create(
+                    rewriter, op.getLoc(), ValueRange{storage},
+                    ValueRange{storageSize}, waitTimepoint)
                     .getResult(0);
     }
 

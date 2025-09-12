@@ -97,9 +97,8 @@ collapseExtractSlice(tensor::ExtractSliceOp sliceOp,
   Value newSliceOp = tensor::ExtractSliceOp::create(
       rewriter, loc, collapseOp, collapsedOffsets, collapsedSizes,
       collapsedStrides);
-  return rewriter
-      .create<tensor::ExpandShapeOp>(loc, resultType, newSliceOp, reassociation,
-                                     expandedSizes)
+  return tensor::ExpandShapeOp::create(rewriter, loc, resultType, newSliceOp,
+                                       reassociation, expandedSizes)
       .getResult();
 }
 

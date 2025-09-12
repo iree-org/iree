@@ -27,8 +27,8 @@ public:
     if (it != memoizedValues.end()) {
       return it->second;
     }
-    Value memoizedValue = builder.create<arith::ConstantIntOp>(
-        loc, *value.getRawData(), value.getBitWidth());
+    Value memoizedValue = arith::ConstantIntOp::create(
+        builder, loc, *value.getRawData(), value.getBitWidth());
     memoizedValues[value] = memoizedValue;
     return memoizedValue;
   }
@@ -39,7 +39,7 @@ public:
     if (matchPattern(lhs, m_ConstantInt(&lhsValue))) {
       return add(lhsValue.getSExtValue(), rhs);
     }
-    return builder.create<arith::AddIOp>(loc, lhs, get(rhs));
+    return arith::AddIOp::create(builder, loc, lhs, get(rhs));
   }
 
   void populate(ValueRange values) {
@@ -69,7 +69,7 @@ public:
     if (it != memoizedIndices.end()) {
       return it->second;
     }
-    Value memoizedValue = builder.create<arith::ConstantIndexOp>(loc, value);
+    Value memoizedValue = arith::ConstantIndexOp::create(builder, loc, value);
     memoizedIndices[value] = memoizedValue;
     return memoizedValue;
   }
@@ -81,7 +81,7 @@ public:
     if (matchPattern(lhs, m_ConstantInt(&lhsValue))) {
       return add(lhsValue.getSExtValue(), rhs);
     }
-    return builder.create<arith::AddIOp>(loc, lhs, get(rhs));
+    return arith::AddIOp::create(builder, loc, lhs, get(rhs));
   }
 
   void populate(ValueRange values) {

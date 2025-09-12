@@ -522,10 +522,9 @@ struct ConvertGatherToExtract
       indices.back() = arith::ConstantIndexOp::create(rewriter, loc, i);
       Value elem = tensor::ExtractOp::create(rewriter, loc,
                                              gatherOp.getIndices(), indices);
-      offsets[i] =
-          rewriter
-              .create<arith::IndexCastOp>(loc, rewriter.getIndexType(), elem)
-              .getResult();
+      offsets[i] = arith::IndexCastOp::create(rewriter, loc,
+                                              rewriter.getIndexType(), elem)
+                       .getResult();
     }
 
     applyPermutationToVector(offsets, gatherOp.getDimensionMap());

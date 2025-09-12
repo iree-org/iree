@@ -307,15 +307,13 @@ struct GlobalLoadOpExpansion
     // Insert a load/transfer to the unknown resource lifetime.
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto resource =
-        rewriter
-            .create<IREE::Util::GlobalLoadOp>(
-                loadOp.getLoc(), expandedGlobal.resourceOp.getType(),
-                expandedGlobal.resourceOp.getSymName())
+        IREE::Util::GlobalLoadOp::create(rewriter, loadOp.getLoc(),
+                                         expandedGlobal.resourceOp.getType(),
+                                         expandedGlobal.resourceOp.getSymName())
             .getResult();
-    auto resourceSize = rewriter
-                            .create<IREE::Util::GlobalLoadOp>(
-                                loadOp.getLoc(), rewriter.getIndexType(),
-                                expandedGlobal.resourceSizeOp.getSymName())
+    auto resourceSize = IREE::Util::GlobalLoadOp::create(
+                            rewriter, loadOp.getLoc(), rewriter.getIndexType(),
+                            expandedGlobal.resourceSizeOp.getSymName())
                             .getResult();
     auto transferOp = IREE::Stream::AsyncTransferOp::create(
         rewriter, loadOp.getLoc(), unknownType, resource, resourceSize,
