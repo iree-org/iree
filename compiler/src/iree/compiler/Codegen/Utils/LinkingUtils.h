@@ -17,9 +17,11 @@ SetVector<IREE::HAL::ExecutableTargetAttr>
 gatherExecutableTargets(ArrayRef<IREE::HAL::ExecutableOp> executableOps);
 
 // Returns a set of executables that contain one or more variants for the given
-// target backend name.
+// target backend name. |lazy| determines whether only lazy-loaded or preloaded
+// executables are returned.
 SmallVector<IREE::HAL::ExecutableOp>
-gatherExecutablesForTarget(mlir::ModuleOp moduleOp, StringRef targetName);
+gatherExecutablesForTarget(mlir::ModuleOp moduleOp, StringRef targetName,
+                           bool lazy = false);
 
 static inline bool allowRenamingPrivateSymbols(Operation *op) {
   return SymbolTable::getSymbolVisibility(op) ==
