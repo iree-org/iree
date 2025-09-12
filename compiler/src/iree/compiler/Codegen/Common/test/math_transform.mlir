@@ -58,7 +58,6 @@ func.func @rewrite_erf(%arg0: f16) -> f16 attributes {
 
 // -----
 
-
 // CHECK-LABEL: func.func @erf_fastmath
 func.func @erf_fastmath(%arg0: f32) -> f32 attributes {
   hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_triple = "amdgcn-amd-amdhsa"}>
@@ -139,7 +138,7 @@ func.func @erf_fastmath_vector(%arg0: vector<4xf32>) -> vector<4xf32> attributes
   // CHECK-DAG: arith.constant dense<0.00491381623> : vector<4xf32>
   // CHECK-DAG: arith.constant dense<-5.61801775E-4> : vector<4xf32>
 
-  // Structure checks for vector implementation
+  // Structure checks for vector implementation.
   // CHECK: %[[AX:.*]] = math.absf %arg0 : vector<4xf32>
   // CHECK: %[[CMP:.*]] = arith.cmpf olt, %[[AX]], %{{.*}} : vector<4xf32>
   // CHECK: %[[T:.*]] = arith.mulf %[[AX]], %[[AX]] : vector<4xf32>

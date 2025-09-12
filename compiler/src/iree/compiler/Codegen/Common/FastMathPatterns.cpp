@@ -15,22 +15,23 @@
 namespace mlir::iree_compiler {
 
 namespace {
+
+// Helper to evaluate a polynomial using FMA chains for both scalar and vector
+// types.
+static Value evalErfPolynomial(Value x, Value t, ArrayRef<Value> coeffs,
+                               RewriterBase &rewriter, Location loc) {
+  Value acc = coeffs[0];
+  for (size_t i = 1; i < coeffs.size(); ++i) {
+    acc = rewriter.create<math::FmaOp>(loc, t, acc, coeffs[i]);
+  }
+  return rewriter.create<math::FmaOp>(loc, x, acc, x);
+}
+
 // Pattern to lower math.erf to its device lib implementation
 // (from
 // https://github.com/ROCm/llvm-project/blob/amd-staging/amd/device-libs/ocml/src/erfF.cl#L11)
 struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
   using OpRewritePattern::OpRewritePattern;
-
-  // Helper to evaluate a polynomial using FMA chains for both scalar and vector
-  // types.
-  static Value evalErfPolynomial(Value x, Value t, ArrayRef<Value> coeffs,
-                                 RewriterBase &rewriter, Location loc) {
-    Value acc = coeffs[0];
-    for (size_t i = 1; i < coeffs.size(); ++i) {
-      acc = rewriter.create<math::FmaOp>(loc, t, acc, coeffs[i]);
-    }
-    return rewriter.create<math::FmaOp>(loc, x, acc, x);
-  }
 
   LogicalResult matchAndRewrite(math::ErfOp op,
                                 PatternRewriter &rewriter) const override {
@@ -38,21 +39,20 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
     Value input = op.getOperand();
     Type resultType = op.getType();
 
-    // Only support f32 and vector types with f32 element type.
     VectorType resVecType = llvm::dyn_cast<VectorType>(resultType);
     if (!(resultType.isF32() ||
           (resVecType && resVecType.getElementType().isF32()))) {
       return rewriter.notifyMatchFailure(
-          op, "Result only supports f32 or vector types with f32 element type");
+          op, "result only supports f32 or vector types with f32 element type");
     }
 
     // Helper to create constants for both scalar and vector types.
     auto createConst = [&](float v) -> Value {
       if (resVecType) {
-        SmallVector<float> values(resVecType.getNumElements(), v);
+        SmallVector<Attribute> values(resVecType.getNumElements(),
+                                      rewriter.getF32FloatAttr(v));
         return rewriter.create<arith::ConstantOp>(
-            loc, resVecType,
-            DenseElementsAttr::get(resVecType, ArrayRef<float>(values)));
+            loc, resVecType, DenseElementsAttr::get(resVecType, values));
       } else {
         return rewriter.create<arith::ConstantOp>(loc, rewriter.getF32Type(),
                                                   rewriter.getF32FloatAttr(v));
@@ -65,12 +65,12 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
         rewriter.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OLT, ax, one);
 
     // Coefficients for |x| < 1.0.
-    SmallVector<Value, 6> coeffs1 = {
+    const SmallVector<Value, 6> coeffs1 = {
         createConst(-0x1.268bc2p-11f), createConst(0x1.420828p-8f),
         createConst(-0x1.b5937p-6f),   createConst(0x1.ce077cp-4f),
         createConst(-0x1.81266p-2f),   createConst(0x1.06eba0p-3f)};
     // Coefficients for |x| >= 1.0.
-    SmallVector<Value, 7> coeffs2 = {
+    const SmallVector<Value, 7> coeffs2 = {
         createConst(0x1.1d3156p-16f), createConst(-0x1.8d129p-12f),
         createConst(0x1.f9a6d2p-9f),  createConst(-0x1.8c3164p-6f),
         createConst(0x1.b4e9c8p-4f),  createConst(0x1.4515fap-1f),
@@ -79,22 +79,20 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
     // Select between the two results using scf.if.
     Value result;
     if (resultType.isF32()) {
-      // For scalar types, use scf.if
+      // For scalar types, use scf.if.
       auto ifOp = rewriter.create<scf::IfOp>(loc, resultType, cmp,
                                              /*withElseRegion=*/true);
 
       // Then region: |x| < 1.0 - evaluate polynomial.
       rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
       Value t = rewriter.create<arith::MulFOp>(loc, ax, ax);
-      Value result1 =
-          evalErfPolynomial(ax, t, ArrayRef<Value>(coeffs1), rewriter, loc);
+      Value result1 = evalErfPolynomial(ax, t, coeffs1, rewriter, loc);
       rewriter.create<scf::YieldOp>(loc, result1);
 
       // Else region: |x| >= 1.0 - evaluate different polynomial and
       // post-processing.
       rewriter.setInsertionPointToStart(&ifOp.getElseRegion().front());
-      Value p2 =
-          evalErfPolynomial(ax, ax, ArrayRef<Value>(coeffs2), rewriter, loc);
+      Value p2 = evalErfPolynomial(ax, ax, coeffs2, rewriter, loc);
       Value negP2 = rewriter.create<arith::NegFOp>(loc, p2);
       Value expNegP2 = rewriter.create<math::ExpOp>(loc, negP2);
       Value result2 = rewriter.create<arith::SubFOp>(loc, one, expNegP2);
@@ -111,13 +109,11 @@ struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
       // Compute t = ax * ax for the first polynomial.
       Value t = rewriter.create<arith::MulFOp>(loc, ax, ax);
 
-      // Compute first polynomial (for |x| < 1.0)
-      Value result1 =
-          evalErfPolynomial(ax, t, ArrayRef<Value>(coeffs1), rewriter, loc);
+      // Compute first polynomial (for |x| < 1.0).
+      Value result1 = evalErfPolynomial(ax, t, coeffs1, rewriter, loc);
 
-      // Compute second polynomial (for |x| >= 1.0)
-      Value p2 =
-          evalErfPolynomial(ax, ax, ArrayRef<Value>(coeffs2), rewriter, loc);
+      // Compute second polynomial (for |x| >= 1.0).
+      Value p2 = evalErfPolynomial(ax, ax, coeffs2, rewriter, loc);
       Value negP2 = rewriter.create<arith::NegFOp>(loc, p2);
       Value expNegP2 = rewriter.create<math::ExpOp>(loc, negP2);
       Value result2 = rewriter.create<arith::SubFOp>(loc, one, expNegP2);
