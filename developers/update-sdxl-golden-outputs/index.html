@@ -4666,7 +4666,9 @@ re-running CI.</p>
 <h2 id="verify-accuracy-before-updating-goldens">Verify accuracy before updating goldens<a class="headerlink" href="#verify-accuracy-before-updating-goldens" title="Permanent link">link</a></h2>
 <p>Before updating golden outputs, first confirm your change maintains acceptable
 accuracy. Follow the steps
-<a href="https://github.com/nod-ai/SHARK-MLPERF/blob/dev/code/stable-diffusion-xl/development.md#test-accuracy-only">outlined</a>.</p>
+<a href="https://github.com/nod-ai/SHARK-MLPERF/blob/dev/code/stable-diffusion-xl/development.md#test-accuracy-only">outlined</a>.
+Use the offline variant of the <code>precompile_model_shortfin.sh</code> script for your
+platform. On MI300X use the one for MI325X.</p>
 <p>A straightforward way to test your change is by editing
 <code>sdxl_harness_rocm_shortfin_from_source_iree.dockerfile</code> so that it builds your
 IREE and exposes the right tooling:</p>
@@ -4678,9 +4680,9 @@ IREE and exposes the right tooling:</p>
 </ul>
 <p>Run the accuracy script (<code>run_accuracy_mi325x.sh</code>) and be mindful of
 platform-specific settings. If you are running in SPX mode, update available
-device IDs accordingly. On MI300x, set <code>CPD=1</code> and use <code>BATCH_SIZE=32</code>. Accuracy
-is considered acceptable if FID and CLIP scores fall within the advertised
-ranges.</p>
+device IDs accordingly (i.e., change to <code>DEVICES="0,1,2,3,4,5,6,7"</code>). On MI300x,
+set <code>CPD=1</code> and use <code>BATCH_SIZE=32</code>. Accuracy is considered acceptable if FID
+and CLIP scores fall within the advertised ranges.</p>
 <h2 id="generate-new-outputs-with-your-iree-build">Generate new outputs with your IREE build<a class="headerlink" href="#generate-new-outputs-with-your-iree-build" title="Permanent link">link</a></h2>
 <p>Once accuracy is confirmed, generate new outputs using the same inputs that CI
 consumes. Both inputs and outputs live in the <code>sharkpublic</code> Azure container. If
