@@ -1,5 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx950 --iree-convert-to-rocdl %s | FileCheck --check-prefix=CHECK-PERMLANE %s
-// UNSUPPORTED: gfx942
+// RUN: iree-opt --iree-gpu-test-target=gfx950 --iree-convert-to-rocdl %s | FileCheck --check-prefix=CHECK-PERMLANE %s
 
 // Test permlane lowering on gfx950.
 #pipeline_layout = #hal.pipeline.layout<bindings = [
