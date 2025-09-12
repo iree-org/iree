@@ -41,6 +41,7 @@ iree_cc_library(
     "Passes.cpp"
     "PropagateEncodings.cpp"
     "SetEncoding.cpp"
+    "SetSplitReductionSizes.cpp"
     "SinkReshapes.cpp"
     "SplitReduction.cpp"
     "TensorPadToTensorInsertSlice.cpp"
