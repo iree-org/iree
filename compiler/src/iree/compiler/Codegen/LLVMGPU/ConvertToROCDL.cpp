@@ -363,8 +363,8 @@ struct ConvertToROCDLPass final
       populateVectorToLLVMConversionPatterns(converter, llvmPatterns);
       vector::populateVectorTransferLoweringPatterns(llvmPatterns,
                                                      /*maxTransferRank=*/1);
-      populateGpuToROCDLConversionPatterns(converter, llvmPatterns,
-                                           gpu::amd::Runtime::Unknown, chipset);
+      populateGpuToROCDLConversionPatterns(
+          converter, llvmPatterns, gpu::amd::Runtime::Unknown, *maybeChipset);
       LLVMConversionTarget target(getContext());
       populateFuncToLLVMFuncOpConversionPattern(converter, llvmPatterns);
       configureGpuToROCDLConversionLegality(target);
