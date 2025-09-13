@@ -23,36 +23,11 @@ namespace mlir::iree_compiler::DispatchCreation {
 #define GEN_PASS_DEF_PROPAGATEENCODINGSPASS
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
 
-namespace {
-
-/// Pattern to swap `tensor.collapse_shape` -> `iree_encoding.set_encoding`
-struct SwapEncodingOpWithTensorCollapseShapeOp
-    : public OpRewritePattern<IREE::Encoding::SetEncodingOp> {
-  using Base = OpRewritePattern<IREE::Encoding::SetEncodingOp>;
-  using Base::Base;
-  LogicalResult matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp,
-                                PatternRewriter &rewriter) const override;
-};
-
-// TODO(#20179): Support the propagation through interfaces. It is supposed to
-// be done with data-flow analysis.
-struct PropagateEncodingsPass
-    : public DispatchCreation::impl::PropagateEncodingsPassBase<
-          PropagateEncodingsPass> {
-  void runOnOperation() override;
-};
-
-} // namespace
-
-LogicalResult SwapEncodingOpWithTensorCollapseShapeOp::matchAndRewrite(
-    IREE::Encoding::SetEncodingOp encodingOp, PatternRewriter &rewriter) const {
-  auto collapseOp =
-      encodingOp.getSource().getDefiningOp<tensor::CollapseShapeOp>();
-  if (!collapseOp) {
-    return rewriter.notifyMatchFailure(encodingOp,
-                                       "expected a collapse_shape producer");
-  }
-  auto target = cast<OpResult>(collapseOp.getResult());
+/// Propagate the set_encoding op up through the `target` using the encoding
+/// propagation interface.
+static LogicalResult
+bubbleUpSetEncodingOp(RewriterBase &rewriter, OpResult target,
+                      IREE::Encoding::SetEncodingOp encodingOp) {
   auto propagationAttrInterface =
       dyn_cast<IREE::Encoding::EncodingPropagationAttrInterface>(
           encodingOp.getResultType().getEncoding());
@@ -70,23 +45,22 @@ LogicalResult SwapEncodingOpWithTensorCollapseShapeOp::matchAndRewrite(
                                        "not able to determine propagation "
                                        "attributes for operands and results");
   }
+  Operation *targetOp = target.getOwner();
   if (!IREE::Flow::isNonNullAndOutsideDispatch(encodingOp) ||
-      !IREE::Flow::isNonNullAndOutsideDispatch(collapseOp)) {
+      !IREE::Flow::isNonNullAndOutsideDispatch(targetOp)) {
     return rewriter.notifyMatchFailure(
         encodingOp, "expected that both operations are outside dispatch");
   }
   auto propagationResult =
-      dyn_cast<IREE::Encoding::EncodingPropagationOpInterface>(
-          collapseOp.getOperation());
+      dyn_cast<IREE::Encoding::EncodingPropagationOpInterface>(targetOp);
   if (!propagationResult) {
     return rewriter.notifyMatchFailure(
         encodingOp, "encoding propagation op interface isn't defined");
   }
   // Propagate the set encoding and generate the new encoding operations.
   FailureOr<IREE::Encoding::PropagationResult> maybeResult =
-      propagationResult.propagateEncoding(
-          rewriter, *propagationEncodings,
-          cast<OpResult>(encodingOp.getSource()));
+      propagationResult.propagateEncoding(rewriter, *propagationEncodings,
+                                          target);
   if (failed(maybeResult)) {
     return rewriter.notifyMatchFailure(
         encodingOp, "not able to propagate encodings and find replacement");
@@ -95,11 +69,58 @@ LogicalResult SwapEncodingOpWithTensorCollapseShapeOp::matchAndRewrite(
   return success();
 }
 
+namespace {
+
+/// Pattern to swap `tensor.collapse_shape` -> `iree_encoding.set_encoding`
+struct SwapEncodingOpWithTensorCollapseShapeOp
+    : public OpRewritePattern<IREE::Encoding::SetEncodingOp> {
+  using Base = OpRewritePattern<IREE::Encoding::SetEncodingOp>;
+  using Base::Base;
+  LogicalResult matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp,
+                                PatternRewriter &rewriter) const override {
+    auto collapseOp =
+        encodingOp.getSource().getDefiningOp<tensor::CollapseShapeOp>();
+    if (!collapseOp) {
+      return rewriter.notifyMatchFailure(encodingOp,
+                                         "expected a collapse_shape producer");
+    }
+    auto target = cast<OpResult>(collapseOp.getResult());
+    return bubbleUpSetEncodingOp(rewriter, target, encodingOp);
+  }
+};
+
+struct SwapEncodingOpWithTensorCastOp
+    : public OpRewritePattern<IREE::Encoding::SetEncodingOp> {
+  using Base = OpRewritePattern<IREE::Encoding::SetEncodingOp>;
+  using Base::Base;
+  LogicalResult matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp,
+                                PatternRewriter &rewriter) const override {
+    auto castOp = encodingOp.getSource().getDefiningOp<tensor::CastOp>();
+    if (!castOp) {
+      return rewriter.notifyMatchFailure(encodingOp,
+                                         "expected a tensor.cast producer");
+    }
+    auto target = cast<OpResult>(castOp.getResult());
+    return bubbleUpSetEncodingOp(rewriter, target, encodingOp);
+  }
+};
+
+// TODO(#20179): Support the propagation through interfaces. It is supposed to
+// be done with data-flow analysis.
+struct PropagateEncodingsPass
+    : public DispatchCreation::impl::PropagateEncodingsPassBase<
+          PropagateEncodingsPass> {
+  void runOnOperation() override;
+};
+
+} // namespace
+
 void PropagateEncodingsPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   MLIRContext *ctx = &getContext();
   RewritePatternSet propagationPatterns(ctx);
-  propagationPatterns.insert<SwapEncodingOpWithTensorCollapseShapeOp>(ctx);
+  propagationPatterns.insert<SwapEncodingOpWithTensorCollapseShapeOp,
+                             SwapEncodingOpWithTensorCastOp>(ctx);
   GreedyRewriteConfig config;
   config.enableFolding(true).enableConstantCSE(false);
   if (failed(applyPatternsGreedily(funcOp, std::move(propagationPatterns),

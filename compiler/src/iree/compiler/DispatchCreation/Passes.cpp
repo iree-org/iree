@@ -181,7 +181,8 @@ static void addDispatchRegionCreationPreprocessingPasses(
       //     c. Transpose generic ops to
       //        - help with dispatch region formation.
       //        - move reduction iterators to be innermost.
-      .addPass(DispatchCreation::createTransposeGenericOpsPass);
+      .addPass(DispatchCreation::createTransposeGenericOpsPass)
+      .addPass(DispatchCreation::createPropagateEncodingsPass);
 
   // Run constant expression hoisting just before dispatch creation in case
   // there are any new hoisting opportunities (e.g. transpose generics or
@@ -273,11 +274,10 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
     // broadcasting ops.
     passManager.addPass(DispatchCreation::createHoistEncodingOpsPass());
     FunctionLikeNest(passManager)
-        .addPass(DispatchCreation::createPropagateEncodingsPass)
-        .addPass(
-            DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass);
+        .addPass(DispatchCreation::createPropagateEncodingsPass);
   }
   FunctionLikeNest(passManager)
+      .addPass(DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass)
       .addPass(DispatchCreation::createConvertEncodingToFlowPass);
   // Hoist encoding operations into initializers when possible.
   IREE::Util::ExprHoistingOptions hoistingOptions;
