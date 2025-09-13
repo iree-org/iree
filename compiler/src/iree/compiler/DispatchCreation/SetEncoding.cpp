@@ -30,7 +30,6 @@ namespace mlir::iree_compiler::DispatchCreation {
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 using IREE::Encoding::EncodingAttr;
-using IREE::Encoding::MatmulKAttr;
 
 //===---------------------------------------------------------------------===//
 // Utility functions
@@ -161,44 +160,9 @@ static LogicalResult setDataTilingEncodings(RewriterBase &rewriter,
   }
   auto setEncodingWrapper = [&](Value src, int64_t operandIndex) -> Value {
     MLIRContext *ctx = linalgOp.getContext();
-    Attribute encoding;
-    switch (encodingOption) {
-    case EncodingOptions::Generic: {
-      encoding = EncodingAttr::get(ctx, operandIndex, encodingInfo->opType,
-                                   encodingInfo->elemTypes, encodingInfo->maps,
-                                   encodingInfo->iterationSizes);
-      break;
-    }
-    case EncodingOptions::MatmulK: {
-      SmallVector<int32_t> kDims;
-      AffineMap indexingMap = encodingInfo->maps[operandIndex];
-      SmallVector<int64_t> kCDims;
-      auto cDims = linalg::inferContractionDims(linalgOp);
-      if (!failed(cDims)) {
-        kCDims.append(cDims->k.begin(), cDims->k.end());
-      }
-      FailureOr<IREE::LinalgExt::ScaledContractionDimensions> scaledCDims =
-          IREE::LinalgExt::inferScaledContractionDims(linalgOp);
-      if (!failed(scaledCDims)) {
-        kCDims.append(scaledCDims->k.begin(), scaledCDims->k.end());
-        kCDims.append(scaledCDims->kB.begin(), scaledCDims->kB.end());
-      }
-      for (auto k : kCDims) {
-        std::optional<unsigned> dimIdx =
-            indexingMap.getResultPosition(rewriter.getAffineDimExpr(k));
-        if (!dimIdx) {
-          continue;
-        }
-        kDims.push_back(dimIdx.value());
-      }
-      encoding = MatmulKAttr::get(ctx, kDims);
-      break;
-    }
-    default: {
-      assert(false && "Unsupported encoding option");
-      return Value();
-    }
-    }
+    Attribute encoding = EncodingAttr::get(
+        ctx, operandIndex, encodingInfo->opType, encodingInfo->elemTypes,
+        encodingInfo->maps, encodingInfo->iterationSizes);
     return setEncoding(rewriter, loc, src, encoding);
   };
 
@@ -522,8 +486,7 @@ struct SetEncodingPass final : impl::SetEncodingPassBase<SetEncodingPass> {
     RewritePatternSet postPatterns(context);
 
     switch (encodingOption) {
-    case EncodingOptions::Generic:
-    case EncodingOptions::MatmulK: {
+    case EncodingOptions::Generic: {
       SmallVector<linalg::LinalgOp> candidates =
           getDataTilingCandidates(funcOp);
       for (linalg::LinalgOp linalgOp : candidates) {

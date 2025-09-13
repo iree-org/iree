@@ -317,15 +317,6 @@ def HoistUniformScalarComputePass :
   let summary = "Hoists scalar (computation) out of dispatch regions.";
 }
 
-def PropagateEncodingsPass :
-    InterfacePass<"iree-dispatch-creation-propagate-encodings", "mlir::FunctionOpInterface"> {
-  let summary = "Propagate encodings across other operations.";
-  let dependentDialects = [
-    "mlir::tensor::TensorDialect",
-    "IREE::Encoding::IREEEncodingDialect",
-  ];
-}
-
 def AnnotateDataTilingHintsPass :
     InterfacePass<"iree-dispatch-creation-annotate-data-tiling-hints", "mlir::FunctionOpInterface"> {
   let summary = "Adds data-tiling hint attribute to linalg operations.";
@@ -359,9 +350,6 @@ def SetEncodingPass : InterfacePass<"iree-dispatch-creation-set-encoding",
             clEnumValN(
                 mlir::iree_compiler::DispatchCreation::EncodingOptions::Padding,
                 "padding", "Encode tensors that need to be padded."),
-            clEnumValN(
-                mlir::iree_compiler::DispatchCreation::EncodingOptions::MatmulK,
-                "matmulk", "Only encodes reduction dimensions in the encoding."),
             clEnumValN(
                 mlir::iree_compiler::DispatchCreation::EncodingOptions::Generic,
                 "default", "Uses EncodingAttr which encodes as much information as possible."))}]>,

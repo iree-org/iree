@@ -18,63 +18,6 @@
 namespace mlir::iree_compiler {
 namespace {
 
-struct ContractionAttrPropagationInterface final
-    : IREE::Encoding::EncodingPropagationAttrInterface::ExternalModel<
-          ContractionAttrPropagationInterface, IREE::Encoding::MatmulKAttr> {
-  bool isPropagableUp(Attribute attr, OpResult target) const {
-    auto encoding = cast<IREE::Encoding::MatmulKAttr>(attr);
-    Operation *attachedToOperation = target.getOwner();
-    if (!attachedToOperation) {
-      return false;
-    }
-    return TypeSwitch<Operation *, bool>(attachedToOperation)
-        .Case<tensor::CollapseShapeOp>([&](auto collapseOp) {
-          ArrayRef<int32_t> kDims = encoding.getKDims().asArrayRef();
-          // TODO: Relax the check to allow transforming innermost reduction
-          // dimensions. We need to revisit the matmul_k encoding semantic.
-          SmallVector<ReassociationIndices, 4> reassociationMaps =
-              collapseOp.getReassociationIndices();
-          for (int32_t k : kDims) {
-            if (reassociationMaps[k].size() != 1) {
-              return false;
-            }
-          }
-          return true;
-        })
-        .Default([&](auto) { return false; });
-  }
-
-  FailureOr<IREE::Encoding::PropagationEncoding>
-  generateBubblingEncodings(Attribute attr, OpResult target) const {
-    auto encoding = cast<IREE::Encoding::MatmulKAttr>(attr);
-    return TypeSwitch<Operation *,
-                      FailureOr<IREE::Encoding::PropagationEncoding>>(
-               target.getOwner())
-        .Case<tensor::CollapseShapeOp>([&](auto collapseOp) {
-          ArrayRef<int32_t> kDims = encoding.getKDims().asArrayRef();
-          SmallVector<ReassociationIndices, 4> reassociationMaps =
-              collapseOp.getReassociationIndices();
-          // Get a mapping from original iteration space to expanded iteration
-          // space.
-          SmallVector<int32_t> newKDims;
-          for (int32_t kDim : kDims) {
-            newKDims.append(reassociationMaps[kDim].begin(),
-                            reassociationMaps[kDim].end());
-          }
-          MLIRContext *ctx = collapseOp.getContext();
-          auto operandEncodingAttr =
-              IREE::Encoding::MatmulKAttr::get(ctx, newKDims);
-          IREE::Encoding::PropagationEncoding propEncoding;
-          propEncoding.operandEncodings.push_back(operandEncodingAttr);
-          // The result encoding will be the same as the encoding
-          // present in the set encoding operation.
-          propEncoding.resultEncodings.push_back(encoding);
-          return propEncoding;
-        })
-        .Default([&](auto) { return failure(); });
-  }
-};
-
 struct ContractionOpPropagationInterface final
     : IREE::Encoding::EncodingPropagationOpInterface::ExternalModel<
           ContractionOpPropagationInterface, tensor::CollapseShapeOp> {
@@ -287,8 +230,6 @@ struct GenericOpPropagationInterface final
 void registerEncodingExternalModels(DialectRegistry &registry) {
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::Encoding::IREEEncodingDialect *dialect) {
-        IREE::Encoding::MatmulKAttr::attachInterface<
-            ContractionAttrPropagationInterface>(*ctx);
         IREE::Encoding::EncodingAttr::attachInterface<
             EncodingAttrPropagationInterface>(*ctx);
       });
