@@ -23,7 +23,8 @@
         "--iree-opt-data-tiling=false",
         "--iree-dispatch-creation-data-tiling",
         "--iree-hip-encoding-layout-resolver=data-tiling",
-        "--iree-llvmgpu-test-combine-layout-transformation"
+        "--iree-llvmgpu-test-combine-layout-transformation",
+        "--iree-hip-enable-tensor-ukernels"
     ],
     "run_function": "prefill_bs4"
 }
