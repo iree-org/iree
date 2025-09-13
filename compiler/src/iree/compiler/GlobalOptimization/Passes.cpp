@@ -62,9 +62,7 @@ static llvm::cl::opt<DispatchCreation::EncodingOptions> clSetEncodingStrategy(
     llvm::cl::values(
         clEnumValN(
             DispatchCreation::EncodingOptions::Generic, "generic",
-            "Using EncodingAttr which encodes as much information as possible"),
-        clEnumValN(DispatchCreation::EncodingOptions::MatmulK, "matmulk",
-                   "Only encodes the reduction dimenesions in the encoding.")),
+            "Using EncodingAttr which encodes as much information as possible")),
     llvm::cl::init(DispatchCreation::EncodingOptions::Generic));
 
 static llvm::cl::opt<bool> clWarnOnUninitializedValues(
