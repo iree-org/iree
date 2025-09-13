@@ -660,6 +660,450 @@ Type TransferGatherOp::getExpectedMaskType() {
   return vector::inferTransferOpMaskType(getVectorType(), getPermutationMap());
 }
 
+//===----------------------------------------------------------------------===//
+// GatherOp/ScatterOp defs
+//===----------------------------------------------------------------------===//
+
+// Speculatable if the op has tensor semantics.
+
+Speculation::Speculatability GatherOp::getSpeculatability() {
+  if (isa<RankedTensorType>(getBase().getType())) {
+    return Speculation::Speculatable;
+  }
+  return Speculation::NotSpeculatable;
+}
+
+Speculation::Speculatability ScatterOp::getSpeculatability() {
+  if (isa<RankedTensorType>(getBase().getType())) {
+    return Speculation::Speculatable;
+  }
+  return Speculation::NotSpeculatable;
+}
+
+// Memory read/write effects for gather/scatter if memref semantics,
+// respectively.
+
+void GatherOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  if (llvm::isa<MemRefType>(getBase().getType())) {
+    effects.emplace_back(MemoryEffects::Read::get(), &getBaseMutable(),
+                         SideEffects::DefaultResource::get());
+  }
+}
+
+void ScatterOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  if (llvm::isa<MemRefType>(getBase().getType())) {
+    effects.emplace_back(MemoryEffects::Write::get(), &getBaseMutable(),
+                         SideEffects::DefaultResource::get());
+  }
+}
+
+// MaskableOpInterface methods.
+
+Type GatherOp::getExpectedMaskType() {
+  // Just expect the mask type to be same as vector type. We can fold in the
+  // mask vector broadcast/transpose anyway.
+  return getVector().getType();
+}
+
+Type ScatterOp::getExpectedMaskType() {
+  // Just expect the mask type to be same as vector type. We can fold in the
+  // mask vector broadcast/transpose anyway.
+  return getValueToStore().getType();
+}
+
+// Verifier.
+
+static LogicalResult verifyGatherScatterIndexingMaps(
+    Operation *op, OperandRange indexVecs, TypedValue<VectorType> vector,
+    TypedValue<ShapedType> base, TypedValue<VectorType> mask,
+    ArrayRef<AffineMap> indexingMaps) {
+  // Check that we have the correct number of indexing maps.
+  int64_t expectedNumIndexingMaps =
+      /*sourceIndexingMap=*/1 + /*indexVecIndexingMaps=*/indexVecs.size() +
+      /*maskIndexingMap=*/(mask ? 1 : 0);
+  if (expectedNumIndexingMaps != indexingMaps.size()) {
+    return op->emitOpError("expected ")
+           << expectedNumIndexingMaps
+           << " indexing maps. got: " << indexingMaps.size();
+  }
+
+  int64_t vectorRank = vector.getType().getRank();
+  int64_t indexSyms = indexVecs.size();
+  for (AffineMap map : indexingMaps) {
+    if (map.getNumDims() != vectorRank) {
+      return op->emitOpError(
+                 "expected all indexing maps to have number of dims "
+                 "equal to vector rank. expected: ")
+             << vectorRank << ", got: " << map.getNumDims() << " dims";
+    }
+    if (map.getNumSymbols() != indexSyms) {
+      return op->emitOpError(
+                 "expected all indexing maps to have number of dims "
+                 "equal to number of index vecs. expected: ")
+             << indexSyms << ", got: " << map.getNumSymbols() << " syms";
+    }
+    // Check if the indexing map only has AffineDimExpr/AffineSymbolExpr/0.
+    if (!llvm::all_of(map.getResults(),
+                      llvm::IsaPred<AffineDimExpr, AffineSymbolExpr,
+                                    AffineConstantExpr>)) {
+      // In theory, we could allow anything in these indexing maps, but it
+      // just makes it easier to not have to handle cases like d0 + 1, and
+      // having to shift the + 1 into the offset field.
+      return op->emitOpError(
+          "expected indexing map results to only be a dim or a symbol");
+    }
+  }
+
+  // Extra verification for index vecs.
+  ArrayRef<int64_t> vectorShape = vector.getType().getShape();
+  ArrayRef<AffineMap> vectorIndexingMaps =
+      ArrayRef(indexingMaps).slice(1, indexSyms);
+  for (auto [i, map] : llvm::enumerate(vectorIndexingMaps)) {
+    SmallVector<int64_t> expectedShape;
+    for (AffineExpr expr : map.getResults()) {
+      if (auto dim = dyn_cast<AffineDimExpr>(expr)) {
+        expectedShape.push_back(vectorShape[dim.getPosition()]);
+      } else {
+        return op->emitOpError(
+            "expected vector indexing maps to not have any symbols");
+      }
+    }
+    ArrayRef<int64_t> actualShape =
+        cast<VectorType>(indexVecs[i].getType()).getShape();
+    if (expectedShape != actualShape) {
+      return op->emitOpError(
+                 "Mismatched vector shape for index vec at position ")
+             << i << ". Expected: [" << expectedShape << "]" << ", got: ["
+             << actualShape << "]";
+    }
+  }
+
+  // Extra verification for mask.
+  if (mask) {
+    AffineMap maskMap = indexingMaps.back();
+    SmallVector<int64_t> expectedShape;
+    for (AffineExpr expr : maskMap.getResults()) {
+      if (auto dim = dyn_cast<AffineDimExpr>(expr)) {
+        expectedShape.push_back(vectorShape[dim.getPosition()]);
+      } else {
+        return op->emitOpError(
+            "expected mask indexing map to not have any symbols");
+      }
+    }
+    ArrayRef<int64_t> actualShape = mask.getType().getShape();
+    if (expectedShape != actualShape) {
+      return op->emitOpError("Mismatched mask shape")
+             << ". Expected: [" << expectedShape << "]" << ", got: ["
+             << actualShape << "]";
+    }
+  }
+
+  return success();
+}
+
+LogicalResult GatherOp::verify() {
+  return verifyGatherScatterIndexingMaps(*this, getIndexVecs(), getVector(),
+                                         getBase(), getMask(),
+                                         getIndexingMapsArray());
+}
+
+LogicalResult ScatterOp::verify() {
+  return verifyGatherScatterIndexingMaps(*this, getIndexVecs(),
+                                         getValueToStore(), getBase(),
+                                         getMask(), getIndexingMapsArray());
+}
+
+//==---------------------------------------------------------------------===//
+// GatherOp/ScatterOp canonicalizations
+// ===----------------------------------------------------------------===//
+
+struct IndexingMapFoldResult {
+  Value operand;
+  AffineMap indexingMap;
+  bool changed;
+};
+
+using IndexingMapFolder = function_ref<IndexingMapFoldResult(
+    int64_t index, Value val, AffineMap valMap, AffineMap &baseMap)>;
+
+static Value foldTransferGatherIndexVecs(
+    GatherOp gatherOp,
+    function_ref<IndexingMapFoldResult(int64_t, Value, AffineMap, AffineMap &)>
+        valueFolder) {
+  SmallVector<Value> indexedValues = gatherOp.getIndexVecs();
+  SmallVector<AffineMap> indexingMaps(
+      ArrayRef(gatherOp.getIndexingMapsArray()).slice(1, indexedValues.size()));
+
+  AffineMap baseMap = gatherOp.getIndexingMapsArray().front();
+
+  bool changed = false;
+  SmallVector<Value> newIndexedValues;
+  SmallVector<AffineMap> newIndexingMaps;
+  llvm::DenseSet<int64_t> deletedSyms;
+  for (auto [index, val, map] : llvm::enumerate(indexedValues, indexingMaps)) {
+    auto [newVal, newMap, valChanged] = valueFolder(index, val, map, baseMap);
+    changed |= valChanged;
+
+    if (newVal) {
+      newIndexedValues.push_back(newVal);
+      newIndexingMaps.push_back(newMap);
+    } else {
+      deletedSyms.insert(index);
+    }
+  }
+
+  if (!changed) {
+    return Value();
+  }
+
+  OpBuilder b(gatherOp);
+
+  // Collect all the indexing maps;
+  SmallVector<AffineMap> updatedIndexingMaps;
+  updatedIndexingMaps.push_back(baseMap);
+  updatedIndexingMaps.append(newIndexingMaps);
+  if (gatherOp.getMask()) {
+    updatedIndexingMaps.push_back(gatherOp.getIndexingMapsArray().back());
+  }
+
+  // Delete the deleted symbols from these maps.
+  if (!deletedSyms.empty()) {
+    SmallVector<AffineExpr> symReplacements;
+    int currSym = 0;
+    for (auto i : llvm::seq<int>(baseMap.getNumSymbols())) {
+      if (deletedSyms.contains(i)) {
+        symReplacements.push_back(b.getAffineConstantExpr(0));
+      } else {
+        symReplacements.push_back(b.getAffineSymbolExpr(currSym));
+        ++currSym;
+      }
+    }
+    for (AffineMap &map : updatedIndexingMaps) {
+      map = map.replaceDimsAndSymbols({}, symReplacements, map.getNumDims(),
+                                      currSym);
+    }
+  }
+
+  SmallVector<Value> operands;
+  SmallVector<int32_t> operandSegmentSizes;
+
+  // Base.
+  operands.push_back(gatherOp.getBase());
+  operandSegmentSizes.push_back(1);
+  // Indices.
+  SmallVector<Value> offsets = gatherOp.getOffsets();
+  operands.append(offsets);
+  operandSegmentSizes.push_back(offsets.size());
+  // IndexVecs.
+  operands.append(newIndexedValues);
+  operandSegmentSizes.push_back(newIndexedValues.size());
+  // Padding.
+  operands.push_back(gatherOp.getPadding());
+  operandSegmentSizes.push_back(1);
+  // Mask.
+  if (gatherOp.getMask()) {
+    operands.push_back(gatherOp.getMask());
+    operandSegmentSizes.push_back(1);
+  } else {
+    operandSegmentSizes.push_back(0);
+  }
+  gatherOp.setIndexingMapsAttr(b.getAffineMapArrayAttr(updatedIndexingMaps));
+  gatherOp->setOperands(operands);
+  gatherOp.getProperties().setOperandSegmentSizes(operandSegmentSizes);
+  return gatherOp.getResult();
+}
+
+static Value foldTransferGatherFromBroadcast(GatherOp gatherOp) {
+  return foldTransferGatherIndexVecs(
+      gatherOp,
+      [](int64_t, Value operand, AffineMap map,
+         AffineMap &) -> IndexingMapFoldResult {
+        auto broadcast = operand.getDefiningOp<vector::BroadcastOp>();
+        if (!broadcast) {
+          return {operand, map, false};
+        }
+
+        int64_t sourceRank = getVectorRank(broadcast.getSourceType());
+        int64_t operandRank = getVectorRank(broadcast.getResultVectorType());
+        AffineMap newMap =
+            map.getSliceMap(operandRank - sourceRank, sourceRank);
+        return {broadcast.getSource(), newMap, true};
+      });
+}
+
+static Value foldTransferGatherFromTranspose(GatherOp gatherOp) {
+  return foldTransferGatherIndexVecs(
+      gatherOp,
+      [](int64_t, Value operand, AffineMap map,
+         AffineMap &) -> IndexingMapFoldResult {
+        auto transpose = operand.getDefiningOp<vector::TransposeOp>();
+        if (!transpose) {
+          return {operand, map, false};
+        }
+
+        AffineMap newMap =
+            AffineMap::getPermutationMap(
+                invertPermutationVector(transpose.getPermutation()),
+                transpose.getContext())
+                .compose(map);
+        return {transpose.getVector(), newMap, true};
+      });
+}
+
+static Value foldTransferGatherFromStep(GatherOp gatherOp) {
+  return foldTransferGatherIndexVecs(
+      gatherOp,
+      [](int64_t index, Value operand, AffineMap map,
+         AffineMap &baseMap) -> IndexingMapFoldResult {
+        auto step = operand.getDefiningOp<vector::StepOp>();
+        if (!step) {
+          return {operand, map, false};
+        }
+
+        assert(map.getNumResults() == 1);
+        SmallVector<AffineExpr> newResults;
+        for (AffineExpr expr : baseMap.getResults()) {
+          if (auto sym = dyn_cast<AffineSymbolExpr>(expr)) {
+            if (sym.getPosition() == index) {
+              expr = map.getResult(0);
+            }
+          }
+          newResults.push_back(expr);
+        }
+        baseMap = AffineMap::get(baseMap.getNumDims(), baseMap.getNumDims(),
+                                 newResults, baseMap.getContext());
+        return {Value(), AffineMap(), true};
+      });
+}
+
+OpFoldResult GatherOp::fold(FoldAdaptor adaptor) {
+  if (auto res = foldTransferGatherFromBroadcast(*this)) {
+    return res;
+  }
+  if (auto res = foldTransferGatherFromTranspose(*this)) {
+    return res;
+  }
+  if (auto res = foldTransferGatherFromStep(*this)) {
+    return res;
+  }
+  return OpFoldResult();
+}
+
+LogicalResult ScatterOp::fold(FoldAdaptor adaptor,
+                              SmallVectorImpl<OpFoldResult> &results) {
+  return failure();
+}
+
+struct FoldSingleElementIndexingMap final : OpRewritePattern<GatherOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(GatherOp xferOp,
+                                PatternRewriter &rewriter) const override {
+
+    auto indexVecFolder = [&](int64_t index, Value indexVec, AffineMap map,
+                              AffineMap &baseMap) -> IndexingMapFoldResult {
+      auto vectorTy = cast<VectorType>(indexVec.getType());
+      if (vectorTy.getNumElements() != 1) {
+        return {indexVec, map, false};
+      }
+
+      // Extract the scalar and add it to the
+      // corressponding base.
+      OpOperand &base = xferOp.getOffsetsMutable()[index];
+      Value extracted = rewriter.create<vector::ExtractOp>(
+          xferOp.getLoc(), indexVec,
+          SmallVector<int64_t>(vectorTy.getRank(), 0));
+      AffineExpr d0, d1;
+      bindDims(xferOp.getContext(), d0, d1);
+      Value newIndex = affine::makeComposedAffineApply(
+                           rewriter, xferOp.getLoc(), d0 + d1,
+                           ArrayRef<OpFoldResult>{base.get(), extracted})
+                           .getResult();
+      base.set(newIndex);
+
+      return {Value(), AffineMap(), true};
+    };
+
+    Value newVal = foldTransferGatherIndexVecs(xferOp, indexVecFolder);
+
+    if (!newVal) {
+      return failure();
+    }
+
+    return success();
+  }
+};
+
+static AffineMap inverseMap(AffineMap map, ArrayRef<AffineExpr> initValues) {
+  MLIRContext *context = map.getContext();
+  assert(initValues.size() == map.getNumInputs());
+  SmallVector<AffineExpr, 4> exprs(initValues);
+  for (unsigned i : llvm::seq(unsigned(0), map.getNumResults())) {
+    if (auto constExpr = dyn_cast<AffineConstantExpr>(map.getResult(i))) {
+      assert(constExpr.getValue() == 0 &&
+             "Unexpected constant in projected permutation");
+      (void)constExpr;
+      continue;
+    }
+
+    // Reverse each dimension existing in the original map result.
+    exprs[map.getDimPosition(i)] = getAffineDimExpr(i, context);
+  }
+  return AffineMap::get(map.getNumResults(), /*symbolCount=*/0, exprs, context);
+}
+
+struct FoldContigousTransferGatherV2ToTransferRead final
+    : OpRewritePattern<GatherOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(GatherOp xferOp,
+                                PatternRewriter &rewriter) const override {
+    if (!xferOp.getIndexVecs().empty()) {
+      return failure();
+    }
+
+    // Try to infer the permutation map.
+    AffineMap baseMap = xferOp.getIndexingMapsArray().front();
+    SmallVector<AffineExpr> zeroInit(baseMap.getNumInputs(),
+                                     rewriter.getAffineConstantExpr(0));
+    AffineMap permutationMap = inverseMap(baseMap, zeroInit);
+
+    Value mask = xferOp.getMask();
+    if (mask) {
+      return failure();
+      // AffineMap maskMap = xferOp.getIndexingMapsArray().back();
+      // SmallVector<AffineExpr> shapeInit =
+      //     llvm::map_to_vector(xferOp.getType().getShape(), [&](int64_t x) {
+      //       return rewriter.getAffineConstantExpr(x);
+      //     });
+      // AffineMap maskTransform = baseMap.compose(inverseMap(maskMap,
+      // shapeInit)); maskTransform.dump(); mask =
+      // applyTransformMapToVector(mask, maskTransform);
+    }
+
+    // Canonicalize to vector.transfer_read.
+    SmallVector<bool> inBounds(baseMap.getNumDims(), true);
+    rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
+        xferOp, xferOp.getType(), xferOp.getBase(), xferOp.getOffsets(),
+        permutationMap, xferOp.getPadding(), mask,
+        rewriter.getBoolArrayAttr(inBounds));
+    return success();
+  };
+};
+
+void GatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                           MLIRContext *ctx) {
+  results.add<FoldSingleElementIndexingMap,
+              FoldContigousTransferGatherV2ToTransferRead>(ctx);
+}
+
+void ScatterOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                            MLIRContext *ctx) {}
+
 // clang-format off
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.cpp.inc" // IWYU pragma: keep
