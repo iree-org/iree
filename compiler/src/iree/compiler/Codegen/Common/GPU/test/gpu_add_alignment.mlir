@@ -70,3 +70,28 @@ func.func @dyn_idxs_right(%dynidx : index) -> vector<8xi64> {
   %0 = vector.load %alloc[%c0, %dynidx] : memref<8x8xi64>, vector<8xi64>
   return %0 : vector<8xi64>
 }
+
+// -----
+
+// CHECK-LABEL: @constant_one
+func.func @constant_one(%dynidx : index) -> vector<8xi64> {
+  %alloc = memref.alloc() { alignment = 64 : i64 } : memref<8x8xi64>
+  %c1 = arith.constant 1 : index
+  // CHECK: vector.load
+  // CHECK-SAME: alignment = 8
+  %0 = vector.load %alloc[%dynidx, %c1] : memref<8x8xi64>, vector<8xi64>
+  return %0 : vector<8xi64>
+}
+
+// -----
+
+// CHECK-LABEL: @constant_two
+func.func @constant_two(%dynidx : index) -> vector<8xi64> {
+  %alloc = memref.alloc() { alignment = 64 : i64 } : memref<8x8xi64>
+  %c1 = arith.constant 2 : index
+  // CHECK: vector.load
+  // CHECK-SAME: alignment = 16
+  %0 = vector.load %alloc[%dynidx, %c1] : memref<8x8xi64>, vector<8xi64>
+  return %0 : vector<8xi64>
+}
+
