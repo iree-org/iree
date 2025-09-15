@@ -102,7 +102,7 @@ func.func @gather_mismatch_dims(%indices: vector<128xindex>,
 
 // -----
 
-func.func @gather_mismatch_dims(%indices: vector<128xindex>,
+func.func @gather_mismatch_syms(%indices: vector<128xindex>,
   %source: memref<4096x64xf16>)
   -> vector<128x64xf16> {
   %cst0 = arith.constant 0.0 : f16
@@ -150,8 +150,74 @@ func.func @gather_indirect_index_vec_load(%indices: vector<64xindex>,
   [%indices, %indices : vector<64xindex>, vector<64xindex>], %cst0
     { indexing_maps = [affine_map<(d0, d1)[s0, s1] -> (s0, s1)>,
                        affine_map<(d0, d1)[s0, s1] -> (d1)>,
-                       affine_map<(d0, d1)[s0, s1] -> (d0)>]}
+                       affine_map<(d0, d1)[s0, s1] -> (s0)>]}
   : memref<4096x64xf16>, vector<64x64xf16>
 
   return %out1 : vector<64x64xf16>
+}
+
+// -----
+
+func.func @scatter_mismatch_dims(%indices: vector<128xindex>,
+  %vector: vector<128x64xf16>,
+  %dest: memref<4096x64xf16>) {
+  %c0 = arith.constant 0 : index
+
+  // expected-error @+1 {{expected all indexing maps to have number of dims equal to vector rank. expected: 2, got: 3 dims}}
+  iree_vector_ext.scatter %vector, %dest[%c0, %c0]
+  [%indices : vector<128xindex>]
+    { indexing_maps = [affine_map<(d0, d1, d2)[s0] -> (s0, d1)>,
+                       affine_map<(d0, d1, d2)[s0] -> (d0)>]}
+  : memref<4096x64xf16>, vector<128x64xf16>
+  return
+}
+
+// -----
+
+func.func @scatter_mismatch_syms(%indices: vector<128xindex>,
+  %vector: vector<128x64xf16>,
+  %dest: memref<4096x64xf16>) {
+  %c0 = arith.constant 0 : index
+
+  // expected-error @+1 {{expected all indexing maps to have number of dims equal to number of index vecs. expected: 1, got: 2 syms}}
+  iree_vector_ext.scatter %vector, %dest[%c0, %c0]
+  [%indices : vector<128xindex>]
+    { indexing_maps = [affine_map<(d0, d1)[s0, s1] -> (s0, d1)>,
+                       affine_map<(d0, d1)[s0, s1] -> (d0)>]}
+  : memref<4096x64xf16>, vector<128x64xf16>
+  return
+}
+
+// -----
+
+func.func @scatter_mismatch_maps(%indices: vector<128xindex>,
+  %vector: vector<128x64xf16>,
+  %dest: memref<4096x64xf16>) {
+  %c0 = arith.constant 0 : index
+
+  // expected-error @+1 {{expected 2 indexing maps. got: 3}}
+  iree_vector_ext.scatter %vector, %dest[%c0, %c0]
+  [%indices : vector<128xindex>]
+    { indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
+                       affine_map<(d0, d1)[s0] -> (d0)>,
+                       affine_map<(d0, d1)[s0] -> (d1)>]}
+  : memref<4096x64xf16>, vector<128x64xf16>
+  return
+}
+
+// -----
+
+func.func @scatter_indirect_index_vec_load(%indices: vector<64xindex>,
+  %vector: vector<64x64xf16>,
+  %dest: memref<4096x64xf16>) {
+  %c0 = arith.constant 0 : index
+
+  // expected-error @+1 {{expected vector indexing maps to not have any symbols}}
+  iree_vector_ext.scatter %vector, %dest[%c0, %c0]
+  [%indices, %indices : vector<64xindex>, vector<64xindex>]
+    { indexing_maps = [affine_map<(d0, d1)[s0, s1] -> (s0, s1)>,
+                       affine_map<(d0, d1)[s0, s1] -> (d1)>,
+                       affine_map<(d0, d1)[s0, s1] -> (s0)>]}
+  : memref<4096x64xf16>, vector<64x64xf16>
+  return
 }
