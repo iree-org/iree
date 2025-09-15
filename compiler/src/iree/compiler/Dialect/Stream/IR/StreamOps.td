@@ -2660,7 +2660,7 @@ def Stream_AsyncStoreOp : Stream_PureOp<"async.store", [
   let hasCanonicalizer = 1;
 }
 
-def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
+def Stream_AsyncDispatchOp : Stream_PureOp<"async.dispatch", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<SymbolUserOpInterface>,
   Stream_AffinityOp,

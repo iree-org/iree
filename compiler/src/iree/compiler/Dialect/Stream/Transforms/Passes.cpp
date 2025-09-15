@@ -172,9 +172,15 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // Specialize the encodings before the lowering of stream tensor ops.
   passManager.addPass(IREE::Stream::createSpecializeEncodingsPass());
 
-  // Lower stream.tensor.* ops to stream.async.* ops based on
-  // affinity/configuration assigned during placement.
   FunctionLikeNest(passManager)
+      // Run canonicalization after specializing to clean up any
+      // duplicate/redundant IR and fold any duplicate encoding chains before we
+      // perform the encoding materialization.
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass)
+
+      // Lower stream.tensor.* ops to stream.async.* ops based on
+      // affinity/configuration assigned during placement.
       .addPass(IREE::Stream::createEncodeHostTensorsPass);
   passManager.addNestedPass<IREE::Stream::ExecutableOp>(
       IREE::Stream::createEncodeDeviceTensorsPass());
@@ -186,6 +192,9 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // lifetime assigned.
   passManager.addPass(IREE::Stream::createVerifyLoweringToAsyncResourcesPass());
 
+  // Elide transfers we can provably detect are not required due to the target
+  // topology. We do this prior to copy-on-write so that we are only providing
+  // real transfers to the analysis.
   passManager.addPass(IREE::Stream::createElideAsyncTransfersPass());
 
   // Materialize copy-on-write behavior with explicit stream.async.* ops.
