@@ -223,6 +223,7 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.math
   MLIRPythonSources.Dialects.memref
   MLIRPythonSources.Dialects.nvgpu
+  MLIRPythonSources.Dialects.nvvm
   MLIRPythonSources.Dialects.pdl
   MLIRPythonSources.Dialects.rocdl
   MLIRPythonSources.Dialects.scf
