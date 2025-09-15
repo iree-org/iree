@@ -984,7 +984,7 @@ addLowerAndOptimizeAddressComputationPasses(FunctionLikeNest &funcPassManager) {
 }
 
 static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
-                                    bool forROCDL) {
+                                    bool forROCDL, bool preserveDebugInfo) {
   modulePassManager.addPass(
       createConvertHALDescriptorTypeToGPUAddressSpacePass());
   modulePassManager.addPass(createCanonicalizerPass());
@@ -1063,8 +1063,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(affine::createAffineExpandIndexOpsPass)
       .addPass(createLowerAffinePass);
 
-  // Strip out the debug info for the kernel.
-  modulePassManager.addPass(createStripDebugInfoPass());
+  if (!preserveDebugInfo) {
+    modulePassManager.addPass(createStripDebugInfoPass());
+  }
   // Cast address spaces of all function arguments to generic.
   modulePassManager.addPass(createLLVMGPUCastAddressSpaceFunctionPass());
   modulePassManager.addPass(IREE::Util::createDropCompilerHintsPass(
@@ -1148,7 +1149,7 @@ void buildLLVMGPUCodegenConfigurationPassPipeline(
 }
 
 void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
-                                     bool useROCM) {
+                                     bool useROCM, bool preserveDebugInfo) {
   // LLVMGPUSelectLoweringStrategyPass may have created ExecutableObjectAttr.
   // Hoisting them now deduplicates them and ensures that rewrite patterns don't
   // need to think about explicitly copying them over to new ops.
@@ -1179,7 +1180,8 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
   //   - All Linalg/Loops/GPU/Affine/Standard ops are converted away.
   //   - The module contains the final llvm.module ready to be serialized.
   //===--------------------------------------------------------------------===//
-  addLowerToLLVMGPUPasses(variantPassManager.nest<ModuleOp>(), useROCM);
+  addLowerToLLVMGPUPasses(variantPassManager.nest<ModuleOp>(), useROCM,
+                          preserveDebugInfo);
 
   LLVM_DEBUG({
     llvm::dbgs() << "Using LLVMGPU pass pipeline:\n";
@@ -1211,7 +1213,8 @@ void buildLLVMGPULinkingPassPipeline(OpPassManager &modulePassManager,
 // ROCDL Pass Pipelines
 //===----------------------------------------------------------------------===//
 
-void buildROCDLCodegenPassPipeline(OpPassManager &variantPassManager) {
+void buildROCDLCodegenPassPipeline(OpPassManager &variantPassManager,
+                                   bool preserveDebugInfo) {
   {
     OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
     modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());
@@ -1225,7 +1228,7 @@ void buildROCDLCodegenPassPipeline(OpPassManager &variantPassManager) {
       IREE::Util::DropCompilerHintsPassOptions{/*keepAssumeInt=*/true}));
 
   addLowerToLLVMGPUPasses(variantPassManager.nest<ModuleOp>(),
-                          /*forROCDL=*/true);
+                          /*forROCDL=*/true, preserveDebugInfo);
 
   LLVM_DEBUG({
     llvm::dbgs() << "Using ROCDL pass pipeline:\n";
@@ -1259,14 +1262,16 @@ void registerCodegenLLVMGPUPasses() {
       "iree-codegen-linalg-to-nvvm-pipeline",
       "Runs the progressive lowering pipeline from Linalg to NVVM",
       [](OpPassManager &passManager) {
-        buildLLVMGPUCodegenPassPipeline(passManager, false);
+        buildLLVMGPUCodegenPassPipeline(passManager, false,
+                                        /*preserveDebugInfo=*/false);
       });
 
   static PassPipelineRegistration<> LinalgROCDLPipeline(
       "iree-codegen-linalg-to-rocdl-pipeline",
       "Runs the progressive lowering pipeline from Linalg to ROCDL",
       [](OpPassManager &passManager) {
-        buildLLVMGPUCodegenPassPipeline(passManager, true);
+        buildLLVMGPUCodegenPassPipeline(passManager, true,
+                                        /*preserveDebugInfo=*/false);
       });
 
   static PassPipelineRegistration<> LLVMGPULinkingPipeline(
@@ -1294,7 +1299,7 @@ void registerCodegenROCDLPasses() {
       "iree-codegen-linalg-to-rocdl-pipeline2",
       "Runs pass pipeline to progressively lower Linalg to ROCDL",
       [](OpPassManager &passManager) {
-        buildROCDLCodegenPassPipeline(passManager);
+        buildROCDLCodegenPassPipeline(passManager, /*preserveDebugInfo=*/false);
       });
 
   static PassPipelineRegistration<> LLVMGPUBufferizePipeline(

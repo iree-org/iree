@@ -451,7 +451,8 @@ public:
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) override {
-    buildLLVMGPUCodegenPassPipeline(passManager, false);
+    buildLLVMGPUCodegenPassPipeline(passManager, false,
+                                    /*preserveDebugInfo=*/false);
   }
 
   void buildLinkingPassPipeline(OpPassManager &passManager) override {
