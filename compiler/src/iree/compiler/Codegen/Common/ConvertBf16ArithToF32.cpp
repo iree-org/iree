@@ -14,7 +14,6 @@
 #include <memory>
 #include <utility>
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Utils/ConversionUtils.h"
