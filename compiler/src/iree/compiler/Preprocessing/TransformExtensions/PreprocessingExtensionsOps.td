@@ -195,49 +195,4 @@ def MatchContractionOp : Op<Transform_Dialect, "iree.match.is_contraction",
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
-def MatchConvolutionOp : Op<Transform_Dialect, "iree.match.is_convolution",
-    [IsolatedFromAbove,
-     MatchOpInterface,
-     SingleOpMatcher,
-     MemoryEffectsOpInterface]> {
-  let summary = [{Check whether the op is a convolution operation.}];
-  let description = [{
-    Matches operations that implement the ConvolutionOpInterface.
-    This includes operations like linalg.conv_2d_nhwc_hwcf, etc.
-
-    #### Return modes
-
-    Succeeds if the operation is a convolution operation, and
-    produces a silenceable failure otherwise.
-  }];
-
-  let arguments = (ins TransformHandleTypeInterface:$operand_handle);
-  let assemblyFormat = "$operand_handle attr-dict `:` type($operand_handle)";
-  let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
-
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-}
-
-def MatchAttentionOp : Op<Transform_Dialect, "iree.match.is_attention",
-    [IsolatedFromAbove,
-     MatchOpInterface,
-     SingleOpMatcher,
-     MemoryEffectsOpInterface]> {
-  let summary = [{Check whether the op is an attention operation.}];
-  let description = [{
-    Matches attention operations like iree_linalg_ext.attention.
-
-    #### Return modes
-
-    Succeeds if the operation is an attention operation, and
-    produces a silenceable failure otherwise.
-  }];
-
-  let arguments = (ins TransformHandleTypeInterface:$operand_handle);
-  let assemblyFormat = "$operand_handle attr-dict `:` type($operand_handle)";
-  let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
-
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-}
-
 #endif // IREE_COMPILER_DIALECT_PREPROCESSING_TRANSFORMEXTENSIONS_PREPROCESSINGEXTENSIONS

@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Preprocessing/TransformExtensions/PreprocessingExtensions.h"
 
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Utils/EquivalenceUtils.h"
 #include "iree/compiler/Utils/ShapeUtils.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
@@ -239,38 +238,6 @@ IREE::transform_dialect::MatchContractionOp::matchOperation(
   }
   return emitSilenceableFailure(current->getLoc())
          << "Operation " << *current << " is not a contraction operation.";
-}
-
-//===----------------------------------------------------------------------===//
-// MatchConvolutionOp
-//===----------------------------------------------------------------------===//
-
-DiagnosedSilenceableFailure
-IREE::transform_dialect::MatchConvolutionOp::matchOperation(
-    Operation *current, transform::TransformResults &results,
-    transform::TransformState &state) {
-  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(current)) {
-    if (linalg::isaConvolutionOpInterface(linalgOp)) {
-      return DiagnosedSilenceableFailure::success();
-    }
-  }
-  return emitSilenceableFailure(current->getLoc())
-         << "Operation " << *current << " is not a convolution operation.";
-}
-
-//===----------------------------------------------------------------------===//
-// MatchAttentionOp
-//===----------------------------------------------------------------------===//
-
-DiagnosedSilenceableFailure
-IREE::transform_dialect::MatchAttentionOp::matchOperation(
-    Operation *current, transform::TransformResults &results,
-    transform::TransformState &state) {
-  if (isa<iree_compiler::IREE::LinalgExt::AttentionOp>(current)) {
-    return DiagnosedSilenceableFailure::success();
-  }
-  return emitSilenceableFailure(current->getLoc())
-         << "Operation " << *current << " is not an attention operation.";
 }
 
 //===----------------------------------------------------------------------===//
