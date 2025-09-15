@@ -271,3 +271,109 @@ module attributes {transform.with_named_sequence} {
     transform.yield
   }
 }
+
+// -----
+
+#map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map3 = affine_map<(d0, d1) -> (d0, d1)>
+#map_batch0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+#map_batch1 = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+#map_batch2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+#map_attn0 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+#map_attn1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>
+#map_attn2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
+#map_attn3 = affine_map<(d0, d1, d2, d3, d4) -> ()>
+#map_attn4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
+
+// The above test actually will search the whole module.
+// The "op_" prefix ensures these functions are processed after existing
+// test functions in alphabetical order, avoiding FileCheck pattern conflicts.
+
+// CHECK-LABEL: func.func @op_matmul
+func.func @op_matmul(%input0: tensor<32x64xi8>, %input1: tensor<32x64xi8>, %dest: tensor<32x32xi32>) -> tensor<32x32xi32> {
+  // CHECK-NEXT: linalg.matmul
+  // CHECK-SAME:   match_status = "matched"
+  %res = linalg.matmul
+        indexing_maps = [#map0, #map1, #map2]
+        ins(%input0, %input1 : tensor<32x64xi8>, tensor<32x64xi8>)
+        outs(%dest : tensor<32x32xi32>) {match_status = "unmatched"} -> tensor<32x32xi32>
+  return %res : tensor<32x32xi32>
+}
+
+// CHECK-LABEL: func.func @op_batch_matmul
+func.func @op_batch_matmul(%input0: tensor<2x32x64xi8>, %input1: tensor<2x32x64xi8>, %dest: tensor<2x32x32xi32>) -> tensor<2x32x32xi32> {
+  // CHECK-NEXT: linalg.batch_matmul
+  // CHECK-SAME:   match_status = "matched"
+  %res = linalg.batch_matmul
+        indexing_maps = [#map_batch0, #map_batch1, #map_batch2]
+        ins(%input0, %input1 : tensor<2x32x64xi8>, tensor<2x32x64xi8>)
+        outs(%dest : tensor<2x32x32xi32>) {match_status = "unmatched"} -> tensor<2x32x32xi32>
+  return %res : tensor<2x32x32xi32>
+}
+
+// CHECK-LABEL: func.func @op_conv2d
+func.func @op_conv2d(%input: tensor<1x230x230x3xf32>, %filter: tensor<7x7x3x64xf32>, %dest: tensor<1x224x224x64xf32>) -> tensor<1x224x224x64xf32> {
+  // CHECK-NEXT: linalg.conv_2d_nhwc_hwcf
+  // CHECK-SAME:   match_status = "matched"
+  %res = linalg.conv_2d_nhwc_hwcf
+        {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
+        ins(%input, %filter : tensor<1x230x230x3xf32>, tensor<7x7x3x64xf32>)
+        outs(%dest : tensor<1x224x224x64xf32>) {match_status = "unmatched"} -> tensor<1x224x224x64xf32>
+  return %res : tensor<1x224x224x64xf32>
+}
+
+// CHECK-LABEL: func.func @op_attention
+func.func @op_attention(%query: tensor<1x16x512xf32>, %key: tensor<1x16x512xf32>, %value: tensor<1x16x512xf32>, %scale: f32, %dest: tensor<1x16x512xf32>) -> tensor<1x16x512xf32> {
+  // CHECK-NEXT: iree_linalg_ext.attention
+  // CHECK-SAME:   match_status = "matched"
+  %res = iree_linalg_ext.attention
+        {indexing_maps = [#map_attn0, #map_attn1, #map_attn2, #map_attn3, #map_attn4], match_status = "unmatched"}
+        ins(%query, %key, %value, %scale : tensor<1x16x512xf32>, tensor<1x16x512xf32>, tensor<1x16x512xf32>, f32)
+        outs(%dest : tensor<1x16x512xf32>) {
+  ^bb0(%in: f32):
+    iree_linalg_ext.yield %in : f32
+  } -> tensor<1x16x512xf32>
+  return %res : tensor<1x16x512xf32>
+}
+
+// CHECK-LABEL: func.func @op_fill
+func.func @op_fill(%dest: tensor<32x64xf32>, %value: f32) -> tensor<32x64xf32> {
+  // CHECK-NEXT: linalg.fill
+  // CHECK-SAME:   match_status = "unmatched"
+  %res = linalg.fill ins(%value : f32) outs(%dest : tensor<32x64xf32>) {match_status = "unmatched"} -> tensor<32x64xf32>
+  return %res : tensor<32x64xf32>
+}
+
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @match_contraction(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
+    transform.iree.match.is_contraction %op : !transform.any_op
+    transform.yield %op : !transform.any_op
+  }
+
+  transform.named_sequence @match_convolution(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
+    transform.iree.match.is_convolution %op : !transform.any_op
+    transform.yield %op : !transform.any_op
+  }
+
+  transform.named_sequence @match_attention(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
+    transform.iree.match.is_attention %op : !transform.any_op
+    transform.yield %op : !transform.any_op
+  }
+
+  transform.named_sequence @annotate(%op: !transform.any_op {transform.readonly}) {
+    %0 = transform.param.constant "matched" -> !transform.any_param
+    transform.annotate %op "match_status" = %0 : !transform.any_op, !transform.any_param
+    transform.yield
+  }
+
+  transform.named_sequence @__transform_main(%module: !transform.any_op) {
+    transform.foreach_match in %module
+        @match_contraction -> @annotate,
+        @match_convolution -> @annotate,
+        @match_attention -> @annotate
+      : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
+  }
+}
