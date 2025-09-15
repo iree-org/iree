@@ -110,7 +110,7 @@ With the requirements out of the way, we can now compile a model and run it.
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-import-onnx-mobilenet.md"
 
 Then run the following command to compile with the `local` device, `llvm-cpu`
-target compilation backend, and recommanded optimization flags:
+target compilation backend, and recommended optimization flags:
 
 ``` shell hl_lines="2-4"
 iree-compile \
