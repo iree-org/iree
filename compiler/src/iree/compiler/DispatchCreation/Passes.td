@@ -317,6 +317,15 @@ def HoistUniformScalarComputePass :
   let summary = "Hoists scalar (computation) out of dispatch regions.";
 }
 
+def PropagateEncodingsPass :
+    InterfacePass<"iree-dispatch-creation-propagate-encodings", "mlir::FunctionOpInterface"> {
+  let summary = "Propagate encodings across other operations.";
+  let dependentDialects = [
+    "mlir::tensor::TensorDialect",
+    "IREE::Encoding::IREEEncodingDialect",
+  ];
+}
+
 def AnnotateDataTilingHintsPass :
     InterfacePass<"iree-dispatch-creation-annotate-data-tiling-hints", "mlir::FunctionOpInterface"> {
   let summary = "Adds data-tiling hint attribute to linalg operations.";

@@ -39,6 +39,7 @@ iree_cc_library(
     "HoistUniformScalarCompute.cpp"
     "MaterializeDefaultWorkgroupCountRegion.cpp"
     "Passes.cpp"
+    "PropagateEncodings.cpp"
     "SetEncoding.cpp"
     "SinkReshapes.cpp"
     "SplitReduction.cpp"
