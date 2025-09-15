@@ -55,9 +55,10 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
           .setVectorMultiReductionLowering(vectorMultiReductionLowering)
           .setVectorTransferSplit(vectorTransferSplit);
 
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
-  DictionaryAttr targetConfig =
-      targetAttr ? targetAttr.getConfiguration() : nullptr;
+  DictionaryAttr targetConfig;
+  if (auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp)) {
+    targetConfig = targetAttr.getConfiguration();
+  }
 
   // Target-dependenet patterns.
   {
@@ -75,8 +76,9 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
     // RVV should be able to lower most of the gather / scatter with indexed
     // load / store.
     if (!targetConfig || !isRISCV(targetConfig) ||
-        !hasAnyVFeature(targetConfig))
+        !hasAnyVFeature(targetConfig)) {
       vector::populateVectorGatherToConditionalLoadPatterns(patterns);
+    }
     vector::populateVectorGatherLoweringPatterns(patterns);
     vector::populateVectorContractLoweringPatterns(
         patterns, vectorTransformOptions.vectorContractLowering,

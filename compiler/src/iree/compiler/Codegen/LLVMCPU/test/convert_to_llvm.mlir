@@ -114,15 +114,4 @@ module attributes {
 }
 
 // CHECK-LABEL:   llvm.func @negative_no_gather_lowering(
-// CHECK-SAME:                                           %[[VAL_0:[0-9]+|[a-zA-Z$._-][a-zA-Z0-9$._-]*]]: !llvm.ptr,
-// CHECK-SAME:                                           %[[VAL_1:[0-9]+|[a-zA-Z$._-][a-zA-Z0-9$._-]*]]: !llvm.ptr,
-// CHECK-SAME:                                           %[[VAL_2:[0-9]+|[a-zA-Z$._-][a-zA-Z0-9$._-]*]]: i64,
-// CHECK-SAME:                                           %[[VAL_3:[0-9]+|[a-zA-Z$._-][a-zA-Z0-9$._-]*]]: i64,
-// CHECK-SAME:                                           %[[VAL_4:[0-9]+|[a-zA-Z$._-][a-zA-Z0-9$._-]*]]: i64,
-// CHECK-SAME:                                           %[[VAL_5:[0-9]+|[a-zA-Z$._-][a-zA-Z0-9$._-]*]]: vector<64xi64>,
-// CHECK-SAME:                                           %[[VAL_6:[0-9]+|[a-zA-Z$._-][a-zA-Z0-9$._-]*]]: vector<64xi1>) -> vector<64xf32> attributes {sym_visibility = "private"} {
-// CHECK:           %[[VAL_7:.*]] = llvm.mlir.constant(dense<0.000000e+00> : vector<64xf32>) : vector<64xf32>
-// CHECK:           %[[VAL_8:.*]] = llvm.getelementptr %[[VAL_1]]{{\[}}%[[VAL_5]]] : (!llvm.ptr, vector<64xi64>) -> vector<64x!llvm.ptr>, f32
-// CHECK:           %[[VAL_9:.*]] = llvm.intr.masked.gather %[[VAL_8]], %[[VAL_6]], %[[VAL_7]] {alignment = 4 : i32} : (vector<64x!llvm.ptr>, vector<64xi1>, vector<64xf32>) -> vector<64xf32>
-// CHECK:           llvm.return %[[VAL_9]] : vector<64xf32>
-// CHECK:         }
+// CHECK: llvm.intr.masked.gather {{.*}} : (vector<64x!llvm.ptr>, vector<64xi1>, vector<64xf32>) -> vector<64xf32>

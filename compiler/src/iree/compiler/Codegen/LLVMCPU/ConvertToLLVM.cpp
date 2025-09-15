@@ -987,9 +987,10 @@ void ConvertToLLVMPass::runOnOperation() {
   moduleOp->setAttr(LLVM::LLVMDialect::getDataLayoutAttrName(),
                     StringAttr::get(moduleOp->getContext(), dataLayoutStr));
 
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(moduleOp);
-  DictionaryAttr targetConfig =
-      targetAttr ? targetAttr.getConfiguration() : nullptr;
+  DictionaryAttr targetConfig;
+  if (auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(moduleOp)) {
+    targetConfig = targetAttr.getConfiguration();
+  }
 
   // Run Vector -> Vector transformations ahead of conversion to LLVM.
   {
@@ -1000,8 +1001,9 @@ void ConvertToLLVMPass::runOnOperation() {
     // RVV should be able to lower most of the gather / scatter with indexed
     // load / store.
     if (!targetConfig || !isRISCV(targetConfig) ||
-        !hasAnyVFeature(targetConfig))
+        !hasAnyVFeature(targetConfig)) {
       vector::populateVectorGatherToConditionalLoadPatterns(patterns);
+    }
     vector::populateVectorInterleaveLoweringPatterns(patterns);
     // TODO: doubtful that the "default" does what one want here, it is likely
     // better to use outerproduct.
