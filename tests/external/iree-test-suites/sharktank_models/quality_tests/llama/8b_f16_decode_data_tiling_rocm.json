@@ -26,8 +26,7 @@
         "--iree-opt-data-tiling=false",
         "--iree-dispatch-creation-data-tiling",
         "--iree-hip-encoding-layout-resolver=data-tiling",
-        "--iree-llvmgpu-test-combine-layout-transformation",
-        "--iree-hip-enable-tensor-ukernels"
+        "--iree-llvmgpu-test-combine-layout-transformation"
     ],
     "run_function": "decode_bs4"
 }
