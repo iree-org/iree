@@ -213,6 +213,19 @@ static bool inlineConstantGlobalLoads(GlobalTable &globalTable) {
       return GlobalAction::PRESERVE;
     }
 
+    // We currently don't support inlining globals with non-util dialect
+    // attributes as the constant materialization machinery in MLIR does not
+    // have a way to preserve them. We could add an attr interface that allows
+    // attrs to be carried along as a way around this but today don't need it.
+    const bool hasAnyNonUtilAttrs =
+        llvm::any_of(global.op->getDialectAttrs(), [](NamedAttribute attr) {
+          auto *dialect = attr.getNameDialect();
+          return !dialect || dialect->getNamespace() != "util";
+        });
+    if (hasAnyNonUtilAttrs) {
+      return GlobalAction::PRESERVE;
+    }
+
     if (llvm::isa<IREE::Util::ReferenceTypeInterface>(
             global.op.getGlobalType())) {
       // We only inline value types; reference types have meaning as globals.
