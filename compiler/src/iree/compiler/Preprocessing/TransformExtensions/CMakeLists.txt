@@ -42,6 +42,7 @@ iree_cc_library(
     MLIRTransformDialectInterfaces
     MLIRTransformUtils
     MLIRValueBoundsOpInterface
+    iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Utils
   PUBLIC
 )
