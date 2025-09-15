@@ -49,10 +49,12 @@ iree_c_embed_data(
     srcs = [
         "iree_uk_amdgpu_dt_matmul_f16.mlir",
         "iree_uk_amdgpu_dt_matmul_f8E4M3FNUZ.mlir",
+        "iree_uk_amdgpu_dt_scaled_matmul_f4E2M1FN.mlir",
         "iree_uk_amdgpu_matmul_bf16.mlir",
         "iree_uk_amdgpu_matmul_f16.mlir",
         "iree_uk_amdgpu_matmul_f8E4M3FN.mlir",
         "iree_uk_amdgpu_matmul_f8E4M3FNUZ.mlir",
+        "iree_uk_amdgpu_scaled_matmul_f4E2M1FN.mlir",
     ],
     c_file_output = "iree_mlir_ukernels_amdgpu.c",
     flatten = True,
@@ -66,10 +68,12 @@ iree_lit_test_suite(
     srcs = [
         "iree_uk_amdgpu_dt_matmul_f16.mlir",
         "iree_uk_amdgpu_dt_matmul_f8E4M3FNUZ.mlir",
+        "iree_uk_amdgpu_dt_scaled_matmul_f4E2M1FN.mlir",
         "iree_uk_amdgpu_matmul_bf16.mlir",
         "iree_uk_amdgpu_matmul_f16.mlir",
         "iree_uk_amdgpu_matmul_f8E4M3FN.mlir",
         "iree_uk_amdgpu_matmul_f8E4M3FNUZ.mlir",
+        "iree_uk_amdgpu_scaled_matmul_f4E2M1FN.mlir",
     ],
     cfg = "//compiler:lit.cfg.py",
     tools = [

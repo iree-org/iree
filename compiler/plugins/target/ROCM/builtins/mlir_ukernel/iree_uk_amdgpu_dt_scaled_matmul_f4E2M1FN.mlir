@@ -1,0 +1,1 @@
+// RUN: iree-opt %s
