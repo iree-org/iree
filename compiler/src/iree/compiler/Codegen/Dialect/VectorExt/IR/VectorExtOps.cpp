@@ -629,7 +629,7 @@ struct FoldSingleElementIndexVec final : OpRewritePattern<TransferGatherOp> {
   }
 };
 
-struct FoldContigousGatherToTransferRead final
+struct FoldContigousTransferGatherToTransferRead final
     : OpRewritePattern<TransferGatherOp> {
   using Base::Base;
 
@@ -650,8 +650,8 @@ struct FoldContigousGatherToTransferRead final
 
 void TransferGatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                    MLIRContext *ctx) {
-  results.add<FoldSingleElementIndexVec, FoldContigousGatherToTransferRead>(
-      ctx);
+  results.add<FoldSingleElementIndexVec,
+              FoldContigousTransferGatherToTransferRead>(ctx);
 }
 
 // MaskableOpInterface methods.
@@ -830,7 +830,7 @@ struct IndexingMapFoldResult {
 using IndexingMapFolder = function_ref<IndexingMapFoldResult(
     int64_t index, Value val, AffineMap valMap, AffineMap &baseMap)>;
 
-static Value foldTransferGatherIndexVecs(
+static Value foldGatherIndexVecs(
     GatherOp gatherOp,
     function_ref<IndexingMapFoldResult(int64_t, Value, AffineMap, AffineMap &)>
         valueFolder) {
@@ -856,6 +856,19 @@ static Value foldTransferGatherIndexVecs(
     }
   }
 
+  Value mask;
+  AffineMap maskMap;
+  if (gatherOp.getMask()) {
+    auto [newMask, newMap, valChanged] =
+        valueFolder(indexedValues.size(), gatherOp.getMask(),
+                    gatherOp.getIndexingMapsArray().back(), baseMap);
+    changed |= valChanged;
+    if (newMask) {
+      mask = newMask;
+      maskMap = newMap;
+    }
+  }
+
   if (!changed) {
     return Value();
   }
@@ -867,7 +880,7 @@ static Value foldTransferGatherIndexVecs(
   updatedIndexingMaps.push_back(baseMap);
   updatedIndexingMaps.append(newIndexingMaps);
   if (gatherOp.getMask()) {
-    updatedIndexingMaps.push_back(gatherOp.getIndexingMapsArray().back());
+    updatedIndexingMaps.push_back(maskMap);
   }
 
   // Delete the deleted symbols from these maps.
@@ -905,8 +918,8 @@ static Value foldTransferGatherIndexVecs(
   operands.push_back(gatherOp.getPadding());
   operandSegmentSizes.push_back(1);
   // Mask.
-  if (gatherOp.getMask()) {
-    operands.push_back(gatherOp.getMask());
+  if (mask) {
+    operands.push_back(mask);
     operandSegmentSizes.push_back(1);
   } else {
     operandSegmentSizes.push_back(0);
@@ -917,8 +930,8 @@ static Value foldTransferGatherIndexVecs(
   return gatherOp.getResult();
 }
 
-static Value foldTransferGatherFromBroadcast(GatherOp gatherOp) {
-  return foldTransferGatherIndexVecs(
+static Value foldGatherFromBroadcast(GatherOp gatherOp) {
+  return foldGatherIndexVecs(
       gatherOp,
       [](int64_t, Value operand, AffineMap map,
          AffineMap &) -> IndexingMapFoldResult {
@@ -935,8 +948,8 @@ static Value foldTransferGatherFromBroadcast(GatherOp gatherOp) {
       });
 }
 
-static Value foldTransferGatherFromTranspose(GatherOp gatherOp) {
-  return foldTransferGatherIndexVecs(
+static Value foldGatherFromTranspose(GatherOp gatherOp) {
+  return foldGatherIndexVecs(
       gatherOp,
       [](int64_t, Value operand, AffineMap map,
          AffineMap &) -> IndexingMapFoldResult {
@@ -954,8 +967,8 @@ static Value foldTransferGatherFromTranspose(GatherOp gatherOp) {
       });
 }
 
-static Value foldTransferGatherFromStep(GatherOp gatherOp) {
-  return foldTransferGatherIndexVecs(
+static Value foldGatherFromStep(GatherOp gatherOp) {
+  return foldGatherIndexVecs(
       gatherOp,
       [](int64_t index, Value operand, AffineMap map,
          AffineMap &baseMap) -> IndexingMapFoldResult {
@@ -974,20 +987,20 @@ static Value foldTransferGatherFromStep(GatherOp gatherOp) {
           }
           newResults.push_back(expr);
         }
-        baseMap = AffineMap::get(baseMap.getNumDims(), baseMap.getNumDims(),
+        baseMap = AffineMap::get(baseMap.getNumDims(), baseMap.getNumSymbols(),
                                  newResults, baseMap.getContext());
         return {Value(), AffineMap(), true};
       });
 }
 
 OpFoldResult GatherOp::fold(FoldAdaptor adaptor) {
-  if (auto res = foldTransferGatherFromBroadcast(*this)) {
+  if (auto res = foldGatherFromBroadcast(*this)) {
     return res;
   }
-  if (auto res = foldTransferGatherFromTranspose(*this)) {
+  if (auto res = foldGatherFromTranspose(*this)) {
     return res;
   }
-  if (auto res = foldTransferGatherFromStep(*this)) {
+  if (auto res = foldGatherFromStep(*this)) {
     return res;
   }
   return OpFoldResult();
@@ -1028,7 +1041,7 @@ struct FoldSingleElementIndexingMap final : OpRewritePattern<GatherOp> {
       return {Value(), AffineMap(), true};
     };
 
-    Value newVal = foldTransferGatherIndexVecs(xferOp, indexVecFolder);
+    Value newVal = foldGatherIndexVecs(xferOp, indexVecFolder);
 
     if (!newVal) {
       return failure();
@@ -1056,8 +1069,7 @@ static AffineMap inverseMap(AffineMap map, ArrayRef<AffineExpr> initValues) {
   return AffineMap::get(map.getNumResults(), /*symbolCount=*/0, exprs, context);
 }
 
-struct FoldContigousTransferGatherV2ToTransferRead final
-    : OpRewritePattern<GatherOp> {
+struct FoldContigousGatherToTransferRead final : OpRewritePattern<GatherOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(GatherOp xferOp,
@@ -1097,8 +1109,7 @@ struct FoldContigousTransferGatherV2ToTransferRead final
 
 void GatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                            MLIRContext *ctx) {
-  results.add<FoldSingleElementIndexingMap,
-              FoldContigousTransferGatherV2ToTransferRead>(ctx);
+  results.add<FoldSingleElementIndexingMap>(ctx);
 }
 
 void ScatterOp::getCanonicalizationPatterns(RewritePatternSet &results,
