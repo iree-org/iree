@@ -244,6 +244,55 @@ populateConvertGPUPrintfOpForHIPRuntime(RewritePatternSet &patterns,
   patterns.add<ConvertGPUPrintfOpForHIPRuntime>(converter);
 }
 
+constexpr StringLiteral kHIPDeviceID = "hip";
+constexpr StringLiteral kStreamAffinityDefault = "stream.affinity.default";
+
+static void populateHIPPrintfConversion(ModuleOp m,
+    RewritePatternSet& llvmPatterns,
+    LLVMTypeConverter& converter) {
+  auto findTopLevelModuleWithAffinity = [](ModuleOp m) -> ModuleOp {
+    // Case 1: m is already the top level module
+    if (m->getAttrOfType<IREE::HAL::DeviceAffinityAttr>(kStreamAffinityDefault)) {
+      return m;
+    }
+    
+    // Case 2: m is the inner builtin.module - find top level module
+    if (auto variantOp = m->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
+      if (auto executableOp = variantOp->getParentOfType<IREE::HAL::ExecutableOp>()) {
+        return executableOp->getParentOfType<ModuleOp>();
+      }
+    }
+    
+    return nullptr;
+  };
+  
+  ModuleOp topLevelModule = findTopLevelModuleWithAffinity(m);
+  if (!topLevelModule) {
+    return;
+  }
+
+  auto defaultAffinity =
+      topLevelModule->getAttrOfType<IREE::HAL::DeviceAffinityAttr>(kStreamAffinityDefault);
+  if (!defaultAffinity) {
+    return;
+  }
+
+  llvm::StringRef deviceSymbol =
+      defaultAffinity.getDevice().getLeafReference();
+  auto globalOp = topLevelModule.lookupSymbol<IREE::Util::GlobalOp>(deviceSymbol);
+  if (!globalOp) {
+    return;
+  }
+
+  auto deviceTarget = dyn_cast<IREE::HAL::DeviceTargetAttr>(
+       globalOp.getInitialValueAttr());
+  if (!deviceTarget || deviceTarget.getDeviceID() != kHIPDeviceID) {
+    return;
+  }
+
+  populateConvertGPUPrintfOpForHIPRuntime(llvmPatterns, converter);
+}
+
 /// Hacky pattern to swap `s_setprio` operations with `amdgpu.mfma` ops.
 /// This is needed for ping-pong scheduling patterns to prevent off
 /// waves from interrupting the MFMA region of the high priority wave.
@@ -510,43 +559,7 @@ struct ConvertToROCDLPass final
       vector::populateVectorTransferLoweringPatterns(llvmPatterns,
                                                      /*maxTransferRank=*/1);
       gpu::amd::Runtime runtime = gpu::amd::Runtime::Unknown;
-      mlir::ModuleOp topLevelModule = nullptr;
-
-      // Case 1: m is already the top level module (has stream.affinity.default)
-      if (auto defaultAffinity =
-              m->getAttrOfType<IREE::HAL::DeviceAffinityAttr>(
-                  "stream.affinity.default")) {
-        topLevelModule = m;
-      }
-      // Case 2: m is the inner builtin.module - find top level module
-      else {
-        if (auto variantOp =
-                m->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
-          if (auto executableOp =
-                  variantOp->getParentOfType<IREE::HAL::ExecutableOp>()) {
-            topLevelModule = executableOp->getParentOfType<mlir::ModuleOp>();
-          }
-        }
-      }
-
-      if (topLevelModule) {
-        if (auto defaultAffinity =
-                topLevelModule->getAttrOfType<IREE::HAL::DeviceAffinityAttr>(
-                    "stream.affinity.default")) {
-          llvm::StringRef deviceSymbol =
-              defaultAffinity.getDevice().getLeafReference();
-          if (auto globalOp = topLevelModule.lookupSymbol<IREE::Util::GlobalOp>(
-                  deviceSymbol)) {
-            if (auto deviceTarget = dyn_cast<IREE::HAL::DeviceTargetAttr>(
-                    globalOp.getInitialValueAttr())) {
-              if (deviceTarget.getDeviceID() == "hip") {
-                populateConvertGPUPrintfOpForHIPRuntime(llvmPatterns,
-                                                        converter);
-              }
-            }
-          }
-        }
-      }
+      populateHIPPrintfConversion(m, llvmPatterns, converter);
       populateGpuToROCDLConversionPatterns(converter, llvmPatterns, runtime,
                                            chipset);
       LLVMConversionTarget target(getContext());
