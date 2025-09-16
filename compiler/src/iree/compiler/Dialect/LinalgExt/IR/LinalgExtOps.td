@@ -1157,7 +1157,7 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction"> {
 
       %exp_v  = math.exp2 %v               : f32  // raise v to the exponent
       %s      = arith.mulf %prev_s, %norm  : f32  // multiply s by the norm
-      %add    = arith.addf %norm, %s       : f32
+      %add    = arith.addf %exp_v, %s      : f32
       linalg.yield %m, %add                : f32, f32
   } -> tensor<256xf32>, tensor<f32>
   ```
