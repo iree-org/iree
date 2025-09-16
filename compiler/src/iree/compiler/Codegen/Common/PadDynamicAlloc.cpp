@@ -110,7 +110,7 @@ namespace {
 struct PadDynamicAllocPass final
     : impl::PadDynamicAllocPassBase<PadDynamicAllocPass> {
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     MLIRContext *context = &getContext();
 
     DataFlowSolver solver;

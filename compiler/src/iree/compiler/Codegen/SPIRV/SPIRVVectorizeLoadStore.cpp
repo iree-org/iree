@@ -817,8 +817,8 @@ struct ScalarizeVectorTransferRead final
       }
 
       auto thenCond = [&](OpBuilder &b, Location loc) {
-        return b
-            .create<memref::LoadOp>(loc, readOp.getBase(), readOp.getIndices())
+        return memref::LoadOp::create(b, loc, readOp.getBase(),
+                                      readOp.getIndices())
             .getResult();
       };
       auto elseCond = [&](OpBuilder &b, Location loc) {
@@ -1062,7 +1062,7 @@ private:
 void SPIRVVectorizeLoadStorePass::runOnOperation() {
   // Uses the signature conversion methodology of the dialect conversion
   // framework to implement the conversion.
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   MLIRContext *context = &getContext();
 
   // Prior pass should have unrolled and broken down vectors with rank > 1.

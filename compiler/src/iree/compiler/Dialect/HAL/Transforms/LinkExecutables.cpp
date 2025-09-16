@@ -47,7 +47,7 @@ struct LinkTargetExecutablesPass
   }
 
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     auto targetBackend = targetRegistry->getTargetBackend(target);
     if (!targetBackend) {
       moduleOp.emitError() << "unregistered target backend '" << target << "'";
@@ -75,7 +75,7 @@ struct LinkAllExecutablesPass
   using IREE::HAL::impl::LinkAllExecutablesPassBase<
       LinkAllExecutablesPass>::LinkAllExecutablesPassBase;
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     // Add pipelines for each target backend used in the module.
     // These will create/rearrange executables.

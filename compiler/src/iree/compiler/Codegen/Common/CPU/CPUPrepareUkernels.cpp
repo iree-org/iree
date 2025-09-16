@@ -196,9 +196,8 @@ struct ConvertBatchMmt4DtoMmt4DPattern
       auto newInit = tensor::createCanonicalRankReducingExtractSliceOp(
           rewriter, loc, initTensor, reducedOutType);
       reducedOut =
-          rewriter
-              .create<linalg::FillOp>(loc, ValueRange{oldFillOp.value()},
-                                      ValueRange{newInit})
+          linalg::FillOp::create(rewriter, loc, ValueRange{oldFillOp.value()},
+                                 ValueRange{newInit})
               .result();
 
       auto loweringConfig =
@@ -412,7 +411,7 @@ struct CPUPrepareUkernelsPass
 void CPUPrepareUkernelsPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
   RewritePatternSet patterns(ctx);
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   IRRewriter rewriter(ctx);
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
 

@@ -94,7 +94,7 @@ void static removeUnitExtentDimsfromMaps(linalg::LinalgOp linalgOp,
 
 void GPUTileAndConvertConvToMatmulPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   // Collect candiates that need to be tiled to convert to matmul.
   IRRewriter rewriter(funcOp);
   SmallVector<linalg::LinalgOp> convCandidates;

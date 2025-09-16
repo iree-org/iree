@@ -101,9 +101,7 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
       }
 
       // Place the op in its own dispatch region if fusion is not possible.
-      if (!isa<IREE::Encoding::MatmulKAttr>(
-              encodingOp.getResultType().getEncoding()) &&
-          !isFusableWithSetEncoding(producerInRegion.getOwner())) {
+      if (!isFusableWithSetEncoding(producerInRegion.getOwner())) {
         continue;
       }
       // Fuse the `encodingOp` and the producer chain into the dispatch.

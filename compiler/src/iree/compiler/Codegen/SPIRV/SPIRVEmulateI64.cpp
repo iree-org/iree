@@ -232,7 +232,7 @@ struct SPIRVEmulateI64Pass final
   }
 
   void runOnOperation() override {
-    auto op = getOperation();
+    mlir::FunctionOpInterface op = getOperation();
     if (supportsI64(op))
       return;
 

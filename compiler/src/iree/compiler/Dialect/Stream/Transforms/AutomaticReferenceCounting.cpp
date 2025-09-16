@@ -717,7 +717,7 @@ struct AutomaticReferenceCountingPass
     : public IREE::Stream::impl::AutomaticReferenceCountingPassBase<
           AutomaticReferenceCountingPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
       if (funcOp.isExternal()) {
         continue;

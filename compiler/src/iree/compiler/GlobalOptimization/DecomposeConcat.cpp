@@ -30,8 +30,8 @@ static Value createTranspose(OpBuilder &builder, Value source,
   Value empty =
       tensor::EmptyOp::create(builder, source.getLoc(), mixedSizes, elemType)
           .getResult();
-  return builder
-      .create<linalg::TransposeOp>(source.getLoc(), source, empty, perm)
+  return linalg::TransposeOp::create(builder, source.getLoc(), source, empty,
+                                     perm)
       ->getResult(0);
 }
 
@@ -117,8 +117,7 @@ struct DecomposeNonOuterDimConcats : public OpRewritePattern<tensor::ConcatOp> {
 
 struct DecomposeConcatPass
     : public impl::DecomposeConcatPassBase<DecomposeConcatPass> {
-  using impl::DecomposeConcatPassBase<
-      DecomposeConcatPass>::DecomposeConcatPassBase;
+  using Base::Base;
   explicit DecomposeConcatPass(bool enableConcatTransposition) {
     this->enableConcatTransposition = enableConcatTransposition;
   }

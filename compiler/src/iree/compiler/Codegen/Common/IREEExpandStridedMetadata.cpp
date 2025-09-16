@@ -253,8 +253,7 @@ struct ConvertCodegenIREEExtractMetadataToMemRef
 
 struct IREEExpandStridedMetadataPass final
     : impl::IREEExpandStridedMetadataPassBase<IREEExpandStridedMetadataPass> {
-  using impl::IREEExpandStridedMetadataPassBase<
-      IREEExpandStridedMetadataPass>::IREEExpandStridedMetadataPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, arith::ArithDialect,

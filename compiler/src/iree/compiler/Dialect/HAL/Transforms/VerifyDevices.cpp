@@ -103,7 +103,7 @@ struct VerifyDevicesPass
   using IREE::HAL::impl::VerifyDevicesPassBase<
       VerifyDevicesPass>::VerifyDevicesPassBase;
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     // Devices are required if we need to convert host code or executables.
     // If we only have hal.executables as input then we can bypass this.

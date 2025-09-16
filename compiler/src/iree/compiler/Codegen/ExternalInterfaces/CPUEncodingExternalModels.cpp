@@ -159,15 +159,14 @@ static Value createElementWiseExtUIOp(OpBuilder &builder, Value input,
       tensor::getMixedSizes(builder, loc, input);
   Value init =
       tensor::EmptyOp::create(builder, loc, inputMixedSizes, outElemType);
-  return builder
-      .create<linalg::GenericOp>(
-          loc, castedType, input, init, maps, iteratorTypes,
-          [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
-            Value castRes =
-                arith::ExtUIOp::create(b, nestedLoc, outElemType, args[0])
-                    ->getResult(0);
-            linalg::YieldOp::create(b, nestedLoc, castRes);
-          })
+  return linalg::GenericOp::create(
+             builder, loc, castedType, input, init, maps, iteratorTypes,
+             [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
+               Value castRes =
+                   arith::ExtUIOp::create(b, nestedLoc, outElemType, args[0])
+                       ->getResult(0);
+               linalg::YieldOp::create(b, nestedLoc, castRes);
+             })
       .getResult(0);
 }
 

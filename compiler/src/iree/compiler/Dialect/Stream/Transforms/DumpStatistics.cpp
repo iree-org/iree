@@ -596,7 +596,7 @@ struct DumpStatisticsPass
     auto os = openOutputFile(outputFile);
 
     // Walk the module once to accumulate everything we care about.
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     UsageInfo usageInfo;
     usageInfo.analyze(moduleOp);
 

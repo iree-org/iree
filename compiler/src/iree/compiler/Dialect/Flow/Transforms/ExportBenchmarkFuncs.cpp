@@ -274,7 +274,7 @@ struct ExportBenchmarkFuncsPass
     : public IREE::Flow::impl::ExportBenchmarkFuncsPassBase<
           ExportBenchmarkFuncsPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     // For analysis required on arguments and results.
     Explorer explorer(moduleOp, TraversalAction::SHALLOW);

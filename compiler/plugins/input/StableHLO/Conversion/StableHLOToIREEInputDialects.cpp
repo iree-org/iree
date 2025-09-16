@@ -149,14 +149,14 @@ Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
 
   switch (llvm::cast<RankedTensorType>(lhs.getType()).getRank()) {
   case 1:
-    return b
-        .create<linalg::VecmatOp>(loc, TypeRange{resultType},
-                                  ValueRange{lhs, rhs}, ValueRange{zeroTensor})
+    return linalg::VecmatOp::create(b, loc, TypeRange{resultType},
+                                    ValueRange{lhs, rhs},
+                                    ValueRange{zeroTensor})
         .getResult(0);
   case 2:
-    return b
-        .create<linalg::MatmulOp>(loc, TypeRange{resultType},
-                                  ValueRange{lhs, rhs}, ValueRange{zeroTensor})
+    return linalg::MatmulOp::create(b, loc, TypeRange{resultType},
+                                    ValueRange{lhs, rhs},
+                                    ValueRange{zeroTensor})
         .getResult(0);
   default:
     assert(false && "unhandled matmul type");
@@ -218,10 +218,9 @@ struct OptimizationBarrierOpConversion final
                   ConversionPatternRewriter &rewriter) const override {
     SmallVector<Value> outputs;
     for (Value operand : adaptor.getOperands()) {
-      outputs.push_back(
-          rewriter
-              .create<IREE::Util::OptimizationBarrierOp>(op.getLoc(), operand)
-              .getResult(0));
+      outputs.push_back(IREE::Util::OptimizationBarrierOp::create(
+                            rewriter, op.getLoc(), operand)
+                            .getResult(0));
     }
     rewriter.replaceOp(op, outputs);
     return success();
@@ -434,10 +433,9 @@ Value scalarToTensor(OpBuilder &builder, Type /*type*/, ValueRange inputs,
   if (isa<ShapedType>(inputs.front().getType())) {
     return Value();
   }
-  return builder
-      .create<tensor::FromElementsOp>(
-          loc, RankedTensorType::get({}, inputs.front().getType()),
-          inputs.front())
+  return tensor::FromElementsOp::create(
+             builder, loc, RankedTensorType::get({}, inputs.front().getType()),
+             inputs.front())
       .getResult();
 }
 

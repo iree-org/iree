@@ -234,8 +234,7 @@ struct VectorizePadWithConditions final
 
 struct TensorToVectorVectorizePadPass final
     : impl::TensorToVectorVectorizePadPassBase<TensorToVectorVectorizePadPass> {
-  using impl::TensorToVectorVectorizePadPassBase<
-      TensorToVectorVectorizePadPass>::TensorToVectorVectorizePadPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, arith::ArithDialect,

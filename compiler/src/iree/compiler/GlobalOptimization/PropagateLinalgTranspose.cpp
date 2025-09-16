@@ -76,8 +76,8 @@ static Value createTranspose(OpBuilder &builder, Value source,
                                    elementType);
   }
   Value empty = createTransposeInit(builder, source, perm);
-  return builder
-      .create<linalg::TransposeOp>(source.getLoc(), source, empty, perm)
+  return linalg::TransposeOp::create(builder, source.getLoc(), source, empty,
+                                     perm)
       ->getResult(0);
 }
 
@@ -967,8 +967,7 @@ namespace {
 struct PropagateLinalgTransposePass
     : public impl::PropagateLinalgTransposePassBase<
           PropagateLinalgTransposePass> {
-  using impl::PropagateLinalgTransposePassBase<
-      PropagateLinalgTransposePass>::PropagateLinalgTransposePassBase;
+  using Base::Base;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, tensor::TensorDialect>();
   }
@@ -1010,7 +1009,7 @@ populateCommonCanonicalizationPatterns(MLIRContext *context,
 
 void PropagateLinalgTransposePass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   // First, specialize all transposes to `linalg.transpose`. This dramatically
   // simplifies all subsequent propagation patterns, both in matching and
   // rewriting.

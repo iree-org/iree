@@ -139,10 +139,8 @@ static Value staticallyExtractSubvector(OpBuilder &rewriter, Location loc,
 
   auto resultVectorType =
       VectorType::get({numElemsToExtract}, vectorType.getElementType());
-  return rewriter
-      .create<vector::ExtractStridedSliceOp>(loc, resultVectorType, src,
-                                             offsets, sizes, strides)
-      ->getResult(0);
+  return vector::ExtractStridedSliceOp::create(rewriter, loc, resultVectorType,
+                                               src, offsets, sizes, strides);
 }
 
 /// Inserts 1-D subvector into a 1-D vector.

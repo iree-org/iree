@@ -1761,16 +1761,15 @@ static void generatePackOpScalarImplementationBody(PackOp packOp,
           idx, getDimValue(builder, loc, packOp.getInput(), dim));
       isInBounds = dim == 0 ? cond : arithBuilder._and(isInBounds, cond);
     }
-    scalar = builder
-                 .create<scf::IfOp>(
-                     loc, isInBounds, /*thenBuilder=*/
-                     [&](OpBuilder &b, Location l) {
-                       scf::YieldOp::create(b, l, createLoad());
-                     },
-                     /*elseBuilder=*/
-                     [&](OpBuilder &b, Location l) {
-                       scf::YieldOp::create(b, l, paddingValue);
-                     })
+    scalar = scf::IfOp::create(
+                 builder, loc, isInBounds, /*thenBuilder=*/
+                 [&](OpBuilder &b, Location l) {
+                   scf::YieldOp::create(b, l, createLoad());
+                 },
+                 /*elseBuilder=*/
+                 [&](OpBuilder &b, Location l) {
+                   scf::YieldOp::create(b, l, paddingValue);
+                 })
                  .getResult(0);
   } else {
     scalar = createLoad();

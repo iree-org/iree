@@ -118,8 +118,7 @@ static LogicalResult convertSoftmaxToGenerics(mlir::FunctionOpInterface funcOp,
 
 struct DecomposeSoftmaxPass
     : impl::DecomposeSoftmaxPassBase<DecomposeSoftmaxPass> {
-  using impl::DecomposeSoftmaxPassBase<
-      DecomposeSoftmaxPass>::DecomposeSoftmaxPassBase;
+  using Base::Base;
   explicit DecomposeSoftmaxPass(bool useFusion) { this->useFusion = useFusion; }
 
   void getDependentDialects(DialectRegistry &registry) const override {

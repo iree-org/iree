@@ -6,6 +6,7 @@
 
 #include <cassert>
 #include "iree/compiler/Codegen/Common/PassUtils.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -79,6 +80,21 @@ annotateKernelForTranslation(LLVM::LLVMFuncOp funcOp,
       attr && attr.getValue() != IREE::Codegen::DenormalFpMath::None) {
     funcOp.setDenormalFpMathF32(
         IREE::Codegen::stringifyDenormalFpMath(attr.getValue()));
+  }
+
+  // Check if the `denormal_fp_math_f32` dictionary is set and proccess it.
+  auto denormalFp32 = cast_or_null<IREE::Codegen::DenormalFpMathAttr>(
+      funcOp->getDiscardableAttr(
+          IREE::Codegen::DenormalFpMathAttr::getFP32DictKeyName()));
+  if (denormalFp32) {
+    if (denormalFp32.getValue() != IREE::Codegen::DenormalFpMath::None) {
+      funcOp.setDenormalFpMathF32(
+          IREE::Codegen::stringifyDenormalFpMath(denormalFp32.getValue()));
+    }
+
+    // Discard the attribute.
+    funcOp->removeDiscardableAttr(
+        IREE::Codegen::DenormalFpMathAttr::getFP32DictKeyName());
   }
 
   // Kernel argument preloading is only supported on gfx942 and newer targets

@@ -260,8 +260,7 @@ static LogicalResult commonRunOnOperation(
 
 struct DecomposePackUnPackOpsPass final
     : impl::DecomposePackUnPackOpsPassBase<DecomposePackUnPackOpsPass> {
-  using impl::DecomposePackUnPackOpsPassBase<
-      DecomposePackUnPackOpsPass>::DecomposePackUnPackOpsPassBase;
+  using Base::Base;
 
   void runOnOperation() override;
 };

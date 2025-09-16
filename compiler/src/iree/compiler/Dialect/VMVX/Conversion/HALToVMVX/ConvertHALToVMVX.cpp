@@ -247,13 +247,11 @@ struct ConvertHALInterfaceBindingSubspanOp
     IndexSet indexSet(op.getLoc(), rewriter);
     auto bindingType = llvm::cast<IREE::Util::ListType>(bindingsArg.getType())
                            .getElementType();
-    auto sourceBuffer =
-        rewriter
-            .create<IREE::Util::ListGetOp>(
-                op.getLoc(), bindingType, bindingsArg,
-                rewriter.createOrFold<arith::ConstantIndexOp>(
-                    op.getLoc(), op.getBinding().getSExtValue()))
-            .getResult();
+    auto sourceBuffer = IREE::Util::ListGetOp::create(
+                            rewriter, op.getLoc(), bindingType, bindingsArg,
+                            rewriter.createOrFold<arith::ConstantIndexOp>(
+                                op.getLoc(), op.getBinding().getSExtValue()))
+                            .getResult();
 
     if (op.getByteOffset() && !matchPattern(op.getByteOffset(), m_Zero())) {
       // Offsetted binding: replace with a BufferSubspanOp.

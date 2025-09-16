@@ -169,9 +169,8 @@ blockDynamicDimensionsOfValue(RewriterBase &rewriter,
 
   auto expandShapeOp = tensor::ExpandShapeOp::create(
       rewriter, loc, outputType, v, reassociation, outputShape);
-  Value barrier = rewriter
-                      .create<IREE::Util::OptimizationBarrierOp>(
-                          loc, expandShapeOp.getResult())
+  Value barrier = IREE::Util::OptimizationBarrierOp::create(
+                      rewriter, loc, expandShapeOp.getResult())
                       .getResult(0);
   auto collapseShapeOp = tensor::CollapseShapeOp::create(
       rewriter, loc, tensorType, barrier, reassociation);

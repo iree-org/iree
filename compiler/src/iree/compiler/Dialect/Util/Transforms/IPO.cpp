@@ -654,7 +654,7 @@ static bool isFuncEmpty(FunctionOpInterface funcOp) {
 class IPOPass : public impl::IPOPassBase<IPOPass> {
 public:
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     // TODO(benvanik): find a nice way of skipping embedded executables. Maybe
     // an op interface like the inliner control interface. For now we recurse

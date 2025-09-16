@@ -763,34 +763,34 @@ struct LLVMGPUConfigureTensorLayoutsPass final
   }
 
   void runOnOperation() override {
-    FunctionOpInterface func = getOperation();
-    IRRewriter rewriter(func);
+    mlir::FunctionOpInterface funcOp = getOperation();
+    IRRewriter rewriter(funcOp);
 
     std::optional<SmallVector<int64_t>> maybeWorkgroupSize =
-        getWorkgroupSize(func);
+        getWorkgroupSize(funcOp);
     if (!maybeWorkgroupSize) {
-      func->emitOpError()
+      funcOp->emitOpError()
           << "unable to query workgroup_size information from entry point";
       return signalPassFailure();
     }
 
-    if (failed(setLayoutsFromLoweringConfig(func, maybeWorkgroupSize.value(),
+    if (failed(setLayoutsFromLoweringConfig(funcOp, maybeWorkgroupSize.value(),
                                             rewriter))) {
       return signalPassFailure();
     }
 
     auto attentionQKMatmul = dyn_cast_or_null<linalg::LinalgOp>(
-        getOpWithAttr(func, "attention_qk_matmul"));
+        getOpWithAttr(funcOp, "attention_qk_matmul"));
     auto attentionPVMatmul = dyn_cast_or_null<linalg::LinalgOp>(
-        getOpWithAttr(func, "attention_pv_matmul"));
+        getOpWithAttr(funcOp, "attention_pv_matmul"));
 
     if (attentionQKMatmul && !attentionPVMatmul) {
-      func->emitError("Expected attention attributes to be set properly");
+      funcOp->emitError("Expected attention attributes to be set properly");
       return signalPassFailure();
     }
 
     if (!attentionQKMatmul && attentionPVMatmul) {
-      func->emitError("Expected attention attributes to be set properly");
+      funcOp->emitError("Expected attention attributes to be set properly");
       return signalPassFailure();
     }
 

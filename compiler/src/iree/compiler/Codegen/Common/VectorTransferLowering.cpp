@@ -25,8 +25,7 @@ namespace {
 class VectorTransferLoweringPass
     : public impl::VectorTransferLoweringPassBase<VectorTransferLoweringPass> {
 public:
-  using impl::VectorTransferLoweringPassBase<
-      VectorTransferLoweringPass>::VectorTransferLoweringPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, scf::SCFDialect,
@@ -37,7 +36,7 @@ public:
 
 void VectorTransferLoweringPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   RewritePatternSet patterns(ctx);
   // Explicitly materialize the mask on transfer_read/transfer_write.

@@ -657,7 +657,7 @@ struct PropagateTimepointsPass
     : public IREE::Stream::impl::PropagateTimepointsPassBase<
           PropagateTimepointsPass> {
   void runOnOperation() override {
-    auto rootOp = getOperation();
+    mlir::ModuleOp rootOp = getOperation();
     SymbolTable symbolTable(rootOp);
 
     // Expand all util.global ops holding resources into (timepoint, resource).

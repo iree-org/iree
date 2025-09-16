@@ -59,7 +59,7 @@ struct EraseUnusedCallOp : public OpRewritePattern<T> {
 class DropUnusedCallsPass
     : public IREE::VM::impl::DropUnusedCallsPassBase<DropUnusedCallsPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    IREE::VM::ModuleOp moduleOp = getOperation();
     SymbolTable symbolTable(moduleOp);
 
     // Find all top-level symbols that have no side effects.

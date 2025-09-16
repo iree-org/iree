@@ -47,12 +47,12 @@ std::string mapPreprocessorDirective(PreprocessorDirective directive) {
 TypedValue<emitc::LValueType> allocateVariable(OpBuilder builder,
                                                Location location, Type type,
                                                Attribute initializer) {
-  Value result = builder
-                     .create<emitc::VariableOp>(
-                         /*location=*/location,
-                         /*resultType=*/emitc::LValueType::get(type),
-                         /*value=*/initializer)
-                     .getResult();
+  Value result =
+      emitc::VariableOp::create(builder,
+                                /*location=*/location,
+                                /*resultType=*/emitc::LValueType::get(type),
+                                /*value=*/initializer)
+          .getResult();
   return cast<TypedValue<emitc::LValueType>>(result);
 }
 
@@ -101,15 +101,14 @@ addressOf(OpBuilder builder, Location location,
           TypedValue<emitc::LValueType> operand) {
   auto ctx = builder.getContext();
 
-  auto result =
-      builder
-          .create<emitc::ApplyOp>(
-              /*location=*/location,
-              /*result=*/
-              emitc::PointerType::get(operand.getType().getValueType()),
-              /*applicableOperator=*/StringAttr::get(ctx, "&"),
-              /*operand=*/operand)
-          .getResult();
+  auto result = emitc::ApplyOp::create(
+                    builder,
+                    /*location=*/location,
+                    /*result=*/
+                    emitc::PointerType::get(operand.getType().getValueType()),
+                    /*applicableOperator=*/StringAttr::get(ctx, "&"),
+                    /*operand=*/operand)
+                    .getResult();
 
   return cast<TypedValue<emitc::PointerType>>(result);
 }
@@ -120,35 +119,35 @@ Value contentsOf(OpBuilder builder, Location location, Value operand) {
   Type type = operand.getType();
   assert(isa<emitc::PointerType>(type));
 
-  return builder
-      .create<emitc::ApplyOp>(
-          /*location=*/location,
-          /*result=*/llvm::cast<emitc::PointerType>(type).getPointee(),
-          /*applicableOperator=*/StringAttr::get(ctx, "*"),
-          /*operand=*/operand)
+  return emitc::ApplyOp::create(
+             builder,
+             /*location=*/location,
+             /*result=*/llvm::cast<emitc::PointerType>(type).getPointee(),
+             /*applicableOperator=*/StringAttr::get(ctx, "*"),
+             /*operand=*/operand)
       .getResult();
 }
 
 Value sizeOf(OpBuilder builder, Location loc, Value value) {
   auto ctx = builder.getContext();
-  return builder
-      .create<emitc::CallOpaqueOp>(
-          /*location=*/loc,
-          /*type=*/emitc::OpaqueType::get(ctx, "iree_host_size_t"),
-          /*callee=*/"sizeof",
-          /*operands=*/ArrayRef<Value>{value})
+  return emitc::CallOpaqueOp::create(
+             builder,
+             /*location=*/loc,
+             /*type=*/emitc::OpaqueType::get(ctx, "iree_host_size_t"),
+             /*callee=*/"sizeof",
+             /*operands=*/ArrayRef<Value>{value})
       .getResult(0);
 }
 
 Value sizeOf(OpBuilder builder, Location loc, Attribute attr) {
   auto ctx = builder.getContext();
-  return builder
-      .create<emitc::CallOpaqueOp>(
-          /*location=*/loc,
-          /*type=*/emitc::OpaqueType::get(ctx, "iree_host_size_t"),
-          /*callee=*/"sizeof",
-          /*operands=*/ArrayRef<Value>{},
-          /*args=*/ArrayAttr::get(ctx, {attr}))
+  return emitc::CallOpaqueOp::create(
+             builder,
+             /*location=*/loc,
+             /*type=*/emitc::OpaqueType::get(ctx, "iree_host_size_t"),
+             /*callee=*/"sizeof",
+             /*operands=*/ArrayRef<Value>{},
+             /*args=*/ArrayAttr::get(ctx, {attr}))
       .getResult(0);
 }
 
@@ -184,9 +183,8 @@ Value arrayElement(OpBuilder builder, Location location, size_t index,
       emitc::LiteralOp::create(builder, location, type, std::to_string(index));
   TypedValue<emitc::LValueType> subscript =
       emitc::SubscriptOp::create(builder, location, operand, indexValue);
-  return builder
-      .create<emitc::LoadOp>(location, subscript.getType().getValueType(),
-                             subscript)
+  return emitc::LoadOp::create(builder, location,
+                               subscript.getType().getValueType(), subscript)
       .getResult();
 }
 
@@ -236,9 +234,8 @@ void structDefinition(OpBuilder builder, Location location,
 Value structMember(OpBuilder builder, Location location, Type type,
                    StringRef memberName, TypedValue<mlir::Type> operand) {
   TypedValue<mlir::Type> member =
-      builder
-          .create<emitc::MemberOp>(location, emitc::LValueType::get(type),
-                                   memberName, operand)
+      emitc::MemberOp::create(builder, location, emitc::LValueType::get(type),
+                              memberName, operand)
           .getResult();
   return emitc::LoadOp::create(builder, location, type, member).getResult();
 }
@@ -300,25 +297,25 @@ Value ireeMakeCstringView(OpBuilder builder, Location location,
   auto quotedStr = std::string("\"") + escapedStr + std::string("\"");
 
   auto ctx = builder.getContext();
-  return builder
-      .create<emitc::CallOpaqueOp>(
-          /*location=*/location,
-          /*type=*/emitc::OpaqueType::get(ctx, "iree_string_view_t"),
-          /*callee=*/"iree_make_cstring_view",
-          /*operands=*/ArrayRef<Value>{},
-          /*args=*/
-          ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, quotedStr)}))
+  return emitc::CallOpaqueOp::create(
+             builder,
+             /*location=*/location,
+             /*type=*/emitc::OpaqueType::get(ctx, "iree_string_view_t"),
+             /*callee=*/"iree_make_cstring_view",
+             /*operands=*/ArrayRef<Value>{},
+             /*args=*/
+             ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, quotedStr)}))
       .getResult(0);
 }
 
 Value ireeOkStatus(OpBuilder builder, Location location) {
   auto ctx = builder.getContext();
-  return builder
-      .create<emitc::CallOpaqueOp>(
-          /*location=*/location,
-          /*type=*/emitc::OpaqueType::get(ctx, "iree_status_t"),
-          /*callee=*/"iree_ok_status",
-          /*operands=*/ArrayRef<Value>{})
+  return emitc::CallOpaqueOp::create(
+             builder,
+             /*location=*/location,
+             /*type=*/emitc::OpaqueType::get(ctx, "iree_status_t"),
+             /*callee=*/"iree_ok_status",
+             /*operands=*/ArrayRef<Value>{})
       .getResult(0);
 }
 
@@ -326,12 +323,12 @@ Value ireeVmInstanceLookupType(OpBuilder builder, Location location,
                                Value instance, Value stringView) {
   auto ctx = builder.getContext();
   Type refType = emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t");
-  return builder
-      .create<emitc::CallOpaqueOp>(
-          /*location=*/location,
-          /*type=*/refType,
-          /*callee=*/"iree_vm_instance_lookup_type",
-          /*operands=*/ArrayRef<Value>{instance, stringView})
+  return emitc::CallOpaqueOp::create(
+             builder,
+             /*location=*/location,
+             /*type=*/refType,
+             /*callee=*/"iree_vm_instance_lookup_type",
+             /*operands=*/ArrayRef<Value>{instance, stringView})
       .getResult(0);
 }
 

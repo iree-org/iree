@@ -2064,7 +2064,7 @@ struct ScheduleAllocationPass
     : public IREE::Stream::impl::ScheduleAllocationPassBase<
           ScheduleAllocationPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     AffinityAnalysis affinityAnalysis(moduleOp);
     if (failed(affinityAnalysis.run())) {

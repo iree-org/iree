@@ -90,10 +90,9 @@ static Value readVectorFromTensor(OpBuilder &b, VectorType vectorType,
   Value c0 = arith::ConstantIndexOp::create(b, tensor.getLoc(), 0);
   SmallVector<Value> indices(vectorType.getRank(), c0);
   SmallVector<bool> inBounds(vectorType.getRank(), true);
-  return b
-      .create<vector::TransferReadOp>(tensor.getLoc(), vectorType, tensor,
-                                      indices, /*padding=*/std::nullopt,
-                                      inBounds)
+  return vector::TransferReadOp::create(b, tensor.getLoc(), vectorType, tensor,
+                                        indices, /*padding=*/std::nullopt,
+                                        inBounds)
       .getResult();
 }
 

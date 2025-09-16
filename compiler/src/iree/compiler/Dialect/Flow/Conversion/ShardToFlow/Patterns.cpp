@@ -119,9 +119,8 @@ splitAxis(TypedValue<RankedTensorType> tensor, int64_t splitAxis,
   std::optional<SmallVector<ReassociationIndices>> reassociation =
       getReassociationIndicesForReshape(tensor.getType(), resultType);
   return cast<TypedValue<RankedTensorType>>(
-      builder
-          .create<tensor::ExpandShapeOp>(resultType, tensor,
-                                         reassociation.value())
+      tensor::ExpandShapeOp::create(builder, resultType, tensor,
+                                    reassociation.value())
           .getResult());
 }
 

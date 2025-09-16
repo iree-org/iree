@@ -201,7 +201,7 @@ struct GPULowerToGlobalLoadsPass final
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
 
     std::optional<SmallVector<int64_t>> workgroupSize =
         mlir::iree_compiler::getWorkgroupSize(funcOp);

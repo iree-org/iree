@@ -38,8 +38,7 @@ namespace {
 struct BufferizeCopyOnlyDispatchesPass final
     : impl::BufferizeCopyOnlyDispatchesPassBase<
           BufferizeCopyOnlyDispatchesPass> {
-  using impl::BufferizeCopyOnlyDispatchesPassBase<
-      BufferizeCopyOnlyDispatchesPass>::BufferizeCopyOnlyDispatchesPassBase;
+  using Base::Base;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<affine::AffineDialect, bufferization::BufferizationDialect,
@@ -52,7 +51,7 @@ struct BufferizeCopyOnlyDispatchesPass final
 } // namespace
 
 void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   /// Check if the dispatch has all sources for
   /// `iree_tensor_ext.dispatch.tensor.store` operations coming from

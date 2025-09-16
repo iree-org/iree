@@ -50,7 +50,7 @@ namespace {
 /// code.
 struct ConvertToNVVMPass final
     : impl::ConvertToNVVMPassBase<ConvertToNVVMPass> {
-  using impl::ConvertToNVVMPassBase<ConvertToNVVMPass>::ConvertToNVVMPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry

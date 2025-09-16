@@ -121,8 +121,6 @@ MlirAttribute ireeGPUReorderWorkgroupsStrategyAttrGet(MlirContext mlirCtx,
 }
 
 uint32_t ireeGPUReorderWorkgroupsStrategyAttrGetValue(MlirAttribute attr) {
-  assert(ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr(attr) &&
-         "attr is not a GPUReorderWorkgroupsStrategyAttr");
   return static_cast<uint32_t>(
       llvm::cast<mlir::iree_compiler::IREE::GPU::ReorderWorkgroupsStrategyAttr>(
           unwrap(attr))
@@ -281,14 +279,12 @@ MlirAttribute ireeGPULoweringConfigAttrGet(MlirContext mlirCtx,
 }
 
 MlirAttribute ireeGPULoweringConfigAttrGetAttributes(MlirAttribute attr) {
-  assert(ireeAttributeIsAGPULoweringConfigAttr(attr));
   return wrap(llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
                   unwrap(attr))
                   .getAttributes());
 }
 
 ireeGPUTileSizes ireeGPULoweringConfigAttrGetTileSizes(MlirAttribute attr) {
-  assert(ireeAttributeIsAGPULoweringConfigAttr(attr));
   ireeGPUTileSizes tilesizes = {};
   mlir::DictionaryAttr dict =
       llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(

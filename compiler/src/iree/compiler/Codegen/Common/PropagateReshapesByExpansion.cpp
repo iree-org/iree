@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -205,39 +206,42 @@ struct ExpandDestinationForallOp final
     if (!forallOp)
       return failure();
 
+    SmallVector<int64_t> expandedDestShape;
+    SmallVector<int64_t> totalInnerSizes;
+    // Get the shape of the outer expand which will be the new destination
+    // of the scf.forall and the total size of inner dimensions per uncollapsed
+    // dimension.
+    SmallVector<ReassociationIndices> reIndices =
+        collapseOp.getReassociationIndices();
+    if (failed(getExpandedShape(reIndices, collapseOp.getSrcType().getShape(),
+                                insertDest, expandedDestShape,
+                                totalInnerSizes))) {
+      return failure();
+    }
+
     // We only want this pattern if the forall op result is being written to a
-    // full slice. Otherwise the hoisted collapse op is not foldable.
+    // full slice, or an expandable buffer. Otherwise the hoisted collapse op is
+    // not foldable.
     for (Operation *foralluser : tiedResult.getUsers()) {
       auto storeOp =
           dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(foralluser);
-      if (!storeOp)
+      if (storeOp && isFullSlice(storeOp, storeOp.getTargetType(),
+                                 storeOp.getTargetDims()))
+        continue;
+      auto storeToBufferOp =
+          dyn_cast<IREE::Codegen::StoreToBufferOp>(foralluser);
+      if (!storeToBufferOp)
         return failure();
-      if (!isFullSlice(storeOp, storeOp.getTargetType(),
-                       storeOp.getTargetDims())) {
+      MemRefType bufferType = storeToBufferOp.getBuffer().getType();
+      if (failed(memref::ExpandShapeOp::computeExpandedType(
+              bufferType, expandedDestShape, reIndices)))
         return failure();
-      }
     }
 
     // This allows us to assume that the extract/inserts in the loop are
     // disjoint and makes the application of this pattern safe.
     if (!forallOpHasMappingType<IREE::Codegen::WorkgroupMappingAttr>(
             forallOp)) {
-      return failure();
-    }
-    // This pattern only supports forall ops with single
-    // output.
-    SmallVector<Value> forallOutputs(forallOp.getOutputs());
-
-    SmallVector<ReassociationIndices> reIndices =
-        collapseOp.getReassociationIndices();
-    SmallVector<int64_t> expandedDestShape;
-    SmallVector<int64_t> totalInnerSizes;
-    // Get the shape of the outer expand which will be the new destination
-    // of the scf.forall and the total size of inner dimensions per uncollapsed
-    // dimension.
-    if (failed(getExpandedShape(reIndices, collapseOp.getSrcType().getShape(),
-                                insertDest, expandedDestShape,
-                                totalInnerSizes))) {
       return failure();
     }
 
@@ -256,6 +260,9 @@ struct ExpandDestinationForallOp final
                         reIndices, forallOp, parallelInsertOp);
     rewriter.setInsertionPoint(forallOp);
 
+    // This pattern only supports forall ops with single
+    // output.
+    SmallVector<Value> forallOutputs(forallOp.getOutputs());
     // Create the expand -> new scf.forall -> collapse chain.
     auto expandedDestType =
         cast<RankedTensorType>(forallOutputs[tiedResultIdx].getType())
@@ -417,6 +424,7 @@ void PropagateReshapesByExpansionPass::runOnOperation() {
   tensor::ExpandShapeOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
                                                      context);
   populateReshapeToInterfaceTensorPatterns(bubbleExpandShapePatterns);
+  populateFoldTensorReshapeIntoBufferPatterns(bubbleExpandShapePatterns);
   bubbleExpandShapePatterns
       .add<ExpandDestinationForallOp, SwapInnerBitcastWithExtractSlice>(
           context);

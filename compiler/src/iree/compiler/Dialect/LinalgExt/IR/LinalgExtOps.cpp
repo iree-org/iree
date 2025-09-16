@@ -522,10 +522,9 @@ struct ConvertGatherToExtract
       indices.back() = arith::ConstantIndexOp::create(rewriter, loc, i);
       Value elem = tensor::ExtractOp::create(rewriter, loc,
                                              gatherOp.getIndices(), indices);
-      offsets[i] =
-          rewriter
-              .create<arith::IndexCastOp>(loc, rewriter.getIndexType(), elem)
-              .getResult();
+      offsets[i] = arith::IndexCastOp::create(rewriter, loc,
+                                              rewriter.getIndexType(), elem)
+                       .getResult();
     }
 
     applyPermutationToVector(offsets, gatherOp.getDimensionMap());
@@ -737,6 +736,34 @@ bool MapScatterOp::isIdentity() {
     }
   }
   return true;
+}
+namespace {
+struct ConvertIdentityMapScatterToCopy
+    : public OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
+                                PatternRewriter &rewriter) const override {
+    if (!mapScatterOp.isIdentity()) {
+      return failure();
+    }
+    if (mapScatterOp.isVectorized()) {
+      return failure();
+    }
+    if (!mapScatterOp.hasPureTensorSemantics()) {
+      return failure();
+    }
+    auto copyOp = linalg::CopyOp::create(rewriter, mapScatterOp.getLoc(),
+                                         mapScatterOp.getInput(),
+                                         mapScatterOp.getOutput());
+    rewriter.replaceOp(mapScatterOp, copyOp.getResults());
+    return success();
+  }
+};
+} // namespace
+
+void MapScatterOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *ctx) {
+  results.add<ConvertIdentityMapScatterToCopy>(ctx);
 }
 
 //===----------------------------------------------------------------------===//

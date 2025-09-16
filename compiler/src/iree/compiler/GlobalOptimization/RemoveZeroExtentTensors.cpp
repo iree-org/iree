@@ -89,7 +89,7 @@ struct RemoveZeroExtentTensorsPass
 } // namespace
 
 void RemoveZeroExtentTensorsPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   MLIRContext *context = &getContext();
   SmallVector<Operation *> opWithZeroExtentTensorOperands;
   SmallVector<tensor::InsertSliceOp> insertSliceOps;

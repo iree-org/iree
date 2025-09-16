@@ -640,11 +640,10 @@ struct FuseFMAOp : public OpRewritePattern<AddOp> {
         return failure();
       }
       rewriter.replaceOp(
-          addOp,
-          rewriter
-              .create<FMAOp>(rewriter.getFusedLoc({a.getLoc(), c.getLoc()}),
-                             a.getType(), a, b, c)
-              .getResult());
+          addOp, FMAOp::create(rewriter,
+                               rewriter.getFusedLoc({a.getLoc(), c.getLoc()}),
+                               a.getType(), a, b, c)
+                     .getResult());
       return success();
     };
     if (auto mulOp = dyn_cast_or_null<MulOp>(addOp.getLhs().getDefiningOp())) {

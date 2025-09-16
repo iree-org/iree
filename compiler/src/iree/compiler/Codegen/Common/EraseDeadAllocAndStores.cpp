@@ -22,8 +22,7 @@ class EraseDeadAllocAndStoresPass final
     : public impl::EraseDeadAllocAndStoresPassBase<
           EraseDeadAllocAndStoresPass> {
 public:
-  using impl::EraseDeadAllocAndStoresPassBase<
-      EraseDeadAllocAndStoresPass>::EraseDeadAllocAndStoresPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<scf::SCFDialect, vector::VectorDialect>();
@@ -32,7 +31,7 @@ public:
 };
 
 void EraseDeadAllocAndStoresPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   IRRewriter rewriter(&getContext());
   memref::eraseDeadAllocAndStores(rewriter, funcOp);
 }

@@ -1616,16 +1616,14 @@ struct ChannelCreateOpPattern
     }
     Value group =
         adaptor.getGroupAttr()
-            ? rewriter
-                  .create<IREE::Util::BufferConstantOp>(
-                      createOp.getLoc(),
-                      /*name=*/StringAttr{}, /*value=*/adaptor.getGroupAttr(),
-                      /*alignment=*/IntegerAttr{}, /*mime_type=*/StringAttr{})
+            ? IREE::Util::BufferConstantOp::create(
+                  rewriter, createOp.getLoc(),
+                  /*name=*/StringAttr{}, /*value=*/adaptor.getGroupAttr(),
+                  /*alignment=*/IntegerAttr{}, /*mime_type=*/StringAttr{})
                   .getResult()
-            : rewriter
-                  .create<IREE::Util::NullOp>(
-                      createOp.getLoc(),
-                      rewriter.getType<IREE::Util::BufferType>())
+            : IREE::Util::NullOp::create(
+                  rewriter, createOp.getLoc(),
+                  rewriter.getType<IREE::Util::BufferType>())
                   .getResult();
     Value rank = adaptor.getRank()
                      ? arith::IndexCastOp::create(rewriter, createOp.getLoc(),

@@ -92,12 +92,11 @@ LogicalResult resolveGPUMappedForallOp(RewriterBase &rewriter,
       return forallOp->emitOpError(
           "found warp mapped forall with non-multiple workgroup size");
     }
-    flatId = rewriter
-                 .create<affine::AffineDelinearizeIndexOp>(
-                     loc, flatId,
-                     ArrayRef<int64_t>{flatWorkgroupSize / subgroupSize,
-                                       subgroupSize})
-                 .getResult(0);
+    flatId =
+        affine::AffineDelinearizeIndexOp::create(
+            rewriter, loc, flatId,
+            ArrayRef<int64_t>{flatWorkgroupSize / subgroupSize, subgroupSize})
+            .getResult(0);
   }
 
   SmallVector<Value> delinSizes;
@@ -160,7 +159,7 @@ LogicalResult resolveGPUMappedForallOp(RewriterBase &rewriter,
 }
 
 void GPUDistributeForallPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   // First map all lane level forall loops to lanes.
   IRRewriter rewriter(funcOp->getContext());

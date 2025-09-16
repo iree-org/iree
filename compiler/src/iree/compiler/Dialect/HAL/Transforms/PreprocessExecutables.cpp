@@ -244,7 +244,7 @@ struct PreprocessExecutablesWithPipelinePass
   void runOnOperation() override {
     if (!pipeline.hasValue())
       return;
-    auto executableOp = getOperation();
+    IREE::HAL::ExecutableOp executableOp = getOperation();
     OpPassManager passManager(executableOp.getOperationName());
     if (failed(buildPassPipeline(pipeline, passManager))) {
       llvm::errs() << "ERROR: failed to parse preprocessing pipeline `"
@@ -272,7 +272,7 @@ struct PreprocessExecutablesWithToolPass
   void runOnOperation() override {
     if (!command.hasValue())
       return;
-    auto executableOp = getOperation();
+    IREE::HAL::ExecutableOp executableOp = getOperation();
     if (failed(preprocessWithCommand(executableOp, command))) {
       llvm::errs() << "ERROR: failed to preprocess executable `"
                    << executableOp.getName() << "` using command `" << command
