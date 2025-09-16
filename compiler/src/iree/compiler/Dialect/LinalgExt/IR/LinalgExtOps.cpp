@@ -2233,11 +2233,15 @@ LogicalResult ExpReductionOp::verify() {
   for (int64_t reducedOperand : getExpReducedOperands()) {
     if (reducedOperand == 0) {
       return op->emitOpError(
-          "index of output operand in exp_reduced_operands cannot be 0");
+          "operand index in exp_reduced_operands cannot be the 0th operand, it "
+          "always contains the maximum value");
     }
     if (reducedOperand >= getNumDpsInits()) {
       return op->emitOpError(
-          "index of output operand in exp_reduced_operands does not exist");
+          "operand index in exp_reduced_operands must index the outs operands ("
+          "outs has ")
+        << getNumDpsInits()
+        << " operands)";
     }
   }
 
