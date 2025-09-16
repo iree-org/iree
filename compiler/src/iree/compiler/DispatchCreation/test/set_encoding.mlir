@@ -1,7 +1,5 @@
 // RUN: iree-opt --split-input-file --iree-dispatch-creation-test-set-scaled-matmul-encodings \
 // RUN:   --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-annotate-data-tiling-hints,iree-dispatch-creation-set-encoding))" %s | FileCheck %s --check-prefixes=CHECK-ALL,CHECK
-// RUN: iree-opt --split-input-file --iree-dispatch-creation-test-set-scaled-matmul-encodings \
-// RUN:   --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-annotate-data-tiling-hints,iree-dispatch-creation-set-encoding{encoding-option=matmulk}))" %s | FileCheck %s --check-prefixes=CHECK-ALL,MATMULK
 // Test with `iree-dispatch-creation-annotate-data-tiling-hints` that adds the
 // data-tiling hint to all the available gemm ops. Otherwise, we have to add the
 // hint to all the gemm ops in the file.
@@ -18,9 +16,6 @@ util.func public @matmul_f32f32f32(%arg0 : tensor<100x250xf32>, %arg1 : tensor<2
 //  CHECK-DAG:   #[[LHS_ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], iteration_sizes = [100, 500, 250]>
 //  CHECK-DAG:   #[[RHS_ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], iteration_sizes = [100, 500, 250]>
 //  CHECK-DAG:   #[[OUT_ENCODING:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], iteration_sizes = [100, 500, 250]>
-//  MATMULK-DAG: #[[LHS_ENCODING:.+]] = #iree_encoding.matmul_k<k_dims = [1]>
-//  MATMULK-DAG: #[[RHS_ENCODING:.+]] = #iree_encoding.matmul_k<k_dims = [0]>
-//  MATMULK-DAG: #[[OUT_ENCODING:.+]] = #iree_encoding.matmul_k<k_dims = []>
 //      CHECK-ALL: util.func public @matmul_f32f32f32(
 // CHECK-ALL-SAME:     %[[ARG0:.+]]: tensor<100x250xf32>
 // CHECK-ALL-SAME:     %[[ARG1:.+]]: tensor<250x500xf32>
@@ -88,9 +83,6 @@ util.func public @matmul_f32f32f32_parallel_reduce_parallel(%arg0 : tensor<32x12
 //  CHECK-DAG:   #[[LHS_ENCODING:.+]] = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], iteration_sizes = [32, 128, 4096]>
 //  CHECK-DAG:   #[[RHS_ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], iteration_sizes = [32, 128, 4096]>
 //  CHECK-DAG:   #[[OUT_ENCODING:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], iteration_sizes = [32, 128, 4096]>
-//  MATMULK-DAG: #[[LHS_ENCODING:.+]] = #iree_encoding.matmul_k<k_dims = [1]>
-//  MATMULK-DAG: #[[RHS_ENCODING:.+]] = #iree_encoding.matmul_k<k_dims = [0]>
-//  MATMULK-DAG: #[[OUT_ENCODING:.+]] = #iree_encoding.matmul_k<k_dims = []>
 //      CHECK-ALL: util.func public @matmul_f32f32f32_parallel_reduce_parallel(
 // CHECK-ALL-SAME:     %[[ARG0:.+]]: tensor<32x128xf32>
 // CHECK-ALL-SAME:     %[[ARG1:.+]]: tensor<128x4096xf32>
@@ -1246,10 +1238,6 @@ util.func public @scaled_contraction_f4_f4_f8_f8_f32(
 // CHECK-DAG:       #[[$ENC3:.+]] = #iree_encoding.encoding<operand_index = 3 : index, op_type =  scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32], user_indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]], #[[$MAP3]], #[[$MAP4]]], iteration_sizes = [256, 512, 128, 32]>
 // CHECK-DAG:       #[[$ENC4:.+]] = #iree_encoding.encoding<operand_index = 4 : index, op_type =  scaled_matmul, element_types = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32], user_indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]], #[[$MAP3]], #[[$MAP4]]], iteration_sizes = [256, 512, 128, 32]>
 
-// MATMULK-DAG:     #[[$ENC0:.+]] = #iree_encoding.matmul_k<k_dims = [1, 2]>
-// MATMULK-DAG:     #[[$ENC1:.+]] = #iree_encoding.matmul_k<k_dims = [1]>
-// MATMULK-DAG:     #[[$ENC2:.+]] = #iree_encoding.matmul_k<k_dims = []>
-
 // CHECK-ALL:       util.func public @scaled_contraction_f4_f4_f8_f8_f32
 // CHECK-ALL-SAME:      %[[A:.*]]: tensor<256x128x32xf4E2M1FN>
 // CHECK-ALL-SAME:      %[[B:.*]]: tensor<512x128x32xf4E2M1FN>
@@ -1263,19 +1251,12 @@ util.func public @scaled_contraction_f4_f4_f8_f8_f32(
 // CHECK-DAG:         %[[BS_ENC:.*]] = iree_encoding.set_encoding %[[BS]] : tensor<512x128xf8E8M0FNU> -> tensor<512x128xf8E8M0FNU, #[[$ENC3]]>
 // CHECK-DAG:         %[[C_ENC:.*]] = iree_encoding.set_encoding %[[C]] : tensor<256x512xf32> -> tensor<256x512xf32, #[[$ENC4]]>
 
-// MATMULK-DAG:       %[[A_ENC:.*]] = iree_encoding.set_encoding %[[A]] : tensor<256x128x32xf4E2M1FN> -> tensor<256x128x32xf4E2M1FN, #[[$ENC0]]>
-// MATMULK-DAG:       %[[B_ENC:.*]] = iree_encoding.set_encoding %[[B]] : tensor<512x128x32xf4E2M1FN> -> tensor<512x128x32xf4E2M1FN, #[[$ENC0]]>
-// MATMULK-DAG:       %[[AS_ENC:.*]] = iree_encoding.set_encoding %[[AS]] : tensor<256x128xf8E8M0FNU> -> tensor<256x128xf8E8M0FNU, #[[$ENC1]]
-// MATMULK-DAG:       %[[BS_ENC:.*]] = iree_encoding.set_encoding %[[BS]] : tensor<512x128xf8E8M0FNU> -> tensor<512x128xf8E8M0FNU, #[[$ENC1]]
-// MATMULK-DAG:       %[[C_ENC:.*]] = iree_encoding.set_encoding %[[C]] : tensor<256x512xf32> -> tensor<256x512xf32, #[[$ENC2]]>
-
 // CHECK-ALL:         %[[GENERIC:.*]] = linalg.generic
 // CHECK-ALL-SAME:      indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]], #[[$MAP3]], #[[$MAP4]]]
 // CHECK-ALL-SAME:      iterator_types = ["parallel", "parallel", "reduction", "reduction"]
 // CHECK-ALL-SAME:      ins(%[[A_ENC]], %[[B_ENC]], %[[AS_ENC]], %[[BS_ENC]]
 // CHECK-ALL-SAME:      outs(%[[C_ENC]]
 // CHECK:             %[[RESULT:.*]] = iree_encoding.unset_encoding %[[GENERIC]] : tensor<256x512xf32, #[[$ENC4]]> -> tensor<256x512xf32>
-// MATMULK:           %[[RESULT:.*]] = iree_encoding.unset_encoding %[[GENERIC]] : tensor<256x512xf32, #[[$ENC2]]> -> tensor<256x512xf32>
 // CHECK-ALL:         util.return %[[RESULT]] : tensor<256x512xf32>
 
 // -----

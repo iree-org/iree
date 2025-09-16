@@ -360,9 +360,6 @@ def SetEncodingPass : InterfacePass<"iree-dispatch-creation-set-encoding",
                 mlir::iree_compiler::DispatchCreation::EncodingOptions::Padding,
                 "padding", "Encode tensors that need to be padded."),
             clEnumValN(
-                mlir::iree_compiler::DispatchCreation::EncodingOptions::MatmulK,
-                "matmulk", "Only encodes reduction dimensions in the encoding."),
-            clEnumValN(
                 mlir::iree_compiler::DispatchCreation::EncodingOptions::Generic,
                 "default", "Uses EncodingAttr which encodes as much information as possible."))}]>,
   ];
