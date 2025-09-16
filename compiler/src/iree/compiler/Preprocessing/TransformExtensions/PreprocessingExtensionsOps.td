@@ -192,9 +192,17 @@ def MatchContractionOp : Op<Transform_Dialect, "iree.match.is_contraction",
 
   let arguments = (ins
     TransformHandleTypeInterface:$operand_handle,
-    OptionalAttr<AffineMapArrayAttr>:$indexing_maps
+    OptionalAttr<AffineMapArrayAttr>:$indexing_maps,
+    OptionalAttr<TypeArrayAttr>:$input_types,        // [LHS_type, RHS_type].
+    OptionalAttr<TypeAttr>:$output_type              // Single output type.
   );
-  let assemblyFormat = "$operand_handle (`indexing_maps` $indexing_maps^)? attr-dict `:` type($operand_handle)";
+  let assemblyFormat = [{
+    $operand_handle
+    (`indexing_maps` $indexing_maps^)?
+    (`input_types` $input_types^)?
+    (`output_type` $output_type^)?
+    attr-dict `:` type($operand_handle)
+  }];
   let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
 
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";

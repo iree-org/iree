@@ -242,29 +242,72 @@ IREE::transform_dialect::MatchContractionOp::matchOperation(
            << "Operation " << *current << " is not a contraction operation.";
   }
 
-  if (!getIndexingMaps()) {
-    return DiagnosedSilenceableFailure::success();
-  }
+  if (std::optional<ArrayAttr> indexingMaps = getIndexingMaps()) {
+    ArrayAttr currentIndexingMaps = linalgOp.getIndexingMaps();
+    ArrayAttr targetIndexingMaps = *indexingMaps;
 
-  ArrayAttr currentIndexingMaps = linalgOp.getIndexingMaps();
-  ArrayAttr targetIndexingMaps = *getIndexingMaps();
-
-  if (currentIndexingMaps.size() != targetIndexingMaps.size()) {
-    return emitSilenceableFailure(current->getLoc())
-           << "indexing maps count mismatch: expected "
-           << targetIndexingMaps.size() << ", got "
-           << currentIndexingMaps.size();
-  }
-
-  for (auto [currentMapAttr, targetMapAttr] :
-       llvm::zip(currentIndexingMaps, targetIndexingMaps)) {
-    AffineMapAttr currentMap = cast<AffineMapAttr>(currentMapAttr);
-    AffineMapAttr targetMap = cast<AffineMapAttr>(targetMapAttr);
-
-    if (currentMap.getValue() != targetMap.getValue()) {
+    if (currentIndexingMaps.size() != targetIndexingMaps.size()) {
       return emitSilenceableFailure(current->getLoc())
-             << "indexing maps don't match: expected " << targetMap << ", got "
-             << currentMap;
+             << "indexing maps count mismatch: expected "
+             << targetIndexingMaps.size() << ", got "
+             << currentIndexingMaps.size();
+    }
+
+    for (auto [currentMapAttr, targetMapAttr] :
+         llvm::zip(currentIndexingMaps, targetIndexingMaps)) {
+      AffineMapAttr currentMap = cast<AffineMapAttr>(currentMapAttr);
+      AffineMapAttr targetMap = cast<AffineMapAttr>(targetMapAttr);
+
+      if (currentMap.getValue() != targetMap.getValue()) {
+        return emitSilenceableFailure(current->getLoc())
+               << "indexing maps don't match: expected " << targetMap
+               << ", got " << currentMap;
+      }
+    }
+  }
+
+  if (std::optional<ArrayAttr> inputTypes = getInputTypes()) {
+    ArrayAttr targetInputTypes = *inputTypes;
+    SmallVector<Type> currentInputTypes;
+    for (Value input : linalgOp.getDpsInputs()) {
+      currentInputTypes.push_back(getElementTypeOrSelf(input.getType()));
+    }
+
+    if (currentInputTypes.size() != targetInputTypes.size()) {
+      return emitSilenceableFailure(current->getLoc())
+             << "input types count mismatch: expected "
+             << targetInputTypes.size() << ", got " << currentInputTypes.size();
+    }
+
+    for (auto [currentType, targetTypeAttr] :
+         llvm::zip(currentInputTypes, targetInputTypes)) {
+      Type targetType = cast<TypeAttr>(targetTypeAttr).getValue();
+
+      if (currentType != targetType) {
+        return emitSilenceableFailure(current->getLoc())
+               << "input types don't match: expected " << targetType << ", got "
+               << currentType;
+      }
+    }
+  }
+
+  if (std::optional<Type> outputType = getOutputType()) {
+    const Type targetOutputType = *outputType;
+    SmallVector<Type> currentOutputTypes;
+    for (Value output : linalgOp.getDpsInits()) {
+      currentOutputTypes.push_back(getElementTypeOrSelf(output.getType()));
+    }
+
+    if (currentOutputTypes.size() != 1) {
+      return emitSilenceableFailure(current->getLoc())
+             << "expected single output, got " << currentOutputTypes.size();
+    }
+
+    Type currentOutputType = currentOutputTypes[0];
+    if (currentOutputType != targetOutputType) {
+      return emitSilenceableFailure(current->getLoc())
+             << "output type doesn't match: expected " << targetOutputType
+             << ", got " << currentOutputType;
     }
   }
 
