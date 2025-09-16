@@ -51,7 +51,7 @@ static SmallVector<unsigned> getReductionDims(TilingInterface op) {
 
 static FailureOr<IREE::Flow::DispatchRegionOp>
 tileOpAndWrapInDispatch(RewriterBase &rewriter, TilingInterface op,
-                        ArrayRef<OpFoldResult> splitSize) {
+                        ArrayRef<OpFoldResult> splitSize, bool fusePad) {
   IRRewriter::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(op);
 
@@ -86,9 +86,12 @@ tileOpAndWrapInDispatch(RewriterBase &rewriter, TilingInterface op,
   scf::SCFTileAndFuseOptions tileAndFuseOptions;
   // Only fuse along the dest operand.
   scf::SCFTileAndFuseOptions::ControlFnTy fusionControlFn =
-      [](tensor::ExtractSliceOp, OpResult, bool isDestArg)
+      [fusePad](tensor::ExtractSliceOp, OpResult result, bool isDestArg)
       -> std::optional<scf::SCFTileAndFuseOptions::ControlFnResult> {
     if (isDestArg) {
+      return scf::SCFTileAndFuseOptions::ControlFnResult{false};
+    }
+    if (fusePad && isa<tensor::PadOp>(result.getOwner())) {
       return scf::SCFTileAndFuseOptions::ControlFnResult{false};
     }
     return std::nullopt;
@@ -181,7 +184,7 @@ void FormSplitReductionDispatchesPass::runOnOperation() {
   SmallVector<IREE::Flow::DispatchRegionOp> splitReductionDispatches;
   for (auto [op, tileSizes] : reductionOps) {
     FailureOr<IREE::Flow::DispatchRegionOp> formedDispatch =
-        tileOpAndWrapInDispatch(rewriter, op, tileSizes);
+        tileOpAndWrapInDispatch(rewriter, op, tileSizes, enableFusePad);
     if (failed(formedDispatch)) {
       op->emitOpError("failed to form split reduction dispatch");
       return signalPassFailure();

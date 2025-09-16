@@ -1,5 +1,6 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-split-reduction-dispatches, cse))" --split-input-file --mlir-print-local-scope %s | FileCheck %s
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-split-reduction-dispatches, iree-dispatch-creation-convert-dispatch-regions-to-workgroups, iree-dispatch-creation-materialize-default-workgroup-count-region, canonicalize))" --split-input-file --mlir-print-local-scope %s | FileCheck %s --check-prefix=WORKGROUP
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-split-reduction-dispatches{enable-fuse-pad}, cse))" --split-input-file --mlir-print-local-scope %s | FileCheck %s --check-prefix=FUSE-PAD
 
 util.func public @split_reduction_dynamic(%arg0: tensor<?x?xf32>) -> tensor<?xf32> {
   %c0 = arith.constant 0 : index
@@ -137,3 +138,38 @@ util.func public @split_reduction_multiple_dims(%arg0: tensor<?x?x?xf32>) -> ten
 //  CHECK-SAME:        ins(%[[DISPATCH]] :
 //  CHECK-SAME:        dimensions = [1, 2]
 //       CHECK:    util.return %[[REDUCE]]
+
+// -----
+
+util.func public @fuse_pad_with_conv(%arg0 : tensor<16x225x225x16xbf16>, %arg1 : tensor<16x225x225x64xbf16>) -> (tensor<64x3x3x16xf32>) {
+  %cst = arith.constant 0.0 : bf16
+  %cst_0 = arith.constant 0.0 : f32
+  %padded = tensor.pad %arg0 low[0, 1, 1, 0] high[0, 1, 1, 0] {
+  ^bb0(%arg4: index, %arg5: index, %arg6: index, %arg7: index):
+    tensor.yield %cst : bf16
+  } : tensor<16x225x225x16xbf16> to tensor<16x227x227x16xbf16>
+  %2 = tensor.empty() : tensor<64x3x3x16xf32>
+  %3 = linalg.fill ins(%cst_0 : f32) outs(%2 : tensor<64x3x3x16xf32>) -> tensor<64x3x3x16xf32>
+  %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d1 + d5, d2 + d6, d3)>, affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d0)>, affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%padded, %arg1 : tensor<16x227x227x16xbf16>, tensor<16x225x225x64xbf16>) outs(%3 : tensor<64x3x3x16xf32>) attrs =  {iree_linalg_ext.split_reduction = [1, 255, 255]} {
+  ^bb0(%in: bf16, %in_1: bf16, %out: f32):
+    %9 = arith.extf %in : bf16 to f32
+    %10 = arith.extf %in_1 : bf16 to f32
+    %11 = arith.mulf %9, %10 : f32
+    %12 = arith.addf %out, %11 : f32
+    linalg.yield %12 : f32
+  } -> tensor<64x3x3x16xf32>
+  util.return %4 : tensor<64x3x3x16xf32>
+}
+// FUSE-PAD-LABEL:  @fuse_pad_with_conv(
+//       FUSE-PAD:    %[[DISPATCH:.+]] = flow.dispatch.region
+//       FUSE-PAD:      scf.forall
+//       FUSE-PAD:        tensor.pad
+//       FUSE-PAD:        linalg.generic
+//       FUSE-PAD:    linalg.reduce
+//       FUSE-PAD:      ins(%[[DISPATCH]]
+
+// Not enabled: pad should be outside of dispatch.
+// CHECK-LABEL:  @fuse_pad_with_conv(
+//       CHECK:    tensor.pad
+//       CHECK:    flow.dispatch.region
+//       CHECK:      linalg.generic

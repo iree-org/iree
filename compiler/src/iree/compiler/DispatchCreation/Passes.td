@@ -282,7 +282,9 @@ def FormSplitReductionDispatchesPass :
   let summary = "Partially tile reduction operations and place into dispatches";
   let options = [
     ListOption<"splitSize", "split-size", "int",
-        "Tile sizes for split reduction (innermost first)">
+        "Tile sizes for split reduction (innermost first)">,
+    Option<"enableFusePad", "enable-fuse-pad", "bool",
+        /*default=*/"false", "Fuse pad into scf.forall">
   ];
   let dependentDialects = [
     "IREE::Flow::FlowDialect",
