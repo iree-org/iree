@@ -340,46 +340,22 @@ getSharedMemoryBytes(MLIRContext *context, IREE::Codegen::InnerTiledOp op,
   // could go dangling.
   std::string key = llvm::formatv("mma = {}, gpuTarget = {}", mma, gpuTarget);
 
-  struct CacheEntry {
-    std::optional<int64_t> sharedMemoryBytes;
-    std::mutex mutex;
-    bool evaluated = false;
-  };
-
   // The cache and the mutex guarding it.
-  // We store the CacheEntry's by pointers, so that we don't need to worry about
-  // entryPtr being invalidated.
-  static llvm::StringMap<std::unique_ptr<CacheEntry>> cache;
+  static llvm::StringMap<std::optional<int64_t>> cache;
   static std::mutex cacheMutex;
+  std::lock_guard<std::mutex> lock(cacheMutex);
 
-  CacheEntry *entryPtr = nullptr;
-
-  {
-    // Critical section on `cacheMutex`. This is the only place where we
-    // access `cache`. When we will later update a cache entry, that will be
-    // through `entryPtr`, independently of `cache`.
-    std::lock_guard<std::mutex> lock(cacheMutex);
-    auto iter = cache.find(key);
-    if (iter != cache.end()) {
-      // Cache hit. Early return.
-      return iter->second->sharedMemoryBytes;
-    }
-    // Cache miss. Create a new cache entry and acquire its mutex.
-    entryPtr =
-        cache.insert({key, std::make_unique<CacheEntry>()}).first->second.get();
-    entryPtr->mutex.lock();
+  auto iter = cache.find(key);
+  if (iter != cache.end()) {
+    // Cache hit. Early return.
+    return iter->second;
   }
+  // Cache miss. Do the expensive evaluation and insert into cache.
+  auto sharedMemoryBytes =
+      expensivelyEvaluateSharedMemoryBytes(context, op, ukernelName, gpuTarget);
+  cache.insert({key, sharedMemoryBytes});
 
-  // If the entry still isn't evaluated after we have acquired its mutex,
-  // perform the evaluation now.
-  if (!entryPtr->evaluated) {
-    entryPtr->sharedMemoryBytes = expensivelyEvaluateSharedMemoryBytes(
-        context, op, ukernelName, gpuTarget);
-    entryPtr->evaluated = true;
-  }
-
-  entryPtr->mutex.unlock();
-  return entryPtr->sharedMemoryBytes;
+  return sharedMemoryBytes;
 }
 
 /// Utility function to help create and replace inner_tiled with a ukernel.
