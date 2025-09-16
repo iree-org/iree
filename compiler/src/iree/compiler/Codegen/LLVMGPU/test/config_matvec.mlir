@@ -483,7 +483,7 @@ func.func @not_vmt() {
 
 // -----
 
-func.func @test_dyn_reduction() {
+func.func @test_dyn_small_reduction() {
   %c32 = arith.constant 32 : index
   %c32_i64 = arith.constant 32 : i64
   %cst = arith.constant 0.000000e+00 : f32
@@ -544,6 +544,5 @@ func.func @test_dyn_reduction() {
   iree_tensor_ext.dispatch.tensor.store %30, %16, offsets = [0, 0], sizes = [128, 128], strides = [1, 1] : tensor<128x128xf8E4M3FNUZ> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x128xf8E4M3FNUZ>>
   return
 }
-
-//      CHECK: #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
-// CHECK-SAME: workgroup_size = [64, 1, 1] subgroup_size = 64,
+// CHECK: #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+// CHECK-LABEL: func.func @test_dyn_small_reduction()
