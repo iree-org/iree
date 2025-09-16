@@ -54,6 +54,7 @@ iree_check_single_backend_test_suite(
     "dynamic_abs.mlir"
     "dynamic_add.mlir"
     "dynamic_dot.mlir"
+    "dynamic_gather_attention.mlir"
     "dynamic_reduce_min.mlir"
     "dynamic_torch_index_select_high_rank.mlir"
     "dynamic_torch_index_select_negative.mlir"

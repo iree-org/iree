@@ -75,6 +75,7 @@ iree_check_single_backend_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_regression_llvm-cpu",
     srcs = [
+        "dynamic_gather_attention.mlir",
         "layernorm.mlir",
         "lowering_config.mlir",
         "pack_pad_transpose_1x9_into_2x1x8x4_issue_12546.mlir",
