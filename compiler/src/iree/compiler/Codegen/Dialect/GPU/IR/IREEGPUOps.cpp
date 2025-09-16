@@ -204,17 +204,66 @@ Operation *CoalescedGatherDMAOp::getIteratingParent() {
 }
 
 LogicalResult CoalescedGatherDMAOp::verify() {
+  auto indicesType = cast<RankedTensorType>(getIndices().getType());
   auto initType = cast<RankedTensorType>(getInit().getType());
   auto resultType = cast<RankedTensorType>(getResult().getType());
-
-  if (initType != resultType) {
-    return emitOpError("init and result types must match");
-  }
+  auto transferType = cast<RankedTensorType>(getTransferType());
 
   // Verify that this op is nested within an InParallelOpInterface op
   if (!isa_and_nonnull<InParallelOpInterface>(getOperation()->getParentOp())) {
     return emitOpError("must be nested within an operation implementing "
                        "InParallelOpInterface");
+  }
+
+  if (initType != resultType) {
+    return emitOpError("init and result must have the same type and shape");
+  }
+
+  // Calculate total number of elements in indices tensor
+  int64_t indicesElements = 1;
+  for (int64_t dim : indicesType.getShape()) {
+    if (dim == ShapedType::kDynamic) {
+      // Skip verification for dynamic shapes
+      return success();
+    }
+    indicesElements *= dim;
+  }
+
+  // Calculate byte size of transfer type element
+  int64_t transferElements = 1;
+  for (int64_t dim : transferType.getShape()) {
+    if (dim == ShapedType::kDynamic) {
+      // Skip verification for dynamic shapes
+      return success();
+    }
+    transferElements *= dim;
+  }
+
+  unsigned transferElementBitWidth =
+      transferType.getElementType().getIntOrFloatBitWidth();
+  int64_t transferTypeBytes = (transferElements * transferElementBitWidth) / 8;
+
+  // Calculate byte size of init element
+  int64_t initElements = 1;
+  for (int64_t dim : initType.getShape()) {
+    if (dim == ShapedType::kDynamic) {
+      // Skip verification for dynamic shapes
+      return success();
+    }
+    initElements *= dim;
+  }
+
+  unsigned initElementBitWidth =
+      initType.getElementType().getIntOrFloatBitWidth();
+  int64_t initTotalBytes = (initElements * initElementBitWidth) / 8;
+
+  // Check constraint: indices_elements * transfer_type_bytes = init_dest_bytes
+  int64_t expectedBytes = indicesElements * transferTypeBytes;
+  if (expectedBytes != initTotalBytes) {
+    return emitOpError(
+               "indices shape dimension times transfer_type byte size (")
+           << expectedBytes << ") must equal init and dest byte size ("
+           << initTotalBytes << ")";
   }
 
   return success();

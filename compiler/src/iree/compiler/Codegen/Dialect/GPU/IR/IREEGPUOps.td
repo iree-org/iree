@@ -289,7 +289,7 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     %result = scf.forall (%i) in (%c1) shared_outs(%out = %dest) -> (tensor<64x32xf32>) {
       scf.forall.in_parallel {
         // Gather 64x32 elements from source based on indices, acting as parallel combining op
-        iree_gpu.coalesced_gather_dma %indices, %source into %out
+        iree_gpu.coalesced_gather_dma %indices, %source into %out with tensor<f32>
           : tensor<64x32xindex>, tensor<1024x64xf32>, tensor<64x32xf32> -> tensor<64x32xf32>
       }
     }
@@ -299,13 +299,14 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
   let arguments = (ins
     RankedTensorOf<[Index]>:$indices,
     AnyRankedTensor:$source,
-    AnyRankedTensor:$init
+    AnyRankedTensor:$init,
+    TensorTypeAttr:$transfer_type
   );
 
   let results = (outs AnyRankedTensor:$result);
 
   let assemblyFormat = [{
-    $indices `,` $source `into` $init attr-dict
+    $indices `,` $source `into` $init `with` $transfer_type attr-dict
     `:` type($indices) `,` type($source) `,` type($init) `->` type($result)
   }];
 
