@@ -336,21 +336,32 @@ module attributes {transform.with_named_sequence} {
 
 // -----
 
-// Verify that operations with exact same matching indexing maps are matched correctly.
+// Verify that operations with exact same matching indexing maps are matched correctly,
+// and operations with different indexing map patterns are not matched.
 
 #map_matmul0 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map_matmul1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map_matmul2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map_transpose_b = affine_map<(d0, d1, d2) -> (d2, d1)>  // Transpose_b RHS map.
 
 // CHECK-LABEL: func.func @op_matmul
-func.func @op_matmul(%input0: tensor<32x64xi8>, %input1: tensor<32x64xi8>, %dest: tensor<32x32xi32>) -> tensor<32x32xi32> {
+func.func @op_matmul(%input0: tensor<32x64xi8>, %input1: tensor<32x64xi8>, %input1_transposed: tensor<64x32xi8>, %dest: tensor<32x32xi32>) -> tensor<32x32xi32> {
   // CHECK-NEXT: linalg.matmul
   // CHECK-SAME:   indexing_maps_match = "matched"
-  %res = linalg.matmul
+  %res1 = linalg.matmul
         indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2]
         ins(%input0, %input1 : tensor<32x64xi8>, tensor<32x64xi8>)
         outs(%dest : tensor<32x32xi32>) {indexing_maps_match = "unmatched"} -> tensor<32x32xi32>
-  return %res : tensor<32x32xi32>
+
+  // Transpose_b matmul - should NOT match (different RHS indexing map).
+  // CHECK-NEXT: linalg.matmul
+  // CHECK-SAME:   indexing_maps_match = "unmatched"
+  %res2 = linalg.matmul
+        indexing_maps = [#map_matmul0, #map_transpose_b, #map_matmul2]
+        ins(%input0, %input1_transposed : tensor<32x64xi8>, tensor<64x32xi8>)
+        outs(%dest : tensor<32x32xi32>) {indexing_maps_match = "unmatched"} -> tensor<32x32xi32>
+
+  return %res1 : tensor<32x32xi32>
 }
 
 module attributes {transform.with_named_sequence} {
@@ -408,46 +419,6 @@ module attributes {transform.with_named_sequence} {
      // Should NOT match: operation has 3 indexing maps but matcher expects 4.
     transform.foreach_match in %module
         @match_different_count -> @annotate_matched
-      : (!transform.any_op) -> (!transform.any_op)
-    transform.yield
-  }
-}
-
-// -----
-
-// Verify that operations with different indexing map patterns are correctly not matched.
-
-#map_matmul0 = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map_matmul1 = affine_map<(d0, d1, d2) -> (d1, d2)>
-#map_matmul2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-
-// CHECK-LABEL: func.func @op_matmul
-func.func @op_matmul(%input0: tensor<32x64xi8>, %input1: tensor<32x64xi8>, %dest: tensor<32x32xi32>) -> tensor<32x32xi32> {
-  // CHECK-NEXT: linalg.matmul
-  // CHECK-SAME:   indexing_maps_match = "unmatched"
-  %res = linalg.matmul
-        indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2]
-        ins(%input0, %input1 : tensor<32x64xi8>, tensor<32x64xi8>)
-        outs(%dest : tensor<32x32xi32>) {indexing_maps_match = "unmatched"} -> tensor<32x32xi32>
-  return %res : tensor<32x32xi32>
-}
-
-module attributes {transform.with_named_sequence} {
-  transform.named_sequence @match_different_maps(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
-    transform.iree.match.is_contraction %op {indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul0]} : !transform.any_op
-    transform.yield %op : !transform.any_op
-  }
-
-  transform.named_sequence @annotate_matched(%op: !transform.any_op {transform.readonly}) {
-    %0 = transform.param.constant "matched" -> !transform.any_param
-    transform.annotate %op "indexing_maps_match" = %0 : !transform.any_op, !transform.any_param
-    transform.yield
-  }
-
-  transform.named_sequence @__transform_main(%module: !transform.any_op) {
-     // Should NOT match: operation has different indexing maps pattern than expected (last map is different).
-    transform.foreach_match in %module
-        @match_different_maps -> @annotate_matched
       : (!transform.any_op) -> (!transform.any_op)
     transform.yield
   }
