@@ -288,9 +288,9 @@ setContractionAnchor(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
 
   // Set layouts for lhs, rhs and acc.
   rewriter.setInsertionPoint(contract);
-  auto layoutedLhs = rewriter.create<ToLayoutOp>(loc, lhs, aLayout, intrinsic);
-  auto layoutedRhs = rewriter.create<ToLayoutOp>(loc, rhs, bLayout, intrinsic);
-  auto layoutedAcc = rewriter.create<ToLayoutOp>(loc, acc, cLayout, intrinsic);
+  auto layoutedLhs = ToLayoutOp::create(rewriter, loc, lhs, aLayout, intrinsic);
+  auto layoutedRhs = ToLayoutOp::create(rewriter, loc, rhs, bLayout, intrinsic);
+  auto layoutedAcc = ToLayoutOp::create(rewriter, loc, acc, cLayout, intrinsic);
 
   // Promote matmul lhs and rhs.
   // TODO: This is a hack until layout analysis is improved. The layout analysis
@@ -313,8 +313,8 @@ setContractionAnchor(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
 
   // Set layout for result.
   rewriter.setInsertionPointAfter(contract);
-  auto toLayout = rewriter.create<ToLayoutOp>(loc, contract->getResult(0),
-                                              cLayout, intrinsic);
+  auto toLayout = ToLayoutOp::create(rewriter, loc, contract->getResult(0),
+                                     cLayout, intrinsic);
   rewriter.replaceAllUsesExcept(contract->getResult(0), toLayout.getResult(),
                                 toLayout);
 
@@ -361,9 +361,9 @@ setConvolutionAnchor(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
 
   // Set layouts for lhs, rhs and acc.
   rewriter.setInsertionPoint(conv);
-  auto layoutedLhs = rewriter.create<ToLayoutOp>(loc, lhs, aLayout, intrinsic);
-  auto layoutedRhs = rewriter.create<ToLayoutOp>(loc, rhs, bLayout, intrinsic);
-  auto layoutedAcc = rewriter.create<ToLayoutOp>(loc, acc, cLayout, intrinsic);
+  auto layoutedLhs = ToLayoutOp::create(rewriter, loc, lhs, aLayout, intrinsic);
+  auto layoutedRhs = ToLayoutOp::create(rewriter, loc, rhs, bLayout, intrinsic);
+  auto layoutedAcc = ToLayoutOp::create(rewriter, loc, acc, cLayout, intrinsic);
 
   // Promote matmul lhs and rhs.
   // TODO: This is a hack until layout analysis is improved. The layout analysis
@@ -387,7 +387,7 @@ setConvolutionAnchor(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
   // Set layout for result.
   rewriter.setInsertionPointAfter(conv);
   auto toLayout =
-      rewriter.create<ToLayoutOp>(loc, conv->getResult(0), cLayout, intrinsic);
+      ToLayoutOp::create(rewriter, loc, conv->getResult(0), cLayout, intrinsic);
   rewriter.replaceAllUsesExcept(conv->getResult(0), toLayout.getResult(),
                                 toLayout);
 
