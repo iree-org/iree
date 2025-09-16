@@ -10,7 +10,6 @@
 #include <functional>
 
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
-#include "iree/compiler/Pipelines/Options.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
@@ -24,10 +23,31 @@ enum class EncodingOptions { Padding, MatmulK, Generic };
 // Pipelines
 //===----------------------------------------------------------------------===//
 
-/// This is a placeholder for future. We should pass all the options through the
-/// struct.
 struct TransformOptions : public PassPipelineOptions<TransformOptions> {
-  DispatchCreationOptions options;
+  Option<bool> enableAggressiveFusion{
+      *this,
+      "aggressive-fusion",
+      llvm::cl::desc("Enable aggressive fusion for dispatch creation pipeline"),
+      llvm::cl::init(false),
+  };
+  Option<bool> enableFuseMultiUse{
+      *this,
+      "fuse-multi-use",
+      llvm::cl::desc("Fuse operations with multiple uses."),
+      llvm::cl::init(true),
+  };
+  Option<bool> dataTiling{
+      *this,
+      "data-tiling",
+      llvm::cl::desc("Enable data-tiling for dispatch creation pipeline"),
+      llvm::cl::init(false),
+  };
+  Option<int64_t> splitReductionTargetSize{
+      *this,
+      "split-reduction-target-size",
+      llvm::cl::desc("Target tile size for split reduction"),
+      llvm::cl::init(0),
+  };
 };
 
 void buildDispatchCreationPassPipeline(
