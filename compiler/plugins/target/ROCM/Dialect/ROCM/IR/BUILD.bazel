@@ -46,7 +46,6 @@ iree_compiler_cc_library(
     hdrs = [
         "ROCMAttrs.h",
         "ROCMDialect.h",
-        "ROCMUkernelBitcodeSupport.h",
     ],
     textual_hdrs = [
         "ROCMAttrs.cpp.inc",

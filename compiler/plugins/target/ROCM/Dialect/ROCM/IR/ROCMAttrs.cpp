@@ -6,7 +6,6 @@
 
 #include "compiler/plugins/target/ROCM/Dialect/ROCM/IR/ROCMAttrs.h"
 #include "compiler/plugins/target/ROCM/Dialect/ROCM/IR/ROCMDialect.h"
-#include "compiler/plugins/target/ROCM/Dialect/ROCM/IR/ROCMUkernelBitcodeSupport.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -32,6 +31,26 @@ BuiltinTuningModuleAttr::getModule(Operation * /*annotationSite*/) const {
   auto &rocmDialect = cast<ROCMDialect>(getDialect());
   return rocmDialect.getOrLoadBuiltinModule(getBuiltinFilename());
 }
+
+//===----------------------------------------------------------------------===//
+// Bitcode Ukernel APIs
+//===----------------------------------------------------------------------===//
+
+/// Utility function to help create and replace argmax linalg with a ukernel.
+LogicalResult handleArgmaxUkernel(RewriterBase &rewriter, StringRef name,
+                                  DictionaryAttr targetConfiguration,
+                                  Operation *contextualOp,
+                                  ArrayRef<Value> inputs,
+                                  ArrayRef<Value> outputs,
+                                  SmallVectorImpl<Value> &otherOperands);
+
+/// Utility function to help create and replace inner_tiled with a ukernel.
+LogicalResult handleInnerTiledMmaUkernel(RewriterBase &rewriter, StringRef name,
+                                         DictionaryAttr targetConfiguration,
+                                         Operation *contextualOp,
+                                         ArrayRef<Value> inputs,
+                                         ArrayRef<Value> outputs,
+                                         SmallVectorImpl<Value> &otherOperands);
 
 //===----------------------------------------------------------------------===//
 // UKernelProviderAttr

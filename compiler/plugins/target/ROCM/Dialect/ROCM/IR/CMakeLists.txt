@@ -16,7 +16,6 @@ iree_cc_library(
   HDRS
     "ROCMAttrs.h"
     "ROCMDialect.h"
-    "ROCMUkernelBitcodeSupport.h"
   TEXTUAL_HDRS
     "ROCMAttrs.cpp.inc"
     "ROCMAttrs.h.inc"
