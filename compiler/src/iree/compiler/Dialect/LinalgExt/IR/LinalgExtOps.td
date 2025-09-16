@@ -1051,21 +1051,51 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
 //===----------------------------------------------------------------------===//
 
 def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction"> {
-
-  let summary = [{A linalg.generic extension with support for exponential reduction.}];
+  let summary = [{
+    A linalg.generic extension with support for exponential reduction.
+  }];
+  
   let description = [{
-    This operation extends linalg.generic, allowing specialization on operations that perform exponential reductions.
+    This operation is a restricted form of a linalg.generic operation, 
+    representing a reduction over `e^{x}` where `x` is an input, and it is known
+    that the function's result is independent of translation over x,      
+      i.e. f(x) = f(x + c).
 
-    The first input and output operands are intrinsically linked, with the initial value of the input operand always calculated as
-    `e` raised to power of the first output operand.
-    We refer to the input operand as the normalizing operand, and the output operand as the reducing operand.
+    Since `e{x}` grows exponentially for `x > 0`, if the values of `x` are 
+    unbounded, the intermediate computation for `e^{x}` in `f(x)`, may not fit
+    in the floating point range, even if the result does. To prevent such 
+    numerical inaccuracies, we can instead compute `f(max(x) - x)`, which will
+    ensure that `e{max(x) - x}` always fits in the range (0, 1], because 
+    0 < e{negative} <= 1.
 
-    The operands listed in `exp_reduced_operands` will be multiplied by the normalizing operand in the next reduction iteration.
+    These properties allow us to compute an online normalization of this 
+    function, in which we don't have to compute the `max(x)` as a seperate
+    reduction, but as a running max.
 
-    As an example,
+    Generally, these properties are hard to infer from a linalg.generic, because
+    two back-to-back reduction combiners in a linalg.generic can have hard to 
+    infer properties. This restricted form ensures we don't have to do 
+    complicated analysis to infer these properties.
+
+    The first input and output operands are intrinsically linked.
+    - The first output operand is always the maximum of the first input operand,
+      henceforth 'nmax'.
+    - The first input operand in the basic block is always `2^{nmax-x}`, where 
+      `x` is the value
+    
+    `norm` is calculated by `2^{nmax - pmax}`, where
+    - `pmax` is the value from the previous iteration.
+    - `nmax` is the new maximum, read from the current element from the input 
+      tensor 
+    
+    The operands listed in `exp_reduced_operands` will be multiplied by `norm`
+    before executing the basic block.
+
+    For example,
 
     ```mlir
-    %M, %O =  iree_linalg_ext.exp_reduction {
+    // compute the exponentials and the sum
+    %M, %O = iree_linalg_ext.exp_reduction {
       indexing_maps = [
         affine_map<(i) -> (i)>,
         affine_map<(i) -> ()>,
@@ -1076,37 +1106,61 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction"> {
       ],
       exp_reduced_operands = [ 1 ]
     } ins(%V: tensor<256xf32>)
-      outs(%exp_V, %S: tensor<256xf32>, tensor<f32>) {
-    ^bb0(%norm: f32, %redux: f32, %s: f32):
-      %add = arith.addf %norm, %s: f32
-      linalg.yield %redux, %add: f32, f32
-    } -> tensor<256xf32>, tensor<f32>
-    return %O : tensor<f32>
+      outs(%M_init, %S: tensor<f32>, tensor<f32>) {
+      ^bb0(%exp_v: f32, %m: f32, %s: f32):
+        // take note of the operand names when comparing with the subsequent
+        // code snippets
+        %add = arith.addf %exp_v, %s : f32 
+        linalg.yield %m, %add        : f32, f32
+    } -> tensor<f32>, tensor<f32>
   ```
 
   Encodes the following computation
 
   ```
-  forall i in [1 .. N]:
-    O += e^(S[i])
+  %M, %O = linalg.generic {
+    indexing_maps = [
+      affine_map<(i) -> (i)>,
+      affine_map<(i) -> ()>,
+      affine_map<(i) -> ()>
+    ],
+    iterator_types = [
+      "reduction"
+    ],
+  } ins(%V: tensor<256xf32>)
+    outs(%M_init, %S: tensor<f32>, tensor<f32>) {
+    ^bb0(%v: f32, %m: f32, %s: f32):
+      %exp_v = math.exp2 %v       : f32
+      %add = arith.addf %norm, %s : f32
+      linalg.yield %m, %add       : f32, f32
+  } -> tensor<256xf32>, tensor<f32>
   ```
 
-  And fuses it into
+  And transforms it into operations equivalent to the following:
 
   ```
-  forall i in [1 .. N]:
-    prevM = M
-    M = max(V[i], M)
+  %M, %O = linalg.generic {
+    indexing_maps = [
+      affine_map<(i) -> (i)>,
+      affine_map<(i) -> ()>,
+      affine_map<(i) -> ()>
+    ],
+    iterator_types = [
+      "reduction"
+    ],
+  } ins(%V: tensor<256xf32>)
+    outs(%M_init, %S: tensor<f32>, tensor<f32>) {
+    ^bb0(%v: f32, %prev_m: f32, %prev_s: f32):
+      %m      = arith.maximumf %v, %prev_m : f32
+      %m_diff = arith.subf %m, %prev_m     : f32
+      %norm   = math.exp2 %m_diff          : f32
 
-    norm = e^(V - M)
-    s = O[i] * e^(prevM - M)
-    O[i] = s + norm
+      %exp_v  = math.exp2 %v               : f32  // raise v to the exponent
+      %s      = arith.mulf %prev_s, %norm  : f32  // multiply s by the norm
+      %add    = arith.addf %norm, %s       : f32
+      linalg.yield %m, %add                : f32, f32
+  } -> tensor<256xf32>, tensor<f32>
   ```
-
-  Which is more numerically stable.
-
-  This pattern is most commonly observed in the online softmax algorithm, where
-  the subtraction by M in the exponent cancels out.
   }];
 
   let arguments = (ins
