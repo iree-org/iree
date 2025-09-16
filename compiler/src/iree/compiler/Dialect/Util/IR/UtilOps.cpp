@@ -2088,6 +2088,38 @@ LogicalResult GlobalStoreIndirectOp::verify() {
 // !util.list<T>
 //===----------------------------------------------------------------------===//
 
+static ParseResult
+parseValueTypeList(OpAsmParser &parser,
+                   SmallVectorImpl<OpAsmParser::UnresolvedOperand> &values,
+                   SmallVectorImpl<Type> &types) {
+  if (parser.parseLSquare()) {
+    return failure();
+  }
+  if (succeeded(parser.parseOptionalRSquare())) {
+    return success(); // empty list
+  }
+  do {
+    OpAsmParser::UnresolvedOperand value;
+    Type type;
+    if (parser.parseOperand(value) || parser.parseColon() ||
+        parser.parseType(type)) {
+      return failure();
+    }
+    values.push_back(value);
+    types.push_back(type);
+  } while (succeeded(parser.parseOptionalComma()));
+  return parser.parseRSquare();
+}
+
+static void printValueTypeList(OpAsmPrinter &p, Operation *,
+                               OperandRange values, TypeRange types) {
+  p << "[";
+  llvm::interleaveComma(llvm::zip(values, types), p, [&](auto pair) {
+    p << std::get<0>(pair) << " : " << std::get<1>(pair);
+  });
+  p << "]";
+}
+
 static ParseResult parseListTypeGet(OpAsmParser &parser, Type &listType,
                                     Type &elementType) {
   if (failed(parser.parseType(listType))) {
@@ -2157,6 +2189,21 @@ static void printListTypeSet(OpAsmPrinter &printer, Operation *, Type listType,
   } else {
     printer.printType(listType);
   }
+}
+
+LogicalResult ListConstructOp::verify() {
+  Operation *op = getOperation();
+  auto listType = cast<IREE::Util::ListType>(getResult().getType());
+  Type elementType = listType.getElementType();
+  for (auto [idx, value] : llvm::enumerate(getValues())) {
+    Type valueType = value.getType();
+    if (!ListType::canImplicitlyCast(valueType, elementType)) {
+      return op->emitError()
+             << "list[" << idx << "] type " << valueType
+             << " cannot be be cast to list type " << elementType;
+    }
+  }
+  return success();
 }
 
 LogicalResult ListGetOp::verify() {

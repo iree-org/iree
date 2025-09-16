@@ -2521,7 +2521,7 @@ def Stream_AsyncBarrierOp : Stream_Op<"async.barrier", [
   let hasCanonicalizer = 1;
 }
 
-def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
+def Stream_AsyncTransferOp : Stream_PureOp<"async.transfer", [
   DeclareOpInterfaceMethods<Stream_AffinityOp, [
     "getAffinityAttr",
     "setAffinityAttr",

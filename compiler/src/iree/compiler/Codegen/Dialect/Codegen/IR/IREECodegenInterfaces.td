@@ -575,6 +575,25 @@ def IREECodegen_UKernelProviderInterface :
         return failure();
       }]
     >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns a data layout attribute for the provided |encoding| and
+        |target_configuration|.
+
+        The return type is deliberately '::mlir::Attribute' to accommodate
+        various data layout specifications. Callers, such as encoding
+        resolvers, are expected to handle a range of possible attributes
+        and gracefully manage cases where an unsupported attribute is returned.
+      }],
+      /*retTy=*/"::mlir::Attribute",
+      /*methodName=*/"getDataLayoutForUKernel",
+      /*args=*/(ins "::mlir::Attribute":$encoding,
+                    "::mlir::DictionaryAttr":$target_configuration),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return {};
+      }]
+    >,
   ];
 }
 

@@ -27,4 +27,4 @@ func.func @argmax_2d_f32i64(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes
 //   CHECK-NOT: lowering_config<{{.*}}ukernel
 // CHECK-LABEL: func @argmax_2d_f32i64(
 //       CHECK: linalg.generic
-//   CHECK-NOT: hal.executable.objects
+//   CHECK-NOT: iree_codegen.ukernel = #iree_codegen.ukernel_descriptor

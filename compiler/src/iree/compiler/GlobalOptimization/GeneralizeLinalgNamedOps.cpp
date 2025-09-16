@@ -23,6 +23,14 @@
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
+// TODO(#21955): Adapts the convolution transformations to work with generalized
+// linalg.generic form, but not only when they are named ops. E.g.,
+// DownscaleSizeOneWindowed2DConvolution patterns.
+static llvm::cl::opt<bool> clDisableConvGeneralization(
+    "iree-global-opt-experimental-disable-conv-generalization",
+    llvm::cl::desc("Disable generalization for some conv ops (experimental)."),
+    llvm::cl::init(false));
+
 #define GEN_PASS_DEF_GENERALIZELINALGNAMEDOPSPASS
 #include "iree/compiler/GlobalOptimization/Passes.h.inc"
 
@@ -47,6 +55,16 @@ void GeneralizeLinalgNamedOpsPass::runOnOperation() {
       namedOpCandidates.push_back(linalgOp);
       return;
     }
+    bool generalizeConvOps = linalg::isaConvolutionOpInterface(linalgOp);
+    if (clDisableConvGeneralization &&
+        isa<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
+            linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
+            linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
+            linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
+            linalg::PoolingNchwMaxOp, linalg::DepthwiseConv2DNhwcHwcOp>(
+            linalgOp)) {
+      generalizeConvOps = false;
+    }
     if (isa_and_nonnull<linalg::AbsOp, linalg::AddOp, linalg::BroadcastOp,
                         linalg::CeilOp, linalg::CopyOp, linalg::DivOp,
                         linalg::DivUnsignedOp, linalg::ExpOp, linalg::FloorOp,
@@ -54,7 +72,7 @@ void GeneralizeLinalgNamedOpsPass::runOnOperation() {
                         linalg::MulOp, linalg::NegFOp, linalg::ReduceOp,
                         linalg::SubOp, linalg::TransposeOp>(
             linalgOp.getOperation()) ||
-        linalg::isaConvolutionOpInterface(linalgOp)) {
+        generalizeConvOps) {
       namedOpCandidates.push_back(linalgOp);
     }
   });

@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/ADT/SmallVector.h"
@@ -233,6 +234,10 @@ public:
     }
     for (auto globalName : deadGlobalNames) {
       globalTable.eraseGlobal(globalName);
+    }
+
+    if (!deadGlobalNames.empty()) {
+      signalFixedPointModified(moduleOp);
     }
   }
 };

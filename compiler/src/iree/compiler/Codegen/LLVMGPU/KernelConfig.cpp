@@ -2578,7 +2578,7 @@ static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
 /// subgroup per workgroup.
 static LogicalResult setArgmaxUkernelConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
-    linalg::GenericOp op, IREE::GPU::UKernelConfigAttr ukernelConfig) {
+    linalg::GenericOp op, IREE::Codegen::UKernelDescriptorAttr ukernelConfig) {
   SmallVector<unsigned> parallelDims;
   SmallVector<unsigned> reductionDims;
   op.getParallelDims(parallelDims);
@@ -2626,8 +2626,8 @@ static LogicalResult setArgmaxUkernelConfig(
   Builder b(context);
   SmallVector<NamedAttribute, 3> attrs = {
       NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
-      NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes)),
-      NamedAttribute("ukernel", ukernelConfig)};
+      NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
+  op->setAttr(kUkernelAttrName, ukernelConfig);
   IREE::GPU::appendPromotedOperandsList(context, attrs, {0, 1});
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
@@ -2818,7 +2818,7 @@ static LogicalResult setConvolutionConfig(
 static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
                                    mlir::FunctionOpInterface entryPointFn,
                                    Operation *computeOp) {
-  IREE::GPU::UKernelConfigAttr ukernelConfig = selectUKernel(computeOp);
+  IREE::Codegen::UKernelDescriptorAttr ukernelConfig = selectUKernel(computeOp);
   LLVM_DEBUG({
     DBGS() << "Selecting root config for: ";
     computeOp->print(llvm::dbgs(), OpPrintingFlags().skipRegions());

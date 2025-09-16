@@ -149,8 +149,7 @@ void GenericVectorizationPass::runOnOperation() {
         return;
       }
       candidates.push_back(op);
-    } else if (vectorizePadding && enableVectorMasking &&
-               isa<tensor::PadOp>(op)) {
+    } else if (enableVectorMasking && isa<tensor::PadOp>(op)) {
       candidates.push_back(op);
     } else if (enableVectorMasking &&
                isa<linalg::PackOp, linalg::UnPackOp>(op)) {
@@ -193,13 +192,14 @@ void GenericVectorizationPass::runOnOperation() {
     if (isa<linalg::GenericOp>(op) && vectorizeToTransferGather) {
       (void)IREE::VectorExt::vectorizeGatherLikeGenericToTransferGather(
           rewriter, cast<linalg::GenericOp>(op), vectorSizes, scalableVecDims,
-          vectorizeGatherAccesses);
+          /*vectorizeNDExtract=*/true);
     } else if (auto gatherOp = dyn_cast<IREE::LinalgExt::GatherOp>(op)) {
       (void)IREE::VectorExt::vectorizeLinalgExtGatherToTransferGather(
           rewriter, gatherOp, vectorSizes);
     } else {
-      FailureOr<linalg::VectorizationResult> result = linalg::vectorize(
-          rewriter, op, vectorSizes, scalableVecDims, vectorizeGatherAccesses);
+      FailureOr<linalg::VectorizationResult> result =
+          linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
+                            /*vectorizeNDExtract=*/true);
       if (succeeded(result)) {
         rewriter.replaceOp(op, result->replacements);
       }

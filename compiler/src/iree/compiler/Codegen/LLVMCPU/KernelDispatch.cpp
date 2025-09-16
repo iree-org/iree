@@ -37,6 +37,7 @@
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
@@ -2918,7 +2919,6 @@ adjustTileSizesForPackOp(mlir::FunctionOpInterface entryPointFn,
                          linalg::PackOp packOp,
                          SmallVector<int64_t> &distTileSizes,
                          SmallVector<int64_t> &parallelVecTileSizes) {
-
   ArrayRef<int64_t> innerDimsPos = packOp.getInnerDimsPos();
   ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
   // Currently we only handle pack op with static inner tile sizes.
@@ -2961,10 +2961,40 @@ adjustTileSizesForPackOp(mlir::FunctionOpInterface entryPointFn,
   return success();
 }
 
+/// Forces the packed domain tile sizes to be the inner tile sizes of
+/// `unpackOp`. Otherwise, the consumer fusion is not available.
+/// Note: the method is designed for fusion cases in data-tiling, like
+/// `matmul->generic->unpack`.
+static void
+adjustTileSizesForUnPackOp(linalg::UnPackOp unpackOp,
+                           SmallVector<int64_t> &parallelVecTileSizes) {
+  auto linalgOp = unpackOp.getSource().getDefiningOp<linalg::LinalgOp>();
+  if (!linalgOp) {
+    return;
+  }
+  AffineMap indexingMap = linalgOp.getIndexingMapMatchingResult(
+      cast<OpResult>(unpackOp.getSource()));
+  int numPackedDims = unpackOp.getInnerDimsPos().size();
+  for (auto [expr, tileSize] :
+       llvm::zip_equal(indexingMap.getResults().take_back(numPackedDims),
+                       unpackOp.getStaticInnerTiles())) {
+    if (ShapedType::isDynamic(tileSize)) {
+      continue;
+    }
+    auto dimExpr = dyn_cast<AffineDimExpr>(expr);
+    if (!dimExpr) {
+      continue;
+    }
+    parallelVecTileSizes[dimExpr.getPosition()] = tileSize;
+  }
+}
+
 /// Adjusts the tile sizes (carried by `rootOp`) to be aligned with
 /// linalg.unpack inner tile sizes, if there are linalg.unpack producers. If the
 /// tile sizes are not aligned, a stack buffer is needed because of
 /// linalg.unpack tiling implementations.
+/// Note: the method is designed for the case that unpack op is not fused with
+/// mmt4d ops.
 static LogicalResult
 adjustTileSizesForUnPackOp(mlir::FunctionOpInterface entryPointFn,
                            Operation *rootOp) {
@@ -3254,6 +3284,8 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
         return failure();
       }
       hasSeenPackOp = true;
+    } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
+      adjustTileSizesForUnPackOp(unpackOp, parallelVecTileSizes);
     } else if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
       SmallVector<int64_t> reductionTileSizes;
       SmallVector<bool> reductionScalableFlags;
@@ -3461,6 +3493,15 @@ lowerUsingDefaultPipeline(mlir::FunctionOpInterface entryPointFn) {
 ///   - `linalg.pack` ops whose producer is a `tensor.collapse_shape`,
 ///     as they will be lowered together into a `map_scatter` later in the
 ///     pipeline.
+///   - `linalg.pack` ops whose producer is a `linalg.unpack`. It is hard to
+///     propagate lowering configs because the tile size is scaled with
+///     UnPackOp's inner tile sizes. With the current infra it's hard to handle
+///     the case, so we ignore it for now. In practice, it is driven by mmt4d
+///     inner dimensions, so it is usually fine to not have the lowering config.
+///     An exception may be that the pack op is for matvec/vecmat which chooses
+///     larger inner tiles, but it is not a common case atm. The tile size
+///     adjustment logic should be revisited anyway, so it is a fair stopgap
+///     today.
 static bool shouldSetLoweringConfig(Operation *op) {
   if (isa_and_nonnull<IREE::LinalgExt::CustomOp>(op->getParentOp()) &&
       getLoweringConfig(op) != nullptr) {
@@ -3468,7 +3509,7 @@ static bool shouldSetLoweringConfig(Operation *op) {
   }
 
   if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
-    if (isa_and_nonnull<tensor::CollapseShapeOp>(
+    if (isa_and_nonnull<tensor::CollapseShapeOp, linalg::UnPackOp>(
             packOp.getSource().getDefiningOp())) {
       return false;
     }
