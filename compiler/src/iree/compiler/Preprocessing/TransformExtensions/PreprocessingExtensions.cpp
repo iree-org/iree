@@ -231,13 +231,44 @@ DiagnosedSilenceableFailure
 IREE::transform_dialect::MatchContractionOp::matchOperation(
     Operation *current, transform::TransformResults &results,
     transform::TransformState &state) {
-  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(current)) {
-    if (linalg::isaContractionOpInterface(linalgOp)) {
-      return DiagnosedSilenceableFailure::success();
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(current);
+  if (!linalgOp) {
+    return emitSilenceableFailure(current->getLoc())
+           << "Operation " << *current << " is not a LinalgOp.";
+  }
+
+  if (!linalg::isaContractionOpInterface(linalgOp)) {
+    return emitSilenceableFailure(current->getLoc())
+           << "Operation " << *current << " is not a contraction operation.";
+  }
+
+  if (!getIndexingMaps()) {
+    return DiagnosedSilenceableFailure::success();
+  }
+
+  ArrayAttr currentIndexingMaps = linalgOp.getIndexingMaps();
+  ArrayAttr targetIndexingMaps = *getIndexingMaps();
+
+  if (currentIndexingMaps.size() != targetIndexingMaps.size()) {
+    return emitSilenceableFailure(current->getLoc())
+           << "indexing maps count mismatch: expected "
+           << targetIndexingMaps.size() << ", got "
+           << currentIndexingMaps.size();
+  }
+
+  for (auto [currentMapAttr, targetMapAttr] :
+       llvm::zip(currentIndexingMaps, targetIndexingMaps)) {
+    AffineMapAttr currentMap = cast<AffineMapAttr>(currentMapAttr);
+    AffineMapAttr targetMap = cast<AffineMapAttr>(targetMapAttr);
+
+    if (currentMap.getValue() != targetMap.getValue()) {
+      return emitSilenceableFailure(current->getLoc())
+             << "indexing maps don't match: expected " << targetMap << ", got "
+             << currentMap;
     }
   }
-  return emitSilenceableFailure(current->getLoc())
-         << "Operation " << *current << " is not a contraction operation.";
+
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===----------------------------------------------------------------------===//

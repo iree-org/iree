@@ -182,14 +182,19 @@ def MatchContractionOp : Op<Transform_Dialect, "iree.match.is_contraction",
     Matches operations that implement the ContractionOpInterface.
     This includes operations like linalg.matmul, linalg.batch_matmul, etc.
 
+    Optionally matches specific indexing maps patterns.
+
     #### Return modes
 
     Succeeds if the operation is a contraction operation, and
     produces a silenceable failure otherwise.
   }];
 
-  let arguments = (ins TransformHandleTypeInterface:$operand_handle);
-  let assemblyFormat = "$operand_handle attr-dict `:` type($operand_handle)";
+  let arguments = (ins
+    TransformHandleTypeInterface:$operand_handle,
+    OptionalAttr<AffineMapArrayAttr>:$indexing_maps
+  );
+  let assemblyFormat = "$operand_handle (`indexing_maps` $indexing_maps^)? attr-dict `:` type($operand_handle)";
   let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
 
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
