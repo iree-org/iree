@@ -321,10 +321,11 @@ getVectorDistributeReductionConfigParallelOp(
     const int64_t threadLoads) {
   MLIRContext *context = op.getContext();
   Builder b(context);
-  SmallVector<unsigned> reductionDims;
-  op.getReductionDims(reductionDims);
+
   SmallVector<unsigned> parallelDims;
+  SmallVector<unsigned> reductionDims;
   op.getParallelDims(parallelDims);
+  op.getReductionDims(reductionDims);
   SmallVector<int64_t> bounds = op.getStaticLoopRanges();
 
   SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 0);
@@ -406,10 +407,11 @@ getVectorDistributeReductionConfigReductionOp(
     const int64_t threadLoads) {
   MLIRContext *context = op.getContext();
   Builder b(context);
-  SmallVector<unsigned> reductionDims;
-  op.getReductionDims(reductionDims);
+
   SmallVector<unsigned> parallelDims;
+  SmallVector<unsigned> reductionDims;
   op.getParallelDims(parallelDims);
+  op.getReductionDims(reductionDims);
   SmallVector<int64_t> bounds = op.getStaticLoopRanges();
 
   SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 0);
