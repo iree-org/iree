@@ -801,8 +801,6 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                           (numLoadingThreads % subgroupSize != 0);
   int64_t workgroupSize = numWorkgroups * subgroupSize;
 
-  // threadLoads *= 2;
-
   std::optional<int64_t> parallelSize = 1;
   for (int64_t dim : parallelDims) {
     if (ShapedType::isDynamic(bounds[dim])) {
@@ -830,8 +828,6 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   if (parallelSize && *parallelSize > numWGPs * numSIMDs) {
     maxWorkgroupSize = target.getPreferredSubgroupSize();
   }
-
-  // Round workgroupSize up to the nearest multiple of subgroupSize.
 
   if (workgroupSize > maxWorkgroupSize) {
     workgroupSize = llvm::APIntOps::GreatestCommonDivisor(
