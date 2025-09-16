@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
+#include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/ArmNeon/Transforms.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -54,6 +55,11 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
           .setVectorMultiReductionLowering(vectorMultiReductionLowering)
           .setVectorTransferSplit(vectorTransferSplit);
 
+  DictionaryAttr targetConfig;
+  if (auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp)) {
+    targetConfig = targetAttr.getConfiguration();
+  }
+
   // Target-dependenet patterns.
   {
     if (enableArmI8mm) {
@@ -67,7 +73,12 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
   {
     RewritePatternSet patterns(ctx);
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
-    vector::populateVectorGatherToConditionalLoadPatterns(patterns);
+    // RVV should be able to lower most of the gather / scatter with indexed
+    // load / store.
+    if (!targetConfig || !isRISCV(targetConfig) ||
+        !hasAnyVFeature(targetConfig)) {
+      vector::populateVectorGatherToConditionalLoadPatterns(patterns);
+    }
     vector::populateVectorGatherLoweringPatterns(patterns);
     vector::populateVectorContractLoweringPatterns(
         patterns, vectorTransformOptions.vectorContractLowering,
