@@ -281,7 +281,7 @@ def SetSplitReductionSizesPass :
     Pass<"iree-dispatch-creation-set-split-reduction-sizes"> {
   let summary = "Set 'iree_linalg_ext.split_reduction' attribute on ops";
   let options = [
-    Option<"splitReductionTargetSize", "split-reduction-target-size", "int64_t", "0",
+    Option<"splitReductionTargetSize", "split-reduction-target-size", "int64_t", "1024",
            "Target tile size for split reduction. Inner reduction "
            "dimensions are tiled first, with the tile size rounded "
            "up until it evenly divides the iteration domain.">

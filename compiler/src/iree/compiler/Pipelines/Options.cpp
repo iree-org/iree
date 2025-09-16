@@ -317,12 +317,11 @@ void DispatchCreationOptions::bindOptions(OptionsBinder &binder) {
   binder.opt<bool>("iree-dispatch-creation-data-tiling", dataTiling,
                    llvm::cl::desc("Enables data tiling path."),
                    llvm::cl::cat(category));
-  binder.opt<int64_t>(
+  binder.opt<bool>(
       "iree-dispatch-creation-split-reduction-target-size",
-      splitReductionTargetSize,
-      llvm::cl::desc("Target tile size for split reduction. Inner reduction "
-                     "dimensions are tiled first, with the tile size rounded "
-                     "up until it evenly divides the iteration domain."),
+      enableSplitReduction,
+      llvm::cl::desc(
+          "Enable split-reduction for certain reduction operations."),
       llvm::cl::cat(category));
 }
 

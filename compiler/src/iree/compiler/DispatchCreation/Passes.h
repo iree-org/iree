@@ -42,11 +42,11 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
       llvm::cl::desc("Enable data-tiling for dispatch creation pipeline"),
       llvm::cl::init(false),
   };
-  Option<int64_t> splitReductionTargetSize{
+  Option<bool> enableSplitReduction{
       *this,
-      "split-reduction-target-size",
-      llvm::cl::desc("Target tile size for split reduction"),
-      llvm::cl::init(0),
+      "split-reduction",
+      llvm::cl::desc("Enable split reduction for dispatch creation pipeline"),
+      llvm::cl::init(false),
   };
 };
 

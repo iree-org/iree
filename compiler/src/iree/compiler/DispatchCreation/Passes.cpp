@@ -174,12 +174,10 @@ static void addDispatchRegionCreationPreprocessingPasses(
       //        - Legacy pass to be deprecated
       .addPass(DispatchCreation::createSplitReductionPass)
       //        - Split reduction using partial reduction tiling.
-      .addPass([&]() {
-        return DispatchCreation::createSetSplitReductionSizesPass(
-            SetSplitReductionSizesPassOptions{
-                /*splitReductionTargetSize=*/
-                dispatchOptions.splitReductionTargetSize});
-      })
+      .addPredicatedPass(
+          dispatchOptions.enableSplitReduction,
+          //  DispatchCreation::createSetSplitReductionSizesPass)
+          []() { return DispatchCreation::createSetSplitReductionSizesPass(); })
       .addPass(DispatchCreation::createFormSplitReductionDispatchesPass)
       //     c. Transpose generic ops to
       //        - help with dispatch region formation.

@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --iree-dispatch-creation-pipeline='split-reduction-target-size=1024' --split-input-file | FileCheck %s
+// RUN: iree-opt %s --iree-dispatch-creation-pipeline='split-reduction=true' --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @basic_reduction(
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<4096xf32>
