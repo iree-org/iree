@@ -60,6 +60,11 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
     return false;
   }
 
+  if (!options.fuseBroadcastConsumers &&
+      IREE::LinalgExt::isBroadcastingOp(linalgConsumerOp)) {
+    return false;
+  }
+
   // Do no fuse bitextend-like operations with producers. Such ops are cloned
   // into all their use dispatches. So fusing producer with consumer here would
   // then result in producer also getting cloned into many dispatches which is
