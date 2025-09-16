@@ -27,6 +27,9 @@ def IREELinalgExt_Dialect : Dialect {
     A dialect designed for experimenting with non-structured operations that
     cannot be represented efficiently/directly by the Linalg dialect.
   }];
+  let dependentDialects = [
+    "linalg::LinalgDialect"
+  ];
   let useDefaultAttributePrinterParser = 1;
 }
 
