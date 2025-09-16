@@ -46,9 +46,6 @@
 
 #define DEBUG_TYPE "iree-dispatch-creation-form-dispatch-regions"
 
-static const char kRootOpAttr[] = "__root_op__";
-static const char kFusionGroupsAttr[] = "__fused_op__";
-
 namespace mlir::iree_compiler::DispatchCreation {
 
 #define GEN_PASS_DEF_FORMDISPATCHREGIONSPASS
@@ -777,13 +774,7 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root,
 }
 
 /// Some heuristic is needed to fuse a dispatchable op with root operations
-/// using tile + fuse. Using some heuristic, each root operation is tagged with
-/// an ID (using an IntegerAttr with name `kRootOpAttr`) and all dispatchable
-/// ops to be fused with it is tagged with the same ID (using a list of
-/// IntegerAttr with name `kFusionGroupsAttr`). Each dispatchable operation can
-/// be marked to fuse with multiple root operations (i.e. replicated). For now a
-/// very simple heuristic is used below, but the mechanism should be general
-/// enough to capture any heuristic.
+/// using tile + fuse.
 static void
 decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
                        FormDispatchRegionsPassOptions const &options,
@@ -884,8 +875,7 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
                    mlir::FunctionOpInterface funcOp,
                    DominanceInfo &dominanceInfo,
                    FormDispatchRegionsPassOptions const &options) {
-  // Step 1: Decide fusion groups (heuristic). This marks rootOps with an
-  // attribute
+  // Step 1: Decide fusion groups (heuristic).
   FusionTracker tracker;
   decideFusableLinalgOps(funcOp.getFunctionBody(), dominanceInfo, options,
                          tracker);
