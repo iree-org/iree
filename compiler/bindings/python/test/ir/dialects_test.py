@@ -34,6 +34,7 @@ from iree.compiler.dialects import (
     llvm,
     math,
     memref,
+    nvvm,
     pdl,
     rocdl,
     scf,
