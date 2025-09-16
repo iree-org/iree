@@ -122,6 +122,48 @@ func.func @expand_dest_forall_multiresult() {
 //  CHECK-SAME:   offsets = [0, 0], sizes = [32, 32], strides = [1, 1]
 //  CHECK-SAME:   !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x32xf32>>
 
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+    #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+func.func @expand_dest_forall_store_to_buffer(%0: memref<?x64x32xf32>, %index: index) {
+  %c0 = arith.constant 0 : index
+  %1 = tensor.empty(%index) : tensor<?x64x32xf32>
+  %2 = scf.forall (%arg0, %arg1) = (0, 0) to (64, 32) step (16, 16)
+    shared_outs(%arg2 = %1) -> (tensor<?x64x32xf32>) {
+    %extracted_slice = tensor.extract_slice %arg2[%c0, %arg0, %arg1] [1, 16, 16] [1, 1, 1]
+         : tensor<?x64x32xf32> to tensor<1x16x16xf32>
+    %expanded = tensor.expand_shape %extracted_slice [[0], [1], [2, 3, 4]]
+              output_shape [1, 16, 2, 4, 2] : tensor<1x16x16xf32> into tensor<1x16x2x4x2xf32>
+    %expanded_barrier = util.optimization_barrier %expanded : tensor<1x16x2x4x2xf32>
+    %collapsed = tensor.collapse_shape %expanded_barrier [[0], [1], [2, 3, 4]] : tensor<1x16x2x4x2xf32> into tensor<1x16x16xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %collapsed into %arg2[%c0, %arg0, %arg1] [1, 16, 16] [1, 1, 1]
+        : tensor<1x16x16xf32> into tensor<?x64x32xf32>
+    }
+  } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+  iree_codegen.store_to_buffer %2, %0 : tensor<?x64x32xf32> into memref<?x64x32xf32>
+  return
+}
+
+// CHECK-LABEL: func @expand_dest_forall_store_to_buffer(
+// CHECK-SAME:     %[[OUTPUT:[a-zA-Z0-9]+]]
+// CHECK-SAME:     %[[INDEX:[a-zA-Z0-9]+]]
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty(%[[INDEX]]) : tensor<?x64x4x4x2xf32>
+//       CHECK:   %[[SCFFORALL:.+]] = scf.forall (%[[ARG0:.+]], %[[ARG1:.+]]) = (0, 0)
+//  CHECK-SAME:       shared_outs(%[[ARG2:.+]] = %[[EMPTY]]) -> (tensor<?x64x4x4x2xf32>) {
+//   CHECK-DAG:     %[[OFFSET:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 8)>()[%[[ARG1]]]
+//       CHECK:     %[[EXTRACT:.+]] = tensor.extract_slice %[[ARG2]]
+//  CHECK-SAME:         [0, %[[ARG0]], %[[OFFSET]], 0, 0] [1, 16, 2, 4, 2] [1, 1, 1, 1, 1]
+//  CHECK-SAME:         tensor<?x64x4x4x2xf32> to tensor<1x16x2x4x2xf32>
+//       CHECK:     %[[BARRIER:.+]] = util.optimization_barrier %[[EXTRACT]] : tensor<1x16x2x4x2xf32>
+//       CHECK:     tensor.parallel_insert_slice %[[BARRIER]] into %[[ARG2]]
+//  CHECK-SAME:         [0, %[[ARG0]], %[[OFFSET]], 0, 0] [1, 16, 2, 4, 2] [1, 1, 1, 1, 1]
+//  CHECK-SAME:         tensor<1x16x2x4x2xf32> into tensor<?x64x4x4x2xf32>
+//       CHECK:   %[[EXPAND_SHAPE:.+]] = memref.expand_shape %[[OUTPUT]]
+//  CHECK-SAME:     memref<?x64x32xf32> into memref<?x64x4x4x2xf32>
+//       CHECK:   iree_codegen.store_to_buffer %[[SCFFORALL]], %[[EXPAND_SHAPE]]
+//  CHECK-SAME:     tensor<?x64x4x4x2xf32> into memref<?x64x4x4x2xf32>
 
 // -----
 
