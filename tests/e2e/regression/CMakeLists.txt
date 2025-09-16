@@ -190,6 +190,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_regression_hip
   SRCS
+    "dynamic_gather_attention.mlir"
     "linalg_ops_dynamic.mlir"
     "split_reduction_using_tiling.mlir"
   TARGET_BACKEND
