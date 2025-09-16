@@ -95,11 +95,10 @@ public:
               arith::IndexCastOp::create(b, indicesTy.getElementType(), index);
           linalg::YieldOp::create(b, cast.getResult());
         };
-        batchIdx = builder
-                       .create<linalg::GenericOp>(indicesTy, indices, empty,
-                                                  indexingMaps, iterators,
-                                                  blockBuilder)
-                       .getResult(0);
+        batchIdx =
+            linalg::GenericOp::create(builder, indicesTy, indices, empty,
+                                      indexingMaps, iterators, blockBuilder)
+                .getResult(0);
       }
 
       indicesTy = llvm::cast<RankedTensorType>(indicesTy.clone(
@@ -158,9 +157,9 @@ public:
     target.addIllegalOp<tosa::ScatterOp>();
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
 
-    FunctionOpInterface func = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     mlir::iree_compiler::populateTosaToLinalgExtPatterns(&patterns);
-    if (failed(applyFullConversion(func, target, std::move(patterns))))
+    if (failed(applyFullConversion(funcOp, target, std::move(patterns))))
       signalPassFailure();
   }
 };

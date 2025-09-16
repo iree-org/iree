@@ -199,7 +199,7 @@ decomposeHorizontallyFusedGemmOperations(RewriterBase &rewriter,
 }
 
 void DecomposeHorizontallyFusedGemmsPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   IRRewriter rewriter(&getContext());
   SmallVector<linalg::LinalgOp> horizontallyFusedOps;
   funcOp.walk([&](linalg::LinalgOp linalgOp) {

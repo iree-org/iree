@@ -639,7 +639,7 @@ class PropagateSubrangesPass
     : public impl::PropagateSubrangesPassBase<PropagateSubrangesPass> {
 public:
   void runOnOperation() override {
-    auto rootOp = getOperation();
+    mlir::ModuleOp rootOp = getOperation();
     SymbolTable symbolTable(rootOp);
 
     // Expand all util.global ops holding resources into resource and subrange.

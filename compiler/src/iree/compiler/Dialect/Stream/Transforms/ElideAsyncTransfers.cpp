@@ -93,7 +93,7 @@ struct ElideAsyncTransfersPass
           ElideAsyncTransfersPass> {
   using ElideAsyncTransfersPassBase::ElideAsyncTransfersPassBase;
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     // Get the topology attribute from the module.
     auto topologyAttr =

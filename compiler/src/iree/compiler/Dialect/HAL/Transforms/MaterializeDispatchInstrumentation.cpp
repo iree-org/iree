@@ -110,7 +110,7 @@ struct MaterializeDispatchInstrumentationPass
       MaterializeDispatchInstrumentationPass>::
       MaterializeDispatchInstrumentationPassBase;
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     if (moduleOp.getBody()->empty())
       return;
 
@@ -266,8 +266,8 @@ struct MaterializeDispatchInstrumentationPass
           // deduplication.
           uint32_t dispatchSiteId = dispatchSiteCount++;
           dispatchOp.getUniformOperandsMutable().append(
-              parentBuilder
-                  .create<arith::ConstantIntOp>(loc, dispatchSiteId, 32)
+              arith::ConstantIntOp::create(parentBuilder, loc, dispatchSiteId,
+                                           32)
                   .getResult());
 
           // Record dispatch site to the host-side metadata.

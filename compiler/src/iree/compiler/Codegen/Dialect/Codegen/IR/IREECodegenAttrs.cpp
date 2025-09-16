@@ -527,9 +527,8 @@ static OpFoldResult getMinimumConstantOffsetValue(OpBuilder &b, Location loc,
   Value modOffset = arith::ConstantIndexOp::create(b, loc, baseMod);
   // If the original add is nsw/nuw, then the new add must also be given we're
   // adding a smaller value.
-  return b
-      .create<arith::AddIOp>(loc, add.getLhs(), modOffset,
-                             add.getOverflowFlags())
+  return arith::AddIOp::create(b, loc, add.getLhs(), modOffset,
+                               add.getOverflowFlags())
       .getResult();
 }
 
@@ -581,9 +580,8 @@ OpFoldResult RotateRowsAttr::swizzleOffset(OpBuilder &b, Location loc,
   // multiple accesses to a memref only differ by a constant value (very common
   // when working with statically shaped memrefs like shared/scratch memory).
   Value diff = arith::SubIOp::create(b, loc, swizzledId, idVal);
-  return b
-      .create<arith::AddIOp>(
-          loc, getValueOrCreateConstantIndexOp(b, loc, offset), diff)
+  return arith::AddIOp::create(
+             b, loc, getValueOrCreateConstantIndexOp(b, loc, offset), diff)
       .getResult();
 }
 
@@ -695,9 +693,8 @@ OpFoldResult XORShuffleAttr::swizzleOffset(OpBuilder &b, Location loc,
   Value swizzledIdVal =
       updateCol(b, loc, idVal, colSwizzled, rowAlignmentVal, accessWidthVal);
   Value diff = arith::SubIOp::create(b, loc, swizzledIdVal, idVal);
-  return b
-      .create<arith::AddIOp>(
-          loc, getValueOrCreateConstantIndexOp(b, loc, offset), diff)
+  return arith::AddIOp::create(
+             b, loc, getValueOrCreateConstantIndexOp(b, loc, offset), diff)
       .getResult();
 }
 

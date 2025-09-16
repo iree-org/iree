@@ -69,7 +69,7 @@ DiagnosedSilenceableFailure static mapNestedForallToThreadsImpl(
 struct GPUDistributePass final
     : impl::GPUDistributePassBase<GPUDistributePass> {
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     IRRewriter rewriter(funcOp->getContext());
 
     // First map all lane level forall loops to lanes.

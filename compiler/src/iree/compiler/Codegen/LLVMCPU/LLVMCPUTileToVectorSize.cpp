@@ -34,8 +34,7 @@ namespace {
 
 struct LLVMCPUTileToVectorSizePass final
     : impl::LLVMCPUTileToVectorSizePassBase<LLVMCPUTileToVectorSizePass> {
-  using impl::LLVMCPUTileToVectorSizePassBase<
-      LLVMCPUTileToVectorSizePass>::LLVMCPUTileToVectorSizePassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, scf::SCFDialect>();

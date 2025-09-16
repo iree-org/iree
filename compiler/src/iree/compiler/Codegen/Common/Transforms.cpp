@@ -306,10 +306,10 @@ swapExpandShapeWithSlice(RewriterBase &rewriter,
         llvm::map_to_vector(delinOffsets, [&](OpFoldResult ofr) {
           return getValueOrCreateConstantIndexOp(rewriter, loc, ofr);
         });
-    OpFoldResult newOffset = rewriter
-                                 .create<affine::AffineLinearizeIndexOp>(
-                                     loc, offsetVals, basis, /*disjoint=*/true)
-                                 .getResult();
+    OpFoldResult newOffset =
+        affine::AffineLinearizeIndexOp::create(rewriter, loc, offsetVals, basis,
+                                               /*disjoint=*/true)
+            .getResult();
     newOffsets.push_back(newOffset);
     newLengths.push_back(newSize);
 

@@ -126,8 +126,7 @@ static LogicalResult isWithinVectorSizeLimit(linalg::LinalgOp linalgOp,
 class GenericVectorizationPass final
     : public impl::GenericVectorizationPassBase<GenericVectorizationPass> {
 public:
-  using impl::GenericVectorizationPassBase<
-      GenericVectorizationPass>::GenericVectorizationPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
@@ -139,7 +138,7 @@ public:
 
 void GenericVectorizationPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   IRRewriter rewriter(context);
   SmallVector<Operation *> candidates;

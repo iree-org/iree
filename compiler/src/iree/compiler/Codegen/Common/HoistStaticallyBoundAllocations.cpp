@@ -33,7 +33,7 @@ struct HoistStaticallyBoundAllocationsPass
 } // namespace
 
 void HoistStaticallyBoundAllocationsPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   IRRewriter rewriter(funcOp->getContext());
 
   std::optional<vector::VscaleRange> vscaleRange;

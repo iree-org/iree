@@ -931,10 +931,9 @@ static Value createCatNegateAndSlice(RewriterBase &rewriter, Value outTensor,
   };
 
   Value result =
-      rewriter
-          .create<linalg::GenericOp>(loc, expandedOutTensor.getType(),
-                                     ValueRange(), expandedOutTensor,
-                                     indexingMaps, iteratorTypes, bodyBuilder)
+      linalg::GenericOp::create(rewriter, loc, expandedOutTensor.getType(),
+                                ValueRange(), expandedOutTensor, indexingMaps,
+                                iteratorTypes, bodyBuilder)
           .getResult(0);
 
   return tensor::CollapseShapeOp::create(rewriter, loc, outTensor.getType(),

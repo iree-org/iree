@@ -96,8 +96,7 @@ public:
 struct IREECodegenCanonicalizerPass final
     : impl::IREECodegenCanonicalizerPassBase<IREECodegenCanonicalizerPass> {
 public:
-  using impl::IREECodegenCanonicalizerPassBase<
-      IREECodegenCanonicalizerPass>::IREECodegenCanonicalizerPassBase;
+  using Base::Base;
   /// Initialize the canonicalizer by building the set of patterns used during
   /// execution.
   LogicalResult initialize(MLIRContext *context) override {

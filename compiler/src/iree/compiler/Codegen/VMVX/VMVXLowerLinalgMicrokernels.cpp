@@ -921,8 +921,7 @@ struct LinalgFillConversion : public OpRewritePattern<linalg::FillOp> {
 class VMVXLowerLinalgMicrokernelsPass
     : public impl::VMVXLowerLinalgMicrokernelsPassBase<
           VMVXLowerLinalgMicrokernelsPass> {
-  using impl::VMVXLowerLinalgMicrokernelsPassBase<
-      VMVXLowerLinalgMicrokernelsPass>::VMVXLowerLinalgMicrokernelsPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, IREE::VMVX::VMVXDialect,

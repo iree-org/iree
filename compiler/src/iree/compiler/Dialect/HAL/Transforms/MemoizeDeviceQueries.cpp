@@ -63,7 +63,7 @@ struct MemoizeDeviceQueriesPass
     : public IREE::HAL::impl::MemoizeDeviceQueriesPassBase<
           MemoizeDeviceQueriesPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     // Analyze the module to determine which devices are used where.
     DeviceAnalysis deviceAnalysis(moduleOp);

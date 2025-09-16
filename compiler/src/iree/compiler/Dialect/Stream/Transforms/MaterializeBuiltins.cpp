@@ -350,7 +350,7 @@ struct MaterializeBuiltinsPass
     : public IREE::Stream::impl::MaterializeBuiltinsPassBase<
           MaterializeBuiltinsPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     if (moduleOp.getBody()->empty())
       return;
 

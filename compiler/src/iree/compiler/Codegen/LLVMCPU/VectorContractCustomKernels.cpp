@@ -1129,7 +1129,7 @@ public:
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
     populateVectorContractCustomKernelsPatterns(target, patterns);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {

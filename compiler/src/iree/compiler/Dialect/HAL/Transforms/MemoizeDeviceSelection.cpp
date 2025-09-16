@@ -147,7 +147,7 @@ struct MemoizeDeviceSelectionPass
     : public IREE::HAL::impl::MemoizeDeviceSelectionPassBase<
           MemoizeDeviceSelectionPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     SymbolTable symbolTable(moduleOp);
 
     DeviceAnalysis deviceAnalysis(moduleOp);

@@ -75,8 +75,8 @@ static std::string getDeviceNamePrefix(IREE::Util::GlobalOpInterface deviceOp) {
     // Already prefixed.
     return deviceName.str();
   }
-  auto prefixedName = "__" + deviceName;
-  return prefixedName.str();
+  std::string prefixedName = ("__" + deviceName).str();
+  return prefixedName;
 }
 
 static void declareDeviceExecutable(IREE::Util::GlobalOpInterface deviceOp,
@@ -470,7 +470,7 @@ struct MaterializeResourceCachesPass
     : public IREE::HAL::impl::MaterializeResourceCachesPassBase<
           MaterializeResourceCachesPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     SymbolTable symbolTable(moduleOp);
 
     // Analyze the module to determine which devices are used where.

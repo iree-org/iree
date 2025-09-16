@@ -188,11 +188,10 @@ struct GenericResourcePattern : public ConversionPattern {
     // If needed insert a transfer to the target lifetime.
     Value result = importOp.getResult();
     if (targetType != externalType) {
-      result = builder
-                   .create<IREE::Stream::AsyncTransferOp>(
-                       loc, targetType, result, resultSize, resultSize,
-                       /*source_affinity=*/executionAffinityAttr,
-                       /*result_affinity=*/executionAffinityAttr)
+      result = IREE::Stream::AsyncTransferOp::create(
+                   builder, loc, targetType, result, resultSize, resultSize,
+                   /*source_affinity=*/executionAffinityAttr,
+                   /*result_affinity=*/executionAffinityAttr)
                    .getResult();
     }
 
@@ -270,12 +269,11 @@ struct ConvertToStreamPass final
       auto resourceValue = inputs[0];
       auto resourceSize = inputs[1];
       assert(inputs.size() == 2 && "expecting 2 operands (resource + size)");
-      Value cast = builder
-                       .create<IREE::Stream::AsyncTransferOp>(
-                           loc, resourceValue.getType(), resourceValue,
-                           resourceSize, resourceSize,
-                           /*source_affinity=*/nullptr,
-                           /*result_affinity=*/nullptr)
+      Value cast = IREE::Stream::AsyncTransferOp::create(
+                       builder, loc, resourceValue.getType(), resourceValue,
+                       resourceSize, resourceSize,
+                       /*source_affinity=*/nullptr,
+                       /*result_affinity=*/nullptr)
                        .getResult();
       return UnrealizedConversionCastOp::create(builder, loc, resultType, cast)
           .getResult(0);

@@ -538,9 +538,8 @@ FailureOr<Value> rankReduceOperand(RewriterBase &rewriter, Location loc,
     std::optional<SmallVector<ReassociationIndices>> reassoc =
         getReassociationIndicesForCollapse(shape, targetShape);
     assert(reassoc.has_value());
-    return rewriter
-        .create<tensor::CollapseShapeOp>(loc, ty.clone(targetShape), operand,
-                                         reassoc.value())
+    return tensor::CollapseShapeOp::create(rewriter, loc, ty.clone(targetShape),
+                                           operand, reassoc.value())
         .getResult();
   }
   llvm_unreachable("unhandled rank reduction strategy");
@@ -888,12 +887,12 @@ static Value getCollapsedOpOperand(Location loc, AttentionOp op,
 
   // Insert a reshape to collapse the dimensions.
   if (isa<MemRefType>(operand.getType())) {
-    return builder
-        .create<memref::CollapseShapeOp>(loc, operand, operandReassociation)
+    return memref::CollapseShapeOp::create(builder, loc, operand,
+                                           operandReassociation)
         .getResult();
   }
-  return builder
-      .create<tensor::CollapseShapeOp>(loc, operand, operandReassociation)
+  return tensor::CollapseShapeOp::create(builder, loc, operand,
+                                         operandReassociation)
       .getResult();
 }
 

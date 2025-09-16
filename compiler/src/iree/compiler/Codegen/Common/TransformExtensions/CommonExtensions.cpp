@@ -768,9 +768,8 @@ void transform_dialect::IREEBufferizeOp::build(OpBuilder &builder,
 static FailureOr<Value> cpuComprehensiveBufferizeAllocationFn(
     OpBuilder &builder, Location loc, MemRefType memRefType,
     ValueRange dynamicSizes, unsigned alignment) {
-  return builder
-      .create<memref::AllocaOp>(loc, memRefType, dynamicSizes,
-                                builder.getI64IntegerAttr(alignment))
+  return memref::AllocaOp::create(builder, loc, memRefType, dynamicSizes,
+                                  builder.getI64IntegerAttr(alignment))
       .getResult();
 }
 
@@ -795,9 +794,8 @@ static FailureOr<Value> gpuComprehensiveBufferizeAllocationFn(
   MemRefType allocType =
       MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
                       AffineMap(), addressSpaceAttr);
-  return builder
-      .create<memref::AllocOp>(loc, allocType, dynamicSizes,
-                               builder.getI64IntegerAttr(alignment))
+  return memref::AllocOp::create(builder, loc, allocType, dynamicSizes,
+                                 builder.getI64IntegerAttr(alignment))
       .getResult();
 }
 

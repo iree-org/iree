@@ -223,7 +223,7 @@ static bool isUsedAsInit(Operation *producer, Operation *user) {
 }
 
 void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   auto *context = &getContext();
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
 

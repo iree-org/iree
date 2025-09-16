@@ -56,7 +56,7 @@ static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 class FuseGlobalsPass : public impl::FuseGlobalsPassBase<FuseGlobalsPass> {
 public:
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     GlobalTable globalTable(moduleOp);
     globalTable.rebuild();

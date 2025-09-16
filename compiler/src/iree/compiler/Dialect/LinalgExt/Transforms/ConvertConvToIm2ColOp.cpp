@@ -266,11 +266,10 @@ public:
     Value colTensor = tensor::EmptyOp::create(rewriter, loc, colTensorShape,
                                               inputType.getElementType());
     Value img2ColTensor =
-        rewriter
-            .create<IREE::LinalgExt::Im2colOp>(
-                loc, input, /*output=*/colTensor, convDims.strides,
-                convDims.dilations, kernelSizes, mOffset, mBasis, kOffset,
-                kBasis, batchPos, mPos, kPos, inputKPerm)
+        IREE::LinalgExt::Im2colOp::create(
+            rewriter, loc, input, /*output=*/colTensor, convDims.strides,
+            convDims.dilations, kernelSizes, mOffset, mBasis, kOffset, kBasis,
+            batchPos, mPos, kPos, inputKPerm)
             .getResult(0);
 
     Value reshapedFilter = tensor::CollapseShapeOp::create(

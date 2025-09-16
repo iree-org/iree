@@ -278,12 +278,11 @@ static void appendDispatchBenchmark(IREE::Stream::AffinityAttr affinityAttr,
       IREE::HAL::CommandBufferModeBitfield::OneShot |
       IREE::HAL::CommandBufferModeBitfield::AllowInlineExecution;
   auto commandBuffer =
-      funcBuilder
-          .create<IREE::HAL::CommandBufferCreateOp>(
-              loc, funcBuilder.getType<IREE::HAL::CommandBufferType>(), device,
-              commandBufferModes, IREE::HAL::CommandCategoryBitfield::Dispatch,
-              queueAffinity,
-              /*binding_capacity=*/Value{})
+      IREE::HAL::CommandBufferCreateOp::create(
+          funcBuilder, loc, funcBuilder.getType<IREE::HAL::CommandBufferType>(),
+          device, commandBufferModes,
+          IREE::HAL::CommandCategoryBitfield::Dispatch, queueAffinity,
+          /*binding_capacity=*/Value{})
           .getResult();
 
   // Constant values.
@@ -472,7 +471,7 @@ struct DumpExecutableBenchmarksPass
   using IREE::HAL::impl::DumpExecutableBenchmarksPassBase<
       DumpExecutableBenchmarksPass>::DumpExecutableBenchmarksPassBase;
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     auto moduleName = moduleOp.getName().value_or("module");
     SymbolTable symbolTable(moduleOp);
 

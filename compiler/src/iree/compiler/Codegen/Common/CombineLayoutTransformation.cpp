@@ -219,9 +219,8 @@ foldExtractSliceIntoMapScatter(RewriterBase &rewriter,
   for (auto [bound, srcIdx] : llvm::zip_equal(bounds, srcIndices)) {
     Value boundValue = getValueOrCreateConstantIndexOp(rewriter, loc, bound);
     auto isOutOfBounds =
-        rewriter
-            .create<arith::CmpIOp>(loc, arith::CmpIPredicate::ult, srcIdx,
-                                   boundValue)
+        arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::ult, srcIdx,
+                              boundValue)
             ->getResult(0);
     mask = arith::AndIOp::create(rewriter, loc, mask, isOutOfBounds);
   }
@@ -681,8 +680,7 @@ namespace {
 struct CombineLayoutTransformationPass final
     : impl::CombineLayoutTransformationPassBase<
           CombineLayoutTransformationPass> {
-  using impl::CombineLayoutTransformationPassBase<
-      CombineLayoutTransformationPass>::CombineLayoutTransformationPassBase;
+  using Base::Base;
 
   void runOnOperation() override {
     CombineRelayoutOpsControlFn controlFn =

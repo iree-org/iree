@@ -72,7 +72,7 @@ struct InjectDispatchTracingPass
     : public IREE::Flow::impl::InjectDispatchTracingPassBase<
           InjectDispatchTracingPass> {
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     auto appendDecodedValuesToLabel = [](std::string str,
                                          SmallVector<int64_t> decodedIndices) {
       llvm::raw_string_ostream os(str);

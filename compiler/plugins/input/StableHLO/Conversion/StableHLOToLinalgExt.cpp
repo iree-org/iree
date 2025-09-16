@@ -507,14 +507,14 @@ struct ScanOpConversion final
     SmallVector<utils::IteratorType> iterators(initDims.size(),
                                                utils::IteratorType::parallel);
 
-    newInit = rewriter
-                  .create<linalg::GenericOp>(
-                      op.getLoc(), init0Ty.clone(initDims), ValueRange{init0},
-                      ValueRange{newInit}, indexingMaps, iterators,
-                      [&](OpBuilder &b, Location loc, ValueRange args) {
-                        linalg::YieldOp::create(b, loc, args[0]);
-                      })
-                  .getResult(0);
+    newInit =
+        linalg::GenericOp::create(
+            rewriter, op.getLoc(), init0Ty.clone(initDims), ValueRange{init0},
+            ValueRange{newInit}, indexingMaps, iterators,
+            [&](OpBuilder &b, Location loc, ValueRange args) {
+              linalg::YieldOp::create(b, loc, args[0]);
+            })
+            .getResult(0);
     outputs.push_back(newInit);
 
     llvm::SmallVector<Type> outputTys;

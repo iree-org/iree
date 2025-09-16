@@ -42,8 +42,7 @@ static void swizzleSharedMemory(mlir::FunctionOpInterface funcOp) {
 namespace {
 struct LLVMGPUVectorToGPUPass final
     : impl::LLVMGPUVectorToGPUPassBase<LLVMGPUVectorToGPUPass> {
-  using impl::LLVMGPUVectorToGPUPassBase<
-      LLVMGPUVectorToGPUPass>::LLVMGPUVectorToGPUPassBase;
+  using Base::Base;
   LLVMGPUVectorToGPUPass(GPUTensorCoreType tensorCoreType)
       : tensorCoreType(tensorCoreType) {}
 
@@ -53,7 +52,7 @@ struct LLVMGPUVectorToGPUPass final
   }
 
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     bool targetMmaSync = tensorCoreType == GPUTensorCoreType::MMA_SYNC;
     RewritePatternSet flatternpatterns(funcOp.getContext());
     populateVectorTransferToGPUMMAPreparationPatterns(flatternpatterns);

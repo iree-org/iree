@@ -68,45 +68,45 @@ static Value computeHouseholder(Value v, Value tau, Value k,
   Value one =
       arith::ConstantOp::create(b, b.getFloatAttr(vTy.getElementType(), 1.0));
 
-  return b
-      .create<linalg::GenericOp>(
-          hTy, ValueRange{v, v}, empty, affineMaps, iterTypes,
-          [&](OpBuilder &bb, Location loc, ValueRange args) {
-            ImplicitLocOpBuilder b(loc, bb);
-            SmallVector<Value> indices;
-            for (int i = 0, s = hTy.getRank(); i < s; ++i) {
-              indices.push_back(linalg::IndexOp::create(b, loc, i));
-            }
+  return linalg::GenericOp::create(
+             b, hTy, ValueRange{v, v}, empty, affineMaps, iterTypes,
+             [&](OpBuilder &bb, Location loc, ValueRange args) {
+               ImplicitLocOpBuilder b(loc, bb);
+               SmallVector<Value> indices;
+               for (int i = 0, s = hTy.getRank(); i < s; ++i) {
+                 indices.push_back(linalg::IndexOp::create(b, loc, i));
+               }
 
-            SmallVector<Value> tauIndices(indices.begin(), indices.end() - 2);
-            tauIndices.push_back(k);
-            Value t = tensor::ExtractOp::create(b, tau, tauIndices);
+               SmallVector<Value> tauIndices(indices.begin(),
+                                             indices.end() - 2);
+               tauIndices.push_back(k);
+               Value t = tensor::ExtractOp::create(b, tau, tauIndices);
 
-            // Generates the lower triangularization of the matrix with
-            // one values on the diagonal.
-            auto tri = [&](Value v, Value i) {
-              Value eq =
-                  arith::CmpIOp::create(b, arith::CmpIPredicate::eq, i, k);
-              Value lt =
-                  arith::CmpIOp::create(b, arith::CmpIPredicate::ult, i, k);
-              Value sel = arith::SelectOp::create(b, eq, one, v);
-              return arith::SelectOp::create(b, lt, zero, sel);
-            };
+               // Generates the lower triangularization of the matrix with
+               // one values on the diagonal.
+               auto tri = [&](Value v, Value i) {
+                 Value eq =
+                     arith::CmpIOp::create(b, arith::CmpIPredicate::eq, i, k);
+                 Value lt =
+                     arith::CmpIOp::create(b, arith::CmpIPredicate::ult, i, k);
+                 Value sel = arith::SelectOp::create(b, eq, one, v);
+                 return arith::SelectOp::create(b, lt, zero, sel);
+               };
 
-            Value v = tri(args[0], indices[indices.size() - 2]);
-            Value vT = tri(args[1], indices[indices.size() - 1]);
+               Value v = tri(args[0], indices[indices.size() - 2]);
+               Value vT = tri(args[1], indices[indices.size() - 1]);
 
-            Value h = arith::MulFOp::create(b, v, vT);
-            h = arith::MulFOp::create(b, h, t);
+               Value h = arith::MulFOp::create(b, v, vT);
+               h = arith::MulFOp::create(b, h, t);
 
-            Value isDiag = arith::CmpIOp::create(b, arith::CmpIPredicate::eq,
-                                                 indices[indices.size() - 2],
-                                                 indices[indices.size() - 1]);
-            Value diag = arith::SelectOp::create(b, isDiag, one, zero);
-            Value sub = arith::SubFOp::create(b, diag, h);
+               Value isDiag = arith::CmpIOp::create(
+                   b, arith::CmpIPredicate::eq, indices[indices.size() - 2],
+                   indices[indices.size() - 1]);
+               Value diag = arith::SelectOp::create(b, isDiag, one, zero);
+               Value sub = arith::SubFOp::create(b, diag, h);
 
-            linalg::YieldOp::create(b, sub);
-          })
+               linalg::YieldOp::create(b, sub);
+             })
       .getResult(0);
 }
 

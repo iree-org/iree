@@ -72,7 +72,7 @@ struct InjectTensorTracingPass
           InjectTensorTracingPass> {
   void runOnOperation() override {
     auto attrName = StringAttr::get(&getContext(), "iree.tensor.trace");
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     funcOp.walk([&](Operation *op) {
       if (auto attr = op->getAttr(attrName)) {
         std::string traceKey;

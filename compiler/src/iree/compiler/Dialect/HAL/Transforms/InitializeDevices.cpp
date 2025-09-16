@@ -95,7 +95,7 @@ struct InitializeDevicesPass
   using IREE::HAL::impl::InitializeDevicesPassBase<
       InitializeDevicesPass>::InitializeDevicesPassBase;
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     for (auto globalOp : moduleOp.getOps<IREE::Util::GlobalOpInterface>()) {
       auto initialValue =
           dyn_cast_if_present<IREE::HAL::DeviceInitializationAttrInterface>(

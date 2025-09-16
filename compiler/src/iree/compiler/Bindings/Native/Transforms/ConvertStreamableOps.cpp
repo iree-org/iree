@@ -20,6 +20,9 @@
 
 namespace mlir::iree_compiler::IREE::ABI {
 
+#define GEN_PASS_DEF_CONVERTSTREAMABLEOPSPASS
+#include "iree/compiler/Bindings/Native/Transforms/Passes.h.inc"
+
 static constexpr int64_t kUnspecifiedDim = -1;
 static constexpr int64_t kTiedDim = -2;
 
@@ -329,27 +332,12 @@ convertStreamableCalls(mlir::ModuleOp moduleOp,
 }
 
 class ConvertStreamableOpsPass
-    : public PassWrapper<ConvertStreamableOpsPass, OperationPass<ModuleOp>> {
+    : public impl::ConvertStreamableOpsPassBase<ConvertStreamableOpsPass> {
 public:
-  ConvertStreamableOpsPass() = default;
-  ConvertStreamableOpsPass(const ConvertStreamableOpsPass &pass) {}
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::tensor::TensorDialect, IREE::Flow::FlowDialect,
-                    IREE::Util::UtilDialect>();
-  }
-
-  StringRef getArgument() const override {
-    return "iree-abi-convert-streamable-ops";
-  }
-
-  StringRef getDescription() const override {
-    return "Converts streamable ops in input dialects into their IREE dialect "
-           "forms.";
-  }
+  using Base::Base;
 
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     // Gather functions that need wrapping.
     SmallVector<IREE::Util::FuncOp> originalFuncOps;
@@ -385,11 +373,5 @@ public:
     }
   }
 };
-
-std::unique_ptr<OperationPass<ModuleOp>> createConvertStreamableOpsPass() {
-  return std::make_unique<ConvertStreamableOpsPass>();
-}
-
-static PassRegistration<ConvertStreamableOpsPass> pass;
 
 } // namespace mlir::iree_compiler::IREE::ABI

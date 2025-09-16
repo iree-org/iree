@@ -721,7 +721,7 @@ public:
 
   void runOnOperation() override {
     llvm::TimerGroup tg("iree-consteval-jit", "Consteval Jit");
-    auto outerModule = getOperation();
+    mlir::ModuleOp outerModuleOp = getOperation();
 
     // Set the target.
     if (!targetDevice) {
@@ -758,14 +758,14 @@ public:
     }
 
     // Build the program.
-    ProgramBuilder programBuilder(outerModule, *deviceTargetAttr,
+    ProgramBuilder programBuilder(outerModuleOp, *deviceTargetAttr,
                                   supportedTypes,
                                   getAnalysis<IREE::Util::ConstExprAnalysis>());
 
     // Iterate over initializers.
     llvm::SmallVector<IREE::Util::InitializerOp> initializerOps;
     llvm::SmallVector<IREE::Util::InitializerOp> deadInitOps;
-    for (auto childOp : outerModule.getOps<IREE::Util::InitializerOp>()) {
+    for (auto childOp : outerModuleOp.getOps<IREE::Util::InitializerOp>()) {
       initializerOps.push_back(childOp);
     }
     for (auto initializerOp : initializerOps) {
@@ -806,7 +806,7 @@ public:
 
     // Process the functions.
     if (failed(processFunctions(binary, programBuilder.getJitFunctions(),
-                                outerModule, tg))) {
+                                outerModuleOp, tg))) {
       signalPassFailure();
       return;
     }

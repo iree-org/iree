@@ -36,7 +36,7 @@ class RemoveSingleIterationLoopPass final
     : public impl::RemoveSingleIterationLoopPassBase<
           RemoveSingleIterationLoopPass> {
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
 
     if (failed(removeOneTripTiledLoops(funcOp))) {
       return signalPassFailure();

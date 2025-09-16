@@ -216,7 +216,7 @@ struct SubstituteExecutablesPass
   using IREE::HAL::impl::SubstituteExecutablesPassBase<
       SubstituteExecutablesPass>::SubstituteExecutablesPassBase;
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     auto moduleName = moduleOp.getName().value_or("module");
     SymbolTable symbolTable(moduleOp);
 

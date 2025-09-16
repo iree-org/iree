@@ -927,7 +927,7 @@ public:
 class ConvertToLLVMPass
     : public impl::ConvertToLLVMPassBase<ConvertToLLVMPass> {
 public:
-  using impl::ConvertToLLVMPassBase<ConvertToLLVMPass>::ConvertToLLVMPassBase;
+  using Base::Base;
   explicit ConvertToLLVMPass(bool reassociateFpReductions) {
     this->reassociateFpReductions = reassociateFpReductions;
   }
@@ -971,21 +971,26 @@ static void populateTanhPatterns(RewritePatternSet &p) {
 };
 
 void ConvertToLLVMPass::runOnOperation() {
-  auto module = getOperation();
+  mlir::ModuleOp moduleOp = getOperation();
   std::string dataLayoutStr = targetDataLayout;
   if (targetDataLayout.empty()) {
-    dataLayoutStr = getDataLayoutString(module);
+    dataLayoutStr = getDataLayoutString(moduleOp);
   }
   std::string targetTripleStr = targetTriple;
   if (targetTripleStr.empty()) {
-    targetTripleStr = getTargetTripleString(module);
+    targetTripleStr = getTargetTripleString(moduleOp);
   }
   // Add required attributes to the module so that the lowering knows how to
   // handle structs and data layouts.
-  module->setAttr(LLVM::LLVMDialect::getTargetTripleAttrName(),
-                  StringAttr::get(module->getContext(), targetTripleStr));
-  module->setAttr(LLVM::LLVMDialect::getDataLayoutAttrName(),
-                  StringAttr::get(module->getContext(), dataLayoutStr));
+  moduleOp->setAttr(LLVM::LLVMDialect::getTargetTripleAttrName(),
+                    StringAttr::get(moduleOp->getContext(), targetTripleStr));
+  moduleOp->setAttr(LLVM::LLVMDialect::getDataLayoutAttrName(),
+                    StringAttr::get(moduleOp->getContext(), dataLayoutStr));
+
+  DictionaryAttr targetConfig;
+  if (auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(moduleOp)) {
+    targetConfig = targetAttr.getConfiguration();
+  }
 
   // Run Vector -> Vector transformations ahead of conversion to LLVM.
   {
@@ -993,7 +998,12 @@ void ConvertToLLVMPass::runOnOperation() {
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
     vector::populateBubbleVectorBitCastOpPatterns(patterns);
     vector::populateVectorBroadcastLoweringPatterns(patterns);
-    vector::populateVectorGatherToConditionalLoadPatterns(patterns);
+    // RVV should be able to lower most of the gather / scatter with indexed
+    // load / store.
+    if (!targetConfig || !isRISCV(targetConfig) ||
+        !hasAnyVFeature(targetConfig)) {
+      vector::populateVectorGatherToConditionalLoadPatterns(patterns);
+    }
     vector::populateVectorInterleaveLoweringPatterns(patterns);
     // TODO: doubtful that the "default" does what one want here, it is likely
     // better to use outerproduct.
@@ -1026,7 +1036,7 @@ void ConvertToLLVMPass::runOnOperation() {
 
   const auto &dataLayoutAnalysis = getAnalysis<DataLayoutAnalysis>();
   LowerToLLVMOptions options(&getContext(),
-                             dataLayoutAnalysis.getAtOrAbove(module));
+                             dataLayoutAnalysis.getAtOrAbove(moduleOp));
   options.dataLayout = llvm::DataLayout(dataLayoutStr);
   options.overrideIndexBitwidth(options.dataLayout.getPointerSizeInBits());
   LLVMTypeConverter typeConverter(&getContext(), options, &dataLayoutAnalysis);
@@ -1041,9 +1051,6 @@ void ConvertToLLVMPass::runOnOperation() {
   //
   // TODO(bjacob): Use a lowering that uses specific ARM/X86 intrinsics.
   bool use32BitImpl = false;
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(module);
-  DictionaryAttr targetConfig =
-      targetAttr ? targetAttr.getConfiguration() : nullptr;
   if (targetConfig && isRISCV(targetConfig)) {
     // Use the 32-bit lowering for RISC-V if 'zve32*' is specified and there is
     // no 64-bit integer vector support.
@@ -1115,14 +1122,14 @@ void ConvertToLLVMPass::runOnOperation() {
                            IREE::Util::UtilDialect, IREE::HAL::HALDialect,
                            math::MathDialect, tosa::TosaDialect>();
 
-  if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
+  if (failed(applyPartialConversion(moduleOp, target, std::move(patterns)))) {
     signalPassFailure();
     return;
   }
 
-  OpPassManager passManager(module.getOperationName());
+  OpPassManager passManager(moduleOp.getOperationName());
   FunctionLikeNest(passManager).addPass(createReconcileUnrealizedCastsPass);
-  if (failed(runPipeline(passManager, module))) {
+  if (failed(runPipeline(passManager, moduleOp))) {
     return signalPassFailure();
   }
 
@@ -1131,7 +1138,7 @@ void ConvertToLLVMPass::runOnOperation() {
     RewritePatternSet patterns(&getContext());
     patterns.insert<RewriteExternCallOpToDynamicImportCallOp, RewriteCallOpABI,
                     RewriteFuncOpABI>(abi, typeConverter);
-    if (failed(applyPatternsGreedily(module, std::move(patterns))))
+    if (failed(applyPatternsGreedily(moduleOp, std::move(patterns))))
       return signalPassFailure();
   }
 
@@ -1143,7 +1150,7 @@ void ConvertToLLVMPass::runOnOperation() {
     if (triple.isWasm()) {
       populateUnfusedFMAOpsPassPatterns(&getContext(), postPatterns);
     }
-    if (failed(applyPatternsGreedily(module, std::move(postPatterns)))) {
+    if (failed(applyPatternsGreedily(moduleOp, std::move(postPatterns)))) {
       return signalPassFailure();
     }
   }

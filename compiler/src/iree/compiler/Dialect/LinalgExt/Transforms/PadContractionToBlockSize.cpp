@@ -89,8 +89,7 @@ namespace {
 
 struct PadContractionToBlockSizePass final
     : impl::PadContractionToBlockSizePassBase<PadContractionToBlockSizePass> {
-  using impl::PadContractionToBlockSizePassBase<
-      PadContractionToBlockSizePass>::PadContractionToBlockSizePassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect>();

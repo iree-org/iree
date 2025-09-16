@@ -68,8 +68,6 @@ static llvm::cl::opt<DispatchCreation::EncodingOptions> clSetEncodingStrategy(
         clEnumValN(
             DispatchCreation::EncodingOptions::Generic, "generic",
             "Using EncodingAttr which encodes as much information as possible"),
-        clEnumValN(DispatchCreation::EncodingOptions::MatmulK, "matmulk",
-                   "Only encodes the reduction dimenesions in the encoding."),
         clEnumValN(DispatchCreation::EncodingOptions::Padding, "padding",
                    "Encode tensors that need to be padded")),
     llvm::cl::init(DispatchCreation::EncodingOptions::Generic));
@@ -273,7 +271,6 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
     // broadcasting ops.
     passManager.addPass(DispatchCreation::createHoistEncodingOpsPass());
     FunctionLikeNest(passManager)
-        .addPass(DispatchCreation::createPropagateEncodingsPass)
         .addPass(
             DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass);
   }

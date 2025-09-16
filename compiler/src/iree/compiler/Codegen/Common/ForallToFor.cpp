@@ -86,9 +86,9 @@ static LogicalResult forallToForLoop(RewriterBase &rewriter,
 
 namespace {
 struct ForallToForPass : impl::ForallToForPassBase<ForallToForPass> {
-  using impl::ForallToForPassBase<ForallToForPass>::ForallToForPassBase;
+  using Base::Base;
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     IRRewriter rewriter(funcOp->getContext());
 
     // Find `scf.forall` ops we want to convert.

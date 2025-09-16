@@ -129,7 +129,7 @@ class GlobalInitializationPass
     : public IREE::VM::impl::GlobalInitializationPassBase<
           GlobalInitializationPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    IREE::VM::ModuleOp moduleOp = getOperation();
     SymbolTable symbolTable(moduleOp);
 
     // Create the __init and __deinit functions. They may be empty if there are

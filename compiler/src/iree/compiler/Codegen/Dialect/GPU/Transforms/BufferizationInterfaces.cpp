@@ -148,11 +148,10 @@ struct BarrierRegionOpBufferizationInterface
         continue;
       }
       tensorizedOperands.push_back(
-          rewriter
-              .create<bufferization::ToTensorOp>(
-                  replacement.getLoc(),
-                  memref::getTensorTypeFromMemRefType(replacement.getType()),
-                  replacement)
+          bufferization::ToTensorOp::create(
+              rewriter, replacement.getLoc(),
+              memref::getTensorTypeFromMemRefType(replacement.getType()),
+              replacement)
               .getResult());
     }
 
@@ -389,12 +388,11 @@ struct BufferResourceCastOpBufferizationInterface
         cacheSwizzleStride = arith::IndexCastOp::create(rewriter, loc, i14Type,
                                                         maybeIndexCacheSwizzle);
       }
-      buffer = rewriter
-                   .create<amdgpu::FatRawBufferCastOp>(
-                       loc, buffer.value(), /*validBytes=*/Value{},
-                       /*cacheSwizzleStride=*/cacheSwizzleStride,
-                       /*boundsCheck=*/true,
-                       /*resetOffset=*/true)
+      buffer = amdgpu::FatRawBufferCastOp::create(
+                   rewriter, loc, buffer.value(), /*validBytes=*/Value{},
+                   /*cacheSwizzleStride=*/cacheSwizzleStride,
+                   /*boundsCheck=*/true,
+                   /*resetOffset=*/true)
                    .getResult();
     }
 

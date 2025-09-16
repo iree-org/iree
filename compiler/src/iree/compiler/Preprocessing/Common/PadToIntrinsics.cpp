@@ -542,10 +542,10 @@ static void padContractionLikeOp(
       sizes;
   for (auto [dimIdx, dimSize] : llvm::enumerate(resultShape)) {
     if (ShapedType::isDynamic(dimSize))
-      sizes.push_back(rewriter
-                          .create<tensor::DimOp>(
-                              loc, linalgOp.getDpsInitOperand(0)->get(), dimIdx)
-                          .getResult());
+      sizes.push_back(
+          tensor::DimOp::create(rewriter, loc,
+                                linalgOp.getDpsInitOperand(0)->get(), dimIdx)
+              .getResult());
     else
       sizes.push_back(rewriter.getIndexAttr(dimSize));
   }
@@ -565,7 +565,7 @@ void PadToIntrinsicsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
 
-  auto moduleOp = getOperation();
+  mlir::ModuleOp moduleOp = getOperation();
   IREE::Stream::AffinityAnalysis affinityAnalysis(moduleOp);
   if (failed(affinityAnalysis.run())) {
     return signalPassFailure();

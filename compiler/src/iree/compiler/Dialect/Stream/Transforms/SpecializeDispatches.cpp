@@ -195,14 +195,13 @@ static void insertConstantTableLookup(mlir::FunctionOpInterface funcOp,
       unsigned operandIdx = operandValues.value().first;
       unsigned argIdx = operandToArgMap[operandIdx];
       auto arg = entryBlock.getArgument(argIdx);
-      auto extractedValue = builder
-                                .create<tensor::ExtractOp>(
-                                    arg.getLoc(), tableTensor,
+      auto extractedValue =
+          tensor::ExtractOp::create(builder, arg.getLoc(), tableTensor,
                                     ValueRange{
                                         siteId,
                                         indexSet.get(operandValues.index()),
                                     })
-                                .getResult();
+              .getResult();
       if (extractedValue.getType() != arg.getType()) {
         extractedValue = arith::IndexCastOp::create(
             builder, arg.getLoc(), arg.getType(), extractedValue);

@@ -28,7 +28,7 @@ public:
     // IREE VM modules use the `.` (period) character for namespacing, so
     // replace any occurrences of `.` with `_`.
 
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     auto optionalName = moduleOp.getName();
     if (!optionalName.has_value())
       return;

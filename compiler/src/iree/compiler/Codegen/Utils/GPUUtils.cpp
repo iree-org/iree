@@ -85,11 +85,10 @@ getSubgroupIdsAndCounts(mlir::OpBuilder &builder, mlir::Location loc,
     mlir::Value subgroupId =
         mlir::gpu::ThreadIdOp::create(builder, loc, indexType, dimAttr[i]);
     if (i == 0) {
-      subgroupId =
-          builder
-              .create<affine::AffineDelinearizeIndexOp>(
-                  loc, subgroupId, ArrayRef<int64_t>{numSubgroups[i], warpSize})
-              .getResult(0);
+      subgroupId = affine::AffineDelinearizeIndexOp::create(
+                       builder, loc, subgroupId,
+                       ArrayRef<int64_t>{numSubgroups[i], warpSize})
+                       .getResult(0);
     }
     procInfo[numDims - 1 - i] = {
         subgroupId,
@@ -483,19 +482,17 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
   Value laneVal = input;
   // Parallel reduction using butterfly shuffles.
   for (uint64_t i = 1; i < numLaneToReduce; i <<= 1) {
-    Value shuffled = builder
-                         .create<gpu::ShuffleOp>(loc, pack(laneVal), i,
-                                                 /*width=*/warpSize,
-                                                 /*mode=*/gpu::ShuffleMode::XOR)
+    Value shuffled = gpu::ShuffleOp::create(builder, loc, pack(laneVal), i,
+                                            /*width=*/warpSize,
+                                            /*mode=*/gpu::ShuffleMode::XOR)
                          .getShuffleResult();
     laneVal = makeArithReduction(builder, loc, kind, laneVal, unpack(shuffled));
   }
   // Broadcast the result to all the lanes.
   if (warpSize != numLaneToReduce) {
-    Value shuffled = builder
-                         .create<gpu::ShuffleOp>(loc, pack(laneVal), 0,
-                                                 /*width=*/warpSize,
-                                                 /*mode=*/gpu::ShuffleMode::IDX)
+    Value shuffled = gpu::ShuffleOp::create(builder, loc, pack(laneVal), 0,
+                                            /*width=*/warpSize,
+                                            /*mode=*/gpu::ShuffleMode::IDX)
                          .getShuffleResult();
     laneVal = unpack(shuffled);
   }
