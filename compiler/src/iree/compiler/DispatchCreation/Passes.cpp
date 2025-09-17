@@ -156,17 +156,14 @@ static void addDispatchRegionCreationPreprocessingPasses(
   FunctionLikeNest(passManager)
       // 5. After all the reshape propagations, fuse elementwise operations
       //    even if the producer has multiple uses.
-      .addPredicatedPass(dispatchOptions.enableFuseMultiUse,
-                         [&]() {
-                           return DispatchCreation::
-                               createFuseMultiUseElementwiseProducerPass();
-                         })
+      .addPredicatedPass(
+          dispatchOptions.enableFuseMultiUse,
+          DispatchCreation::createFuseMultiUseElementwiseProducerPass)
 
       // 6. Some more "post elementwise fusion passes".
       //    a. Detensorize.
       //       TODO: This is probably not in the right place.
-      .addPredicatedPass(clDetensoring,
-                         [&]() { return mlir::createLinalgDetensorizePass(); })
+      .addPredicatedPass(clDetensoring, mlir::createLinalgDetensorizePass)
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
 
