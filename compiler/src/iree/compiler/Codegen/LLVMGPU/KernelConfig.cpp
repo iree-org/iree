@@ -133,7 +133,7 @@ static llvm::cl::opt<bool>
                     llvm::cl::Hidden, llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clDirectConvolution(
-    "iree-codegen-use-direct-convolution",
+    "iree-codegen-llvmgpu-use-direct-convolution",
     llvm::cl::desc("Use direct convolution in tile and fuse pipeline"),
     llvm::cl::init(false));
 
@@ -2873,7 +2873,7 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
   if (clDirectConvolution) {
     if (succeeded(IREE::GPU::setDirectConvolutionLoweringConfig(
             target, entryPointFn, computeOp))) {
-      LDBG() << "Direct Convolution Config";
+      LDBG() << "Tile and fuse direct convolution config";
       return success();
     }
   }

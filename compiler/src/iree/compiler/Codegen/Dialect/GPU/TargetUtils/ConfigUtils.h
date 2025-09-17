@@ -20,6 +20,13 @@ LogicalResult setDataTiledMultiMmaLoweringConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
     Operation *op, IREE::Codegen::UKernelDescriptorAttr ukernelConfig);
 
+/// Helper for setting up a convolution config using direct convolution based on
+/// the specified target.
+LogicalResult
+setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
+                                   mlir::FunctionOpInterface entryPoint,
+                                   Operation *op);
+
 /// Helper for setting up a convolution config using IGEMM based on the
 /// specified target.
 /// TODO: Currently this only succeeds if the target supports an mma
@@ -50,12 +57,6 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
 LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
                             mlir::FunctionOpInterface entryPoint,
                             Operation *op);
-
-// For Direct Convolution
-LogicalResult
-setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
-                                   mlir::FunctionOpInterface entryPoint,
-                                   Operation *computeOp);
 
 //===----------------------------------------------------------------------===//
 // Pass Pipeline Options
