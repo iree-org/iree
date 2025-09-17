@@ -308,32 +308,6 @@ ireeGPUTileSizes ireeGPULoweringConfigAttrGetTileSizes(MlirAttribute attr) {
   return tilesizes;
 }
 
-ireeGPUSubgroupCountInfo
-ireeGPULoweringConfigAttrGetSubgroupCount(MlirAttribute attr) {
-  auto loweringConfigAttr =
-      llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
-          unwrap(attr));
-  std::optional<int64_t> subgroupMCount =
-      mlir::iree_compiler::IREE::GPU::getSubgroupMCount(loweringConfigAttr);
-  std::optional<int64_t> subgroupNCount =
-      mlir::iree_compiler::IREE::GPU::getSubgroupNCount(loweringConfigAttr);
-
-  ireeGPUSubgroupCountInfo info = {};
-
-  if (subgroupMCount) {
-    info.subgroupMCountAttr = wrap(mlir::IntegerAttr::get(
-        mlir::IndexType::get(loweringConfigAttr.getContext()),
-        *subgroupMCount));
-  }
-
-  if (subgroupNCount) {
-    info.subgroupNCountAttr = wrap(mlir::IntegerAttr::get(
-        mlir::IndexType::get(loweringConfigAttr.getContext()),
-        *subgroupNCount));
-  }
-  return info;
-}
-
 MlirAttribute ireeGPULoweringConfigAttrGetMmaKind(MlirAttribute attr) {
   auto loweringConfigAttr =
       llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(

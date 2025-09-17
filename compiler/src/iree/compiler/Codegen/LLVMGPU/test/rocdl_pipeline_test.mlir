@@ -142,9 +142,6 @@ hal.executable @ceildiv_expand_dispatch {
 
 // -----
 
-#config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 128], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_m_count = 2, subgroup_n_count = 2}>
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false>}>
-
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -157,7 +154,7 @@ hal.executable.variant public @rocm target(<"rocm", "rocm-hsaco-fb">) {
     hal.return %x, %y, %z : index, index, index
   }
   builtin.module {
-    func.func @matmul_map_scatter() attributes {translation_info = #translation} {
+    func.func @matmul_map_scatter() {
       %true = arith.constant true
       %cst = arith.constant 0.000000e+00 : f32
       %c0 = arith.constant 0 : index
@@ -171,7 +168,7 @@ hal.executable.variant public @rocm target(<"rocm", "rocm-hsaco-fb">) {
       %7 = iree_codegen.load_from_buffer %3 : memref<256x256xf16, #amdgpu.address_space<fat_raw_buffer>> -> tensor<256x256xf16>
       %8 = tensor.empty() : tensor<256x256xf32>
       %9 = linalg.fill ins(%cst : f32) outs(%8 : tensor<256x256xf32>) -> tensor<256x256xf32>
-      %10 = linalg.matmul {lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, promote_operands = [0, 1], reduction = [0, 0, 128], subgroup_m_count = 2 : i64, subgroup_n_count = 2 : i64, workgroup = [64, 64, 0]}>} ins(%6, %7 : tensor<256x256xf16>, tensor<256x256xf16>) outs(%9 : tensor<256x256xf32>) -> tensor<256x256xf32>
+      %10 = linalg.matmul ins(%6, %7 : tensor<256x256xf16>, tensor<256x256xf16>) outs(%9 : tensor<256x256xf32>) -> tensor<256x256xf32>
       %11 = tensor.empty() : tensor<2x16x8x4x4x4x4xf32>
       %12 = iree_linalg_ext.map_scatter %10 into %11 {
       ^bb0(%arg0: index, %arg1: index):

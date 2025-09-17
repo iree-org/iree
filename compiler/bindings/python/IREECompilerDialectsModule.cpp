@@ -466,24 +466,6 @@ NB_MODULE(_ireeCompilerDialects, m) {
             return getIntArrayAttrValues(tilesizes.reductionAttr);
           })
       .def_property_readonly(
-          "subgroup_count_mn",
-          [](MlirAttribute self) -> py::tuple {
-            ireeGPUSubgroupCountInfo info =
-                ireeGPULoweringConfigAttrGetSubgroupCount(self);
-            MlirAttribute mCountAttr = info.subgroupMCountAttr;
-            MlirAttribute nCountAttr = info.subgroupNCountAttr;
-            std::optional<int64_t> mCount;
-            if (!mlirAttributeIsNull(mCountAttr)) {
-              mCount = mlirIntegerAttrGetValueInt(mCountAttr);
-            }
-
-            std::optional<int64_t> nCount;
-            if (!mlirAttributeIsNull(nCountAttr)) {
-              nCount = mlirIntegerAttrGetValueInt(nCountAttr);
-            }
-            return py::make_tuple(mCount, nCount);
-          })
-      .def_property_readonly(
           "mma_kind", [](MlirAttribute self) -> std::optional<MlirAttribute> {
             auto attr = ireeGPULoweringConfigAttrGetMmaKind(self);
             if (!mlirAttributeIsNull(attr))
