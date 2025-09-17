@@ -272,9 +272,8 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     ## Lowering Paths
 
     Two lowering strategies are supported:
-    1. Lowers to `amdgpu.gather_to_lds` operations when lowering
-       requirements are met
-    2. Default lowering using `vector.gather` operations
+    1. Lowers to `amdgpu.gather_to_lds` operations when lowering requirements are met.
+    2. Default lowering using `vector.gather` operations.
 
     ## Operands and Results
 
@@ -282,17 +281,34 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     * `$source`: Source tensor containing the data to be gathered
     * `$init`: Destination tensor receiving the gathered data (destination-passing style)
     * `$result`: Output tensor with gathered data (same type as `$init`)
+    * `$transfer_type`: Type attribute specifying the smallest unit being transferred by GPU threads.
+       It must be a vector type with element type matching the element type of `$source`.
 
     ## Example
 
+    The following example shows how this op is designed to be used in a tiled scenario, which sets up
+    lowering path for efficient gathering.
+
+    1. Outer `scf.forall` represents workgroup-level parallelism.
+    2. Inner `scf.forall` represents subgroup-level parallelism.
+    3. Each thread in the subgroup coalesces its memory accesses when gathering data and writes to
+       its lane-offset in the destination tensor.
+
     ```mlir
-    %result = scf.forall (%i) in (%c1) shared_outs(%out = %dest) -> (tensor<64x32xf32>) {
+    %result = scf.forall (%wg_i, %wg_j) in (16, 1) shared_outs(%wg_out = %dest) -> (tensor<128x16xf32>) {
+      %indices_wg_slice = tensor.extract_slice ...
+      %dest_wg_slice = tensor.extract_slice ...
+
+      %inner_result = scf.forall (%sg_i, %sg_j) in (32, 1) shared_outs(%sg_out = %dest_wg_slice) -> (tensor<8x16xf32>) {
+        scf.forall.in_parallel {
+          iree_gpu.coalesced_gather_dma %indices_wg_slice, %source into %sg_out with tensor<4xf32> : ...
+        }
+      } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+
       scf.forall.in_parallel {
-        // Gather 64x32 elements from source based on indices, acting as parallel combining op
-        iree_gpu.coalesced_gather_dma %indices, %source into %out with tensor<f32>
-          : tensor<64x32xindex>, tensor<1024x64xf32>, tensor<64x32xf32> -> tensor<64x32xf32>
+        tensor.parallel_insert_slice %inner_result into %wg_out[...] : ...
       }
-    }
+    } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
     ```
   }];
 
