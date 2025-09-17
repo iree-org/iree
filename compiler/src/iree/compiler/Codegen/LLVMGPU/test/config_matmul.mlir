@@ -65,6 +65,7 @@ func.func @matmul_4096_32_4096(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC) 
 
 // -----
 
+
 !TA = tensor<4096x1xf32>
 !TB = tensor<1x4096xf32>
 !TC = tensor<4096x4096xf32>
@@ -83,10 +84,32 @@ func.func @matmul_4096_1_4096(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC) {
 
 // -----
 
+// A matvec-like matmul. Here we specifically check the logic in config selection that makes 2
+// parallel dimensions used per workgroup.
+!TA = tensor<4x4096xf32>
+!TB = tensor<4096x4096xf32>
+!TC = tensor<4x4096xf32>
+!DTC = !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4x4096xf32>>
+//        CHECK:    #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+//   CHECK-SAME:    workgroup_size = [64, 1, 1] subgroup_size = 64
+//  CHECK-LABEL:    @matmul_4_4096_4096
+func.func @matmul_4_4096_4096(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC) {
+  //      CHECK:  lowering_config = #iree_gpu.lowering_config<{
+  // CHECK-SAME:     lane_basis = {{\[}}[1, 1, 64], [0, 1, 2]],
+  // CHECK-SAME:     partial_reduction = [0, 0, 256],
+  // CHECK-SAME:     subgroup_basis = {{\[}}[1, 1, 1], [0, 1, 2]],
+  // CHECK-SAME:     thread = [0, 0, 4],
+  // CHECK-SAME:     workgroup = [2, 1, 0]}>
+  %0 = linalg.matmul ins(%arg0, %arg1 : !TA, !TB) outs(%arg2 : !TC) -> !TC
+  iree_tensor_ext.dispatch.tensor.store %0, %arg3, offsets = [0, 0], sizes = [4, 4096], strides = [1, 1] : !TC -> !DTC
+  return
+}
+
+// -----
+
 // ============================================================================
 // Dynamic M
 // ============================================================================
- // LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
 
 !TA = tensor<?x32xf32>
 !TB = tensor<32x32xf32>
