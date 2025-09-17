@@ -43,10 +43,14 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 #define DEBUG_TYPE "iree-dispatch-creation-form-dispatch-regions"
 
 namespace mlir::iree_compiler::DispatchCreation {
+
+// Maximum number of operands allowed for a dispatch region.
+constexpr int kIreeMaxOperandCount = 16;
 
 #define GEN_PASS_DEF_FORMDISPATCHREGIONSPASS
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
@@ -133,6 +137,9 @@ public:
   // Insert `op` into the fusion group.
   void insert(Operation *op);
 
+  // Check if adding `op` would exceed the operand limit.
+  bool wouldExceedOperandLimit(Operation *op) const;
+
 private:
   Operation *rootOp;
   // All operations to be fused with the root op. This does not include
@@ -159,6 +166,40 @@ void FusionGroup::insert(Operation *op) {
     map = inverseAndBroadcastProjectedPermutation(map);
     loopMaps.insert({op, map});
   }
+}
+
+bool FusionGroup::wouldExceedOperandLimit(Operation *newOp) const {
+  llvm::SmallSetVector<Operation *, kIreeMaxOperandCount> dispatchOperands;
+  int64_t numResults = 0;
+
+  auto visitOp = [&](Operation *op) {
+    auto visitOperand = [&](OpOperand *operand) {
+      if (!isa<RankedTensorType>(operand->get().getType())) {
+        return;
+      }
+      Operation *definingOp = operand->get().getDefiningOp();
+      if (definingOp && definingOp != newOp && !loopMaps.contains(definingOp)) {
+        dispatchOperands.insert(definingOp);
+      }
+    };
+    visitUsedValuesDefinedAbove(op->getRegions(), visitOperand);
+    llvm::for_each(llvm::make_pointer_range(op->getOpOperands()), visitOperand);
+
+    for (OpResult result : op->getResults()) {
+      if (llvm::any_of(result.getUsers(), [&](Operation *user) {
+            return user != newOp && !loopMaps.contains(user);
+          })) {
+        ++numResults;
+        break;
+      }
+    }
+  };
+
+  visitOp(newOp);
+  for (auto [op, map] : this->loopMaps) {
+    visitOp(op);
+  }
+  return (dispatchOperands.size() + numResults) > kIreeMaxOperandCount;
 }
 
 FailureOr<AffineMap>
@@ -568,6 +609,11 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
     return false;
   }
 
+  // Check operand limit before allowing fusion
+  if (tracker.getFusionGroup(producer).wouldExceedOperandLimit(consumer)) {
+    return false;
+  }
+
   // Check if the iteration spaces of the producer and consumer are same.
   // TODO(#12664): This is unnecessary requirement, but we need a better config
   // to tile the consumer with a larger iteration space.
@@ -720,6 +766,12 @@ static bool isFusableWithProducer(OpOperand &operand,
   if (!tracker.getFusionGroup(consumer).isFusable(producer)) {
     return false;
   }
+
+  // Check operand limit before allowing fusion
+  if (tracker.getFusionGroup(consumer).wouldExceedOperandLimit(producer)) {
+    return false;
+  }
+
   return true;
 }
 
