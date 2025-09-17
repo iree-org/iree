@@ -21,6 +21,8 @@ include "mlir/Interfaces/VectorInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 
+def TensorTypeAttr : TypeAttrBase<"TensorType", "Tensor type attribute">;
+
 def IREECodegen_QueryTileSizesOp :
     Op<IREECodegen_Dialect, "query_tile_sizes", [Pure]> {
   let summary = [{Yields tile sizes for the specified tensor type.}];

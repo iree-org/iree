@@ -9,8 +9,6 @@
 
 include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.td"
 
-def TensorTypeAttr : TypeAttrBase<"TensorType", "Tensor type attribute">;
-
 def IREECodegen_InnerTileDescAttrInterface :
   AttrInterface<"InnerTileDescAttrInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
