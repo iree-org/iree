@@ -173,8 +173,7 @@ def MatchRegionsOp : Op<Transform_Dialect, "iree.match.regions",
 }
 
 def MatchContractionOp : Op<Transform_Dialect, "iree.match.is_contraction",
-    [IsolatedFromAbove,
-     MatchOpInterface,
+    [MatchOpInterface,
      SingleOpMatcher,
      MemoryEffectsOpInterface]> {
   let summary = [{Check whether the op is a contraction operation.}];
@@ -196,12 +195,20 @@ def MatchContractionOp : Op<Transform_Dialect, "iree.match.is_contraction",
     OptionalAttr<TypeArrayAttr>:$input_types,        // [LHS_type, RHS_type].
     OptionalAttr<TypeAttr>:$output_type              // Single output type.
   );
+
+  let results = (outs
+    TransformParamTypeInterface:$batch,
+    TransformParamTypeInterface:$m,
+    TransformParamTypeInterface:$n,
+    TransformParamTypeInterface:$k
+  );
+
   let assemblyFormat = [{
     $operand_handle
     (`indexing_maps` $indexing_maps^)?
     (`input_types` $input_types^)?
     (`output_type` $output_type^)?
-    attr-dict `:` type($operand_handle)
+    attr-dict `:` functional-type(operands, results)
   }];
   let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
 

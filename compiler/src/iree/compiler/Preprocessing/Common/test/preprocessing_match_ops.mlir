@@ -316,7 +316,8 @@ func.func @op_fill(%dest: tensor<32x64xf32>, %value: f32) -> tensor<32x64xf32> {
 
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_contraction(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
-    transform.iree.match.is_contraction %op : !transform.any_op
+    %batch, %m, %n, %k = transform.iree.match.is_contraction %op :
+      (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
     transform.yield %op : !transform.any_op
   }
 
@@ -366,7 +367,10 @@ func.func @op_matmul(%input0: tensor<32x64xi8>, %input1: tensor<32x64xi8>, %inpu
 
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_correct_maps(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
-    transform.iree.match.is_contraction %op {indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2]} : !transform.any_op
+   %batch, %m, %n, %k = transform.iree.match.is_contraction %op
+    {indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2]} :
+    (!transform.any_op) ->
+    (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
     transform.yield %op : !transform.any_op
   }
 
@@ -405,7 +409,7 @@ func.func @op_matmul(%input0: tensor<32x64xi8>, %input1: tensor<32x64xi8>, %dest
 
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_different_count(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
-    transform.iree.match.is_contraction %op {indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2, #map_matmul0]} : !transform.any_op
+    %batch, %m, %n, %k = transform.iree.match.is_contraction %op {indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2, #map_matmul0]} : (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
     transform.yield %op : !transform.any_op
   }
 
@@ -476,11 +480,11 @@ func.func @test_type_matching(
 
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_f16_f32_types(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
-    transform.iree.match.is_contraction %op {
+    %batch, %m, %n, %k = transform.iree.match.is_contraction %op {
       indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2],
       input_types = [f16, f16],
       output_type = f32
-    } : !transform.any_op
+    } : (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
     transform.yield %op : !transform.any_op
   }
 
@@ -541,10 +545,10 @@ func.func @test_input_type_matching(
 
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_f16_inputs_only(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
-    transform.iree.match.is_contraction %op {
+    %batch, %m, %n, %k = transform.iree.match.is_contraction %op {
       indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2],
       input_types = [f16, f16]
-    } : !transform.any_op
+    } : (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
     transform.yield %op : !transform.any_op
   }
 
@@ -605,10 +609,10 @@ func.func @test_output_type_matching(
 
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_f32_output_only(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
-    transform.iree.match.is_contraction %op {
+    %batch, %m, %n, %k = transform.iree.match.is_contraction %op {
       indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2],
       output_type = f32
-    } : !transform.any_op
+    } : (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
     transform.yield %op : !transform.any_op
   }
 

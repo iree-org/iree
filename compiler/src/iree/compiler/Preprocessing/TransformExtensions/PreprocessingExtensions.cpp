@@ -311,6 +311,27 @@ IREE::transform_dialect::MatchContractionOp::matchOperation(
     }
   }
 
+  // Get the actual size values for batch/m/n/k dimensions after verifying it's
+  // a contraction operation.
+  linalg::ContractionDimensions contractionDims =
+      linalg::inferContractionDims(linalgOp).value();
+  SmallVector<int64_t> iterationDomain = linalgOp.getStaticLoopRanges();
+  MLIRContext *context = current->getContext();
+  Builder builder(context);
+
+  auto iterationSizes = [&](ArrayRef<unsigned> dimIndices) {
+    return llvm::to_vector(
+        llvm::map_range(dimIndices, [&](unsigned dimIdx) -> Attribute {
+          return builder.getI64IntegerAttr(iterationDomain[dimIdx]);
+        }));
+  };
+
+  results.setParams(cast<OpResult>(getBatch()),
+                    iterationSizes(contractionDims.batch));
+  results.setParams(cast<OpResult>(getM()), iterationSizes(contractionDims.m));
+  results.setParams(cast<OpResult>(getN()), iterationSizes(contractionDims.n));
+  results.setParams(cast<OpResult>(getK()), iterationSizes(contractionDims.k));
+
   return DiagnosedSilenceableFailure::success();
 }
 
