@@ -281,8 +281,6 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     * `$source`: Source tensor containing the data to be gathered
     * `$init`: Destination tensor receiving the gathered data (destination-passing style)
     * `$result`: Output tensor with gathered data (same type as `$init`)
-    * `$transfer_type`: Type attribute specifying the smallest unit being transferred by GPU threads.
-       It must be a vector type with element type matching the element type of `$source`.
 
     ## Example
 
@@ -301,7 +299,7 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
 
       %inner_result = scf.forall (%sg_i, %sg_j) in (32, 1) shared_outs(%sg_out = %dest_wg_slice) -> (tensor<8x16xf32>) {
         scf.forall.in_parallel {
-          iree_gpu.coalesced_gather_dma %indices_wg_slice, %source into %sg_out with tensor<4xf32> : ...
+          iree_gpu.coalesced_gather_dma %indices_wg_slice, %source into %sg_out : ...
         }
       } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
 
@@ -315,14 +313,13 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
   let arguments = (ins
     RankedTensorOf<[Index]>:$indices,
     AnyRankedTensor:$source,
-    AnyRankedTensor:$init,
-    TensorTypeAttr:$transfer_type
+    AnyRankedTensor:$init
   );
 
   let results = (outs AnyRankedTensor:$result);
 
   let assemblyFormat = [{
-    $indices `,` $source `into` $init `with` $transfer_type attr-dict
+    $indices `,` $source `into` $init attr-dict
     `:` type($indices) `,` type($source) `,` type($init) `->` type($result)
   }];
 
