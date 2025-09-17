@@ -466,6 +466,22 @@ NB_MODULE(_ireeCompilerDialects, m) {
             return getIntArrayAttrValues(tilesizes.reductionAttr);
           })
       .def_property_readonly(
+          "subgroup_basis",
+          [](MlirAttribute self)
+              -> std::tuple<std::vector<int64_t>, std::vector<int64_t>> {
+            ireeGPUSubgroupBasisInfo basisInfo =
+                ireeGPULoweringConfigAttrGetSubgroupBasis(self);
+            std::vector<int64_t> counts;
+            std::vector<int64_t> mapping;
+            if (!mlirAttributeIsNull(basisInfo.countsAttr)) {
+              counts = getIntArrayAttrValues(basisInfo.countsAttr);
+            }
+            if (!mlirAttributeIsNull(basisInfo.mappingAttr)) {
+              mapping = getIntArrayAttrValues(basisInfo.mappingAttr);
+            }
+            return std::make_tuple(counts, mapping);
+          })
+      .def_property_readonly(
           "mma_kind", [](MlirAttribute self) -> std::optional<MlirAttribute> {
             auto attr = ireeGPULoweringConfigAttrGetMmaKind(self);
             if (!mlirAttributeIsNull(attr))

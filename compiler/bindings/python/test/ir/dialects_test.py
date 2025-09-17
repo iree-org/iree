@@ -353,6 +353,7 @@ def lowering_config_attr():
     assert lowering_config.workgroup_tile_sizes == []
     assert lowering_config.reduction_tile_sizes == []
     assert lowering_config.mma_kind == None
+    assert lowering_config.subgroup_basis == ([], [])
 
     mma_intrinsic = iree_gpu.MMAIntrinsic.MFMA_F32_16x16x16_F16
     mma_attr = iree_gpu.MMAAttr.get(mma_intrinsic)
@@ -361,12 +362,16 @@ def lowering_config_attr():
             "reduction": get_index_array_attr([1]),
             "workgroup": get_index_array_attr([2, 3]),
             "mma_kind": mma_attr,
+            "subgroup_basis": ir.ArrayAttr.get(
+                [get_index_array_attr([1, 1, 4]), get_index_array_attr([0, 1, 2])]
+            ),
         }
     )
     lowering_config = iree_gpu.LoweringConfigAttr.get(attributes)
     assert lowering_config.workgroup_tile_sizes == [2, 3]
     assert lowering_config.reduction_tile_sizes == [1]
     assert lowering_config.mma_kind == mma_attr
+    assert lowering_config.subgroup_basis == ([1, 1, 4], [0, 1, 2])
     assert (
         str(lowering_config.mma_kind) == "#iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>"
     )
