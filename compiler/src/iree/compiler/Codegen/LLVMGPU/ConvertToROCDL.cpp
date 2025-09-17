@@ -245,10 +245,12 @@ struct ConvertToROCDLPass final
       if (allTypesValid.wasInterrupted()) {
         return signalPassFailure();
       }
-      bool supportsScaledExtTrunc = *maybeChipset == amdgpu::Chipset(9, 5, 0);
+      bool supportsScaledExtTrunc =
+          getGPUTargetAttr(m).getWgp().getScaledMma().size();
       arith::populateArithToAMDGPUConversionPatterns(
           patterns, /*convertFP8Arithmetic=*/true, /*saturateFP8Truncf=*/false,
-          /*allowPackedF16Rtz=*/false, supportsScaledExtTrunc, /*chipset=*/*maybeChipset);
+          /*allowPackedF16Rtz=*/false, supportsScaledExtTrunc,
+          /*chipset=*/*maybeChipset);
       arith::populateCeilFloorDivExpandOpsPatterns(patterns);
       populateSwapSetPrioWithMFMAPatterns(patterns);
       populateConvertGPUToAMDGPUPatterns(patterns, *maybeChipset);
