@@ -51,10 +51,10 @@
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 namespace mlir::iree_compiler {
 
-llvm::cl::opt<bool> clGPUEarlyTileAndFuseMatmul(
-    "iree-codegen-llvmgpu-early-tile-and-fuse-matmul",
+llvm::cl::opt<bool> clGPUUseTileAndFuseMatmul(
+    "iree-codegen-llvmgpu-use-tile-and-fuse-matmul",
     llvm::cl::desc("test the the tile and fuse pipeline for matmul"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 llvm::cl::opt<bool> clGPUTestTileAndFuseVectorize(
     "iree-codegen-llvmgpu-test-tile-and-fuse-vectorize",
@@ -2855,7 +2855,7 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     LDBG() << "Tile and fuse data tiled MMA inner_tiled config";
     return success();
   }
-  if (clGPUEarlyTileAndFuseMatmul) {
+  if (clGPUUseTileAndFuseMatmul) {
     if (succeeded(IREE::GPU::setMatmulLoweringConfig(
             target, entryPointFn, computeOp, clUseDirectLoad))) {
       LDBG() << "Tile and fuse matmul config";
@@ -2878,13 +2878,6 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     }
   }
   if (succeeded(setVectorDistributionConfig(target, entryPointFn, computeOp))) {
-    return success();
-  }
-  // TODO (nirvedhmeshram, qedawkins) : remove this when tile and fuse backend
-  // config becomes the default for matmul.
-  if (succeeded(IREE::GPU::setMatmulLoweringConfig(target, entryPointFn,
-                                                   computeOp))) {
-    LDBG() << "Tile and fuse matmul config after no vector distribute config";
     return success();
   }
 
