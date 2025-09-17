@@ -21,7 +21,8 @@ func.func @matmul_32_32_32(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC) {
   // GENERALIZED:   linalg.generic
   // SPECIALIZED:   linalg.matmul
   //      CHECK:  #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
-  // CHECK-SAME:  promote_operands = [0, 1], reduction = [0, 0, 32], subgroup_m_count = 2 : i64, subgroup_n_count = 2 : i64,
+  // CHECK-SAME:  promote_operands = [0, 1], reduction = [0, 0, 32]
+  // CHECK-SAME{LITERAL}: subgroup_basis = [[2, 2, 1], [0, 1, 2]]
   // CHECK-SAME:  workgroup = [32, 32, 0]}>
   %0 = linalg.matmul ins(%arg0, %arg1 : !TA, !TB) outs(%arg2 : !TC) -> !TC
   iree_tensor_ext.dispatch.tensor.store %0, %arg3, offsets = [0, 0], sizes = [32, 32], strides = [1, 1] : !TC -> !DTC
@@ -38,7 +39,8 @@ func.func @matmul_32_32_32(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC) {
 // CHECK-SAME:    workgroup_size = [256, 1, 1] subgroup_size = 64, {}>
 func.func @matmul_4096_4096_4096(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC) {
   //      CHECK:  #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
-  // CHECK-SAME:  promote_operands = [0, 1], reduction = [0, 0, 16], subgroup_m_count = 2 : i64, subgroup_n_count = 2 : i64,
+  // CHECK-SAME:  promote_operands = [0, 1], reduction = [0, 0, 16]
+  // CHECK-SAME{LITERAL}: subgroup_basis = [[2, 2, 1], [0, 1, 2]]
   // CHECK-SAME:  workgroup = [64, 128, 0]}>}
   %0 = linalg.matmul ins(%arg0, %arg1 : !TA, !TB) outs(%arg2 : !TC) -> !TC
   iree_tensor_ext.dispatch.tensor.store %0, %arg3, offsets = [0, 0], sizes = [4096, 4096], strides = [1, 1] : !TC -> !DTC
@@ -55,7 +57,8 @@ func.func @matmul_4096_4096_4096(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC
 // CHECK-SAME:    workgroup_size = [256, 1, 1] subgroup_size = 64, {}>
 func.func @matmul_4096_32_4096(%arg0: !TA, %arg1: !TB, %arg2: !TC, %arg3: !DTC) {
   //      CHECK:  #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
-  // CHECK-SAME:  promote_operands = [0, 1], reduction = [0, 0, 16], subgroup_m_count = 2 : i64, subgroup_n_count = 2 : i64,
+  // CHECK-SAME:  promote_operands = [0, 1], reduction = [0, 0, 16]
+  // CHECK-SAME{LITERAL}: subgroup_basis = [[2, 2, 1], [0, 1, 2]]
   // CHECK-SAME:  workgroup = [64, 128, 0]}>}
   %0 = linalg.matmul ins(%arg0, %arg1 : !TA, !TB) outs(%arg2 : !TC) -> !TC
   iree_tensor_ext.dispatch.tensor.store %0, %arg3, offsets = [0, 0], sizes = [4096, 4096], strides = [1, 1] : !TC -> !DTC

@@ -127,11 +127,11 @@ static scf::ForOp hoistVectorExtractInsertSlice(
   // BBArgs are updated.
   for (auto extractStridedSliceOp : extractOps) {
     extractStridedSliceOp->moveBefore(forOp);
-    if (!forOp.isDefinedOutsideOfLoop(extractStridedSliceOp.getVector())) {
-      assert(extractStridedSliceOp.getVector() == tensorBBArg &&
+    if (!forOp.isDefinedOutsideOfLoop(extractStridedSliceOp.getSource())) {
+      assert(extractStridedSliceOp.getSource() == tensorBBArg &&
              "extractSlice source not defined above must be the tracked bbArg");
       rewriter.startOpModification(extractStridedSliceOp);
-      extractStridedSliceOp.getVectorMutable().assign(
+      extractStridedSliceOp.getSourceMutable().assign(
           forOp.getInitArgs()[initArgNumber]);
       rewriter.finalizeOpModification(extractStridedSliceOp);
     }

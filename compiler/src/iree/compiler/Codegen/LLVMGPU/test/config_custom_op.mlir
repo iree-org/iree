@@ -40,7 +40,11 @@ func.func @custom_op(%arg0 : tensor<384x512xf32>, %arg1 : tensor<512x128xf32>,
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 //      CHECK:   ^bb
 //      CHECK:     linalg.matmul
-// CHECK-SAME:         lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>, promote_operands = [0, 1], reduction = [0, 0, 32], subgroup_m_count = 2 : i64, subgroup_n_count = 2 : i64, workgroup = [64, 64, 0]}>
+// CHECK-SAME:   mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
+// CHECK-SAME:   promote_operands = [0, 1]
+// CHECK-SAME:   reduction = [0, 0, 32]
+// CHECK-SAME{LITERAL}: subgroup_basis = [[2, 2, 1], [0, 1, 2]]
+// CHECK-SAME:   workgroup = [64, 64, 0]}>
 //      CHECK:   iree_linalg_ext.yield
 
 // -----

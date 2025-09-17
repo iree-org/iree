@@ -133,9 +133,6 @@ struct ireeGPUSubgroupCountInfo {
   MlirAttribute subgroupNCountAttr;
 };
 
-MLIR_CAPI_EXPORTED ireeGPUSubgroupCountInfo
-ireeGPULoweringConfigAttrGetSubgroupCount(MlirAttribute attr);
-
 MLIR_CAPI_EXPORTED MlirAttribute
 ireeGPULoweringConfigAttrGetMmaKind(MlirAttribute attr);
 

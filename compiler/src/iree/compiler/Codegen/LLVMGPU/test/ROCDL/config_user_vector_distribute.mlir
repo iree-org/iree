@@ -16,7 +16,7 @@
 // OPT-IN-SAME:    gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = true>
 #config = #iree_gpu.lowering_config<{workgroup = [128, 128, 0], reduction = [0, 0, 32], promote_operands = [0, 1],
                                     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-                                    subgroup_m_count = 2, subgroup_n_count = 2}>
+                                    subgroup_basis = [[2, 2, 1], [0, 1, 2]]}>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -88,7 +88,7 @@ hal.executable public @main_0_dispatch_0 {
 // OPT-IN-SAME:    gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = <Transpose>>
 #config = #iree_gpu.lowering_config<{workgroup = [128, 128, 0], reduction = [0, 0, 32], promote_operands = [0, 1],
                                     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-                                    subgroup_m_count = 2, subgroup_n_count = 2}>
+                                    subgroup_basis = [[2, 2, 1], [0, 1, 2]]}>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -155,7 +155,7 @@ hal.executable public @main_0_dispatch_0 {
 // OPT-OUT-SAME:    gpu_pipeline_options = #iree_gpu.pipeline_options<reorder_workgroups_strategy = <None>>
 #config = #iree_gpu.lowering_config<{workgroup = [128, 128, 0], reduction = [0, 0, 32], promote_operands = [0, 1],
                                     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-                                    subgroup_m_count = 2, subgroup_n_count = 2}>
+                                    subgroup_basis = [[2, 2, 1], [0, 1, 2]]}>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
