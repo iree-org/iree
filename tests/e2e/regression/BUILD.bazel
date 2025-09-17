@@ -68,7 +68,6 @@ iree_check_single_backend_test_suite(
         "--iree-llvmcpu-target-cpu=generic",
     ],
     driver = "local-task",
-    input_type = "stablehlo",
     target_backend = "llvm-cpu",
 )
 
@@ -82,7 +81,6 @@ iree_check_single_backend_test_suite(
     ] + BACKEND_TESTS,
     compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
     driver = "local-task",
-    input_type = "stablehlo",
     target_backend = "llvm-cpu",
 )
 
@@ -110,7 +108,6 @@ iree_check_single_backend_test_suite(
     ],
     compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
     driver = "local-task",
-    input_type = "tosa",
     target_backend = "llvm-cpu",
 )
 
@@ -120,7 +117,6 @@ iree_check_single_backend_test_suite(
         "layernorm.mlir",
     ] + BACKEND_TESTS,
     driver = "local-task",
-    input_type = "stablehlo",
     target_backend = "vmvx",
 )
 
@@ -129,7 +125,6 @@ iree_check_single_backend_test_suite(
     # TODO(#10024): Fix layernorm.mlir on Pixel 6 and put in BACKEND_TESTS.
     srcs = BACKEND_TESTS,
     driver = "vulkan",
-    input_type = "stablehlo",
     target_backend = "vulkan-spirv",
 )
 
@@ -140,7 +135,6 @@ iree_check_single_backend_test_suite(
         "layernorm.mlir",
     ] + BACKEND_TESTS,
     driver = "cuda",
-    input_type = "stablehlo",
     tags = [
         # CUDA cuInit fails with sanitizer on.
         "noasan",
@@ -220,6 +214,5 @@ iree_check_single_backend_test_suite(
     compiler_flags = [
         "--iree-vmvx-enable-microkernels",
     ],
-    input_type = "tosa",
     target_backend = "vmvx",
 )

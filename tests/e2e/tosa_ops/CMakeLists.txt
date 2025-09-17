@@ -60,8 +60,6 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-llvmcpu-target-cpu=generic"
-  INPUT_TYPE
-    "tosa"
 )
 
 iree_check_single_backend_test_suite(
@@ -112,8 +110,6 @@ iree_check_single_backend_test_suite(
     "vmvx"
   DRIVER
     "local-task"
-  INPUT_TYPE
-    "tosa"
 )
 
 iree_check_single_backend_test_suite(
@@ -166,8 +162,6 @@ iree_check_single_backend_test_suite(
     "local-sync"
   COMPILER_FLAGS
     "--iree-vmvx-enable-microkernels"
-  INPUT_TYPE
-    "tosa"
 )
 
 iree_check_single_backend_test_suite(
@@ -218,8 +212,6 @@ iree_check_single_backend_test_suite(
     "vulkan-spirv"
   DRIVER
     "vulkan"
-  INPUT_TYPE
-    "tosa"
 )
 
 iree_check_single_backend_test_suite(
@@ -270,8 +262,6 @@ iree_check_single_backend_test_suite(
     "metal-spirv"
   DRIVER
     "metal"
-  INPUT_TYPE
-    "tosa"
 )
 
 iree_check_single_backend_test_suite(
@@ -323,8 +313,6 @@ iree_check_single_backend_test_suite(
     "cuda"
   COMPILER_FLAGS
     "--iree-stream-emulate-memset"
-  INPUT_TYPE
-    "tosa"
   RUNNER_ARGS
     "--cuda_use_streams=false"
   LABELS
@@ -382,8 +370,6 @@ iree_check_single_backend_test_suite(
     "cuda"
   DRIVER
     "cuda"
-  INPUT_TYPE
-    "tosa"
   RUNNER_ARGS
     "--cuda_use_streams=true"
   LABELS
@@ -441,8 +427,6 @@ iree_check_single_backend_test_suite(
     "rocm"
   DRIVER
     "hip"
-  INPUT_TYPE
-    "tosa"
   RUNNER_ARGS
     "--hip_use_streams=true"
 )
