@@ -792,10 +792,14 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     sharedWgpTiles[i] = 1;
   }
 
+  const bool anyAreMatmulLike = llvm::any_of(
+      computeOps, [](linalg::LinalgOp op) { return isMatmulLike(op); });
+
   // TODO: This is enabled for matvec on ROCm for now. We should
   // validate this strategy and extend to more linalg generics and to CUDA.
   if (isROCmBackend(target) && ShapedType::isStaticShape(bounds) &&
-      isMatmulLike(computeOps.front())) {
+      anyAreMatmulLike) {
+
     int64_t parallelIdx =
         *llvm::find_if(sharedParallelDims,
                        [&](int64_t currIdx) { return bounds[currIdx] != 1; });
