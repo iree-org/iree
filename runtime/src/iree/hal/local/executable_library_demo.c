@@ -55,36 +55,119 @@ static const iree_hal_executable_library_header_t header = {
     .features = IREE_HAL_EXECUTABLE_LIBRARY_FEATURE_NONE,
     .sanitizer = IREE_HAL_EXECUTABLE_LIBRARY_SANITIZER_NONE,
 };
+
 // Table of export function entry points.
 static const iree_hal_executable_dispatch_v0_t entry_points[2] = {
     dispatch_tile_a,
     dispatch_tile_b,
 };
-// Optional attributes for each dispatch function used by the runtime.
-// The table can be omitted if no attributes are non-zero. We don't use
-// local_memory in our dispatches here and don't need to specify the sizes.
+
+// Dispatch parameters for dispatch_tile_a.
+// This describes the function's ABI: 1 constant and 2 bindings.
+static const iree_hal_executable_dispatch_parameter_v0_t
+    dispatch_tile_a_params[3] = {
+        {
+            // The float constant 'f0' used for addition.
+            .type = IREE_HAL_EXECUTABLE_DISPATCH_PARAM_TYPE_V0_CONSTANT,
+            .size = sizeof(float),
+            .flags = IREE_HAL_EXECUTABLE_DISPATCH_PARAM_FLAG_V0_NONE,
+            .name = 0,    // "scalar_addend"
+            .offset = 0,  // starts at constants[0]
+        },
+        {
+            // Input buffer binding.
+            .type = IREE_HAL_EXECUTABLE_DISPATCH_PARAM_TYPE_V0_BINDING,
+            .size = 0,  // unused for bindings
+            .flags = IREE_HAL_EXECUTABLE_DISPATCH_PARAM_FLAG_V0_NONE,
+            .name = 1,    // "src_buffer"
+            .offset = 0,  // binding[0]
+        },
+        {
+            // Output buffer binding.
+            .type = IREE_HAL_EXECUTABLE_DISPATCH_PARAM_TYPE_V0_BINDING,
+            .size = 0,  // unused for bindings
+            .flags = IREE_HAL_EXECUTABLE_DISPATCH_PARAM_FLAG_V0_NONE,
+            .name = 2,    // "dst_buffer"
+            .offset = 1,  // binding[1]
+        },
+};
+
+// Dispatch parameters for dispatch_tile_b.
+// This function only uses 2 bindings and no constants.
+static const iree_hal_executable_dispatch_parameter_v0_t
+    dispatch_tile_b_params[2] = {
+        {
+            // Input buffer binding.
+            .type = IREE_HAL_EXECUTABLE_DISPATCH_PARAM_TYPE_V0_BINDING,
+            .size = 0,  // unused for bindings
+            .flags = IREE_HAL_EXECUTABLE_DISPATCH_PARAM_FLAG_V0_NONE,
+            .name = 1,    // "src_buffer"
+            .offset = 0,  // binding[0]
+        },
+        {
+            // Output buffer binding.
+            .type = IREE_HAL_EXECUTABLE_DISPATCH_PARAM_TYPE_V0_BINDING,
+            .size = 0,  // unused for bindings
+            .flags = IREE_HAL_EXECUTABLE_DISPATCH_PARAM_FLAG_V0_NONE,
+            .name = 2,    // "dst_buffer"
+            .offset = 1,  // binding[1]
+        },
+};
+
+// Parameter table - one array per dispatch entry point.
+// NULL entries indicate the dispatch follows the standard HAL ABI.
+static const iree_hal_executable_dispatch_parameter_v0_t* entry_params[2] = {
+    dispatch_tile_a_params,
+    dispatch_tile_b_params,
+};
+
+// String table for parameter names.
+// These are referenced by the 'name' field in the param structs above.
+static const char* parameter_names[3] = {
+    "scalar_addend",
+    "src_buffer",
+    "dst_buffer",
+};
+
+// Attributes for each dispatch function used by the runtime.
+// Required to specify constant and binding counts for dispatch validation.
 static const iree_hal_executable_dispatch_attrs_v0_t entry_attrs[2] = {
     {
+        .flags = IREE_HAL_EXECUTABLE_DISPATCH_FLAG_V0_NONE,
         .local_memory_pages = 0,
         .constant_count = 1,
         .binding_count = 2,
+        .workgroup_size_x = 0,  // runtime specified
+        .workgroup_size_y = 0,  // runtime specified
+        .workgroup_size_z = 0,  // runtime specified
+        .parameter_count =
+            sizeof(dispatch_tile_a_params) / sizeof(dispatch_tile_a_params[0]),
     },
     {
+        .flags = IREE_HAL_EXECUTABLE_DISPATCH_FLAG_V0_NONE,
         .local_memory_pages = 0,
         .constant_count = 0,
-        .binding_count = 0,
+        .binding_count = 2,
+        .workgroup_size_x = 0,  // runtime specified
+        .workgroup_size_y = 0,  // runtime specified
+        .workgroup_size_z = 0,  // runtime specified
+        .parameter_count =
+            sizeof(dispatch_tile_b_params) / sizeof(dispatch_tile_b_params[0]),
     },
 };
+
 // Names for each entry point.
 static const char* entry_point_names[2] = {
     "dispatch_tile_a",
     "dispatch_tile_b",
 };
+
 // User tags for debugging/logging; not used for anything but presentation.
 static const char* entry_point_tags[2] = {
     "matmul+div",
     "conv2d[512x512]",
 };
+
 static const iree_hal_executable_library_v0_t library = {
     .header = &header,
     .imports =
@@ -97,8 +180,13 @@ static const iree_hal_executable_library_v0_t library = {
             .count = 2,
             .ptrs = entry_points,
             .attrs = entry_attrs,
+            .params = entry_params,
+            .occupancy = NULL,  // no occupancy info provided
             .names = entry_point_names,
             .tags = entry_point_tags,
+            .parameter_names = parameter_names,
+            .source_locations = NULL,
+            .stage_locations = NULL,
         },
     .constants =
         {
