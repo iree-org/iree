@@ -83,6 +83,21 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
+    check_regression_dynamic_gather_attention_llvm-cpu
+  SRCS
+    "dynamic_gather_attention.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-target-cpu=generic"
+  LABELS
+    "noriscv"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     check_regression_tosa_llvm-cpu
   SRCS
     "linalg_quantized_matmul_vs_linalg_matmul.mlir"
