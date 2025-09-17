@@ -432,7 +432,7 @@ util.func @split_reduction_by_tiling(%arg0 : tensor<?x131072xf32>) -> tensor<?xf
 //       CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //       CHECK:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.workgroups
-//  CHECK-SAME:       [%[[D0]]](%[[ARG0]], %[[D0]])
+//  CHECK-SAME:       [%[[C0]], %[[D0]]](%[[ARG0]], %[[C0]], %[[D0]])
 //       CHECK:     %[[FORALL:.+]] = scf.forall
 //       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[FORALL]]
 //       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups[%[[D0]]](%[[DISPATCH0]], %[[D0]])
@@ -463,7 +463,7 @@ util.func @split_reduction_2d_by_tiling(%arg0 : tensor<?x2048x128xf32>) -> tenso
 //       CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //       CHECK:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.workgroups
-//  CHECK-SAME:       [%[[D0]]](%[[ARG0]], %[[D0]])
+//  CHECK-SAME:       [%[[C0]], %[[D0]]](%[[ARG0]], %[[C0]], %[[D0]])
 //       CHECK:     %[[FORALL:.+]] = scf.forall
 //       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[FORALL]]
 //       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups[%[[D0]]](%[[DISPATCH0]], %[[D0]])
