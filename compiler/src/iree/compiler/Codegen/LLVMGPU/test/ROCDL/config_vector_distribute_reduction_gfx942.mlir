@@ -440,3 +440,55 @@ func.func @batch_matvec_f16_f32() {
 //  CHECK-SAME:                 subgroup_basis = {{\[}}[1, 1, 1], [0, 1, 2]],
 //  CHECK-SAME:                 thread = [0, 0, 8],
 //  CHECK-SAME:                 workgroup = [2, 1, 0]
+
+// -----
+
+!TA = tensor<1024x96xf32>
+!TB = tensor<1024xf32>
+!DTB = !iree_tensor_ext.dispatch.tensor<readwrite:tensor<1024xf32>>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+//       CHECK:  LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+// CHECK-LABEL:  @reduction_size_96
+//       CHECK:         lane_basis = {{\[}}[1, 64], [0, 1]]
+//  CHECK-SAME:  partial_reduction =       [0, 256],
+//  CHECK-SAME:     subgroup_basis = {{\[}}[1, 1], [0, 1]]
+//  CHECK-SAME:             thread =       [0, 4],
+//  CHECK-SAME:          workgroup =       [1, 0]
+func.func @reduction_size_96(%arg0 : !TA, %arg1 : !TB, %arg2 : !DTB) {
+  %0 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]}
+  ins(%arg0 : !TA) outs(%arg1 : !TB) {
+  ^bb0(%in: f32, %out: f32):
+    %1 = arith.addf %in, %out : f32
+    linalg.yield %1 : f32
+  } -> !TB
+  iree_tensor_ext.dispatch.tensor.store %0, %arg2, offsets = [0], sizes = [1024], strides = [1] : !TB -> !DTB
+  return
+}
+
+// -----
+
+// Current logic dictates that the load size of a thread must divide the reduction dimension (if static).
+// With a reduction size of 97, the load size is 1 (see the 'thread' field of the config).
+!TA = tensor<1024x97xf32>
+!TB = tensor<1024xf32>
+!DTB = !iree_tensor_ext.dispatch.tensor<readwrite:tensor<1024xf32>>
+//       CHECK:  LLVMGPUVectorDistribute workgroup_size = [128, 1, 1] subgroup_size = 64
+// CHECK-LABEL:  @reduction_size_97
+//       CHECK:         lane_basis = {{\[}}[1, 64], [0, 1]]
+//  CHECK-SAME:  partial_reduction =       [0, 128],
+//  CHECK-SAME:     subgroup_basis = {{\[}}[1, 2], [0, 1]]
+//  CHECK-SAME:             thread =       [0, 1],
+//  CHECK-SAME:          workgroup =       [1, 0]
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+func.func @reduction_size_97(%arg0 : !TA, %arg1 : !TB, %arg2 : !DTB) {
+  %0 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]}
+  ins(%arg0 : !TA) outs(%arg1 : !TB) {
+  ^bb0(%in: f32, %out: f32):
+    %1 = arith.addf %in, %out : f32
+    linalg.yield %1 : f32
+  } -> !TB
+  iree_tensor_ext.dispatch.tensor.store %0, %arg2, offsets = [0], sizes = [1024], strides = [1] : !TB -> !DTB
+  return
+}
