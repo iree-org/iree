@@ -51,11 +51,15 @@ def ElementwiseOpFusionPass :
   let summary = "Fuse elementwise operations.";
   let options = [
     Option<"intraDispatch", "intra-dispatch", "bool",
-           /*default=*/"false", "Fuse operations within a dispatch only (default is to fuse only operations outside of a dispatch)">,
+           /*default=*/"false",
+           "Fuse operations within a dispatch only (default is to fuse only operations outside of a dispatch)">,
     Option<"fuseMultiReduction", "fuse-multi-reduction", "bool",
            /*default=*/"true", "Fuse ops that have multiple reduction iterators">,
     Option<"fuseTruncateOps", "fuse-truncate-ops", "bool",
-           /*default=*/"false", "Fuse producer truncate-like operations with consumers">,
+           /*default=*/"false",
+           "Fuse producer truncate-like operations with consumers">,
+    Option<"fuseBroadcastOps", "fuse-broadcast-ops", "bool",
+           /*default=*/"false", "Fuse broadcast-like ops with producers">,
   ];
   let dependentDialects = [
     "mlir::affine::AffineDialect",

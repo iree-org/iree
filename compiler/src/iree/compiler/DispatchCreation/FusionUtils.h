@@ -22,6 +22,8 @@ struct ElementwiseOpsFusabilityOptions {
   bool fuseMultiReduction = false;
   // Control fusion with producer that is a truncate-like operation.
   bool fuseTruncateOps = false;
+  // Control fusion with a consumer that is broadcast-like.
+  bool fuseBroadcastConsumers = false;
 };
 bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *operand,
                                 ElementwiseOpsFusabilityOptions options);

@@ -116,7 +116,8 @@ static void addDispatchRegionCreationPreprocessingPasses(
             ElementwiseOpFusionPassOptions{
                 /*intraDispatch=*/false,
                 /*fuseMultiReduction=*/clEnableElementWiseFuseMultiReduction,
-                /*fuseTruncateOps=*/clEnableEarlyTruncFusion});
+                /*fuseTruncateOps=*/clEnableEarlyTruncFusion,
+                /*fuseBroadcastOps=*/false});
       })
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
@@ -135,7 +136,8 @@ static void addDispatchRegionCreationPreprocessingPasses(
             ElementwiseOpFusionPassOptions{
                 /*intraDispatch=*/false,
                 /*fuseMultiReduction=*/clEnableElementWiseFuseMultiReduction,
-                /*fuseTruncateOps=*/clEnableEarlyTruncFusion});
+                /*fuseTruncateOps=*/clEnableEarlyTruncFusion,
+                /*fuseBroadcastOps=*/false});
       })
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
@@ -220,7 +222,8 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
         return DispatchCreation::createElementwiseOpFusionPass(
             ElementwiseOpFusionPassOptions{/*intraDispatch=*/true,
                                            /*fuseMultiReduction=*/false,
-                                           /*fuseTruncateOps=*/true});
+                                           /*fuseTruncateOps=*/true,
+                                           /*fuseBroadcastOps=*/true});
       })
       // 5. After all the reshape propagations, fuse elementwise operations
       //    even if the producer has multiple uses.
