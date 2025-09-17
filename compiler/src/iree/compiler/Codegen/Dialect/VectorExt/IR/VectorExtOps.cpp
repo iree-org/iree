@@ -1062,7 +1062,6 @@ static AffineMap inverseMap(AffineMap map, ArrayRef<AffineExpr> initValues) {
       (void)constExpr;
       continue;
     }
-
     // Reverse each dimension existing in the original map result.
     exprs[map.getDimPosition(i)] = getAffineDimExpr(i, context);
   }
@@ -1086,15 +1085,22 @@ struct FoldContigousGatherToTransferRead final : OpRewritePattern<GatherOp> {
 
     Value mask = xferOp.getMask();
     if (mask) {
+      // vector_ext.gather has a nicer mask representation where the mask
+      // indexing is part of the op definition as an indexing map. transfer_read
+      // on the other hand, models it as the vector shape read from the slice
+      // before any permutation or broadcasting.
+      //
+      // We can create a mask compatible with transfer_read by create a map from
+      // the mask domain to the source domain.
+      AffineMap maskMap = xferOp.getIndexingMapsArray().back();
+      SmallVector<AffineExpr> shapeInit =
+          llvm::map_to_vector(xferOp.getType().getShape(), [&](int64_t x) {
+            return rewriter.getAffineConstantExpr(x);
+          });
+      AffineMap maskTransform = baseMap.compose(inverseMap(maskMap, shapeInit));
+      maskTransform.dump();
       return failure();
-      // AffineMap maskMap = xferOp.getIndexingMapsArray().back();
-      // SmallVector<AffineExpr> shapeInit =
-      //     llvm::map_to_vector(xferOp.getType().getShape(), [&](int64_t x) {
-      //       return rewriter.getAffineConstantExpr(x);
-      //     });
-      // AffineMap maskTransform = baseMap.compose(inverseMap(maskMap,
-      // shapeInit)); maskTransform.dump(); mask =
-      // applyTransformMapToVector(mask, maskTransform);
+      // mask = applyTransformMapToVector(mask, maskTransform);
     }
 
     // Canonicalize to vector.transfer_read.
@@ -1109,7 +1115,8 @@ struct FoldContigousGatherToTransferRead final : OpRewritePattern<GatherOp> {
 
 void GatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                            MLIRContext *ctx) {
-  results.add<FoldSingleElementIndexingMap>(ctx);
+  results.add<FoldSingleElementIndexingMap, FoldContigousGatherToTransferRead>(
+      ctx);
 }
 
 void ScatterOp::getCanonicalizationPatterns(RewritePatternSet &results,
