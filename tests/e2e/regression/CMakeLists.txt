@@ -43,8 +43,6 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-llvmcpu-reassociate-fp-reductions=false"
     "--iree-llvmcpu-target-cpu=generic"
-  INPUT_TYPE
-    "stablehlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -76,8 +74,6 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-llvmcpu-target-cpu=generic"
-  INPUT_TYPE
-    "stablehlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -91,8 +87,6 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-llvmcpu-target-cpu=generic"
-  INPUT_TYPE
-    "tosa"
 )
 
 iree_check_single_backend_test_suite(
@@ -119,8 +113,6 @@ iree_check_single_backend_test_suite(
     "vmvx"
   DRIVER
     "local-task"
-  INPUT_TYPE
-    "stablehlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -146,8 +138,6 @@ iree_check_single_backend_test_suite(
     "vulkan-spirv"
   DRIVER
     "vulkan"
-  INPUT_TYPE
-    "stablehlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -175,8 +165,6 @@ iree_check_single_backend_test_suite(
     "cuda"
   DRIVER
     "cuda"
-  INPUT_TYPE
-    "stablehlo"
   LABELS
     "noasan"
     "nomsan"
@@ -248,8 +236,6 @@ iree_check_single_backend_test_suite(
     "vmvx"
   COMPILER_FLAGS
     "--iree-vmvx-enable-microkernels"
-  INPUT_TYPE
-    "tosa"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

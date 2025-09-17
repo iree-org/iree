@@ -83,8 +83,6 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-input-demote-f64-to-f32"
     "--iree-llvmcpu-target-cpu=generic"
-  INPUT_TYPE
-    "stablehlo"
   LABELS
     "nowasm"
 )
@@ -162,8 +160,6 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-input-demote-f64-to-f32"
     "--iree-llvmcpu-target-cpu=host"
-  INPUT_TYPE
-    "stablehlo"
   LABELS
     "hostonly"
     "local"
@@ -239,8 +235,6 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-input-demote-f64-to-f32"
-  INPUT_TYPE
-    "stablehlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -312,8 +306,6 @@ iree_check_single_backend_test_suite(
     "vulkan"
   COMPILER_FLAGS
     "--iree-input-demote-f64-to-f32"
-  INPUT_TYPE
-    "stablehlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -389,8 +381,6 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-input-demote-f64-to-f32"
     "--iree-stream-emulate-memset"
-  INPUT_TYPE
-    "stablehlo"
   RUNNER_ARGS
     "--cuda_use_streams=false"
   LABELS
@@ -473,8 +463,6 @@ iree_check_single_backend_test_suite(
     "cuda"
   COMPILER_FLAGS
     "--iree-input-demote-f64-to-f32"
-  INPUT_TYPE
-    "stablehlo"
   RUNNER_ARGS
     "--cuda_use_streams=true"
   LABELS
@@ -555,8 +543,6 @@ iree_check_single_backend_test_suite(
     "rocm"
   DRIVER
     "hip"
-  INPUT_TYPE
-    "stablehlo"
   RUNNER_ARGS
     "--hip_use_streams=true"
 )
@@ -630,8 +616,6 @@ iree_check_single_backend_test_suite(
     "metal-spirv"
   DRIVER
     "metal"
-  INPUT_TYPE
-    "stablehlo"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
