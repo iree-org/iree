@@ -1982,6 +1982,48 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#iree_gpucoalesced_gather_dma-gpucoalescedgatherdmaop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_gpu.coalesced_gather_dma (GPU::CoalescedGatherDMAOp)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lowering-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      Lowering Paths
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#operands-and-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      Operands and Results
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Example">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#iree_gpuglobal_load_dma-gpugloballoaddmaop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_gpu.global_load_dma (GPU::GlobalLoadDMAOp)
@@ -5192,6 +5234,48 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#iree_gpucoalesced_gather_dma-gpucoalescedgatherdmaop" class="md-nav__link">
+    <span class="md-ellipsis">
+      iree_gpu.coalesced_gather_dma (GPU::CoalescedGatherDMAOp)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lowering-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      Lowering Paths
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#operands-and-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      Operands and Results
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Example">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#iree_gpuglobal_load_dma-gpugloballoaddmaop" class="md-nav__link">
     <span class="md-ellipsis">
       iree_gpu.global_load_dma (GPU::GlobalLoadDMAOp)
@@ -5770,6 +5854,12 @@ SPIR-V/LLVM are handled separately.</p>
 <li><a href="#operations">Operations</a><ul>
 <li><a href="#iree_gpubarrier_region-gpubarrierregionop">iree_gpu.barrier_region (GPU::BarrierRegionOp)</a></li>
 <li><a href="#iree_gpubuffer_resource_cast-gpubufferresourcecastop">iree_gpu.buffer_resource_cast (GPU::BufferResourceCastOp)</a></li>
+<li><a href="#iree_gpucoalesced_gather_dma-gpucoalescedgatherdmaop">iree_gpu.coalesced_gather_dma (GPU::CoalescedGatherDMAOp)</a></li>
+</ul>
+</li>
+<li><a href="#lowering-paths">Lowering Paths</a></li>
+<li><a href="#operands-and-results">Operands and Results</a></li>
+<li><a href="#example">Example</a><ul>
 <li><a href="#iree_gpuglobal_load_dma-gpugloballoaddmaop">iree_gpu.global_load_dma (GPU::GlobalLoadDMAOp)</a></li>
 <li><a href="#iree_gpuvalue_barrier-gpuvaluebarrierop">iree_gpu.value_barrier (GPU::ValueBarrierOp)</a></li>
 <li><a href="#iree_gpuyield-gpuyieldop">iree_gpu.yield (GPU::YieldOp)</a></li>
@@ -5997,6 +6087,92 @@ effort and has no verification or failure modes.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="iree_gpucoalesced_gather_dma-gpucoalescedgatherdmaop"><code>iree_gpu.coalesced_gather_dma</code> (GPU::CoalescedGatherDMAOp)<a class="headerlink" href="#iree_gpucoalesced_gather_dma-gpucoalescedgatherdmaop" title="Permanent link">link</a></h3>
+<p><em>Coalesced gather DMA operation for efficient GPU memory access</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.coalesced_gather_dma` $indices `,` $source `into` $init attr-dict
+              `:` type($indices) `,` type($source) `,` type($init) `-&gt;` type($result)
+</code></pre></div>
+<p>Performs a coalesced gather operation that reads elements from a source tensor
+based on indices and produces a result tensor with the gathered data. The operation is
+specifically designed for subgroup-level parallelism, where threads within a
+subgroup cooperatively gather data with coalesced memory accesses. It implements
+<code>ParallelCombiningOpInterface</code> and must live inside an op implementing
+<code>InParallelOpInterface</code>, such as <code>scf.forall.in_parallel</code>.</p>
+<h2 id="lowering-paths">Lowering Paths<a class="headerlink" href="#lowering-paths" title="Permanent link">link</a></h2>
+<p>Two lowering strategies are supported:
+1. Lowers to <code>amdgpu.gather_to_lds</code> operations when lowering requirements are met.
+2. Default lowering using <code>vector.gather</code> operations.</p>
+<h2 id="operands-and-results">Operands and Results<a class="headerlink" href="#operands-and-results" title="Permanent link">link</a></h2>
+<ul>
+<li><code>$indices</code>: Tensor of index type specifying gather locations in the source tensor</li>
+<li><code>$source</code>: Source tensor containing the data to be gathered</li>
+<li><code>$init</code>: Destination tensor receiving the gathered data (destination-passing style)</li>
+<li><code>$result</code>: Output tensor with gathered data (same type as <code>$init</code>)</li>
+</ul>
+<h2 id="example">Example<a class="headerlink" href="#example" title="Permanent link">link</a></h2>
+<p>The following example shows how this op is designed to be used in a tiled scenario, which sets up
+lowering path for efficient gathering.</p>
+<ol>
+<li>Outer <code>scf.forall</code> represents workgroup-level parallelism.</li>
+<li>Inner <code>scf.forall</code> represents subgroup-level parallelism.</li>
+<li>Each thread in the subgroup coalesces its memory accesses when gathering data and writes to
+   its lane-offset in the destination tensor.</li>
+</ol>
+<div class="highlight"><pre><span></span><code>%result = scf.forall (%wg_i, %wg_j) in (16, 1) shared_outs(%wg_out = %dest) -&gt; (tensor&lt;128x16xf32&gt;) {
+  %indices_wg_slice = tensor.extract_slice ...
+  %dest_wg_slice = tensor.extract_slice ...
+
+  %inner_result = scf.forall (%sg_i, %sg_j) in (32, 1) shared_outs(%sg_out = %dest_wg_slice) -&gt; (tensor&lt;8x16xf32&gt;) {
+    scf.forall.in_parallel {
+      iree_gpu.coalesced_gather_dma %indices_wg_slice, %source into %sg_out : ...
+    }
+  } {mapping = [#gpu.thread&lt;linear_dim_1&gt;, #gpu.thread&lt;linear_dim_0&gt;]}
+
+  scf.forall.in_parallel {
+    tensor.parallel_insert_slice %inner_result into %wg_out[...] : ...
+  }
+} {mapping = [#gpu.warp&lt;linear_dim_1&gt;, #gpu.warp&lt;linear_dim_0&gt;]}
+</code></pre></div>
+<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>ParallelCombiningOpInterface</code></p>
+<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>indices</code></td>
+<td>ranked tensor of index values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source</code></td>
+<td>ranked tensor of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>init</code></td>
+<td>ranked tensor of any type values</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>ranked tensor of any type values</td>
+</tr>
+</tbody>
+</table>
 <h3 id="iree_gpuglobal_load_dma-gpugloballoaddmaop"><code>iree_gpu.global_load_dma</code> (GPU::GlobalLoadDMAOp)<a class="headerlink" href="#iree_gpuglobal_load_dma-gpugloballoaddmaop" title="Permanent link">link</a></h3>
 <p><em>Does a global load DMA operation</em></p>
 <p>Syntax:</p>
@@ -6013,7 +6189,7 @@ from <code>$source[sourceIndices]</code> and store it to <code>$target[targetInd
 Collectively, all threads in the subgroup orchestrate the load DMA operation.</p>
 <p>Note: each gather has a load width is 32bit.</p>
 <p>Traits: <code>SameVariadicOperandSize</code></p>
-<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
+<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6057,7 +6233,7 @@ produces.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
+<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6072,7 +6248,7 @@ produces.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
+<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6096,7 +6272,7 @@ produces.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;::mlir::iree_compiler::IREE::GPU::BarrierRegionOp&gt;</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RegionBranchTerminatorOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
+<h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
