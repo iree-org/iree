@@ -1014,8 +1014,8 @@ void ConvertToLLVMPass::runOnOperation() {
         patterns, /*force32BitVectorIndices=*/false);
     vector::populateVectorMaskOpLoweringPatterns(patterns);
     vector::populateVectorShapeCastLoweringPatterns(patterns);
-    vector::populateVectorFromElementsLoweringPatterns(patterns);
-    vector::populateVectorToElementsLoweringPatterns(patterns);
+    vector::populateVectorFromElementsUnrollPatterns(patterns);
+    vector::populateVectorToElementsUnrollPatterns(patterns);
     // TODO: doubtful that the "default" does what one want here, it is likely
     // better to use shuffle.
     vector::populateVectorTransposeLoweringPatterns(
@@ -1091,8 +1091,8 @@ void ConvertToLLVMPass::runOnOperation() {
   vector::populateVectorStepLoweringPatterns(patterns);
   populateVectorToLLVMConversionPatterns(typeConverter, patterns,
                                          reassociateFpReductions);
-  vector::populateVectorFromElementsLoweringPatterns(patterns);
-  vector::populateVectorToElementsLoweringPatterns(patterns);
+  vector::populateVectorFromElementsUnrollPatterns(patterns);
+  vector::populateVectorToElementsUnrollPatterns(patterns);
   ub::populateUBToLLVMConversionPatterns(typeConverter, patterns);
   vector::populateVectorTransferLoweringPatterns(patterns,
                                                  /*maxTransferRank=*/1);
