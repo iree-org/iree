@@ -533,19 +533,19 @@ func.func @non_contiguous_reduction_example(%arg0: !TA, %arg1: !TB, %arg2: !DTB)
 #map3 = affine_map<(d0, d1, d2) -> (d0)>
 #map4 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module {
-  func.func @foo(%arg0: tensor<32xf32>, %arg1: tensor<32x64xf32>, %arg2: tensor<32x64x128xf32>, %arg3: tensor<32x64x128xf32>, %arg4: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<32x64x128xf32>>) {
-    %0 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]} ins(%arg1 : tensor<32x64xf32>) outs(%arg0 : tensor<32xf32>) {
+  func.func @foo(%arg0: tensor<320xf32>, %arg1: tensor<320x64xf32>, %arg2: tensor<320x64x5120xf32>, %arg3: tensor<320x64x5120xf32>, %arg4: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<320x64x5120xf32>>) {
+    %0 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]} ins(%arg1 : tensor<320x64xf32>) outs(%arg0 : tensor<320xf32>) {
     ^bb0(%in: f32, %out: f32):
       %2 = arith.addf %in, %out : f32
       linalg.yield %2 : f32
-    } -> tensor<32xf32>
-    %1 = linalg.generic {indexing_maps = [#map2, #map3, #map4, #map2], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg2, %0, %arg1 : tensor<32x64x128xf32>, tensor<32xf32>, tensor<32x64xf32>) outs(%arg3 : tensor<32x64x128xf32>) {
+    } -> tensor<320xf32>
+    %1 = linalg.generic {indexing_maps = [#map2, #map3, #map4, #map2], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg2, %0, %arg1 : tensor<320x64x5120xf32>, tensor<320xf32>, tensor<320x64xf32>) outs(%arg3 : tensor<320x64x5120xf32>) {
     ^bb0(%in: f32, %in_0: f32, %in_1: f32, %out: f32):
       %2 = arith.addf %in, %in_0 : f32
       %3 = arith.addf %2, %in_1 : f32
       linalg.yield %3 : f32
-    } -> tensor<32x64x128xf32>
-    iree_tensor_ext.dispatch.tensor.store %1, %arg4, offsets = [0, 0, 0], sizes = [32, 64, 128], strides = [1, 1, 1] : tensor<32x64x128xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<32x64x128xf32>>
+    } -> tensor<320x64x5120xf32>
+    iree_tensor_ext.dispatch.tensor.store %1, %arg4, offsets = [0, 0, 0], sizes = [320, 64, 5120], strides = [1, 1, 1] : tensor<320x64x5120xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<320x64x5120xf32>>
     return
   }
 }
