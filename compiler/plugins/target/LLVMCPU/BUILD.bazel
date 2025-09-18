@@ -41,6 +41,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/Encoding/IR",
         "//compiler/src/iree/compiler/Dialect/HAL/Target",
         "//compiler/src/iree/compiler/Dialect/HAL/Target/Devices",
+        "//compiler/src/iree/compiler/Dialect/HAL/Utils:LLVMCodeGenUtils",
         "//compiler/src/iree/compiler/Dialect/HAL/Utils:LLVMLinkerUtils",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
         "//compiler/src/iree/compiler/Dialect/Util/IR",

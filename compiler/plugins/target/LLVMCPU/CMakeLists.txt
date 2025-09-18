@@ -62,6 +62,7 @@ iree_cc_library(
     iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Target::Devices
+    iree::compiler::Dialect::HAL::Utils::LLVMCodeGenUtils
     iree::compiler::Dialect::HAL::Utils::LLVMLinkerUtils
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::Util::IR
