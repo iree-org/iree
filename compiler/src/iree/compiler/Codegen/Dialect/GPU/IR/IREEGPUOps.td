@@ -17,6 +17,9 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
 
+// Type constraint for operations that support both tensor and memref types
+def AnyRankedTensorOrMemRef : AnyTypeOf<[AnyRankedTensor, AnyMemRef]>;
+
 //===----------------------------------------------------------------------===//
 // BarrierRegionOp
 //===----------------------------------------------------------------------===//
@@ -311,12 +314,12 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
   }];
 
   let arguments = (ins
-    RankedTensorOf<[Index]>:$indices,
-    AnyRankedTensor:$source,
-    AnyRankedTensor:$init
+    AnyTypeOf<[RankedTensorOf<[Index]>, MemRefOf<[Index]>]>:$indices,
+    AnyRankedTensorOrMemRef:$source,
+    AnyRankedTensorOrMemRef:$init
   );
 
-  let results = (outs AnyRankedTensor:$result);
+  let results = (outs AnyRankedTensorOrMemRef:$result);
 
   let assemblyFormat = [{
     $indices `,` $source `into` $init attr-dict
@@ -326,9 +329,13 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
   let hasVerifier = 1;
 
   let extraClassDeclaration = [{
-    // Get the rank of the result tensor
+    // Get the rank of the result tensor/memref
     unsigned getResultRank() {
-      return ::llvm::cast<RankedTensorType>(getResult().getType()).getRank();
+      if (auto tensorType = ::llvm::dyn_cast<RankedTensorType>(getResult().getType()))
+        return tensorType.getRank();
+      if (auto memrefType = ::llvm::dyn_cast<MemRefType>(getResult().getType()))
+        return memrefType.getRank();
+      return 0;
     }
   }];
 }
