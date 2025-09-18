@@ -190,6 +190,9 @@ bool FusionGroup::wouldExceedOperandLimit(Operation *newOp) const {
         return;
       }
       Operation *definingOp = operand->get().getDefiningOp();
+      if (llvm::isa_and_nonnull<linalg::FillOp, tensor::EmptyOp>(definingOp)) {
+        return;
+      }
       if (definingOp && definingOp != newOp && !loopMaps.contains(definingOp)) {
         dispatchOperands.insert(definingOp);
       }
