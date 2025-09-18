@@ -553,7 +553,54 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     batchDims.push_back(batchDim);
   }
 
-  auto getDimBounds = [&](SmallVector<int64_t> dims) -> SmallVector<int64_t> {
+  // Infer if lhs or rhs is transposed to help generate better schedule.
+  // TODO: Drop this. This is only a consideration for other pipelines.
+  bool transposedLhs =
+      kDims.back() !=
+      llvm::cast<AffineDimExpr>(maps[0].getResults().back()).getPosition();
+  bool transposedRhs =
+      nDims.back() !=
+      llvm::cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
+  bool couldNeedPadding = false;
+
+  // Helper to pad bounds to a preferred alignment.
+  auto maybePaddedBounds = [&](int64_t originalBound,
+                               int64_t alignment) -> int64_t {
+    int64_t remainder = originalBound % alignment;
+    if (remainder == 0) {
+      return originalBound;
+    }
+    couldNeedPadding = true;
+    return originalBound + alignment - remainder;
+  };
+  // Since the TileAndFuse (I)GEMM pipeline can support padding we can align
+  // the bounds of our problem so that we get favorable tile sizes.
+  // Please see the document linked in
+  // https://github.com/iree-org/iree/issues/21932 for details on how the
+  // specific limits for padding were decided.
+  // TODO (nirvedhmeshram,jerryyin) : Consider doing this in the heuristic
+  // calculation directly so that we can be smarter about needing padding
+  // or not. Also when this is a part of the heuristic it will be easier
+  // to take into account the element type instead of the constants
+  // 128 and 32 that were derived for bf16 type with f32 accumulation.
+  auto getDimBounds = [&](SmallVector<int64_t> dims,
+                          bool PaddingCanBeExpensive) -> SmallVector<int64_t> {
+    return llvm::map_to_vector(dims, [&](int64_t dim) {
+      if (ShapedType::isDynamic(bounds[dim]) || !canSupportUnaligned ||
+          PaddingCanBeExpensive) {
+        return bounds[dim];
+      } else if (bounds[dim] > 128) {
+        return maybePaddedBounds(bounds[dim], 128);
+      } else if (bounds[dim] > 32) {
+        return maybePaddedBounds(bounds[dim], 32);
+      }
+
+      return bounds[dim];
+    });
+  };
+
+  auto getDimBoundsNoPad =
+      [&](SmallVector<int64_t> dims) -> SmallVector<int64_t> {
     return llvm::map_to_vector(dims, [&](int64_t dim) { return bounds[dim]; });
   };
 
@@ -578,20 +625,18 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   Type lhsElemType = getElementTypeOrSelf(lhs);
   Type rhsElemType = getElementTypeOrSelf(rhs);
   Type initElemType = getElementTypeOrSelf(init);
-
-  GPUMatmulShapeType problem{getDimBounds(mDims), getDimBounds(nDims),
-                             getDimBounds(kDims), getDimBounds(batchDims),
-                             lhsElemType,         rhsElemType,
-                             initElemType};
-
-  // Infer if lhs or rhs is transposed to help generate better schedule.
-  // TODO: Drop this. This is only a consideration for other pipelines.
-  bool transposedLhs =
-      kDims.back() !=
-      llvm::cast<AffineDimExpr>(maps[0].getResults().back()).getPosition();
-  bool transposedRhs =
-      nDims.back() !=
-      llvm::cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
+  // TODO (nirvedhmeshram) :  We only voluntarily allow padded configurations
+  // for tranpose_b layouts as thats where we currently dont have any overhead
+  // for padding. Other layouts still can have overhead and once we fix the root
+  // causes for that we can relax this condition.
+  GPUMatmulShapeType problem{
+      getDimBounds(mDims, transposedLhs || !transposedRhs),
+      getDimBounds(nDims, transposedLhs || !transposedRhs),
+      getDimBoundsNoPad(kDims),
+      getDimBoundsNoPad(batchDims),
+      lhsElemType,
+      rhsElemType,
+      initElemType};
 
   bool mustBeAligned = true;
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
@@ -696,7 +741,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
                                            : ArrayRef<Attribute>{};
   GPU::appendPromotedOperandsList(context, attrs, promotionList,
                                   promotionTypes);
-  if (!mustBeAligned) {
+  if (!mustBeAligned || couldNeedPadding) {
     SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
 
     // Initialize inner and outer padding sizes from reductionTileSizes.

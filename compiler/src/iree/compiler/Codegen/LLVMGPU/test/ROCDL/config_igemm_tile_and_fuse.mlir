@@ -176,19 +176,19 @@ func.func @conv_nhwc_fhwc_unaligned_channel(%arg0: tensor<16x26x19x287xf16>, %ar
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 
-// GFX942-SAME:     padding = [1, 4, 32, 32, 32]
+// GFX942-SAME:     padding = [1, 4, 32, 64, 32]
 // GFX942-SAME:     promote_operands = [0, 1]
 // GFX942-SAME:     reduction = [0, 0, 0, 0, 2]
-// GFX942-SAME:     subgroup = [1, 2, 1, 1, 0]
-// GFX942-SAME:     workgroup = [1, 4, 32, 32, 0]
+// GFX942-SAME:     subgroup = [1, 2, 1, 2, 0]
+// GFX942-SAME:     workgroup = [1, 4, 32, 64, 0]
 
-// MI300X-SAME:     padding = [1, 2, 32, 32, 32]
+// MI300X-SAME:     padding = [1, 4, 32, 64, 32]
 // MI300X-SAME:     promote_operands = [0, 1]
 // MI300X-SAME:     reduction = [0, 0, 0, 0, 2]
-// MI300X-SAME:     subgroup = [1, 1, 1, 1, 0]
-// MI300X-SAME:     workgroup = [1, 2, 32, 32, 0]
+// MI300X-SAME:     subgroup = [1, 2, 1, 2, 0]
+// MI300X-SAME:     workgroup = [1, 4, 32, 64, 0]
 
-// PAD-CONV-GFX942:     padding_conv = [1, 4, 32, 32, 0, 0, 32]
+// PAD-CONV-GFX942:     padding_conv = [1, 4, 32, 64, 0, 0, 32]
 
 // -----
 
@@ -220,15 +220,15 @@ func.func @conv_chwn_chwf_unaligned_batch(%arg0: tensor<16x193x129x40xbf16>, %ar
 //  CHECK-SAME:     subgroup = [1, 1, 1, 1, 0]
 //  CHECK-SAME:     workgroup = [16, 1, 1, 16, 0]
 
-// PAD-CONV-GFX942:     padding_conv = [16, 1, 1, 16, 0, 0, 0]
+// PAD-CONV-GFX942:     padding_conv =  [16, 1, 1, 16, 0, 0, 0]
 
 // -----
 
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0 + d4, d1 + d5, d2, d6)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d2, d3, d4, d5, d6)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
-func.func @group_conv_hwgc_gfhwc_unaligned(%arg0: tensor<61x93x16x56xbf16>, %arg1: tensor<16x56x3x3x56xbf16>, %arg2: tensor<59x91x16x56xf32>) -> tensor<59x91x16x56xf32> {
-  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<61x93x16x56xbf16>, tensor<16x56x3x3x56xbf16>) outs(%arg2 : tensor<59x91x16x56xf32>) {
+func.func @group_conv_hwgc_gfhwc_unaligned(%arg0: tensor<61x93x16x55xbf16>, %arg1: tensor<16x56x3x3x55xbf16>, %arg2: tensor<59x91x16x56xf32>) -> tensor<59x91x16x56xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<61x93x16x55xbf16>, tensor<16x56x3x3x55xbf16>) outs(%arg2 : tensor<59x91x16x56xf32>) {
     ^bb0(%in: bf16, %in_4: bf16, %out: f32):
       %10 = arith.extf %in : bf16 to f32
       %11 = arith.extf %in_4 : bf16 to f32
@@ -246,19 +246,19 @@ func.func @group_conv_hwgc_gfhwc_unaligned(%arg0: tensor<61x93x16x56xbf16>, %arg
 
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 // GFX942-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_BF16>
-// GFX942-SAME:     padding = [1, 32, 1, 64, 128]
+// GFX942-SAME:     padding = [4, 32, 1, 64, 16]
 // GFX942-SAME:     promote_operands = [0, 1]
-// GFX942-SAME:     reduction = [0, 0, 0, 0, 8]
-// GFX942-SAME:     subgroup = [1, 1, 0, 1, 0]
-// GFX942-SAME:     workgroup = [1, 32, 1, 64, 0]
+// GFX942-SAME:     reduction = [0, 0, 0, 0, 1]
+// GFX942-SAME:     subgroup = [2, 1, 0, 2, 0]
+// GFX942-SAME:     workgroup = [4, 32, 1, 64, 0]
 
-// MI300X-SAME:     padding = [1, 32, 1, 64, 128]
+// MI300X-SAME:     padding = [2, 32, 1, 32, 16]
 // MI300X-SAME:     promote_operands = [0, 1]
-// MI300X-SAME:     reduction = [0, 0, 0, 0, 8]
+// MI300X-SAME:     reduction = [0, 0, 0, 0, 1]
 // MI300X-SAME:     subgroup = [1, 1, 0, 1, 0]
-// MI300X-SAME:     workgroup = [1, 32, 1, 64, 0]
+// MI300X-SAME:     workgroup = [2, 32, 1, 32, 0]
 
-// PAD-CONV-GFX942:     padding_conv = [1, 32, 1, 64, 0, 0, 128]
+// PAD-CONV-GFX942:     padding_conv = [4, 32, 1, 64, 0, 0, 16]
 
 // -----
 
@@ -286,19 +286,19 @@ module {
 
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 // GFX942-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_BF16>
-// GFX942-SAME:     padding = [2, 2, 32, 64, 64]
+// GFX942-SAME:     padding = [1, 4, 32, 64, 64]
 // GFX942-SAME:     promote_operands = [0, 1]
 // GFX942-SAME:     reduction = [0, 0, 0, 0, 4]
-// GFX942-SAME:     subgroup = [2, 1, 1, 2, 0]
-// GFX942-SAME:     workgroup = [2, 2, 32, 64, 0]
+// GFX942-SAME:     subgroup = [1, 2, 1, 2, 0]
+// GFX942-SAME:     workgroup = [1, 4, 32, 64, 0]
 
-// MI300X-SAME:     padding = [1, 2, 32, 32, 64]
+// MI300X-SAME:     padding = [1, 2, 32, 64, 64]
 // MI300X-SAME:     promote_operands = [0, 1]
 // MI300X-SAME:     reduction = [0, 0, 0, 0, 4]
-// MI300X-SAME:     subgroup = [1, 1, 1, 1, 0]
-// MI300X-SAME:     workgroup = [1, 2, 32, 32, 0]
+// MI300X-SAME:     subgroup = [1, 1, 1, 2, 0]
+// MI300X-SAME:     workgroup = [1, 2, 32, 64, 0]
 
-// PAD-CONV-GFX942:     padding_conv = [2, 2, 32, 64, 0, 0]
+// PAD-CONV-GFX942:     padding_conv = [1, 4, 32, 64, 0, 0]
 
 // -----
 
@@ -339,5 +339,5 @@ func.func @conv_nhwc_small_channel_no_pad_conv(%arg0: tensor<16x26x19x3xf16>, %a
 }
 
 //         CHECK-LABEL:  func.func @conv_nhwc_small_channel_no_pad_conv
-//     PAD-CONV-GFX942:     padding = [1, 4, 32, 32, 32]
+//     PAD-CONV-GFX942:     padding = [1, 4, 32, 64, 32]
 // PAD-CONV-GFX942-NOT:     padding_conv
