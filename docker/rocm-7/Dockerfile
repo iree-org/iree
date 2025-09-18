@@ -19,8 +19,6 @@ RUN python3 -m pip install \
 # Set ROCm environment variables
 RUN export ROCM_PATH=$(python3 -m rocm_sdk path --root) && \
     export LD_LIBRARY_PATH="$ROCM_PATH/lib":$LD_LIBRARY_PATH && \
-    echo "export ROCM_PATH=$ROCM_PATH" >> $GITHUB_ENV && \
-    echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
 # Verify ROCm installation
 RUN python3 -c "import rocm_sdk; print('ROCm SDK installed successfully')"
