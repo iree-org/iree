@@ -1744,23 +1744,24 @@ getMatmulCacheTileSizesForShape(ArrayRef<int64_t> inputTileSizes,
   return outputTileSizes;
 }
 
+/// Returns true if it matches setContractionRootConfig's expectations. It could
+/// break compilation as IREE is transiting to generalize matmul in
+/// linalg.generic form, so some operations are not expected.
+static bool meetLegacyContractionOpInterface(linalg::LinalgOp linalgOp) {
+  SmallVector<unsigned> dims;
+  linalgOp.getReductionDims(dims);
+  return dims.size() == 1 && dims[0] == linalgOp.getNumLoops() - 1;
+}
+
 /// Sets the lowering configuration for dispatch region with root op that
 /// implements the contraction operation interface.
 static LogicalResult
 setContractionRootConfig(mlir::FunctionOpInterface entryPointFn,
                          linalg::LinalgOp linalgOp) {
   assert(!getLoweringConfig(linalgOp) && "expected lowering_config is not set");
-  unsigned numLoops = linalgOp.getNumLoops();
-  {
-    SmallVector<unsigned> dims;
-    linalgOp.getReductionDims(dims);
-    if (dims.size() != 1 || dims[0] != numLoops - 1) {
-      return linalgOp.emitOpError(
-          "expected to have exactly one reduction dim, and it is the innermost "
-          "dim");
-    }
-  }
-
+  assert(meetLegacyContractionOpInterface(linalgOp) &&
+         "expected to have exactly one reduction dim, and it is the innermost "
+         "dim");
   // Consider all element types and use the smallest vector size. The tiling
   // sizes are chosen based on the vector size.
   auto lhsShapedType =
@@ -1785,6 +1786,7 @@ setContractionRootConfig(mlir::FunctionOpInterface entryPointFn,
   LDBG() << "Vector pre-processing strategy: " << vecPreProcStrategy;
 
   DistributionHeuristicConfig distConfig;
+  unsigned numLoops = linalgOp.getNumLoops();
   distConfig.maxTileSizes.resize(numLoops, clDefaultDistTileSize);
   distConfig.allowIncompleteTile =
       vecPreProcStrategy != VectorPreProcStrategy::None;
@@ -2900,7 +2902,8 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
   }
 
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
-    if (linalg::isaContractionOpInterface(linalgOp)) {
+    if (linalg::isaContractionOpInterface(linalgOp) &&
+        meetLegacyContractionOpInterface(linalgOp)) {
       return setContractionRootConfig(entryPointFn, linalgOp);
     }
     if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
