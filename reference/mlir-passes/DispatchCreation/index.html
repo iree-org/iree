@@ -2973,6 +2973,30 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-dispatch-creation-set-split-reduction-sizes" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-dispatch-creation-set-split-reduction-sizes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="-iree-dispatch-creation-set-split-reduction-sizes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#options_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      Options
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-dispatch-creation-sink-reshapes" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-dispatch-creation-sink-reshapes
@@ -3001,7 +3025,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_9" class="md-nav__link">
+  <a href="#options_10" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -5401,6 +5425,30 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-dispatch-creation-set-split-reduction-sizes" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-dispatch-creation-set-split-reduction-sizes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="-iree-dispatch-creation-set-split-reduction-sizes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#options_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      Options
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-dispatch-creation-sink-reshapes" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-dispatch-creation-sink-reshapes
@@ -5429,7 +5477,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_9" class="md-nav__link">
+  <a href="#options_10" class="md-nav__link">
     <span class="md-ellipsis">
       Options
     </span>
@@ -5609,13 +5657,18 @@ operations in tiled/padded layouts.</p>
 <h4 id="options_8">Options<a class="headerlink" href="#options_8" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-encoding-option : Select the type of encoding options to add.
 </code></pre></div>
+<h3 id="-iree-dispatch-creation-set-split-reduction-sizes"><code>-iree-dispatch-creation-set-split-reduction-sizes</code><a class="headerlink" href="#-iree-dispatch-creation-set-split-reduction-sizes" title="Permanent link">link</a></h3>
+<p><em>Set 'iree_linalg_ext.split_reduction' attribute on ops</em></p>
+<h4 id="options_9">Options<a class="headerlink" href="#options_9" title="Permanent link">link</a></h4>
+<div class="highlight"><pre><span></span><code>-split-reduction-target-size : Target tile size for split reduction. Inner reduction dimensions are tiled first, with the tile size rounded up until it evenly divides the iteration domain.
+</code></pre></div>
 <h3 id="-iree-dispatch-creation-sink-reshapes"><code>-iree-dispatch-creation-sink-reshapes</code><a class="headerlink" href="#-iree-dispatch-creation-sink-reshapes" title="Permanent link">link</a></h3>
 <p><em>Sink reshapes to allow for compute op -&gt; consumer fusion.</em></p>
 <h3 id="-iree-dispatch-creation-split-reduction-ops"><code>-iree-dispatch-creation-split-reduction-ops</code><a class="headerlink" href="#-iree-dispatch-creation-split-reduction-ops" title="Permanent link">link</a></h3>
 <p><em>Split reduction dimension to increase parallelism.</em></p>
 <h3 id="-iree-dispatch-creation-tensor-pad-to-tensor-insert-slice"><code>-iree-dispatch-creation-tensor-pad-to-tensor-insert-slice</code><a class="headerlink" href="#-iree-dispatch-creation-tensor-pad-to-tensor-insert-slice" title="Permanent link">link</a></h3>
 <p><em>Convert tensor.pad into linalg.fill + tensor.insert_slice.</em></p>
-<h4 id="options_9">Options<a class="headerlink" href="#options_9" title="Permanent link">link</a></h4>
+<h4 id="options_10">Options<a class="headerlink" href="#options_10" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-skip-one-linalg-use-case : Skip the op that has only one use which is usedby a Linalg op
 </code></pre></div>
 <h3 id="-iree-dispatch-creation-transpose-generic-ops"><code>-iree-dispatch-creation-transpose-generic-ops</code><a class="headerlink" href="#-iree-dispatch-creation-transpose-generic-ops" title="Permanent link">link</a></h3>
