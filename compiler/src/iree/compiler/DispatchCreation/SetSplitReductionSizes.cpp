@@ -18,7 +18,6 @@ namespace mlir::iree_compiler::DispatchCreation {
 #define GEN_PASS_DEF_SETSPLITREDUCTIONSIZESPASS
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
 
-namespace {
 static SmallVector<int64_t> getStaticReductionDimSizes(linalg::LinalgOp op) {
   SmallVector<int64_t> dimSizes;
   for (auto [loopRange, loopType] :
@@ -46,6 +45,7 @@ findSmallestFactorWithLowerBound(int64_t x, int64_t lowerBound) {
   return std::nullopt;
 };
 
+namespace {
 struct SetSplitReductionSizesPass final
     : public impl::SetSplitReductionSizesPassBase<SetSplitReductionSizesPass> {
   using Base::Base;
