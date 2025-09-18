@@ -282,6 +282,8 @@ void buildIREEVMTransformPassPipeline(
     dispatchTransformOptions.enableFuseMultiUse =
         dispatchCreationOptions.enableFuseMultiUse;
     dispatchTransformOptions.dataTiling = dispatchCreationOptions.dataTiling;
+    dispatchTransformOptions.enableSplitReduction =
+        dispatchCreationOptions.enableSplitReduction;
     if (compileFrom < IREEVMPipelinePhase::DispatchCreation) { // late-entry
       IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "DispatchCreation");
       if (hooks.beforePhase)

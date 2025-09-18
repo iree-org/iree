@@ -173,6 +173,8 @@ static void addDispatchRegionCreationPreprocessingPasses(
       //        - Legacy pass to be deprecated
       .addPass(DispatchCreation::createSplitReductionPass)
       //        - Split reduction using partial reduction tiling.
+      .addPredicatedPass(dispatchOptions.enableSplitReduction,
+                         DispatchCreation::createSetSplitReductionSizesPass)
       .addPass([]() {
         FormSplitReductionDispatchesPassOptions options;
         options.enableFusePad = clEnableFusePaddingIntoLinalgConsumerOps;

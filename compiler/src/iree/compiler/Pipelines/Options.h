@@ -221,6 +221,7 @@ struct DispatchCreationOptions {
 
   bool enableAggressiveFusion = false;
   bool enableFuseMultiUse = true;
+  bool enableSplitReduction = false;
 
   // Enables data tiling in dispatch creation phase. There are two data-tiling
   // flags during the transition state. The other has to be off if this one is

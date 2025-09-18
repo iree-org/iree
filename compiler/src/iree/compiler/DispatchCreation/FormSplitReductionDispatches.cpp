@@ -181,7 +181,6 @@ void FormSplitReductionDispatchesPass::runOnOperation() {
     return;
   }
 
-  SmallVector<IREE::Flow::DispatchRegionOp> splitReductionDispatches;
   for (auto [op, tileSizes] : reductionOps) {
     FailureOr<IREE::Flow::DispatchRegionOp> formedDispatch =
         tileOpAndWrapInDispatch(rewriter, op, tileSizes, enableFusePad);
@@ -189,7 +188,6 @@ void FormSplitReductionDispatchesPass::runOnOperation() {
       op->emitOpError("failed to form split reduction dispatch");
       return signalPassFailure();
     }
-    splitReductionDispatches.push_back(formedDispatch.value());
   }
 
   // Run some canonicalization patterns within dispatches.
