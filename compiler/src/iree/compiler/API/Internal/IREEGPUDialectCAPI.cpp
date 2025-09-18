@@ -356,6 +356,33 @@ ireeGPUGetSingleSubgroupLayout(MlirAttribute attr, uint32_t fragment) {
   return result;
 }
 
+ireeGPUSubgroupBasisInfo
+ireeGPULoweringConfigAttrGetSubgroupBasis(MlirAttribute attr) {
+  auto loweringConfigAttr =
+      llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
+          unwrap(attr));
+
+  mlir::FailureOr<mlir::iree_compiler::IREE::GPU::Basis> basisResult =
+      mlir::iree_compiler::IREE::GPU::getBasis(
+          loweringConfigAttr,
+          mlir::iree_compiler::IREE::GPU::TilingLevel::Subgroup);
+
+  ireeGPUSubgroupBasisInfo info = {};
+  if (failed(basisResult)) {
+    return info;
+  }
+
+  mlir::iree_compiler::IREE::GPU::Basis basis = *basisResult;
+  mlir::Builder builder(loweringConfigAttr.getContext());
+  mlir::ArrayAttr countsAttr = builder.getI64ArrayAttr(basis.counts);
+  mlir::ArrayAttr mappingAttr = builder.getI64ArrayAttr(basis.mapping);
+
+  info.countsAttr = wrap(countsAttr);
+  info.mappingAttr = wrap(mappingAttr);
+
+  return info;
+}
+
 ireeGPUTargetInfo
 ireeHALExecutableTargetAttrGetGPUTargetInfo(MlirAttribute attr) {
   auto executableTargetAttr =
