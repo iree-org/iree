@@ -318,8 +318,7 @@ void DispatchCreationOptions::bindOptions(OptionsBinder &binder) {
                    llvm::cl::desc("Enables data tiling path."),
                    llvm::cl::cat(category));
   binder.opt<bool>(
-      "iree-dispatch-creation-split-reduction-target-size",
-      enableSplitReduction,
+      "iree-dispatch-creation-enable-split-reduction", enableSplitReduction,
       llvm::cl::desc(
           "Enable split-reduction for certain reduction operations."),
       llvm::cl::cat(category));
