@@ -164,15 +164,15 @@ void buildGlobalOptimizationPassPipeline(
       // decisions as SetEncoding is expected to pick the ideal layout for
       // that operation anyway, and this way we only need to make such a
       // decision once.
-      .addPredicatedPass(
-          clEnableTransposePropagation,
-          [&]() {
-            PropagateLinalgTransposePassOptions options;
-            options.enableAggressivePropagation =
-                transformOptions.options.aggressiveTransposePropagation;
-            options.enableAttentionVTranspose = clEnableAttentionVTranspose;
-            return createPropagateLinalgTransposePass(options);
-          })
+      .addPredicatedPass(clEnableTransposePropagation, [&]() {
+        PropagateLinalgTransposePassOptions options;
+        options.enableAggressivePropagation =
+            transformOptions.options.aggressiveTransposePropagation;
+        options.enableAttentionVTranspose = clEnableAttentionVTranspose;
+        return createPropagateLinalgTransposePass(options);
+      });
+  mainPassManager.addPass(DispatchCreation::createFoldUnitExtentDimsPass());
+  FunctionLikeNest(mainPassManager)
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass);
 
