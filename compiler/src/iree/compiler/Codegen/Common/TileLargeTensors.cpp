@@ -208,6 +208,7 @@ static void processRegion(RewriterBase &rewriter, Region *region,
         ArrayRef<int64_t> bounds = mapScatterOp.getInputType().getShape();
         tileToMaxVectorSize(rewriter, mapScatterOp, bounds,
                             std::max<int64_t>(maxVectorSize / 4, 1));
+        continue;
       }
 
       // Else recursively process all nested operations.
