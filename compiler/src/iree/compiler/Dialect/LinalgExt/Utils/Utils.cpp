@@ -32,6 +32,18 @@ static bool hasAllOneValues(ArrayRef<int64_t> attr) {
   return llvm::all_of(attr, [](int64_t element) { return element == 1; });
 }
 
+OpFoldResult computeProductUsingAffine(OpBuilder &builder, Location loc,
+                                       ArrayRef<OpFoldResult> vals) {
+  auto mulMap = AffineMap::get(
+      2, 0, {builder.getAffineDimExpr(0) * builder.getAffineDimExpr(1)});
+  OpFoldResult product = builder.getIndexAttr(1);
+  for (OpFoldResult val : vals) {
+    product = affine::makeComposedFoldedAffineApply(builder, loc, mulMap,
+                                                    {product, val});
+  }
+  return product;
+}
+
 OpFoldResult addOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
                      OpFoldResult b) {
   AffineExpr d0, d1;

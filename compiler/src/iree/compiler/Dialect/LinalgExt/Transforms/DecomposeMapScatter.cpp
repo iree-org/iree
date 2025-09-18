@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -88,6 +89,36 @@ struct FoldSubViewIntoMapScatter final : OpRewritePattern<MapScatterOp> {
   }
 };
 
+/// Flatten the output buffer, and populate `strides` with the strides of the
+/// flattened buffer if needed. If the buffer is collapsible, then the strides
+/// will remain empty. Otherwise, the strides from the original buffer will be
+/// added to the `strides` list.
+static Value createFlatOutputBuffer(RewriterBase &rewriter, Location loc,
+                                    Value outputBuffer,
+                                    ArrayRef<OpFoldResult> sizes,
+                                    SmallVectorImpl<Value> &strides) {
+  auto outputBufferType = cast<MemRefType>(outputBuffer.getType());
+  SmallVector<ReassociationIndices> reassociations;
+  reassociations.push_back(
+      llvm::to_vector(llvm::seq<int64_t>(outputBufferType.getRank())));
+  if (memref::CollapseShapeOp::isGuaranteedCollapsible(outputBufferType,
+                                                       reassociations)) {
+    return memref::CollapseShapeOp::create(rewriter, loc, outputBuffer,
+                                           reassociations);
+  }
+  auto stridedMetadataOp =
+      memref::ExtractStridedMetadataOp::create(rewriter, loc, outputBuffer);
+  strides.append(stridedMetadataOp.getStrides().begin(),
+                 stridedMetadataOp.getStrides().end());
+  Value offset = stridedMetadataOp.getOffset();
+  OpFoldResult collapsedSize =
+      IREE::LinalgExt::computeProductUsingAffine(rewriter, loc, sizes);
+  SmallVector<OpFoldResult> collapsedShape = {collapsedSize};
+  SmallVector<OpFoldResult> collapsedStrides = {rewriter.getIndexAttr(1)};
+  return memref::ReinterpretCastOp::create(rewriter, loc, outputBuffer, offset,
+                                           collapsedShape, collapsedStrides);
+}
+
 /// Decompose an iree_linalg_ext.map_scatter op with a vector input, and a
 /// memref output. The map_scatter op is lowered into a sequence of vector ops
 /// to compute a vector of indices for the elements of the map_scatter input,
@@ -97,37 +128,39 @@ struct FoldSubViewIntoMapScatter final : OpRewritePattern<MapScatterOp> {
 /// collapsible strides, then the decomposition will fail.
 static LogicalResult decomposeMapScatter(MapScatterOp mapScatterOp,
                                          RewriterBase &rewriter) {
-  auto inputType = cast<VectorType>(mapScatterOp.getInputType());
-  SmallVector<ReassociationIndices> reassociations;
-  auto outputType = cast<MemRefType>(mapScatterOp.getOutputType());
-  reassociations.push_back(
-      llvm::to_vector(llvm::seq<int64_t>(outputType.getRank())));
-  if (!memref::CollapseShapeOp::isGuaranteedCollapsible(outputType,
-                                                        reassociations)) {
-    return rewriter.notifyMatchFailure(mapScatterOp,
-                                       "output buffer is not collapsible");
-  }
   Location loc = mapScatterOp.getLoc();
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(mapScatterOp);
-  Value flatOutputBuffer = memref::CollapseShapeOp::create(
-      rewriter, loc, mapScatterOp.getOutput(), reassociations);
-
-  auto idxInit = tensor::EmptyOp::create(rewriter, loc, inputType.getShape(),
-                                         rewriter.getIndexType());
-  auto maskInit = tensor::EmptyOp::create(rewriter, loc, inputType.getShape(),
-                                          rewriter.getIntegerType(1));
   SmallVector<OpFoldResult> outputSizes =
       memref::getMixedSizes(rewriter, loc, mapScatterOp.getOutput());
+  SmallVector<Value> strides;
+  Value flatOutputBuffer = createFlatOutputBuffer(
+      rewriter, loc, mapScatterOp.getOutput(), outputSizes, strides);
 
+  auto inputType = cast<VectorType>(mapScatterOp.getInputType());
   auto bodyBuilder = [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
     auto inlineBodyBuilder = [&](OpBuilder inlineBuilder, Location inlineLoc,
                                  ArrayRef<Value> yieldedValues) {
       SmallVector<Value> outputIndices(yieldedValues);
       Value mask = outputIndices.pop_back_val();
-      Value linearIdx = affine::AffineLinearizeIndexOp::create(
-          inlineBuilder, inlineLoc, outputIndices, outputSizes,
-          /*disjoint=*/true);
+      Value linearIdx;
+      // If strides are empty, this means that the memref layout was contiguous,
+      // so we can simply linearize the indices based on the shape. Otherwise,
+      // use the strides to compute the linear index.
+      if (strides.empty()) {
+        linearIdx = affine::AffineLinearizeIndexOp::create(
+            inlineBuilder, inlineLoc, outputIndices, outputSizes,
+            /*disjoint=*/true);
+      } else {
+        linearIdx = arith::ConstantIndexOp::create(inlineBuilder, inlineLoc, 0);
+        for (auto [outputIdx, stride] :
+             llvm::zip_equal(outputIndices, strides)) {
+          Value stridedOutputIdx = arith::MulIOp::create(
+              inlineBuilder, inlineLoc, outputIdx, stride);
+          linearIdx = arith::AddIOp::create(inlineBuilder, inlineLoc, linearIdx,
+                                            stridedOutputIdx);
+        }
+      }
       linalg::YieldOp::create(inlineBuilder, inlineLoc,
                               ValueRange{linearIdx, mask});
     };
@@ -137,6 +170,10 @@ static LogicalResult decomposeMapScatter(MapScatterOp mapScatterOp,
         });
     mapScatterOp.inlineMapScatterBody(b, nestedLoc, indices, inlineBodyBuilder);
   };
+  auto idxInit = tensor::EmptyOp::create(rewriter, loc, inputType.getShape(),
+                                         rewriter.getIndexType());
+  auto maskInit = tensor::EmptyOp::create(rewriter, loc, inputType.getShape(),
+                                          rewriter.getIntegerType(1));
   SmallVector<AffineMap> maps(
       2, rewriter.getMultiDimIdentityMap(inputType.getRank()));
   SmallVector<utils::IteratorType> iterTypes(inputType.getRank(),
