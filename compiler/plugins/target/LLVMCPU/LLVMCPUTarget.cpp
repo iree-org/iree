@@ -25,6 +25,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/Target/Devices/LocalDevice.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
+#include "iree/compiler/Dialect/HAL/Utils/LLVMCodeGenUtils.h"
 #include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/PluginAPI/Client.h"
@@ -35,7 +36,6 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Linker/Linker.h"
-#include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/Support/TargetSelect.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/ArmSME/IR/ArmSME.h"
@@ -140,42 +140,6 @@ static LogicalResult appendDebugDatabase(std::vector<int8_t> &baseFile,
   std::memcpy(baseFile.data() + baseFileSize + debugFileSize, &footer,
               sizeof(footer));
   return success();
-}
-
-// Propagate the target features and target cpu to individual LLVMFuncOp if
-// their corresponding attributes haven't been set there.
-static void
-propagateModuleTargetAttributes(ModuleOp moduleOp,
-                                const llvm::TargetMachine &targetMachine,
-                                OpBuilder &executableBuilder) {
-  llvm::MCSubtargetInfo const *subTargetInfo =
-      targetMachine.getMCSubtargetInfo();
-
-  const std::vector<llvm::SubtargetFeatureKV> enabledFeatures =
-      subTargetInfo->getEnabledProcessorFeatures();
-
-  auto plussedFeatures = llvm::to_vector(
-      llvm::map_range(enabledFeatures, [](llvm::SubtargetFeatureKV feature) {
-        return std::string("+") + feature.Key;
-      }));
-
-  auto plussedFeaturesRefs = llvm::to_vector(llvm::map_range(
-      plussedFeatures, [](auto &it) { return StringRef(it.c_str()); }));
-
-  auto fullTargetFeaturesAttr = LLVM::TargetFeaturesAttr::get(
-      executableBuilder.getContext(), plussedFeaturesRefs);
-
-  StringRef targetCPU = targetMachine.getTargetCPU();
-
-  Block &body = moduleOp.getBodyRegion().front();
-  for (auto funcOp : body.getOps<LLVM::LLVMFuncOp>()) {
-    if (!funcOp.getTargetFeatures().has_value()) {
-      funcOp.setTargetFeaturesAttr(fullTargetFeaturesAttr);
-    }
-    if (!funcOp.getTargetCpu().has_value() && !targetCPU.empty()) {
-      funcOp.setTargetCpuAttr(executableBuilder.getStringAttr(targetCPU));
-    }
-  }
 }
 
 class LLVMCPUTargetBackend final : public TargetBackend {
@@ -349,14 +313,15 @@ public:
         LLVM::LLVMDialect::getTargetTripleAttrName(),
         executableBuilder.getStringAttr(targetTriple.str()));
 
+    auto variantModOp = variantOp.getInnerModule();
     // Propagate target features and cpu to function ops.
-    propagateModuleTargetAttributes(variantOp.getInnerModule(), *targetMachine,
-                                    executableBuilder);
+    populateLLVMFuncTargetAttrs(variantModOp, *targetMachine,
+                                executableBuilder.getContext());
 
     // At this moment we are leaving MLIR LLVM dialect land translating module
     // into target independent LLVMIR.
-    auto llvmModule = mlir::translateModuleToLLVMIR(variantOp.getInnerModule(),
-                                                    context, libraryName);
+    auto llvmModule =
+        mlir::translateModuleToLLVMIR(variantModOp, context, libraryName);
     if (!llvmModule) {
       return variantOp.emitError() << "failed to translate the MLIR LLVM "
                                       "dialect to the native llvm::Module";
