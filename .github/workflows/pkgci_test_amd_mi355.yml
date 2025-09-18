@@ -21,12 +21,9 @@ on:
 
 jobs:
   test_amd_mi355:
-    name: "Mi355x Testing"
+    name: "test_mi355"
     strategy:
       fail-fast: false
-      matrix:
-        version: [3.11]
-        os: [linux-mi35x-1gpu-ossci-iree-org]
     runs-on: linux-mi35x-1gpu-ossci-iree-org
     timeout-minutes: 60
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
@@ -41,7 +38,7 @@ jobs:
       IREE_HIP_ENABLE: 1
       IREE_HIP_TEST_TARGET_CHIP: "gfx950"
     container:
-      image: 'ghcr.io/rocm/no_rocm_image_ubuntu24_04@sha256:405945a40deaff9db90b9839c0f41d4cba4a383c1a7459b28627047bf6302a26'
+      image: 'ghcr.io/sa-faizal/iree/rocm-7:latest'
       options: --ipc host
         --group-add video
         --device /dev/kfd
@@ -51,23 +48,21 @@ jobs:
       run:
         shell: bash
     steps:
-      - name: Run rocminfo
-        run: rocminfo
+      - name: "Setting up Python"
+        id: setup_python
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: "3.11"
+      - name: Create Python venv
+        run: |
+           python -m venv ${VENV_DIR}
+           source ${VENV_DIR}/bin/activate
       - name: Check out repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           submodules: false
       - name: Check out runtime submodules
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
-        with:
-          # Must match the subset of versions built in pkgci_build_packages.
-          python-version: "3.11"
-      - name: Install dependencies
-        if: ${{ inputs.artifact_run_id != '' }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install gh
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         if: ${{ inputs.artifact_run_id == '' }}
         with:
@@ -78,22 +73,6 @@ jobs:
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
-      - name: Install pip deps
-        if: ${{ !cancelled() }}
-        run: |
-          # Install TheRock
-          sudo apt-get update
-          sudo apt install -y gfortran build-essential binutils
-          python -m pip install \
-            --index-url https://d2awnip2yjpvqn.cloudfront.net/v2/gfx950-dcgpu/ \
-            rocm[libraries,devel]
-
-          # Set environment variables
-          export ROCM_PATH=$(python -m rocm_sdk path --root)
-          export LD_LIBRARY_PATH="$ROCM_PATH/lib":$LD_LIBRARY_PATH
-          echo "ROCM_PATH=$ROCM_PATH" >> $GITHUB_ENV
-          echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> $GITHUB_ENV
-
       - name: Build tests
         run: ./build_tools/pkgci/build_tests_using_package.sh ${VENV_DIR}/bin
       - name: Run GPU tests
