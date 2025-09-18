@@ -319,7 +319,7 @@ void DispatchCreationOptions::bindOptions(OptionsBinder &binder) {
   binder.opt<bool>(
       "iree-dispatch-creation-data-tiling", dataTiling,
       llvm::cl::desc(
-          "Enables data tiling path starting from DispatchCreationPhase."),
+          "Enables data tiling path starting from DispatchCreation phase."),
       llvm::cl::cat(category));
   binder.opt<bool>(
       "iree-dispatch-creation-split-reduction-target-size",
