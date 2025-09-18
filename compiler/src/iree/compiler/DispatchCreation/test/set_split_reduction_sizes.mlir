@@ -76,17 +76,17 @@ util.func public @inner_dynamic_parallel(%arg0: tensor<4096x?xf32>, %d0: index) 
 
 // -----
 
-// CHECK-LABEL: @negative_dynamic_reduction
-util.func public @negative_dynamic_reduction(%arg0: tensor<64x?xf32>, %d0: index) -> tensor<64xf32> {
+// CHECK-LABEL: @negative_outer_dynamic_reduction
+util.func public @negative_outer_dynamic_reduction(%arg0: tensor<?x64xf32>, %d0: index) -> tensor<64xf32> {
   // We bail out on dynamic reduction dimensions.
   // CHECK-NOT: iree_linalg_ext.split_reduction
   %cst = arith.constant 0.0 : f32
   %0 = tensor.empty() : tensor<64xf32>
   %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<64xf32>) -> tensor<64xf32>
   %2 = linalg.generic {
-      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>],
-      iterator_types = ["parallel", "reduction"]
-  } ins(%arg0 : tensor<64x?xf32>) outs(%1 : tensor<64xf32>) {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>],
+      iterator_types = ["reduction", "parallel"]
+  } ins(%arg0 : tensor<?x64xf32>) outs(%1 : tensor<64xf32>) {
   ^bb0(%in: f32, %out: f32):
     %3 = arith.addf %in, %out : f32
     linalg.yield %3 : f32
