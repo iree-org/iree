@@ -54,9 +54,11 @@ iree_cc_library(
     MLIRArithDialect
     MLIRArithUtils
     MLIRControlFlowInterfaces
+    MLIRDestinationStyleOpInterface
     MLIRGPUDialect
     MLIRIR
     MLIRLinalgDialect
+    MLIRParallelCombiningOpInterface
     MLIRParser
     MLIRSCFDialect
     MLIRSideEffectInterfaces

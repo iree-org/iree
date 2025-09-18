@@ -7,11 +7,15 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/Interfaces/DestinationStyleOpInterface.h"
+#include "mlir/Interfaces/ParallelCombiningOpInterface.h"
 #include "mlir/Support/LLVM.h"
 
 // clang-format off
@@ -177,6 +181,43 @@ struct FoldBufferCastOfTensorCast final
 void BufferResourceCastOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *ctx) {
   results.add<FoldBufferCastOfTensorCast>(ctx);
+}
+
+//===----------------------------------------------------------------------===//
+// CoalescedGatherDMAOp
+//===----------------------------------------------------------------------===//
+
+// DestinationStyleOpInterface implementation
+MutableOperandRange CoalescedGatherDMAOp::getDpsInitsMutable() {
+  return getInitMutable();
+}
+
+// ParallelCombiningOpInterface implementation
+MutableOperandRange CoalescedGatherDMAOp::getUpdatedDestinations() {
+  // Return the init operand as the destination being updated
+  return getInitMutable();
+}
+
+Operation *CoalescedGatherDMAOp::getIteratingParent() {
+  // Return the parent scf.forall operation
+  return getOperation()->getParentOfType<scf::ForallOp>();
+}
+
+LogicalResult CoalescedGatherDMAOp::verify() {
+  auto initType = cast<RankedTensorType>(getInit().getType());
+  auto resultType = cast<RankedTensorType>(getResult().getType());
+
+  // Verify that this op is nested within an InParallelOpInterface op
+  if (!isa_and_nonnull<InParallelOpInterface>(getOperation()->getParentOp())) {
+    return emitOpError("must be nested within an operation implementing "
+                       "InParallelOpInterface");
+  }
+
+  if (initType != resultType) {
+    return emitOpError("init and result must have the same type and shape");
+  }
+
+  return success();
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU
