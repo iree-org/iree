@@ -20,7 +20,7 @@ iree_lit_test_suite(
         [
             "annotate_kernel_for_translation.mlir",
             "buffer_instructions_optimization.mlir",
-            "config_direct_conv_tile_and_fuse.mlir"
+            "config_direct_conv_tile_and_fuse.mlir",
             "config_igemm_tile_and_fuse.mlir",
             "config_tile_and_fuse.mlir",
             "config_tile_and_fuse_gfx950.mlir",

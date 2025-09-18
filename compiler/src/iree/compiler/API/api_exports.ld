@@ -99,6 +99,7 @@ VER_0 {
     ireeGPUPipelineOptionsAttrGetPrefetchSharedMemory;
     ireeGPUPipelineOptionsAttrGetReorderWorkgroupsStrategy;
     ireeGPUPipelineOptionsAttrGetTypeID;
+    ireeGPUPipelineOptionsAttrGetUseDirectConvolution;
     ireeGPUPipelineOptionsAttrGetUseIgemmConvolution;
     ireeGPUReorderWorkgroupsStrategyAttrGet;
     ireeGPUReorderWorkgroupsStrategyAttrGetTypeID;

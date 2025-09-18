@@ -83,6 +83,14 @@ ireeGPUPipelineOptionsAttrGetUseIgemmConvolution(MlirAttribute attr) {
 }
 
 MlirAttribute
+ireeGPUPipelineOptionsAttrGetUseDirectConvolution(MlirAttribute attr) {
+  auto gpuAttr =
+      llvm::cast<mlir::iree_compiler::IREE::GPU::GPUPipelineOptionsAttr>(
+          unwrap(attr));
+  return wrap(gpuAttr.getUseDirectConvolution());
+}
+
+MlirAttribute
 ireeGPUPipelineOptionsAttrGetReorderWorkgroupsStrategy(MlirAttribute attr) {
   auto gpuAttr =
       llvm::cast<mlir::iree_compiler::IREE::GPU::GPUPipelineOptionsAttr>(

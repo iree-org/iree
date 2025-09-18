@@ -287,6 +287,14 @@ NB_MODULE(_ireeCompilerDialects, m) {
             return std::nullopt;
           })
       .def_property_readonly(
+          "use_direct_convolution",
+          [](MlirAttribute self) -> std::optional<bool> {
+            auto attr = ireeGPUPipelineOptionsAttrGetUseDirectConvolution(self);
+            if (!mlirAttributeIsNull(attr))
+              return mlirBoolAttrGetValue(attr);
+            return std::nullopt;
+          })
+      .def_property_readonly(
           "reorder_workgroups_strategy",
           [](MlirAttribute self) -> std::optional<MlirAttribute> {
             auto attr =
