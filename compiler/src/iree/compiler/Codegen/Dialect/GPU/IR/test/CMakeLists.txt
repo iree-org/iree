@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "bufferize_coalesced_gather_dma.mlir"
     "canonicalize.mlir"
     "iree_gpu_attrs.mlir"
     "iree_gpu_inner_tiled_ops.mlir"
