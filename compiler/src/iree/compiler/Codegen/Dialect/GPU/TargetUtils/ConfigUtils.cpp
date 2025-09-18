@@ -109,7 +109,6 @@ LogicalResult setDataTiledMultiMmaLoweringConfig(
       context, /*prefetchSharedMemory=*/false,
       /*no_reduce_shared_memory_bank_conflicts=*/true,
       /*use_igemm_convolution=*/false,
-      /*use_direct_convolution=*/false,
       /*reorder_workgroups_strategy=*/std::nullopt);
   pipelineAttrs.emplace_back(
       b.getStringAttr(IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()),
@@ -797,7 +796,6 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
       linalgOp->getContext(), /*prefetchSharedMemory=*/true,
       /*no_reduce_shared_memory_bank_conflicts=*/useDirectLoad,
       /*use_igemm_convolution=*/true,
-      /*use_direct_convolution=*/false,
       /*reorder_workgroups_strategy=*/std::nullopt);
   pipelineAttrs.emplace_back(
       StringAttr::get(linalgOp->getContext(),
@@ -857,7 +855,6 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
       linalgOp->getContext(), /*prefetchSharedMemory=*/true,
       /*no_reduce_shared_memory_bank_conflicts=*/useDirectLoad,
       /*use_igemm_convolution=*/false,
-      /*use_direct_convolution=*/false,
       /*reorder_workgroups_strategy=*/std::nullopt);
   pipelineAttrs.emplace_back(
       StringAttr::get(linalgOp->getContext(),
@@ -1486,11 +1483,7 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
   Type rhsElemType = getElementTypeOrSelf(rhs);
   Type initElemType = getElementTypeOrSelf(init);
 
-  // TODO(Max191): Support multiple M/N/K dimension problems for MMASchedules
-  // once the pipeline is able to support it. After adding multiple dimensions,
-  // all instances of schedule->m/nSubgroupCounts[0] and
-  // schedule->m/n/kTileSizes[0] need to use the full list of sizes instead of
-  // just the first element.
+  // TODO: Support tiling and finding mma schedule on multiple M/N/K dimensions.
   int64_t mDim = convolutionDims->outputImage.back();
   int64_t nDim = convolutionDims->outputChannel.back();
   int64_t kDim = convolutionDims->inputChannel.back();
@@ -1601,7 +1594,6 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
       context, /*prefetchSharedMemory=*/false,
       /*no_reduce_shared_memory_bank_conflicts=*/false,
       /*use_igemm_convolution=*/false,
-      /*use_direct_convolution=*/true,
       /*reorder_workgroups_strategy=*/std::nullopt);
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   pipelineAttrs.emplace_back(
@@ -1728,11 +1720,6 @@ getPipelineOptions(FunctionOpInterface funcOp,
     if (useIgemmConvolution) {
       pipelineOptions.useIgemmConvolution = useIgemmConvolution.getValue();
     }
-    BoolAttr useDirectConvolution =
-        pipelineOptionsAttr.getUseDirectConvolution();
-    if (useDirectConvolution) {
-      pipelineOptions.useDirectConvolution = useDirectConvolution.getValue();
-    }
     ReorderWorkgroupsStrategyAttr reorderWorkgroupsStrategy =
         pipelineOptionsAttr.getReorderWorkgroupsStrategy();
     if (reorderWorkgroupsStrategy) {
@@ -1768,7 +1755,6 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
             << options.enableReduceSharedMemoryBankConflicts << ", "
             << ", prefetchSharedMemory = " << options.prefetchSharedMemory
             << ", useIgemmConvolution = " << options.useIgemmConvolution
-            << ", useDirectConvolution = " << options.useDirectConvolution
             << ", reorderWorkgroupsStrategy = " << reorderStr
             << ", enableUkernels = " << options.enableUkernels << "}";
 }

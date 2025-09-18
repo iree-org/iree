@@ -23,10 +23,11 @@ bool ireeAttributeIsAGPUPipelineOptionsAttr(MlirAttribute attr) {
       unwrap(attr));
 }
 
-MlirAttribute ireeGPUPipelineOptionsAttrGet(
-    MlirContext mlirCtx, bool *prefetchSharedMemory,
-    bool *noReduceSharedMemoryBankConflicts, bool *useIgemmConvolution,
-    bool *useDirectConvolution, MlirAttribute *reorderWorkgroupsStrategy) {
+MlirAttribute
+ireeGPUPipelineOptionsAttrGet(MlirContext mlirCtx, bool *prefetchSharedMemory,
+                              bool *noReduceSharedMemoryBankConflicts,
+                              bool *useIgemmConvolution,
+                              MlirAttribute *reorderWorkgroupsStrategy) {
   mlir::MLIRContext *ctx = unwrap(mlirCtx);
   mlir::Builder b(ctx);
   auto prefetchSharedMemoryAttr = mlir::BoolAttr();
@@ -42,10 +43,6 @@ MlirAttribute ireeGPUPipelineOptionsAttrGet(
   if (useIgemmConvolution) {
     useIgemmConvolutionAttr = b.getBoolAttr(*useIgemmConvolution);
   }
-  auto useDirectConvolutionAttr = mlir::BoolAttr();
-  if (useDirectConvolution) {
-    useDirectConvolutionAttr = b.getBoolAttr(*useDirectConvolution);
-  }
   auto strategyAttr =
       mlir::iree_compiler::IREE::GPU::ReorderWorkgroupsStrategyAttr();
   if (reorderWorkgroupsStrategy) {
@@ -55,7 +52,7 @@ MlirAttribute ireeGPUPipelineOptionsAttrGet(
   }
   return wrap(mlir::iree_compiler::IREE::GPU::GPUPipelineOptionsAttr::get(
       ctx, prefetchSharedMemoryAttr, noReduceSharedMemoryBankConflictsAttr,
-      useIgemmConvolutionAttr, useDirectConvolutionAttr, strategyAttr));
+      useIgemmConvolutionAttr, strategyAttr));
 }
 
 MlirAttribute
@@ -80,14 +77,6 @@ ireeGPUPipelineOptionsAttrGetUseIgemmConvolution(MlirAttribute attr) {
       llvm::cast<mlir::iree_compiler::IREE::GPU::GPUPipelineOptionsAttr>(
           unwrap(attr));
   return wrap(gpuAttr.getUseIgemmConvolution());
-}
-
-MlirAttribute
-ireeGPUPipelineOptionsAttrGetUseDirectConvolution(MlirAttribute attr) {
-  auto gpuAttr =
-      llvm::cast<mlir::iree_compiler::IREE::GPU::GPUPipelineOptionsAttr>(
-          unwrap(attr));
-  return wrap(gpuAttr.getUseDirectConvolution());
 }
 
 MlirAttribute

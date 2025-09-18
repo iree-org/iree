@@ -108,7 +108,6 @@ extern void ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts();
 extern void ireeGPUPipelineOptionsAttrGetPrefetchSharedMemory();
 extern void ireeGPUPipelineOptionsAttrGetReorderWorkgroupsStrategy();
 extern void ireeGPUPipelineOptionsAttrGetTypeID();
-extern void ireeGPUPipelineOptionsAttrGetUseDirectConvolution();
 extern void ireeGPUPipelineOptionsAttrGetUseIgemmConvolution();
 extern void ireeGPUReorderWorkgroupsStrategyAttrGet();
 extern void ireeGPUReorderWorkgroupsStrategyAttrGetTypeID();
@@ -1025,7 +1024,6 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeGPUPipelineOptionsAttrGetPrefetchSharedMemory;
   x += (uintptr_t)&ireeGPUPipelineOptionsAttrGetReorderWorkgroupsStrategy;
   x += (uintptr_t)&ireeGPUPipelineOptionsAttrGetTypeID;
-  x += (uintptr_t)&ireeGPUPipelineOptionsAttrGetUseDirectConvolution;
   x += (uintptr_t)&ireeGPUPipelineOptionsAttrGetUseIgemmConvolution;
   x += (uintptr_t)&ireeGPUReorderWorkgroupsStrategyAttrGet;
   x += (uintptr_t)&ireeGPUReorderWorkgroupsStrategyAttrGetTypeID;

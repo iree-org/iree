@@ -14,8 +14,7 @@
      gpu_pipeline_options = #iree_gpu.pipeline_options<
        prefetch_shared_memory = false,
        no_reduce_shared_memory_bank_conflicts = false,
-       use_igemm_convolution = false,
-       use_direct_convolution = true>
+       use_igemm_convolution = false>
   }>
 #config = #iree_gpu.lowering_config<{
   workgroup = [1, 1, 32, 64, 0, 0, 0],

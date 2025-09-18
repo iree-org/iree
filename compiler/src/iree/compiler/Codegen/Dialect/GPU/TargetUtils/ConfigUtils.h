@@ -68,7 +68,6 @@ struct GPUPipelineOptions {
   bool enableReduceSharedMemoryBankConflicts = true;
   bool prefetchSharedMemory = false;
   bool useIgemmConvolution = false;
-  bool useDirectConvolution = false;
   bool enableUkernels = false;
   std::optional<ReorderWorkgroupsStrategy> reorderStrategy;
 };

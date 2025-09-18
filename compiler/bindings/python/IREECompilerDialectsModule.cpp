@@ -235,7 +235,6 @@ NB_MODULE(_ireeCompilerDialects, m) {
           [](const py::object &, std::optional<bool> prefetchSharedMemory,
              std::optional<bool> noReduceSharedMemoryBankConflicts,
              std::optional<bool> useIgemmConvolution,
-             std::optional<bool> useDirectConvolution,
              std::optional<MlirAttribute> reorderWorkgroupsStrategy,
              MlirContext ctx) {
             return ireeGPUPipelineOptionsAttrGet(
@@ -247,8 +246,6 @@ NB_MODULE(_ireeCompilerDialects, m) {
                     : nullptr,
                 useIgemmConvolution.has_value() ? &*useIgemmConvolution
                                                 : nullptr,
-                useDirectConvolution.has_value() ? &*useDirectConvolution
-                                                 : nullptr,
                 reorderWorkgroupsStrategy.has_value()
                     ? &*reorderWorkgroupsStrategy
                     : nullptr);
@@ -256,7 +253,6 @@ NB_MODULE(_ireeCompilerDialects, m) {
           "cls"_a, "prefetch_shared_memory"_a = py::none(),
           "no_reduce_shared_memory_bank_conflicts"_a = py::none(),
           "use_igemm_convolution"_a = py::none(),
-          "use_direct_convolution"_a = py::none(),
           "reorder_workgroups_strategy"_a = py::none(), py::kw_only(),
           "ctx"_a = py::none(),
           "Gets an #iree_gpu.pipeline_options from parameters.")
@@ -282,14 +278,6 @@ NB_MODULE(_ireeCompilerDialects, m) {
           "use_igemm_convolution",
           [](MlirAttribute self) -> std::optional<bool> {
             auto attr = ireeGPUPipelineOptionsAttrGetUseIgemmConvolution(self);
-            if (!mlirAttributeIsNull(attr))
-              return mlirBoolAttrGetValue(attr);
-            return std::nullopt;
-          })
-      .def_property_readonly(
-          "use_direct_convolution",
-          [](MlirAttribute self) -> std::optional<bool> {
-            auto attr = ireeGPUPipelineOptionsAttrGetUseDirectConvolution(self);
             if (!mlirAttributeIsNull(attr))
               return mlirBoolAttrGetValue(attr);
             return std::nullopt;

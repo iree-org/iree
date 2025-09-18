@@ -410,10 +410,7 @@ LogicalResult isAtBoundary(Operation *op) {
 void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
                                    const GPUPipelineOptions &pipelineOptions,
                                    bool forROCDL) {
-  if (pipelineOptions.useIgemmConvolution ||
-      pipelineOptions.useDirectConvolution) {
-    funcPassManager.addPass(createGPUPadConvsPass());
-  }
+  funcPassManager.addPass(createGPUPadConvsPass());
   if (pipelineOptions.useIgemmConvolution) {
     funcPassManager.addPass(createConvolutionToIGEMMPass());
   }
