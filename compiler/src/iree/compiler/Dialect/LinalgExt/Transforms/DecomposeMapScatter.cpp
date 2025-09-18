@@ -95,8 +95,8 @@ struct FoldSubViewIntoMapScatter final : OpRewritePattern<MapScatterOp> {
 /// added to the `strides` list.
 static Value createFlatOutputBuffer(RewriterBase &rewriter, Location loc,
                                     Value outputBuffer,
-                                    SmallVector<OpFoldResult> sizes,
-                                    SmallVector<Value> &strides) {
+                                    ArrayRef<OpFoldResult> sizes,
+                                    SmallVectorImpl<Value> &strides) {
   auto outputBufferType = cast<MemRefType>(outputBuffer.getType());
   SmallVector<ReassociationIndices> reassociations;
   reassociations.push_back(
@@ -112,7 +112,7 @@ static Value createFlatOutputBuffer(RewriterBase &rewriter, Location loc,
                  stridedMetadataOp.getStrides().end());
   Value offset = stridedMetadataOp.getOffset();
   OpFoldResult collapsedSize =
-      IREE::LinalgExt::computeProduct(rewriter, loc, sizes);
+      IREE::LinalgExt::computeProductUsingAffine(rewriter, loc, sizes);
   SmallVector<OpFoldResult> collapsedShape = {collapsedSize};
   SmallVector<OpFoldResult> collapsedStrides = {rewriter.getIndexAttr(1)};
   return memref::ReinterpretCastOp::create(rewriter, loc, outputBuffer, offset,

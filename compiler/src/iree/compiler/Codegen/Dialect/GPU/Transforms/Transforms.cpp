@@ -573,7 +573,7 @@ collapseParallelInsertOp(RewriterBase &rewriter,
     ArrayRef<OpFoldResult> groupSizes(sizes.begin() + group.front(),
                                       sizes.begin() + group.back() + 1);
     OpFoldResult collapsedSize =
-        IREE::LinalgExt::computeProduct(rewriter, loc, groupSizes);
+        IREE::LinalgExt::computeProductUsingAffine(rewriter, loc, groupSizes);
     newOffsets.push_back(collapsedOffset);
     newSizes.push_back(collapsedSize);
   }

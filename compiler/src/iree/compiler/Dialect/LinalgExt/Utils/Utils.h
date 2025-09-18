@@ -23,8 +23,8 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 
 /// Helper to compute the product of a list of OpFoldResult inputs with
 /// affine.apply.
-OpFoldResult computeProduct(OpBuilder &builder, Location loc,
-                            ArrayRef<OpFoldResult> vals);
+OpFoldResult computeProductUsingAffine(OpBuilder &builder, Location loc,
+                                       ArrayRef<OpFoldResult> vals);
 
 /// Helper method to add 2 OpFoldResult inputs with affine.apply.
 OpFoldResult addOfrs(OpBuilder &builder, Location loc, OpFoldResult a,

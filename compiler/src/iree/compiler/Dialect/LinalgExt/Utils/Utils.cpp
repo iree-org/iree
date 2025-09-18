@@ -32,8 +32,8 @@ static bool hasAllOneValues(ArrayRef<int64_t> attr) {
   return llvm::all_of(attr, [](int64_t element) { return element == 1; });
 }
 
-OpFoldResult computeProduct(OpBuilder &builder, Location loc,
-                            ArrayRef<OpFoldResult> vals) {
+OpFoldResult computeProductUsingAffine(OpBuilder &builder, Location loc,
+                                       ArrayRef<OpFoldResult> vals) {
   auto mulMap = AffineMap::get(
       2, 0, {builder.getAffineDimExpr(0) * builder.getAffineDimExpr(1)});
   OpFoldResult product = builder.getIndexAttr(1);
