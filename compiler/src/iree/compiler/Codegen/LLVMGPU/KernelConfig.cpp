@@ -604,13 +604,8 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     return std::min(numSubgroupsPerReduction * subgroupSize, maxWorkgroupSize);
   }();
 
-  // TODO(pashu123): Currently, the threadLoads is done on the basis of
-  // the root operation and ignores other operation within a dispatch.
-  // Extend it to use per operation within a dispatch.
-
-  SmallVector<unsigned> sharedParallelDims = parallelDims;
-  llvm::SmallDenseSet<unsigned> sharedParallelSet(sharedParallelDims.begin(),
-                                                  sharedParallelDims.end());
+  llvm::SmallDenseSet<unsigned> sharedParallelSet(parallelDims.begin(),
+                                                  parallelDims.end());
   for (linalg::LinalgOp linalgOp : computeOps) {
     SmallVector<unsigned> currParallelDims;
     linalgOp.getParallelDims(currParallelDims);
@@ -633,9 +628,8 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   if (isROCmBackend(target) && ShapedType::isStaticShape(bounds) &&
       anyAreMatmulLike) {
 
-    int64_t parallelIdx =
-        *llvm::find_if(sharedParallelDims,
-                       [&](int64_t currIdx) { return bounds[currIdx] != 1; });
+    int64_t parallelIdx = *llvm::find_if(
+        parallelDims, [&](int64_t currIdx) { return bounds[currIdx] != 1; });
     int64_t parallelBound = bounds[parallelIdx];
     int64_t numParallelReductions = 1;
     const int64_t maxParallelFactor = workgroupSize / 4;
@@ -710,14 +704,14 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
         NamedAttribute("thread", b.getI64ArrayAttr(threadTileSizes)),
         NamedAttribute("lane_basis", threadBasisAttr),
         NamedAttribute("subgroup_basis", subgroupBasisAttr)};
-    auto redConfigDict = b.getDictionaryAttr(redConfigAttrs);
-    return IREE::GPU::LoweringConfigAttr::get(context, redConfigDict);
+    const auto config = b.getDictionaryAttr(redConfigAttrs);
+    return IREE::GPU::LoweringConfigAttr::get(context, config);
   }();
   for (linalg::LinalgOp linalgOp : reductionOpsToConfigure) {
     setLoweringConfig(linalgOp, reductionConfig);
   }
 
-  const auto getParallelConfig = [&]() -> IREE::GPU::LoweringConfigAttr {
+  auto getParallelConfig = [&]() -> IREE::GPU::LoweringConfigAttr {
     const int64_t reductionTileSize =
         llvm::APIntOps::GreatestCommonDivisor(
             {64, static_cast<uint64_t>(lastReductionSize)},
@@ -729,10 +723,10 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       threadBasis >>= 1;
     }
 
-    int64_t subgroupBasis = reductionTileSize / (threadBasis * threadLoads);
-    subgroupBasis = subgroupBasis == 0 ? 1 : subgroupBasis;
+    const int64_t subgroupBasis =
+        std::max<int64_t>(reductionTileSize / (threadBasis * threadLoads), 1);
 
-    // // For the shared dimensions, set the reduction tile sizes to be zero.
+    // For the shared dimensions, set the reduction tile sizes to be zero.
     SmallVector<int64_t> reductionTileSizes;
     for (int64_t i = 0; i < numLoops; i++) {
       reductionTileSizes.push_back(sharedWgpTiles[i] > 0 ? 0 : 1);
@@ -760,9 +754,8 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
         NamedAttribute("thread", b.getI64ArrayAttr(threadTileSizes)),
         NamedAttribute("lane_basis", laneBasisAttr),
         NamedAttribute("subgroup_basis", subgroupBasisAttr)};
-    auto pllConfigDict = b.getDictionaryAttr(pllConfigAttrs);
-
-    return IREE::GPU::LoweringConfigAttr::get(context, pllConfigDict);
+    const auto config = b.getDictionaryAttr(pllConfigAttrs);
+    return IREE::GPU::LoweringConfigAttr::get(context, config);
   };
 
   if (!parallelOpsToConfigure.empty()) {
@@ -772,15 +765,19 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     }
   }
 
-  auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(context);
-  SmallVector<NamedAttribute, 1> pipelineAttrs = {NamedAttribute(
-      IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName(), pipelineOptions)};
+  const IREE::GPU::GPUPipelineOptionsAttr pipelineOptions =
+      IREE::GPU::GPUPipelineOptionsAttr::get(context);
 
-  auto pipelineConfig = b.getDictionaryAttr(pipelineAttrs);
+  const NamedAttribute pipelineOptionsAttribute(
+      IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName(), pipelineOptions);
 
-  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      context, CodeGenPipeline::LLVMGPUVectorDistribute, SymbolRefAttr(),
-      {workgroupSize, 1, 1}, subgroupSize, pipelineConfig);
+  const DictionaryAttr pipelineConfig = b.getDictionaryAttr(
+      SmallVector<NamedAttribute, 1>{pipelineOptionsAttribute});
+
+  const IREE::Codegen::TranslationInfoAttr translationInfo =
+      IREE::Codegen::TranslationInfoAttr::get(
+          context, CodeGenPipeline::LLVMGPUVectorDistribute, SymbolRefAttr(),
+          {workgroupSize, 1, 1}, subgroupSize, pipelineConfig);
 
   return setTranslationInfo(entryPoint, translationInfo);
 }
