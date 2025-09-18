@@ -103,10 +103,10 @@ transform.named_sequence
   %decomposition_config = transform.param.constant {
     qk_attrs = {attention_qk_matmul,
                 lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.virtual_mma_layout<VMFMA_F32_32x32x16_F16>,
-                                                              subgroup_m_count = 4, subgroup_n_count = 1, promote_operands = [1] }>},
+                                                              subgroup_basis = [[1, 1, 4, 1, 1, 1], [0, 1, 2, 4, 5]], promote_operands = [1] }>},
     pv_attrs = {attention_pv_matmul,
                 lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
-                                                              subgroup_m_count = 4, subgroup_n_count = 1, promote_operands = [1] }>}
+                                                              subgroup_basis = [[1, 1, 4, 1, 1, 1], [0, 1, 2, 3, 5]], promote_operands = [1] }>}
   } -> !transform.any_param
 
   transform.yield %attention, %config, %decomposition_config : !transform.any_op, !transform.any_param, !transform.any_param
@@ -146,7 +146,7 @@ transform.named_sequence
   %config = transform.param.constant #iree_codegen.compilation_info<
     lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
                                                  mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-                                                 subgroup_m_count = 2, subgroup_n_count = 2,
+                                                 subgroup_basis = [[2, 2, 1], [0, 1, 2]],
                                                  reduction = [0, 0, 64],
                                                  workgroup = [64, 128, 0]}>,
     translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute

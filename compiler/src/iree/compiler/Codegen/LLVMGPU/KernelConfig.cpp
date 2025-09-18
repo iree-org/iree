@@ -19,7 +19,6 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
-#include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -35,7 +34,6 @@
 #include "llvm/Support/InterleavedRange.h"
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/Analysis/SliceAnalysis.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/Attributes.h"
@@ -53,10 +51,10 @@
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 namespace mlir::iree_compiler {
 
-llvm::cl::opt<bool> clGPUEarlyTileAndFuseMatmul(
-    "iree-codegen-llvmgpu-early-tile-and-fuse-matmul",
+llvm::cl::opt<bool> clGPUUseTileAndFuseMatmul(
+    "iree-codegen-llvmgpu-use-tile-and-fuse-matmul",
     llvm::cl::desc("test the the tile and fuse pipeline for matmul"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 llvm::cl::opt<bool> clGPUTestTileAndFuseVectorize(
     "iree-codegen-llvmgpu-test-tile-and-fuse-vectorize",
@@ -874,6 +872,21 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 // Vector Distribution Contraction/Convolution Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
+static IREE::GPU::Basis projectBasis(const IREE::GPU::Basis &basis,
+                                     ArrayRef<int64_t> projectedDims) {
+  // Projection simply involves projecting the mapping and keeping the counts.
+  IREE::GPU::Basis projectedBasis;
+  projectedBasis.counts = basis.counts;
+  SetVector<int64_t> projected(projectedDims.begin(), projectedDims.end());
+  for (auto [dim, map] : llvm::enumerate(basis.mapping)) {
+    if (projected.contains(dim)) {
+      continue;
+    }
+    projectedBasis.mapping.push_back(map);
+  }
+  return projectedBasis;
+}
+
 static LogicalResult
 setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                                        mlir::FunctionOpInterface entryPoint,
@@ -1002,6 +1015,8 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
+  LDBG() << "Schedule: " << schedule;
+
   int64_t flatWorkgroupSize =
       targetSubgroupSize *
       ShapedType::getNumElements(schedule->nSubgroupCounts) *
@@ -1043,8 +1058,15 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
   IREE::GPU::appendPromotedOperandsList(context, attrs, {0, 1});
   IREE::GPU::setMmaKind(context, attrs, schedule->mmaKind);
-  IREE::GPU::setSubgroupMCount(context, attrs, schedule->mSubgroupCounts[0]);
-  IREE::GPU::setSubgroupNCount(context, attrs, schedule->nSubgroupCounts[0]);
+  IREE::GPU::Basis subgroupBasis = {
+      SmallVector<int64_t>(op.getNumLoops(), 1),
+      // Distribute subgroups from outer to inner. Mostly an arbitrary choice.
+      // We can change this if it matters.
+      llvm::to_vector(llvm::seq<int64_t>(op.getNumLoops()))};
+  subgroupBasis.counts[mDim] = schedule->mSubgroupCounts[0];
+  subgroupBasis.counts[nDim] = schedule->nSubgroupCounts[0];
+  IREE::GPU::setBasis(context, attrs, IREE::GPU::TilingLevel::Subgroup,
+                      subgroupBasis);
 
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
@@ -1296,8 +1318,15 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
       llvm::to_vector(llvm::seq<int64_t>(op.getNumDpsInputs()));
   IREE::GPU::appendPromotedOperandsList(context, attrs, promotedOperands);
   IREE::GPU::setMmaKind(context, attrs, schedule->mmaKind);
-  IREE::GPU::setSubgroupMCount(context, attrs, schedule->mSubgroupCounts[0]);
-  IREE::GPU::setSubgroupNCount(context, attrs, schedule->nSubgroupCounts[0]);
+  IREE::GPU::Basis subgroupBasis = {
+      SmallVector<int64_t>(op.getNumLoops(), 1),
+      // Distribute subgroups from outer to inner. Mostly an arbitrary choice.
+      // We can change this if it matters.
+      llvm::to_vector(llvm::seq<int64_t>(op.getNumLoops()))};
+  subgroupBasis.counts[mDim] = schedule->mSubgroupCounts[0];
+  subgroupBasis.counts[nDim] = schedule->nSubgroupCounts[0];
+  IREE::GPU::setBasis(context, attrs, IREE::GPU::TilingLevel::Subgroup,
+                      subgroupBasis);
 
   auto configDict = DictionaryAttr::get(context, attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
@@ -1476,14 +1505,6 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
 
   auto [qkSchedule, pvSchedule] = attSchedule.value();
 
-  // TODO: Due to a bug in layout configuration, we cannot set warp count on
-  // the N dimension. This is however ok, because we generally do not want to
-  // distribute subgroups on N dimension anyway.
-  if (pvSchedule.nSubgroupCounts[0] != 1) {
-    pvSchedule.nTileSizes[0] *= pvSchedule.nSubgroupCounts[0];
-    pvSchedule.nSubgroupCounts[0] = 1;
-  }
-
   LDBG() << "Target Subgroup size: " << targetSubgroupSize;
   LDBG() << "QK Schedule: " << qkSchedule;
   LDBG() << "PV Schedule: " << pvSchedule;
@@ -1538,21 +1559,29 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   SmallVector<NamedAttribute, 2> qkConfig;
   SmallVector<NamedAttribute, 2> pvConfig;
 
+  IREE::GPU::Basis subgroupBasis = {
+      SmallVector<int64_t>(opInfo.getDomainRank(), 1),
+      // Distribute subgroups from outer to inner. Mostly an arbitrary choice.
+      // We can change this if it matters.
+      llvm::to_vector(llvm::seq<int64_t>(opInfo.getDomainRank()))};
+  if (mDim.has_value()) {
+    subgroupBasis.counts[mDim.value()] = pvSchedule.mSubgroupCounts[0];
+  }
+  if (nDim.has_value()) {
+    subgroupBasis.counts[nDim.value()] = pvSchedule.nSubgroupCounts[0];
+  }
+
   // Configuring for qk matmul.
   IREE::GPU::appendPromotedOperandsList(context, qkConfig, {0, 1});
   IREE::GPU::setMmaKind(context, qkConfig, qkSchedule.mmaKind);
-  IREE::GPU::setSubgroupMCount(context, qkConfig,
-                               qkSchedule.mSubgroupCounts[0]);
-  IREE::GPU::setSubgroupNCount(context, qkConfig,
-                               qkSchedule.nSubgroupCounts[0]);
+  IREE::GPU::setBasis(context, qkConfig, IREE::GPU::TilingLevel::Subgroup,
+                      projectBasis(subgroupBasis, opInfo.getNDims()));
 
   // Configuring for pv matmul.
   IREE::GPU::appendPromotedOperandsList(context, pvConfig, {1});
   IREE::GPU::setMmaKind(context, pvConfig, pvSchedule.mmaKind);
-  IREE::GPU::setSubgroupMCount(context, pvConfig,
-                               pvSchedule.mSubgroupCounts[0]);
-  IREE::GPU::setSubgroupNCount(context, pvConfig,
-                               pvSchedule.nSubgroupCounts[0]);
+  IREE::GPU::setBasis(context, pvConfig, IREE::GPU::TilingLevel::Subgroup,
+                      projectBasis(subgroupBasis, opInfo.getK1Dims()));
 
   SmallVector<NamedAttribute, 2> qkAttrs;
   SmallVector<NamedAttribute, 2> pvAttrs;
@@ -1601,21 +1630,6 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUVectorDistribute,
       workgroupSize, targetSubgroupSize, pipelineConfig);
-}
-
-static IREE::GPU::Basis projectBasis(const IREE::GPU::Basis &basis,
-                                     ArrayRef<int64_t> projectedDims) {
-  // Projection simply involves projecting the mapping and keeping the counts.
-  IREE::GPU::Basis projectedBasis;
-  projectedBasis.counts = basis.counts;
-  SetVector<int64_t> projected(projectedDims.begin(), projectedDims.end());
-  for (auto [dim, map] : llvm::enumerate(basis.mapping)) {
-    if (projected.contains(dim)) {
-      continue;
-    }
-    projectedBasis.mapping.push_back(map);
-  }
-  return projectedBasis;
 }
 
 struct AttentionReductionHeuristicSeeds {
@@ -2841,7 +2855,7 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     LDBG() << "Tile and fuse data tiled MMA inner_tiled config";
     return success();
   }
-  if (clGPUEarlyTileAndFuseMatmul) {
+  if (clGPUUseTileAndFuseMatmul) {
     if (succeeded(IREE::GPU::setMatmulLoweringConfig(
             target, entryPointFn, computeOp, clUseDirectLoad))) {
       LDBG() << "Tile and fuse matmul config";
@@ -2864,13 +2878,6 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     }
   }
   if (succeeded(setVectorDistributionConfig(target, entryPointFn, computeOp))) {
-    return success();
-  }
-  // TODO (nirvedhmeshram, qedawkins) : remove this when tile and fuse backend
-  // config becomes the default for matmul.
-  if (succeeded(IREE::GPU::setMatmulLoweringConfig(target, entryPointFn,
-                                                   computeOp))) {
-    LDBG() << "Tile and fuse matmul config after no vector distribute config";
     return success();
   }
 

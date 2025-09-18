@@ -122,13 +122,8 @@ class MMASchedule:
     n_tile_count: int
     k_tile_count: int
 
-    def __str__(self):
-        return (
-            "mma_schedule = #iree_gpu.mma_schedule<"
-            + f"intrinsic = #iree_gpu.mma_layout<{self.intrinsic}>, "
-            + f"subgroup_m_count = {self.m_count}, "
-            + f"subgroup_n_count = {self.n_count}>"
-        )
+    def get_subgroup_basis(self) -> str:
+        return f"[[{self.m_count}, {self.n_count}, 1], [0, 1, 2]]"
 
 
 # Describes how to construct compilation info for the testcase.
@@ -168,8 +163,7 @@ class IREEGPUCompilationInfo(CompilationInfo):
             "#iree_codegen.compilation_info<\n"
             f"  lowering_config = #iree_gpu.lowering_config<{{"
             f"  mma_kind = #iree_gpu.mma_layout<{self.mma_schedule.intrinsic}>, "
-            f"  subgroup_m_count = {self.mma_schedule.m_count}, "
-            f"  subgroup_n_count = {self.mma_schedule.n_count}, "
+            f"  subgroup_basis = {self.mma_schedule.get_subgroup_basis()}, "
             f"  workgroup = {self.workgroup_tile}, "
             f"  reduction = {self.reduction_tile} }}>,\n"
             f"  translation_info = #iree_codegen.translation_info<pipeline = {compiler_pipeline} {self.workgroup_size_str()}\n"

@@ -7,8 +7,10 @@
 #include "iree/compiler/Codegen/Common/CombineLayoutTransformation.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-combine-layout-transformation"
@@ -54,6 +56,45 @@ gpuPadDistributionConfigFn(ArrayRef<int64_t> iterationBounds,
   return {workgroupDistributionConfig, threadDistributionConfig};
 }
 
+/// The control function for when to fold a relayout op chain into a map_scatter
+/// op. Only combine complex relayout sequences at the end of a dispatch that
+/// are difficult to handle in GPU Codegen. Any of the following list of
+/// conditions are considered to indicate a complex relayout sequence, and will
+/// cause the control function to return true:
+/// 1. There are pack or unpack ops in the chain.
+/// 2. There are reshape ops in the chain.
+///    - We expect reshape ops to be folded
+///      into the output buffer at this point, if possible, so any leftover
+///      reshape ops will be difficult to handle in during code generation.
+/// 3. There are pad ops in the chain.
+///    - We want to be able to pull out the pad and write padding values
+///      directly to the output buffer.
+///
+/// The GPUCombineLayoutTransformationPass is expected to run early on during
+/// the configuration phase of Codegen, so the conditions above are based on the
+/// assumption that the relayout op chain represents the tail end of a dispatch
+/// before any tiling or distribution.
+static bool gpuRelayoutCombinationControlFn(OpResult leaf) {
+  if (leaf.getNumUses() != 1) {
+    return false;
+  }
+  if (!isa<IREE::Codegen::StoreToBufferOp>(*leaf.getUsers().begin())) {
+    return false;
+  }
+  llvm::SetVector<Operation *> slice;
+  BackwardSliceOptions options;
+  options.filter = isSupportedRelayoutOp;
+  options.inclusive = true;
+  LogicalResult result = getBackwardSlice(leaf, &slice, options);
+  if (failed(result)) {
+    return false;
+  }
+  return llvm::any_of(
+      slice,
+      llvm::IsaPred<linalg::PackOp, linalg::UnPackOp, tensor::ExpandShapeOp,
+                    tensor::CollapseShapeOp, tensor::PadOp>);
+}
+
 namespace {
 
 struct GPUCombineLayoutTransformationPass final
@@ -64,15 +105,9 @@ struct GPUCombineLayoutTransformationPass final
       GPUCombineLayoutTransformationPassBase;
 
   void runOnOperation() override {
-    // The GPUCombineLayoutTransformationPass provides a distribution
-    // implementation for tensor.pad ops, but pad ops can't be combined in
-    // Workgroup scope anyway, so there is no point in using the pass with
-    // Workgroup scope.
-    CombineRelayoutOpsControlFn controlFn = getCombineRelayoutOpsControlFn(
-        IREE::Codegen::RelayoutCombinationScope::Dispatch);
     if (failed(combineLayoutTransformation(
             &getContext(), getOperation(), gpuPadDistributionConfigFn,
-            /*doReshapeByExpansion=*/true, controlFn))) {
+            /*doReshapeByExpansion=*/true, gpuRelayoutCombinationControlFn))) {
       return signalPassFailure();
     }
   }

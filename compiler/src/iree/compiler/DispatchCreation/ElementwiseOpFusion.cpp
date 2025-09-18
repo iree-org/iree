@@ -167,6 +167,7 @@ void ElementwiseOpFusionPass::runOnOperation() {
         ElementwiseOpsFusabilityOptions options;
         options.fuseMultiReduction = fuseMultiReduction;
         options.fuseTruncateOps = fuseTruncateOps;
+        options.fuseBroadcastConsumers = fuseBroadcastOps;
         return areFusableAsElementwiseOps(context, fusedOperand, options);
       };
 

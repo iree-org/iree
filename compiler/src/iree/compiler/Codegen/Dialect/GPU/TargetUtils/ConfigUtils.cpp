@@ -14,7 +14,6 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -298,15 +297,26 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     // For matmuls with small arithmetic intensity, use small
     // bestMNTileCountPerSubgroup and large bestKTileCountPerSubgroup.
     problem.gemmSize = GemmSize::SmallGemm;
-    seeds = {/*bestSubgroupCountPerWorkgroup=*/2,
-             /*bestMNTileCountPerSubgroup=*/2,
-             /*bestKTileCountPerSubgroup=*/4,
-             /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits / inBitWidth};
+    LDBG() << "This config is SmallGemm";
+    if (isGemm) {
+      seeds = {/*bestSubgroupCountPerWorkgroup=*/2,
+               /*bestMNTileCountPerSubgroup=*/2,
+               /*bestKTileCountPerSubgroup=*/4,
+               /*bestKElementCountPerSubgroup*/ 2 * kCacheLineSizeBits /
+                   inBitWidth};
+    } else {
+      seeds = {/*bestSubgroupCountPerWorkgroup=*/2,
+               /*bestMNTileCountPerSubgroup=*/2,
+               /*bestKTileCountPerSubgroup=*/4,
+               /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits /
+                   inBitWidth};
+    }
   } else if (computeIntensity >= gemmCutoffs.largeGemmCutoff) {
     // For matmuls with large arithmetic intensity, use large
     // bestMNTileCountPerSubgroup and small bestKTileCountPerSubgroup to
     // amortize launch/memory costs and maximize throughput.
     problem.gemmSize = GemmSize::LargeGemm;
+    LDBG() << "This config is LargeGemm";
     if (isGemm) {
       seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
                /*bestMNTileCountPerSubgroup=*/16,
@@ -326,11 +336,12 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
     // Choose balanced tile shapes. Empirically, medium-AI workloads can favor
     // either small or large tiles depending on kernel details.
     problem.gemmSize = GemmSize::MediumGemm;
+    LDBG() << "This config is MediumGemm";
     if (isGemm) {
       seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
                /*bestMNTileCountPerSubgroup=*/8,
                /*bestKTileCountPerSubgroup=*/4,
-               /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits /
+               /*bestKElementCountPerSubgroup*/ 2 * kCacheLineSizeBits /
                    inBitWidth};
     } else {
       // Favor more subgroups for convolution to help latency hiding from global
@@ -338,7 +349,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
       seeds = {/*bestSubgroupCountPerWorkgroup=*/8,
                /*bestMNTileCountPerSubgroup=*/4,
                /*bestKTileCountPerSubgroup=*/4,
-               /*bestKElementCountPerSubgroup*/ kCacheLineSizeBits /
+               /*bestKElementCountPerSubgroup*/ 2 * kCacheLineSizeBits /
                    inBitWidth};
     }
   }

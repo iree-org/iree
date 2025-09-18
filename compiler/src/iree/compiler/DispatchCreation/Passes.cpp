@@ -68,8 +68,6 @@ static llvm::cl::opt<DispatchCreation::EncodingOptions> clSetEncodingStrategy(
         clEnumValN(
             DispatchCreation::EncodingOptions::Generic, "generic",
             "Using EncodingAttr which encodes as much information as possible"),
-        clEnumValN(DispatchCreation::EncodingOptions::MatmulK, "matmulk",
-                   "Only encodes the reduction dimenesions in the encoding."),
         clEnumValN(DispatchCreation::EncodingOptions::Padding, "padding",
                    "Encode tensors that need to be padded")),
     llvm::cl::init(DispatchCreation::EncodingOptions::Generic));
@@ -118,7 +116,8 @@ static void addDispatchRegionCreationPreprocessingPasses(
             ElementwiseOpFusionPassOptions{
                 /*intraDispatch=*/false,
                 /*fuseMultiReduction=*/clEnableElementWiseFuseMultiReduction,
-                /*fuseTruncateOps=*/clEnableEarlyTruncFusion});
+                /*fuseTruncateOps=*/clEnableEarlyTruncFusion,
+                /*fuseBroadcastOps=*/false});
       })
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
@@ -137,7 +136,8 @@ static void addDispatchRegionCreationPreprocessingPasses(
             ElementwiseOpFusionPassOptions{
                 /*intraDispatch=*/false,
                 /*fuseMultiReduction=*/clEnableElementWiseFuseMultiReduction,
-                /*fuseTruncateOps=*/clEnableEarlyTruncFusion});
+                /*fuseTruncateOps=*/clEnableEarlyTruncFusion,
+                /*fuseBroadcastOps=*/false});
       })
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
@@ -158,17 +158,14 @@ static void addDispatchRegionCreationPreprocessingPasses(
   FunctionLikeNest(passManager)
       // 5. After all the reshape propagations, fuse elementwise operations
       //    even if the producer has multiple uses.
-      .addPredicatedPass(dispatchOptions.enableFuseMultiUse,
-                         [&]() {
-                           return DispatchCreation::
-                               createFuseMultiUseElementwiseProducerPass();
-                         })
+      .addPredicatedPass(
+          dispatchOptions.enableFuseMultiUse,
+          DispatchCreation::createFuseMultiUseElementwiseProducerPass)
 
       // 6. Some more "post elementwise fusion passes".
       //    a. Detensorize.
       //       TODO: This is probably not in the right place.
-      .addPredicatedPass(clDetensoring,
-                         [&]() { return mlir::createLinalgDetensorizePass(); })
+      .addPredicatedPass(clDetensoring, mlir::createLinalgDetensorizePass)
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
 
@@ -176,8 +173,12 @@ static void addDispatchRegionCreationPreprocessingPasses(
       //        - Legacy pass to be deprecated
       .addPass(DispatchCreation::createSplitReductionPass)
       //        - Split reduction using partial reduction tiling.
-      .addPass(DispatchCreation::createFormSplitReductionDispatchesPass)
-
+      .addPass([]() {
+        FormSplitReductionDispatchesPassOptions options;
+        options.enableFusePad = clEnableFusePaddingIntoLinalgConsumerOps;
+        return DispatchCreation::createFormSplitReductionDispatchesPass(
+            options);
+      })
       //     c. Transpose generic ops to
       //        - help with dispatch region formation.
       //        - move reduction iterators to be innermost.
@@ -221,7 +222,8 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
         return DispatchCreation::createElementwiseOpFusionPass(
             ElementwiseOpFusionPassOptions{/*intraDispatch=*/true,
                                            /*fuseMultiReduction=*/false,
-                                           /*fuseTruncateOps=*/true});
+                                           /*fuseTruncateOps=*/true,
+                                           /*fuseBroadcastOps=*/true});
       })
       // 5. After all the reshape propagations, fuse elementwise operations
       //    even if the producer has multiple uses.
@@ -273,7 +275,6 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
     // broadcasting ops.
     passManager.addPass(DispatchCreation::createHoistEncodingOpsPass());
     FunctionLikeNest(passManager)
-        .addPass(DispatchCreation::createPropagateEncodingsPass)
         .addPass(
             DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass);
   }

@@ -900,7 +900,7 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
                               pvSchedule->mSize,
                               pvSchedule->kSize,
                               intrinsicAK,
-                              /*mSubgroupCount=*/schedule.mSubgroupCounts[0],
+                              /*mSubgroupCount=*/pvSchedule->mSubgroupCounts[0],
                               /*nSubgroupCount=*/1,
                               pvSchedule->mTileSizes[0],
                               pvSchedule->kTileSizes[0],

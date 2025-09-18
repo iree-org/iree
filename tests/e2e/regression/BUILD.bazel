@@ -86,6 +86,20 @@ iree_check_single_backend_test_suite(
     target_backend = "llvm-cpu",
 )
 
+# TODO(22013): Merge the test suite into the main one, after the issue is fixed.
+iree_check_single_backend_test_suite(
+    name = "check_regression_dynamic_gather_attention_llvm-cpu",
+    srcs = [
+        "dynamic_gather_attention.mlir",
+    ],
+    compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
+    driver = "local-task",
+    tags = [
+        "noriscv",
+    ],
+    target_backend = "llvm-cpu",
+)
+
 iree_check_single_backend_test_suite(
     name = "check_regression_tosa_llvm-cpu",
     srcs = [
@@ -141,6 +155,7 @@ iree_check_single_backend_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_regression_hip",
     srcs = [
+        "dynamic_gather_attention.mlir",
         "linalg_ops_dynamic.mlir",
         "split_reduction_using_tiling.mlir",
     ],

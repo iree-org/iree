@@ -1015,7 +1015,7 @@ struct ReifyExtractOfCreateMask final
     if (isa<VectorType>(extractOp.getResult().getType())) {
       return failure();
     }
-    auto maskOp = extractOp.getVector().getDefiningOp<vector::CreateMaskOp>();
+    auto maskOp = extractOp.getSource().getDefiningOp<vector::CreateMaskOp>();
     if (!maskOp) {
       return failure();
     }
