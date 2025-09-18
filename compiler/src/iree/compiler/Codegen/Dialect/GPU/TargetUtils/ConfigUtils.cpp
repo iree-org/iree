@@ -569,10 +569,11 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     assert(llvm::all_of(operands,
                         [](Value a) { return isa<ShapedType>(a.getType()); }) &&
            "All operands must be a shaped type");
-    assert(*getRank(lhs) > *getRank(operands[3]) &&
-           *getRank(rhs) > *getRank(operands[4]) &&
-           "Expected operands #1 and #2 to have a greater rank then their "
-           "corresponding scales, operands #3 and #4");
+    assert(*getRank(lhs) > *getRank(operands[2]) &&
+           *getRank(rhs) > *getRank(operands[3]) &&
+           "Expected operand #0 (lhs) and operand #1 (rhs) to have a greater "
+           "rank than their corresponding scales, operand #2 (lhs_scale) and "
+           "operand #3 (rhs_scale)");
   }
   Type lhsElemType = getElementTypeOrSelf(lhs);
   Type rhsElemType = getElementTypeOrSelf(rhs);
