@@ -402,6 +402,11 @@ struct GPUEncodingResolverMaterializerAttr
 struct GPUSerializableAttr final
     : IREE::Encoding::SerializableAttr::ExternalModel<GPUSerializableAttr,
                                                       GPUEncodingResolverAttr> {
+  bool isSerialized(Attribute attr) const {
+    auto configuration = cast<GPUEncodingResolverAttr>(attr).getConfiguration();
+    return configuration &&
+           configuration.getNamed(kEncodingInfoAttrName).has_value();
+  }
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
