@@ -499,9 +499,7 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   OpBuilder b(context);
 
   // Collect the ops that need to be configured. We currently require all
-  // reduction ops in this set to have the same iterator types, and the other
-  // (all parallel) ops to have the same rank. Moreover the root op must be a
-  // reduction op.
+  // reduction ops in this set to have the same iterator types.
   if (!hasReductionIterator(root)) {
     return failure();
   }
@@ -532,11 +530,11 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       return failure();
     }
   }
-  for (auto pll : parallelOpsToConfigure) {
-    if (pll.getIteratorTypesArray().size() != rootOpMaps.size()) {
-      return failure();
-    }
-  }
+  // for (auto pll : parallelOpsToConfigure) {
+  //   if (pll.getIteratorTypesArray().size() != rootOpMaps.size()) {
+  //     return failure();
+  //   }
+  // }
   const IREE::GPU::TargetWgpAttr wgp = target.getWgp();
   const SmallVector<int64_t> bounds = root.getStaticLoopRanges();
   const auto numLoops = root.getNumLoops();
@@ -716,16 +714,19 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     }
   }
 
-  SmallVector<int64_t> loopIota(numLoops);
-  std::iota(loopIota.begin(), loopIota.end(), 0);
+  const auto partialReduction =
+      workgroupReductionThreads * threadReductionElements;
 
   const auto reductionConfig = [&]() {
+    SmallVector<int64_t> loopIota(numLoops);
+    std::iota(loopIota.begin(), loopIota.end(), 0);
+
     SmallVector<int64_t> threadTileSizes = whereReduction;
     threadTileSizes[lastReductionDim] = threadReductionElements;
 
     SmallVector<int64_t> partialReductionTileSizes = whereReduction;
-    partialReductionTileSizes[lastReductionDim] =
-        workgroupReductionThreads * threadReductionElements;
+
+    partialReductionTileSizes[lastReductionDim] = partialReduction;
 
     SmallVector<int64_t> laneBasis(numLoops, 1);
     if (!parallelDims.empty()) {
@@ -758,12 +759,31 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // TODO(newling) this needs updating for the non-contiguous reduction
   // dimension case.
-  auto getParallelConfig = [&]() -> IREE::GPU::LoweringConfigAttr {
+  //
+  // TODO(newling) This needs a major overhaul.
+  auto getParallelConfig =
+      [lastReductionSize, threadReductionElements, &b, context,
+       partialReduction,
+       subgroupSize](linalg::LinalgOp lop) -> IREE::GPU::LoweringConfigAttr {
+    auto bounds = lop.getStaticLoopRanges();
+    auto numPllLoops = bounds.size();
+
+    auto backDim = numPllLoops - 1;
+    auto pllDimSize = bounds.back();
+    if (ShapedType::isDynamic(pllDimSize)) {
+      pllDimSize = kVectorDistributeReductionSizeToTargetIfDynamic;
+    }
+
+    SmallVector<int64_t> loopIota(numPllLoops);
+    std::iota(loopIota.begin(), loopIota.end(), 0);
+
+    SmallVector<int64_t> pllWorkgroups(numPllLoops, 1);
+    pllWorkgroups.back() = 0;
+
     const int64_t reductionTileSize =
         llvm::APIntOps::GreatestCommonDivisor(
             {64, static_cast<uint64_t>(lastReductionSize)},
-            {64,
-             static_cast<uint64_t>(workgroupThreads * threadReductionElements)})
+            {64, static_cast<uint64_t>(partialReduction)})
             .getZExtValue();
 
     int64_t threadBasis = subgroupSize;
@@ -776,19 +796,19 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
     // For the shared dimensions, set the reduction tile sizes to be zero.
     SmallVector<int64_t> reductionTileSizes;
-    for (int64_t i = 0; i < numLoops; i++) {
-      reductionTileSizes.push_back(sharedWgpTiles[i] > 0 ? 0 : 1);
+    for (int64_t i = 0; i < numPllLoops; i++) {
+      reductionTileSizes.push_back(0); // sharedWgpTiles[i] > 0 ? 0 : 1);
     }
-    reductionTileSizes[lastReductionDim] = reductionTileSize;
+    reductionTileSizes[backDim] = reductionTileSize;
 
-    SmallVector<int64_t> threadTileSizes(numLoops, 0);
-    threadTileSizes[lastReductionDim] = threadReductionElements;
+    SmallVector<int64_t> threadTileSizes(numPllLoops, 0);
+    threadTileSizes[backDim] = threadReductionElements;
 
-    SmallVector<int64_t> threadCounts(numLoops, 1);
-    threadCounts[lastReductionDim] = threadBasis;
+    SmallVector<int64_t> threadCounts(numPllLoops, 1);
+    threadCounts[backDim] = threadBasis;
 
-    SmallVector<int64_t> subGroupCounts(numLoops, 1);
-    subGroupCounts[lastReductionDim] = subgroupBasis;
+    SmallVector<int64_t> subGroupCounts(numPllLoops, 1);
+    subGroupCounts[backDim] = subgroupBasis;
 
     ArrayAttr subgroupBasisAttr = b.getArrayAttr(
         {b.getI64ArrayAttr(subGroupCounts), b.getI64ArrayAttr(loopIota)});
@@ -797,18 +817,19 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
         {b.getI64ArrayAttr(threadCounts), b.getI64ArrayAttr(loopIota)});
 
     NamedAttribute pllConfigAttrs[] = {
-        NamedAttribute("workgroup", b.getI64ArrayAttr(sharedWgpTiles)),
+        NamedAttribute("workgroup", b.getI64ArrayAttr(pllWorkgroups)),
         NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes)),
         NamedAttribute("thread", b.getI64ArrayAttr(threadTileSizes)),
         NamedAttribute("lane_basis", laneBasisAttr),
         NamedAttribute("subgroup_basis", subgroupBasisAttr)};
     const auto config = b.getDictionaryAttr(pllConfigAttrs);
+
     return IREE::GPU::LoweringConfigAttr::get(context, config);
   };
 
   if (!parallelOpsToConfigure.empty()) {
-    const auto pllLoweringConfig = getParallelConfig();
     for (linalg::LinalgOp linalgOp : parallelOpsToConfigure) {
+      const auto pllLoweringConfig = getParallelConfig(linalgOp);
       setLoweringConfig(linalgOp, pllLoweringConfig);
     }
   }
