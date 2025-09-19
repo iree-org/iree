@@ -326,11 +326,14 @@ IREE::transform_dialect::MatchContractionOp::matchOperation(
         }));
   };
 
-  results.setParams(cast<OpResult>(getBatch()),
+  results.setParams(cast<OpResult>(getBatchDims()),
                     iterationSizes(contractionDims.batch));
-  results.setParams(cast<OpResult>(getM()), iterationSizes(contractionDims.m));
-  results.setParams(cast<OpResult>(getN()), iterationSizes(contractionDims.n));
-  results.setParams(cast<OpResult>(getK()), iterationSizes(contractionDims.k));
+  results.setParams(cast<OpResult>(getMDims()),
+                    iterationSizes(contractionDims.m));
+  results.setParams(cast<OpResult>(getNDims()),
+                    iterationSizes(contractionDims.n));
+  results.setParams(cast<OpResult>(getKDims()),
+                    iterationSizes(contractionDims.k));
 
   return DiagnosedSilenceableFailure::success();
 }

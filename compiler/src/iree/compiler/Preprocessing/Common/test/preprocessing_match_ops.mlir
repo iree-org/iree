@@ -274,12 +274,11 @@ module attributes {transform.with_named_sequence} {
 
 // -----
 
-// Verify that the basic contraction matcher works without indexing maps.
+// Verify that the basic contraction matcher works and can extract dimension sizes.
 
 #map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#map3 = affine_map<(d0, d1) -> (d0, d1)>
 #map_batch0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 #map_batch1 = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 #map_batch2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
@@ -315,9 +314,23 @@ func.func @op_fill(%dest: tensor<32x64xf32>, %value: f32) -> tensor<32x64xf32> {
 }
 
 module attributes {transform.with_named_sequence} {
-  transform.named_sequence @match_contraction(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
-    %batch, %m, %n, %k = transform.iree.match.is_contraction %op :
+  transform.named_sequence @match_matmul(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
+    %batch_dims, %m_dims, %n_dims, %k_dims = transform.iree.match.is_contraction %op :
       (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+    %c32 = transform.param.constant 32 : i64 -> !transform.param<i64>
+    transform.match.param.cmpi eq %m_dims, %c32 : !transform.param<i64>
+    transform.match.param.cmpi eq %n_dims, %c32 : !transform.param<i64>
+    transform.yield %op : !transform.any_op
+  }
+
+  transform.named_sequence @match_batch_matmul(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
+    %batch_dims, %m_dims, %n_dims, %k_dims = transform.iree.match.is_contraction %op :
+      (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+    %c2 = transform.param.constant 2 : i64 -> !transform.param<i64>
+    %c32 = transform.param.constant 32 : i64 -> !transform.param<i64>
+    transform.match.param.cmpi eq %batch_dims, %c2 : !transform.param<i64>
+    transform.match.param.cmpi eq %m_dims, %c32 : !transform.param<i64>
+    transform.match.param.cmpi eq %n_dims, %c32 : !transform.param<i64>
     transform.yield %op : !transform.any_op
   }
 
@@ -329,7 +342,8 @@ module attributes {transform.with_named_sequence} {
 
   transform.named_sequence @__transform_main(%module: !transform.any_op) {
     transform.foreach_match in %module
-        @match_contraction -> @annotate
+        @match_matmul -> @annotate,
+        @match_batch_matmul -> @annotate
       : (!transform.any_op) -> (!transform.any_op)
     transform.yield
   }

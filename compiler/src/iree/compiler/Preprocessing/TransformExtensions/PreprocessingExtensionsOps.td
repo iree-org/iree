@@ -187,6 +187,14 @@ def MatchContractionOp : Op<Transform_Dialect, "iree.match.is_contraction",
 
     Succeeds if the operation is a contraction operation, and
     produces a silenceable failure otherwise.
+
+    #### Results
+
+    Returns arrays of dimension sizes for each contraction dimension:
+    - batch_dims: Array of batch dimension sizes.
+    - m_dims: Array of M dimension sizes.
+    - n_dims: Array of N dimension sizes.
+    - k_dims: Array of K dimension sizes.
   }];
 
   let arguments = (ins
@@ -197,10 +205,10 @@ def MatchContractionOp : Op<Transform_Dialect, "iree.match.is_contraction",
   );
 
   let results = (outs
-    TransformParamTypeInterface:$batch,
-    TransformParamTypeInterface:$m,
-    TransformParamTypeInterface:$n,
-    TransformParamTypeInterface:$k
+    TransformParamTypeInterface:$batch_dims,
+    TransformParamTypeInterface:$m_dims,
+    TransformParamTypeInterface:$n_dims,
+    TransformParamTypeInterface:$k_dims
   );
 
   let assemblyFormat = [{
