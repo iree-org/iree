@@ -762,8 +762,7 @@ struct CPUSerializableAttr final
                                                       CPUEncodingResolverAttr> {
   bool isSerialized(Attribute attr) const {
     auto configuration = cast<CPUEncodingResolverAttr>(attr).getConfiguration();
-    return configuration &&
-           configuration.getNamed(kEncodingInfoAttrName).has_value();
+    return configuration && configuration.contains(kEncodingInfoAttrName);
   }
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
@@ -903,8 +902,7 @@ struct VMVXSerializableAttr final
   bool isSerialized(Attribute attr) const {
     auto configuration =
         cast<VMVXEncodingResolverAttr>(attr).getConfiguration();
-    return configuration &&
-           configuration.getNamed(kEncodingInfoAttrName).has_value();
+    return configuration && configuration.contains(kEncodingInfoAttrName);
   }
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,

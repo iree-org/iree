@@ -404,8 +404,7 @@ struct GPUSerializableAttr final
                                                       GPUEncodingResolverAttr> {
   bool isSerialized(Attribute attr) const {
     auto configuration = cast<GPUEncodingResolverAttr>(attr).getConfiguration();
-    return configuration &&
-           configuration.getNamed(kEncodingInfoAttrName).has_value();
+    return configuration && configuration.contains(kEncodingInfoAttrName);
   }
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
