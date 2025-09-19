@@ -2201,7 +2201,7 @@ void AsyncBarrierOp::getCanonicalizationPatterns(RewritePatternSet &results,
 OpFoldResult AsyncTransferOp::fold(FoldAdaptor operands) {
   if (auto sourceTransferOp = getSource().getDefiningOp<AsyncTransferOp>()) {
     if (sourceTransferOp.getSource().getType() == getResult().getType() &&
-        sourceTransferOp.getSourceAffinity() == getResultAffinity()) {
+        sourceTransferOp.getSourceAffinity() == getTargetAffinity()) {
       return sourceTransferOp.getSource();
     }
   }
