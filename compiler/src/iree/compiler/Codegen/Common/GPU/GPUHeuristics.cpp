@@ -61,8 +61,27 @@ static int64_t calculateOperandsSharedMemoryUsedInBytes(
                   prod(schedule.mSubgroupCounts);
   int64_t tileN = schedule.nSize * prod(schedule.nTileSizes) *
                   prod(schedule.nSubgroupCounts);
-  int64_t tileK = schedule.kSize * prod(schedule.kTileSizes);
+  int64_t tileK = prod(schedule.kSize) * prod(schedule.kTileSizes);
   return (tileM * tileK * lhsBitwidth + tileN * tileK * rhsBitwidth) / 8;
+}
+
+static int64_t
+calculateScalesSharedMemoryUsedInBytes(const GPUMMASchedule &schedule,
+                                       int64_t lhsSclBitwidth,
+                                       int64_t rhsSclBitwidth) {
+
+  int64_t tileM = schedule.mSize * prod(schedule.mTileSizes) *
+                  prod(schedule.mSubgroupCounts);
+  int64_t tileN = schedule.nSize * prod(schedule.nTileSizes) *
+                  prod(schedule.nSubgroupCounts);
+  // The last reduction dimension for a scaled GEMM is not present
+  // in scales.
+  SmallVector<int64_t> tileKoCounts(schedule.kTileSizes.begin(),
+                                    schedule.kTileSizes.end() - 1);
+  SmallVector<int64_t> tileKoSizes(schedule.kSize.begin(),
+                                   schedule.kSize.end() - 1);
+  int64_t tileK = prod(tileKoSizes) * prod(tileKoCounts);
+  return (tileM * tileK * lhsSclBitwidth + tileN * tileK * rhsSclBitwidth) / 8;
 }
 
 static int64_t
@@ -95,9 +114,10 @@ static bool isScheduleAligned(const GPUMatmulShapeType &problem,
                           schedule.nSize;
   SmallVector<int64_t, 2> alignedKSizes(problem.kSizes);
   alignedKSizes.back() =
-      mustBeAligned ? problem.kSizes.back()
-                    : llvm::divideCeil(problem.kSizes.back(), schedule.kSize) *
-                          schedule.kSize;
+      mustBeAligned
+          ? problem.kSizes.back()
+          : llvm::divideCeil(problem.kSizes.back(), schedule.kSize.back()) *
+                schedule.kSize.back();
   // Returns the number of elements in the schedule for each dimension.
   auto getScheduleSizes =
       [&](int64_t size, SmallVector<int64_t> tileCount,
@@ -126,9 +146,12 @@ static bool isScheduleAligned(const GPUMatmulShapeType &problem,
   bool isValidN = areAligned(
       alignedNSizes, getScheduleSizes(schedule.nSize, schedule.nTileSizes,
                                       schedule.nSubgroupCounts));
-  bool isValidK = areAligned(
-      alignedKSizes,
-      getScheduleSizes(schedule.kSize, schedule.kTileSizes, std::nullopt));
+  bool isValidK =
+      areAligned(alignedKSizes,
+                 llvm::map_to_vector(
+                     llvm::seq<int64_t>(alignedKSizes.size()), [&](int64_t i) {
+                       return schedule.kSize[i] * schedule.kTileSizes[i];
+                     }));
   return isValidM && isValidN && isValidK;
 }
 
@@ -154,7 +177,7 @@ static bool isValidMMASchedule(const GPUMatmulShapeType &problem,
                     prod(schedule.mSubgroupCounts);
   int64_t nWgSize = schedule.nSize * prod(schedule.nTileSizes) *
                     prod(schedule.nSubgroupCounts);
-  int64_t kWgSize = schedule.kSize * prod(schedule.kTileSizes);
+  int64_t kWgSize = prod(schedule.kSize) * prod(schedule.kTileSizes);
   int64_t innerLhsDimSize = transposedLhs ? mWgSize : kWgSize;
   int64_t innerRhsDimSize = transposedRhs ? kWgSize : nWgSize;
 
@@ -510,9 +533,9 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
       getBestKTileSizes(problem, intrinsic, seeds);
 
   return GPUMMASchedule{
-      intrinsic.mmaKind,   intrinsic.mSizes[0], intrinsic.nSizes[0],
-      intrinsic.kSizes[0], mSubgroupCounts,     nSubgroupCounts,
-      mTileSizes,          nTileSizes,          kTileSizes};
+      intrinsic.mmaKind, intrinsic.mSizes[0], intrinsic.nSizes[0],
+      intrinsic.kSizes,  mSubgroupCounts,     nSubgroupCounts,
+      mTileSizes,        nTileSizes,          kTileSizes};
 }
 
 /// Compare the MMA intrinsics by following precedence rules:
@@ -628,7 +651,7 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
     int64_t subgroupSize, std::optional<int64_t> wgpCount, bool transposedLhs,
     bool transposedRhs, bool canUpcastAcc, bool mustBeAligned,
-    bool doCPromotion) {
+    bool doCPromotion, bool scaled) {
 
   sortMMAIntrinsics(problem, intrinsics);
 
@@ -659,6 +682,12 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
                              transposedLhs, transposedRhs);
       int64_t sharedMemoryUsed = calculateOperandsSharedMemoryUsedInBytes(
           schedule, lhsBitwidth, rhsBitwidth);
+      if (scaled) {
+        // Currently only support scales of type F8E8M0.
+        int64_t scaleBitwidth = 8;
+        sharedMemoryUsed += calculateScalesSharedMemoryUsedInBytes(
+            schedule, scaleBitwidth, scaleBitwidth);
+      }
       if (doCPromotion) {
         sharedMemoryUsed +=
             calculateResultSharedMemoryUsedInBytes(schedule, resultBitwidth);
@@ -902,7 +931,7 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
     GPUMMASchedule qkSchedule{
         intrinsicA.mmaKind,
         pvSchedule->mSize,
-        pvSchedule->kSize,
+        pvSchedule->kSize[0],
         intrinsicAK,
         /*mSubgroupCount=*/pvSchedule->mSubgroupCounts,
         /*nSubgroupCount=*/SmallVector<int64_t>(qkMatmul.nSizes.size(), 1),

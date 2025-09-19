@@ -1050,7 +1050,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   workgroupTileSizes[nDim] =
       schedule->nSubgroupCounts[0] * schedule->nTileSizes[0] * schedule->nSize;
 
-  reductionTileSizes[kDim] = schedule->kTileSizes[0] * schedule->kSize;
+  reductionTileSizes[kDim] = schedule->kTileSizes[0] * schedule->kSize[0];
 
   // Tile all filter loop dimensions to 1.
   for (int64_t filterDim : convolutionDims->filterLoop) {
@@ -1308,7 +1308,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   workgroupTileSizes[nDim] =
       schedule->nSubgroupCounts[0] * schedule->nTileSizes[0] * schedule->nSize;
 
-  reductionTileSizes[kDim] = schedule->kTileSizes[0] * schedule->kSize;
+  reductionTileSizes[kDim] = schedule->kTileSizes[0] * schedule->kSize[0];
 
   LLVM_DEBUG(debugPrintContractionInfo("Workgroup tile sizes", op.getNumLoops(),
                                        *contractionDims, workgroupTileSizes));
@@ -1591,7 +1591,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
     reductionTileSizes[k2Dim] = pvSchedule.kTileSizes[i];
     // Multiply by the intrinsic shape for the inner most dim.
     if (i == k2Dims.size() - 1) {
-      reductionTileSizes[k2Dim] *= pvSchedule.kSize;
+      reductionTileSizes[k2Dim] *= pvSchedule.kSize.back();
     }
   }
 

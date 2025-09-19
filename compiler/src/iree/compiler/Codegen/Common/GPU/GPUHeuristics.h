@@ -63,7 +63,8 @@ struct GPUMMASchedule {
   IREE::Codegen::InnerTileDescAttrInterface mmaKind;
   int64_t mSize; // Native MMA intrinsic size along M dimension for a subgroup.
   int64_t nSize; // Native MMA intrinsic size along N dimension for a subgroup.
-  int64_t kSize; // Native MMA intrinsic size along K dimension for a subgroup.
+  SmallVector<int64_t>
+      kSize; // Native MMA intrinsic size along K dimension for a subgroup.
 
   // Number of subgroups along each M and N dimension.
   SmallVector<int64_t> mSubgroupCounts;
@@ -80,7 +81,8 @@ struct GPUMMASchedule {
   // Constructor for multi M, N, K dim schedules.
   GPUMMASchedule(IREE::Codegen::InnerTileDescAttrInterface kind,
                  int64_t mIntrinsicSize, int64_t nIntrinsicSize,
-                 int64_t kIntrinsicSize, ArrayRef<int64_t> mSubgroupCounts,
+                 ArrayRef<int64_t> kIntrinsicSize,
+                 ArrayRef<int64_t> mSubgroupCounts,
                  ArrayRef<int64_t> nSubgroupCounts,
                  ArrayRef<int64_t> mTileSizes, ArrayRef<int64_t> nTileSizes,
                  ArrayRef<int64_t> kTileSizes)
@@ -92,8 +94,9 @@ struct GPUMMASchedule {
   // Constructor for single M, N, K dim schedules.
   GPUMMASchedule(IREE::Codegen::InnerTileDescAttrInterface kind,
                  int64_t mIntrinsicSize, int64_t nIntrinsicSize,
-                 int64_t kIntrinsicSize, int64_t mSubgroup, int64_t nSubgroup,
-                 int64_t mTileSize, int64_t nTileSize, int64_t kTileSize)
+                 ArrayRef<int64_t> kIntrinsicSize, int64_t mSubgroup,
+                 int64_t nSubgroup, int64_t mTileSize, int64_t nTileSize,
+                 int64_t kTileSize)
       : mmaKind(kind), mSize(mIntrinsicSize), nSize(nIntrinsicSize),
         kSize(kIntrinsicSize), mSubgroupCounts({mSubgroup}),
         nSubgroupCounts({nSubgroup}), mTileSizes({mTileSize}),
@@ -102,14 +105,13 @@ struct GPUMMASchedule {
 
 /// Returns a schedule for using one of the given MMA |intrinsics| to target the
 /// input |problem|. Returns std::nullopt if we cannot find such a schedule.
-FailureOr<GPUMMASchedule>
-deduceMMASchedule(const GPUMatmulShapeType &problem,
-                  ArrayRef<GPUIntrinsicType> intrinsics,
-                  const GPUMMAHeuristicSeeds &seeds,
-                  int64_t sharedMemLimitInBytes, int64_t subgroupSize,
-                  std::optional<int64_t> cuCount, bool transposedLhs = false,
-                  bool transposedRhs = false, bool canUpcastAcc = false,
-                  bool mustBeAligned = true, bool doCPromotion = false);
+FailureOr<GPUMMASchedule> deduceMMASchedule(
+    const GPUMatmulShapeType &problem, ArrayRef<GPUIntrinsicType> intrinsics,
+    const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
+    int64_t subgroupSize, std::optional<int64_t> cuCount,
+    bool transposedLhs = false, bool transposedRhs = false,
+    bool canUpcastAcc = false, bool mustBeAligned = true,
+    bool doCPromotion = false, bool scaled = false);
 
 /// Returns a schedule for the pvMatmul in attention using one of the given MMA
 /// |intrinsics| to target the given attention matmul problems, |qkMatmul|
