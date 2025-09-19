@@ -59,17 +59,20 @@ static bool isFusableWithSetEncoding(Operation *target) {
   return true;
 }
 
-struct FuseEncodingOpsIntoDispatchRegionsPass
-    : public DispatchCreation::impl::FuseEncodingOpsIntoDispatchRegionsPassBase<
+struct FuseEncodingOpsIntoDispatchRegionsPass final
+    : impl::FuseEncodingOpsIntoDispatchRegionsPassBase<
           FuseEncodingOpsIntoDispatchRegionsPass> {
+  using Base::Base;
   void runOnOperation() override {
     mlir::FunctionOpInterface funcOp = getOperation();
     MLIRContext *context = &getContext();
     IRRewriter rewriter(context);
 
     // Run CSE to eliminate common encoding ops.
-    DominanceInfo domInfo;
-    mlir::eliminateCommonSubExpressions(rewriter, domInfo, funcOp);
+    if (enableCSE) {
+      DominanceInfo domInfo;
+      mlir::eliminateCommonSubExpressions(rewriter, domInfo, funcOp);
+    }
 
     SmallVector<IREE::Encoding::SetEncodingOp> encodingOps;
     funcOp->walk([&](IREE::Encoding::SetEncodingOp encodingOp) {
@@ -120,7 +123,7 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
     }
 
     // Dynamic dims may have dominance issues after pulling encoding ops into
-    // producer dispatch regions, so we need to resolve tensor.dim ops., Also
+    // producer dispatch regions, so we need to resolve tensor.dim ops. Also
     // run the canonicalization patterns to remove redundantly returned results.
     GreedyRewriteConfig config;
     config.enableConstantCSE(false);

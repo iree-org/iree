@@ -1,4 +1,7 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-fuse-encoding-ops-into-dispatch-regions-pass))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-fuse-encoding-ops-into-dispatch-regions-pass))" \
+// RUN:   --split-input-file %s | FileCheck %s --check-prefixes=CHECK,NO-CSE
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-fuse-encoding-ops-into-dispatch-regions-pass{enable-cse=true}))" \
+// RUN:   --split-input-file %s | FileCheck %s --check-prefixes=CHECK,CSE
 
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #encoding = #iree_encoding.testing<>
@@ -146,16 +149,19 @@ util.func public @multi_encoding_fusion_dynamic(%arg0: tensor<?x?x?xf32>, %d0: i
   %3 = iree_encoding.set_encoding %1 : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #encoding>
   util.return %2, %3 : tensor<?x?x?xf32, #encoding>, tensor<?x?x?xf32, #encoding>
 }
-// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing<>
-// CHECK-LABEL: @multi_encoding_fusion_dynamic
-// CHECK-SAME:    {{.+}}: tensor<?x?x?xf32>, %[[D0:.+]]: index, %[[D1:.+]]: index, %[[D2:.+]]: index)
-// CHECK:       %[[DISPATCH:.+]] = flow.dispatch.region -> (tensor<?x?x?xf32, #[[$ENCODING]]>
-// CHECK-SAME:      {%[[D0]], %[[D1]], %[[D2]]}
-// CHECK:         %[[ADD:.+]] = linalg.generic
-// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding
-// CHECK:         flow.return %[[SET_ENCODING]] :
-// CHECK:       }
-// CHECK:       util.return %[[DISPATCH]], %[[DISPATCH]]
+// CHECK-DAG:       #[[$ENCODING:.+]] = #iree_encoding.testing<>
+// CHECK-LABEL:     @multi_encoding_fusion_dynamic
+// CHECK-SAME:        {{.+}}: tensor<?x?x?xf32>, %[[D0:.+]]: index, %[[D1:.+]]: index, %[[D2:.+]]: index)
+// CSE:             %[[DISPATCH:.+]] = flow.dispatch.region -> (tensor<?x?x?xf32, #[[$ENCODING]]>
+// NO-CSE:          %[[DISPATCH:.+]] = flow.dispatch.region -> (tensor<?x?x?xf32>
+// CHECK-SAME:          {%[[D0]], %[[D1]], %[[D2]]}
+// CHECK:             %[[ADD:.+]] = linalg.generic
+// CSE:               %[[SET_ENCODING:.+]] = iree_encoding.set_encoding
+// CSE:               flow.return %[[SET_ENCODING]] :
+// NO-CSE:            flow.return %[[ADD]] :
+// CHECK:           }
+// CSE:             util.return %[[DISPATCH]], %[[DISPATCH]]
+// NO-CSE-COUNT-2:  iree_encoding.set_encoding %[[DISPATCH]]
 
 // -----
 
