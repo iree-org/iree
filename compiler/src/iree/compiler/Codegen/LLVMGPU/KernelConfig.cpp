@@ -782,7 +782,7 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     SmallVector<int64_t> workgroupTileSizes = sharedWgpTiles;
     workgroupTileSizes.resize(op.getNumLoops(), 0);
 
-    const int64_t reductionTileSize =
+    int64_t reductionTileSize =
         llvm::APIntOps::GreatestCommonDivisor(
             {64, static_cast<uint64_t>(lastReductionSize)},
             {64, static_cast<uint64_t>(partialReduction)})
@@ -793,7 +793,7 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       threadBasis >>= 1;
     }
 
-    const int64_t subgroupBasis = std::max<int64_t>(
+    int64_t subgroupBasis = std::max<int64_t>(
         reductionTileSize / (threadBasis * threadReductionElements), 1);
 
     for (auto iter : llvm::enumerate(sharedWgpTiles)) {
@@ -803,8 +803,16 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       }
     }
 
+    int threadSize = threadReductionElements;
+    if (sharedWgpTiles.size() > op.getNumLoops()) {
+      threadSize = 1;
+      reductionTileSize = 1;
+      threadBasis = 1;
+      subgroupBasis = 1;
+    }
+
     reductionTileSizes[parallelDims.back()] = reductionTileSize;
-    threadTileSizes[parallelDims.back()] = threadReductionElements;
+    threadTileSizes[parallelDims.back()] = threadSize;
     threadCounts[parallelDims.back()] = threadBasis;
     subGroupCounts[parallelDims.back()] = subgroupBasis;
 
