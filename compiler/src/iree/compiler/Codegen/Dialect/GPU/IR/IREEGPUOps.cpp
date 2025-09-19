@@ -243,6 +243,8 @@ LogicalResult CoalescedGatherDMAOp::verify() {
         !isa<MemRefType>(getSource().getType())) {
       return emitOpError("all operands must be memrefs when init is a memref");
     }
+  } else {
+    return emitOpError("input types must either be all tensors or memrefs");
   }
 
   return success();

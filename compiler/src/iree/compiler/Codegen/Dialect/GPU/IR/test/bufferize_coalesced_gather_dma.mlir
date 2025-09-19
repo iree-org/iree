@@ -37,7 +37,6 @@ func.func @bufferize_coalesced_gather_dma_dynamic(%indices: tensor<?x?xindex>,
 // CHECK-LABEL: func @bufferize_coalesced_gather_dma_dynamic
 //       CHECK:   scf.forall
 //       CHECK:     iree_gpu.coalesced_gather_dma %{{.+}}, %{{.+}} into %{{.+}} : memref<?x?xindex, strided<[?, ?], offset: ?>>, memref<?x?xf32, strided<[?, ?], offset: ?>>, memref<?x?xf32, strided<[?, ?], offset: ?>>
-
 // -----
 
 // Test bufferization with different element types
