@@ -115,7 +115,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         NON_CHECK_TESTS,
         include = ["*.mlir"],
-        exclude = CPU_SPECIFIC_TESTS + NON_CHECK_TESTS,
+        exclude = CPU_SPECIFIC_TESTS + CHECK_TESTS,
     ),
     cfg = "//tools:lit.cfg.py",
     compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
