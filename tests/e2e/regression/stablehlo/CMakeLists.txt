@@ -124,7 +124,7 @@ iree_check_single_backend_test_suite(
 
 iree_lit_test_suite(
   NAME
-    lit_stablehlo_regression
+    lit
   SRCS
     "globals_ml_program.mlir"
   TOOLS
