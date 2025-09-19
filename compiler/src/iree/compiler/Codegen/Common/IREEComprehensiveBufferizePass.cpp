@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -203,7 +204,13 @@ void EliminateEmptyTensorsPass::runOnOperation() {
     }
   }
 
+  // iree_codegen.store_to_buffer may consumer reshape operands that got stuck
+  // at the end of the funcOp, which will prevent the SubsetInsertionOpInterface
+  // implementation from eliminating empty tensors. Push up these reshape ops
+  // as far as possible to prevent the reshapes from blocking empty tensor
+  // elimination.
   IRRewriter rewriter(funcOp->getContext());
+  moveUpMemrefReshapeOps(rewriter, funcOp);
   auto bufferizationOptions = getBufferizationOptions();
   OneShotAnalysisState state(funcOp, bufferizationOptions);
   // Analyze IR.
