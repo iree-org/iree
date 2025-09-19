@@ -302,7 +302,7 @@ struct CoalescedGatherDMAOpBufferizationInterface
           IREE::GPU::CoalescedGatherDMAOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
-    // This op reads from the source and indices tensors
+    // This op reads from the source and indices tensors.
     auto gatherOp = cast<IREE::GPU::CoalescedGatherDMAOp>(op);
     return opOperand.get() == gatherOp.getIndices() ||
            opOperand.get() == gatherOp.getSource();
@@ -310,7 +310,7 @@ struct CoalescedGatherDMAOpBufferizationInterface
 
   bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
                                const AnalysisState &state) const {
-    // This op writes to the init/destination tensor
+    // This op writes to the init/destination tensor.
     auto gatherOp = cast<IREE::GPU::CoalescedGatherDMAOp>(op);
     return opOperand.get() == gatherOp.getInit();
   }
@@ -320,7 +320,7 @@ struct CoalescedGatherDMAOpBufferizationInterface
                     const AnalysisState &state) const {
     auto gatherOp = cast<IREE::GPU::CoalescedGatherDMAOp>(op);
     SmallVector<bufferization::AliasingValue> alist;
-    // The result aliases with the init operand
+    // The result aliases with the init operand.
     if (opOperand.get() == gatherOp.getInit()) {
       alist.push_back({gatherOp.getResult(), BufferRelation::Equivalent});
     }
@@ -332,7 +332,7 @@ struct CoalescedGatherDMAOpBufferizationInterface
                           bufferization::BufferizationState &state) const {
     auto gatherOp = cast<IREE::GPU::CoalescedGatherDMAOp>(op);
 
-    // Get the bufferized operands
+    // Get the bufferized operands.
     FailureOr<Value> indicesBuffer =
         getBuffer(rewriter, gatherOp.getIndices(), options, state);
     FailureOr<Value> sourceBuffer =
@@ -344,32 +344,24 @@ struct CoalescedGatherDMAOpBufferizationInterface
       return failure();
     }
 
-    // Check if we're inside an scf.forall.in_parallel block
-    // If so, we need to move the op outside of it
+    // Check if we're inside an scf.forall.in_parallel block.
+    // If so, we need to move the op outside of it.
     Operation *parentOp = gatherOp->getParentOp();
     if (isa_and_nonnull<scf::InParallelOp>(parentOp)) {
-      // Get the forall op containing the in_parallel
+      // Get the forall op containing the in_parallel.
       auto forallOp = parentOp->getParentOfType<scf::ForallOp>();
       if (forallOp) {
-        // Insert the memref version before the in_parallel block
+        // Insert the memref version before the in_parallel block.
         rewriter.setInsertionPoint(parentOp);
         rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
             gatherOp.getLoc(), initBuffer->getType(), *indicesBuffer,
             *sourceBuffer, *initBuffer);
-        // The result is the same as the init buffer (in-place update)
+        // The result is the same as the init buffer.
         bufferization::replaceOpWithBufferizedValues(rewriter, op, *initBuffer);
         return success();
       }
     }
-
-    // Otherwise, create the op in place
-    rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
-        gatherOp.getLoc(), initBuffer->getType(), *indicesBuffer, *sourceBuffer,
-        *initBuffer);
-
-    // The result is the same as the init buffer (in-place update)
-    bufferization::replaceOpWithBufferizedValues(rewriter, op, *initBuffer);
-    return success();
+    return failure();
   }
 };
 
