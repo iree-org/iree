@@ -796,6 +796,13 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     const int64_t subgroupBasis = std::max<int64_t>(
         reductionTileSize / (threadBasis * threadReductionElements), 1);
 
+    for (auto iter : llvm::enumerate(sharedWgpTiles)) {
+      if (iter.value() > 0) {
+        reductionTileSizes[iter.index()] = 0;
+        workgroupTileSizes[iter.index()] = iter.value();
+      }
+    }
+
     reductionTileSizes[parallelDims.back()] = reductionTileSize;
     threadTileSizes[parallelDims.back()] = threadReductionElements;
     threadCounts[parallelDims.back()] = threadBasis;
