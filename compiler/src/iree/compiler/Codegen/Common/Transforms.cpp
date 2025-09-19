@@ -16,6 +16,20 @@
 
 namespace mlir::iree_compiler {
 
+void moveUpMemrefReshapeOps(RewriterBase &rewriter, Operation *op) {
+  DominanceInfo domInfo(op);
+  SmallVector<Operation *> reshapeOps;
+  op->walk([&](Operation *nestedOp) {
+    if (isa<memref::ExpandShapeOp, memref::CollapseShapeOp>(nestedOp)) {
+      reshapeOps.push_back(nestedOp);
+    }
+  });
+
+  for (Operation *reshapeOp : reshapeOps) {
+    moveOpAfterLastOperand(rewriter, domInfo, reshapeOp);
+  }
+}
+
 /// Fuse consumers of forall ops into it after checking that they are tilable.
 
 namespace {

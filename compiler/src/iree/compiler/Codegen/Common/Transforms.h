@@ -92,6 +92,10 @@ LogicalResult normalizeLoopBounds(RewriterBase &rewriter, scf::ForOp forOp);
 LogicalResult normalizeLoopBounds(RewriterBase &rewriter,
                                   scf::ForallOp forallOp);
 
+/// Move memref.expand_shape and memref.collapse_shape ops nested within the
+/// `op` up to just after their last operand producer.
+void moveUpMemrefReshapeOps(RewriterBase &rewriter, Operation *op);
+
 /// Populate patterns that fold tensor.expand/collapse_shape into the memref
 /// of iree_codegen.load_from_buffer or iree_codegen.store_to_buffer ops.
 void populateFoldTensorReshapeIntoBufferPatterns(RewritePatternSet &patterns);
