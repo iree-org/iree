@@ -111,7 +111,7 @@ iree_check_single_backend_test_suite(
 )
 
 iree_lit_test_suite(
-    name = "lit_stablehlo_regression",
+    name = "lit",
     srcs = enforce_glob(
         NON_CHECK_TESTS,
         include = ["*.mlir"],
