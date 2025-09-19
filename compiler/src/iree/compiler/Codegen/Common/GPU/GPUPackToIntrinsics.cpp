@@ -314,7 +314,7 @@ void GPUPackToIntrinsicsPass::runOnOperation() {
            consumer->getBlock() == producer->getBlock();
   };
 
-  linalg::populateDataLayoutPropagationPatterns(patterns, control);
+  linalg::populateDataLayoutPropagationPatterns(patterns, control, false);
   linalg::populateExtractSliceSinkingPatterns(patterns, controlExtract);
   patterns.add<PackDestinationForOp>(context);
   linalg::UnPackOp::getCanonicalizationPatterns(patterns, context);
