@@ -225,4 +225,42 @@ def MatchContractionOp : Op<Transform_Dialect, "iree.match.contraction",
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
+def MatchSizeEqualsOp : Op<Transform_Dialect, "iree.match.size_equals",
+    [MatchOpInterface,
+     SingleOpMatcher,
+     MemoryEffectsOpInterface]> {
+  let summary = [{Check whether a single transform parameter matches expected size values.}];
+  let description = [{
+    Matches dimension sizes against expected values.
+    The dimension sizes is an array of transform parameters, and the expected values
+    are structured as nested arrays where each sub-array corresponds to a position
+    in the size array.
+
+    Example: %batch_dims = [[2, 4], [8, 16], [32, 64]]
+    This means:
+    - %batch_dims[0] should be either 2 or 4.
+    - %batch_dims[1] should be either 8 or 16.
+    - %batch_dims[2] should be either 32 or 64.
+
+    #### Return modes
+
+    Succeeds if all parameters match their corresponding expected values, and
+    produces a silenceable failure otherwise.
+  }];
+
+  let arguments = (ins
+    TransformHandleTypeInterface:$operand_handle, // 1) The operation to check.
+    TransformParamTypeInterface:$dimension_sizes, // 2) Array of dimension parameters.
+    ArrayAttr:$expected_values                    // 3) Nested array of expected values.
+  );
+
+  let assemblyFormat = [{
+    $operand_handle `,` $dimension_sizes `,` $expected_values attr-dict `:` type($operand_handle) `,` type($dimension_sizes)
+  }];
+
+  let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+}
+
 #endif // IREE_COMPILER_DIALECT_PREPROCESSING_TRANSFORMEXTENSIONS_PREPROCESSINGEXTENSIONS

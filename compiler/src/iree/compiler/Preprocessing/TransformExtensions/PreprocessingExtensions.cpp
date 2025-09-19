@@ -300,27 +300,40 @@ IREE::transform_dialect::MatchContractionOp::matchOperation(
   results.setParams(cast<OpResult>(getKDims()),
                     iterationSizes(contractionDims.k));
 
-  // Get the actual size values for batch/m/n/k dimensions after verifying it's
-  // a contraction operation.
-  linalg::ContractionDimensions contractionDims =
-      linalg::inferContractionDims(linalgOp).value();
-  SmallVector<int64_t> iterationDomain = linalgOp.getStaticLoopRanges();
-  Builder builder(getContext());
+  return DiagnosedSilenceableFailure::success();
+}
 
-  auto iterationSizes = [&](ArrayRef<unsigned> dimIndices) {
-    return llvm::map_to_vector(dimIndices, [&](unsigned dimIdx) -> Attribute {
-      return builder.getI64IntegerAttr(iterationDomain[dimIdx]);
+//===----------------------------------------------------------------------===//
+// MatchSizeEqualsOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+IREE::transform_dialect::MatchSizeEqualsOp::matchOperation(
+    Operation *current, transform::TransformResults &results,
+    transform::TransformState &state) {
+  Location loc = current->getLoc();
+  ArrayRef<transform::Param> actualDimSizes =
+      state.getParams(getDimensionSizes());
+  ArrayAttr targetDimensionSizes = getExpectedValues();
+
+  if (actualDimSizes.size() != targetDimensionSizes.size()) {
+    return emitSilenceableFailure(loc)
+           << "Dimension sizes array and target sizes array have different "
+              "lengths";
+  }
+
+  for (auto [dimParam, targetValuesAttr] :
+       llvm::zip_equal(actualDimSizes, targetDimensionSizes)) {
+    int64_t currentDimSize = cast<IntegerAttr>(dimParam).getInt();
+    ArrayAttr allowedSizes = cast<ArrayAttr>(targetValuesAttr);
+    bool foundMatch = llvm::any_of(allowedSizes, [&](Attribute targetAttr) {
+      return cast<IntegerAttr>(targetAttr).getInt() == currentDimSize;
     });
-  };
-
-  results.setParams(cast<OpResult>(getBatchDims()),
-                    iterationSizes(contractionDims.batch));
-  results.setParams(cast<OpResult>(getMDims()),
-                    iterationSizes(contractionDims.m));
-  results.setParams(cast<OpResult>(getNDims()),
-                    iterationSizes(contractionDims.n));
-  results.setParams(cast<OpResult>(getKDims()),
-                    iterationSizes(contractionDims.k));
+    if (!foundMatch) {
+      return emitSilenceableFailure(loc) << "Dimension size " << currentDimSize
+                                         << " does not match target sizes";
+    }
+  }
 
   return DiagnosedSilenceableFailure::success();
 }
