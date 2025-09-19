@@ -24,6 +24,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/ADT/STLExtras.h"
@@ -754,6 +755,14 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<int64_t> bounds = op.getStaticLoopRanges();
   IREE::GPU::TargetWgpAttr wgp = target.getWgp();
   int64_t reductionSize = bounds[reductionDims.back()];
+  // In case of a scaled contraction op, consider the entire reduction
+  // dimension.
+  if (IREE::LinalgExt::isaScaledContractionOpInterface(op)) {
+    reductionSize = 1;
+    for (unsigned dim : reductionDims) {
+      reductionSize *= bounds[dim];
+    }
+  }
 
   if (ShapedType::isDynamic(reductionSize)) {
     reductionSize = kVectorDistributeReductionSizeToTargetIfDynamic;
