@@ -65,7 +65,12 @@ LayoutAttr::verify(function_ref<mlir::InFlightDiagnostic()> emitError,
   return success();
 }
 
-bool LayoutAttr::isSerialized() const { return true; }
+bool LayoutAttr::isSerialized() const {
+  ArrayRef<Attribute> layouts = getLayouts().getValue();
+  return llvm::all_of(layouts, [](Attribute layout) {
+    return cast<SerializableAttr>(layout).isSerialized();
+  });
+}
 
 bool LayoutAttr::isIdentityLayout() const {
   auto layouts = getLayouts().getAsRange<SerializableAttr>();

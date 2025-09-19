@@ -245,9 +245,8 @@ struct SinkUnsetEncodingOp
     // Propagate the set encoding and generate the new encoding operations.
     rewriter.setInsertionPointAfter(encodingOp);
     FailureOr<IREE::Encoding::PropagationResult> maybeResult =
-        propagationResult.propagateEncoding(
-            rewriter, *propagationEncodings,
-            cast<OpResult>(encodingOp.getResult()));
+        propagationResult.propagateEncoding(rewriter, *propagationEncodings,
+                                            consumerOperand);
     if (failed(maybeResult)) {
       return rewriter.notifyMatchFailure(
           encodingOp, "not able to propagate encodings and find replacement");

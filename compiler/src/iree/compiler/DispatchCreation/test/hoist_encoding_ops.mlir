@@ -321,7 +321,9 @@ util.func public @propagate_unset_encoding_through_generic(%arg0: tensor<?x4096x
 // CHECK:           %[[GENERIC:.+]] = linalg.generic
 // CHECK-SAME:        ins(%[[ARG0]], %[[SET_ENCODING]] :  tensor<?x4096xf32, #[[$ENCODING]]>, tensor<f32, #[[$ENCODING1]]>)
 // CHECK-SAME:        outs(%[[EMPTY]] :  tensor<4096x?xbf16, #[[$ENCODING2]]>)
-// CHECK:           %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[GENERIC]] : tensor<4096x?xbf16, #[[$ENCODING2]]> -> tensor<4096x?xbf16>{%[[ARG2]]}
+// CHECK:           %[[C0:.+]] = arith.constant 0 : index
+// CHECK:           %[[RESULT_DIM:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+// CHECK:           %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[GENERIC]] : tensor<4096x?xbf16, #[[$ENCODING2]]> -> tensor<4096x?xbf16>{%[[RESULT_DIM]]}
 // CHECK:           flow.return %[[UNSET_ENCODING:.+]] : tensor<4096x?xbf16>
 // CHECK:         }
 
@@ -357,7 +359,9 @@ util.func public @propagate_unset_encoding_through_generic_with_scalar(%arg0: te
 // CHECK:         %{{.+}} = flow.dispatch.region -> (tensor<4096x?xf32>{%[[ARG2]]}
 // CHECK:           %[[GENERIC:.+]] = linalg.generic
 // CHECK-SAME:        ins(%[[ARG0]], %[[ARG1]]
-// CHECK:           %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[GENERIC]] : tensor<4096x?xf32, #[[$ENCODING]]> -> tensor<4096x?xf32>{%[[ARG2]]}
+// CHECK:           %[[C1:.+]] = arith.constant 1 : index
+// CHECK:           %[[RESULT_DIM:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+// CHECK:           %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[GENERIC]] : tensor<4096x?xf32, #[[$ENCODING]]> -> tensor<4096x?xf32>{%[[RESULT_DIM]]}
 // CHECK:           return %[[UNSET_ENCODING]]
 
 // -----

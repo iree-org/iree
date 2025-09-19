@@ -23,11 +23,11 @@ namespace {
 /// means that the op can be encoded by casting its types to the encoded types.
 /// This transform adds iree_encoding.set_encoding ops to the operands of the
 /// `op`, and clones the `op` with the new encoded operands and encoded result
-/// types. If the `opResult` is produced by an iree_encoding.unset_encoding op,
-/// and it is consumed by the `op`, then take the source of the unset encoding
-/// instead of re-setting the encoding. If the `opResult` is produced by the
-/// `op`, then do not unset the encoding after cloning the op, because the
-/// encoded result will be used for propagation.
+/// types. If the `propagationSource` comes froman iree_encoding.unset_encoding
+/// op, and it is consumed by the `op`, then take the source of the unset
+/// encoding instead of re-setting the encoding. If the `propagationSource` is
+/// produced by the `op`, then do not unset the encoding after cloning the op,
+/// because the encoded result will be used for propagation.
 ///
 /// Use this function for ops that:
 /// 1. Are encoded by casting their types to the encoded types.
@@ -35,28 +35,27 @@ namespace {
 ///    for propagation, and do not need to re-set the encoding.
 static IREE::Encoding::PropagationResult propagateThroughEncodingCastableOp(
     RewriterBase &builder, Operation *op,
-    IREE::Encoding::PropagationEncoding encodings, OpResult opResult,
-    ArrayRef<SmallVector<Value>> resultDynamicDims) {
+    IREE::Encoding::PropagationEncoding encodings,
+    OpOperand *propagationSource) {
   SmallVector<Value> encodedOperands;
   IREE::Encoding::PropagationResult result;
-  auto maybeUnsetEncodingOp =
-      dyn_cast<IREE::Encoding::UnsetEncodingOp>(opResult.getOwner());
+  auto maybeUnsetEncodingProducer =
+      propagationSource->get().getDefiningOp<IREE::Encoding::UnsetEncodingOp>();
   OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPoint(op);
   for (auto [operand, encoding] :
-       llvm::zip(op->getOperands(), encodings.operandEncodings)) {
+       llvm::zip_equal(op->getOperands(), encodings.operandEncodings)) {
     // Scalar operands do not need encodings.
     auto operandType = dyn_cast<RankedTensorType>(operand.getType());
     if (!operandType) {
       encodedOperands.push_back(operand);
       continue;
     }
-    // If the operand comes from the provided opResult, and the owner of the
-    // opResult is an iree_encoding.unset_encoding op, then we don't need to
-    // set the encoding again, because this opResult is assumed to be the source
-    // of propagation.
-    if (operand == opResult && maybeUnsetEncodingOp) {
-      encodedOperands.push_back(maybeUnsetEncodingOp.getSource());
+    // If the operand comes from the provided producer unset_encoding op, then
+    // we don't need to set the encoding again, because this operand is the
+    // source of propagation.
+    if (operand == propagationSource->get() && maybeUnsetEncodingProducer) {
+      encodedOperands.push_back(maybeUnsetEncodingProducer.getSource());
       continue;
     }
     auto encodedOperandType = operandType.cloneWithEncoding(encoding);
@@ -78,7 +77,7 @@ static IREE::Encoding::PropagationResult propagateThroughEncodingCastableOp(
   }
   SmallVector<Type> encodedResultTypes;
   for (auto [result, encoding] :
-       llvm::zip(op->getResults(), encodings.resultEncodings)) {
+       llvm::zip_equal(op->getResults(), encodings.resultEncodings)) {
     auto resultType = cast<RankedTensorType>(result.getType());
     auto encodedResultType = resultType.cloneWithEncoding(encoding);
     encodedResultTypes.push_back(encodedResultType);
@@ -89,15 +88,19 @@ static IREE::Encoding::PropagationResult propagateThroughEncodingCastableOp(
     // If this encoded result is coming from the source of propagation, we want
     // to return the encoded result.
     OpResult originalResult = op->getOpResult(encodedResult.getResultNumber());
-    if (originalResult == opResult) {
+    if (originalResult == propagationSource->get()) {
       result.replacements.push_back(encodedResult);
       continue;
     }
     // Otherwise, we need to unset the encoding so the types are consistent with
     // the other results' users.
+    SmallVector<OpFoldResult> mixedSizes =
+        tensor::getMixedSizes(builder, op->getLoc(), encodedResult);
+    SmallVector<Value> resultDynamicDims;
+    std::tie(std::ignore, resultDynamicDims) = decomposeMixedValues(mixedSizes);
     auto unsetEncodingOp = IREE::Encoding::UnsetEncodingOp::create(
         builder, op->getLoc(), originalResult.getType(), encodedResult,
-        resultDynamicDims[encodedResult.getResultNumber()]);
+        resultDynamicDims);
     result.generatedEncodingOps.push_back(unsetEncodingOp);
     result.replacements.push_back(unsetEncodingOp.getResult());
   }
@@ -184,13 +187,14 @@ struct LayoutAttrPropagationInterface final
     : IREE::Encoding::EncodingPropagationAttrInterface::ExternalModel<
           LayoutAttrPropagationInterface, IREE::Encoding::LayoutAttr> {
   bool isPropagableUp(Attribute attr, OpResult target) const {
+    auto layoutAttr = cast<IREE::Encoding::LayoutAttr>(attr);
     return TypeSwitch<Operation *, bool>(target.getOwner())
         .Case<tensor::CastOp>([&](auto castOp) {
           // CastOp is propagable if it is casting between compatible shapes,
           // because the dimensions need to be consistent with the
           // user_indexing_maps carried by the encoding. The tensor.cast op
           // verifier already guarantees that the shapes are compatible.
-          return true;
+          return layoutAttr.isSerialized();
         })
         .Default([&](auto) { return false; });
   }
@@ -211,72 +215,27 @@ struct LayoutAttrPropagationInterface final
   }
 };
 
-struct GenericOpPropagationInterface final
+template <typename OpTy>
+struct EncodingCastableOpPropagationInterface final
     : IREE::Encoding::EncodingPropagationOpInterface::ExternalModel<
-          GenericOpPropagationInterface, linalg::GenericOp> {
+          EncodingCastableOpPropagationInterface<OpTy>, OpTy> {
   FailureOr<IREE::Encoding::PropagationResult>
   propagateEncoding(Operation *op, RewriterBase &rewriter,
                     IREE::Encoding::PropagationEncoding encodings,
-                    OpResult opResult) const {
-    OpBuilder::InsertionGuard guard(rewriter);
-    auto genericOp = cast<linalg::GenericOp>(op);
-    return TypeSwitch<Operation *,
-                      FailureOr<IREE::Encoding::PropagationResult>>(
-               opResult.getOwner())
-        .Case<IREE::Encoding::UnsetEncodingOp>(
-            [&](auto encodingOp)
-                -> FailureOr<IREE::Encoding::PropagationResult> {
-              SmallVector<SmallVector<Value>> resultDynamicDims;
-              rewriter.setInsertionPoint(genericOp);
-              for (Value initOperand : genericOp.getDpsInits()) {
-                SmallVector<OpFoldResult> mixedSizes = tensor::getMixedSizes(
-                    rewriter, genericOp.getLoc(), initOperand);
-                SmallVector<Value> dynamicSizes;
-                std::tie(std::ignore, dynamicSizes) =
-                    decomposeMixedValues(mixedSizes);
-                resultDynamicDims.push_back(dynamicSizes);
-              }
-              return propagateThroughEncodingCastableOp(
-                  rewriter, genericOp, encodings, opResult, resultDynamicDims);
-            })
-        .Default([&](auto) { return failure(); });
+                    OpOperand *propagationSource) const {
+    return propagateThroughEncodingCastableOp(rewriter, op, encodings,
+                                              propagationSource);
   }
 };
 
-struct CollapseShapeOpPropagationInterface final
-    : IREE::Encoding::EncodingPropagationOpInterface::ExternalModel<
-          CollapseShapeOpPropagationInterface, tensor::CollapseShapeOp> {
-  FailureOr<IREE::Encoding::PropagationResult>
-  propagateEncoding(Operation *op, RewriterBase &builder,
-                    IREE::Encoding::PropagationEncoding encodings,
-                    OpResult opResult) const {
-    return TypeSwitch<Operation *,
-                      FailureOr<IREE::Encoding::PropagationResult>>(
-               opResult.getOwner())
-        .Case<tensor::CollapseShapeOp>([&](auto collapseOp) {
-          return propagateThroughEncodingCastableOp(builder, collapseOp,
-                                                    encodings, opResult,
-                                                    /*resultDynamicDims=*/{{}});
-        })
-        .Default([&](auto) { return failure(); });
-  }
-};
-
-struct CastOpPropagationInterface final
-    : IREE::Encoding::EncodingPropagationOpInterface::ExternalModel<
-          CastOpPropagationInterface, tensor::CastOp> {
-  FailureOr<IREE::Encoding::PropagationResult>
-  propagateEncoding(Operation *op, RewriterBase &builder,
-                    IREE::Encoding::PropagationEncoding encodings,
-                    OpResult opResult) const {
-    return TypeSwitch<Operation *,
-                      FailureOr<IREE::Encoding::PropagationResult>>(
-               opResult.getOwner())
-        .Case<tensor::CastOp>([&](auto castOp) {
-          return propagateThroughEncodingCastableOp(
-              builder, castOp, encodings, opResult, /*resultDynamicDims=*/{{}});
-        })
-        .Default([&](auto) { return failure(); });
+/// Helper structures that iterates over all Op types in `OpTys` and registers
+/// the associated EncodingPropagationOpInterface.
+template <typename... Ops>
+struct EncodingCastableOpPropagationInterfaceHelper {
+  static void registerOpInterface(MLIRContext *context) {
+    (Ops::template attachInterface<EncodingCastableOpPropagationInterface<Ops>>(
+         *context),
+     ...);
   }
 };
 
@@ -292,13 +251,13 @@ void registerEncodingExternalModels(DialectRegistry &registry) {
   });
   registry.addExtension(
       +[](MLIRContext *ctx, mlir::tensor::TensorDialect *dialect) {
-        tensor::CollapseShapeOp::attachInterface<
-            CollapseShapeOpPropagationInterface>(*ctx);
-        tensor::CastOp::attachInterface<CastOpPropagationInterface>(*ctx);
+        EncodingCastableOpPropagationInterfaceHelper<
+            tensor::CollapseShapeOp, tensor::CastOp>::registerOpInterface(ctx);
       });
   registry.addExtension(
       +[](MLIRContext *ctx, mlir::linalg::LinalgDialect *dialect) {
-        linalg::GenericOp::attachInterface<GenericOpPropagationInterface>(*ctx);
+        EncodingCastableOpPropagationInterfaceHelper<
+            linalg::GenericOp>::registerOpInterface(ctx);
       });
 }
 

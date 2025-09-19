@@ -26,11 +26,12 @@ namespace mlir::iree_compiler::DispatchCreation {
 /// Propagate the set_encoding op up through the `target` using the encoding
 /// propagation interface.
 static LogicalResult
-bubbleUpSetEncodingOp(RewriterBase &rewriter, OpResult target,
+bubbleUpSetEncodingOp(RewriterBase &rewriter, OpOperand *propagationSource,
                       IREE::Encoding::SetEncodingOp encodingOp) {
   auto propagationAttrInterface =
       dyn_cast<IREE::Encoding::EncodingPropagationAttrInterface>(
           encodingOp.getResultType().getEncoding());
+  auto target = cast<OpResult>(propagationSource->get());
   if (!propagationAttrInterface ||
       !propagationAttrInterface.isPropagableUp(target)) {
     return rewriter.notifyMatchFailure(
@@ -60,7 +61,7 @@ bubbleUpSetEncodingOp(RewriterBase &rewriter, OpResult target,
   // Propagate the set encoding and generate the new encoding operations.
   FailureOr<IREE::Encoding::PropagationResult> maybeResult =
       propagationResult.propagateEncoding(rewriter, *propagationEncodings,
-                                          target);
+                                          propagationSource);
   if (failed(maybeResult)) {
     return rewriter.notifyMatchFailure(
         encodingOp, "not able to propagate encodings and find replacement");
@@ -71,11 +72,10 @@ bubbleUpSetEncodingOp(RewriterBase &rewriter, OpResult target,
 
 namespace {
 
-/// Pattern to swap `tensor.cast` -> `iree_encoding.set_encoding`
+/// Pattern to swap `tensor.cast` -> `iree_encoding.set_encoding`.
 struct SwapEncodingOpWithTensorCastOp
     : public OpRewritePattern<IREE::Encoding::SetEncodingOp> {
-  using Base = OpRewritePattern<IREE::Encoding::SetEncodingOp>;
-  using Base::Base;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp,
                                 PatternRewriter &rewriter) const override {
     auto castOp = encodingOp.getSource().getDefiningOp<tensor::CastOp>();
@@ -83,8 +83,8 @@ struct SwapEncodingOpWithTensorCastOp
       return rewriter.notifyMatchFailure(encodingOp,
                                          "expected a tensor.cast producer");
     }
-    auto target = cast<OpResult>(castOp.getResult());
-    return bubbleUpSetEncodingOp(rewriter, target, encodingOp);
+    OpOperand &propagationSource = encodingOp.getSourceMutable();
+    return bubbleUpSetEncodingOp(rewriter, &propagationSource, encodingOp);
   }
 };
 
