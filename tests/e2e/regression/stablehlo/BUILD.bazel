@@ -118,7 +118,6 @@ iree_lit_test_suite(
         exclude = CPU_SPECIFIC_TESTS + CHECK_TESTS,
     ),
     cfg = "//tools:lit.cfg.py",
-    compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
     tools = [
         "//tools:iree-run-mlir",
         "@llvm-project//llvm:FileCheck",
