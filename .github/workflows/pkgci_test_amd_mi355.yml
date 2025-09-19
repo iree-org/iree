@@ -50,6 +50,10 @@ jobs:
         with:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
+      - name: Check out repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          submodules: false
       - name: Setup base venv
         run: |
            python -m venv ${VENV_DIR}
@@ -57,10 +61,6 @@ jobs:
             ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
               --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
               --fetch-gh-workflow=${{ inputs.artifact_run_id }}
-      - name: Check out repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          submodules: false
       - name: Check out runtime submodules
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: Install dependencies
