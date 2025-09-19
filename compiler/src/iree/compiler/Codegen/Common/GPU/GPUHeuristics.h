@@ -80,11 +80,10 @@ struct GPUMMASchedule {
   // Constructor for multi M, N, K dim schedules.
   GPUMMASchedule(IREE::Codegen::InnerTileDescAttrInterface kind,
                  int64_t mIntrinsicSize, int64_t nIntrinsicSize,
-                 int64_t kIntrinsicSize, SmallVector<int64_t> mSubgroupCounts,
-                 SmallVector<int64_t> nSubgroupCounts,
-                 SmallVector<int64_t> mTileSizes,
-                 SmallVector<int64_t> nTileSizes,
-                 SmallVector<int64_t> kTileSizes)
+                 int64_t kIntrinsicSize, ArrayRef<int64_t> mSubgroupCounts,
+                 ArrayRef<int64_t> nSubgroupCounts,
+                 ArrayRef<int64_t> mTileSizes, ArrayRef<int64_t> nTileSizes,
+                 ArrayRef<int64_t> kTileSizes)
       : mmaKind(kind), mSize(mIntrinsicSize), nSize(nIntrinsicSize),
         kSize(kIntrinsicSize), mSubgroupCounts(mSubgroupCounts),
         nSubgroupCounts(nSubgroupCounts), mTileSizes(mTileSizes),

@@ -1379,7 +1379,6 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   if (failed(maybeBounds)) {
     return failure();
   }
-
   ArrayRef<int64_t> bounds = maybeBounds.value();
 
   auto opInfo =
@@ -1387,31 +1386,54 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
           op.getQueryMap(), op.getKeyMap(), op.getValueMap(), op.getOutputMap())
           .value();
 
-  auto getDimAndSize = [&bounds](ArrayRef<int64_t> dims)
-      -> std::pair<std::optional<int64_t>, int64_t> {
-    std::optional<int64_t> dim;
-    int64_t size = 1;
-    if (!dims.empty()) {
-      dim = dims.back();
-      size = bounds[dim.value()];
-    }
-    return {dim, size};
+  auto getDimBounds = [&](ArrayRef<int64_t> dims) -> SmallVector<int64_t> {
+    return llvm::map_to_vector(dims, [&](int64_t dim) { return bounds[dim]; });
   };
-  auto [mDim, mDimSize] = getDimAndSize(opInfo.getMDims());
-  auto [k1Dim, k1DimSize] = getDimAndSize(opInfo.getK1Dims());
-  auto [k2Dim, k2DimSize] = getDimAndSize(opInfo.getK2Dims());
-  auto [nDim, nDimSize] = getDimAndSize(opInfo.getNDims());
 
-  // Dynamic dims are expected to be taken care of earlier in the pipeline.
-  if (ShapedType::isDynamic(mDimSize) || ShapedType::isDynamic(k1DimSize) ||
-      ShapedType::isDynamic(k2DimSize) || ShapedType::isDynamic(nDimSize)) {
+  SmallVector<int64_t> mBounds = getDimBounds(opInfo.getMDims());
+  int64_t mSize = std::accumulate(mBounds.begin(), mBounds.end(), (int64_t)1,
+                                  [](int64_t a, int64_t b) -> int64_t {
+                                    if (ShapedType::isDynamic(a) ||
+                                        ShapedType::isDynamic(b)) {
+                                      return ShapedType::kDynamic;
+                                    }
+                                    return a * b;
+                                  });
+  // Bail out on skinny M dimension. This will be handled by the warp reduction
+  // pipeline.
+  if (!ShapedType::isDynamic(mSize) && mSize <= kVerySkinnyDimThreshold) {
+    LDBG() << "Bailing out due to skinny M dimension: " << mSize;
     return failure();
   }
 
-  // Bail out on skinny attention.
-  if (mDimSize <= kVerySkinnyDimThreshold) {
+  // TODO: Add dynamic shape support for inner most dims, this is mostly
+  // possible in VectorDistribute through masking, just not tested enough to
+  // enable it.
+  if (ShapedType::isDynamic(bounds[opInfo.getK1Dims().back()]) ||
+      ShapedType::isDynamic(bounds[opInfo.getK2Dims().back()]) ||
+      ShapedType::isDynamic(bounds[opInfo.getNDims().back()]) ||
+      ShapedType::isDynamic(bounds[opInfo.getMDims().back()])) {
     return failure();
   }
+
+  // Gather all static M, N, and K dimensions to deduce the MMASchedule. Dynamic
+  // dimensions will be tiled to 1 in workgroup tiling, so they are ignored when
+  // computing an MMA schedule.
+  auto getStaticDims = [&](ArrayRef<int64_t> dims) {
+    SmallVector<int64_t> staticDims;
+    for (int64_t dim : dims) {
+      if (!ShapedType::isDynamic(bounds[dim])) {
+        staticDims.push_back(dim);
+      }
+    }
+    return staticDims;
+  };
+  SmallVector<int64_t> batchDims, mDims, k2Dims, k1Dims, nDims;
+  batchDims = getStaticDims(opInfo.getBatchDims());
+  mDims = getStaticDims(opInfo.getMDims());
+  k2Dims = getStaticDims(opInfo.getK2Dims());
+  k1Dims = getStaticDims(opInfo.getK1Dims());
+  nDims = getStaticDims(opInfo.getNDims());
 
   Value qMatrix = op.getQuery();
   Value kMatrix = op.getKey();
@@ -1452,16 +1474,18 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   Type vElementType = getElementTypeOrSelf(vMatrix);
   Type f32Type = b.getF32Type();
   GPUMatmulShapeType qkMatmul{
-      /*m=*/mDimSize,
-      /*n=*/k2DimSize,
-      /*k=*/k1DimSize,
+      /*m=*/getDimBounds(mDims),
+      /*n=*/getDimBounds(nDims),
+      /*k=*/getDimBounds(k1Dims),
+      /*batch=*/getDimBounds(batchDims),
       /*lhsType=*/qElementType,
       /*rhsType=*/kElementType,
       /*accType=*/f32Type,
   };
-  GPUMatmulShapeType pvMatmul{/*m=*/mDimSize,
-                              /*n=*/nDimSize,
-                              /*k=*/k2DimSize,
+  GPUMatmulShapeType pvMatmul{/*m=*/getDimBounds(mDims),
+                              /*n=*/getDimBounds(nDims),
+                              /*k=*/getDimBounds(k2Dims),
+                              /*batch=*/getDimBounds(batchDims),
                               /*lhsType=*/vElementType,
                               /*rhsType=*/vElementType,
                               /*accType=*/f32Type};
@@ -1473,18 +1497,17 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   LDBG() << "Attention Vector Distribution Config";
 
   // Infer if Q, K and V are transposed to help generate better schedule.
-  bool transposedQ =
-      k1Dim != llvm::cast<AffineDimExpr>(op.getQueryMap().getResults().back())
-                   .getPosition();
-  bool transposedK =
-      k1Dim != llvm::cast<AffineDimExpr>(op.getKeyMap().getResults().back())
-                   .getPosition();
-  bool transposedV =
-      k2Dim != llvm::cast<AffineDimExpr>(op.getValueMap().getResults().back())
-                   .getPosition();
+  bool transposedQ = k1Dims.back() != llvm::cast<AffineDimExpr>(
+                                          op.getQueryMap().getResults().back())
+                                          .getPosition();
+  bool transposedK = k1Dims.back() != llvm::cast<AffineDimExpr>(
+                                          op.getKeyMap().getResults().back())
+                                          .getPosition();
+  bool transposedV = k2Dims.back() != llvm::cast<AffineDimExpr>(
+                                          op.getValueMap().getResults().back())
+                                          .getPosition();
 
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
-
   // First try to find a schedule with an exactly matching intrinsic.
   std::optional<std::pair<GPUMMASchedule, GPUMMASchedule>> attSchedule =
       deduceAttentionSchedule(qkMatmul, pvMatmul, intrinsics, pvMatmulSeeds,
@@ -1517,11 +1540,16 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
 
   SmallVector<int64_t> workgroupTileSizes(opInfo.getDomainRank(), 0);
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
+  IREE::GPU::Basis subgroupBasis = {
+      SmallVector<int64_t>(opInfo.getDomainRank(), 1),
+      // Distribute subgroups from outer to inner. Mostly an arbitrary choice.
+      // We can change this if it matters.
+      llvm::to_vector(llvm::seq<int64_t>(opInfo.getDomainRank()))};
+
   // Tile all batch dimensions with unit size.
   for (int64_t batch : opInfo.getBatchDims()) {
     workgroupTileSizes[batch] = 1;
   }
-
   // Tile all m, n, and k2 dimensions to 1 except the innermost. Unit dims
   // from this tiling are folded before vectorization. k1 dimension cannot be
   // tiled, so we leave it.
@@ -1536,19 +1564,30 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   }
 
   // Compute the M/N dimension tile size by multiply subgroup information.
-  if (mDim.has_value()) {
-    workgroupTileSizes[mDim.value()] = pvSchedule.mSubgroupCounts[0] *
-                                       pvSchedule.mTileSizes[0] *
-                                       pvSchedule.mSize;
+  for (auto [i, mDim] : llvm::enumerate(mDims)) {
+    workgroupTileSizes[mDim] =
+        pvSchedule.mSubgroupCounts[i] * pvSchedule.mTileSizes[i];
+    // Multiply by the intrinsic shape for the inner most dim.
+    if (i == mDims.size() - 1) {
+      workgroupTileSizes[mDim] *= pvSchedule.mSize;
+    }
+    subgroupBasis.counts[mDim] = pvSchedule.mSubgroupCounts[i];
   }
-  if (nDim.has_value()) {
-    workgroupTileSizes[nDim.value()] = pvSchedule.nSubgroupCounts[0] *
-                                       pvSchedule.nTileSizes[0] *
-                                       pvSchedule.nSize;
+  for (auto [i, nDim] : llvm::enumerate(nDims)) {
+    workgroupTileSizes[nDim] =
+        pvSchedule.nSubgroupCounts[i] * pvSchedule.nTileSizes[i];
+    // Multiply by the intrinsic shape for the inner most dim.
+    if (i == nDims.size() - 1) {
+      workgroupTileSizes[nDim] *= pvSchedule.nSize;
+    }
+    subgroupBasis.counts[nDim] = pvSchedule.nSubgroupCounts[i];
   }
-  if (k2Dim.has_value()) {
-    reductionTileSizes[k2Dim.value()] =
-        pvSchedule.kTileSizes[0] * pvSchedule.kSize;
+  for (auto [i, k2Dim] : llvm::enumerate(k2Dims)) {
+    reductionTileSizes[k2Dim] = pvSchedule.kTileSizes[i];
+    // Multiply by the intrinsic shape for the inner most dim.
+    if (i == k2Dims.size() - 1) {
+      reductionTileSizes[k2Dim] *= pvSchedule.kSize;
+    }
   }
 
   SmallVector<NamedAttribute, 2> attrs = {
@@ -1558,18 +1597,6 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
 
   SmallVector<NamedAttribute, 2> qkConfig;
   SmallVector<NamedAttribute, 2> pvConfig;
-
-  IREE::GPU::Basis subgroupBasis = {
-      SmallVector<int64_t>(opInfo.getDomainRank(), 1),
-      // Distribute subgroups from outer to inner. Mostly an arbitrary choice.
-      // We can change this if it matters.
-      llvm::to_vector(llvm::seq<int64_t>(opInfo.getDomainRank()))};
-  if (mDim.has_value()) {
-    subgroupBasis.counts[mDim.value()] = pvSchedule.mSubgroupCounts[0];
-  }
-  if (nDim.has_value()) {
-    subgroupBasis.counts[nDim.value()] = pvSchedule.nSubgroupCounts[0];
-  }
 
   // Configuring for qk matmul.
   IREE::GPU::appendPromotedOperandsList(context, qkConfig, {0, 1});
