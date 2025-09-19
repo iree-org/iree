@@ -551,4 +551,4 @@ func.func @test_dyn_reduction() {
 }
 
 //      CHECK: #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
-// CHECK-SAME: workgroup_size = [2, 1, 1] subgroup_size = 64,
+// CHECK-SAME: workgroup_size = [64, 1, 1] subgroup_size = 64,
