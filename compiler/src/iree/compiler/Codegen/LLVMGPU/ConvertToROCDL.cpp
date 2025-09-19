@@ -264,8 +264,8 @@ struct ConvertToROCDLPass final
       vector::populateVectorContractLoweringPatterns(
           patterns, options.vectorContractLowering);
 
-      vector::populateVectorFromElementsLoweringPatterns(patterns);
-      vector::populateVectorToElementsLoweringPatterns(patterns);
+      vector::populateVectorFromElementsUnrollPatterns(patterns);
+      vector::populateVectorToElementsUnrollPatterns(patterns);
       vector::populateVectorGatherLoweringPatterns(patterns);
       vector::populateVectorMaskOpLoweringPatterns(patterns);
       // We currently always use 64 bit indices, thus ensure the bit width of
