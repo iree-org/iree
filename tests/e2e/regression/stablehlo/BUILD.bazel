@@ -38,7 +38,8 @@ NON_CHECK_TESTS = [
 
 iree_check_single_backend_test_suite(
     name = "check_stablehlo_regression_llvm-cpu",
-    srcs = enforce_glob(CHECK_TESTS + CPU_SPECIFIC_TESTS,
+    srcs = enforce_glob(
+        CHECK_TESTS + CPU_SPECIFIC_TESTS,
         include = ["*.mlir"],
         exclude = NON_CHECK_TESTS,
     ),
@@ -49,7 +50,8 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_stablehlo_regression_vmvx",
-    srcs = enforce_glob(CHECK_TESTS,
+    srcs = enforce_glob(
+        CHECK_TESTS,
         include = ["*.mlir"],
         exclude = CPU_SPECIFIC_TESTS + NON_CHECK_TESTS,
     ),
@@ -59,7 +61,8 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_stablehlo_regression_vulkan-spirv",
-    srcs = enforce_glob(CHECK_TESTS,
+    srcs = enforce_glob(
+        CHECK_TESTS,
         include = ["*.mlir"],
         exclude = CPU_SPECIFIC_TESTS + NON_CHECK_TESTS,
     ),
@@ -69,7 +72,8 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_stablehlo_regression_cuda",
-    srcs = enforce_glob(CHECK_TESTS,
+    srcs = enforce_glob(
+        CHECK_TESTS,
         include = ["*.mlir"],
         exclude = CPU_SPECIFIC_TESTS + NON_CHECK_TESTS,
     ),
@@ -87,7 +91,8 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_stablehlo_regression_hip",
-    srcs = enforce_glob(CHECK_TESTS,
+    srcs = enforce_glob(
+        CHECK_TESTS,
         include = ["*.mlir"],
         exclude = CPU_SPECIFIC_TESTS + NON_CHECK_TESTS,
     ),
@@ -105,10 +110,10 @@ iree_check_single_backend_test_suite(
     target_backend = "rocm",
 )
 
-
 iree_lit_test_suite(
     name = "lit_stablehlo_regression",
-    srcs = enforce_glob(NON_CHECK_TESTS,
+    srcs = enforce_glob(
+        NON_CHECK_TESTS,
         include = ["*.mlir"],
         exclude = CPU_SPECIFIC_TESTS + NON_CHECK_TESTS,
     ),
