@@ -757,28 +757,30 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     setLoweringConfig(linalgOp, reductionConfig);
   }
 
-  // TODO(newling) this needs updating for the non-contiguous reduction
-  // dimension case.
-  //
   // TODO(newling) This needs a major overhaul.
   auto getParallelConfig =
-      [lastReductionSize, threadReductionElements, &b, context,
-       partialReduction,
-       subgroupSize](linalg::LinalgOp lop) -> IREE::GPU::LoweringConfigAttr {
-    auto bounds = lop.getStaticLoopRanges();
-    auto numPllLoops = bounds.size();
+      [sharedWgpTiles, lastReductionSize, partialReduction,
+       threadReductionElements,
+       subgroupSize](linalg::LinalgOp op) -> IREE::GPU::LoweringConfigAttr {
+    MLIRContext *context = op.getContext();
+    Builder b(context);
 
-    auto backDim = numPllLoops - 1;
-    auto pllDimSize = bounds.back();
-    if (ShapedType::isDynamic(pllDimSize)) {
-      pllDimSize = kVectorDistributeReductionSizeToTargetIfDynamic;
-    }
+    SmallVector<unsigned> parallelDims;
+    SmallVector<unsigned> reductionDims;
+    op.getParallelDims(parallelDims);
+    op.getReductionDims(reductionDims);
 
-    SmallVector<int64_t> loopIota(numPllLoops);
-    std::iota(loopIota.begin(), loopIota.end(), 0);
+    SmallVector<int64_t> bounds = op.getStaticLoopRanges();
 
-    SmallVector<int64_t> pllWorkgroups(numPllLoops, 1);
-    pllWorkgroups.back() = 0;
+    SmallVector<int64_t> threadTileSizes(op.getNumLoops(), 0);
+    SmallVector<int64_t> threadCounts(op.getNumLoops(), 1);
+    SmallVector<int64_t> subGroupCounts(op.getNumLoops(), 1);
+    SmallVector<int64_t> mapping(op.getNumLoops());
+    std::iota(mapping.begin(), mapping.end(), 0);
+    SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 1);
+
+    SmallVector<int64_t> workgroupTileSizes = sharedWgpTiles;
+    workgroupTileSizes.resize(op.getNumLoops(), 0);
 
     const int64_t reductionTileSize =
         llvm::APIntOps::GreatestCommonDivisor(
@@ -794,37 +796,28 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     const int64_t subgroupBasis = std::max<int64_t>(
         reductionTileSize / (threadBasis * threadReductionElements), 1);
 
-    // For the shared dimensions, set the reduction tile sizes to be zero.
-    SmallVector<int64_t> reductionTileSizes;
-    for (int64_t i = 0; i < numPllLoops; i++) {
-      reductionTileSizes.push_back(0); // sharedWgpTiles[i] > 0 ? 0 : 1);
-    }
-    reductionTileSizes[backDim] = reductionTileSize;
-
-    SmallVector<int64_t> threadTileSizes(numPllLoops, 0);
-    threadTileSizes[backDim] = threadReductionElements;
-
-    SmallVector<int64_t> threadCounts(numPllLoops, 1);
-    threadCounts[backDim] = threadBasis;
-
-    SmallVector<int64_t> subGroupCounts(numPllLoops, 1);
-    subGroupCounts[backDim] = subgroupBasis;
+    reductionTileSizes[parallelDims.back()] = reductionTileSize;
+    threadTileSizes[parallelDims.back()] = threadReductionElements;
+    threadCounts[parallelDims.back()] = threadBasis;
+    subGroupCounts[parallelDims.back()] = subgroupBasis;
 
     ArrayAttr subgroupBasisAttr = b.getArrayAttr(
-        {b.getI64ArrayAttr(subGroupCounts), b.getI64ArrayAttr(loopIota)});
+        {b.getI64ArrayAttr(subGroupCounts), b.getI64ArrayAttr(mapping)});
 
     ArrayAttr laneBasisAttr = b.getArrayAttr(
-        {b.getI64ArrayAttr(threadCounts), b.getI64ArrayAttr(loopIota)});
+        {b.getI64ArrayAttr(threadCounts), b.getI64ArrayAttr(mapping)});
 
-    NamedAttribute pllConfigAttrs[] = {
-        NamedAttribute("workgroup", b.getI64ArrayAttr(pllWorkgroups)),
+    NamedAttribute configAttrs[] = {
+        NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
         NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes)),
         NamedAttribute("thread", b.getI64ArrayAttr(threadTileSizes)),
         NamedAttribute("lane_basis", laneBasisAttr),
         NamedAttribute("subgroup_basis", subgroupBasisAttr)};
-    const auto config = b.getDictionaryAttr(pllConfigAttrs);
 
-    return IREE::GPU::LoweringConfigAttr::get(context, config);
+    auto configDict = b.getDictionaryAttr(configAttrs);
+    auto loweringConfig =
+        IREE::GPU::LoweringConfigAttr::get(context, configDict);
+    return loweringConfig;
   };
 
   if (!parallelOpsToConfigure.empty()) {

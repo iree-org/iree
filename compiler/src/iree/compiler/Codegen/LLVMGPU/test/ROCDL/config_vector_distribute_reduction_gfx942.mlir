@@ -173,7 +173,7 @@ func.func @test_multiple_reduction() {
 // CHECK-SAME:    outs(%{{.*}} : tensor<2x32x10x16384xf32>)
 // CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
 // CHECK-SAME:              lane_basis = {{\[}}[1, 1, 1, 64], [0, 1, 2, 3]]
-// CHECK-SAME:              reduction = [0, 0, 0, 8192],
+// CHECK-SAME:              reduction = [1, 1, 1, 8192],
 // CHECK-SAME:              subgroup_basis = {{\[}}[1, 1, 1, 16], [0, 1, 2, 3]],
 // CHECK-SAME:              thread = [0, 0, 0, 8],
 
@@ -247,7 +247,7 @@ func.func @test_multiple_stores(%arg0: !iree_tensor_ext.dispatch.tensor<readonly
 //       CHECK:   linalg.generic
 //  CHECK-SAME:      attrs =  {lowering_config = #iree_gpu.lowering_config<{
 //  CHECK-SAME:               lane_basis = {{\[}}[1, 64], [0, 1]],
-//  CHECK-SAME:               reduction = [0, 4096],
+//  CHECK-SAME:               reduction = [1, 4096],
 //  CHECK-SAME:               subgroup_basis = {{\[}}[1, 16], [0, 1]],
 //  CHECK-SAME:               thread = [0, 4],
 //  CHECK-SAME:               workgroup = [1, 0]
@@ -527,25 +527,70 @@ func.func @non_contiguous_reduction_example(%arg0: !TA, %arg1: !TB, %arg2: !DTB)
 // -----
 
 
+// CHECK-LABEL: what_should_happen_1
+
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map3 = affine_map<(d0, d1, d2) -> (d0)>
 #map4 = affine_map<(d0, d1, d2) -> (d0, d1)>
-module {
-  func.func @foo(%arg0: tensor<320xf32>, %arg1: tensor<320x64xf32>, %arg2: tensor<320x64x5120xf32>, %arg3: tensor<320x64x5120xf32>, %arg4: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<320x64x5120xf32>>) {
-    %0 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]} ins(%arg1 : tensor<320x64xf32>) outs(%arg0 : tensor<320xf32>) {
-    ^bb0(%in: f32, %out: f32):
-      %2 = arith.addf %in, %out : f32
-      linalg.yield %2 : f32
-    } -> tensor<320xf32>
-    %1 = linalg.generic {indexing_maps = [#map2, #map3, #map4, #map2], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg2, %0, %arg1 : tensor<320x64x5120xf32>, tensor<320xf32>, tensor<320x64xf32>) outs(%arg3 : tensor<320x64x5120xf32>) {
-    ^bb0(%in: f32, %in_0: f32, %in_1: f32, %out: f32):
-      %2 = arith.addf %in, %in_0 : f32
-      %3 = arith.addf %2, %in_1 : f32
-      linalg.yield %3 : f32
-    } -> tensor<320x64x5120xf32>
-    iree_tensor_ext.dispatch.tensor.store %1, %arg4, offsets = [0, 0, 0], sizes = [320, 64, 5120], strides = [1, 1, 1] : tensor<320x64x5120xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<320x64x5120xf32>>
-    return
-  }
+func.func @what_should_happen_1(%arg0: tensor<320xf32>, %arg1: tensor<320x64xf32>, %arg2: tensor<320x64x5120xf32>, %arg3: tensor<320x64x5120xf32>, %arg4: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<320x64x5120xf32>>) {
+  %0 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]} ins(%arg1 : tensor<320x64xf32>) outs(%arg0 : tensor<320xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %2 = arith.addf %in, %out : f32
+    linalg.yield %2 : f32
+  } -> tensor<320xf32>
+  %1 = linalg.generic {indexing_maps = [#map2, #map3, #map4, #map2], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg2, %0, %arg1 : tensor<320x64x5120xf32>, tensor<320xf32>, tensor<320x64xf32>) outs(%arg3 : tensor<320x64x5120xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %in_1: f32, %out: f32):
+    %2 = arith.addf %in, %in_0 : f32
+    %3 = arith.addf %2, %in_1 : f32
+    linalg.yield %3 : f32
+  } -> tensor<320x64x5120xf32>
+  iree_tensor_ext.dispatch.tensor.store %1, %arg4, offsets = [0, 0, 0], sizes = [320, 64, 5120], strides = [1, 1, 1] : tensor<320x64x5120xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<320x64x5120xf32>>
+  return
+}
+
+// -----
+
+!T4567 = tensor<4x5x6x7xf32>
+!DT4567 = !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4x5x6x7xf32>>
+!T45 = tensor<4x5xf32>
+!T67 = tensor<6x7xf32>
+!T1045 = tensor<10x4x5xf32>
+!T1067 = tensor<10x6x7xf32>
+
+#map44 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#map33 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map32 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map42_0 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+#map42_1 = affine_map<(d0, d1, d2, d3) -> (d2, d3)>
+
+
+// CHECK-LABEL: what_should_happen_2
+func.func @what_should_happen_2(%arg0 : !T4567, %arg1 : !T45, %arg2 : !T67, %arg3 : !T1045, %arg4 : !T1067, %arg5 : !DT4567) {
+
+  // Step 1: reduce T1045 (arg3) into T45 (arg1)
+  %red0 = linalg.generic {indexing_maps = [#map33, #map32], iterator_types = ["reduction", "parallel", "parallel"]} ins(%arg3 : !T1045) outs(%arg1 : !T45) {
+  ^bb0(%in: f32, %out: f32):
+    %1 = arith.addf %in, %out : f32
+    linalg.yield %1 : f32
+  } -> !T45
+
+  // Step 2: reduce T1067 (arg4) into T67 (arg2)
+  %red1 = linalg.generic {indexing_maps = [#map33, #map32], iterator_types = ["reduction", "parallel", "parallel"]} ins(%arg4 : !T1067) outs(%arg2 : !T67) {
+  ^bb0(%in: f32, %out: f32):
+    %1 = arith.addf %in, %out : f32
+    linalg.yield %1 : f32
+  } -> !T67
+
+  // Step 3: elementwise add the results of step 1 and step 2 and T4567 (arg0)
+  %sum = linalg.generic {indexing_maps = [#map44, #map42_0, #map42_1, #map44], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg0, %red0, %red1 : !T4567, !T45, !T67) outs(%arg0 : !T4567) {
+  ^bb0(%in: f32, %in_0: f32, %in_1: f32, %out: f32):
+    %1 = arith.addf %in, %in_0 : f32
+    %2 = arith.addf %1, %in_1 : f32
+    linalg.yield %2 : f32
+  } -> !T4567
+
+  iree_tensor_ext.dispatch.tensor.store %sum, %arg5, offsets = [0, 0, 0, 0], sizes = [4, 5, 6, 7], strides = [1, 1, 1, 1] : !T4567 -> !DT4567
+  return
 }
