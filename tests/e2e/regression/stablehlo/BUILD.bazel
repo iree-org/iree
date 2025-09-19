@@ -118,8 +118,12 @@ iree_lit_test_suite(
         exclude = CPU_SPECIFIC_TESTS + CHECK_TESTS,
     ),
     cfg = "//tools:lit.cfg.py",
+    tags = [
+        "hostonly",
+    ],
     tools = [
         "//tools:iree-run-mlir",
+        "@llvm-project//lld",
         "@llvm-project//llvm:FileCheck",
     ],
 )
