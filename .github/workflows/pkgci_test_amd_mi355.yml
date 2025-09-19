@@ -65,7 +65,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install gh
-          # Install TheRock
+          # Install ROCm from TheRock's preview releases.
+          # See https://github.com/ROCm/TheRock/blob/main/RELEASES.md
           sudo apt install -y gfortran build-essential binutils
           python -m pip install \
             --index-url https://d2awnip2yjpvqn.cloudfront.net/v2/gfx950-dcgpu/ \
