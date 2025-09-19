@@ -225,4 +225,37 @@ def MatchContractionOp : Op<Transform_Dialect, "iree.match.is_contraction",
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
+def MatchSizeEqualsOp : Op<Transform_Dialect, "iree.match.size_equals",
+    [MatchOpInterface,
+     SingleOpMatcher,
+     MemoryEffectsOpInterface]> {
+  let summary = [{Check whether a single transform parameter matches expected size values.}];
+  let description = [{
+    Matches a single transform parameter (dimension size) against expected values.
+    The parameter can match any of the provided expected values.
+
+    Example: %M, [4096, 2048]
+    This means the M dimension can be 4096 or 2048.
+
+    #### Return modes
+
+    Succeeds if the parameter matches one of the expected values, and
+    produces a silenceable failure otherwise.
+  }];
+
+  let arguments = (ins
+    TransformHandleTypeInterface:$operand_handle, // 1) The operation to check.
+    TransformParamTypeInterface:$size,            // 2) Single dimension size.
+    I64ArrayAttr:$expected_values                 // 3) Expected values.
+  );
+
+  let assemblyFormat = [{
+    $operand_handle `,` $size `,` $expected_values attr-dict `:` type($operand_handle) `,` type($size)
+  }];
+
+  let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+}
+
 #endif // IREE_COMPILER_DIALECT_PREPROCESSING_TRANSFORMEXTENSIONS_PREPROCESSINGEXTENSIONS

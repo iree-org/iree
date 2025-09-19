@@ -332,6 +332,42 @@ IREE::transform_dialect::MatchContractionOp::matchOperation(
 }
 
 //===----------------------------------------------------------------------===//
+// MatchSizeEqualsOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+IREE::transform_dialect::MatchSizeEqualsOp::matchOperation(
+    Operation *current, transform::TransformResults &results,
+    transform::TransformState &state) {
+  ArrayAttr expectedValuesAttr = getExpectedValues();
+  assert(expectedValuesAttr && "expected_values attribute should not be null");
+
+  SmallVector<int64_t> expectedValues =
+      llvm::to_vector(llvm::map_range(expectedValuesAttr, [](Attribute attr) {
+        return cast<IntegerAttr>(attr).getInt();
+      }));
+
+  OpResult sizeResult = cast<OpResult>(getSize());
+  ArrayRef<Attribute> paramValues = state.getParams(sizeResult);
+
+  // Handle empty parameter case (e.g., empty batch dimension for regular
+  // matmul).
+  if (paramValues.empty()) {
+    return emitSilenceableFailure(current->getLoc())
+           << "No parameter values found for size result";
+  }
+
+  int64_t actualSize = cast<IntegerAttr>(paramValues[0]).getInt();
+  if (!llvm::is_contained(expectedValues, actualSize)) {
+    return emitSilenceableFailure(current->getLoc())
+           << "Size " << actualSize << " not in expected values "
+           << expectedValues;
+  }
+
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===----------------------------------------------------------------------===//
 // MatchCastCompatibleTypesOp
 //===----------------------------------------------------------------------===//
 
