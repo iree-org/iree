@@ -120,7 +120,7 @@ struct FuseEncodingOpsIntoDispatchRegionsPass
     }
 
     // Dynamic dims may have dominance issues after pulling encoding ops into
-    // producer dispatch regions, so we need to resolve tensor.dim ops. Also
+    // producer dispatch regions, so we need to resolve tensor.dim ops., Also
     // run the canonicalization patterns to remove redundantly returned results.
     GreedyRewriteConfig config;
     config.enableConstantCSE(false);
