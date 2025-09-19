@@ -23,7 +23,6 @@ jobs:
   test_mi355:
     runs-on: linux-mi35x-1gpu-ossci-iree-org
     timeout-minutes: 60
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       BUILD_DIR: build-tests
@@ -51,10 +50,13 @@ jobs:
         with:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
-      - name: Create Python venv
+      - name: Setup base venv
         run: |
            python -m venv ${VENV_DIR}
            source ${VENV_DIR}/bin/activate
+            ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
+              --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
+              --fetch-gh-workflow=${{ inputs.artifact_run_id }}
       - name: Check out repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
@@ -69,8 +71,11 @@ jobs:
           # See https://github.com/ROCm/TheRock/blob/main/RELEASES.md
           sudo apt install -y gfortran build-essential binutils
           python -m pip install \
-            --index-url https://d2awnip2yjpvqn.cloudfront.net/v2/gfx950-dcgpu/ \
-            rocm[libraries,devel]
+            --index-url https://rocm.nightlies.amd.com/v2/gfx950-dcgpu/ \
+            rocm==7.0.0rc20250917 \
+            rocm[libraries]==7.0.0rc20250917 \
+            rocm[devel]==7.0.0rc20250917
+          python -m pip freeze | grep rocm
 
           # Set environment variables
           export ROCM_PATH=$(python -m rocm_sdk path --root)
@@ -82,11 +87,6 @@ jobs:
         with:
           name: linux_x86_64_release_packages
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
-      - name: Setup base venv
-        run: |
-          ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
-            --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
-            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
 
       - name: Build tests
         run: ./build_tools/pkgci/build_tests_using_package.sh ${VENV_DIR}/bin
