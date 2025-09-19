@@ -193,7 +193,6 @@ bool FusionGroup::wouldExceedOperandLimit(Operation *newOp) const {
             return user != newOp && !loopMaps.contains(user);
           })) {
         ++numResults;
-        break;
       }
     }
   };
