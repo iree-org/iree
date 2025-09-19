@@ -128,8 +128,11 @@ iree_lit_test_suite(
   SRCS
     "globals_ml_program.mlir"
   TOOLS
+    ${IREE_LLD_TARGET}
     FileCheck
     iree-run-mlir
+  LABELS
+    "hostonly"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
