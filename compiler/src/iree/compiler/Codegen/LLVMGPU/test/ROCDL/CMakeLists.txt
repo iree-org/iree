@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "annotate_kernel_for_translation.mlir"
     "buffer_instructions_optimization.mlir"
+    "config_direct_conv_tile_and_fuse.mlir"
     "config_igemm_tile_and_fuse.mlir"
     "config_tile_and_fuse.mlir"
     "config_tile_and_fuse_gfx950.mlir"
@@ -25,6 +26,7 @@ iree_lit_test_suite(
     "config_vector_distribute_gfx950.mlir"
     "config_vector_distribute_reduction_gfx942.mlir"
     "configure_buffer_instructions.mlir"
+    "pipeline_direct_conv_tile_and_fuse.mlir"
     "pipeline_elementwise_f8fnuz.mlir"
     "pipeline_elementwise_f8ocp.mlir"
     "pipeline_igemm_tile_and_fuse.mlir"

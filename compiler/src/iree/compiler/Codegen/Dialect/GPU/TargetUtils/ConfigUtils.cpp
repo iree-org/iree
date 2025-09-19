@@ -1463,6 +1463,196 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
       {flatWorkgroupSize, 1, 1}, flatWorkgroupSize, DictionaryAttr());
 }
 
+LogicalResult
+setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
+                                   mlir::FunctionOpInterface entryPoint,
+                                   Operation *op) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  if (!linalgOp || !linalg::isaConvolutionOpInterface(linalgOp)) {
+    return failure();
+  }
+
+  if (target.getWgp().getMma().empty())
+    return failure();
+
+  const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
+
+  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
+  FailureOr<mlir::linalg::ConvolutionDimensions> convolutionDims =
+      mlir::linalg::inferConvolutionDims(linalgOp);
+  if (failed(convolutionDims)) {
+    return failure();
+  }
+
+  // This strategy turns non-strided/dilated convolution problems into matmul
+  // problems by tiling certain dimensions to 1:
+  //  - Batch dimensions (parallel shared by the image and output)
+  //  - Filter dimensions (reduction on the filter, and convolved on the image)
+  //  - All output image dimensions except the innermost one
+  //
+  // After this, the remaining non-unit dimensions are:
+  //  - One output image dimension corresponding to the M dimension of a matmul.
+  //  - The output channel dimension, corresponding to the N dimension.
+  //  - The input channel dimension, corresponding to the K dimension.
+
+  // TODO: Relax this condition to strictly alignment requirements.
+  if (convolutionDims->outputChannel.size() < 1 ||
+      convolutionDims->inputChannel.size() < 1 ||
+      convolutionDims->filterLoop.size() < 1 ||
+      convolutionDims->outputImage.size() < 1) {
+    return failure();
+  }
+
+  auto isAllOnesList = [](ArrayRef<int64_t> list) {
+    return llvm::all_of(list, [](int64_t i) { return i == 1; });
+  };
+
+  // TODO: Support non-unit strides/dilations.
+  if (!isAllOnesList(convolutionDims->strides) ||
+      !isAllOnesList(convolutionDims->dilations)) {
+    return failure();
+  }
+
+  // TODO: Support NCHW convolutions. This is just a matmul_transpose_a, however
+  // the distribution patterns currently do not support that variant.
+  bool isOutputChannelFirst = convolutionDims->outputChannel.back() <
+                              convolutionDims->outputImage.front();
+  if (isOutputChannelFirst) {
+    return failure();
+  }
+
+  Value lhs = linalgOp.getDpsInputOperand(0)->get();
+  Value rhs = linalgOp.getDpsInputOperand(1)->get();
+  Value init = linalgOp.getDpsInitOperand(0)->get();
+
+  Type lhsElemType = getElementTypeOrSelf(lhs);
+  Type rhsElemType = getElementTypeOrSelf(rhs);
+  Type initElemType = getElementTypeOrSelf(init);
+
+  // TODO: Support tiling and finding mma schedule on multiple M/N/K dimensions.
+  int64_t mDim = convolutionDims->outputImage.back();
+  int64_t nDim = convolutionDims->outputChannel.back();
+  int64_t kDim = convolutionDims->inputChannel.back();
+  GPUMatmulShapeType problem{bounds[mDim], bounds[nDim], bounds[kDim],
+                             lhsElemType,  rhsElemType,  initElemType};
+
+  AffineMap inputMap = linalgOp.getIndexingMapsArray()[0];
+  AffineMap filterMap = linalgOp.getIndexingMapsArray()[1];
+  int64_t mPos, nPos, lhsKPos, rhsKPos;
+  for (auto [idx, e] : llvm::enumerate(inputMap.getResults())) {
+    if (e.isFunctionOfDim(mDim)) {
+      mPos = idx;
+    }
+    if (e.isFunctionOfDim(kDim)) {
+      lhsKPos = idx;
+    }
+  }
+  for (auto [idx, e] : llvm::enumerate(filterMap.getResults())) {
+    if (e.isFunctionOfDim(nDim)) {
+      nPos = idx;
+    }
+    if (e.isFunctionOfDim(kDim)) {
+      rhsKPos = idx;
+    }
+  }
+  bool transposedLhs = mPos > lhsKPos;
+  bool transposedRhs = rhsKPos > nPos;
+  bool mustBeAligned = true;
+  std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
+      target, problem, transposedLhs, transposedRhs, /*isGemm*/ false,
+      mustBeAligned);
+
+  if (!schedule) {
+    LDBG() << "Attempting to deduce unaligned TileAndFuse MMA schedulee";
+    mustBeAligned = false;
+    schedule = getMmaScheduleFromProblemAndTarget(
+        target, problem, transposedLhs, transposedRhs, /*isGemm*/ false,
+        mustBeAligned);
+  }
+  if (!schedule) {
+    LDBG() << "Failed to deduce TileAndFuse MMA schedule";
+    return failure();
+  }
+
+  int64_t flatWorkgroupSize =
+      targetSubgroupSize *
+      ShapedType::getNumElements(schedule->nSubgroupCounts) *
+      ShapedType::getNumElements(schedule->mSubgroupCounts);
+  std::array<int64_t, 3> workgroupSize{flatWorkgroupSize, 1, 1};
+
+  SmallVector<int64_t> workgroupTileSizes(linalgOp.getNumLoops(), 0);
+  SmallVector<int64_t> reductionTileSizes(linalgOp.getNumLoops(), 0);
+  SmallVector<int64_t> subgroupTileSizes(linalgOp.getNumLoops(), 0);
+  // Tile all batch dimensions with unit size.
+  for (int64_t batch : convolutionDims->batch) {
+    workgroupTileSizes[batch] = 1;
+  }
+  for (int64_t depth : convolutionDims->depth) {
+    workgroupTileSizes[depth] = 1;
+  }
+  // Tile all filter loop dimensions to 1.
+  for (int64_t f : convolutionDims->filterLoop) {
+    reductionTileSizes[f] = 1;
+  }
+  // Tile all m, n, k dimensions to 1 except the innermost.
+  for (int64_t oi : llvm::drop_end(convolutionDims->outputImage)) {
+    workgroupTileSizes[oi] = 1;
+  }
+  for (int64_t oc : llvm::drop_end(convolutionDims->outputChannel)) {
+    workgroupTileSizes[oc] = 1;
+  }
+  for (int64_t ic : llvm::drop_end(convolutionDims->inputChannel)) {
+    reductionTileSizes[ic] = 1;
+  }
+
+  // Compute the M/N dimension tile size by multiply subgroup information.
+  workgroupTileSizes[mDim] =
+      schedule->mSubgroupCounts[0] * schedule->mTileSizes[0] * schedule->mSize;
+  subgroupTileSizes[mDim] = schedule->mTileSizes[0];
+  workgroupTileSizes[nDim] =
+      schedule->nSubgroupCounts[0] * schedule->nTileSizes[0] * schedule->nSize;
+  subgroupTileSizes[nDim] = schedule->nTileSizes[0];
+
+  // The reduction tile size is just the post-packing tile count.
+  reductionTileSizes[kDim] = schedule->kTileSizes[0];
+
+  MLIRContext *context = linalgOp.getContext();
+  Builder b(context);
+  SmallVector<NamedAttribute, 4> attrs = {
+      NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
+      NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes)),
+      NamedAttribute("subgroup", b.getI64ArrayAttr(subgroupTileSizes))};
+  IREE::GPU::appendPromotedOperandsList(context, attrs, {0, 1});
+  IREE::GPU::setMmaKind(context, attrs, schedule->mmaKind);
+
+  if (!mustBeAligned) {
+    SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
+    paddingTileSizes[kDim] = reductionTileSizes[kDim] * schedule->kSize;
+    attrs.emplace_back(StringAttr::get(context, "padding_conv"),
+                       b.getI64ArrayAttr(paddingTileSizes));
+  }
+
+  auto configDict = DictionaryAttr::get(context, attrs);
+  auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
+
+  // Prefetch shared memory is kept off.
+  auto pipelineOptions = IREE::GPU::GPUPipelineOptionsAttr::get(
+      context, /*prefetchSharedMemory=*/false,
+      /*no_reduce_shared_memory_bank_conflicts=*/false,
+      /*use_igemm_convolution=*/false,
+      /*reorder_workgroups_strategy=*/std::nullopt);
+  SmallVector<NamedAttribute, 1> pipelineAttrs;
+  pipelineAttrs.emplace_back(
+      IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName(), pipelineOptions);
+
+  auto pipelineConfig = DictionaryAttr::get(context, pipelineAttrs);
+
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, loweringConfig,
+      Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse, workgroupSize,
+      targetSubgroupSize, pipelineConfig);
+}
+
 //====---------------------------------------------------------------------===//
 // Sort Pipeline Configuration
 //====---------------------------------------------------------------------===//
