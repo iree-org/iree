@@ -115,8 +115,7 @@ def IREEEncoding_SerializableAttr :
       ),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        assert(false && "unimplemented interface method");
-        return true;
+        return false;
       }]
     >,
     InterfaceMethod<
@@ -427,8 +426,12 @@ def IREEEncoding_PropagationOpInterface :
   let methods = [
     InterfaceMethod<
         [{
-          Returns a list of transformed operations, set_encoding/unset_encoding
-          operations and the transformed result for further transformation.
+          Propagate an encoding through the operation. The propagationSource
+          is the result from which the encoding is being propagated, and can
+          either be a result of the operation (propagating up), or a producer
+          of the operation (propagating down). Returns a list of transformed
+          operations for further transformation, and any new set_encoding or
+          unset_encoding operations from which propagation can continue.
         }],
         /*retTy=*/
         "llvm::FailureOr<::mlir::iree_compiler::IREE::Encoding::PropagationResult>",
@@ -436,7 +439,7 @@ def IREEEncoding_PropagationOpInterface :
         /*args=*/(ins
           "::mlir::RewriterBase &":$builder,
           "::mlir::iree_compiler::IREE::Encoding::PropagationEncoding":$encodings,
-          "::mlir::OpResult":$opResult
+          "::mlir::OpOperand *":$propagationSource
         ),
         /*methodBody=*/"",
         /*defaultImplementation=*/[{

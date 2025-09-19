@@ -760,6 +760,10 @@ struct CPULayoutResolverAttr final
 struct CPUSerializableAttr final
     : IREE::Encoding::SerializableAttr::ExternalModel<CPUSerializableAttr,
                                                       CPUEncodingResolverAttr> {
+  bool isSerialized(Attribute attr) const {
+    auto configuration = cast<CPUEncodingResolverAttr>(attr).getConfiguration();
+    return configuration && configuration.contains(kEncodingInfoAttrName);
+  }
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
@@ -895,6 +899,12 @@ struct VMVXLayoutResolverAttr final
 struct VMVXSerializableAttr final
     : IREE::Encoding::SerializableAttr::ExternalModel<
           VMVXSerializableAttr, VMVXEncodingResolverAttr> {
+  bool isSerialized(Attribute attr) const {
+    auto configuration =
+        cast<VMVXEncodingResolverAttr>(attr).getConfiguration();
+    return configuration && configuration.contains(kEncodingInfoAttrName);
+  }
+
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
                                     ValueRange dynamicDims) const {

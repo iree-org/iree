@@ -23,7 +23,70 @@ namespace mlir::iree_compiler::DispatchCreation {
 #define GEN_PASS_DEF_PROPAGATEENCODINGSPASS
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
 
+/// Propagate the set_encoding op up through the `target` using the encoding
+/// propagation interface.
+static LogicalResult
+bubbleUpSetEncodingOp(RewriterBase &rewriter, OpOperand *propagationSource,
+                      IREE::Encoding::SetEncodingOp encodingOp) {
+  auto propagationAttrInterface =
+      dyn_cast<IREE::Encoding::EncodingPropagationAttrInterface>(
+          encodingOp.getResultType().getEncoding());
+  auto target = cast<OpResult>(propagationSource->get());
+  if (!propagationAttrInterface ||
+      !propagationAttrInterface.isPropagableUp(target)) {
+    return rewriter.notifyMatchFailure(
+        encodingOp, "the propagation attribute interface isn't defined or the "
+                    "target isn't propagable");
+  }
+  // Get the encoding attributes for the operands and results of the operation.
+  FailureOr<IREE::Encoding::PropagationEncoding> propagationEncodings =
+      propagationAttrInterface.generateBubblingEncodings(target);
+  if (failed(propagationEncodings)) {
+    return rewriter.notifyMatchFailure(encodingOp,
+                                       "not able to determine propagation "
+                                       "attributes for operands and results");
+  }
+  Operation *targetOp = target.getOwner();
+  if (!IREE::Flow::isNonNullAndOutsideDispatch(encodingOp) ||
+      !IREE::Flow::isNonNullAndOutsideDispatch(targetOp)) {
+    return rewriter.notifyMatchFailure(
+        encodingOp, "expected that both operations are outside dispatch");
+  }
+  auto propagationResult =
+      dyn_cast<IREE::Encoding::EncodingPropagationOpInterface>(targetOp);
+  if (!propagationResult) {
+    return rewriter.notifyMatchFailure(
+        encodingOp, "encoding propagation op interface isn't defined");
+  }
+  // Propagate the set encoding and generate the new encoding operations.
+  FailureOr<IREE::Encoding::PropagationResult> maybeResult =
+      propagationResult.propagateEncoding(rewriter, *propagationEncodings,
+                                          propagationSource);
+  if (failed(maybeResult)) {
+    return rewriter.notifyMatchFailure(
+        encodingOp, "not able to propagate encodings and find replacement");
+  }
+  rewriter.replaceOp(encodingOp, maybeResult->replacements[0]);
+  return success();
+}
+
 namespace {
+
+/// Pattern to swap `tensor.cast` -> `iree_encoding.set_encoding`.
+struct SwapEncodingOpWithTensorCastOp
+    : public OpRewritePattern<IREE::Encoding::SetEncodingOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp,
+                                PatternRewriter &rewriter) const override {
+    auto castOp = encodingOp.getSource().getDefiningOp<tensor::CastOp>();
+    if (!castOp) {
+      return rewriter.notifyMatchFailure(encodingOp,
+                                         "expected a tensor.cast producer");
+    }
+    OpOperand &propagationSource = encodingOp.getSourceMutable();
+    return bubbleUpSetEncodingOp(rewriter, &propagationSource, encodingOp);
+  }
+};
 
 // TODO(#20179): Support the propagation through interfaces. It is supposed to
 // be done with data-flow analysis.
@@ -39,8 +102,7 @@ void PropagateEncodingsPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   MLIRContext *ctx = &getContext();
   RewritePatternSet propagationPatterns(ctx);
-  // TODO(#21970): Add patterns to the pass. The pass is not used currently, but
-  // it is a placeholder for future changes. So it is not deleted atm.
+  propagationPatterns.insert<SwapEncodingOpWithTensorCastOp>(ctx);
   GreedyRewriteConfig config;
   config.enableFolding(true).enableConstantCSE(false);
   if (failed(applyPatternsGreedily(funcOp, std::move(propagationPatterns),
