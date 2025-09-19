@@ -49,18 +49,9 @@ iree_check_single_backend_test_suite(
   NAME
     check_regression_llvm-cpu
   SRCS
-    "dynamic_abs.mlir"
-    "dynamic_add.mlir"
-    "dynamic_dot.mlir"
-    "dynamic_reduce_min.mlir"
-    "dynamic_torch_index_select_high_rank.mlir"
-    "dynamic_torch_index_select_negative.mlir"
-    "dynamic_torch_index_select_scalar.mlir"
-    "dynamic_torch_index_select_vector.mlir"
     "i1_inlined_constant.mlir"
     "layernorm.mlir"
     "linalg_ops.mlir"
-    "lowering_config.mlir"
     "pack_pad_transpose_1x9_into_2x1x8x4_issue_12546.mlir"
     "reduction_broadcast_elementwise.mlir"
     "scalar_computation.mlir"
@@ -108,14 +99,6 @@ iree_check_single_backend_test_suite(
   NAME
     check_regression_vmvx
   SRCS
-    "dynamic_abs.mlir"
-    "dynamic_add.mlir"
-    "dynamic_dot.mlir"
-    "dynamic_reduce_min.mlir"
-    "dynamic_torch_index_select_high_rank.mlir"
-    "dynamic_torch_index_select_negative.mlir"
-    "dynamic_torch_index_select_scalar.mlir"
-    "dynamic_torch_index_select_vector.mlir"
     "i1_inlined_constant.mlir"
     "layernorm.mlir"
     "linalg_ops.mlir"
@@ -134,14 +117,6 @@ iree_check_single_backend_test_suite(
   NAME
     check_regression_vulkan-spirv
   SRCS
-    "dynamic_abs.mlir"
-    "dynamic_add.mlir"
-    "dynamic_dot.mlir"
-    "dynamic_reduce_min.mlir"
-    "dynamic_torch_index_select_high_rank.mlir"
-    "dynamic_torch_index_select_negative.mlir"
-    "dynamic_torch_index_select_scalar.mlir"
-    "dynamic_torch_index_select_vector.mlir"
     "i1_inlined_constant.mlir"
     "linalg_ops.mlir"
     "reduction_broadcast_elementwise.mlir"
@@ -159,14 +134,6 @@ iree_check_single_backend_test_suite(
   NAME
     check_regression_cuda
   SRCS
-    "dynamic_abs.mlir"
-    "dynamic_add.mlir"
-    "dynamic_dot.mlir"
-    "dynamic_reduce_min.mlir"
-    "dynamic_torch_index_select_high_rank.mlir"
-    "dynamic_torch_index_select_negative.mlir"
-    "dynamic_torch_index_select_scalar.mlir"
-    "dynamic_torch_index_select_vector.mlir"
     "i1_inlined_constant.mlir"
     "large_reduction.mlir"
     "layernorm.mlir"

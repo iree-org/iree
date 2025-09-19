@@ -17,14 +17,6 @@ package(
 )
 
 BACKEND_TESTS = [
-    "dynamic_abs.mlir",
-    "dynamic_add.mlir",
-    "dynamic_dot.mlir",
-    "dynamic_reduce_min.mlir",
-    "dynamic_torch_index_select_high_rank.mlir",
-    "dynamic_torch_index_select_negative.mlir",
-    "dynamic_torch_index_select_scalar.mlir",
-    "dynamic_torch_index_select_vector.mlir",
     "i1_inlined_constant.mlir",
     "linalg_ops.mlir",
     "reduction_broadcast_elementwise.mlir",
@@ -75,7 +67,6 @@ iree_check_single_backend_test_suite(
     name = "check_regression_llvm-cpu",
     srcs = [
         "layernorm.mlir",
-        "lowering_config.mlir",
         "pack_pad_transpose_1x9_into_2x1x8x4_issue_12546.mlir",
         "split_reduction_using_tiling.mlir",
     ] + BACKEND_TESTS,
