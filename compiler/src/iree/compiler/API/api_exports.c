@@ -88,7 +88,7 @@ extern void ireeCompilerSourceWrapBuffer();
 extern void ireeGPULoweringConfigAttrGet();
 extern void ireeGPULoweringConfigAttrGetAttributes();
 extern void ireeGPULoweringConfigAttrGetMmaKind();
-extern void ireeGPULoweringConfigAttrGetSubgroupCount();
+extern void ireeGPULoweringConfigAttrGetSubgroupBasis();
 extern void ireeGPULoweringConfigAttrGetTileSizes();
 extern void ireeGPULoweringConfigAttrGetTypeID();
 extern void ireeGPUMMAAttrGet();
@@ -1004,7 +1004,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeGPULoweringConfigAttrGet;
   x += (uintptr_t)&ireeGPULoweringConfigAttrGetAttributes;
   x += (uintptr_t)&ireeGPULoweringConfigAttrGetMmaKind;
-  x += (uintptr_t)&ireeGPULoweringConfigAttrGetSubgroupCount;
+  x += (uintptr_t)&ireeGPULoweringConfigAttrGetSubgroupBasis;
   x += (uintptr_t)&ireeGPULoweringConfigAttrGetTileSizes;
   x += (uintptr_t)&ireeGPULoweringConfigAttrGetTypeID;
   x += (uintptr_t)&ireeGPUMMAAttrGet;

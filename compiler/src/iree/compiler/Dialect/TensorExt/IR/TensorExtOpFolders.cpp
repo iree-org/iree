@@ -80,6 +80,7 @@ struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
         newResultSizes[resDynamicDim] = castSize;
       }
       ++intermediateDynamicDim;
+      ++resDynamicDim;
     }
 
     auto newType =

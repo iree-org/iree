@@ -6,11 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Conversion/ConversionTarget.h"
 
-#include "iree/compiler/Dialect/HAL/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/BuiltinTypes.h"
 
 namespace mlir::iree_compiler {
 

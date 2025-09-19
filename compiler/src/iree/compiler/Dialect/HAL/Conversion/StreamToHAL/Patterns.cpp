@@ -7,7 +7,6 @@
 #include "iree/compiler/Dialect/HAL/Conversion/StreamToHAL/Patterns.h"
 #include "iree/compiler/Dialect/HAL/Analysis/Captures.h"
 #include "iree/compiler/Dialect/HAL/Conversion/StreamToHAL/Utils.h"
-#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"

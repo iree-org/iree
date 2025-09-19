@@ -89,7 +89,7 @@ static MaskResult getMask(Operation *op) {
       transferRead.getMask().getDefiningOp<vector::ExtractOp>();
   auto maskOp =
       maybeExtractOp
-          ? maybeExtractOp.getVector().getDefiningOp<vector::CreateMaskOp>()
+          ? maybeExtractOp.getSource().getDefiningOp<vector::CreateMaskOp>()
           : transferRead.getMask().getDefiningOp<vector::CreateMaskOp>();
   if (maybeExtractOp) {
     if (maybeExtractOp.getStaticPosition().size() + 1 !=

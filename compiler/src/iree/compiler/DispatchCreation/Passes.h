@@ -42,6 +42,12 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
       llvm::cl::desc("Enable data-tiling for dispatch creation pipeline"),
       llvm::cl::init(false),
   };
+  Option<bool> enableSplitReduction{
+      *this,
+      "split-reduction",
+      llvm::cl::desc("Enable split reduction for dispatch creation pipeline"),
+      llvm::cl::init(false),
+  };
 };
 
 void buildDispatchCreationPassPipeline(

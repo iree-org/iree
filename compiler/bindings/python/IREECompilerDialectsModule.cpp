@@ -466,22 +466,20 @@ NB_MODULE(_ireeCompilerDialects, m) {
             return getIntArrayAttrValues(tilesizes.reductionAttr);
           })
       .def_property_readonly(
-          "subgroup_count_mn",
-          [](MlirAttribute self) -> py::tuple {
-            ireeGPUSubgroupCountInfo info =
-                ireeGPULoweringConfigAttrGetSubgroupCount(self);
-            MlirAttribute mCountAttr = info.subgroupMCountAttr;
-            MlirAttribute nCountAttr = info.subgroupNCountAttr;
-            std::optional<int64_t> mCount;
-            if (!mlirAttributeIsNull(mCountAttr)) {
-              mCount = mlirIntegerAttrGetValueInt(mCountAttr);
+          "subgroup_basis",
+          [](MlirAttribute self)
+              -> std::tuple<std::vector<int64_t>, std::vector<int64_t>> {
+            ireeGPUSubgroupBasisInfo basisInfo =
+                ireeGPULoweringConfigAttrGetSubgroupBasis(self);
+            std::vector<int64_t> counts;
+            std::vector<int64_t> mapping;
+            if (!mlirAttributeIsNull(basisInfo.countsAttr)) {
+              counts = getIntArrayAttrValues(basisInfo.countsAttr);
             }
-
-            std::optional<int64_t> nCount;
-            if (!mlirAttributeIsNull(nCountAttr)) {
-              nCount = mlirIntegerAttrGetValueInt(nCountAttr);
+            if (!mlirAttributeIsNull(basisInfo.mappingAttr)) {
+              mapping = getIntArrayAttrValues(basisInfo.mappingAttr);
             }
-            return py::make_tuple(mCount, nCount);
+            return std::make_tuple(counts, mapping);
           })
       .def_property_readonly(
           "mma_kind", [](MlirAttribute self) -> std::optional<MlirAttribute> {

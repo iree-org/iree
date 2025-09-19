@@ -1332,10 +1332,14 @@ static SmallVector<ConstantAllocation> extractConstantsWithLifetime(
   [[maybe_unused]] std::unique_ptr<AsmState> asmState;
   LLVM_DEBUG(asmState = std::make_unique<AsmState>(executeOp->getParentOp()));
 
-  // Bucket constant ops by affinity.
-  llvm::MapVector<IREE::Stream::AffinityAttr,
-                  SmallVector<IREE::Stream::AsyncConstantOp>>
-      constantOps;
+  // Bucket constant ops by affinity and whether they are global (from our
+  // perspective, in that they escape into the global program) or local (only
+  // used within this region and guaranteed dead by the end).
+  using ConstantsForAffinityMap =
+      llvm::MapVector<IREE::Stream::AffinityAttr,
+                      SmallVector<IREE::Stream::AsyncConstantOp>>;
+  ConstantsForAffinityMap globalConstantOps;
+  ConstantsForAffinityMap localConstantOps;
   for (auto constantOp : executeOp.getOps<IREE::Stream::AsyncConstantOp>()) {
     // Match only the lifetime being requested.
     Value regionValue = constantOp.getResult();
@@ -1344,16 +1348,19 @@ static SmallVector<ConstantAllocation> extractConstantsWithLifetime(
       continue;
     }
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "Bucketing constant op for lifetime based on affinity: ";
-      constantOp.print(llvm::dbgs(), *asmState);
-      llvm::dbgs() << "\n";
-    });
-
     // Try to find the escaping result value in the parent of the execution
     // region. This may fail if the value never escapes, indicating that its
     // affinity is local to the region.
     Value resultValue = findEscapingResultValue(regionValue);
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "Bucketing ";
+      llvm::dbgs() << (resultValue ? "escaping (globalish)"
+                                   : "non-escaping (local)");
+      llvm::dbgs() << " constant op for lifetime based on affinity: ";
+      constantOp.print(llvm::dbgs(), *asmState);
+      llvm::dbgs() << "\n";
+    });
 
     // Find a pinned affinity for the value or inherit the execution region
     // affinity.
@@ -1386,14 +1393,24 @@ static SmallVector<ConstantAllocation> extractConstantsWithLifetime(
     }
 
     // Append to affinity bucket.
-    constantOps[allocationAffinity].push_back(constantOp);
-  }
-  if (constantOps.empty()) {
-    return {};
+    if (resultValue) {
+      globalConstantOps[allocationAffinity].push_back(constantOp);
+    } else {
+      localConstantOps[allocationAffinity].push_back(constantOp);
+    }
   }
 
   // Allocate constant upload ops per unique affinity.
-  for (auto [affinityAttr, constantOps] : constantOps) {
+  // TODO(benvanik): rewrite this file (or handle constants in a new earlier
+  // pass) so that we can use transient allocations for localConstantOps. Today
+  // we run all initializers to completion and are (as much as we can be) pretty
+  // sure the non-transient allocation gets released by the time we get back to
+  // user code.
+  for (auto [affinityAttr, constantOps] : globalConstantOps) {
+    constantAllocations.push_back(allocateConstantBatch(
+        executeOp, affinityAttr, constantOps, externalBuilder));
+  }
+  for (auto [affinityAttr, constantOps] : localConstantOps) {
     constantAllocations.push_back(allocateConstantBatch(
         executeOp, affinityAttr, constantOps, externalBuilder));
   }

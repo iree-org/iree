@@ -29,7 +29,7 @@ namespace mlir::iree_compiler::DispatchCreation {
 /// is implemented.
 static llvm::cl::opt<bool> clTestSetScaledMatmulEncodings(
     "iree-dispatch-creation-test-set-scaled-matmul-encodings",
-    llvm::cl::desc("Set encodings on scaled matmul ops"), llvm::cl::init(true),
+    llvm::cl::desc("Set encodings on scaled matmul ops"), llvm::cl::init(false),
     llvm::cl::Hidden);
 
 namespace {

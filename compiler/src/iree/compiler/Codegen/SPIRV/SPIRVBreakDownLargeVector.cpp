@@ -70,7 +70,7 @@ struct BreakDownCastExtractExtend final : OpRewritePattern<arith::ExtUIOp> {
     if (!extractOp)
       return failure();
 
-    auto bitCastOp = extractOp.getVector().getDefiningOp<vector::BitCastOp>();
+    auto bitCastOp = extractOp.getSource().getDefiningOp<vector::BitCastOp>();
     if (!bitCastOp)
       return failure();
 

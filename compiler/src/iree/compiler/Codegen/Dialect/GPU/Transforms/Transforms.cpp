@@ -549,16 +549,6 @@ collapseParallelInsertOp(RewriterBase &rewriter,
   Value loopInit = forallOp.getOutputs()[resultIdx];
   SmallVector<OpFoldResult> mixedInitSizes =
       tensor::getMixedSizes(rewriter, loc, loopInit);
-  auto prod = [&](ArrayRef<OpFoldResult> vals) -> OpFoldResult {
-    auto mulMap = AffineMap::get(
-        2, 0, {rewriter.getAffineDimExpr(0) * rewriter.getAffineDimExpr(1)});
-    OpFoldResult product = rewriter.getIndexAttr(1);
-    for (OpFoldResult val : vals) {
-      product = affine::makeComposedFoldedAffineApply(rewriter, loc, mulMap,
-                                                      {product, val});
-    }
-    return product;
-  };
   SmallVector<OpFoldResult> offsets = parallelInsertOp.getMixedOffsets();
   SmallVector<OpFoldResult> sizes = parallelInsertOp.getMixedSizes();
   SmallVector<OpFoldResult> newSizes, newOffsets;
@@ -582,7 +572,8 @@ collapseParallelInsertOp(RewriterBase &rewriter,
             .getResult();
     ArrayRef<OpFoldResult> groupSizes(sizes.begin() + group.front(),
                                       sizes.begin() + group.back() + 1);
-    OpFoldResult collapsedSize = prod(groupSizes);
+    OpFoldResult collapsedSize =
+        IREE::LinalgExt::computeProductUsingAffine(rewriter, loc, groupSizes);
     newOffsets.push_back(collapsedOffset);
     newSizes.push_back(collapsedSize);
   }
