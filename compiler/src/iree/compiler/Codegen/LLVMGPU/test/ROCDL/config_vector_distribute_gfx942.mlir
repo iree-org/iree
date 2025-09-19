@@ -400,27 +400,9 @@ func.func @attention_20x64x4096x64_f8() {
 
 // -----
 
-// CHECK:       #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
-// CHECK-NOT:   prefetch_shared_memory = true
-
-// CHECK-LABEL: func.func @attention_multi_m()
-
-#pipeline_layout = #hal.pipeline.layout<bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
-func.func @attention_multi_m() {
+func.func @attention_multi_m(%4 : tensor<20x256x16x64xf16>, %5 : tensor<20x4096x64xf16>, %6 : tensor<20x4096x64xf16>) -> tensor<20x256x16x64xf16> {
   %cst = arith.constant 1.250000e-01 : f16
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x256x16x64xf16>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf16>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf16>>
-  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<20x256x16x64xf16>>
-  %4 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [20, 256, 16, 64], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x256x16x64xf16>> -> tensor<20x256x16x64xf16>
-  %5 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf16>> -> tensor<20x4096x64xf16>
-  %6 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf16>> -> tensor<20x4096x64xf16>
   %7 = tensor.empty() : tensor<20x256x16x64xf16>
   %8 = iree_linalg_ext.attention  {indexing_maps = [
                      affine_map<(b, m0, m1, k1, k2, n) -> (b, m0, m1, k1)>,
@@ -432,9 +414,10 @@ func.func @attention_multi_m() {
                       ^bb0(%score: f32):
                         iree_linalg_ext.yield %score : f32
                      } -> tensor<20x256x16x64xf16>
-  iree_tensor_ext.dispatch.tensor.store %8, %3, offsets = [0, 0, 0, 0], sizes = [20, 256, 16, 64], strides = [1, 1, 1, 1] : tensor<20x256x16x64xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<20x256x16x64xf16>>
-  return
+  return %8 : tensor<20x256x16x64xf16>
 }
+
+// CHECK-LABEL: func.func @attention_multi_m
 
 // CHECK:                #iree_gpu.lowering_config
 // CHECK-SAME{LITERAL}:                  subgroup_basis = [[1, 4, 1, 1, 1, 1], [0, 1, 2, 4, 5]]
@@ -443,3 +426,33 @@ func.func @attention_multi_m() {
 // CHECK-SAME:           #iree_gpu.lowering_config
 // CHECK-SAME:                           reduction =  [0, 0, 0, 0, 64, 0]
 // CHECK-SAME:                           workgroup =  [1, 4, 16, 0, 0, 64]
+
+// -----
+
+func.func @attention_multi_m_dynamic(%4 : tensor<20x8x?x16x64xf16>, %5 : tensor<20x4096x64xf16>, %6 : tensor<20x4096x64xf16>) -> tensor<20x8x?x16x64xf16> {
+  %cst = arith.constant 1.250000e-01 : f16
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %dim = tensor.dim %4, %c2 : tensor<20x8x?x16x64xf16>
+  %7 = tensor.empty(%dim) : tensor<20x8x?x16x64xf16>
+  %8 = iree_linalg_ext.attention  {indexing_maps = [
+                     affine_map<(b, m0, m1, m2, k1, k2, n) -> (b, m0, m1, m2, k1)>,
+                     affine_map<(b, m0, m1, m2, k1, k2, n) -> (b, k2, k1)>,
+                     affine_map<(b, m0, m1, m2, k1, k2, n) -> (b, k2, n)>,
+                     affine_map<(b, m0, m1, m2, k1, k2, n) -> ()>,
+                     affine_map<(b, m0, m1, m2, k1, k2, n) -> (b, m0, m1, m2, n)>]}
+                     ins(%4, %5, %6, %cst : tensor<20x8x?x16x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%7 : tensor<20x8x?x16x64xf16>) {
+                      ^bb0(%score: f32):
+                        iree_linalg_ext.yield %score : f32
+                     } -> tensor<20x8x?x16x64xf16>
+  return %8 : tensor<20x8x?x16x64xf16>
+}
+
+// CHECK-LABEL: func.func @attention_multi_m_dynamic
+// CHECK:                #iree_gpu.lowering_config
+// CHECK-SAME{LITERAL}:                  subgroup_basis = [[1, 4, 1, 1, 1, 1, 1], [0, 1, 2, 3, 5, 6]]
+// CHECK-SAME:           #iree_gpu.lowering_config
+// CHECK-SAME{LITERAL}:                  subgroup_basis = [[1, 4, 1, 1, 1, 1, 1], [0, 1, 2, 3, 4, 5]]
+// CHECK-SAME:           #iree_gpu.lowering_config
+// CHECK-SAME:                           reduction =  [0, 0, 0, 0, 0, 64, 0]
+// CHECK-SAME:                           workgroup =  [1, 4, 1, 16, 0, 0, 64]
