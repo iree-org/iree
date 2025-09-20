@@ -200,8 +200,9 @@ def MatchContractionOp : Op<Transform_Dialect, "iree.match.is_contraction",
   let arguments = (ins
     TransformHandleTypeInterface:$operand_handle,
     OptionalAttr<AffineMapArrayAttr>:$indexing_maps,
-    OptionalAttr<TypeArrayAttr>:$input_types,        // [LHS_type, RHS_type].
-    OptionalAttr<TypeAttr>:$output_type              // Single output type.
+    OptionalAttr<TypeAttr>:$lhs_type,                 // LHS input type.
+    OptionalAttr<TypeAttr>:$rhs_type,                 // RHS input type.
+    OptionalAttr<TypeAttr>:$output_type               // Output type.
   );
 
   let results = (outs
@@ -214,7 +215,8 @@ def MatchContractionOp : Op<Transform_Dialect, "iree.match.is_contraction",
   let assemblyFormat = [{
     $operand_handle
     (`indexing_maps` $indexing_maps^)?
-    (`input_types` $input_types^)?
+    (`lhs_type` $lhs_type^)?
+    (`rhs_type` $rhs_type^)?
     (`output_type` $output_type^)?
     attr-dict `:` functional-type(operands, results)
   }];

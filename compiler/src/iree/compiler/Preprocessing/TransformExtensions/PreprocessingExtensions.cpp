@@ -245,7 +245,6 @@ IREE::transform_dialect::MatchContractionOp::matchOperation(
   if (std::optional<ArrayAttr> indexingMaps = getIndexingMaps()) {
     ArrayAttr currentIndexingMaps = linalgOp.getIndexingMaps();
     ArrayAttr targetIndexingMaps = *indexingMaps;
-
     if (currentIndexingMaps.size() != targetIndexingMaps.size()) {
       return emitSilenceableFailure(current->getLoc())
              << "indexing maps count mismatch: expected "
@@ -257,7 +256,6 @@ IREE::transform_dialect::MatchContractionOp::matchOperation(
          llvm::zip(currentIndexingMaps, targetIndexingMaps)) {
       AffineMapAttr currentMap = cast<AffineMapAttr>(currentMapAttr);
       AffineMapAttr targetMap = cast<AffineMapAttr>(targetMapAttr);
-
       if (currentMap.getValue() != targetMap.getValue()) {
         return emitSilenceableFailure(current->getLoc())
                << "indexing maps don't match: expected " << targetMap
@@ -266,28 +264,23 @@ IREE::transform_dialect::MatchContractionOp::matchOperation(
     }
   }
 
-  if (std::optional<ArrayAttr> inputTypes = getInputTypes()) {
-    ArrayAttr targetInputTypes = *inputTypes;
-    SmallVector<Type> currentInputTypes;
-    for (Value input : linalgOp.getDpsInputs()) {
-      currentInputTypes.push_back(getElementTypeOrSelf(input.getType()));
-    }
-
-    if (currentInputTypes.size() != targetInputTypes.size()) {
+  if (std::optional<Type> lhsType = getLhsType()) {
+    Type targetLhsType = *lhsType;
+    Type currentLhsType = getElementTypeOrSelf(linalgOp.getDpsInputs()[0]);
+    if (currentLhsType != targetLhsType) {
       return emitSilenceableFailure(current->getLoc())
-             << "input types count mismatch: expected "
-             << targetInputTypes.size() << ", got " << currentInputTypes.size();
+             << "LHS type doesn't match: expected " << targetLhsType << ", got "
+             << currentLhsType;
     }
+  }
 
-    for (auto [currentType, targetTypeAttr] :
-         llvm::zip(currentInputTypes, targetInputTypes)) {
-      Type targetType = cast<TypeAttr>(targetTypeAttr).getValue();
-
-      if (currentType != targetType) {
-        return emitSilenceableFailure(current->getLoc())
-               << "input types don't match: expected " << targetType << ", got "
-               << currentType;
-      }
+  if (std::optional<Type> rhsType = getRhsType()) {
+    Type targetRhsType = *rhsType;
+    Type currentRhsType = getElementTypeOrSelf(linalgOp.getDpsInputs()[1]);
+    if (currentRhsType != targetRhsType) {
+      return emitSilenceableFailure(current->getLoc())
+             << "RHS type doesn't match: expected " << targetRhsType << ", got "
+             << currentRhsType;
     }
   }
 

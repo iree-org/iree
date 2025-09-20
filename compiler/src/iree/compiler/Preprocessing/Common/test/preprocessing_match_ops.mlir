@@ -496,7 +496,8 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_f16_f32_types(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
     %batch, %m, %n, %k = transform.iree.match.is_contraction %op {
       indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2],
-      input_types = [f16, f16],
+      lhs_type = f16,
+      rhs_type = f16,
       output_type = f32
     } : (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
     transform.yield %op : !transform.any_op
@@ -561,7 +562,8 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_f16_inputs_only(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
     %batch, %m, %n, %k = transform.iree.match.is_contraction %op {
       indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2],
-      input_types = [f16, f16]
+      lhs_type = f16,
+      rhs_type = f16
     } : (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
     transform.yield %op : !transform.any_op
   }
