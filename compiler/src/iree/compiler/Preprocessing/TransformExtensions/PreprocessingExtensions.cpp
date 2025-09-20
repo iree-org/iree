@@ -8,7 +8,7 @@
 
 #include "iree/compiler/Utils/EquivalenceUtils.h"
 #include "iree/compiler/Utils/ShapeUtils.h"
-#include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -221,6 +221,150 @@ IREE::transform_dialect::MatchCastCompatibleDagFromRootOp::verify() {
   }
   // TODO: Region verification that it includes a single DAG.
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// MatchContractionOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+IREE::transform_dialect::MatchContractionOp::matchOperation(
+    Operation *current, transform::TransformResults &results,
+    transform::TransformState &state) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(current);
+  if (!linalgOp) {
+    return emitSilenceableFailure(current->getLoc())
+           << "Operation " << *current << " is not a LinalgOp.";
+  }
+
+  if (!linalg::isaContractionOpInterface(linalgOp)) {
+    return emitSilenceableFailure(current->getLoc())
+           << "Operation " << *current << " is not a contraction operation.";
+  }
+
+  if (std::optional<ArrayAttr> indexingMaps = getIndexingMaps()) {
+    ArrayAttr currentIndexingMaps = linalgOp.getIndexingMaps();
+    ArrayAttr targetIndexingMaps = *indexingMaps;
+    if (currentIndexingMaps.size() != targetIndexingMaps.size()) {
+      return emitSilenceableFailure(current->getLoc())
+             << "indexing maps count mismatch: expected "
+             << targetIndexingMaps.size() << ", got "
+             << currentIndexingMaps.size();
+    }
+
+    for (auto [currentMapAttr, targetMapAttr] :
+         llvm::zip(currentIndexingMaps, targetIndexingMaps)) {
+      AffineMapAttr currentMap = cast<AffineMapAttr>(currentMapAttr);
+      AffineMapAttr targetMap = cast<AffineMapAttr>(targetMapAttr);
+      if (currentMap.getValue() != targetMap.getValue()) {
+        return emitSilenceableFailure(current->getLoc())
+               << "indexing maps don't match: expected " << targetMap
+               << ", got " << currentMap;
+      }
+    }
+  }
+
+  if (std::optional<Type> lhsType = getLhsType()) {
+    Type targetLhsType = *lhsType;
+    Type currentLhsType = getElementTypeOrSelf(linalgOp.getDpsInputs()[0]);
+    if (currentLhsType != targetLhsType) {
+      return emitSilenceableFailure(current->getLoc())
+             << "LHS type doesn't match: expected " << targetLhsType << ", got "
+             << currentLhsType;
+    }
+  }
+
+  if (std::optional<Type> rhsType = getRhsType()) {
+    Type targetRhsType = *rhsType;
+    Type currentRhsType = getElementTypeOrSelf(linalgOp.getDpsInputs()[1]);
+    if (currentRhsType != targetRhsType) {
+      return emitSilenceableFailure(current->getLoc())
+             << "RHS type doesn't match: expected " << targetRhsType << ", got "
+             << currentRhsType;
+    }
+  }
+
+  if (std::optional<Type> outputType = getOutputType()) {
+    const Type targetOutputType = *outputType;
+    SmallVector<Type> currentOutputTypes;
+    for (Value output : linalgOp.getDpsInits()) {
+      currentOutputTypes.push_back(getElementTypeOrSelf(output.getType()));
+    }
+
+    if (currentOutputTypes.size() != 1) {
+      return emitSilenceableFailure(current->getLoc())
+             << "expected single output, got " << currentOutputTypes.size();
+    }
+
+    Type currentOutputType = currentOutputTypes[0];
+    if (currentOutputType != targetOutputType) {
+      return emitSilenceableFailure(current->getLoc())
+             << "output type doesn't match: expected " << targetOutputType
+             << ", got " << currentOutputType;
+    }
+  }
+
+  // Get the actual size values for batch/m/n/k dimensions after verifying it's
+  // a contraction operation.
+  linalg::ContractionDimensions contractionDims =
+      linalg::inferContractionDims(linalgOp).value();
+  SmallVector<int64_t> iterationDomain = linalgOp.getStaticLoopRanges();
+  MLIRContext *context = current->getContext();
+  Builder builder(context);
+
+  auto iterationSizes = [&](ArrayRef<unsigned> dimIndices) {
+    return llvm::to_vector(
+        llvm::map_range(dimIndices, [&](unsigned dimIdx) -> Attribute {
+          return builder.getI64IntegerAttr(iterationDomain[dimIdx]);
+        }));
+  };
+
+  results.setParams(cast<OpResult>(getBatchDims()),
+                    iterationSizes(contractionDims.batch));
+  results.setParams(cast<OpResult>(getMDims()),
+                    iterationSizes(contractionDims.m));
+  results.setParams(cast<OpResult>(getNDims()),
+                    iterationSizes(contractionDims.n));
+  results.setParams(cast<OpResult>(getKDims()),
+                    iterationSizes(contractionDims.k));
+
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===----------------------------------------------------------------------===//
+// MatchSizeEqualsOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+IREE::transform_dialect::MatchSizeEqualsOp::matchOperation(
+    Operation *current, transform::TransformResults &results,
+    transform::TransformState &state) {
+  ArrayAttr expectedValuesAttr = getExpectedValues();
+  assert(expectedValuesAttr && "expected_values attribute should not be null");
+
+  SmallVector<int64_t> expectedValues =
+      llvm::to_vector(llvm::map_range(expectedValuesAttr, [](Attribute attr) {
+        return cast<IntegerAttr>(attr).getInt();
+      }));
+
+  OpResult sizeResult = cast<OpResult>(getSize());
+  ArrayRef<Attribute> paramValues = state.getParams(sizeResult);
+
+  // Handle empty parameter case (e.g., empty batch dimension for regular
+  // matmul).
+  if (paramValues.empty()) {
+    return emitSilenceableFailure(current->getLoc())
+           << "No parameter values found for size result";
+  }
+
+  int64_t actualSize = cast<IntegerAttr>(paramValues[0]).getInt();
+  if (!llvm::is_contained(expectedValues, actualSize)) {
+    return emitSilenceableFailure(current->getLoc())
+           << "Size " << actualSize << " not in expected values "
+           << expectedValues;
+  }
+
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===----------------------------------------------------------------------===//
