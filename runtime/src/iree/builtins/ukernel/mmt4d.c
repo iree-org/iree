@@ -38,7 +38,7 @@ static void iree_uk_mmt4d_validate(const iree_uk_mmt4d_params_t* params) {
                  8);
   // - Ensure that (K0 * {LHS,RHS} element bits) is a multiple of 8 bits.
   int lhs_bits = iree_uk_type_bit_count(iree_uk_mmt4d_lhs_type(mmt4d_type));
-  int rhs_bits = iree_uk_type_bit_count(iree_uk_mmt4d_lhs_type(mmt4d_type));
+  int rhs_bits = iree_uk_type_bit_count(iree_uk_mmt4d_rhs_type(mmt4d_type));
   IREE_UK_ASSERT(!((params->K0 * lhs_bits) % 8));
   IREE_UK_ASSERT(!((params->K0 * rhs_bits) % 8));
   // - Ensure that {LHS,RHS} strides are multiples of 8 bits.
