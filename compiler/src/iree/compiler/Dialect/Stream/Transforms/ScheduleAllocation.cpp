@@ -659,24 +659,23 @@ static LogicalResult applyAsyncBarrierOp(IREE::Stream::AsyncBarrierOp barrierOp,
   return success();
 }
 
-static LogicalResult applyAsyncTransferOp(IREE::Stream::AsyncTransferOp asyncOp,
-                                          AllocationScope &scope,
-                                          OpBuilder builder) {
+static LogicalResult
+applyAsyncTransferOp(IREE::Stream::AffinityAttr executionAffinityAttr,
+                     IREE::Stream::AsyncTransferOp asyncOp,
+                     AllocationScope &scope, OpBuilder builder) {
   // Lookup the affinity for where we are executing. This lets us determine if
   // this transfer is incoming or outgoing.
   auto isStaging = [](Value value) {
     return llvm::cast<IREE::Stream::ResourceType>(value.getType())
                .getLifetime() == IREE::Stream::Lifetime::Staging;
   };
-  auto currentAffinityAttr =
-      IREE::Stream::AffinityAttr::lookupOrDefault(asyncOp);
   auto sourceAffinityAttr = asyncOp.getSourceAffinityAttr();
   auto resultAffinityAttr = asyncOp.getResultAffinityAttr();
-  bool transferIn =
-      (sourceAffinityAttr && sourceAffinityAttr != currentAffinityAttr) ||
+  const bool transferIn =
+      (sourceAffinityAttr && sourceAffinityAttr != executionAffinityAttr) ||
       isStaging(asyncOp.getSource());
-  bool transferOut =
-      (resultAffinityAttr && resultAffinityAttr != currentAffinityAttr) ||
+  const bool transferOut =
+      (resultAffinityAttr && resultAffinityAttr != executionAffinityAttr) ||
       isStaging(asyncOp.getResult());
 
   auto sourceRange = scope.lookupResourceRange(asyncOp.getSource());
@@ -911,11 +910,13 @@ static LogicalResult applyAsyncCallOp(IREE::Stream::AsyncCallOp asyncOp,
   return success();
 }
 
-static LogicalResult applyAsyncAllocations(Region &region,
-                                           AllocationScope &scope);
+static LogicalResult
+applyAsyncAllocations(IREE::Stream::AffinityAttr executionAffinityAttr,
+                      Region &region, AllocationScope &scope);
 
 static LogicalResult
-applyAsyncConcurrentOp(IREE::Stream::AsyncConcurrentOp asyncOp,
+applyAsyncConcurrentOp(IREE::Stream::AffinityAttr executionAffinityAttr,
+                       IREE::Stream::AsyncConcurrentOp asyncOp,
                        AllocationScope &scope, OpBuilder builder) {
   // Remove operands from the yield now that we aren't returning anything.
   // Must do this before we recurse so that the ops we are transforming have no
@@ -928,7 +929,8 @@ applyAsyncConcurrentOp(IREE::Stream::AsyncConcurrentOp asyncOp,
   // Resources are captured inside of the region and need to be mapped back to
   // the parent scope where they will be captured after lowering into
   // stream.cmd.execute.
-  if (failed(applyAsyncAllocations(asyncOp.getBody(), scope))) {
+  if (failed(applyAsyncAllocations(executionAffinityAttr, asyncOp.getBody(),
+                                   scope))) {
     return failure();
   }
 
@@ -946,8 +948,9 @@ applyAsyncConcurrentOp(IREE::Stream::AsyncConcurrentOp asyncOp,
 // Converts async operations to explicit commands using the allocation mappings
 // in |scope|. Upon successful return the region should have no more defined
 // values.
-static LogicalResult applyAsyncAllocations(Region &region,
-                                           AllocationScope &scope) {
+static LogicalResult
+applyAsyncAllocations(IREE::Stream::AffinityAttr executionAffinityAttr,
+                      Region &region, AllocationScope &scope) {
   // Walk the ops backwards so that we can delete them, freeing uses so that
   // producers can be deleted in turn.
   auto &block = region.getBlocks().front();
@@ -991,7 +994,8 @@ static LogicalResult applyAsyncAllocations(Region &region,
                      return applyAsyncBarrierOp(op, scope, OpBuilder(op));
                    })
                    .Case([&](IREE::Stream::AsyncTransferOp op) {
-                     return applyAsyncTransferOp(op, scope, OpBuilder(op));
+                     return applyAsyncTransferOp(executionAffinityAttr, op,
+                                                 scope, OpBuilder(op));
                    })
                    .Case([&](IREE::Stream::AsyncDispatchOp op) {
                      return applyAsyncDispatchOp(op, scope, OpBuilder(op));
@@ -1000,7 +1004,8 @@ static LogicalResult applyAsyncAllocations(Region &region,
                      return applyAsyncCallOp(op, scope, OpBuilder(op));
                    })
                    .Case([&](IREE::Stream::AsyncConcurrentOp op) {
-                     return applyAsyncConcurrentOp(op, scope, OpBuilder(op));
+                     return applyAsyncConcurrentOp(executionAffinityAttr, op,
+                                                   scope, OpBuilder(op));
                    })
                    .Default(failure()))) {
       return region.getParentOp()->emitError()
@@ -1940,13 +1945,13 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
 
   // Recreate the execution op with all the new arguments. Note that we drop
   // the results (besides the timepoint) as they are all aliased.
+  IREE::Stream::AffinityAttr executionAffinityAttr =
+      executeOp.getAffinityAttr();
   auto newExecuteOp = IREE::Stream::CmdExecuteOp::create(
       executeBuilder, executeOp.getLoc(), newAwaitTimepoint, newOperands,
       newOperandSizes);
   newExecuteOp.setOnce(isExecutedOnce(executeOp));
-  if (executeOp.getAffinity().has_value()) {
-    newExecuteOp.setAffinityAttr(executeOp.getAffinityAttr());
-  }
+  newExecuteOp.setAffinityAttr(executionAffinityAttr);
   newExecuteOp.getBody().takeBody(executeOp.getBody());
   executeOp.getResultTimepoint().replaceAllUsesWith(
       newExecuteOp.getResultTimepoint());
@@ -2008,7 +2013,8 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
       });
 
   // Apply the scope to the region and convert ops.
-  if (failed(applyAsyncAllocations(newExecuteOp.getBody(), scope))) {
+  if (failed(applyAsyncAllocations(executionAffinityAttr,
+                                   newExecuteOp.getBody(), scope))) {
     return newExecuteOp.emitError()
            << "failed to apply allocations/issue commands";
   }

@@ -2525,6 +2525,7 @@ def Stream_AsyncTransferOp : Stream_PureOp<"async.transfer", [
   DeclareOpInterfaceMethods<Stream_AffinityOp, [
     "getAffinityAttr",
     "setAffinityAttr",
+    "getResultAffinityAttr",
   ]>,
   Stream_AsyncPhaseOp,
   Stream_StreamableOp,
@@ -2549,7 +2550,7 @@ def Stream_AsyncTransferOp : Stream_PureOp<"async.transfer", [
     Stream_Size:$source_size,
     Stream_Size:$result_size,
     OptionalAttr<Stream_AffinityAttr>:$source_affinity,
-    OptionalAttr<Stream_AffinityAttr>:$result_affinity
+    OptionalAttr<Stream_AffinityAttr>:$target_affinity
   );
   let results = (outs
     AnyTypeOf<[
@@ -2563,7 +2564,7 @@ def Stream_AsyncTransferOp : Stream_PureOp<"async.transfer", [
     `` `{` $source_size `}`
     (`from` `(` $source_affinity^ `)`)?
     `->`
-    (`to` `(` $result_affinity^ `)`)?
+    (`to` `(` $target_affinity^ `)`)?
     type($result) `` `{` $result_size `}`
     attr-dict-with-keyword
   }];

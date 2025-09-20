@@ -2587,7 +2587,7 @@ IREE::Stream::AffinityAttr AsyncTransferOp::getAffinityAttr() {
     // If result is staging then the op should execute on the producer.
     return getSourceAffinityAttr();
   } else {
-    // Default to result affinity.
+    // Default to source affinity (today we transfer from sources).
     return getSourceAffinityAttr();
   }
 }
@@ -2606,9 +2606,9 @@ void AsyncTransferOp::setAffinityAttr(IREE::Stream::AffinityAttr value) {
   } else if (sourceType.getLifetime() == IREE::Stream::Lifetime::Staging) {
     // If source is staging then the op should execute on the consumer.
     if (value) {
-      setResultAffinityAttr(value);
+      setTargetAffinityAttr(value);
     } else {
-      removeResultAffinityAttr();
+      removeTargetAffinityAttr();
     }
   } else if (resultType.getLifetime() == IREE::Stream::Lifetime::Staging) {
     // If result is staging then the op should execute on the producer.
@@ -2620,11 +2620,15 @@ void AsyncTransferOp::setAffinityAttr(IREE::Stream::AffinityAttr value) {
   } else {
     // Default to result affinity.
     if (value) {
-      setResultAffinityAttr(value);
+      setTargetAffinityAttr(value);
     } else {
-      removeResultAffinityAttr();
+      removeTargetAffinityAttr();
     }
   }
+}
+
+IREE::Stream::AffinityAttr AsyncTransferOp::getResultAffinityAttr() {
+  return getTargetAffinityAttr();
 }
 
 void AsyncTransferOp::getAsyncAccessRanges(
