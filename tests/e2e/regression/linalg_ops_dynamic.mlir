@@ -28,6 +28,21 @@ func.func @batch_matmul_dynamic_reduction_size_B32_M1_N128_K3() {
   return
 }
 
+func.func @matmul_dynamic_M_M1_N64_K32() {
+  %lhs = flow.tensor.dynamic_constant dense<1.0> : tensor<1x32xf32> -> tensor<?x32xf32>
+  %rhs = flow.tensor.dynamic_constant dense<0.5> : tensor<32x64xf32> -> tensor<32x64xf32>
+  %cst = arith.constant 0.000000 : f32
+  %c_0_index = arith.constant 0 : index
+  %dim_0 = tensor.dim %lhs, %c_0_index : tensor<?x32xf32>
+  %output = tensor.empty(%dim_0) : tensor<?x64xf32>
+  %filled = linalg.fill ins(%cst : f32) outs(%output : tensor<?x64xf32>) -> tensor<?x64xf32>
+  %observed = linalg.matmul ins(%lhs, %rhs : tensor<?x32xf32>, tensor<32x64xf32>) outs(%filled : tensor<?x64xf32>) -> tensor<?x64xf32>
+  %expected = flow.tensor.dynamic_constant dense<16.0> : tensor<1x64xf32> -> tensor<?x64xf32>
+  check.expect_almost_eq(%observed, %expected, atol 1.0e-04) : tensor<?x64xf32>
+  return
+}
+
+
 // Batched matmul where B=2 M=1 N=3 K=dynamic.
 // Tested with K=5 and operands with varying values.
 func.func @dynamic_matmul_dynamic_reduction_size_B2_M1_N3_K5() {
