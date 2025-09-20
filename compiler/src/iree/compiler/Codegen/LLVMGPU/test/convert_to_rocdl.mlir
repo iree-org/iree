@@ -328,3 +328,37 @@ builtin.module {
 //   CHECK-DAG: llvm.getelementptr %[[A0]][0, 0, 0, 0]
 //   CHECK-DAG: %[[A:.+]] = llvm.mlir.addressof @__shared_memory__
 //   CHECK-DAG: llvm.getelementptr %[[A]][0, 0, 0, 0]
+
+
+// -----
+// Test gpu.printf lowering for HIP runtime
+
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb">
+#translation = #iree_codegen.translation_info<pipeline = None workgroup_size = [128, 1, 1] subgroup_size = 64>
+#device_target_hip = #hal.device.target<"hip", [#executable_target_rocm_hsaco_fb]> : !hal.device
+module attributes {stream.affinity.default = #hal.device.affinity<@__device_0>, transform.with_named_sequence} {
+  util.global private @__device_0 = #device_target_hip
+  hal.executable private @test {
+    hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
+      builtin.module {
+        func.func @gpu_printf_lowering() attributes {translation_info = #translation} {
+          %block_id_y = gpu.block_id  y upper_bound 256
+          %thread_id_x = gpu.thread_id  x upper_bound 128
+          gpu.printf "Hello, World from block %d - thread %d", %block_id_y, %thread_id_x : index, index
+          return
+        }
+      }
+    }
+  }
+}
+
+// CHECK-DAG: llvm.mlir.global internal constant @[[$STR:.+]]("Hello, World from block %d - thread %d\00") {addr_space = 0 : i32}
+// CHECK-DAG: llvm.func @__ockl_printf_append_string_n(i64, !llvm.ptr, i64, i32) -> i64
+// CHECK-DAG: llvm.func @__ockl_printf_append_args(i64, i32, i64, i64, i64, i64, i64, i64, i64, i32) -> i64
+// CHECK-DAG: llvm.func @__ockl_printf_begin(i64) -> i64
+// CHECK-LABEL: llvm.func @gpu_printf_lowering()
+//   CHECK: %[[BEGIN:.+]] = llvm.call @__ockl_printf_begin
+//   CHECK: %[[ADR:.+]] = llvm.mlir.addressof @[[$STR]]
+//   CHECK: %[[GEP:.+]] = llvm.getelementptr %[[ADR]]
+//   CHECK: %[[APPEND_STR:.+]] = llvm.call @__ockl_printf_append_string_n(%[[BEGIN]], %[[GEP]]
+//   CHECK: llvm.call @__ockl_printf_append_args(%[[APPEND_STR]]
