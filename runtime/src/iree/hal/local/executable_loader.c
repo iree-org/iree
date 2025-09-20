@@ -70,6 +70,18 @@ void iree_hal_executable_loader_release(
   }
 }
 
+iree_status_t iree_hal_executable_loader_infer_format(
+    iree_hal_executable_loader_t* executable_loader,
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_const_byte_span_t executable_data,
+    iree_host_size_t executable_format_capacity, char* executable_format,
+    iree_host_size_t* out_inferred_size) {
+  IREE_ASSERT_ARGUMENT(executable_loader);
+  return executable_loader->vtable->infer_format(
+      executable_loader, caching_mode, executable_data,
+      executable_format_capacity, executable_format, out_inferred_size);
+}
+
 bool iree_hal_executable_loader_query_support(
     iree_hal_executable_loader_t* executable_loader,
     iree_hal_executable_caching_mode_t caching_mode,
