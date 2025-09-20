@@ -32,6 +32,7 @@
         "--iree-hal-target-device=local",
         "--iree-llvmcpu-target-cpu-features=host",
         "--iree-opt-level=O3",
+        "--iree-opt-data-tiling",
         "--iree-global-opt-experimental-disable-conv-generalization"
     ],
     "pipeline_compiler_flags": [
