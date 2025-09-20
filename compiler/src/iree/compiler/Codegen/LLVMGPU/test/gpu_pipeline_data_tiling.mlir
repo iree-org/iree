@@ -32,6 +32,6 @@ module attributes {stream.affinity.default = #hal.device.affinity<@__device_0>} 
 }
 
 // CHECK:      @set_encoding()
-// CHECK:        linalg.pack
-// CHECK:        tensor.expand_shape
-// CHECK:        linalg.generic
+// CHECK:        %[[INPUT:.+]] = iree_codegen.load_from_buffer
+// CHECK:        %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter{{.*}} %[[INPUT]] into %{{.*}}
+// CHECK:        iree_codegen.store_to_buffer %[[MAP_SCATTER]]
