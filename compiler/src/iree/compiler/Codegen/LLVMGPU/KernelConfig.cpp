@@ -457,10 +457,6 @@ getVectorDistributeReductionConfig(
   }
 
   int64_t partialReductionSize = workgroupSize * threadLoads;
-  partialReductionSize = llvm::APIntOps::GreatestCommonDivisor(
-                             {64, static_cast<uint64_t>(partialReductionSize)},
-                             {64, static_cast<uint64_t>(lastReductionDimSize)})
-                             .getZExtValue();
 
   int64_t threadBasis = subgroupSize;
   int subgroupStride = threadBasis * threadLoads;
@@ -797,10 +793,16 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   unsigned threadLoads = largestLoadSizeInBits / *bitWidth;
   if (!hasDynamicReductionDim) {
-    while ((reductionSize / threadLoads) % subgroupSize != 0) {
+    // Ensure threads either load a full vector, or nothing.
+    while (reductionSize % threadLoads != 0) {
       threadLoads /= 2;
     }
   }
+  assert(reductionSize % threadLoads == 0);
+  int64_t numLoadingThreads = reductionSize / threadLoads;
+  int64_t numWorkgroups = numLoadingThreads / subgroupSize +
+                          (numLoadingThreads % subgroupSize != 0);
+  int64_t workgroupSize = numWorkgroups * subgroupSize;
 
   std::optional<int64_t> parallelSize = 1;
   for (int64_t dim : parallelDims) {
@@ -830,7 +832,6 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     maxWorkgroupSize = target.getPreferredSubgroupSize();
   }
 
-  int64_t workgroupSize = reductionSize / threadLoads;
   if (workgroupSize > maxWorkgroupSize) {
     workgroupSize = llvm::APIntOps::GreatestCommonDivisor(
                         {64, static_cast<uint64_t>(workgroupSize)},
@@ -838,7 +839,7 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                         .getZExtValue();
   }
 
-  // Total parallel size that can fill the GPU with enough workgorups.
+  // Total parallel size that can fill the GPU with enough workgroups.
   // TODO: query from the target device; roughly 2x hardware compute unit.
   const int parallelThreshold = 256;
   // How many 128-bit vectors each thread should at least read.

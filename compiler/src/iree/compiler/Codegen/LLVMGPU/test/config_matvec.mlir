@@ -307,12 +307,7 @@ func.func @i4_dequant_matvec() {
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
 //       CHECK:   linalg.generic
-//  CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
-//  CHECK-SAME:               lane_basis = {{\[}}[1, 1, 64], [0, 1, 2]],
-//  CHECK-SAME:               partial_reduction = [0, 1, 128],
-//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1], [0, 1, 2]],
-//  CHECK-SAME:               thread = [0, 1, 2],
-//  CHECK-SAME:               workgroup = [8, 0, 0]
+//  CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{lane_basis = {{\[}}[1, 1, 64], [0, 1, 2]], partial_reduction = [0, 1, 2048], subgroup_basis = {{\[}}[1, 1, 1], [0, 1, 2]], thread = [0, 1, 32], workgroup = [8, 0, 0]
 
 // -----
 
@@ -551,4 +546,4 @@ func.func @test_dyn_reduction() {
 }
 
 //      CHECK: #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
-// CHECK-SAME: workgroup_size = [2, 1, 1] subgroup_size = 64,
+// CHECK-SAME: workgroup_size = [64, 1, 1] subgroup_size = 64,
