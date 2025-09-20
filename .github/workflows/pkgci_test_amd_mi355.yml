@@ -54,6 +54,13 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           submodules: false
+      - name: Check out runtime submodules
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        if: ${{ inputs.artifact_run_id == '' }}
+        with:
+          name: linux_x86_64_release_packages
+          path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
       - name: Setup base venv
         run: |
            python -m venv ${VENV_DIR}
@@ -61,8 +68,6 @@ jobs:
             ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
               --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
               --fetch-gh-workflow=${{ inputs.artifact_run_id }}
-      - name: Check out runtime submodules
-        run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -82,11 +87,6 @@ jobs:
           export LD_LIBRARY_PATH="$ROCM_PATH/lib":$LD_LIBRARY_PATH
           echo "ROCM_PATH=$ROCM_PATH" >> $GITHUB_ENV
           echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> $GITHUB_ENV
-      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
-        if: ${{ inputs.artifact_run_id == '' }}
-        with:
-          name: linux_x86_64_release_packages
-          path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
 
       - name: Build tests
         run: ./build_tools/pkgci/build_tests_using_package.sh ${VENV_DIR}/bin
