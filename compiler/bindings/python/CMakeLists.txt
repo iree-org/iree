@@ -222,6 +222,7 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.llvm
   MLIRPythonSources.Dialects.math
   MLIRPythonSources.Dialects.memref
+  MLIRPythonSources.Dialects.nvvm
   MLIRPythonSources.Dialects.pdl
   MLIRPythonSources.Dialects.rocdl
   MLIRPythonSources.Dialects.scf
