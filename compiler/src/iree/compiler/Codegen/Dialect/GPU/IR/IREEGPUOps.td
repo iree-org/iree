@@ -280,8 +280,6 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     accesses. It implements ParallelCombiningOpInterface and must live inside an
     op implementing `InParallelOpInterface`, such as `scf.forall.in_parallel`.
 
-
-
     ## Lowering Paths
 
     Two lowering strategies are supported:
@@ -349,6 +347,7 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
       if (auto memrefType = ::llvm::dyn_cast<MemRefType>(getResult().getType()))
         return memrefType.getRank();
       assert(false && "expected ranked tensor or memref type");
+      return 0;
     }
   }];
 }
