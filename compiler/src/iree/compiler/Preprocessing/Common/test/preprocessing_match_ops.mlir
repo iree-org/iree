@@ -315,7 +315,8 @@ func.func @op_fill(%dest: tensor<32x64xf32>, %value: f32) -> tensor<32x64xf32> {
 
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_matmul(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
-    %batch_dims, %m_dims, %n_dims, %k_dims = transform.iree.match.is_contraction %op :
+    %batch_dims, %m_dims, %n_dims, %k_dims = transform.iree.match.is_contraction %op,
+      lhs_type = i8, rhs_type = i8, output_type = i32 :
       (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
     %c32 = transform.param.constant 32 : i64 -> !transform.param<i64>
     transform.match.param.cmpi eq %m_dims, %c32 : !transform.param<i64>
@@ -324,7 +325,8 @@ module attributes {transform.with_named_sequence} {
   }
 
   transform.named_sequence @match_batch_matmul(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
-    %batch_dims, %m_dims, %n_dims, %k_dims = transform.iree.match.is_contraction %op :
+    %batch_dims, %m_dims, %n_dims, %k_dims = transform.iree.match.is_contraction %op,
+      lhs_type = i8, rhs_type = i8, output_type = i32 :
       (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
     %c2 = transform.param.constant 2 : i64 -> !transform.param<i64>
     %c32 = transform.param.constant 32 : i64 -> !transform.param<i64>
@@ -381,8 +383,8 @@ func.func @op_matmul(%input0: tensor<32x64xi8>, %input1: tensor<32x64xi8>, %inpu
 
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_correct_maps(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
-   %batch, %m, %n, %k = transform.iree.match.is_contraction %op
-    {indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2]} :
+   %batch, %m, %n, %k = transform.iree.match.is_contraction %op,
+    lhs_type = i8, rhs_type = i8, output_type = i32 {indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2]} :
     (!transform.any_op) ->
     (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
     transform.yield %op : !transform.any_op
@@ -423,7 +425,9 @@ func.func @op_matmul(%input0: tensor<32x64xi8>, %input1: tensor<32x64xi8>, %dest
 
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_different_count(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
-    %batch, %m, %n, %k = transform.iree.match.is_contraction %op {indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2, #map_matmul0]} : (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+    %batch, %m, %n, %k = transform.iree.match.is_contraction %op,
+      lhs_type = i8, rhs_type = i8, output_type = i32 {indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2, #map_matmul0]} :
+      (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
     transform.yield %op : !transform.any_op
   }
 
@@ -437,210 +441,6 @@ module attributes {transform.with_named_sequence} {
      // Should NOT match: operation has 3 indexing maps but matcher expects 4.
     transform.foreach_match in %module
         @match_different_count -> @annotate_matched
-      : (!transform.any_op) -> (!transform.any_op)
-    transform.yield
-  }
-}
-
-// -----
-
-// Verify type matching with various input and output types.
-
-#map_matmul0 = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map_matmul1 = affine_map<(d0, d1, d2) -> (d1, d2)>
-#map_matmul2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-
-// CHECK-LABEL: func.func @test_type_matching
-func.func @test_type_matching(
-    %input0_f16: tensor<32x64xf16>, %input1_f16: tensor<32x64xf16>,
-    %input0_i8: tensor<32x64xi8>, %input1_i8: tensor<32x64xi8>,
-    %input0_mixed: tensor<32x64xf16>, %input1_mixed: tensor<32x64xf32>,
-    %dest_f32: tensor<32x32xf32>, %dest_i32: tensor<32x32xi32>, %dest_f16: tensor<32x32xf16>
-) -> tensor<32x32xf32> {
-  // Case 1: f16 inputs, f32 output - should match.
-  // CHECK-NEXT: linalg.matmul
-  // CHECK-SAME:   type_match = "matched"
-  %res1 = linalg.matmul
-        indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2]
-        ins(%input0_f16, %input1_f16 : tensor<32x64xf16>, tensor<32x64xf16>)
-        outs(%dest_f32 : tensor<32x32xf32>) {type_match = "unmatched"} -> tensor<32x32xf32>
-
-  // Case 2: i8 inputs, i32 output - should NOT match (different input types).
-  // CHECK-NEXT: linalg.matmul
-  // CHECK-SAME:   type_match = "unmatched"
-  %res2 = linalg.matmul
-        indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2]
-        ins(%input0_i8, %input1_i8 : tensor<32x64xi8>, tensor<32x64xi8>)
-        outs(%dest_i32 : tensor<32x32xi32>) {type_match = "unmatched"} -> tensor<32x32xi32>
-
-  // Case 3: Mixed f16/f32 inputs, f32 output - should NOT match (mixed input types).
-  // CHECK-NEXT: linalg.matmul
-  // CHECK-SAME:   type_match = "unmatched"
-  %res3 = linalg.matmul
-        indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2]
-        ins(%input0_mixed, %input1_mixed : tensor<32x64xf16>, tensor<32x64xf32>)
-        outs(%dest_f32 : tensor<32x32xf32>) {type_match = "unmatched"} -> tensor<32x32xf32>
-
-  // Case 4: f16 inputs, f16 output - should NOT match (wrong output type).
-  // CHECK-NEXT: linalg.matmul
-  // CHECK-SAME:   type_match = "unmatched"
-  %res4 = linalg.matmul
-        indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2]
-        ins(%input0_f16, %input1_f16 : tensor<32x64xf16>, tensor<32x64xf16>)
-        outs(%dest_f16 : tensor<32x32xf16>) {type_match = "unmatched"} -> tensor<32x32xf16>
-
-  return %res1 : tensor<32x32xf32>
-}
-
-module attributes {transform.with_named_sequence} {
-  transform.named_sequence @match_f16_f32_types(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
-    %batch, %m, %n, %k = transform.iree.match.is_contraction %op {
-      indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2],
-      lhs_type = f16,
-      rhs_type = f16,
-      output_type = f32
-    } : (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
-    transform.yield %op : !transform.any_op
-  }
-
-  transform.named_sequence @annotate_matched(%op: !transform.any_op {transform.readonly}) {
-    %0 = transform.param.constant "matched" -> !transform.any_param
-    transform.annotate %op "type_match" = %0 : !transform.any_op, !transform.any_param
-    transform.yield
-  }
-
-  transform.named_sequence @__transform_main(%module: !transform.any_op) {
-    transform.foreach_match in %module
-        @match_f16_f32_types -> @annotate_matched
-      : (!transform.any_op) -> (!transform.any_op)
-    transform.yield
-  }
-}
-
-// -----
-
-// Verify matching with only input types specified.
-
-#map_matmul0 = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map_matmul1 = affine_map<(d0, d1, d2) -> (d1, d2)>
-#map_matmul2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-
-// CHECK-LABEL: func.func @test_input_type_matching
-func.func @test_input_type_matching(
-    %input0_f16: tensor<32x64xf16>, %input1_f16: tensor<32x64xf16>,
-    %input0_i8: tensor<32x64xi8>, %input1_i8: tensor<32x64xi8>,
-    %dest_f32: tensor<32x32xf32>, %dest_f16: tensor<32x32xf16>
-) -> tensor<32x32xf32> {
-  // Case 1: f16 inputs, f32 output - should match (checking inputs).
-  // CHECK-NEXT: linalg.matmul
-  // CHECK-SAME:   input_type_match = "matched"
-  %res1 = linalg.matmul
-        indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2]
-        ins(%input0_f16, %input1_f16 : tensor<32x64xf16>, tensor<32x64xf16>)
-        outs(%dest_f32 : tensor<32x32xf32>) {input_type_match = "unmatched"} -> tensor<32x32xf32>
-
-  // Case 2: f16 inputs, f16 output - should also match (checking inputs).
-  // CHECK-NEXT: linalg.matmul
-  // CHECK-SAME:   input_type_match = "matched"
-  %res2 = linalg.matmul
-        indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2]
-        ins(%input0_f16, %input1_f16 : tensor<32x64xf16>, tensor<32x64xf16>)
-        outs(%dest_f16 : tensor<32x32xf16>) {input_type_match = "unmatched"} -> tensor<32x32xf16>
-
-  // Case 3: i8 inputs, f32 output - should NOT match (wrong input types).
-  // CHECK-NEXT: linalg.matmul
-  // CHECK-SAME:   input_type_match = "unmatched"
-  %res3 = linalg.matmul
-        indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2]
-        ins(%input0_i8, %input1_i8 : tensor<32x64xi8>, tensor<32x64xi8>)
-        outs(%dest_f32 : tensor<32x32xf32>) {input_type_match = "unmatched"} -> tensor<32x32xf32>
-
-  return %res1 : tensor<32x32xf32>
-}
-
-module attributes {transform.with_named_sequence} {
-  transform.named_sequence @match_f16_inputs_only(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
-    %batch, %m, %n, %k = transform.iree.match.is_contraction %op {
-      indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2],
-      lhs_type = f16,
-      rhs_type = f16
-    } : (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
-    transform.yield %op : !transform.any_op
-  }
-
-  transform.named_sequence @annotate_matched(%op: !transform.any_op {transform.readonly}) {
-    %0 = transform.param.constant "matched" -> !transform.any_param
-    transform.annotate %op "input_type_match" = %0 : !transform.any_op, !transform.any_param
-    transform.yield
-  }
-
-  transform.named_sequence @__transform_main(%module: !transform.any_op) {
-    transform.foreach_match in %module
-        @match_f16_inputs_only -> @annotate_matched
-      : (!transform.any_op) -> (!transform.any_op)
-    transform.yield
-  }
-}
-
-// -----
-
-// Verify matching with only output type specified.
-
-#map_matmul0 = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map_matmul1 = affine_map<(d0, d1, d2) -> (d1, d2)>
-#map_matmul2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-
-// CHECK-LABEL: func.func @test_output_type_matching
-func.func @test_output_type_matching(
-    %input0_f16: tensor<32x64xf16>, %input1_f16: tensor<32x64xf16>,
-    %input0_i8: tensor<32x64xi8>, %input1_i8: tensor<32x64xi8>,
-    %dest_f32: tensor<32x32xf32>, %dest_f16: tensor<32x32xf16>
-) -> tensor<32x32xf32> {
-  // Case 1: f16 inputs, f32 output - should match.
-  // CHECK-NEXT: linalg.matmul
-  // CHECK-SAME:   output_type_match = "matched"
-  %res1 = linalg.matmul
-        indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2]
-        ins(%input0_f16, %input1_f16 : tensor<32x64xf16>, tensor<32x64xf16>)
-        outs(%dest_f32 : tensor<32x32xf32>) {output_type_match = "unmatched"} -> tensor<32x32xf32>
-
-  // Case 2: i8 inputs, f32 output - should match (checking output).
-  // CHECK-NEXT: linalg.matmul
-  // CHECK-SAME:   output_type_match = "matched"
-  %res2 = linalg.matmul
-        indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2]
-        ins(%input0_i8, %input1_i8 : tensor<32x64xi8>, tensor<32x64xi8>)
-        outs(%dest_f32 : tensor<32x32xf32>) {output_type_match = "unmatched"} -> tensor<32x32xf32>
-
-  // Case 3: f16 inputs, f16 output - should NOT match (wrong output type).
-  // CHECK-NEXT: linalg.matmul
-  // CHECK-SAME:   output_type_match = "unmatched"
-  %res3 = linalg.matmul
-        indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2]
-        ins(%input0_f16, %input1_f16 : tensor<32x64xf16>, tensor<32x64xf16>)
-        outs(%dest_f16 : tensor<32x32xf16>) {output_type_match = "unmatched"} -> tensor<32x32xf16>
-
-  return %res1 : tensor<32x32xf32>
-}
-
-module attributes {transform.with_named_sequence} {
-  transform.named_sequence @match_f32_output_only(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
-    %batch, %m, %n, %k = transform.iree.match.is_contraction %op {
-      indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2],
-      output_type = f32
-    } : (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
-    transform.yield %op : !transform.any_op
-  }
-
-  transform.named_sequence @annotate_matched(%op: !transform.any_op {transform.readonly}) {
-    %0 = transform.param.constant "matched" -> !transform.any_param
-    transform.annotate %op "output_type_match" = %0 : !transform.any_op, !transform.any_param
-    transform.yield
-  }
-
-  transform.named_sequence @__transform_main(%module: !transform.any_op) {
-    transform.foreach_match in %module
-        @match_f32_output_only -> @annotate_matched
       : (!transform.any_op) -> (!transform.any_op)
     transform.yield
   }

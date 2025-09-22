@@ -199,10 +199,10 @@ def MatchContractionOp : Op<Transform_Dialect, "iree.match.is_contraction",
 
   let arguments = (ins
     TransformHandleTypeInterface:$operand_handle,
-    OptionalAttr<AffineMapArrayAttr>:$indexing_maps,
-    OptionalAttr<TypeAttr>:$lhs_type,                 // LHS input type.
-    OptionalAttr<TypeAttr>:$rhs_type,                 // RHS input type.
-    OptionalAttr<TypeAttr>:$output_type               // Output type.
+    TypeAttr:$lhs_type,                    // LHS input type.
+    TypeAttr:$rhs_type,                    // RHS input type.
+    TypeAttr:$output_type,                 // Output type.
+    OptionalAttr<AffineMapArrayAttr>:$indexing_maps
   );
 
   let results = (outs
@@ -214,10 +214,10 @@ def MatchContractionOp : Op<Transform_Dialect, "iree.match.is_contraction",
 
   let assemblyFormat = [{
     $operand_handle
+    `,` `lhs_type` `=` $lhs_type
+    `,` `rhs_type` `=` $rhs_type
+    `,` `output_type` `=` $output_type
     (`indexing_maps` $indexing_maps^)?
-    (`lhs_type` $lhs_type^)?
-    (`rhs_type` $rhs_type^)?
-    (`output_type` $output_type^)?
     attr-dict `:` functional-type(operands, results)
   }];
   let extraClassDeclaration = SingleOpMatcher.extraDeclaration;

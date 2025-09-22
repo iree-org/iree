@@ -10,6 +10,7 @@
 #include "iree/compiler/Utils/ShapeUtils.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/IRMapping.h"
@@ -227,80 +228,80 @@ IREE::transform_dialect::MatchCastCompatibleDagFromRootOp::verify() {
 // MatchContractionOp
 //===----------------------------------------------------------------------===//
 
+// Helper function to get indexing maps for matmul variants.
+static ArrayAttr getMatmulIndexingMaps(StringAttr variant,
+                                       MLIRContext *context) {
+  Builder builder(context);
+  AffineExpr d0 = builder.getAffineDimExpr(0);
+  AffineExpr d1 = builder.getAffineDimExpr(1);
+  AffineExpr d2 = builder.getAffineDimExpr(2);
+
+  // Default indexing maps (NN case).
+  AffineMap mapA = AffineMap::get(3, 0, {d0, d2}, context); // (M, K).
+  AffineMap mapB = AffineMap::get(3, 0, {d2, d1}, context); // (K, N).
+  AffineMap mapC = AffineMap::get(3, 0, {d0, d1}, context); // (M, N).
+
+  StringRef variantStr = variant.getValue();
+  if (variantStr[0] == 'T') { // Transpose A.
+    mapA = AffineMap::get(3, 0, {d2, d0}, context);
+  }
+
+  if (variantStr[1] == 'T') { // Transpose B.
+    mapB = AffineMap::get(3, 0, {d1, d2}, context);
+  }
+
+  return builder.getArrayAttr({AffineMapAttr::get(mapA),
+                               AffineMapAttr::get(mapB),
+                               AffineMapAttr::get(mapC)});
+}
+
 DiagnosedSilenceableFailure
 IREE::transform_dialect::MatchContractionOp::matchOperation(
     Operation *current, transform::TransformResults &results,
     transform::TransformState &state) {
+  Location loc = current->getLoc();
   auto linalgOp = dyn_cast<linalg::LinalgOp>(current);
   if (!linalgOp) {
-    return emitSilenceableFailure(current->getLoc())
+    return emitSilenceableFailure(loc)
            << "Operation " << *current << " is not a LinalgOp.";
   }
 
   if (!linalg::isaContractionOpInterface(linalgOp)) {
-    return emitSilenceableFailure(current->getLoc())
+    return emitSilenceableFailure(loc)
            << "Operation " << *current << " is not a contraction operation.";
   }
 
-  if (std::optional<ArrayAttr> indexingMaps = getIndexingMaps()) {
-    ArrayAttr currentIndexingMaps = linalgOp.getIndexingMaps();
-    ArrayAttr targetIndexingMaps = *indexingMaps;
-    if (currentIndexingMaps.size() != targetIndexingMaps.size()) {
-      return emitSilenceableFailure(current->getLoc())
-             << "indexing maps count mismatch: expected "
-             << targetIndexingMaps.size() << ", got "
-             << currentIndexingMaps.size();
-    }
-
-    for (auto [currentMapAttr, targetMapAttr] :
-         llvm::zip(currentIndexingMaps, targetIndexingMaps)) {
-      AffineMapAttr currentMap = cast<AffineMapAttr>(currentMapAttr);
-      AffineMapAttr targetMap = cast<AffineMapAttr>(targetMapAttr);
-      if (currentMap.getValue() != targetMap.getValue()) {
-        return emitSilenceableFailure(current->getLoc())
-               << "indexing maps don't match: expected " << targetMap
-               << ", got " << currentMap;
-      }
-    }
+  Type targetLhsType = getLhsType();
+  Type currentLhsType = getElementTypeOrSelf(linalgOp.getDpsInputs()[0]);
+  if (currentLhsType != targetLhsType) {
+    return emitSilenceableFailure(loc)
+           << "LHS type doesn't match: expected " << targetLhsType << ", got "
+           << currentLhsType;
   }
 
-  if (std::optional<Type> lhsType = getLhsType()) {
-    Type targetLhsType = *lhsType;
-    Type currentLhsType = getElementTypeOrSelf(linalgOp.getDpsInputs()[0]);
-    if (currentLhsType != targetLhsType) {
-      return emitSilenceableFailure(current->getLoc())
-             << "LHS type doesn't match: expected " << targetLhsType << ", got "
-             << currentLhsType;
-    }
+  Type targetRhsType = getRhsType();
+  Type currentRhsType = getElementTypeOrSelf(linalgOp.getDpsInputs()[1]);
+  if (currentRhsType != targetRhsType) {
+    return emitSilenceableFailure(loc)
+           << "RHS type doesn't match: expected " << targetRhsType << ", got "
+           << currentRhsType;
   }
 
-  if (std::optional<Type> rhsType = getRhsType()) {
-    Type targetRhsType = *rhsType;
-    Type currentRhsType = getElementTypeOrSelf(linalgOp.getDpsInputs()[1]);
-    if (currentRhsType != targetRhsType) {
-      return emitSilenceableFailure(current->getLoc())
-             << "RHS type doesn't match: expected " << targetRhsType << ", got "
-             << currentRhsType;
-    }
+  Type targetOutputType = getOutputType();
+  // Since linalg::isaContractionOpInterface already verified single output in
+  // above code, we can directly access it.
+  Type currentOutputType =
+      getElementTypeOrSelf(linalgOp.getDpsInits()[0].getType());
+  if (currentOutputType != targetOutputType) {
+    return emitSilenceableFailure(loc)
+           << "output type doesn't match: expected " << targetOutputType
+           << ", got " << currentOutputType;
   }
 
-  if (std::optional<Type> outputType = getOutputType()) {
-    const Type targetOutputType = *outputType;
-    SmallVector<Type> currentOutputTypes;
-    for (Value output : linalgOp.getDpsInits()) {
-      currentOutputTypes.push_back(getElementTypeOrSelf(output.getType()));
-    }
-
-    if (currentOutputTypes.size() != 1) {
-      return emitSilenceableFailure(current->getLoc())
-             << "expected single output, got " << currentOutputTypes.size();
-    }
-
-    Type currentOutputType = currentOutputTypes[0];
-    if (currentOutputType != targetOutputType) {
-      return emitSilenceableFailure(current->getLoc())
-             << "output type doesn't match: expected " << targetOutputType
-             << ", got " << currentOutputType;
+  ArrayAttr currentIndexingMaps = linalgOp.getIndexingMaps();
+  if (std::optional<ArrayAttr> targetIndexingMaps = getIndexingMaps()) {
+    if (currentIndexingMaps != *targetIndexingMaps) {
+      return emitSilenceableFailure(loc) << "indexing maps don't match";
     }
   }
 
@@ -309,14 +310,12 @@ IREE::transform_dialect::MatchContractionOp::matchOperation(
   linalg::ContractionDimensions contractionDims =
       linalg::inferContractionDims(linalgOp).value();
   SmallVector<int64_t> iterationDomain = linalgOp.getStaticLoopRanges();
-  MLIRContext *context = current->getContext();
-  Builder builder(context);
+  Builder builder(getContext());
 
   auto iterationSizes = [&](ArrayRef<unsigned> dimIndices) {
-    return llvm::to_vector(
-        llvm::map_range(dimIndices, [&](unsigned dimIdx) -> Attribute {
-          return builder.getI64IntegerAttr(iterationDomain[dimIdx]);
-        }));
+    return llvm::map_to_vector(dimIndices, [&](unsigned dimIdx) -> Attribute {
+      return builder.getI64IntegerAttr(iterationDomain[dimIdx]);
+    });
   };
 
   results.setParams(cast<OpResult>(getBatchDims()),
