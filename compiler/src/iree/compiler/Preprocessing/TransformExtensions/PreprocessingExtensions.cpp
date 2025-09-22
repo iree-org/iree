@@ -228,6 +228,33 @@ IREE::transform_dialect::MatchCastCompatibleDagFromRootOp::verify() {
 // MatchContractionOp
 //===----------------------------------------------------------------------===//
 
+// Helper function to get indexing maps for matmul variants.
+static ArrayAttr getMatmulIndexingMaps(StringAttr variant,
+                                       MLIRContext *context) {
+  Builder builder(context);
+  AffineExpr d0 = builder.getAffineDimExpr(0);
+  AffineExpr d1 = builder.getAffineDimExpr(1);
+  AffineExpr d2 = builder.getAffineDimExpr(2);
+
+  // Default indexing maps (NN case).
+  AffineMap mapA = AffineMap::get(3, 0, {d0, d2}, context); // (M, K).
+  AffineMap mapB = AffineMap::get(3, 0, {d2, d1}, context); // (K, N).
+  AffineMap mapC = AffineMap::get(3, 0, {d0, d1}, context); // (M, N).
+
+  StringRef variantStr = variant.getValue();
+  if (variantStr[0] == 'T') { // Transpose A.
+    mapA = AffineMap::get(3, 0, {d2, d0}, context);
+  }
+
+  if (variantStr[1] == 'T') { // Transpose B.
+    mapB = AffineMap::get(3, 0, {d1, d2}, context);
+  }
+
+  return builder.getArrayAttr({AffineMapAttr::get(mapA),
+                               AffineMapAttr::get(mapB),
+                               AffineMapAttr::get(mapC)});
+}
+
 DiagnosedSilenceableFailure
 IREE::transform_dialect::MatchContractionOp::matchOperation(
     Operation *current, transform::TransformResults &results,
@@ -305,14 +332,12 @@ IREE::transform_dialect::MatchContractionOp::matchOperation(
   linalg::ContractionDimensions contractionDims =
       linalg::inferContractionDims(linalgOp).value();
   SmallVector<int64_t> iterationDomain = linalgOp.getStaticLoopRanges();
-  MLIRContext *context = current->getContext();
-  Builder builder(context);
+  Builder builder(getContext());
 
   auto iterationSizes = [&](ArrayRef<unsigned> dimIndices) {
-    return llvm::to_vector(
-        llvm::map_range(dimIndices, [&](unsigned dimIdx) -> Attribute {
-          return builder.getI64IntegerAttr(iterationDomain[dimIdx]);
-        }));
+    return llvm::map_to_vector(dimIndices, [&](unsigned dimIdx) -> Attribute {
+      return builder.getI64IntegerAttr(iterationDomain[dimIdx]);
+    });
   };
 
   results.setParams(cast<OpResult>(getBatchDims()),
