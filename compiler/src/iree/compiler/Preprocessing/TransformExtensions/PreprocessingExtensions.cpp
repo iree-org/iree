@@ -8,8 +8,9 @@
 
 #include "iree/compiler/Utils/EquivalenceUtils.h"
 #include "iree/compiler/Utils/ShapeUtils.h"
-#include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/IRMapping.h"
@@ -221,6 +222,85 @@ IREE::transform_dialect::MatchCastCompatibleDagFromRootOp::verify() {
   }
   // TODO: Region verification that it includes a single DAG.
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// MatchContractionOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+IREE::transform_dialect::MatchContractionOp::matchOperation(
+    Operation *current, transform::TransformResults &results,
+    transform::TransformState &state) {
+  Location loc = current->getLoc();
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(current);
+  if (!linalgOp) {
+    return emitSilenceableFailure(loc)
+           << "Operation " << *current << " is not a LinalgOp.";
+  }
+
+  if (!linalg::isaContractionOpInterface(linalgOp)) {
+    return emitSilenceableFailure(loc)
+           << "Operation " << *current << " is not a contraction operation.";
+  }
+
+  Type targetLhsType = getLhsType();
+  Type currentLhsType = getElementTypeOrSelf(linalgOp.getDpsInputs()[0]);
+  if (currentLhsType != targetLhsType) {
+    return emitSilenceableFailure(loc)
+           << "LHS type doesn't match: expected " << targetLhsType << ", got "
+           << currentLhsType;
+  }
+
+  Type targetRhsType = getRhsType();
+  Type currentRhsType = getElementTypeOrSelf(linalgOp.getDpsInputs()[1]);
+  if (currentRhsType != targetRhsType) {
+    return emitSilenceableFailure(loc)
+           << "RHS type doesn't match: expected " << targetRhsType << ", got "
+           << currentRhsType;
+  }
+
+  Type targetOutputType = getOutputType();
+  // Since linalg::isaContractionOpInterface already verified single output in
+  // above code, we can directly access it.
+  Type currentOutputType =
+      getElementTypeOrSelf(linalgOp.getDpsInits()[0].getType());
+  if (currentOutputType != targetOutputType) {
+    return emitSilenceableFailure(loc)
+           << "output type doesn't match: expected " << targetOutputType
+           << ", got " << currentOutputType;
+  }
+
+  ArrayAttr currentIndexingMaps = linalgOp.getIndexingMaps();
+  if (std::optional<ArrayAttr> targetIndexingMaps = getIndexingMaps()) {
+    if (currentIndexingMaps != *targetIndexingMaps) {
+      return emitSilenceableFailure(loc) << "indexing maps don't match";
+    }
+  }
+
+  // Get the actual size values for batch/m/n/k dimensions after verifying it's
+  // a contraction operation.
+  linalg::ContractionDimensions contractionDims =
+      linalg::inferContractionDims(linalgOp).value();
+  SmallVector<int64_t> iterationDomain = linalgOp.getStaticLoopRanges();
+  Builder builder(getContext());
+
+  auto iterationSizes = [&](ArrayRef<unsigned> dimIndices) {
+    return llvm::map_to_vector(dimIndices, [&](unsigned dimIdx) -> Attribute {
+      return builder.getI64IntegerAttr(iterationDomain[dimIdx]);
+    });
+  };
+
+  results.setParams(cast<OpResult>(getBatchDims()),
+                    iterationSizes(contractionDims.batch));
+  results.setParams(cast<OpResult>(getMDims()),
+                    iterationSizes(contractionDims.m));
+  results.setParams(cast<OpResult>(getNDims()),
+                    iterationSizes(contractionDims.n));
+  results.setParams(cast<OpResult>(getKDims()),
+                    iterationSizes(contractionDims.k));
+
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===----------------------------------------------------------------------===//
