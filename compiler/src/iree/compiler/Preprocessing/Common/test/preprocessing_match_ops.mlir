@@ -353,8 +353,8 @@ module attributes {transform.with_named_sequence} {
 
 // -----
 
-// Verify that operations with exact same matching indexing maps are matched correctly,
-// and operations with different indexing map patterns are not matched.
+// Verify that contractions with exact same matching indexing maps are matched correctly,
+// and contractions with different indexing map patterns are not matched.
 
 #map_matmul0 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map_matmul1 = affine_map<(d0, d1, d2) -> (d1, d2)>
@@ -406,7 +406,7 @@ module attributes {transform.with_named_sequence} {
 
 // -----
 
-// Verify that operations with different number of indexing maps are correctly not matched.
+// Verify that contractions with a different number of indexing maps are correctly not matched.
 
 #map_matmul0 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map_matmul1 = affine_map<(d0, d1, d2) -> (d1, d2)>
@@ -441,6 +441,57 @@ module attributes {transform.with_named_sequence} {
      // Should NOT match: operation has 3 indexing maps but matcher expects 4.
     transform.foreach_match in %module
         @match_different_count -> @annotate_matched
+      : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
+  }
+}
+
+// -----
+
+// Verify the contractions with lowering config can be matched successfully.
+
+#promote_config = #iree_gpu.lowering_config<{promote_operands = [0, 1]}>
+#mma_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>}>
+
+// CHECK-LABEL: func.func @test_promote_operands_config
+func.func @test_promote_operands_config(%a: tensor<32x1024xf32>, %b: tensor<1024x128xf32>, %c: tensor<32x128xf32>) -> tensor<32x128xf32> {
+  // CHECK-NEXT: linalg.matmul
+  // CHECK-SAME:   lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1]}>
+  // CHECK-SAME:   match_status = "matched_with_lowering_config"
+  %mm = linalg.matmul {lowering_config = #promote_config}
+    ins(%a, %b : tensor<32x1024xf32>, tensor<1024x128xf32>)
+    outs(%c : tensor<32x128xf32>) -> tensor<32x128xf32>
+  return %mm : tensor<32x128xf32>
+}
+
+// CHECK-LABEL: func.func @test_mma_layout_config
+func.func @test_mma_layout_config(%a: tensor<64x64xf32>, %b: tensor<64x64xf32>, %c: tensor<64x64xf32>) -> tensor<64x64xf32> {
+  // CHECK-NEXT: linalg.matmul
+  // CHECK-SAME:   lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>}>
+  // CHECK-SAME:   match_status = "matched_with_lowering_config"
+  %mm = linalg.matmul {lowering_config = #mma_config}
+    ins(%a, %b : tensor<64x64xf32>, tensor<64x64xf32>)
+    outs(%c : tensor<64x64xf32>) -> tensor<64x64xf32>
+  return %mm : tensor<64x64xf32>
+}
+
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @match_matmul(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
+    %batch_dims, %m_dims, %n_dims, %k_dims = transform.iree.match.is_contraction %op,
+      lhs_type = f32, rhs_type = f32, output_type = f32 :
+      (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+    transform.yield %op : !transform.any_op
+  }
+
+  transform.named_sequence @annotate(%op: !transform.any_op {transform.readonly}) {
+    %0 = transform.param.constant "matched_with_lowering_config" -> !transform.any_param
+    transform.annotate %op "match_status" = %0 : !transform.any_op, !transform.any_param
+    transform.yield
+  }
+
+  transform.named_sequence @__transform_main(%module: !transform.any_op) {
+    transform.foreach_match in %module
+        @match_matmul -> @annotate
       : (!transform.any_op) -> (!transform.any_op)
     transform.yield
   }
