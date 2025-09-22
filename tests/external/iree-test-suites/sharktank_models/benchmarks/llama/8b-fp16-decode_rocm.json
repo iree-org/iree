@@ -19,7 +19,7 @@
     },
     "golden_time_ms": {
         "mi250": 9.0,
-        "mi300": 90.0,
+        "mi300": 10.01,
         "mi308": 12.0
     },
     "compilation_required": true,
