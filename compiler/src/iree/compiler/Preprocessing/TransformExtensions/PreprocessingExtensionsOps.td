@@ -229,18 +229,16 @@ def MatchSizeEqualsOp : Op<Transform_Dialect, "iree.match.size_equals",
     [MatchOpInterface,
      SingleOpMatcher,
      MemoryEffectsOpInterface]> {
-  let summary = [{Check whether a single transform parameter matches expected size values.}];
+  let summary = [{Check whether transform parameters match expected size values exactly.}];
   let description = [{
     Matches dimension sizes against expected values.
-    The dimension sizes is an array of transform parameters, and the expected values
-    are structured as nested arrays where each sub-array corresponds to a position
-    in the size array.
+    Each position in the dimension sizes array must match the corresponding
+    expected value exactly.
 
-    Example: %batch_dims = [[2, 4], [8, 16], [32, 64]]
+    Example: %batch_dims contains [2, 4] and expected_values is [2, 4].
     This means:
-    - %batch_dims[0] should be either 2 or 4.
-    - %batch_dims[1] should be either 8 or 16.
-    - %batch_dims[2] should be either 32 or 64.
+    - %batch_dims[0] must equal 2.
+    - %batch_dims[1] must equal 4.
 
     #### Return modes
 
@@ -251,11 +249,12 @@ def MatchSizeEqualsOp : Op<Transform_Dialect, "iree.match.size_equals",
   let arguments = (ins
     TransformHandleTypeInterface:$operand_handle, // 1) The operation to check.
     TransformParamTypeInterface:$dimension_sizes, // 2) Array of dimension parameters.
-    ArrayAttr:$expected_values                    // 3) Nested array of expected values.
+    ArrayAttr:$expected_values                    // 3) Array of expected values.
   );
 
   let assemblyFormat = [{
-    $operand_handle `,` $dimension_sizes `,` $expected_values attr-dict `:` type($operand_handle) `,` type($dimension_sizes)
+    $operand_handle `,` $dimension_sizes `,` $expected_values
+    attr-dict `:` type($operand_handle) `,` type($dimension_sizes)
   }];
 
   let extraClassDeclaration = SingleOpMatcher.extraDeclaration;

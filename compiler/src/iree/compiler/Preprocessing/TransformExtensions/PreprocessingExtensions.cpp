@@ -312,26 +312,24 @@ IREE::transform_dialect::MatchSizeEqualsOp::matchOperation(
     Operation *current, transform::TransformResults &results,
     transform::TransformState &state) {
   Location loc = current->getLoc();
-  ArrayRef<transform::Param> actualDimSizes =
+  ArrayRef<transform::Param> currentDimSizes =
       state.getParams(getDimensionSizes());
   ArrayAttr targetDimensionSizes = getExpectedValues();
 
-  if (actualDimSizes.size() != targetDimensionSizes.size()) {
+  if (currentDimSizes.size() != targetDimensionSizes.size()) {
     return emitSilenceableFailure(loc)
            << "Dimension sizes array and target sizes array have different "
               "lengths";
   }
 
-  for (auto [dimParam, targetValuesAttr] :
-       llvm::zip_equal(actualDimSizes, targetDimensionSizes)) {
-    int64_t currentDimSize = cast<IntegerAttr>(dimParam).getInt();
-    ArrayAttr allowedSizes = cast<ArrayAttr>(targetValuesAttr);
-    bool foundMatch = llvm::any_of(allowedSizes, [&](Attribute targetAttr) {
-      return cast<IntegerAttr>(targetAttr).getInt() == currentDimSize;
-    });
-    if (!foundMatch) {
-      return emitSilenceableFailure(loc) << "Dimension size " << currentDimSize
-                                         << " does not match target sizes";
+  for (auto [currentDimSizeAttr, targetDimSizeAttr] :
+       llvm::zip_equal(currentDimSizes, targetDimensionSizes)) {
+    int64_t currentDimSize = cast<IntegerAttr>(currentDimSizeAttr).getInt();
+    int64_t targetDimSize = cast<IntegerAttr>(targetDimSizeAttr).getInt();
+    if (currentDimSize != targetDimSize) {
+      return emitSilenceableFailure(loc)
+             << "Dimension size " << currentDimSize
+             << " does not match expected size " << targetDimSize;
     }
   }
 
