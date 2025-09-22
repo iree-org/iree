@@ -161,7 +161,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // Note: this only deduplicates equivalent executables. We could in addition
   // generalize executables to prune further (e.g. by promoting a dimension to
   // an argument if two executables differ only in that one dimension).
-  passManager.addPass(IREE::Flow::createDeduplicateExecutablesPass());
+  // passManager.addPass(IREE::Flow::createDeduplicateExecutablesPass());
 
   // Create one function per exported program entry point that can be used with
   // iree-benchmark-module to benchmark each function individually. Whether

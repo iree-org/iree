@@ -61,6 +61,11 @@ def DetachElementwiseFromNamedOpsPass :
   let summary = "Detaches elementwise ops from named Linalg ops.";
 }
 
+def GetPaddingValuePass :
+    Pass<"iree-global-opt-get-padding-value", ""> {
+  let summary = "pass to get the padding value";
+}
+
 def EraseUnusedLinalgOperandsPass :
     Pass<"iree-global-opt-erase-unused-linalg-operands", "mlir::ModuleOp"> {
   let summary = "Erases unused linalg operand and remove dead code.";

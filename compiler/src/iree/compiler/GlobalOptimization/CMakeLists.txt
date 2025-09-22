@@ -50,6 +50,7 @@ iree_cc_library(
     "ExpandTensorShapes.cpp"
     "FuseDequantizationMatmul.cpp"
     "FuseSiluHorizontalMatmul.cpp"
+    "GetPaddingValue.cpp"
     "GeneralizeLinalgNamedOps.cpp"
     "GlobalLoopInvariantCodeMotion.cpp"
     "InferNumericNarrowing.cpp"

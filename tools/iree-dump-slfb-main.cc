@@ -164,17 +164,17 @@ void deserializeFromSLFb(const char *filename) {
             continue;
           }
 
-          flatbuffers_uint32_vec_t data =
-              iree_exsleratev2_hal_exsleratev2_Uint32Buffer_data(uint32_buffer);
+          // flatbuffers_uint32_vec_t data =
+          //     iree_exsleratev2_hal_exsleratev2_Uint32Buffer_data(uint32_buffer);
 
-          printf("    %zu: category=%u\n", j, category);
-          if (data) {
-            printf("    Uint32Buffer (%zu bytes):\n[",
-                   flatbuffers_uint32_vec_len(data));
-            for (size_t i = 0; i < flatbuffers_uint32_vec_len(data); i++) {
-              printf("%u ", flatbuffers_uint32_vec_at(data, i));
-            }
-          }
+          // printf("    %zu: category=%u\n", j, category);
+          // if (data) {
+          //   printf("    Uint32Buffer (%zu bytes):\n[",
+          //          flatbuffers_uint32_vec_len(data));
+          //   for (size_t i = 0; i < flatbuffers_uint32_vec_len(data); i++) {
+          //     printf("%u ", flatbuffers_uint32_vec_at(data, i));
+          //   }
+          // }
           printf("]\n");
         }
       }
