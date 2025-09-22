@@ -862,7 +862,7 @@ pdl.pattern @annotate_scaled_matmul_like_f4E2M1FN_m8_n128_k1024 : benefit(1) {
   }
 }
 
-pdl.pattern @annotate_scaled_matmul_like_f4E2M1FN_m8_n64_k2048 : benefit(2) {
+pdl.pattern @annotate_scaled_matmul_like_f4E2M1FN_m8_n64_k2048 : benefit(1) {
   %elemtypes = pdl.attribute = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32]
   %imaps = pdl.attribute = [
     affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
@@ -940,6 +940,88 @@ pdl.pattern @annotate_scaled_matmul_like_f4E2M1FN_m8_n64_k2048 : benefit(2) {
 
     %builtin_attr = pdl.attribute = "rocm.builtin_name"
     %builtin_annotation = pdl.attribute = "iree_uk_amdgpu_scaled_matmul_f4E2M1FN_m8_n64_k2048.mlir"
+    pdl.apply_native_rewrite "annotateOperation"(%generic_op, %builtin_attr, %builtin_annotation : !pdl.operation, !pdl.attribute, !pdl.attribute)
+  }
+}
+
+pdl.pattern @annotate_dt_scaled_matmul_like_f4E2M1FN_m8_n64_k2048 : benefit(2) {
+  %elemtypes = pdl.attribute = [f4E2M1FN, f4E2M1FN, f8E8M0FNU, f8E8M0FNU, f32]
+  %imaps = pdl.attribute = [
+    affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+    affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>,
+    affine_map<(d0, d1, d2, d3) -> (d0, d2)>,
+    affine_map<(d0, d1, d2, d3) -> (d1, d2)>,
+    affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+  ]
+
+  %lhs_type = pdl.type
+  %rhs_type = pdl.type
+  %lhs_scale_type = pdl.type
+  %rhs_scale_type = pdl.type
+  %out_type = pdl.type
+  %zero_type = pdl.type : f32
+
+  %lhs = pdl.operand : %lhs_type
+  %rhs = pdl.operand : %rhs_type
+  %lhs_scale = pdl.operand : %lhs_scale_type
+  %rhs_scale = pdl.operand : %rhs_scale_type
+  %out_init = pdl.operand : %out_type
+
+  %zero_val = pdl.attribute = 0. : f32
+  %zero_op = pdl.operation "arith.constant" {"value" = %zero_val} -> (%zero_type : !pdl.type)
+  %zero = pdl.result 0 of %zero_op
+  %fill_op = pdl.operation "linalg.fill" (%zero, %out_init : !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
+  %fill = pdl.result 0 of %fill_op
+
+  // Match the a matmul-like generic with above indexing maps.
+  %generic_op = pdl.operation (%lhs, %rhs, %lhs_scale, %rhs_scale, %fill : !pdl.value, !pdl.value, !pdl.value, !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
+  pdl.apply_native_constraint "matchContraction"(
+        %generic_op, %elemtypes, %imaps
+        : !pdl.operation, !pdl.attribute, !pdl.attribute)
+
+  %attr_name = pdl.attribute = "iree_codegen.ukernel"
+  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) {isNegated = true}
+
+  %empty = pdl.attribute = {}
+  %c0 = pdl.attribute = 0
+  %c1 = pdl.attribute = 1
+  %c8 = pdl.attribute = 8
+  %c64 = pdl.attribute = 64
+
+  pdl.apply_native_constraint "dimIsMultipleOf"(%lhs, %c0, %c8 : !pdl.value, !pdl.attribute, !pdl.attribute)
+  pdl.apply_native_constraint "dimIsMultipleOf"(%lhs, %c1, %c64 : !pdl.value, !pdl.attribute, !pdl.attribute)
+  pdl.apply_native_constraint "dimIsMultipleOf"(%rhs, %c0, %c64 : !pdl.value, !pdl.attribute, !pdl.attribute)
+  pdl.apply_native_constraint "dimIsMultipleOf"(%rhs, %c1, %c64 : !pdl.value, !pdl.attribute, !pdl.attribute)
+
+  pdl.rewrite {
+    // Call the C++ "annotateOperation" utility to add the attributes to the matched linalg.generic op.
+    // This modifies the operation in-place.
+
+    %annotation = pdl.attribute = #iree_codegen.ukernel_descriptor<"dt_mmt_8x64_f4f4f32", tensor>
+    pdl.apply_native_rewrite "annotateOperation"(%generic_op, %attr_name, %annotation : !pdl.operation, !pdl.attribute, !pdl.attribute)
+
+    %config_name = pdl.attribute = "compilation_info"
+    %config = pdl.attribute = #iree_codegen.compilation_info<
+      lowering_config = #iree_gpu.lowering_config<{
+        workgroup = [8, 64, 0]
+      }>,
+      translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+        workgroup_size = [512, 1, 1] subgroup_size = 64,
+        // This strategy uses the maximum amount of possible shared memory on
+        // all gfx9 architectures so shared memory padding to reduce bank
+        // conflicts must be disabled. Also prefetching is done manually in the
+        // above and is disabled here as well.
+        {gpu_pipeline_options =
+          #iree_gpu.pipeline_options<
+            prefetch_shared_memory = false,
+            no_reduce_shared_memory_bank_conflicts = true>,
+        // This strategy requires 2 waves per SIMD.
+          llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>
+    >
+    pdl.apply_native_rewrite "annotateOperation"(%generic_op, %config_name, %config : !pdl.operation, !pdl.attribute, !pdl.attribute)
+
+    %builtin_attr = pdl.attribute = "rocm.builtin_name"
+    %builtin_annotation = pdl.attribute = "iree_uk_amdgpu_dt_scaled_matmul_f4E2M1FN_m8_n64_k2048.mlir"
     pdl.apply_native_rewrite "annotateOperation"(%generic_op, %builtin_attr, %builtin_annotation : !pdl.operation, !pdl.attribute, !pdl.attribute)
   }
 }

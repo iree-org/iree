@@ -684,9 +684,9 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
            "All operands must be a shaped type");
     assert(*getRank(lhs) > *getRank(operands[2]) &&
            *getRank(rhs) > *getRank(operands[3]) &&
-           "Expected operand #0 (lhs) and operand #1 (rhs) to have a greater "
-           "rank than their corresponding scales, operand #2 (lhs_scale) and "
-           "operand #3 (rhs_scale)");
+           "Expected operands #0 (lhs) and #1 (rhs) to have a greater rank "
+           "than their corresponding scales, operands #2 (lhs_scale) and #3 "
+           "(rhs_scale)");
   }
   Type lhsElemType = getElementTypeOrSelf(lhs);
   Type rhsElemType = getElementTypeOrSelf(rhs);
