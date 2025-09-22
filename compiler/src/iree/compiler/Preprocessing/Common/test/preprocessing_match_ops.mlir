@@ -315,7 +315,7 @@ func.func @op_fill(%dest: tensor<32x64xf32>, %value: f32) -> tensor<32x64xf32> {
 
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_matmul(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
-    %batch_dims, %m_dims, %n_dims, %k_dims = transform.iree.match.is_contraction %op,
+    %batch_dims, %m_dims, %n_dims, %k_dims = transform.iree.match.contraction %op,
       lhs_type = i8, rhs_type = i8, output_type = i32 :
       (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
     %c32 = transform.param.constant 32 : i64 -> !transform.param<i64>
@@ -325,7 +325,7 @@ module attributes {transform.with_named_sequence} {
   }
 
   transform.named_sequence @match_batch_matmul(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
-    %batch_dims, %m_dims, %n_dims, %k_dims = transform.iree.match.is_contraction %op,
+    %batch_dims, %m_dims, %n_dims, %k_dims = transform.iree.match.contraction %op,
       lhs_type = i8, rhs_type = i8, output_type = i32 :
       (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
     %c2 = transform.param.constant 2 : i64 -> !transform.param<i64>
@@ -383,7 +383,7 @@ func.func @op_matmul(%input0: tensor<32x64xi8>, %input1: tensor<32x64xi8>, %inpu
 
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_correct_maps(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
-   %batch, %m, %n, %k = transform.iree.match.is_contraction %op,
+   %batch, %m, %n, %k = transform.iree.match.contraction %op,
     lhs_type = i8, rhs_type = i8, output_type = i32 {indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2]} :
     (!transform.any_op) ->
     (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
@@ -425,7 +425,7 @@ func.func @op_matmul(%input0: tensor<32x64xi8>, %input1: tensor<32x64xi8>, %dest
 
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_different_count(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
-    %batch, %m, %n, %k = transform.iree.match.is_contraction %op,
+    %batch, %m, %n, %k = transform.iree.match.contraction %op,
       lhs_type = i8, rhs_type = i8, output_type = i32 {indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2, #map_matmul0]} :
       (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
     transform.yield %op : !transform.any_op
@@ -477,7 +477,7 @@ func.func @test_mma_layout_config(%a: tensor<64x64xf32>, %b: tensor<64x64xf32>, 
 
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_matmul(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
-    %batch_dims, %m_dims, %n_dims, %k_dims = transform.iree.match.is_contraction %op,
+    %batch_dims, %m_dims, %n_dims, %k_dims = transform.iree.match.contraction %op,
       lhs_type = f32, rhs_type = f32, output_type = f32 :
       (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
     transform.yield %op : !transform.any_op

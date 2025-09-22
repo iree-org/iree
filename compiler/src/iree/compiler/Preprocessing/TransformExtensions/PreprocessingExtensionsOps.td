@@ -172,7 +172,7 @@ def MatchRegionsOp : Op<Transform_Dialect, "iree.match.regions",
   let hasVerifier = 1;
 }
 
-def MatchContractionOp : Op<Transform_Dialect, "iree.match.is_contraction",
+def MatchContractionOp : Op<Transform_Dialect, "iree.match.contraction",
     [MatchOpInterface,
      SingleOpMatcher,
      MemoryEffectsOpInterface]> {
