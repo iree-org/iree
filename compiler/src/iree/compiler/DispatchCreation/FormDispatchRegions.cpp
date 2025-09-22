@@ -125,6 +125,15 @@ public:
   FailureOr<AffineMap> getRootParallelLoopToOpMap(Operation *op) const;
 
   bool isFusable(Operation *op) const {
+    // TODO(#22053): Don't fuse with a producer if it is a contraction.
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+    if (linalgOp &&
+        llvm::any_of(op->getUsers(),
+                     [this](Operation *user) { return contains(user); }) &&
+        linalg::isaContractionOpInterface(linalgOp)) {
+      return false;
+    }
+
     return succeeded(getRootParallelLoopToOpMap(op));
   }
 
