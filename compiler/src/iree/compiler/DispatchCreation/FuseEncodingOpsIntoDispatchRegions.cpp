@@ -68,12 +68,6 @@ struct FuseEncodingOpsIntoDispatchRegionsPass final
     MLIRContext *context = &getContext();
     IRRewriter rewriter(context);
 
-    // Run CSE to eliminate common encoding ops.
-    if (enableCSE) {
-      DominanceInfo domInfo;
-      mlir::eliminateCommonSubExpressions(rewriter, domInfo, funcOp);
-    }
-
     SmallVector<IREE::Encoding::SetEncodingOp> encodingOps;
     funcOp->walk([&](IREE::Encoding::SetEncodingOp encodingOp) {
       if (IREE::Flow::isNonNullAndOutsideDispatch(encodingOp)) {
@@ -123,7 +117,7 @@ struct FuseEncodingOpsIntoDispatchRegionsPass final
     }
 
     // Dynamic dims may have dominance issues after pulling encoding ops into
-    // producer dispatch regions, so we need to resolve tensor.dim ops. Also
+    // producer dispatch regions, so we need to resolve tensor.dim ops., Also
     // run the canonicalization patterns to remove redundantly returned results.
     GreedyRewriteConfig config;
     config.enableConstantCSE(false);

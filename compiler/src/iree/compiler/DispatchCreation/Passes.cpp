@@ -279,11 +279,7 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
     passManager.addPass(DispatchCreation::createHoistEncodingOpsPass());
   }
   FunctionLikeNest(passManager)
-      .addPass([&]() {
-        return DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass(
-            DispatchCreation::FuseEncodingOpsIntoDispatchRegionsPassOptions{
-                /*enableCSE=*/options.dataTiling.getValue()});
-      })
+      .addPass(DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass)
       .addPass(DispatchCreation::createConvertEncodingToFlowPass);
   // Hoist encoding operations into initializers when possible.
   IREE::Util::ExprHoistingOptions hoistingOptions;
