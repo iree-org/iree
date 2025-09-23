@@ -154,8 +154,8 @@ struct ExecutePartitionBuilder {
       if (transferOp.getSourceAffinityAttr() == partition->affinity) {
         transferOp.setSourceAffinityAttr(nullptr);
       }
-      if (transferOp.getResultAffinityAttr() == partition->affinity) {
-        transferOp.setResultAffinityAttr(nullptr);
+      if (transferOp.getTargetAffinityAttr() == partition->affinity) {
+        transferOp.setTargetAffinityAttr(nullptr);
       }
     } else if (auto affinityOp =
                    dyn_cast<IREE::Stream::AffinityOpInterface>(clonedOp)) {
