@@ -63,7 +63,8 @@ func.func @softmax_dynamic() {
   %cst_0 = arith.constant 0.000000e+00 : f32
   %cst_1 = arith.constant -3.40282347E+38 : f32
   %cst_2 = arith.constant dense<7.812500e-03> : tensor<12x128x128xf32>
-  %cst_3 = flow.tensor.dynamic_constant dense<5.000000e+00> : tensor<12x128x128xf32> -> tensor<?x?x?xf32>
+  %dynamic_input = flow.tensor.dynamic_constant dense<5.000000e+00> : tensor<12x128x128xf32> -> tensor<?x?x?xf32>
+  %cst_3 = util.optimization_barrier %dynamic_input : tensor<?x?x?xf32>
   %c_0_index = arith.constant 0 : index
   %c_1_index = arith.constant 1 : index
   %c_2_index = arith.constant 2 : index

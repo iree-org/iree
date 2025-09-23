@@ -79,7 +79,8 @@ func.func @layernorm_dynamic() {
   %cst_1 = arith.constant dense<0.000000e+00> : tensor<128x384xf32>
   %cst_2 = flow.tensor.dynamic_constant dense<9.99999996E-13> : tensor<128x1xf32> -> tensor<?x1xf32>
   %cst_3 = flow.tensor.dynamic_constant dense<3.840000e+02> : tensor<128x1xf32> -> tensor<?x1xf32>
-  %cst_4 = flow.tensor.dynamic_constant dense<5.000000e+00> : tensor<128x384xf32> -> tensor<?x?xf32>
+  %dyn_cst_4 = flow.tensor.dynamic_constant dense<5.000000e+00> : tensor<128x384xf32> -> tensor<?x?xf32>
+  %cst_4 = util.optimization_barrier %dyn_cst_4 : tensor<?x?xf32>
   %c_0_index = arith.constant 0 : index
   %c_1_index = arith.constant 1 : index
   %dim_0 = tensor.dim %cst_4, %c_0_index : tensor<?x?xf32>

@@ -185,12 +185,12 @@ func.func @test_multiple_reduction() {
 #pipeline_layout = #hal.pipeline.layout<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @test_dyn_reduction(%arg0: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<128x128xf32>>, %arg1: index) {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x?x32xf8E4M3FNUZ>>{%arg1}
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x?x32x128xf8E4M3FNUZ>>{%arg1}
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x?x64xf8E4M3FNUZ>>{%arg1}
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x?x64x128xf8E4M3FNUZ>>{%arg1}
   %2 = iree_tensor_ext.dispatch.tensor.load %arg0, offsets = [0, 0], sizes = [128, 128], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<128x128xf32>> -> tensor<128x128xf32>
-  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [128, %arg1, 32], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x?x32xf8E4M3FNUZ>>{%arg1} -> tensor<128x?x32xf8E4M3FNUZ>
-  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [128, %arg1, 32, 128], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x?x32x128xf8E4M3FNUZ>>{%arg1} -> tensor<128x?x32x128xf8E4M3FNUZ>
-  %5 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "reduction"]} ins(%3, %4 : tensor<128x?x32xf8E4M3FNUZ>, tensor<128x?x32x128xf8E4M3FNUZ>) outs(%2 : tensor<128x128xf32>) attrs =  {lowering_config = #iree_gpu.lowering_config<{partial_reduction = [0, 0, 1, 32], subgroup_basis = [[1, 1, 1, 1], [0, 1, 2, 3]], thread = [0, 0, 1, 16], lane_basis = [[1, 1, 1, 2], [0, 1, 2, 3]], workgroup = [1, 1, 0, 0]}>} {
+  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [128, %arg1, 32], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x?x64xf8E4M3FNUZ>>{%arg1} -> tensor<128x?x64xf8E4M3FNUZ>
+  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [128, %arg1, 32, 128], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x?x64x128xf8E4M3FNUZ>>{%arg1} -> tensor<128x?x64x128xf8E4M3FNUZ>
+  %5 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "reduction"]} ins(%3, %4 : tensor<128x?x64xf8E4M3FNUZ>, tensor<128x?x64x128xf8E4M3FNUZ>) outs(%2 : tensor<128x128xf32>) attrs =  {lowering_config = #iree_gpu.lowering_config<{partial_reduction = [0, 0, 1, 32], subgroup_basis = [[1, 1, 1, 1], [0, 1, 2, 3]], thread = [0, 0, 1, 16], lane_basis = [[1, 1, 1, 2], [0, 1, 2, 3]], workgroup = [1, 1, 0, 0]}>} {
   ^bb0(%in: f8E4M3FNUZ, %in_0: f8E4M3FNUZ, %out: f32):
     %6 = arith.extf %in : f8E4M3FNUZ to f32
     %7 = arith.extf %in_0 : f8E4M3FNUZ to f32
@@ -201,13 +201,13 @@ func.func @test_dyn_reduction(%arg0: !iree_tensor_ext.dispatch.tensor<readwrite:
   iree_tensor_ext.dispatch.tensor.store %5, %arg0, offsets = [0, 0], sizes = [128, 128], strides = [1, 1] : tensor<128x128xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<128x128xf32>>
   return
 }
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [2, 1, 1] subgroup_size = 64
-//       CHECK: func.func @test_dyn_reduction
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+// CHECK-LABEL: func.func @test_dyn_reduction
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:      attrs =  {lowering_config = #iree_gpu.lowering_config<{
-//  CHECK-SAME:               lane_basis = {{\[}}[1, 1, 1, 2], [0, 1, 2, 3]],
-//  CHECK-SAME:               partial_reduction = [0, 0, 1, 32],
+//  CHECK-SAME:               lane_basis = {{\[}}[1, 1, 1, 64], [0, 1, 2, 3]],
+//  CHECK-SAME:               partial_reduction = [0, 0, 1, 1024],
 //  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1, 1], [0, 1, 2, 3]],
 //  CHECK-SAME:               thread = [0, 0, 1, 16],
 //  CHECK-SAME:               workgroup = [1, 1, 0, 0]
@@ -287,7 +287,7 @@ func.func @test_gather_config(%arg0: !iree_tensor_ext.dispatch.tensor<readonly:t
   return
 }
 //      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
-//      CHECK: func.func @test_gather_config
+//CHECK-LABEL: func.func @test_gather_config
 // CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //      CHECK:   linalg.generic
 //  CHECK-NOT:      attrs =  {lowering_config = #iree_gpu.lowering_config<{
@@ -295,9 +295,9 @@ func.func @test_gather_config(%arg0: !iree_tensor_ext.dispatch.tensor<readonly:t
 //      CHECK:   linalg.generic
 // CHECK-SAME:      attrs =  {lowering_config = #iree_gpu.lowering_config<{
 // CHECK-SAME:               lane_basis = {{\[}}[1, 64], [0, 1]],
-// CHECK-SAME:               partial_reduction = [0, 64],
+// CHECK-SAME:               partial_reduction = [0, 256],
 // CHECK-SAME:               subgroup_basis = {{\[}}[1, 1], [0, 1]],
-// CHECK-SAME:               thread = [0, 1],
+// CHECK-SAME:               thread = [0, 4],
 // CHECK-SAME:               workgroup = [1, 0]
 
 // -----
@@ -331,9 +331,9 @@ func.func @split_reduction_config(%arg0 : tensor<?x131072xf32>,
       : tensor<?x1024xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x1024xf32>>{%1}
   return
 }
-//      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
-//      CHECK: func @split_reduction_config
-//      CHECK:   linalg.generic
+//      CHECK:       #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+//      CHECK-LABEL: func @split_reduction_config
+//      CHECK:       linalg.generic
 // CHECK-SAME:       lowering_config = #iree_gpu.lowering_config
 
 // -----
@@ -440,3 +440,55 @@ func.func @batch_matvec_f16_f32() {
 //  CHECK-SAME:                 subgroup_basis = {{\[}}[1, 1, 1], [0, 1, 2]],
 //  CHECK-SAME:                 thread = [0, 0, 8],
 //  CHECK-SAME:                 workgroup = [2, 1, 0]
+
+// -----
+
+!TA = tensor<1024x96xf32>
+!TB = tensor<1024xf32>
+!DTB = !iree_tensor_ext.dispatch.tensor<readwrite:tensor<1024xf32>>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+//       CHECK:  LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+// CHECK-LABEL:  @reduction_size_96
+//       CHECK:         lane_basis = {{\[}}[1, 64], [0, 1]]
+//  CHECK-SAME:  partial_reduction =       [0, 256],
+//  CHECK-SAME:     subgroup_basis = {{\[}}[1, 1], [0, 1]]
+//  CHECK-SAME:             thread =       [0, 4],
+//  CHECK-SAME:          workgroup =       [1, 0]
+func.func @reduction_size_96(%arg0 : !TA, %arg1 : !TB, %arg2 : !DTB) {
+  %0 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]}
+  ins(%arg0 : !TA) outs(%arg1 : !TB) {
+  ^bb0(%in: f32, %out: f32):
+    %1 = arith.addf %in, %out : f32
+    linalg.yield %1 : f32
+  } -> !TB
+  iree_tensor_ext.dispatch.tensor.store %0, %arg2, offsets = [0], sizes = [1024], strides = [1] : !TB -> !DTB
+  return
+}
+
+// -----
+
+// Current logic dictates that the load size of a thread must divide the reduction dimension (if static).
+// With a reduction size of 97, the load size is 1 (see the 'thread' field of the config).
+!TA = tensor<1024x97xf32>
+!TB = tensor<1024xf32>
+!DTB = !iree_tensor_ext.dispatch.tensor<readwrite:tensor<1024xf32>>
+//       CHECK:  LLVMGPUVectorDistribute workgroup_size = [128, 1, 1] subgroup_size = 64
+// CHECK-LABEL:  @reduction_size_97
+//       CHECK:         lane_basis = {{\[}}[1, 64], [0, 1]]
+//  CHECK-SAME:  partial_reduction =       [0, 128],
+//  CHECK-SAME:     subgroup_basis = {{\[}}[1, 2], [0, 1]]
+//  CHECK-SAME:             thread =       [0, 1],
+//  CHECK-SAME:          workgroup =       [1, 0]
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+func.func @reduction_size_97(%arg0 : !TA, %arg1 : !TB, %arg2 : !DTB) {
+  %0 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]}
+  ins(%arg0 : !TA) outs(%arg1 : !TB) {
+  ^bb0(%in: f32, %out: f32):
+    %1 = arith.addf %in, %out : f32
+    linalg.yield %1 : f32
+  } -> !TB
+  iree_tensor_ext.dispatch.tensor.store %0, %arg2, offsets = [0], sizes = [1024], strides = [1] : !TB -> !DTB
+  return
+}
