@@ -146,16 +146,15 @@ util.func public @multi_encoding_fusion_dynamic(%arg0: tensor<?x?x?xf32>, %d0: i
   %3 = iree_encoding.set_encoding %1 : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #encoding>
   util.return %2, %3 : tensor<?x?x?xf32, #encoding>, tensor<?x?x?xf32, #encoding>
 }
-// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing<>
-// CHECK-LABEL: @multi_encoding_fusion_dynamic
-// CHECK-SAME:    {{.+}}: tensor<?x?x?xf32>, %[[D0:.+]]: index, %[[D1:.+]]: index, %[[D2:.+]]: index)
-// CHECK:       %[[DISPATCH:.+]] = flow.dispatch.region -> (tensor<?x?x?xf32, #[[$ENCODING]]>
-// CHECK-SAME:      {%[[D0]], %[[D1]], %[[D2]]}
-// CHECK:         %[[ADD:.+]] = linalg.generic
-// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding
-// CHECK:         flow.return %[[SET_ENCODING]] :
-// CHECK:       }
-// CHECK:       util.return %[[DISPATCH]], %[[DISPATCH]]
+// CHECK-DAG:      #[[$ENCODING:.+]] = #iree_encoding.testing<>
+// CHECK-LABEL:    @multi_encoding_fusion_dynamic
+// CHECK-SAME:       {{.+}}: tensor<?x?x?xf32>, %[[D0:.+]]: index, %[[D1:.+]]: index, %[[D2:.+]]: index)
+// CHECK:          %[[DISPATCH:.+]] = flow.dispatch.region -> (tensor<?x?x?xf32>
+// CHECK-SAME:         {%[[D0]], %[[D1]], %[[D2]]}
+// CHECK:            %[[ADD:.+]] = linalg.generic
+// CHECK:            flow.return %[[ADD]] :
+// CHECK:          }
+// CHECK-COUNT-2:  iree_encoding.set_encoding %[[DISPATCH]]
 
 // -----
 
