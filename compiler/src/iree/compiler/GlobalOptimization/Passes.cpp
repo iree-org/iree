@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "iree/compiler/Modules/IO/Parameters/Transforms/Passes.h"
+#include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -146,6 +147,8 @@ void buildGlobalOptimizationPassPipeline(
         return createGeneralizeLinalgNamedOpsPass(opt);
       });
 
+  mainPassManager.addPass(
+      Preprocessing::createConvertConvFilterToChannelsLastPass());
   mainPassManager.addPass(DispatchCreation::createFoldUnitExtentDimsPass());
   mainPassManager.addPass(
       GlobalOptimization::createConvertStridedContractionToContractionPass());
