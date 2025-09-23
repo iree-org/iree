@@ -1917,7 +1917,7 @@ def Stream_TensorTraceOp : Stream_Op<"tensor.trace", [
   let hasVerifier = 1;
 }
 
-def Stream_TensorDispatchOp : Stream_Op<"tensor.dispatch", [
+def Stream_TensorDispatchOp : Stream_PureOp<"tensor.dispatch", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<SymbolUserOpInterface>,
   Stream_AffinityOp,
