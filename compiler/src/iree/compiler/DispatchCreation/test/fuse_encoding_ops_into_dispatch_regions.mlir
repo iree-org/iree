@@ -149,7 +149,7 @@ util.func public @multi_encoding_fusion_dynamic(%arg0: tensor<?x?x?xf32>, %d0: i
 // CHECK-DAG:      #[[$ENCODING:.+]] = #iree_encoding.testing<>
 // CHECK-LABEL:    @multi_encoding_fusion_dynamic
 // CHECK-SAME:       {{.+}}: tensor<?x?x?xf32>, %[[D0:.+]]: index, %[[D1:.+]]: index, %[[D2:.+]]: index)
-// CHECK:          %[[DISPATCH:.+]] = flow.dispatch.region -> (tensor<?x?x?xf32, #[[$ENCODING]]>
+// CHECK:          %[[DISPATCH:.+]] = flow.dispatch.region -> (tensor<?x?x?xf32>
 // CHECK-SAME:         {%[[D0]], %[[D1]], %[[D2]]}
 // CHECK:            %[[ADD:.+]] = linalg.generic
 // CHECK:            flow.return %[[ADD]] :
