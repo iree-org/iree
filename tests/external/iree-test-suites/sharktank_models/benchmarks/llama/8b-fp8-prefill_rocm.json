@@ -22,7 +22,7 @@
         "mi308": 192.506
     },
     "compilation_required": true,
-    "mlir_url": "https://sharkpublic.blob.core.windows.net/sharkpublic/yrathore/llama_8b_fp8_output.mlir",
+    "mlir_url": "https://sharkpublic.blob.core.windows.net/sharkpublic/yrathore/llama_8b_fp8_latest.mlir",
     "compile_flags": [
         "--iree-hal-target-backends=rocm",
         "--iree-hal-target-device=hip",
