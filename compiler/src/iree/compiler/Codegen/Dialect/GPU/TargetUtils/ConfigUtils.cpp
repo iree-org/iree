@@ -364,7 +364,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
   std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
       problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
       wgpCount, transposedLhs, transposedRhs, /*canUpcastAcc=*/false,
-      /*mustBeAligned*/ mustBeAligned, doCPromotion);
+      /*mustBeAligned*/ mustBeAligned, doCPromotion, scaled);
   return schedule;
 }
 
@@ -1627,7 +1627,7 @@ setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
 
   if (!mustBeAligned) {
     SmallVector<int64_t> paddingTileSizes = workgroupTileSizes;
-    paddingTileSizes[kDim] = reductionTileSizes[kDim] * schedule->kSize;
+    paddingTileSizes[kDim] = reductionTileSizes[kDim] * schedule->kSize[0];
     attrs.emplace_back(StringAttr::get(context, "padding_conv"),
                        b.getI64ArrayAttr(paddingTileSizes));
   }
