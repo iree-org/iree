@@ -54,7 +54,6 @@ iree-compile matmul.mlir -o /tmp/matmul.mlir \
   --iree-hal-target-device=hip \
   --iree-hip-target=gfx942 \
   --iree-dispatch-creation-data-tiling \
-  --iree-hip-encoding-layout-resolver=data-tiling \
   --iree-llvmgpu-test-combine-layout-transformation=true
 ```
 

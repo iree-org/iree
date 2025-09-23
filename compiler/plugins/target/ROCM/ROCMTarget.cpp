@@ -81,7 +81,8 @@ struct ROCMOptions {
   std::string bitcodeDirectory = getDefaultBitcodeDirectory();
   int wavesPerEu = 0;
   std::string enableROCMUkernels = "none";
-  std::string encodingLayoutResolver = GPU::kNoEncodingLayoutResolverName;
+  std::string encodingLayoutResolver =
+      GPU::kDataTilingEncodingLayoutResolverName;
   bool slpVectorization = true;
   bool globalISel = false;
   bool specializeDispatches = false;
