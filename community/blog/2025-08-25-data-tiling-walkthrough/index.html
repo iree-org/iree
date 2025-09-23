@@ -4919,7 +4919,6 @@ host/device programming model. [<a href="https://llvm.org/devmtg/2025-06/slides/
 <div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span>matmul.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/matmul.mlir<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-hal-target-device<span class="o">=</span>hip<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-hip-target<span class="o">=</span>gfx942<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-opt-data-tiling<span class="o">=</span><span class="nb">false</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-dispatch-creation-data-tiling<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-hip-encoding-layout-resolver<span class="o">=</span>data-tiling<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-llvmgpu-test-combine-layout-transformation<span class="o">=</span><span class="nb">true</span>
@@ -4949,7 +4948,6 @@ different from what the post shows, but they follow the same mechanism.
 <span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-llvmcpu-target-cpu-features<span class="o">=</span>host<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-opt-data-tiling<span class="o">=</span><span class="nb">false</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-dispatch-creation-data-tiling
 </code></pre></div>
 

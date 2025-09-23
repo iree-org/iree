@@ -5548,7 +5548,8 @@ For example, here is part of a config file for running ONNX model tests on CPU:<
 <span class="w">  </span><span class="nt">&quot;iree_compile_flags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">    </span><span class="s2">&quot;--iree-hal-target-device=local&quot;</span><span class="p">,</span>
 <span class="w">    </span><span class="s2">&quot;--iree-hal-local-target-device-backends=llvm-cpu&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="s2">&quot;--iree-llvmcpu-target-cpu=host&quot;</span>
+<span class="w">    </span><span class="s2">&quot;--iree-llvmcpu-target-cpu=host&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">&quot;--iree-opt-data-tiling&quot;</span>
 <span class="w">  </span><span class="p">],</span>
 <span class="w">  </span><span class="nt">&quot;iree_run_module_flags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
 <span class="w">    </span><span class="s2">&quot;--device=local-task&quot;</span>
@@ -5556,7 +5557,6 @@ For example, here is part of a config file for running ONNX model tests on CPU:<
 <span class="w">  </span><span class="nt">&quot;tests_and_expected_outcomes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;skip&quot;</span><span class="p">,</span>
 <span class="w">    </span><span class="nt">&quot;tests/model_zoo/validated/vision/body_analysis_models_test.py::test_models[age_gender/models/age_googlenet.onnx]&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;pass&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;tests/model_zoo/validated/vision/body_analysis_models_test.py::test_models[age_gender/models/gender_googlenet.onnx]&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;pass&quot;</span><span class="p">,</span>
 </code></pre></div></td></tr></table></div>
 <p>Unlike the ONNX operator tests, we do not run the full set of tests on every
 commit to <a href="https://github.com/iree-org/iree">iree-org/iree</a>. Instead, we run a

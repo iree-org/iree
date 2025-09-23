@@ -1380,6 +1380,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#data-tiling-iree-opt-data-tiling-off" class="md-nav__link">
+    <span class="md-ellipsis">
+      Data-Tiling (--iree-opt-data-tiling (off))
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#constant-evaluation-iree-opt-const-eval-on" class="md-nav__link">
     <span class="md-ellipsis">
       Constant evaluation (--iree-opt-const-eval (on))
@@ -4744,6 +4753,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#data-tiling-iree-opt-data-tiling-off" class="md-nav__link">
+    <span class="md-ellipsis">
+      Data-Tiling (--iree-opt-data-tiling (off))
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#constant-evaluation-iree-opt-const-eval-on" class="md-nav__link">
     <span class="md-ellipsis">
       Constant evaluation (--iree-opt-const-eval (on))
@@ -4901,6 +4919,33 @@ to <code>linalg</code> named ops even when the resulting op will be a <code>lina
 </li>
 </ul>
 <h2 id="high-level-program-optimizations">High level program optimizations<a class="headerlink" href="#high-level-program-optimizations" title="Permanent link">link</a></h2>
+<h3 id="data-tiling-iree-opt-data-tiling-off">Data-Tiling (<code>--iree-opt-data-tiling</code> (off))<a class="headerlink" href="#data-tiling-iree-opt-data-tiling-off" title="Permanent link">link</a></h3>
+<p>Modifies data layout of operands for certain operations, such as matrix
+multiplication, that prefer specifics layouts. These layout preferences depend
+on the operations and the target hardware.</p>
+<p>The layout changes can be propagated as far as possible across the workload, so
+the entire workload can use the updated layouts, as opposed to having to perform
+layout transformations at runtime. This may involve fusions or
+constant-evaluation that can amortize or remove layout-transformation overheads.</p>
+<p>Data-tiling is an optional optimization technique, and it is not supported by
+all backends. Any backend does not develop data-tiling may result in worse
+performance if it is enabled. The targets that support data-tiling are:</p>
+<ul>
+<li>CPU (x86)</li>
+<li>CPU (AArch64)</li>
+<li>CPU (RISC-V)</li>
+<li>GPU (ROCm)</li>
+<li>VMVX</li>
+</ul>
+<p>See the <a href="https://iree.dev/community/blog/2025-08-25-data-tiling-walkthrough/">blog post</a>
+to learn more about details.</p>
+<div class="admonition question -">
+<p class="admonition-title">Something missing or broken?</p>
+<p>Don't see the target here that you think should be? Reach out to <a href="https://discord.com/channels/689900678990135345/1254843174111678555">our
+data-tiling Discord channel</a>;
+we welcome contributions on
+<a href="https://github.com/iree-org/iree">our GitHub page</a>!</p>
+</div>
 <h3 id="constant-evaluation-iree-opt-const-eval-on">Constant evaluation (<code>--iree-opt-const-eval</code> (on))<a class="headerlink" href="#constant-evaluation-iree-opt-const-eval-on" title="Permanent link">link</a></h3>
 <p>Performs compile-time evaluation of any global initializers which produce
 the initial values for global constants, storing the global directly in the
