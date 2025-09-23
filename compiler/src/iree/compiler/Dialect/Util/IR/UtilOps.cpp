@@ -1413,26 +1413,6 @@ void OptimizationBarrierOp::build(OpBuilder &builder, OperationState &state,
   state.addAttributes(attributes);
 }
 
-LogicalResult OptimizationBarrierOp::verify() {
-  Operation *op = getOperation();
-  if (op->getNumOperands() != op->getNumResults()) {
-    return op->emitOpError()
-           << "must have same number of operands and results, but has "
-           << op->getNumOperands() << " and " << op->getNumResults()
-           << ", respectively";
-  }
-
-  for (int i = 0, e = op->getNumOperands(); i < e; ++i) {
-    if (op->getOperand(i).getType() != op->getResult(i).getType()) {
-      op->emitOpError() << "must have same operand and result types, but they "
-                           "differ at index "
-                        << i;
-    }
-  }
-
-  return success();
-}
-
 //===----------------------------------------------------------------------===//
 // util.unfoldable_constant
 //===----------------------------------------------------------------------===//

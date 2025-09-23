@@ -547,8 +547,6 @@ def Util_OptimizationBarrierOp : Util_Op<"optimization_barrier", [
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes
     )>,
   ];
-
-  let hasVerifier = 1;
 }
 
 def Util_UnfoldableConstantOp : Util_Op<"unfoldable_constant"> {
