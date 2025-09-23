@@ -525,7 +525,7 @@ def Util_AssumeIntOp : Util_PureOp<"assume.int", [
 }
 
 def Util_OptimizationBarrierOp : Util_Op<"optimization_barrier", [
-  SameOperandsAndResultType,
+  AllTypesMatch<["operands", "results"]>,
 ]> {
   let summary = [{Prevents compiler optimizations across a value.}];
   let description = [{
