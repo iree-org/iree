@@ -69,6 +69,11 @@ def DecomposeMapScatterPass :
     "::mlir::vector::VectorDialect",
     "::mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect"
   ];
+  let options = [
+    Option<"testPreprocessingPatterns", "test-preprocessing-patterns", "bool",
+           /*default=*/"false",
+           "Test only map_scatter decomposition preprocessing patterns.">,
+  ];
 }
 
 def DecomposeWinogradTransformPass :

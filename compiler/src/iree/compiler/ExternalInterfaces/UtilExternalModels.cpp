@@ -6,7 +6,6 @@
 
 #include "iree/compiler/ExternalInterfaces/UtilExternalModels.h"
 
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
@@ -191,15 +190,14 @@ struct GlobalOpInterfaceExternalModel
     auto globalOp = cast<ml_program::GlobalOp>(op);
     if (globalOp.getIsMutable()) {
       return cast<IREE::Util::GlobalLoadOpInterface>(
-          builder
-              .create<ml_program::GlobalLoadOp>(
-                  loc, globalOp.getType(), FlatSymbolRefAttr::get(globalOp))
+          ml_program::GlobalLoadOp::create(builder, loc, globalOp.getType(),
+                                           FlatSymbolRefAttr::get(globalOp))
               .getOperation());
     } else {
       return cast<IREE::Util::GlobalLoadOpInterface>(
-          builder
-              .create<ml_program::GlobalLoadConstOp>(
-                  loc, globalOp.getType(), FlatSymbolRefAttr::get(globalOp))
+          ml_program::GlobalLoadConstOp::create(
+              builder, loc, globalOp.getType(),
+              FlatSymbolRefAttr::get(globalOp))
               .getOperation());
     }
   }
@@ -209,9 +207,8 @@ struct GlobalOpInterfaceExternalModel
                                                    OpBuilder &builder) const {
     auto globalOp = cast<ml_program::GlobalOp>(op);
     return cast<IREE::Util::GlobalStoreOpInterface>(
-        builder
-            .create<ml_program::GlobalStoreOp>(
-                loc, FlatSymbolRefAttr::get(globalOp), value)
+        ml_program::GlobalStoreOp ::create(
+            builder, loc, FlatSymbolRefAttr::get(globalOp), value)
             .getOperation());
   }
 };
@@ -297,33 +294,6 @@ struct LinalgOpTiedOpInterfaceHelper {
         0,
         (Ops::template attachInterface<LinalgOpTiedOpInterface<Ops>>(*context),
          0)...};
-  }
-};
-
-// TODO(Max191): Remove this interface once GPU data tiling stops using early
-// materialization. This only exists for handling inner_tiled ops before
-// dispatch workgroups are created, which only happens with early
-// materialization.
-struct InnerTiledOpTiedOpInterface
-    : public IREE::Util::TiedOpInterface::ExternalModel<
-          InnerTiledOpTiedOpInterface, IREE::Codegen::InnerTiledOp> {
-  Value getTiedResult(Operation *op, unsigned resultIndex) const {
-    auto tiledOp = cast<IREE::Codegen::InnerTiledOp>(op);
-    return IREE::Util::TiedOpInterface::findTiedBaseValue(
-        tiledOp.getOutputs()[resultIndex]);
-  }
-
-  ::std::optional<unsigned>
-  getTiedResultOperandIndex(Operation *op, unsigned resultIndex) const {
-    auto tiledOp = cast<IREE::Codegen::InnerTiledOp>(op);
-    return {tiledOp.getOutputs().getBeginOperandIndex() + resultIndex};
-  }
-
-  SmallVector<int64_t> getTiedResultOperandIndices(Operation *op) const {
-    auto tiledOp = cast<IREE::Codegen::InnerTiledOp>(op);
-    return llvm::to_vector(llvm::seq(
-        static_cast<int64_t>(tiledOp.getOutputs().getBeginOperandIndex()),
-        static_cast<int64_t>(tiledOp.getNumOperands())));
   }
 };
 
@@ -463,12 +433,6 @@ void registerUtilExternalModels(DialectRegistry &registry) {
         tensor::InsertSliceOp::attachInterface<InsertSliceOpTiedOpInterface>(
             *context);
       });
-
-  registry.addExtension(+[](MLIRContext *context,
-                            IREE::Codegen::IREECodegenDialect *dialect) {
-    IREE::Codegen::InnerTiledOp::attachInterface<InnerTiledOpTiedOpInterface>(
-        *context);
-  });
 
   registry.addExtension(
       +[](MLIRContext *context, linalg::LinalgDialect *dialect) {

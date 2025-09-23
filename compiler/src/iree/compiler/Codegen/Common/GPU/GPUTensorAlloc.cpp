@@ -116,8 +116,9 @@ struct SwapAllocTensorPattern final
 
     rewriter.setInsertionPoint(linalgOp);
     std::optional<Attribute> memorySpace = allocOp.getMemorySpace();
-    auto newAllocOp = rewriter.create<bufferization::AllocTensorOp>(
-        allocOp.getLoc(), allocOp.getType(), allocOp.getDynamicSizes(),
+    auto newAllocOp = bufferization::AllocTensorOp::create(
+        rewriter, allocOp.getLoc(), allocOp.getType(),
+        allocOp.getDynamicSizes(),
         /*copy=*/Value(),
         memorySpace ? cast<IntegerAttr>(*memorySpace) : IntegerAttr());
     rewriter.modifyOpInPlace(linalgOp, [&]() {

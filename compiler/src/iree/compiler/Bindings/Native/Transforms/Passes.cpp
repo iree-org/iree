@@ -27,7 +27,7 @@ void buildTransformPassPipeline(OpPassManager &passManager,
 
   // Wraps the entry points in an export function.
   passManager.addPass(
-      createWrapEntryPointsPass(invocationOptions.invocationModel));
+      createWrapEntryPointsPass({invocationOptions.invocationModel}));
 
   // Cleanup the IR after manipulating it.
   passManager.addPass(createInlinerPass());

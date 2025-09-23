@@ -50,7 +50,6 @@ using llvm::dbgs;
 #define DEBUG_VECTOR_TO_MMA "transform-llvmgpu-extensions-vector-to-mma"
 
 #define DBGS() (dbgs() << '[' << DEBUG_TYPE << "] ")
-#define LDBG(X) LLVM_DEBUG(dbgs() << '[' << DEBUG_TYPE << "] " << X)
 #define DBGS_ALIAS() (dbgs() << '[' << DEBUG_TYPE_ALIAS << "] ")
 #define DBGS_VECTOR_TO_MMA() (dbgs() << '[' << DEBUG_VECTOR_TO_MMA << "] ")
 
@@ -157,7 +156,7 @@ replaceAllUsesOfLaneWithin(RewriterBase &b,
                            gpu::WarpExecuteOnLane0Op executeOp) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(executeOp);
-  Value zero = b.create<arith::ConstantIndexOp>(executeOp.getLoc(), 0);
+  Value zero = arith::ConstantIndexOp::create(b, executeOp.getLoc(), 0);
   b.setInsertionPointToStart(&executeOp.getWarpRegion().front());
   Value laneId = executeOp.getLaneid();
   bool applied = false;
@@ -249,17 +248,17 @@ rewriteScfIfAsWarpExecuteOnLane0(RewriterBase &rewriter, Location loc,
   if (workgroupSizeX != warpSize) {
     // Add a guard for `threadIdxx < warp size` around the
     // WarpExecuteOnLane0Op.
-    Value predicate = rewriter.create<arith::CmpIOp>(
-        loc, arith::CmpIPredicate::ult, threadIdxx,
-        rewriter.create<arith::ConstantIndexOp>(loc, warpSize));
+    Value predicate = arith::CmpIOp::create(
+        rewriter, loc, arith::CmpIPredicate::ult, threadIdxx,
+        arith::ConstantIndexOp::create(rewriter, loc, warpSize));
     // Note: return-less IfOp is built with a terminator, no need to
     // add one.
     auto newIfOp =
-        rewriter.create<scf::IfOp>(loc, predicate, /*withElseRegion=*/false);
+        scf::IfOp::create(rewriter, loc, predicate, /*withElseRegion=*/false);
     rewriter.setInsertionPointToStart(&newIfOp.getThenRegion().front());
   }
-  auto warpOp = rewriter.create<gpu::WarpExecuteOnLane0Op>(
-      loc, TypeRange(), threadIdxx, warpSize);
+  auto warpOp = gpu::WarpExecuteOnLane0Op::create(rewriter, loc, TypeRange(),
+                                                  threadIdxx, warpSize);
 
   // Move the code from the previous ifOp to the
   // WarpExecuteOnLane0Op.
@@ -271,7 +270,7 @@ rewriteScfIfAsWarpExecuteOnLane0(RewriterBase &rewriter, Location loc,
                                      sourceBlock.without_terminator().begin(),
                                      sourceBlock.without_terminator().end());
   rewriter.setInsertionPointToEnd(&targetBlock);
-  rewriter.create<gpu::YieldOp>(loc);
+  gpu::YieldOp::create(rewriter, loc);
 
   // Erase old op.
   rewriter.eraseOp(ifOp);
@@ -372,7 +371,7 @@ static Value allocateGlobalSharedMemory(Location loc, OpBuilder &builder,
     memrefType = MemRefType::get({1}, type, MemRefLayoutAttrInterface{},
                                  addressSpaceAttr);
   }
-  return builder.create<memref::AllocOp>(loc, memrefType);
+  return memref::AllocOp::create(builder, loc, memrefType);
 }
 
 /// Return a value yielded by `warpOp` which satisfies the filter lambda
@@ -393,23 +392,6 @@ static OpOperand *getWarpResult(gpu::WarpExecuteOnLane0Op warpOp,
 }
 
 namespace {
-/// Pattern to convert InsertElement to broadcast, this is a workaround
-/// until MultiDimReduction distribution is supported.
-class InsertElementToBroadcast final
-    : public OpRewritePattern<vector::InsertElementOp> {
-public:
-  using OpRewritePattern<vector::InsertElementOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(vector::InsertElementOp insertOp,
-                                PatternRewriter &rewriter) const override {
-    if (insertOp.getDestVectorType().getNumElements() != 1)
-      return failure();
-    rewriter.replaceOpWithNewOp<vector::BroadcastOp>(
-        insertOp, insertOp.getDestVectorType(), insertOp.getSource());
-    return success();
-  }
-};
-
 /// Sink out load op feeding into a warp op yield.
 /// ```
 /// %0 = vector.warp_execute_on_lane_0(%arg0) -> (f32) {
@@ -428,7 +410,7 @@ public:
 /// gpu.synchronize
 /// %0 = memref.load %src[%c0] : memref<1024xf32>
 struct WarpOpLoad : public OpRewritePattern<gpu::WarpExecuteOnLane0Op> {
-  using OpRewritePattern<gpu::WarpExecuteOnLane0Op>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(gpu::WarpExecuteOnLane0Op warpOp,
                                 PatternRewriter &rewriter) const override {
     OpOperand *operand = getWarpResult(warpOp, llvm::IsaPred<memref::LoadOp>);
@@ -447,9 +429,10 @@ struct WarpOpLoad : public OpRewritePattern<gpu::WarpExecuteOnLane0Op> {
     // TODO: generalize this.
     // options.warpSyncronizationFn currently must take a
     // WarpExecuteOnLane0Op which we don't have here.
-    rewriter.create<gpu::BarrierOp>(load.getLoc());
-    Value newRead = rewriter.create<memref::LoadOp>(
-        load.getLoc(), distributedVal.getType(), load.getMemref(), indices);
+    gpu::BarrierOp::create(rewriter, load.getLoc());
+    Value newRead = memref::LoadOp::create(rewriter, load.getLoc(),
+                                           distributedVal.getType(),
+                                           load.getMemref(), indices);
 
     // The result type of WarpExecuteOnLane0Op may or may not match
     // the yielded type depending on whether the op has "broadcast"
@@ -458,8 +441,8 @@ struct WarpOpLoad : public OpRewritePattern<gpu::WarpExecuteOnLane0Op> {
       rewriter.startOpModification(use.getOwner());
       Value replacement = newRead;
       if (use.get().getType() != newRead.getType()) {
-        replacement = rewriter.create<vector::BroadcastOp>(
-            load.getLoc(), use.get().getType(), newRead);
+        replacement = vector::BroadcastOp::create(rewriter, load.getLoc(),
+                                                  use.get().getType(), newRead);
       }
       use.getOwner()->setOperand(use.getOperandNumber(), replacement);
       rewriter.finalizeOpModification(use.getOwner());
@@ -472,7 +455,7 @@ struct WarpOpLoad : public OpRewritePattern<gpu::WarpExecuteOnLane0Op> {
 /// really have the semantic of global variables. Therefore hoisting them is
 /// always correct for static allocations.
 struct HoistSharedMemoryAlloc : public OpRewritePattern<memref::AllocOp> {
-  using OpRewritePattern<memref::AllocOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(memref::AllocOp alloc,
                                 PatternRewriter &rewriter) const override {
     if (!iree_compiler::hasSharedMemoryAddressSpace(alloc.getType()))
@@ -500,7 +483,6 @@ static void populateMultiReductionLoweringPatterns(Operation *target,
 
   vector::populateVectorMultiReductionLoweringPatterns(
       patterns, vector::VectorMultiReductionLowering::InnerReduction, benefit);
-  patterns.add<InsertElementToBroadcast>(target->getContext(), benefit);
 }
 
 static AffineMap simpleDistributionFunction(Value val) {
@@ -532,12 +514,11 @@ static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
   assert((val.getType().isF32() || val.getType().isInteger(32)) &&
          "unsupported shuffle type");
   Type i32Type = builder.getIntegerType(32);
-  Value srcIdxI32 = builder.create<arith::IndexCastOp>(loc, i32Type, srcIdx);
-  Value warpSzI32 = builder.create<arith::ConstantOp>(
-      loc, builder.getIntegerAttr(i32Type, warpSz));
-  Value result = builder
-                     .create<gpu::ShuffleOp>(loc, val, srcIdxI32, warpSzI32,
-                                             gpu::ShuffleMode::IDX)
+  Value srcIdxI32 = arith::IndexCastOp::create(builder, loc, i32Type, srcIdx);
+  Value warpSzI32 = arith::ConstantOp::create(
+      builder, loc, builder.getIntegerAttr(i32Type, warpSz));
+  Value result = gpu::ShuffleOp::create(builder, loc, val, srcIdxI32, warpSzI32,
+                                        gpu::ShuffleMode::IDX)
                      .getResult(0);
   return result;
 }
@@ -563,7 +544,7 @@ static void populatePropagateVectorDistribution(Operation *target,
 
 static void warpSyncronizationFn(Location loc, OpBuilder &builder,
                                  gpu::WarpExecuteOnLane0Op warpOp) {
-  builder.create<gpu::BarrierOp>(loc);
+  gpu::BarrierOp::create(builder, loc);
 };
 
 static void populateWarpExecuteOnLane0ToScf(
@@ -794,7 +775,7 @@ DiagnosedSilenceableFailure transform_dialect::SynchronizeLoopOp::applyToOne(
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   rewriter.setInsertionPointAfter(forOp);
-  rewriter.create<gpu::BarrierOp>(forOp.getLoc());
+  gpu::BarrierOp::create(rewriter, forOp.getLoc());
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -1366,7 +1347,7 @@ namespace {
 /// Polygeist.
 class BarrierElimination final : public OpRewritePattern<gpu::BarrierOp> {
 public:
-  using OpRewritePattern<gpu::BarrierOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(gpu::BarrierOp barrier,
                                 PatternRewriter &rewriter) const override {
@@ -1468,7 +1449,7 @@ transform_dialect::AMDGPUDistributeVectorsOp::applyToOne(
 
   rewriter.setInsertionPointToStart(&target.getFunctionBody().front());
   Value laneId =
-      rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::x);
+      gpu::ThreadIdOp::create(rewriter, target.getLoc(), gpu::Dimension::x);
   int64_t subgroupSize = getSubgroupSize();
 
   populateGPUDistributionPatterns(patterns);

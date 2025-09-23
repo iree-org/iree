@@ -334,13 +334,13 @@ struct IndexSwitchToIfPattern : public OpRewritePattern<scf::IndexSwitchOp> {
                                 PatternRewriter &rewriter) const override {
     if (switchOp.getNumCases() != 1)
       return failure();
-    Value caseValue = rewriter.create<arith::ConstantIndexOp>(
-        switchOp.getLoc(), switchOp.getCases().front());
+    Value caseValue = arith::ConstantIndexOp::create(
+        rewriter, switchOp.getLoc(), switchOp.getCases().front());
     Value isCaseValue = rewriter.createOrFold<arith::CmpIOp>(
         switchOp.getLoc(), arith::CmpIPredicate::eq, switchOp.getArg(),
         caseValue);
-    auto ifOp = rewriter.create<scf::IfOp>(
-        switchOp.getLoc(), switchOp.getResultTypes(), isCaseValue);
+    auto ifOp = scf::IfOp::create(rewriter, switchOp.getLoc(),
+                                  switchOp.getResultTypes(), isCaseValue);
     rewriter.inlineRegionBefore(switchOp.getCaseRegions().front(),
                                 ifOp.getThenRegion(),
                                 ifOp.getThenRegion().begin());
@@ -412,8 +412,8 @@ struct MergeIndexSwitchPattern : public OpRewritePattern<scf::IndexSwitchOp> {
     SmallVector<Type> newResultTypes;
     llvm::append_range(newResultTypes, prevOp.getResultTypes());
     llvm::append_range(newResultTypes, nextOp.getResultTypes());
-    auto newOp = rewriter.create<scf::IndexSwitchOp>(
-        rewriter.getFusedLoc({prevOp.getLoc(), nextOp.getLoc()}),
+    auto newOp = scf::IndexSwitchOp::create(
+        rewriter, rewriter.getFusedLoc({prevOp.getLoc(), nextOp.getLoc()}),
         newResultTypes, prevOp.getArg(), prevOp.getCases(),
         prevOp.getNumCases());
     SmallVector<std::pair<Value, Value>> resultReplacements;
@@ -470,7 +470,8 @@ struct MergeIndexSwitchPattern : public OpRewritePattern<scf::IndexSwitchOp> {
       }
 
       // Add the merged yield containing results from both regions.
-      targetBuilder.create<scf::YieldOp>(
+      scf::YieldOp::create(
+          targetBuilder,
           targetBuilder.getFusedLoc(yieldA.getLoc(), yieldB.getLoc()),
           yieldValues);
     };

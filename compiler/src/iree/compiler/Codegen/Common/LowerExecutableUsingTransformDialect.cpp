@@ -22,7 +22,7 @@ public:
 } // namespace
 
 void LowerExecutableUsingTransformDialectPass::runOnOperation() {
-  auto moduleOp = getOperation();
+  mlir::ModuleOp moduleOp = getOperation();
   auto funcOps = moduleOp.getOps<FunctionOpInterface>();
 
   if (funcOps.empty() || !llvm::hasSingleElement(funcOps)) {

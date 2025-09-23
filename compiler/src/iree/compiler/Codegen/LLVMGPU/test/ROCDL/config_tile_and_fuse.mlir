@@ -1,14 +1,7 @@
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx942 \
-// RUN: --iree-codegen-llvmgpu-early-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
+// RUN: --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
 // RUN: --iree-codegen-llvmgpu-use-igemm=false \
 // RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefix=CHECK
-//
-// RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx942 \
-// RUN: --iree-codegen-llvmgpu-use-igemm=false \
-// RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefix=LATE
-
-// RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx942 \
-// RUN:     --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefix=DEFAULT
 
 // TODO: This test is still using the legacy LLVMGPU kernel config. This needs
 // to be migrated to the rocdl heuristics, but for now is just physically
@@ -46,11 +39,9 @@ func.func @expanded_matmul_transpose_b(%lhs: tensor<2x64x2048xf16>, %rhs: tensor
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 //  CHECK-SAME:     promote_operands = [0, 1]
-//  CHECK-SAME:     reduction = [0, 0, 0, 0, 4]
-//  CHECK-SAME:     subgroup = [1, 1, 4, 1, 0]
-//  CHECK-SAME:     workgroup = [1, 1, 64, 64, 0]
-
-//        LATE:  LLVMGPUVectorDistribute
+//  CHECK-SAME:     reduction = [0, 0, 0, 0, 8]
+//  CHECK-SAME:     subgroup = [1, 2, 2, 2, 0]
+//  CHECK-SAME:     workgroup = [1, 2, 64, 64, 0]
 
 // -----
 
@@ -83,11 +74,9 @@ func.func @multi_dim_mma_schedule(%lhs: tensor<10x32x128x16xf16>, %rhs: tensor<4
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 //  CHECK-SAME:     promote_operands = [0, 1]
-//  CHECK-SAME:     reduction = [0, 0, 0, 0, 4, 1]
-//  CHECK-SAME:     subgroup = [2, 2, 1, 1, 0, 0]
-//  CHECK-SAME:     workgroup = [2, 2, 32, 32, 0, 0]
-
-//        LATE:  LLVMGPUVectorDistribute
+//  CHECK-SAME:     reduction = [0, 0, 0, 0, 8, 1]
+//  CHECK-SAME:     subgroup = [2, 4, 1, 1, 0, 0]
+//  CHECK-SAME:     workgroup = [2, 4, 32, 32, 0, 0]
 
 // -----
 
@@ -126,8 +115,6 @@ func.func @dynamic_multi_dim_mma_schedule(%lhs: tensor<?x6x16x?x16xf16>, %rhs: t
 //  CHECK-SAME:     subgroup = [0, 1, 0, 1, 1, 0, 0]
 //  CHECK-SAME:     workgroup = [1, 2, 1, 16, 32, 0, 0]
 
-//        LATE:  LLVMGPUVectorDistribute
-
 // -----
 
 func.func @mfma_matmul_1024x1024x1024(%lhs: tensor<1024x1024xf16>, %rhs: tensor<1024x1024xf16>) -> tensor<1024x1024xf32> {
@@ -149,11 +136,9 @@ func.func @mfma_matmul_1024x1024x1024(%lhs: tensor<1024x1024xf16>, %rhs: tensor<
 //       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 //  CHECK-SAME:     promote_operands = [0, 1]
-//  CHECK-SAME:     reduction = [0, 0, 2]
-//  CHECK-SAME:     subgroup = [4, 4, 0]
-//  CHECK-SAME:     workgroup = [128, 128, 0]
-
-//        LATE:  LLVMGPUVectorDistribute
+//  CHECK-SAME:     reduction = [0, 0, 8]
+//  CHECK-SAME:     subgroup = [2, 4, 0]
+//  CHECK-SAME:     workgroup = [64, 128, 0]
 
 // -----
 
@@ -172,8 +157,6 @@ func.func @mfma_matmul_k_aligned_intrinsic(%lhs: tensor<1024x360xf16>, %rhs: ten
 // CHECK:         linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME:    mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
 
-// LATE: LLVMGPUVectorDistribute
-
 // -----
 
 // This tests the mfma lowering intrinsic M alignment. Since gemmM = 176, and will
@@ -189,8 +172,6 @@ func.func @mfma_matmul_m_aligned_intrinsic(%lhs: tensor<176x1024xi8>, %rhs: tens
 // CHECK-LABEL: func.func @mfma_matmul_m_aligned_intrinsic
 // CHECK:         linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME:    mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8>
-
-// LATE: LLVMGPUVectorDistribute
 
 // -----
 
@@ -212,31 +193,21 @@ module {
 //  CHECK-SAME:     thread = [1, 1, 1, 1, 0, 0, 0]
 //  CHECK-SAME:     workgroup = [1, 1, 1, 64, 0, 0, 0]
 
-//        LATE:  LLVMGPUVectorDistribute
-
 // -----
 
-module {
-  func.func @matmul_dynamic_dim(%11: tensor<?x256xf16>, %12: tensor<256x256xf16>) -> tensor<?x256xf32> {
-    %c0 = arith.constant 0 : index
-    %cst = arith.constant 0.000000e+00 : f32
-    %8 = tensor.dim %11, %c0 : tensor<?x256xf16>
-    %13 = tensor.empty(%8) : tensor<?x256xf32>
-    %14 = linalg.fill ins(%cst : f32) outs(%13 : tensor<?x256xf32>) -> tensor<?x256xf32>
-    %15 = linalg.matmul ins(%11, %12 : tensor<?x256xf16>, tensor<256x256xf16>) outs(%14 : tensor<?x256xf32>) -> tensor<?x256xf32>
-    return %15 : tensor<?x256xf32>
-  }
+func.func @matmul_dynamic_M(%arg0: tensor<?x256xf32>, %arg1: tensor<256x256xf32>, %arg2: tensor<?x256xf32>, %arg3: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x256xf32>>, %arg4 : index) {
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<?x256xf32>, tensor<256x256xf32>) outs(%arg2 : tensor<?x256xf32>) -> tensor<?x256xf32>
+  iree_tensor_ext.dispatch.tensor.store %0, %arg3, offsets = [0, 0], sizes = [%arg4, 256], strides = [1, 1] : tensor<?x256xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x256xf32>>{%arg4}
+  return
 }
 
-// CHECK-LABEL: func.func @matmul_dynamic_dim
+// CHECK-LABEL: func.func @matmul_dynamic_M
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
 //       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     promote_operands = [0, 1]
 //  CHECK-SAME:     reduction = [0, 0, 4]
 //  CHECK-SAME:     thread = [1, 4, 0]
 //  CHECK-SAME:     workgroup = [1, 256, 0]
-
-//        LATE:  LLVMGPUWarpReduction
 
 // -----
 
@@ -331,15 +302,13 @@ func.func @unaligned_to_intrinsic_batched_matmul(%lhs : tensor<12x2x577xf32>, %r
 }
 }
 
-// LATE-LABEL: func.func @unaligned_to_intrinsic_batched_matmul
-// LATE-SAME:    #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
-// LATE-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
-//      LATE:    linalg.batch_matmul {{.*}}lowering_config = #iree_gpu.lowering_config
-//  LATE-SAME:     padding = [1, 16, 16, 4]
-//  LATE-SAME:     promote_operands = [0, 1, 2]
-//  LATE-SAME:     reduction = [0, 0, 0, 1]
-//  LATE-SAME:     subgroup = [0, 1, 1, 0]
-//  LATE-SAME:     workgroup = [1, 16, 16, 0]
+// CHECK-LABEL: func.func @unaligned_to_intrinsic_batched_matmul
+// CHECK-SAME:    #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
+// CHECK-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
+// CHECK:         linalg.batch_matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:     reduction = [0, 0, 0, 1]
+// CHECK-SAME:     subgroup = [0, 1, 1, 0]
+// CHECK-SAME:     workgroup = [1, 16, 16, 0]
 
 // -----
 
@@ -358,15 +327,15 @@ func.func @unaligned_matmul_with_two_reduce_dim(%arg0: tensor<196x9x4xf32>, %arg
 }
 }
 
-// LATE-LABEL: func.func @unaligned_matmul_with_two_reduce_dim
-// LATE-SAME:  {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64
-// LATE:       linalg.generic
-// LATE-SAME:  {lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
-// LATE-SAME:  padding = [16, 1, 16, 4]
-// LATE-SAME:  promote_operands = [0, 1, 2]
-// LATE-SAME:  reduction = [0, 1, 0, 1],
-// LATE-SAME:  subgroup = [1, 0, 1, 0],
-// LATE-SAME:  workgroup = [16, 0, 16, 0]}
+// CHECK-LABEL: func.func @unaligned_matmul_with_two_reduce_dim
+// CHECK-SAME:  {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64
+// CHECK:       linalg.generic
+// CHECK-SAME:  {lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>
+// CHECK-SAME:  padding = [64, 1, 16, 4]
+// CHECK-SAME:  promote_operands = [0, 1]
+// CHECK-SAME:  reduction = [0, 1, 0, 1],
+// CHECK-SAME:  subgroup = [2, 0, 1, 0],
+// CHECK-SAME:  workgroup = [64, 0, 16, 0]}
 
 // -----
 
@@ -438,15 +407,15 @@ func.func @unaligned_to_intrinsic_batched_matmul_tiling_check(%lhs : tensor<12x5
 // In this unit test, if C promotion is not considered, it will deduce a MMA
 // schedule with nTileSize of 16 while in reality it should be 8.
 
-// LATE-LABEL: func.func @unaligned_to_intrinsic_batched_matmul_tiling_check
-// LATE-SAME:    #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
-// LATE-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
-//      LATE:    linalg.batch_matmul {{.*}}lowering_config = #iree_gpu.lowering_config
-//  LATE-SAME:     padding = [1, 16, 512, 4]
-//  LATE-SAME:     promote_operands = [0, 1, 2]
-//  LATE-SAME:     reduction = [0, 0, 0, 1]
-//  LATE-SAME:     subgroup = [0, 1, 8, 0]
-//  LATE-SAME:     workgroup = [1, 16, 512, 0]
+// CHECK-LABEL: func.func @unaligned_to_intrinsic_batched_matmul_tiling_check
+// CHECK-SAME:    #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64
+// CHECK-SAME:    {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = false>}
+// CHECK:         linalg.batch_matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:      padding = [1, 16, 64, 4]
+// CHECK-SAME:      promote_operands = [0, 1]
+// CHECK-SAME:      reduction = [0, 0, 0, 1]
+// CHECK-SAME:      subgroup = [0, 1, 2, 0]
+// CHECK-SAME:      workgroup = [1, 16, 64, 0]
 
 // -----
 
@@ -844,5 +813,60 @@ func.func @small_reduction(%arg0 : tensor<2x?xf32>, %arg1 : tensor<?xf32>, %arg2
   } -> tensor<?xf32>
   return %0 : tensor<?xf32>
 }
-// DEFAULT-LABEL: @small_reduction
-//  DEFAULT-SAME:     #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+// CHECK-LABEL: @small_reduction
+// CHECK-SAME:     #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @fully_dyn_elementwise(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %dim = tensor.dim %arg0, %c0 : tensor<?x?xf32>
+  %dim_1 = tensor.dim %arg0, %c1 : tensor<?x?xf32>
+  %0 = tensor.empty(%dim, %dim_1) : tensor<?x?xf32>
+  %1 = linalg.generic {
+    indexing_maps = [#map, #map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0 : tensor<?x?xf32>) outs(%0 : tensor<?x?xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %2 = math.absf %in : f32
+    linalg.yield %2 : f32
+  } -> tensor<?x?xf32>
+  return %1 : tensor<?x?xf32>
+}
+
+// CHECK-LABEL: func.func @fully_dyn_elementwise
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1, 1]
+//  CHECK-SAME:     workgroup = [1, 64]
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+func.func @dyn_parallel_reduction(%arg0: tensor<?x32xf32>) -> tensor<?xf32> {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant -3.40282306E+38 : f32
+  %dim = tensor.dim %arg0, %c0 : tensor<?x32xf32>
+  %0 = tensor.empty(%dim) : tensor<?xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<?xf32>) -> tensor<?xf32>
+  %2 = linalg.generic {
+    indexing_maps = [#map, #map1],
+    iterator_types = ["parallel", "reduction"]}
+    ins(%arg0 : tensor<?x32xf32>) outs(%1 : tensor<?xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %3 = math.absf %in : f32
+    %4 = arith.maximumf %3, %out : f32
+    linalg.yield %4 : f32
+  } -> tensor<?xf32>
+  return %2 : tensor<?xf32>
+}
+
+// CHECK-LABEL: func.func @dyn_parallel_reduction
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     reduction = [0, 4]
+//  CHECK-SAME:     thread = [1, 0]
+//  CHECK-SAME:     workgroup = [64, 0]

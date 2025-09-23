@@ -63,8 +63,8 @@ Value transposeReshape(Value arg, Location loc,
 
   // Construct transpose. If no reshape is needed, we are done.
   auto transposeType = RankedTensorType::get(transposedShape, elementType);
-  Value transposeResult = rewriter.create<mlir::stablehlo::TransposeOp>(
-      loc, transposeType, arg, transposePermutationAttr);
+  Value transposeResult = mlir::stablehlo::TransposeOp::create(
+      rewriter, loc, transposeType, arg, transposePermutationAttr);
   if (noReshape)
     return transposeResult;
 
@@ -72,23 +72,25 @@ Value transposeReshape(Value arg, Location loc,
   auto reshapedType = RankedTensorType::get({leftSize, rightSize}, elementType);
 
   if (reshapedType.hasStaticShape()) {
-    return rewriter.create<mlir::stablehlo::ReshapeOp>(loc, reshapedType,
-                                                       transposeResult);
+    return mlir::stablehlo::ReshapeOp::create(rewriter, loc, reshapedType,
+                                              transposeResult);
   }
 
   SmallVector<Value> reshapeDims;
   auto multiplyDynamicDims = [&](llvm::ArrayRef<int64_t> dims) -> Value {
-    Value dynamicSize = rewriter.create<mlir::stablehlo::GetDimensionSizeOp>(
-        loc, arg, rewriter.getI64IntegerAttr(dims.front()));
-    Value dynamicSizeReshaped = rewriter.create<mlir::stablehlo::ReshapeOp>(
-        loc, RankedTensorType::get({1}, rewriter.getI32Type()), dynamicSize);
+    Value dynamicSize = mlir::stablehlo::GetDimensionSizeOp::create(
+        rewriter, loc, arg, rewriter.getI64IntegerAttr(dims.front()));
+    Value dynamicSizeReshaped = mlir::stablehlo::ReshapeOp::create(
+        rewriter, loc, RankedTensorType::get({1}, rewriter.getI32Type()),
+        dynamicSize);
     for (auto idx : dims.drop_front()) {
-      Value dim = rewriter.create<mlir::stablehlo::GetDimensionSizeOp>(
-          loc, arg, rewriter.getI64IntegerAttr(idx));
-      Value dimReshaped = rewriter.create<mlir::stablehlo::ReshapeOp>(
-          loc, RankedTensorType::get({1}, rewriter.getI32Type()), dim);
-      dynamicSizeReshaped = rewriter.create<mlir::stablehlo::MulOp>(
-          loc, dynamicSizeReshaped, dimReshaped);
+      Value dim = mlir::stablehlo::GetDimensionSizeOp::create(
+          rewriter, loc, arg, rewriter.getI64IntegerAttr(idx));
+      Value dimReshaped = mlir::stablehlo::ReshapeOp::create(
+          rewriter, loc, RankedTensorType::get({1}, rewriter.getI32Type()),
+          dim);
+      dynamicSizeReshaped = mlir::stablehlo::MulOp::create(
+          rewriter, loc, dynamicSizeReshaped, dimReshaped);
     }
     return dynamicSizeReshaped;
   };
@@ -96,22 +98,22 @@ Value transposeReshape(Value arg, Location loc,
   if (leftSize < 0) {
     reshapeDims.push_back(multiplyDynamicDims(leftDims));
   } else {
-    reshapeDims.push_back(rewriter.create<mlir::stablehlo::ConstantOp>(
-        loc, rewriter.getI32TensorAttr(leftSize)));
+    reshapeDims.push_back(mlir::stablehlo::ConstantOp::create(
+        rewriter, loc, rewriter.getI32TensorAttr(leftSize)));
   }
 
   if (rightSize < 0) {
     reshapeDims.push_back(multiplyDynamicDims(rightDims));
   } else {
-    reshapeDims.push_back(rewriter.create<mlir::stablehlo::ConstantOp>(
-        loc, rewriter.getI32TensorAttr(rightSize)));
+    reshapeDims.push_back(mlir::stablehlo::ConstantOp::create(
+        rewriter, loc, rewriter.getI32TensorAttr(rightSize)));
   }
 
-  Value reshapeDimsTensor = rewriter.create<mlir::stablehlo::ConcatenateOp>(
-      loc, RankedTensorType::get({2}, rewriter.getI32Type()), reshapeDims,
-      rewriter.getI64IntegerAttr(0));
-  return rewriter.create<mlir::stablehlo::DynamicReshapeOp>(
-      loc, reshapedType, transposeResult, reshapeDimsTensor);
+  Value reshapeDimsTensor = mlir::stablehlo::ConcatenateOp::create(
+      rewriter, loc, RankedTensorType::get({2}, rewriter.getI32Type()),
+      reshapeDims, rewriter.getI64IntegerAttr(0));
+  return mlir::stablehlo::DynamicReshapeOp::create(
+      rewriter, loc, reshapedType, transposeResult, reshapeDimsTensor);
 }
 
 Value processDotArg(Value arg, Location loc, ArrayRef<int64_t> contractDimsAttr,
@@ -181,11 +183,13 @@ struct GeneralDotRemoveBatch final
     for (auto dim : dimNumbers.getRhsContractingDimensions())
       newRhsContractingDims.push_back(dim - 1);
 
-    auto lhs = rewriter.create<mlir::stablehlo::ReshapeOp>(
-        op.getLoc(), lhsTy.clone(lhsTy.getShape().drop_front()), op.getLhs());
+    auto lhs = mlir::stablehlo::ReshapeOp::create(
+        rewriter, op.getLoc(), lhsTy.clone(lhsTy.getShape().drop_front()),
+        op.getLhs());
 
-    auto rhs = rewriter.create<mlir::stablehlo::ReshapeOp>(
-        op.getLoc(), rhsTy.clone(rhsTy.getShape().drop_front()), op.getRhs());
+    auto rhs = mlir::stablehlo::ReshapeOp::create(
+        rewriter, op.getLoc(), rhsTy.clone(rhsTy.getShape().drop_front()),
+        op.getRhs());
 
     auto newDimNumbers = mlir::stablehlo::DotDimensionNumbersAttr::get(
         rewriter.getContext(),
@@ -196,8 +200,8 @@ struct GeneralDotRemoveBatch final
         /*rhsContractingDimensions=*/
         newRhsContractingDims);
 
-    auto dot = rewriter.create<mlir::stablehlo::DotGeneralOp>(
-        op.getLoc(), ty.clone(ty.getShape().drop_front()), lhs, rhs,
+    auto dot = mlir::stablehlo::DotGeneralOp::create(
+        rewriter, op.getLoc(), ty.clone(ty.getShape().drop_front()), lhs, rhs,
         newDimNumbers, op.getPrecisionConfigAttr(), op.getAlgorithmAttr());
     rewriter.replaceOpWithNewOp<mlir::stablehlo::ReshapeOp>(op, ty,
                                                             dot.getResult());
@@ -277,8 +281,8 @@ struct GeneralDotConvert final
         // (modulo optimizing the trivial transpose/reshape operations). For
         // sparse cases, however, this rewriting preserves the output sparsity
         // that was explicitly given for the general dot operation.
-        Value newDotOp = rewriter.create<mlir::stablehlo::DotOp>(
-            loc, resultTy, lhs, rhs, precisionConfig);
+        Value newDotOp = mlir::stablehlo::DotOp::create(
+            rewriter, loc, resultTy, lhs, rhs, precisionConfig);
         if (auto enc = sparse_tensor::getSparseTensorEncoding(resultTy)) {
           newDotOp.setType(RankedTensorType::get(
               resultTy.getShape(), resultTy.getElementType(), enc));
@@ -310,8 +314,8 @@ struct GeneralDotConvert final
     ShapedType newTy = RankedTensorType::get(
         {lhsShapeType.getShape()[0], rhsShapeType.getShape()[1]},
         resultTy.getElementType());
-    Value newDotOp = rewriter.create<mlir::stablehlo::DotOp>(
-        loc, newTy, lhs, rhs, precisionConfig);
+    Value newDotOp = mlir::stablehlo::DotOp::create(rewriter, loc, newTy, lhs,
+                                                    rhs, precisionConfig);
     if (static_cast<int64_t>(lhsContractingDims.size()) ==
             lhsTy.getRank() - 1 &&
         static_cast<int64_t>(rhsContractingDims.size()) ==
@@ -337,10 +341,11 @@ struct GeneralDotConvert final
       for (int64_t contractingDim : contractingDims) {
         for (; index < contractingDim; ++index) {
           staticDims.push_back(ty.getDimSize(index));
-          Value dynDim = rewriter.create<mlir::stablehlo::GetDimensionSizeOp>(
-              loc, arg, rewriter.getI64IntegerAttr(index));
-          Value dynDimReshaped = rewriter.create<mlir::stablehlo::ReshapeOp>(
-              loc, RankedTensorType::get({1}, rewriter.getI32Type()), dynDim);
+          Value dynDim = mlir::stablehlo::GetDimensionSizeOp::create(
+              rewriter, loc, arg, rewriter.getI64IntegerAttr(index));
+          Value dynDimReshaped = mlir::stablehlo::ReshapeOp::create(
+              rewriter, loc, RankedTensorType::get({1}, rewriter.getI32Type()),
+              dynDim);
           dynDims.push_back(dynDimReshaped);
         }
         index++;
@@ -348,10 +353,11 @@ struct GeneralDotConvert final
 
       for (; index < ty.getRank(); ++index) {
         staticDims.push_back(ty.getDimSize(index));
-        Value dynDim = rewriter.create<mlir::stablehlo::GetDimensionSizeOp>(
-            loc, arg, rewriter.getI64IntegerAttr(index));
-        Value dynDimReshaped = rewriter.create<mlir::stablehlo::ReshapeOp>(
-            loc, RankedTensorType::get({1}, rewriter.getI32Type()), dynDim);
+        Value dynDim = mlir::stablehlo::GetDimensionSizeOp::create(
+            rewriter, loc, arg, rewriter.getI64IntegerAttr(index));
+        Value dynDimReshaped = mlir::stablehlo::ReshapeOp::create(
+            rewriter, loc, RankedTensorType::get({1}, rewriter.getI32Type()),
+            dynDim);
         dynDims.push_back(dynDimReshaped);
       }
     };
@@ -359,15 +365,16 @@ struct GeneralDotConvert final
     getDynamicDims(op.getLhs(), lhsContractingDims);
     getDynamicDims(op.getRhs(), rhsContractingDims);
 
-    Value reshapeDimsTensor = rewriter.create<mlir::stablehlo::ConcatenateOp>(
-        loc,
+    Value reshapeDimsTensor = mlir::stablehlo::ConcatenateOp::create(
+        rewriter, loc,
         RankedTensorType::get({static_cast<int64_t>(dynDims.size())},
                               rewriter.getI32Type()),
         dynDims, rewriter.getI64IntegerAttr(0));
 
-    Value result = rewriter.create<mlir::stablehlo::DynamicReshapeOp>(
-        loc, RankedTensorType::get(staticDims, resultTy.getElementType()),
-        newDotOp, reshapeDimsTensor);
+    Value result = mlir::stablehlo::DynamicReshapeOp::create(
+        rewriter, loc,
+        RankedTensorType::get(staticDims, resultTy.getElementType()), newDotOp,
+        reshapeDimsTensor);
 
     rewriter.replaceOp(op, result);
     return success();
@@ -388,15 +395,15 @@ struct DotVectorOptimization final : OpRewritePattern<mlir::stablehlo::DotOp> {
 
     llvm::SmallVector<int64_t> dotShape;
     if (lhsTy.getRank() == 2 && lhsTy.getDimSize(0) == 1) {
-      lhs = b.create<mlir::stablehlo::ReshapeOp>(
-          lhsTy.clone({lhsTy.getDimSize(1)}), lhs);
+      lhs = mlir::stablehlo::ReshapeOp::create(
+          b, lhsTy.clone({lhsTy.getDimSize(1)}), lhs);
     } else if (lhsTy.getRank() == 2) {
       dotShape.push_back(lhsTy.getDimSize(0));
     }
 
     if (rhsTy.getRank() == 2 && rhsTy.getDimSize(1) == 1) {
-      rhs = b.create<mlir::stablehlo::ReshapeOp>(
-          rhsTy.clone({rhsTy.getDimSize(0)}), rhs);
+      rhs = mlir::stablehlo::ReshapeOp::create(
+          b, rhsTy.clone({rhsTy.getDimSize(0)}), rhs);
     } else if (rhsTy.getRank() == 2) {
       dotShape.push_back(rhsTy.getDimSize(1));
     }
@@ -405,9 +412,10 @@ struct DotVectorOptimization final : OpRewritePattern<mlir::stablehlo::DotOp> {
       return rewriter.notifyMatchFailure(op, "no vector reform available.");
     }
 
-    auto newDot = b.create<mlir::stablehlo::DotOp>(
-        resultTy.clone(dotShape), lhs, rhs, op.getPrecisionConfigAttr());
-    auto resultReshape = b.create<mlir::stablehlo::ReshapeOp>(resultTy, newDot);
+    auto newDot = mlir::stablehlo::DotOp::create(
+        b, resultTy.clone(dotShape), lhs, rhs, op.getPrecisionConfigAttr());
+    auto resultReshape =
+        mlir::stablehlo::ReshapeOp::create(b, resultTy, newDot);
 
     rewriter.replaceOp(op, resultReshape);
     return success();

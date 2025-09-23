@@ -24,7 +24,6 @@ func.func @multi_mma_mfma_i32_16x16x32_i8(%a : tensor<1x2x8x4x16x2x8xi8>,
 // CHECK-LABEL: @multi_mma_mfma_i32_16x16x32_i8
 //       CHECK: iree_codegen.inner_tiled
 //  CHECK-SAME: #hal.executable.object<{path = "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8.gfx942.bc"
+//  CHECK-SAME: iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8", bitcode>
 //  CHECK-NOT:  promote_operands
 //  CHECK-SAME: reduction = [0, 0, 0]
-//  CHECK-SAME: #iree_gpu.ukernel_config<name = "iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8"
-//  CHECK-SAME: shared_memory_bytes = 8192

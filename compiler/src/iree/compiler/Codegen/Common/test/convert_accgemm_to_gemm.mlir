@@ -31,6 +31,7 @@ func.func @accumulate_gemm(%1 : tensor<512x128xi8>, %2 : tensor<512x128xi8>) {
 //       CHECK: %[[FILL:.+]] = linalg.fill ins(%[[C0]] : i32) outs(%[[EMPTY]] : tensor<512x512xi32>) -> tensor<512x512xi32>
 //       CHECK: %[[GEMM:.+]] = linalg.generic {{.*}} outs(%[[FILL]] : tensor<512x512xi32>) {
 //       CHECK: %[[ADD:.+]] = linalg.generic {{.+}} ins(%[[GEMM]]
+//  CHECK-SAME:   outs(%[[EMPTY]]
 //       CHECK: iree_tensor_ext.dispatch.tensor.store %[[ADD]]
 
 // -----
@@ -82,6 +83,7 @@ func.func @acc_conv_nchw(%1 : tensor<1x64x58x58xf32>, %2 : tensor<64x64x3x3xf32>
 //       CHECK: %[[FILL:.+]] = linalg.fill ins(%[[C0]] : f32) outs(%[[EMPTY]] : tensor<1x64x56x56xf32>) -> tensor<1x64x56x56xf32>
 //       CHECK: %[[CONV:.+]] = linalg.conv_2d_nchw_fchw {{.*}} outs(%[[FILL]] : tensor<1x64x56x56xf32>)
 //       CHECK: %[[ADD:.+]] = linalg.generic {{.+}} ins(%[[CONV]]
+//  CHECK-SAME:   outs(%[[EMPTY]]
 //       CHECK: iree_tensor_ext.dispatch.tensor.store %[[ADD]]
 
 // -----
@@ -97,12 +99,20 @@ func.func @nonacc_gemm(%1 : tensor<512x128xi8>, %2 : tensor<512x128xi8>) {
   %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<512x512xi32>>
   %empty = tensor.empty() : tensor<512x512xi32>
   %fill = linalg.fill ins(%c0_i32 : i32) outs(%empty : tensor<512x512xi32>) -> tensor<512x512xi32>
-  %5 = linalg.matmul_transpose_b
+  %5 = linalg.matmul
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d2)>,
+      affine_map<(d0, d1, d2) -> (d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ]
     ins(%1, %2 : tensor<512x128xi8>, tensor<512x128xi8>) outs(%fill : tensor<512x512xi32>) -> tensor<512x512xi32>
   iree_tensor_ext.dispatch.tensor.store %5, %3, offsets = [0, 0], sizes = [512, 512], strides = [1, 1] : tensor<512x512xi32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<512x512xi32>>
   return
 }
 
+// CHECK-DAG: #[[$MA:.*]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+// CHECK-DAG: #[[$MB:.*]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+// CHECK-DAG: #[[$MC:.*]] = affine_map<(d0, d1, d2) -> (d0, d1)>
 // CHECK-LABEL: func.func @nonacc_gemm
-//       CHECK: linalg.matmul_transpose_b
+//       CHECK: linalg.matmul indexing_maps = [#[[$MA]], #[[$MB]], #[[$MC]]]
 //   CHECK-NOT: linalg.generic

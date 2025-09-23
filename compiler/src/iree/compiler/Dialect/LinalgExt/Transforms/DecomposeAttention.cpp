@@ -19,8 +19,7 @@ namespace {
 
 struct DecomposeAttentionPass final
     : impl::DecomposeAttentionPassBase<DecomposeAttentionPass> {
-  using impl::DecomposeAttentionPassBase<
-      DecomposeAttentionPass>::DecomposeAttentionPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry

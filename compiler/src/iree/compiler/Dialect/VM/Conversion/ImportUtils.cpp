@@ -119,26 +119,26 @@ Value castToImportType(Value value, Type targetType, OpBuilder &builder) {
   if (llvm::isa<FloatType>(sourceType) && llvm::isa<IntegerType>(targetType) &&
       sourceType.getIntOrFloatBitWidth() ==
           targetType.getIntOrFloatBitWidth()) {
-    return builder.create<mlir::arith::BitcastOp>(value.getLoc(), targetType,
-                                                  value);
+    return mlir::arith::BitcastOp::create(builder, value.getLoc(), targetType,
+                                          value);
   } else if (sourceIsInteger &&
              (targetType.isSignedInteger() || targetType.isSignlessInteger())) {
     if (targetType.getIntOrFloatBitWidth() >
         sourceType.getIntOrFloatBitWidth()) {
-      return builder.create<mlir::arith::ExtSIOp>(value.getLoc(), targetType,
-                                                  value);
+      return mlir::arith::ExtSIOp::create(builder, value.getLoc(), targetType,
+                                          value);
     } else {
-      return builder.create<mlir::arith::TruncIOp>(value.getLoc(), targetType,
-                                                   value);
+      return mlir::arith::TruncIOp::create(builder, value.getLoc(), targetType,
+                                           value);
     }
   } else if (sourceIsInteger && targetType.isUnsignedInteger()) {
     if (targetType.getIntOrFloatBitWidth() >
         sourceType.getIntOrFloatBitWidth()) {
-      return builder.create<mlir::arith::ExtUIOp>(value.getLoc(), targetType,
-                                                  value);
+      return mlir::arith::ExtUIOp::create(builder, value.getLoc(), targetType,
+                                          value);
     } else {
-      return builder.create<mlir::arith::TruncIOp>(value.getLoc(), targetType,
-                                                   value);
+      return mlir::arith::TruncIOp::create(builder, value.getLoc(), targetType,
+                                           value);
     }
   } else {
     return value;
@@ -175,8 +175,8 @@ std::optional<SmallVector<Value>> rewriteAttrToOperands(Location loc,
     // conversions can do their job. If we want to remove the dependency
     // from standard ops in the future we could instead go directly to
     // one of the vm constant ops.
-    auto constValue = builder.create<mlir::arith::ConstantOp>(
-        loc, inputType,
+    auto constValue = mlir::arith::ConstantOp::create(
+        builder, loc, inputType,
         IntegerAttr::get(inputType, APInt(inputType.getIntOrFloatBitWidth(),
                                           intAttr.getValue().getSExtValue())));
     return {{constValue}};
@@ -185,16 +185,16 @@ std::optional<SmallVector<Value>> rewriteAttrToOperands(Location loc,
     APFloat value = floatAttr.getValue();
     value.convert(llvm::cast<FloatType>(inputType).getFloatSemantics(),
                   llvm::RoundingMode::NearestTiesToEven, &lossy);
-    auto constValue = builder.create<mlir::arith::ConstantOp>(
-        loc, inputType, FloatAttr::get(inputType, value));
+    auto constValue = mlir::arith::ConstantOp::create(
+        builder, loc, inputType, FloatAttr::get(inputType, value));
     return {{constValue}};
   } else if (auto elementsAttr =
                  llvm::dyn_cast<DenseIntElementsAttr>(attrValue)) {
     SmallVector<Value> elementValues;
     elementValues.reserve(elementsAttr.getNumElements());
     for (auto intAttr : elementsAttr.getValues<Attribute>()) {
-      elementValues.push_back(builder.create<mlir::arith::ConstantOp>(
-          loc, elementsAttr.getType().getElementType(),
+      elementValues.push_back(mlir::arith::ConstantOp::create(
+          builder, loc, elementsAttr.getType().getElementType(),
           cast<TypedAttr>(intAttr)));
     }
     return elementValues;
@@ -209,7 +209,7 @@ std::optional<SmallVector<Value>> rewriteAttrToOperands(Location loc,
     }
     return allValues;
   } else if (auto strAttr = llvm::dyn_cast<StringAttr>(attrValue)) {
-    return {{builder.create<IREE::VM::RodataInlineOp>(loc, strAttr)}};
+    return {{IREE::VM::RodataInlineOp::create(builder, loc, strAttr)}};
   }
 
   // This may be a custom dialect type. As we can't trivially access the storage

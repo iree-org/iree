@@ -33,15 +33,15 @@ Value broadcastToFeatureDim(Location loc, RankedTensorType resultType,
         loc, resultType, value1d, shapeValue, dims);
   }
   assert(resultType.hasStaticShape());
-  return rewriter.create<mlir::stablehlo::BroadcastInDimOp>(loc, resultType,
-                                                            value1d, dims);
+  return mlir::stablehlo::BroadcastInDimOp::create(rewriter, loc, resultType,
+                                                   value1d, dims);
 }
 
 // Get the shape of operand, assuming it is a dynamic shape with static rank.
 Value getShapeValue(Location loc, Value operand, PatternRewriter &rewriter) {
   RankedTensorType resultType = cast<RankedTensorType>(operand.getType());
-  return rewriter.create<mlir::shape::ShapeOfOp>(
-      loc,
+  return mlir::shape::ShapeOfOp::create(
+      rewriter, loc,
       RankedTensorType::get({resultType.getRank()}, rewriter.getIndexType()),
       operand);
 }
@@ -71,11 +71,12 @@ Value materializeEpsilon(Operation *op, FloatAttr epsilonAttr, FloatType fpType,
   auto scalarType = RankedTensorType::get({}, fpType);
   auto epsilonTensorAttr =
       DenseElementsAttr::get(scalarType, {cast<Attribute>(epsilonAttr)});
-  Value epsilon = b.create<mlir::stablehlo::ConstantOp>(epsilonTensorAttr);
+  Value epsilon = mlir::stablehlo::ConstantOp::create(b, epsilonTensorAttr);
   DenseI64ArrayAttr dims = rewriter.getDenseI64ArrayAttr({});
   if (broadcastToType.hasStaticShape()) {
-    return b.create<mlir::stablehlo::BroadcastInDimOp>(broadcastToType, epsilon,
-                                                       /*broadcast_dims=*/dims);
+    return mlir::stablehlo::BroadcastInDimOp::create(b, broadcastToType,
+                                                     epsilon,
+                                                     /*broadcast_dims=*/dims);
   }
   Value shapeValue = getShapeValue(op->getLoc(), broadcastTo, rewriter);
   return b.createOrFold<mlir::stablehlo::DynamicBroadcastInDimOp>(
@@ -112,9 +113,9 @@ struct UnfuseBatchNormInferencePattern final
     if (!epsilon) {
       return failure();
     }
-    Value stddev = rewriter.create<mlir::stablehlo::AddOp>(
-        bnOp.getLoc(), bnOp.getVariance(), epsilon);
-    stddev = rewriter.create<mlir::stablehlo::SqrtOp>(bnOp.getLoc(), stddev);
+    Value stddev = mlir::stablehlo::AddOp::create(rewriter, bnOp.getLoc(),
+                                                  bnOp.getVariance(), epsilon);
+    stddev = mlir::stablehlo::SqrtOp::create(rewriter, bnOp.getLoc(), stddev);
 
     // Broadcast all terms.
     Value shapeValue;
@@ -135,12 +136,12 @@ struct UnfuseBatchNormInferencePattern final
 
     // Compute:
     // scale * (input - mean) / stddev + offset
-    Value result = rewriter.create<mlir::stablehlo::SubtractOp>(
-        bnOp.getLoc(), bnOp.getOperand(), broadcastMean);
-    result = rewriter.create<mlir::stablehlo::MulOp>(bnOp.getLoc(), result,
-                                                     broadcastScale);
-    result = rewriter.create<mlir::stablehlo::DivOp>(bnOp.getLoc(), result,
-                                                     broadcastStddev);
+    Value result = mlir::stablehlo::SubtractOp::create(
+        rewriter, bnOp.getLoc(), bnOp.getOperand(), broadcastMean);
+    result = mlir::stablehlo::MulOp::create(rewriter, bnOp.getLoc(), result,
+                                            broadcastScale);
+    result = mlir::stablehlo::DivOp::create(rewriter, bnOp.getLoc(), result,
+                                            broadcastStddev);
     rewriter.replaceOpWithNewOp<mlir::stablehlo::AddOp>(bnOp, result,
                                                         broadcastOffset);
 
@@ -156,8 +157,8 @@ Value createReduce(Location loc, Value operand, Value zero,
   auto operandType = cast<RankedTensorType>(operand.getType());
   auto reduceResultType = RankedTensorType::get(
       {operandType.getDimSize(featureIndex)}, operandType.getElementType());
-  auto reduce = rewriter.create<mlir::stablehlo::ReduceOp>(
-      loc, reduceResultType, operand, zero, reduceDims);
+  auto reduce = mlir::stablehlo::ReduceOp::create(
+      rewriter, loc, reduceResultType, operand, zero, reduceDims);
 
   // setup "stablehlo.reduce"'s body
   Region &region = reduce.getBody();
@@ -171,9 +172,9 @@ Value createReduce(Location loc, Value operand, Value zero,
   {
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToStart(&block);
-    Value addResult = rewriter.create<mlir::stablehlo::AddOp>(
-        loc, *firstArgument, *secondArgument);
-    rewriter.create<mlir::stablehlo::ReturnOp>(loc, addResult);
+    Value addResult = mlir::stablehlo::AddOp::create(
+        rewriter, loc, *firstArgument, *secondArgument);
+    mlir::stablehlo::ReturnOp::create(rewriter, loc, addResult);
   }
 
   return reduce.getResult(0);
@@ -192,17 +193,18 @@ Value calculateReduceSize(Operation *op, Value operand,
     Value operandShape = getShapeValue(op->getLoc(), operand, rewriter);
     Value scaleShape = getShapeValue(op->getLoc(), scale, rewriter);
     Value operandTotalSize =
-        b.create<shape::NumElementsOp>(indexType, operandShape);
+        shape::NumElementsOp::create(b, indexType, operandShape);
     Value scaleTotalSize =
-        b.create<shape::NumElementsOp>(indexType, scaleShape);
+        shape::NumElementsOp::create(b, indexType, scaleShape);
     Value reduceSize =
-        b.create<shape::DivOp>(indexType, operandTotalSize, scaleTotalSize);
-    reduceSize = b.create<arith::IndexCastOp>(b.getI64Type(), reduceSize);
-    reduceSize = b.create<tensor::FromElementsOp>(reduceSize);
-    reduceSize = b.create<mlir::stablehlo::ConvertOp>(
-        RankedTensorType::get({1}, operandType.getElementType()), reduceSize);
-    reduceSize = b.create<mlir::stablehlo::ReshapeOp>(
-        RankedTensorType::get({}, operandType.getElementType()), reduceSize);
+        shape::DivOp::create(b, indexType, operandTotalSize, scaleTotalSize);
+    reduceSize = arith::IndexCastOp::create(b, b.getI64Type(), reduceSize);
+    reduceSize = tensor::FromElementsOp::create(b, reduceSize);
+    reduceSize = mlir::stablehlo::ConvertOp::create(
+        b, RankedTensorType::get({1}, operandType.getElementType()),
+        reduceSize);
+    reduceSize = mlir::stablehlo::ReshapeOp::create(
+        b, RankedTensorType::get({}, operandType.getElementType()), reduceSize);
     return b.createOrFold<mlir::stablehlo::DynamicBroadcastInDimOp>(
         scaleType, reduceSize, scaleShape, b.getDenseI64ArrayAttr({}));
   }
@@ -222,8 +224,8 @@ Value calculateReduceSize(Operation *op, Value operand,
   if (losesInfo) {
     op->emitWarning("Conversion of reduce_dims_size loses precision");
   }
-  Value reduceSize = b.create<mlir::stablehlo::ConstantOp>(
-      DenseFPElementsAttr::get(scaleType, floatValue));
+  Value reduceSize = mlir::stablehlo::ConstantOp::create(
+      b, DenseFPElementsAttr::get(scaleType, floatValue));
   return reduceSize;
 }
 
@@ -253,8 +255,8 @@ struct UnfuseBatchNormTrainingPattern final
     }
 
     // zero constant
-    Value constZero = rewriter.create<mlir::stablehlo::ConstantOp>(
-        bnOp.getLoc(),
+    Value constZero = mlir::stablehlo::ConstantOp::create(
+        rewriter, bnOp.getLoc(),
         DenseFPElementsAttr::get(RankedTensorType::get({}, fpType),
                                  APFloat::getZero(fpType.getFloatSemantics())));
     // epsilon
@@ -275,30 +277,30 @@ struct UnfuseBatchNormTrainingPattern final
     Value sum = createReduce(bnOp.getLoc(), bnOp.getOperand(), constZero,
                              dimensionsWithoutFeature, featureIndex, rewriter);
     // X^2
-    Value operandSquare = rewriter.create<mlir::stablehlo::MulOp>(
-        bnOp.getLoc(), bnOp.getOperand(), bnOp.getOperand());
+    Value operandSquare = mlir::stablehlo::MulOp::create(
+        rewriter, bnOp.getLoc(), bnOp.getOperand(), bnOp.getOperand());
     // Sum[X^2]
     Value squareSum =
         createReduce(bnOp.getLoc(), operandSquare, constZero,
                      dimensionsWithoutFeature, featureIndex, rewriter);
     // E[X]
-    Value mean =
-        rewriter.create<mlir::stablehlo::DivOp>(bnOp.getLoc(), sum, reduceSize);
+    Value mean = mlir::stablehlo::DivOp::create(rewriter, bnOp.getLoc(), sum,
+                                                reduceSize);
     // E[X^2]
-    Value squareMean = rewriter.create<mlir::stablehlo::DivOp>(
-        bnOp.getLoc(), squareSum, reduceSize);
+    Value squareMean = mlir::stablehlo::DivOp::create(rewriter, bnOp.getLoc(),
+                                                      squareSum, reduceSize);
     // E^2[X]
     Value meanSquare =
-        rewriter.create<mlir::stablehlo::MulOp>(bnOp.getLoc(), mean, mean);
+        mlir::stablehlo::MulOp::create(rewriter, bnOp.getLoc(), mean, mean);
     // Var[X]
-    Value var = rewriter.create<mlir::stablehlo::SubtractOp>(
-        bnOp.getLoc(), squareMean, meanSquare);
+    Value var = mlir::stablehlo::SubtractOp::create(rewriter, bnOp.getLoc(),
+                                                    squareMean, meanSquare);
     // Var[X] + epsilon
     Value varAddEpsilon =
-        rewriter.create<mlir::stablehlo::AddOp>(bnOp.getLoc(), var, epsilon);
+        mlir::stablehlo::AddOp::create(rewriter, bnOp.getLoc(), var, epsilon);
     // Sqrt(Var[X] + epsilon)
     Value sqrtVar =
-        rewriter.create<mlir::stablehlo::SqrtOp>(bnOp.getLoc(), varAddEpsilon);
+        mlir::stablehlo::SqrtOp::create(rewriter, bnOp.getLoc(), varAddEpsilon);
 
     Value shapeValue;
     if (!operandType.hasStaticShape()) {
@@ -307,27 +309,27 @@ struct UnfuseBatchNormTrainingPattern final
     // X - E[X]
     Value meanBroadcast = broadcastToFeatureDim(
         bnOp.getLoc(), operandType, mean, shapeValue, featureIndex, rewriter);
-    Value operandMinusMean = rewriter.create<mlir::stablehlo::SubtractOp>(
-        bnOp.getLoc(), bnOp.getOperand(), meanBroadcast);
+    Value operandMinusMean = mlir::stablehlo::SubtractOp::create(
+        rewriter, bnOp.getLoc(), bnOp.getOperand(), meanBroadcast);
     // (X - E[X]) / Sqrt(Var[X] + epsilon)
     Value sqrtVarBroadcast =
         broadcastToFeatureDim(bnOp.getLoc(), operandType, sqrtVar, shapeValue,
                               featureIndex, rewriter);
-    Value normalized = rewriter.create<mlir::stablehlo::DivOp>(
-        bnOp.getLoc(), operandMinusMean, sqrtVarBroadcast);
+    Value normalized = mlir::stablehlo::DivOp::create(
+        rewriter, bnOp.getLoc(), operandMinusMean, sqrtVarBroadcast);
 
     // ((X - E[X]) / Sqrt(Var[X] + epsilon)) * scale
     Value scaleBroadcast =
         broadcastToFeatureDim(bnOp.getLoc(), operandType, bnOp.getScale(),
                               shapeValue, featureIndex, rewriter);
-    Value scaledNormalized = rewriter.create<mlir::stablehlo::MulOp>(
-        bnOp.getLoc(), normalized, scaleBroadcast);
+    Value scaledNormalized = mlir::stablehlo::MulOp::create(
+        rewriter, bnOp.getLoc(), normalized, scaleBroadcast);
     // ((X - E[X]) / Sqrt(Var[X] + epsilon)) * scale + offset.
     Value offsetBroadcast =
         broadcastToFeatureDim(bnOp.getLoc(), operandType, bnOp.getOffset(),
                               shapeValue, featureIndex, rewriter);
-    Value shiftedNormalized = rewriter.create<mlir::stablehlo::AddOp>(
-        bnOp.getLoc(), scaledNormalized, offsetBroadcast);
+    Value shiftedNormalized = mlir::stablehlo::AddOp::create(
+        rewriter, bnOp.getLoc(), scaledNormalized, offsetBroadcast);
 
     // results
     SmallVector<Value> results = {shiftedNormalized, mean, var};

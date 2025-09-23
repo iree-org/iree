@@ -7,19 +7,14 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/SymbolTable.h"
 #include "mlir/Support/LogicalResult.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
@@ -98,8 +93,8 @@ struct DeduplicateTensorBarrierSources
     if (orderedSources.size() == op.getSources().size()) {
       return failure();
     }
-    auto newOp = rewriter.create<TensorBarrierOp>(op.getLoc(), orderedSources,
-                                                  op.getSignalFence());
+    auto newOp = TensorBarrierOp::create(rewriter, op.getLoc(), orderedSources,
+                                         op.getSignalFence());
     SmallVector<Value> newResults;
     newResults.reserve(newOp.getNumResults());
     for (unsigned newIndex : resultMapping) {
@@ -844,8 +839,8 @@ struct MergeExecutableConstantBlocks
     // about making that work.
     rewriter.setInsertionPoint(blockOps.front());
     auto fusedLoc = rewriter.getFusedLoc(blockLocs);
-    auto newBlockOp = rewriter.create<ExecutableConstantBlockOp>(
-        fusedLoc, rewriter.getFunctionType(inputTypes, resultTypes),
+    auto newBlockOp = ExecutableConstantBlockOp::create(
+        rewriter, fusedLoc, rewriter.getFunctionType(inputTypes, resultTypes),
         rewriter.getArrayAttr(resultKeys), /*arg_attrs=*/ArrayAttr(),
         /*res_attrs=*/ArrayAttr());
 
@@ -1129,8 +1124,8 @@ struct ElideSignaledFence : public OpRewritePattern<FenceSignalOp> {
     }
 
     // Safe to elide.
-    Value nullFence = rewriter.create<IREE::Util::NullOp>(
-        rewriter.getFusedLoc({createOp.getLoc(), signalOp.getLoc()}),
+    Value nullFence = IREE::Util::NullOp::create(
+        rewriter, rewriter.getFusedLoc({createOp.getLoc(), signalOp.getLoc()}),
         fence.getType());
     rewriter.replaceAllUsesWith(fence, nullFence);
     rewriter.eraseOp(signalOp);

@@ -59,13 +59,14 @@ struct DropToLayoutUnitDims final
     VectorLayoutInterface newLayout = toLayoutOp.getLayout().project(unitDims);
 
     Value rankReducedValue = rankReducingExtract.value();
-    auto newToLayoutOp = rewriter.create<IREE::VectorExt::ToLayoutOp>(
-        loc, rankReducedValue.getType(), rankReducedValue, newLayout,
+    auto newToLayoutOp = IREE::VectorExt::ToLayoutOp::create(
+        rewriter, loc, rankReducedValue.getType(), rankReducedValue, newLayout,
         toLayoutOp.getSharedMemoryConversion(), toLayoutOp.getMmaKindAttr());
 
     // Expand to preserve output shape using insert_slice.
-    Value dest = rewriter.create<tensor::EmptyOp>(
-        loc, tensor::getMixedSizes(rewriter, loc, toLayoutOp.getInput()),
+    Value dest = tensor::EmptyOp::create(
+        rewriter, loc,
+        tensor::getMixedSizes(rewriter, loc, toLayoutOp.getInput()),
         inputTy.getElementType());
 
     int64_t rank = inputTy.getRank();

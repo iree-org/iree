@@ -1,4 +1,5 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 --iree-codegen-llvmgpu-use-vector-distribution \
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=false \
+// RUN: --iree-codegen-llvmgpu-use-vector-distribution=true \
 // RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefix=WMMA
 
 // TODO: This test is still using the legacy LLVMGPU kernel config. This needs
@@ -33,6 +34,5 @@ func.func @wmma_matmul_1024x1024x1024() {
 // WMMA: linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 // WMMA-SAME:                           mma_kind = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>
 // WMMA-SAME:                           reduction =  [0, 0, 64]
-// WMMA-SAME:                           subgroup_m_count = 2
-// WMMA-SAME:                           subgroup_n_count = 2
+// WMMA-LITERAL-SAME:                   subgroup_basis = [[2, 2, 1], [0, 1, 2]]
 // WMMA-SAME:                           workgroup =  [64, 128, 0]

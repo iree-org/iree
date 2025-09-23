@@ -56,7 +56,7 @@ bool iree_hal_cuda_semaphore_acquire_event_host_wait(
 iree_status_t iree_hal_cuda_semaphore_multi_wait(
     const iree_hal_semaphore_list_t semaphore_list,
     iree_hal_wait_mode_t wait_mode, iree_timeout_t timeout,
-    iree_arena_block_pool_t* block_pool);
+    iree_hal_wait_flags_t flags, iree_arena_block_pool_t* block_pool);
 
 #ifdef __cplusplus
 }  // extern "C"

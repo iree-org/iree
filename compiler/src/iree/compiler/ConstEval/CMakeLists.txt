@@ -49,6 +49,7 @@ iree_cc_library(
     MLIRFunctionInterfaces
     MLIRIR
     MLIRPass
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::Util::Analysis::Constant
     iree::compiler::Dialect::Util::IR

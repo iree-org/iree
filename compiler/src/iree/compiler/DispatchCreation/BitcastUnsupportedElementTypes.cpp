@@ -63,10 +63,10 @@ static LogicalResult bitcastBlockArgUser(RewriterBase &rewriter,
     rewriter.setInsertionPoint(load);
 
     // Load in the new type -> bitcast back to the original type.
-    auto newLoad = rewriter.create<IREE::TensorExt::DispatchTensorLoadOp>(
-        load.getLoc(), targetType, arg, load.getSourceDims(), load.getOffsets(),
-        load.getSizes(), load.getStrides(), load.getStaticOffsets(), newSizes,
-        load.getStaticStrides());
+    auto newLoad = IREE::TensorExt::DispatchTensorLoadOp::create(
+        rewriter, load.getLoc(), targetType, arg, load.getSourceDims(),
+        load.getOffsets(), load.getSizes(), load.getStrides(),
+        load.getStaticOffsets(), newSizes, load.getStaticStrides());
     rewriter.replaceOpWithNewOp<IREE::TensorExt::BitCastOp>(
         load, originalType, newLoad, load.getSizes(), load.getSizes());
     return success();
@@ -81,9 +81,9 @@ static LogicalResult bitcastBlockArgUser(RewriterBase &rewriter,
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(store);
 
-    auto bitcast = rewriter.create<IREE::TensorExt::BitCastOp>(
-        store.getLoc(), targetType, store.getValue(), store.getSizes(),
-        store.getSizes());
+    auto bitcast = IREE::TensorExt::BitCastOp::create(
+        rewriter, store.getLoc(), targetType, store.getValue(),
+        store.getSizes(), store.getSizes());
     // Bitcast to the target type -> store in the new type.
     rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorStoreOp>(
         store, TypeRange{}, bitcast, arg, store.getTargetDims(),
@@ -136,9 +136,9 @@ bitcastWorkgroupsInputs(RewriterBase &rewriter,
     rewriter.setInsertionPoint(workgroupsOp);
     ValueRange sourceDims =
         workgroupsOp.getOperandDynamicDims(operand.getOperandNumber());
-    auto inputBitcast = rewriter.create<IREE::Flow::TensorBitCastOp>(
-        workgroupsOp.getLoc(), castedTensorType, operand.get(), sourceDims,
-        sourceDims);
+    auto inputBitcast = IREE::Flow::TensorBitCastOp::create(
+        rewriter, workgroupsOp.getLoc(), castedTensorType, operand.get(),
+        sourceDims, sourceDims);
     operand.assign(inputBitcast);
 
     blockArg.setType(castedDispatchType);
@@ -205,8 +205,8 @@ bitcastWorkgroupsOutputs(RewriterBase &rewriter,
       ValueRange dynamicDims =
           workgroupsOp.getOperandDynamicDims(tiedOperand->getOperandNumber());
 
-      auto inputBitcast = rewriter.create<IREE::Flow::TensorBitCastOp>(
-          workgroupsOp.getLoc(), castedTensorType, tiedOperand->get(),
+      auto inputBitcast = IREE::Flow::TensorBitCastOp::create(
+          rewriter, workgroupsOp.getLoc(), castedTensorType, tiedOperand->get(),
           dynamicDims, dynamicDims);
       tiedOperand->assign(inputBitcast);
     }
@@ -224,9 +224,9 @@ bitcastWorkgroupsOutputs(RewriterBase &rewriter,
 
   // Clone the op with new result types and steal the body.
   rewriter.setInsertionPoint(workgroupsOp);
-  auto newWorkgroupsOp = rewriter.create<IREE::Flow::DispatchWorkgroupsOp>(
-      workgroupsOp->getLoc(), workgroupsOp.getWorkload(), newResultTypes,
-      workgroupsOp.getResultDims(), workgroupsOp.getArguments(),
+  auto newWorkgroupsOp = IREE::Flow::DispatchWorkgroupsOp::create(
+      rewriter, workgroupsOp->getLoc(), workgroupsOp.getWorkload(),
+      newResultTypes, workgroupsOp.getResultDims(), workgroupsOp.getArguments(),
       workgroupsOp.getArgumentDims(),
       workgroupsOp.getTiedResultOperandIndices(), workgroupsOp->getAttrs());
   newWorkgroupsOp->setDialectAttrs(workgroupsOp->getDialectAttrs());
@@ -246,9 +246,9 @@ bitcastWorkgroupsOutputs(RewriterBase &rewriter,
     auto originalType =
         cast<RankedTensorType>(workgroupsOp.getResult(resultIndex).getType());
     ValueRange dynamicDims = newWorkgroupsOp.getResultDynamicDims(resultIndex);
-    replacements[resultIndex] = rewriter.create<IREE::Flow::TensorBitCastOp>(
-        workgroupsOp.getLoc(), originalType, replacements[resultIndex],
-        dynamicDims, dynamicDims);
+    replacements[resultIndex] = IREE::Flow::TensorBitCastOp::create(
+        rewriter, workgroupsOp.getLoc(), originalType,
+        replacements[resultIndex], dynamicDims, dynamicDims);
   }
 
   rewriter.replaceOp(workgroupsOp, replacements);

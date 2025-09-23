@@ -1,37 +1,28 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-materialize-device-encoding))" --split-input-file %s | FileCheck %s
 
-#pipeline_layout = #hal.pipeline.layout<bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
-#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [bf16, bf16, bf16], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iteration_sizes = [1, 1000, ?]>
-func.func @set_encoding_with_padding_semantics_bf16_x86_64_avx512f() attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
-}{
-  %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x1000xbf16>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x1000xbf16, #encoding>>
-  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 1000], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x1000xbf16>> -> tensor<1x1000xbf16>
-  %3 = iree_encoding.set_encoding %2 : tensor<1x1000xbf16> -> tensor<1x1000xbf16, #encoding>
-  iree_tensor_ext.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [1, 1000], strides = [1, 1] : tensor<1x1000xbf16, #encoding> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x1000xbf16,  #encoding>>
-  return
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding = #iree_encoding.encoding<operand_index = 0 : i64, op_type =  matmul, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [1, 1000, ?]>
+#executable_target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features = "+avx512f", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>, target_triple = "x86_64-xyz-xyz"}>
+func.func @set_encoding_with_padding_semantics_bf16_x86_64_avx512f(%arg0: tensor<1x1000xbf16>)
+    -> tensor<1x1000xbf16, #encoding> attributes { hal.executable.target = #executable_target } {
+  %0 = iree_encoding.set_encoding %arg0 : tensor<1x1000xbf16> -> tensor<1x1000xbf16, #encoding>
+  return %0 : tensor<1x1000xbf16, #encoding>
 }
 // This tests that
 //   1. The padding value is created for linalg.pack ops.
 //   2. The inner tile sizes are less than or equal to values in iteration_sizes.
 //      We could choose 128 when it is a narrow matrix.
 // CHECK-LABEL: func.func @set_encoding_with_padding_semantics_bf16_x86_64_avx512f
-// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG:     %[[IN_BINDING:.+]] = hal.interface.binding.subspan {{.+}} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x1000xbf16>>
-// CHECK-DAG:     %[[OUT_BINDING:.+]] = hal.interface.binding.subspan {{.+}} : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x1000x1x1xbf16>>
-// CHECK:         %[[SRC:.+]] = iree_tensor_ext.dispatch.tensor.load %[[IN_BINDING]]
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[INIT:.+]] = tensor.empty() : tensor<1x1000x1x1xbf16>
 // CHECK:         %[[PACK:.+]] = linalg.pack %[[SRC]]
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
 // CHECK-SAME:      inner_tiles = [1, 1]
 // CHECK-SAME:      into %[[INIT]] : tensor<1x1000xbf16> -> tensor<1x1000x1x1xbf16>
-// CHECK:         iree_tensor_ext.dispatch.tensor.store %[[PACK]], %[[OUT_BINDING]]
+// CHECK:         return %[[PACK]]
 
 // -----
 
@@ -1677,7 +1668,14 @@ func.func @matmul_transpose_a_f32f32f32(%arg0: tensor<256x128xf32>, %arg1: tenso
   %6 = iree_encoding.set_encoding %arg0 : tensor<256x128xf32> -> tensor<256x128xf32, #encoding_lhs>
   %10 = iree_encoding.set_encoding %arg1 : tensor<256x512xf32> -> tensor<256x512xf32, #encoding_rhs>
   %14 = iree_encoding.set_encoding %arg2 : tensor<128x512xf32> -> tensor<128x512xf32, #encoding_result>
-  %15 = linalg.matmul_transpose_a ins(%6, %10 : tensor<256x128xf32, #encoding_lhs>, tensor<256x512xf32, #encoding_rhs>) outs(%14 : tensor<128x512xf32, #encoding_result>) -> tensor<128x512xf32, #encoding_result>
+  %15 = linalg.matmul
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d2, d0)>,
+      affine_map<(d0, d1, d2) -> (d2, d1)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ]
+    ins(%6, %10 : tensor<256x128xf32, #encoding_lhs>, tensor<256x512xf32, #encoding_rhs>)
+    outs(%14 : tensor<128x512xf32, #encoding_result>) -> tensor<128x512xf32, #encoding_result>
   %16 = iree_encoding.unset_encoding %15 : tensor<128x512xf32, #encoding_result> -> tensor<128x512xf32>
   return %16 : tensor<128x512xf32>
 }
@@ -1716,7 +1714,14 @@ func.func @matmul_transpose_b_f32f32f32(%arg0: tensor<128x256xf32>, %arg1: tenso
   %6 = iree_encoding.set_encoding %arg0 : tensor<128x256xf32> -> tensor<128x256xf32, #encoding_lhs>
   %10 = iree_encoding.set_encoding %arg1 : tensor<512x256xf32> -> tensor<512x256xf32, #encoding_rhs>
   %14 = iree_encoding.set_encoding %arg2 : tensor<128x512xf32> -> tensor<128x512xf32, #encoding_result>
-  %15 = linalg.matmul_transpose_b ins(%6, %10 : tensor<128x256xf32, #encoding_lhs>, tensor<512x256xf32, #encoding_rhs>) outs(%14 : tensor<128x512xf32, #encoding_result>) -> tensor<128x512xf32, #encoding_result>
+  %15 = linalg.matmul
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d2)>,
+      affine_map<(d0, d1, d2) -> (d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ]
+    ins(%6, %10 : tensor<128x256xf32, #encoding_lhs>, tensor<512x256xf32, #encoding_rhs>)
+    outs(%14 : tensor<128x512xf32, #encoding_result>) -> tensor<128x512xf32, #encoding_result>
   %16 = iree_encoding.unset_encoding %15 : tensor<128x512xf32, #encoding_result> -> tensor<128x512xf32>
   return %16 : tensor<128x512xf32>
 }
@@ -1755,7 +1760,14 @@ func.func @batch_matmul_transpose_a_f32f32f32(%arg0: tensor<2x256x128xf32>, %arg
   %7 = iree_encoding.set_encoding %arg0 : tensor<2x256x128xf32> -> tensor<2x256x128xf32, #encoding_lhs>
   %12 = iree_encoding.set_encoding %arg1 : tensor<2x256x512xf32> -> tensor<2x256x512xf32, #encoding_rhs>
   %17 = iree_encoding.set_encoding %arg2 : tensor<2x128x512xf32> -> tensor<2x128x512xf32, #encoding_result>
-  %18 = linalg.batch_matmul_transpose_a ins(%7, %12 : tensor<2x256x128xf32, #encoding_lhs>, tensor<2x256x512xf32, #encoding_rhs>) outs(%17 : tensor<2x128x512xf32, #encoding_result>) -> tensor<2x128x512xf32, #encoding_result>
+  %18 = linalg.batch_matmul
+    indexing_maps = [
+      affine_map<(d0, d1, d2, d3) -> (d0, d3, d1)>,
+      affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>,
+      affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+    ]
+    ins(%7, %12 : tensor<2x256x128xf32, #encoding_lhs>, tensor<2x256x512xf32, #encoding_rhs>)
+    outs(%17 : tensor<2x128x512xf32, #encoding_result>) -> tensor<2x128x512xf32, #encoding_result>
   %19 = iree_encoding.unset_encoding %18 : tensor<2x128x512xf32, #encoding_result> -> tensor<2x128x512xf32>
   return %19 : tensor<2x128x512xf32>
 }
@@ -1794,7 +1806,14 @@ func.func @batch_matmul_transpose_b_f32f32f32(%arg0: tensor<2x128x256xf32>, %arg
   %7 = iree_encoding.set_encoding %arg0 : tensor<2x128x256xf32> -> tensor<2x128x256xf32, #encoding_lhs>
   %12 = iree_encoding.set_encoding %arg1 : tensor<2x512x256xf32> -> tensor<2x512x256xf32, #encoding_rhs>
   %17 = iree_encoding.set_encoding %arg2 : tensor<2x128x512xf32> -> tensor<2x128x512xf32, #encoding_result>
-  %18 = linalg.batch_matmul_transpose_b ins(%7, %12 : tensor<2x128x256xf32, #encoding_lhs>, tensor<2x512x256xf32, #encoding_rhs>) outs(%17 : tensor<2x128x512xf32, #encoding_result>) -> tensor<2x128x512xf32, #encoding_result>
+  %18 = linalg.batch_matmul
+    indexing_maps = [
+      affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+      affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+      affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+    ]
+    ins(%7, %12 : tensor<2x128x256xf32, #encoding_lhs>, tensor<2x512x256xf32, #encoding_rhs>)
+    outs(%17 : tensor<2x128x512xf32, #encoding_result>) -> tensor<2x128x512xf32, #encoding_result>
   %19 = iree_encoding.unset_encoding %18 : tensor<2x128x512xf32, #encoding_result> -> tensor<2x128x512xf32>
   return %19 : tensor<2x128x512xf32>
 }
@@ -2220,3 +2239,43 @@ func.func @set_encoding_transpose_multi_result() attributes {
 //       CHECK:   %[[PACK:.+]] = linalg.pack %[[TRANSPOSE]]
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[TRANSPOSE]], %[[RESULT_BINDING]]
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[PACK]], %[[RESULT_BINDING1]]
+
+// -----
+
+#executable_target_xyz = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map3 = affine_map<(d0, d1) -> ()>
+#map4 = affine_map<(d0, d1) -> (d0, d1)>
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+#encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [2, 4, 3]>
+#encoding1 = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, [#map2, #map3]], iteration_sizes = [2, 4, 3]>
+func.func @generic_with_0d_tensor() attributes {hal.executable.target = #executable_target_xyz} {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x4xf32, #encoding>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<f32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x4xf32, #encoding>>
+  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2, 4], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x4xf32, #encoding>> -> tensor<2x4xf32, #encoding>
+  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<f32>> -> tensor<f32>
+  %5 = iree_encoding.set_encoding %4 : tensor<f32> -> tensor<f32, #encoding1>
+  %6 = tensor.empty() : tensor<2x4xf32, #encoding>
+  %7 = linalg.fill ins(%cst : f32) outs(%6 : tensor<2x4xf32, #encoding>) -> tensor<2x4xf32, #encoding>
+  %8 = linalg.generic {indexing_maps = [#map4, #map3, #map4], iterator_types = ["parallel", "parallel"]} ins(%3, %5 : tensor<2x4xf32, #encoding>, tensor<f32, #encoding1>) outs(%7 : tensor<2x4xf32, #encoding>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %9 = arith.addf %in, %in_0 : f32
+    linalg.yield %9 : f32
+  } -> tensor<2x4xf32, #encoding>
+  iree_tensor_ext.dispatch.tensor.store %8, %2, offsets = [0, 0], sizes = [2, 4], strides = [1, 1] : tensor<2x4xf32, #encoding> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x4xf32, #encoding>>
+  return
+}
+
+// CHECK-LABEL: func.func @generic_with_0d_tensor
+//   CHECK-DAG:   %[[INPUT_BINDING:.+]] = hal.interface.binding.subspan {{.*}} binding(0)
+//   CHECK-DAG:   %[[INPUT_0D_BINDING:.+]] = hal.interface.binding.subspan {{.*}} binding(1)
+//   CHECK-DAG:   %[[RESULT_BINDING:.+]] = hal.interface.binding.subspan {{.*}} binding(2)
+//   CHECK-DAG:   %[[INPUT:.+]] = iree_tensor_ext.dispatch.tensor.load %[[INPUT_BINDING]]
+//   CHECK-DAG:   %[[INPUT_0D:.+]] = iree_tensor_ext.dispatch.tensor.load %[[INPUT_0D_BINDING]]
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic {{.*}} ins(%[[INPUT]], %[[INPUT_0D]] : tensor<1x1x2x4xf32>, tensor<f32>)
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[GENERIC]], %[[RESULT_BINDING]]

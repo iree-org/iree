@@ -20,7 +20,7 @@ namespace {
 
 struct VectorizeStaticMapScatterOpPattern final
     : OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
-  using OpRewritePattern<IREE::LinalgExt::MapScatterOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
                                 PatternRewriter &rewriter) const override {
     if (mapScatterOp.isVectorized()) {
@@ -34,12 +34,13 @@ struct VectorizeStaticMapScatterOpPattern final
     }
     Location loc = mapScatterOp.getLoc();
     rewriter.setInsertionPoint(mapScatterOp);
-    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
     SmallVector<Value> zeros(inputType.getRank(), zero);
     auto inputVectorType =
         VectorType::get(inputType.getShape(), inputType.getElementType());
-    Value inputVector = rewriter.create<vector::TransferReadOp>(
-        loc, inputVectorType, mapScatterOp.getInput(), /*indices=*/zeros,
+    Value inputVector = vector::TransferReadOp::create(
+        rewriter, loc, inputVectorType, mapScatterOp.getInput(),
+        /*indices=*/zeros,
         /*padding=*/std::nullopt);
     auto vectorizedMapScatterOp =
         clone(rewriter, mapScatterOp, mapScatterOp.getResultTypes(),

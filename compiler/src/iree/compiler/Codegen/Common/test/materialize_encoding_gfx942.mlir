@@ -238,6 +238,54 @@ func.func @set_encoding_ACC_unroll8x8x4_MFMA_F32_16x16x4_F32() {
 
 #encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32],
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
+                                    iteration_sizes = [?, 513, ?]>
+func.func @set_encoding_ACC_dynamic_M_MFMA_F32_16x16x4_F32(%arg0 : tensor<?x513xf32>) -> tensor<?x513xf32, #encoding> {
+  %0 = iree_encoding.set_encoding %arg0 : tensor<?x513xf32> -> tensor<?x513xf32, #encoding>
+  return %0 : tensor<?x513xf32, #encoding>
+}
+
+// CHECK-LABEL: func.func @set_encoding_ACC_dynamic_M_MFMA_F32_16x16x4_F32
+// CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f32)
+// CHECK-SAME:      outer_dims_perm = [0, 1]
+// CHECK-SAME:      inner_dims_pos = [0, 1]
+// CHECK-SAME:      inner_tiles = [128, 128]
+// CHECK-SAME:      : tensor<?x513xf32> -> tensor<?x5x128x128xf32>
+// CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
+// CHECK-SAME       : tensor<?x5x128x128xf32> into tensor<?x5x4x4x2x4x16x8xf32>
+// CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
+// CHECK-SAME:       ins(%[[EXPAND]] : tensor<?x5x4x4x2x4x16x8xf32>)
+// CHECK-SAME:       outs({{.*}} : tensor<?x5x4x2x8x4x16x4xf32>)
+// CHECK-SAME:       permutation = [0, 1, 2, 4, 7, 3, 6, 5]
+// CHECK:         return %[[TRANSPOSE]]
+
+// -----
+
+#encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32],
+                                    user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
+                                    iteration_sizes = [255, ?, ?]>
+func.func @set_encoding_ACC_dynamic_N_MFMA_F32_16x16x4_F32(%arg0 : tensor<255x?xf32>) -> tensor<255x?xf32, #encoding> {
+  %0 = iree_encoding.set_encoding %arg0 : tensor<255x?xf32> -> tensor<255x?xf32, #encoding>
+  return %0 : tensor<255x?xf32, #encoding>
+}
+
+// CHECK-LABEL: func.func @set_encoding_ACC_dynamic_N_MFMA_F32_16x16x4_F32
+// CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f32)
+// CHECK-SAME:      outer_dims_perm = [0, 1]
+// CHECK-SAME:      inner_dims_pos = [0, 1]
+// CHECK-SAME:      inner_tiles = [128, 128]
+// CHECK-SAME:      : tensor<255x?xf32> -> tensor<2x?x128x128xf32>
+// CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
+// CHECK-SAME       : tensor<2x?x128x128xf32> into tensor<2x?x4x8x4x4x16x2xf32>
+// CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
+// CHECK-SAME:       ins(%[[EXPAND]] : tensor<2x?x4x8x4x4x16x2xf32>)
+// CHECK-SAME:       outs({{.*}} : tensor<2x?x4x8x2x4x16x4xf32>)
+// CHECK-SAME:       permutation = [0, 1, 5, 3, 7, 2, 6, 4]
+// CHECK:         return %[[TRANSPOSE]]
+
+// -----
+
+#encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32],
+                                    user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     iteration_sizes = [255, 513, ?]>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -634,14 +682,13 @@ func.func @matmul_lowering_MFMA_I32_16x16x32_I8() {
 // Custom {max_load_instruction_bits = 64} => implied default {intrinsics_k = 1} (omitted in output) instead of {intrinsics_k = 2}.
 
 #target_gfx942_except_max_load_instruction_bits_64 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
-  iree.gpu.target = #iree_gpu.target<
+  iree_codegen.target_info = #iree_gpu.target<
     arch = "gfx942", features = "", wgp = <
       compute =  fp64|fp32|fp16|int64|int32|int16|int8,
       storage =  b64|b32|b16|b8,
       subgroup = shuffle|arithmetic,
       dot =  dp4xi8toi32,
       mma = [<MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>, <MFMA_F32_32x32x8_F16>, <MFMA_F32_16x16x32_F8E4M3FNUZ>, <MFMA_I32_16x16x32_I8>, <MFMA_I32_32x32x16_I8>],
-      scaled_mma = [],
       subgroup_size_choices = [64],
       max_workgroup_sizes = [1024, 1024, 1024],
       max_thread_count_per_workgroup = 1024,
@@ -709,14 +756,13 @@ func.func @matmul_lowering_MFMA_I32_16x16x32_I8_custom_max_load_instruction_bits
 // Custom {max_load_instruction_bits = 256} => {intrinsics_k = 4} instead of {intrinsics_k = 2}.
 
 #target_gfx942_except_max_load_instruction_bits_256 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
-  iree.gpu.target = #iree_gpu.target<
+  iree_codegen.target_info = #iree_gpu.target<
     arch = "gfx942", features = "", wgp = <
       compute =  fp64|fp32|fp16|int64|int32|int16|int8,
       storage =  b64|b32|b16|b8,
       subgroup = shuffle|arithmetic,
       dot =  dp4xi8toi32,
       mma = [<MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>, <MFMA_F32_32x32x8_F16>, <MFMA_F32_16x16x32_F8E4M3FNUZ>, <MFMA_I32_16x16x32_I8>, <MFMA_I32_32x32x16_I8>],
-      scaled_mma = [],
       subgroup_size_choices = [64],
       max_workgroup_sizes = [1024, 1024, 1024],
       max_thread_count_per_workgroup = 1024,
@@ -784,14 +830,13 @@ func.func @matmul_lowering_MFMA_I32_16x16x32_I8_custom_max_load_instruction_bits
 // Custom {simds_per_wgp = 1} => implied default {subgroups_n = 1} (omitted in output) and {intrinsics_n = 8} instead of {subgroups_n = 4}.
 
 #target_gfx942_except_simds_per_wgp_1 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
-  iree.gpu.target = #iree_gpu.target<
+  iree_codegen.target_info = #iree_gpu.target<
     arch = "gfx942", features = "", wgp = <
       compute =  fp64|fp32|fp16|int64|int32|int16|int8,
       storage =  b64|b32|b16|b8,
       subgroup = shuffle|arithmetic,
       dot =  dp4xi8toi32,
       mma = [<MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>, <MFMA_F32_32x32x8_F16>, <MFMA_F32_16x16x32_F8E4M3FNUZ>, <MFMA_I32_16x16x32_I8>, <MFMA_I32_32x32x16_I8>],
-      scaled_mma = [],
       subgroup_size_choices = [64],
       max_workgroup_sizes = [1024, 1024, 1024],
       max_thread_count_per_workgroup = 1024,
@@ -859,14 +904,13 @@ func.func @matmul_lowering_MFMA_I32_16x16x32_I8_custom_simds_per_wgp_1() attribu
 // Custom 2x smaller {vgpr_space_bits = 8192} => smaller intrinsics_m and intrinsics_n
 
 #target_gfx942_except_vgpr_space_bits_8192 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
-  iree.gpu.target = #iree_gpu.target<
+  iree_codegen.target_info = #iree_gpu.target<
     arch = "gfx942", features = "", wgp = <
       compute =  fp64|fp32|fp16|int64|int32|int16|int8,
       storage =  b64|b32|b16|b8,
       subgroup = shuffle|arithmetic,
       dot =  dp4xi8toi32,
       mma = [<MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>, <MFMA_F32_32x32x8_F16>, <MFMA_F32_16x16x32_F8E4M3FNUZ>, <MFMA_I32_16x16x32_I8>, <MFMA_I32_32x32x16_I8>],
-      scaled_mma = [],
       subgroup_size_choices = [64],
       max_workgroup_sizes = [1024, 1024, 1024],
       max_thread_count_per_workgroup = 1024,
@@ -934,14 +978,13 @@ func.func @matmul_lowering_MFMA_I32_16x16x32_I8_custom_vgpr_space_bits_8192() at
 // Custom 4x smaller {vgpr_space_bits = 4096} => smaller intrinsics_m and intrinsics_n
 
 #target_gfx942_except_vgpr_space_bits_4096 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
-  iree.gpu.target = #iree_gpu.target<
+  iree_codegen.target_info = #iree_gpu.target<
     arch = "gfx942", features = "", wgp = <
       compute =  fp64|fp32|fp16|int64|int32|int16|int8,
       storage =  b64|b32|b16|b8,
       subgroup = shuffle|arithmetic,
       dot =  dp4xi8toi32,
       mma = [<MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>, <MFMA_F32_32x32x8_F16>, <MFMA_F32_16x16x32_F8E4M3FNUZ>, <MFMA_I32_16x16x32_I8>, <MFMA_I32_32x32x16_I8>],
-      scaled_mma = [],
       subgroup_size_choices = [64],
       max_workgroup_sizes = [1024, 1024, 1024],
       max_thread_count_per_workgroup = 1024,
@@ -1009,14 +1052,13 @@ func.func @matmul_lowering_MFMA_I32_16x16x32_I8_custom_vgpr_space_bits_4096() at
 // Custom smaller {vgpr_space_bits = 32768} => larger intrinsics_m and/or intrinsics_n
 
 #target_gfx942_except_vgpr_space_bits_32768 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
-  iree.gpu.target = #iree_gpu.target<
+  iree_codegen.target_info = #iree_gpu.target<
     arch = "gfx942", features = "", wgp = <
       compute =  fp64|fp32|fp16|int64|int32|int16|int8,
       storage =  b64|b32|b16|b8,
       subgroup = shuffle|arithmetic,
       dot =  dp4xi8toi32,
       mma = [<MFMA_F32_16x16x4_F32>, <MFMA_F32_16x16x16_F16>, <MFMA_F32_32x32x8_F16>, <MFMA_F32_16x16x32_F8E4M3FNUZ>, <MFMA_I32_16x16x32_I8>, <MFMA_I32_32x32x16_I8>],
-      scaled_mma = [],
       subgroup_size_choices = [64],
       max_workgroup_sizes = [1024, 1024, 1024],
       max_thread_count_per_workgroup = 1024,

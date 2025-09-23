@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "ROCMAttrs.h"
     "ROCMDialect.h"
+    "ROCMUkernelBitcodeSupport.h"
   TEXTUAL_HDRS
     "ROCMAttrs.cpp.inc"
     "ROCMAttrs.h.inc"
@@ -25,16 +26,34 @@ iree_cc_library(
     "ROCMAttrs.cpp"
     "ROCMBuiltinManager.cpp"
     "ROCMDialect.cpp"
+    "ROCMUkernelBitcodeSupport.cpp"
   DEPS
     ::ROCMAttrs
     ::ROCMDialectGen
+    LLVMExecutionEngine
+    LLVMIRReader
     LLVMSupport
+    MLIRBufferizationDialect
+    MLIRGPUDialect
+    MLIRGPUTransformOps
+    MLIRGPUTransforms
+    MLIRGPUUtils
     MLIRIR
+    MLIRLinalgDialect
+    MLIRLinalgInterfacesIncGenLib
     MLIRParser
     MLIRSupport
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::Codegen::Utils
+    iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Codegen::Dialect::GPU::Transforms::GPUTransforms
+    iree::compiler::Codegen::Utils
+    iree::compiler::Dialect::Encoding::IR
+    iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
+    iree::compiler::plugins::target::ROCM::builtins::mlir_ukernel::iree_mlir_ukernel_patterns_amdgpu
+    iree::compiler::plugins::target::ROCM::builtins::mlir_ukernel::iree_mlir_ukernels_amdgpu
     iree::compiler::plugins::target::ROCM::builtins::specialization::iree_specialization_patterns_amdgpu
     iree::compiler::plugins::target::ROCM::builtins::tuning::iree_default_tuning_specs_amdgpu
   PUBLIC

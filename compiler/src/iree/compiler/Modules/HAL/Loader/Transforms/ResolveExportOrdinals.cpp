@@ -26,7 +26,7 @@ public:
   }
 
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     SymbolTable symbolTable(moduleOp);
     for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
       funcOp.walk([&](IREE::HAL::Loader::ExecutableExportOrdinalOp ordinalOp) {

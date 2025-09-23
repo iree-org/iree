@@ -40,7 +40,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 
@@ -50,8 +50,6 @@
 #include <numeric>
 
 #define DEBUG_TYPE "iree-codegen-materialize-encoding"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::IREE::GPU {
 
@@ -85,10 +83,25 @@ static MMAAttr chooseIntrinsicMMAAttr(TypeRange eTypes, TargetWgpAttr wgp) {
 
 static DataTiledMMAAttr
 chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
-                       IREE::Encoding::EncodingAttr encoding) {
+                       IREE::Encoding::EncodingAttr encoding,
+                       GPUEncodingResolverAttr resolver) {
   if (!target) {
     return {};
   }
+  // First try finding a data-tiled MMA layout through the ukernel provider if
+  // one can be found in the config. The ukernel provider is only available in
+  // case ukernels are enabled, so we're sure we want to override the default
+  // logic.
+  DictionaryAttr config = resolver.getConfiguration();
+  if (IREE::Codegen::UKernelProviderInterface provider =
+          getUKernelProviderFromTarget(config)) {
+    auto mma = dyn_cast_if_present<IREE::GPU::DataTiledMMAAttr>(
+        provider.getDataLayoutForUKernel(encoding, config));
+    if (mma) {
+      return mma;
+    }
+  }
+
   MLIRContext *ctx = target.getContext();
   IREE::GPU::TargetWgpAttr wgp = target.getWgp();
   if (!wgp.getMaxLoadInstructionBits() || !wgp.getVgprSpaceBits() ||
@@ -234,10 +247,15 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
                                intrinsicsK);
 }
 
-static Operation *lowerContractionOpToMultiMmaOp(OpBuilder &builder,
-                                                 linalg::LinalgOp linalgOp,
-                                                 ValueRange operands,
-                                                 TargetAttr targetAttr) {
+static Operation *
+lowerContractionOpToMultiMmaOp(OpBuilder &builder, linalg::LinalgOp linalgOp,
+                               ValueRange operands,
+                               GPUEncodingResolverAttr resolver) {
+  IREE::GPU::TargetAttr targetAttr =
+      getGPUTargetAttr(resolver.getConfiguration());
+  if (!targetAttr) {
+    return nullptr;
+  }
   if (!linalgOp.hasPureTensorSemantics()) {
     return nullptr;
   }
@@ -270,13 +288,14 @@ static Operation *lowerContractionOpToMultiMmaOp(OpBuilder &builder,
     return nullptr;
   }
 
-  IREE::GPU::DataTiledMMAAttr mma = chooseDataTiledMMAAttr(
-      resultEncoding.getElementTypesArray(), targetAttr, resultEncoding);
+  IREE::GPU::DataTiledMMAAttr mma =
+      chooseDataTiledMMAAttr(resultEncoding.getElementTypesArray(), targetAttr,
+                             resultEncoding, resolver);
   if (!mma) {
-    LDBG("expect encodings on operand types");
+    LDBG() << "expect encodings on operand types";
     return nullptr;
   }
-  LDBG("Target MMA: " << mma);
+  LDBG() << "Target MMA: " << mma;
 
   MLIRContext *ctx = builder.getContext();
   SmallVector<AffineExpr> lhsExprs, rhsExprs, accExprs;
@@ -304,8 +323,8 @@ static Operation *lowerContractionOpToMultiMmaOp(OpBuilder &builder,
       linalgOp.getIteratorTypesArray();
 
   Location loc = linalgOp.getLoc();
-  Operation *mmaOp = builder.create<Codegen::InnerTiledOp>(
-      loc, operands.take_front(inputs.size()),
+  Operation *mmaOp = Codegen::InnerTiledOp::create(
+      builder, loc, operands.take_front(inputs.size()),
       operands.take_back(outputs.size()),
       ArrayRef<AffineMap>{lhsMap, rhsMap, accMap}, iteratorTypes, mma);
   return mmaOp;
@@ -320,8 +339,8 @@ struct GPUEncodingPackedLayoutMaterializerAttr
 
   MaterializeEncodingInfo getEncodingInfoImpl(Attribute attr,
                                               RankedTensorType type) const {
-    auto layoutAttr = cast<GPUEncodingResolverAttr>(attr);
-    DictionaryAttr config = layoutAttr.getConfiguration();
+    auto resolver = cast<GPUEncodingResolverAttr>(attr);
+    DictionaryAttr config = resolver.getConfiguration();
 
     auto encoding = llvm::dyn_cast_or_null<IREE::Encoding::EncodingAttr>(
         type.getEncoding());
@@ -335,8 +354,9 @@ struct GPUEncodingPackedLayoutMaterializerAttr
     if (!gpuAttr) {
       return info;
     }
+
     DataTiledMMAAttr mma = chooseDataTiledMMAAttr(
-        encoding.getElementTypesArray(), gpuAttr, encoding);
+        encoding.getElementTypesArray(), gpuAttr, encoding, resolver);
     if (!mma) {
       return info;
     }
@@ -369,24 +389,23 @@ struct GPUEncodingResolverMaterializerAttr
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
                      ValueRange convertedOperands) const {
-    auto layoutAttr = cast<GPUEncodingResolverAttr>(attr);
+    auto resolverAttr = cast<GPUEncodingResolverAttr>(attr);
     auto linalgOp = llvm::dyn_cast<linalg::LinalgOp>(op);
     if (!linalgOp) {
       return nullptr;
     }
-    DictionaryAttr config = layoutAttr.getConfiguration();
-    IREE::GPU::TargetAttr gpuAttr = getGPUTargetAttr(config);
-    if (!gpuAttr) {
-      return nullptr;
-    }
     return lowerContractionOpToMultiMmaOp(b, linalgOp, convertedOperands,
-                                          gpuAttr);
+                                          resolverAttr);
   }
 };
 
 struct GPUSerializableAttr final
     : IREE::Encoding::SerializableAttr::ExternalModel<GPUSerializableAttr,
                                                       GPUEncodingResolverAttr> {
+  bool isSerialized(Attribute attr) const {
+    auto configuration = cast<GPUEncodingResolverAttr>(attr).getConfiguration();
+    return configuration && configuration.contains(kEncodingInfoAttrName);
+  }
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
@@ -409,7 +428,16 @@ struct GPULayoutResolverAttr final
       configItems.append(existingConfig.getValue().begin(),
                          existingConfig.getValue().end());
     }
-    storeNamedAttrIfPresent(configItems, config, kGPUTargetAttrName);
+    if (IREE::GPU::TargetAttr targetAttr = getGPUTargetAttr(config)) {
+      addConfigGPUTarget(ctx, targetAttr, configItems);
+    }
+    // Pass along the ukernel provider if one has been provided, so we can use
+    // it to choose the data tiling layouts.
+    if (IREE::Codegen::UKernelProviderInterface ukernelProvider =
+            getUKernelProviderFromTarget(config)) {
+      configItems.emplace_back(StringAttr::get(ctx, kUKernelProviderName),
+                               ukernelProvider);
+    }
     return GPUEncodingResolverAttr::get(ctx,
                                         DictionaryAttr::get(ctx, configItems));
   }

@@ -116,7 +116,7 @@ struct VerifyAsyncAccessRangesPass
     : public IREE::Stream::impl::VerifyAsyncAccessRangesPassBase<
           VerifyAsyncAccessRangesPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     // TODO(benvanik): do whole-program data flow analysis to get bounded sizes
     // for range checking. Today we just do static checks.
     if (moduleOp

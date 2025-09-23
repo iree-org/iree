@@ -18,8 +18,12 @@ iree_lit_test_suite(
     "config_ukernel_argmax_gfx942.mlir"
     "config_ukernel_data_tiled_mma_gfx942.mlir"
     "default_tuning_specs_amdgpu.mlir"
+    "enable_tensor_ukernels.mlir"
     "gpu_encoding_attrs.mlir"
+    "lower_rocm_tensor_ukernel_descriptor.mlir"
+    "lower_rocm_ukernel_descriptor.mlir"
     "lowering_strategy_from_tuning_spec.mlir"
+    "materialize_encoding_ukernel_gfx942.mlir"
     "ukernel_pipeline_transform.mlir"
   TOOLS
     FileCheck

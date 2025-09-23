@@ -221,7 +221,7 @@ packDynamicSlicesConservatively(IREE::Stream::ResourcePackOp packOp,
 struct LayoutSlicesPass
     : public IREE::Stream::impl::LayoutSlicesPassBase<LayoutSlicesPass> {
   void runOnOperation() override {
-    auto parentOp = getOperation();
+    mlir::CallableOpInterface parentOp = getOperation();
     if (!parentOp.getCallableRegion() ||
         parentOp.getCallableRegion()->empty()) {
       return;

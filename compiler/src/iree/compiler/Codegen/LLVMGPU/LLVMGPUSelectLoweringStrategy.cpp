@@ -25,8 +25,7 @@ class LLVMGPUSelectLoweringStrategyPass final
     : public impl::LLVMGPUSelectLoweringStrategyPassBase<
           LLVMGPUSelectLoweringStrategyPass> {
 public:
-  using impl::LLVMGPUSelectLoweringStrategyPassBase<
-      LLVMGPUSelectLoweringStrategyPass>::LLVMGPUSelectLoweringStrategyPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
@@ -39,23 +38,19 @@ public:
 
 /// Verify that valid configuration is set for all ops within the compiled
 /// module.
-template <typename ConfigTy>
-static LogicalResult
-verifyLoweringConfiguration(FunctionOpInterface funcOp,
-                            IREE::Codegen::TranslationInfoAttr translationInfo,
-                            ArrayRef<int64_t> workgroupSize) {
+static LogicalResult verifyLoweringConfiguration(
+    FunctionOpInterface funcOp,
+    IREE::Codegen::TranslationInfoAttr translationInfo) {
   auto walkResult = funcOp.walk([&](Operation *op) -> WalkResult {
-    auto loweringConfig = getLoweringConfig<ConfigTy>(op);
+    auto loweringConfig = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
     if (!loweringConfig)
-      return WalkResult::advance();
+      return success();
 
-    // Calls the correct overloaded function based on ConfigTy.
-    if constexpr (std::is_same_v<ConfigTy, IREE::GPU::LoweringConfigAttr>) {
-      return verifyGPUMatmulPipeline(op, loweringConfig, translationInfo);
-    } else {
-      return verifyGPUMatmulPipeline(op, loweringConfig, translationInfo,
-                                     workgroupSize);
+    if (translationInfo.getDispatchLoweringPassPipeline() ==
+        IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute) {
+      return verifyLLVMGPUVectorDistributePipeline(op, loweringConfig);
     }
+    return success();
   });
 
   return failure(walkResult.wasInterrupted());
@@ -71,14 +66,7 @@ verifyEntryPoint(FunctionOpInterface funcOp,
   }
 
   // Verify GPU-specific configuration
-  if (failed(verifyLoweringConfiguration<IREE::GPU::LoweringConfigAttr>(
-          funcOp, translationInfo, workgroupSize.value()))) {
-    return failure();
-  }
-
-  // Verify Codegen-specific configuration
-  if (failed(verifyLoweringConfiguration<IREE::Codegen::LoweringConfigAttr>(
-          funcOp, translationInfo, workgroupSize.value()))) {
+  if (failed(verifyLoweringConfiguration(funcOp, translationInfo))) {
     return failure();
   }
 
@@ -86,7 +74,7 @@ verifyEntryPoint(FunctionOpInterface funcOp,
 }
 
 void LLVMGPUSelectLoweringStrategyPass::runOnOperation() {
-  auto moduleOp = getOperation();
+  mlir::ModuleOp moduleOp = getOperation();
   for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
     if (failed(initGPULaunchConfig(funcOp))) {
       return signalPassFailure();

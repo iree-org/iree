@@ -203,20 +203,21 @@ void buildDeviceQueryRegion(const KernelFeatures &features, Value device,
   TypedAttr zeroAttr = builder.getZeroAttr(i32Type);
 
   auto buildQueryOp = [&](const char *key, uint32_t value, Value result) {
-    auto queryOp = builder.create<IREE::HAL::DeviceQueryOp>(
-        loc, boolType, i32Type, device, builder.getStringAttr("hal.dispatch"),
-        builder.getStringAttr(key), zeroAttr);
-    auto zero = builder.create<arith::ConstantIntOp>(loc, 0, 32);
-    auto val = builder.create<arith::ConstantIntOp>(loc, value, 32);
-    auto andOp = builder.create<arith::AndIOp>(loc, queryOp.getValue(), val);
-    auto cmpOp = builder.create<arith::CmpIOp>(loc, arith::CmpIPredicate::ne,
-                                               andOp, zero);
+    auto queryOp = IREE::HAL::DeviceQueryOp::create(
+        builder, loc, boolType, i32Type, device,
+        builder.getStringAttr("hal.dispatch"), builder.getStringAttr(key),
+        zeroAttr);
+    auto zero = arith::ConstantIntOp::create(builder, loc, 0, 32);
+    auto val = arith::ConstantIntOp::create(builder, loc, value, 32);
+    auto andOp = arith::AndIOp::create(builder, loc, queryOp.getValue(), val);
+    auto cmpOp = arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::ne,
+                                       andOp, zero);
     // Verify that 1) the query succeeds and 2) the capability is supported.
-    auto ok = builder.create<arith::AndIOp>(loc, queryOp.getOk(), cmpOp);
-    return builder.create<arith::AndIOp>(loc, result, ok).getResult();
+    auto ok = arith::AndIOp::create(builder, loc, queryOp.getOk(), cmpOp);
+    return arith::AndIOp::create(builder, loc, result, ok).getResult();
   };
 
-  Value result = builder.create<arith::ConstantIntOp>(loc, true, 1);
+  Value result = arith::ConstantIntOp::create(builder, loc, true, 1);
   if (features.computeFloat) {
     result =
         buildQueryOp("compute.bitwidths.fp", features.computeFloat, result);
@@ -239,7 +240,7 @@ void buildDeviceQueryRegion(const KernelFeatures &features, Value device,
   if (features.address) {
     result = buildQueryOp("address.mode", features.address, result);
   }
-  builder.create<IREE::HAL::ReturnOp>(loc, result);
+  IREE::HAL::ReturnOp::create(builder, loc, result);
 }
 
 // Returns the device queries as a list of unique keys.

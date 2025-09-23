@@ -34,7 +34,7 @@ struct VectorizeToLayoutOpPattern final
                IREE::VectorExt::ToLayoutOp toLayoutOp) const {
     Location loc = toLayoutOp.getLoc();
     ShapedType inputTy = toLayoutOp.getType();
-    auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
     auto identityMap = rewriter.getMultiDimIdentityMap(inputTy.getRank());
     SmallVector<int64_t> readShape =
         toLayoutOp.getLayout().getUndistributedShape();
@@ -43,17 +43,17 @@ struct VectorizeToLayoutOpPattern final
       SmallVector<OpFoldResult> mixedSourceDims =
           tensor::getMixedSizes(rewriter, loc, toLayoutOp.getInput());
       auto maskType = VectorType::get(readShape, rewriter.getI1Type());
-      mask =
-          rewriter.create<vector::CreateMaskOp>(loc, maskType, mixedSourceDims);
+      mask = vector::CreateMaskOp::create(rewriter, loc, maskType,
+                                          mixedSourceDims);
     }
     VectorType vectorType =
         VectorType::get(readShape, inputTy.getElementType());
     auto inBounds = rewriter.getBoolArrayAttr(
         SmallVector<bool>(vectorType.getRank(), true));
     auto padValue =
-        rewriter.create<ub::PoisonOp>(loc, inputTy.getElementType());
-    auto read = rewriter.create<vector::TransferReadOp>(
-        loc,
+        ub::PoisonOp::create(rewriter, loc, inputTy.getElementType());
+    auto read = vector::TransferReadOp::create(
+        rewriter, loc,
         /*type=*/vectorType,
         /*source=*/toLayoutOp.getInput(),
         /*indices=*/ValueRange{SmallVector<Value>(readShape.size(), zero)},
@@ -72,15 +72,16 @@ struct VectorizeToLayoutOpPattern final
     ShapedType tensorTy = tensorLayoutOp.getType();
     auto resType =
         RankedTensorType::get(tensorTy.getShape(), tensorTy.getElementType());
-    auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
     int64_t rank = tensorTy.getShape().size();
     auto inBounds = rewriter.getBoolArrayAttr(SmallVector<bool>(rank, true));
     auto identityMap = rewriter.getMultiDimIdentityMap(tensorTy.getRank());
-    auto empty = rewriter.create<tensor::EmptyOp>(
-        loc, tensor::getMixedSizes(rewriter, loc, tensorLayoutOp.getInput()),
+    auto empty = tensor::EmptyOp::create(
+        rewriter, loc,
+        tensor::getMixedSizes(rewriter, loc, tensorLayoutOp.getInput()),
         tensorTy.getElementType());
-    return rewriter.create<vector::TransferWriteOp>(
-        loc,
+    return vector::TransferWriteOp::create(
+        rewriter, loc,
         /*result=*/resType,
         /*vector=*/vectorLayoutOp,
         /*source=*/empty,
@@ -100,9 +101,9 @@ struct VectorizeToLayoutOpPattern final
     Location loc = toLayoutOp.getLoc();
     vector::TransferReadOp readOp = createReadOp(rewriter, toLayoutOp);
     // Create the toLayout operation but with vector types instead.
-    auto newLayoutOp = rewriter.create<IREE::VectorExt::ToLayoutOp>(
-        loc, readOp, toLayoutOp.getLayout(), toLayoutOp.getMmaKindAttr(),
-        toLayoutOp.getSharedMemoryConversion());
+    auto newLayoutOp = IREE::VectorExt::ToLayoutOp::create(
+        rewriter, loc, readOp, toLayoutOp.getLayout(),
+        toLayoutOp.getMmaKindAttr(), toLayoutOp.getSharedMemoryConversion());
     // Create the write back to a tensor.
     vector::TransferWriteOp writeOp =
         createWriteOp(rewriter, toLayoutOp, newLayoutOp, readOp.getMask());
@@ -169,8 +170,8 @@ buildPartialGenericOp(RewriterBase &rewriter, linalg::GenericOp fullOp,
   }
 
   for (Value val : newOutputs) {
-    Value out = rewriter.create<tensor::EmptyOp>(fullOp.getLoc(), vectorSizes,
-                                                 getElementTypeOrSelf(val));
+    Value out = tensor::EmptyOp::create(rewriter, fullOp.getLoc(), vectorSizes,
+                                        getElementTypeOrSelf(val));
     outs.push_back(out);
     indexingMaps.push_back(ident);
   }
@@ -184,8 +185,8 @@ buildPartialGenericOp(RewriterBase &rewriter, linalg::GenericOp fullOp,
     }
   }
 
-  auto newOp = rewriter.create<linalg::GenericOp>(
-      fullOp.getLoc(), TypeRange(outs), ins, outs, indexingMaps,
+  auto newOp = linalg::GenericOp::create(
+      rewriter, fullOp.getLoc(), TypeRange(outs), ins, outs, indexingMaps,
       fullOp.getIteratorTypesArray(),
       [&](OpBuilder &b, Location loc, ValueRange blockArgs) {
         IRMapping localMap;
@@ -209,7 +210,7 @@ buildPartialGenericOp(RewriterBase &rewriter, linalg::GenericOp fullOp,
         if (!hasYield) {
           SmallVector<Value> yieldValues = llvm::map_to_vector(
               newOutputs, [&](Value val) { return localMap.lookup(val); });
-          b.create<linalg::YieldOp>(loc, yieldValues);
+          linalg::YieldOp::create(b, loc, yieldValues);
         }
       });
 
@@ -422,7 +423,7 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
   SmallVector<bool> indexed;
   SmallVector<AffineMap> indexedMaps;
 
-  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
 
   for (auto [i, index] : llvm::enumerate(extractOp.getIndices())) {
     if (!tmap.contains(index)) {
@@ -442,9 +443,9 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
     // TODO: Mask the operation here. It's really hard to do that here though
     // because we don't have access to the vectorization infra, but maybe there
     // are easier ways to do it here.
-    auto read = rewriter.create<vector::TransferReadOp>(
-        loc, readType, tensor, operandIndices, /*padding=*/std::nullopt,
-        readMap);
+    auto read = vector::TransferReadOp::create(
+        rewriter, loc, readType, tensor, operandIndices,
+        /*padding=*/std::nullopt, readMap);
 
     baseIndices.push_back(zero);
     indexed.push_back(true);
@@ -453,25 +454,25 @@ LogicalResult vectorizeGatherLikeGenericToTransferGather(
   }
 
   auto gatherTy = VectorType::get(canonicalVectorSizes, extractOp.getType());
-  Value padding = rewriter.create<ub::PoisonOp>(loc, extractOp.getType());
+  Value padding = ub::PoisonOp::create(rewriter, loc, extractOp.getType());
   // tensor.extract always produces in-bounds accesses.
   SmallVector<Attribute> inBounds(gatherTy.getRank(),
                                   rewriter.getBoolAttr(true));
 
-  auto transferGatherOp = rewriter.create<IREE::VectorExt::TransferGatherOp>(
-      loc, gatherTy, extractOp.getTensor(), baseIndices, indexVecs,
+  auto transferGatherOp = IREE::VectorExt::TransferGatherOp::create(
+      rewriter, loc, gatherTy, extractOp.getTensor(), baseIndices, indexVecs,
       rewriter.getBoolArrayAttr(indexed),
       rewriter.getAffineMapArrayAttr(indexedMaps),
       inversePerm(itSpaceToExtract), padding,
       /*mask=*/Value(), rewriter.getArrayAttr(inBounds));
 
   // Create a empty tensor to write to.
-  auto emptyOp = rewriter.create<tensor::EmptyOp>(loc, canonicalVectorSizes,
-                                                  gatherTy.getElementType());
+  auto emptyOp = tensor::EmptyOp::create(rewriter, loc, canonicalVectorSizes,
+                                         gatherTy.getElementType());
   SmallVector<Value> writeIndices(canonicalVectorSizes.size(), zero);
 
-  auto writeOp = rewriter.create<vector::TransferWriteOp>(
-      loc, transferGatherOp.getResult(), emptyOp, writeIndices);
+  auto writeOp = vector::TransferWriteOp::create(
+      rewriter, loc, transferGatherOp.getResult(), emptyOp, writeIndices);
 
   tmap[extractOp.getResult()] = {
       writeOp.getResult(),
@@ -540,20 +541,20 @@ vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
   auto indicesVecTy = VectorType::get(
       vectorSizes.take_front(gatherOp.getBatchRank()), rewriter.getIndexType());
 
-  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-  auto indicesVecRead = rewriter.create<vector::TransferReadOp>(
-      loc, indicesVecTy.clone(indicesTy.getElementType()),
+  Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+  auto indicesVecRead = vector::TransferReadOp::create(
+      rewriter, loc, indicesVecTy.clone(indicesTy.getElementType()),
       gatherOp.getIndices(), SmallVector<Value>(indicesTy.getRank(), zero),
       std::nullopt);
   VectorType indicesMaskType = indicesVecTy.clone(rewriter.getI1Type());
   SmallVector<OpFoldResult> gatherDims =
       tensor::getMixedSizes(rewriter, loc, gatherOp.getOutput());
-  Value indicesMask = rewriter.create<vector::CreateMaskOp>(
-      loc, indicesMaskType,
+  Value indicesMask = vector::CreateMaskOp::create(
+      rewriter, loc, indicesMaskType,
       ArrayRef(gatherDims).take_front(gatherOp.getBatchRank()));
   Value indicesVec = maskOperation(rewriter, indicesVecRead, indicesMask);
   indicesVec =
-      rewriter.create<arith::IndexCastOp>(loc, indicesVecTy, indicesVec);
+      arith::IndexCastOp::create(rewriter, loc, indicesVecTy, indicesVec);
 
   SmallVector<Value> baseIndices(sourceTy.getRank(), zero);
   SmallVector<bool> indexed(sourceTy.getRank(), false);
@@ -563,20 +564,21 @@ vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
   auto indexedMaps = rewriter.getAffineMapArrayAttr(SmallVector<AffineMap>(
       1,
       rewriter.getMultiDimIdentityMap(sourceTy.getRank()).getMajorSubMap(1)));
-  Value padding = rewriter.create<ub::PoisonOp>(loc, gatherTy.getElementType());
-  auto transferGatherOp = rewriter.create<IREE::VectorExt::TransferGatherOp>(
-      loc, gatherVectorTy, gatherOp.getSource(), baseIndices,
+  Value padding =
+      ub::PoisonOp::create(rewriter, loc, gatherTy.getElementType());
+  auto transferGatherOp = IREE::VectorExt::TransferGatherOp::create(
+      rewriter, loc, gatherVectorTy, gatherOp.getSource(), baseIndices,
       ValueRange{indicesVec}, rewriter.getBoolArrayAttr(indexed), indexedMaps,
       rewriter.getMultiDimIdentityMap(gatherTy.getRank()), padding,
       /*mask=*/Value(), inBounds);
 
   VectorType gatherMaskType = gatherVectorTy.clone(rewriter.getI1Type());
   Value gatherMask =
-      rewriter.create<vector::CreateMaskOp>(loc, gatherMaskType, gatherDims);
+      vector::CreateMaskOp::create(rewriter, loc, gatherMaskType, gatherDims);
   Value maskedGather = maskOperation(rewriter, transferGatherOp, gatherMask);
   SmallVector<Value> writeIndices(gatherTy.getRank(), zero);
-  auto writeOp = rewriter.create<vector::TransferWriteOp>(
-      loc, maskedGather, gatherOp.getOutput(), writeIndices);
+  auto writeOp = vector::TransferWriteOp::create(
+      rewriter, loc, maskedGather, gatherOp.getOutput(), writeIndices);
   Value maskedWrite = maskOperation(rewriter, writeOp, gatherMask);
 
   rewriter.replaceOp(gatherOp, maskedWrite);

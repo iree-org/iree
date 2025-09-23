@@ -70,26 +70,24 @@ struct FftRfftOpConversion
     const int64_t lastDim = inputShape.size() - 1;
     const bool needTranspose = dim != lastDim;
     if (needTranspose) {
-      Value cstLastDim = rewriter.create<torch::Torch::ConstantIntOp>(
-          loc, rewriter.getI64IntegerAttr(lastDim));
-      Value cstFftDim = rewriter.create<torch::Torch::ConstantIntOp>(
-          loc, rewriter.getI64IntegerAttr(dim));
+      Value cstLastDim = torch::Torch::ConstantIntOp::create(
+          rewriter, loc, rewriter.getI64IntegerAttr(lastDim));
+      Value cstFftDim = torch::Torch::ConstantIntOp::create(
+          rewriter, loc, rewriter.getI64IntegerAttr(dim));
       std::swap(preFftShape[dim], preFftShape[lastDim]);
 
-      self = rewriter.create<torch::Torch::AtenTransposeIntOp>(
-          loc,
+      self = torch::Torch::AtenTransposeIntOp::create(
+          rewriter, loc,
           inputTensorType.getWithSizesAndDtype(preFftShape,
                                                inputTensorType.getDtype()),
           self, cstFftDim, cstLastDim);
     }
 
     // Cast to the builtin tensor type.
-    Value builtinCast =
-        rewriter.create<torch::TorchConversion::ToBuiltinTensorOp>(
-            loc,
-            cast<torch::Torch::ValueTensorType>(self.getType())
-                .toBuiltinTensor(),
-            self);
+    Value builtinCast = torch::TorchConversion::ToBuiltinTensorOp::create(
+        rewriter, loc,
+        cast<torch::Torch::ValueTensorType>(self.getType()).toBuiltinTensor(),
+        self);
 
     auto rewriteRes =
         IREE::LinalgExt::rewriteFft(op, builtinCast, fftLength, rewriter);
@@ -104,35 +102,34 @@ struct FftRfftOpConversion
     postFftShape.back() = fftLength / 2 + 1;
     Type postFftType = inputTensorType.getWithSizesAndDtype(
         postFftShape, inputTensorType.getDtype());
-    Value torchReal =
-        rewriter.create<torch::TorchConversion::FromBuiltinTensorOp>(
-            loc, postFftType, real);
-    Value torchImag =
-        rewriter.create<torch::TorchConversion::FromBuiltinTensorOp>(
-            loc, postFftType, imag);
+    Value torchReal = torch::TorchConversion::FromBuiltinTensorOp::create(
+        rewriter, loc, postFftType, real);
+    Value torchImag = torch::TorchConversion::FromBuiltinTensorOp::create(
+        rewriter, loc, postFftType, imag);
 
     // Unsqueeze a 1 dimension at the end
     SmallVector<int64_t> unsqueezedTensorSizes(postFftShape);
     unsqueezedTensorSizes.push_back(1);
     Type unsqueezedTensorType = inputTensorType.getWithSizesAndDtype(
         unsqueezedTensorSizes, inputTensorType.getDtype());
-    Value axisUnsqueeze = rewriter.create<torch::Torch::ConstantIntOp>(
-        loc, rewriter.getI64IntegerAttr(-1));
-    Value unsqueezedReal = rewriter.create<torch::Torch::AtenUnsqueezeOp>(
-        loc, unsqueezedTensorType, torchReal, axisUnsqueeze);
-    Value unsqueezedImag = rewriter.create<torch::Torch::AtenUnsqueezeOp>(
-        loc, unsqueezedTensorType, torchImag, axisUnsqueeze);
+    Value axisUnsqueeze = torch::Torch::ConstantIntOp::create(
+        rewriter, loc, rewriter.getI64IntegerAttr(-1));
+    Value unsqueezedReal = torch::Torch::AtenUnsqueezeOp::create(
+        rewriter, loc, unsqueezedTensorType, torchReal, axisUnsqueeze);
+    Value unsqueezedImag = torch::Torch::AtenUnsqueezeOp::create(
+        rewriter, loc, unsqueezedTensorType, torchImag, axisUnsqueeze);
 
     // Concatenate real and imag
     Type listType = torch::Torch::ListType::get(unsqueezedTensorType);
-    Value slices = rewriter.create<torch::Torch::PrimListConstructOp>(
-        loc, listType, llvm::ArrayRef<Value>{unsqueezedReal, unsqueezedImag});
+    Value slices = torch::Torch::PrimListConstructOp::create(
+        rewriter, loc, listType,
+        llvm::ArrayRef<Value>{unsqueezedReal, unsqueezedImag});
     SmallVector<int64_t> concatenatedTensorSizes(unsqueezedTensorSizes);
     concatenatedTensorSizes.back() = 2;
     Type concatenatedTensorType = inputTensorType.getWithSizesAndDtype(
         concatenatedTensorSizes, inputTensorType.getDtype());
-    Value concatenated = rewriter.create<torch::Torch::AtenCatOp>(
-        loc, concatenatedTensorType, slices, axisUnsqueeze);
+    Value concatenated = torch::Torch::AtenCatOp::create(
+        rewriter, loc, concatenatedTensorType, slices, axisUnsqueeze);
 
     // View as complex (and transpose back)
     SmallVector<int64_t> complexResultSizes(concatenatedTensorSizes);
@@ -143,13 +140,13 @@ struct FftRfftOpConversion
                 complexResultSizes,
                 mlir::ComplexType::get(inputTensorType.getDtype())));
     if (needTranspose) {
-      Value complex = rewriter.create<torch::Torch::AtenViewAsComplexOp>(
-          loc, complexResultType, concatenated);
+      Value complex = torch::Torch::AtenViewAsComplexOp::create(
+          rewriter, loc, complexResultType, concatenated);
 
-      Value cstLastDim = rewriter.create<torch::Torch::ConstantIntOp>(
-          loc, rewriter.getI64IntegerAttr(lastDim));
-      Value cstFftDim = rewriter.create<torch::Torch::ConstantIntOp>(
-          loc, rewriter.getI64IntegerAttr(dim));
+      Value cstLastDim = torch::Torch::ConstantIntOp::create(
+          rewriter, loc, rewriter.getI64IntegerAttr(lastDim));
+      Value cstFftDim = torch::Torch::ConstantIntOp::create(
+          rewriter, loc, rewriter.getI64IntegerAttr(dim));
       std::swap(complexResultSizes[dim], complexResultSizes[lastDim]);
 
       rewriter.replaceOpWithNewOp<torch::Torch::AtenTransposeIntOp>(

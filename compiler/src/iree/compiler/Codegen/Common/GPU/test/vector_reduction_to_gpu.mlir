@@ -91,8 +91,8 @@ module {
     %c384 = arith.constant 384 : index
     %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) offset(%c0) : memref<1xvector<4xi32>, #hal.descriptor_type<uniform_buffer>>
     %1 = memref.load %0[%c0] : memref<1xvector<4xi32>, #hal.descriptor_type<uniform_buffer>>
-    %2 = vector.extractelement %1[%c0 : index] : vector<4xi32>
-    %3 = vector.extractelement %1[%c1 : index] : vector<4xi32>
+    %2 = vector.extract %1[%c0] : i32 from vector<4xi32>
+    %3 = vector.extract %1[%c1] : i32 from vector<4xi32>
     %4 = arith.index_castui %2 : i32 to index
     %5 = arith.index_castui %3 : i32 to index
     %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%4) : memref<128x384xf32>
@@ -114,11 +114,10 @@ module {
 
 //   CHECK-LABEL: func.func @reduce_uniform_buffer_offset()
 //     CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//     CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //         CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
 //         CHECK:   %[[LOAD:.+]] = memref.load %[[SUBSPAN]][%[[C0]]]
-//         CHECK:   %[[EXT0:.+]] = vector.extractelement %[[LOAD]][%[[C0]] : index] : vector<4xi32>
-//         CHECK:   %[[EXT1:.+]] = vector.extractelement %[[LOAD]][%[[C1]] : index] : vector<4xi32>
+//         CHECK:   %[[EXT0:.+]] = vector.extract %[[LOAD]][0] : i32 from vector<4xi32>
+//         CHECK:   %[[EXT1:.+]] = vector.extract %[[LOAD]][1] : i32 from vector<4xi32>
 //         CHECK:   %[[OFFSET0:.+]] = arith.index_castui %[[EXT0]] : i32 to index
 //         CHECK:   %[[OFFSET1:.+]] = arith.index_castui %[[EXT1]] : i32 to index
 //         CHECK:   hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[OFFSET0]])
@@ -150,8 +149,8 @@ module {
     %c384 = arith.constant 384 : index
     %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : memref<1xvector<4xi32>, #hal.descriptor_type<storage_buffer>>
     %1 = memref.load %0[%c0] : memref<1xvector<4xi32>, #hal.descriptor_type<storage_buffer>>
-    %2 = vector.extractelement %1[%c0 : index] : vector<4xi32>
-    %3 = vector.extractelement %1[%c1 : index] : vector<4xi32>
+    %2 = vector.extract %1[%c0] : i32 from vector<4xi32>
+    %3 = vector.extract %1[%c1] : i32 from vector<4xi32>
     %4 = arith.index_castui %2 : i32 to index
     %5 = arith.index_castui %3 : i32 to index
     %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%4) : memref<128x384xf32>
@@ -173,11 +172,10 @@ module {
 
 //   CHECK-LABEL: func.func @reduce_storage_buffer_offset()
 //     CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//     CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //         CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
 //         CHECK:   %[[LOAD:.+]] = memref.load %[[SUBSPAN]][%[[C0]]]
-//         CHECK:   %[[EXT0:.+]] = vector.extractelement %[[LOAD]][%[[C0]] : index] : vector<4xi32>
-//         CHECK:   %[[EXT1:.+]] = vector.extractelement %[[LOAD]][%[[C1]] : index] : vector<4xi32>
+//         CHECK:   %[[EXT0:.+]] = vector.extract %[[LOAD]][0] : i32 from vector<4xi32>
+//         CHECK:   %[[EXT1:.+]] = vector.extract %[[LOAD]][1] : i32 from vector<4xi32>
 //         CHECK:   %[[OFFSET0:.+]] = arith.index_castui %[[EXT0]] : i32 to index
 //         CHECK:   %[[OFFSET1:.+]] = arith.index_castui %[[EXT1]] : i32 to index
 //         CHECK:   hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[OFFSET0]])

@@ -176,8 +176,8 @@ struct FftOpPartitionableLoops
   getPartitionableLoops(Operation *op,
                         std::optional<unsigned> maxNumPartitionedLoops) const {
     auto fftOp = cast<IREE::LinalgExt::FftOp>(op);
-    auto range = llvm::seq<unsigned>(0, fftOp.getOperandRank());
-    SmallVector<unsigned> partitionableLoops(range.begin(), range.end());
+    auto partitionableLoops =
+        llvm::to_vector(llvm::seq<unsigned>(0, fftOp.getOperandRank()));
     // Indices matter for coeff computation.
     if (!fftOp.hasCoeff()) {
       partitionableLoops.pop_back();

@@ -88,8 +88,8 @@ struct UtilInlinerInterface : public DialectInlinerInterface {
     if (!returnOp)
       return;
     OpBuilder builder(op);
-    builder.create<mlir::cf::BranchOp>(op->getLoc(), newDest,
-                                       returnOp.getOperands());
+    mlir::cf::BranchOp::create(builder, op->getLoc(), newDest,
+                               returnOp.getOperands());
     op->erase();
   }
 
@@ -128,9 +128,10 @@ UtilDialect::UtilDialect(MLIRContext *context)
 Operation *UtilDialect::materializeConstant(OpBuilder &builder, Attribute value,
                                             Type type, Location loc) {
   if (isa<IREE::Util::NullAttr>(value)) {
-    return builder.create<IREE::Util::NullOp>(loc, type);
+    return IREE::Util::NullOp::create(builder, loc, type);
   } else if (arith::ConstantOp::isBuildableWith(value, type)) {
-    return builder.create<arith::ConstantOp>(loc, type, cast<TypedAttr>(value));
+    return arith::ConstantOp::create(builder, loc, type,
+                                     cast<TypedAttr>(value));
   }
   return nullptr;
 }

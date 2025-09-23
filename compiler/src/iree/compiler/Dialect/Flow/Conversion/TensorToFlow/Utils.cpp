@@ -153,8 +153,9 @@ convertInsertSliceOpToFlowUpdateOp(RewriterBase &rewriter,
     auto unreducedShape = getShapeFromSizes(sizes);
     sourceType =
         RankedTensorType::get(unreducedShape, sourceType.getElementType());
-    source = rewriter.create<IREE::Flow::TensorReshapeOp>(
-        loc, sourceType, source, sourceDynamicDims, sourceDynamicDims);
+    source = IREE::Flow::TensorReshapeOp::create(rewriter, loc, sourceType,
+                                                 source, sourceDynamicDims,
+                                                 sourceDynamicDims);
   }
 
   auto offsetVals = getValueOrCreateConstantIndexOp(rewriter, loc,
@@ -203,12 +204,12 @@ convertExtractSliceOpToFlowSliceOp(RewriterBase &rewriter,
   auto sourceDynamicDims =
       tensor::createDynamicDimValues(rewriter, loc, sliceOp.getSource());
   auto resultDynamicDims = getDynamicValues(sizes);
-  Value replacement = rewriter.create<TensorSliceOp>(
-      loc, resultType, sliceOp.getSource(), sourceDynamicDims, offsetVals,
-      sizeVals, resultDynamicDims);
+  Value replacement = TensorSliceOp::create(
+      rewriter, loc, resultType, sliceOp.getSource(), sourceDynamicDims,
+      offsetVals, sizeVals, resultDynamicDims);
   if (resultType.getRank() > sliceOp.getType().getRank()) {
-    replacement = rewriter.create<IREE::Flow::TensorReshapeOp>(
-        loc, sliceOp.getType(), replacement, resultDynamicDims,
+    replacement = IREE::Flow::TensorReshapeOp::create(
+        rewriter, loc, sliceOp.getType(), replacement, resultDynamicDims,
         resultDynamicDims);
   }
   rewriter.replaceOp(sliceOp, replacement);

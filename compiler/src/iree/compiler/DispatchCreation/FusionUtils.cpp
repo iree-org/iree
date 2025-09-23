@@ -36,27 +36,32 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
     return true;
   }
 
-  // Don't fuse if all of the consumer maps aren't projected permutations.
-  if (auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp)) {
-    if (!llvm::all_of(
-            linalgConsumerOp.getIndexingMapsArray(),
-            [](AffineMap map) { return map.isProjectedPermutation(); })) {
-      return false;
-    }
-  }
-
   // If the generic op is "just" copy, then fuse always.
   Block &body = producerOp->getRegion(0).front();
   if (std::begin(body)->hasTrait<OpTrait::IsTerminator>())
     return true;
-  if (llvm::all_of(body.getArguments(),
+
+  auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp);
+  if (!linalgConsumerOp) {
+    return false;
+  }
+
+  // The operands aren't used, its just an `linalg.index` or `tensor.extract`
+  // op. Fuse with all non-reduction ops.
+  if (linalgConsumerOp.getNumParallelLoops() ==
+          linalgConsumerOp.getNumLoops() &&
+      llvm::all_of(body.getArguments(),
                    [](BlockArgument arg) { return arg.use_empty(); })) {
-    // The operands aren't used, its just an `linalg.index` op.
     return true;
   }
 
   // If producer does not have a single user, dont fuse.
   if (!producerOp->hasOneUse()) {
+    return false;
+  }
+
+  if (!options.fuseBroadcastConsumers &&
+      IREE::LinalgExt::isBroadcastingOp(linalgConsumerOp)) {
     return false;
   }
 
@@ -71,13 +76,13 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
     return false;
   }
 
-  auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp);
-  if (!linalgConsumerOp) {
-    return false;
-  }
-
   if (!options.fuseTruncateOps &&
       IREE::LinalgExt::isBitTruncateOp(producerOp)) {
+    // TODO(IanWood1): do this regardless of `options.fuseTruncateOps`.
+    // Never fuse truncate -> extend.
+    if (IREE::LinalgExt::isBitExtendOp(consumerOp)) {
+      return false;
+    }
     // Do not fuse with bit-truncate-like operations with their consumers
     // unless:
     //
@@ -154,13 +159,8 @@ getProducerDispatchValueAndOpChain(Value operand) {
 
   auto producerDispatch =
       dyn_cast<IREE::Flow::DispatchRegionOp>(producerValue.getOwner());
-  // TODO(MaheshRavishankar): Multi-result producer dispatches can be supported.
-  // Will require to move the consumer dispatch immediately after the producer
-  // instead of what is done below and move other operands of the consumer
-  // dispatch before the producer dispatch.
   if (!producerDispatch ||
-      !llvm::hasSingleElement(producerDispatch.getBody()) ||
-      producerDispatch->getNumResults() != 1) {
+      !llvm::hasSingleElement(producerDispatch.getBody())) {
     return std::nullopt;
   }
   if (!llvm::hasSingleElement(producerValue.getUses())) {

@@ -440,8 +440,8 @@ DiagnosedSilenceableFailure IREE::Util::transform_dialect::CastAndCallOp::apply(
     replacements = terminator->getOperands();
     rewriter.eraseOp(terminator);
   } else {
-    auto callOp = rewriter.create<IREE::Util::CallOp>(
-        insertionPoint->getLoc(), targetFunction.getResultTypes(),
+    auto callOp = IREE::Util::CallOp::create(
+        rewriter, insertionPoint->getLoc(), targetFunction.getResultTypes(),
         targetFunction.getName(), inputs, /*tied_operands=*/ArrayAttr{},
         /*arg_attrs=*/nullptr, /*res_attrs=*/nullptr);
     exceptedUser = callOp;

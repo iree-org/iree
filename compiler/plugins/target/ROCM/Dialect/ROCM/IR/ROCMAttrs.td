@@ -8,6 +8,7 @@
 #define IREE_PLUGINS_TARGET_ROCM_DIALECT_ROCMATTRS
 
 include "ROCMDialect.td"
+include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/BuiltinTypeInterfaces.td"
@@ -36,6 +37,39 @@ def ROCM_BuiltinTuningModuleAttr :
     StringRefParameter<>:$builtin_filename
   );
   let assemblyFormat = "`<` $builtin_filename `>`";
+}
+
+def ROCM_UKernelProviderAttr  :
+    AttrDef<ROCM_Dialect, "UKernelProvider", [
+    DeclareAttrInterfaceMethods<IREECodegen_UKernelProviderInterface, [
+        "createAndReplaceWithUkernelOp"
+      ]>
+    ]> {
+  let mnemonic = "ukernel_provider";
+  let summary = [{
+    An attribute that provides context specific ukernel implementations for ROCM.
+  }];
+  let parameters = (ins);
+  let assemblyFormat = [{}];
+}
+
+//===---------------------------------------------------------------------===//
+// rocm.tensor_ukernel_provider
+//===---------------------------------------------------------------------===//
+
+def ROCM_TensorUKernelProviderAttr  :
+    AttrDef<ROCM_Dialect, "TensorUKernelProvider", [
+    DeclareAttrInterfaceMethods<IREECodegen_UKernelProviderInterface, [
+      "getDataLayoutForUKernel",
+      "getMLIRUKernel",
+      ]>
+    ]> {
+  let mnemonic = "tensor_ukernel_provider";
+  let summary = [{
+    An attribute that provides context specific tensor ukernel implementations for ROCM.
+  }];
+  let parameters = (ins);
+  let assemblyFormat = [{}];
 }
 
 #endif // IREE_PLUGINS_TARGET_ROCM_DIALECT_ROCMATTRS

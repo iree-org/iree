@@ -54,7 +54,7 @@ public:
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
 
     // Lower vector transfer permutation map.
     {

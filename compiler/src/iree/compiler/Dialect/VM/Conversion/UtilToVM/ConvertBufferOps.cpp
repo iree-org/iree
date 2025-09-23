@@ -58,7 +58,7 @@ static Value getAlignment(Location loc, std::optional<APInt> alignment,
       alignment.has_value()
           ? static_cast<int32_t>(alignment.value().getZExtValue())
           : 0;
-  return builder.create<IREE::VM::ConstI32Op>(loc, alignmentValue);
+  return IREE::VM::ConstI32Op::create(builder, loc, alignmentValue);
 }
 
 struct BufferAllocOpConversion
@@ -101,12 +101,12 @@ struct BufferSliceOpConversion
     auto resultType =
         getTypeConverter()->convertType(sliceOp.getResult().getType());
     auto sliceLength = castToI64(adaptor.getResultSize(), rewriter);
-    Value newBuffer = rewriter.create<IREE::VM::BufferAllocOp>(
-        sliceOp.getLoc(), resultType, sliceLength,
+    Value newBuffer = IREE::VM::BufferAllocOp::create(
+        rewriter, sliceOp.getLoc(), resultType, sliceLength,
         getAlignment(sliceOp.getLoc(), adaptor.getAlignment(), rewriter));
-    Value zero = rewriter.create<IREE::VM::ConstI64ZeroOp>(sliceOp.getLoc());
-    rewriter.create<IREE::VM::BufferCopyOp>(
-        sliceOp.getLoc(), adaptor.getSource(),
+    Value zero = IREE::VM::ConstI64ZeroOp::create(rewriter, sliceOp.getLoc());
+    IREE::VM::BufferCopyOp::create(
+        rewriter, sliceOp.getLoc(), adaptor.getSource(),
         castToI64(adaptor.getSourceOffset(), rewriter), newBuffer, zero,
         sliceLength);
     rewriter.replaceOp(sliceOp, newBuffer);
@@ -120,8 +120,8 @@ struct BufferSizeOpConversion
   LogicalResult
   matchAndRewrite(IREE::Util::BufferSizeOp sizeOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    Value size = rewriter.create<IREE::VM::BufferLengthOp>(
-        sizeOp.getLoc(), rewriter.getI64Type(), adaptor.getOperand());
+    Value size = IREE::VM::BufferLengthOp::create(
+        rewriter, sizeOp.getLoc(), rewriter.getI64Type(), adaptor.getOperand());
     rewriter.replaceOp(sizeOp, castToIndex(size, rewriter));
     return success();
   }
@@ -165,7 +165,7 @@ static Value unscaleOffset(Location loc, Value offset, int64_t scale,
     return offset;
   return builder.createOrFold<IREE::VM::DivI64SOp>(
       loc, offset.getType(), offset,
-      builder.create<IREE::VM::ConstI64Op>(loc, scale));
+      IREE::VM::ConstI64Op::create(builder, loc, scale));
 }
 
 struct BufferFillOpConversion

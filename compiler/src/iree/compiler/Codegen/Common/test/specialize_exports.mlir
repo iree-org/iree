@@ -1,5 +1,5 @@
 // RUN: iree-opt %s \
-// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-specialize-exports, cse)))" \
+// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-specialize-exports)))" \
 // RUN:   --split-input-file | FileCheck %s
 
 #executable_target_embedded_elf_aarch64 = #hal.executable.target<"llvm-cpu", "embedded-elf-aarch64">
@@ -10,7 +10,7 @@
 hal.executable private @single_specialization_executable {
   hal.executable.variant public @variant target(#executable_target_embedded_elf_aarch64) {
     hal.executable.export public @matmul_transpose_b_Dx1024x4096_f16xf16xf32 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -28,8 +28,13 @@ hal.executable private @single_specialization_executable {
         %8 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0], sizes = [1024, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x4096xf16>> -> tensor<1024x4096xf16>
         %9 = tensor.empty(%4) : tensor<?x1024xf32>
         %10 = linalg.fill ins(%cst : f32) outs(%9 : tensor<?x1024xf32>) -> tensor<?x1024xf32>
-        %11 = linalg.matmul_transpose_b {
-          iree_codegen.specialization_ranges = #util<int.assumption.multi_array[
+        %11 = linalg.matmul
+          indexing_maps = [
+            affine_map<(d0, d1, d2) -> (d0, d2)>,
+            affine_map<(d0, d1, d2) -> (d1, d2)>,
+            affine_map<(d0, d1, d2) -> (d0, d1)>
+          ]
+          {iree_codegen.specialization_ranges = #util<int.assumption.multi_array[
             [<umin = 128, umax = 4096, udiv = 128>, <umin = 128, umax = 4096, udiv = 128>, <umin = 64, udiv = 64>],
             [<umin = 4096, udiv = 256>, <umin = 4096, udiv = 256>, <udiv = 64>]]>}
           ins(%7, %8 : tensor<?x4096xf16>, tensor<1024x4096xf16>) outs(%10 : tensor<?x1024xf32>) -> tensor<?x1024xf32>
@@ -40,31 +45,34 @@ hal.executable private @single_specialization_executable {
   }
 }
 
+// Note the `CHECK-NOT: tensor.dim` which checks than unused `tensor.dim` ops are eliminated.
+
 // CHECK-LABEL: hal.executable private @single_specialization_executable
 
 //       CHECK:   hal.executable.export public @matmul_transpose_b_Dx1024x4096_f16xf16xf32 ordinal(0)
 //  CHECK-SAME:     condition(%{{.*}}: !hal.device, %[[W:.+]]: index) -> i1
-//   CHECK-DAG:       %[[TRUE:.+]] = arith.constant true
-//       CHECK:       %[[UMIN:.+]] = arith.cmpi ule, %c128, %[[W]]
-//       CHECK:       %[[CMIN:.+]] = arith.andi %[[UMIN]], %[[TRUE]]
-//       CHECK:       %[[UMAX:.+]] = arith.cmpi uge, %c4096, %[[W]]
-//       CHECK:       %[[CMAX:.+]] = arith.andi %[[UMAX]], %[[CMIN]]
-//       CHECK:       %[[UREM:.+]] = arith.remui %[[W]], %c128
-//       CHECK:       %[[UDIV:.+]] = arith.cmpi eq, %[[UREM]], %c0
-//       CHECK:       %[[CDIV:.+]] = arith.andi %[[UDIV]], %[[CMAX]]
+//   CHECK-DAG:       %[[UMAX:.+]] = arith.cmpi uge, %[[W]], %c128
+//   CHECK-DAG:       %[[UMIN:.+]] = arith.cmpi ule, %[[W]], %c4096
+//   CHECK-DAG:       %[[CMIN:.+]] = arith.andi %[[UMIN]], %[[UMAX]]
+//   CHECK-DAG:       %[[UREM:.+]] = arith.remui %[[W]], %c128
+//   CHECK-DAG:       %[[UDIV:.+]] = arith.cmpi eq, %[[UREM]], %c0
+//       CHECK:       %[[CDIV:.+]] = arith.andi %[[UDIV]], %[[CMIN]]
 //       CHECK:       hal.return %[[CDIV]]
 //       CHECK:     fallback(@matmul_transpose_b_Dx1024x4096_f16xf16xf32_0)
 //  CHECK-SAME:     count(%{{[A-Za-z0-9]*}}: !hal.device
-//  CHECK-NEXT:       iree_tensor_ext.dispatch.workgroup_count_from_slice
+//  CHECK-NEXT:       iree_tensor_ext.dispatch.workgroup_count_from_slice()
 
 //       CHECK:   hal.executable.export public @matmul_transpose_b_Dx1024x4096_f16xf16xf32_0 ordinal(1)
-//  CHECK-NEXT:       iree_tensor_ext.dispatch.workgroup_count_from_slice
+//  CHECK-NEXT:       iree_tensor_ext.dispatch.workgroup_count_from_slice()
 
 //       CHECK:   builtin.module
 //       CHECK:     func.func @matmul_transpose_b_Dx1024x4096_f16xf16xf32
 //       CHECK:       util.assume.int %{{.*}}<umin = 128, umax = 4096, udiv = 128>
+//   CHECK-NOT:       tensor.dim
 //       CHECK:     func.func @matmul_transpose_b_Dx1024x4096_f16xf16xf32_0
 //       CHECK:       util.assume.int %{{.*}}<umin = 256, umax = 1048320, udiv = 256>
+//   CHECK-NOT:       tensor.dim
+
 
 // -----
 
@@ -76,7 +84,7 @@ hal.executable private @single_specialization_executable {
 hal.executable private @multiple_specialization_executable {
   hal.executable.variant public @variant target(#executable_target_embedded_elf_aarch64) {
     hal.executable.export public @matmul_transpose_b_Dx1024x4096_f16xf16xf32 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -94,8 +102,13 @@ hal.executable private @multiple_specialization_executable {
         %8 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0], sizes = [1024, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x4096xf16>> -> tensor<1024x4096xf16>
         %9 = tensor.empty(%4) : tensor<?x1024xf32>
         %10 = linalg.fill ins(%cst : f32) outs(%9 : tensor<?x1024xf32>) -> tensor<?x1024xf32>
-        %11 = linalg.matmul_transpose_b {
-          iree_codegen.specialization_ranges = #util<int.assumption.multi_array[
+        %11 = linalg.matmul
+          indexing_maps = [
+            affine_map<(d0, d1, d2) -> (d0, d2)>,
+            affine_map<(d0, d1, d2) -> (d1, d2)>,
+            affine_map<(d0, d1, d2) -> (d0, d1)>
+          ]
+          {iree_codegen.specialization_ranges = #util<int.assumption.multi_array[
             [<umin = 128, umax = 4096, udiv = 128>, <umin = 128, umax = 4096, udiv = 128>, <umin = 64, udiv = 64>],
             [<umin = 0, udiv = 512>, <umin = 0, udiv = 512>, <udiv = 64>], [<udiv = 16>, <udiv = 16>, <udiv = 64>],
             [<umin = 0, udiv = 512>, <umin = 0, udiv = 512>, <udiv = 64>]]>}
@@ -118,7 +131,7 @@ hal.executable private @multiple_specialization_executable {
 //       CHECK:     fallback(@matmul_transpose_b_Dx1024x4096_f16xf16xf32_0_1)
 
 //       CHECK:   hal.executable.export public @matmul_transpose_b_Dx1024x4096_f16xf16xf32_0_1 ordinal(2)
-//  CHECK-NEXT:       iree_tensor_ext.dispatch.workgroup_count_from_slice
+//  CHECK-NEXT:       iree_tensor_ext.dispatch.workgroup_count_from_slice()
 
 //       CHECK:   builtin.module
 //       CHECK:     func.func @matmul_transpose_b_Dx1024x4096_f16xf16xf32
@@ -138,7 +151,7 @@ hal.executable private @multiple_specialization_executable {
 hal.executable private @multiple_dimension_assume {
   hal.executable.variant public @variant target(#executable_target_embedded_elf_aarch64) {
     hal.executable.export public @matmul_transpose_b_Dx1024x4096_f16xf16xf32 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -162,8 +175,13 @@ hal.executable private @multiple_dimension_assume {
         %11 = iree_tensor_ext.dispatch.tensor.load %8, offsets = [0, 0], sizes = [%5, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x4096xf16>>{%5} -> tensor<?x4096xf16>
         %12 = tensor.empty(%6, %5) : tensor<?x?xf32>
         %13 = linalg.fill ins(%cst : f32) outs(%12 : tensor<?x?xf32>) -> tensor<?x?xf32>
-        %14 = linalg.matmul_transpose_b {
-          iree_codegen.specialization_ranges = #util<int.assumption.multi_array[
+        %14 = linalg.matmul
+          indexing_maps = [
+            affine_map<(d0, d1, d2) -> (d0, d2)>,
+            affine_map<(d0, d1, d2) -> (d1, d2)>,
+            affine_map<(d0, d1, d2) -> (d0, d1)>
+          ]
+          {iree_codegen.specialization_ranges = #util<int.assumption.multi_array[
             [<umin = 128, umax = 4096, udiv = 128>, <umin = 128, umax = 4096, udiv = 128>, <umin = 64, udiv = 64>],
             [<umin = 4096, udiv = 256>, <umin = 4096, udiv = 256>, <udiv = 64>]]>}
           ins(%10, %11 : tensor<?x4096xf16>, tensor<?x4096xf16>) outs(%13 : tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -178,46 +196,42 @@ hal.executable private @multiple_dimension_assume {
 
 //       CHECK:   hal.executable.export public @matmul_transpose_b_Dx1024x4096_f16xf16xf32 ordinal(0)
 //  CHECK-SAME:     condition(%{{.*}}: !hal.device, %[[W0:[A-Za-z0-9]+]]: index, %[[W1:[A-Za-z0-9]+]]: index) -> i1
-//       CHECK:       %[[TRUE:.+]] = arith.constant true
-//       CHECK:       %[[UMIN:.+]] = arith.cmpi ule, %c128, %[[W0]]
-//       CHECK:       %[[CMIN:.+]] = arith.andi %[[UMIN]], %[[TRUE]]
-//       CHECK:       %[[UMAX:.+]] = arith.cmpi uge, %c4096, %[[W0]]
-//       CHECK:       %[[CMAX:.+]] = arith.andi %[[UMAX]], %[[CMIN]]
-//       CHECK:       %[[UREM:.+]] = arith.remui %[[W0]], %c128
-//       CHECK:       %[[UDIV:.+]] = arith.cmpi eq, %[[UREM]], %c0
-//       CHECK:       %[[CDIV:.+]] = arith.andi %[[UDIV]], %[[CMAX]]
-//       CHECK:       %[[UMIN1:.+]] = arith.cmpi ule, %c128, %[[W1]]
-//       CHECK:       %[[CMIN1:.+]] = arith.andi %[[UMIN1]], %[[CDIV]]
-//       CHECK:       %[[UMAX1:.+]] = arith.cmpi uge, %c4096, %[[W1]]
-//       CHECK:       %[[CMAX1:.+]] = arith.andi %[[UMAX1]], %[[CMIN1]]
-//       CHECK:       %[[UREM1:.+]] = arith.remui %[[W1]], %c128
-//       CHECK:       %[[UDIV1:.+]] = arith.cmpi eq, %[[UREM1]], %c0
+//   CHECK-DAG:       %[[UMAX:.+]] = arith.cmpi uge, %[[W0]], %c128
+//   CHECK-DAG:       %[[UMIN:.+]] = arith.cmpi ule, %[[W0]], %c4096
+//   CHECK-DAG:       %[[CMAX:.+]] = arith.andi %[[UMIN]], %[[UMAX]]
+//   CHECK-DAG:       %[[UREM:.+]] = arith.remui %[[W0]], %c128
+//   CHECK-DAG:       %[[UDIV:.+]] = arith.cmpi eq, %[[UREM]], %c0
+//   CHECK-DAG:       %[[CDIV:.+]] = arith.andi %[[UDIV]], %[[CMAX]]
+//   CHECK-DAG:       %[[UMAX1:.+]] = arith.cmpi uge, %[[W1]], %c128
+//   CHECK-DAG:       %[[CMIN1:.+]] = arith.andi %[[UMAX1]], %[[CDIV]]
+//   CHECK-DAG:       %[[UMIN1:.+]] = arith.cmpi ule, %[[W1]], %c4096
+//   CHECK-DAG:       %[[CMAX1:.+]] = arith.andi %[[UMIN1]], %[[CMIN1]]
+//   CHECK-DAG:       %[[UREM1:.+]] = arith.remui %[[W1]], %c128
+//   CHECK-DAG:       %[[UDIV1:.+]] = arith.cmpi eq, %[[UREM1]], %c0
 //       CHECK:       %[[CDIV1:.+]] = arith.andi %[[UDIV1]], %[[CMAX1]]
 //       CHECK:       hal.return %[[CDIV1]]
 //       CHECK:     fallback(@matmul_transpose_b_Dx1024x4096_f16xf16xf32_0)
 //  CHECK-SAME:     count(%{{[A-Za-z0-9]*}}: !hal.device
-//  CHECK-NEXT:       iree_tensor_ext.dispatch.workgroup_count_from_slice
+//  CHECK-NEXT:       iree_tensor_ext.dispatch.workgroup_count_from_slice()
 
 //       CHECK:   hal.executable.export public @matmul_transpose_b_Dx1024x4096_f16xf16xf32_0 ordinal(1)
 //  CHECK-SAME:     condition(%{{.*}}: !hal.device, %[[W0:[A-Za-z0-9]+]]: index, %[[W1:[A-Za-z0-9]+]]: index) -> i1
-//       CHECK:       %[[TRUE:.+]] = arith.constant true
-//       CHECK:       %[[UMIN:.+]] = arith.cmpi ule, %c4096, %[[W0]]
-//       CHECK:       %[[CMIN:.+]] = arith.andi %[[UMIN]], %[[TRUE]]
-//       CHECK:       %[[UREM:.+]] = arith.remui %[[W0]], %c256
-//       CHECK:       %[[UDIV:.+]] = arith.cmpi eq, %[[UREM]], %c0
-//       CHECK:       %[[CDIV:.+]] = arith.andi %[[UDIV]], %[[CMIN]]
-//       CHECK:       %[[UMIN1:.+]] = arith.cmpi ule, %c4096, %[[W1]]
-//       CHECK:       %[[CMIN1:.+]] = arith.andi %[[UMIN1]], %[[CDIV]]
-//       CHECK:       %[[UREM1:.+]] = arith.remui %[[W1]], %c256
-//       CHECK:       %[[UDIV1:.+]] = arith.cmpi eq, %[[UREM1]], %c0
-//       CHECK:       %[[CDIV1:.+]] = arith.andi %[[UDIV1]], %[[CMIN1]]
+//   CHECK-DAG:       %[[UMAX:.+]] = arith.cmpi uge, %[[W0]], %c4096
+//   CHECK-DAG:       %[[UREM:.+]] = arith.remui %[[W0]], %c256
+//   CHECK-DAG:       %[[UDIV:.+]] = arith.cmpi eq, %[[UREM]], %c0
+//   CHECK-DAG:       %[[CDIV:.+]] = arith.andi %[[UDIV]], %[[UMAX]]
+//   CHECK-DAG:       %[[UMAX1:.+]] = arith.cmpi uge, %[[W1]], %c4096
+//   CHECK-DAG:       %[[CMIN:.+]] = arith.andi %[[UMAX1]], %[[CDIV]]
+//   CHECK-DAG:       %[[UREM1:.+]] = arith.remui %[[W1]], %c256
+//   CHECK-DAG:       %[[UDIV1:.+]] = arith.cmpi eq, %[[UREM1]], %c0
+//       CHECK:       %[[CDIV1:.+]] = arith.andi %[[UDIV1]], %[[CMIN]]
 //       CHECK:       hal.return %[[CDIV1]]
 //       CHECK:     fallback(@matmul_transpose_b_Dx1024x4096_f16xf16xf32_0_1)
 //  CHECK-SAME:     count(%{{[A-Za-z0-9]*}}: !hal.device
-//  CHECK-NEXT:       iree_tensor_ext.dispatch.workgroup_count_from_slice
+//  CHECK-NEXT:       iree_tensor_ext.dispatch.workgroup_count_from_slice()
 
 //       CHECK:   hal.executable.export public @matmul_transpose_b_Dx1024x4096_f16xf16xf32_0_1 ordinal(2)
-//  CHECK-NEXT:       iree_tensor_ext.dispatch.workgroup_count_from_slice
+//  CHECK-NEXT:       iree_tensor_ext.dispatch.workgroup_count_from_slice()
 
 //       CHECK:   builtin.module
 //       CHECK:     func.func @matmul_transpose_b_Dx1024x4096_f16xf16xf32
@@ -243,7 +257,7 @@ hal.executable private @multiple_dimension_assume {
 hal.executable private @unrelated_int_assume {
   hal.executable.variant public @variant target(#executable_target_embedded_elf_aarch64) {
     hal.executable.export public @matmul_transpose_b_Dx1024x4096_f16xf16xf32 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -266,8 +280,13 @@ hal.executable private @unrelated_int_assume {
         %8 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0], sizes = [1024, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x4096xf16>> -> tensor<1024x4096xf16>
         %9 = tensor.empty(%4) : tensor<?x1024xf32>
         %10 = linalg.fill ins(%cst : f32) outs(%9 : tensor<?x1024xf32>) -> tensor<?x1024xf32>
-        %11 = linalg.matmul_transpose_b {
-          iree_codegen.specialization_ranges = #util<int.assumption.multi_array[
+        %11 = linalg.matmul
+          indexing_maps = [
+            affine_map<(d0, d1, d2) -> (d0, d2)>,
+            affine_map<(d0, d1, d2) -> (d1, d2)>,
+            affine_map<(d0, d1, d2) -> (d0, d1)>
+          ]
+          {iree_codegen.specialization_ranges = #util<int.assumption.multi_array[
             [<umin = 4096, udiv = 256>, <udiv = 256>, <udiv = 64>]]>}
           ins(%7, %8 : tensor<?x4096xf16>, tensor<1024x4096xf16>) outs(%10 : tensor<?x1024xf32>) -> tensor<?x1024xf32>
         iree_tensor_ext.dispatch.tensor.store %11, %6, offsets = [0, 0], sizes = [%4, 1024], strides = [1, 1] : tensor<?x1024xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x1024xf32>>{%4}
@@ -283,10 +302,10 @@ hal.executable private @unrelated_int_assume {
 //  CHECK-SAME:     condition(%{{.*}}: !hal.device, %[[W:.+]]: index) -> i1
 //       CHECK:     fallback(@matmul_transpose_b_Dx1024x4096_f16xf16xf32_0)
 //  CHECK-SAME:     count(%{{[A-Za-z0-9]*}}: !hal.device
-//  CHECK-NEXT:       iree_tensor_ext.dispatch.workgroup_count_from_slice
+//  CHECK-NEXT:       iree_tensor_ext.dispatch.workgroup_count_from_slice()
 
 //       CHECK:   hal.executable.export public @matmul_transpose_b_Dx1024x4096_f16xf16xf32_0 ordinal(1)
-//  CHECK-NEXT:       iree_tensor_ext.dispatch.workgroup_count_from_slice
+//  CHECK-NEXT:       iree_tensor_ext.dispatch.workgroup_count_from_slice()
 
 //       CHECK:   builtin.module
 //       CHECK:     func.func @matmul_transpose_b_Dx1024x4096_f16xf16xf32
@@ -308,7 +327,7 @@ hal.executable private @unrelated_int_assume {
 hal.executable private @no_assume {
   hal.executable.variant public @variant target(#executable_target_embedded_elf_aarch64) {
     hal.executable.export public @matmul_transpose_b_Dx1024x4096_f16xf16xf32 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -328,8 +347,13 @@ hal.executable private @no_assume {
         %11 = iree_tensor_ext.dispatch.tensor.load %8, offsets = [0, 0], sizes = [%5, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x4096xf16>>{%5} -> tensor<?x4096xf16>
         %12 = tensor.empty(%6, %5) : tensor<?x?xf32>
         %13 = linalg.fill ins(%cst : f32) outs(%12 : tensor<?x?xf32>) -> tensor<?x?xf32>
-        %14 = linalg.matmul_transpose_b {
-          iree_codegen.specialization_ranges = #util<int.assumption.multi_array[
+        %14 = linalg.matmul
+          indexing_maps = [
+            affine_map<(d0, d1, d2) -> (d0, d2)>,
+            affine_map<(d0, d1, d2) -> (d1, d2)>,
+            affine_map<(d0, d1, d2) -> (d0, d1)>
+          ]
+          {iree_codegen.specialization_ranges = #util<int.assumption.multi_array[
             [<umin = 128, umax = 4096, udiv = 128>, <umin = 128, umax = 4096, udiv = 128>, <umin = 64, udiv = 64>],
             [<umin = 4096, udiv = 256>, <umin = 4096, udiv = 256>, <udiv = 64>]]>}
           ins(%10, %11 : tensor<?x4096xf16>, tensor<?x4096xf16>) outs(%13 : tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -346,16 +370,16 @@ hal.executable private @no_assume {
 //  CHECK-SAME:     condition(%{{.*}}: !hal.device
 //       CHECK:     fallback(@matmul_transpose_b_Dx1024x4096_f16xf16xf32_0)
 //  CHECK-SAME:     count(%{{[A-Za-z0-9]*}}: !hal.device
-//  CHECK-NEXT:       iree_tensor_ext.dispatch.workgroup_count_from_slice
+//  CHECK-NEXT:       iree_tensor_ext.dispatch.workgroup_count_from_slice()
 
 //       CHECK:   hal.executable.export public @matmul_transpose_b_Dx1024x4096_f16xf16xf32_0 ordinal(1)
 //  CHECK-SAME:     condition(%{{.*}}: !hal.device
 //       CHECK:     fallback(@matmul_transpose_b_Dx1024x4096_f16xf16xf32_0_1)
 //  CHECK-SAME:     count(%{{[A-Za-z0-9]*}}: !hal.device
-//  CHECK-NEXT:       iree_tensor_ext.dispatch.workgroup_count_from_slice
+//  CHECK-NEXT:       iree_tensor_ext.dispatch.workgroup_count_from_slice()
 
 //       CHECK:   hal.executable.export public @matmul_transpose_b_Dx1024x4096_f16xf16xf32_0_1 ordinal(2)
-//  CHECK-NEXT:       iree_tensor_ext.dispatch.workgroup_count_from_slice
+//  CHECK-NEXT:       iree_tensor_ext.dispatch.workgroup_count_from_slice()
 
 //       CHECK:   builtin.module
 //       CHECK:     func.func @matmul_transpose_b_Dx1024x4096_f16xf16xf32
@@ -375,7 +399,7 @@ hal.executable private @no_assume {
 hal.executable private @static_never_applies_udiv {
   hal.executable.variant public @variant target(#executable_target_embedded_elf_aarch64) {
     hal.executable.export public @fill_4xf32 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {

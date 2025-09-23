@@ -316,7 +316,7 @@ static void createNewOperandWithStaticSizes(
     changeNeeded = true;
     // Get the new operand value given its size and element type by
     // casting it.
-    Value newOperand = rewriter.create<tensor::CastOp>(loc, resultType, src);
+    Value newOperand = tensor::CastOp::create(rewriter, loc, resultType, src);
     unsigned index = opOperand->getOperandNumber();
     newOperands[index] = newOperand;
   }
@@ -375,10 +375,10 @@ struct StaticizeLinalgExtOp : public OpRewritePattern<OpTy> {
          llvm::zip_equal(op->getResults(), newOp->getResults())) {
       Type newType = newResult.getType();
       Type oldType = oldResult.getType();
-      replacements.push_back((newType != oldType)
-                                 ? rewriter.create<tensor::CastOp>(
-                                       loc, oldType, cast<Value>(newResult))
-                                 : cast<Value>(newResult));
+      replacements.push_back(
+          (newType != oldType) ? tensor::CastOp::create(rewriter, loc, oldType,
+                                                        cast<Value>(newResult))
+                               : cast<Value>(newResult));
     }
     rewriter.replaceOp(op, replacements);
     return success();
@@ -445,7 +445,7 @@ ScatterOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
-FailureOr<SmallVector<int64_t>> ScatterOp::getStaticLoopRanges() {
+SmallVector<int64_t> ScatterOp::getStaticLoopRanges() {
   // Scatter loop ranges are loop ranges for update.
   return SmallVector<int64_t>(getUpdateType().getShape());
 }
@@ -477,7 +477,7 @@ GatherOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
-FailureOr<SmallVector<int64_t>> GatherOp::getStaticLoopRanges() {
+SmallVector<int64_t> GatherOp::getStaticLoopRanges() {
   return SmallVector<int64_t>(getOutputType().getShape());
 }
 
@@ -515,17 +515,16 @@ struct ConvertGatherToExtract
     }
 
     // Get all `indexDepth` indices as scalars.
-    SmallVector<Value> indices(indicesShape.size(),
-                               rewriter.create<arith::ConstantIndexOp>(loc, 0));
+    SmallVector<Value> indices(
+        indicesShape.size(), arith::ConstantIndexOp::create(rewriter, loc, 0));
     SmallVector<OpFoldResult> offsets(gatherOp.getIndexDepth());
     for (int64_t i = 0; i < gatherOp.getIndexDepth(); ++i) {
-      indices.back() = rewriter.create<arith::ConstantIndexOp>(loc, i);
-      Value elem = rewriter.create<tensor::ExtractOp>(
-          loc, gatherOp.getIndices(), indices);
-      offsets[i] =
-          rewriter
-              .create<arith::IndexCastOp>(loc, rewriter.getIndexType(), elem)
-              .getResult();
+      indices.back() = arith::ConstantIndexOp::create(rewriter, loc, i);
+      Value elem = tensor::ExtractOp::create(rewriter, loc,
+                                             gatherOp.getIndices(), indices);
+      offsets[i] = arith::IndexCastOp::create(rewriter, loc,
+                                              rewriter.getIndexType(), elem)
+                       .getResult();
     }
 
     applyPermutationToVector(offsets, gatherOp.getDimensionMap());
@@ -544,8 +543,9 @@ struct ConvertGatherToExtract
     }
     auto resultType =
         cast<RankedTensorType>(gatherOp.getSourceType()).clone(resultShape);
-    auto sliceOp = rewriter.create<tensor::ExtractSliceOp>(
-        loc, resultType, gatherOp.getSource(), offsets, sizes, strides);
+    auto sliceOp = tensor::ExtractSliceOp::create(rewriter, loc, resultType,
+                                                  gatherOp.getSource(), offsets,
+                                                  sizes, strides);
 
     // `sliceOp` may differ from the expected result type by leading unit
     // dimensions. Reshape so that the types match.
@@ -596,7 +596,7 @@ MapScatterOp MapScatterOp::createIdentityMapScatter(OpBuilder &builder,
     resultType.push_back(output.getType());
   }
   auto mapScatterOp =
-      builder.create<MapScatterOp>(loc, resultType, input, output);
+      MapScatterOp::create(builder, loc, resultType, input, output);
 
   // Add the transformation block with an identity transformation.
   Region &region = mapScatterOp.getTransformationRegion();
@@ -607,10 +607,10 @@ MapScatterOp MapScatterOp::createIdentityMapScatter(OpBuilder &builder,
   Block *block =
       builder.createBlock(&region, region.end(), indexTypes, blockArgLocs);
   SmallVector<Value> yieldedValues(block->getArguments());
-  Value mask = builder.create<arith::ConstantIntOp>(loc, /*value=*/1,
-                                                    /*width=*/1);
+  Value mask = arith::ConstantIntOp::create(builder, loc, /*value=*/1,
+                                            /*width=*/1);
   yieldedValues.push_back(mask);
-  builder.create<IREE::LinalgExt::YieldOp>(loc, yieldedValues);
+  IREE::LinalgExt::YieldOp::create(builder, loc, yieldedValues);
   return mapScatterOp;
 }
 
@@ -736,6 +736,34 @@ bool MapScatterOp::isIdentity() {
     }
   }
   return true;
+}
+namespace {
+struct ConvertIdentityMapScatterToCopy
+    : public OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
+                                PatternRewriter &rewriter) const override {
+    if (!mapScatterOp.isIdentity()) {
+      return failure();
+    }
+    if (mapScatterOp.isVectorized()) {
+      return failure();
+    }
+    if (!mapScatterOp.hasPureTensorSemantics()) {
+      return failure();
+    }
+    auto copyOp = linalg::CopyOp::create(rewriter, mapScatterOp.getLoc(),
+                                         mapScatterOp.getInput(),
+                                         mapScatterOp.getOutput());
+    rewriter.replaceOp(mapScatterOp, copyOp.getResults());
+    return success();
+  }
+};
+} // namespace
+
+void MapScatterOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *ctx) {
+  results.add<ConvertIdentityMapScatterToCopy>(ctx);
 }
 
 //===----------------------------------------------------------------------===//
@@ -874,8 +902,8 @@ struct RemoveUnusedSortOpResults
 
     // Create new op using only operands associated to used results or block
     // args.
-    auto newSortOp = rewriter.create<IREE::LinalgExt::SortOp>(
-        loc, usedResultTypes,
+    auto newSortOp = IREE::LinalgExt::SortOp::create(
+        rewriter, loc, usedResultTypes,
         /*inputs=*/ValueRange{}, usedOperands, sortOp.getDimension());
     newSortOp.getRegion().takeBody(sortOp.getRegion());
     newSortOp.getRegion().front().eraseArguments(eraseArg);
@@ -1871,6 +1899,17 @@ void AttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
         indexingMaps, DictionaryAttr());
 }
 
+void AttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+                        TypeRange results, ValueRange inputOperands,
+                        ValueRange initOperands, ArrayAttr indexingMaps) {
+  assert(inputOperands.size() < 6);
+  assert(initOperands.size() == 1);
+  Value mask = inputOperands.size() > 4 ? inputOperands[4] : Value();
+  build(odsBuilder, odsState, results, inputOperands[0], inputOperands[1],
+        inputOperands[2], inputOperands[3], mask, initOperands[0], indexingMaps,
+        DictionaryAttr());
+}
+
 LogicalResult AttentionOp::verify() {
   AttentionOp attnOp = *this;
 
@@ -1995,7 +2034,7 @@ SmallVector<AffineMap> AttentionOp::getIndexingMapsArray() {
       getIndexingMaps().getAsValueRange<AffineMapAttr>());
 }
 
-FailureOr<SmallVector<int64_t>> AttentionOp::getStaticLoopRanges() {
+SmallVector<int64_t> AttentionOp::getStaticLoopRanges() {
   SmallVector<int64_t> bounds(getIterationDomainRank());
   SmallVector<bool> dimsFound(getIterationDomainRank(), false);
 
@@ -2028,13 +2067,18 @@ SmallVector<AffineMap> AttentionOp::getIndexingMapsForOperands() {
 }
 
 SmallVector<AffineMap> AttentionOp::getIndexingMapsForResults() {
-  auto maps = getIndexingMapsArray();
-  return SmallVector<AffineMap>(maps.begin() + getNumDpsInputs(), maps.end());
+  return llvm::to_vector_of<AffineMap>(
+      llvm::drop_begin(getIndexingMapsArray(), getNumDpsInputs()));
 }
 
 void AttentionOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
                                               MLIRContext *ctx) {
   patterns.insert<StaticizeLinalgExtOp<AttentionOp>>(ctx);
+}
+
+AffineMap AttentionOp::getMatchingIndexingMap(OpOperand *operand) {
+  return *(getIndexingMaps().getAsValueRange<AffineMapAttr>().begin() +
+           operand->getOperandNumber());
 }
 
 //===----------------------------------------------------------------------===//
@@ -2384,7 +2428,7 @@ LogicalResult Im2colOp::verify() {
            << ") to match the number of shared dimensions (m_Pos + k_pos = "
            << sharedRank << ")";
   }
-  SmallVector<int64_t> permVec(inputKPerm.begin(), inputKPerm.end());
+  SmallVector<int64_t> permVec(inputKPerm);
   llvm::sort(permVec);
   for (int64_t i = 0; i < static_cast<int64_t>(sharedRank); ++i) {
     if (permVec[i] != i) {

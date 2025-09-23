@@ -169,10 +169,7 @@ SmallVector<int64_t> deriveThreadTileSizes(Operation *op) {
         return deriveIm2colOpThreadTileSizes(im2colOp, numThreads);
       })
       .Case([&](IREE::LinalgExt::ScatterOp scatterOp) -> SmallVector<int64_t> {
-        int64_t loopDepth = scatterOp.getLoopIteratorTypes().size();
-        SmallVector<int64_t> loopBounds =
-            scatterOp.getStaticLoopRanges().value_or(
-                SmallVector<int64_t>(loopDepth, ShapedType::kDynamic));
+        SmallVector<int64_t> loopBounds = scatterOp.getStaticLoopRanges();
         int64_t elemBits = scatterOp.getOriginalType().getElementTypeBitWidth();
         int64_t vectorSize = kPreferredCopyNumBits / elemBits;
         return getVectorTileSizesFromLoopRanges(loopBounds, numThreads,

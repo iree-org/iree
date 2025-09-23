@@ -1127,6 +1127,32 @@ def Util_ListCreateOp : Util_PureOp<"list.create", [
   let assemblyFormat = "($initial_capacity^)? attr-dict `:` qualified(type($result))";
 }
 
+def Util_ListConstructOp : Util_PureOp<"list.construct", [
+  MemoryEffects<[MemAlloc]>,
+]> {
+  let summary = [{Constructs a list with the given initial values.}];
+  let description = [{
+    Creates a new list with the given values added in order. The list will be
+    allocated with an initial capacity equal to the number of values. This is a
+    pseudo-operation that expands to a list create, resize, and a series of
+    sets.
+  }];
+
+  let arguments = (ins
+    Variadic<AnyType>:$values
+  );
+  let results = (outs
+    Util_AnyListType:$result
+  );
+
+  let assemblyFormat = [{
+    custom<ValueTypeList>($values, type($values))
+    attr-dict `:` qualified(type($result))
+  }];
+
+  let hasVerifier = 1;
+}
+
 def Util_ListSizeOp : Util_Op<"list.size", [
   MemoryEffects<[MemRead]>,
 ]> {

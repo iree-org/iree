@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/ADT/SmallVector.h"
@@ -55,7 +56,7 @@ static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 class FuseGlobalsPass : public impl::FuseGlobalsPassBase<FuseGlobalsPass> {
 public:
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     GlobalTable globalTable(moduleOp);
     globalTable.rebuild();
@@ -233,6 +234,10 @@ public:
     }
     for (auto globalName : deadGlobalNames) {
       globalTable.eraseGlobal(globalName);
+    }
+
+    if (!deadGlobalNames.empty()) {
+      signalFixedPointModified(moduleOp);
     }
   }
 };

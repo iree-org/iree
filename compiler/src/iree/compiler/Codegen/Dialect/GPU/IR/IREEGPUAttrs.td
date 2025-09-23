@@ -306,14 +306,25 @@ def IREEGPU_VirtualMMAAttr :
     These interleaving and/or unrolling changes in the layout is especially
     useful to coalesce reads from shared memory to register or align layouts
     in a chained-matmul operation.
+
+    If set to true (similar to MMAAttr), |col_major| indicates the computation
+    is perfomed as below:
+
+    ```
+      C^T += B^T x A^T
+    ```
   }];
 
-  let assemblyFormat = "`<` struct(params) `>`";
+  let assemblyFormat = "`<` $intrinsic (`,` `col_major` `=` $col_major^)? `>`";
 
   let parameters = (ins
-    EnumParameter<IREEGPU_VirtualMMAIntrinsic>:$intrinsic
+    EnumParameter<IREEGPU_VirtualMMAIntrinsic>:$intrinsic,
+    DefaultValuedParameter<"bool", "false">:$col_major
   );
 
+  let builders = [
+    AttrBuilder<(ins "VirtualMMAIntrinsic":$intrinsic)>
+  ];
   let extraClassDeclaration = [{
     int64_t getBlockSize() const;
 
@@ -404,28 +415,6 @@ def IREEGPU_ScaledMMAAttr :
 }
 
 //===----------------------------------------------------------------------===//
-// MMA schedule
-//===----------------------------------------------------------------------===//
-
-def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
-  let mnemonic = "mma_schedule";
-  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
-
-  string description = [{
-    A schedule of MMA intrinsic instruction and various levels of tile sizes
-    to solve a specific contraction problem.
-  }];
-
-  let parameters = (ins
-    "::mlir::iree_compiler::IREE::Codegen::InnerTileDescAttrInterface":$intrinsic,
-    "int64_t":$subgroup_m_count,
-    "int64_t":$subgroup_n_count
-  );
-
-  let assemblyFormat = "`<` struct(params) `>`";
-}
-
-//===----------------------------------------------------------------------===//
 // iree_gpu.gpu_encoding_resolver
 //===----------------------------------------------------------------------===//
 
@@ -498,10 +487,10 @@ def IREEGPU_TargetWgpAttr : AttrDef<IREEGPU_Dialect, "TargetWgp"> {
     "ComputeBitwidthsAttr":$compute,
     "StorageBitwidthsAttr":$storage,
     "SubgroupOpsAttr":$subgroup,
-    "DotProductOpsAttr":$dot,
+    DefaultValuedParameter<"DotProductOpsAttr", "DotProductOpsAttr::get($_ctxt, DotProductOps::None)">:$dot,
     // MMAs available on this target. Heuristic MMA selection runs is order.
-    "MMAOpsArrayAttr":$mma,
-    "ScaledMMAOpsArrayAttr":$scaled_mma,
+    DefaultValuedParameter<"MMAOpsArrayAttr", "MMAOpsArrayAttr::get($_ctxt, {})">:$mma,
+    DefaultValuedParameter<"ScaledMMAOpsArrayAttr", "ScaledMMAOpsArrayAttr::get($_ctxt, {})">:$scaled_mma,
 
     // Limits
     // Supported subgroup size choices.
@@ -556,6 +545,10 @@ def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
 
     // An optional SKU identifier to distinguish different models.
     OptionalParameter<"StringAttr">:$sku,
+    // An optional memory bandwidth in TB/s.
+    OptionalParameter<"FloatAttr">:$memory_bandwidth_tbps,
+    // An optional performance dictionary in TFLOPS.
+    OptionalParameter<"DictionaryAttr">:$perf_tflops,
     // An optional extra dict
     // This field allows to inject more features/limits not supported in the
     // above list for better flexibility.
@@ -569,7 +562,9 @@ def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
 // GPU Target Attributes
 //===----------------------------------------------------------------------===//
 
-def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
+def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target", [
+  DeclareAttrInterfaceMethods<IREECodegen_TargetInfoAttrInterface, [
+    "getMaximumWorkgroupCount"]>]> {
   let summary = [{Full GPU target attribute.}];
   let description = [{
     This attributes describes a full GPU target. It contains a few fields:
@@ -658,26 +653,6 @@ def IREEGPU_LaneIdAttr : AttrDef<IREEGPU_Dialect, "LaneId", [
   let description = [{
     An attribute for mapping scf.forall ops to subgroup lanes.
   }];
-}
-
-//===---------------------------------------------------------------------===//
-// iree_gpu.ukernel_config
-//===---------------------------------------------------------------------===//
-
-def IREEGPU_UKernelConfigAttr  :
-    AttrDef<IREEGPU_Dialect, "UKernelConfig", []> {
-  let mnemonic = "ukernel_config";
-  let summary = [{An attribute specifying a ukernel that an op can lower to.}];
-  let description = [{
-    An attribute that can be applied to any operation to specify that it has
-    been matched with a ukernel that is a legal lowering for it.
-  }];
-  let assemblyFormat = "`<` struct(params) `>`";
-  let parameters = (ins
-       "StringAttr":$name,
-       "DictionaryAttr":$def_attrs,
-       DefaultValuedParameter<"int64_t", "0", "Size in bytes of shared memory workspace">:$shared_memory_bytes
-  );
 }
 
 //===----------------------------------------------------------------------===//

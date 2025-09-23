@@ -843,7 +843,7 @@ if(IREE_BUILD_PYTHON_BINDINGS)
     FetchContent_Declare(
         nanobind
         GIT_REPOSITORY https://github.com/wjakob/nanobind.git
-        GIT_TAG        0f9ce749b257fdfe701edb3cf6f7027ba029434a # v2.4.0
+        GIT_TAG        cc860b2b771a0003ce70415fc56ea18f61b0a153 # v2.9.0
     )
     FetchContent_MakeAvailable(nanobind)
   endif()

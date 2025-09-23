@@ -128,13 +128,26 @@ def CombineLayoutTransformationPass :
   let summary =
     "Combines layout transformation operations into a single map_scatter operation.";
   let description = [{
-    Starting from iree_codegen.store_to_buffer ops, iteratively combine producer
+    Starting from the specified leaf ops, iteratively combine producer
     layout/indexing transformation ops (linalg.transpose, tensor.collapse_shape,
     etc.) into a single iree_linalg_ext.map_scatter operation. For tensor.pad
     ops, the writing of pad values is distributed to workgroups, and then the
     padding values are written directly to the output buffer of the
     store_to_buffer op.
   }];
+  let options = [
+    Option<"scope", "scope",
+           "::mlir::iree_compiler::IREE::Codegen::RelayoutCombinationScope",
+           /*default=*/"IREE::Codegen::RelayoutCombinationScope::Dispatch",
+           "Specify the roots for layout transformation combination.",
+           [{
+           ::llvm::cl::values(
+             clEnumValN(IREE::Codegen::RelayoutCombinationScope::Dispatch, "dispatch",
+               "Combine relayout ops starting from iree_codegen.store_to_buffer"),
+             clEnumValN(IREE::Codegen::RelayoutCombinationScope::Workgroup, "workgroup",
+               "Combine relayout ops starting from workgroup forall terminator ops"))
+           }]>
+  ];
   let dependentDialects = [
     "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
     "scf::SCFDialect",
@@ -357,7 +370,8 @@ def FissionTransferOpsInControlFlowPass : InterfacePass<"iree-codegen-fission-tr
   let summary =
       "Fission transfer read and write ops in control flow to allow prefetching.";
   let dependentDialects = [
-      "memref::MemRefDialect"
+      "memref::MemRefDialect",
+      "affine::AffineDialect"
   ];
   let options = [
     Option<"FissionMultiTrip", "fission-multi-trip",
@@ -432,10 +446,6 @@ def GenericVectorizationPass :
       "Control whether the op lowering config represents a set of masked vector sizes">,
     Option<"vectorizeCopies", "vectorize-copies", "bool", /*default=*/"true",
       "Enable vectorization of linalg.copy operations.">,
-    Option<"vectorizePadding", "vectorize-padding", "bool", /*default=*/"false",
-      "Rewrite all tensor.pad ops in the function to vector form.">,
-    Option<"vectorizeGatherAccesses", "vectorize-gather-accesses", "bool", /*default=*/"false",
-      "Enable vectorizaiton of operations that may generate vector.gather operations.">,
     Option<"vectorizeToTransferGather", "vectorize-to-transfer-gather", "bool", /*default=*/"false",
       "Enables vectorization of gather-like operations that may generate iree_vector_ext.transfer_gather">,
     Option<"enableCleanup", "enable-cleanup", "bool",/*default=*/"true",
@@ -571,6 +581,30 @@ def LoweringConfigInterpreterPass :
 def LowerUKernelOpsToCallsPass :
     Pass<"iree-codegen-lower-ukernel-ops-to-calls", "ModuleOp"> {
   let summary = "Lower micro-kernel wrapper ops into function calls";
+}
+
+def LowerBitcodeUKernelsPass :
+    Pass<"iree-codegen-lower-bitcode-ukernels", ""> {
+  let summary = "Lowers ops with ukernel descriptors to ukernel_generic";
+  let dependentDialects = [
+    "iree_compiler::IREE::Codegen::IREECodegenDialect"
+  ];
+}
+
+def LowerMemrefUKernelsPass :
+    Pass<"iree-codegen-lower-memref-ukernels", ""> {
+  let summary = "Lowers ops with ukernel descriptors and memref operands";
+  let dependentDialects = [
+    "memref::MemRefDialect"
+  ];
+}
+
+def LowerTensorUKernelsPass :
+    Pass<"iree-codegen-lower-tensor-ukernels", ""> {
+  let summary = "Lowers ops with ukernel descriptors and tensor operands";
+  let dependentDialects = [
+    "tensor::TensorDialect"
+  ];
 }
 
 def MaterializeHostEncodingPass :

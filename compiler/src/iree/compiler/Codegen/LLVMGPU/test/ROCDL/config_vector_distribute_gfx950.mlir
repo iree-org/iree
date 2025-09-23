@@ -1,4 +1,5 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx950 --iree-codegen-llvmgpu-use-vector-distribution \
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx950 --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=false \
+// RUN: --iree-codegen-llvmgpu-use-vector-distribution \
 // RUN:   --iree-codegen-llvmgpu-use-unaligned-gemm-vector-distribution --iree-codegen-llvmgpu-use-igemm=false \
 // RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s
 
@@ -40,8 +41,7 @@ func.func @expanded_matmul_transpose_b() {
 // CHECK: linalg.generic {{.*}}lowering_config =  #iree_gpu.lowering_config
 // CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
 // CHECK-SAME:                           reduction =  [0, 0, 0, 0, 256]
-// CHECK-SAME:                           subgroup_m_count = 1
-// CHECK-SAME:                           subgroup_n_count = 4
+// CHECK-SAME{LITERAL}:                  subgroup_basis = [[1, 1, 1, 4, 1], [0, 1, 2, 3, 4]]
 // CHECK-SAME:                           workgroup =  [1, 1, 64, 64, 0]
 
 // -----
@@ -72,8 +72,7 @@ func.func @conv_nhwc() {
 // CHECK: linalg.conv_2d_nhwc_hwcf {{.*}} lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
 // CHECK-SAME:                           reduction =  [0, 0, 0, 0, 1, 1, 64]
-// CHECK-SAME:                           subgroup_m_count = 2
-// CHECK-SAME:                           subgroup_n_count = 2
+// CHECK-SAME{LITERAL}:                  subgroup_basis = [[1, 1, 2, 2, 1, 1, 1], [0, 1, 2, 3, 4, 5, 6]]
 // CHECK-SAME:                           workgroup =  [1, 1, 64, 128, 0, 0, 0]
 
 // -----
@@ -104,8 +103,7 @@ func.func @mfma_matmul_1024x1024x1024() {
 // CHECK: linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
 // CHECK-SAME:                           reduction =  [0, 0, 128]
-// CHECK-SAME:                           subgroup_m_count = 2
-// CHECK-SAME:                           subgroup_n_count = 2
+// CHECK-SAME{LITERAL}:                  subgroup_basis = [[2, 2, 1], [0, 1, 2]]
 // CHECK-SAME:                           workgroup =  [64, 128, 0]
 
 // -----
@@ -155,8 +153,7 @@ func.func @conv_nchwc() {
 // CHECK: linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
 // CHECK-SAME:                           reduction =  [0, 0, 0, 0, 0, 1, 1, 1, 64]
-// CHECK-SAME:                           subgroup_m_count = 2
-// CHECK-SAME:                           subgroup_n_count = 2
+// CHECK-SAME{LITERAL}:                  subgroup_basis = [[1, 1, 1, 2, 2, 1, 1, 1, 1], [0, 1, 2, 3, 4, 5, 6, 7, 8]]
 // CHECK-SAME:                           workgroup =  [1, 1, 1, 32, 32, 0, 0, 0, 0]
 
 // -----
@@ -230,9 +227,9 @@ func.func @attention_20x4096x64x4096x64() {
 }
 
 // CHECK:      MFMA_F32_16x16x16_F16
+// CHECK-SAME{LITERAL}: subgroup_basis = [[1, 4, 1, 1, 1], [0, 1, 3, 4]]
 // CHECK-SAME: MFMA_F32_16x16x32_F16
-// CHECK-SAME: subgroup_m_count = 4
-// CHECK-SAME: subgroup_n_count = 1
+// CHECK-SAME{LITERAL}: subgroup_basis = [[1, 4, 1, 1, 1], [0, 1, 2, 3]]
 // CHECK-SAME: reduction =  [0, 0, 0, 64, 0]
 // CHECK-SAME: workgroup =  [1, 64, 0, 0, 64]
 
@@ -240,6 +237,7 @@ func.func @attention_20x4096x64x4096x64() {
 
 // CHECK:       #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
 // CHECK-NOT:   prefetch_shared_memory = true
+// CHECK:       iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">
 
 // CHECK-LABEL: func.func @attention_large_head_dim_shared_mem()
 
@@ -277,8 +275,39 @@ func.func @attention_large_head_dim_shared_mem() {
 }
 
 // CHECK:      MFMA_F32_16x16x16_F16
+// CHECK-SAME{LITERAL}: subgroup_basis = [[4, 1, 1, 1], [0, 2, 3]]
 // CHECK-SAME: MFMA_F32_16x16x32_F16
-// CHECK-SAME: subgroup_m_count = 4
-// CHECK-SAME: subgroup_n_count = 1
+// CHECK-SAME{LITERAL}: subgroup_basis = [[4, 1, 1, 1], [0, 1, 2]]
 // CHECK-SAME: reduction =  [0, 0, 64, 0]
 // CHECK-SAME: workgroup =  [64, 0, 0, 64]
+
+// -----
+
+// The fix introduced for bug https://github.com/iree-org/iree/issues/21602 was
+// to constrain the MMA layout to be the same for the 2 matmuls inside
+// attention. Before this fix, the PV matmul used MFMA_F32_16x16x128_F8E4M3FN
+// and the QK matmul used MFMA_F32_32x32x64_F8E4M3FN. Vector distribution failed
+// to distribute these layouts to threads.
+
+//       CHECK: #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64
+// CHECK:       iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">
+// CHECK-LABEL: func.func @attention_check_mma_accs_compatable
+
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d3)>
+#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d2)>
+#map3 = affine_map<(d0, d1, d2, d3, d4) -> ()>
+#map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+func.func @attention_check_mma_accs_compatable(%arg0: f32, %arg1: tensor<960x4096x64xf8E4M3FN>, %arg2: tensor<960x4096x64xf8E4M3FN>, %arg3: tensor<960x4096x64xf8E4M3FN>, %arg4: tensor<960x4096x64xf32>, %arg5: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<960x4096x64xf32>>) {
+  %0 = iree_linalg_ext.attention {indexing_maps = [#map, #map1, #map2, #map3, #map4]} ins(%arg1, %arg2, %arg3, %arg0 : tensor<960x4096x64xf8E4M3FN>, tensor<960x4096x64xf8E4M3FN>, tensor<960x4096x64xf8E4M3FN>, f32) outs(%arg4 : tensor<960x4096x64xf32>) {
+  ^bb0(%arg6: f32):
+    iree_linalg_ext.yield %arg6 : f32
+  } -> tensor<960x4096x64xf32>
+  iree_tensor_ext.dispatch.tensor.store %0, %arg5, offsets = [0, 0, 0], sizes = [960, 4096, 64], strides = [1, 1, 1] : tensor<960x4096x64xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<960x4096x64xf32>>
+  return
+}
+//      CHECK: decomposition_config =
+// CHECK-SAME: attention_pv_matmul
+// CHECK-SAME:   #iree_gpu.mma_layout<MFMA_F32_32x32x64_F8E4M3FN>
+// CHECK-SAME: attention_qk_matmul
+// CHECK-SAME:   #iree_gpu.mma_layout<MFMA_F32_32x32x64_F8E4M3FN>

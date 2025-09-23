@@ -78,8 +78,9 @@ struct BubbleResourceCastPattern
               }
 
               rewriter.setInsertionPoint(extract);
-              auto newCast = rewriter.create<IREE::GPU::BufferResourceCastOp>(
-                  loc, extract.getSource().getType(), extract.getSource());
+              auto newCast = IREE::GPU::BufferResourceCastOp::create(
+                  rewriter, loc, extract.getSource().getType(),
+                  extract.getSource());
               extract.getSourceMutable().assign(newCast);
               return true;
             })
@@ -89,8 +90,8 @@ struct BubbleResourceCastPattern
               }
 
               rewriter.setInsertionPoint(expand);
-              auto newCast = rewriter.create<IREE::GPU::BufferResourceCastOp>(
-                  loc, expand.getSrcType(), expand.getSrc());
+              auto newCast = IREE::GPU::BufferResourceCastOp::create(
+                  rewriter, loc, expand.getSrcType(), expand.getSrc());
               expand.getSrcMutable().assign(newCast);
               return true;
             })
@@ -101,9 +102,8 @@ struct BubbleResourceCastPattern
                   }
 
                   rewriter.setInsertionPoint(collapse);
-                  auto newCast =
-                      rewriter.create<IREE::GPU::BufferResourceCastOp>(
-                          loc, collapse.getSrcType(), collapse.getSrc());
+                  auto newCast = IREE::GPU::BufferResourceCastOp::create(
+                      rewriter, loc, collapse.getSrcType(), collapse.getSrc());
                   collapse.getSrcMutable().assign(newCast);
                   return true;
                 })
@@ -113,8 +113,8 @@ struct BubbleResourceCastPattern
               }
 
               rewriter.setInsertionPoint(pad);
-              auto newCast = rewriter.create<IREE::GPU::BufferResourceCastOp>(
-                  loc, pad.getSourceType(), pad.getSource());
+              auto newCast = IREE::GPU::BufferResourceCastOp::create(
+                  rewriter, loc, pad.getSourceType(), pad.getSource());
               pad.getSourceMutable().assign(newCast);
               return true;
             })
@@ -126,8 +126,9 @@ struct BubbleResourceCastPattern
               rewriter.setInsertionPoint(linalgOp);
               // Only propagate to input operands.
               for (auto inputOperand : linalgOp.getDpsInputOperands()) {
-                auto newCast = rewriter.create<IREE::GPU::BufferResourceCastOp>(
-                    loc, inputOperand->get().getType(), inputOperand->get());
+                auto newCast = IREE::GPU::BufferResourceCastOp::create(
+                    rewriter, loc, inputOperand->get().getType(),
+                    inputOperand->get());
                 inputOperand->assign(newCast);
               }
               return true;

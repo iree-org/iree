@@ -46,13 +46,11 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/IR/BuiltinAttributes.h"
 
 #define DEBUG_TYPE "iree-codegen-materialize-encoding"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::IREE::CPU {
 
@@ -72,7 +70,7 @@ getScalableTileFlags(linalg::ContractionDimensions cDims,
   // TODO(egebeysel): I think this isScalable*Enabled flag should be temporary
   // and the temporary SME flag should probably come next to it.
   if (!isAArch64(config) || !isScalableVectorizationEnabled()) {
-    LDBG("Pre-conditions to enable scalable tiling are not met!");
+    LDBG() << "Pre-conditions to enable scalable tiling are not met!";
     return failure();
   }
 
@@ -87,7 +85,7 @@ getScalableTileFlags(linalg::ContractionDimensions cDims,
   // TODO(egebeysel): Add logic for SME.
   if (mDim.has_value()) {
     if (hasFeature(config, "+sme")) {
-      LDBG("SME with data-tiling is not supported yet!");
+      LDBG() << "SME with data-tiling is not supported yet!";
       return failure();
     }
     scalableTiles.push_back(false);
@@ -160,16 +158,15 @@ static Value createElementWiseExtUIOp(OpBuilder &builder, Value input,
   SmallVector<OpFoldResult> inputMixedSizes =
       tensor::getMixedSizes(builder, loc, input);
   Value init =
-      builder.create<tensor::EmptyOp>(loc, inputMixedSizes, outElemType);
-  return builder
-      .create<linalg::GenericOp>(
-          loc, castedType, input, init, maps, iteratorTypes,
-          [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
-            Value castRes =
-                b.create<arith::ExtUIOp>(nestedLoc, outElemType, args[0])
-                    ->getResult(0);
-            b.create<linalg::YieldOp>(nestedLoc, castRes);
-          })
+      tensor::EmptyOp::create(builder, loc, inputMixedSizes, outElemType);
+  return linalg::GenericOp::create(
+             builder, loc, castedType, input, init, maps, iteratorTypes,
+             [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
+               Value castRes =
+                   arith::ExtUIOp::create(b, nestedLoc, outElemType, args[0])
+                       ->getResult(0);
+               linalg::YieldOp::create(b, nestedLoc, castRes);
+             })
       .getResult(0);
 }
 
@@ -197,7 +194,7 @@ static Value getMmt4dOperand(Value value, linalg::LinalgOp linalgOp,
         type, /*isBatched=*/!cDims->batch.empty(),
         /*isTransposed=*/operandIdx == 2 && (transpose ^ cDims->n.empty()), ri);
     expandedValue =
-        builder.create<tensor::ExpandShapeOp>(loc, newType, value, ri);
+        tensor::ExpandShapeOp::create(builder, loc, newType, value, ri);
   }
   if (elemTypes[operandIdx].isUnsignedInteger()) {
     return createElementWiseExtUIOp(builder, expandedValue, loc,
@@ -263,8 +260,9 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
     }
     ratedTile.productMxNxK = tile.M * tile.N * tile.K;
     ratedTiles.push_back(ratedTile);
-    LDBG("candidate: " << llvm::interleaved(ArrayRef{tile.M, tile.N, tile.K})
-                       << " penalty:" << ratedTile.paddingPenalty);
+    LDBG() << "candidate: "
+           << llvm::interleaved(ArrayRef{tile.M, tile.N, tile.K})
+           << " penalty:" << ratedTile.paddingPenalty;
     bestPaddingPenalty = std::min(bestPaddingPenalty, ratedTile.paddingPenalty);
   }
   RatedTileMxNxK bestRatedTile;
@@ -279,10 +277,10 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
   // Sanity check. This assert can only fail if there's a programming mistake
   // locally here.
   assert(bestRatedTile.paddingPenalty == bestPaddingPenalty);
-  LDBG("bestRatedTile: " << llvm::interleaved(ArrayRef{bestRatedTile.M,
-                                                       bestRatedTile.N,
-                                                       bestRatedTile.K})
-                         << " penalty:" << bestRatedTile.paddingPenalty);
+  LDBG() << "bestRatedTile: "
+         << llvm::interleaved(
+                ArrayRef{bestRatedTile.M, bestRatedTile.N, bestRatedTile.K})
+         << " penalty:" << bestRatedTile.paddingPenalty;
   return bestRatedTile;
 }
 
@@ -342,17 +340,18 @@ FailureOr<Operation *> lowerContractionOpWithEncoding(
   auto cDims = IREE::Encoding::getEncodingContractionDims(lhsEncoding);
   Operation *result;
   if (cDims->batch.empty()) {
-    result = builder.create<linalg::Mmt4DOp>(linalgOp.getLoc(), newResultType,
-                                             ValueRange{newLhs, newRhs},
-                                             ValueRange{newResult});
+    result = linalg::Mmt4DOp::create(builder, linalgOp.getLoc(), newResultType,
+                                     ValueRange{newLhs, newRhs},
+                                     ValueRange{newResult});
   } else {
-    result = builder.create<linalg::BatchMmt4DOp>(
-        linalgOp.getLoc(), newResultType, ValueRange{newLhs, newRhs},
+    result = linalg::BatchMmt4DOp::create(
+        builder, linalgOp.getLoc(), newResultType, ValueRange{newLhs, newRhs},
         ValueRange{newResult});
   }
   if (!ri.empty()) {
-    result = builder.create<tensor::CollapseShapeOp>(
-        linalgOp->getLoc(), operands[2].getType(), result->getResult(0), ri);
+    result = tensor::CollapseShapeOp::create(builder, linalgOp->getLoc(),
+                                             operands[2].getType(),
+                                             result->getResult(0), ri);
   }
   return result;
 }
@@ -741,8 +740,12 @@ struct CPULayoutResolverAttr final
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
     SmallVector<NamedAttribute> configItems;
-    storeNamedAttrIfPresent(configItems, config, "cpu_features");
-    storeNamedAttrIfPresent(configItems, config, "target_triple");
+    if (std::optional<StringRef> cpuFeatures = getConfigCpuFeatures(config)) {
+      addConfigCpuFeatures(ctx, cpuFeatures.value(), configItems);
+    }
+    if (std::optional<StringRef> targetTriple = getConfigTargetTriple(config)) {
+      addConfigTargetTriple(ctx, targetTriple.value(), configItems);
+    }
     storeNamedAttrIfPresent(configItems, config, "ukernels");
     return CPUEncodingResolverAttr::get(ctx,
                                         DictionaryAttr::get(ctx, configItems));
@@ -757,6 +760,10 @@ struct CPULayoutResolverAttr final
 struct CPUSerializableAttr final
     : IREE::Encoding::SerializableAttr::ExternalModel<CPUSerializableAttr,
                                                       CPUEncodingResolverAttr> {
+  bool isSerialized(Attribute attr) const {
+    auto configuration = cast<CPUEncodingResolverAttr>(attr).getConfiguration();
+    return configuration && configuration.contains(kEncodingInfoAttrName);
+  }
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
@@ -892,6 +899,12 @@ struct VMVXLayoutResolverAttr final
 struct VMVXSerializableAttr final
     : IREE::Encoding::SerializableAttr::ExternalModel<
           VMVXSerializableAttr, VMVXEncodingResolverAttr> {
+  bool isSerialized(Attribute attr) const {
+    auto configuration =
+        cast<VMVXEncodingResolverAttr>(attr).getConfiguration();
+    return configuration && configuration.contains(kEncodingInfoAttrName);
+  }
+
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
                                     ValueRange dynamicDims) const {

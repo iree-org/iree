@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-check-ir-before-llvm-conversion))" %s --verify-diagnostics -split-input-file
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-check-ir-before-llvm-conversion))" %s --verify-diagnostics -split-input-file | FileCheck %s
 
 func.func @dynamic_allocas(%arg0: index) {
   // expected-error @+1 {{expected no unbounded stack allocations}}
@@ -57,3 +57,11 @@ func.func @nested_op_alloca(%arg0 : index) {
   }
   return
 }
+
+// -----
+
+func.func @complex_alloca() {
+  %0 = memref.alloca() : memref<128xcomplex<f32>>
+  return
+}
+// CHECK-LABEL: func @complex_alloca(

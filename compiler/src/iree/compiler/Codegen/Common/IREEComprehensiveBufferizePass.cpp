@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -65,7 +66,7 @@ static FailureOr<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
       type = MemRefType::get(type.getShape(), type.getElementType(),
                              type.getLayout());
   }
-  return builder.create<memref::AllocOp>(loc, type, dynamicSizes).getResult();
+  return memref::AllocOp::create(builder, loc, type, dynamicSizes).getResult();
 }
 static LogicalResult defaultMemCpyFn(OpBuilder &builder, Location loc,
                                      Value from, Value to) {
@@ -94,8 +95,7 @@ class IREEComprehensiveBufferizePass final
     : public impl::IREEComprehensiveBufferizePassBase<
           IREEComprehensiveBufferizePass> {
 public:
-  using impl::IREEComprehensiveBufferizePassBase<
-      IREEComprehensiveBufferizePass>::IREEComprehensiveBufferizePassBase;
+  using Base::Base;
   explicit IREEComprehensiveBufferizePass(
       BufferizationOptions::AllocationFn allocationFn,
       BufferizationOptions::MemCpyFn memCpyFn)
@@ -131,8 +131,7 @@ private:
 class IREEBufferizeConstantsPass final
     : public impl::IREEBufferizeConstantsPassBase<IREEBufferizeConstantsPass> {
 public:
-  using impl::IREEBufferizeConstantsPassBase<
-      IREEBufferizeConstantsPass>::IREEBufferizeConstantsPassBase;
+  using Base::Base;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, bufferization::BufferizationDialect,
                     memref::MemRefDialect>();
@@ -149,7 +148,6 @@ static IREEOneShotBufferizationOptions getBufferizationOptions() {
   // it's own logic to handle constants. We'd like to leave the arith.constant
   // as is and insert bufferization.to_buffer to convert the tensor to memref.
   options.opFilter.denyOperation<arith::ConstantOp>();
-  options.opFilter.denyOperation<bufferization::ToBufferOp>();
 
   // This type converter converts tensor types to memref types when no exact
   // memref type can be inferred from the context.
@@ -184,7 +182,7 @@ eliminateEmptyTensors(RewriterBase &rewriter, Operation *op,
 }
 
 void EliminateEmptyTensorsPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   MLIRContext *context = &getContext();
 
   OpBuilder b(context);
@@ -206,7 +204,13 @@ void EliminateEmptyTensorsPass::runOnOperation() {
     }
   }
 
+  // iree_codegen.store_to_buffer may consumer reshape operands that got stuck
+  // at the end of the funcOp, which will prevent the SubsetInsertionOpInterface
+  // implementation from eliminating empty tensors. Push up these reshape ops
+  // as far as possible to prevent the reshapes from blocking empty tensor
+  // elimination.
   IRRewriter rewriter(funcOp->getContext());
+  moveUpMemrefReshapeOps(rewriter, funcOp);
   auto bufferizationOptions = getBufferizationOptions();
   OneShotAnalysisState state(funcOp, bufferizationOptions);
   // Analyze IR.
@@ -233,7 +237,7 @@ runIREEOneShotBufferize(Operation *op,
 
 /// Run comprehensive bufferize.
 void IREEComprehensiveBufferizePass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   IREEOneShotBufferizationOptions options = getBufferizationOptions();
   options.testAnalysisOnly = testAnalysisOnly;
   options.printConflicts = printConflicts;
@@ -249,6 +253,18 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   if (failed(runIREEOneShotBufferize(funcOp, options, bufferizationState))) {
     return signalPassFailure();
   }
+
+  // All to_buffer ops on single use constants will have already had any
+  // write conflicts resolved by the analysis, so we can safely mark them as
+  // read only.
+  funcOp->walk([](bufferization::ToBufferOp toBuffer) {
+    if (auto constant =
+            toBuffer.getTensor().getDefiningOp<arith::ConstantOp>()) {
+      if (constant->hasOneUse()) {
+        toBuffer.setReadOnly(true);
+      }
+    }
+  });
 
   // Remove redundant args and unused results.
   {

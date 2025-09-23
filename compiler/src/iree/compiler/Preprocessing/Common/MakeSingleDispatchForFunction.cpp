@@ -138,8 +138,8 @@ void MakeSingleDispatchForFunctionPass::runOnOperation() {
 
   auto resultTypes =
       llvm::map_to_vector(results, [](Value v) -> Type { return v.getType(); });
-  auto dispatchRegionOp = rewriter.create<IREE::Flow::DispatchRegionOp>(
-      funcOp.getLoc(), resultTypes,
+  auto dispatchRegionOp = IREE::Flow::DispatchRegionOp::create(
+      rewriter, funcOp.getLoc(), resultTypes,
       /*result_dims=*/ValueRange{}, /*workload=*/ValueRange{});
   Region &regionOpBody = dispatchRegionOp.getBody();
   Block *newBlock = rewriter.createBlock(&regionOpBody, regionOpBody.begin());
@@ -147,8 +147,8 @@ void MakeSingleDispatchForFunctionPass::runOnOperation() {
     rewriter.moveOpBefore(op, newBlock, newBlock->end());
   }
   rewriter.setInsertionPointToEnd(newBlock);
-  rewriter.create<IREE::Flow::ReturnOp>(dispatchRegionOp.getLoc(),
-                                        results.getArrayRef());
+  IREE::Flow::ReturnOp::create(rewriter, dispatchRegionOp.getLoc(),
+                               results.getArrayRef());
   rewriter.replaceUsesWithIf(
       results.getArrayRef(), dispatchRegionOp->getResults(),
       [&](OpOperand &use) {

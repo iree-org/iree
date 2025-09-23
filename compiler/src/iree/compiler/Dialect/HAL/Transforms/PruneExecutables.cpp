@@ -96,7 +96,7 @@ static void eraseOps(ArrayRef<Attribute> symbolRefAttrs,
 struct PruneExecutablesPass
     : public IREE::HAL::impl::PruneExecutablesPassBase<PruneExecutablesPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     // Gather all executable op symbols into a map that we can quickly check
     // while walking ops.

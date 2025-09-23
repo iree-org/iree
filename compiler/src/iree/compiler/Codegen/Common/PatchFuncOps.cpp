@@ -4,18 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <iterator>
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
-#include "llvm/Support/Casting.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/Support/DebugLog.h"
 
 #define DEBUG_TYPE "iree-codegen-debug-patch-func-ops"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -40,7 +34,7 @@ static LogicalResult getMatchedFuncOp(StringRef fileName,
     return failure();
   }
   moduleOp = *maybeModuleOp;
-  LDBG("--found patching library @" << fileName);
+  LDBG() << "--found patching library @" << fileName;
 
   for (auto candidate : moduleOp->getOps<FunctionOpInterface>()) {
     if (funcOp.getName() == candidate.getName()) {
@@ -62,7 +56,7 @@ struct PatchFuncOpsPass : public impl::PatchFuncOpsPassBase<PatchFuncOpsPass> {
 
 void PatchFuncOpsPass::runOnOperation() {
   if (clCodegenPatchedFuncOpsFileName.empty()) {
-    LDBG("skip, because no file is provided");
+    LDBG() << "skip, because no file is provided";
     return;
   }
   Operation *startOp = getOperation();
@@ -84,10 +78,10 @@ void PatchFuncOpsPass::runOnOperation() {
       return signalPassFailure();
     }
     if (!replacement) {
-      LDBG("--did not find matching funcOp" << funcOp.getName());
+      LDBG() << "--did not find matching funcOp" << funcOp.getName();
       continue;
     }
-    LDBG("--found matching funcOp" << funcOp.getName());
+    LDBG() << "--found matching funcOp" << funcOp.getName();
     // Do not use takeBody method because it drops the reference in the module
     // op that contains the patches.
     IRMapping mapper;

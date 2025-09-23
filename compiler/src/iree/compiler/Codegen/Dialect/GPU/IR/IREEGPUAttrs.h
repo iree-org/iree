@@ -17,8 +17,6 @@
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/BuiltinTypes.h"
 
 namespace mlir::iree_compiler::IREE::GPU {
 
@@ -75,6 +73,10 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
 MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
                                                 MMAFragment fragment,
                                                 bool colMajor);
+
+MMASingleSubgroupLayout
+getSingleSubgroupLayout(VirtualMMAIntrinsic virtualIntrinsic,
+                        MMAFragment fragment, bool colMajor);
 
 MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
                                                 MMAFragment fragment);

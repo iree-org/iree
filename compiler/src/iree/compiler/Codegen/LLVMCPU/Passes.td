@@ -138,21 +138,27 @@ def LLVMCPUTilePass :
   }];
   let options = [
     Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
-      "Tiling level used to retrieve the configuration from lowering_config">
+      "Tiling level used to retrieve the configuration from lowering_config.">,
+    Option<"skipRootOp", "skip-root-op", "bool", /*default=*/"false",
+      "Do not tile the root op if the option is true.">
   ];
 }
 
-def LLVMCPUTileAndFusePass :
-    InterfacePass<"iree-llvmcpu-tile-and-fuse", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to tile and fuse TilingInterface operations.";
-  let options = [
-    Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
-      "Use default tiling level used to retrieve the configuration from lowering_config">
-  ];
+def LLVMCPUTileToVectorSizePass :
+    InterfacePass<"iree-llvmcpu-tile-to-vector-size", "mlir::FunctionOpInterface"> {
+  let summary = "Tile TilingInterface operations to target vector size.";
+  let description = [{
+    Walk through all the TilingInterface operations and tiling the dimensions to
+    target vector sizes, if the lowering config is present and the dimension is
+    known as greater than the vector size.
+
+    It is intended to be used before vectorization that avoids big vectors and
+    stack buffers.
+  }];
 }
 
-def LLVMCPUTileRootAndFuseProducerConsumerPass
-    : InterfacePass<"iree-llvmcpu-tile-root-and-fuse-producer-consumer",
+def LLVMCPUTileAndFuseProducerConsumerPass
+    : InterfacePass<"iree-llvmcpu-tile-and-fuse-producer-consumer",
                     "mlir::FunctionOpInterface"> {
   let summary = "Pass to tile root op and fuse with producer and consumer "
                 "TilingInterface ops.";
@@ -179,7 +185,14 @@ def LLVMCPUTileRootAndFuseProducerConsumerPass
               "only-fuse-producer-input-operands", "bool",
               /*default=*/"false",
               "Specifies if we only want to fuse producer's input operands. "
-              "This is helpful to tile&fuse in case of reduction dimensions.">];
+              "This is helpful to tile&fuse in case of reduction dimensions.">,
+       // TODO(hanchung): Support the case that the last operation is before the
+       // root op.
+       Option<"anchorOnRootOp",
+              "anchor-on-root-op", "bool",
+              /*default=*/"true",
+              "Anchor on the root op to start the tiling. Otherwise, find the "
+              "last operation after the root op that contains the `tilingLevel` config.">];
 }
 
 def LLVMCPUVerifyVectorSizeLegalityPass :

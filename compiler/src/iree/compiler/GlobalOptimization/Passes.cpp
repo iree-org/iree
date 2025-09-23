@@ -59,12 +59,9 @@ static llvm::cl::opt<DemotionOption> clDemoteContractionInputsToBF16Strategy(
 static llvm::cl::opt<DispatchCreation::EncodingOptions> clSetEncodingStrategy(
     "iree-global-opt-set-encoding-strategy",
     llvm::cl::desc("Set the encoding strategy for operations."),
-    llvm::cl::values(
-        clEnumValN(
-            DispatchCreation::EncodingOptions::Generic, "generic",
-            "Using EncodingAttr which encodes as much information as possible"),
-        clEnumValN(DispatchCreation::EncodingOptions::MatmulK, "matmulk",
-                   "Only encodes the reduction dimenesions in the encoding.")),
+    llvm::cl::values(clEnumValN(
+        DispatchCreation::EncodingOptions::Generic, "generic",
+        "Using EncodingAttr which encodes as much information as possible")),
     llvm::cl::init(DispatchCreation::EncodingOptions::Generic));
 
 static llvm::cl::opt<bool> clWarnOnUninitializedValues(
@@ -115,7 +112,7 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(createRemoveZeroExtentTensorsPass)
       .addPass(createDetachElementwiseFromNamedOpsPass)
-      .addPass(mlir::createLinalgNamedOpConversionPass);
+      .addPass(mlir::createSimplifyDepthwiseConvPass);
   mainPassManager.addPass(createEraseUnusedLinalgOperandsPass());
 
   // Expand tensor shapes into SSA values and optimize the whole program.
@@ -181,12 +178,12 @@ void buildGlobalOptimizationPassPipeline(
 
   // Enable data tiling after they are in a canonical form.
   if (transformOptions.options.dataTiling) {
-    FunctionLikeNest(mainPassManager).addPass([&]() {
-      return DispatchCreation::createSetEncodingPass(
-          DispatchCreation::SetEncodingPassOptions{clSetEncodingStrategy});
-    });
-    // TODO(hanchung): Make data-tiling passes be FunctionOpInterface pass, so
-    // we can use `FunctionLikNest` here.
+    FunctionLikeNest(mainPassManager)
+        .addPass(DispatchCreation::createAnnotateDataTilingHintsPass)
+        .addPass([&]() {
+          return DispatchCreation::createSetEncodingPass(
+              DispatchCreation::SetEncodingPassOptions{clSetEncodingStrategy});
+        });
     if (clEnableEarlyMaterialization) {
       mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
     }

@@ -7,6 +7,7 @@
 #include "compiler/plugins/target/LLVMCPU/LLVMTargetOptions.h"
 
 #include "compiler/plugins/target/LLVMCPU/ResolveCPUAndCPUFeatures.h"
+#include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
@@ -126,20 +127,17 @@ void LLVMTarget::storeToConfigAttrs(MLIRContext *context,
   auto addBool = [&](StringRef name, bool value) {
     config.emplace_back(b.getStringAttr(name), b.getBoolAttr(value));
   };
-  auto addInt64 = [&](StringRef name, int64_t value) {
-    config.emplace_back(b.getStringAttr(name), b.getI64IntegerAttr(value));
-  };
 
-  addString("target_triple", triple);
+  addConfigTargetTriple(context, triple, config);
   addString("cpu", cpu);
-  addString("cpu_features", cpuFeatures);
+  addConfigCpuFeatures(context, cpuFeatures, config);
   if (!dataLayout.empty()) {
-    addString("data_layout", dataLayout);
+    addConfigDataLayout(context, dataLayout, config);
   }
   if (vectorWidthInBytes != DEFAULT_VECTOR_WIDTH_IN_BYTES) {
-    addInt64("native_vector_size", vectorWidthInBytes);
+    addConfigNativeVectorSize(context, vectorWidthInBytes, config);
   }
-  addInt64("max_stack_allocation_size", maxStackAllocSizeInBytes);
+  addConfigMaxStackAllocationSize(context, maxStackAllocSizeInBytes, config);
   if (linkEmbedded != DEFAULT_LINK_EMBEDDED) {
     addBool("link_embedded", linkEmbedded);
   }
@@ -234,24 +232,13 @@ LLVMTarget::loadFromConfigAttr(Location loc, DictionaryAttr config,
     }
     return fallback;
   };
-  auto getInt64 = [&](StringRef name, int64_t fallback) -> int64_t {
-    Attribute attr = config.get(name);
-    if (auto iattr = llvm::dyn_cast_if_present<IntegerAttr>(attr)) {
-      return iattr.getValue().getSExtValue();
-    } else if (attr) {
-      hasFailures = true;
-      emitError(loc) << "executable config '" << name
-                     << "' requires i64 but got " << attr;
-    }
-    return fallback;
-  };
 
   LLVMTarget target;
 
   // Constructor arguments.
-  auto triple = getOptionalString("target_triple");
+  auto triple = getConfigTargetTriple(config);
   auto cpu = getOptionalString("cpu");
-  auto cpuFeatures = getOptionalString("cpu_features");
+  auto cpuFeatures = getConfigCpuFeatures(config);
   bool linkEmbedded = getBool("link_embedded", DEFAULT_LINK_EMBEDDED);
   if (triple || cpu || cpuFeatures) {
     if (!triple) {
@@ -279,9 +266,9 @@ LLVMTarget::loadFromConfigAttr(Location loc, DictionaryAttr config,
     target.copy(defaultTarget);
   }
 
-  target.dataLayout = getString("data_layout", DEFAULT_DATA_LAYOUT, false);
+  target.dataLayout = getConfigDataLayout(config).value_or(DEFAULT_DATA_LAYOUT);
   target.vectorWidthInBytes =
-      getInt64("native_vector_size", DEFAULT_VECTOR_WIDTH_IN_BYTES);
+      getConfigNativeVectorSize(config).value_or(DEFAULT_VECTOR_WIDTH_IN_BYTES);
 
   target.debugSymbols = getBool("debug_symbols", DEFAULT_DEBUG_SYMBOLS);
   target.linkStatic = getBool("link_static", DEFAULT_LINK_STATIC);

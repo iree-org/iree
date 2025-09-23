@@ -762,6 +762,24 @@ LogicalResult setMatmulOpConfig(IREE::GPU::TargetAttr target,
       CodeGenPipeline::SPIRVBaseVectorize, workgroupSize);
 }
 
+static LogicalResult setTilingAndMatmulOpConfig(linalg::LinalgOp op,
+                                                IREE::GPU::TargetAttr target) {
+  if (!isMatmulOrBatchMatmul(op)) {
+    return failure();
+  }
+  // Try to tile and vectorize first. It's common to see 32 threads
+  // per subgroup for GPUs.
+  std::array<int64_t, 2> workgroupXY = {32, 2};
+  std::array<int64_t, 3> threadMNK;
+  auto inputType = cast<ShapedType>(op->getOperand(0).getType());
+  if (IREE::Util::getTypeBitWidth(inputType.getElementType()) == 16) {
+    threadMNK = {8, 8, 8};
+  } else {
+    threadMNK = {8, 8, 4};
+  }
+  return detail::setMatmulOpConfig(target, op, workgroupXY, threadMNK);
+}
+
 } // namespace detail
 
 //===----------------------------------------------------------------------===//
@@ -1509,29 +1527,13 @@ static LogicalResult setSPIRVOpConfig(IREE::GPU::TargetAttr target,
   // Otherwise fallback to use a default configuration that tiles and
   // distributes/vectorizes.
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
-      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([&](auto op) {
-        // Try to tile and vectorize first. It's common to see 32 threads
-        // per subgroup for GPUs.
-        std::array<int64_t, 2> workgroupXY = {32, 2};
-        std::array<int64_t, 3> threadMNK;
-        auto inputType = llvm::cast<ShapedType>(op.getInputs()[0].getType());
-        if (IREE::Util::getTypeBitWidth(inputType.getElementType()) == 16) {
-          threadMNK = {8, 8, 8};
-        } else {
-          threadMNK = {8, 8, 4};
-        }
-        auto result =
-            detail::setMatmulOpConfig(target, op, workgroupXY, threadMNK);
-        if (succeeded(result))
-          return success();
-
-        LLVM_DEBUG(llvm::dbgs()
-                   << "failed to set matmul op config, trying reduction\n");
-        if (succeeded(setReductionConfig(target, op)))
-          return success();
-
-        // If unsuccessful, try to tile and distribute.
-        return setDefaultOpConfig(target, op);
+      .Case<linalg::MatmulOp, linalg::BatchMatmulOp>([](auto op) {
+        // Assertion is better than returning failure here to
+        // avoid unexpected configurations.
+        assert(false && "named matmul not supported here, pass expects it to "
+                        "generalized first");
+        return op->emitOpError(
+            "named matmul not supported, expected to be generalized first");
       })
       .Case<linalg::ConvolutionOpInterface>([target](auto op) {
         // Use the result type in case of larger bitwidth for accumulators.
@@ -1546,21 +1548,31 @@ static LogicalResult setSPIRVOpConfig(IREE::GPU::TargetAttr target,
           if (succeeded(result))
             return success();
         }
-
         // If unsuccessful, try to tile and distribute/vectorize.
         return setDefaultOpConfig(target, op);
       })
       .Case<linalg::GenericOp>([&](linalg::GenericOp op) {
-        LLVM_DEBUG(llvm::dbgs() << "figuring configuration for generic op\n");
-        if (succeeded(setReductionConfig(target, op)))
+        LLVM_DEBUG(llvm::dbgs() << "configuring for generic op\n");
+        if (succeeded(detail::setTilingAndMatmulOpConfig(op, target))) {
           return success();
+        }
+        LLVM_DEBUG(llvm::dbgs()
+                   << "failed to set matmul op config, trying reduction\n");
+
+        if (succeeded(setReductionConfig(target, op))) {
+          return success();
+        }
+        LLVM_DEBUG(llvm::dbgs() << "failed to set reduction op config");
 
         // If a generic op has reduction iterator types, it can be treated as a
         // root op for configuration as well. Use the default configuration,
         // which will mark it as a root.
         if (op.getNumLoops() != op.getNumParallelLoops()) {
+          LLVM_DEBUG(llvm::dbgs() << "trying default config for generic");
           return setDefaultOpConfig(target, op);
         }
+
+        LLVM_DEBUG(llvm::dbgs() << "failed to set config of generic");
         return failure();
       })
       .Case<IREE::LinalgExt::FftOp>([target](IREE::LinalgExt::FftOp op) {

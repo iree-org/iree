@@ -9,14 +9,9 @@
 #include <algorithm>
 #include <numeric>
 
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
-#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Utils/Permutation.h"
-#include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Shard/IR/ShardOps.h"
@@ -24,7 +19,6 @@
 #include "mlir/Dialect/Shard/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
-#include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
@@ -64,9 +58,9 @@ buildTranspose(Value v, ArrayRef<int64_t> transposeVector,
   SmallVector<int64_t> transposedShape =
       permute(type.getShape(), transposeVector);
   Value target =
-      builder.create<tensor::EmptyOp>(transposedShape, type.getElementType());
+      tensor::EmptyOp::create(builder, transposedShape, type.getElementType());
   return cast<TypedValue<RankedTensorType>>(
-      builder.create<linalg::TransposeOp>(v, target, transposeVector)
+      linalg::TransposeOp::create(builder, v, target, transposeVector)
           ->getResult(0));
 }
 
@@ -119,9 +113,8 @@ splitAxis(TypedValue<RankedTensorType> tensor, int64_t splitAxis,
   std::optional<SmallVector<ReassociationIndices>> reassociation =
       getReassociationIndicesForReshape(tensor.getType(), resultType);
   return cast<TypedValue<RankedTensorType>>(
-      builder
-          .create<tensor::ExpandShapeOp>(resultType, tensor,
-                                         reassociation.value())
+      tensor::ExpandShapeOp::create(builder, resultType, tensor,
+                                    reassociation.value())
           .getResult());
 }
 
@@ -162,7 +155,7 @@ collapseAxesN(TypedValue<RankedTensorType> tensor, int64_t firstAxis, int64_t n,
   std::optional<SmallVector<ReassociationIndices>> reassociation =
       getReassociationIndicesForCollapse(shape, newShape);
   return cast<TypedValue<RankedTensorType>>(
-      builder.create<tensor::CollapseShapeOp>(tensor, reassociation.value())
+      tensor::CollapseShapeOp::create(builder, tensor, reassociation.value())
           .getResult());
 }
 
@@ -230,10 +223,10 @@ struct ShardAllReduceToFlow
     Value channel = buildCachedChannelLoading(op, builder);
     RankedTensorType resultType =
         cast<RankedTensorType>(op.getOperand().getType());
-    Value target = builder.create<tensor::EmptyOp>(resultType.getShape(),
-                                                   resultType.getElementType());
-    auto flowAllReduce = builder.create<IREE::Flow::CollectiveAllReduceOp>(
-        convertReductionKind(op.getReductionAttr()),
+    Value target = tensor::EmptyOp::create(builder, resultType.getShape(),
+                                           resultType.getElementType());
+    auto flowAllReduce = IREE::Flow::CollectiveAllReduceOp::create(
+        builder, convertReductionKind(op.getReductionAttr()),
         getCollectiveElementTypeAttr(resultType), target, op.getOperand(),
         channel);
     rewriter.replaceAllUsesWith(op.getResult(), flowAllReduce.getResult());
@@ -268,11 +261,11 @@ struct ShardAllGatherToFlow
 
     RankedTensorType flowAllGatherResultType = transpose(
         cast<RankedTensorType>(op.getResult().getType()), 0, gatherAxis);
-    Value target = builder.create<tensor::EmptyOp>(
-        flowAllGatherResultType.getShape(),
-        op.getResult().getType().getElementType());
-    auto flowAllGather = builder.create<IREE::Flow::CollectiveAllGatherOp>(
-        getCollectiveElementTypeAttr(flowAllGatherResultType), target,
+    Value target =
+        tensor::EmptyOp::create(builder, flowAllGatherResultType.getShape(),
+                                op.getResult().getType().getElementType());
+    auto flowAllGather = IREE::Flow::CollectiveAllGatherOp::create(
+        builder, getCollectiveElementTypeAttr(flowAllGatherResultType), target,
         flowAllGatherOperand, channel);
 
     Value res = buildTranspose(flowAllGather, 0, gatherAxis, builder);
@@ -318,12 +311,12 @@ struct ShardAllToAllToFlow
     TypedValue<RankedTensorType> splitAxisAsMostOuter =
         buildTranspose(op.getOperand(), 0, splitAxis, builder);
 
-    Value target = builder.create<tensor::EmptyOp>(
-        splitAxisAsMostOuter.getType().getShape(),
+    Value target = tensor::EmptyOp::create(
+        builder, splitAxisAsMostOuter.getType().getShape(),
         splitAxisAsMostOuter.getType().getElementType());
-    auto flowAllToAll = builder.create<IREE::Flow::CollectiveAllToAllOp>(
-        getCollectiveElementTypeAttr(splitAxisAsMostOuter.getType()), target,
-        splitAxisAsMostOuter, channel);
+    auto flowAllToAll = IREE::Flow::CollectiveAllToAllOp::create(
+        builder, getCollectiveElementTypeAttr(splitAxisAsMostOuter.getType()),
+        target, splitAxisAsMostOuter, channel);
 
     TypedValue<RankedTensorType> splitAxisBackInItsPlace =
         buildTranspose(flowAllToAll, 0, splitAxis, builder);
@@ -347,8 +340,8 @@ struct ShardProcessLinearIndexToFlow
     ImplicitLocOpBuilder builder(op->getLoc(), rewriter);
     builder.setInsertionPointAfter(op.getOperation());
     Value channel = buildCachedChannelLoading(op, builder);
-    Value newIndex = builder.create<IREE::Flow::ChannelRankOp>(
-        builder.getIndexType(), channel);
+    Value newIndex = IREE::Flow::ChannelRankOp::create(
+        builder, builder.getIndexType(), channel);
     rewriter.replaceAllUsesWith(op.getResult(), newIndex);
     return success();
   }
@@ -380,14 +373,13 @@ struct ShardReduceScatterToFlow
     RankedTensorType flowReduceScatterResultType = transpose(
         cast<RankedTensorType>(op.getResult().getType()), 0, scatterAxis);
 
-    Value target = builder.create<tensor::EmptyOp>(
-        flowReduceScatterResultType.getShape(),
-        op.getResult().getType().getElementType());
-    auto flowReduceScatter =
-        builder.create<IREE::Flow::CollectiveReduceScatterOp>(
-            convertReductionKind(op.getReductionAttr()),
-            getCollectiveElementTypeAttr(flowReduceScatterResultType), target,
-            flowReduceScatterOperand, channel);
+    Value target =
+        tensor::EmptyOp::create(builder, flowReduceScatterResultType.getShape(),
+                                op.getResult().getType().getElementType());
+    auto flowReduceScatter = IREE::Flow::CollectiveReduceScatterOp::create(
+        builder, convertReductionKind(op.getReductionAttr()),
+        getCollectiveElementTypeAttr(flowReduceScatterResultType), target,
+        flowReduceScatterOperand, channel);
 
     Value res = buildTranspose(flowReduceScatter, 0, scatterAxis, builder);
 

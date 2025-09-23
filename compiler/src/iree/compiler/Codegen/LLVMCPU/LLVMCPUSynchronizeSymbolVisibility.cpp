@@ -34,7 +34,7 @@ struct LLVMCPUSynchronizeSymbolVisibilityPass
     : public impl::LLVMCPUSynchronizeSymbolVisibilityPassBase<
           LLVMCPUSynchronizeSymbolVisibilityPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     for (auto &op : moduleOp.getOps()) {
       if (auto globalOp = dyn_cast<LLVM::GlobalOp>(op)) {
         setVisibilityFromLinkage(globalOp, globalOp.getLinkage());

@@ -12,6 +12,7 @@
 #include "compiler/plugins/target/ROCM/Dialect/ROCM/Transforms/Passes.h"
 #include "compiler/plugins/target/ROCM/builtins/ukernel/iree_uk_amdgpu_bitcode.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
@@ -83,8 +84,10 @@ struct ROCMOptions {
   std::string encodingLayoutResolver = GPU::kNoEncodingLayoutResolverName;
   bool slpVectorization = true;
   bool globalISel = false;
-
   bool specializeDispatches = false;
+  bool enableTensorUKernels = false;
+  IREE::Codegen::DenormalFpMath denormalFpMathF32 =
+      IREE::Codegen::DenormalFpMath::None;
 
   void bindOptions(OptionsBinder &binder) {
     using namespace llvm;
@@ -156,6 +159,18 @@ struct ROCMOptions {
         cl::cat(category),
         cl::desc(
             "Enable runtime specialization of dynamically shaped dispatches."));
+    binder.opt<bool>("iree-hip-enable-tensor-ukernels", enableTensorUKernels,
+                     cl::cat(category),
+                     cl::desc("Enable MLIR-based ukernels."));
+    binder.opt<IREE::Codegen::DenormalFpMath>(
+        "iree-hip-denormal-fp-math-f32", denormalFpMathF32, cl::cat(category),
+        cl::desc("Denormal floating point math mode for f32"),
+        cl::values(
+            clEnumValN(IREE::Codegen::DenormalFpMath::PreserveSign,
+                       "preserve-sign",
+                       "Convert denormals to zero while preserving sign"),
+            clEnumValN(IREE::Codegen::DenormalFpMath::PositiveZero,
+                       "positive-zero", "Convert denormals to positive zero")));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
@@ -285,7 +300,7 @@ public:
 
     if (auto target = GPU::getHIPTargetDetails(
             options.target, options.targetFeatures, context)) {
-      addConfig(kGPUTargetAttrName, target);
+      addConfigGPUTarget(context, target, configItems);
       if (options.encodingLayoutResolver !=
           GPU::kNoEncodingLayoutResolverName) {
         if (Attribute encoding = GPU::getHIPTargetEncodingLayoutAttr(
@@ -325,8 +340,21 @@ public:
     }
 
     addConfig("ukernels", b.getStringAttr(options.enableROCMUkernels));
+    if (options.enableROCMUkernels != "none") {
+      addConfig("iree_codegen.ukernel_provider",
+                IREE::ROCM::UKernelProviderAttr::get(context));
+    }
     if (options.wavesPerEu > 0) {
-      addConfig("waves_per_eu", b.getI64IntegerAttr(options.wavesPerEu));
+      addConfigWavesPerEu(b.getContext(), options.wavesPerEu, configItems);
+    }
+    if (options.denormalFpMathF32 != IREE::Codegen::DenormalFpMath::None) {
+      addConfigDenormalFpMathF32(b.getContext(), options.denormalFpMathF32,
+                                 configItems);
+    }
+
+    if (options.enableTensorUKernels) {
+      addConfig(kUKernelProviderName,
+                IREE::ROCM::TensorUKernelProviderAttr::get(context));
     }
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
@@ -350,8 +378,9 @@ public:
   buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                  OpPassManager &passManager) override {
     if (options.specializeDispatches) {
-      if (auto attr = getGPUTargetAttr(targetAttr)) {
+      if (auto attr = getGPUTargetAttr(targetAttr.getContext(), targetAttr)) {
         ROCM::ApplyBuiltinPDLPatternsPassOptions options;
+        options.enableSpecialization = true;
         if (IREE::GPU::TargetChipAttr chip = attr.getChip()) {
           if (StringAttr sku = chip.getSku()) {
             options.targets.push_back(sku.str());
@@ -364,7 +393,32 @@ public:
         });
       }
     }
-    buildLLVMGPUCodegenConfigurationPassPipeline(passManager);
+    if (options.enableTensorUKernels) {
+      if (auto attr = getGPUTargetAttr(targetAttr.getContext(), targetAttr)) {
+        ROCM::ApplyBuiltinPDLPatternsPassOptions options;
+        options.enableTensorUKernels = true;
+        if (IREE::GPU::TargetChipAttr chip = attr.getChip()) {
+          if (StringAttr sku = chip.getSku()) {
+            options.targets.push_back(sku.str());
+          }
+        }
+        options.targets.push_back(attr.getArch().str());
+        OpPassManager &modulePassManager = passManager.nest<ModuleOp>();
+        FunctionLikeNest(modulePassManager).addPass([&]() {
+          return ROCM::createApplyBuiltinPDLPatternsPass(options);
+        });
+      }
+    }
+    passManager.addPass(createSpecializeExportsPass());
+    buildLLVMGPUCodegenCommonConfigurationPassPipeline(passManager);
+    OpPassManager &modulePassManager = passManager.nest<ModuleOp>();
+    if (options.enableTensorUKernels) {
+      modulePassManager.addPass(
+          IREE::ROCM::createApplyBuiltinPDLPatternsDriverPass());
+    }
+    modulePassManager.addPass(createMaterializeTuningSpecsPass());
+    modulePassManager.addPass(createMaterializeUserConfigsPass());
+    modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass());
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
@@ -442,7 +496,7 @@ public:
     auto targetAttr = variantOp.getTargetAttr();
     StringRef targetArch = options.target;
     StringRef targetFeatures = options.targetFeatures;
-    if (auto attr = getGPUTargetAttr(targetAttr)) {
+    if (auto attr = getGPUTargetAttr(variantOp.getContext(), targetAttr)) {
       targetArch = attr.getArch();
       targetFeatures = attr.getFeatures();
     }
@@ -671,10 +725,10 @@ public:
                          ".linked.ll", *llvmModule);
       }
 
-      // For example 'gfx942'
+      // For example 'gfx942'.
       StringRef targetCPU = targetMachine->getTargetCPU();
 
-      // For example 'amdgcn-amd-amdhsa'
+      // For example 'amdgcn-amd-amdhsa'.
       std::string targetTriple = targetMachine->getTargetTriple().str();
 
       // Run LLVM optimization passes.
@@ -682,18 +736,16 @@ public:
       optimizeModule(*llvmModule, *targetMachine, options.slpVectorization,
                      passesString);
       if (!serializationOptions.dumpIntermediatesPath.empty()) {
-
         // Additional context on '-mcpu' flag in PR comments, see for example:
         // https://github.com/iree-org/iree/pull/20716#issuecomment-2851650421
-        std::string header =
-            llvm::formatv(R"TXT(
-; To reproduce the .optimized.ll from the .linked.ll, run:
-; opt -S -mtriple={} -mcpu={} --passes='{}'
-; The flag '-S' to emit LLVMIR.
-; The behavior of some passes depends on '-mtriple' and '-mcpu'
+        std::string header = llvm::formatv(
+            R"TXT(; To reproduce the .optimized.ll from the .linked.ll, run:
+; opt -S -mtriple={} -mcpu={} --passes='{}' <.linked.ll>
+; The flag '-S' is to emit LLVMIR.
+; The behavior of some passes depends on '-mtriple' and '-mcpu'.
 
 )TXT",
-                          targetTriple, targetCPU, passesString);
+            targetTriple, targetCPU, passesString);
 
         dumpModuleToPath(serializationOptions.dumpIntermediatesPath,
                          serializationOptions.dumpBaseName, variantOp.getName(),
@@ -711,11 +763,18 @@ public:
           llvm::errs() << "Error: cloning LLVM IR failed\n";
           return failure();
         }
+        std::string asmHeader = llvm::formatv(
+            R"TXT(; To reproduce the .rocmasm from .optimized.ll, run:
+; llc -mtriple={} -mcpu={} -mattr='{}' -O3 <.optimized.ll> -o <out.rocmasm>
+
+)TXT",
+            targetTriple, targetCPU, targetMachine->getTargetFeatureString());
+
         std::string targetISA =
             translateModuleToISA(*moduleCopy.get(), *targetMachine);
         dumpDataToPath(serializationOptions.dumpIntermediatesPath,
                        serializationOptions.dumpBaseName, variantOp.getName(),
-                       ".rocmasm", targetISA);
+                       ".rocmasm", asmHeader + targetISA);
       }
 
       // Serialize hsaco kernel into the binary that we will embed in the
@@ -776,9 +835,11 @@ public:
     }
 
     // Add the binary data to the target executable.
-    executableBuilder.create<iree_compiler::IREE::HAL::ExecutableBinaryOp>(
-        variantOp.getLoc(), variantOp.getSymName(),
+    auto binaryOp = IREE::HAL::ExecutableBinaryOp::create(
+        executableBuilder, variantOp.getLoc(), variantOp.getSymName(),
         variantOp.getTarget().getFormat(), binaryContainer.value());
+    binaryOp.setMimeTypeAttr(
+        executableBuilder.getStringAttr("application/x-flatbuffers"));
 
     return success();
   }

@@ -39,8 +39,8 @@ static LogicalResult lowerToLoopsImpl(OpBuilder &builder,
     return tilableOp.generateScalarImplementation(builder, loc, ivs);
   }
   LogicalResult status = success();
-  builder.create<scf::ForOp>(
-      loc,
+  scf::ForOp::create(
+      builder, loc,
       getValueOrCreateConstantIndexOp(builder, loc,
                                       loopRanges[loopDepth].offset),
       getValueOrCreateConstantIndexOp(builder, loc, loopRanges[loopDepth].size),
@@ -49,7 +49,7 @@ static LogicalResult lowerToLoopsImpl(OpBuilder &builder,
       ValueRange{}, [&](OpBuilder &b, Location loc, Value iv, ValueRange args) {
         ivs.push_back(iv);
         status = lowerToLoopsImpl(b, tilableOp, loopRanges, loopDepth + 1, ivs);
-        b.create<scf::YieldOp>(loc);
+        scf::YieldOp::create(b, loc);
       });
   return status;
 }

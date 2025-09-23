@@ -13,7 +13,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -30,7 +30,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-lower-to-global-loads"
-#define LDBG(X) LLVM_DEBUG(llvm::dbgs() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -43,8 +42,8 @@ static LogicalResult
 distributeLinalgCopyToThreads(RewriterBase &rewriter, linalg::CopyOp copy,
                               ArrayRef<int64_t> workgroupSize,
                               int64_t subgroupSize) {
-  LDBG("==== distributing op: ");
-  LDBG(*copy);
+  LDBG() << "==== distributing op: ";
+  LDBG() << *copy;
   Location loc = copy.getLoc();
 
   // The linalg.copy we are dealing with represents a region we need to copy to
@@ -83,50 +82,50 @@ distributeLinalgCopyToThreads(RewriterBase &rewriter, linalg::CopyOp copy,
   int64_t residualElements =
       totalCopySizePerSubgroup % (subgroupSize * elementsPerCopy);
 
-  LDBG("-- elementsPerCopy: " << elementsPerCopy);
-  LDBG("-- workgroupSize: " << workgroupSize[0]);
-  LDBG("-- numSubgroups: " << numSubgroups);
-  LDBG("-- totalCopySize: " << totalCopySize);
-  LDBG("-- totalCopySizePerSubgroup: " << totalCopySizePerSubgroup);
-  LDBG("-- numCopiesPerThread: " << numCopiesPerThread);
-  LDBG("-- residualElements: " << residualElements);
+  LDBG() << "-- elementsPerCopy: " << elementsPerCopy;
+  LDBG() << "-- workgroupSize: " << workgroupSize[0];
+  LDBG() << "-- numSubgroups: " << numSubgroups;
+  LDBG() << "-- totalCopySize: " << totalCopySize;
+  LDBG() << "-- totalCopySizePerSubgroup: " << totalCopySizePerSubgroup;
+  LDBG() << "-- numCopiesPerThread: " << numCopiesPerThread;
+  LDBG() << "-- residualElements: " << residualElements;
 
   if (residualElements != 0) {
     return rewriter.notifyMatchFailure(
         copy, "Cannot proceed: cannot handle copying residual elements.");
   }
 
-  Value subgroupId = rewriter.create<gpu::SubgroupIdOp>(loc, nullptr);
-  Value laneId = rewriter.create<gpu::LaneIdOp>(loc, nullptr);
+  Value subgroupId = gpu::SubgroupIdOp::create(rewriter, loc, nullptr);
+  Value laneId = gpu::LaneIdOp::create(rewriter, loc, nullptr);
 
   auto sourceType = cast<MemRefType>(copy.getOperand(0).getType());
   auto localType = cast<MemRefType>(copy.getOutputs().front().getType());
 
   auto getGlobalGatherIndex = [&](Value sgIdVal, Value lIdVal,
                                   Value indVar) -> Value {
-    auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    return rewriter.create<affine::AffineLinearizeIndexOp>(
-        loc, ValueRange{sgIdVal, indVar, lIdVal, zero},
+    auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    return affine::AffineLinearizeIndexOp::create(
+        rewriter, loc, ValueRange{sgIdVal, indVar, lIdVal, zero},
         ArrayRef<int64_t>{numSubgroups, numCopiesPerThread, subgroupSize,
                           elementsPerCopy},
         /*disjoint=*/true);
   };
 
   auto getSubgroupStoreBaseIndex = [&](Value sgIdVal, Value indVar) -> Value {
-    auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
     return getGlobalGatherIndex(sgIdVal, zero, indVar);
   };
 
   // Build a for loop skeleton:
-  auto lowerBound = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  auto lowerBound = arith::ConstantIndexOp::create(rewriter, loc, 0);
   auto upperBound =
-      rewriter.create<arith::ConstantIndexOp>(loc, numCopiesPerThread);
-  auto step = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+      arith::ConstantIndexOp::create(rewriter, loc, numCopiesPerThread);
+  auto step = arith::ConstantIndexOp::create(rewriter, loc, 1);
   scf::ForOp forOp =
-      rewriter.create<scf::ForOp>(loc, lowerBound, upperBound, step);
+      scf::ForOp::create(rewriter, loc, lowerBound, upperBound, step);
 
   auto delinearizeIndex = [&](Value index, ArrayRef<int64_t> shape) {
-    return rewriter.create<affine::AffineDelinearizeIndexOp>(loc, index, shape)
+    return affine::AffineDelinearizeIndexOp::create(rewriter, loc, index, shape)
         .getMultiIndex();
   };
 
@@ -143,8 +142,8 @@ distributeLinalgCopyToThreads(RewriterBase &rewriter, linalg::CopyOp copy,
         getSubgroupStoreBaseIndex(subgroupId, inductionVar);
     ValueRange delinearizedLocalIndices =
         delinearizeIndex(linearizedBaseIndices, localType.getShape());
-    rewriter.create<IREE::GPU::GlobalLoadDMAOp>(
-        loc, copy.getOperand(0), delinearizedGlobalIndices,
+    IREE::GPU::GlobalLoadDMAOp::create(
+        rewriter, loc, copy.getOperand(0), delinearizedGlobalIndices,
         copy.getOutputs()[0], delinearizedLocalIndices);
   }
 
@@ -159,15 +158,15 @@ static LogicalResult isEligibleForGlobalDMA(linalg::CopyOp copy) {
   auto targetType = cast<MemRefType>(copy.getOutputs().front().getType());
 
   if (!getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copy)) {
-    LDBG("-- Op: " << *copy);
-    LDBG("-- does not have `use_global_load_dma` attribute, skipping.");
+    LDBG() << "-- Op: " << *copy;
+    LDBG() << "-- does not have `use_global_load_dma` attribute, skipping.";
     return failure();
   }
 
   if (!hasGlobalMemoryAddressSpace(sourceType) ||
       !hasSharedMemoryAddressSpace(targetType)) {
-    LDBG("-- Op: " << *copy);
-    LDBG("-- incompatible source or target memory address space.");
+    LDBG() << "-- Op: " << *copy;
+    LDBG() << "-- incompatible source or target memory address space.";
     return failure();
   }
 
@@ -202,7 +201,7 @@ struct GPULowerToGlobalLoadsPass final
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
 
     std::optional<SmallVector<int64_t>> workgroupSize =
         mlir::iree_compiler::getWorkgroupSize(funcOp);

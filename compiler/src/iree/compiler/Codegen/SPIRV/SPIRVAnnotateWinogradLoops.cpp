@@ -19,11 +19,10 @@ class SPIRVAnnotateWinogradLoopsPass final
     : public impl::SPIRVAnnotateWinogradLoopsPassBase<
           SPIRVAnnotateWinogradLoopsPass> {
 public:
-  using impl::SPIRVAnnotateWinogradLoopsPassBase<
-      SPIRVAnnotateWinogradLoopsPass>::SPIRVAnnotateWinogradLoopsPassBase;
+  using Base::Base;
 
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     SmallVector<scf::ForOp> forOps;
     funcOp.walk([&](scf::ForOp forOp) {
       if (!isTiledAndDistributedLoop(forOp))

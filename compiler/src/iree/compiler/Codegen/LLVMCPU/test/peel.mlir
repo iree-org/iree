@@ -1,6 +1,6 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-peel))" -split-input-file %s | FileCheck %s
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[65, 65, 0], [8, 32, 0], [0, 0, 16]]>
+#config = #iree_cpu.lowering_config<distribution = [65, 65, 0], vector_common_parallel = [8, 32, 0], vector_reduction = [0, 0, 16]>
 func.func @peel_static_matmul(%arg0: tensor<128x49xf32>, %arg1: tensor<49x512xf32>, %arg2: tensor<128x512xf32>) -> tensor<128x512xf32> {
   %c16 = arith.constant 16 : index
   %c49 = arith.constant 49 : index
@@ -75,7 +75,7 @@ func.func @peel_static_matmul(%arg0: tensor<128x49xf32>, %arg1: tensor<49x512xf3
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[4, 64], [1, 16]]>
+#config = #iree_cpu.lowering_config<distribution = [4, 64], vector_common_parallel = [1, 16]>
 #map = affine_map<(d0)[s0] -> (-d0 + s0, 16)>
 #map1 = affine_map<(d0) -> (d0 * 16)>
 module {

@@ -80,7 +80,7 @@ static void applyFastSlowPathConversion(mlir::FunctionOpInterface funcOp) {
 
   // Build the condition for the scf.if op: all pad sizes are zero.
   Location loc = padOp.getLoc();
-  Value cstZero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  Value cstZero = arith::ConstantIndexOp::create(rewriter, loc, 0);
   SmallVector<Value> eqZeroCmpVals;
   for (OpFoldResult pad : llvm::concat<OpFoldResult>(lowPads, highPads)) {
     if (auto padValue = dyn_cast<Value>(pad)) {
@@ -90,14 +90,14 @@ static void applyFastSlowPathConversion(mlir::FunctionOpInterface funcOp) {
       padSizeOps.insert(padValue.getDefiningOp());
     }
     if (!isZero(pad)) {
-      eqZeroCmpVals.push_back(rewriter.create<arith::CmpIOp>(
-          loc, arith::CmpIPredicate::eq,
+      eqZeroCmpVals.push_back(arith::CmpIOp::create(
+          rewriter, loc, arith::CmpIPredicate::eq,
           getValueOrCreateConstantIndexOp(rewriter, loc, pad), cstZero));
     }
   }
   Value ifCond = eqZeroCmpVals.front();
   for (Value cmp : llvm::ArrayRef(eqZeroCmpVals).drop_front())
-    ifCond = rewriter.create<arith::AndIOp>(loc, ifCond, cmp);
+    ifCond = arith::AndIOp::create(rewriter, loc, ifCond, cmp);
 
   SmallVector<Operation *> cloneOps;
   for (Operation *op : allOps) {
@@ -118,15 +118,15 @@ static void applyFastSlowPathConversion(mlir::FunctionOpInterface funcOp) {
         builder.clone(*op, bvm);
       }
     }
-    builder.create<scf::YieldOp>(loc);
+    scf::YieldOp::create(builder, loc);
   };
   auto elseBuilder = [&](OpBuilder &builder, Location loc) {
     IRMapping bvm;
     for (Operation *op : cloneOps)
       builder.clone(*op, bvm);
-    builder.create<scf::YieldOp>(loc);
+    scf::YieldOp::create(builder, loc);
   };
-  rewriter.create<scf::IfOp>(padOp.getLoc(), ifCond, thenBuilder, elseBuilder);
+  scf::IfOp::create(rewriter, padOp.getLoc(), ifCond, thenBuilder, elseBuilder);
 
   // All of these ops have been cloned to both regions. Erease them now.
   for (Operation *op : llvm::reverse(cloneOps))

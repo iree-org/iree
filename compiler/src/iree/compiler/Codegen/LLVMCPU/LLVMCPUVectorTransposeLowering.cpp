@@ -53,7 +53,7 @@ public:
 
 void LLVMCPUVectorTransposeLoweringPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   auto vectorTransformOptions =
       vector::VectorTransformsOptions().setVectorTransposeLowering(

@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -50,7 +49,7 @@ emitNormalizedLoopBounds(RewriterBase &rewriter, Location loc, Block *body,
   SmallVector<OpFoldResult> newLbs;
   SmallVector<OpFoldResult> newUbs;
   SmallVector<OpFoldResult> newSteps;
-  for (auto &&[iv, lb, ub, step] : llvm::zip(ivs, lbs, ubs, steps)) {
+  for (auto [iv, lb, ub, step] : llvm::zip_equal(ivs, lbs, ubs, steps)) {
     std::optional<int64_t> stepInt = getConstantIntValue(step);
     // Bail out on negative steps.
     if (!stepInt || stepInt.value() <= 0) {
@@ -154,8 +153,8 @@ LogicalResult normalizeLoopBounds(RewriterBase &rewriter,
   }
 
   rewriter.setInsertionPointAfter(forallOp);
-  auto newLoop = rewriter.create<scf::ForallOp>(
-      rewriter.getUnknownLoc(), newLoopParams->lowerBounds,
+  auto newLoop = scf::ForallOp::create(
+      rewriter, rewriter.getUnknownLoc(), newLoopParams->lowerBounds,
       newLoopParams->upperBounds, newLoopParams->steps, forallOp.getOutputs(),
       forallOp.getMapping());
   rewriter.eraseOp(newLoop.getTerminator());
@@ -169,8 +168,7 @@ LogicalResult normalizeLoopBounds(RewriterBase &rewriter,
 namespace {
 struct NormalizeLoopBoundsPass final
     : impl::NormalizeLoopBoundsPassBase<NormalizeLoopBoundsPass> {
-  using impl::NormalizeLoopBoundsPassBase<
-      NormalizeLoopBoundsPass>::NormalizeLoopBoundsPassBase;
+  using Base::Base;
 
   void runOnOperation() override {
     Operation *op = getOperation();

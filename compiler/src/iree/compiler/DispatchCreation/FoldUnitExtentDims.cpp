@@ -11,6 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
@@ -41,79 +42,6 @@ namespace mlir::iree_compiler::DispatchCreation {
 //===----------------------------------------------------------------------===//
 
 namespace {
-struct FoldAttentionMaskUnitDim final
-    : public OpRewritePattern<IREE::LinalgExt::AttentionOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(IREE::LinalgExt::AttentionOp attentionOp,
-                                PatternRewriter &rewriter) const override {
-    TypedValue<ShapedType> mask = attentionOp.getMask();
-    if (!mask) {
-      return failure();
-    }
-    auto detail = IREE::LinalgExt::AttentionOpDetail::get(
-                      attentionOp.getQueryMap(), attentionOp.getKeyMap(),
-                      attentionOp.getValueMap(), attentionOp.getOutputMap())
-                      .value();
-    auto mDims = detail.getMDims();
-    auto maskShape = mask.getType().getShape();
-    AffineMap maskMap = attentionOp.getMaskMap().value();
-    if (!mDims.size()) {
-      return failure();
-    }
-
-    llvm::DenseMap<int64_t, int64_t> loopToMaskDim;
-    for (auto [i, result] : llvm::enumerate(maskMap.getResults())) {
-      loopToMaskDim[cast<AffineDimExpr>(result).getPosition()] = i;
-    }
-
-    // Find unit M dims in the mask map.
-    llvm::DenseSet<int64_t> loopsToDrop;
-    for (int64_t dim : mDims) {
-      auto it = loopToMaskDim.find(dim);
-      if (it != loopToMaskDim.end() && maskShape[it->second] == 1) {
-        loopsToDrop.insert(dim);
-      }
-    }
-    if (loopsToDrop.size() == 0) {
-      return rewriter.notifyMatchFailure(attentionOp, "no unit M dim");
-    }
-
-    // Compute the reassociation to remove unit dims and the new shape.
-    ReassociationIndices indices;
-    SmallVector<ReassociationIndices> reassoc;
-    SmallVector<int64_t> resultShape;
-    llvm::SmallBitVector resultsToDrop(maskShape.size());
-    for (auto [i, size] : llvm::enumerate(maskShape)) {
-      int64_t loop = maskMap.getDimPosition(i);
-      if (!loopsToDrop.contains(loop)) {
-        resultShape.push_back(size);
-        if (indices.size())
-          reassoc.emplace_back(std::move(indices));
-      } else {
-        resultsToDrop.set(i);
-      }
-      indices.push_back(i);
-    }
-    if (indices.size()) {
-      reassoc.emplace_back(std::move(indices));
-    }
-
-    auto loc = attentionOp.getLoc();
-    auto collapseOp = rewriter.create<tensor::CollapseShapeOp>(
-        loc, mask.getType().clone(resultShape), mask, reassoc);
-
-    rewriter.modifyOpInPlace(attentionOp, [&]() {
-      attentionOp.getMaskMutable().assign(collapseOp);
-      AffineMap newMap = maskMap.dropResults(resultsToDrop);
-      auto newMaps = attentionOp.getIndexingMapsArray();
-      newMaps[attentionOp.getMaskMutable().begin()->getOperandNumber()] =
-          newMap;
-      attentionOp.setIndexingMapsAttr(rewriter.getAffineMapArrayAttr(newMaps));
-    });
-    return success();
-  }
-};
-
 /// Simplify collapse_shape(expand_shape) by removing unneeded unit dimensions
 /// that get expanded and subsequently collapsed.
 ///
@@ -159,9 +87,10 @@ struct DropUnitDimsFromCollapseOfExpand
           continue;
         }
 
-        // If we are collapsing multiple unit dims together, at least 1 must be
-        // kept (prefer the first).
-        if (outShape[outDim] == 1 && innerIdx != 0) {
+        // If outShape[outDim] == 1, we must preserve 1 unit dim,
+        // so we drop the first. If the first is the only unit dim,
+        // we can't drop it anyway.
+        if (outShape[outDim] == 1 && innerIdx == 0) {
           continue;
         }
         toDrop.insert(inDim);
@@ -171,8 +100,13 @@ struct DropUnitDimsFromCollapseOfExpand
     // Remove dimensions from `toDrop` that weren't introduced by the
     // `expandOp` op.
     const auto expandReassoc = expandOp.getReassociationIndices();
-    for (const auto &[inDim, indices] : llvm::enumerate(expandReassoc)) {
-      if (indices.size() == 1) {
+    for (const auto &indices : expandReassoc) {
+      // If all of indices are in `toDrop`, we must preserve at least one
+      // to avoid an empty reassociation map during expansion.
+      // This can happen when outShape does not have a unit dimension
+      // corresponding to the unit dimensions being dropped here.
+      if (llvm::all_of(indices,
+                       [&](int64_t idx) { return toDrop.contains(idx); })) {
         toDrop.erase(indices[0]);
       }
     }
@@ -251,8 +185,8 @@ struct DropUnitDimsFromCollapseOfExpand
     Value newExpanded = expandOp.getSrc();
     if (!llvm::all_of(newExpandReassoc,
                       llvm::hasSingleElement<ReassociationIndicesRef>)) {
-      newExpanded = rewriter.create<tensor::ExpandShapeOp>(
-          expandOp.getLoc(),
+      newExpanded = tensor::ExpandShapeOp::create(
+          rewriter, expandOp.getLoc(),
           RankedTensorType::get(newInterShape,
                                 expandOp.getType().getElementType()),
           expandOp.getSrc(), newExpandReassoc, newInterSizes);
@@ -261,9 +195,9 @@ struct DropUnitDimsFromCollapseOfExpand
     Value result = newExpanded;
     if (!llvm::all_of(newCollapseReassoc,
                       llvm::hasSingleElement<ReassociationIndicesRef>)) {
-      result = rewriter.create<tensor::CollapseShapeOp>(
-          collapseOp.getLoc(), collapseOp.getType(), newExpanded,
-          newCollapseReassoc);
+      result = tensor::CollapseShapeOp::create(rewriter, collapseOp.getLoc(),
+                                               collapseOp.getType(),
+                                               newExpanded, newCollapseReassoc);
     }
     rewriter.replaceOp(collapseOp, result);
     return success();
@@ -296,9 +230,8 @@ populatefoldUnitDimsPatterns(RewritePatternSet &foldUnitDimsPatterns) {
   IREE::LinalgExt::populateFoldUnitExtentDimsPatterns(foldUnitDimsPatterns,
                                                       options);
   linalg::populateMoveInitOperandsToInputPattern(foldUnitDimsPatterns);
-  foldUnitDimsPatterns
-      .insert<FoldAttentionMaskUnitDim, DropUnitDimsFromCollapseOfExpand>(
-          foldUnitDimsPatterns.getContext());
+  foldUnitDimsPatterns.insert<DropUnitDimsFromCollapseOfExpand>(
+      foldUnitDimsPatterns.getContext());
 }
 
 static LogicalResult
@@ -326,8 +259,16 @@ foldUnitDimsOnGlobal(IRRewriter &rewriter, IREE::Util::GlobalOpInterface global,
                                                       newGlobalType);
           })
           .Case<IREE::Stream::NamedParameterAttr>(
+              // TODO: Remove this case once frontends have caught up, we should
+              // not have stream.parameter.named at this level.
               [&](IREE::Stream::NamedParameterAttr attr) {
                 return IREE::Stream::NamedParameterAttr::get(
+                    rewriter.getContext(), newGlobalType, attr.getScope(),
+                    attr.getKey(), attr.getConfig());
+              })
+          .Case<IREE::Flow::NamedParameterAttr>(
+              [&](IREE::Flow::NamedParameterAttr attr) {
+                return IREE::Flow::NamedParameterAttr::get(
                     rewriter.getContext(), newGlobalType, attr.getScope(),
                     attr.getKey(), attr.getConfig());
               })
@@ -358,8 +299,8 @@ foldUnitDimsOnGlobal(IRRewriter &rewriter, IREE::Util::GlobalOpInterface global,
   }
   for (auto store : storeOps) {
     rewriter.setInsertionPoint(store);
-    Value collapse = rewriter.create<tensor::CollapseShapeOp>(
-        store.getLoc(), newGlobalType, store->getOperand(0),
+    Value collapse = tensor::CollapseShapeOp::create(
+        rewriter, store.getLoc(), newGlobalType, store->getOperand(0),
         expandShapeReInds.value());
     auto newStore =
         clone(rewriter, store, store->getResultTypes(), store->getOperands());
@@ -386,7 +327,7 @@ struct FoldUnitExtentDimsForFuncPass final
 } // namespace
 
 void FoldUnitExtentDimsPass::runOnOperation() {
-  auto moduleOp = getOperation();
+  mlir::ModuleOp moduleOp = getOperation();
   MLIRContext *context = &getContext();
 
   SymbolTable moduleSymbols(moduleOp);

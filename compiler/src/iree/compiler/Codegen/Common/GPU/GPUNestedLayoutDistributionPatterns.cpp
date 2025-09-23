@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Utils/Permutation.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
@@ -53,7 +54,7 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
   ArrayRef<int64_t> batchOffsets(offsets.begin(), rank);
   ArrayRef<int64_t> outerVectorOffsets(offsets.begin() + rank, rank);
 
-  SmallVector<Value> slicedIndices(indices.begin(), indices.end());
+  SmallVector<Value> slicedIndices(indices);
   for (const auto &[i, dim] : llvm::enumerate(permutationMap.getResults())) {
     // Broadcasted dimension offsets can be used as-is; the read index is
     // invariant of the thread in such cases (and illegal for writes).
@@ -65,8 +66,8 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
     int64_t elementCount = vectorLayout.getElementTile()[i];
     Location loc = offset.getLoc();
     SmallVector<Value> ids = {
-        warpIndices[i], b.create<arith::ConstantIndexOp>(loc, batchOffsets[i]),
-        b.create<arith::ConstantIndexOp>(loc, outerVectorOffsets[i]),
+        warpIndices[i], arith::ConstantIndexOp::create(b, loc, batchOffsets[i]),
+        arith::ConstantIndexOp::create(b, loc, outerVectorOffsets[i]),
         threadIndices[i], offset};
     // The order in which a vector dimension is "tiled" is
     // subgroups -> batches -> outer vectors -> threads -> elements
@@ -82,7 +83,7 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
     if (std::optional<int64_t> offsetConst = getConstantIntValue(offset))
       disjoint = *offsetConst < elementCount;
     slicedIndices[pos] =
-        b.create<affine::AffineLinearizeIndexOp>(loc, ids, sizes, disjoint);
+        affine::AffineLinearizeIndexOp::create(b, loc, ids, sizes, disjoint);
   }
   return slicedIndices;
 }
@@ -140,7 +141,7 @@ static VectorValue getDeinterleavedPackedForm(PatternRewriter &rewriter,
   VectorType interleavedPackedType =
       VectorType::get(interleavedPackedShape, val.getType().getElementType());
   VectorValue interleavedPackedShaped =
-      rewriter.create<vector::ShapeCastOp>(loc, interleavedPackedType, val);
+      vector::ShapeCastOp::create(rewriter, loc, interleavedPackedType, val);
 
   // 0 1 2 3 4 5 ---> 0 2 4 1 3 5
   SmallVector<int64_t> perm;
@@ -150,8 +151,8 @@ static VectorValue getDeinterleavedPackedForm(PatternRewriter &rewriter,
       perm.push_back(tileGroupIdx * layout.getRank() + undistributedDim);
     }
   }
-  return rewriter.create<vector::TransposeOp>(loc, interleavedPackedShaped,
-                                              perm);
+  return vector::TransposeOp::create(rewriter, loc, interleavedPackedShaped,
+                                     perm);
 }
 
 /// Given a distributed vector that has B1XB2xO1XO2xE1XE2,
@@ -174,8 +175,8 @@ static VectorValue getDeinterleavedUnpackedForm(PatternRewriter &rewriter,
   }
   VectorType unpackedType = VectorType::get(
       unpackedShape, deinterleavedPacked.getType().getElementType());
-  return rewriter.create<vector::ShapeCastOp>(loc, unpackedType,
-                                              deinterleavedPacked);
+  return vector::ShapeCastOp::create(rewriter, loc, unpackedType,
+                                     deinterleavedPacked);
 }
 
 /// Given a distributed vector that has [B1xO1xE1]x[B2xO2xE2],
@@ -196,7 +197,7 @@ static VectorValue getInterleavedPackedForm(PatternRewriter &rewriter,
   VectorType nonInterleavedPackedType = VectorType::get(
       nonInterleavedPackedShape, val.getType().getElementType());
   VectorValue nonInterleavedPackedShaped =
-      rewriter.create<vector::ShapeCastOp>(loc, nonInterleavedPackedType, val);
+      vector::ShapeCastOp::create(rewriter, loc, nonInterleavedPackedType, val);
   // 0 1 2 3 4 5 ---> 0 3 1 4 2 5
   SmallVector<int64_t> perm;
   perm.reserve(layout.getRank() * 3);
@@ -205,8 +206,8 @@ static VectorValue getInterleavedPackedForm(PatternRewriter &rewriter,
       perm.push_back(tileGroupIdx + 3 * undistributedDim);
     }
   }
-  return rewriter.create<vector::TransposeOp>(loc, nonInterleavedPackedShaped,
-                                              perm);
+  return vector::TransposeOp::create(rewriter, loc, nonInterleavedPackedShaped,
+                                     perm);
 }
 
 /// Computes the warp and thread indices for the given vector layout from a
@@ -236,8 +237,9 @@ static VectorValue getSlicedPermutedMask(PatternRewriter &rewriter,
   SmallVector<int64_t> sliceMaskOffsets =
       getDistributedTransferOffsetsFromNestedLayout(offsets, vectorLayout);
   SmallVector<int64_t> strides(vectorLayout.getElementTile().size(), 1);
-  VectorValue slicedMask = rewriter.create<vector::ExtractStridedSliceOp>(
-      loc, mask, sliceMaskOffsets, vectorLayout.getElementTile(), strides);
+  VectorValue slicedMask = vector::ExtractStridedSliceOp::create(
+      rewriter, loc, mask, sliceMaskOffsets, vectorLayout.getElementTile(),
+      strides);
   return slicedMask;
 }
 
@@ -248,8 +250,9 @@ static VectorValue getSlicedIndexVec(PatternRewriter &rewriter, Location loc,
   SmallVector<int64_t> sliceMaskOffsets =
       getDistributedTransferOffsetsFromNestedLayout(offsets, vectorLayout);
   SmallVector<int64_t> strides(vectorLayout.getElementTile().size(), 1);
-  VectorValue slicedIndexVec = rewriter.create<vector::ExtractStridedSliceOp>(
-      loc, indexVec, sliceMaskOffsets, vectorLayout.getElementTile(), strides);
+  VectorValue slicedIndexVec = vector::ExtractStridedSliceOp::create(
+      rewriter, loc, indexVec, sliceMaskOffsets, vectorLayout.getElementTile(),
+      strides);
   return slicedIndexVec;
 }
 
@@ -271,15 +274,26 @@ static VectorValue projectVector(RewriterBase &rewriter, Location loc,
     slicedDims.erase(iterSpacePos);
   }
 
-  SmallVector<int64_t> transposePerm(slicedDims.begin(), slicedDims.end());
+  auto transposePerm = llvm::to_vector_of<int64_t>(slicedDims);
   transposePerm.append(remaningDims);
   auto transposed =
-      rewriter.create<vector::TransposeOp>(loc, val, transposePerm);
+      vector::TransposeOp::create(rewriter, loc, val, transposePerm);
 
   SmallVector<int64_t> extractedPos(slicedDims.size(), 0);
   auto sliced =
-      rewriter.create<vector::ExtractOp>(loc, transposed, extractedPos);
+      vector::ExtractOp::create(rewriter, loc, transposed, extractedPos);
   return cast<VectorValue>(sliced.getResult());
+}
+
+static VectorValue extractSliceAsVector(RewriterBase &rewriter, Location loc,
+                                        Value src, ArrayRef<int64_t> offsets) {
+  Value slice = vector::ExtractOp::create(rewriter, loc, src, offsets);
+  // Promote the slicedVector to 0-d vector if it is a scalar.
+  if (!isa<VectorType>(slice.getType())) {
+    auto promotedType = VectorType::get({}, getElementTypeOrSelf(slice));
+    slice = vector::BroadcastOp::create(rewriter, loc, promotedType, slice);
+  }
+  return cast<VectorValue>(slice);
 }
 
 namespace {
@@ -337,8 +351,9 @@ struct DistributeTransferRead final
 
     // Initialize the full distributed vector for unrolling the batch/outer
     // vector dimensions.
-    Value zero = rewriter.create<arith::ConstantOp>(
-        readOp.getLoc(), vectorType, rewriter.getZeroAttr(vectorType));
+    Value zero =
+        arith::ConstantOp::create(rewriter, readOp.getLoc(), vectorType,
+                                  rewriter.getZeroAttr(vectorType));
     VectorValue acc = cast<VectorValue>(zero);
 
     SmallVector<Value> warpIndices, threadIndices;
@@ -378,10 +393,10 @@ struct DistributeTransferRead final
                                            maskOffsets, maskLayout, mask);
       }
 
-      VectorValue slicedRead = rewriter.create<vector::TransferReadOp>(
-          readOp.getLoc(), innerVectorType, readOp.getBase(), slicedIndices,
-          readOp.getPermutationMapAttr(), readOp.getPadding(), slicedMask,
-          readOp.getInBoundsAttr());
+      VectorValue slicedRead = vector::TransferReadOp::create(
+          rewriter, readOp.getLoc(), innerVectorType, readOp.getBase(),
+          slicedIndices, readOp.getPermutationMapAttr(), readOp.getPadding(),
+          slicedMask, readOp.getInBoundsAttr());
 
       if (acc.getType().getRank() == 0) {
         // TODO: This should really be a folding pattern in
@@ -389,8 +404,8 @@ struct DistributeTransferRead final
         // support 0-d vectors...
         acc = slicedRead;
       } else {
-        acc = rewriter.create<vector::InsertStridedSliceOp>(
-            readOp.getLoc(), slicedRead, acc, offsets, strides);
+        acc = vector::InsertStridedSliceOp::create(
+            rewriter, readOp.getLoc(), slicedRead, acc, offsets, strides);
       }
     }
 
@@ -476,16 +491,9 @@ struct DistributeTransferWrite final
       // dimensions are either unrolled or distributed such that this is a
       // contiguous slice.
       ArrayRef<int64_t> offsetArray(offsets);
-      Value slicedVector = rewriter.create<vector::ExtractOp>(
-          writeOp.getLoc(), distributedVector,
-          offsetArray.take_front(rank * 2));
-      // Promote the slicedVector to 0-d vector if it is a scalar.
-      if (!isa<VectorType>(slicedVector.getType())) {
-        auto promotedType =
-            VectorType::get({}, getElementTypeOrSelf(slicedVector));
-        slicedVector = rewriter.create<vector::BroadcastOp>(
-            writeOp.getLoc(), promotedType, slicedVector);
-      }
+      VectorValue slicedVector =
+          extractSliceAsVector(rewriter, writeOp.getLoc(), distributedVector,
+                               offsetArray.take_front(rank * 2));
 
       VectorValue slicedMask = nullptr;
       if (mask) {
@@ -497,10 +505,10 @@ struct DistributeTransferWrite final
                                            maskOffsets, maskLayout, mask);
       }
 
-      rewriter.create<vector::TransferWriteOp>(
-          writeOp.getLoc(), slicedVector, writeOp.getBase(), slicedIndices,
-          writeOp.getPermutationMapAttr(), slicedMask,
-          writeOp.getInBoundsAttr());
+      vector::TransferWriteOp::create(rewriter, writeOp.getLoc(), slicedVector,
+                                      writeOp.getBase(), slicedIndices,
+                                      writeOp.getPermutationMapAttr(),
+                                      slicedMask, writeOp.getInBoundsAttr());
     }
 
     rewriter.eraseOp(writeOp);
@@ -579,8 +587,9 @@ struct DistributeTransferGather final
 
     // Initialize the full distributed vector for unrolling the batch/outer
     // vector dimensions.
-    Value zero = rewriter.create<arith::ConstantOp>(
-        gatherOp.getLoc(), vectorType, rewriter.getZeroAttr(vectorType));
+    Value zero =
+        arith::ConstantOp::create(rewriter, gatherOp.getLoc(), vectorType,
+                                  rewriter.getZeroAttr(vectorType));
     VectorValue acc = cast<VectorValue>(zero);
 
     SmallVector<Value> warpIndices, threadIndices;
@@ -650,12 +659,11 @@ struct DistributeTransferGather final
                                            maskOffsets, maskLayout, mask);
       }
 
-      VectorValue slicedGather =
-          rewriter.create<IREE::VectorExt::TransferGatherOp>(
-              gatherOp.getLoc(), innerVectorType, gatherOp.getBase(),
-              slicedIndices, slicedIndexVecs, gatherOp.getIndexed(),
-              gatherOp.getIndexedMaps(), gatherOp.getPermutationMapAttr(),
-              gatherOp.getPadding(), slicedMask, gatherOp.getInBoundsAttr());
+      VectorValue slicedGather = IREE::VectorExt::TransferGatherOp::create(
+          rewriter, gatherOp.getLoc(), innerVectorType, gatherOp.getBase(),
+          slicedIndices, slicedIndexVecs, gatherOp.getIndexed(),
+          gatherOp.getIndexedMaps(), gatherOp.getPermutationMapAttr(),
+          gatherOp.getPadding(), slicedMask, gatherOp.getInBoundsAttr());
 
       if (acc.getType().getRank() == 0) {
         // TODO: This should really be a folding pattern in
@@ -663,12 +671,110 @@ struct DistributeTransferGather final
         // support 0-d vectors...
         acc = slicedGather;
       } else {
-        acc = rewriter.create<vector::InsertStridedSliceOp>(
-            gatherOp.getLoc(), slicedGather, acc, offsets, strides);
+        acc = vector::InsertStridedSliceOp::create(
+            rewriter, gatherOp.getLoc(), slicedGather, acc, offsets, strides);
       }
     }
 
     replaceOpWithDistributedValues(rewriter, gatherOp, acc);
+    return success();
+  }
+
+  Value threadId;
+  int64_t subgroupSize;
+};
+
+/// Pattern to distribute `iree_linalg_ext.map_scatter` ops with nested layouts.
+/// Only the input is distributed, since the output is never a vector. The
+/// distribution of the input is similar to that of a vector.transfer_write.
+struct DistributeMapScatter final
+    : OpDistributionPattern<IREE::LinalgExt::MapScatterOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  DistributeMapScatter(MLIRContext *context, Value threadId,
+                       int64_t subgroupSize)
+      : OpDistributionPattern(context), threadId(threadId),
+        subgroupSize(subgroupSize) {}
+
+  LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    auto input = dyn_cast<VectorValue>(mapScatterOp.getInput());
+    if (!input) {
+      return rewriter.notifyMatchFailure(mapScatterOp, "input is not a vector");
+    }
+    NestedLayoutAttr vectorLayout =
+        dyn_cast<NestedLayoutAttr>(signature[input]);
+    if (!vectorLayout) {
+      return rewriter.notifyMatchFailure(mapScatterOp,
+                                         "non-nested map_scatter layout");
+    }
+    if (!isa<MemRefType>(mapScatterOp.getOutput().getType())) {
+      return rewriter.notifyMatchFailure(mapScatterOp,
+                                         "distribution expects memrefs");
+    }
+    SmallVector<Value> warpIndices, threadIndices;
+    if (failed(populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
+                                            vectorLayout, warpIndices,
+                                            threadIndices))) {
+      return rewriter.notifyMatchFailure(
+          mapScatterOp, "warp or thread tiles have overlapping strides");
+    }
+
+    Value distributedVector = getDistributed(rewriter, input, vectorLayout);
+
+    Location loc = mapScatterOp.getLoc();
+    Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
+    SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
+    for (auto [idx, offsets] :
+         llvm::enumerate(StaticTileOffsetRange(distShape, tileShape))) {
+      // Extract the "element vector" from the inner most dimensions. All outer
+      // dimensions are either unrolled or distributed such that this is a
+      // contiguous slice.
+      ArrayRef<int64_t> offsetArray(offsets);
+      VectorValue distributedInput = extractSliceAsVector(
+          rewriter, loc, distributedVector,
+          offsetArray.take_front(vectorLayout.getRank() * 2));
+
+      // Clone the map_scatter op with the "element vector" as the input, and
+      // adjust the transformation region to account for the distributed
+      // offsets.
+      AffineMap permutationMap =
+          rewriter.getMultiDimIdentityMap(input.getType().getRank());
+      SmallVector<Value> indices(input.getType().getRank(), zero);
+      SmallVector<Value> distributedOffsets =
+          getTransferIndicesFromNestedLayout(rewriter, indices, offsets,
+                                             vectorLayout, permutationMap,
+                                             warpIndices, threadIndices);
+      IREE::LinalgExt::MapScatterOp distributedMapScatter =
+          clone(rewriter, mapScatterOp, mapScatterOp.getResultTypes(),
+                {distributedInput, mapScatterOp.getOutput()});
+      int64_t sliceRank = distributedInput.getType().getRank();
+      int64_t rankDiff = input.getType().getRank() - sliceRank;
+      // Add the distributed offsets in the map_scatter transformation body.
+      auto transformationBuilder = [&](ArrayRef<BlockArgument> newIndices) {
+        SmallVector<Value> replacementIndices(distributedOffsets);
+        for (auto [i, replacementIdx] : llvm::enumerate(replacementIndices)) {
+          // Rank-reduced dimensions can be directly replaced by the distributed
+          // index, since their size is 1 in the new map_scatter input.
+          if (i < rankDiff) {
+            continue;
+          }
+          // Otherwise, the dimension is a contiguous element dimension, so
+          // the mapping is achieved by adding the corresponding block argument
+          // to the sliced index.
+          BlockArgument newTransformationIdx = newIndices[i - rankDiff];
+          replacementIdx = arith::AddIOp::create(
+              rewriter, loc, newTransformationIdx, replacementIdx);
+        }
+        return replacementIndices;
+      };
+      distributedMapScatter.insertTransformationAtStart(
+          rewriter, transformationBuilder, sliceRank);
+    }
+
+    rewriter.eraseOp(mapScatterOp);
     return success();
   }
 
@@ -699,16 +805,16 @@ static VectorValue broadcastToShape(RewriterBase &rewriter, Value source,
 
   VectorType broadcastedVecType =
       VectorType::get(leadingBroadcastShape, getElementTypeOrSelf(source));
-  VectorValue broadcasted = rewriter.create<vector::BroadcastOp>(
-      source.getLoc(), broadcastedVecType, source);
+  VectorValue broadcasted = vector::BroadcastOp::create(
+      rewriter, source.getLoc(), broadcastedVecType, source);
 
   // Transpose the broadcasted dims to the right place.
   SmallVector<int64_t> inversePerm = invertPermutationVector(perm);
   if (isIdentityPermutation(inversePerm)) {
     return broadcasted;
   }
-  return rewriter.create<vector::TransposeOp>(source.getLoc(), broadcasted,
-                                              inversePerm);
+  return vector::TransposeOp::create(rewriter, source.getLoc(), broadcasted,
+                                     inversePerm);
 }
 
 struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
@@ -844,7 +950,7 @@ struct DistributeMultiReduction final
           loc, rewriter, multiReduceOp.getKind(), disSrc.getType());
 
       disSrc = cast<VectorValue>(
-          rewriter.create<arith::SelectOp>(loc, mask, disSrc, passThruSrc)
+          arith::SelectOp::create(rewriter, loc, mask, disSrc, passThruSrc)
               .getResult());
     }
 
@@ -862,8 +968,8 @@ struct DistributeMultiReduction final
     }
     Value localInit = getCombiningIdentityValue(
         loc, rewriter, multiReduceOp.getKind(), disAcc.getType());
-    Value localReduction = rewriter.create<vector::MultiDimReductionOp>(
-        loc, disSrc, localInit, distributedReductionMask,
+    Value localReduction = vector::MultiDimReductionOp::create(
+        rewriter, loc, disSrc, localInit, distributedReductionMask,
         multiReduceOp.getKind());
 
     // TODO: As per current upstream lowering implementations, there is no point
@@ -879,7 +985,7 @@ struct DistributeMultiReduction final
       // Broadcast scalar accumulator to vector.
       VectorType vecType = VectorType::get(ArrayRef{int64_t(1)}, elemTy);
       locallyReduced =
-          rewriter.create<vector::BroadcastOp>(loc, vecType, localReduction);
+          vector::BroadcastOp::create(rewriter, loc, vecType, localReduction);
     }
 
     assert(locallyReduced && "result should have been a vector");
@@ -895,8 +1001,8 @@ struct DistributeMultiReduction final
       int64_t numElements = shaped.getNumElements();
       SmallVector<int64_t> flatShape(1, numElements);
       VectorType flatVecType = VectorType::get(flatShape, elemTy);
-      VectorValue flat = rewriter.create<vector::ShapeCastOp>(loc, flatVecType,
-                                                              locallyReduced);
+      VectorValue flat = vector::ShapeCastOp::create(rewriter, loc, flatVecType,
+                                                     locallyReduced);
 
       // Do inter-thread/warp reduce.
       FailureOr<VectorValue> threadReducedFlat = doThreadReduction(
@@ -907,15 +1013,15 @@ struct DistributeMultiReduction final
 
       // Do reduction against accumulator, which needs to be done after thread
       // reduction.
-      threadReduced = rewriter.create<vector::ShapeCastOp>(
-          loc, shaped, threadReducedFlat.value());
+      threadReduced = vector::ShapeCastOp::create(rewriter, loc, shaped,
+                                                  threadReducedFlat.value());
     }
 
     if (!accVector) {
       // Broadcast the scalar (e.g., f32) to a vector type (e.g., vector<f32>)
       // because the following implementation requires the operand to be a
       // vector.
-      disAcc = rewriter.create<vector::BroadcastOp>(loc, shaped, disAcc);
+      disAcc = vector::BroadcastOp::create(rewriter, loc, shaped, disAcc);
     }
 
     bool hasSubgroupReductions =
@@ -933,8 +1039,8 @@ struct DistributeMultiReduction final
       if (resVector) {
         replaceOpWithDistributedValues(rewriter, multiReduceOp, accReduced);
       } else {
-        Value accReducedVal = rewriter.create<vector::ExtractOp>(
-            loc, accReduction, ArrayRef{int64_t(0)});
+        Value accReducedVal = vector::ExtractOp::create(
+            rewriter, loc, accReduction, ArrayRef{int64_t(0)});
         replaceOpWithDistributedValues(rewriter, multiReduceOp, accReducedVal);
       }
       return success();
@@ -956,12 +1062,12 @@ struct DistributeMultiReduction final
     int64_t numElements = flatVecType.getNumElements();
     Location loc = flat.getLoc();
 
-    auto constOp = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(flatVecType));
+    auto constOp = arith::ConstantOp::create(rewriter, loc,
+                                             rewriter.getZeroAttr(flatVecType));
     auto res = llvm::cast<VectorValue>(constOp.getResult());
 
     for (unsigned i = 0; i < numElements; ++i) {
-      Value extracted = rewriter.create<vector::ExtractOp>(loc, flat, i);
+      Value extracted = vector::ExtractOp::create(rewriter, loc, flat, i);
       // Reduce across all reduction dimensions 1-by-1.
       for (unsigned i = 0, e = reductionMask.size(); i != e; ++i) {
         if (reductionMask[i]) {
@@ -970,26 +1076,26 @@ struct DistributeMultiReduction final
           assert(offset <= std::numeric_limits<uint32_t>::max() &&
                  width <= std::numeric_limits<uint32_t>::max());
 
-          extracted = rewriter.create<gpu::SubgroupReduceOp>(
-              loc, extracted, combiningKindToAllReduce(kind),
+          extracted = gpu::SubgroupReduceOp::create(
+              rewriter, loc, extracted, combiningKindToAllReduce(kind),
               /*uniform=*/false, /*cluster_size=*/width,
               /*cluster_stride=*/offset);
         }
       }
 
-      res = rewriter.create<vector::InsertOp>(loc, extracted, res, i);
+      res = vector::InsertOp::create(rewriter, loc, extracted, res, i);
     }
     return res;
   }
 
   Value getBufferForSubgroupReduction(RewriterBase &rewriter, MemRefType memTy,
                                       Value val) const {
-    auto alloc = rewriter.create<memref::AllocOp>(val.getLoc(), memTy);
+    auto alloc = memref::AllocOp::create(rewriter, val.getLoc(), memTy);
     // Insert gpu.barrier to make sure previous iteration of batch loop has
     // fully read the subgroup partial reductions.
     // TODO: We should be only creating a barrier if this buffer is going to be
     // reused.
-    rewriter.create<gpu::BarrierOp>(val.getLoc());
+    gpu::BarrierOp::create(rewriter, val.getLoc());
     return alloc;
   }
 
@@ -1061,12 +1167,12 @@ struct DistributeMultiReduction final
                                   VectorValue valueToWrite, Value buffer,
                                   NestedLayoutAttr srcLayout,
                                   ArrayRef<int64_t> reductionDims) const {
-    Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
     VectorType unDistributedType = valueToWrite.getType();
     SmallVector<Value> indices(unDistributedType.getRank(), c0);
     SmallVector<bool> inBounds(unDistributedType.getRank(), true);
-    auto write = rewriter.create<vector::TransferWriteOp>(
-        loc, valueToWrite, buffer, indices, inBounds);
+    auto write = vector::TransferWriteOp::create(rewriter, loc, valueToWrite,
+                                                 buffer, indices, inBounds);
     // Set layouts signature for write.
     // We need to set the layout on the srcVector/first operand.
     auto subgroupTileLens =
@@ -1107,14 +1213,14 @@ struct DistributeMultiReduction final
                                                getElementTypeOrSelf(buffer));
     auto readTy = VectorType::get(readLayout.getUndistributedShape(),
                                   getElementTypeOrSelf(buffer));
-    auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
     auto inBounds = rewriter.getBoolArrayAttr(
         SmallVector<bool>(readLayout.getRank(), true));
-    auto mask = rewriter.create<vector::CreateMaskOp>(
-        loc, readTy.clone(rewriter.getI1Type()),
+    auto mask = vector::CreateMaskOp::create(
+        rewriter, loc, readTy.clone(rewriter.getI1Type()),
         memref::getMixedSizes(rewriter, loc, buffer));
-    auto read = rewriter.create<vector::TransferReadOp>(
-        loc,
+    auto read = vector::TransferReadOp::create(
+        rewriter, loc,
         /*vectorType=*/readTy,
         /*source=*/buffer,
         /*indices=*/SmallVector<Value>(readLayout.getRank(), zero),
@@ -1129,8 +1235,8 @@ struct DistributeMultiReduction final
     // different subgroups.
     // Since the data was distributed to every thread, it will
     // form a gpu.subgroup_reduce operation later.
-    auto secondReduction = rewriter.create<vector::MultiDimReductionOp>(
-        loc, kind, read, acc, reductionDims);
+    auto secondReduction = vector::MultiDimReductionOp::create(
+        rewriter, loc, kind, read, acc, reductionDims);
     if (resLayout) {
       setSignatureForRedistribution(rewriter, secondReduction,
                                     {readLayout, resLayout}, {resLayout});
@@ -1176,8 +1282,8 @@ struct DistributeMultiReduction final
     }
     VectorType partialReducedDistributedType = VectorType::get(
         partialReducedDistributedShape, srcVector.getType().getElementType());
-    Value isoRankThreadReduced = rewriter.create<vector::ShapeCastOp>(
-        loc, partialReducedDistributedType, threadReduced);
+    Value isoRankThreadReduced = vector::ShapeCastOp::create(
+        rewriter, loc, partialReducedDistributedType, threadReduced);
 
     SmallVector<int64_t> preDistrShape =
         srcLayout.getUndistributedPackedShape();
@@ -1192,8 +1298,8 @@ struct DistributeMultiReduction final
     }
     auto unDistributedType = VectorType::get(
         partialReductionShape, srcVector.getType().getElementType());
-    VectorValue valueToWrite = rewriter.create<IREE::VectorExt::ToSIMDOp>(
-        loc, unDistributedType, isoRankThreadReduced);
+    VectorValue valueToWrite = IREE::VectorExt::ToSIMDOp::create(
+        rewriter, loc, unDistributedType, isoRankThreadReduced);
 
     auto workgroupMemoryAddressSpace = Attribute(gpu::AddressSpaceAttr::get(
         rewriter.getContext(), gpu::AddressSpace::Workgroup));
@@ -1205,7 +1311,7 @@ struct DistributeMultiReduction final
     writePartialResultToBuffer(rewriter, loc, valueToWrite, alloc, srcLayout,
                                reductionDims);
     // Wait for writes to buffer to finish.
-    rewriter.create<gpu::BarrierOp>(loc);
+    gpu::BarrierOp::create(rewriter, loc);
     return doSubgroupReductionFromBuffer(rewriter, loc, alloc, srcLayout,
                                          resLayout, reductionDims, kind, acc);
   }
@@ -1299,16 +1405,14 @@ struct DistributeContract final
       VectorValue interleavedMaskRhs =
           getInterleavedPackedForm(rewriter, maskRhs, rhsLayout);
 
-      disLhs = cast<VectorValue>(
-          rewriter
-              .create<arith::SelectOp>(loc, interleavedMaskLhs, disLhs,
-                                       passThruLhs)
-              .getResult());
-      disRhs = cast<VectorValue>(
-          rewriter
-              .create<arith::SelectOp>(loc, interleavedMaskRhs, disRhs,
-                                       passThruRhs)
-              .getResult());
+      disLhs = cast<VectorValue>(arith::SelectOp::create(rewriter, loc,
+                                                         interleavedMaskLhs,
+                                                         disLhs, passThruLhs)
+                                     .getResult());
+      disRhs = cast<VectorValue>(arith::SelectOp::create(rewriter, loc,
+                                                         interleavedMaskRhs,
+                                                         disRhs, passThruRhs)
+                                     .getResult());
     }
 
     Value acc = contractOp.getAcc();
@@ -1344,7 +1448,7 @@ struct DistributeContract final
     } else {
       VectorType vecType = VectorType::get(ArrayRef{int64_t(1)}, accElemTy);
       localContractValue =
-          rewriter.create<vector::BroadcastOp>(loc, vecType, localContract);
+          vector::BroadcastOp::create(rewriter, loc, vecType, localContract);
     }
 
     assert(localContractValue && "result should have been a vector");
@@ -1392,17 +1496,17 @@ struct DistributeContract final
     VectorType partialReducedDistributedType =
         VectorType::get(reductionLayout.getDistributedShape(),
                         localContractValue.getType().getElementType());
-    Value shapeCasted = rewriter.create<vector::ShapeCastOp>(
-        loc, partialReducedDistributedType, localContractValue);
+    Value shapeCasted = vector::ShapeCastOp::create(
+        rewriter, loc, partialReducedDistributedType, localContractValue);
     VectorType unDistributedType =
         VectorType::get(reductionLayout.getUndistributedShape(),
                         localContractValue.getType().getElementType());
-    Value undistrLocalReduced = rewriter.create<IREE::VectorExt::ToSIMDOp>(
-        loc, unDistributedType, shapeCasted);
+    Value undistrLocalReduced = IREE::VectorExt::ToSIMDOp::create(
+        rewriter, loc, unDistributedType, shapeCasted);
 
     // Create the partial reduction
-    auto partialReduction = rewriter.create<vector::MultiDimReductionOp>(
-        loc, contractOp.getKind(), undistrLocalReduced, acc,
+    auto partialReduction = vector::MultiDimReductionOp::create(
+        rewriter, loc, contractOp.getKind(), undistrLocalReduced, acc,
         partialReductionDims);
     if (resVector) {
       setSignatureForRedistribution(rewriter, partialReduction,
@@ -1454,8 +1558,9 @@ struct DistributeContract final
     Value localInit = getCombiningIdentityValue(
         loc, rewriter, contractOp.getKind(), acc.getType());
 
-    auto localContractOp = rewriter.create<vector::ContractionOp>(
-        loc, lhs, rhs, localInit, rewriter.getAffineMapArrayAttr(newMaps),
+    auto localContractOp = vector::ContractionOp::create(
+        rewriter, loc, lhs, rhs, localInit,
+        rewriter.getAffineMapArrayAttr(newMaps),
         rewriter.getArrayAttr(newIterators), contractOp.getKind());
     localContractOp->setDiscardableAttrs(
         contractOp->getDiscardableAttrDictionary());
@@ -1511,8 +1616,8 @@ struct DistributeTranspose final : OpDistributionPattern<vector::TransposeOp> {
         permutation.push_back(it + (i * rank));
       }
     }
-    VectorValue transposed = rewriter.create<vector::TransposeOp>(
-        transposeOp.getLoc(), input, permutation);
+    VectorValue transposed = vector::TransposeOp::create(
+        rewriter, transposeOp.getLoc(), input, permutation);
     replaceOpWithDistributedValues(rewriter, transposeOp, transposed);
     return success();
   }
@@ -1580,8 +1685,9 @@ struct DistributeBatchOuterToLayoutConversions final
       interleavePermutation[2 * i + 1] = i + rank;
     }
 
-    auto interleaved = rewriter.create<vector::TransposeOp>(
-        loc, getDistributed(rewriter, input, layoutA), interleavePermutation);
+    auto interleaved = vector::TransposeOp::create(
+        rewriter, loc, getDistributed(rewriter, input, layoutA),
+        interleavePermutation);
 
     // Shape cast to match the new layout.
 
@@ -1591,14 +1697,14 @@ struct DistributeBatchOuterToLayoutConversions final
         transposedShapeB, interleaved.getResultVectorType().getElementType());
 
     auto reshaped =
-        rewriter.create<vector::ShapeCastOp>(loc, reshapedType, interleaved);
+        vector::ShapeCastOp::create(rewriter, loc, reshapedType, interleaved);
 
     // Inverse transpose to preserve original order.
     SmallVector<int64_t> invertedPermutation =
         invertPermutationVector(interleavePermutation);
 
-    auto layouted = rewriter.create<vector::TransposeOp>(loc, reshaped,
-                                                         invertedPermutation);
+    auto layouted = vector::TransposeOp::create(rewriter, loc, reshaped,
+                                                invertedPermutation);
 
     replaceOpWithDistributedValues(rewriter, toLayoutOp, layouted.getResult());
     return success();
@@ -1729,20 +1835,20 @@ struct DistributeStep final : OpDistributionPattern<vector::StepOp> {
     }
     VectorType offsetType =
         VectorType::get({distributedLen}, builder.getIndexType());
-    auto constOffset = builder.create<arith::ConstantOp>(
-        loc, DenseElementsAttr::get(offsetType, offsets));
+    auto constOffset = arith::ConstantOp::create(
+        builder, loc, DenseElementsAttr::get(offsetType, offsets));
     Value finalOffset = constOffset;
     for (const DimInfo &dimInfo : distributedDims) {
       assert(dimInfo.dimIdx.has_value());
       if (dimInfo.dimStride != 0) {
         auto strideVal =
-            builder.create<arith::ConstantIndexOp>(loc, dimInfo.dimStride);
-        auto dimIdxOffsetPerElem = builder.create<arith::MulIOp>(
-            loc, strideVal, dimInfo.dimIdx.value());
-        auto dimIdxOffset = builder.create<vector::BroadcastOp>(
-            loc, offsetType, dimIdxOffsetPerElem);
+            arith::ConstantIndexOp::create(builder, loc, dimInfo.dimStride);
+        auto dimIdxOffsetPerElem = arith::MulIOp::create(
+            builder, loc, strideVal, dimInfo.dimIdx.value());
+        auto dimIdxOffset = vector::BroadcastOp::create(
+            builder, loc, offsetType, dimIdxOffsetPerElem);
         finalOffset =
-            builder.create<arith::AddIOp>(loc, finalOffset, dimIdxOffset);
+            arith::AddIOp::create(builder, loc, finalOffset, dimIdxOffset);
       }
     }
     return cast<VectorValue>(finalOffset);
@@ -1795,8 +1901,8 @@ struct DistributeStep final : OpDistributionPattern<vector::StepOp> {
         rewriter, loc, distributedDims, distributedElements, originalElements);
     VectorType finalSlicedStepOpType =
         VectorType::get({distributedShape}, result.getType().getElementType());
-    auto finalSlicedStepOp = rewriter.create<vector::ShapeCastOp>(
-        loc, finalSlicedStepOpType, slicedStepOp);
+    auto finalSlicedStepOp = vector::ShapeCastOp::create(
+        rewriter, loc, finalSlicedStepOpType, slicedStepOp);
     replaceOpWithDistributedValues(rewriter, stepOp, {finalSlicedStepOp});
     return success();
   }
@@ -1817,8 +1923,8 @@ SmallVector<Value> createDistributedMaskBounds(PatternRewriter &rewriter,
   constexpr int64_t threadIdx = 3;
   constexpr int64_t elementIdx = 4;
   SmallVector<Value> bounds;
-  auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-  auto one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+  auto one = arith::ConstantIndexOp::create(rewriter, loc, 1);
 
   for (auto [unDistributedDim, upperBound] : llvm::enumerate(upperBounds)) {
     SmallVector<int64_t> undistributedShape =
@@ -1828,10 +1934,10 @@ SmallVector<Value> createDistributedMaskBounds(PatternRewriter &rewriter,
                                       undistributedShape[elementIdx]};
     int64_t elementPerThread = ShapedType::getNumElements(distrShape);
     auto allValid =
-        rewriter.create<arith::ConstantIndexOp>(loc, elementPerThread);
+        arith::ConstantIndexOp::create(rewriter, loc, elementPerThread);
     int64_t elementTileSize = distrShape.back();
     auto elementTileLastIdx =
-        rewriter.create<arith::ConstantIndexOp>(loc, elementTileSize - 1);
+        arith::ConstantIndexOp::create(rewriter, loc, elementTileSize - 1);
 
     // A special condition if the pre-distribution bounds match
     // the mask dimension length, then the distributed bounds
@@ -1847,10 +1953,9 @@ SmallVector<Value> createDistributedMaskBounds(PatternRewriter &rewriter,
         continue;
       }
     }
-    auto lastValidIdx = rewriter.create<arith::SubIOp>(loc, upperBound, one);
-    auto delineraizedLastValidIdx =
-        rewriter.create<affine::AffineDelinearizeIndexOp>(loc, lastValidIdx,
-                                                          undistributedShape);
+    auto lastValidIdx = arith::SubIOp::create(rewriter, loc, upperBound, one);
+    auto delineraizedLastValidIdx = affine::AffineDelinearizeIndexOp::create(
+        rewriter, loc, lastValidIdx, undistributedShape);
     SmallVector<Value> packedLastValidIdx =
         delineraizedLastValidIdx.getResults();
 
@@ -1858,24 +1963,22 @@ SmallVector<Value> createDistributedMaskBounds(PatternRewriter &rewriter,
     // Every [vtid] less than [vtid that encounters last valid element] should
     // have a all valid element tile
     auto linearizedLastValidIdxPreThreads =
-        rewriter.create<affine::AffineLinearizeIndexOp>(
-            loc,
+        affine::AffineLinearizeIndexOp::create(
+            rewriter, loc,
             ValueRange{packedLastValidIdx[batchIdx],
                        packedLastValidIdx[outerIdx], elementTileLastIdx},
             distrShape);
     // Bound is defined as lastIdx + 1;
-    auto distrUpperBoundPreThreads = rewriter.create<arith::AddIOp>(
-        loc, linearizedLastValidIdxPreThreads, one);
+    auto distrUpperBoundPreThreads = arith::AddIOp::create(
+        rewriter, loc, linearizedLastValidIdxPreThreads, one);
 
-    auto linearizedLastValidIdx =
-        rewriter.create<affine::AffineLinearizeIndexOp>(
-            loc,
-            ValueRange{packedLastValidIdx[batchIdx],
-                       packedLastValidIdx[outerIdx],
-                       packedLastValidIdx[elementIdx]},
-            distrShape);
+    auto linearizedLastValidIdx = affine::AffineLinearizeIndexOp::create(
+        rewriter, loc,
+        ValueRange{packedLastValidIdx[batchIdx], packedLastValidIdx[outerIdx],
+                   packedLastValidIdx[elementIdx]},
+        distrShape);
     auto distrUpperBound =
-        rewriter.create<arith::AddIOp>(loc, linearizedLastValidIdx, one);
+        arith::AddIOp::create(rewriter, loc, linearizedLastValidIdx, one);
 
     // The following code constructs a selection tree
     // that in effect follows the code:
@@ -1894,34 +1997,34 @@ SmallVector<Value> createDistributedMaskBounds(PatternRewriter &rewriter,
     //     [u1][u2][u4]
 
     // tid == u3
-    auto cmpBoundTidEq = rewriter.create<arith::CmpIOp>(
-        loc, arith::CmpIPredicate::eq, threadIndices[unDistributedDim],
-        packedLastValidIdx[threadIdx]);
+    auto cmpBoundTidEq = arith::CmpIOp::create(
+        rewriter, loc, arith::CmpIPredicate::eq,
+        threadIndices[unDistributedDim], packedLastValidIdx[threadIdx]);
     // tid < u3
-    auto cmpBoundTidSlt = rewriter.create<arith::CmpIOp>(
-        loc, arith::CmpIPredicate::slt, threadIndices[unDistributedDim],
-        packedLastValidIdx[threadIdx]);
+    auto cmpBoundTidSlt = arith::CmpIOp::create(
+        rewriter, loc, arith::CmpIPredicate::slt,
+        threadIndices[unDistributedDim], packedLastValidIdx[threadIdx]);
     // sg == u0
-    auto cmpBoundSgEq = rewriter.create<arith::CmpIOp>(
-        loc, arith::CmpIPredicate::eq, subgroupIndices[unDistributedDim],
-        packedLastValidIdx[subgroupIdx]);
+    auto cmpBoundSgEq = arith::CmpIOp::create(
+        rewriter, loc, arith::CmpIPredicate::eq,
+        subgroupIndices[unDistributedDim], packedLastValidIdx[subgroupIdx]);
     // sg < u0
-    auto cmpBoundSgSlt = rewriter.create<arith::CmpIOp>(
-        loc, arith::CmpIPredicate::slt, subgroupIndices[unDistributedDim],
-        packedLastValidIdx[subgroupIdx]);
+    auto cmpBoundSgSlt = arith::CmpIOp::create(
+        rewriter, loc, arith::CmpIPredicate::slt,
+        subgroupIndices[unDistributedDim], packedLastValidIdx[subgroupIdx]);
 
     // selectTid0 = tid < u3 ? [u1][u2][max] : all invalid
-    auto selectTid0 = rewriter.create<arith::SelectOp>(
-        loc, cmpBoundTidSlt, distrUpperBoundPreThreads, zero);
+    auto selectTid0 = arith::SelectOp::create(rewriter, loc, cmpBoundTidSlt,
+                                              distrUpperBoundPreThreads, zero);
     // selectTid1 = tid == u3 : [u1][u2][u4] : selectTid0
-    auto selectTid1 = rewriter.create<arith::SelectOp>(
-        loc, cmpBoundTidEq, distrUpperBound, selectTid0);
+    auto selectTid1 = arith::SelectOp::create(rewriter, loc, cmpBoundTidEq,
+                                              distrUpperBound, selectTid0);
     // selectSg0 = sg < u0 ? all valid : all invalid
     auto selectSg0 =
-        rewriter.create<arith::SelectOp>(loc, cmpBoundSgSlt, allValid, zero);
+        arith::SelectOp::create(rewriter, loc, cmpBoundSgSlt, allValid, zero);
     // selectSg1 = sg == u0 ? selectTid1 : selectSg0
-    auto selectSg1 = rewriter.create<arith::SelectOp>(loc, cmpBoundSgEq,
-                                                      selectTid1, selectSg0);
+    auto selectSg1 = arith::SelectOp::create(rewriter, loc, cmpBoundSgEq,
+                                             selectTid1, selectSg0);
     bounds.push_back(selectSg1);
   }
   return bounds;
@@ -1961,8 +2064,8 @@ struct DistributeCreateMask final
     Type elemType = maskOp.getType().getElementType();
     auto distrUnpackedType =
         VectorType::get(resultLayout.getDistributedUnpackedShape(), elemType);
-    auto distrMask = rewriter.create<vector::CreateMaskOp>(
-        loc, distrUnpackedType, distributedBounds);
+    auto distrMask = vector::CreateMaskOp::create(
+        rewriter, loc, distrUnpackedType, distributedBounds);
     VectorValue interleavedDistrMask =
         getInterleavedPackedForm(rewriter, distrMask, resultLayout);
     replaceOpWithDistributedValues(rewriter, maskOp, {interleavedDistrMask});
@@ -2001,7 +2104,7 @@ struct DistributeConstantMask final
 
     SmallVector<Value> constOperands;
     for (int64_t size : maskOp.getMaskDimSizes()) {
-      Value index = rewriter.create<arith::ConstantIndexOp>(loc, size);
+      Value index = arith::ConstantIndexOp::create(rewriter, loc, size);
       constOperands.push_back(index);
     }
 
@@ -2012,8 +2115,8 @@ struct DistributeConstantMask final
     Type elemType = maskOp.getType().getElementType();
     auto distrUnpackedType =
         VectorType::get(resultLayout.getDistributedUnpackedShape(), elemType);
-    auto distrMask = rewriter.create<vector::CreateMaskOp>(
-        loc, distrUnpackedType, distributedBounds);
+    auto distrMask = vector::CreateMaskOp::create(
+        rewriter, loc, distrUnpackedType, distributedBounds);
     VectorValue interleavedDistrMask =
         getInterleavedPackedForm(rewriter, distrMask, resultLayout);
     replaceOpWithDistributedValues(rewriter, maskOp, {interleavedDistrMask});
@@ -2030,8 +2133,8 @@ void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
                                                    int64_t subgroupSize,
                                                    int64_t maxBitsPerShuffle) {
   patterns.add<DistributeTransferRead, DistributeTransferWrite,
-               DistributeTransferGather>(patterns.getContext(), threadId,
-                                         subgroupSize);
+               DistributeTransferGather, DistributeMapScatter>(
+      patterns.getContext(), threadId, subgroupSize);
   patterns.add<DistributeBroadcast, DistributeTranspose>(patterns.getContext());
   patterns.add<DistributeMultiReduction>(patterns.getContext(), subgroupSize,
                                          maxBitsPerShuffle);

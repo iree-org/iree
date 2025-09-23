@@ -1,14 +1,13 @@
-// RUN: iree-opt --iree-transform-dialect-interpreter --split-input-file --canonicalize --cse %s | FileCheck %s
+// RUN: iree-opt --iree-transform-dialect-interpreter --split-input-file %s | FileCheck %s
 
 #nested = #iree_vector_ext.nested_layout<
-  subgroup_tile = [2, 1, 1],
-  batch_tile    = [8, 2, 4],
-  outer_tile        = [1, 4, 4],
-  thread_tile       = [8, 2, 4],
+  subgroup_tile    = [2, 1, 1],
+  batch_tile       = [8, 2, 4],
+  outer_tile       = [1, 4, 4],
+  thread_tile      = [8, 2, 4],
   element_tile     = [1, 8, 2],
-
-  subgroup_strides        = [1, 1, 1],
-  thread_strides          = [1, 8, 16]
+  subgroup_strides = [1, 1, 1],
+  thread_strides   = [1, 8, 16]
 >
 
 // CHECK-LABEL: @distribute_elementwise_nested_layout_f16
@@ -28,15 +27,22 @@ func.func @distribute_elementwise_nested_layout_f16(%a: vector<128x128x128xf16>,
   return %d : vector<128x128x128xf16>
 }
 
-#layout = #iree_vector_ext.nested_layout<
-  subgroup_tile = [1, 1],
-  batch_tile = [1, 1],
-  outer_tile = [1, 1],
-  thread_tile = [1, 1],
-  element_tile = [16, 16],
+// CHECK-LABEL: @distribute_poison
+func.func @distribute_poison() -> vector<128x128x128xf16> {
+  // CHECK: ub.poison : vector<8x2x4x1x4x4x1x8x2xf16>
+  %root = ub.poison : vector<128x128x128xf16>
+  %rootl = iree_vector_ext.to_layout %root to layout(#nested) : vector<128x128x128xf16>
+  return %rootl: vector<128x128x128xf16>
+}
 
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile    = [1, 1],
+  batch_tile       = [1, 1],
+  outer_tile       = [1, 1],
+  thread_tile      = [1, 1],
+  element_tile     = [16, 16],
   subgroup_strides = [1, 1],
-  thread_strides = [1, 1]
+  thread_strides   = [1, 1]
 >
 
 // CHECK-LABEL: @distribute_scf_for
@@ -63,14 +69,13 @@ func.func @distribute_scf_for(%a: vector<16x16xi32>, %b: vector<16x16xi32>) -> v
 }
 
 #layout_0d = #iree_vector_ext.nested_layout<
-  subgroup_tile = [],
-  batch_tile = [],
-  outer_tile = [],
-  thread_tile = [],
-  element_tile = [],
-
+  subgroup_tile    = [],
+  batch_tile       = [],
+  outer_tile       = [],
+  thread_tile      = [],
+  element_tile     = [],
   subgroup_strides = [],
-  thread_strides = []
+  thread_strides   = []
 >
 
 // CHECK-LABEL: @distribute_scf_for_0d

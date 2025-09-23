@@ -147,8 +147,8 @@ struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
               permutation, reassociations, expandedType))) {
         continue;
       }
-      auto expandOp = rewriter.create<tensor::ExpandShapeOp>(
-          loc, expandedType, operand, reassociations);
+      auto expandOp = tensor::ExpandShapeOp::create(rewriter, loc, expandedType,
+                                                    operand, reassociations);
       maybeExpands[opIndex] = expandOp;
       newOperands[opIndex] = expandOp.getResult();
 
@@ -187,8 +187,8 @@ struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
       newPermutationsAttr = rewriter.getArrayAttr(newPermutations);
     }
     // Create the new inner_tiled op with the expanded type.
-    auto expandedTiledOp = rewriter.create<Codegen::InnerTiledOp>(
-        loc, /*inputs=*/ValueRange{newOperands}.take_front(numInputs),
+    auto expandedTiledOp = Codegen::InnerTiledOp::create(
+        rewriter, loc, /*inputs=*/ValueRange{newOperands}.take_front(numInputs),
         /*inits=*/ValueRange{newOperands}.drop_front(numInputs),
         tiledOp.getIndexingMaps(), tiledOp.getIteratorTypes(),
         tiledOp.getKind(), newPermutationsAttr);
@@ -205,8 +205,8 @@ struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
       if (!tiedInitExpand) {
         continue;
       }
-      result = rewriter.create<tensor::CollapseShapeOp>(
-          loc, tiledOp.getResultTypes()[resIndex], result,
+      result = tensor::CollapseShapeOp::create(
+          rewriter, loc, tiledOp.getResultTypes()[resIndex], result,
           tiedInitExpand.getReassociation());
     }
 

@@ -20,7 +20,7 @@ iree_setup_c_src_root(
 if(IREE_ENABLE_RUNTIME_COVERAGE)
   message(WARNING
     "IREE_ENABLE_RUNTIME_COVERAGE enabling coverage in all runtime libraries. "
-    "All runtime binaries are instrumented and should not be used for"
+    "All runtime binaries are instrumented and should not be used for "
     "benchmarking."
   )
   add_compile_options(

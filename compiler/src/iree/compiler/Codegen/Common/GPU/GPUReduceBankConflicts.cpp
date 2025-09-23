@@ -65,11 +65,12 @@ static void padAlloc(MLIRContext *context, memref::AllocOp allocOp,
   IRRewriter rewriter(context);
   rewriter.setInsertionPoint(allocOp);
   Location loc = allocOp.getLoc();
-  Value paddedAlloc = rewriter.create<memref::AllocOp>(loc, allocType);
+  Value paddedAlloc = memref::AllocOp::create(rewriter, loc, allocType);
   SmallVector<int64_t> offsets(shape.size(), 0);
   SmallVector<int64_t> strides(shape.size(), 1);
-  Value subview = rewriter.create<memref::SubViewOp>(
-      loc, paddedAlloc, offsets, allocOp.getType().getShape(), strides);
+  Value subview =
+      memref::SubViewOp::create(rewriter, loc, paddedAlloc, offsets,
+                                allocOp.getType().getShape(), strides);
   replaceMemrefUsesAndPropagateType(rewriter, loc, allocOp, subview);
   rewriter.eraseOp(allocOp);
 }

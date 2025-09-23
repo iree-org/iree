@@ -33,21 +33,15 @@ struct ParameterLoadOpPattern
     // Derive the allocation requirements.
     auto resourceType =
         cast<IREE::Stream::ResourceType>(loadOp.getResults().front().getType());
-    auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
-    auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
-    if (failed(deriveAllowedResourceBufferBits(loc, resourceType, memoryTypes,
-                                               bufferUsage))) {
-      return failure();
-    }
 
-    // Lookup the appropriate device/queue for allocation based on the buffer
-    // propreties.
-    Value memoryTypeOp =
-        rewriter.create<IREE::HAL::MemoryTypeOp>(loc, memoryTypes);
-    Value bufferUsageOp =
-        rewriter.create<IREE::HAL::BufferUsageOp>(loc, bufferUsage);
-    auto [device, queueAffinity] = lookupDeviceAndQueueAffinityFor(
-        loadOp, memoryTypeOp, bufferUsageOp, rewriter);
+    auto resolveOp = IREE::HAL::AllocatorResolveMemoryPropertiesOp::create(
+        rewriter, loc, rewriter.getI32Type(), rewriter.getI32Type(),
+        IREE::Stream::AffinityAttr::lookupOrDefault(loadOp),
+        static_cast<IREE::HAL::Lifetime>(resourceType.getLifetime()));
+
+    auto [device, queueAffinity] =
+        lookupDeviceAndQueueAffinityFor(loadOp, resolveOp.getMemoryTypes(),
+                                        resolveOp.getBufferUsage(), rewriter);
 
     // Gather wait/signal fence, which are optional.
     Value waitFence =
@@ -58,11 +52,11 @@ struct ParameterLoadOpPattern
     // Queue operation, which acts like an allocation.
     SmallVector<Type> newResultTypes(loadOp.getResults().size(),
                                      rewriter.getType<IREE::HAL::BufferType>());
-    auto newOp = rewriter.create<IREE::IO::Parameters::LoadOp>(
-        loc, newResultTypes, device, queueAffinity, waitFence, signalFence,
-        adaptor.getSourceScopeAttr(), adaptor.getSourceKeysAttr(),
-        adaptor.getSourceOffsets(), memoryTypeOp, bufferUsageOp,
-        adaptor.getResultSizes());
+    auto newOp = IREE::IO::Parameters::LoadOp::create(
+        rewriter, loc, newResultTypes, device, queueAffinity, waitFence,
+        signalFence, adaptor.getSourceScopeAttr(), adaptor.getSourceKeysAttr(),
+        adaptor.getSourceOffsets(), resolveOp.getMemoryTypes(),
+        resolveOp.getBufferUsage(), adaptor.getResultSizes());
 
     SmallVector<Value> resultReplacements;
     llvm::append_range(resultReplacements, newOp.getResults());
@@ -89,8 +83,8 @@ struct ParameterReadOpPattern
         loc, device, readOp.getResultTimepoint(), rewriter);
 
     // Queue operation (a read is just a gather with a single span).
-    rewriter.create<IREE::IO::Parameters::GatherOp>(
-        loc, device, queueAffinity, waitFence, signalFence,
+    IREE::IO::Parameters::GatherOp::create(
+        rewriter, loc, device, queueAffinity, waitFence, signalFence,
         adaptor.getSourceScopeAttr(),
         rewriter.getArrayAttr(adaptor.getSourceKeyAttr()),
         ValueRange{adaptor.getSourceOffset()}, adaptor.getTarget(),
@@ -119,9 +113,9 @@ struct ParameterWriteOpPattern
         loc, device, writeOp.getResultTimepoint(), rewriter);
 
     // Queue operation (a write is just a scatter with a single span).
-    rewriter.create<IREE::IO::Parameters::ScatterOp>(
-        loc, device, queueAffinity, waitFence, signalFence, adaptor.getSource(),
-        ValueRange{adaptor.getSourceOffset()},
+    IREE::IO::Parameters::ScatterOp::create(
+        rewriter, loc, device, queueAffinity, waitFence, signalFence,
+        adaptor.getSource(), ValueRange{adaptor.getSourceOffset()},
         ValueRange{adaptor.getSourceLength()}, adaptor.getTargetScopeAttr(),
         rewriter.getArrayAttr(adaptor.getTargetKeyAttr()),
         ValueRange{adaptor.getTargetOffset()});
@@ -148,8 +142,8 @@ struct ParameterGatherOpPattern
         loc, device, gatherOp.getResultTimepoint(), rewriter);
 
     // Queue operation.
-    rewriter.create<IREE::IO::Parameters::GatherOp>(
-        loc, device, queueAffinity, waitFence, signalFence,
+    IREE::IO::Parameters::GatherOp::create(
+        rewriter, loc, device, queueAffinity, waitFence, signalFence,
         adaptor.getSourceScopeAttr(), adaptor.getSourceKeysAttr(),
         adaptor.getSourceOffsets(), adaptor.getTarget(),
         adaptor.getTargetOffsets(), adaptor.getTargetLengths());
@@ -176,11 +170,11 @@ struct ParameterScatterOpPattern
         loc, device, scatterOp.getResultTimepoint(), rewriter);
 
     // Queue operation.
-    rewriter.create<IREE::IO::Parameters::ScatterOp>(
-        loc, device, queueAffinity, waitFence, signalFence, adaptor.getSource(),
-        adaptor.getSourceOffsets(), adaptor.getSourceLengths(),
-        adaptor.getTargetScopeAttr(), adaptor.getTargetKeysAttr(),
-        adaptor.getTargetOffsets());
+    IREE::IO::Parameters::ScatterOp::create(
+        rewriter, loc, device, queueAffinity, waitFence, signalFence,
+        adaptor.getSource(), adaptor.getSourceOffsets(),
+        adaptor.getSourceLengths(), adaptor.getTargetScopeAttr(),
+        adaptor.getTargetKeysAttr(), adaptor.getTargetOffsets());
 
     rewriter.replaceOp(scatterOp, {signalFence});
     return success();

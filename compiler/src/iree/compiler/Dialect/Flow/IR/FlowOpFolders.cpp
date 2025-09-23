@@ -216,8 +216,8 @@ struct ReplaceDispatchResultIfZeroElements
         continue;
       if (isTensorResultZeroElements(result)) {
         auto dynamicDims = op.getResultDynamicDims(result.getResultNumber());
-        auto emptyOp = rewriter.create<IREE::Flow::TensorEmptyOp>(
-            result.getLoc(), result.getType(), dynamicDims);
+        auto emptyOp = IREE::Flow::TensorEmptyOp::create(
+            rewriter, result.getLoc(), result.getType(), dynamicDims);
         rewriter.replaceAllUsesWith(result, emptyOp);
         didReplaceAny = true;
       }
@@ -243,8 +243,8 @@ struct ElideRedundantWorkloadValues
 
     // Create a new flow.dispatch.workgroup op with new workloads.
     Location loc = op.getLoc();
-    auto newWorkgroupsOp = rewriter.create<DispatchWorkgroupsOp>(
-        loc, newWorkload, op.getResultTypes(), op.getResultDims(),
+    auto newWorkgroupsOp = DispatchWorkgroupsOp::create(
+        rewriter, loc, newWorkload, op.getResultTypes(), op.getResultDims(),
         op.getArguments(), op.getArgumentDims(),
         op.getTiedOperandsAsIntegerList(),
         getPrunedAttributeList(op, /*elidedAttrs=*/{}));
@@ -449,23 +449,21 @@ namespace {
 
 struct ExpandDynamicShapeConstant
     : public OpRewritePattern<TensorDynamicConstantOp> {
-  using OpRewritePattern<TensorDynamicConstantOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorDynamicConstantOp op,
                                 PatternRewriter &rewriter) const override {
-    auto constantOp = rewriter.create<IREE::Flow::TensorConstantOp>(
-        op.getLoc(), op.getValue());
+    auto constantOp = IREE::Flow::TensorConstantOp::create(
+        rewriter, op.getLoc(), op.getValue());
     auto dynamicType = op.getType();
     auto staticType = cast<ShapedType>(op.getValue().getType());
     SmallVector<Value> dynamicDims;
     for (int64_t i = 0; i < dynamicType.getRank(); ++i) {
       if (dynamicType.isDynamicDim(i)) {
-        auto dimValue = rewriter
-                            .create<arith::ConstantIndexOp>(
-                                op.getLoc(), staticType.getDimSize(i))
+        auto dimValue = arith::ConstantIndexOp::create(rewriter, op.getLoc(),
+                                                       staticType.getDimSize(i))
                             .getResult();
-        dynamicDims.push_back(rewriter
-                                  .create<IREE::Util::OptimizationBarrierOp>(
-                                      op.getLoc(), dimValue)
+        dynamicDims.push_back(IREE::Util::OptimizationBarrierOp::create(
+                                  rewriter, op.getLoc(), dimValue)
                                   .getResult(0));
       }
     }
@@ -566,7 +564,7 @@ struct FlattenTensorCastLikeChain : public OpRewritePattern<CastOpTy> {
 };
 
 struct ResolveShapedRank : public OpRewritePattern<tensor::RankOp> {
-  using OpRewritePattern<tensor::RankOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::RankOp op,
                                 PatternRewriter &rewriter) const override {
     auto shapedType = llvm::cast<ShapedType>(op.getTensor().getType());
@@ -577,7 +575,7 @@ struct ResolveShapedRank : public OpRewritePattern<tensor::RankOp> {
 };
 
 struct ResolveShapedDim : public OpRewritePattern<tensor::DimOp> {
-  using OpRewritePattern<tensor::DimOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::DimOp op,
                                 PatternRewriter &rewriter) const override {
     if (!op.getConstantIndex().has_value()) {
@@ -677,7 +675,7 @@ namespace {
 // Replace `flow.tensor.splat`-`flow.tensor.load` op-pairs by the input
 // primitive value for the splat op.
 struct FoldSplatLoadIntoPrimitive : public OpRewritePattern<TensorLoadOp> {
-  using OpRewritePattern<TensorLoadOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
     auto sourceOp =
@@ -750,7 +748,7 @@ void TensorEmptyOp::getCanonicalizationPatterns(RewritePatternSet &results,
 namespace {
 
 struct FoldSplatReshapeIntoSplat : public OpRewritePattern<TensorReshapeOp> {
-  using OpRewritePattern<TensorReshapeOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorReshapeOp reshapeOp,
                                 PatternRewriter &rewriter) const override {
     auto splatOp = dyn_cast_if_present<TensorSplatOp>(
@@ -837,8 +835,7 @@ struct SinkCastLikeOpAcrossTransfer final : OpRewritePattern<TransferOpT> {
     }
     Value originValue = sourceOp.getSource();
     ValueRange originDims = sourceOp.getSourceDims();
-    auto newOp =
-        rewriter.create<TransferOpT>(transferOp.getLoc(), originValue,
+    auto newOp = TransferOpT::create(rewriter, transferOp.getLoc(), originValue,
                                      originDims, transferOp.getTargetAttr());
     IRMapping mapper;
     mapper.map(originValue, newOp.getResult());
@@ -1069,7 +1066,7 @@ namespace {
 // When the target tensor is a result of a tensor.cast operation, the op needs
 // to be updated to use the source of the cast as the target tensor.
 struct FoldTensorUpdateOpWithCasts : public OpRewritePattern<TensorUpdateOp> {
-  using OpRewritePattern<TensorUpdateOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorUpdateOp updateOp,
                                 PatternRewriter &rewriter) const override {
     auto targetCastOp = updateOp.getTarget().getDefiningOp<tensor::CastOp>();
@@ -1080,8 +1077,8 @@ struct FoldTensorUpdateOpWithCasts : public OpRewritePattern<TensorUpdateOp> {
                                  : cast<Value>(updateOp.getTarget()));
     Value update = (updateCastOp ? cast<Value>(updateCastOp.getSource())
                                  : cast<Value>(updateOp.getUpdate()));
-    auto newOp = rewriter.create<TensorUpdateOp>(
-        updateOp.getLoc(), target.getType(), target,
+    auto newOp = TensorUpdateOp::create(
+        rewriter, updateOp.getLoc(), target.getType(), target,
         refreshDimsOnTypeChange(updateOp, updateOp.getTarget().getType(),
                                 target.getType(), updateOp.getTargetDims(),
                                 rewriter),
@@ -1097,7 +1094,7 @@ struct FoldTensorUpdateOpWithCasts : public OpRewritePattern<TensorUpdateOp> {
 
 struct ReplaceOpIfTensorUpdateOperandZeroElements
     : public OpRewritePattern<TensorUpdateOp> {
-  using OpRewritePattern<TensorUpdateOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorUpdateOp op,
                                 PatternRewriter &rewriter) const override {
     auto operand = op.getUpdate();

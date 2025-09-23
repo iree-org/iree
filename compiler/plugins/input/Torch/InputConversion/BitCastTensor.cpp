@@ -42,9 +42,8 @@ public:
     }
 
     // Cast to the builtin tensor type.
-    Value builtinCast =
-        rewriter.create<torch::TorchConversion::ToBuiltinTensorOp>(loc, bType,
-                                                                   in);
+    Value builtinCast = torch::TorchConversion::ToBuiltinTensorOp::create(
+        rewriter, loc, bType, in);
 
     auto rType = resultType.toBuiltinTensor();
     if (auto dtype = dyn_cast<IntegerType>(rType.getElementType())) {
@@ -59,26 +58,25 @@ public:
       auto inElemWidth = IREE::Util::getTypeBitWidth(bType.getElementType());
       auto outElemWidth = IREE::Util::getTypeBitWidth(rType.getElementType());
       if (inElemWidth > outElemWidth) {
-        auto scale = rewriter.create<arith::ConstantIndexOp>(
-            loc, inElemWidth / outElemWidth);
-        outDynamicDims.back() = rewriter.create<arith::DivSIOp>(
-            loc, inDynamicDims.back(), scale.getResult());
+        auto scale = arith::ConstantIndexOp::create(rewriter, loc,
+                                                    inElemWidth / outElemWidth);
+        outDynamicDims.back() = arith::DivSIOp::create(
+            rewriter, loc, inDynamicDims.back(), scale.getResult());
 
       } else if (inElemWidth < outElemWidth) {
-        auto scale = rewriter.create<arith::ConstantIndexOp>(
-            loc, outElemWidth / inElemWidth);
-        outDynamicDims.back() = rewriter.create<arith::MulIOp>(
-            loc, outDynamicDims.back(), scale.getResult(),
+        auto scale = arith::ConstantIndexOp::create(rewriter, loc,
+                                                    outElemWidth / inElemWidth);
+        outDynamicDims.back() = arith::MulIOp::create(
+            rewriter, loc, outDynamicDims.back(), scale.getResult(),
             arith::IntegerOverflowFlags::nsw);
       }
     }
 
-    Value flowBitcast = rewriter.create<IREE::TensorExt::BitCastOp>(
-        loc, rType, builtinCast, inDynamicDims, outDynamicDims);
+    Value flowBitcast = IREE::TensorExt::BitCastOp::create(
+        rewriter, loc, rType, builtinCast, inDynamicDims, outDynamicDims);
 
-    auto torchCast =
-        rewriter.create<torch::TorchConversion::FromBuiltinTensorOp>(
-            loc, resultType, flowBitcast);
+    auto torchCast = torch::TorchConversion::FromBuiltinTensorOp::create(
+        rewriter, loc, resultType, flowBitcast);
     rewriter.replaceOp(op, torchCast);
     return success();
   }
@@ -97,25 +95,23 @@ public:
     auto resultType = cast<torch::Torch::ValueTensorType>(op.getType());
     auto bType = inType.toBuiltinTensor();
 
-    Value builtinCast =
-        rewriter.create<torch::TorchConversion::ToBuiltinTensorOp>(loc, bType,
-                                                                   in);
+    Value builtinCast = torch::TorchConversion::ToBuiltinTensorOp::create(
+        rewriter, loc, bType, in);
     auto rType = resultType.toBuiltinTensor();
 
     // Cast to the builtin tensor type.
     llvm::SmallVector<Value> dynDims;
     for (int i = 0, s = bType.getRank(); i < s; ++i) {
       if (bType.isDynamicDim(i)) {
-        dynDims.push_back(rewriter.create<tensor::DimOp>(loc, builtinCast, i));
+        dynDims.push_back(tensor::DimOp::create(rewriter, loc, builtinCast, i));
       }
     }
 
-    Value flowBitcast = rewriter.create<IREE::TensorExt::BitCastOp>(
-        loc, rType, builtinCast, dynDims, dynDims);
+    Value flowBitcast = IREE::TensorExt::BitCastOp::create(
+        rewriter, loc, rType, builtinCast, dynDims, dynDims);
 
-    auto torchCast =
-        rewriter.create<torch::TorchConversion::FromBuiltinTensorOp>(
-            loc, resultType, flowBitcast);
+    auto torchCast = torch::TorchConversion::FromBuiltinTensorOp::create(
+        rewriter, loc, resultType, flowBitcast);
     rewriter.replaceOp(op, torchCast);
     return success();
   }
@@ -179,13 +175,13 @@ public:
         tensorShape, rewriter.getIntegerType(unpackedBitWidth));
 
     // Cast to the builtin tensor type.
-    auto builtinCast =
-        rewriter.create<torch::TorchConversion::ToBuiltinTensorOp>(
-            loc, rhsType.toBuiltinTensor(), rhs);
+    auto builtinCast = torch::TorchConversion::ToBuiltinTensorOp::create(
+        rewriter, loc, rhsType.toBuiltinTensor(), rhs);
 
     // No dynamic dims because we are bitcasting a constant.
-    auto flowBitcast = rewriter.create<IREE::TensorExt::BitCastOp>(
-        loc, bitCastTargetType, builtinCast, ValueRange(), ValueRange());
+    auto flowBitcast = IREE::TensorExt::BitCastOp::create(
+        rewriter, loc, bitCastTargetType, builtinCast, ValueRange(),
+        ValueRange());
 
     // Cast back to the (un)signed torch tensor type to inform later lowerings.
     Type unpackedElementType;
@@ -196,9 +192,8 @@ public:
     torch::Torch::ValueTensorType newRhsType =
         torch::Torch::ValueTensorType::get(rewriter.getContext(), tensorShape,
                                            unpackedElementType);
-    auto torchCast =
-        rewriter.create<torch::TorchConversion::FromBuiltinTensorOp>(
-            loc, newRhsType, flowBitcast);
+    auto torchCast = torch::TorchConversion::FromBuiltinTensorOp::create(
+        rewriter, loc, newRhsType, flowBitcast);
     op->replaceUsesOfWith(rhs, torchCast);
     return success();
   }

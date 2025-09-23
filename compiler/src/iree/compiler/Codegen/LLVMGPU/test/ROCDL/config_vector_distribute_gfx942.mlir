@@ -1,4 +1,5 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --iree-codegen-llvmgpu-use-vector-distribution \
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=false \
+// RUN:    --iree-codegen-llvmgpu-use-vector-distribution \
 // RUN:   --iree-codegen-llvmgpu-use-unaligned-gemm-vector-distribution --iree-codegen-llvmgpu-use-igemm=false \
 // RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s
 
@@ -40,8 +41,7 @@ func.func @expanded_matmul_transpose_b() {
 // CHECK: linalg.generic {{.*}}lowering_config =  #iree_gpu.lowering_config
 // CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 // CHECK-SAME:                           reduction =  [0, 0, 0, 0, 128]
-// CHECK-SAME:                           subgroup_m_count = 1
-// CHECK-SAME:                           subgroup_n_count = 4
+// CHECK-SAME{LITERAL}:                   subgroup_basis = [[1, 1, 1, 4, 1], [0, 1, 2, 3, 4]]
 // CHECK-SAME:                           workgroup =  [1, 1, 64, 64, 0]
 
 // -----
@@ -72,8 +72,7 @@ func.func @conv_nhwc() {
 // CHECK: linalg.conv_2d_nhwc_hwcf {{.*}} lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 // CHECK-SAME:                           reduction =  [0, 0, 0, 0, 1, 1, 32]
-// CHECK-SAME:                           subgroup_m_count = 2
-// CHECK-SAME:                           subgroup_n_count = 2
+// CHECK-SAME{LITERAL}:                  subgroup_basis = [[1, 1, 2, 2, 1, 1, 1], [0, 1, 2, 3, 4, 5, 6]
 // CHECK-SAME:                           workgroup =  [1, 1, 64, 128, 0, 0, 0]
 
 // -----
@@ -86,11 +85,10 @@ func.func @conv_nhwc() {
 #target = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
   compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
   subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
-  mma = [], scaled_mma = [],
   subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
   max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
   max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #target}>
 func.func @matmul_256x256x256() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
@@ -112,7 +110,7 @@ func.func @matmul_256x256x256() attributes {hal.executable.target = #executable_
 
 // -----
 
-// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -138,8 +136,7 @@ func.func @mfma_matmul_1024x1024x1024() {
 // CHECK: linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 // CHECK-SAME:                           reduction =  [0, 0, 64]
-// CHECK-SAME:                           subgroup_m_count = 2
-// CHECK-SAME:                           subgroup_n_count = 2
+// CHECK-SAME{LITERAL}:                   subgroup_basis = [[2, 2, 1], [0, 1, 2]]
 // CHECK-SAME:                           workgroup =  [64, 128, 0]
 
 // -----
@@ -189,8 +186,7 @@ func.func @conv_nchwc() {
 // CHECK: linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 // CHECK-SAME:                           reduction =  [0, 0, 0, 0, 0, 1, 1, 1, 32]
-// CHECK-SAME:                           subgroup_m_count = 2
-// CHECK-SAME:                           subgroup_n_count = 2
+// CHECK-SAME{LITERAL}:                   subgroup_basis = [[1, 1, 1, 2, 2, 1, 1, 1, 1], [0, 1, 2, 3, 4, 5, 6, 7, 8]]
 // CHECK-SAME:                           workgroup =  [1, 1, 1, 32, 32, 0, 0, 0, 0]
 
 // -----
@@ -264,8 +260,10 @@ func.func @attention_20x4096x64x4096x64() {
 }
 
 // CHECK:                #iree_gpu.lowering_config
-// CHECK-SAME:                           subgroup_m_count = 4
-// CHECK-SAME:                           subgroup_n_count = 1
+// CHECK-SAME{LITERAL}:                  subgroup_basis = [[1, 4, 1, 1, 1], [0, 1, 3, 4]]
+// CHECK-SAME:           #iree_gpu.lowering_config
+// CHECK-SAME{LITERAL}:                  subgroup_basis = [[1, 4, 1, 1, 1], [0, 1, 2, 3]]
+// CHECK-SAME:           #iree_gpu.lowering_config
 // CHECK-SAME:                           reduction =  [0, 0, 0, 64, 0]
 // CHECK-SAME:                           workgroup =  [1, 64, 0, 0, 64]
 
@@ -306,10 +304,12 @@ func.func @attention_20x4096x64x4096x64_f8() {
   return
 }
 
-// CHECK:      VMFMA_F32_16x16x32_F8E4M3FNUZ
-// CHECK-SAME: MFMA_F32_16x16x32_F8E4M3FNUZ
-// CHECK-SAME: subgroup_m_count = 4
-// CHECK-SAME: subgroup_n_count = 1
+// CHECK:                #iree_gpu.lowering_config
+// CHECK-SAME:            VMFMA_F32_16x16x32_F8E4M3FNUZ
+// CHECK-SAME{LITERAL}:   subgroup_basis = [[1, 4, 1, 1, 1], [0, 1, 3, 4]]
+// CHECK-SAME:           #iree_gpu.lowering_config
+// CHECK-SAME:            MFMA_F32_16x16x32_F8E4M3FNUZ
+// CHECK-SAME{LITERAL}:   subgroup_basis = [[1, 4, 1, 1, 1], [0, 1, 2, 3]]
 // CHECK-SAME: reduction =  [0, 0, 0, 128, 0]
 // CHECK-SAME: workgroup =  [1, 64, 0, 0, 64]
 
@@ -354,7 +354,105 @@ func.func @attention_large_head_dim_shared_mem() {
 }
 
 // CHECK:                #iree_gpu.lowering_config
-// CHECK-SAME:                           subgroup_m_count = 2
-// CHECK-SAME:                           subgroup_n_count = 1
-// CHECK-SAME:                           reduction =  [0, 0, 16, 0]
-// CHECK-SAME:                           workgroup =  [32, 0, 0, 16]
+// CHECK-SAME{LITERAL}:   subgroup_basis = [[2, 1, 1, 1], [0, 2, 3]]
+// CHECK-SAME:           #iree_gpu.lowering_config
+// CHECK-SAME{LITERAL}:   subgroup_basis = [[2, 1, 1, 1], [0, 1, 2]]
+// CHECK:                #iree_gpu.lowering_config
+// CHECK-SAME: reduction =  [0, 0, 16, 0]
+// CHECK-SAME: workgroup =  [32, 0, 0, 16]
+
+// -----
+
+// CHECK:       #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK-LABEL: func.func @attention_20x64x4096x64_f8()
+
+// Test that the config logic can handle a missing M dimension.
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @attention_20x64x4096x64_f8() {
+  %cst = arith.constant 1.250000e-01 : f8E4M3FNUZ
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x64xf8E4M3FNUZ>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf8E4M3FNUZ>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf8E4M3FNUZ>>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<20x64xf8E4M3FNUZ>>
+  %4 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [20, 64], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x64xf8E4M3FNUZ>> -> tensor<20x64xf8E4M3FNUZ>
+  %5 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf8E4M3FNUZ>> -> tensor<20x4096x64xf8E4M3FNUZ>
+  %6 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf8E4M3FNUZ>> -> tensor<20x4096x64xf8E4M3FNUZ>
+  %7 = tensor.empty() : tensor<20x64xf8E4M3FNUZ>
+  %8 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d2, d3, d4) -> (d0, d2)>,
+                     affine_map<(d0, d2, d3, d4) -> (d0, d3, d2)>,
+                     affine_map<(d0, d2, d3, d4) -> (d0, d3, d4)>,
+                     affine_map<(d0, d2, d3, d4) -> ()>,
+                     affine_map<(d0, d2, d3, d4) -> (d0, d4)>]}
+                     ins(%4, %5, %6, %cst : tensor<20x64xf8E4M3FNUZ>, tensor<20x4096x64xf8E4M3FNUZ>, tensor<20x4096x64xf8E4M3FNUZ>, f8E4M3FNUZ) outs(%7 : tensor<20x64xf8E4M3FNUZ>) {
+                      ^bb0(%score: f32):
+                        iree_linalg_ext.yield %score : f32
+                     } -> tensor<20x64xf8E4M3FNUZ>
+  iree_tensor_ext.dispatch.tensor.store %8, %3, offsets = [0, 0], sizes = [20, 64], strides = [1, 1] : tensor<20x64xf8E4M3FNUZ> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<20x64xf8E4M3FNUZ>>
+  return
+}
+
+// -----
+
+func.func @attention_multi_m(%4 : tensor<20x256x16x64xf16>, %5 : tensor<20x4096x64xf16>, %6 : tensor<20x4096x64xf16>) -> tensor<20x256x16x64xf16> {
+  %cst = arith.constant 1.250000e-01 : f16
+  %c0 = arith.constant 0 : index
+  %7 = tensor.empty() : tensor<20x256x16x64xf16>
+  %8 = iree_linalg_ext.attention  {indexing_maps = [
+                     affine_map<(b, m0, m1, k1, k2, n) -> (b, m0, m1, k1)>,
+                     affine_map<(b, m0, m1, k1, k2, n) -> (b, k2, k1)>,
+                     affine_map<(b, m0, m1, k1, k2, n) -> (b, k2, n)>,
+                     affine_map<(b, m0, m1, k1, k2, n) -> ()>,
+                     affine_map<(b, m0, m1, k1, k2, n) -> (b, m0, m1, n)>]}
+                     ins(%4, %5, %6, %cst : tensor<20x256x16x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%7 : tensor<20x256x16x64xf16>) {
+                      ^bb0(%score: f32):
+                        iree_linalg_ext.yield %score : f32
+                     } -> tensor<20x256x16x64xf16>
+  return %8 : tensor<20x256x16x64xf16>
+}
+
+// CHECK-LABEL: func.func @attention_multi_m
+
+// CHECK:                #iree_gpu.lowering_config
+// CHECK-SAME{LITERAL}:                  subgroup_basis = [[1, 4, 1, 1, 1, 1], [0, 1, 2, 4, 5]]
+// CHECK-SAME:           #iree_gpu.lowering_config
+// CHECK-SAME{LITERAL}:                  subgroup_basis = [[1, 4, 1, 1, 1, 1], [0, 1, 2, 3, 4]]
+// CHECK-SAME:           #iree_gpu.lowering_config
+// CHECK-SAME:                           reduction =  [0, 0, 0, 0, 64, 0]
+// CHECK-SAME:                           workgroup =  [1, 4, 16, 0, 0, 64]
+
+// -----
+
+func.func @attention_multi_m_dynamic(%4 : tensor<20x8x?x16x64xf16>, %5 : tensor<20x4096x64xf16>, %6 : tensor<20x4096x64xf16>) -> tensor<20x8x?x16x64xf16> {
+  %cst = arith.constant 1.250000e-01 : f16
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %dim = tensor.dim %4, %c2 : tensor<20x8x?x16x64xf16>
+  %7 = tensor.empty(%dim) : tensor<20x8x?x16x64xf16>
+  %8 = iree_linalg_ext.attention  {indexing_maps = [
+                     affine_map<(b, m0, m1, m2, k1, k2, n) -> (b, m0, m1, m2, k1)>,
+                     affine_map<(b, m0, m1, m2, k1, k2, n) -> (b, k2, k1)>,
+                     affine_map<(b, m0, m1, m2, k1, k2, n) -> (b, k2, n)>,
+                     affine_map<(b, m0, m1, m2, k1, k2, n) -> ()>,
+                     affine_map<(b, m0, m1, m2, k1, k2, n) -> (b, m0, m1, m2, n)>]}
+                     ins(%4, %5, %6, %cst : tensor<20x8x?x16x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%7 : tensor<20x8x?x16x64xf16>) {
+                      ^bb0(%score: f32):
+                        iree_linalg_ext.yield %score : f32
+                     } -> tensor<20x8x?x16x64xf16>
+  return %8 : tensor<20x8x?x16x64xf16>
+}
+
+// CHECK-LABEL: func.func @attention_multi_m_dynamic
+// CHECK:                #iree_gpu.lowering_config
+// CHECK-SAME{LITERAL}:                  subgroup_basis = [[1, 4, 1, 1, 1, 1, 1], [0, 1, 2, 3, 5, 6]]
+// CHECK-SAME:           #iree_gpu.lowering_config
+// CHECK-SAME{LITERAL}:                  subgroup_basis = [[1, 4, 1, 1, 1, 1, 1], [0, 1, 2, 3, 4, 5]]
+// CHECK-SAME:           #iree_gpu.lowering_config
+// CHECK-SAME:                           reduction =  [0, 0, 0, 0, 0, 64, 0]
+// CHECK-SAME:                           workgroup =  [1, 4, 1, 16, 0, 0, 64]

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-spirv-select-lowering-strategy-pass)' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-codegen-gpu-generalize-named-ops),iree-spirv-select-lowering-strategy-pass)' %s | FileCheck %s
 
 // Odd K that forbids vectorization.
 
@@ -8,8 +8,8 @@
   #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [], scaled_mma = [],
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none,
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -36,7 +36,7 @@ func.func @batch_matmul_1x3x32() attributes {hal.executable.target = #executable
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseDistribute workgroup_size = [32, 1, 1]>
 //       CHECK: func.func @batch_matmul_1x3x32()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
-//       CHECK:   linalg.batch_matmul
+//       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #[[$CONFIG]]
 
 // -----
@@ -49,8 +49,8 @@ func.func @batch_matmul_1x3x32() attributes {hal.executable.target = #executable
   #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [], scaled_mma = [],
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none,
     subgroup_size_choices = [64], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -76,7 +76,7 @@ func.func @matmul_64x16xi8() attributes {hal.executable.target = #executable_tar
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [2, 32, 1]>
 //       CHECK: func.func @matmul_64x16xi8()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
-//       CHECK:   linalg.matmul
+//       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #[[$CONFIG]]
 
 // -----
@@ -89,8 +89,8 @@ func.func @matmul_64x16xi8() attributes {hal.executable.target = #executable_tar
   #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int64|int32, storage = b32, subgroup = none, dot = none, mma = [], scaled_mma = [],
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int64|int32, storage = b32, subgroup = none,
     subgroup_size_choices = [64], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -116,7 +116,7 @@ func.func @matmul_64x16xi64() attributes {hal.executable.target = #executable_ta
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [4, 16, 1]>
 //       CHECK: func.func @matmul_64x16xi64()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
-//       CHECK:   linalg.matmul
+//       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #[[$CONFIG]]
 
 // -----
@@ -129,8 +129,8 @@ func.func @matmul_64x16xi64() attributes {hal.executable.target = #executable_ta
   #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [], scaled_mma = [],
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none,
     subgroup_size_choices = [64], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -167,8 +167,9 @@ func.func @matmul_400x273() attributes {hal.executable.target = #executable_targ
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseDistribute workgroup_size = [32, 2, 1]>
 //       CHECK: func.func @matmul_400x273()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
-//       CHECK:   linalg.matmul
+//       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #[[$CONFIG]]
+//       CHECK:   linalg.generic
 
 // -----
 
@@ -180,8 +181,8 @@ func.func @matmul_400x273() attributes {hal.executable.target = #executable_targ
   #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [], scaled_mma = [],
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none,
     subgroup_size_choices = [64], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -218,8 +219,9 @@ func.func @matmul_25x546() attributes {hal.executable.target = #executable_targe
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseDistribute workgroup_size = [2, 32, 1]>
 //       CHECK: func.func @matmul_25x546()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
-//       CHECK:   linalg.matmul
+//       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #[[$CONFIG]]
+//       CHECK:   linalg.generic
 
 // -----
 
@@ -233,8 +235,8 @@ func.func @matmul_25x546() attributes {hal.executable.target = #executable_targe
   #hal.pipeline.binding<storage_buffer>
 ]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [], scaled_mma = [],
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none,
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -272,5 +274,6 @@ func.func @matmul_pointwise_256x1024() attributes {hal.executable.target = #exec
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [32, 2, 1]>
 //       CHECK: func.func @matmul_pointwise_256x1024()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
-//       CHECK:   linalg.matmul
+//       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #[[$CONFIG]]
+//       CHECK:   linalg.generic

@@ -4,11 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <memory>
-#include <utility>
-
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
-#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
@@ -103,7 +99,7 @@ struct VerifyDevicesPass
   using IREE::HAL::impl::VerifyDevicesPassBase<
       VerifyDevicesPass>::VerifyDevicesPassBase;
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     // Devices are required if we need to convert host code or executables.
     // If we only have hal.executables as input then we can bypass this.

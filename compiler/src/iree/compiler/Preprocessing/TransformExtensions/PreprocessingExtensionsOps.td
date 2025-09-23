@@ -172,4 +172,57 @@ def MatchRegionsOp : Op<Transform_Dialect, "iree.match.regions",
   let hasVerifier = 1;
 }
 
+def MatchContractionOp : Op<Transform_Dialect, "iree.match.contraction",
+    [MatchOpInterface,
+     SingleOpMatcher,
+     MemoryEffectsOpInterface]> {
+  let summary = [{Check whether the op is a contraction operation.}];
+  let description = [{
+    Matches operations that implement the ContractionOpInterface.
+    This includes operations like linalg.matmul, linalg.batch_matmul, etc.
+
+    Optionally matches specific indexing maps patterns.
+
+    #### Return modes
+
+    Succeeds if the operation is a contraction operation, and
+    produces a silenceable failure otherwise.
+
+    #### Results
+
+    Returns arrays of dimension sizes for each contraction dimension:
+    - batch_dims: Array of batch dimension sizes.
+    - m_dims: Array of M dimension sizes.
+    - n_dims: Array of N dimension sizes.
+    - k_dims: Array of K dimension sizes.
+  }];
+
+  let arguments = (ins
+    TransformHandleTypeInterface:$operand_handle,
+    TypeAttr:$lhs_type,                    // LHS input type.
+    TypeAttr:$rhs_type,                    // RHS input type.
+    TypeAttr:$output_type,                 // Output type.
+    OptionalAttr<AffineMapArrayAttr>:$indexing_maps
+  );
+
+  let results = (outs
+    TransformParamTypeInterface:$batch_dims,
+    TransformParamTypeInterface:$m_dims,
+    TransformParamTypeInterface:$n_dims,
+    TransformParamTypeInterface:$k_dims
+  );
+
+  let assemblyFormat = [{
+    $operand_handle
+    `,` `lhs_type` `=` $lhs_type
+    `,` `rhs_type` `=` $rhs_type
+    `,` `output_type` `=` $output_type
+    (`indexing_maps` $indexing_maps^)?
+    attr-dict `:` functional-type(operands, results)
+  }];
+  let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+}
+
 #endif // IREE_COMPILER_DIALECT_PREPROCESSING_TRANSFORMEXTENSIONS_PREPROCESSINGEXTENSIONS

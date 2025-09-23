@@ -45,9 +45,9 @@ static Value createTransposeOp(RewriterBase &rewriter, Location loc,
   applyPermutationToVector(dimSizes, perm);
 
   auto tensorType = cast<RankedTensorType>(tensor.getType());
-  auto emptyTensor = rewriter.create<tensor::EmptyOp>(
-      loc, dimSizes, tensorType.getElementType());
-  return rewriter.create<linalg::TransposeOp>(loc, tensor, emptyTensor, perm)
+  auto emptyTensor = tensor::EmptyOp::create(rewriter, loc, dimSizes,
+                                             tensorType.getElementType());
+  return linalg::TransposeOp::create(rewriter, loc, tensor, emptyTensor, perm)
       .getResult()[0];
 }
 
@@ -70,9 +70,10 @@ convertConvFilterToTargetLayout(linalg::Conv2DNhwcHwcfOp convOp,
 
   SmallVector<utils::IteratorType> iterators = convOp.getIteratorTypesArray();
 
-  auto genericOp = rewriter.create<linalg::GenericOp>(
-      loc, output.getType(), ValueRange{input, transposedFilter}, output,
-      ArrayRef<AffineMap>{inputMap, transposedFilterMap, outputMap}, iterators);
+  auto genericOp = linalg::GenericOp::create(
+      rewriter, loc, output.getType(), ValueRange{input, transposedFilter},
+      output, ArrayRef<AffineMap>{inputMap, transposedFilterMap, outputMap},
+      iterators);
 
   // Reuse the same payload as the original convolution op.
   rewriter.inlineRegionBefore(convOp->getRegion(0), genericOp.getRegion(),

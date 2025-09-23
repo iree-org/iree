@@ -121,9 +121,130 @@ struct ConvertToMultiMma final : OpInterfaceRewritePattern<linalg::LinalgOp> {
   }
 };
 
+// This pattern hoists pack & unpack ops out of scf.for op.
+struct PackDestinationForOp final : OpRewritePattern<scf::YieldOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(scf::YieldOp yieldOp,
+                                PatternRewriter &rewriter) const override {
+    Location loc = yieldOp.getLoc();
+
+    // Get the enclosing scf.for op.
+    auto parentOp = yieldOp->getParentOp();
+    auto forOp = dyn_cast<scf::ForOp>(parentOp);
+    if (!forOp)
+      return failure();
+
+    linalg::UnPackOp unpackOp;
+    linalg::PackOp packOp;
+    int64_t tiedResultIdx = 0;
+
+    // Iterate through all the operands of yieldOp & hoist the first legal
+    // pack-unpack pair.
+    for (auto [idx, operand] : llvm::enumerate(yieldOp.getOperands())) {
+      unpackOp = operand.getDefiningOp<linalg::UnPackOp>();
+      if (!unpackOp) {
+        continue;
+      }
+
+      // Get the corresponding packOp.
+      auto iterArg = forOp.getRegionIterArgs()[idx];
+      for (auto user : iterArg.getUsers()) {
+        packOp = dyn_cast<linalg::PackOp>(user);
+        if (packOp &&
+            ((packOp.getInnerDimsPos() == unpackOp.getInnerDimsPos()) &&
+             (packOp.getMixedTiles() == unpackOp.getMixedTiles()) &&
+             (packOp.getOuterDimsPerm() == unpackOp.getOuterDimsPerm()))) {
+          break;
+        } else {
+          packOp = nullptr;
+        }
+      }
+
+      if (packOp && unpackOp) {
+        // Apply the pattern only if packOp & unpackOp are the only 2 users of
+        // the regionIterArg.
+        bool hasOtherUsers = false;
+        for (auto user : iterArg.getUsers()) {
+          if (user != packOp && user != unpackOp) {
+            hasOtherUsers = true;
+            packOp = nullptr;
+            unpackOp = nullptr;
+            break;
+          }
+        }
+        // Set the operand index value on finding a valid pack-unpack pair to
+        // hoist.
+        if (!hasOtherUsers) {
+          tiedResultIdx = idx;
+          break;
+        }
+      }
+    }
+    if (!packOp || !unpackOp) {
+      return failure();
+    }
+
+    // Create the pack -> new scf.for -> unpack chain.
+    rewriter.setInsertionPoint(forOp);
+    Value input = linalg::PackOp::createDestinationTensor(
+        rewriter, loc, forOp.getInitArgs()[tiedResultIdx],
+        packOp.getMixedTiles(), packOp.getInnerDimsPos(),
+        packOp.getOuterDimsPerm());
+
+    auto packedDest = linalg::PackOp::create(
+        rewriter, loc, forOp.getInitArgs()[tiedResultIdx], input,
+        packOp.getInnerDimsPos(), packOp.getMixedTiles(),
+        packOp.getPaddingValue(), packOp.getOuterDimsPerm());
+
+    auto packOpValues = llvm::to_vector_of<Value>(forOp.getInitArgs());
+    packOpValues[tiedResultIdx] = packedDest.getResult();
+    scf::ForOp newForOp = scf::ForOp::create(
+        rewriter, loc, forOp.getLowerBound(), forOp.getUpperBound(),
+        forOp.getStep(), packOpValues);
+
+    // Destination tensor for the new unpackOp, based on the shape of the
+    // original tensor that got packed, to help unpack into unaligned shapes and
+    // drop padding added by the packOp.
+    Value empty = tensor::EmptyOp::create(
+        rewriter, loc, packOp.getSourceType().getShape(),
+        packOp.getSourceType().getElementType());
+
+    auto unpackedOutput = linalg::UnPackOp::create(
+        rewriter, loc, newForOp.getResults()[tiedResultIdx], empty,
+        unpackOp.getInnerDimsPos(), unpackOp.getMixedTiles(),
+        unpackOp.getOuterDimsPerm());
+
+    // Users of the result of unpackOp must use the input to the unpackOp.
+    unpackOp->getResult(0).replaceAllUsesWith(unpackOp.getOperand(0));
+
+    // Users of the result of packOp must use the init of the forOp.
+    for (auto user : forOp.getRegionIterArgs()[tiedResultIdx].getUsers()) {
+      user->getResult(0).replaceAllUsesWith(
+          newForOp.getRegionIterArgs()[tiedResultIdx]);
+    }
+
+    // Merge the old scf.for block with the new scf.for block.
+    SmallVector<Value> ivs = {newForOp.getInductionVar()};
+    SmallVector<Value> argReplacements(ivs);
+    argReplacements.append(newForOp.getRegionIterArgs().begin(),
+                           newForOp.getRegionIterArgs().end());
+    rewriter.mergeBlocks(forOp.getBody(), newForOp.getBody(), argReplacements);
+
+    // Replaces the uses of the old scf.for with the new scf.for.
+    for (int idx = 0; idx < forOp->getNumResults(); ++idx) {
+      if (idx == tiedResultIdx) {
+        forOp->getResult(idx).replaceAllUsesWith(unpackedOutput->getResult(0));
+      } else {
+        forOp->getResult(idx).replaceAllUsesWith(newForOp->getResult(idx));
+      }
+    }
+    return success();
+  }
+};
+
 void GPUPackToIntrinsicsPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   // Step 1. Pack candidate linalg ops to specified shapes.
   IRRewriter rewriter(funcOp);
@@ -168,7 +289,34 @@ void GPUPackToIntrinsicsPass::runOnOperation() {
     return !getLoweringConfig(producer) && !getLoweringConfig(consumer);
   };
 
+  // Additionally, we do not sink extract slice through generic if slice source
+  // is a block argument or if the source, slice or generic are in different
+  // blocks as this would affect how tiling uses extract slice ops.
+
+  linalg::ControlPropagationFn controlExtract =
+      [](OpOperand *opOperand) -> bool {
+    Operation *producer = opOperand->get().getDefiningOp();
+    Operation *consumer = opOperand->getOwner();
+    if (getLoweringConfig(producer) || getLoweringConfig(consumer)) {
+      return false;
+    }
+    auto sliceOp = dyn_cast<tensor::ExtractSliceOp>(producer);
+    if (!sliceOp) {
+      return false;
+    }
+    Operation *producerSrc = sliceOp.getSource().getDefiningOp();
+    // If source is not an op, e.g is a block argument then return false.
+    if (!producerSrc) {
+      return false;
+    }
+
+    return producerSrc->getBlock() == producer->getBlock() &&
+           consumer->getBlock() == producer->getBlock();
+  };
+
   linalg::populateDataLayoutPropagationPatterns(patterns, control);
+  linalg::populateExtractSliceSinkingPatterns(patterns, controlExtract);
+  patterns.add<PackDestinationForOp>(context);
   linalg::UnPackOp::getCanonicalizationPatterns(patterns, context);
   if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();

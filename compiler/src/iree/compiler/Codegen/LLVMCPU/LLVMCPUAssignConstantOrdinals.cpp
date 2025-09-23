@@ -19,7 +19,7 @@ struct LLVMCPUAssignConstantOrdinalsPass
     : public impl::LLVMCPUAssignConstantOrdinalsPassBase<
           LLVMCPUAssignConstantOrdinalsPass> {
   void runOnOperation() override {
-    auto variantOp = getOperation();
+    IREE::HAL::ExecutableVariantOp variantOp = getOperation();
 
     // Get a constant key -> ordinal mapping.
     auto keyOrdinals = variantOp.gatherConstantOrdinals();

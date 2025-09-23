@@ -5,10 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
-#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
@@ -19,6 +17,7 @@
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -32,8 +31,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-materialize-encoding"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -44,6 +41,22 @@ namespace mlir::iree_compiler {
 using namespace IREE::Encoding;
 
 namespace {
+
+static void
+updateFuncSignature(FunctionOpInterface funcOp,
+                    const MaterializeEncodingTypeConverter &typeConverter) {
+  // Do not convert the type if the type converter does not understand the
+  // conversion. E.g., `!hal.buffer_view` type.
+  auto convertType = [&](Type t) {
+    Type newType = typeConverter.convertType(t);
+    return newType ? newType : t;
+  };
+  SmallVector<Type> newInputs =
+      llvm::map_to_vector(funcOp.getArgumentTypes(), convertType);
+  SmallVector<Type> newResults =
+      llvm::map_to_vector(funcOp.getResultTypes(), convertType);
+  funcOp.setType(FunctionType::get(funcOp.getContext(), newInputs, newResults));
+}
 
 static LogicalResult
 materializeFuncOpEncodings(FunctionOpInterface funcOp,
@@ -61,24 +74,29 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     // pass, and remove the ad-hoc materialization pass for padding.
     if (targetConfig && targetConfig.getAs<IREE::GPU::GPUPaddingResolverAttr>(
                             IREE::Encoding::kEncodingResolverAttrName)) {
-      LDBG("Found GPUPaddingResolverAttr encoding resolver. Materialization "
-           "will be handled later.");
+      LDBG()
+          << "Found GPUPaddingResolverAttr encoding resolver. Materialization "
+             "will be handled later.";
       return success();
     }
 
     auto getTestTargetOrNopLayout =
         [&]() -> IREE::Encoding::LayoutMaterializerAttr {
       if (testCLGPUTarget) {
-        LDBG("Select GPUEncodingResolverAttr attribute as the layout "
-             "attribute. (testCLGPUTarget)");
+        LDBG() << "Select GPUEncodingResolverAttr attribute as the layout "
+                  "attribute. (testCLGPUTarget)";
+        SmallVector<NamedAttribute> configItems;
+        // Setting a nullptr to `target` below returns the target from command
+        // line.
+        IREE::GPU::TargetAttr targetAttr =
+            getGPUTargetAttr(ctx, /*target=*/nullptr);
+        addConfigGPUTarget(ctx, targetAttr, configItems);
         return cast<IREE::Encoding::LayoutMaterializerAttr>(
             IREE::GPU::GPUEncodingResolverAttr::get(
-                ctx,
-                DictionaryAttr::get(ctx, NamedAttribute(kGPUTargetAttrName,
-                                                        getCLGPUTarget(ctx)))));
+                ctx, DictionaryAttr::get(ctx, configItems)));
       }
-      LDBG("Select EncodingNopLayoutAttr attribute as the layout "
-           "attribute (Encoding resolver unknown or unsupported).");
+      LDBG() << "Select EncodingNopLayoutAttr attribute as the layout "
+                "attribute (Encoding resolver unknown or unsupported).";
       return cast<IREE::Encoding::LayoutMaterializerAttr>(
           IREE::Codegen::EncodingNopLayoutAttr::get(ctx));
     };
@@ -104,17 +122,21 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
                   resolverAttr.cloneWithSimplifiedConfig(targetConfig))
             : getTestTargetOrNopLayout();
 
-    LDBG("Selected Encoding::LayoutMaterializerAttr with target configuration: "
-         << layoutAttrWithTargetInfo);
+    LDBG() << "Selected Encoding::LayoutMaterializerAttr with target "
+              "configuration: "
+           << layoutAttrWithTargetInfo;
 
     MaterializeEncodingTypeConverter typeConverter(layoutAttrWithTargetInfo);
     MaterializeEncodingConversionTarget target(*ctx);
     populateMaterializeEncodingPatterns(patterns, target, typeConverter);
 
     if (failed(applyPartialConversion(funcOp, target, std::move(patterns)))) {
-      funcOp.emitOpError("materialization failed");
-      return failure();
+      return funcOp.emitOpError("materialization failed");
     }
+
+    // The update is required for testing purposes, which results in fewer IRs.
+    // We do not expect inputs and outputs from `funcOp` in practice.
+    updateFuncSignature(funcOp, typeConverter);
   }
 
   // Run patterns to fold pack/unpack ops with pad/extract_slice ops, resolve
@@ -145,8 +167,7 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
         });
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
-      funcOp.emitOpError("folding patterns failed");
-      return failure();
+      return funcOp.emitOpError("folding patterns failed");
     }
 
     IRRewriter rewriter(ctx);

@@ -16,51 +16,30 @@
 
 namespace mlir::iree_compiler {
 
-/// Deprecated! This flag had buggy/unintentional semantics.
-/// Its original comment said:
-/// ""use native hardware operations instead of polynomial approximation".
-static llvm::cl::opt<bool> clNativeMathPrecision(
-    "iree-codegen-gpu-native-math-precision",
-    llvm::cl::desc("Deprecated! This flag doesn't do anything anymore and will "
-                   "be removed soon."),
-    llvm::cl::init(false));
-
 #define GEN_PASS_DEF_MATHTRANSFORMPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 static void populateMathFunctionsRewritePatterns(
     RewritePatternSet &patterns,
     const std::function<bool(StringRef)> &predicate) {
-  if (predicate(math::TanOp::getOperationName())) {
-    populateExpandTanPattern(patterns);
+  llvm::SmallVector<StringRef> opNames,
+      opFullNames = {math::TanOp::getOperationName(),
+                     math::SinhOp::getOperationName(),
+                     math::CoshOp::getOperationName(),
+                     math::AsinhOp::getOperationName(),
+                     math::AcoshOp::getOperationName(),
+                     math::AtanhOp::getOperationName(),
+                     math::PowFOp::getOperationName(),
+                     math::FPowIOp::getOperationName(),
+                     math::Exp2Op::getOperationName(),
+                     math::RoundEvenOp::getOperationName()};
+  size_t prefix = math::MathDialect::getDialectNamespace().size() + 1;
+  for (StringRef name : opFullNames) {
+    if (predicate(name)) {
+      opNames.push_back(name.drop_front(prefix));
+    }
   }
-  if (predicate(math::SinhOp::getOperationName())) {
-    populateExpandSinhPattern(patterns);
-  }
-  if (predicate(math::CoshOp::getOperationName())) {
-    populateExpandCoshPattern(patterns);
-  }
-  if (predicate(math::AsinhOp::getOperationName())) {
-    populateExpandAsinhPattern(patterns);
-  }
-  if (predicate(math::AcoshOp::getOperationName())) {
-    populateExpandAcoshPattern(patterns);
-  }
-  if (predicate(math::AtanhOp::getOperationName())) {
-    populateExpandAtanhPattern(patterns);
-  }
-  if (predicate(math::PowFOp::getOperationName())) {
-    populateExpandPowFPattern(patterns);
-  }
-  if (predicate(math::FPowIOp::getOperationName())) {
-    populateExpandFPowIPattern(patterns);
-  }
-  if (predicate(math::Exp2Op::getOperationName())) {
-    populateExpandExp2FPattern(patterns);
-  }
-  if (predicate(math::RoundEvenOp::getOperationName())) {
-    populateExpandRoundEvenPattern(patterns);
-  }
+  math::populateExpansionPatterns(patterns, opNames);
 }
 
 static bool predicateRewrite(StringRef name,
@@ -173,27 +152,12 @@ static bool predicateDeviceLibImpl(StringRef name,
 
 namespace {
 
-struct DeprecationWarningForNativeMathPrecision {
-  DeprecationWarningForNativeMathPrecision() {
-    if (clNativeMathPrecision) {
-      clNativeMathPrecision.error(
-          "This option is deprecated, does not do anything anymore, and will "
-          "be removed soon. It was mainly used on the ROCm target, but the "
-          "behavior that it once enabled is now default on ROCm. More "
-          "generally, MathTransformPass should do the right things for each "
-          "target.");
-    }
-  }
-};
-
 class MathTransformPass final
     : public impl::MathTransformPassBase<MathTransformPass> {
 public:
   using Base::Base;
 
   void runOnOperation() override {
-    static DeprecationWarningForNativeMathPrecision warning;
-
     RewritePatternSet patterns(&getContext());
     auto target = IREE::HAL::ExecutableTargetAttr::lookup(getOperation());
     if (!target) {

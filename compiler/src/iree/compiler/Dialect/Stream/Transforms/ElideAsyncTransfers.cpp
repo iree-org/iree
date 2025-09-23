@@ -69,7 +69,10 @@ struct ElideCompatibleTransferPattern
                                          "missing affinity information");
     }
     // Check if we need to keep the transfer based on topology.
-    if (topologyAttr.requiresTransfer(sourceAffinityAttr, resultAffinityAttr)) {
+    if (!topologyAttr.hasUnifiedMemory(sourceAffinityAttr,
+                                       resultAffinityAttr) &&
+        !topologyAttr.hasTransparentAccess(sourceAffinityAttr,
+                                           resultAffinityAttr)) {
       return rewriter.notifyMatchFailure(
           transferOp, "not eliding, transfer required by topology");
     }
@@ -90,7 +93,7 @@ struct ElideAsyncTransfersPass
           ElideAsyncTransfersPass> {
   using ElideAsyncTransfersPassBase::ElideAsyncTransfersPassBase;
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     // Get the topology attribute from the module.
     auto topologyAttr =

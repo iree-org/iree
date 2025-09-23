@@ -51,11 +51,15 @@ def ElementwiseOpFusionPass :
   let summary = "Fuse elementwise operations.";
   let options = [
     Option<"intraDispatch", "intra-dispatch", "bool",
-           /*default=*/"false", "Fuse operations within a dispatch only (default is to fuse only operations outside of a dispatch)">,
+           /*default=*/"false",
+           "Fuse operations within a dispatch only (default is to fuse only operations outside of a dispatch)">,
     Option<"fuseMultiReduction", "fuse-multi-reduction", "bool",
            /*default=*/"true", "Fuse ops that have multiple reduction iterators">,
     Option<"fuseTruncateOps", "fuse-truncate-ops", "bool",
-           /*default=*/"false", "Fuse producer truncate-like operations with consumers">,
+           /*default=*/"false",
+           "Fuse producer truncate-like operations with consumers">,
+    Option<"fuseBroadcastOps", "fuse-broadcast-ops", "bool",
+           /*default=*/"false", "Fuse broadcast-like ops with producers">,
   ];
   let dependentDialects = [
     "mlir::affine::AffineDialect",
@@ -137,6 +141,8 @@ def FuseMultiUseElementwiseProducerPass :
                    "mlir::FunctionOpInterface"> {
   let summary = "Fuse elementwise linalg operations on tensors when producers have multiple uses.";
   let options = [
+    Option<"intraDispatch", "intra-dispatch", "bool",
+           /*default=*/"false", "Fuse operations within a dispatch only (default is to fuse only operations outside of a dispatch)">,
     Option<"numIterations", "num-iterations", "unsigned",
            /*default=*/"2", "Number of iterations to fuse multiuse ops">
   ];
@@ -275,12 +281,26 @@ def FormScalarDispatchesPass :
   ];
 }
 
+def SetSplitReductionSizesPass :
+    Pass<"iree-dispatch-creation-set-split-reduction-sizes"> {
+  let summary = "Set 'iree_linalg_ext.split_reduction' attribute on ops";
+  let options = [
+    Option<"splitReductionTargetSize", "split-reduction-target-size", "int64_t", "1024",
+           "Target tile size for split reduction. Inner reduction "
+           "dimensions are tiled first, with the tile size rounded "
+           "up until it evenly divides the iteration domain.">
+  ];
+  let dependentDialects = [];
+}
+
 def FormSplitReductionDispatchesPass :
     InterfacePass<"iree-dispatch-creation-form-split-reduction-dispatches", "mlir::FunctionOpInterface"> {
   let summary = "Partially tile reduction operations and place into dispatches";
   let options = [
     ListOption<"splitSize", "split-size", "int",
-        "Tile sizes for split reduction (innermost first)">
+        "Tile sizes for split reduction (innermost first)">,
+    Option<"enableFusePad", "enable-fuse-pad", "bool",
+        /*default=*/"false", "Fuse pad into scf.forall">
   ];
   let dependentDialects = [
     "IREE::Flow::FlowDialect",
@@ -324,9 +344,23 @@ def PropagateEncodingsPass :
   ];
 }
 
+def AnnotateDataTilingHintsPass :
+    InterfacePass<"iree-dispatch-creation-annotate-data-tiling-hints", "mlir::FunctionOpInterface"> {
+  let summary = "Adds data-tiling hint attribute to linalg operations.";
+  let description = [{
+    The pass does nothing, if any operation already has the data-tiling hint
+    attribute. Otherwise, it aggressively filters linalg ops and adds the
+    data-tiling hint attribute to the operations.
+  }];
+}
+
 def SetEncodingPass : InterfacePass<"iree-dispatch-creation-set-encoding",
                                     "mlir::FunctionOpInterface"> {
   let summary = "Introduces tensor encoding for flow dispatch regions.";
+  let description = [{
+    Sets the encoding for compute operations to allow execution of the
+    operations in tiled/padded layouts.
+  }];
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
     "IREE::Flow::FlowDialect",
@@ -343,9 +377,6 @@ def SetEncodingPass : InterfacePass<"iree-dispatch-creation-set-encoding",
             clEnumValN(
                 mlir::iree_compiler::DispatchCreation::EncodingOptions::Padding,
                 "padding", "Encode tensors that need to be padded."),
-            clEnumValN(
-                mlir::iree_compiler::DispatchCreation::EncodingOptions::MatmulK,
-                "matmulk", "Only encodes reduction dimensions in the encoding."),
             clEnumValN(
                 mlir::iree_compiler::DispatchCreation::EncodingOptions::Generic,
                 "default", "Uses EncodingAttr which encodes as much information as possible."))}]>,

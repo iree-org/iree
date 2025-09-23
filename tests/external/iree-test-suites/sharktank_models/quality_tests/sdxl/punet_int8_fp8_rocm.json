@@ -27,12 +27,12 @@
     ],
     "outputs": [
         {
-            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_output.bin",
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_output_v2.bin",
             "value": "1x4x128x128xf16"
         }
     ],
     "real_weights": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/punet_fp8_weights.irpa",
-    "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/stan/sdxl-punet/11-26-2024/punet_fp8.mlir",
+    "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/08122025_transpose_manual/mlir/punet_fp8.mlir",
     "device": "hip",
     "compiler_flags": [
         "--iree-hal-target-device=hip",
@@ -42,8 +42,6 @@
         "--iree-vm-target-truncate-unsupported-floats",
         "--iree-llvmgpu-enable-prefetch=true",
         "--iree-opt-data-tiling=false",
-        "--iree-codegen-gpu-native-math-precision=true",
-        "--iree-codegen-llvmgpu-use-vector-distribution",
         "--iree-hip-waves-per-eu=2",
         "--iree-execution-model=async-external",
         "--iree-scheduling-dump-statistics-format=json",

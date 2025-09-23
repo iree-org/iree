@@ -14,6 +14,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -33,8 +34,6 @@
 #include "mlir/Support/FileUtilities.h"
 
 #define DEBUG_TYPE "iree-codegen-materialize-tuning-specs"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -82,7 +81,7 @@ static LogicalResult dumpFinalTuningSpecToDir(ModuleOp tuningSpec) {
     return tuningSpec->emitError()
            << "Failed to create a unique file in " << dir << "\n";
   }
-  LDBG("Linked tuning spec file path: " << dumpPath);
+  LDBG() << "Linked tuning spec file path: " << dumpPath;
 
   std::string error;
   auto file = mlir::openOutputFile(dumpPath, &error);
@@ -180,12 +179,12 @@ struct MaterializeTuningSpecsPass final
   }
 
   void runOnOperation() override {
-    ModuleOp module = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     MLIRContext *ctx = &getContext();
     auto dialect = ctx->getOrLoadDialect<IREE::Codegen::IREECodegenDialect>();
     assert(dialect);
 
-    FailureOr<ModuleOp> userTuningSpec = getUserTuningSpec(module, *dialect);
+    FailureOr<ModuleOp> userTuningSpec = getUserTuningSpec(moduleOp, *dialect);
     const bool hasUserTuningSpec = succeeded(userTuningSpec);
     if (!hasUserTuningSpec && !clCodegenTuningSpecPath.empty()) {
       // When a user spec is requested but fails to load, this is a hard
@@ -194,7 +193,7 @@ struct MaterializeTuningSpecsPass final
     }
 
     FailureOr<ModuleOp> defaultTuningSpec =
-        getDefaultTuningSpec(module, *dialect);
+        getDefaultTuningSpec(moduleOp, *dialect);
     const bool hasDefaultTuningSpec = succeeded(defaultTuningSpec);
     if (!hasUserTuningSpec && !hasDefaultTuningSpec) {
       // No specs available, nothing to do.
@@ -226,10 +225,10 @@ struct MaterializeTuningSpecsPass final
       FailureOr<DenseElementsAttr> serializedSpec =
           serializeTuningSpecToAttr(tuningSpecWithDefaultAttr);
       if (failed(serializedSpec)) {
-        module->emitError("Failed to serialize default tuning specs");
+        moduleOp->emitError("Failed to serialize default tuning specs");
         return signalPassFailure();
       }
-      module->setAttr(kSerializedTuningSpecAttrName, *serializedSpec);
+      moduleOp->setAttr(kSerializedTuningSpecAttrName, *serializedSpec);
       return;
     }
 
@@ -260,7 +259,7 @@ struct MaterializeTuningSpecsPass final
     FailureOr<transform::NamedSequenceOp> newEntrypoint =
         linkTuningSpecs(linkedTuningSpec.get());
     if (failed(newEntrypoint)) {
-      module->emitError("Failed to link tuning specs");
+      moduleOp->emitError("Failed to link tuning specs");
       return signalPassFailure();
     }
 
@@ -271,10 +270,10 @@ struct MaterializeTuningSpecsPass final
     FailureOr<DenseElementsAttr> serializedSpec =
         serializeTuningSpecToAttr(linkedTuningSpec.get());
     if (failed(serializedSpec)) {
-      module->emitError("Failed to serialize linked tuning specs");
+      moduleOp->emitError("Failed to serialize linked tuning specs");
       return signalPassFailure();
     }
-    module->setAttr(kSerializedTuningSpecAttrName, *serializedSpec);
+    moduleOp->setAttr(kSerializedTuningSpecAttrName, *serializedSpec);
   }
 };
 

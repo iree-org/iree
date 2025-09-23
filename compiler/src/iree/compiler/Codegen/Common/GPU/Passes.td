@@ -140,6 +140,13 @@ def GPUFuseAndHoistParallelLoopsPass :
 def GPUGeneralizeNamedOpsPass :
     InterfacePass<"iree-codegen-gpu-generalize-named-ops", "mlir::FunctionOpInterface"> {
   let summary = "Convert named Linalg ops to linalg.generic ops";
+
+  let description = [{
+    Convert a subset of named Linalg ops to linalg.generics. The subset does not
+    contain all named ops. The rule-of-thumb is that named ops whose operand
+    maps are projections are in the subset. For example convolutions and pooling ops
+    are not generalized by this pass, but matmuls are.
+  }];
 }
 
 def GPUGreedilyDistributeToThreadsPass :
@@ -161,19 +168,6 @@ def GPUInferMemorySpacePass :
   ];
 }
 
-def GPULowerToUKernelsPass :
-    Pass<"iree-codegen-gpu-lower-to-ukernels", ""> {
-  let summary = "Lower suitable ops to previously-selected microkernels";
-  let dependentDialects = [
-    "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
-    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
-    "::mlir::arith::ArithDialect",
-    "::mlir::bufferization::BufferizationDialect",
-    "::mlir::gpu::GPUDialect",
-    "::mlir::tensor::TensorDialect",
-  ];
-}
-
 def GPUMultiBufferingPass :
     InterfacePass<"iree-codegen-gpu-multi-buffering", "mlir::FunctionOpInterface"> {
   let summary = "Pass to do multi buffering.";
@@ -191,6 +185,16 @@ def GPUPackToIntrinsicsPass :
   let dependentDialects = [
     "::mlir::tensor::TensorDialect",
     "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
+  ];
+}
+
+def GPUPadConvsPass :
+    InterfacePass<"iree-codegen-gpu-pad-convs",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Pass to pad operands of a convolution with padding configuration provided.";
+  let dependentDialects = [
+    "::mlir::linalg::LinalgDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
   ];
 }
@@ -300,6 +304,17 @@ def GPUTensorTilePass :
     Option<"distributeToSubgroup", "distribute-to-subgroup", "bool",
            /*default=*/"false",
            "Distribute the workloads to subgroup if true, otherwise distribute to threads.">,
+  ];
+}
+
+def GPUTileAndConvertConvToMatmulPass :
+    InterfacePass<"iree-codegen-gpu-tile-and-convert-conv-to-matmul", "mlir::FunctionOpInterface"> {
+  let summary = "Convert convolution to matmul using tiling.";
+  let dependentDialects = [
+    "::mlir::tensor::TensorDialect",
+    "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+    "::mlir::scf::SCFDialect",
   ];
 }
 

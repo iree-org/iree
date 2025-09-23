@@ -144,8 +144,8 @@ struct DispatchTensorStoreOpInterface
               cast<MemRefType>(target.getType()), storeOp.getMixedOffsets(),
               storeOp.getMixedSizes(), storeOp.getMixedStrides()));
 
-      target = rewriter.create<memref::SubViewOp>(
-          storeOp->getLoc(), subviewMemRefType, target,
+      target = memref::SubViewOp::create(
+          rewriter, storeOp->getLoc(), subviewMemRefType, target,
           storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
           storeOp.getMixedStrides());
     } // else: Writing the entire tensor, no subview required.
@@ -390,9 +390,9 @@ static LogicalResult bufferizePackOp(RewriterBase &rewriter, linalg::PackOp op,
 
   // Set insertion point now that potential alloc/dealloc are introduced.
   rewriter.setInsertionPoint(op);
-  rewriter.create<IREE::LinalgExt::PackOp>(
-      op.getLoc(), source, dest, op.getInnerDimsPos(), op.getMixedTiles(),
-      op.getPaddingValue(), op.getOuterDimsPerm());
+  IREE::LinalgExt::PackOp::create(rewriter, op.getLoc(), source, dest,
+                                  op.getInnerDimsPos(), op.getMixedTiles(),
+                                  op.getPaddingValue(), op.getOuterDimsPerm());
 
   // Replace the results of the old op with the new output buffers.
   bufferization::replaceOpWithBufferizedValues(rewriter, op, dest);
@@ -416,9 +416,9 @@ static LogicalResult bufferizeUnPackOp(RewriterBase &rewriter,
 
   // Set insertion point now that potential alloc/dealloc are introduced.
   rewriter.setInsertionPoint(op);
-  rewriter.create<IREE::LinalgExt::UnPackOp>(
-      op.getLoc(), source, dest, op.getInnerDimsPos(), op.getMixedTiles(),
-      op.getOuterDimsPerm());
+  IREE::LinalgExt::UnPackOp::create(rewriter, op.getLoc(), source, dest,
+                                    op.getInnerDimsPos(), op.getMixedTiles(),
+                                    op.getOuterDimsPerm());
 
   // Replace the results of the old op with the new output buffers.
   bufferization::replaceOpWithBufferizedValues(rewriter, op, dest);
@@ -557,8 +557,9 @@ struct DispatchTensorStoreOpSubsetInsertionInterface
   Value buildSubsetExtraction(Operation *op, OpBuilder &builder,
                               Location loc) const {
     auto storeOp = cast<IREE::TensorExt::DispatchTensorStoreOp>(op);
-    auto loadOp = builder.create<IREE::TensorExt::DispatchTensorLoadOp>(
-        loc, llvm::cast<RankedTensorType>(storeOp.getValue().getType()),
+    auto loadOp = IREE::TensorExt::DispatchTensorLoadOp::create(
+        builder, loc,
+        llvm::cast<RankedTensorType>(storeOp.getValue().getType()),
         storeOp.getTarget(), storeOp.getTargetDims(), storeOp.getMixedOffsets(),
         storeOp.getMixedSizes(), storeOp.getMixedStrides());
     return loadOp.getResult();
@@ -650,8 +651,8 @@ struct StoreToBufferOpSubsetInsertionInterface
   Value buildSubsetExtraction(Operation *op, OpBuilder &builder,
                               Location loc) const {
     auto storeOp = cast<IREE::Codegen::StoreToBufferOp>(op);
-    auto loadOp = builder.create<IREE::Codegen::LoadFromBufferOp>(
-        loc, storeOp.getTensor().getType(), storeOp.getBuffer());
+    auto loadOp = IREE::Codegen::LoadFromBufferOp::create(
+        builder, loc, storeOp.getTensor().getType(), storeOp.getBuffer());
     return loadOp.getResult();
   }
 

@@ -17,6 +17,7 @@ iree_cc_library(
     "FusionUtils.h"
     "Passes.h"
   SRCS
+    "AnnotateDataTilingHints.cpp"
     "BitcastUnsupportedElementTypes.cpp"
     "BubbleUpExpandShapes.cpp"
     "CloneProducersIntoDispatchRegions.cpp"
@@ -40,6 +41,7 @@ iree_cc_library(
     "Passes.cpp"
     "PropagateEncodings.cpp"
     "SetEncoding.cpp"
+    "SetSplitReductionSizes.cpp"
     "SinkReshapes.cpp"
     "SplitReduction.cpp"
     "TensorPadToTensorInsertSlice.cpp"
@@ -83,6 +85,7 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::Encoding::IR
+    iree::compiler::Dialect::Encoding::Utils
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms

@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "annotate_data_tiling_hints.mlir"
     "bitcast_unsupported_element_types.mlir"
     "bubble_up_expand_shapes.mlir"
     "bubble_up_extract_slice.mlir"
@@ -36,6 +37,7 @@ iree_lit_test_suite(
     "fuse_encoding_ops_into_dispatch_regions.mlir"
     "fuse_horizontal_contractions.mlir"
     "fuse_multiuse_elementwise_producer.mlir"
+    "fuse_multiuse_intra_dispatch.mlir"
     "fusion_preprocessing.mlir"
     "hoist_encoding_ops.mlir"
     "hoist_uniform_scalar_compute.mlir"
@@ -44,10 +46,12 @@ iree_lit_test_suite(
     "pad_fusion_with_producer.mlir"
     "pipeline_tests.mlir"
     "pipeline_tests_aggressive.mlir"
+    "pipeline_tests_split_reduction.mlir"
     "propagate_encodings.mlir"
     "set_encoding.mlir"
     "set_encoding_padding.mlir"
     "set_encoding_pipeline.mlir"
+    "set_split_reduction_sizes.mlir"
     "sink_reshapes.mlir"
     "split_reduction.mlir"
     "tensor_pad_to_tensor_insert_slice.mlir"

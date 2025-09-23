@@ -18,16 +18,22 @@ namespace mlir::iree_compiler::IREE::GPU {
 /// specified target.
 LogicalResult setDataTiledMultiMmaLoweringConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
-    Operation *op, IREE::GPU::UKernelConfigAttr ukernelConfig);
+    Operation *op, IREE::Codegen::UKernelDescriptorAttr ukernelConfig);
+
+/// Helper for setting up a convolution config using direct convolution based on
+/// the specified target.
+LogicalResult
+setDirectConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
+                                   mlir::FunctionOpInterface entryPoint,
+                                   Operation *op);
 
 /// Helper for setting up a convolution config using IGEMM based on the
 /// specified target.
 /// TODO: Currently this only succeeds if the target supports an mma
 /// kind. Add support for a fallback direct lowering path.
-LogicalResult
-setIGEMMConvolutionLoweringConfig(IREE::GPU::TargetAttr target,
-                                  mlir::FunctionOpInterface entryPoint,
-                                  Operation *op, bool useDirectLoad = false);
+LogicalResult setIGEMMConvolutionLoweringConfig(
+    IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
+    Operation *op, bool useDirectLoad = false, bool padConv = false);
 
 /// Helper for setting up a matmul config based on the specified target.
 /// TODO: Currently this only succeeds if the target supports an mma

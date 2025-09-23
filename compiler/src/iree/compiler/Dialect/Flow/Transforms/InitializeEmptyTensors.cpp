@@ -43,7 +43,7 @@ namespace {
 
 /// Converts an tensor.empty() op to `flow.tensor.splat` op.
 struct RewriteTensorEmptyToSplat : public OpRewritePattern<tensor::EmptyOp> {
-  using OpRewritePattern<tensor::EmptyOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::EmptyOp emptyTensorOp,
                                 PatternRewriter &rewriter) const override {
     if (!shouldBeConvertedToFlowTensorOp(emptyTensorOp)) {
@@ -58,7 +58,7 @@ struct RewriteTensorEmptyToSplat : public OpRewritePattern<tensor::EmptyOp> {
           emptyTensorOp, "unable to get zero value for element type");
     }
     Value value =
-        rewriter.create<arith::ConstantOp>(loc, elementType, zero.value());
+        arith::ConstantOp::create(rewriter, loc, elementType, zero.value());
     rewriter.replaceOpWithNewOp<TensorSplatOp>(emptyTensorOp, resultType, value,
                                                emptyTensorOp.getDynamicSizes());
     return success();
@@ -67,7 +67,7 @@ struct RewriteTensorEmptyToSplat : public OpRewritePattern<tensor::EmptyOp> {
 
 /// Converts an tensor.empty() op to `flow.tensor.empty` op.
 struct RewriteTensorEmptyToEmpty : public OpRewritePattern<tensor::EmptyOp> {
-  using OpRewritePattern<tensor::EmptyOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::EmptyOp emptyTensorOp,
                                 PatternRewriter &rewriter) const override {
     if (!shouldBeConvertedToFlowTensorOp(emptyTensorOp)) {

@@ -178,7 +178,7 @@ By default, the CMake build includes:
 
 The default build does _not_ include:
 
-* CUDA and ROCM/HIP targets
+* CUDA and ROCm/HIP targets
 * Python and other language bindings for the compiler or runtime
 * Advanced features like AddressSanitizer or tracing instrumentation
 * Experimental components
@@ -213,6 +213,19 @@ The default build does _not_ include:
         cmake -G Ninja -B ../iree-build/ -S . \
             -DIREE_TARGET_BACKEND_CUDA=ON \
             -DIREE_HAL_DRIVER_CUDA=ON
+        ```
+
+    === "Enable ROCm/HIP"
+
+        This configure command will
+
+        * Enable the ROCm compiler target backend
+        * Enable the HIP runtime HAL driver
+
+        ``` shell
+        cmake -G Ninja -B ../iree-build/ -S . \
+            -DIREE_TARGET_BACKEND_ROCM=ON \
+            -DIREE_HAL_DRIVER_HIP=ON
         ```
 
 ### Extensions and integrations

@@ -14,7 +14,6 @@
 #include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
-#include "iree/compiler/Utils/ModuleUtils.h"
 #include "iree/compiler/Utils/StringUtils.h"
 #include "iree/compiler/Utils/ToolUtils.h"
 #include "iree/schemas/cuda_executable_def_builder.h"
@@ -22,7 +21,6 @@
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
-#include "llvm/IR/Constants.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
@@ -424,7 +422,7 @@ public:
 
     if (auto target = GPU::getCUDATargetDetails(
             options.clTarget, options.clTargetFeatures, context)) {
-      configItems.emplace_back(kGPUTargetAttrName, target);
+      addConfigGPUTarget(context, target, configItems);
     }
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
@@ -467,7 +465,8 @@ public:
     auto targetAttr = variantOp.getTargetAttr();
     StringRef targetArch = options.clTarget;
     StringRef targetFeatures = options.clTargetFeatures;
-    if (auto attr = getGPUTargetAttr(targetAttr)) {
+    if (auto attr =
+            getGPUTargetAttr(executableBuilder.getContext(), targetAttr)) {
       targetArch = attr.getArch();
       targetFeatures = attr.getFeatures();
     }
@@ -697,10 +696,12 @@ public:
     iree_hal_cuda_ExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
-    executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        variantOp.getLoc(), variantOp.getSymName(),
+    auto binaryOp = IREE::HAL::ExecutableBinaryOp::create(
+        executableBuilder, variantOp.getLoc(), variantOp.getSymName(),
         variantOp.getTarget().getFormat(),
         builder.getBufferAttr(executableBuilder.getContext()));
+    binaryOp.setMimeTypeAttr(
+        executableBuilder.getStringAttr("application/x-flatbuffers"));
 
     return success();
   }

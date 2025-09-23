@@ -4,9 +4,9 @@ module attributes { transform.with_named_sequence } {
   // default IREE codegen.
   transform.named_sequence @custom_transform_strategy(
       %variant_op: !transform.any_op) {
-    // Step 1. Re-match the matmul
+    // Step 1. Re-match the matmul. It is now a linalg.generic, because of op generalization in the SPIRV pipeline
     // ===========================================================================
-    %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    %matmul = transform.structured.match ops{["linalg.generic"]} in %variant_op : (!transform.any_op) -> !transform.any_op
 
     // Step 2. Tile to grid
     // ===========================================================================
@@ -48,7 +48,6 @@ module attributes { transform.with_named_sequence } {
     transform.iree.forall_to_workgroup %func_7 : (!transform.any_op) -> ()
     transform.iree.map_nested_forall_to_gpu_threads %func_7
         workgroup_dims = [4, 8, 1] : (!transform.any_op) -> ()
-
     transform.print {name = "Ran custom_transform_strategy"}
     transform.yield
   }
@@ -79,9 +78,24 @@ module attributes { transform.with_named_sequence } {
   //===------------------------------------------------------===
   // Matchers
   //===------------------------------------------------------===
-  transform.named_sequence @match_matmul(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op) {
-    transform.match.operation_name %matmul ["linalg.matmul"] : !transform.any_op
-    transform.yield %matmul : !transform.any_op
+
+  // Match for our matmul (a linalg.generic with certain properties).
+  transform.named_sequence @match_matmul(%root: !transform.any_op {transform.readonly}) -> !transform.any_op {
+    transform.match.operation_name %root ["linalg.generic"] : !transform.any_op
+    %ins, %outs = transform.iree.match.cast_compatible_dag_from_root %root {
+      ^bb0(%lhs: tensor<16x5xf32>, %rhs: tensor<5x16xf32>, %out: tensor<16x16xf32>):
+      %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                                            affine_map<(d0, d1, d2) -> (d2, d1)>,
+                                            affine_map<(d0, d1, d2) -> (d0, d1)>],
+                            iterator_types = ["parallel", "parallel", "reduction"]}
+          ins(%lhs, %rhs : tensor<16x5xf32>, tensor<5x16xf32>) outs(%out : tensor<16x16xf32>) {
+        ^bb0(%in: f32, %in_0: f32, %acc: f32):
+          %10 = arith.mulf %in, %in_0 : f32
+          %11 = arith.addf %acc, %10 : f32
+          linalg.yield %11 : f32
+        } -> tensor<16x16xf32>
+    } : (!transform.any_op) -> (!transform.any_value, !transform.any_value)
+    transform.yield %root : !transform.any_op
   }
 
   transform.named_sequence @match_reduce(%reduce: !transform.any_op {transform.readonly}) -> (!transform.any_op) {
@@ -91,7 +105,6 @@ module attributes { transform.with_named_sequence } {
       %c2 = transform.param.constant 2 : i64 -> !transform.param<i64>
       %rank = transform.match.structured.rank %arg1 : (!transform.any_op) -> !transform.param<i64>
       transform.match.param.cmpi eq %rank, %c2 : !transform.param<i64>
-
       transform.match.structured.dim %arg1[-1] {reduction} : !transform.any_op
       transform.match.structured.yield %arg1 : !transform.any_op
     }

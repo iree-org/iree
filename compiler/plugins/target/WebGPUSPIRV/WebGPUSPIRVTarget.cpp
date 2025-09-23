@@ -88,7 +88,7 @@ public:
     Builder b(context);
     SmallVector<NamedAttribute, 1> configItems;
     if (auto target = GPU::getWebGPUTargetDetails(context)) {
-      configItems.emplace_back(kGPUTargetAttrName, target);
+      addConfigGPUTarget(context, target, configItems);
     }
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
@@ -249,8 +249,8 @@ public:
     iree_hal_webgpu_ExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
-    auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        variantOp.getLoc(), variantOp.getSymName(),
+    auto binaryOp = IREE::HAL::ExecutableBinaryOp::create(
+        executableBuilder, variantOp.getLoc(), variantOp.getSymName(),
         variantOp.getTarget().getFormat(),
         builder.getBufferAttr(executableBuilder.getContext()));
     binaryOp.setMimeTypeAttr(

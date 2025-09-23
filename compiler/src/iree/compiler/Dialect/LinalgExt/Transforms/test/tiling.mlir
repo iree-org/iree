@@ -2424,6 +2424,176 @@ module attributes { transform.with_named_sequence } {
 
 // -----
 
+func.func public @arg_compare_split_reduction_dynamic(%arg0: tensor<?x?xf32>) -> (tensor<?xf32>, tensor<?xi32>) {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0_i32 = arith.constant 0 : i32
+
+  %dim = tensor.dim %arg0, %c0 : tensor<?x?xf32>
+  %0 = tensor.empty(%dim) : tensor<?xf32>
+  %1 = tensor.empty(%dim) : tensor<?xi32>
+
+  %2 = linalg.fill ins(%cst : f32) outs(%0 : tensor<?xf32>) -> tensor<?xf32>
+  %3 = linalg.fill ins(%c0_i32 : i32) outs(%1 : tensor<?xi32>) -> tensor<?xi32>
+
+  %4:2 = iree_linalg_ext.arg_compare {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>],
+      iterator_types = ["parallel", "reduction"]}
+      dimension(1)
+      ins(%arg0 : tensor<?x?xf32>) outs(%2, %3 : tensor<?xf32>, tensor<?xi32>) {
+    ^bb0(%in: f32, %out_val: f32):  // Only 2 arguments: input and init value.
+      %cmp = arith.cmpf ogt, %in, %out_val : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<?xf32>, tensor<?xi32>
+
+  return %4#0, %4#1 : tensor<?xf32>, tensor<?xi32>
+}
+
+// CHECK-LABEL: func.func public @arg_compare_split_reduction_dynamic
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<?x?xf32>)
+
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK-DAG: %[[C0_I32:.+]] = arith.constant 0 : i32
+
+// CHECK-DAG: %[[DIM:.+]] = tensor.dim %[[ARG0]], %[[C0]] : tensor<?x?xf32>
+// CHECK-DAG: %[[EMPTY_VAL:.+]] = tensor.empty(%[[DIM]]) : tensor<?xf32>
+// CHECK-DAG: %[[EMPTY_IDX:.+]] = tensor.empty(%[[DIM]]) : tensor<?xi32>
+
+// CHECK-DAG: %[[FILL_VAL:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[EMPTY_VAL]] : tensor<?xf32>) -> tensor<?xf32>
+// CHECK-DAG: %[[FILL_IDX:.+]] = linalg.fill ins(%[[C0_I32]] : i32) outs(%[[EMPTY_IDX]] : tensor<?xi32>) -> tensor<?xi32>
+
+// CHECK-DAG: %[[DIM_0:.+]] = tensor.dim %[[ARG0]], %[[C1]] : tensor<?x?xf32>
+// CHECK-DAG: %[[NUM_CHUNKS:.+]] = affine.apply #[[MAP:.+]]()[%[[DIM_0]]]
+// CHECK-DAG: %[[PARTIAL_VAL_EMPTY:.+]] = tensor.empty(%[[DIM]], %[[NUM_CHUNKS]]) : tensor<?x?xf32>
+// CHECK-DAG: %[[PARTIAL_IDX_EMPTY:.+]] = tensor.empty(%[[DIM]], %[[NUM_CHUNKS]]) : tensor<?x?xi32>
+
+// CHECK-DAG: %[[BROADCAST_VAL:.+]] = linalg.broadcast ins(%[[FILL_VAL]] : tensor<?xf32>) outs(%[[PARTIAL_VAL_EMPTY]] : tensor<?x?xf32>) dimensions = [1]
+// CHECK-DAG: %[[BROADCAST_IDX:.+]] = linalg.broadcast ins(%[[FILL_IDX]] : tensor<?xi32>) outs(%[[PARTIAL_IDX_EMPTY]] : tensor<?x?xi32>) dimensions = [1]
+
+// CHECK: %[[ITER:.+]]:2 = scf.forall (%[[IV:.+]]) = (0) to (%[[DIM_0]]) step (128) shared_outs(%[[VAL_SHARED:.+]] = %[[BROADCAST_VAL]], %[[IDX_SHARED:.+]] = %[[BROADCAST_IDX]]) -> (tensor<?x?xf32>, tensor<?x?xi32>)
+// CHECK:   %[[CHUNK_SIZE:.+]] = affine.min #[[MAP1:.+]](%[[IV]])[%[[DIM_0]]]
+// CHECK:   %[[CHUNK_IDX:.+]] = affine.apply #[[MAP2:.+]]()[%[[IV]]]
+// CHECK:   %[[INPUT_SLICE:.+]] = tensor.extract_slice %[[ARG0]][0, %[[IV]]] [%[[DIM]], %[[CHUNK_SIZE]]] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+// CHECK:   %[[VAL_SLICE:.+]] = tensor.extract_slice %[[VAL_SHARED]][0, %[[CHUNK_IDX]]] [%[[DIM]], 1] [1, 1] : tensor<?x?xf32> to tensor<?xf32>
+// CHECK:   %[[IDX_SLICE:.+]] = tensor.extract_slice %[[IDX_SHARED]][0, %[[CHUNK_IDX]]] [%[[DIM]], 1] [1, 1] : tensor<?x?xi32> to tensor<?xi32>
+
+// CHECK:   %[[INDEX_BASE:.+]] = arith.muli %[[CHUNK_IDX]], %[[CHUNK_SIZE]] : index
+
+// CHECK:   %[[ARG_COMPARE:.+]]:2 = iree_linalg_ext.arg_compare dimension(1) ins(%[[INPUT_SLICE]] : tensor<?x?xf32>) outs(%[[VAL_SLICE]], %[[IDX_SLICE]] : tensor<?xf32>, tensor<?xi32>) index_base(%[[INDEX_BASE]] : index)
+// CHECK:     ^bb0(%[[IN:.+]]: f32, %[[OUT_VAL:.+]]: f32):
+// CHECK:       %[[CMP:.+]] = arith.cmpf ogt, %[[IN]], %[[OUT_VAL]] : f32
+// CHECK:       iree_linalg_ext.yield %[[CMP]] : i1
+// CHECK:     } -> tensor<?xf32>, tensor<?xi32>
+
+// CHECK:   scf.forall.in_parallel {
+// CHECK:     tensor.parallel_insert_slice %[[ARG_COMPARE]]#0 into %[[VAL_SHARED]][0, %[[CHUNK_IDX]]] [%[[DIM]], 1] [1, 1] : tensor<?xf32> into tensor<?x?xf32>
+// CHECK:     tensor.parallel_insert_slice %[[ARG_COMPARE]]#1 into %[[IDX_SHARED]][0, %[[CHUNK_IDX]]] [%[[DIM]], 1] [1, 1] : tensor<?xi32> into tensor<?x?xi32>
+// CHECK:   }
+
+// CHECK: %[[REDUCED:.+]]:2 = linalg.reduce ins(%[[ITER]]#0, %[[ITER]]#1 : tensor<?x?xf32>, tensor<?x?xi32>) outs(%[[FILL_VAL]], %[[FILL_IDX]] : tensor<?xf32>, tensor<?xi32>) dimensions = [1]
+// CHECK:   (%[[IN:.+]]: f32, %[[IN_IDX:.+]]: i32, %[[INIT:.+]]: f32, %[[INIT_IDX:.+]]: i32) {
+// CHECK:     %[[CMP:.+]] = arith.cmpf ogt, %[[IN]], %[[INIT]] : f32
+// CHECK:     %[[SELECT_VAL:.+]] = arith.select %[[CMP]], %[[IN]], %[[INIT]] : f32
+// CHECK:     %[[SELECT_IDX:.+]] = arith.select %[[CMP]], %[[IN_IDX]], %[[INIT_IDX]] : i32
+// CHECK:     linalg.yield %[[SELECT_VAL]], %[[SELECT_IDX]] : f32, i32
+// CHECK:   }
+
+// CHECK: return %[[REDUCED]]#0, %[[REDUCED]]#1 : tensor<?xf32>, tensor<?xi32>
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %arg_compare_op = transform.structured.match ops{["iree_linalg_ext.arg_compare"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %fill_op:2, %split_op, %combining_op, %forall_op = transform.structured.tile_reduction_using_forall %arg_compare_op by tile_sizes = [0, 128] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+// -----
+
+func.func @arg_compare_split_reduction_static(%arg0: tensor<64x4096xf32>) -> (tensor<64xf32>, tensor<64xi32>) {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0_i32 = arith.constant 0 : i32
+
+  %0 = tensor.empty() : tensor<64xf32>
+  %1 = tensor.empty() : tensor<64xi32>
+
+  %2 = linalg.fill ins(%cst : f32) outs(%0 : tensor<64xf32>) -> tensor<64xf32>
+  %3 = linalg.fill ins(%c0_i32 : i32) outs(%1 : tensor<64xi32>) -> tensor<64xi32>
+
+  %4:2 = iree_linalg_ext.arg_compare {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>],
+      iterator_types = ["parallel", "reduction"]}
+      dimension(1)
+      ins(%arg0 : tensor<64x4096xf32>) outs(%2, %3 : tensor<64xf32>, tensor<64xi32>) {
+    ^bb0(%in: f32, %out_val: f32):
+      %cmp = arith.cmpf ogt, %in, %out_val : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<64xf32>, tensor<64xi32>
+
+  return %4#0, %4#1 : tensor<64xf32>, tensor<64xi32>
+}
+
+// CHECK-LABEL: func.func @arg_compare_split_reduction_static
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<64x4096xf32>)
+
+// CHECK-DAG: %[[C128:.+]] = arith.constant 128 : index
+// CHECK-DAG: %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK-DAG: %[[C0_I32:.+]] = arith.constant 0 : i32
+
+// CHECK-DAG: %[[EMPTY_VAL:.+]] = tensor.empty() : tensor<64xf32>
+// CHECK-DAG: %[[EMPTY_IDX:.+]] = tensor.empty() : tensor<64xi32>
+
+// CHECK-DAG: %[[FILL_VAL:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[EMPTY_VAL]] : tensor<64xf32>) -> tensor<64xf32>
+// CHECK-DAG: %[[FILL_IDX:.+]] = linalg.fill ins(%[[C0_I32]] : i32) outs(%[[EMPTY_IDX]] : tensor<64xi32>) -> tensor<64xi32>
+
+// CHECK-DAG: %[[PARTIAL_VAL_EMPTY:.+]] = tensor.empty() : tensor<64x32xf32>
+// CHECK-DAG: %[[PARTIAL_IDX_EMPTY:.+]] = tensor.empty() : tensor<64x32xi32>
+
+// CHECK-DAG: %[[BROADCAST_VAL:.+]] = linalg.broadcast ins(%[[FILL_VAL]] : tensor<64xf32>) outs(%[[PARTIAL_VAL_EMPTY]] : tensor<64x32xf32>) dimensions = [1]
+// CHECK-DAG: %[[BROADCAST_IDX:.+]] = linalg.broadcast ins(%[[FILL_IDX]] : tensor<64xi32>) outs(%[[PARTIAL_IDX_EMPTY]] : tensor<64x32xi32>) dimensions = [1]
+
+// CHECK: %[[ITER:.+]]:2 = scf.forall (%[[IV:.+]]) = (0) to (4096) step (128) shared_outs(%[[VAL_SHARED:.+]] = %[[BROADCAST_VAL]], %[[IDX_SHARED:.+]] = %[[BROADCAST_IDX]]) -> (tensor<64x32xf32>, tensor<64x32xi32>)
+// CHECK:   %[[CHUNK_IDX:.+]] = affine.apply #[[MAP:.+]]()[%[[IV]]]
+// CHECK:   %[[INPUT_SLICE:.+]] = tensor.extract_slice %[[ARG0]][0, %[[IV]]] [64, 128] [1, 1] : tensor<64x4096xf32> to tensor<64x128xf32>
+// CHECK:   %[[VAL_SLICE:.+]] = tensor.extract_slice %[[VAL_SHARED]][0, %[[CHUNK_IDX]]] [64, 1] [1, 1] : tensor<64x32xf32> to tensor<64xf32>
+// CHECK:   %[[IDX_SLICE:.+]] = tensor.extract_slice %[[IDX_SHARED]][0, %[[CHUNK_IDX]]] [64, 1] [1, 1] : tensor<64x32xi32> to tensor<64xi32>
+
+// CHECK:   %[[INDEX_BASE:.+]] = arith.muli %[[CHUNK_IDX]], %[[C128]] : index
+
+// CHECK:   %[[ARG_COMPARE:.+]]:2 = iree_linalg_ext.arg_compare dimension(1) ins(%[[INPUT_SLICE]] : tensor<64x128xf32>) outs(%[[VAL_SLICE]], %[[IDX_SLICE]] : tensor<64xf32>, tensor<64xi32>) index_base(%[[INDEX_BASE]] : index)
+// CHECK:     ^bb0(%[[IN:.+]]: f32, %[[OUT_VAL:.+]]: f32):
+// CHECK:       %[[CMP:.+]] = arith.cmpf ogt, %[[IN]], %[[OUT_VAL]] : f32
+// CHECK:       iree_linalg_ext.yield %[[CMP]] : i1
+// CHECK:     } -> tensor<64xf32>, tensor<64xi32>
+
+// CHECK:   scf.forall.in_parallel {
+// CHECK:     tensor.parallel_insert_slice %[[ARG_COMPARE]]#0 into %[[VAL_SHARED]][0, %[[CHUNK_IDX]]] [64, 1] [1, 1] : tensor<64xf32> into tensor<64x32xf32>
+// CHECK:     tensor.parallel_insert_slice %[[ARG_COMPARE]]#1 into %[[IDX_SHARED]][0, %[[CHUNK_IDX]]] [64, 1] [1, 1] : tensor<64xi32> into tensor<64x32xi32>
+// CHECK:   }
+
+// CHECK: %[[REDUCED:.+]]:2 = linalg.reduce ins(%[[ITER]]#0, %[[ITER]]#1 : tensor<64x32xf32>, tensor<64x32xi32>) outs(%[[FILL_VAL]], %[[FILL_IDX]] : tensor<64xf32>, tensor<64xi32>) dimensions = [1]
+// CHECK:   (%[[IN:.+]]: f32, %[[IN_IDX:.+]]: i32, %[[INIT:.+]]: f32, %[[INIT_IDX:.+]]: i32) {
+// CHECK:     %[[CMP:.+]] = arith.cmpf ogt, %[[IN]], %[[INIT]] : f32
+// CHECK:     %[[SELECT_VAL:.+]] = arith.select %[[CMP]], %[[IN]], %[[INIT]] : f32
+// CHECK:     %[[SELECT_IDX:.+]] = arith.select %[[CMP]], %[[IN_IDX]], %[[INIT_IDX]] : i32
+// CHECK:     linalg.yield %[[SELECT_VAL]], %[[SELECT_IDX]] : f32, i32
+// CHECK:   }
+
+// CHECK: return %[[REDUCED]]#0, %[[REDUCED]]#1 : tensor<64xf32>, tensor<64xi32>
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %arg_compare_op = transform.structured.match ops{["iree_linalg_ext.arg_compare"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %fill_op:2, %split_op, %combining_op, %forall_op = transform.structured.tile_reduction_using_forall %arg_compare_op by tile_sizes = [0, 128] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+// -----
+
 #mapQ = affine_map<(batch, m, k1, k2, n) -> (batch, m, k1)>
 #mapK = affine_map<(batch, m, k1, k2, n) -> (batch, k2, k1)>
 #mapV = affine_map<(batch, m, k1, k2, n) -> (batch, k2, n)>

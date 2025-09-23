@@ -688,7 +688,7 @@ struct ElideAsyncCopiesPass
     : public IREE::Stream::impl::ElideAsyncCopiesPassBase<
           ElideAsyncCopiesPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     if (moduleOp.getBody()->empty()) {
       return;
     }

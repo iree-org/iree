@@ -151,10 +151,8 @@ struct FoldAttentionAndTranspose
       dispatchIndexOpFoldResults(outputShape, dynamicShape, staticShape);
       Type resultType = RankedTensorType::get(
           staticShape, cast<RankedTensorType>(v.getType()).getElementType());
-      return rewriter
-          .create<tensor::ExpandShapeOp>(loc, resultType, v, reassociation,
-                                         outputShape)
-          .getResult();
+      return tensor::ExpandShapeOp::create(rewriter, loc, resultType, v,
+                                           reassociation, outputShape);
     };
 
     Value expandedQuery = getReshape(attentionOp.getQuery(), {{0, 1}, {2}, {3}},
@@ -172,8 +170,8 @@ struct FoldAttentionAndTranspose
         getIndexingMap(6, {d0, d2, d1, d5})};
     ArrayAttr newIndexingMapsAttr =
         rewriter.getAffineMapArrayAttr(newIndexingMaps);
-    auto newAttentionOp = rewriter.create<IREE::LinalgExt::AttentionOp>(
-        attentionOp.getLoc(), expandedInit.getType(), expandedQuery,
+    auto newAttentionOp = IREE::LinalgExt::AttentionOp::create(
+        rewriter, attentionOp.getLoc(), expandedInit.getType(), expandedQuery,
         expandedKey, expandedValue, attentionOp.getScale(), expandedInit,
         newIndexingMapsAttr);
     rewriter.replaceOp(transposeLikeOp, newAttentionOp);

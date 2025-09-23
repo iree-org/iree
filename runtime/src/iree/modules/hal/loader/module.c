@@ -233,7 +233,7 @@ typedef struct {
   union {
     struct {
       iree_vm_ref_t executable;
-      int32_t entry_point;
+      iree_hal_executable_export_ordinal_t export_ordinal;
       int32_t workgroup_x;
       int32_t workgroup_y;
       int32_t workgroup_z;
@@ -298,7 +298,7 @@ static iree_status_t iree_hal_loader_module_executable_dispatch(
   iree_byte_span_t local_memory = iree_byte_span_empty();
 
   return iree_hal_local_executable_issue_dispatch_inline(
-      (iree_hal_local_executable_t*)executable, args->entry_point,
+      (iree_hal_local_executable_t*)executable, args->export_ordinal,
       &dispatch_state, processor_id, local_memory);
 }
 

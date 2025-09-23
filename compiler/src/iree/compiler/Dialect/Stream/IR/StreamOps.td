@@ -2521,7 +2521,7 @@ def Stream_AsyncBarrierOp : Stream_Op<"async.barrier", [
   let hasCanonicalizer = 1;
 }
 
-def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
+def Stream_AsyncTransferOp : Stream_PureOp<"async.transfer", [
   DeclareOpInterfaceMethods<Stream_AffinityOp, [
     "getAffinityAttr",
     "setAffinityAttr",
@@ -2660,7 +2660,7 @@ def Stream_AsyncStoreOp : Stream_PureOp<"async.store", [
   let hasCanonicalizer = 1;
 }
 
-def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
+def Stream_AsyncDispatchOp : Stream_PureOp<"async.dispatch", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<SymbolUserOpInterface>,
   Stream_AffinityOp,

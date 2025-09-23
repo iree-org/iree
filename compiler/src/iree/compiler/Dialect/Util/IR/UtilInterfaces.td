@@ -741,7 +741,7 @@ def Util_NumericCastOpInterface : OpInterface<"NumericCastOpInterface"> {
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
           return llvm::cast<NumericCastOpInterface>(
-            builder.create<ConcreteOp>($_op->getLoc(), resultType, input)
+            ConcreteOp::create(builder,$_op->getLoc(), resultType, input)
               .getOperation());
       }]
     >,

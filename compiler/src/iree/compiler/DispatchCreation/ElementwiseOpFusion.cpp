@@ -96,8 +96,8 @@ struct GatherFusionPattern final : public OpRewritePattern<tensor::ExtractOp> {
           });
       SmallVector<Value, 4> indices = extractOp.getIndices();
       indices = applyProjectedPermutation(indices, perm);
-      auto newExtract = rewriter.create<tensor::ExtractOp>(
-          extractOp.getLoc(), operand.get(), indices);
+      auto newExtract = tensor::ExtractOp::create(rewriter, extractOp.getLoc(),
+                                                  operand.get(), indices);
       extractOps.push_back(newExtract);
     }
     rewriter.cloneRegionBefore(producerOp.getRegion(), consumerOp.getRegion(),
@@ -167,6 +167,7 @@ void ElementwiseOpFusionPass::runOnOperation() {
         ElementwiseOpsFusabilityOptions options;
         options.fuseMultiReduction = fuseMultiReduction;
         options.fuseTruncateOps = fuseTruncateOps;
+        options.fuseBroadcastConsumers = fuseBroadcastOps;
         return areFusableAsElementwiseOps(context, fusedOperand, options);
       };
 

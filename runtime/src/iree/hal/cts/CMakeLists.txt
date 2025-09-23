@@ -15,8 +15,10 @@ set(IREE_ALL_CTS_TESTS
   "command_buffer_update_buffer"
   "driver"
   "event"
+  "executable"
   "executable_cache"
   "file"
+  "queue_host_call"
   "semaphore"
   "semaphore_submission"
   PARENT_SCOPE
@@ -28,6 +30,7 @@ set(IREE_ALL_CTS_TESTS
 set(IREE_EXECUTABLE_CTS_TESTS
   "command_buffer_dispatch"
   "command_buffer_dispatch_constants"
+  "executable"
   "executable_cache"
   PARENT_SCOPE
 )
@@ -37,6 +40,7 @@ set(IREE_ALL_CTS_EXECUTABLE_SOURCES
   "command_buffer_dispatch_test"
   "command_buffer_dispatch_constants_test"
   "executable_cache_test"
+  "executable_test"
   PARENT_SCOPE
 )
 
@@ -198,9 +202,35 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    executable_test_library
+  HDRS
+    "executable_test.h"
+  DEPS
+    ::cts_test_base
+    iree::base
+    iree::hal
+    iree::testing::gtest
+  TESTONLY
+)
+
+iree_cc_library(
+  NAME
     file_test_library
   HDRS
     "file_test.h"
+  DEPS
+    ::cts_test_base
+    iree::base
+    iree::hal
+    iree::testing::gtest
+  TESTONLY
+)
+
+iree_cc_library(
+  NAME
+    queue_host_call_test_library
+  HDRS
+    "queue_host_call_test.h"
   DEPS
     ::cts_test_base
     iree::base

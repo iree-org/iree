@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
@@ -30,9 +29,11 @@ namespace mlir::iree_compiler {
 ///   2. Each vector.insert_strided_slice can map to a
 ///      vector.extract_stirded_slice op.
 /// Returns failure if it can not find the set from vector unrolling artifacts.
+/// NOTE: `insertOps` must be mutable because `.getOffsets()` are non-const.
 static FailureOr<SmallVector<vector::ExtractStridedSliceOp>>
-getUnrolledExtractSlices(BlockArgument srcTensor,
-                         SmallVector<vector::InsertStridedSliceOp> insertOps) {
+getUnrolledExtractSlices(
+    BlockArgument srcTensor,
+    MutableArrayRef<vector::InsertStridedSliceOp> insertOps) {
   SmallVector<vector::ExtractStridedSliceOp> res;
   for (auto user : srcTensor.getUsers()) {
     auto extractStridedSliceOp = dyn_cast<vector::ExtractStridedSliceOp>(user);
@@ -44,7 +45,7 @@ getUnrolledExtractSlices(BlockArgument srcTensor,
     return failure();
 
   std::reverse(res.begin(), res.end());
-  for (const auto [extractOp, insertOp] : llvm::zip_equal(res, insertOps)) {
+  for (auto [extractOp, insertOp] : llvm::zip_equal(res, insertOps)) {
     auto offset0 = insertOp.getOffsets();
     auto offset1 = extractOp.getOffsets();
     if (offset0 != offset1)
@@ -125,11 +126,11 @@ static scf::ForOp hoistVectorExtractInsertSlice(
   // BBArgs are updated.
   for (auto extractStridedSliceOp : extractOps) {
     extractStridedSliceOp->moveBefore(forOp);
-    if (!forOp.isDefinedOutsideOfLoop(extractStridedSliceOp.getVector())) {
-      assert(extractStridedSliceOp.getVector() == tensorBBArg &&
+    if (!forOp.isDefinedOutsideOfLoop(extractStridedSliceOp.getSource())) {
+      assert(extractStridedSliceOp.getSource() == tensorBBArg &&
              "extractSlice source not defined above must be the tracked bbArg");
       rewriter.startOpModification(extractStridedSliceOp);
-      extractStridedSliceOp.getVectorMutable().assign(
+      extractStridedSliceOp.getSourceMutable().assign(
           forOp.getInitArgs()[initArgNumber]);
       rewriter.finalizeOpModification(extractStridedSliceOp);
     }
@@ -214,7 +215,7 @@ public:
 };
 
 void HoistUnrolledVectorExtractInsertSlicePass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   IRRewriter rewriter(funcOp->getContext());
   funcOp.walk([&](scf::ForOp forOp) {
     hoistUnrolledVectorExtractInsert(rewriter, forOp);

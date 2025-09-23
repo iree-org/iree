@@ -75,10 +75,6 @@ MLIR_CAPI_EXPORTED void ireeCodegenGetTunerRootOps(MlirModule module,
                                                    size_t *numOps,
                                                    MlirOperation *rootOps);
 
-MLIR_CAPI_EXPORTED void ireeCodegenQueryMMAIntrinsics(MlirOperation op,
-                                                      size_t *numIntrinsics,
-                                                      uint32_t *mmaIntrinsics);
-
 struct ireeCodegenAttentionOpDetail {
   MlirAttribute batch;
   MlirAttribute m;

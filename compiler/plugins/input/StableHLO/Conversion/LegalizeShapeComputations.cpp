@@ -60,11 +60,12 @@ struct HloElementwiseConverter : OpRewritePattern<OpTy> {
         ShapedType operandTy = cast<ShapedType>(operand.getType());
         if (operandTy.getRank() == 0) {
           Value extract =
-              rewriter.create<tensor::ExtractOp>(loc, operand, ValueRange({}));
+              tensor::ExtractOp::create(rewriter, loc, operand, ValueRange({}));
           extracts.push_back(extract);
         } else {
-          Value idx = rewriter.create<arith::ConstantIndexOp>(loc, i);
-          Value extract = rewriter.create<tensor::ExtractOp>(loc, operand, idx);
+          Value idx = arith::ConstantIndexOp::create(rewriter, loc, i);
+          Value extract =
+              tensor::ExtractOp::create(rewriter, loc, operand, idx);
           extracts.push_back(extract);
         }
       }
@@ -97,12 +98,13 @@ struct ConcatenateConverter final
       ShapedType operandTy = llvm::cast<ShapedType>(operand.getType());
       if (operandTy.getRank() == 0) {
         Value extract =
-            rewriter.create<tensor::ExtractOp>(loc, operand, ValueRange({}));
+            tensor::ExtractOp::create(rewriter, loc, operand, ValueRange({}));
         elements.push_back(extract);
       } else {
         for (int i = 0, s = operandTy.getNumElements(); i < s; ++i) {
-          Value idx = rewriter.create<arith::ConstantIndexOp>(loc, i);
-          Value extract = rewriter.create<tensor::ExtractOp>(loc, operand, idx);
+          Value idx = arith::ConstantIndexOp::create(rewriter, loc, i);
+          Value extract =
+              tensor::ExtractOp::create(rewriter, loc, operand, idx);
           elements.push_back(extract);
         }
       }
@@ -123,13 +125,13 @@ struct GetDimSizeConverter final
     Type resultTy = op.getType();
     Type elementTy = getElementTypeOrSelf(resultTy);
     IntegerAttr dimAttr = rewriter.getIndexAttr(op.getDimension());
-    auto dimConst = rewriter.create<arith::ConstantOp>(loc, dimAttr);
+    auto dimConst = arith::ConstantOp::create(rewriter, loc, dimAttr);
 
-    Value dimOp = rewriter.create<tensor::DimOp>(loc, rewriter.getIndexType(),
-                                                 op.getOperand(), dimConst);
+    Value dimOp = tensor::DimOp::create(rewriter, loc, rewriter.getIndexType(),
+                                        op.getOperand(), dimConst);
 
     // Cast to the correct element type and convert to a tensor.
-    Value cast = rewriter.create<arith::IndexCastOp>(loc, elementTy, dimOp);
+    Value cast = arith::IndexCastOp::create(rewriter, loc, elementTy, dimOp);
     rewriter.replaceOpWithNewOp<tensor::FromElementsOp>(op, resultTy, cast);
     return success();
   }

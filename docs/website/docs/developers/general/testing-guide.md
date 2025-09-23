@@ -467,8 +467,8 @@ For example, here is part of a config file for running ONNX operator tests on
 CPU:
 
 <!-- markdownlint-disable-next-line -->
-```json title="tests/external/iree-test-suites/onnx_ops/onnx_ops_cpu_llvm_sync.json" linenums="1"
---8<-- "tests/external/iree-test-suites/onnx_ops/onnx_ops_cpu_llvm_sync.json::20"
+```json title="tests/external/iree-test-suites/onnx_ops/onnx_ops_cpu_llvm_sync_O0.json" linenums="1"
+--8<-- "tests/external/iree-test-suites/onnx_ops/onnx_ops_cpu_llvm_sync_O0.json::20"
 ```
 
 ##### Updating config files
@@ -537,6 +537,8 @@ Types of Sharktank tests:
 
 The quality and benchmark test config files are stored in
 [`tests/external/iree-test-suites/sharktank_models`](https://github.com/iree-org/iree/tree/main/tests/external/iree-test-suites/sharktank_models).
+
+Detailed steps on how to update the golden output in SDXL may be found [here](../update-sdxl-golden-outputs.md).
 
 <!-- TODO(scotttodd): document how to coordinate changes across these projects -->
 

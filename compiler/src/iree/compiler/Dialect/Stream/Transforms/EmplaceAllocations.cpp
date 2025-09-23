@@ -58,8 +58,8 @@ replaceUsesAndTransfer(Value oldValue, Value newValue,
       newValue.getLoc(), newValue, builder);
   IREE::Stream::AffinityAttr sourceAffinity = usageAffinityAttr;
   IREE::Stream::AffinityAttr resultAffinity = usageAffinityAttr;
-  Value transferValue = builder.create<IREE::Stream::AsyncTransferOp>(
-      newValue.getLoc(), oldValue.getType(), newValue, newValueSize,
+  Value transferValue = IREE::Stream::AsyncTransferOp::create(
+      builder, newValue.getLoc(), oldValue.getType(), newValue, newValueSize,
       newValueSize, sourceAffinity, resultAffinity);
   oldValue.replaceAllUsesWith(transferValue);
 }
@@ -153,8 +153,8 @@ static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp,
 
     // TODO(multi-device): possibly perform analysis to pick an affinity based
     // on usage. Today we assume the resource affinity matches the execution op.
-    auto allocaOp = builder.create<IREE::Stream::AsyncAllocaOp>(
-        dispatchOp.getLoc(), result.getType(), resultSize,
+    auto allocaOp = IREE::Stream::AsyncAllocaOp::create(
+        builder, dispatchOp.getLoc(), result.getType(), resultSize,
         dispatchOp.getAffinityAttr());
 
     auto operandIndex = dispatchOp.getResourceOperands().size();

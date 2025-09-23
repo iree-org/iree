@@ -83,3 +83,35 @@ func.func @interleave_and_bitcast_lowering() {
 // 2D vector.bitcast tha followed should be replaced with 1D vector.bitcast
 //       CHECK:   llvm.bitcast {{.*}} : vector<4xi8> to vector<8xi4>
 //   CHECK-NOT:   vector.bitcast %{{.*}} : vector<4x4xi8> to vector<4x8xi4>
+
+// -----
+
+module attributes {
+    hal.executable.target = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {target_triple="riscv64-unknown-elf"}>
+} {
+  func.func private @gather_lowering(%buffer : memref<2048xf32>, %index : vector<64xindex>, %mask : vector<64xi1>) -> vector<64xf32> {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant dense<0.000000e+00> : vector<64xf32>
+    %r = vector.gather %buffer[%c0] [%index], %mask, %cst : memref<2048xf32>, vector<64xindex>, vector<64xi1>, vector<64xf32> into vector<64xf32>
+    return %r : vector<64xf32>
+  }
+}
+
+// CHECK-LABEL:   llvm.func @gather_lowering(
+// CHECK-NOT: llvm.intr.masked.gather
+
+// -----
+
+module attributes {
+    hal.executable.target = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {target_triple="riscv64-unknown-elf", cpu_features ="+v"}>
+} {
+  func.func private @negative_no_gather_lowering(%buffer : memref<2048xf32>, %index : vector<64xindex>, %mask : vector<64xi1>) -> vector<64xf32> {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant dense<0.000000e+00> : vector<64xf32>
+    %r = vector.gather %buffer[%c0] [%index], %mask, %cst : memref<2048xf32>, vector<64xindex>, vector<64xi1>, vector<64xf32> into vector<64xf32>
+    return %r : vector<64xf32>
+  }
+}
+
+// CHECK-LABEL:   llvm.func @negative_no_gather_lowering(
+// CHECK: llvm.intr.masked.gather {{.*}} : (vector<64x!llvm.ptr>, vector<64xi1>, vector<64xf32>) -> vector<64xf32>

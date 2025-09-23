@@ -328,8 +328,7 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
          "getTiledImplementation",
          "getIterationDomainTileFromOperandTiles",
          "getTiledImplementationFromOperandTiles",
-         "generateScalarImplementation"]>,
-     SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">]> {
+         "generateScalarImplementation"]>]> {
   let summary = [{Scatter with a mapping from source indices to result indices.}];
   let description = [{
     Takes two operands, `input` and `output`, and stores every element of
@@ -354,6 +353,7 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region AnyRegion:$transformation_region);
   let hasVerifier = 1;
+  let hasCanonicalizer = 1;
   let assemblyFormat = [{
     attr-dict $input `into` $output
     $transformation_region
@@ -678,7 +678,6 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
 }
 
 def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
-  SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
@@ -688,8 +687,12 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
    "getTiledImplementation",
    "generateResultTileValue",
    "getIterationDomain"]
-  >
-]> {
+  >,
+  DeclareOpInterfaceMethods<PartialReductionOpInterface,
+   ["generateInitialTensorForPartialReduction",
+    "tileToPartialReduction",
+    "mergeReductions",
+    "getPartialResultTilePosition"]>]> {
   let summary = "Performs an arg-reduction using a user-defined comparator.";
   let description = [{
     The `arg_compare` op performs a reduction over a given dimension of a tensor,
@@ -801,11 +804,11 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
 
 def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
      DestinationStyleOpInterface, LinalgExtInterface,
      DeclareOpInterfaceMethods<LinalgFusionInterface,
       ["getIndexingMapsForResults", "getIndexingMapsForOperands",
        "getStaticLoopRanges"]>,
+     DeclareOpInterfaceMethods<IndexingMapOpInterface, ["getMatchingIndexingMap"]>,
      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>,
      DeclareOpInterfaceMethods<TilingInterface,
@@ -852,13 +855,17 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
 
   let builders = [
     OpBuilder<(ins "TypeRange":$results,
-    "Value":$query,
-    "Value":$key,
-    "Value":$value,
-    "Value":$scale,
-    "Value":$output,
-    "ArrayAttr":$indexing_maps,
-    CArg<"std::optional<Value>", "std::nullopt">:$mask)>
+      "Value":$query,
+      "Value":$key,
+      "Value":$value,
+      "Value":$scale,
+      "Value":$output,
+      "ArrayAttr":$indexing_maps,
+      CArg<"std::optional<Value>", "std::nullopt">:$mask)>,
+    OpBuilder<(ins "TypeRange":$results,
+      "ValueRange":$inputOperands,
+      "ValueRange":$initOperands,
+      "ArrayAttr":$indexing_maps)>
   ];
 
   let extraClassDeclaration = [{
@@ -909,7 +916,6 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
 
 def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
      DestinationStyleOpInterface,
      IndexingMapOpInterface,
      LinalgExtInterface,

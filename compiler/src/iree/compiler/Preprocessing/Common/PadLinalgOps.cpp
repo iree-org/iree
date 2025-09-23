@@ -80,11 +80,11 @@ public:
     auto rhsPaddedType = RankedTensorType::get(
         getFullShape({newKSize, newNSize}), rhsType.getElementType());
 
-    Value lhsPaddingValue = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(lhsType.getElementType()));
+    Value lhsPaddingValue = arith::ConstantOp::create(
+        rewriter, loc, rewriter.getZeroAttr(lhsType.getElementType()));
 
-    Value rhsPaddingValue = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(rhsType.getElementType()));
+    Value rhsPaddingValue = arith::ConstantOp::create(
+        rewriter, loc, rewriter.getZeroAttr(rhsType.getElementType()));
 
     auto createPadding = [&](ArrayRef<int64_t> padding) {
       SmallVector<OpFoldResult> result;
@@ -99,15 +99,15 @@ public:
 
     Value paddedLhs = lhs;
     if (paddingForM > 0 || paddingForK > 0) {
-      paddedLhs = rewriter.create<tensor::PadOp>(
-          loc, lhsPaddedType, lhs, createPadding({0, 0}),
+      paddedLhs = tensor::PadOp::create(
+          rewriter, loc, lhsPaddedType, lhs, createPadding({0, 0}),
           createPadding({paddingForM, paddingForK}), lhsPaddingValue);
     }
 
     Value paddedRhs = rhs;
     if (paddingForK > 0 || paddingForN > 0) {
-      paddedRhs = rewriter.create<tensor::PadOp>(
-          loc, rhsPaddedType, rhs, createPadding({0, 0}),
+      paddedRhs = tensor::PadOp::create(
+          rewriter, loc, rhsPaddedType, rhs, createPadding({0, 0}),
           createPadding({paddingForK, paddingForN}), rhsPaddingValue);
     }
 
@@ -120,10 +120,10 @@ public:
     } else {
       auto newResultType = RankedTensorType::get(
           getFullShape({newMSize, newNSize}), resultType.getElementType());
-      Value resultPaddingValue = rewriter.create<arith::ConstantOp>(
-          loc, rewriter.getZeroAttr(resultType.getElementType()));
-      Value paddedResult = rewriter.create<tensor::PadOp>(
-          loc, newResultType, result, createPadding({0, 0}),
+      Value resultPaddingValue = arith::ConstantOp::create(
+          rewriter, loc, rewriter.getZeroAttr(resultType.getElementType()));
+      Value paddedResult = tensor::PadOp::create(
+          rewriter, loc, newResultType, result, createPadding({0, 0}),
           createPadding({paddingForM, paddingForN}), resultPaddingValue);
       auto paddedMatmulOp =
           mlir::clone(rewriter, linalgOp, {newResultType},

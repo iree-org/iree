@@ -29,7 +29,7 @@ IREE_TARGET_BACKEND_ROCM="${IREE_TARGET_BACKEND_ROCM:-${OFF_IF_DARWIN}}"
 # Enable WebGPU compiler builds and tests by default. All deps get fetched as
 # needed, but some of the deps are too large to enable by default for all
 # developers.
-IREE_TARGET_BACKEND_WEBGPU_SPIRV="${IREE_TARGET_BACKEND_WEBGPU_SPIRV:-ON}"
+IREE_TARGET_BACKEND_WEBGPU_SPIRV="${IREE_TARGET_BACKEND_WEBGPU_SPIRV:-${OFF_IF_DARWIN}}"
 # Enable building the `iree-test-deps` target.
 IREE_BUILD_TEST_DEPS="${IREE_BUILD_TEST_DEPS:-1}"
 

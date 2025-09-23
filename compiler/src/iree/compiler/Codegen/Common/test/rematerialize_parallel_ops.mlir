@@ -169,3 +169,46 @@ func.func @no_external_capture_fusion(%arg0: tensor<4096x64xi64>, %arg1: tensor<
 // CHECK-LABEL: func @no_external_capture_fusion(
 //       CHECK:   linalg.generic
 //       CHECK:   linalg.generic
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
+#map3 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#pipeline_layout = #hal.pipeline.layout<
+  bindings = [
+    #hal.pipeline.binding<storage_buffer, Indirect>,
+    #hal.pipeline.binding<storage_buffer, Indirect>
+  ]>
+func.func @producer_has_direct_write(%arg0: tensor<3x4x5xf32>, %arg1: tensor<3x5xf32>) {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %c64 = arith.constant 64 : index
+  %c128 = arith.constant 128 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c64) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<3x5xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c128) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<3x4x5xf32>>
+  %2 = tensor.empty() : tensor<3x5xf32>
+  %3 = tensor.empty() : tensor<3x4x5xf32>
+  %4 = linalg.fill ins(%cst : f32) outs(%2 : tensor<3x5xf32>) -> tensor<3x5xf32>
+  %5 = linalg.generic {indexing_maps = [#map, #map1, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0, %arg1 : tensor<3x4x5xf32>, tensor<3x5xf32>) outs(%3 : tensor<3x4x5xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %7 = arith.subf %in, %in_0 : f32
+    linalg.yield %7 : f32
+  } -> tensor<3x4x5xf32>
+  %6 = linalg.generic {indexing_maps = [#map2, #map3], iterator_types = ["parallel", "parallel", "reduction"]} ins(%5 : tensor<3x4x5xf32>) outs(%4 : tensor<3x5xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %7 = math.exp %in : f32
+    %8 = arith.addf %7, %out : f32
+    linalg.yield %8 : f32
+  } -> tensor<3x5xf32>
+  iree_tensor_ext.dispatch.tensor.store %6, %0, offsets = [0, 0], sizes = [3, 5], strides = [1, 1] : tensor<3x5xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<3x5xf32>>
+  iree_tensor_ext.dispatch.tensor.store %5, %1, offsets = [0, 0, 0], sizes = [3, 4, 5], strides = [1, 1, 1] : tensor<3x4x5xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<3x4x5xf32>>
+  return
+}
+// CHECK-LABEL: func.func @producer_has_direct_write
+//       CHECK:   %[[ELEM:.+]] = linalg.generic
+//       CHECK:   %[[REDUCTION:.+]] = linalg.generic
+//  CHECK-SAME:     ins(%[[ELEM]]
+//   CHECK-DAG:   iree_tensor_ext.dispatch.tensor.store %[[REDUCTION]]
+//   CHECK-DAG:   iree_tensor_ext.dispatch.tensor.store %[[ELEM]]

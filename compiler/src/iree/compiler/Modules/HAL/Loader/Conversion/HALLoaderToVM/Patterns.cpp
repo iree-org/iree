@@ -44,8 +44,8 @@ struct ExecutableLoadOpConversion
   matchAndRewrite(IREE::HAL::Loader::ExecutableLoadOp loadOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Get format string as a rodata blob.
-    auto executableFormatStr = rewriter.create<IREE::VM::RodataInlineOp>(
-        loadOp.getLoc(), loadOp.getFormatAttr());
+    auto executableFormatStr = IREE::VM::RodataInlineOp::create(
+        rewriter, loadOp.getLoc(), loadOp.getFormatAttr());
 
     // Pack constants, if any.
     auto constantBuffer = createPackedConstantBuffer(
