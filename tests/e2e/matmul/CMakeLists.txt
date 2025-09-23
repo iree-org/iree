@@ -1319,7 +1319,6 @@ iree_generated_e2e_runner_test(
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
     "--iree-dispatch-creation-data-tiling"
-    "--iree-hip-encoding-layout-resolver=data-tiling"
     "--iree-llvmgpu-test-combine-layout-transformation=true"
   LABELS
     "noasan"
@@ -1349,7 +1348,6 @@ iree_generated_e2e_runner_test(
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
     "--iree-dispatch-creation-data-tiling"
-    "--iree-hip-encoding-layout-resolver=data-tiling"
     "--iree-llvmgpu-test-combine-layout-transformation=true"
   LABELS
     "noasan"
@@ -1379,7 +1377,6 @@ iree_generated_e2e_runner_test(
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
     "--iree-dispatch-creation-data-tiling"
-    "--iree-hip-encoding-layout-resolver=data-tiling"
     "--iree-llvmgpu-test-combine-layout-transformation=true"
   LABELS
     "noasan"
@@ -1410,7 +1407,6 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling=false"
     "--iree-hip-enable-ukernels=multi_mma"
     "--iree-dispatch-creation-data-tiling"
-    "--iree-hip-encoding-layout-resolver=data-tiling"
     "--iree-llvmgpu-test-combine-layout-transformation=true"
   LABELS
     "noasan"
@@ -1440,7 +1436,6 @@ iree_generated_e2e_runner_test(
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
     "--iree-dispatch-creation-data-tiling"
-    "--iree-hip-encoding-layout-resolver=data-tiling"
     "--iree-llvmgpu-test-combine-layout-transformation=true"
   LABELS
     "noasan"
@@ -1470,7 +1465,6 @@ iree_generated_e2e_runner_test(
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
     "--iree-dispatch-creation-data-tiling"
-    "--iree-hip-encoding-layout-resolver=data-tiling"
     "--iree-llvmgpu-test-combine-layout-transformation=true"
   LABELS
     "noasan"
@@ -1500,7 +1494,6 @@ iree_generated_e2e_runner_test(
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
     "--iree-dispatch-creation-data-tiling"
-    "--iree-hip-encoding-layout-resolver=data-tiling"
     "--iree-llvmgpu-test-combine-layout-transformation=true"
   LABELS
     "noasan"
@@ -1532,7 +1525,6 @@ iree_generated_e2e_runner_test(
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
     "--iree-dispatch-creation-data-tiling"
-    "--iree-hip-encoding-layout-resolver=data-tiling"
     "--iree-llvmgpu-test-combine-layout-transformation=true"
     "--iree-hip-enable-tensor-ukernels"
   LABELS
@@ -1565,7 +1557,6 @@ iree_generated_e2e_runner_test(
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
     "--iree-dispatch-creation-data-tiling"
-    "--iree-hip-encoding-layout-resolver=data-tiling"
     "--iree-llvmgpu-test-combine-layout-transformation=true"
     "--iree-hip-enable-tensor-ukernels"
   LABELS
@@ -1597,7 +1588,6 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling=false"
     "--iree-dispatch-creation-data-tiling"
     "--iree-input-demote-f64-to-f32=false"
-    "--iree-hip-encoding-layout-resolver=data-tiling"
     "--iree-llvmgpu-test-combine-layout-transformation=true"
   LABELS
     "noasan"
@@ -1720,7 +1710,6 @@ iree_generated_e2e_runner_test(
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
     "--iree-dispatch-creation-data-tiling"
-    "--iree-hip-encoding-layout-resolver=data-tiling"
     "--iree-llvmgpu-test-combine-layout-transformation=true"
     "--iree-hip-enable-tensor-ukernels"
   LABELS
@@ -1882,7 +1871,6 @@ iree_generated_e2e_runner_test(
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
     "--iree-dispatch-creation-data-tiling"
-    "--iree-hip-encoding-layout-resolver=data-tiling"
   RUNNER_ARGS
     "--require_exact_results=false"
     "--acceptable_fp_delta=1e-04"
@@ -1914,7 +1902,6 @@ iree_generated_e2e_runner_test(
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
     "--iree-dispatch-creation-data-tiling"
-    "--iree-hip-encoding-layout-resolver=data-tiling"
   LABELS
     "noasan"
     "nomsan"
@@ -2105,7 +2092,6 @@ iree_generated_e2e_runner_test(
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
     "--iree-dispatch-creation-data-tiling"
-    "--iree-hip-encoding-layout-resolver=data-tiling"
   RUNNER_ARGS
     "--require_exact_results=false"
     "--acceptable_fp_delta=1e-04"
@@ -2137,7 +2123,6 @@ iree_generated_e2e_runner_test(
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
     "--iree-dispatch-creation-data-tiling"
-    "--iree-hip-encoding-layout-resolver=data-tiling"
   RUNNER_ARGS
     "--require_exact_results=false"
     "--acceptable_fp_delta=1e-04"
@@ -2169,7 +2154,6 @@ iree_generated_e2e_runner_test(
     ${IREE_HIP_TEST_COMPILER_FLAGS}
     "--iree-opt-data-tiling=false"
     "--iree-dispatch-creation-data-tiling"
-    "--iree-hip-encoding-layout-resolver=data-tiling"
   LABELS
     "noasan"
     "nomsan"

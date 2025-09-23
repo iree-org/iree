@@ -21,7 +21,6 @@ iree_check_single_backend_test_suite(
     "hip"
   COMPILER_FLAGS
     "--iree-global-opt-enable-early-materialization=false"
-    "--iree-hip-encoding-layout-resolver=data-tiling"
     "--iree-llvmgpu-test-combine-layout-transformation=true"
 )
 
