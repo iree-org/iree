@@ -8681,7 +8681,7 @@ value.</p>
               `` `{` $source_size `}`
               (`from` `(` $source_affinity^ `)`)?
               `-&gt;`
-              (`to` `(` $result_affinity^ `)`)?
+              (`to` `(` $target_affinity^ `)`)?
               type($result) `` `{` $result_size `}`
               attr-dict-with-keyword
 </code></pre></div>
@@ -8696,7 +8696,7 @@ devices with discrete memory spaces or pools.</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>source_affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
-<tr><td><code>result_affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
+<tr><td><code>target_affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_15">Operands:<a class="headerlink" href="#operands_15" title="Permanent link">link</a></h5>
