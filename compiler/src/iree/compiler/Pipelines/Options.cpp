@@ -158,9 +158,11 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
                    llvm::cl::desc("Transposes all concatenations to happen"
                                   "along the outer most dimension."),
                    llvm::cl::cat(category));
-  binder.opt<bool>("iree-opt-data-tiling", dataTiling,
-                   llvm::cl::desc("Enables data tiling path."),
-                   llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-opt-data-tiling", dataTiling,
+      llvm::cl::desc(
+          "Enables data tiling path starting from GlobalOptimization phase."),
+      llvm::cl::cat(category));
   binder.opt<bool>(
       "iree-opt-const-eval", constEval,
       llvm::cl::desc("Enables eager evaluation of constants using the full "
@@ -314,9 +316,11 @@ void DispatchCreationOptions::bindOptions(OptionsBinder &binder) {
   binder.opt<bool>("iree-dispatch-creation-fuse-multi-use", enableFuseMultiUse,
                    llvm::cl::desc("Fuse operations with multiple uses."),
                    llvm::cl::cat(category));
-  binder.opt<bool>("iree-dispatch-creation-data-tiling", dataTiling,
-                   llvm::cl::desc("Enables data tiling path."),
-                   llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-dispatch-creation-data-tiling", dataTiling,
+      llvm::cl::desc(
+          "Enables data tiling path starting from DispatchCreation phase."),
+      llvm::cl::cat(category));
   binder.opt<bool>(
       "iree-dispatch-creation-enable-split-reduction", enableSplitReduction,
       llvm::cl::desc(
