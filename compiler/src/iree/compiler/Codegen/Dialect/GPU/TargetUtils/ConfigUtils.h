@@ -16,7 +16,7 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 /// Helper for setting up a data tiled multi-MMA inner_tiled config based on the
 /// specified target.
-LogicalResult setDataTiledMultiMmaLoweringConfig(
+LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
     Operation *op, IREE::Codegen::UKernelDescriptorAttr ukernelConfig);
 
