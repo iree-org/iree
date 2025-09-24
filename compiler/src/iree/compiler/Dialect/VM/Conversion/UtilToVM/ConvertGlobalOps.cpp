@@ -14,39 +14,6 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-struct InitializerOpConversion
-    : public OpConversionPattern<IREE::Util::InitializerOp> {
-  using Base::Base;
-  LogicalResult
-  matchAndRewrite(IREE::Util::InitializerOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    auto newOp = IREE::VM::InitializerOp::create(rewriter, op.getLoc());
-    rewriter.cloneRegionBefore(op.getBody(), newOp.getBody(),
-                               newOp.getBody().begin());
-
-    // Tell the rewriter to convert the region signature.
-    const TypeConverter &typeConverter = *getTypeConverter();
-    TypeConverter::SignatureConversion signatureConversion(0);
-    if (failed(rewriter.convertRegionTypes(&newOp.getBody(), typeConverter,
-                                           &signatureConversion))) {
-      return rewriter.notifyMatchFailure(op, "failed to convert region types");
-    }
-
-    rewriter.eraseOp(op);
-    return success();
-  }
-};
-
-struct ReturnOpConversion : public OpConversionPattern<IREE::Util::ReturnOp> {
-  using Base::Base;
-  LogicalResult
-  matchAndRewrite(IREE::Util::ReturnOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<IREE::VM::ReturnOp>(op);
-    return success();
-  }
-};
-
 struct GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
   TypeConverter &typeConverter;
   GlobalOpConversion(MLIRContext *context, TypeConverter &typeConverter)
@@ -260,11 +227,6 @@ void populateUtilGlobalToVMPatterns(MLIRContext *context,
                                     ConversionTarget &conversionTarget,
                                     TypeConverter &typeConverter,
                                     RewritePatternSet &patterns) {
-  conversionTarget
-      .addIllegalOp<IREE::Util::InitializerOp, IREE::Util::ReturnOp>();
-  patterns.insert<InitializerOpConversion, ReturnOpConversion>(typeConverter,
-                                                               context);
-
   conversionTarget.addIllegalOp<
       IREE::Util::GlobalOp, IREE::Util::GlobalAddressOp,
       IREE::Util::GlobalLoadOp, IREE::Util::GlobalLoadIndirectOp,

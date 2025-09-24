@@ -71,14 +71,21 @@ static IREE::Stream::AffinityAttr getOpAffinity(Operation *op) {
   return {};
 }
 
-// Returns a return op in `op`.
-static IREE::Util::ReturnOp getAnyReturnOp(IREE::Util::FuncOp op) {
+// Returns any terminator with the ReturnLike trait that has operands.
+// This excludes util.unreachable.
+static Operation *getAnyReturnLikeOp(IREE::Util::FuncOp op) {
   for (auto &block : op.getCallableRegion()->getBlocks()) {
-    if (auto retOp = dyn_cast<IREE::Util::ReturnOp>(block.getTerminator())) {
-      return retOp;
+    auto *terminator = block.getTerminator();
+    if (terminator && terminator->hasTrait<OpTrait::ReturnLike>()) {
+      if (terminator->getNumOperands() > 0 ||
+          isa<IREE::Util::ReturnOp>(terminator)) {
+        return terminator;
+      }
     }
   }
-  llvm_unreachable("Util::FuncOp has no return op");
+  // Functions may have all unreachable terminators.
+  // In that case, return nullptr and let caller handle it.
+  return nullptr;
 };
 
 // Base pattern type for resource usage refinement.
@@ -265,19 +272,29 @@ struct ApplyFuncOp : public UsageRefinementPattern<IREE::Util::FuncOp> {
 
     // Results:
     SmallVector<Type> newOutputs;
-    auto anyReturnOp = getAnyReturnOp(op);
+    auto anyReturnOp = getAnyReturnLikeOp(op);
     for (auto outputType : llvm::enumerate(op.getFunctionType().getResults())) {
       auto oldType =
           llvm::dyn_cast<IREE::Stream::ResourceType>(outputType.value());
       if (!oldType) {
         newOutputs.push_back(outputType.value());
       } else if (oldType.getLifetime() == IREE::Stream::Lifetime::Unknown) {
-        auto returnValue = anyReturnOp.getOperand(outputType.index());
-        auto newUsage = analysis.lookupResourceUsage(returnValue);
-        auto newLifetime = convertUsageToLifetime(newUsage);
-        auto newType =
-            rewriter.getType<IREE::Stream::ResourceType>(newLifetime);
-        newOutputs.push_back(newType);
+        // If we have a return-like op with operands use its operand for
+        // analysis. If all terminators are unreachable (no operands) keep the
+        // type as-is.
+        if (anyReturnOp && outputType.index() < anyReturnOp->getNumOperands()) {
+          auto returnValue = anyReturnOp->getOperand(outputType.index());
+          auto newUsage = analysis.lookupResourceUsage(returnValue);
+          auto newLifetime = convertUsageToLifetime(newUsage);
+          auto newType =
+              rewriter.getType<IREE::Stream::ResourceType>(newLifetime);
+          newOutputs.push_back(newType);
+        } else {
+          // No return op with operands found; keep the original type.
+          // Arises in function with an infinite loop and only an unreachable
+          // return.
+          newOutputs.push_back(oldType);
+        }
       } else {
         newOutputs.push_back(oldType);
       }

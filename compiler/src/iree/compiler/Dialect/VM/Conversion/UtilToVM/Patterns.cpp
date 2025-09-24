@@ -103,26 +103,6 @@ struct CmpNEOpConversion : public OpConversionPattern<IREE::Util::CmpNEOp> {
   }
 };
 
-//===----------------------------------------------------------------------===//
-// Compiler hints
-//===----------------------------------------------------------------------===//
-
-struct UnreachableOpConversion
-    : public OpConversionPattern<IREE::Util::UnreachableOp> {
-  using Base::Base;
-  LogicalResult
-  matchAndRewrite(IREE::Util::UnreachableOp srcOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<IREE::VM::FailOp>(
-        srcOp,
-        rewriter.createOrFold<IREE::VM::ConstI32Op>(
-            srcOp.getLoc(),
-            static_cast<int32_t>(IREE::Util::StatusCode::Unknown)),
-        srcOp.getMessage());
-    return success();
-  }
-};
-
 } // namespace
 
 void populateUtilToVMPatterns(MLIRContext *context,
@@ -133,7 +113,6 @@ void populateUtilToVMPatterns(MLIRContext *context,
   patterns.insert<NullOpConversion>(typeConverter, context);
   patterns.insert<CmpEQOpConversion>(typeConverter, context);
   patterns.insert<CmpNEOpConversion>(typeConverter, context);
-  patterns.insert<UnreachableOpConversion>(typeConverter, context);
 
   populateUtilAlignmentToVMPatterns(context, conversionTarget, typeConverter,
                                     patterns);
