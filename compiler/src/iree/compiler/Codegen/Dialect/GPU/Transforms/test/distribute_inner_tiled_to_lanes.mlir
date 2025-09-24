@@ -550,10 +550,12 @@ func.func @data_tiled_2x2x4_tensor_multi_mma_unrolled_to_subgroups(%lhs: tensor<
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]
+//       CHECK:   %[[C2:.+]] = arith.constant 2 : index
 //       CHECK:   scf.forall (%[[THREAD_ID:.+]]) in (256) shared_outs(%[[ACC_ARG:.+]] = %[[ACC]]) -> (tensor<1x1x2x2x4x16x4xf32>)
-//   CHECK-DAG:     %[[LHS_IN_IDS:.+]]:6 = affine.delinearize_index %[[THREAD_ID]] into (2, 2, 4, 4, 4)
+//   CHECK-DAG:     %[[LHS_IN_IDS:.+]]:5 = affine.delinearize_index %[[THREAD_ID]] into (4, 4, 4, 4)
+//   CHECK-DAG:     %[[LHS_IDX0_CLAMPED:.+]] = arith.divui %[[LHS_IN_IDS]]#1, %[[C2]] : index
 //   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]]
-//  CHECK-SAME:       [0, 0, %[[LHS_IN_IDS]]#1, %[[LHS_IN_IDS]]#3, %[[LHS_IN_IDS]]#4, %[[LHS_IN_IDS]]#5, 0] [1, 1, 1, 1, 1, 1, 4] [1, 1, 1, 1, 1, 1, 1]
+//  CHECK-SAME:       [0, 0, %[[LHS_IDX0_CLAMPED]], %[[LHS_IN_IDS]]#2, %[[LHS_IN_IDS]]#3, %[[LHS_IN_IDS]]#4, 0] [1, 1, 1, 1, 1, 1, 4] [1, 1, 1, 1, 1, 1, 1]
 //   CHECK-DAG:     %[[IN_IDS:.+]]:4 = affine.delinearize_index %[[THREAD_ID]] into (2, 4, 16)
 //   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]]
 //  CHECK-SAME:       [0, 0, %[[IN_IDS]]#1, %[[IN_IDS]]#2, %[[IN_IDS]]#3, 0] [1, 1, 1, 1, 1, 4] [1, 1, 1, 1, 1, 1]

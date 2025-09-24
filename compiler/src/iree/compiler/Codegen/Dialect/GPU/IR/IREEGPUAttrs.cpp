@@ -71,7 +71,7 @@ static bool is_AMD(MMAIntrinsic intrinsic) {
   return is_AMD_MFMA(intrinsic) || is_AMD_WMMA(intrinsic);
 }
 
-static int64_t getIntrinsicSubgroupSize(MMAIntrinsic intrinsic) {
+int64_t getIntrinsicSubgroupSize(MMAIntrinsic intrinsic) {
   // Not using Wave64 at all at the moment, so the only place where the
   // subgroup size is 64 is on CDNA* architectures.
   return is_AMD_MFMA(intrinsic) ? 64 : 32;
@@ -780,21 +780,6 @@ LogicalResult MMAAttr::populateOperandOffsetsSizesStrides(
 // DataTiledMMA Attributes
 //===----------------------------------------------------------------------===//
 
-/// Returns the swizzled tile shape, but with dim sizes overwritten with 1 if
-/// `predicate` returns false.
-static SmallVector<int64_t>
-sliceSwizzledShape(const TileSwizzle &swizzle,
-                   std::function<bool(TileSwizzle::Dim)> predicate) {
-  SmallVector<int64_t> shape;
-  for (TileSwizzle::ExpandShapeDimVectorType e : swizzle.expandShape) {
-    for (TileSwizzle::Dim d : e) {
-      shape.push_back(predicate(d) ? d.size : 1);
-    }
-  }
-  applyPermutationToVector(shape, swizzle.permutation);
-  return shape;
-}
-
 int64_t DataTiledMMAAttr::getExpectedNumInputs() const { return 2; }
 
 int64_t DataTiledMMAAttr::getExpectedNumOutputs() const { return 1; }
@@ -804,170 +789,12 @@ DataTiledMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
   return verifyMmaIndexingMaps(maps);
 }
 
-void DataTiledMMAAttr::getUndistributedTileTypes(
-    SmallVectorImpl<VectorType> &result) const {
-  MLIRContext *ctx = getContext();
-  OpaqueMmaLayout o = getOpaqueMMALayout(ctx, getIntrinsic());
-  int64_t m = o.mSize * getIntrinsicsM() * getSubgroupsM();
-  int64_t n = o.nSize * getIntrinsicsN() * getSubgroupsN();
-  int64_t k = o.kSize * getIntrinsicsK();
-  result.push_back(VectorType::get({m, k}, o.aType));
-  result.push_back(VectorType::get({k, n}, o.bType));
-  result.push_back(VectorType::get({m, n}, o.cType));
-}
-
-void DataTiledMMAAttr::getDistributedTileTypes(
-    SmallVectorImpl<VectorType> &result) const {
-  auto [A, B, C] = getABCElementTypes();
-  auto getShape = [=](MMAFragment fragment) {
-    return sliceSwizzledShape(
-        getSwizzle(*this, fragment), [](TileSwizzle::Dim d) {
-          return d.kind != TileSwizzle::Dim::Kind::CrossThread;
-        });
-  };
-  result.assign({VectorType::get(getShape(MMAFragment::Lhs), A),
-                 VectorType::get(getShape(MMAFragment::Rhs), B),
-                 VectorType::get(getShape(MMAFragment::Acc), C)});
-}
-
 int64_t DataTiledMMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());
 }
 
-Attribute DataTiledMMAAttr::getDistributionMappingKind() const {
-  return gpu::GPUThreadMappingAttr::get(getContext(),
-                                        gpu::MappingId::LinearDim0);
-}
-
-OpFoldResult
-DataTiledMMAAttr::getDistributionWorkerCount(OpBuilder &, Location,
-                                             Operation *opToDistribute) const {
-  if (auto func = opToDistribute->getParentOfType<FunctionOpInterface>()) {
-    if (auto wgSizes = getWorkgroupSize(func)) {
-      return getAsIndexOpFoldResult(getContext(),
-                                    ShapedType::getNumElements(*wgSizes));
-    }
-  }
-  return OpFoldResult();
-}
-
-LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
-    OpBuilder &builder, Location loc, uint32_t operandIndex, Value threadId,
-    ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
-    SmallVectorImpl<OpFoldResult> &sizes,
-    SmallVectorImpl<OpFoldResult> &strides) const {
-  assert(operandIndex <= 2 && "Must index valid MMA operand");
-  auto fragment = static_cast<IREE::GPU::MMAFragment>(operandIndex);
-  TileSwizzle swizzle = getSwizzle(*this, fragment);
-
-  LLVM_DEBUG({
-    DBGS() << "DataTiledMMAAttr::populateOperandOffsetsSizesStrides\n";
-    DBGS() << "    fragment: " << llvm::to_underlying(fragment) << "\n";
-    DBGS() << "    swizzle: " << swizzle << "\n";
-  });
-
-  MLIRContext *ctx = builder.getContext();
-  SmallVector<OpFoldResult> tileSizes = getAsIndexOpFoldResult(
-      ctx, sliceSwizzledShape(swizzle, [](TileSwizzle::Dim d) {
-        return d.kind != TileSwizzle::Dim::Kind::CrossThread;
-      }));
-
-  // Most of the rest of this function is the computation of the offsets.
-  // The basic idea is to delinearize the threadId over the basis of
-  // cross-thread dimensions. These cross-thread dimensions may be either
-  // the intrinsic's own, or they may come from expansion to multiple subgroups.
-  // Normally, that distinction is irrelevant here: we just delinearize the
-  // thread-id over all cross-thread dimensions.
-  //
-  // There are, however, two special cases that require inserting dummy
-  // dimensions into the delinearization index list, which are later
-  // removed when constructing tile offsets:
-  //
-  // 1. On RDNA3 only: some intrinsics use multiple threads (currently 2)
-  //    to read the same data. This redundancy is not represented in the
-  //    TileSwizzle structures we rely on. In these cases, the thread grid
-  //    encoded by TileSwizzle is *smaller* than the subgroup size, and an
-  //    implicit "distribution-only" dimension exists where multiple threads
-  //    map to identical data. To handle this, we distinguish between
-  //    layoutThreadSizes and distributionThreadSizes.
-  //
-  // 2. LHS delinearization when both subGroupsM and subGroupsN > 1.
-  //    Although subGroupsN is not part of the LHS swizzle, we must still
-  //    delinearize over the combined subGroupsM × subGroupsN space. By
-  //    contrast, RHS does *not* need special handling, since subGroupsM can be
-  //    treated as an implicit leading dimension and omitted anyway.
-
-  // Handle the RDNA3 special case.
-  SmallVector<int64_t> layoutThreadSizes =
-      sliceSwizzledShape(swizzle, [](TileSwizzle::Dim d) {
-        return d.kind == TileSwizzle::Dim::Kind::CrossThread;
-      });
-  // In layoutThreadSizes, intrinsic level dimensions are mixed with expansion
-  // to multiple subgroups, so in order to tell if there are additional
-  // distribution-only thread dimensions, we need to get back to the intrinsic.
-  TileSwizzle intrinsicSwizzle = getIntrinsicSwizzle(getIntrinsic(), fragment);
-
-  SmallVector<int64_t> intrinsicLayoutThreadSizes =
-      sliceSwizzledShape(intrinsicSwizzle, [](TileSwizzle::Dim d) {
-        return d.kind == TileSwizzle::Dim::Kind::CrossThread;
-      });
-  int64_t intrinsicLayoutThreadBound =
-      ShapedType::getNumElements(intrinsicLayoutThreadSizes);
-  SmallVector<int64_t> distributionThreadSizes = layoutThreadSizes;
-  int distributionOnlyDimIdx =
-      distributionThreadSizes.size() - intrinsicLayoutThreadSizes.size();
-  // Now we are able to tell if there is an extra distribution-only dimension.
-  bool hasDistributionOnlyDim = intrinsicLayoutThreadBound < getSubgroupSize();
-  if (hasDistributionOnlyDim) {
-    // Insert the extra distribution-only dimension. This will need to be paired
-    // below with erasing the corresponding dim out of the delinearized indices.
-    distributionThreadSizes.insert(
-        distributionThreadSizes.begin() + distributionOnlyDimIdx,
-        getSubgroupSize() / intrinsicLayoutThreadBound);
-  }
-
-  // Handle the subgroupsM/N special case.
-  int64_t subgroupsM = getSubgroupsM();
-  int64_t subgroupsN = getSubgroupsN();
-  bool needsLhsSubgroupNDim = (fragment == IREE::GPU::MMAFragment::Lhs) &&
-                              subgroupsM > 1 && subgroupsN > 1;
-  const int lhsSubgroupNDimIdx = 1;
-  if (needsLhsSubgroupNDim) {
-    distributionThreadSizes.insert(
-        distributionThreadSizes.begin() + lhsSubgroupNDimIdx, subgroupsN);
-  }
-
-  // Obtain the offsets from delinearization along the distributionThreadSizes.
-  // Use a delinearize without outer bound and throw away its initial result
-  // to get clamping behavior.
-  SmallVector<OpFoldResult> tileOffsets =
-      affine::AffineDelinearizeIndexOp::create(
-          builder, loc, getValueOrCreateConstantIndexOp(builder, loc, threadId),
-          distributionThreadSizes, /*hasOuterBound=*/false)
-          ->getResults()
-          .drop_front();
-
-  // Erase the delinearized index that corresponds to the dummy
-  // dimension that we had inserted above. This is what causes multiple
-  // threads (which only differed in the index being discarded here) to read
-  // exactly the same data.
-  if (hasDistributionOnlyDim) {
-    tileOffsets.erase(tileOffsets.begin() + distributionOnlyDimIdx);
-  }
-  if (needsLhsSubgroupNDim) {
-    tileOffsets.erase(tileOffsets.begin() + lhsSubgroupNDimIdx);
-  }
-
-  // Strides are trivial: each slice is contiguous along the *expanded* dims
-  // even if it may not be contiguous in the flattened layout.
-  SmallVector<OpFoldResult> tileStrides(tileSizes.size(),
-                                        builder.getIndexAttr(1));
-
-  offsets.append(tileOffsets);
-  sizes.append(tileSizes);
-  strides.append(tileStrides);
-
-  return success();
+int64_t DataTiledMMAAttr::getFlatWorkgroupSize() const {
+  return getSubgroupSize() * getSubgroupsM() * getSubgroupsN();
 }
 
 /// Increment the mutable vector `indices` to traverse the index space below
@@ -1107,6 +934,26 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
   }
   results.push_back(acc);
   return success();
+}
+
+TileSwizzle DataTiledMMAAttr::getTileSwizzle(unsigned operandIndex) const {
+  auto fragment = static_cast<IREE::GPU::MMAFragment>(operandIndex);
+  return getSwizzle(*this, fragment);
+}
+
+IREE::Codegen::TileMxNxK DataTiledMMAAttr::getTileMNK() const {
+  IREE::Codegen::TileMxNxK innerTile;
+  std::tie(innerTile.M, innerTile.N, innerTile.K) =
+      getMNKShapeFromIntrinsic(getIntrinsic());
+  innerTile.M *= getIntrinsicsM() * getSubgroupsM();
+  innerTile.N *= getIntrinsicsN() * getSubgroupsN();
+  innerTile.K *= getIntrinsicsK();
+  return innerTile;
+}
+
+void DataTiledMMAAttr::getElementTypes(SmallVectorImpl<Type> &result) const {
+  auto [a, b, c] = IREE::GPU::getABCElementTypes(getContext(), getIntrinsic());
+  result.assign({a, b, c});
 }
 
 //===----------------------------------------------------------------------===//

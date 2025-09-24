@@ -42,28 +42,27 @@ constexpr int64_t kPreferredCopyNumBits = 128;
 // Lowering Config Selection
 //===----------------------------------------------------------------------===//
 
-LogicalResult setDataTiledMultiMmaLoweringConfig(
+LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
     Operation *op, IREE::Codegen::UKernelDescriptorAttr ukernelConfig) {
   auto multiMmaOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op);
   if (!multiMmaOp) {
     return failure();
   }
-  auto dataTiledMmaAttr = dyn_cast<DataTiledMMAAttr>(multiMmaOp.getKind());
+  auto dataTiledMmaAttr =
+      dyn_cast<DataTiledMMAInterfaceAttr>(multiMmaOp.getKind());
   if (!dataTiledMmaAttr) {
     return failure();
   }
 
-  LDBG() << "MultiMMA TileAndFuse Config";
+  LDBG() << "Data Tiled MMA InnerTiled TileAndFuse Config";
 
   // Compute workgroup size, which is given by the subgroup size times the
   // number of subgroups. The number of subgroups is found by the product of
   // subgroup unrolling factors, since the non-unrolled inner kernel takes a
   // single subgroup.
   const int64_t targetSubgroupSize = dataTiledMmaAttr.getSubgroupSize();
-  int64_t flatWorkgroupSize = targetSubgroupSize *
-                              dataTiledMmaAttr.getSubgroupsM() *
-                              dataTiledMmaAttr.getSubgroupsN();
+  int64_t flatWorkgroupSize = dataTiledMmaAttr.getFlatWorkgroupSize();
   std::array<int64_t, 3> workgroupSize{flatWorkgroupSize, 1, 1};
 
   // Set all workgroup and reduction tile sizes to 1, since the data tiled

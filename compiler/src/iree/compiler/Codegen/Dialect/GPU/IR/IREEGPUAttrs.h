@@ -66,6 +66,7 @@ struct MMASingleSubgroupLayout {
 int64_t getMSize(MMAIntrinsic intrinsic);
 int64_t getNSize(MMAIntrinsic intrinsic);
 int64_t getKSize(MMAIntrinsic intrinsic);
+int64_t getIntrinsicSubgroupSize(MMAIntrinsic intrinsic);
 
 MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
                                                 MMAFragment fragment);

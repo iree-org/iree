@@ -81,7 +81,7 @@ static MMAAttr chooseIntrinsicMMAAttr(TypeRange eTypes, TargetWgpAttr wgp) {
   return candidateMma;
 }
 
-static DataTiledMMAAttr
+static DataTiledMMAInterfaceAttr
 chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
                        IREE::Encoding::EncodingAttr encoding,
                        GPUEncodingResolverAttr resolver) {
@@ -288,16 +288,14 @@ lowerContractionOpToMultiMmaOp(OpBuilder &builder, linalg::LinalgOp linalgOp,
     return nullptr;
   }
 
-  IREE::GPU::DataTiledMMAAttr mma =
+  IREE::GPU::DataTiledMMAInterfaceAttr dataTiledAttr =
       chooseDataTiledMMAAttr(resultEncoding.getElementTypesArray(), targetAttr,
                              resultEncoding, resolver);
-  if (!mma) {
+  if (!dataTiledAttr) {
     LDBG() << "expect encodings on operand types";
     return nullptr;
   }
-  LDBG() << "Target MMA: " << mma;
 
-  MLIRContext *ctx = builder.getContext();
   SmallVector<AffineExpr> lhsExprs, rhsExprs, accExprs;
   int baseIdx = contractionDims->batch.empty() ? 0 : 1;
   if (baseIdx) {
@@ -315,6 +313,7 @@ lowerContractionOpToMultiMmaOp(OpBuilder &builder, linalg::LinalgOp linalgOp,
   rhsExprs.append({nExpr, kExpr});
   accExprs.append({mExpr, nExpr});
   int64_t numDims = baseIdx + 3;
+  MLIRContext *ctx = builder.getContext();
   auto lhsMap = AffineMap::get(numDims, 0, lhsExprs, ctx);
   auto rhsMap = AffineMap::get(numDims, 0, rhsExprs, ctx);
   auto accMap = AffineMap::get(numDims, 0, accExprs, ctx);
@@ -326,7 +325,8 @@ lowerContractionOpToMultiMmaOp(OpBuilder &builder, linalg::LinalgOp linalgOp,
   Operation *mmaOp = Codegen::InnerTiledOp::create(
       builder, loc, operands.take_front(inputs.size()),
       operands.take_back(outputs.size()),
-      ArrayRef<AffineMap>{lhsMap, rhsMap, accMap}, iteratorTypes, mma);
+      ArrayRef<AffineMap>{lhsMap, rhsMap, accMap}, iteratorTypes,
+      cast<IREE::GPU::DataTiledMMAAttr>(dataTiledAttr));
   return mmaOp;
 }
 
@@ -355,7 +355,7 @@ struct GPUEncodingPackedLayoutMaterializerAttr
       return info;
     }
 
-    DataTiledMMAAttr mma = chooseDataTiledMMAAttr(
+    DataTiledMMAInterfaceAttr mma = chooseDataTiledMMAAttr(
         encoding.getElementTypesArray(), gpuAttr, encoding, resolver);
     if (!mma) {
       return info;
@@ -363,8 +363,7 @@ struct GPUEncodingPackedLayoutMaterializerAttr
 
     // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
     // based on its operand index in the matmul.
-    TileMxNxK innerTile;
-    std::tie(innerTile.M, innerTile.N, innerTile.K) = mma.getMNKShape();
+    TileMxNxK innerTile = mma.getTileMNK();
     FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
         getEncodingInfoForMatmul(encoding, innerTile);
     if (failed(maybeEncodingInfo)) {
