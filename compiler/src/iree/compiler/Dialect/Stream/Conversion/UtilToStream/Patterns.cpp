@@ -142,6 +142,30 @@ struct ReturnOpConversion
   }
 };
 
+struct UnreachableOpConversion
+    : public OpConversionPattern<IREE::Util::UnreachableOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Util::UnreachableOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::Util::UnreachableOp>(op,
+                                                           op.getMessageAttr());
+    return success();
+  }
+};
+
+struct SCFUnreachableOpConversion
+    : public OpConversionPattern<IREE::Util::SCFUnreachableOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Util::SCFUnreachableOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::Util::SCFUnreachableOp>(
+        op, op.getMessageAttr());
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Globals
 //===----------------------------------------------------------------------===//
@@ -403,6 +427,8 @@ void populateUtilToStreamConversionPatterns(
   patterns.insert<FuncOpSignatureConversion>(typeConverter, context);
   patterns.insert<CallOpConversion, ReturnOpConversion>(typeConverter, context,
                                                         affinityAnalysis);
+  patterns.insert<UnreachableOpConversion, SCFUnreachableOpConversion>(
+      typeConverter, context);
 
   auto expansionState = std::make_shared<GlobalExpansionState>();
   // TODO(#7432): add indirect global expansion support to streams.
@@ -453,6 +479,8 @@ void populateUtilToStreamConversionPatterns(
       });
   addGenericLegalOp<IREE::Util::CallOp>(conversionTarget, typeConverter);
   addGenericLegalOp<IREE::Util::ReturnOp>(conversionTarget, typeConverter);
+  conversionTarget
+      .addLegalOp<IREE::Util::UnreachableOp, IREE::Util::SCFUnreachableOp>();
 
   conversionTarget.addDynamicallyLegalOp<IREE::Util::GlobalOp>(
       [&](IREE::Util::GlobalOp op) {

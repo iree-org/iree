@@ -381,7 +381,7 @@ static FuncAnalysis analyzeFuncOp(IREE::Util::FuncOp funcOp,
     auto arg = funcOp.getArgument(argIndex);
     bool onlyReturnUsers = true;
     for (auto user : arg.getUsers()) {
-      if (!isa<IREE::Util::ReturnOp>(user)) {
+      if (!user->hasTrait<OpTrait::ReturnLike>()) {
         onlyReturnUsers = false;
         break;
       }
