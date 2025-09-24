@@ -315,8 +315,7 @@ public:
 
     auto variantModOp = variantOp.getInnerModule();
     // Propagate target features and cpu to function ops.
-    populateLLVMFuncTargetAttrs(variantModOp, *targetMachine,
-                                executableBuilder.getContext());
+    populateLLVMFuncTargetAttrs(variantModOp, *targetMachine);
 
     // At this moment we are leaving MLIR LLVM dialect land translating module
     // into target independent LLVMIR.

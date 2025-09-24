@@ -18,8 +18,7 @@ namespace mlir::iree_compiler::IREE::HAL {
 // Propagate the target features and target cpu to individual LLVMFuncOp within
 // this module if their corresponding attributes haven't been set there.
 void populateLLVMFuncTargetAttrs(ModuleOp moduleOp,
-                                 const llvm::TargetMachine &targetMachine,
-                                 mlir::MLIRContext *context = nullptr);
+                                 const llvm::TargetMachine &targetMachine);
 
 } // namespace mlir::iree_compiler::IREE::HAL
 

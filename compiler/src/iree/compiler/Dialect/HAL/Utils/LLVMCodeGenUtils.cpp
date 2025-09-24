@@ -12,30 +12,22 @@
 namespace mlir::iree_compiler::IREE::HAL {
 
 void populateLLVMFuncTargetAttrs(ModuleOp moduleOp,
-                                 const llvm::TargetMachine &targetMachine,
-                                 mlir::MLIRContext *context) {
-  if (!context) {
-    context = moduleOp.getContext();
-  }
-
+                                 const llvm::TargetMachine &targetMachine) {
+  MLIRContext *context = moduleOp.getContext();
   llvm::MCSubtargetInfo const *subTargetInfo =
       targetMachine.getMCSubtargetInfo();
+  StringRef targetCPU = targetMachine.getTargetCPU();
 
   const std::vector<llvm::SubtargetFeatureKV> enabledFeatures =
       subTargetInfo->getEnabledProcessorFeatures();
-
   auto plussedFeatures = llvm::to_vector(
       llvm::map_range(enabledFeatures, [](llvm::SubtargetFeatureKV feature) {
         return std::string("+") + feature.Key;
       }));
-
   auto plussedFeaturesRefs = llvm::to_vector(llvm::map_range(
       plussedFeatures, [](auto &it) { return StringRef(it.c_str()); }));
-
   auto fullTargetFeaturesAttr =
       LLVM::TargetFeaturesAttr::get(context, plussedFeaturesRefs);
-
-  StringRef targetCPU = targetMachine.getTargetCPU();
 
   Block &bodyBlock = moduleOp.getBodyRegion().front();
   for (auto funcOp : bodyBlock.getOps<LLVM::LLVMFuncOp>()) {
