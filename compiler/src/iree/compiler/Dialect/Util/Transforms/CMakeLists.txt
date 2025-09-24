@@ -29,6 +29,7 @@ iree_cc_library(
     "HoistIntoGlobals.cpp"
     "IPO.cpp"
     "ImportResources.cpp"
+    "LiftCFGToSCF.cpp"
     "OptimizeIntArithmetic.cpp"
     "Passes.cpp"
     "Patterns.cpp"
@@ -60,6 +61,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms
+    MLIRUBDialect
     MLIRVectorDialect
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Analysis::Attributes
