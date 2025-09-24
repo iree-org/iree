@@ -525,7 +525,7 @@ def Util_AssumeIntOp : Util_PureOp<"assume.int", [
 }
 
 def Util_OptimizationBarrierOp : Util_Op<"optimization_barrier", [
-  SameOperandsAndResultType,
+  AllTypesMatch<["operands", "results"]>,
 ]> {
   let summary = [{Prevents compiler optimizations across a value.}];
   let description = [{
@@ -547,8 +547,6 @@ def Util_OptimizationBarrierOp : Util_Op<"optimization_barrier", [
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes
     )>,
   ];
-
-  let hasVerifier = 1;
 }
 
 def Util_UnfoldableConstantOp : Util_Op<"unfoldable_constant"> {
