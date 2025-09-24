@@ -509,10 +509,15 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
   SmallVector<int64_t> kTileSizes =
       getBestKTileSizes(problem, intrinsic, seeds);
 
-  return GPUMMASchedule{
-      intrinsic.mmaKind,   intrinsic.mSizes[0], intrinsic.nSizes[0],
-      intrinsic.kSizes[0], mSubgroupCounts,     nSubgroupCounts,
-      mTileSizes,          nTileSizes,          kTileSizes};
+  return GPUMMASchedule{intrinsic.mmaKind,
+                        prod(intrinsic.mSizes),
+                        prod(intrinsic.nSizes),
+                        prod(intrinsic.kSizes),
+                        mSubgroupCounts,
+                        nSubgroupCounts,
+                        mTileSizes,
+                        nTileSizes,
+                        kTileSizes};
 }
 
 /// Compare the MMA intrinsics by following precedence rules:
