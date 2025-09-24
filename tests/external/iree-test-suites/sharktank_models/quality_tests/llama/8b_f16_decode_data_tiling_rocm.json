@@ -23,9 +23,7 @@
         "--iree-hal-target-device=hip",
         "--iree-opt-level=O3",
         "--iree-stream-resource-memory-model=discrete",
-        "--iree-opt-data-tiling=false",
-        "--iree-dispatch-creation-data-tiling",
-        "--iree-llvmgpu-test-combine-layout-transformation"
+        "--iree-dispatch-creation-data-tiling"
     ],
     "run_function": "decode_bs4"
 }
