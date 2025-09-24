@@ -453,6 +453,8 @@ void populateUtilToStreamConversionPatterns(
       });
   addGenericLegalOp<IREE::Util::CallOp>(conversionTarget, typeConverter);
   addGenericLegalOp<IREE::Util::ReturnOp>(conversionTarget, typeConverter);
+  conversionTarget
+      .addLegalOp<IREE::Util::UnreachableOp, IREE::Util::SCFUnreachableOp>();
 
   conversionTarget.addDynamicallyLegalOp<IREE::Util::GlobalOp>(
       [&](IREE::Util::GlobalOp op) {
