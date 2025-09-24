@@ -36,5 +36,6 @@
         "--iree-scheduling-dump-statistics-format=json",
         "--iree-scheduling-dump-statistics-file=compilation_info.json"
     ],
-    "compiled_file_name":"llama_8b-fp16-prefill_vmfbs/model.rocm_gfx942"
+    "compiled_file_name":"llama_8b-fp16-prefill_vmfbs/model.rocm_gfx942",
+    "real_weights_file_path": "/shark-dev/8b/instruct/weights/llama3.1_8b_instruct_fp16.irpa"
 }
