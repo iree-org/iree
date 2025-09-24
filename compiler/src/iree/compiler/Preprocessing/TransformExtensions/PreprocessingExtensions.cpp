@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Utils/EquivalenceUtils.h"
 #include "iree/compiler/Utils/ShapeUtils.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/IR/AffineMap.h"
@@ -320,15 +321,9 @@ DiagnosedSilenceableFailure IREE::transform_dialect::MatchSizeEqualsOp::apply(
                                   << targetDimensionSizes.size() << ")";
   }
 
-  for (auto [currentDimSizeAttr, targetDimSizeAttr] :
-       llvm::zip_equal(currentDimSizes, targetDimensionSizes)) {
-    int64_t currentDimSize = cast<IntegerAttr>(currentDimSizeAttr).getInt();
-    int64_t targetDimSize = cast<IntegerAttr>(targetDimSizeAttr).getInt();
-    if (currentDimSize != targetDimSize) {
-      return emitSilenceableError()
-             << "Dimension size " << currentDimSize
-             << " does not match expected size " << targetDimSize;
-    }
+  if (!llvm::equal(currentDimSizes, targetDimensionSizes)) {
+    return emitSilenceableError()
+           << "Dimension sizes do not match expected values";
   }
 
   return DiagnosedSilenceableFailure::success();

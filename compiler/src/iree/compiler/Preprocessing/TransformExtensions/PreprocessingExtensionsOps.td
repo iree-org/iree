@@ -235,10 +235,10 @@ def MatchSizeEqualsOp : Op<Transform_Dialect, "iree.match.size_equals",
     Each position in the dimension sizes array must match the corresponding
     expected value exactly.
 
-    Example: %batch_dims contains [2, 4] and expected_values is [2, 4].
-    This means:
-    - %batch_dims[0] must equal 2.
-    - %batch_dims[1] must equal 4.
+    ### Example
+
+    `transform.iree.match.size_equals %m, [512, 256] : !transform.param<i64>`
+    succeeds when `%m` has exactly two dimensions, 512 and 256.
 
     #### Return modes
 
