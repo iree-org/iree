@@ -42,6 +42,7 @@ iree_compiler_cc_library(
         "EncodingDialect.cpp.inc",
         "EncodingEnums.cpp.inc",
         "EncodingInterfaces.cpp.inc",
+        "EncodingOpInterfaces.cpp.inc",
         "EncodingOps.cpp",
         "EncodingOps.cpp.inc",
         "EncodingTypeInterfaces.cpp.inc",
@@ -54,6 +55,7 @@ iree_compiler_cc_library(
         "EncodingDialect.h.inc",
         "EncodingEnums.h.inc",
         "EncodingInterfaces.h.inc",
+        "EncodingOpInterfaces.h.inc",
         "EncodingOps.h",
         "EncodingOps.h.inc",
         "EncodingTypeInterfaces.h.inc",
@@ -65,6 +67,7 @@ iree_compiler_cc_library(
         ":EncodingInterfacesGen",
         ":EncodingOpsIncGen",
         ":EncodingTypesGen",
+        "//compiler/src/iree/compiler/Dialect/TensorExt/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:DialectUtils",
@@ -146,6 +149,14 @@ iree_gentbl_cc_library(
             ["--gen-type-interface-defs"],
             "EncodingTypeInterfaces.cpp.inc",
         ),
+        (
+            ["--gen-op-interface-decls"],
+            "EncodingOpInterfaces.h.inc",
+        ),
+        (
+            ["--gen-op-interface-defs"],
+            "EncodingOpInterfaces.cpp.inc",
+        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "EncodingInterfaces.td",
@@ -191,6 +202,7 @@ iree_gentbl_cc_library(
 
 iree_tablegen_doc(
     name = "EncodingDialectDocGen",
+    category = "Dialects",
     tbl_outs = [
         (
             [

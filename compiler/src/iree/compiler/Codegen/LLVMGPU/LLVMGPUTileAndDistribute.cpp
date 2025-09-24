@@ -103,22 +103,22 @@ calculateDistributedTileSize(ArrayRef<int64_t> numElements, OpBuilder &builder,
   if (partitionedLoops.empty()) {
     return tileSizesVal;
   }
-  auto zero = builder.create<arith::ConstantIndexOp>(operation->getLoc(), 0);
+  auto zero = arith::ConstantIndexOp::create(builder, operation->getLoc(), 0);
   tileSizesVal.resize(
       cast<TilingInterface>(operation).getLoopIteratorTypes().size(), zero);
 
   // partitionedLoops contains the dimensions we want to distribute.
   // We are distributing them in order onto the different workgroup
   // dimensions.
-  SmallVector<int64_t> distributedDim(numElements.begin(), numElements.end());
+  SmallVector<int64_t> distributedDim(numElements);
   distributedDim.resize(partitionedLoops.size());
   unsigned idIdx = 0;
   std::reverse(distributedDim.begin(), distributedDim.end());
   for (unsigned depth : partitionedLoops) {
     if (depth >= blockTileSize.size())
       continue;
-    tileSizesVal[depth] = builder.create<arith::ConstantIndexOp>(
-        operation->getLoc(),
+    tileSizesVal[depth] = arith::ConstantIndexOp::create(
+        builder, operation->getLoc(),
         llvm::divideCeil(blockTileSize[depth], distributedDim[idIdx++]));
     if (idIdx == kNumMaxParallelDims)
       break;
@@ -203,8 +203,7 @@ private:
   bool distributeToWarp = false;
 
 public:
-  using impl::LLVMGPUTileAndDistributePassBase<
-      LLVMGPUTileAndDistributePass>::LLVMGPUTileAndDistributePassBase;
+  using Base::Base;
   LLVMGPUTileAndDistributePass(bool distributeToWarp)
       : distributeToWarp(distributeToWarp) {}
 
@@ -213,7 +212,7 @@ public:
   }
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
 
     // Promote C matrix and propagate the potential  fill producer into the temp
     // allocation. This needs to be done before reduction tiling.

@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
@@ -29,8 +30,12 @@ namespace mlir::iree_compiler::IREE::Flow {
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 static constexpr int64_t kMaxCost = INT64_MAX;
+static constexpr int64_t kReductionCost = 2;
 
-namespace {
+static int64_t saturatingMul(int64_t lhs, int64_t rhs) {
+  assert(lhs > 0 && rhs > 0);
+  return (lhs > kMaxCost / rhs) ? kMaxCost : lhs * rhs;
+}
 
 // This op estimates the cost of a list of perfectly nested loop ranges simply
 // as the product of ranges. Note that this does not take into account the cost
@@ -47,11 +52,7 @@ static int64_t costOfDomain(ArrayRef<int64_t> domain) {
       multiplier = 1024;
     }
 
-    // Preform saturating multiplication
-    if (product > kMaxCost / multiplier) {
-      return kMaxCost;
-    }
-    product *= multiplier;
+    product = saturatingMul(product, multiplier);
   }
   return product;
 }
@@ -61,6 +62,12 @@ static int64_t estimateLinalgOpCost(linalg::LinalgOp op) {
   // For linalg ops we know the iteration domain, so return the number
   // of iterations of the iteration domain (or INT64_MAX for dynamic.)
   int64_t cost = costOfDomain(op.getStaticLoopRanges());
+
+  // Operations with reduction iterators are generally more costly and are
+  // likely to be the most important operation in the dispatch.
+  if (op.getNumReductionLoops()) {
+    cost = saturatingMul(cost, kReductionCost);
+  }
   LLVM_DEBUG(llvm::dbgs() << "// " << op->getName() << " cost: " << cost
                           << "\n");
   return cost;
@@ -189,7 +196,7 @@ static bool isMatvecLike(linalg::LinalgOp linalgOp) {
     return false;
 
   // One of the input should have all the parallel dimensions with size one.
-  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
   SmallVector<AffineMap> maps = linalgOp.getIndexingMapsArray();
   SmallVector<utils::IteratorType> iterators = linalgOp.getIteratorTypesArray();
 
@@ -294,6 +301,8 @@ static std::string summarizeLinalgOp(linalg::LinalgOp op) {
       prefix = "horizontal_multi_contract";
     } else if (succeeded(linalg::inferConvolutionDims(op))) {
       prefix = "conv";
+    } else if (op.getNumReductionLoops()) {
+      prefix = "reduction";
     }
   }
 
@@ -411,12 +420,13 @@ static std::string summarizeDispatchRegion(Region &region) {
   if (!bestOp) {
     std::string bestSummary = "";
     // Check if there is a possible slow memory copy as a dispatch. The current
-    // heuristic is to check if a dispatch.tensor.store stores a tensor that is
-    // directly loaded from a dispatch.tensor.load.
-    region.walk([&](IREE::Flow::DispatchTensorStoreOp storeOp) {
+    // heuristic is to check if a iree_tensor_ext.dispatch.tensor.store stores a
+    // tensor that is directly loaded from a
+    // iree_tensor_ext.dispatch.tensor.load.
+    region.walk([&](IREE::TensorExt::DispatchTensorStoreOp storeOp) {
       Value input = storeOp.getValue();
       if (auto loadOp =
-              input.getDefiningOp<IREE::Flow::DispatchTensorLoadOp>()) {
+              input.getDefiningOp<IREE::TensorExt::DispatchTensorLoadOp>()) {
         bestSummary = "slow_memcpy";
         return WalkResult::interrupt();
       }
@@ -480,8 +490,6 @@ static std::string summarizeDispatchRegion(Region &region) {
   LLVM_DEBUG(llvm::dbgs() << "// best op summary: '" << bestSummary << "'\n");
   return bestSummary;
 }
-
-} // namespace
 
 struct AnnotateDispatchesPass
     : public IREE::Flow::impl::AnnotateDispatchesPassBase<

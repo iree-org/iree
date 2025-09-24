@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
@@ -40,9 +41,7 @@ namespace {
 class ValueAliasingSet {
 public:
   void addAlias(Value aliasee, Value aliaser) {
-    auto aliaseeWithId = getWithId(aliasee);
-    auto aliaserWithId = getWithId(aliaser);
-    valueAliasing.unionSets(aliaseeWithId, aliaserWithId);
+    valueAliasing.unionSets(aliasee, aliaser);
   }
 
   SmallVector<SmallVector<Value>> getValueAliasSets() const {
@@ -53,7 +52,7 @@ public:
       auto &aliasSet = result.emplace_back();
       for (auto mi = valueAliasing.member_begin(**it);
            mi != valueAliasing.member_end(); ++mi) {
-        aliasSet.push_back(mi->value);
+        aliasSet.push_back(*mi);
       }
     }
     return result;
@@ -61,36 +60,13 @@ public:
 
   auto getValueAliases(Value value) const {
     return llvm::make_filter_range(
-        llvm::map_range(
-            llvm::make_range(valueAliasing.findLeader(getWithId(value)),
-                             valueAliasing.member_end()),
-            NumberedValue::getValue),
+        llvm::make_range(valueAliasing.findLeader(value),
+                         valueAliasing.member_end()),
         [=](Value aliaser) { return aliaser != value; });
   }
 
 private:
-  // EquivalenceClasses require ordering for value type to return deterministic
-  // results, so we provide it by assigning id to all values added to the set.
-  struct NumberedValue {
-    Value value;
-    int64_t id;
-
-    static Value getValue(const NumberedValue &value) { return value.value; }
-  };
-
-  struct Comparator {
-    int operator()(const NumberedValue &a, const NumberedValue &b) const {
-      return a.id < b.id;
-    }
-  };
-
-  NumberedValue getWithId(Value value) const {
-    auto [iterator, inserted] = id.try_emplace(value, id.size());
-    return {value, iterator->second};
-  }
-
-  mutable llvm::DenseMap<Value, int64_t> id;
-  llvm::EquivalenceClasses<NumberedValue, Comparator> valueAliasing;
+  llvm::EquivalenceClasses<Value> valueAliasing;
 };
 
 // Builds a map of value aliases from aliasee to a set of aliasers.
@@ -541,8 +517,8 @@ static LogicalResult applyAsyncSplatOp(IREE::Stream::AsyncSplatOp asyncOp,
                                        AllocationScope &scope,
                                        OpBuilder builder) {
   auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
-  builder.create<IREE::Stream::CmdFillOp>(
-      asyncOp.getLoc(), targetRange.resource, targetRange.resourceSize,
+  IREE::Stream::CmdFillOp::create(
+      builder, asyncOp.getLoc(), targetRange.resource, targetRange.resourceSize,
       targetRange.offset, targetRange.length, asyncOp.getValue());
   asyncOp.erase();
   return success();
@@ -553,8 +529,8 @@ static LogicalResult applyAsyncCloneOp(IREE::Stream::AsyncCloneOp asyncOp,
                                        OpBuilder builder) {
   auto sourceRange = scope.lookupResourceRange(asyncOp.getSource());
   auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
-  builder.create<IREE::Stream::CmdCopyOp>(
-      asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
+  IREE::Stream::CmdCopyOp::create(
+      builder, asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
       sourceRange.offset, targetRange.resource, targetRange.resourceSize,
       targetRange.offset, targetRange.length);
   asyncOp.erase();
@@ -568,8 +544,8 @@ static LogicalResult applyAsyncSliceOp(IREE::Stream::AsyncSliceOp asyncOp,
   auto sourceOffset = scope.add(asyncOp.getLoc(), sourceRange.offset,
                                 asyncOp.getSourceOffset());
   auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
-  builder.create<IREE::Stream::CmdCopyOp>(
-      asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
+  IREE::Stream::CmdCopyOp::create(
+      builder, asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
       sourceOffset, targetRange.resource, targetRange.resourceSize,
       targetRange.offset, asyncOp.getResultSize());
   asyncOp.erase();
@@ -582,8 +558,8 @@ static LogicalResult applyAsyncFillOp(IREE::Stream::AsyncFillOp asyncOp,
   auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
   auto targetOffset = scope.add(asyncOp.getLoc(), targetRange.offset,
                                 asyncOp.getTargetOffset());
-  builder.create<IREE::Stream::CmdFillOp>(
-      asyncOp.getLoc(), targetRange.resource, targetRange.resourceSize,
+  IREE::Stream::CmdFillOp::create(
+      builder, asyncOp.getLoc(), targetRange.resource, targetRange.resourceSize,
       targetOffset, asyncOp.getTargetLength(), asyncOp.getValue());
   asyncOp.erase();
   return success();
@@ -597,8 +573,8 @@ static LogicalResult applyAsyncUpdateOp(IREE::Stream::AsyncUpdateOp asyncOp,
   auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
   auto targetOffset = scope.add(asyncOp.getLoc(), targetRange.offset,
                                 asyncOp.getTargetOffset());
-  builder.create<IREE::Stream::CmdCopyOp>(
-      asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
+  IREE::Stream::CmdCopyOp::create(
+      builder, asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
       sourceOffset, targetRange.resource, targetRange.resourceSize,
       targetOffset, asyncOp.getUpdateSize());
   asyncOp.erase();
@@ -614,8 +590,8 @@ static LogicalResult applyAsyncCopyOp(IREE::Stream::AsyncCopyOp asyncOp,
   auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
   auto targetOffset = scope.add(asyncOp.getLoc(), targetRange.offset,
                                 asyncOp.getTargetOffset());
-  builder.create<IREE::Stream::CmdCopyOp>(
-      asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
+  IREE::Stream::CmdCopyOp::create(
+      builder, asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
       sourceOffset, targetRange.resource, targetRange.resourceSize,
       targetOffset, asyncOp.getLength());
   asyncOp.erase();
@@ -656,8 +632,8 @@ applyAsyncCollectiveOp(IREE::Stream::AsyncCollectiveOp asyncOp,
   newResourceAccesses.push_back(IREE::Stream::ResourceAccessBitfieldAttr::get(
       builder.getContext(), IREE::Stream::ResourceAccessBitfield::Write));
 
-  builder.create<IREE::Stream::CmdCollectiveOp>(
-      asyncOp.getLoc(), asyncOp.getOp(), asyncOp.getChannel(),
+  IREE::Stream::CmdCollectiveOp::create(
+      builder, asyncOp.getLoc(), asyncOp.getOp(), asyncOp.getChannel(),
       asyncOp.getElementCount(), asyncOp.getParam(), newResources,
       newResourceSizes, newResourceOffsets, newResourceLengths,
       builder.getArrayAttr(newResourceAccesses));
@@ -674,33 +650,32 @@ static LogicalResult applyAsyncBarrierOp(IREE::Stream::AsyncBarrierOp barrierOp,
   auto targetRange = scope.lookupResourceRange(barrierOp.getResult());
 
   // Perform the copy.
-  builder.create<IREE::Stream::CmdCopyOp>(
-      barrierOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
-      sourceRange.offset, targetRange.resource, targetRange.resourceSize,
-      targetRange.offset, sourceRange.length);
+  IREE::Stream::CmdCopyOp::create(
+      builder, barrierOp.getLoc(), sourceRange.resource,
+      sourceRange.resourceSize, sourceRange.offset, targetRange.resource,
+      targetRange.resourceSize, targetRange.offset, sourceRange.length);
 
   barrierOp.erase();
   return success();
 }
 
-static LogicalResult applyAsyncTransferOp(IREE::Stream::AsyncTransferOp asyncOp,
-                                          AllocationScope &scope,
-                                          OpBuilder builder) {
+static LogicalResult
+applyAsyncTransferOp(IREE::Stream::AffinityAttr executionAffinityAttr,
+                     IREE::Stream::AsyncTransferOp asyncOp,
+                     AllocationScope &scope, OpBuilder builder) {
   // Lookup the affinity for where we are executing. This lets us determine if
   // this transfer is incoming or outgoing.
   auto isStaging = [](Value value) {
     return llvm::cast<IREE::Stream::ResourceType>(value.getType())
                .getLifetime() == IREE::Stream::Lifetime::Staging;
   };
-  auto currentAffinityAttr =
-      IREE::Stream::AffinityAttr::lookupOrDefault(asyncOp);
   auto sourceAffinityAttr = asyncOp.getSourceAffinityAttr();
   auto resultAffinityAttr = asyncOp.getResultAffinityAttr();
-  bool transferIn =
-      (sourceAffinityAttr && sourceAffinityAttr != currentAffinityAttr) ||
+  const bool transferIn =
+      (sourceAffinityAttr && sourceAffinityAttr != executionAffinityAttr) ||
       isStaging(asyncOp.getSource());
-  bool transferOut =
-      (resultAffinityAttr && resultAffinityAttr != currentAffinityAttr) ||
+  const bool transferOut =
+      (resultAffinityAttr && resultAffinityAttr != executionAffinityAttr) ||
       isStaging(asyncOp.getResult());
 
   auto sourceRange = scope.lookupResourceRange(asyncOp.getSource());
@@ -708,23 +683,23 @@ static LogicalResult applyAsyncTransferOp(IREE::Stream::AsyncTransferOp asyncOp,
 
   // Incoming transfers need invalidation.
   if (transferIn) {
-    builder.create<IREE::Stream::CmdInvalidateOp>(
-        asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
-        sourceRange.offset, sourceRange.length,
+    IREE::Stream::CmdInvalidateOp::create(
+        builder, asyncOp.getLoc(), sourceRange.resource,
+        sourceRange.resourceSize, sourceRange.offset, sourceRange.length,
         asyncOp.getSourceAffinityAttr());
   }
 
   // Perform the copy.
-  builder.create<IREE::Stream::CmdCopyOp>(
-      asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
+  IREE::Stream::CmdCopyOp::create(
+      builder, asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
       sourceRange.offset, targetRange.resource, targetRange.resourceSize,
       targetRange.offset, sourceRange.length);
 
   // Outgoing transfers need flushes.
   if (transferOut) {
-    builder.create<IREE::Stream::CmdFlushOp>(
-        asyncOp.getLoc(), targetRange.resource, targetRange.resourceSize,
-        targetRange.offset, targetRange.length,
+    IREE::Stream::CmdFlushOp::create(
+        builder, asyncOp.getLoc(), targetRange.resource,
+        targetRange.resourceSize, targetRange.offset, targetRange.length,
         asyncOp.getResultAffinityAttr());
   }
 
@@ -792,10 +767,11 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
     newResourceAccesses.push_back(resourceAccess);
   }
 
-  auto newOp = builder.create<IREE::Stream::CmdDispatchOp>(
-      asyncOp.getLoc(), asyncOp.getWorkload(), asyncOp.getEntryPointsAttr(),
-      newOperands, newResources, newResourceSizes, newResourceOffsets,
-      newResourceLengths, builder.getArrayAttr(newResourceAccesses));
+  auto newOp = IREE::Stream::CmdDispatchOp::create(
+      builder, asyncOp.getLoc(), asyncOp.getWorkload(),
+      asyncOp.getEntryPointsAttr(), newOperands, newResources, newResourceSizes,
+      newResourceOffsets, newResourceLengths,
+      builder.getArrayAttr(newResourceAccesses));
   newOp->setDialectAttrs(asyncOp->getDialectAttrs());
   asyncOp.erase();
   return success();
@@ -850,9 +826,9 @@ static void convertAsyncFuncOp(IREE::Stream::AsyncFuncOp asyncOp) {
       FunctionType::get(asyncOp.getContext(), newInputs, newResults);
 
   OpBuilder builder(asyncOp);
-  auto cmdOp = builder.create<IREE::Stream::CmdFuncOp>(
-      asyncOp.getLoc(), asyncOp.getName(), newFunctionType, newArgAttrs,
-      newResultAttrs);
+  auto cmdOp = IREE::Stream::CmdFuncOp::create(
+      builder, asyncOp.getLoc(), asyncOp.getName(), newFunctionType,
+      newArgAttrs, newResultAttrs);
   cmdOp->setDialectAttrs(asyncOp->getDialectAttrs());
   asyncOp.erase();
 }
@@ -922,8 +898,8 @@ static LogicalResult applyAsyncCallOp(IREE::Stream::AsyncCallOp asyncOp,
     newResourceAccesses.push_back(resourceAccess);
   }
 
-  auto newOp = builder.create<IREE::Stream::CmdCallOp>(
-      asyncOp.getLoc(), newResultTypes, asyncOp.getCalleeAttr(),
+  auto newOp = IREE::Stream::CmdCallOp::create(
+      builder, asyncOp.getLoc(), newResultTypes, asyncOp.getCalleeAttr(),
       newResourceOperands, newResourceSizes, newResourceOffsets,
       newResourceLengths,
       /*result_sizes=*/ValueRange{},
@@ -934,11 +910,13 @@ static LogicalResult applyAsyncCallOp(IREE::Stream::AsyncCallOp asyncOp,
   return success();
 }
 
-static LogicalResult applyAsyncAllocations(Region &region,
-                                           AllocationScope &scope);
+static LogicalResult
+applyAsyncAllocations(IREE::Stream::AffinityAttr executionAffinityAttr,
+                      Region &region, AllocationScope &scope);
 
 static LogicalResult
-applyAsyncConcurrentOp(IREE::Stream::AsyncConcurrentOp asyncOp,
+applyAsyncConcurrentOp(IREE::Stream::AffinityAttr executionAffinityAttr,
+                       IREE::Stream::AsyncConcurrentOp asyncOp,
                        AllocationScope &scope, OpBuilder builder) {
   // Remove operands from the yield now that we aren't returning anything.
   // Must do this before we recurse so that the ops we are transforming have no
@@ -951,7 +929,8 @@ applyAsyncConcurrentOp(IREE::Stream::AsyncConcurrentOp asyncOp,
   // Resources are captured inside of the region and need to be mapped back to
   // the parent scope where they will be captured after lowering into
   // stream.cmd.execute.
-  if (failed(applyAsyncAllocations(asyncOp.getBody(), scope))) {
+  if (failed(applyAsyncAllocations(executionAffinityAttr, asyncOp.getBody(),
+                                   scope))) {
     return failure();
   }
 
@@ -960,7 +939,7 @@ applyAsyncConcurrentOp(IREE::Stream::AsyncConcurrentOp asyncOp,
   block.eraseArguments([&](auto arg) { return true; });
 
   // Rewrite wave op to remove results.
-  auto newOp = builder.create<IREE::Stream::CmdConcurrentOp>(asyncOp.getLoc());
+  auto newOp = IREE::Stream::CmdConcurrentOp::create(builder, asyncOp.getLoc());
   newOp.getBody().takeBody(asyncOp.getBody());
   asyncOp.erase();
   return success();
@@ -969,8 +948,9 @@ applyAsyncConcurrentOp(IREE::Stream::AsyncConcurrentOp asyncOp,
 // Converts async operations to explicit commands using the allocation mappings
 // in |scope|. Upon successful return the region should have no more defined
 // values.
-static LogicalResult applyAsyncAllocations(Region &region,
-                                           AllocationScope &scope) {
+static LogicalResult
+applyAsyncAllocations(IREE::Stream::AffinityAttr executionAffinityAttr,
+                      Region &region, AllocationScope &scope) {
   // Walk the ops backwards so that we can delete them, freeing uses so that
   // producers can be deleted in turn.
   auto &block = region.getBlocks().front();
@@ -1014,7 +994,8 @@ static LogicalResult applyAsyncAllocations(Region &region,
                      return applyAsyncBarrierOp(op, scope, OpBuilder(op));
                    })
                    .Case([&](IREE::Stream::AsyncTransferOp op) {
-                     return applyAsyncTransferOp(op, scope, OpBuilder(op));
+                     return applyAsyncTransferOp(executionAffinityAttr, op,
+                                                 scope, OpBuilder(op));
                    })
                    .Case([&](IREE::Stream::AsyncDispatchOp op) {
                      return applyAsyncDispatchOp(op, scope, OpBuilder(op));
@@ -1023,7 +1004,8 @@ static LogicalResult applyAsyncAllocations(Region &region,
                      return applyAsyncCallOp(op, scope, OpBuilder(op));
                    })
                    .Case([&](IREE::Stream::AsyncConcurrentOp op) {
-                     return applyAsyncConcurrentOp(op, scope, OpBuilder(op));
+                     return applyAsyncConcurrentOp(executionAffinityAttr, op,
+                                                   scope, OpBuilder(op));
                    })
                    .Default(failure()))) {
       return region.getParentOp()->emitError()
@@ -1110,8 +1092,8 @@ allocateLocalTransients(IREE::Stream::AsyncExecuteOp executeOp,
   auto fusedLoc = externalBuilder.getFusedLoc(locs);
   auto indexType = externalBuilder.getIndexType();
   SmallVector<Type> packedOffsetTypes(dynamicSliceSizes.size(), indexType);
-  auto packOp = externalBuilder.create<IREE::Stream::ResourcePackOp>(
-      fusedLoc, indexType, packedOffsetTypes,
+  auto packOp = IREE::Stream::ResourcePackOp::create(
+      externalBuilder, fusedLoc, indexType, packedOffsetTypes,
       /*offset=*/nullptr, externalBuilder.getIndexArrayAttr(lifetimeIntervals),
       dynamicSliceSizes, executeOp.getAffinityAttr());
 
@@ -1119,8 +1101,9 @@ allocateLocalTransients(IREE::Stream::AsyncExecuteOp executeOp,
   auto transientType = externalBuilder.getType<IREE::Stream::ResourceType>(
       IREE::Stream::Lifetime::Transient);
   auto timepointType = externalBuilder.getType<IREE::Stream::TimepointType>();
-  auto allocaOp = externalBuilder.create<IREE::Stream::ResourceAllocaOp>(
-      fusedLoc, transientType, timepointType, packOp.getTotalLength(),
+  auto allocaOp = IREE::Stream::ResourceAllocaOp::create(
+      externalBuilder, fusedLoc, transientType, timepointType,
+      packOp.getTotalLength(),
       /*indeterminate_lifetime=*/UnitAttr{}, executeOp.getAwaitTimepoint(),
       executeOp.getAffinityAttr());
   TransientAllocation allocation;
@@ -1142,6 +1125,128 @@ allocateLocalTransients(IREE::Stream::AsyncExecuteOp executeOp,
   }
 
   return allocation;
+}
+
+//===----------------------------------------------------------------------===//
+// Affinity utilities
+//===----------------------------------------------------------------------===//
+
+// Walks up the use-def chain to find an affinity the given local value is
+// pinned to. May return nullptr if there's no assigned affinity and the
+// enclosing execution region affinity should be used.
+//
+// TODO(benvanik): change this to use an affinity analysis on the escaping
+// value instead. The local value may not have a transfer associated with it.
+static IREE::Stream::AffinityAttr findLocalValueAffinity(Value value) {
+  while (value) {
+    auto definingOp = value.getDefiningOp();
+    if (!definingOp) {
+      // Block argument or something we don't track locally.
+      return {};
+    } else if (auto transferOp =
+                   dyn_cast<IREE::Stream::AsyncTransferOp>(definingOp)) {
+      return transferOp.getResultAffinityAttr();
+    } else if (auto regionOp = dyn_cast<RegionBranchOpInterface>(definingOp)) {
+      // A region op with a yielded value (like stream.async.concurrent).
+      // Note that we always want to check for tied ops first as that will let
+      // us skip over the region entirely.
+      if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(definingOp)) {
+        if (auto tiedValue = tiedOp.getTiedResultOperand(value)) {
+          value = tiedValue;
+          continue;
+        }
+      }
+      unsigned resultIndex = cast<OpResult>(value).getResultNumber();
+      auto &block = regionOp.getOperation()->getRegion(0).front();
+      auto terminatorOp =
+          cast<RegionBranchTerminatorOpInterface>(block.getTerminator());
+      value = terminatorOp.getSuccessorOperands(
+          RegionBranchPoint::parent())[resultIndex];
+    } else if (auto tiedOp =
+                   dyn_cast<IREE::Util::TiedOpInterface>(definingOp)) {
+      // If the producer is tied then try to get the operand.
+      value = tiedOp.getTiedResultOperand(value);
+    } else {
+      // Analysis blocked.
+      break;
+    }
+  }
+  return {};
+}
+
+// Finds an execution region result value for the given region value, if any.
+// This will recursively walk tied values to try to reach the region yield.
+static Value findEscapingResultValue(Value regionValue) {
+  SmallVector<OpOperand *> worklist;
+  llvm::append_range(worklist, llvm::make_pointer_range(regionValue.getUses()));
+  while (!worklist.empty()) {
+    auto *use = worklist.pop_back_val();
+    if (auto yieldOp = dyn_cast<IREE::Stream::YieldOp>(use->getOwner())) {
+      Value parentValue =
+          yieldOp->getParentOp()->getResult(use->getOperandNumber());
+      if (isa<IREE::Stream::AsyncExecuteOp>(parentValue.getDefiningOp())) {
+        // TODO(benvanik): return a set if multiple escapes?
+        return parentValue;
+      }
+      llvm::append_range(worklist,
+                         llvm::make_pointer_range(parentValue.getUses()));
+    } else if (auto tiedOp =
+                   dyn_cast<IREE::Util::TiedOpInterface>(use->getOwner())) {
+      for (auto tiedResult :
+           tiedOp.getOperandTiedResults(use->getOperandNumber())) {
+        llvm::append_range(worklist,
+                           llvm::make_pointer_range(tiedResult.getUses()));
+      }
+    }
+  }
+  return {};
+}
+
+// Attempts to derive an allocation affinity for a result of an execution op.
+// This will be a combination of the producer (the execute op) and all analyzed
+// users and transfer targets.
+static IREE::Stream::AffinityAttr
+deriveResultAffinity(IREE::Stream::AffinityOpInterface executeOp,
+                     Value resultValue, Value regionValue,
+                     AffinityAnalysis &affinityAnalysis) {
+  SmallVector<IREE::Stream::AffinityAttr> usageAffinities;
+  if (affinityAnalysis.tryLookupPinnedAffinities(resultValue,
+                                                 usageAffinities)) {
+    LLVM_DEBUG({
+      llvm::dbgs() << "  => affinity analysis provided pinned op affinities: ";
+      IREE::Stream::AffinityAttr::joinOR(usageAffinities).print(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    });
+  } else if (affinityAnalysis.tryLookupResourceUsageAffinity(resultValue,
+                                                             usageAffinities)) {
+    LLVM_DEBUG({
+      llvm::dbgs() << "  => affinity analysis provided allocation affinities: ";
+      IREE::Stream::AffinityAttr::joinOR(usageAffinities).print(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    });
+  }
+  if (auto localAllocationAffinity = findLocalValueAffinity(regionValue)) {
+    usageAffinities.push_back(localAllocationAffinity);
+    LLVM_DEBUG({
+      llvm::dbgs() << "  => merging local value affinity: ";
+      localAllocationAffinity.print(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    });
+  } else {
+    usageAffinities.push_back(executeOp.getAffinityAttr());
+    LLVM_DEBUG({
+      llvm::dbgs() << "  => merging execution affinity: ";
+      executeOp.getAffinityAttr().print(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    });
+  }
+  auto allocationAffinity = IREE::Stream::AffinityAttr::joinOR(usageAffinities);
+  LLVM_DEBUG({
+    llvm::dbgs() << "  => final affinity: ";
+    allocationAffinity.print(llvm::dbgs());
+    llvm::dbgs() << "\n";
+  });
+  return allocationAffinity;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1170,23 +1275,11 @@ static bool isOnlyUseYield(Value value) {
   return true;
 }
 
-// Extracts stream.async.constant ops with the given lifetime from |executeOp|
-// into their own dedicated stream.resource.constants upload op. The uploaded
-// constants will be captured by the region for use within as if they had still
-// existed in there.
-static std::optional<ConstantAllocation>
-extractConstantsWithLifetime(IREE::Stream::AsyncExecuteOp executeOp,
-                             IREE::Stream::Lifetime lifetime,
-                             OpBuilder &externalBuilder) {
-  auto constantOps = llvm::filter_to_vector(
-      executeOp.getOps<IREE::Stream::AsyncConstantOp>(),
-      [&](IREE::Stream::AsyncConstantOp op) {
-        return cast<IREE::Stream::ResourceType>(op.getResult().getType())
-                   .getLifetime() == lifetime;
-      });
-  if (constantOps.empty())
-    return {};
-
+static ConstantAllocation
+allocateConstantBatch(IREE::Stream::AsyncExecuteOp executeOp,
+                      IREE::Stream::AffinityAttr affinityAttr,
+                      ArrayRef<IREE::Stream::AsyncConstantOp> constantOps,
+                      OpBuilder &externalBuilder) {
   // Allocate a new constant upload op and insert a subview for each constant.
   SmallVector<Location> locs;
   SmallVector<Type> resultTypes;
@@ -1200,11 +1293,10 @@ extractConstantsWithLifetime(IREE::Stream::AsyncExecuteOp executeOp,
   }
   auto timepointType = externalBuilder.getType<IREE::Stream::TimepointType>();
   ConstantAllocation allocation;
-  allocation.constantsOp =
-      externalBuilder.create<IREE::Stream::ResourceConstantsOp>(
-          externalBuilder.getFusedLoc(locs), resultTypes, timepointType,
-          externalBuilder.getArrayAttr(initialValues), resultSizes,
-          executeOp.getAffinityAttr());
+  allocation.constantsOp = IREE::Stream::ResourceConstantsOp::create(
+      externalBuilder, externalBuilder.getFusedLoc(locs), resultTypes,
+      timepointType, externalBuilder.getArrayAttr(initialValues), resultSizes,
+      affinityAttr);
 
   // Remap original constants to reservations.
   auto &entryBlock = executeOp.getBody().front();
@@ -1233,22 +1325,121 @@ extractConstantsWithLifetime(IREE::Stream::AsyncExecuteOp executeOp,
   return allocation;
 }
 
+// Extracts stream.async.constant ops with the given lifetime from |executeOp|
+// into their own dedicated stream.resource.constants upload op. The uploaded
+// constants will be captured by the region for use within as if they had still
+// existed in there.
+static SmallVector<ConstantAllocation> extractConstantsWithLifetime(
+    IREE::Stream::AsyncExecuteOp executeOp, IREE::Stream::Lifetime lifetime,
+    AffinityAnalysis &affinityAnalysis, OpBuilder &externalBuilder) {
+  SmallVector<ConstantAllocation> constantAllocations;
+
+  [[maybe_unused]] std::unique_ptr<AsmState> asmState;
+  LLVM_DEBUG(asmState = std::make_unique<AsmState>(executeOp->getParentOp()));
+
+  // Bucket constant ops by affinity and whether they are global (from our
+  // perspective, in that they escape into the global program) or local (only
+  // used within this region and guaranteed dead by the end).
+  using ConstantsForAffinityMap =
+      llvm::MapVector<IREE::Stream::AffinityAttr,
+                      SmallVector<IREE::Stream::AsyncConstantOp>>;
+  ConstantsForAffinityMap globalConstantOps;
+  ConstantsForAffinityMap localConstantOps;
+  for (auto constantOp : executeOp.getOps<IREE::Stream::AsyncConstantOp>()) {
+    // Match only the lifetime being requested.
+    Value regionValue = constantOp.getResult();
+    if (cast<IREE::Stream::ResourceType>(regionValue.getType()).getLifetime() !=
+        lifetime) {
+      continue;
+    }
+
+    // Try to find the escaping result value in the parent of the execution
+    // region. This may fail if the value never escapes, indicating that its
+    // affinity is local to the region.
+    Value resultValue = findEscapingResultValue(regionValue);
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "Bucketing ";
+      llvm::dbgs() << (resultValue ? "escaping (globalish)"
+                                   : "non-escaping (local)");
+      llvm::dbgs() << " constant op for lifetime based on affinity: ";
+      constantOp.print(llvm::dbgs(), *asmState);
+      llvm::dbgs() << "\n";
+    });
+
+    // Find a pinned affinity for the value or inherit the execution region
+    // affinity.
+    IREE::Stream::AffinityAttr allocationAffinity;
+    if (resultValue) {
+      allocationAffinity = deriveResultAffinity(executeOp, resultValue,
+                                                regionValue, affinityAnalysis);
+      LLVM_DEBUG({
+        llvm::dbgs() << "  => derived constant result affinity: ";
+        allocationAffinity.print(llvm::dbgs());
+        llvm::dbgs() << "\n";
+      });
+    } else {
+      if (auto localAllocationAffinity = findLocalValueAffinity(regionValue)) {
+        allocationAffinity = localAllocationAffinity;
+        LLVM_DEBUG({
+          llvm::dbgs() << "  => using local value affinity (non-escaping): ";
+          allocationAffinity.print(llvm::dbgs());
+          llvm::dbgs() << "\n";
+        });
+      } else {
+        allocationAffinity = executeOp.getAffinityAttr();
+        LLVM_DEBUG({
+          llvm::dbgs()
+              << "  => using execution affinity (non-escaping, unannotated): ";
+          allocationAffinity.print(llvm::dbgs());
+          llvm::dbgs() << "\n";
+        });
+      }
+    }
+
+    // Append to affinity bucket.
+    if (resultValue) {
+      globalConstantOps[allocationAffinity].push_back(constantOp);
+    } else {
+      localConstantOps[allocationAffinity].push_back(constantOp);
+    }
+  }
+
+  // Allocate constant upload ops per unique affinity.
+  // TODO(benvanik): rewrite this file (or handle constants in a new earlier
+  // pass) so that we can use transient allocations for localConstantOps. Today
+  // we run all initializers to completion and are (as much as we can be) pretty
+  // sure the non-transient allocation gets released by the time we get back to
+  // user code.
+  for (auto [affinityAttr, constantOps] : globalConstantOps) {
+    constantAllocations.push_back(allocateConstantBatch(
+        executeOp, affinityAttr, constantOps, externalBuilder));
+  }
+  for (auto [affinityAttr, constantOps] : localConstantOps) {
+    constantAllocations.push_back(allocateConstantBatch(
+        executeOp, affinityAttr, constantOps, externalBuilder));
+  }
+
+  return constantAllocations;
+}
+
 // Extracts stream.async.constant ops from |executeOp| into their own dedicated
 // stream.resource.constants upload ops per lifetime. The uploaded constants
 // will be captured by the region for use within as if they had still existed in
 // there.
 static SmallVector<ConstantAllocation>
 extractConstants(IREE::Stream::AsyncExecuteOp executeOp,
+                 AffinityAnalysis &affinityAnalysis,
                  OpBuilder &externalBuilder) {
   SmallVector<ConstantAllocation> allocations;
-  if (auto allocation = extractConstantsWithLifetime(
-          executeOp, IREE::Stream::Lifetime::Constant, externalBuilder)) {
-    allocations.push_back(std::move(allocation).value());
-  }
-  if (auto allocation = extractConstantsWithLifetime(
-          executeOp, IREE::Stream::Lifetime::Variable, externalBuilder)) {
-    allocations.push_back(std::move(allocation).value());
-  }
+  llvm::append_range(
+      allocations,
+      extractConstantsWithLifetime(executeOp, IREE::Stream::Lifetime::Constant,
+                                   affinityAnalysis, externalBuilder));
+  llvm::append_range(
+      allocations,
+      extractConstantsWithLifetime(executeOp, IREE::Stream::Lifetime::Variable,
+                                   affinityAnalysis, externalBuilder));
   return allocations;
 }
 
@@ -1351,49 +1542,6 @@ static Value findTiedYieldResult(Value seedValue) {
   return {};
 }
 
-// Walks up the use-def chain to find an affinity the given local value is
-// pinned to. May return nullptr if there's no assigned affinity and the
-// enclosing execution region affinity should be used.
-//
-// TODO(benvanik): change this to use an affinity analysis on the escaping
-// value instead. The local value may not have a transfer associated with it.
-static IREE::Stream::AffinityAttr findLocalValueAffinity(Value value) {
-  while (value) {
-    auto definingOp = value.getDefiningOp();
-    if (!definingOp) {
-      // Block argument or something we don't track locally.
-      return {};
-    } else if (auto transferOp =
-                   dyn_cast<IREE::Stream::AsyncTransferOp>(definingOp)) {
-      return transferOp.getResultAffinityAttr();
-    } else if (auto regionOp = dyn_cast<RegionBranchOpInterface>(definingOp)) {
-      // A region op with a yielded value (like stream.async.concurrent).
-      // Note that we always want to check for tied ops first as that will let
-      // us skip over the region entirely.
-      if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(definingOp)) {
-        if (auto tiedValue = tiedOp.getTiedResultOperand(value)) {
-          value = tiedValue;
-          continue;
-        }
-      }
-      unsigned resultIndex = cast<OpResult>(value).getResultNumber();
-      auto &block = regionOp.getOperation()->getRegion(0).front();
-      auto terminatorOp =
-          cast<RegionBranchTerminatorOpInterface>(block.getTerminator());
-      value = terminatorOp.getSuccessorOperands(
-          RegionBranchPoint::parent())[resultIndex];
-    } else if (auto tiedOp =
-                   dyn_cast<IREE::Util::TiedOpInterface>(definingOp)) {
-      // If the producer is tied then try to get the operand.
-      value = tiedOp.getTiedResultOperand(value);
-    } else {
-      // Analysis blocked.
-      break;
-    }
-  }
-  return {};
-}
-
 // Returns a reversed list of subrange operations that lead from an initial
 // resource down a sequence to |derivedValue|. The first element in the list
 // will be the last subview of |derivedValue| and the last element will be the
@@ -1473,7 +1621,8 @@ static bool isExecutedOnce(Operation *op) {
 // Performs allocation for all results and local region transients of the given
 // |executeOp| region. IR will be inserted around the op in its parent block.
 static LogicalResult
-allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
+allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
+                        AffinityAnalysis &affinityAnalysis) {
   LLVM_DEBUG(llvm::dbgs() << "[[ Allocating execution region ]]\n");
 
   AllocationScope scope(executeOp);
@@ -1508,7 +1657,8 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
   // op. We'll then capture the result and use that to initialize variables and
   // constants within the region. Note that this removes ops from the region and
   // as such we want to run it first before we go allocate transients.
-  auto constantAllocations = extractConstants(executeOp, externalBuilder);
+  auto constantAllocations =
+      extractConstants(executeOp, affinityAnalysis, externalBuilder);
   for (auto &constantAllocation : constantAllocations) {
     bool anyCaptured = false;
     for (auto &reservation : constantAllocation.reservations) {
@@ -1603,20 +1753,22 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
     scope.mapResourceRange(arg, resourceRange, asmState.get());
   }
   ResultAllocationMap resultReservations;
-  for (auto [result, resultSize] :
+  for (auto [resultValue, resultSize] :
        llvm::zip_equal(executeOp.getResults(), executeOp.getResultSizes())) {
-    auto resultType = llvm::cast<IREE::Stream::ResourceType>(result.getType());
-    if (handledResults.contains(result)) {
-      resultReplacements.push_back(std::make_pair(result, Value{}));
+    auto resultType =
+        llvm::cast<IREE::Stream::ResourceType>(resultValue.getType());
+    if (handledResults.contains(resultValue)) {
+      resultReplacements.push_back(std::make_pair(resultValue, Value{}));
       continue;
     }
 
     // Find the internal op that defined the result.
-    auto yieldValue = yieldOp.getResourceOperands()[result.getResultNumber()];
+    auto yieldValue =
+        yieldOp.getResourceOperands()[resultValue.getResultNumber()];
 
     // Early-exit if we are tied to an operand and have storage already.
     auto tiedOperandIndex =
-        executeOp.getTiedResultOperandIndex(result.getResultNumber());
+        executeOp.getTiedResultOperandIndex(resultValue.getResultNumber());
     if (tiedOperandIndex.has_value()) {
       // Already tied; no need to modify just map.
       auto tiedOperand = executeOp.getOperand(tiedOperandIndex.value());
@@ -1628,7 +1780,7 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
         llvm::dbgs() << " = arg ";
         arg.printAsOperand(llvm::dbgs(), asmState);
         llvm::dbgs() << " = ";
-        result.printAsOperand(llvm::dbgs(), asmState);
+        resultValue.printAsOperand(llvm::dbgs(), asmState);
         llvm::dbgs() << "\n";
         auto subrangeStack = gatherSubranges(yieldValue);
         if (!subrangeStack.empty()) {
@@ -1650,14 +1802,14 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
                                                          externalBuilder);
       scope.mapResourceRange(yieldValue, resourceRange, asmState.get());
       if (resourceRange.offset) {
-        auto resultSubviewOp =
-            externalBuilder.create<IREE::Stream::ResourceSubviewOp>(
-                yieldValue.getLoc(), tiedOperand, resourceRange.resourceSize,
-                resourceRange.offset, resourceRange.length);
+        auto resultSubviewOp = IREE::Stream::ResourceSubviewOp::create(
+            externalBuilder, yieldValue.getLoc(), tiedOperand,
+            resourceRange.resourceSize, resourceRange.offset,
+            resourceRange.length);
         resultReplacements.push_back(
-            std::make_pair(result, resultSubviewOp.getResult()));
+            std::make_pair(resultValue, resultSubviewOp.getResult()));
       } else {
-        resultReplacements.push_back(std::make_pair(result, tiedOperand));
+        resultReplacements.push_back(std::make_pair(resultValue, tiedOperand));
       }
       continue;
     }
@@ -1677,23 +1829,21 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
         llvm::dbgs() << " = arg ";
         arg.printAsOperand(llvm::dbgs(), asmState);
         llvm::dbgs() << " = ";
-        result.printAsOperand(llvm::dbgs(), asmState);
+        resultValue.printAsOperand(llvm::dbgs(), asmState);
         llvm::dbgs() << "\n";
       });
-      resultReplacements.push_back(std::make_pair(result, operand));
+      resultReplacements.push_back(std::make_pair(resultValue, operand));
       continue;
     }
 
     // Find a pinned affinity for the value or inherit the execution region
     // affinity.
-    auto allocationAffinity = findLocalValueAffinity(yieldValue);
-    if (!allocationAffinity) {
-      allocationAffinity = executeOp.getAffinityAttr();
-    }
+    auto allocationAffinity = deriveResultAffinity(
+        executeOp, resultValue, yieldValue, affinityAnalysis);
 
     // Queue up the allocation for packing.
     ResultReservation resultReservation = {
-        definingOp->getLoc(), result, resultType, resultSize, yieldValue,
+        definingOp->getLoc(), resultValue, resultType, resultSize, yieldValue,
     };
     LLVM_DEBUG({
       AsmState asmState(executeOp->getParentOp());
@@ -1795,12 +1945,13 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
 
   // Recreate the execution op with all the new arguments. Note that we drop
   // the results (besides the timepoint) as they are all aliased.
-  auto newExecuteOp = executeBuilder.create<IREE::Stream::CmdExecuteOp>(
-      executeOp.getLoc(), newAwaitTimepoint, newOperands, newOperandSizes);
+  IREE::Stream::AffinityAttr executionAffinityAttr =
+      executeOp.getAffinityAttr();
+  auto newExecuteOp = IREE::Stream::CmdExecuteOp::create(
+      executeBuilder, executeOp.getLoc(), newAwaitTimepoint, newOperands,
+      newOperandSizes);
   newExecuteOp.setOnce(isExecutedOnce(executeOp));
-  if (executeOp.getAffinity().has_value()) {
-    newExecuteOp.setAffinityAttr(executeOp.getAffinityAttr());
-  }
+  newExecuteOp.setAffinityAttr(executionAffinityAttr);
   newExecuteOp.getBody().takeBody(executeOp.getBody());
   executeOp.getResultTimepoint().replaceAllUsesWith(
       newExecuteOp.getResultTimepoint());
@@ -1862,7 +2013,8 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
       });
 
   // Apply the scope to the region and convert ops.
-  if (failed(applyAsyncAllocations(newExecuteOp.getBody(), scope))) {
+  if (failed(applyAsyncAllocations(executionAffinityAttr,
+                                   newExecuteOp.getBody(), scope))) {
     return newExecuteOp.emitError()
            << "failed to apply allocations/issue commands";
   }
@@ -1881,8 +2033,8 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
   for (auto &release : pendingReleases) {
     auto reservation = release.first;
     auto reservationSize = release.second;
-    auto deallocaOp = builder.create<IREE::Stream::ResourceDeallocaOp>(
-        reservation.getLoc(), reservation, reservationSize,
+    auto deallocaOp = IREE::Stream::ResourceDeallocaOp::create(
+        builder, reservation.getLoc(), reservation, reservationSize,
         /*prefer_origin=*/false, newExecuteOp.getResultTimepoint(),
         newExecuteOp.getAffinityAttr());
     joinTimepoints.push_back(deallocaOp.getResultTimepoint());
@@ -1896,8 +2048,9 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
     joinTimepoints.push_back(newExecuteOp.getResultTimepoint());
     auto fusedLoc = builder.getFusedLoc(llvm::map_to_vector(
         joinTimepoints, [](auto timepoint) { return timepoint.getLoc(); }));
-    auto joinOp = builder.create<IREE::Stream::TimepointJoinOp>(
-        fusedLoc, newExecuteOp.getResultTimepoint().getType(), joinTimepoints);
+    auto joinOp = IREE::Stream::TimepointJoinOp::create(
+        builder, fusedLoc, newExecuteOp.getResultTimepoint().getType(),
+        joinTimepoints);
     executeTimepointUsers.insert(joinOp);
     newExecuteOp.getResultTimepoint().replaceUsesWithIf(
         joinOp.getResultTimepoint(), [&](OpOperand &operand) {
@@ -1934,7 +2087,15 @@ struct ScheduleAllocationPass
     : public IREE::Stream::impl::ScheduleAllocationPassBase<
           ScheduleAllocationPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
+
+    AffinityAnalysis affinityAnalysis(moduleOp);
+    if (failed(affinityAnalysis.run())) {
+      llvm::errs() << "affinity analysis failed to converge; the input IR may "
+                      "not be correct\n";
+      return signalPassFailure();
+    }
+
     for (auto &parentOp : llvm::make_early_inc_range(moduleOp.getOps())) {
       if (auto asyncFuncOp = dyn_cast<IREE::Stream::AsyncFuncOp>(parentOp)) {
         convertAsyncFuncOp(asyncFuncOp);
@@ -1952,7 +2113,7 @@ struct ScheduleAllocationPass
       for (auto op : operations) {
         if (failed(TypeSwitch<Operation *, LogicalResult>(op)
                        .Case([&](IREE::Stream::AsyncExecuteOp op) {
-                         return allocateExecutionRegion(op);
+                         return allocateExecutionRegion(op, affinityAnalysis);
                        })
                        .Case([&](IREE::Stream::AsyncLoadOp op) {
                          return convertAsyncLoadOp(op);

@@ -196,6 +196,15 @@ There are other more specific test targets, such as `iree_hal_cts_test_suite`,
 which are designed to test specific runtime support with template configuration
 and is not supported by Bazel rules.
 
+### Code Coverage
+
+Use the [IREE_ENABLE_RUNTIME_COVERAGE](../../building/cmake-options/#iree_enable_runtime_coverage)
+CMake option to enable code coverage instrumentation and add synthetic targets
+for managing profiling state. Tests run with coverage enabled with automatically
+write profiles to the build directory and then the
+`iree-runtime-coverage-export` target can be built to export LCOV information
+for tooling/IDEs.
+
 ## IREE core end-to-end (e2e) tests
 
 Here "end-to-end" means from the input accepted by the IREE core compiler
@@ -409,18 +418,6 @@ repository.
 * Keeping tests out of tree forces them to use public project APIs and allows
   the core project to keep its infrastructure simpler.
 
-#### linalg operator tests
-
-Tests for operators in the MLIR linalg dialect like `matmul`, and `convolution`
-are being migrated from folders like
-[`tests/e2e/matmul/`](https://github.com/iree-org/iree/tree/main/tests/e2e/matmul)
-in the
-[iree-org/iree](https://github.com/iree-org/iree) repository to
-[`linalg_ops/`](https://github.com/iree-org/iree-test-suites/tree/main/linalg_ops)
-in the
-[iree-org/iree-test-suites](https://github.com/iree-org/iree-test-suites)
-repository.
-
 #### :simple-onnx: ONNX operator tests
 
 Tests for individual ONNX operators are included at
@@ -470,8 +467,8 @@ For example, here is part of a config file for running ONNX operator tests on
 CPU:
 
 <!-- markdownlint-disable-next-line -->
-```json title="tests/external/iree-test-suites/onnx_ops/onnx_ops_cpu_llvm_sync.json" linenums="1"
---8<-- "tests/external/iree-test-suites/onnx_ops/onnx_ops_cpu_llvm_sync.json::20"
+```json title="tests/external/iree-test-suites/onnx_ops/onnx_ops_cpu_llvm_sync_O0.json" linenums="1"
+--8<-- "tests/external/iree-test-suites/onnx_ops/onnx_ops_cpu_llvm_sync_O0.json::20"
 ```
 
 ##### Updating config files
@@ -537,6 +534,11 @@ Types of Sharktank tests:
 * Small scale versions of models
 * Quality tests for full models
 * Benchmarks for full models
+
+The quality and benchmark test config files are stored in
+[`tests/external/iree-test-suites/sharktank_models`](https://github.com/iree-org/iree/tree/main/tests/external/iree-test-suites/sharktank_models).
+
+Detailed steps on how to update the golden output in SDXL may be found [here](../update-sdxl-golden-outputs.md).
 
 <!-- TODO(scotttodd): document how to coordinate changes across these projects -->
 

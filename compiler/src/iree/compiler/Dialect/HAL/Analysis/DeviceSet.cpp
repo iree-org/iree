@@ -26,7 +26,7 @@ DeviceSet::DeviceSet(ArrayRef<IREE::HAL::DeviceTargetAttr> targetAttrs) {
 }
 
 DeviceSet::DeviceSet(const DenseSet<IREE::HAL::DeviceTargetAttr> &targetAttrs)
-    : targetAttrs(targetAttrs) {}
+    : targetAttrs(targetAttrs.begin(), targetAttrs.end()) {}
 
 DeviceSet::~DeviceSet() = default;
 
@@ -44,7 +44,7 @@ DeviceSet::getExecutableTargets() const {
 
 template <typename AttrT>
 static std::optional<typename AttrT::ValueType> joinConfigAttrs(
-    const DenseSet<IREE::HAL::DeviceTargetAttr> &targetAttrs, StringRef name,
+    const SetVector<IREE::HAL::DeviceTargetAttr> &targetAttrs, StringRef name,
     std::function<typename AttrT::ValueType(typename AttrT::ValueType,
                                             typename AttrT::ValueType)>
         join) {
@@ -71,12 +71,12 @@ static std::optional<typename AttrT::ValueType> joinConfigAttrs(
 
 template <typename AttrT>
 static std::optional<StaticRange<typename AttrT::ValueType>>
-joinConfigStaticRanges(const DenseSet<IREE::HAL::DeviceTargetAttr> &targetAttrs,
-                       StringRef name,
-                       std::function<StaticRange<typename AttrT::ValueType>(
-                           StaticRange<typename AttrT::ValueType>,
-                           StaticRange<typename AttrT::ValueType>)>
-                           join) {
+joinConfigStaticRanges(
+    const SetVector<IREE::HAL::DeviceTargetAttr> &targetAttrs, StringRef name,
+    std::function<StaticRange<typename AttrT::ValueType>(
+        StaticRange<typename AttrT::ValueType>,
+        StaticRange<typename AttrT::ValueType>)>
+        join) {
   if (targetAttrs.empty()) {
     return std::nullopt;
   }

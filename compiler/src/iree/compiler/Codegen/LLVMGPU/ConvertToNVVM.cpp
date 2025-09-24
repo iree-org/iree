@@ -8,7 +8,6 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
-#include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
 #include "mlir/Conversion/ComplexToLLVM/ComplexToLLVM.h"
@@ -50,7 +49,7 @@ namespace {
 /// code.
 struct ConvertToNVVMPass final
     : impl::ConvertToNVVMPassBase<ConvertToNVVMPass> {
-  using impl::ConvertToNVVMPassBase<ConvertToNVVMPass>::ConvertToNVVMPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
@@ -68,11 +67,9 @@ struct ConvertToNVVMPass final
         converter, [](gpu::AddressSpace space) -> unsigned {
           switch (space) {
           case gpu::AddressSpace::Global:
-            return static_cast<unsigned>(
-                NVVM::NVVMMemorySpace::kGlobalMemorySpace);
+            return static_cast<unsigned>(NVVM::NVVMMemorySpace::Global);
           case gpu::AddressSpace::Workgroup:
-            return static_cast<unsigned>(
-                NVVM::NVVMMemorySpace::kSharedMemorySpace);
+            return static_cast<unsigned>(NVVM::NVVMMemorySpace::Shared);
           case gpu::AddressSpace::Private:
             return 0;
           }
@@ -99,7 +96,6 @@ struct ConvertToNVVMPass final
       populateVectorToSCFConversionPatterns(
           patterns, VectorTransferToSCFOptions().enableFullUnroll());
       populateDropSharedMemoryDeallocOpPatterns(patterns);
-      populateScalarizeMathOps(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
       vector::populateVectorBroadcastLoweringPatterns(patterns);
@@ -107,6 +103,7 @@ struct ConvertToNVVMPass final
           patterns, options.vectorContractLowering);
       vector::populateVectorGatherLoweringPatterns(patterns);
       vector::populateVectorMaskOpLoweringPatterns(patterns);
+      vector::populateVectorFromElementsUnrollPatterns(patterns);
       // We currently always use 64 bit indices, thus ensure the bit width of
       // the mask compare is consistent.
       vector::populateVectorMaskMaterializationPatterns(

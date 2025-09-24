@@ -7,9 +7,11 @@
 #ifndef IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 #define IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/TargetParser/Triple.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -21,6 +23,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Interfaces/SubsetOpInterface.h"
 
 namespace mlir::iree_compiler {
 
@@ -37,24 +40,27 @@ bool isEntryPoint(mlir::FunctionOpInterface func);
 std::optional<IREE::HAL::ExecutableExportOp>
 getEntryPoint(mlir::FunctionOpInterface funcOp);
 
-/// Returns the StringAttr with the name `stringAttr` in the `srcAttr`, if
-/// found. The `srcAttr` can be either IREE::HAL::ExecutableTargetAttr or
-/// DictionaryAttr.
-std::optional<StringAttr> getConfigStringAttr(Attribute srcAttr,
-                                              StringRef stringAttr);
+/// Methods to retrieve information association with `configuration` field
+/// of `hal.executable.target` attribute used commonly in codegen pipelines.
+std::optional<StringRef> getConfigDataLayout(DictionaryAttr targetConfig);
+IREE::Codegen::TargetInfoAttrInterface
+getConfigTargetInfo(DictionaryAttr targetConfig);
+std::optional<StringRef> getConfigTargetTriple(DictionaryAttr targetConfig);
+std::optional<StringRef> getConfigCpuFeatures(DictionaryAttr targetConfig);
 
-/// Returns the IntegerAttr with the name `integerAttr` in the `srcAttr`, if
-/// found.
-std::optional<IntegerAttr> getConfigIntegerAttr(Attribute srcAttr,
-                                                StringRef integerAttr);
-
-/// Returns the BoolAttr with the name `boolAttr` in the `srcAttr`, if
-/// found.
-std::optional<BoolAttr> getConfigBoolAttr(Attribute srcAttr,
-                                          StringRef boolAttr);
+/// Methods to add attributes to the `config` list.
+void addConfigCpuFeatures(MLIRContext *context, StringRef cpuFeatures,
+                          SmallVectorImpl<NamedAttribute> &config);
+void addConfigTargetInfo(MLIRContext *context,
+                         IREE::Codegen::TargetInfoAttrInterface targetAttr,
+                         SmallVectorImpl<NamedAttribute> &config);
+void addConfigDataLayout(MLIRContext *context, StringRef dataLayoutStr,
+                         SmallVectorImpl<NamedAttribute> &config);
+void addConfigTargetTriple(MLIRContext *context, StringRef targetTripleStr,
+                           SmallVectorImpl<NamedAttribute> &config);
 
 /// Returns the LLVM Target triple associated with the `attr`, if set.
-std::optional<llvm::Triple> getTargetTriple(Attribute attr);
+std::optional<llvm::Triple> getTargetTriple(DictionaryAttr targetConfig);
 
 /// Returns the target architecture name, in IREE_ARCH convention, from the
 /// given target triple.
@@ -69,20 +75,23 @@ bool isWebGPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 // Returns true if the ukernel with given `ukernelName` is enabled.
 // If `ukernelName` is empty (the default), returns true if any ukernel
 // is enabled at all.
-bool hasUkernel(Attribute attr, StringRef ukernelName = "");
-
-/// Returns the CPU target features associated with the `attr`, if found.
-std::optional<StringRef> getCpuFeatures(Attribute attr);
+bool hasUkernel(DictionaryAttr attr, StringRef ukernelName = "");
 
 /// Returns true if `attr` has `feature` in its CPU features.
-bool hasFeature(Attribute attr, StringRef feature);
+bool hasFeature(DictionaryAttr targetConfig, StringRef feature);
 
 /// Architecture identification.
-bool isX86(Attribute attr);
-bool isX86_64(Attribute attr);
-bool isAArch64(Attribute attr);
-bool isRISCV(Attribute attr);
-bool isRISCV32(Attribute attr);
+bool isX86(DictionaryAttr targetConfig);
+bool isX86_64(DictionaryAttr targetConfig);
+bool isAArch64(DictionaryAttr targetConfig);
+bool isRISCV(DictionaryAttr targetConfig);
+bool isRISCV32(DictionaryAttr targetConfig);
+bool isRISCV64(DictionaryAttr targetConfig);
+
+/// Get maximum workgroup count in [x, y, z] for target attribute if it is
+/// available. Returns ShapedType::kDynamic if it is unknown.
+std::array<int64_t, 3> getMaxWorkgroupCount(DictionaryAttr targetConfig);
+std::array<int64_t, 3> getMaxWorkgroupCount(Operation *op);
 
 /// Checks if a tensor value is generated from a read-only object, like
 /// and interface binding with read-only attribute or from an `arith.constant`
@@ -150,6 +159,10 @@ struct LoopTilingAndDistributionInfo {
   unsigned processorDistributionDim;
 };
 
+/// Returns true if the `op` describes computation in CodeGen concept. E.g.,
+/// TilingInterface op and UKernelOpInterface are compute ops.
+bool isComputeOp(Operation *op);
+
 /// Returns the list of TilingInterface ops in the operation obtained by a
 /// post order walk of the operation. This implies that in case of
 /// nested compute ops, the outermost compute ops are towards the end of the
@@ -201,8 +214,40 @@ int getReductionTilingFactor(int64_t dimSize);
 int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp);
 
 //===---------------------------------------------------------------------===//
+// Bufferization utility functions
+//===---------------------------------------------------------------------===//
+
+/// Find the memref version of the given InterfaceBindingSubspanOp. If no such
+/// op exists in the same block (before the given op), create a new op.
+Value findOrCreateSubspanBuffer(RewriterBase &rewriter,
+                                IREE::HAL::InterfaceBindingSubspanOp subspanOp);
+
+//===---------------------------------------------------------------------===//
 // Misc. utility functions.
 //===---------------------------------------------------------------------===//
+
+/// Given a list of `Value`s, set the insertion point to the last (least
+/// dominant) of these values.
+Operation *setInsertionPointAfterLastValue(OpBuilder &builder,
+                                           ArrayRef<Value> values);
+
+/// Given a SubsetInsertionOpInterface, find all values that are needed to
+/// build an equivalent subset extraction, and set the insertion point to the
+/// last of these values.
+Operation *
+setInsertionPointAfterLastNeededValue(OpBuilder &builder,
+                                      SubsetInsertionOpInterface subsetOp);
+
+/// Moves the op to right after its last (most dominant) operand. If the operand
+/// is a block argument, then the op is moved to the start of the block.
+void moveOpAfterLastOperand(RewriterBase &rewriter, DominanceInfo &domInfo,
+                            Operation *op);
+
+/// Check if the two tensor types (with their respective dynamic dimension
+/// values) have the same shape.
+bool equalTensorShape(RankedTensorType tensorType, ValueRange tensorDynSizes,
+                      IREE::TensorExt::DispatchTensorType dispatchTensorType,
+                      ValueRange dispatchTensorDynSizes);
 
 /// Convert byte offset into offsets in terms of number of elements based
 /// on `elementType`
@@ -215,9 +260,6 @@ OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
 Operation *dropEncodingAndCloneOp(OpBuilder &builder, Operation *op,
                                   ValueRange convertedInputOperands,
                                   ValueRange convertedOutputOperands);
-
-/// Check if a linalg.generic is representing an argmax operation.
-LogicalResult isArgmaxOp(linalg::GenericOp genericOp);
 
 /// Replace the uses of memref value `origValue` with the given
 /// `replacementValue`. Some uses of the memref value might require changes to
@@ -255,12 +297,30 @@ computeDimUpperBound(Value shapedValue, unsigned dimNum,
 // Utility to make sure we are storing the full incoming subspan. Otherwise we
 // cannot simply adjust the subspan's resultant type later.
 bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
-                 IREE::Flow::DispatchTensorType tensorType,
+                 IREE::TensorExt::DispatchTensorType tensorType,
                  ValueRange dynamicDims);
+
+/// Retrieves the DenormalFpMathAttr for F32 values from the given target
+/// configuration. This attribute specifies how denormal floating-point values
+/// are handled in F32 operations.
+IREE::Codegen::DenormalFpMathAttr
+getConfigDenormalFpMathF32Attr(DictionaryAttr targetConfig);
+std::optional<IREE::Codegen::DenormalFpMath>
+getConfigDenormalFpMathF32(DictionaryAttr targetConfig);
+
+/// Adds a denormal floating-point math configuration for F32 values to the
+/// configuration list. This configures how denormal floating-point values are
+/// handled in F32 operations.
+void addConfigDenormalFpMathF32(MLIRContext *context,
+                                IREE::Codegen::DenormalFpMath mode,
+                                SmallVectorImpl<NamedAttribute> &config);
 
 //===----------------------------------------------------------------------===//
 // Utility functions for vector size inference for dynamic shapes
 //===----------------------------------------------------------------------===//
+
+using SizesAndScalableFlags =
+    std::pair<SmallVector<int64_t>, SmallVector<bool>>;
 
 struct VectorizationTileSizes {
   SmallVector<int64_t> destShape;
@@ -273,8 +333,17 @@ struct VectorizationTileSizes {
 /// chain.
 std::optional<VectorizationTileSizes> inferSizesFromIR(Value val);
 
-/// Returns the result sizes and vector input sizes of the linalg.unpack op. The
-/// inferred bounding size is returned if it is dynamic shape. Returns
+/// Returns the inferred input-vector-sizes for the `op` (for read + write
+/// operations), given the provided vector sizes for the write operation.
+/// Returns std::nullopt, if it fails to compute the sizes.
+/// For now, it only supports non-scalable vectors.
+std::optional<SizesAndScalableFlags>
+getVectorInputSizesFromDestTiles(linalg::UnPackOp op,
+                                 ArrayRef<int64_t> writeVectorSizes,
+                                 ArrayRef<bool> scalableFlags);
+
+/// Returns the result sizes and vector input sizes of the linalg.unpack op.
+/// The inferred bounding size is returned if it is dynamic shape. Returns
 /// std::nullopt if the shape inference failed.
 std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::UnPackOp op);
 
@@ -288,6 +357,37 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::PackOp op);
 /// Returns std::nullopt if vector sizes can't be inferred.
 std::optional<VectorizationTileSizes>
 inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult);
+
+/// Tries to infer the vector sizes from an IR using ValueBounds analysis.
+/// Returns std::nullopt if vector sizes can't be inferred.
+std::optional<VectorizationTileSizes> inferSizesFromIR(scf::ForOp forOp,
+                                                       OpResult opResult);
+
+/// Returns the underlying index if the given value is a constant index.
+std::optional<int64_t> getConstantIndex(Value value);
+
+/// Return true if we can prove that the we always run at least the first
+/// iteration of the ForOp.
+bool alwaysRunsFirstIteration(scf::ForOp op);
+
+/// Return true if we can prove that the we never run more than one iteration of
+/// the ForOp.
+bool neverRunsSecondIteration(scf::ForOp op);
+
+///  This function checks whether the `genericOp` has any external captures,
+///  i.e., whether it uses any values that are defined outside of its body.
+///  %10 = linalg.generic {indexing_maps = [#map, #map],
+///          iterator_types = ["parallel", "parallel"]}
+///         ins(%5 : tensor<4096x64xi64>) outs(%9 : tensor<4096x64xf16>) {
+///          ^bb0(%in: i64, %out: f16):
+///            %14 = linalg.index 0 : index
+///            %15 = arith.index_cast %in : i64 to index
+///            %extracted = tensor.extract %4[%14, %15] : tensor<4096x64xf16>
+///            linalg.yield %extracted : f16
+///           } -> tensor<4096x64xf16>
+///  Here %4 is an external capture used via tensor.extract inside
+///  linalg.generic hence the above `genericOp` has an external capture.
+bool hasExternalCapture(linalg::GenericOp genericOp);
 
 } // namespace mlir::iree_compiler
 

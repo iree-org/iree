@@ -138,17 +138,17 @@ func.func @batch_mmt4d_with_fill_batch_dim(%arg0: tensor<12x10x32x8x1xf32>, %arg
 
 // -----
 
-func.func @batch_mmt4d_with_lowering_config(%arg0: tensor<12x4x64x8x1xf16>, %arg1: tensor<12x4x64x8x1xf16>, %arg2: tensor<12x4x4x8x8xf16>) -> tensor<12x4x4x8x8xf16> attributes {
+func.func @batch_mmt4d_with_cpu_lowering_config(%arg0: tensor<12x4x64x8x1xf16>, %arg1: tensor<12x4x64x8x1xf16>, %arg2: tensor<12x4x4x8x8xf16>) -> tensor<12x4x4x8x8xf16> attributes {
   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "mmt4d", target_triple="x86_64-xyz-xyz", cpu_features=""}>
 } {
   %cst = arith.constant 0.000000e+00 : f16
-  %0 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 4, 4, 0, 0], [1, 1, 1, 0, 8], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]>} ins(%cst : f16) outs(%arg2 : tensor<12x4x4x8x8xf16>) -> tensor<12x4x4x8x8xf16>
-  %1 = linalg.batch_mmt4d {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 4, 4, 0, 0, 0, 0], [1, 1, 1, 0, 8, 8, 0], [0, 0, 0, 1, 0, 0, 1]]>} ins(%arg0, %arg1 : tensor<12x4x64x8x1xf16>, tensor<12x4x64x8x1xf16>) outs(%0 : tensor<12x4x4x8x8xf16>) -> tensor<12x4x4x8x8xf16>
+  %0 = linalg.fill {lowering_config = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 1, 0, 8], vector_inner_parallel = [0, 0, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 0]>} ins(%cst : f16) outs(%arg2 : tensor<12x4x4x8x8xf16>) -> tensor<12x4x4x8x8xf16>
+  %1 = linalg.batch_mmt4d {lowering_config = #iree_cpu.lowering_config<distribution = [1, 4, 4, 0, 0, 0, 0], vector_common_parallel = [1, 1, 1, 0, 8, 8, 0], vector_reduction = [0, 0, 0, 1, 0, 0, 1]>} ins(%arg0, %arg1 : tensor<12x4x64x8x1xf16>, tensor<12x4x64x8x1xf16>) outs(%0 : tensor<12x4x4x8x8xf16>) -> tensor<12x4x4x8x8xf16>
   return %1 : tensor<12x4x4x8x8xf16>
 }
-// CHECK:      #[[CONFIG1:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4, 4, 0, 0], [1, 1, 0, 8], [0, 0, 0, 0], [0, 0, 0, 0]]>
-// CHECK:      #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4, 4, 0, 0, 0, 0], [1, 1, 0, 8, 8, 0], [0, 0, 1, 0, 0, 1]]>
-// CHECK:      func.func @batch_mmt4d_with_lowering_config
+// CHECK:      #[[CONFIG1:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 0, 8], vector_inner_parallel = [0, 0, 0, 0], vector_reduction = [0, 0, 0, 0]>
+// CHECK:      #[[CONFIG2:.+]] = #iree_cpu.lowering_config<distribution = [4, 4, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 8, 8, 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
+// CHECK:      func.func @batch_mmt4d_with_cpu_lowering_config
 // CHECK:        linalg.fill {lowering_config = #[[CONFIG1]]}
 // CHECK:        linalg.mmt4d {lowering_config = #[[CONFIG2]]}
 

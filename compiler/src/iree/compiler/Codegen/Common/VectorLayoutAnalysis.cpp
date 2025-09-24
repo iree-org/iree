@@ -35,8 +35,7 @@ public:
   explicit DistributionLayout(Value val) : AnalysisState(val) {}
 
   TypedValue<VectorType> getValue() const {
-    auto anchor = getAnchor();
-    assert(isa<Value>(anchor) && "expected anchor to be a value");
+    LatticeAnchor anchor = getAnchor();
     Value val = cast<Value>(anchor);
     assert(isa<VectorType>(val.getType()) &&
            "expected value to be of vector type");
@@ -213,7 +212,7 @@ ChangeResult DistributionLayout::resolveWithPossibleConflict(
   // layouts by creating a copy of constOp for other users.
   if (!opOperand.get().hasOneUse() &&
       llvm::isa_and_nonnull<arith::ConstantOp, vector::StepOp,
-                            vector::CreateMaskOp>(
+                            vector::CreateMaskOp, vector::ConstantMaskOp>(
           opOperand.get().getDefiningOp())) {
     builder.setInsertionPoint(opOperand.get().getDefiningOp());
     Operation *copiedConstOp = builder.clone(*opOperand.get().getDefiningOp());
@@ -239,10 +238,10 @@ ChangeResult DistributionLayout::resolveWithPossibleConflict(
   // Resolve conflict by create an operation that takes the input the conflicted
   // value and returns the resolved value.
   Value input = opOperand.get();
-  // Create a resolution operation. This conflict should be handeled later by
+  // Create a resolution operation. This conflict should be handled later by
   // someone else, not this analysis.
   Operation *resolveOp =
-      builder.create<IREE::VectorExt::ToLayoutOp>(input.getLoc(), input, rhs);
+      IREE::VectorExt::ToLayoutOp::create(builder, input.getLoc(), input, rhs);
   Value resolvedValue = resolveOp->getResult(0);
   opOperand.set(resolvedValue);
 
@@ -336,7 +335,7 @@ void DistributionLayout::onUpdate(DataFlowSolver *solver) const {
       solver->enqueue({solver->getProgramPointAfter(definingOp), enforcement});
     } else {
       // TODO: This is not always correct. Ideally, we should enqueue all
-      // predecessors of these block arguements.
+      // predecessors of these block arguments.
       solver->enqueue(
           {solver->getProgramPointAfter(value.getParentBlock()->getParentOp()),
            enforcement});
@@ -390,10 +389,10 @@ getAgreedLayout(ArrayRef<const DistributionLayout *> layouts) {
   return initializedLayouts[0];
 }
 
-/// Hueristic to use to choose the best layout when enforcing the same layout
-/// to all operands. Current hueristic is to simply choose the first operand
+/// Heuristic to use to choose the best layout when enforcing the same layout
+/// to all operands. Current heuristic is to simply choose the first operand
 /// which has a layout.
-/// TODO: Use a better hueristic.
+/// TODO: Use a better heuristic.
 static DistributionLayout *
 enforceSameLayoutHueristic(ArrayRef<DistributionLayout *> operands) {
   DistributionLayout *chosenOperandLayout = nullptr;
@@ -756,7 +755,7 @@ static void enforceLayoutToBroadcastOp(
   // Ensure that there are no broadcasted unit dims as we do not know how to
   // handle them as of now.
   assert(broadcast.computeBroadcastedUnitDims().empty() &&
-         "Streching in broadcasting not implemented yet.");
+         "Stretching in broadcasting not implemented yet.");
   // The starting k dimensions of the result are the ones that need to be
   // projected out.
 
@@ -845,30 +844,15 @@ static void enforceLayoutToTransferReadOp(
     return;
   }
 
-  // Build a transposed layout.
-  SmallVector<unsigned> permutation;
-  AffineMap permMap = read.getPermutationMap();
-  bool isSupportedPerm =
-      permMap.isPermutationOfMinorIdentityWithBroadcasting(permutation);
-  VectorLayoutInterface layout = result->getLayout();
-  SmallVector<int64_t> transposePerm(permutation.begin(), permutation.end());
-  if (isSupportedPerm) {
-    layout = layout.permute(transposePerm);
-    AffineMap toMinorIdentity =
-        AffineMap::getPermutationMap(permutation, permMap.getContext());
-    AffineMap orderedMap = toMinorIdentity.compose(permMap);
-    SmallVector<bool> droppedDims(layout.getRank(), false);
-    for (unsigned bdim : orderedMap.getBroadcastDims()) {
-      droppedDims[bdim] = true;
-    }
-    layout = layout.project(droppedDims);
+  DistributionLayout *maskLattice = operandLattices[0];
 
-    for (auto [index, operandLattice] : llvm::enumerate(operandLattices)) {
-      ChangeResult changed = operandLattice->resolveWithPossibleConflict(
-          layout, getOpOperand(read, index));
-      update(operandLattice, changed);
-    }
-  }
+  VectorLayoutInterface layout = result->getLayout();
+  AffineMap maskMap =
+      inversePermutation(compressUnusedDims(read.getPermutationMap()));
+  VectorLayoutInterface maskLayout = layout.apply(maskMap);
+  ChangeResult changed = maskLattice->resolveWithPossibleConflict(
+      maskLayout, getOpOperand(read, 0));
+  update(maskLattice, changed);
 }
 
 static void enforceLayoutToTransferWriteOp(
@@ -890,22 +874,56 @@ static void enforceLayoutToTransferWriteOp(
     return;
   }
 
-  // Build a transposed layout.
-  SmallVector<unsigned> permutation;
-  AffineMap permMap = write.getPermutationMap();
-  bool isSupportedPerm =
-      permMap.isPermutationOfMinorIdentityWithBroadcasting(permutation);
+  DistributionLayout *maskLattice = operandLattices[1];
+
   VectorLayoutInterface layout = writeOperand->getLayout();
-  SmallVector<int64_t> transposePerm(permutation.begin(), permutation.end());
-  if (isSupportedPerm) {
-    layout = layout.permute(transposePerm);
+  AffineMap maskMap =
+      inversePermutation(compressUnusedDims(write.getPermutationMap()));
+  VectorLayoutInterface maskLayout = layout.apply(maskMap);
+  ChangeResult changed = maskLattice->resolveWithPossibleConflict(
+      maskLayout, getOpOperand(write, 1));
+  update(maskLattice, changed);
+}
+
+static void enforceLayoutToTransferGatherOp(
+    TransferGatherOp gather, ArrayRef<DistributionLayout *> operandLattices,
+    ArrayRef<const DistributionLayout *> resultLattices,
+    std::function<void(DistributionLayout *, ChangeResult)> update) {
+  if (resultLattices.empty()) {
+    return;
   }
 
-  for (auto [index, operandLattice] :
-       llvm::enumerate(operandLattices.slice(1))) {
-    ChangeResult changed = operandLattice->resolveWithPossibleConflict(
-        layout, getOpOperand(write, index + 1));
-    update(operandLattice, changed);
+  // transfer_gather has only one vector result.
+  const DistributionLayout *result = resultLattices[0];
+  // Cannot enforce layout if result is uninitialized.
+  if (result->isUninitialized()) {
+    return;
+  }
+  VectorLayoutInterface layout = result->getLayout();
+
+  ArrayRef<DistributionLayout *> indexVecLattices =
+      operandLattices.slice(0, gather.getIndexVecs().size());
+  AffineMap sourceMap =
+      inverseAndBroadcastProjectedPermutation(gather.getPermutationMap());
+  VectorLayoutInterface sourceLayout = layout.apply(sourceMap);
+  for (auto [i, lattice, operand] :
+       llvm::enumerate(indexVecLattices, gather.getIndexVecsMutable())) {
+    AffineMap indexVecMap = gather.getIndexedMapsArray()[i];
+    VectorLayoutInterface indexVecLayout = sourceLayout.apply(indexVecMap);
+    ChangeResult changed =
+        lattice->resolveWithPossibleConflict(indexVecLayout, operand);
+    update(lattice, changed);
+  }
+
+  if (gather.getMask()) {
+    DistributionLayout *maskLattice =
+        operandLattices[gather.getIndexVecs().size()];
+    AffineMap maskMap =
+        inversePermutation(compressUnusedDims(gather.getPermutationMap()));
+    VectorLayoutInterface maskLayout = layout.apply(maskMap);
+    ChangeResult changed = maskLattice->resolveWithPossibleConflict(
+        maskLayout, gather.getMaskMutable()[0]);
+    update(maskLattice, changed);
   }
 }
 
@@ -962,6 +980,12 @@ void enforcementTransferFunction(
   if (auto write = dyn_cast<vector::TransferWriteOp>(op)) {
     enforceLayoutToTransferWriteOp(write, operandLattices, resultLattices,
                                    update);
+    return;
+  }
+
+  if (auto gather = dyn_cast<TransferGatherOp>(op)) {
+    enforceLayoutToTransferGatherOp(gather, operandLattices, resultLattices,
+                                    update);
     return;
   }
 }

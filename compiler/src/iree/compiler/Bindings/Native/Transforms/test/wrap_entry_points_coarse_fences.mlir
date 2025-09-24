@@ -185,7 +185,7 @@ util.func private @pinnedImport(tensor<2xi32> {iree.abi.affinity = #hal.device.a
 }
 
 // CHECK: util.func private @_pinnedImport(%[[ARG_TENSOR:.+]]: tensor<2xi32>) -> tensor<2xi32> {
-// CHECK-DAG:   %[[DEVICE_C:.+]] = hal.device.resolve on(<@dev_c>) : !hal.device
+// CHECK-DAG:   %[[DEVICE_C:.+]] = hal.device.resolve on(#hal.device.affinity<@dev_c>) : !hal.device
 // CHECK-DAG:   %[[ARG_FENCE:.+]] = hal.fence.create device(%[[DEVICE_C]] : !hal.device) flags("None") : !hal.fence
 // CHECK-DAG:   %[[ARG_READY:.+]] = hal.tensor.barrier join(%[[ARG_TENSOR]] : tensor<2xi32>) => %[[ARG_FENCE]] : !hal.fence
 // CHECK-DAG:   %[[ARG_VIEW:.+]] = hal.tensor.export on(#hal.device.affinity<@dev_a>) %[[ARG_READY]] : tensor<2xi32> -> !hal.buffer_view

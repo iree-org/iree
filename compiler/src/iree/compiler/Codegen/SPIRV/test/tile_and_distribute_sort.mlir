@@ -7,7 +7,7 @@
 ]>
 hal.executable private @static_3d_sort  {
   hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export @static_3d_sort layout(#pipeline_layout) attributes {
+    hal.executable.export public @static_3d_sort layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [16 : index, 1 : index, 1 : index]
     }
@@ -15,7 +15,6 @@ hal.executable private @static_3d_sort  {
       func.func @static_3d_sort() {
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<64x32x128xi32, #hal.descriptor_type<storage_buffer>>
-        memref.assume_alignment %0, 64 : memref<64x32x128xi32, #hal.descriptor_type<storage_buffer>>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
         %1 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]

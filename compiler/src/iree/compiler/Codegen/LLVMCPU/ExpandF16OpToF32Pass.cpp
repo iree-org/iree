@@ -43,10 +43,10 @@ public:
         operands.push_back(operand);
         continue;
       }
-      Value ext = rewriter.create<arith::ExtFOp>(loc, f32Type, operand);
+      Value ext = arith::ExtFOp::create(rewriter, loc, f32Type, operand);
       operands.push_back(ext);
     }
-    Value newOp = rewriter.create<Op>(loc, f32Type, operands);
+    Value newOp = Op::create(rewriter, loc, f32Type, operands);
 
     rewriter.replaceOpWithNewOp<arith::TruncFOp>(op, resultType, newOp);
     return success();

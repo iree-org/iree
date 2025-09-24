@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -34,10 +35,8 @@ namespace {
 /// be specified. It picks the `tilingLevel`-th list as tiling sizes from
 /// lowering_config.
 struct LLVMCPUTilePass : impl::LLVMCPUTilePassBase<LLVMCPUTilePass> {
-  using impl::LLVMCPUTilePassBase<LLVMCPUTilePass>::LLVMCPUTilePassBase;
-  explicit LLVMCPUTilePass(int64_t tilingLevel) {
-    this->tilingLevel = tilingLevel;
-  }
+  using Base::Base;
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, affine::AffineDialect,
                     linalg::LinalgDialect, scf::SCFDialect,
@@ -49,20 +48,13 @@ struct LLVMCPUTilePass : impl::LLVMCPUTilePassBase<LLVMCPUTilePass> {
 
 void LLVMCPUTilePass::runOnOperation() {
   if (tilingLevel == -1) {
-    LLVM_DEBUG(llvm::dbgs() << "tilingLevel not set, skip tiling\n");
+    LDBG() << "tilingLevel not set, skip tiling";
     return;
   }
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-  FailureOr<IREE::Codegen::LoweringConfigAttr> rootLoweringConfig =
-      getFirstLoweringConfig<IREE::Codegen::LoweringConfigAttr>(computeOps);
-  if (failed(rootLoweringConfig)) {
-    LLVM_DEBUG(llvm::dbgs() << "can't find lowering_config, skip tiling\n");
-    return;
-  }
-
   for (auto computeOp : computeOps) {
     auto op = dyn_cast<TilingInterface>(computeOp);
     if (!op || op.getLoopIteratorTypes().empty())
@@ -75,21 +67,32 @@ void LLVMCPUTilePass::runOnOperation() {
     if (isa<tensor::PadOp>(computeOp))
       continue;
 
-    LLVM_DEBUG(llvm::dbgs() << "candidate: " << op << "\n");
-    SmallVector<int64_t> tileSizes;
-    SmallVector<bool> tileScalableFlags;
-    if (auto loweringConfig =
-            getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op)) {
-      tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
-      tileScalableFlags = loweringConfig.getScalableTileFlagVals(tilingLevel);
-    } else {
-      tileSizes = rootLoweringConfig.value().getTileSizeVals(tilingLevel);
-      tileScalableFlags =
-          rootLoweringConfig.value().getScalableTileFlagVals(tilingLevel);
+    IREE::Codegen::LoweringConfigAttrInterface maybeLoweringConfig =
+        getLoweringConfig(op);
+    if (!maybeLoweringConfig) {
+      LDBG() << "can't find lowering_config, skip tiling";
+      continue;
+    }
+    if (!maybeLoweringConfig.hasTilingLevel(tilingLevel)) {
+      LDBG() << "target tiling level does not exist";
+      continue;
     }
 
+    LDBG() << "candidate: " << op;
+    if (skipRootOp && maybeLoweringConfig.hasWorkgroupTilingLevel()) {
+      LDBG() << "skip tiling on the root op";
+      continue;
+    }
+
+    auto tileSizesAttr = dyn_cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
+        getLoweringConfig(op).getTilingLevelAttr(tilingLevel));
+    SmallVector<int64_t> tileSizes(tileSizesAttr.getSizes());
+    SmallVector<bool> tileScalableFlags(tileSizesAttr.getScalableFlags());
+    scf::SCFTilingOptions tilingOptions;
+    setSCFTileSizes(tilingOptions, op, std::move(tileSizes),
+                    std::move(tileScalableFlags));
     if (llvm::all_of(tileSizes, [](int64_t v) { return v == 0; })) {
-      LLVM_DEBUG(llvm::dbgs() << "tiling sizes are all zeros, skip tiling\n");
+      LDBG() << "tiling sizes are all zeros, skip tiling";
       continue;
     }
 
@@ -101,7 +104,7 @@ void LLVMCPUTilePass::runOnOperation() {
         scf::tileUsingSCF(rewriter, op, options);
     if (failed(tiledResults))
       continue;
-    rewriter.replaceOp(op, tiledResults->mergeResult.replacements);
+    rewriter.replaceOp(op, tiledResults->replacements);
   }
 
   RewritePatternSet patterns =
@@ -112,15 +115,18 @@ void LLVMCPUTilePass::runOnOperation() {
   context->getLoadedDialect<tensor::TensorDialect>()
       ->getCanonicalizationPatterns(patterns);
   if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
-    LLVM_DEBUG(llvm::dbgs() << "----- cleanup failed -----\n");
+    LDBG() << "----- cleanup failed -----";
     return signalPassFailure();
   }
 }
 } // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUTilePass(int64_t tilingLevel) {
-  return std::make_unique<LLVMCPUTilePass>(tilingLevel);
+createLLVMCPUTilePass(int64_t tilingLevel, bool skipRootOp) {
+  LLVMCPUTilePassOptions options;
+  options.tilingLevel = tilingLevel;
+  options.skipRootOp = skipRootOp;
+  return std::make_unique<LLVMCPUTilePass>(options);
 }
 
 } // namespace mlir::iree_compiler

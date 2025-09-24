@@ -132,8 +132,8 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
       auto resultSize = rewriter.createOrFold<IREE::Stream::ResourceSizeOp>(
           op->getLoc(), result);
       auto affinityAttr = getOpAffinity(op);
-      auto transferOp = rewriter.create<IREE::Stream::AsyncTransferOp>(
-          op->getLoc(), newType, result, resultSize, resultSize,
+      auto transferOp = IREE::Stream::AsyncTransferOp::create(
+          rewriter, op->getLoc(), newType, result, resultSize, resultSize,
           /*source_affinity=*/affinityAttr,
           /*target_affinity=*/affinityAttr);
       result.replaceUsesWithIf(transferOp.getResult(), [&](OpOperand &operand) {
@@ -180,8 +180,8 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
           }
         }
       }
-      auto transferOp = rewriter.create<IREE::Stream::AsyncTransferOp>(
-          result.getLoc(), newType, result, resultSize, resultSize,
+      auto transferOp = IREE::Stream::AsyncTransferOp::create(
+          rewriter, result.getLoc(), newType, result, resultSize, resultSize,
           /*source_affinity=*/affinityAttr,
           /*target_affinity=*/affinityAttr);
       result.replaceAllUsesExcept(transferOp.getResult(), transferOp);
@@ -457,7 +457,7 @@ static void insertUsageRefinementPatterns(MLIRContext *context,
 struct RefineUsagePass
     : public IREE::Stream::impl::RefineUsagePassBase<RefineUsagePass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     if (moduleOp.getBody()->empty())
       return;
 
@@ -475,7 +475,7 @@ struct RefineUsagePass
     insertUsageRefinementPatterns(&getContext(), analysis, patterns);
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
     GreedyRewriteConfig rewriteConfig;
-    rewriteConfig.useTopDownTraversal = true;
+    rewriteConfig.setUseTopDownTraversal();
     if (failed(
             applyPatternsGreedily(moduleOp, frozenPatterns, rewriteConfig))) {
       return signalPassFailure();

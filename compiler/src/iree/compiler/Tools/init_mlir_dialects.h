@@ -38,7 +38,6 @@
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/TransformOps/MemRefTransformOps.h"
-#include "mlir/Dialect/Mesh/IR/MeshDialect.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
@@ -47,12 +46,14 @@
 #include "mlir/Dialect/SCF/TransformOps/SCFTransformOps.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
+#include "mlir/Dialect/Shard/IR/ShardDialect.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/IR/TensorInferTypeOpInterfaceImpl.h"
 #include "mlir/Dialect/Tensor/IR/TensorTilingInterfaceImpl.h"
 #include "mlir/Dialect/Tensor/TransformOps/TensorTransformOps.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/LoopExtension/LoopExtension.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
 
@@ -77,7 +78,7 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   LLVM::LLVMDialect,
                   linalg::LinalgDialect,
                   math::MathDialect,
-                  mesh::MeshDialect,
+                  shard::ShardDialect,
                   memref::MemRefDialect,
                   ml_program::MLProgramDialect,
                   NVVM::NVVMDialect,
@@ -95,7 +96,8 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   vector::VectorDialect,
                   tensor::TensorDialect,
                   transform::TransformDialect,
-                  shape::ShapeDialect>();
+                  shape::ShapeDialect,
+                  ub::UBDialect>();
   // clang-format on
   cf::registerBufferizableOpInterfaceExternalModels(registry);
   func::registerInlinerExtension(registry);

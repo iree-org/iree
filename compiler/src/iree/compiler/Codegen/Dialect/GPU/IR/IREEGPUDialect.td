@@ -38,15 +38,4 @@ def IREEGPU_Dialect : Dialect {
   }];
 }
 
-//===----------------------------------------------------------------------===//
-// Type definitions
-//===----------------------------------------------------------------------===//
-
-class RankedTensorOrVectorOf<list<Type> allowedTypes> :
-  ShapedContainerType<allowedTypes,
-      Or<[IsVectorOfNonZeroRankTypePred, And<[IsTensorTypePred, HasRankPred]>]>,
-  "ranked tensor or vector", "::mlir::ShapedType">;
-
-def AnyRankedTensorOrVector : RankedTensorOrVectorOf<[AnyType]>;
-
 #endif // IREE_CODEGEN_DIALECT_GPU_IREEGPU_DIALECT

@@ -43,7 +43,11 @@ static void vectorizeLinalgOps(mlir::FunctionOpInterface funcOp) {
             op)) {
       return WalkResult::advance();
     }
-    (void)linalg::vectorize(rewriter, op);
+    FailureOr<linalg::VectorizationResult> result =
+        linalg::vectorize(rewriter, op);
+    if (succeeded(result)) {
+      rewriter.replaceOp(op, result->replacements);
+    }
     return WalkResult::advance();
   });
 }
@@ -82,7 +86,7 @@ public:
     registry.insert<vector::VectorDialect>();
   }
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     LLVM_DEBUG({
       llvm::dbgs() << "LLVMGPUTensorCoreVectorizationPass runOnOperation():\n";
       funcOp->dump();

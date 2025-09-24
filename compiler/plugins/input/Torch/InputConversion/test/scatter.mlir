@@ -6,7 +6,7 @@ func.func @scatter_update(
   %0 = tm_tensor.scatter {dimension_map = array<i64: 0>} unique_indices(true)
     ins(%updates, %indices : tensor<3xi32>, tensor<3x1xi32>)
     outs(%original : tensor<8xi32>)  {
-  ^bb0(%update: i32, %orig: i32):  // no predecessors
+  ^bb0(%update: i32, %orig: i32):
     tm_tensor.yield %update: i32
   } -> tensor<8xi32>
   return %0 : tensor<8xi32>
@@ -32,7 +32,7 @@ func.func @scatter_add(
   %0 = tm_tensor.scatter {dimension_map = array<i64: 0>} unique_indices(true)
     ins(%updates, %indices : tensor<3xi32>, tensor<3x1xi32>)
     outs(%original : tensor<8xi32>)  {
-  ^bb0(%update: i32, %orig: i32):  // no predecessors
+  ^bb0(%update: i32, %orig: i32):
     %add = arith.addi %orig, %update: i32
     tm_tensor.yield %add: i32
   } -> tensor<8xi32>

@@ -22,7 +22,7 @@ func.func @binding_ptrs() {
   // CHECK: %[[OFFSET_PTR0:.+]] = llvm.getelementptr %[[BASE_PTR]][18]
   // CHECK: %[[OFFSET_D0:.+]] = llvm.mul %[[C5]], %[[C2]]
   // CHECK: %[[INDEX1:.+]] = llvm.add %[[OFFSET_D0]], %[[C1]]
-  // CHECK: %[[OFFSET_PTR1:.+]] = llvm.getelementptr %[[OFFSET_PTR0]][%[[INDEX1]]]
+  // CHECK: %[[OFFSET_PTR1:.+]] = llvm.getelementptr inbounds|nuw %[[OFFSET_PTR0]][%[[INDEX1]]]
   // CHECK: %[[VALUE:.+]] = llvm.load %[[OFFSET_PTR1]]
   %c1 = arith.constant 1 : index
   %c5 = arith.constant 5 : index
@@ -87,7 +87,7 @@ func.func @binding_ptrs_dynamic() {
   // CHECK: %[[INDEX1:.+]] = llvm.mul %[[STRIDE1]], %[[C5]]
   // CHECK: %[[T1:.+]] = llvm.add %[[INDEX2]], %[[INDEX1]]
   // CHECK: %[[T2:.+]] = llvm.add %[[T1]], %[[C3]]
-  // CHECK: %[[OFFSET_PTR1:.+]] = llvm.getelementptr %[[OFFSET_PTR0]][%[[T2]]]
+  // CHECK: %[[OFFSET_PTR1:.+]] = llvm.getelementptr inbounds|nuw %[[OFFSET_PTR0]][%[[T2]]]
   // CHECK: %[[VALUE:.+]] = llvm.load %[[OFFSET_PTR1]]
   %c3 = arith.constant 3 : index
   %c5 = arith.constant 5 : index
@@ -130,7 +130,7 @@ func.func @binding_ptrs_sub_byte_dynamic() {
   // CHECK: %[[BASE_BIT_OFFSET:.+]] = llvm.mul %[[OFFSET_ZEXT]], %[[C8]]
   // CHECK: %[[BASE_OFFSET:.+]] = llvm.udiv %[[BASE_BIT_OFFSET]], %[[C4]]
   // CHECK: %[[OFFSET_PTR0:.+]] = llvm.getelementptr %[[BASE_PTR]][%[[BASE_OFFSET]]]
-  // CHECK: %[[OFFSET_PTR1:.+]] = llvm.getelementptr %[[OFFSET_PTR0]][7]
+  // CHECK: %[[OFFSET_PTR1:.+]] = llvm.getelementptr inbounds|nuw %[[OFFSET_PTR0]][7]
   // CHECK: %[[VALUE:.+]] = llvm.load %[[OFFSET_PTR1]]
   %c7 = arith.constant 7 : index
   %value = memref.load %memref[%c7] : memref<?xi4, strided<[1], offset: ?>>

@@ -172,7 +172,6 @@ iree_bitcode_library(
     "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "internal_headers_filegroup.stamp"
   SRCS
-    "fallback.c"
     "mmt4d.c"
     "mmt4d_tile_generic.c"
     "pack.c"
@@ -229,6 +228,7 @@ iree_link_bitcode(
   NAME
     ukernel_bitcode_riscv_64
   SRCS
+    "arch/riscv_64/ukernel_bitcode_arch_riscv_64.bc"
     "ukernel_bitcode_generic_riscv_64.bc"
 
 )

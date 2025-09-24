@@ -67,9 +67,9 @@ iree_cc_library(
     "ConvertToLLVM.h"
     "KernelConfig.h"
     "Passes.h"
-    "ROCDLKernelConfig.h"
     "ROCDLPasses.h"
   SRCS
+    "AMDGPUEmulateNarrowType.cpp"
     "ConvertToLLVM.cpp"
     "ConvertToNVVM.cpp"
     "ConvertToROCDL.cpp"
@@ -82,22 +82,18 @@ iree_cc_library(
     "LLVMGPULinkExecutables.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPUPackSharedMemoryAlloc.cpp"
-    "LLVMGPUPrefetching.cpp"
-    "LLVMGPUPromoteMatmulToFitMMA.cpp"
     "LLVMGPUSelectLoweringStrategy.cpp"
     "LLVMGPUTensorCoreVectorization.cpp"
-    "LLVMGPUTensorPad.cpp"
     "LLVMGPUTileAndDistribute.cpp"
     "LLVMGPUVectorDistribute.cpp"
     "LLVMGPUVectorLowering.cpp"
     "LLVMGPUVectorToGPU.cpp"
     "Passes.cpp"
     "ROCDLAnnotateKernelForTranslation.cpp"
+    "ROCDLBufferInstructionsOptimization.cpp"
     "ROCDLConfigureBufferInstructions.cpp"
-    "ROCDLKernelConfig.cpp"
     "ROCDLLowerExecutableTarget.cpp"
-    "ROCDLSelectLoweringStrategy.cpp"
-    "TestLLVMGPUQueryMMAPass.cpp"
+    "ROCDLPrefetching.cpp"
     "Verifiers.cpp"
   DEPS
     ::PassHeaders
@@ -140,6 +136,8 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRMathDialect
     MLIRMathToLLVM
+    MLIRMathToROCDL
+    MLIRMathTransforms
     MLIRMemRefDialect
     MLIRMemRefToLLVM
     MLIRMemRefTransforms
@@ -161,6 +159,7 @@ iree_cc_library(
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
+    MLIRTensorTransforms
     MLIRTransformDialect
     MLIRTransformUtils
     MLIRTransforms
@@ -190,17 +189,27 @@ iree_cc_library(
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Codegen::Utils::VectorOpUtils
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::Transforms
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::LinalgExt::Utils
+    iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Utils
   PUBLIC
+)
+
+iree_tablegen_doc(
+  NAME
+    CodegenLLVMGPUPassesDocGen
+  CATEGORY
+    "Passes"
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-doc CodegenLLVMGPUPasses.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

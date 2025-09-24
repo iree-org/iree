@@ -5,10 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/Conversion/StreamToHAL/Patterns.h"
-
 #include "iree/compiler/Dialect/HAL/Analysis/Captures.h"
 #include "iree/compiler/Dialect/HAL/Conversion/StreamToHAL/Utils.h"
-#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
@@ -62,6 +60,15 @@ struct ContextResolveOpPattern
       return success();
     }
 
+    // TODO(multi-device): policy for selecting the appropriate affinity.
+    // Today we only support optimal affinities for certain ops as there needs
+    // to be some runtime policy hooks to choose otherwise. For any op that
+    // ends up here we select the first device in the optimal set.
+    if (auto deviceOptimalAttr =
+            dyn_cast_if_present<IREE::HAL::DeviceOptimalAttr>(affinityAttr)) {
+      affinityAttr = deviceOptimalAttr.getAffinities().front();
+    }
+
     // We currently only handle HAL device affinities.
     // We could make this an interface to select the device and allow users to
     // provide their own affinities to convert to HAL. In the future users may
@@ -87,22 +94,24 @@ struct ResourceAllocOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceAllocOp allocOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto [allocator, queueAffinity] =
-        lookupAllocatorAndQueueAffinityFor(allocOp, rewriter);
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
-
     auto resourceType =
         cast<IREE::Stream::ResourceType>(allocOp.getResult().getType());
 
-    auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
-    auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
-    if (failed(deriveAllowedResourceBufferBits(allocOp.getLoc(), resourceType,
-                                               memoryTypes, bufferUsage))) {
-      return failure();
-    }
+    auto resolveOp = IREE::HAL::AllocatorResolveMemoryPropertiesOp::create(
+        rewriter, allocOp.getLoc(), rewriter.getI32Type(),
+        rewriter.getI32Type(), allocOp.getAffinity().value_or(nullptr),
+        static_cast<IREE::HAL::Lifetime>(resourceType.getLifetime()));
+
+    // Lookup the appropriate allocator/queue for allocation based on the buffer
+    // propreties.
+    auto [allocator, queueAffinity] = lookupAllocatorAndQueueAffinityFor(
+        allocOp, resolveOp.getMemoryTypes(), resolveOp.getBufferUsage(),
+        rewriter);
 
     rewriter.replaceOpWithNewOp<IREE::HAL::AllocatorAllocateOp>(
-        allocOp, bufferType, allocator, queueAffinity, memoryTypes, bufferUsage,
+        allocOp, bufferType, allocator, queueAffinity,
+        resolveOp.getMemoryTypes(), resolveOp.getBufferUsage(),
         adaptor.getStorageSize());
     return success();
   }
@@ -115,18 +124,22 @@ struct ResourceAllocaOpPattern
   matchAndRewrite(IREE::Stream::ResourceAllocaOp allocaOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = allocaOp.getLoc();
-    auto [device, queueAffinity] =
-        lookupDeviceAndQueueAffinityFor(allocaOp, rewriter);
-    auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
 
+    // Derive buffer propreties from the resource type.
     auto resourceType =
         cast<IREE::Stream::ResourceType>(allocaOp.getResult().getType());
-    auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
-    auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
-    if (failed(deriveAllowedResourceBufferBits(loc, resourceType, memoryTypes,
-                                               bufferUsage))) {
-      return failure();
-    }
+    auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
+
+    // Lookup the appropriate device/queue for allocation based on the buffer
+    // propreties.
+    auto resolveOp = IREE::HAL::AllocatorResolveMemoryPropertiesOp::create(
+        rewriter, loc, rewriter.getI32Type(), rewriter.getI32Type(),
+        allocaOp.getAffinity().value_or(nullptr),
+        static_cast<IREE::HAL::Lifetime>(resourceType.getLifetime()));
+
+    auto [device, queueAffinity] =
+        lookupDeviceAndQueueAffinityFor(allocaOp, resolveOp.getMemoryTypes(),
+                                        resolveOp.getBufferUsage(), rewriter);
 
     // Behavior flags.
     IREE::HAL::AllocaFlagBitfield flags = IREE::HAL::AllocaFlagBitfield::None;
@@ -141,10 +154,11 @@ struct ResourceAllocaOpPattern
         loc, device, allocaOp.getResultTimepoint(), rewriter);
 
     // Queue allocation.
-    auto pool = rewriter.create<arith::ConstantIntOp>(loc, 0, 64);
-    auto allocateOp = rewriter.create<IREE::HAL::DeviceQueueAllocaOp>(
-        loc, bufferType, device, queueAffinity, waitFence, signalFence, pool,
-        memoryTypes, bufferUsage, adaptor.getStorageSize(), flags);
+    auto pool = arith::ConstantIntOp::create(rewriter, loc, 0, 64);
+    auto allocateOp = IREE::HAL::DeviceQueueAllocaOp::create(
+        rewriter, loc, bufferType, device, queueAffinity, waitFence,
+        signalFence, pool, resolveOp.getMemoryTypes(),
+        resolveOp.getBufferUsage(), adaptor.getStorageSize(), flags);
 
     rewriter.replaceOp(allocaOp, {allocateOp.getResult(), signalFence});
     return success();
@@ -159,8 +173,21 @@ struct ResourceDeallocaOpPattern
                   OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = deallocaOp.getLoc();
+
+    // Derive buffer propreties from the resource type. This must match the
+    // original allocation. If we're uncertain if it does we have to switch to
+    // prefer-origin mode.
+    auto resourceType =
+        cast<IREE::Stream::ResourceType>(deallocaOp.getOperand().getType());
+
+    auto resolveOp = IREE::HAL::AllocatorResolveMemoryPropertiesOp::create(
+        rewriter, loc, rewriter.getI32Type(), rewriter.getI32Type(),
+        deallocaOp.getAffinity().value_or(nullptr),
+        static_cast<IREE::HAL::Lifetime>(resourceType.getLifetime()));
+
     auto [device, queueAffinity] =
-        lookupDeviceAndQueueAffinityFor(deallocaOp, rewriter);
+        lookupDeviceAndQueueAffinityFor(deallocaOp, resolveOp.getMemoryTypes(),
+                                        resolveOp.getBufferUsage(), rewriter);
 
     // Gather wait/signal fence, which are optional.
     Value waitFence =
@@ -168,16 +195,17 @@ struct ResourceDeallocaOpPattern
     Value signalFence = getOrCreateSignalFence(
         loc, device, deallocaOp.getResultTimepoint(), rewriter);
 
+    bool preferOrigin = deallocaOp.getPreferOrigin();
     // Route to the origin of the allocation (if available).
     IREE::HAL::DeallocaFlagBitfield flags =
         IREE::HAL::DeallocaFlagBitfield::None;
-    if (deallocaOp.getPreferOrigin()) {
+    if (preferOrigin) {
       flags = flags | IREE::HAL::DeallocaFlagBitfield::PreferOrigin;
     }
 
     // Queue deallocation.
-    rewriter.create<IREE::HAL::DeviceQueueDeallocaOp>(
-        loc, device, queueAffinity, waitFence, signalFence,
+    IREE::HAL::DeviceQueueDeallocaOp::create(
+        rewriter, loc, device, queueAffinity, waitFence, signalFence,
         adaptor.getOperand(), flags);
 
     rewriter.replaceOp(deallocaOp, {signalFence});
@@ -239,12 +267,9 @@ struct ResourceTryMapOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceTryMapOp tryMapOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto [allocator, queueAffinity] =
-        lookupAllocatorAndQueueAffinityFor(tryMapOp, rewriter);
     auto resourceType =
         llvm::cast<IREE::Stream::ResourceType>(tryMapOp.getResult().getType());
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
-
     auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
     auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
     switch (resourceType.getLifetime()) {
@@ -280,9 +305,18 @@ struct ResourceTryMapOpPattern
       break;
     }
 
+    Value bufferUsageOp = IREE::HAL::BufferUsageOp::create(
+        rewriter, tryMapOp.getLoc(), bufferUsage);
+    Value memoryTypeOp = IREE::HAL::MemoryTypeOp::create(
+        rewriter, tryMapOp.getLoc(), memoryTypes);
+    // Lookup the appropriate allocator/queue for allocation based on the buffer
+    // propreties.
+    auto [allocator, queueAffinity] = lookupAllocatorAndQueueAffinityFor(
+        tryMapOp, memoryTypeOp, bufferUsageOp, rewriter);
+
     rewriter.replaceOpWithNewOp<IREE::HAL::AllocatorImportOp>(
         tryMapOp, rewriter.getI1Type(), bufferType, allocator, queueAffinity,
-        memoryTypes, bufferUsage, adaptor.getSource(),
+        memoryTypeOp, bufferUsageOp, adaptor.getSource(),
         adaptor.getSourceOffset(), adaptor.getResultSize());
     return success();
   }
@@ -344,7 +378,7 @@ struct FileConstantOpPattern
         queueAffinity, IREE::HAL::MemoryAccessBitfield::Read,
         constantOp.getSource(), constantOp.getSourceOffset(),
         constantOp.getSourceLength(),
-        rewriter.create<arith::ConstantIntOp>(constantOp.getLoc(), 0, 32));
+        arith::ConstantIntOp::create(rewriter, constantOp.getLoc(), 0, 32));
     return success();
   }
 };
@@ -366,9 +400,9 @@ struct FileReadOpPattern
         loc, device, readOp.getResultTimepoint(), rewriter);
 
     // Queue read.
-    rewriter.create<IREE::HAL::DeviceQueueReadOp>(
-        loc, device, queueAffinity, waitFence, signalFence, adaptor.getSource(),
-        adaptor.getSourceOffset(), adaptor.getTarget(),
+    IREE::HAL::DeviceQueueReadOp::create(
+        rewriter, loc, device, queueAffinity, waitFence, signalFence,
+        adaptor.getSource(), adaptor.getSourceOffset(), adaptor.getTarget(),
         adaptor.getTargetOffset(), adaptor.getLength(),
         rewriter.getAttr<IREE::HAL::ReadFlagBitfieldAttr>(
             IREE::HAL::ReadFlagBitfield::None));
@@ -395,9 +429,9 @@ struct FileWriteOpPattern
         loc, device, writeOp.getResultTimepoint(), rewriter);
 
     // Queue write.
-    rewriter.create<IREE::HAL::DeviceQueueWriteOp>(
-        loc, device, queueAffinity, waitFence, signalFence, adaptor.getSource(),
-        adaptor.getSourceOffset(), adaptor.getTarget(),
+    IREE::HAL::DeviceQueueWriteOp::create(
+        rewriter, loc, device, queueAffinity, waitFence, signalFence,
+        adaptor.getSource(), adaptor.getSourceOffset(), adaptor.getTarget(),
         adaptor.getTargetOffset(), adaptor.getLength(),
         rewriter.getAttr<IREE::HAL::WriteFlagBitfieldAttr>(
             IREE::HAL::WriteFlagBitfield::None));
@@ -419,8 +453,9 @@ buildStorageAssertions(Location loc, Value buffer, StringAttr message,
                        OpBuilder &builder) {
   auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
   auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
-  if (failed(deriveRequiredResourceBufferBits(loc, resourceType, memoryTypes,
-                                              bufferUsage))) {
+  if (failed(deriveRequiredResourceBufferBits(
+          loc, static_cast<IREE::HAL::Lifetime>(resourceType.getLifetime()),
+          memoryTypes, bufferUsage))) {
     return failure();
   }
 
@@ -429,9 +464,9 @@ buildStorageAssertions(Location loc, Value buffer, StringAttr message,
   auto requiredUsage = IREE::HAL::BufferUsageBitfieldAttr::get(
       builder.getContext(), bufferUsage);
 
-  builder.create<IREE::HAL::BufferAssertOp>(loc, buffer, message, allocator,
-                                            minimumLength, requiredTypes,
-                                            requiredUsage);
+  IREE::HAL::BufferAssertOp::create(builder, loc, buffer, message, allocator,
+                                    minimumLength, requiredTypes,
+                                    requiredUsage);
   return success();
 }
 
@@ -534,10 +569,10 @@ struct TensorExportBufferViewOpPattern
 
     // NOTE: we should have verified supported encodings/types at entry into the
     // HAL pipeline.
-    auto encodingType = rewriter.create<IREE::HAL::EncodingTypeOp>(
-        loc, tensorType.getEncoding());
-    auto elementType = rewriter.create<IREE::HAL::ElementTypeOp>(
-        loc, tensorType.getElementType());
+    auto encodingType = IREE::HAL::EncodingTypeOp::create(
+        rewriter, loc, tensorType.getEncoding());
+    auto elementType = IREE::HAL::ElementTypeOp::create(
+        rewriter, loc, tensorType.getElementType());
 
     // Flatten static + dynamic shape dimensions.
     SmallVector<Value> dims;
@@ -546,14 +581,14 @@ struct TensorExportBufferViewOpPattern
       if (tensorType.isDynamicDim(idx)) {
         dims.push_back(dynamicDims[dynamicIdx++]);
       } else {
-        dims.push_back(rewriter.create<arith::ConstantIndexOp>(
-            loc, tensorType.getDimSize(idx)));
+        dims.push_back(arith::ConstantIndexOp::create(
+            rewriter, loc, tensorType.getDimSize(idx)));
       }
     }
 
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewCreateOp>(
         exportOp, adaptor.getSource(),
-        rewriter.create<arith::ConstantIndexOp>(loc, 0),
+        arith::ConstantIndexOp::create(rewriter, loc, 0),
         adaptor.getSourceSize(), elementType, encodingType, dims);
     return success();
   }
@@ -572,10 +607,11 @@ struct TensorTraceOpPattern
              adaptor.getResourceEncodings().getAsRange<TypeAttr>())) {
       int64_t dynamicDimCount =
           cast<ShapedType>(resourceEncoding.getValue()).getNumDynamicDims();
-      bufferViews.push_back(rewriter.create<IREE::Stream::TensorExportOp>(
-          traceOp.getLoc(), rewriter.getType<IREE::HAL::BufferViewType>(),
-          resource, resourceEncoding,
-          resourceEncodingDims.take_front(dynamicDimCount), resourceSize,
+      bufferViews.push_back(IREE::Stream::TensorExportOp::create(
+          rewriter, traceOp.getLoc(),
+          rewriter.getType<IREE::HAL::BufferViewType>(), resource,
+          resourceEncoding, resourceEncodingDims.take_front(dynamicDimCount),
+          resourceSize,
           /*affinity=*/IREE::Stream::AffinityAttr{}));
       resourceEncodingDims = resourceEncodingDims.drop_front(dynamicDimCount);
     }
@@ -745,8 +781,8 @@ struct CmdDispatchOpPattern
     // Get the device handle we're executing against in this execution region.
     // Note that this is a dynamic value: we have to treat the device as unknown
     // here.
-    Value device = rewriter.create<IREE::HAL::CommandBufferDeviceOp>(
-        loc, rewriter.getType<IREE::HAL::DeviceType>(),
+    Value device = IREE::HAL::CommandBufferDeviceOp::create(
+        rewriter, loc, rewriter.getType<IREE::HAL::DeviceType>(),
         commandBufferMapping.getHandle());
 
     // Prepare for variant switch table by gathering the conditions selecting
@@ -787,8 +823,9 @@ struct CmdDispatchOpPattern
           rewriter);
 
       // Allow each variant to define how it is dispatched.
-      auto switchOp = rewriter.create<scf::IndexSwitchOp>(
-          loc, TypeRange{}, selectedIndex, caseIndices, caseIndices.size());
+      auto switchOp =
+          scf::IndexSwitchOp::create(rewriter, loc, TypeRange{}, selectedIndex,
+                                     caseIndices, caseIndices.size());
       for (size_t i = 0; i < caseExportOps.size(); ++i) {
         auto [entryPointAttr, exportOp] = caseExportOps[i];
         auto &caseBlock = switchOp.getCaseRegions()[i].emplaceBlock();
@@ -796,19 +833,144 @@ struct CmdDispatchOpPattern
         emitDispatchOp(loc, affinityAttr, device, commandBufferMapping,
                        exportOp, entryPointAttr, dispatchOp, adaptor,
                        caseBuilder);
-        caseBuilder.create<scf::YieldOp>(loc);
+        scf::YieldOp::create(caseBuilder, loc);
       }
 
       // Fallback for no available variant. Today we just no-op as executable
       // loading should have already failed.
       auto &defaultBlock = switchOp.getDefaultRegion().emplaceBlock();
       auto defaultBuilder = OpBuilder::atBlockBegin(&defaultBlock);
-      defaultBuilder.create<scf::YieldOp>(loc);
+      scf::YieldOp::create(defaultBuilder, loc);
 
       rewriter.replaceOp(dispatchOp, switchOp);
     }
 
     return success();
+  }
+
+  // Returns the fully qualified export name (@executable::@variant::@export).
+  SymbolRefAttr getExportRef(IREE::HAL::ExecutableExportOp exportOp) const {
+    auto variantOp =
+        exportOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+    auto executableOp = variantOp->getParentOfType<IREE::HAL::ExecutableOp>();
+    return SymbolRefAttr::get(executableOp.getSymNameAttr(),
+                              {
+                                  FlatSymbolRefAttr::get(variantOp),
+                                  FlatSymbolRefAttr::get(exportOp),
+                              });
+  }
+
+  // Selects the ordinal for the given |baseExportOp| and calculates its
+  // workgroup count. The ordinal may be different than the ordinal of the
+  // export itself if any fallbacks are specified. Each export condition will be
+  // evaluated and the first that matches will be returned.
+  //
+  // As an example, a fallback chain of @0 -> @1 -> @2 (with @0 being the
+  // highest priority) would result in a decision tree:
+  //   %ordinal, %workgroups = scf.if %cond0 {
+  //     %ordinal0 = hal.executable.export.ordinal @0
+  //     %workgroups0 = calculate for @0
+  //     scf.yield %ordinal0, %workgroups0
+  //   } else {
+  //     %ordinal12, %workgroups12 = scf.if %cond1 {
+  //       %ordinal1 = hal.executable.export.ordinal @1
+  //       %workgroups1 = calculate for @1
+  //       scf.yield %ordinal1, %workgroups1
+  //     } else {
+  //       %ordinal2 = hal.executable.export.ordinal @2
+  //       %workgroups2 = calculate for @2
+  //       scf.yield %ordinal2, %workgroups2
+  //     }
+  //     scf.yield %ordinal12, %workgroups12
+  //   }
+  std::tuple<Value, std::array<Value, 3>>
+  selectExport(Location loc, IREE::HAL::ExecutableExportOp baseExportOp,
+               Value device, ValueRange workload, OpBuilder &builder) const {
+    if (!baseExportOp.getConditionBody()) {
+      // No fallback - fast path to just the base export.
+      Value ordinal = IREE::HAL::ExecutableExportOrdinalOp::create(
+          builder, loc, builder.getIndexType(), getExportRef(baseExportOp));
+      auto workgroupCount =
+          baseExportOp.calculateWorkgroupCount(loc, device, workload, builder);
+      return {ordinal, workgroupCount};
+    }
+    // Recursively build the selection decision tree.
+    auto fallbackExportOp =
+        SymbolTable::lookupNearestSymbolFrom<IREE::HAL::ExecutableExportOp>(
+            baseExportOp, baseExportOp.getConditionFallbackAttr());
+    return buildExportSelection(loc, baseExportOp, fallbackExportOp, device,
+                                workload, builder);
+  }
+  std::tuple<Value, std::array<Value, 3>>
+  buildExportSelection(Location loc, IREE::HAL::ExecutableExportOp tryExportOp,
+                       IREE::HAL::ExecutableExportOp fallbackExportOp,
+                       Value device, ValueRange workload,
+                       OpBuilder &builder) const {
+    // Inline the condition logic.
+    Value tryCondition =
+        tryExportOp.calculateCondition(loc, device, workload, builder);
+
+    // Create an scf.if: the then region will simply return the
+    // ordinal (condition matches) and the else region will contain the rest of
+    // the decision tree.
+    Type indexType = builder.getIndexType();
+    auto ifOp = scf::IfOp::create(
+        builder, loc, TypeRange{indexType, indexType, indexType, indexType},
+        tryCondition,
+        /*addThenBlock=*/true, /*addElseBlock=*/true);
+    {
+      auto thenBuilder = ifOp.getThenBodyBuilder();
+      Value tryOrdinal = IREE::HAL::ExecutableExportOrdinalOp::create(
+          thenBuilder, loc, thenBuilder.getIndexType(),
+          getExportRef(tryExportOp));
+      auto tryWorkgroupCount = tryExportOp.calculateWorkgroupCount(
+          loc, device, workload, thenBuilder);
+      scf::YieldOp::create(thenBuilder, loc,
+                           ValueRange{
+                               tryOrdinal,
+                               tryWorkgroupCount[0],
+                               tryWorkgroupCount[1],
+                               tryWorkgroupCount[2],
+                           });
+    }
+    {
+      auto elseBuilder = ifOp.getElseBodyBuilder();
+      if (fallbackExportOp.getConditionBody()) {
+        // Recursively chain to the next fallback-enabled export.
+        auto chainExportOp =
+            SymbolTable::lookupNearestSymbolFrom<IREE::HAL::ExecutableExportOp>(
+                fallbackExportOp, fallbackExportOp.getConditionFallbackAttr());
+        auto [chainOrdinal, chainWorkgroupCount] =
+            buildExportSelection(loc, fallbackExportOp, chainExportOp, device,
+                                 workload, elseBuilder);
+        scf::YieldOp::create(elseBuilder, loc,
+                             ValueRange{
+                                 chainOrdinal,
+                                 chainWorkgroupCount[0],
+                                 chainWorkgroupCount[1],
+                                 chainWorkgroupCount[2],
+                             });
+      } else {
+        // Tail of recursion; fallback has no fallback.
+        Value fallbackOrdinal = IREE::HAL::ExecutableExportOrdinalOp::create(
+            elseBuilder, loc, indexType, getExportRef(fallbackExportOp));
+        auto fallbackWorkgroupCount = fallbackExportOp.calculateWorkgroupCount(
+            loc, device, workload, elseBuilder);
+        scf::YieldOp::create(elseBuilder, loc,
+                             ValueRange{
+                                 fallbackOrdinal,
+                                 fallbackWorkgroupCount[0],
+                                 fallbackWorkgroupCount[1],
+                                 fallbackWorkgroupCount[2],
+                             });
+      }
+    }
+    return {ifOp.getResult(0),
+            {
+                ifOp.getResult(1),
+                ifOp.getResult(2),
+                ifOp.getResult(3),
+            }};
   }
 
   Operation *emitDispatchOp(
@@ -817,14 +979,13 @@ struct CmdDispatchOpPattern
       IREE::HAL::ExecutableExportOp exportOp, SymbolRefAttr entryPointAttr,
       IREE::Stream::CmdDispatchOp dispatchOp, OpAdaptor adaptor,
       OpBuilder &builder) const {
-    auto workgroupCount = exportOp.calculateWorkgroupCount(
-        loc, device, adaptor.getWorkload(), builder);
-
-    Value executable = builder.create<IREE::HAL::ExecutableLookupOp>(
-        loc, builder.getType<IREE::HAL::ExecutableType>(), device,
+    Value executable = IREE::HAL::ExecutableLookupOp::create(
+        builder, loc, builder.getType<IREE::HAL::ExecutableType>(), device,
         entryPointAttr.getRootReference().getValue());
-    Value ordinal = builder.create<IREE::HAL::ExecutableExportOrdinalOp>(
-        loc, builder.getIndexType(), entryPointAttr);
+
+    // Select the export and calculate its workgroup count.
+    auto [ordinal, workgroupCount] =
+        selectExport(loc, exportOp, device, adaptor.getWorkload(), builder);
 
     auto layoutAttr = exportOp.getLayout();
     SmallVector<IREE::HAL::BindingValue> bindings;
@@ -855,8 +1016,8 @@ struct CmdDispatchOpPattern
 
     auto flags = IREE::HAL::DispatchFlags::None;
 
-    return builder.create<IREE::HAL::CommandBufferDispatchOp>(
-        loc, commandBufferMapping.getHandle(), executable, ordinal,
+    return IREE::HAL::CommandBufferDispatchOp::create(
+        builder, loc, commandBufferMapping.getHandle(), executable, ordinal,
         workgroupCount, adaptor.getUniformOperands(), bindings, flags);
   }
 };
@@ -923,15 +1084,17 @@ struct CmdCallOpPattern
     Value zeroIndex;
     auto getZeroIndex = [&]() {
       if (!zeroIndex) {
-        zeroIndex = rewriter.create<arith::ConstantIndexOp>(callOp.getLoc(), 0);
+        zeroIndex =
+            arith::ConstantIndexOp::create(rewriter, callOp.getLoc(), 0);
       }
       return zeroIndex;
     };
     Value nullBuffer;
     auto getNullBuffer = [&]() {
       if (!nullBuffer) {
-        nullBuffer = rewriter.create<IREE::Util::NullOp>(
-            callOp.getLoc(), rewriter.getType<IREE::HAL::BufferType>());
+        nullBuffer = IREE::Util::NullOp::create(
+            rewriter, callOp.getLoc(),
+            rewriter.getType<IREE::HAL::BufferType>());
       }
       return nullBuffer;
     };
@@ -1044,8 +1207,8 @@ static void insertSerializationBarriers(Location loc, Block &block,
     if (op->hasTrait<OpTrait::IsTerminator>())
       continue;
     builder.setInsertionPointAfter(op);
-    builder.create<IREE::HAL::CommandBufferExecutionBarrierOp>(
-        loc, commandBuffer, sourceStage, targetStage, flags);
+    IREE::HAL::CommandBufferExecutionBarrierOp::create(
+        builder, loc, commandBuffer, sourceStage, targetStage, flags);
   }
 }
 
@@ -1126,8 +1289,8 @@ struct CmdExecuteOpPattern
       if (auto fillOp = dyn_cast<IREE::Stream::CmdFillOp>(*singleTransferOp)) {
         auto fillTargetBuffer = rewriter.getRemappedValue(
             executeOp.getClosureCapturedValue(fillOp.getTarget()));
-        rewriter.create<IREE::HAL::DeviceQueueFillOp>(
-            loc, device, queueAffinity, waitFence, signalFence,
+        IREE::HAL::DeviceQueueFillOp::create(
+            rewriter, loc, device, queueAffinity, waitFence, signalFence,
             fillTargetBuffer, fillOp.getTargetOffset(),
             fillOp.getTargetLength(), fillOp.getValue(),
             IREE::HAL::FillFlagBitfield::None);
@@ -1137,8 +1300,8 @@ struct CmdExecuteOpPattern
             executeOp.getClosureCapturedValue(copyOp.getSource()));
         auto copyTargetBuffer = rewriter.getRemappedValue(
             executeOp.getClosureCapturedValue(copyOp.getTarget()));
-        rewriter.create<IREE::HAL::DeviceQueueCopyOp>(
-            loc, device, queueAffinity, waitFence, signalFence,
+        IREE::HAL::DeviceQueueCopyOp::create(
+            rewriter, loc, device, queueAffinity, waitFence, signalFence,
             copySourceBuffer, copyOp.getSourceOffset(), copyTargetBuffer,
             copyOp.getTargetOffset(), copyOp.getLength(),
             IREE::HAL::CopyFlagBitfield::None);
@@ -1199,11 +1362,12 @@ struct CmdExecuteOpPattern
       // Create a new command buffer for recording.
       Value bindingTableCapacity =
           bindingTable.empty() ? Value{}
-                               : rewriter.create<arith::ConstantIndexOp>(
-                                     loc, bindingTable.size());
-      Value commandBuffer = rewriter.create<IREE::HAL::CommandBufferCreateOp>(
-          loc, rewriter.getType<IREE::HAL::CommandBufferType>(), device, modes,
-          commandCategories, queueAffinity, bindingTableCapacity);
+                               : arith::ConstantIndexOp::create(
+                                     rewriter, loc, bindingTable.size());
+      Value commandBuffer = IREE::HAL::CommandBufferCreateOp::create(
+          rewriter, loc, rewriter.getType<IREE::HAL::CommandBufferType>(),
+          device, modes, commandCategories, queueAffinity,
+          bindingTableCapacity);
       mapping->mapCommandBuffer(executeOp, commandBuffer,
                                 std::move(bindingTable));
 
@@ -1214,8 +1378,8 @@ struct CmdExecuteOpPattern
                                   OpBuilder::atBlockBegin(&bodyBlock));
 
       // Begin/end recording and inline the execution region between them.
-      auto endOp = rewriter.create<IREE::HAL::CommandBufferFinalizeOp>(
-          loc, commandBuffer);
+      auto endOp = IREE::HAL::CommandBufferFinalizeOp::create(rewriter, loc,
+                                                              commandBuffer);
       rewriter.inlineBlockBefore(&executeOp.getBody().front(), endOp,
                                  adaptor.getResourceOperands());
 
@@ -1229,13 +1393,13 @@ struct CmdExecuteOpPattern
     Value commandBuffer;
     if (!bitEnumContainsAll(modes,
                             IREE::HAL::CommandBufferModeBitfield::OneShot)) {
-      auto memoizeOp = rewriter.create<IREE::HAL::DeviceMemoizeOp>(
-          loc, rewriter.getType<IREE::HAL::CommandBufferType>(), device,
-          queueAffinity);
+      auto memoizeOp = IREE::HAL::DeviceMemoizeOp::create(
+          rewriter, loc, rewriter.getType<IREE::HAL::CommandBufferType>(),
+          device, queueAffinity);
       auto ip = rewriter.saveInsertionPoint();
       rewriter.setInsertionPointToStart(&memoizeOp.getBody().emplaceBlock());
-      rewriter.create<IREE::HAL::ReturnOp>(
-          loc, recordCommandBuffer(device, queueAffinity, rewriter));
+      IREE::HAL::ReturnOp::create(
+          rewriter, loc, recordCommandBuffer(device, queueAffinity, rewriter));
       rewriter.restoreInsertionPoint(ip);
       commandBuffer = memoizeOp.getResult(0);
     } else {
@@ -1251,13 +1415,13 @@ struct CmdExecuteOpPattern
     // Queue execution.
     IREE::HAL::ExecuteFlagBitfield flags = IREE::HAL::ExecuteFlagBitfield::None;
     if (bindingTableValues.empty()) {
-      rewriter.create<IREE::HAL::DeviceQueueExecuteOp>(
-          loc, device, queueAffinity, waitFence, signalFence, commandBuffer,
-          flags);
+      IREE::HAL::DeviceQueueExecuteOp::create(
+          rewriter, loc, device, queueAffinity, waitFence, signalFence,
+          commandBuffer, flags);
     } else {
-      rewriter.create<IREE::HAL::DeviceQueueExecuteIndirectOp>(
-          loc, device, queueAffinity, waitFence, signalFence, commandBuffer,
-          bindingTableValues, flags);
+      IREE::HAL::DeviceQueueExecuteIndirectOp::create(
+          rewriter, loc, device, queueAffinity, waitFence, signalFence,
+          commandBuffer, bindingTableValues, flags);
     }
 
     rewriter.replaceOp(executeOp, signalFence);
@@ -1398,8 +1562,8 @@ struct TimepointBarrierOpPattern
     // NOTE: this assumes that if this op still exists the input resource is
     // already available. If it isn't then timepoint propagation should have
     // replaced the signal op with the producing timepoint.
-    Value nullFence = rewriter.create<IREE::Util::NullOp>(
-        barrierOp.getLoc(), rewriter.getType<IREE::HAL::FenceType>());
+    Value nullFence = IREE::Util::NullOp::create(
+        rewriter, barrierOp.getLoc(), rewriter.getType<IREE::HAL::FenceType>());
     rewriter.replaceOp(barrierOp, {adaptor.getResource(), nullFence});
     return success();
   }
@@ -1414,12 +1578,12 @@ struct TimepointAwaitOpPattern
     auto loc = awaitOp.getLoc();
 
     // Perform the blocking wait.
-    Value timeoutMillis = rewriter.create<arith::ConstantIntOp>(loc, -1, 32);
-    auto fenceOp = rewriter.create<IREE::HAL::FenceAwaitOp>(
-        loc, rewriter.getI32Type(), timeoutMillis,
+    Value timeoutMillis = arith::ConstantIntOp::create(rewriter, loc, -1, 32);
+    auto fenceOp = IREE::HAL::FenceAwaitOp::create(
+        rewriter, loc, rewriter.getI32Type(), timeoutMillis,
         IREE::HAL::WaitFlagBitfield::None, adaptor.getAwaitTimepoint());
-    rewriter.create<IREE::Util::StatusCheckOkOp>(loc, fenceOp.getStatus(),
-                                                 "failed to wait on timepoint");
+    IREE::Util::StatusCheckOkOp::create(rewriter, loc, fenceOp.getStatus(),
+                                        "failed to wait on timepoint");
 
     // Pass along operands.
     rewriter.replaceOp(awaitOp, adaptor.getResourceOperands());
@@ -1439,38 +1603,37 @@ struct ChannelCreateOpPattern
     auto getDefault = [&]() {
       if (!neg1I32) {
         neg1I32 =
-            rewriter.create<arith::ConstantIntOp>(createOp.getLoc(), -1, 32);
+            arith::ConstantIntOp::create(rewriter, createOp.getLoc(), -1, 32);
       }
       return neg1I32;
     };
     Value id = adaptor.getId();
     if (!id) {
-      id = rewriter.create<IREE::Util::NullOp>(
-          createOp.getLoc(), rewriter.getType<IREE::Util::BufferType>());
+      id = IREE::Util::NullOp::create(
+          rewriter, createOp.getLoc(),
+          rewriter.getType<IREE::Util::BufferType>());
     }
     Value group =
         adaptor.getGroupAttr()
-            ? rewriter
-                  .create<IREE::Util::BufferConstantOp>(
-                      createOp.getLoc(),
-                      /*name=*/StringAttr{}, /*value=*/adaptor.getGroupAttr(),
-                      /*alignment=*/IntegerAttr{}, /*mime_type=*/StringAttr{})
+            ? IREE::Util::BufferConstantOp::create(
+                  rewriter, createOp.getLoc(),
+                  /*name=*/StringAttr{}, /*value=*/adaptor.getGroupAttr(),
+                  /*alignment=*/IntegerAttr{}, /*mime_type=*/StringAttr{})
                   .getResult()
-            : rewriter
-                  .create<IREE::Util::NullOp>(
-                      createOp.getLoc(),
-                      rewriter.getType<IREE::Util::BufferType>())
+            : IREE::Util::NullOp::create(
+                  rewriter, createOp.getLoc(),
+                  rewriter.getType<IREE::Util::BufferType>())
                   .getResult();
-    Value rank =
-        adaptor.getRank()
-            ? rewriter.create<arith::IndexCastOp>(
-                  createOp.getLoc(), rewriter.getI32Type(), adaptor.getRank())
-            : getDefault();
-    Value count =
-        adaptor.getRank()
-            ? rewriter.create<arith::IndexCastOp>(
-                  createOp.getLoc(), rewriter.getI32Type(), adaptor.getCount())
-            : getDefault();
+    Value rank = adaptor.getRank()
+                     ? arith::IndexCastOp::create(rewriter, createOp.getLoc(),
+                                                  rewriter.getI32Type(),
+                                                  adaptor.getRank())
+                     : getDefault();
+    Value count = adaptor.getRank()
+                      ? arith::IndexCastOp::create(rewriter, createOp.getLoc(),
+                                                   rewriter.getI32Type(),
+                                                   adaptor.getCount())
+                      : getDefault();
     rewriter.replaceOpWithNewOp<IREE::HAL::ChannelCreateOp>(
         createOp, rewriter.getType<IREE::HAL::ChannelType>(), device,
         queueAffinity, IREE::HAL::ChannelFlagBitfield::None, id, group, rank,
@@ -1485,10 +1648,10 @@ struct ChannelSplitOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::ChannelSplitOp splitOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    Value color = rewriter.create<arith::IndexCastOp>(
-        splitOp.getLoc(), rewriter.getI32Type(), adaptor.getColor());
-    Value key = rewriter.create<arith::IndexCastOp>(
-        splitOp.getLoc(), rewriter.getI32Type(), adaptor.getKey());
+    Value color = arith::IndexCastOp::create(
+        rewriter, splitOp.getLoc(), rewriter.getI32Type(), adaptor.getColor());
+    Value key = arith::IndexCastOp::create(
+        rewriter, splitOp.getLoc(), rewriter.getI32Type(), adaptor.getKey());
     rewriter.replaceOpWithNewOp<IREE::HAL::ChannelSplitOp>(
         splitOp, rewriter.getType<IREE::HAL::ChannelType>(),
         adaptor.getChannel(), color, key, IREE::HAL::ChannelFlagBitfield::None);
@@ -1502,11 +1665,11 @@ struct ChannelRankOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::ChannelRankOp rankOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto newOp = rewriter.create<IREE::HAL::ChannelRankAndCountOp>(
-        rankOp.getLoc(), rewriter.getI32Type(), rewriter.getI32Type(),
+    auto newOp = IREE::HAL::ChannelRankAndCountOp::create(
+        rewriter, rankOp.getLoc(), rewriter.getI32Type(), rewriter.getI32Type(),
         adaptor.getChannel());
-    Value indexRank = rewriter.create<arith::IndexCastOp>(
-        rankOp.getLoc(), rewriter.getIndexType(), newOp.getRank());
+    Value indexRank = arith::IndexCastOp::create(
+        rewriter, rankOp.getLoc(), rewriter.getIndexType(), newOp.getRank());
     rewriter.replaceOp(rankOp, indexRank);
     return success();
   }
@@ -1518,11 +1681,11 @@ struct ChannelCountOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::ChannelCountOp countOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto newOp = rewriter.create<IREE::HAL::ChannelRankAndCountOp>(
-        countOp.getLoc(), rewriter.getI32Type(), rewriter.getI32Type(),
-        adaptor.getChannel());
-    Value indexCount = rewriter.create<arith::IndexCastOp>(
-        countOp.getLoc(), rewriter.getIndexType(), newOp.getCount());
+    auto newOp = IREE::HAL::ChannelRankAndCountOp::create(
+        rewriter, countOp.getLoc(), rewriter.getI32Type(),
+        rewriter.getI32Type(), adaptor.getChannel());
+    Value indexCount = arith::IndexCastOp::create(
+        rewriter, countOp.getLoc(), rewriter.getIndexType(), newOp.getCount());
     rewriter.replaceOp(countOp, indexCount);
     return success();
   }

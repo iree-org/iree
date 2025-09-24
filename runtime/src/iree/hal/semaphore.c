@@ -12,6 +12,37 @@
 #include "iree/hal/device.h"
 
 //===----------------------------------------------------------------------===//
+// String utils
+//===----------------------------------------------------------------------===//
+
+static const iree_bitfield_string_mapping_t
+    iree_hal_semaphore_compatibility_mappings[] = {
+        {IREE_HAL_SEMAPHORE_COMPATIBILITY_ALL, IREE_SVL("ALL")},
+        {IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY, IREE_SVL("HOST_ONLY")},
+        {IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_ONLY, IREE_SVL("DEVICE_ONLY")},
+        {IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_WAIT, IREE_SVL("HOST_WAIT")},
+        {IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_WAIT, IREE_SVL("DEVICE_WAIT")},
+        {IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_SIGNAL, IREE_SVL("HOST_SIGNAL")},
+        {IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_SIGNAL,
+         IREE_SVL("DEVICE_SIGNAL")},
+};
+
+IREE_API_EXPORT iree_status_t iree_hal_semaphore_compatibility_parse(
+    iree_string_view_t value, iree_hal_semaphore_compatibility_t* out_value) {
+  return iree_bitfield_parse(
+      value, IREE_ARRAYSIZE(iree_hal_semaphore_compatibility_mappings),
+      iree_hal_semaphore_compatibility_mappings, out_value);
+}
+
+IREE_API_EXPORT iree_string_view_t iree_hal_semaphore_compatibility_format(
+    iree_hal_semaphore_compatibility_t value,
+    iree_bitfield_string_temp_t* out_temp) {
+  return iree_bitfield_format_inline(
+      value, IREE_ARRAYSIZE(iree_hal_semaphore_compatibility_mappings),
+      iree_hal_semaphore_compatibility_mappings, out_temp);
+}
+
+//===----------------------------------------------------------------------===//
 // iree_hal_semaphore_t
 //===----------------------------------------------------------------------===//
 
@@ -21,8 +52,9 @@
 IREE_HAL_API_RETAIN_RELEASE(semaphore);
 
 IREE_API_EXPORT iree_status_t iree_hal_semaphore_create(
-    iree_hal_device_t* device, uint64_t initial_value,
-    iree_hal_semaphore_flags_t flags, iree_hal_semaphore_t** out_semaphore) {
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    uint64_t initial_value, iree_hal_semaphore_flags_t flags,
+    iree_hal_semaphore_t** out_semaphore) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_semaphore);
   *out_semaphore = NULL;
@@ -30,7 +62,7 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_create(
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, initial_value);
   iree_status_t status =
       IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device, create_semaphore)(
-          device, initial_value, flags, out_semaphore);
+          device, queue_affinity, initial_value, flags, out_semaphore);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -68,13 +100,14 @@ IREE_API_EXPORT void iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore,
   IREE_TRACE_ZONE_END(z0);
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_semaphore_wait(
-    iree_hal_semaphore_t* semaphore, uint64_t value, iree_timeout_t timeout) {
+IREE_API_EXPORT iree_status_t
+iree_hal_semaphore_wait(iree_hal_semaphore_t* semaphore, uint64_t value,
+                        iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
   IREE_ASSERT_ARGUMENT(semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, value);
   iree_status_t status =
-      _VTABLE_DISPATCH(semaphore, wait)(semaphore, value, timeout);
+      _VTABLE_DISPATCH(semaphore, wait)(semaphore, value, timeout, flags);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -103,7 +136,8 @@ iree_status_t iree_hal_semaphore_wait_source_ctl(
     case IREE_WAIT_SOURCE_COMMAND_WAIT_ONE: {
       const iree_timeout_t timeout =
           ((const iree_wait_source_wait_params_t*)params)->timeout;
-      return iree_hal_semaphore_wait(semaphore, target_value, timeout);
+      return iree_hal_semaphore_wait(semaphore, target_value, timeout,
+                                     IREE_HAL_WAIT_FLAG_DEFAULT);
     }
     case IREE_WAIT_SOURCE_COMMAND_EXPORT: {
       const iree_wait_primitive_type_t target_type =
@@ -133,9 +167,71 @@ iree_hal_semaphore_await(iree_hal_semaphore_t* semaphore, uint64_t value) {
   };
 }
 
+IREE_API_EXPORT iree_status_t iree_hal_semaphore_import_timepoint(
+    iree_hal_semaphore_t* semaphore, uint64_t value,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_external_timepoint_t external_timepoint) {
+  IREE_ASSERT_ARGUMENT(semaphore);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, value);
+  iree_status_t status = _VTABLE_DISPATCH(semaphore, import_timepoint)(
+      semaphore, value, queue_affinity, external_timepoint);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_semaphore_export_timepoint(
+    iree_hal_semaphore_t* semaphore, uint64_t value,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_external_timepoint_type_t requested_type,
+    iree_hal_external_timepoint_flags_t requested_flags,
+    iree_hal_external_timepoint_t* IREE_RESTRICT out_external_timepoint) {
+  IREE_ASSERT_ARGUMENT(semaphore);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, value);
+  iree_status_t status = _VTABLE_DISPATCH(semaphore, export_timepoint)(
+      semaphore, value, queue_affinity, requested_type, requested_flags,
+      out_external_timepoint);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 //===----------------------------------------------------------------------===//
 // iree_hal_semaphore_list_t
 //===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT void iree_hal_semaphore_list_retain(
+    iree_hal_semaphore_list_t semaphore_list) {
+  for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
+    iree_hal_semaphore_retain(semaphore_list.semaphores[i]);
+  }
+}
+
+IREE_API_EXPORT void iree_hal_semaphore_list_release(
+    iree_hal_semaphore_list_t semaphore_list) {
+  for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
+    iree_hal_semaphore_release(semaphore_list.semaphores[i]);
+  }
+}
+
+IREE_API_EXPORT bool iree_hal_semaphore_list_poll(
+    iree_hal_semaphore_list_t semaphore_list) {
+  for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
+    // NOTE: this is unfortunately expensive in failure cases as it'll return
+    // a clone (or maybe the original!) status. We rely on failures being
+    // exceptional to make this acceptable.
+    uint64_t current_value = 0;
+    iree_status_t status =
+        iree_hal_semaphore_query(semaphore_list.semaphores[i], &current_value);
+    if (!iree_status_is_ok(status)) {
+      iree_status_ignore(status);
+      return false;
+    } else if (current_value < semaphore_list.payload_values[i]) {
+      return false;  // not yet reached
+    }
+  }
+  return true;
+}
 
 IREE_API_EXPORT iree_status_t
 iree_hal_semaphore_list_signal(iree_hal_semaphore_list_t semaphore_list) {
@@ -181,7 +277,8 @@ IREE_API_EXPORT void iree_hal_semaphore_list_fail(
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_semaphore_list_wait(
-    iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout) {
+    iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
+    iree_hal_wait_flags_t flags) {
   if (!semaphore_list.count) return iree_ok_status();
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -199,7 +296,8 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_list_wait(
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
     status = iree_hal_semaphore_wait(semaphore_list.semaphores[i],
-                                     semaphore_list.payload_values[i], timeout);
+                                     semaphore_list.payload_values[i], timeout,
+                                     flags);
     if (!iree_status_is_ok(status)) break;
   }
 

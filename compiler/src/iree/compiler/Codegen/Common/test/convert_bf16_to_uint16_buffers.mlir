@@ -74,11 +74,8 @@ func.func @mmt4d_bf16xbf16xf32() {
   %c64 = arith.constant 64 : index
   %c128 = arith.constant 128 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<1x3x8x1xbf16>
-  memref.assume_alignment %0, 64 : memref<1x3x8x1xbf16>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c64) flags(ReadOnly) : memref<1x3x8x1xbf16, strided<[24, 8, 1, 1], offset: 32>>
-  memref.assume_alignment %1, 64 : memref<1x3x8x1xbf16, strided<[24, 8, 1, 1], offset: 32>>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c128) : memref<1x1x8x8xf32, strided<[64, 64, 8, 1], offset: 32>>
-  memref.assume_alignment %2, 64 : memref<1x1x8x8xf32, strided<[64, 64, 8, 1], offset: 32>>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index

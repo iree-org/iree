@@ -12,11 +12,8 @@ func.func @hoist_unrolled_vector_for_mma() {
   %c64 = arith.constant 64 : index
   %c2048 = arith.constant 2048 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<3456x2048xf16>
-  memref.assume_alignment %0, 64 : memref<3456x2048xf16>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<2048x1024xf16>
-  memref.assume_alignment %1, 64 : memref<2048x1024xf16>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : memref<3456x1024xf32>
-  memref.assume_alignment %2, 64 : memref<3456x1024xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %3 = gpu.thread_id  x
   %4 = gpu.thread_id  y

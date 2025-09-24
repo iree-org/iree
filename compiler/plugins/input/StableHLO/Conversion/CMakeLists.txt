@@ -34,22 +34,12 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_tablegen_library(
-  NAME
-    CHLODecompositionPatterns
-  TD_FILE
-    "CHLODecompositionPatterns.td"
-  OUTS
-    --gen-rewriters CHLODecompositionPatterns.h.inc
-)
-
 iree_cc_library(
   NAME
     StableHLOLegalization
   SRCS
     "CheckVHLOStableHloMixUsage.cpp"
     "ConvertCollectives.cpp"
-    "LegalizeCHLO.cpp"
     "LegalizeControlFlow.cpp"
     "LegalizeShapeComputations.cpp"
     "LegalizeToLinalgUtils.cpp"
@@ -60,7 +50,6 @@ iree_cc_library(
     "StableHLOToLinalgExt.cpp"
     "VerifyCompilerInputLegality.cpp"
   DEPS
-    ::CHLODecompositionPatterns
     ::PassHeaders
     ChloOps
     LLVMSupport
@@ -95,6 +84,8 @@ iree_cc_library(
     VhloOps
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::LinalgExt::Transforms
+    iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Utils

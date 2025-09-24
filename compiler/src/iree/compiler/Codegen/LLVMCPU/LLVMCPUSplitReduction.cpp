@@ -4,20 +4,17 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/TileSizeSelection.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-llvmcpu-split-reduction"
 
@@ -46,44 +43,41 @@ LogicalResult splitReductionPrecondition(Operation *op,
   linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
 
   if (!linalgOp.hasPureTensorSemantics()) {
-    LLVM_DEBUG(llvm::dbgs() << "doesn't have tensor semantics\n");
+    LDBG() << "doesn't have tensor semantics";
     return failure();
   }
   if (linalgOp.getNumReductionLoops() != 1) {
-    LLVM_DEBUG(llvm::dbgs() << "number of reduction loops != 1\n");
+    LDBG() << "number of reduction loops != 1";
     return failure();
   }
   if (linalgOp.getNumDpsInits() != 1) {
-    LLVM_DEBUG(llvm::dbgs() << "doesn't have exactly 1 output\n");
+    LDBG() << "doesn't have exactly 1 output";
     return failure();
   }
   if (!linalgOp.hasOnlyProjectedPermutations()) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "index map doesn't have only projected permutations\n");
+    LDBG() << "index map doesn't have only projected permutations";
     return failure();
   }
   if (!isa<linalg::GenericOp>(op)) {
-    LLVM_DEBUG(llvm::dbgs() << "is not a generic op\n");
+    LDBG() << "is not a generic op";
     return failure();
   }
   if (linalgOp.getNumDpsInputs() != 1) {
-    LLVM_DEBUG(llvm::dbgs() << "doesn't have exactly 1 input\n");
+    LDBG() << "doesn't have exactly 1 input";
     return failure();
   }
   // The `linalg::splitReduction` method does not work for ops with indexing
   // semantics. See https://github.com/iree-org/iree/pull/14979
   if (linalgOp.hasIndexSemantics()) {
-    LLVM_DEBUG(llvm::dbgs() << "the split method used currently doesnt support "
-                               "indexing semantics\n");
+    LDBG()
+        << "the split method used currently doesnt support indexing semantics";
     return failure();
   }
 
   auto elemType =
       getElementTypeOrSelf(linalgOp.getDpsInitOperand(0)->get().getType());
   if (!(fpReductionReordering || elemType.isIntOrIndex())) {
-    LLVM_DEBUG(
-        llvm::dbgs()
-        << "skipped because reduction reordering on FP is not enabled.\n");
+    LDBG() << "skipped because reduction reordering on FP is not enabled.";
     return failure();
   }
 
@@ -94,9 +88,7 @@ LogicalResult splitReductionPrecondition(Operation *op,
   unsigned lastIdx = map.getNumResults() - 1;
   unsigned lastDim = map.getDimPosition(lastIdx);
   if (lastDim != dims[0]) {
-    LLVM_DEBUG(
-        llvm::dbgs()
-        << "innermost dimension of the input operand is not reduction\n");
+    LDBG() << "innermost dimension of the input operand is not reduction";
     return failure();
   }
 
@@ -129,17 +121,17 @@ LogicalResult splitReductionImpl(Operation *op, int64_t size,
   FailureOr<scf::SCFTilingResult> tileResFirst = scf::tileUsingSCF(
       rewriter, cast<TilingInterface>(linalgOp.getOperation()), options);
   if (failed(tileResFirst)) {
-    LLVM_DEBUG(llvm::dbgs() << "failed on step 1 (SCFTiling)\n");
+    LDBG() << "failed on step 1 (SCFTiling)";
     return failure();
   }
-  rewriter.replaceOp(linalgOp, tileResFirst->mergeResult.replacements);
+  rewriter.replaceOp(linalgOp, tileResFirst->replacements);
 
   // 2) Apply splitReduction on the single vector-length array.
   // splitReduction already replaces the op.
   FailureOr<linalg::SplitReductionResult> splitRes = splitReduction(
       rewriter, cast<linalg::LinalgOp>(tileResFirst->tiledOps.back()), fn);
   if (failed(splitRes)) {
-    LLVM_DEBUG(llvm::dbgs() << "failed on step 2 (SplitReduction)\n");
+    LDBG() << "failed on step 2 (SplitReduction)";
     return success();
   }
 
@@ -156,11 +148,10 @@ LogicalResult splitReductionImpl(Operation *op, int64_t size,
       rewriter, cast<TilingInterface>(splitRes->splitLinalgOp.getOperation()),
       options);
   if (failed(tileRes)) {
-    LLVM_DEBUG(llvm::dbgs() << "failed on step 3 (SCFTiling)\n");
+    LDBG() << "failed on step 3 (SCFTiling)";
     return failure();
   }
-  rewriter.replaceOp(splitRes->splitLinalgOp,
-                     tileRes->mergeResult.replacements);
+  rewriter.replaceOp(splitRes->splitLinalgOp, tileRes->replacements);
   return success();
 }
 
@@ -168,8 +159,7 @@ LogicalResult splitReductionImpl(Operation *op, int64_t size,
 class LLVMCPUSplitReductionPass
     : public impl::LLVMCPUSplitReductionPassBase<LLVMCPUSplitReductionPass> {
 public:
-  using impl::LLVMCPUSplitReductionPassBase<
-      LLVMCPUSplitReductionPass>::LLVMCPUSplitReductionPassBase;
+  using Base::Base;
   explicit LLVMCPUSplitReductionPass(bool fpReductionReordering) {
     this->enableFpReductionReordering = fpReductionReordering;
   }
@@ -181,36 +171,37 @@ public:
 
 void LLVMCPUSplitReductionPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   IRRewriter rewriter(context);
   SmallVector<linalg::GenericOp> candidates;
   funcOp.walk([&](linalg::GenericOp op) { candidates.push_back(op); });
   for (auto genericOp : candidates) {
-    LLVM_DEBUG(llvm::dbgs() << "candidate: " << genericOp << "\n");
+    LDBG() << "candidate: " << genericOp;
     if (failed(splitReductionPrecondition(genericOp,
                                           enableFpReductionReordering))) {
       continue;
     }
 
-    auto maybeLoweringConfig =
-        getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(genericOp);
+    IREE::Codegen::LoweringConfigAttrInterface maybeLoweringConfig =
+        getLoweringConfig(genericOp);
     if (!maybeLoweringConfig) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "can't find lowering_config, skip SplitReduction");
+      LDBG() << "can't find lowering_config, skip SplitReduction";
       continue;
     }
-    TilingConfig tilingConfig(maybeLoweringConfig);
-    auto [reductionSizes, scalableDims] =
-        tilingConfig.getVectorReductionSizes();
+    auto attr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
+        maybeLoweringConfig.getTilingLevelAttr(
+            IREE::CPU::TilingLevel::VectorReductionTiles));
+    ArrayRef<bool> scalableDims = attr.getScalableFlags();
     if (scalableDims.back()) {
-      LLVM_DEBUG(llvm::dbgs() << "scalable reduction dimensions not yet "
-                                 "supported, skip SplitReduction");
+      LDBG() << "scalable reduction dimensions not yet supported, skip "
+                "SplitReduction";
       continue;
     }
+    ArrayRef<int64_t> reductionSizes = attr.getSizes();
     if (reductionSizes.empty()) {
-      LLVM_DEBUG(llvm::dbgs() << "the list of reduction tiling sizes is empty, "
-                                 "skip SplitReduction");
+      LDBG()
+          << "the list of reduction tiling sizes is empty, skip SplitReduction";
       continue;
     }
     int64_t size = reductionSizes.back();

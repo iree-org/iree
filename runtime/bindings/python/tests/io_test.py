@@ -96,6 +96,67 @@ class ParameterApiTest(unittest.TestCase):
             verify_archive(file_path)
             gc.collect()
 
+    def testArchiveFileRoundtripByFD(self):
+        orig_array = np.asarray([[1], [2], [3]], dtype=np.int64)
+
+        def verify_archive_from_fd(file_path: Path):
+            f = open(file_path, "rb")
+            self.assertIsNotNone(f)
+
+            handle = rt.FileHandle.wrap_fd(f.fileno(), True, False)
+
+            # Load and verify.
+            index = rt.ParameterIndex()
+            # For this test, disable mmap to make temp file management on
+            # windows a bit better.
+            index.load_from_file_handle(handle, "irpa")
+            self.assertEqual(len(index), 3)
+
+            # Note that the happy path of most properties are verified via
+            # the repr (as they are called internal to that).
+            entries = dict(index.items())
+            self.assertEqual(
+                repr(entries["weight"]),
+                "<ParameterIndexEntry 'weight' splat b'\\x02':600>",
+            )
+            self.assertEqual(
+                repr(entries["bias"]),
+                "<ParameterIndexEntry 'bias' splat b' ':30>",
+            )
+            self.assertRegex(
+                repr(entries["array"]),
+                r"<ParameterIndexEntry 'array' FileHandle<fd\(.*\)>",
+            )
+
+            # Verify some non-happy paths.
+            with self.assertRaisesRegex(ValueError, "Entry is not file storage based"):
+                entries["weight"].file_storage
+            with self.assertRaisesRegex(ValueError, "Entry is not splat"):
+                entries["array"].splat_pattern
+
+            # Verify that the repr of the index itself is sensical.
+            index_repr = repr(index)
+            self.assertIn("Parameter scope <global> (3 entries", index_repr)
+
+            f.close()
+
+        with tempfile.TemporaryDirectory() as td:
+            file_path = Path(td) / "archive.irpa"
+            rt.save_archive_file(
+                {
+                    "weight": rt.SplatValue(np.int8(2), [30, 20]),
+                    "bias": rt.SplatValue(array.array("b", [32]), 30),
+                    "array": orig_array,
+                },
+                file_path,
+            )
+            self.assertTrue(file_path.exists())
+            self.assertGreater(file_path.stat().st_size, 0)
+            # Open / verify in its own scope and collect prior to tearing
+            # down the temp dir.
+            verify_archive_from_fd(file_path)
+            gc.collect()
+
     def testParameterIndexEntryFromToNumpy(self):
         array = np.array([[1, 2], [3, 4]], dtype=np.int32)
         index = rt.ParameterIndex()
@@ -136,6 +197,12 @@ class ParameterApiTest(unittest.TestCase):
         index_entry_as_array = rt.parameter_index_entry_as_numpy_ndarray(entry)
         expected_array = np.array([1, 2, 3, 4], dtype=np.uint8)
         np.testing.assert_array_equal(index_entry_as_array, expected_array, strict=True)
+
+    def testFileHandleWrap(self):
+        fh = rt.FileHandle.wrap_memory(b"foobar")
+        view = fh.host_allocation
+        del fh
+        self.assertEqual(bytes(view), b"foobar")
 
     def testFileHandleWrap(self):
         fh = rt.FileHandle.wrap_memory(b"foobar")

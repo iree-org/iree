@@ -45,7 +45,9 @@ static LogicalResult captureUsedOperationsAndBlockArguements(
   auto yieldOp = cast<linalg::YieldOp>(linalgOp.getBlock()->getTerminator());
   Value result = yieldOp.getOperand(resultNumber);
 
-  getBackwardSlice(result, &usedOperations, options);
+  [[maybe_unused]] LogicalResult ret =
+      getBackwardSlice(result, &usedOperations, options);
+  assert(ret.succeeded());
 
   // Get all block arguments used by the operations. If any of the arguments
   // used is a dpsInit argument other than resultNumber, return failure.
@@ -145,9 +147,9 @@ decomposeHorizontallyFusedGemmOperations(RewriterBase &rewriter,
         inputs, [](OpOperand *operand) { return operand->get(); });
     SmallVector<Value> initVals = llvm::map_to_vector(
         inits, [](OpOperand *operand) { return operand->get(); });
-    auto newOp = rewriter.create<linalg::GenericOp>(
-        linalgOp.getLoc(), TypeRange{inits[0]->get().getType()}, inputVals,
-        initVals, indexingMaps, iteratorTypes,
+    auto newOp = linalg::GenericOp::create(
+        rewriter, linalgOp.getLoc(), TypeRange{inits[0]->get().getType()},
+        inputVals, initVals, indexingMaps, iteratorTypes,
         [&](OpBuilder &b, Location loc, ValueRange blockArgs) {
           Block *oldBody = linalgOp.getBlock();
           usedInputs.insert(resultNumber + linalgOp.getNumDpsInputs());
@@ -164,7 +166,7 @@ decomposeHorizontallyFusedGemmOperations(RewriterBase &rewriter,
             b.clone(*usedOperation, regionMapping);
           }
 
-          b.create<linalg::YieldOp>(loc, regionMapping.lookup(result));
+          linalg::YieldOp::create(b, loc, regionMapping.lookup(result));
         });
 
     // If on decomposition any dims are unused propagating lowering config isnt
@@ -197,7 +199,7 @@ decomposeHorizontallyFusedGemmOperations(RewriterBase &rewriter,
 }
 
 void DecomposeHorizontallyFusedGemmsPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   IRRewriter rewriter(&getContext());
   SmallVector<linalg::LinalgOp> horizontallyFusedOps;
   funcOp.walk([&](linalg::LinalgOp linalgOp) {

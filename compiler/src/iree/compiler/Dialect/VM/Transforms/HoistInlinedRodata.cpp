@@ -18,25 +18,14 @@
 
 namespace mlir::iree_compiler::IREE::VM {
 
+#define GEN_PASS_DEF_HOISTINLINEDRODATAPASS
+#include "iree/compiler/Dialect/VM/Transforms/Passes.h.inc"
+
 class HoistInlinedRodataPass
-    : public PassWrapper<HoistInlinedRodataPass,
-                         OperationPass<IREE::VM::ModuleOp>> {
-public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::VM::VMDialect>();
-  }
-
-  StringRef getArgument() const override {
-    return "iree-vm-hoist-inlined-rodata";
-  }
-
-  StringRef getDescription() const override {
-    return "Hoists inline vm.rodata.inline values to module-level constant "
-           "storage.";
-  }
-
+    : public IREE::VM::impl::HoistInlinedRodataPassBase<
+          HoistInlinedRodataPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    IREE::VM::ModuleOp moduleOp = getOperation();
     SymbolTable moduleSymbolTable(moduleOp);
 
     // Find all inline byte buffers in the module.
@@ -53,9 +42,9 @@ public:
       } else {
         moduleBuilder.setInsertionPointToStart(&moduleOp.getBlock());
       }
-      auto rodataOp = moduleBuilder.create<IREE::VM::RodataOp>(
-          inlineOp.getLoc(), inferConstantName(parentOp, inlineOp),
-          inlineOp.getValue());
+      auto rodataOp = IREE::VM::RodataOp::create(
+          moduleBuilder, inlineOp.getLoc(),
+          inferConstantName(parentOp, inlineOp), inlineOp.getValue());
       if (auto alignmentAttr = inlineOp.getAlignmentAttr()) {
         rodataOp.setAlignmentAttr(alignmentAttr);
       }
@@ -94,18 +83,11 @@ private:
   void replaceInlineOpWithRodataRef(IREE::VM::RodataInlineOp inlineOp,
                                     IREE::VM::RodataOp rodataOp) {
     OpBuilder builder(inlineOp);
-    auto refOp =
-        builder.create<IREE::VM::ConstRefRodataOp>(inlineOp.getLoc(), rodataOp);
+    auto refOp = IREE::VM::ConstRefRodataOp::create(builder, inlineOp.getLoc(),
+                                                    rodataOp);
     inlineOp.replaceAllUsesWith(refOp.getValue());
     inlineOp.erase();
   }
 };
-
-std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
-createHoistInlinedRodataPass() {
-  return std::make_unique<HoistInlinedRodataPass>();
-}
-
-static PassRegistration<HoistInlinedRodataPass> pass;
 
 } // namespace mlir::iree_compiler::IREE::VM

@@ -87,11 +87,8 @@ func.func @batch_matmul_func() attributes {translation_info = #translation} {
   %c32 = arith.constant 32 : index
   %c64 = arith.constant 64 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(32) offset(%c0) : memref<4x32x1024xf32>
-  memref.assume_alignment %0, 32 : memref<4x32x1024xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(32) offset(%c0) : memref<4x1024x64xf32>
-  memref.assume_alignment %1, 32 : memref<4x1024x64xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(32) offset(%c0) : memref<4x32x64xf32>
-  memref.assume_alignment %2, 32 : memref<4x32x64xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -265,11 +262,8 @@ module {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<1x64x56x56xf32>
-    memref.assume_alignment %0, 64 : memref<1x64x56x56xf32>
     %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c41664) : memref<64x64x1x1xf32>
-    memref.assume_alignment %1, 64 : memref<64x64x1x1xf32>
     %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c802816) : memref<1x64x56x56xf32>
-    memref.assume_alignment %2, 64 : memref<1x64x56x56xf32>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %workgroup_count_x = hal.interface.workgroup.count[0] : index
     %workgroup_id_y = hal.interface.workgroup.id[1] : index

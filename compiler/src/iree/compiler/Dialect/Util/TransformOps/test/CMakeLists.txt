@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "create_serialized_module.mlir"
     "symbol_transforms.mlir"
   TOOLS
     FileCheck

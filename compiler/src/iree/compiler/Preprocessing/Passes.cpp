@@ -119,9 +119,9 @@ buildTransposeConvolutionPassPipeline(OpPassManager &passManager,
                                       const TransformOptions &options) {
   FunctionLikeNest(passManager)
       .addPass(GlobalOptimization::createDetachElementwiseFromNamedOpsPass)
-      .addPass(mlir::createLinalgNamedOpConversionPass)
-      .addPass(GlobalOptimization::createConvert1X1FilterConv2DToMatmulPass)
+      .addPass(mlir::createSimplifyDepthwiseConvPass)
       .addPass(createConvertConvToChannelsLastPass)
+      .addPass(GlobalOptimization::createConvert1X1FilterConv2DToMatmulPass)
       .addPass(createConvertConvFilterToChannelsLastPass);
   passManager.addPass(DispatchCreation::createFoldUnitExtentDimsPass());
   passManager.addPass(createCanonicalizerPass());
@@ -147,6 +147,9 @@ buildMakeSingleDispatchPassPipeline(OpPassManager &passManager,
   // Generalize transposes and any other remaining named linalg ops that can
   // now be represented as generics.
   passManager.addPass(GlobalOptimization::createGeneralizeLinalgNamedOpsPass());
+  passManager.addPass(DispatchCreation::createFoldUnitExtentDimsForFuncPass());
+  passManager.addPass(
+      GlobalOptimization::createConvertStridedContractionToContractionPass());
   passManager.addPass(DispatchCreation::createFusionPreprocessingPass());
   passManager.addPass(mlir::createCSEPass());
   DispatchCreation::BubbleUpExpandShapesPassOptions bubbleOptions;
@@ -156,7 +159,15 @@ buildMakeSingleDispatchPassPipeline(OpPassManager &passManager,
   passManager.addPass(DispatchCreation::createElementwiseOpFusionPass(
       DispatchCreation::ElementwiseOpFusionPassOptions{
           /*enableElementWiseFuseMultiReduction=*/true}));
+  // After elementwise operation fusion sink reshapes that block
+  // producer-consumer fusion.
+  passManager.addPass(DispatchCreation::createSinkReshapesPass());
   passManager.addPass(createMakeSingleDispatchForFunctionPass());
+  passManager.addPass(DispatchCreation::createElementwiseOpFusionPass(
+      DispatchCreation::ElementwiseOpFusionPassOptions{
+          /*intraDispatch=*/true,
+          /*fuseMultiReduction=*/false,
+          /*fuseTruncateOps=*/true}));
 }
 
 void registerPreprocessingPasses() {

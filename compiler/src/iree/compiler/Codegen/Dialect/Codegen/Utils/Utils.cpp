@@ -5,11 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
-#include "llvm/ADT/STLExtras.h"
+#include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -52,18 +50,26 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, TileSwizzle::Dim dim) {
 static llvm::raw_ostream &
 operator<<(llvm::raw_ostream &os,
            const TileSwizzle::ExpandShapeDimVectorType &expandShapeDimVector) {
-  os << "[";
-  llvm::interleaveComma(expandShapeDimVector, os);
-  return os << "]";
+  return os << llvm::interleaved_array(expandShapeDimVector);
 }
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const TileSwizzle &swizzle) {
-  os << "{expandShape = [";
-  llvm::interleaveComma(swizzle.expandShape, os);
-  os << "], permutation = [";
-  llvm::interleaveComma(swizzle.permutation, os);
-  os << "]}";
+  return os << "{expandShape = " << llvm::interleaved_array(swizzle.expandShape)
+            << ", permutation = "
+            << llvm::interleaved_array(swizzle.permutation) << "}";
+}
+
+static llvm::raw_ostream &
+operator<<(llvm::raw_ostream &os, const ScalableTileFlags &scalableTileFlags) {
+  if (scalableTileFlags.empty())
+    return os;
+  os << "scalableTiles = [";
+  for (unsigned i = 0; i < scalableTileFlags.size(); ++i) {
+    os << (scalableTileFlags[i] ? "true" : "false");
+    if (i + 1 < scalableTileFlags.size())
+      os << ", ";
+  }
   return os;
 }
 
@@ -71,7 +77,8 @@ bool operator==(const MaterializeEncodingInfo &lhs,
                 const MaterializeEncodingInfo &rhs) {
   return lhs.innerDimsPos == rhs.innerDimsPos &&
          lhs.innerTileSizes == rhs.innerTileSizes &&
-         lhs.outerDimsPerm == rhs.outerDimsPerm && lhs.swizzle == rhs.swizzle;
+         lhs.outerDimsPerm == rhs.outerDimsPerm && lhs.swizzle == rhs.swizzle &&
+         lhs.scalableTiles == rhs.scalableTiles;
 }
 
 bool operator!=(const MaterializeEncodingInfo &lhs,
@@ -81,14 +88,16 @@ bool operator!=(const MaterializeEncodingInfo &lhs,
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const MaterializeEncodingInfo &encodingInfo) {
-  os << "{innerDimsPos = [";
-  llvm::interleaveComma(encodingInfo.innerDimsPos, os);
-  os << "], innerTileSizes = [";
-  llvm::interleaveComma(encodingInfo.innerTileSizes, os);
-  os << "], outerDimsPerm = [";
-  llvm::interleaveComma(encodingInfo.outerDimsPerm, os);
+  os << "{innerDimsPos = [" << llvm::interleaved(encodingInfo.innerDimsPos)
+     << "], innerTileSizes = ["
+     << llvm::interleaved(encodingInfo.innerTileSizes) << "], outerDimsPerm = ["
+     << llvm::interleaved(encodingInfo.outerDimsPerm);
+
   if (encodingInfo.swizzle) {
     os << "], swizzle = " << encodingInfo.swizzle.value();
+  }
+  if (encodingInfo.scalableTiles) {
+    os << "], " << encodingInfo.scalableTiles.value();
   }
   os << "]}";
   return os;
@@ -224,6 +233,10 @@ DictionaryAttr serializeEncodingInfo(MLIRContext *ctx,
     items.emplace_back(b.getStringAttr("swizzle"),
                        serializeTileSwizzle(ctx, info.swizzle.value()));
   }
+  if (info.scalableTiles) {
+    items.emplace_back(b.getStringAttr("scalableTiles"),
+                       b.getBoolArrayAttr(info.scalableTiles.value()));
+  }
 
   return b.getDictionaryAttr(items);
 }
@@ -257,16 +270,25 @@ deserializeEncodingInfo(DictionaryAttr attr) {
       return std::nullopt;
     }
   }
+  if (attr.contains("scalableTiles")) {
+    auto value = attr.getNamed("scalableTiles");
+    if (!value || !isa<ArrayAttr>(value->getValue()))
+      return std::nullopt;
+    ScalableTileFlags res = llvm::map_to_vector(
+        cast<ArrayAttr>(value->getValue()),
+        [](Attribute a) { return cast<BoolAttr>(a).getValue(); });
+    info.scalableTiles = std::move(res);
+  }
 
   return info;
 }
 
 bool isIdentityLayout(const MaterializeEncodingInfo &info) {
-  // It is not an identity layout if swizzle is present. The swizzle is an
-  // optional variable. User should not set the field when they do not need
-  // swizzle.
+  // It is not an identity layout if swizzle is present. The swizzle and
+  // scalableTiles are optional variables. User should not set the fields when
+  // they do not need them.
   return info.innerDimsPos.empty() && info.innerTileSizes.empty() &&
-         info.outerDimsPerm.empty() && !info.swizzle;
+         info.outerDimsPerm.empty() && !info.swizzle && !info.scalableTiles;
 }
 
 SmallVector<int64_t>
@@ -284,7 +306,7 @@ FailureOr<MaterializeEncodingInfo>
 getEncodingInfoForMatmul(Encoding::EncodingAttr encoding, TileMxNxK tileMxNxK) {
   MaterializeEncodingInfo encodingInfo;
   FailureOr<linalg::ContractionDimensions> cDims =
-      getEncodingContractionDims(encoding);
+      Encoding::getEncodingContractionDims(encoding);
   if (failed(cDims)) {
     return failure();
   }

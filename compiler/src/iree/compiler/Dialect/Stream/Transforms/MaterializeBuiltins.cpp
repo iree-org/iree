@@ -14,7 +14,6 @@
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/Utils/ElementPackingUtils.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
@@ -214,8 +213,8 @@ static LogicalResult replaceBuiltinSplatOp(IREE::Stream::AsyncSplatOp splatOp,
       splatOp.getResult().getType(),
   };
   OpBuilder builder(splatOp);
-  auto dispatchOp = builder.create<IREE::Stream::AsyncDispatchOp>(
-      loc, resultTypes, workload,
+  auto dispatchOp = IREE::Stream::AsyncDispatchOp::create(
+      builder, loc, resultTypes, workload,
       builder.getArrayAttr({SymbolRefAttr::get(
           builder.getStringAttr(builtinName),
           FlatSymbolRefAttr::get(builder.getContext(), builtinName))}),
@@ -309,8 +308,8 @@ static LogicalResult replaceBuiltinFillOp(IREE::Stream::AsyncFillOp fillOp,
       fillOp.getResult().getType(),
   };
   OpBuilder builder(fillOp);
-  auto dispatchOp = builder.create<IREE::Stream::AsyncDispatchOp>(
-      loc, resultTypes, workload,
+  auto dispatchOp = IREE::Stream::AsyncDispatchOp::create(
+      builder, loc, resultTypes, workload,
       builder.getArrayAttr({SymbolRefAttr::get(
           builder.getStringAttr(builtinName),
           FlatSymbolRefAttr::get(builder.getContext(), builtinName))}),
@@ -351,7 +350,7 @@ struct MaterializeBuiltinsPass
     : public IREE::Stream::impl::MaterializeBuiltinsPassBase<
           MaterializeBuiltinsPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     if (moduleOp.getBody()->empty())
       return;
 

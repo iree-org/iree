@@ -7,7 +7,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
-#include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
@@ -19,12 +19,11 @@ namespace {
 
 struct DecomposeAttentionPass final
     : impl::DecomposeAttentionPassBase<DecomposeAttentionPass> {
-  using impl::DecomposeAttentionPassBase<
-      DecomposeAttentionPass>::DecomposeAttentionPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::LinalgExt::IREELinalgExtDialect,
-                    linalg::LinalgDialect, tensor::TensorDialect>();
+    registry
+        .insert<IREE::LinalgExt::IREELinalgExtDialect, tensor::TensorDialect>();
   }
   void runOnOperation() override;
 };

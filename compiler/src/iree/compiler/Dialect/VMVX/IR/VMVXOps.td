@@ -31,7 +31,7 @@ let opDocGroup = OpGroupUtilityOps in {
 def VMVX_GetBufferDescriptorOp : VMVX_PureOp<"get_buffer_descriptor", [
     SameVariadicResultSize
   ]> {
-  let summary = "Late binds a base buffer/offset/strides";
+  let summary = [{Late binds a base buffer/offset/strides.}];
   let description = [{
     Queries a base buffer, offset and strides. This op is late bound to its
     source (alloca, binding, etc), allowing additional layers of
@@ -60,7 +60,7 @@ def VMVX_GetBufferDescriptorOp : VMVX_PureOp<"get_buffer_descriptor", [
 
 def VMVX_GetRawInterfaceBindingBufferOp : VMVX_PureOp<
     "get_raw_interface_binding_buffer"> {
-  let summary = "Gets the raw buffer associated with a binding";
+  let summary = [{Gets the raw buffer associated with a binding.}];
   let description = [{
     Normally, a slice of a binding buffer is returned via
     hal.interface.binding.subspan. However, the normal VMVX lowering flow for
@@ -99,7 +99,7 @@ def OpGroupABIOps : OpDocGroup {
 let opDocGroup = OpGroupABIOps in {
 
 def VMVX_BinaryOp : VMVX_Op<"binary", [SameVariadicOperandSize]> {
-  let summary = "Performs a strided elementwise operation on two same-rank buffers";
+  let summary = [{Performs a strided elementwise operation on two same-rank buffers.}];
   let description = [{
     Performs the operation in-place as if:
     ```
@@ -142,7 +142,7 @@ def VMVX_BinaryOp : VMVX_Op<"binary", [SameVariadicOperandSize]> {
 }
 
 def VMVX_CopyOp : VMVX_Op<"copy", [SameVariadicOperandSize]> {
-  let summary = "Copy from one buffer to another";
+  let summary = [{Copy from one buffer to another.}];
   let arguments = (ins
     // LHS.
     VMVX_Buffer:$in_buffer,
@@ -169,7 +169,7 @@ def VMVX_CopyOp : VMVX_Op<"copy", [SameVariadicOperandSize]> {
 }
 
 def VMVX_Fill2DOp : VMVX_Op<"fill2d"> {
-  let summary = "Fill a tile with a scalar";
+  let summary = [{Fill a tile with a scalar.}];
   let description = [{
     Fills a tile with dimensions [m, n] with a scalar.
   }];
@@ -193,7 +193,7 @@ def VMVX_Fill2DOp : VMVX_Op<"fill2d"> {
 }
 
 def VMVX_UnaryOp : VMVX_Op<"unary", [SameVariadicOperandSize]> {
-  let summary = "Performs a strided elementwise unary operation";
+  let summary = [{Performs a strided elementwise unary operation.}];
   let description = [{
     Performs the operation in-place as if:
     ```

@@ -2,15 +2,14 @@
 
 hal.executable @dispatch {
 hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
-    iree.gpu.target = #iree_gpu.target<arch = "rdna3", features = "spirv:v1.6,cap:Shader",
+    iree_codegen.target_info = #iree_gpu.target<arch = "rdna3", features = "spirv:v1.6,cap:Shader",
       wgp = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic, dot = dp4xi8toi32, mma = [<WMMAR3_F32_16x16x16_F16>, <WMMAR3_F16_16x16x16_F16>],
       subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
       max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>}>) {
   hal.executable.export public @dispatch ordinal(0) layout(#hal.pipeline.layout<bindings = [
     #hal.pipeline.binding<storage_buffer>]>
-  ) {
-  ^bb0(%arg0: !hal.device):
-    %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+  ) count(%arg0: !hal.device) -> (index, index, index) {
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
     hal.return %x, %y, %z : index, index, index
   }
   builtin.module {
@@ -47,17 +46,16 @@ hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-s
 
 hal.executable @dispatch_with_unsupported_types {
 hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
-    iree.gpu.target = #iree_gpu.target<arch = "rdna4", features = "spirv:v1.6,cap:Shader",
-      wgp = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b32, subgroup = none, dot = none,
+    iree_codegen.target_info = #iree_gpu.target<arch = "rdna4", features = "spirv:v1.6,cap:Shader",
+      wgp = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b32, subgroup = none,
              mma = [<WMMAR4_F32_16x16x16_F16>, <WMMAR4_F16_16x16x16_F16>, <WMMAR4_BF16_16x16x16_BF16>, <WMMAR4_F32_16x16x16_BF16>,
                     <WMMAR4_F32_16x16x16_F8E5M2>, <WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2>, <WMMAR4_I32_16x16x16_I8>],
       subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
       max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>}>) {
   hal.executable.export public @dispatch ordinal(0) layout(#hal.pipeline.layout<bindings = [
     #hal.pipeline.binding<storage_buffer>]>
-  ) {
-  ^bb0(%arg0: !hal.device):
-    %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+  ) count(%arg0: !hal.device) -> (index, index, index) {
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
     hal.return %x, %y, %z : index, index, index
   }
   builtin.module {

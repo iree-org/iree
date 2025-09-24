@@ -10,7 +10,9 @@
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
@@ -30,7 +32,7 @@ namespace mlir::iree_compiler {
 
 void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
   SymbolTableCollection symbolTableCollection;
-  // Collect all the adressOfOps to static shared memory globals.
+  // Collect all the addressOfOps to static shared memory globals.
   SmallVector<LLVM::AddressOfOp> addressOfOps;
   moduleOp.walk([&](LLVM::AddressOfOp addressOfOp) {
     // Check that the global associated with this addressOfOp has shared memory
@@ -44,9 +46,9 @@ void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
   builder.setInsertionPoint(&moduleOp.front());
   auto type =
       LLVM::LLVMArrayType::get(IntegerType::get(builder.getContext(), 8), 0);
-  LLVM::GlobalOp global = builder.create<LLVM::GlobalOp>(
-      moduleOp.getLoc(), type, /*isConstant=*/false, LLVM::Linkage::External,
-      "__dynamic_shared_memory__", Attribute(),
+  LLVM::GlobalOp global = LLVM::GlobalOp::create(
+      builder, moduleOp.getLoc(), type, /*isConstant=*/false,
+      LLVM::Linkage::External, "__dynamic_shared_memory__", Attribute(),
       /*alignment=*/16, /*addr_space=*/3);
   uint32_t numberOfBytes = 0;
   // Replace the addressOfOps with correctly offseted pointers to dynamic
@@ -70,16 +72,16 @@ void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
     auto loc = addressOfOp.getLoc();
     builder.setInsertionPoint(addressOfOp);
     LLVM::AddressOfOp globalPtr =
-        builder.create<LLVM::AddressOfOp>(loc, global);
-    Value zero = builder.create<LLVM::ConstantOp>(
-        loc, IntegerType::get(builder.getContext(), 64),
+        LLVM::AddressOfOp::create(builder, loc, global);
+    Value zero = LLVM::ConstantOp::create(
+        builder, loc, IntegerType::get(builder.getContext(), 64),
         builder.getI64IntegerAttr(0));
-    Value offsetValue = builder.create<LLVM::ConstantOp>(
-        loc, IntegerType::get(builder.getContext(), 64),
+    Value offsetValue = LLVM::ConstantOp::create(
+        builder, loc, IntegerType::get(builder.getContext(), 64),
         builder.getI64IntegerAttr(offset));
-    Value shiftedPtr = builder.create<LLVM::GEPOp>(
-        loc, globalPtr.getType(), global.getGlobalType(), globalPtr,
-        ValueRange({zero, offsetValue}));
+    Value shiftedPtr = LLVM::GEPOp::create(builder, loc, globalPtr.getType(),
+                                           global.getGlobalType(), globalPtr,
+                                           ValueRange({zero, offsetValue}));
     addressOfOp.replaceAllUsesWith(shiftedPtr);
     addressOfOp.erase();
   }
@@ -89,6 +91,18 @@ void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
     for (auto exportOp : variantOp.getExportOps()) {
       exportOp->setAttr(exportOp.getWorkgroupLocalMemoryAttrName(),
                         builder.getIndexAttr(numberOfBytes));
+    }
+  }
+}
+
+void setSharedMemoryAlignment(ModuleOp moduleOp, uint64_t newAlignment) {
+  for (auto global : moduleOp.getOps<LLVM::GlobalOp>()) {
+    if (global.getAddrSpace() == 3) {
+      uint64_t baseAlignment = 0;
+      if (std::optional<uint64_t> alignment = global.getAlignment()) {
+        baseAlignment = alignment.value();
+      }
+      global.setAlignment(std::max<uint64_t>(baseAlignment, newAlignment));
     }
   }
 }
@@ -107,8 +121,8 @@ struct ScalarizeMathOp : public OpRewritePattern<MathOpTy> {
     if (!vecType)
       return failure();
     Location loc = mathOp.getLoc();
-    Value newVector = rewriter.create<arith::ConstantOp>(
-        loc, vecType, rewriter.getZeroAttr(vecType));
+    Value newVector = arith::ConstantOp::create(rewriter, loc, vecType,
+                                                rewriter.getZeroAttr(vecType));
 
     for (int64_t element : llvm::seq(int64_t(0), vecType.getNumElements())) {
       llvm::SmallVector<int64_t> indices;
@@ -121,11 +135,11 @@ struct ScalarizeMathOp : public OpRewritePattern<MathOpTy> {
       SmallVector<Value> newOperands;
       for (Value operand : mathOp->getOperands()) {
         newOperands.push_back(
-            rewriter.create<vector::ExtractOp>(loc, operand, indices));
+            vector::ExtractOp::create(rewriter, loc, operand, indices));
       }
-      Value scalarOp = rewriter.create<MathOpTy>(loc, newOperands);
+      Value scalarOp = MathOpTy::create(rewriter, loc, newOperands);
       newVector =
-          rewriter.create<vector::InsertOp>(loc, scalarOp, newVector, indices);
+          vector::InsertOp::create(rewriter, loc, scalarOp, newVector, indices);
     }
     rewriter.replaceOp(mathOp, newVector);
     return success();
@@ -133,15 +147,14 @@ struct ScalarizeMathOp : public OpRewritePattern<MathOpTy> {
 };
 
 struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
-  using OpRewritePattern<memref::AllocOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(memref::AllocOp allocOp,
                                 PatternRewriter &rewriter) const override {
     if (!hasSharedMemoryAddressSpace(allocOp.getType()))
       return failure();
     ArrayRef<int64_t> shape = allocOp.getType().getShape();
-    if (llvm::any_of(shape,
-                     [](int64_t dim) { return ShapedType::isDynamic(dim); })) {
+    if (ShapedType::isDynamicShape(shape)) {
       return failure();
     }
 
@@ -168,8 +181,8 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
     SymbolTable symbolTable(moduleOp);
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPoint(&moduleOp.front());
-    auto global = rewriter.create<memref::GlobalOp>(
-        funcOp.getLoc(), "__shared_memory__",
+    auto global = memref::GlobalOp::create(
+        rewriter, funcOp.getLoc(), "__shared_memory__",
         /*sym_visibility=*/rewriter.getStringAttr("private"),
         /*type=*/allocType,
         /*initial_value=*/ElementsAttr(),
@@ -194,7 +207,6 @@ class TestLLVMGPULegalizeOpPass final
   }
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    populateScalarizeMathOps(patterns);
     populateConvertSharedMemoryAllocOps(patterns);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
@@ -241,15 +253,13 @@ analyzeSubspans(llvm::SetVector<IREE::HAL::InterfaceBindingSubspanOp> &subspans,
   return result;
 }
 
-class ConvertFunc : public ConvertToLLVMPattern {
+class ConvertFunc : public ConvertOpToLLVMPattern<func::FuncOp> {
 public:
-  explicit ConvertFunc(MLIRContext *context, LLVMTypeConverter &converter)
-      : ConvertToLLVMPattern(mlir::func::FuncOp::getOperationName(), context,
-                             converter, 100) {}
+  explicit ConvertFunc(LLVMTypeConverter &converter)
+      : ConvertOpToLLVMPattern(converter, 100) {}
   LogicalResult
-  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+  matchAndRewrite(func::FuncOp funcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto funcOp = cast<func::FuncOp>(op);
     FunctionType fnType = funcOp.getFunctionType();
     (void)fnType;
     if (!funcOp.isPublic())
@@ -314,8 +324,8 @@ public:
 
     auto llvmFuncType = LLVM::LLVMFunctionType::get(
         LLVM::LLVMVoidType::get(rewriter.getContext()), llvmInputTypes);
-    auto newFuncOp = rewriter.create<LLVM::LLVMFuncOp>(
-        funcOp.getLoc(), funcOp.getName(), llvmFuncType,
+    auto newFuncOp = LLVM::LLVMFuncOp::create(
+        rewriter, funcOp.getLoc(), funcOp.getName(), llvmFuncType,
         LLVM::Linkage::External, /*dsoLocal=*/false, /*cconv=*/LLVM::CConv::C,
         /*comdat=*/nullptr, funcAttrs);
 
@@ -365,16 +375,12 @@ public:
   }
 };
 
-class ConvertIREEBindingSubspanOp : public ConvertToLLVMPattern {
-public:
-  explicit ConvertIREEBindingSubspanOp(MLIRContext *context,
-                                       LLVMTypeConverter &converter)
-      : ConvertToLLVMPattern(
-            IREE::HAL::InterfaceBindingSubspanOp::getOperationName(), context,
-            converter) {}
+struct ConvertIREEBindingSubspanOp final
+    : public ConvertOpToLLVMPattern<IREE::HAL::InterfaceBindingSubspanOp> {
+  using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
   LogicalResult
-  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+  matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Bail until nested under an LLVMFuncOp.
     auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
@@ -384,8 +390,6 @@ public:
 
     Location loc = op->getLoc();
     auto subspanOp = cast<IREE::HAL::InterfaceBindingSubspanOp>(op);
-    IREE::HAL::InterfaceBindingSubspanOpAdaptor adaptor(
-        operands, op->getAttrDictionary());
     MemRefType memrefType =
         llvm::dyn_cast<MemRefType>(subspanOp.getResult().getType());
     mlir::BlockArgument llvmBufferArg =
@@ -396,7 +400,7 @@ public:
     auto [strides, offset] = memrefType.getStridesAndOffset();
     if (memrefType.hasStaticShape() &&
         !llvm::any_of(strides, ShapedType::isDynamic) &&
-        !ShapedType::isDynamic(offset)) {
+        ShapedType::isStatic(offset)) {
       auto desc = MemRefDescriptor::fromStaticShape(
           rewriter, loc, *getTypeConverter(), memrefType, llvmBufferBasePtr);
       rewriter.replaceOp(op, {desc});
@@ -417,13 +421,13 @@ public:
       if (ShapedType::isDynamic(offset)) {
         int32_t elementBitWidth =
             IREE::Util::getTypeBitWidth(memrefType.getElementType());
-        Value elementBitWidthVal = rewriter.create<LLVM::ConstantOp>(
-            loc, llvmIndexType, elementBitWidth);
-        Value eight = rewriter.create<LLVM::ConstantOp>(loc, llvmIndexType, 8);
+        Value elementBitWidthVal = LLVM::ConstantOp::create(
+            rewriter, loc, llvmIndexType, elementBitWidth);
+        Value eight = LLVM::ConstantOp::create(rewriter, loc, llvmIndexType, 8);
         Value bitOffset =
-            rewriter.create<LLVM::MulOp>(loc, baseOffsetValue, eight);
+            LLVM::MulOp::create(rewriter, loc, baseOffsetValue, eight);
         Value elementOffsetVal =
-            rewriter.create<LLVM::UDivOp>(loc, bitOffset, elementBitWidthVal);
+            LLVM::UDivOp::create(rewriter, loc, bitOffset, elementBitWidthVal);
         desc.setOffset(rewriter, loc, elementOffsetVal);
       } else {
         desc.setConstantOffset(rewriter, loc, offset);
@@ -454,13 +458,13 @@ public:
             Value currentStrideVal;
             if (std::optional<int64_t> currentStrideInt =
                     getConstantIntValue(currentStride)) {
-              currentStrideVal = rewriter.create<LLVM::ConstantOp>(
-                  loc, llvmIndexType, currentStrideInt.value());
+              currentStrideVal = LLVM::ConstantOp::create(
+                  rewriter, loc, llvmIndexType, currentStrideInt.value());
             } else {
               currentStrideVal = cast<Value>(currentStride);
             }
             currentStride =
-                rewriter.create<LLVM::MulOp>(loc, currentStrideVal, dim)
+                LLVM::MulOp::create(rewriter, loc, currentStrideVal, dim)
                     .getResult();
             desc.setStride(rewriter, loc, i - 1, cast<Value>(currentStride));
           } else {
@@ -476,15 +480,12 @@ public:
   }
 };
 
-class ConvertIREEConstantOp : public ConvertToLLVMPattern {
-public:
-  explicit ConvertIREEConstantOp(MLIRContext *context,
-                                 LLVMTypeConverter &converter)
-      : ConvertToLLVMPattern(
-            IREE::HAL::InterfaceConstantLoadOp::getOperationName(), context,
-            converter) {}
+struct ConvertIREEConstantOp final
+    : public ConvertOpToLLVMPattern<IREE::HAL::InterfaceConstantLoadOp> {
+  using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
+
   LogicalResult
-  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+  matchAndRewrite(IREE::HAL::InterfaceConstantLoadOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Bail until nested under an LLVMFuncOp.
     auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
@@ -497,6 +498,53 @@ public:
     mlir::BlockArgument llvmBufferArg = llvmFuncOp.getArgument(
         numBindings + ireeConstantOp.getOrdinal().getZExtValue());
     assert(llvmBufferArg.getType().isInteger(32));
+
+    // If the constant has non-trivial assumptions placed on it about
+    // its min and max values or divisibility, use that information to
+    // annotate the corresponding arguments. The hasOneUse() check prevents us
+    // from applying assumptions that don't hold at all usage sites.
+    if (op.getResult().hasOneUse()) {
+      OpOperand *operand = op.getResult().getUses().begin().getOperand();
+      auto assumeOp = dyn_cast<IREE::Util::AssumeIntOp>(operand->getOwner());
+      if (assumeOp) {
+        unsigned opIdx = operand->getOperandNumber();
+        auto [min, max] = assumeOp.getUnionedUnsignedRange(opIdx);
+
+        if (min.has_value() && max.has_value()) {
+          assert(*min <= std::numeric_limits<uint32_t>::max() &&
+                 "Push-constant's maximum value can't be outside 32 bits, but "
+                 "this is assumed");
+          // Note: LLVM's range(iN lb, ub) is [lb, ub), while MLIR's is [lb,
+          // ub], so we add 1 to the upper bound.
+          llvmFuncOp.setArgAttr(llvmBufferArg.getArgNumber(),
+                                LLVM::LLVMDialect::getRangeAttrName(),
+                                rewriter.getAttr<LLVM::ConstantRangeAttr>(
+                                    APInt(32, *min), APInt(32, *max) + 1));
+        }
+
+        auto divisibility = assumeOp.getUnionedUnsignedDivisor(opIdx);
+
+        auto makeI32Const = [&](uint32_t val) -> Value {
+          return LLVM::ConstantOp::create(rewriter, assumeOp.getLoc(),
+                                          rewriter.getI32Type(),
+                                          rewriter.getI32IntegerAttr(val));
+        };
+        if (divisibility.has_value() && *divisibility > 1) {
+          Location loc = assumeOp.getLoc();
+          assert(*divisibility <= std::numeric_limits<uint32_t>::max() &&
+                 "push constant shouldn't be statically divisible by a value "
+                 "it can't hold");
+          Value knownDivisibleBy = makeI32Const(*divisibility);
+          // This'll almost always become an and
+          Value lowPart = LLVM::URemOp::create(rewriter, loc, llvmBufferArg,
+                                               knownDivisibleBy);
+          Value zero = makeI32Const(0);
+          Value isEvenlyDivided = LLVM::ICmpOp::create(
+              rewriter, loc, LLVM::ICmpPredicate::eq, lowPart, zero);
+          LLVM::AssumeOp::create(rewriter, loc, isEvenlyDivided);
+        }
+      }
+    }
 
     Type dstType = getTypeConverter()->convertType(ireeConstantOp.getType());
     // llvm.zext requires that the result type has a larger bitwidth.
@@ -530,13 +578,14 @@ struct HALInterfaceWorkgroupOpsConverter final
   }
 };
 
-class ConvertNullPointerOp : public ConvertToLLVMPattern {
+class ConvertNullPointerOp
+    : public ConvertOpToLLVMPattern<IREE::Codegen::NullPointerOp> {
 public:
-  ConvertNullPointerOp(MLIRContext *context, LLVMTypeConverter &converter)
-      : ConvertToLLVMPattern(IREE::Codegen::NullPointerOp::getOperationName(),
-                             context, converter) {}
+  using ConvertOpToLLVMPattern<
+      IREE::Codegen::NullPointerOp>::ConvertOpToLLVMPattern;
+
   LogicalResult
-  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+  matchAndRewrite(IREE::Codegen::NullPointerOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<LLVM::ZeroOp>(
         op, LLVM::LLVMPointerType::get(getContext()));
@@ -544,29 +593,78 @@ public:
   }
 };
 
+struct ConvertIREEUtilAssumeIntOp final
+    : public ConvertOpToLLVMPattern<IREE::Util::AssumeIntOp> {
+  using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
+
+  LogicalResult
+  matchAndRewrite(IREE::Util::AssumeIntOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Bail until nested under an LLVMFuncOp.
+    auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
+    if (!llvmFuncOp)
+      return failure();
+
+    Location loc = op.getLoc();
+    auto updateConds = [&](std::optional<Value> &conds, Value cond) {
+      if (!conds)
+        conds = cond;
+      else
+        conds = LLVM::AndOp::create(rewriter, loc, *conds, cond);
+    };
+    // Materialize the assumptions that aren't atteched directly to arguments
+    // in order to account for the fact that i64 inputs get passed in as a pair
+    // of i32 constants.
+    for (auto [idx, mlirVal, llvmVal] :
+         llvm::enumerate(op.getOperands(), adaptor.getOperands())) {
+      if (mlirVal.getDefiningOp<IREE::HAL::InterfaceConstantLoadOp>())
+        continue;
+      std::optional<Value> conds;
+      Type type = llvmVal.getType();
+      auto [min, max] = op.getUnionedUnsignedRange(idx);
+      // This should be a range() bundle but LLVM doesn't understand those yet.
+      if (min.has_value() && *min > 0) {
+        Value minConst = createIndexAttrConstant(rewriter, loc, type, *min);
+        Value minCond = LLVM::ICmpOp::create(
+            rewriter, loc, LLVM::ICmpPredicate::uge, llvmVal, minConst);
+        updateConds(conds, minCond);
+      }
+      if (max.has_value()) {
+        Value maxConst = createIndexAttrConstant(rewriter, loc, type, *max);
+        Value maxCond = LLVM::ICmpOp::create(
+            rewriter, loc, LLVM::ICmpPredicate::ule, llvmVal, maxConst);
+        updateConds(conds, maxCond);
+      }
+      std::optional<uint64_t> divisor = op.getUnionedUnsignedDivisor(idx);
+      if (divisor && *divisor > 1) {
+        Value divisorConst =
+            createIndexAttrConstant(rewriter, loc, type, *divisor);
+        Value remainder =
+            LLVM::URemOp::create(rewriter, loc, llvmVal, divisorConst);
+        Value zero = createIndexAttrConstant(rewriter, loc, type, 0);
+        Value divisorCond = LLVM::ICmpOp::create(
+            rewriter, loc, LLVM::ICmpPredicate::eq, remainder, zero);
+        updateConds(conds, divisorCond);
+      }
+
+      if (conds.has_value()) {
+        LLVM::AssumeOp::create(rewriter, loc, *conds);
+      }
+    }
+    rewriter.replaceOp(op, adaptor.getOperands());
+    return success();
+  }
+};
 } // namespace
 
 void populateLLVMConversionPatterns(MLIRContext *context,
                                     RewritePatternSet &patterns,
                                     LLVMTypeConverter &converter) {
   patterns.add<ConvertFunc, ConvertIREEBindingSubspanOp, ConvertIREEConstantOp,
-               ConvertNullPointerOp>(context, converter);
+               ConvertNullPointerOp, ConvertIREEUtilAssumeIntOp>(converter);
   converter.addConversion([context](IREE::Codegen::NullPointerType type) {
     return LLVM::LLVMPointerType::get(context);
   });
-}
-
-void populateScalarizeMathOps(RewritePatternSet &patterns) {
-  patterns.add<ScalarizeMathOp<math::SqrtOp>, ScalarizeMathOp<math::AbsFOp>,
-               ScalarizeMathOp<math::AtanOp>, ScalarizeMathOp<math::Atan2Op>,
-               ScalarizeMathOp<math::CeilOp>, ScalarizeMathOp<math::CosOp>,
-               ScalarizeMathOp<math::ExpOp>, ScalarizeMathOp<math::Exp2Op>,
-               ScalarizeMathOp<math::ExpM1Op>, ScalarizeMathOp<math::FloorOp>,
-               ScalarizeMathOp<math::LogOp>, ScalarizeMathOp<math::Log1pOp>,
-               ScalarizeMathOp<math::Log10Op>, ScalarizeMathOp<math::Log2Op>,
-               ScalarizeMathOp<math::PowFOp>, ScalarizeMathOp<math::RsqrtOp>,
-               ScalarizeMathOp<math::SinOp>, ScalarizeMathOp<math::SqrtOp>,
-               ScalarizeMathOp<math::TanhOp>>(patterns.getContext());
 }
 
 void populateConvertSharedMemoryAllocOps(RewritePatternSet &patterns) {

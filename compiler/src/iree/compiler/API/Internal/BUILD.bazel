@@ -35,6 +35,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Tools:version",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:TargetParser",
         "@llvm-project//mlir:BuiltinToLLVMIRTranslation",
         "@llvm-project//mlir:BytecodeWriter",
         "@llvm-project//mlir:CAPIIR",
@@ -138,9 +139,12 @@ iree_compiler_cc_library(
         "//compiler/bindings/c:headers",
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
         "//compiler/src/iree/compiler/Codegen/Utils",
+        "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
+        "//compiler/src/iree/compiler/Dialect/LinalgExt/Utils",
         "@llvm-project//mlir:CAPIIR",
         "@llvm-project//mlir:CAPIIRHeaders",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
     ],
 )
 
@@ -152,6 +156,7 @@ iree_compiler_cc_library(
     deps = [
         "//compiler/bindings/c:headers",
         "//compiler/src/iree/compiler/Codegen/Dialect/GPU/IR:IREEGPUDialect",
+        "//compiler/src/iree/compiler/Codegen/Utils",
         "@llvm-project//mlir:CAPIIR",
         "@llvm-project//mlir:CAPIIRHeaders",
         "@llvm-project//mlir:IR",

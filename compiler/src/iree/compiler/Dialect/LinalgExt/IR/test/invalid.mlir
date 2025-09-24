@@ -1,10 +1,20 @@
 // RUN: iree-opt --split-input-file --verify-diagnostics %s
 
+func.func @linalg_ext_op_interface_mixed_semantics(
+    %input: memref<256xf32>, %output: tensor<8x32xf32>
+) -> tensor<8x32xf32> {
+  // expected-error@+1 {{expected operation that implements LinalgExtInterface to have either pure buffer semantics or pure tensor semantics}}
+  %0 = iree_linalg_ext.pack %input inner_dims_pos = [0] inner_tiles = [32] into %output : (memref<256xf32> tensor<8x32xf32>) -> tensor<8x32xf32>
+  return %0 : tensor<8x32xf32>
+}
+
+// -----
+
 func.func @sort_invalid_dimension(%arg0: tensor<128xi32>) -> tensor<128xi32> {
   // expected-error @+1 {{dimension must be within (0, 1]}}
   %0 = iree_linalg_ext.sort dimension(1)
     outs(%arg0 : tensor<128xi32>) {
-  ^bb0(%arg1: i32, %arg2: i32):  // no predecessors
+  ^bb0(%arg1: i32, %arg2: i32):
     %1 = arith.cmpi sgt, %arg1, %arg2 : i32
     iree_linalg_ext.yield %1 : i1
   } -> tensor<128xi32>
@@ -18,7 +28,7 @@ func.func @sort_mismatch_rank(%arg0: tensor<?x?xi32>, %arg1: tensor<?xf32>)
   // expected-error @+1 {{expected operand 1 to be rank 2, same as other operands}}
   %0:2 = iree_linalg_ext.sort dimension(0)
       outs(%arg0, %arg1 : tensor<?x?xi32>, tensor<?xf32>) {
-      ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
+      ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):
         %1 = arith.cmpf ogt, %arg4, %arg5 : f32
         iree_linalg_ext.yield %1 : i1
       } -> tensor<?x?xi32>, tensor<?xf32>
@@ -32,7 +42,7 @@ func.func @sort_mismatch_shape(%arg0: tensor<?xi32>, %arg1: tensor<42xf32>)
   // expected-error @+1 {{expected operand 1 to have same shape as other operands}}
   %0:2 = iree_linalg_ext.sort dimension(0)
       outs(%arg0, %arg1 : tensor<?xi32>, tensor<42xf32>) {
-      ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
+      ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):
         %1 = arith.cmpf ogt, %arg4, %arg5 : f32
         iree_linalg_ext.yield %1 : i1
       } -> tensor<?xi32>, tensor<42xf32>
@@ -421,13 +431,403 @@ func.func @scatter_index_depth_too_small(
 
 // -----
 
+func.func @gather_output_too_large(
+    %source : tensor<10xf32>, %idx : tensor<1xi32>,
+    %output : tensor<2xf32>) -> tensor<2xf32> {
+  // expected-error @below {{'iree_linalg_ext.gather' op mismatch in shape of indices and output value at dim#0}}
+  %0 = iree_linalg_ext.gather
+    dimension_map = [0]
+    ins(%source, %idx : tensor<10xf32>, tensor<1xi32>)
+    outs(%output : tensor<2xf32>) -> tensor<2xf32>
+  return %0 : tensor<2xf32>
+}
+
+// -----
+
+func.func @gather_mismatch_output_and_source(
+    %source : tensor<10x10xf32>, %idx : tensor<2xi32>,
+    %output : tensor<1xf32>) -> tensor<1xf32> {
+  // expected-error @below {{'iree_linalg_ext.gather' op shape of output value dim#0 must match source value at dim#1}}
+  %0 = iree_linalg_ext.gather
+    dimension_map = [0]
+    ins(%source, %idx : tensor<10x10xf32>, tensor<2xi32>)
+    outs(%output : tensor<1xf32>) -> tensor<1xf32>
+  return %0 : tensor<1xf32>
+}
+
+// -----
+
+func.func @gather_indices_batch_rank_too_large(
+    %source : tensor<10x10xf32>, %idx : tensor<1x2xi32>,
+    %output : tensor<10xf32>) -> tensor<10xf32> {
+  // expected-error @below {{'iree_linalg_ext.gather' op expected indices to be equal to batch rank or batch rank + 1}}
+  %0 = iree_linalg_ext.gather
+    dimension_map = [0]
+    ins(%source, %idx : tensor<10x10xf32>, tensor<1x2xi32>)
+    outs(%output : tensor<10xf32>) -> tensor<10xf32>
+  return %0 : tensor<10xf32>
+}
+
+// -----
+
+func.func @gather_dim_map_mismatch(
+    %source : tensor<2xf32>, %idx : tensor<1xi32>,
+    %output : tensor<1xf32>) -> tensor<1xf32> {
+  // expected-error @below {{'iree_linalg_ext.gather' op expected output to be at least the rank of non indexed source dims}}
+  %0 = iree_linalg_ext.gather
+    dimension_map = [0, 1]
+    ins(%source, %idx : tensor<2xf32>, tensor<1xi32>)
+    outs(%output : tensor<1xf32>) -> tensor<1xf32>
+  return %0 : tensor<1xf32>
+}
+
+// -----
+
+func.func @map_scatter_mixed_element_types(
+    %input: memref<4xf16>, %output: memref<4xf32>
+) {
+  // expected-error@+1 {{expected input and output element types to match}}
+  iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %mask : index, i1
+  } : memref<4xf16> into memref<4xf32>
+  return
+}
+
+// -----
+
+func.func @map_scatter_wrong_num_arguments(
+    %input: memref<4xf32>, %output: memref<4xf32>
+) {
+  // expected-error@+1 {{expected number of block arguments to be equal to the input rank}}
+  iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index, %idx1: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %mask : index, i1
+  } : memref<4xf32> into memref<4xf32>
+  return
+}
+
+// -----
+
+func.func @map_scatter_wrong_argument_types(
+    %input: memref<4xf32>, %output: memref<4xf32>
+) {
+  // expected-error@+1 {{expected block arguments to be index types}}
+  iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: i64):
+      %mask = arith.constant true
+      %idx_cast = arith.index_cast %idx0 : i64 to index
+      iree_linalg_ext.yield %idx_cast, %mask : index, i1
+  } : memref<4xf32> into memref<4xf32>
+  return
+}
+
+// -----
+
+func.func @map_scatter_wrong_yielded_types(
+    %input: memref<4xf32>, %output: memref<4xf32>
+) {
+  iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index):
+      %mask = arith.constant true
+      %idx_cast = arith.index_cast %idx0 : index to i64
+      // expected-error@+1 {{expected yielded indices to be index types}}
+      iree_linalg_ext.yield %idx_cast, %mask : i64, i1
+  } : memref<4xf32> into memref<4xf32>
+  return
+}
+
+// -----
+
+func.func @map_scatter_wrong_mask_type(
+    %input: memref<4xf32>, %output: memref<4xf32>
+) {
+  iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index):
+      %mask = arith.constant 1 : i32
+      // expected-error@+1 {{expected yielded mask to be i1 type}}
+      iree_linalg_ext.yield %idx0, %mask : index, i32
+  } : memref<4xf32> into memref<4xf32>
+  return
+}
+
+// -----
+
+func.func @map_scatter_wrong_num_yielded_values(
+    %input: memref<4xf32>, %output: memref<4xf32>
+) {
+  iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index):
+      // expected-error@+1 {{expected transformation_region to yield a value for each output dimension and a mask}}
+      iree_linalg_ext.yield %idx0 : index
+  } : memref<4xf32> into memref<4xf32>
+  return
+}
+
+// -----
+
+func.func @map_scatter_0D(
+    %input: vector<f32>, %output: memref<4xf32>
+) {
+  // expected-error@+1 {{expected input type to have non-zero rank}}
+  iree_linalg_ext.map_scatter %input into %output {
+    ^bb0():
+      %mask = arith.constant true
+      %zero = arith.constant 0 : index
+      iree_linalg_ext.yield %zero, %mask : index, i1
+  } : vector<f32> into memref<4xf32>
+  return
+}
+
+// -----
+
+func.func @arg_compare_invalid_too_many_inputs(
+    %input_val: tensor<2x10xf32>,
+    %input_extra: tensor<2x10xf32>,
+    %out_val: tensor<2xf32>,
+    %out_idx: tensor<2xi32>
+) -> (tensor<2xf32>, tensor<2xi32>) {
+  // expected-error@+1 {{expected exactly one tensor input operand, but got 2}}
+  %0:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input_val, %input_extra : tensor<2x10xf32>, tensor<2x10xf32>)
+    outs(%out_val, %out_idx : tensor<2xf32>, tensor<2xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2xf32>, tensor<2xi32>
+  return %0#0, %0#1 : tensor<2xf32>, tensor<2xi32>
+}
+
+// -----
+
+func.func @arg_compare_invalid_missing_output(
+    %input_val: tensor<2x10xf32>,
+    %out_val: tensor<2xf32>) -> (tensor<2xf32>, tensor<2xi32>) {
+  // expected-error@+1 {{expected two output operands (value and index), but got 1}}
+  %0:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input_val : tensor<2x10xf32>)
+    outs(%out_val : tensor<2xf32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2xf32>, tensor<2xi32>
+  return %0#0, %0#1 : tensor<2xf32>, tensor<2xi32>
+}
+
+// -----
+
+func.func @arg_compare_invalid_dim(
+    %input_val: tensor<2x10xf32>,
+    %out_val: tensor<2xf32>,
+    %out_idx: tensor<2xi32>) -> (tensor<2xf32>, tensor<2xi32>) {
+  // expected-error@+1 {{reduction dimension exceeds or equals input rank. got dimension: 2, but input rank is: 2}}
+  %0:2 = iree_linalg_ext.arg_compare
+    dimension(2)
+    ins(%input_val : tensor<2x10xf32>)
+    outs(%out_val, %out_idx : tensor<2xf32>, tensor<2xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2xf32>, tensor<2xi32>
+  return %0#0, %0#1 : tensor<2xf32>, tensor<2xi32>
+}
+
+// -----
+
+func.func @arg_compare_invalid_type_mismatch(
+    %input_val: tensor<2x10xf32>,
+    %out_val: tensor<2xf16>,
+    %out_idx: tensor<2xi32>) -> (tensor<2xf16>, tensor<2xi32>) {
+  // expected-error@+1 {{input and output value element types must match. Input type: 'f32', output value type: 'f16'}}
+  %0:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input_val : tensor<2x10xf32>)
+    outs(%out_val, %out_idx : tensor<2xf16>, tensor<2xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2xf16>, tensor<2xi32>
+  return %0#0, %0#1 : tensor<2xf16>, tensor<2xi32>
+}
+
+// -----
+
+func.func @arg_compare_invalid_output_shape_mismatch(
+    %input_val: tensor<2x10xf32>,
+    %out_val: tensor<2xf32>,
+    %out_idx: tensor<10xi32>) -> (tensor<2xf32>, tensor<10xi32>) {
+  // expected-error@+1 {{output indices/values shape must match. Output value shape: [2], output index shape: [10]}}
+  %0:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input_val : tensor<2x10xf32>)
+    outs(%out_val, %out_idx : tensor<2xf32>, tensor<10xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2xf32>, tensor<10xi32>
+  return %0#0, %0#1 : tensor<2xf32>, tensor<10xi32>
+}
+
+// -----
+
+func.func @arg_compare_invalid_output_shape_wrong_reduction(
+    %input_val: tensor<2x10xf32>,
+    %out_val: tensor<1xf32>,
+    %out_idx: tensor<1xi32>) -> (tensor<1xf32>, tensor<1xi32>) {
+  // expected-error@+1 {{output shape must match input shape with reduction dimension removed. Expected: [2], but got: [1]}}
+  %0:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input_val : tensor<2x10xf32>)
+    outs(%out_val, %out_idx : tensor<1xf32>, tensor<1xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<1xf32>, tensor<1xi32>
+  return %0#0, %0#1 : tensor<1xf32>, tensor<1xi32>
+}
+
+// -----
+
+func.func @arg_compare_invalid_output_same_as_input(
+    %input_val: tensor<2x10xf32>,
+    %out_val: tensor<2x10xf32>,
+    %out_idx: tensor<2x10xi32>) -> (tensor<2x10xf32>, tensor<2x10xi32>) {
+  // expected-error@+1 {{output shape must match input shape with reduction dimension removed. Expected: [2], but got: [2, 10]}}
+  %0:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input_val : tensor<2x10xf32>)
+    outs(%out_val, %out_idx : tensor<2x10xf32>, tensor<2x10xi32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2x10xf32>, tensor<2x10xi32>
+  return %0#0, %0#1 : tensor<2x10xf32>, tensor<2x10xi32>
+}
+
+// -----
+
+func.func @arg_compare_missing_region_yield(
+    %input : tensor<2x6xf32>,
+    %outv : tensor<2xf32>,
+    %outi : tensor<2xindex>
+) -> (tensor<2xf32>, tensor<2xindex>) {
+  // expected-error@+1 {{region block should have 2 arguments}}
+  %0:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input : tensor<2x6xf32>)
+    outs(%outv, %outi : tensor<2xf32>, tensor<2xindex>) {} -> tensor<2xf32>, tensor<2xindex>
+  return %0#0, %0#1 : tensor<2xf32>, tensor<2xindex>
+}
+
+// -----
+
+func.func @arg_compare_invalid_region_argument_type(
+    %input : tensor<2x6xf32>,
+    %outv : tensor<2xf32>,
+    %outi : tensor<2xindex>
+) -> (tensor<2xf32>, tensor<2xindex>) {
+  // expected-error@+1 {{ comparator region arguments must match input element type. Expected: 'f32', but got: 'f32' and 'i32'}}
+  %0:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input : tensor<2x6xf32>)
+    outs(%outv, %outi : tensor<2xf32>, tensor<2xindex>) {
+    ^bb0(%a: f32, %b: i32):
+      %cmp = arith.cmpf ogt, %a, %a : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2xf32>, tensor<2xindex>
+  return %0#0, %0#1 : tensor<2xf32>, tensor<2xindex>
+}
+
+// -----
+
+func.func @arg_compare_missing_yield_operand(
+    %input : tensor<2x6xf32>,
+    %outv : tensor<2xf32>, %outi : tensor<2xindex>
+) -> (tensor<2xf32>, tensor<2xindex>) {
+  // expected-error@+1 {{expected linalg_ext.yield to return 1 operand, but got 0}}
+  %0:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input : tensor<2x6xf32>)
+    outs(%outv, %outi : tensor<2xf32>, tensor<2xindex>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+  } -> tensor<2xf32>, tensor<2xindex>
+  return %0#0, %0#1 : tensor<2xf32>, tensor<2xindex>
+}
+
+// -----
+
+func.func @arg_compare_yield_two_operands(
+    %input : tensor<2x6xf32>,
+    %outv : tensor<2xf32>,
+    %outi : tensor<2xindex>
+) -> (tensor<2xf32>, tensor<2xindex>) {
+  // expected-error@+1 {{expected linalg_ext.yield to return 1 operand, but got 2}}
+  %0:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input : tensor<2x6xf32>)
+    outs(%outv, %outi : tensor<2xf32>, tensor<2xindex>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      %unused = arith.constant 0 : i1
+      iree_linalg_ext.yield %cmp, %unused : i1, i1
+  } -> tensor<2xf32>, tensor<2xindex>
+  return %0#0, %0#1 : tensor<2xf32>, tensor<2xindex>
+}
+
+// -----
+
+func.func @arg_compare_invalid_region_terminator(
+    %input : tensor<2x6xf32>,
+    %outv : tensor<2xf32>,
+    %outi : tensor<2xindex>
+) -> (tensor<2xf32>, tensor<2xindex>) {
+  // expected-error@+1 {{region block must end with a linalg_ext.yield i1, but got: 'f32'}}
+  %0:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input : tensor<2x6xf32>)
+    outs(%outv, %outi : tensor<2xf32>, tensor<2xindex>) {
+    ^bb0(%a: f32, %b: f32):
+      %add = arith.addf %a, %b : f32
+      iree_linalg_ext.yield %add : f32
+  } -> tensor<2xf32>, tensor<2xindex>
+  return %0#0, %0#1 : tensor<2xf32>, tensor<2xindex>
+}
+
+// -----
+
+func.func @arg_compare_invalid_index_base_type(
+    %input: tensor<2x10xf32>,
+    %outv: tensor<2xf32>,
+    %outi: tensor<2xindex>,
+    %bad_index_base: i32
+) -> (tensor<2xf32>, tensor<2xindex>) {
+  // expected-error@+1 {{operand #3 must be index, but got 'i32'}}
+  %0:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input : tensor<2x10xf32>)
+    outs(%outv, %outi : tensor<2xf32>, tensor<2xindex>)
+    index_base(%bad_index_base : i32) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2xf32>, tensor<2xindex>
+  return %0#0, %0#1 : tensor<2xf32>, tensor<2xindex>
+}
+
+// -----
+
 func.func @topk_invalid(%input_values: tensor<2x10xf32>, %input_indices: tensor<2x10xi32>, %out_values : tensor<2x3xf32>, %out_indices: tensor<2x3xi32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
   // expected-error@+1 {{expected one or two input operands}}
   %0:2 = iree_linalg_ext.topk
         dimension(1)
         ins(%input_indices, %input_indices, %input_indices : tensor<2x10xi32>, tensor<2x10xi32>, tensor<2x10xi32>)
         outs(%out_values, %out_indices : tensor<2x3xf32>, tensor<2x3xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+        ^bb0(%arg0: f32, %arg1: f32):
           %0 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %0 : i1
         } -> tensor<2x3xf32>, tensor<2x3xi32>
@@ -442,7 +842,7 @@ func.func @topk_invalid(%input_values: tensor<2x10xi32>, %input_indices: tensor<
         dimension(1)
         ins(%input_values, %input_indices : tensor<2x10xi32> , tensor<2x10xi32>)
         outs(%out_values, %out_indices : tensor<2x3xf32>, tensor<2x3xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+        ^bb0(%arg0: f32, %arg1: f32):
           %0 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %0 : i1
         } -> tensor<2x3xf32>, tensor<2x3xi32>
@@ -457,7 +857,7 @@ func.func @topk_invalid(%input_values: tensor<2x10xf32>, %input_indices: tensor<
         dimension(1)
         ins(%input_values, %input_indices : tensor<2x10xf32> , tensor<2x10xf32>)
         outs(%out_values, %out_indices : tensor<2x3xf32>, tensor<2x3xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+        ^bb0(%arg0: f32, %arg1: f32):
           %0 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %0 : i1
         } -> tensor<2x3xf32>, tensor<2x3xi32>
@@ -472,7 +872,7 @@ func.func @topk_invalid(%input_values: tensor<10x2x10xf32>, %input_indices: tens
         dimension(1)
         ins(%input_values, %input_indices : tensor<10x2x10xf32> , tensor<10x2x10xi32>)
         outs(%out_values, %out_indices : tensor<2x3xf32>, tensor<2x3xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+        ^bb0(%arg0: f32, %arg1: f32):
           %0 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %0 : i1
         } -> tensor<2x3xf32>, tensor<2x3xi32>
@@ -487,7 +887,7 @@ func.func @topk_invalid(%input_values: tensor<3x10xf32>, %input_indices: tensor<
         dimension(1)
         ins(%input_values, %input_indices : tensor<3x10xf32> , tensor<2x10xi32>)
         outs(%out_values, %out_indices : tensor<2x3xf32>, tensor<2x3xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+        ^bb0(%arg0: f32, %arg1: f32):
           %0 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %0 : i1
         } -> tensor<2x3xf32>, tensor<2x3xi32>
@@ -502,7 +902,7 @@ func.func @topk_invalid(%input_values: tensor<2x10xf32>, %input_indices: tensor<
         dimension(1)
         ins(%input_values, %input_indices : tensor<2x10xf32> , tensor<2x10xi32>)
         outs(%out_values, %out_indices : tensor<3x3xf32>, tensor<2x3xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+        ^bb0(%arg0: f32, %arg1: f32):
           %0 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %0 : i1
         } -> tensor<3x3xf32>, tensor<2x3xi32>
@@ -517,7 +917,7 @@ func.func @topk_invalid(%input_values: tensor<3x10xf32>, %input_indices: tensor<
         dimension(1)
         ins(%input_values, %input_indices  : tensor<3x10xf32> , tensor<3x10xi32>)
         outs(%out_values, %out_indices : tensor<2x3xf32>, tensor<2x3xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+        ^bb0(%arg0: f32, %arg1: f32):
           %0 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %0 : i1
         } -> tensor<2x3xf32>, tensor<2x3xi32>
@@ -635,6 +1035,7 @@ func.func @illegal_im2col_strides(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x10
   %1 = iree_linalg_ext.im2col strides = [1] dilations = [1, 1] kernel_size = [3, 3]
            m_offset = [0] * [1] k_offset = [0] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
            ins(%arg0 : tensor<2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -648,6 +1049,7 @@ func.func @illegal_im2col_dilations(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1, 1] kernel_size = [3, 3]
            m_offset = [0] * [1] k_offset = [0] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
            ins(%arg0 : tensor<2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -661,6 +1063,7 @@ func.func @illegal_im2col_kernel_size(%arg0: tensor<2x34x34x640xf32>) -> tensor<
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3]
            m_offset = [0] * [1] k_offset = [0] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
            ins(%arg0 : tensor<2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -674,6 +1077,7 @@ func.func @illegal_im2col_m_offset(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
            m_offset = [0, 0] * [1] k_offset = [0] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
            ins(%arg0 : tensor<2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -687,6 +1091,7 @@ func.func @illegal_im2col_k_offset(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
            m_offset = [0] * [1] k_offset = [0, 0] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
            ins(%arg0 : tensor<2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -700,6 +1105,7 @@ func.func @illegal_im2col_m_strides(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
            m_offset = [0] * [0] k_offset = [0] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
            ins(%arg0 : tensor<2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -713,6 +1119,7 @@ func.func @illegal_im2col_k_strides(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
            m_offset = [0] * [1] k_offset = [0] * [2]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
            ins(%arg0 : tensor<2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -726,6 +1133,7 @@ func.func @illegal_im2col_input_rank(%arg0: tensor<1x2x34x34x640xf32>) -> tensor
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
            m_offset = [0] * [1] k_offset = [0] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
            ins(%arg0 : tensor<1x2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -739,9 +1147,38 @@ func.func @illegal_im2col_output_rank(%arg0: tensor<2x34x34x640xf32>) -> tensor<
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
            m_offset = [0] * [1] k_offset = [0] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
            ins(%arg0 : tensor<2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x9x640xf32>) -> tensor<2x1024x9x640xf32>
   return %1 : tensor<2x1024x9x640xf32>
+}
+
+// -----
+
+func.func @illegal_im2col_perm_num(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+  %0 = tensor.empty() : tensor<2x1024x5760xf32>
+  // expected-error @+1 {{expected input_k_perm size (2) to match the number of shared dimensions (m_Pos + k_pos = 3)}}
+  %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+           m_offset = [0] * [1] k_offset = [0] * [1]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1]
+           ins(%arg0 : tensor<2x34x34x640xf32>)
+           outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  return %1 : tensor<2x1024x5760xf32>
+}
+
+// -----
+
+func.func @illegal_im2col_perm_value(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
+  %0 = tensor.empty() : tensor<2x1024x5760xf32>
+  // expected-error @+1 {{expected input_k_perm to be a permutation of [0, 3)}}
+  %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+           m_offset = [0] * [1] k_offset = [0] * [1]
+           batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [1, 2, 3]
+           ins(%arg0 : tensor<2x34x34x640xf32>)
+           outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+  return %1 : tensor<2x1024x5760xf32>
 }
 
 // -----

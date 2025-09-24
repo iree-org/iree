@@ -9,6 +9,7 @@
 
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Dialect/Transform/Interfaces/MatchInterfaces.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 
 namespace mlir {

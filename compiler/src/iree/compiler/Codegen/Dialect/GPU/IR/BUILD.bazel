@@ -35,12 +35,12 @@ iree_td_library(
     deps = [
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:td_files",
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
+        "@llvm-project//mlir:DestinationStyleOpInterfaceTdFiles",
         "@llvm-project//mlir:DialectUtilsTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:ParallelCombiningOpInterfaceTdFiles",
         "@llvm-project//mlir:SCFTdFiles",
         "@llvm-project//mlir:SideEffectInterfacesTdFiles",
-        "@llvm-project//mlir:TilingInterfaceTdFiles",
-        "@llvm-project//mlir:VectorInterfacesTdFiles",
     ],
 )
 
@@ -54,7 +54,7 @@ iree_compiler_cc_library(
         "IREEGPUDialect.cpp",
         "IREEGPUInterfaces.cpp",
         "IREEGPUOps.cpp",
-        "TilingInterfaceImpl.cpp",
+        "PromotionImpls.cpp",
     ],
     hdrs = [
         "DerivedConfigUtils.h",
@@ -89,7 +89,9 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/Utils",
         "//compiler/src/iree/compiler/Codegen/Dialect/VectorExt/IR:IREEVectorExtDialect",
         "//compiler/src/iree/compiler/Codegen/Utils:VectorOpUtils",
+        "//compiler/src/iree/compiler/Dialect/Encoding/Utils",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
+        "//compiler/src/iree/compiler/Dialect/TensorExt/IR",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AMDGPUDialect",
@@ -97,9 +99,12 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:ArithUtils",
         "@llvm-project//mlir:ControlFlowInterfaces",
+        "@llvm-project//mlir:DestinationStyleOpInterface",
         "@llvm-project//mlir:DialectUtils",
+        "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:ParallelCombiningOpInterface",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:SideEffectInterfaces",
@@ -107,7 +112,6 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TilingInterface",
         "@llvm-project//mlir:VectorDialect",
-        "@llvm-project//mlir:VectorInterfaces",
     ],
 )
 
@@ -161,6 +165,7 @@ iree_gentbl_cc_library(
     td_file = "IREEGPUAttrs.td",
     deps = [
         ":td_files",
+        "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:LoweringConfigInterfaceGen",
         "@llvm-project//mlir:SCFDeviceMappingInterfacesIncGen",
     ],
 )
@@ -179,7 +184,10 @@ iree_gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "IREEGPUInterfaces.td",
-    deps = [":td_files"],
+    deps = [
+        ":td_files",
+        "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:LoweringConfigInterfaceGen",
+    ],
 )
 
 iree_gentbl_cc_library(
@@ -203,6 +211,7 @@ iree_gentbl_cc_library(
 
 iree_tablegen_doc(
     name = "IREEGPUDialectDocGen",
+    category = "Dialects",
     tbl_outs = [
         (
             [

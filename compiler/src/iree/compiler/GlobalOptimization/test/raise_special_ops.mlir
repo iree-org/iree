@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-global-opt-raise-special-ops --iree-flow-canonicalize --split-input-file --mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --iree-global-opt-raise-special-ops --canonicalize --split-input-file --mlir-print-local-scope %s | FileCheck %s
 
 // CHECK-LABEL: @softmax
 //  CHECK-SAME: %[[ARG:.+]]: tensor<?x?x?xf32>
@@ -188,7 +188,11 @@ util.func public @aTransposeBMatmul(%arg0 : tensor<10x20xf32>,
 // CHECK-LABEL: util.func public @aTransposeBMatmul
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<10x20xf32>
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<40x20xf32>
-//       CHECK:   %[[RESULT:.+]] = linalg.matmul_transpose_b
+//       CHECK:   %[[RESULT:.+]] = linalg.matmul
+//  CHECK-SAME:       indexing_maps = [
+//  CHECK-SAME:         affine_map<(d0, d1, d2) -> (d0, d2)>,
+//  CHECK-SAME:         affine_map<(d0, d1, d2) -> (d1, d2)>,
+//  CHECK-SAME:         affine_map<(d0, d1, d2) -> (d0, d1)>]
 //  CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 //       CHECK:   util.return %[[RESULT]]
 
@@ -214,7 +218,11 @@ util.func public @aTransposeBBatchMatmul(%arg0 : tensor<5x10x20xf32>,
 // CHECK-LABEL: util.func public @aTransposeBBatchMatmul
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<5x10x20xf32>
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<5x40x20xf32>
-//       CHECK:   %[[RESULT:.+]] = linalg.batch_matmul_transpose_b
+//       CHECK:   %[[RESULT:.+]] = linalg.batch_matmul
+//  CHECK-SAME:       indexing_maps = [
+//  CHECK-SAME:         affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+//  CHECK-SAME:         affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+//  CHECK-SAME:         affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]
 //  CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 //       CHECK:   util.return %[[RESULT]]
 
@@ -341,18 +349,17 @@ util.func public @test_slice_negate_cat_peephole(%arg0: tensor<1x32x1x128xf16>) 
 
 // CHECK-LABEL: util.func public @test_slice_negate_cat_peephole
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<1x32x1x128xf16>
+//       CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //       CHECK:   %[[C1:.+]] = arith.constant 1 : index
 //       CHECK:   %[[EXPIN:.+]] = tensor.expand_shape %[[ARG0]] {{\[\[}}0], [1], [2], [3, 4]] output_shape [1, 32, 1, 2, 64] : tensor<1x32x1x128xf16> into tensor<1x32x1x2x64xf16>
 //       CHECK:   %[[NREV:.+]] = linalg.generic
 //  CHECK-SAME:       iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
 
-//       CHECK:      %[[I0:.+]] = linalg.index 0 : index
 //       CHECK:      %[[I1:.+]] = linalg.index 1 : index
-//       CHECK:      %[[I2:.+]] = linalg.index 2 : index
 //       CHECK:      %[[I3:.+]] = linalg.index 3 : index
 //       CHECK:      %[[I4:.+]] = linalg.index 4 : index
 //       CHECK:      %[[R3:.+]] = arith.subi %[[C1]], %[[I3]] : index
-//       CHECK:      %[[EXTR:.+]] = tensor.extract %expanded[%[[I0]], %[[I1]], %[[I2]], %[[R3]], %[[I4]]] : tensor<1x32x1x2x64xf16>
+//       CHECK:      %[[EXTR:.+]] = tensor.extract %expanded[%[[C0]], %[[I1]], %[[C0]], %[[R3]], %[[I4]]] : tensor<1x32x1x2x64xf16>
 //       CHECK:      %[[NEGF:.+]] = arith.negf %[[EXTR]] : f16
 //       CHECK:      %[[CMP:.+]] = arith.cmpi eq, %[[R3]], %[[C1]] : index
 //       CHECK:      %[[SEL:.+]] = arith.select %[[CMP]], %[[NEGF]], %[[EXTR]] : f16

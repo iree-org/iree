@@ -3,11 +3,10 @@
 // RUN:  | FileCheck %s
 
 // Note: not the real target definition, missing types
-#executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.target<arch = "gfx1100", features = "",
+#executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<arch = "gfx1100", features = "",
   wgp = <compute =  fp32,
     storage =  b32,
     subgroup =  arithmetic,
-    dot =  none, mma = [],
     subgroup_size_choices = [32, 64],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
@@ -17,16 +16,18 @@
 
 hal.executable private @static {
   hal.executable.variant public @rocm_hsaco_fb target(#executable_target) {
-    hal.executable.export public @static ordinal(0) layout(#pipeline_layout) attributes {workgroup_size = [64 : index, 2 : index, 1 : index]} {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @static ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c32 = arith.constant 32 : index
       %c8 = arith.constant 8 : index
       %c1 = arith.constant 1 : index
       hal.return %c32, %c8, %c1 : index, index, index
-    }
+    } attributes {workgroup_size = [64 : index, 2 : index, 1 : index]}
     builtin.module {
 // CHECK-LABEL: func.func @static()
       func.func @static() {
+// CHECK-NEXT: gpu.lane_id upper_bound 32
+        %lane_id = gpu.lane_id
+
 // CHECK-NEXT: gpu.thread_id x upper_bound 64
 // CHECK-NEXT: gpu.thread_id y upper_bound 2
 // CHECK-NEXT: gpu.thread_id z upper_bound 1
@@ -70,12 +71,45 @@ hal.executable private @static {
 
 // -----
 
+// Note: not the real target definition, missing types
+#executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<arch = "gfx1100", features = "",
+  wgp = <compute =  fp32,
+    storage =  b32,
+    subgroup =  arithmetic,
+    subgroup_size_choices = [32, 64],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>}>
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>
+
+hal.executable private @manual_subgroup_size {
+  hal.executable.variant public @rocm_hsaco_fb target(#executable_target) {
+    hal.executable.export public @manual_subgroup_size ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
+      %c32 = arith.constant 32 : index
+      %c8 = arith.constant 8 : index
+      %c1 = arith.constant 1 : index
+      hal.return %c32, %c8, %c1 : index, index, index
+    } attributes {subgroup_size = 64 : index}
+    builtin.module {
+// CHECK-LABEL: func.func @manual_subgroup_size()
+      func.func @manual_subgroup_size() {
+// CHECK-NEXT: gpu.lane_id upper_bound 64
+        %lane_id = gpu.lane_id
+
+        return
+      }
+    }
+  }
+}
+
+// -----
+
 #executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-  {iree.gpu.target = #iree_gpu.target<arch = "gfx1100", features = "",
+  {iree_codegen.target_info = #iree_gpu.target<arch = "gfx1100", features = "",
   wgp = <compute =  fp32,
     storage =  b32,
     subgroup = arithmetic,
-    dot =  none, mma = [],
     subgroup_size_choices = [32, 64],
     max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024,
@@ -85,8 +119,7 @@ hal.executable private @static {
 
 hal.executable private @dynamic {
   hal.executable.variant public @rocm_hsaco_fb target(#executable_target) {
-    hal.executable.export public @dynamic ordinal(0) layout(#pipeline_layout) {
-      ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
+    hal.executable.export public @dynamic ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index) -> (index, index, index) {
       %count_x = affine.apply affine_map<()[s0] -> (s0 ceildiv 32)>()[%arg1]
       %count_y = affine.apply affine_map<()[s0] -> (s0 ceildiv 8)>()[%arg2]
       %count_z = arith.constant 1 : index
@@ -143,13 +176,12 @@ hal.executable private @dynamic {
 
 hal.executable private @static_cpu {
   hal.executable.variant public @embedded_elf_x86_64 target(#executable_target) {
-    hal.executable.export public @static_cpu ordinal(0) layout(#pipeline_layout) attributes {workgroup_size = [64 : index, 2 : index, 1 : index]} {
-    ^bb0(%arg0: !hal.device):
+    hal.executable.export public @static_cpu ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c32 = arith.constant 32 : index
       %c8 = arith.constant 8 : index
       %c1 = arith.constant 1 : index
       hal.return %c32, %c8, %c1 : index, index, index
-    }
+    } attributes {workgroup_size = [64 : index, 2 : index, 1 : index]}
     builtin.module {
 // CHECK-LABEL: func.func @static_cpu()
       func.func @static_cpu() {
@@ -180,8 +212,7 @@ hal.executable private @static_cpu {
 
 hal.executable private @dynamic_cpu {
   hal.executable.variant public @embedded_elf_x86_64 target(#executable_target) {
-    hal.executable.export public @dynamic_cpu ordinal(0) layout(#pipeline_layout) {
-      ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
+    hal.executable.export public @dynamic_cpu ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index) -> (index, index, index) {
       %count_x = affine.apply affine_map<()[s0] -> (s0 ceildiv 32)>()[%arg1]
       %count_y = affine.apply affine_map<()[s0] -> (s0 ceildiv 8)>()[%arg2]
       %count_z = arith.constant 1 : index

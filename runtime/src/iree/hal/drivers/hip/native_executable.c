@@ -174,17 +174,6 @@ static iree_status_t iree_hal_hip_native_executable_flatbuffer_verify(
                               i);
     }
 
-    uint32_t block_shared_memory_size =
-        iree_hal_hip_ExportDef_block_shared_memory_size_get(export_def);
-    if (block_shared_memory_size > limits->max_block_shared_memory_size) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "exports[%" PRIhsz
-                              "] requires %uB of shared memory and "
-                              "exceeds the device maximum of %uB per block",
-                              i, block_shared_memory_size,
-                              limits->max_block_shared_memory_size);
-    }
-
     uint32_t constant_count =
         iree_hal_hip_ExportDef_constant_count_get(export_def);
     if (constant_count > IREE_HAL_HIP_MAX_DISPATCH_CONSTANT_COUNT) {
@@ -207,6 +196,30 @@ static iree_status_t iree_hal_hip_native_executable_flatbuffer_verify(
 
     IREE_RETURN_IF_ERROR(iree_hal_debug_verify_export_def(
         iree_hal_hip_ExportDef_debug_info_get(export_def)));
+  }
+
+  return iree_ok_status();
+}
+
+// Verifies a function against the device limits so that we can avoid doing so
+// during runtime.
+static iree_status_t iree_hal_hip_function_attributes_verify(
+    iree_host_size_t id, const iree_hal_hip_dynamic_symbols_t* symbols,
+    hipFunction_t function, const iree_hal_hip_limits_t* limits) {
+  int block_shared_memory_size;
+  IREE_RETURN_IF_ERROR(IREE_HIP_CALL_TO_STATUS(
+      symbols,
+      hipFuncGetAttribute(
+          &block_shared_memory_size,
+          (hipFuncAttribute)HIP_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, function),
+      "hipFuncGetAttribute"));
+  if (block_shared_memory_size > limits->max_block_shared_memory_size) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "exports[%" PRIhsz
+                            "] requires %uB of shared memory and "
+                            "exceeds the device maximum of %uB per block",
+                            id, block_shared_memory_size,
+                            limits->max_block_shared_memory_size);
   }
 
   return iree_ok_status();
@@ -397,16 +410,8 @@ iree_status_t iree_hal_hip_native_executable_create(
           break;
         }
 
-        uint32_t block_shared_memory_size =
-            iree_hal_hip_ExportDef_block_shared_memory_size_get(export_def);
-        status = IREE_HIP_CALL_TO_STATUS(
-            symbols,
-            hipFuncSetAttribute(
-                function,
-                (hipFuncAttribute)
-                    HIP_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
-                block_shared_memory_size),
-            "hipFuncSetAttribute");
+        status = iree_hal_hip_function_attributes_verify(i, symbols, function,
+                                                         &limits);
         if (!iree_status_is_ok(status)) break;
 
         // Package required parameters for kernel launches for each entry
@@ -419,14 +424,24 @@ iree_status_t iree_hal_hip_native_executable_create(
         kernel_info->block_dims[0] = block_dims->x;
         kernel_info->block_dims[1] = block_dims->y;
         kernel_info->block_dims[2] = block_dims->z;
-        kernel_info->block_shared_memory_size =
-            iree_hal_hip_ExportDef_block_shared_memory_size_get(export_def);
         kernel_info->constant_count =
             iree_hal_hip_ExportDef_constant_count_get(export_def);
         iree_hal_hip_BindingBits_vec_t binding_flags_vec =
             iree_hal_hip_ExportDef_binding_flags_get(export_def);
         kernel_info->binding_count =
             iree_hal_hip_BindingBits_vec_len(binding_flags_vec);
+
+        if (iree_hal_hip_ExportDef_block_shared_memory_size_get(export_def) !=
+            0) {
+          status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                    "exports[%" PRIhsz
+                                    "] for kernel `%s` specified non-zero "
+                                    "deprecated field block_shared_memory_size "
+                                    "in modules[%u]. Verify matching compiler "
+                                    "and runtime versions.",
+                                    i, kernel_name, module_ordinal);
+          break;
+        }
 
         IREE_TRACE({
           iree_hal_debug_export_info_t* export_info =
@@ -478,7 +493,8 @@ static void iree_hal_hip_native_executable_destroy(
 }
 
 iree_status_t iree_hal_hip_native_executable_lookup_kernel_params(
-    iree_hal_executable_t* base_executable, int32_t ordinal,
+    iree_hal_executable_t* base_executable,
+    iree_hal_executable_export_ordinal_t ordinal,
     iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_hip_kernel_params_t** out_params) {
   *out_params = NULL;
@@ -506,7 +522,57 @@ iree_status_t iree_hal_hip_native_executable_lookup_kernel_params(
   return iree_ok_status();
 }
 
+static iree_host_size_t iree_hal_hip_native_executable_export_count(
+    iree_hal_executable_t* base_executable) {
+  iree_hal_hip_native_executable_t* executable =
+      iree_hal_hip_native_executable_cast(base_executable);
+  // TODO(hip): return the total number of exports in the executable.
+  (void)executable;
+  return 0;
+}
+
+static iree_status_t iree_hal_hip_native_executable_export_info(
+    iree_hal_executable_t* base_executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_export_info_t* out_info) {
+  iree_hal_hip_native_executable_t* executable =
+      iree_hal_hip_native_executable_cast(base_executable);
+  (void)executable;
+  // TODO(hip): return export information from kernel metadata.
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "reflection not implemented");
+}
+
+static iree_status_t iree_hal_hip_native_executable_export_parameters(
+    iree_hal_executable_t* base_executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_host_size_t capacity,
+    iree_hal_executable_export_parameter_t* out_parameters) {
+  iree_hal_hip_native_executable_t* executable =
+      iree_hal_hip_native_executable_cast(base_executable);
+  (void)executable;
+  // TODO(hip): return export parameter information from kernel metadata.
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "parameter reflection not implemented");
+}
+
+static iree_status_t iree_hal_hip_native_executable_lookup_export_by_name(
+    iree_hal_executable_t* base_executable, iree_string_view_t name,
+    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+  iree_hal_hip_native_executable_t* executable =
+      iree_hal_hip_native_executable_cast(base_executable);
+  (void)executable;
+  // TODO(hip): lookup the export ordinal by name.
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "reflection not implemented");
+}
+
 static const iree_hal_executable_vtable_t
     iree_hal_hip_native_executable_vtable = {
         .destroy = iree_hal_hip_native_executable_destroy,
+        .export_count = iree_hal_hip_native_executable_export_count,
+        .export_info = iree_hal_hip_native_executable_export_info,
+        .export_parameters = iree_hal_hip_native_executable_export_parameters,
+        .lookup_export_by_name =
+            iree_hal_hip_native_executable_lookup_export_by_name,
 };

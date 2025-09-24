@@ -4,8 +4,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/GlobalOptimization/Passes.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "iree/compiler/Modules/IO/Parameters/Transforms/Passes.h"
@@ -23,11 +23,6 @@ static llvm::cl::opt<bool> clEnableQuantizedMatmulReassociation(
     "iree-global-opt-enable-quantized-matmul-reassociation",
     llvm::cl::desc(
         "Enables reassociation of quantized matmul ops (experimental)."),
-    llvm::cl::init(false));
-static llvm::cl::opt<bool> clEnableFuseSiluHorizontalMatmul(
-    "iree-global-opt-enable-fuse-silu-horizontal-matmul",
-    llvm::cl::desc(
-        "Enables fusing specifically structured matmuls (experimental)."),
     llvm::cl::init(false));
 static llvm::cl::opt<bool> clEnableTransposePropagation(
     "iree-global-opt-propagate-transposes",
@@ -61,11 +56,13 @@ static llvm::cl::opt<DemotionOption> clDemoteContractionInputsToBF16Strategy(
         clEnumValN(DemotionOption::None, "none", "Demote no contraction ops.")),
     llvm::cl::init(DemotionOption::None));
 
-static llvm::cl::opt<int> clPadFactor(
-    "iree-global-opt-pad-factor",
-    llvm::cl::desc("provides padding size hints that will be attached to "
-                   "encodings."),
-    llvm::cl::init(32));
+static llvm::cl::opt<DispatchCreation::EncodingOptions> clSetEncodingStrategy(
+    "iree-global-opt-set-encoding-strategy",
+    llvm::cl::desc("Set the encoding strategy for operations."),
+    llvm::cl::values(clEnumValN(
+        DispatchCreation::EncodingOptions::Generic, "generic",
+        "Using EncodingAttr which encodes as much information as possible")),
+    llvm::cl::init(DispatchCreation::EncodingOptions::Generic));
 
 static llvm::cl::opt<bool> clWarnOnUninitializedValues(
     "iree-global-opt-enable-warn-on-uninitialized-values",
@@ -77,7 +74,7 @@ void buildGlobalOptExprHoistingPassPipeline(
   options.maxSizeIncreaseThreshold =
       transformOptions.options.constExprMaxSizeIncreaseThreshold;
   options.registerDependentDialectsFn = [](DialectRegistry &registry) {
-    registry.insert<IREE::Flow::FlowDialect>();
+    registry.insert<IREE::TensorExt::IREETensorExtDialect>();
   };
   passManager.addPass(IREE::Util::createHoistIntoGlobalsPass(options));
 }
@@ -112,11 +109,12 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(IREE::Util::createOptimizeIntArithmeticPass)
       .addPass(createLinalgQuantizedConvToConvPass)
       .addPass(createLinalgQuantizedMatmulToMatmulPass)
-      .addPass(IREE::Flow::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(createRemoveZeroExtentTensorsPass)
       .addPass(createDetachElementwiseFromNamedOpsPass)
       .addPass(mlir::createLinalgNamedOpConversionPass)
       .addPass(createGetPaddingValuePass);
+      .addPass(mlir::createSimplifyDepthwiseConvPass);
   mainPassManager.addPass(createEraseUnusedLinalgOperandsPass());
 
   // Expand tensor shapes into SSA values and optimize the whole program.
@@ -151,16 +149,16 @@ void buildGlobalOptimizationPassPipeline(
       });
 
   mainPassManager.addPass(DispatchCreation::createFoldUnitExtentDimsPass());
+  mainPassManager.addPass(
+      GlobalOptimization::createConvertStridedContractionToContractionPass());
   FunctionLikeNest(mainPassManager)
-      .addPredicatedPass(clEnableFuseSiluHorizontalMatmul,
-                         createFuseSiluHorizontalMatmulPass)
       .addPass([&]() {
         return createDemoteContractionInputsToBF16Pass(
             clDemoteContractionInputsToBF16Strategy);
       })
       .addPredicatedPass(clEnableQuantizedMatmulReassociation,
                          createFuseDequantizationMatmulPass)
-      .addPass(IREE::Flow::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
       // Propagate transposes immediately before set encoding/data tiling
       // because transpose propagation cannot take an opinion on the preferred
@@ -177,21 +175,21 @@ void buildGlobalOptimizationPassPipeline(
             options.enableAttentionVTranspose = clEnableAttentionVTranspose;
             return createPropagateLinalgTransposePass(options);
           })
-      .addPass(IREE::Flow::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass);
 
   // Enable data tiling after they are in a canonical form.
   if (transformOptions.options.dataTiling) {
-    FunctionLikeNest(mainPassManager).addPass([&]() {
-      return DispatchCreation::createSetEncodingPass(
-          DispatchCreation::SetEncodingPassOptions{clPadFactor});
-    });
-    // TODO(hanchung): Make data-tiling passes be FunctionOpInterface pass, so
-    // we can use `FunctionLikNest` here.
+    FunctionLikeNest(mainPassManager)
+        .addPass(DispatchCreation::createAnnotateDataTilingHintsPass)
+        .addPass([&]() {
+          return DispatchCreation::createSetEncodingPass(
+              DispatchCreation::SetEncodingPassOptions{clSetEncodingStrategy});
+        });
     if (clEnableEarlyMaterialization) {
       mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
     }
-    mainPassManager.addPass(IREE::Flow::createCanonicalizerPass());
+    mainPassManager.addPass(IREE::Flow::createCanonicalizePass());
     mainPassManager.addPass(createCSEPass());
     mainPassManager.addPass(createSimplifyPackUnpackPass());
     FunctionLikeNest(mainPassManager).addPass(createDataLayoutPropagationPass);
@@ -203,7 +201,7 @@ void buildGlobalOptimizationPassPipeline(
   // Hoist loop invariants (e.g. from scf loops) with zero-trip-check.
   FunctionLikeNest(mainPassManager)
       .addPass(createGlobalLoopInvariantCodeMotionPass)
-      .addPass(IREE::Flow::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
 
       // Simplify util.global accesses early on; this can help with dispatch
@@ -220,7 +218,7 @@ void buildGlobalOptimizationPassPipeline(
 
   FunctionLikeNest(mainPassManager)
       .addPass(IREE::Util::createOptimizeIntArithmeticPass)
-      .addPass(IREE::Flow::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(createCSEPass);
 
   if (transformOptions.options.constExprHoisting) {
@@ -238,7 +236,7 @@ void buildGlobalOptimizationPassPipeline(
   }
 
   FunctionLikeNest(mainPassManager)
-      .addPass(IREE::Flow::createCanonicalizerPass)
+      .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
       // After running const-eval to a fixed point and folding unit extent dims,
       // try any new raising opportunities.

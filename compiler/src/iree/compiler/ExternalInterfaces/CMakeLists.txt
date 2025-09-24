@@ -14,20 +14,23 @@ iree_cc_library(
   NAME
     ExternalModels
   HDRS
-    "FlowExternalModels.h"
+    "EncodingExternalModels.h"
     "HALExternalModels.h"
     "Interfaces.h"
     "LinalgExtExternalModels.h"
     "StreamExternalModels.h"
+    "TensorExtExternalModels.h"
     "UtilExternalModels.h"
   SRCS
-    "FlowExternalModels.cpp"
+    "EncodingExternalModels.cpp"
     "HALExternalModels.cpp"
     "Interfaces.cpp"
     "LinalgExtExternalModels.cpp"
     "StreamExternalModels.cpp"
+    "TensorExtExternalModels.cpp"
     "UtilExternalModels.cpp"
   DEPS
+    LLVMSupport
     MLIRArithDialect
     MLIRGPUDialect
     MLIRIR
@@ -37,13 +40,13 @@ iree_cc_library(
     MLIRMLProgramDialect
     MLIRTensorDialect
     MLIRValueBoundsOpInterface
-    iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::Stream::IR
+    iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Dialect::Util::IR
   PUBLIC
 )

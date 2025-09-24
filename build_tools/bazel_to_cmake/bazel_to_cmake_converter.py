@@ -460,6 +460,7 @@ class BuildFileFunctions(object):
         args=None,
         tags=None,
         includes=None,
+        group=None,
         **kwargs,
     ):
         if self._should_skip_target(tags=tags, **kwargs):
@@ -475,6 +476,7 @@ class BuildFileFunctions(object):
         labels_block = self._convert_string_list_block("LABELS", tags)
         timeout_block = self._convert_timeout_arg_block("TIMEOUT", timeout)
         includes_block = self._convert_includes_block(includes)
+        group_block = self._convert_string_arg_block("GROUP", group)
 
         self._converter.body += (
             f"iree_cc_test(\n"
@@ -489,6 +491,7 @@ class BuildFileFunctions(object):
             f"{labels_block}"
             f"{timeout_block}"
             f"{includes_block}"
+            f"{group_block}"
             f")\n\n"
         )
 
@@ -588,6 +591,31 @@ class BuildFileFunctions(object):
             f"{hdrs_block}"
             f"{srcs_block}"
             f"{copts_block}"
+            f")\n\n"
+        )
+
+    def iree_amdgpu_binary(
+        self, name, target, arch, srcs, internal_hdrs=[], copts=[], linkopts=[]
+    ):
+        name_block = self._convert_string_arg_block("NAME", name, quote=False)
+        target_block = self._convert_string_arg_block("TARGET", target, quote=False)
+        arch_block = self._convert_string_arg_block("ARCH", arch, quote=False)
+        hdrs_block = self._convert_srcs_block(internal_hdrs, block_name="INTERNAL_HDRS")
+        srcs_block = self._convert_srcs_block(srcs)
+        copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
+        linkopts_block = self._convert_string_list_block(
+            "LINKOPTS", linkopts, sort=False
+        )
+
+        self._converter.body += (
+            f"iree_amdgpu_binary(\n"
+            f"{name_block}"
+            f"{target_block}"
+            f"{arch_block}"
+            f"{hdrs_block}"
+            f"{srcs_block}"
+            f"{copts_block}"
+            f"{linkopts_block}"
             f")\n\n"
         )
 
@@ -732,6 +760,7 @@ class BuildFileFunctions(object):
     def iree_tablegen_doc(
         self,
         name,
+        category,
         tblgen,
         td_file,
         tbl_outs,
@@ -741,6 +770,7 @@ class BuildFileFunctions(object):
         test=None,
     ):
         name_block = self._convert_string_arg_block("NAME", name, quote=False)
+        category_block = self._convert_string_arg_block("CATEGORY", category)
         tblgen_block = self._convert_tblgen_block(tblgen)
         td_file_block = self._convert_td_file_block(td_file)
         outs_block = self._convert_tbl_outs_block(tbl_outs)
@@ -748,6 +778,7 @@ class BuildFileFunctions(object):
         self._converter.body += (
             f"iree_tablegen_doc(\n"
             f"{name_block}"
+            f"{category_block}"
             f"{td_file_block}"
             f"{outs_block}"
             f"{tblgen_block}"

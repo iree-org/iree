@@ -25,6 +25,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -116,11 +117,8 @@ static SmallVector<int64_t> deduceSubgroupCounts(linalg::LinalgOp op) {
     assert(workgroupTileSizes[i] % subgroupTileSizes[i] == 0);
     subgroupCounts.push_back(workgroupTileSizes[i] / subgroupTileSizes[i]);
   }
-  LLVM_DEBUG({
-    llvm::dbgs() << "deduced subgroup counts (X, Y, Z) = [";
-    llvm::interleaveComma(subgroupCounts, llvm::dbgs());
-    llvm::dbgs() << "]\n";
-  });
+  LLVM_DEBUG(llvm::dbgs() << "deduced subgroup counts (X, Y, Z) = "
+                          << llvm::interleaved_array(subgroupCounts) << "\n");
   return subgroupCounts;
 }
 
@@ -152,7 +150,7 @@ static LogicalResult tileToSubgroup(mlir::FunctionOpInterface funcOp,
     tileSizes.resize(
         std::min(cast<linalg::LinalgOp>(op).getNumParallelLoops(), 3u));
     return llvm::map_to_vector(tileSizes, [&](int64_t v) -> Value {
-      return builder.create<arith::ConstantIndexOp>(op->getLoc(), v);
+      return arith::ConstantIndexOp::create(builder, op->getLoc(), v);
     });
   };
   auto tilingOptions = linalg::LinalgTilingOptions()
@@ -281,7 +279,7 @@ void populateVectorUnrollPatterns(ArrayRef<int64_t> cooperativeOpSize,
 class CombineContractTranspose final
     : public OpRewritePattern<vector::ContractionOp> {
 public:
-  using OpRewritePattern<vector::ContractionOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::ContractionOp op,
                                 PatternRewriter &rewriter) const override {
@@ -314,8 +312,8 @@ public:
     if (!foundTranspose)
       return failure();
 
-    Value res = rewriter.create<vector::ContractionOp>(
-        loc, newSources[0], newSources[1], newSources[2],
+    Value res = vector::ContractionOp::create(
+        rewriter, loc, newSources[0], newSources[1], newSources[2],
         rewriter.getAffineMapArrayAttr(newMaps), op.getIteratorTypes());
     rewriter.replaceOp(op, res);
     return success();
@@ -337,7 +335,7 @@ public:
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
 
     // First we need to discover the CodeGen lowering configuration. It was
     // decided earlier and attached to a linalg op as an attribute.
@@ -404,7 +402,7 @@ public:
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
 
     // First discover the chosen cooperative matrix shape. It was decided
     // earlier and attached to the export op as an attribute.

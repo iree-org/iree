@@ -121,7 +121,9 @@ llvm::SetVector<Operation *> computeSliceToMoveIntoDispatch(
   };
   options.omitBlockArguments = true;
   llvm::SetVector<Operation *> slice;
-  getBackwardSlice(rootOp, &slice, options);
+  [[maybe_unused]] LogicalResult result =
+      getBackwardSlice(rootOp, &slice, options);
+  assert(result.succeeded());
   return slice;
 }
 
@@ -283,10 +285,10 @@ void FormScalarDispatchesPass::runOnOperation() {
     Block *countBody = rewriter.createBlock(&countRegion, countRegion.begin());
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPointToStart(countBody);
-    auto one = rewriter.create<arith::ConstantIndexOp>(
-        dispatchRegionOp.value()->getLoc(), 1);
-    rewriter.create<IREE::Flow::ReturnOp>(dispatchRegionOp.value()->getLoc(),
-                                          ValueRange{one, one, one});
+    auto one = arith::ConstantIndexOp::create(
+        rewriter, dispatchRegionOp.value()->getLoc(), 1);
+    IREE::Flow::ReturnOp::create(rewriter, dispatchRegionOp.value()->getLoc(),
+                                 ValueRange{one, one, one});
   }
 }
 

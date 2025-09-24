@@ -213,8 +213,8 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
     // affinity info. Note that we pack "use efficiency cores only" into the SMT
     // bit and use that to force a QoS level that ensures only efficiency cores
     // are used when present. Probably.
-    group->ideal_thread_affinity.specified = 1;
     group->ideal_thread_affinity.group = (uint32_t)node_id;
+    group->ideal_thread_affinity.id_assigned = 1;
     group->ideal_thread_affinity.id = i;
     switch (performance_level) {
       default:

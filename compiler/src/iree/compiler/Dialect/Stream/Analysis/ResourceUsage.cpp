@@ -269,10 +269,8 @@ private:
         })
         .Case([&](IREE::Util::GlobalLoadOpInterface op) {
           removeAssumedBits(NOT_GLOBAL_READ);
-          auto *globalInfo =
-              solver.getExplorer().queryGlobalInfoFrom(op.getGlobalName(), op);
-          auto globalType = llvm::cast<IREE::Stream::ResourceType>(
-              globalInfo->op.getGlobalType());
+          auto globalType = cast<IREE::Stream::ResourceType>(
+              op.getLoadedGlobalValue().getType());
           switch (globalType.getLifetime()) {
           case IREE::Stream::Lifetime::Constant:
             removeAssumedBits(NOT_CONSTANT);
@@ -640,10 +638,8 @@ private:
         })
         .Case([&](IREE::Util::GlobalStoreOpInterface op) {
           removeAssumedBits(NOT_GLOBAL_WRITE);
-          auto *globalInfo =
-              solver.getExplorer().queryGlobalInfoFrom(op.getGlobalName(), op);
-          auto globalType = llvm::cast<IREE::Stream::ResourceType>(
-              globalInfo->op.getGlobalType());
+          auto globalType = cast<IREE::Stream::ResourceType>(
+              op.getStoredGlobalValue().getType());
           switch (globalType.getLifetime()) {
           case IREE::Stream::Lifetime::Constant:
             removeAssumedBits(NOT_CONSTANT);
@@ -813,8 +809,25 @@ private:
           removeAssumedBits(NOT_DISPATCH_READ);
           for (auto result : op.getOperandTiedResults(operandIdx)) {
             removeAssumedBits(NOT_MUTATED | NOT_DISPATCH_WRITE);
-            auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
-                *this, Position::forValue(result), DFX::Resolution::REQUIRED);
+            // TODO(#20748): some programs do some very naughty things with
+            // in-place operations that may lead to 10000+ sequentially tied
+            // dispatches. Currently getElementFor will recursively perform an
+            // update on initialization and that easily leads to stack
+            // overflows. The correct solution is to either pre-seed during
+            // value initialization or find a way to short-circuit the walk and
+            // break the tied traversal. An alternative would be to add a solver
+            // getElementFor helper that takes a callback instead of returning
+            // a result to allow it to manage a worklist instead of using the
+            // native stack.
+            //
+            // Original code (that should be what happens):
+            //   auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
+            //    *this, Position::forValue(result), DFX::Resolution::REQUIRED);
+            auto &resultUsage =
+                solver.getOrCreateElementFor<ValueResourceUsage>(
+                    Position::forValue(result), *this,
+                    DFX::Resolution::REQUIRED, /*forceUpdate=*/false,
+                    /*updateAfterInit=*/false);
             getState() ^= resultUsage.getState();
           }
         })

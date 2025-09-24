@@ -7,19 +7,14 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/SymbolTable.h"
 #include "mlir/Support/LogicalResult.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
@@ -98,8 +93,8 @@ struct DeduplicateTensorBarrierSources
     if (orderedSources.size() == op.getSources().size()) {
       return failure();
     }
-    auto newOp = rewriter.create<TensorBarrierOp>(op.getLoc(), orderedSources,
-                                                  op.getSignalFence());
+    auto newOp = TensorBarrierOp::create(rewriter, op.getLoc(), orderedSources,
+                                         op.getSignalFence());
     SmallVector<Value> newResults;
     newResults.reserve(newOp.getNumResults());
     for (unsigned newIndex : resultMapping) {
@@ -115,6 +110,59 @@ struct DeduplicateTensorBarrierSources
 void TensorBarrierOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context) {
   results.insert<DeduplicateTensorBarrierSources>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// hal.allocator.*
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Tries to fold either the device or queue affinity of a select when all
+/// potential values of either match.
+struct FoldAllocatorSelect : public OpRewritePattern<AllocatorSelectOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(AllocatorSelectOp op,
+                                PatternRewriter &rewriter) const override {
+    // Calculate the unique set of devices and unique set of queue affinities.
+    DenseSet<Value> devices;
+    DenseSet<Value> queueAffinities;
+    for (auto [device, queueAffinity] :
+         llvm::zip_equal(op.getDevices(), op.getQueueAffinities())) {
+      devices.insert(device);
+      queueAffinities.insert(queueAffinity);
+    }
+    if (devices.size() == 1 && queueAffinities.size() == 1) {
+      // Only a single selected combination.
+      Value commonDevice = *devices.begin();
+      Value commonQueueAffinityMask = *queueAffinities.begin();
+      rewriter.replaceOp(op, {commonDevice, commonQueueAffinityMask});
+      return success();
+    } else if (devices.size() == 1 && !op.getSelectedDevice().use_empty()) {
+      // Device is common but queue masks are not.
+      // This is unlikely to arise naturally.
+      Value commonDevice = *devices.begin();
+      rewriter.replaceAllUsesWith(op.getSelectedDevice(), commonDevice);
+      return success();
+    } else if (queueAffinities.size() == 1 &&
+               !op.getSelectedQueueAffinity().use_empty()) {
+      // Queue affinities are common (likely "any") but devices are not.
+      // We can fold the queue affinity mask to a constant now to allow it to
+      // propagate.
+      Value commonQueueAffinityMask = *queueAffinities.begin();
+      rewriter.replaceAllUsesWith(op.getSelectedQueueAffinity(),
+                                  commonQueueAffinityMask);
+      return success();
+    }
+    return failure();
+  }
+};
+
+} // namespace
+
+void AllocatorSelectOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                    MLIRContext *context) {
+  results.insert<FoldAllocatorSelect>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -661,6 +709,47 @@ void DeviceQueueBarrierOp::getCanonicalizationPatterns(
 
 namespace {
 
+/// Removes the condition region and fallback from an export that will always be
+/// selected. This happens if the condition region is folded using a specialized
+/// target environment that allows for compile-time query evaluation.
+struct DropTrueConditionRegion : public OpRewritePattern<ExecutableExportOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(ExecutableExportOp exportOp,
+                                PatternRewriter &rewriter) const override {
+    auto *block = exportOp.getConditionBody();
+    if (!block) {
+      return rewriter.notifyMatchFailure(exportOp, "no condition region");
+    }
+
+    auto returnOp =
+        dyn_cast_if_present<IREE::HAL::ReturnOp>(block->getTerminator());
+    if (!returnOp) {
+      return rewriter.notifyMatchFailure(exportOp,
+                                         "invalid condition terminator");
+    }
+
+    Value conditionResult = returnOp.getOperand(0);
+    if (!matchPattern(conditionResult, m_One())) {
+      return rewriter.notifyMatchFailure(exportOp,
+                                         "non-constant true condition result");
+    }
+
+    rewriter.eraseBlock(block);
+    rewriter.modifyOpInPlace(exportOp,
+                             [&]() { exportOp.removeConditionFallbackAttr(); });
+    return success();
+  }
+};
+
+} // namespace
+
+void ExecutableExportOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                     MLIRContext *context) {
+  results.insert<DropTrueConditionRegion>(context);
+}
+
+namespace {
+
 // Returns a set of fused locations for each result from all return sites.
 static SmallVector<Location> gatherResultLocations(int numResults,
                                                    Region &region) {
@@ -750,8 +839,8 @@ struct MergeExecutableConstantBlocks
     // about making that work.
     rewriter.setInsertionPoint(blockOps.front());
     auto fusedLoc = rewriter.getFusedLoc(blockLocs);
-    auto newBlockOp = rewriter.create<ExecutableConstantBlockOp>(
-        fusedLoc, rewriter.getFunctionType(inputTypes, resultTypes),
+    auto newBlockOp = ExecutableConstantBlockOp::create(
+        rewriter, fusedLoc, rewriter.getFunctionType(inputTypes, resultTypes),
         rewriter.getArrayAttr(resultKeys), /*arg_attrs=*/ArrayAttr(),
         /*res_attrs=*/ArrayAttr());
 
@@ -855,7 +944,8 @@ struct DropUnusedExecutableConstantBlockDeviceArg
     if (!deviceArg.use_empty())
       return failure();
     rewriter.modifyOpInPlace(blockOp, [&]() {
-      blockOp.eraseArgument(0);
+      // Type conversion here shouldn't fail.
+      (void)blockOp.eraseArgument(0);
       blockOp.setFunctionTypeAttr(TypeAttr::get(
           rewriter.getFunctionType(/*inputs=*/{}, blockOp.getResultTypes())));
     });
@@ -1034,8 +1124,8 @@ struct ElideSignaledFence : public OpRewritePattern<FenceSignalOp> {
     }
 
     // Safe to elide.
-    Value nullFence = rewriter.create<IREE::Util::NullOp>(
-        rewriter.getFusedLoc({createOp.getLoc(), signalOp.getLoc()}),
+    Value nullFence = IREE::Util::NullOp::create(
+        rewriter, rewriter.getFusedLoc({createOp.getLoc(), signalOp.getLoc()}),
         fence.getType());
     rewriter.replaceAllUsesWith(fence, nullFence);
     rewriter.eraseOp(signalOp);
@@ -1091,6 +1181,24 @@ void FenceAwaitOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                MLIRContext *context) {
   results.insert<ElideEmptyFenceAwait>(context);
   results.insert<DeduplicateFenceAwaitFences>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// hal.buffer_usage
+//===----------------------------------------------------------------------===//
+
+OpFoldResult BufferUsageOp::fold(FoldAdaptor operands) {
+  return IntegerAttr::get(IntegerType::get(getContext(), 32),
+                          getUsageAttr().getInt());
+}
+
+//===----------------------------------------------------------------------===//
+// hal.memory_type
+//===----------------------------------------------------------------------===//
+
+OpFoldResult MemoryTypeOp::fold(FoldAdaptor operands) {
+  return IntegerAttr::get(IntegerType::get(getContext(), 32),
+                          getTypeAttr().getInt());
 }
 
 } // namespace mlir::iree_compiler::IREE::HAL

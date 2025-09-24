@@ -19,8 +19,6 @@ void populateLLVMConversionPatterns(MLIRContext *context,
                                     RewritePatternSet &patterns,
                                     LLVMTypeConverter &converter);
 
-void populateScalarizeMathOps(RewritePatternSet &patterns);
-
 /// Lower hal.interface ops to the equivalent gpu ops.
 void populateLowerHALInterfaceOp(RewritePatternSet &patterns);
 
@@ -28,6 +26,8 @@ void populateLowerHALInterfaceOp(RewritePatternSet &patterns);
 void populateConvertSharedMemoryAllocOps(RewritePatternSet &patterns);
 
 void ConvertToDynamicSharedMemory(ModuleOp moduleOp);
+
+void setSharedMemoryAlignment(ModuleOp moduleOp, uint64_t newAlignment);
 
 using MemorySpaceMapping =
     std::function<unsigned(gpu::AddressSpace gpuAddressSpace)>;

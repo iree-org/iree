@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
@@ -131,7 +130,7 @@ namespace {
 
 struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
     : public OpRewritePattern<memref::ExtractStridedMetadataOp> {
-  using OpRewritePattern<memref::ExtractStridedMetadataOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(memref::ExtractStridedMetadataOp op,
                                 PatternRewriter &rewriter) const override {
     auto binding =
@@ -202,11 +201,11 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
       newBufferType = MemRefType::get(
           staticLinearShape, memRefType.getElementType(),
           MemRefLayoutAttrInterface(), memRefType.getMemorySpace());
-      Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-      newBinding = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-          loc, newBufferType, binding.getLayoutAttr(), binding.getBindingAttr(),
-          zero, dynamicLinearShape, binding.getAlignmentAttr(),
-          binding.getDescriptorFlagsAttr());
+      Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+      newBinding = IREE::HAL::InterfaceBindingSubspanOp::create(
+          rewriter, loc, newBufferType, binding.getLayoutAttr(),
+          binding.getBindingAttr(), zero, dynamicLinearShape,
+          binding.getAlignmentAttr(), binding.getDescriptorFlagsAttr());
     }
     SmallVector<Value> results;
     results.reserve(memRefType.getRank() * 2 + 2);
@@ -215,8 +214,8 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
       if (newBufferType == baseBufferType) {
         results.push_back(newBinding);
       } else {
-        Value reinterpretCast = rewriter.create<memref::ReinterpretCastOp>(
-            loc, baseBufferType, newBinding, /*offset=*/0,
+        Value reinterpretCast = memref::ReinterpretCastOp::create(
+            rewriter, loc, baseBufferType, newBinding, /*offset=*/0,
             /*sizes=*/ArrayRef<int64_t>(),
             /*strides=*/ArrayRef<int64_t>());
         results.push_back(reinterpretCast);
@@ -253,8 +252,7 @@ struct ConvertCodegenIREEExtractMetadataToMemRef
 
 struct IREEExpandStridedMetadataPass final
     : impl::IREEExpandStridedMetadataPassBase<IREEExpandStridedMetadataPass> {
-  using impl::IREEExpandStridedMetadataPassBase<
-      IREEExpandStridedMetadataPass>::IREEExpandStridedMetadataPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, arith::ArithDialect,
@@ -266,8 +264,12 @@ struct IREEExpandStridedMetadataPass final
 } // namespace
 
 void populateIREEResolveExtractStridedMetadataPatterns(
-    RewritePatternSet &patterns) {
-  memref::populateResolveExtractStridedMetadataPatterns(patterns);
+    RewritePatternSet &patterns, bool allowSubviewExpansion) {
+  if (allowSubviewExpansion) {
+    memref::populateExpandStridedMetadataPatterns(patterns);
+  } else {
+    memref::populateResolveExtractStridedMetadataPatterns(patterns);
+  }
   amdgpu::populateAmdgpuResolveStridedMetadataPatterns(patterns);
   patterns.insert<ResolveExtractMetadataFromHalInterfaceBindingSubspan>(
       patterns.getContext());
@@ -278,8 +280,8 @@ void populateIREEResolveExtractStridedMetadataPatterns(
 void IREEExpandStridedMetadataPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
-  populateIREEResolveExtractStridedMetadataPatterns(patterns);
-  populateRemoveDeadMemAllocPatterns(patterns);
+  populateIREEResolveExtractStridedMetadataPatterns(patterns,
+                                                    allowSubviewExpansion);
   if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
   }

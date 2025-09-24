@@ -200,3 +200,104 @@ func.func @pipelined_loop_extract(%arg0: f32, %arg1: f32) -> (f32, f32) {
 //       CHECK:     vector.extract
 //       CHECK:     vector.extract
 //       CHECK:     return {{.*}} : f32, f32
+
+// -----
+
+func.func @extract_on_induction_variable() -> f32 {
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
+  %cst = arith.constant dense<[1.000000e+00, 2.000000e+00, 3.000000e+00, 4.000000e+00]> : vector<4xf32>
+  %0 = scf.for %arg0 = %c1 to %c3 step %c1 iter_args(%arg1 = %cst) -> (vector<4xf32>) {
+    %2 = vector.extract %arg1[%arg0] : f32 from vector<4xf32>
+    %3 = arith.addf %2, %2 : f32
+    %4 = vector.broadcast %3 : f32 to vector<4xf32>
+    scf.yield %4 : vector<4xf32>
+  }
+  %1 = vector.extract %0[0] : f32 from vector<4xf32>
+  return %1 : f32
+}
+
+// On the first iteration, value 2.0000 is extracted.
+// On subsequent iterations, the result of the add is broadcast, then extracted.
+// This test checks that the redundant broadcast->extract is eliminated.
+// CHECK-LABEL: func.func @extract_on_induction_variable
+//   CHECK-DAG:      %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:      %[[C3:.+]] = arith.constant 3 : index
+//   CHECK-DAG:      %[[CST:.+]] = arith.constant 2.000000e+00 : f32
+//       CHECK:      %[[FOR:.+]] = scf.for %[[ARG0:.+]] = %[[C1]] to %[[C3]] step %[[C1]] iter_args(%[[ARG1:.+]] = %[[CST]]) -> (f32) {
+//       CHECK:        %[[ADD:.+]] = arith.addf %[[ARG1]], %[[ARG1]] : f32
+//       CHECK:        scf.yield %[[ADD]] : f32
+//       CHECK:      }
+//       CHECK:      return %[[FOR]] : f32
+
+// -----
+
+func.func @subset_of_indvars_updated() -> (vector<4xf32>, vector<4xf32>) {
+  %cv0 = arith.constant dense<0.000000e+00> : vector<4xf32>
+  %cv1 = arith.constant dense<1.000000e+00> : vector<4xf32>
+  %c1 = arith.constant 1 : index
+  %c10 = arith.constant 10 : index
+  %0 = vector.shape_cast %cv1 : vector<4xf32> to vector<1x4xf32>
+  %1:2 = scf.for %arg2 = %c1 to %c10 step %c1 iter_args(%arg3 = %cv0, %arg4 = %0) -> (vector<4xf32>, vector<1x4xf32>) {
+    %3 = vector.shape_cast %arg4 : vector<1x4xf32> to vector<4xf32>
+    %4 = arith.addf %arg3, %3 : vector<4xf32>
+    %5 = arith.mulf %arg3, %3 : vector<4xf32>
+    %6 = vector.shape_cast %5 : vector<4xf32> to vector<1x4xf32>
+    scf.yield %4, %6 : vector<4xf32>, vector<1x4xf32>
+  }
+  %2 = vector.shape_cast %1#1 : vector<1x4xf32> to vector<4xf32>
+  return %1#0, %2 : vector<4xf32>, vector<4xf32>
+}
+
+// The first iter argument is unchanged (there is no shape_casting on it to start with)
+// but the second iter argument is folded.
+// CHECK-LABEL: func.func @subset_of_indvars_updated
+//   CHECK-DAG:   %[[CV0:.+]] = arith.constant dense<0.000000e+00> : vector<4xf32>
+//   CHECK-DAG:   %[[CV1:.+]] = arith.constant dense<1.000000e+00> : vector<4xf32>
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[C10:.+]] = arith.constant 10 : index
+//       CHECK:        %[[FOR:.+]]:2 = scf.for %[[ARG2:.+]] = %[[C1]] to %[[C10]] step %[[C1]]
+//  CHECK-SAME:            iter_args(%[[ARG3:.+]] = %[[CV0]], %[[ARG4:.+]] = %[[CV1]])
+//  CHECK-SAME:                                            -> (vector<4xf32>, vector<4xf32>) {
+//       CHECK:       %[[ADD:.+]] = arith.addf %[[ARG3]], %[[ARG4]] : vector<4xf32>
+//       CHECK:       %[[MUL:.+]] = arith.mulf %[[ARG3]], %[[ARG4]] : vector<4xf32>
+//       CHECK:       scf.yield %[[ADD]], %[[MUL]] : vector<4xf32>, vector<4xf32>
+//       CHECK:     }
+//       CHECK:   return %[[FOR]]#0, %[[FOR]]#1 : vector<4xf32>, vector<4xf32>
+
+
+// -----
+
+func.func @multiple_users() -> vector<1x1x1x4xf32> {
+  %cst = arith.constant dense<1.000000e+00> : vector<1x1x1x4xf32>
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
+  %0 = scf.for %arg0 = %c1 to %c3 step %c1 iter_args(%arg1 = %cst) -> (vector<1x1x1x4xf32>) {
+    %1 = vector.shape_cast %arg1 : vector<1x1x1x4xf32> to vector<4xf32>
+    %2 = vector.shape_cast %arg1 : vector<1x1x1x4xf32> to vector<4xf32>
+    %3 = builtin.unrealized_conversion_cast %arg1 : vector<1x1x1x4xf32> to vector<4xf32>
+    %4 = builtin.unrealized_conversion_cast %arg1 : vector<1x1x1x4xf32> to vector<4xf32>
+    %5 = arith.addf %1, %2 : vector<4xf32>
+    %6 = arith.addf %3, %4 : vector<4xf32>
+    %7 = arith.addf %5, %6 : vector<4xf32>
+    %8 = vector.shape_cast %7 : vector<4xf32> to vector<1x1x1x4xf32>
+    scf.yield %8 : vector<1x1x1x4xf32>
+  }
+  return %0 : vector<1x1x1x4xf32>
+}
+
+// The multiple users of %arg1 are all of the same type, and are therefore candidates
+// for folding with the yielded value for %arg1.
+// CHECK-LABEL: func.func @multiple_users
+//   CHECK-DAG:    %[[CST:.+]] = arith.constant dense<1.000000e+00> : vector<4xf32>
+//   CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:    %[[C3:.+]] = arith.constant 3 : index
+//       CHECK:     %[[FOR:.+]] = scf.for %[[ARG0:.+]] = %[[C1]] to %[[C3]] step %[[C1]]
+//  CHECK-SAME:                   iter_args(%[[ARG1:.+]] = %[[CST]]) -> (vector<4xf32>) {
+//       CHECK:       %[[ADD0:.+]] = arith.addf %[[ARG1]], %[[ARG1]] : vector<4xf32>
+//       CHECK:       %[[ADD1:.+]] = arith.addf %[[ARG1]], %[[ARG1]] : vector<4xf32>
+//       CHECK:       %[[ADD2:.+]] = arith.addf %[[ADD0]], %[[ADD1]] : vector<4xf32>
+//       CHECK:       scf.yield %[[ADD2]] : vector<4xf32>
+//  CHECK-NEXT:     }
+//       CHECK:     %[[SHAPE_CAST_1:.+]] = vector.shape_cast %[[FOR]] : vector<4xf32> to vector<1x1x1x4xf32>
+//       CHECK:     return %[[SHAPE_CAST_1]] : vector<1x1x1x4xf32>

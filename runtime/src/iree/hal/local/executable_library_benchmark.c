@@ -10,7 +10,6 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
 #include "iree/hal/api.h"
 #include "iree/hal/local/executable_library.h"
@@ -18,6 +17,7 @@
 #include "iree/hal/local/loaders/registration/init.h"
 #include "iree/hal/local/local_executable.h"
 #include "iree/hal/local/plugins/registration/init.h"
+#include "iree/io/file_contents.h"
 #include "iree/testing/benchmark.h"
 
 IREE_FLAG(string, executable_format, "",
@@ -25,7 +25,7 @@ IREE_FLAG(string, executable_format, "",
 IREE_FLAG(string, executable_file, "",
           "Path to the executable library file to load.");
 
-IREE_FLAG(int32_t, entry_point, 0, "Entry point ordinal to run.");
+IREE_FLAG(int32_t, export_ordinal, 0, "Export ordinal to run.");
 
 IREE_FLAG(int32_t, workgroup_count_x, 1,
           "X dimension of the workgroup count defining the number of\n"
@@ -152,10 +152,10 @@ static iree_status_t iree_hal_executable_library_run(
       iree_make_cstring_view(FLAG_executable_format);
 
   // Load the executable data.
-  iree_file_contents_t* file_contents = NULL;
-  IREE_RETURN_IF_ERROR(iree_file_read_contents(FLAG_executable_file,
-                                               IREE_FILE_READ_FLAG_DEFAULT,
-                                               host_allocator, &file_contents));
+  iree_io_file_contents_t* file_contents = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_io_file_contents_read(iree_make_cstring_view(FLAG_executable_file),
+                                 host_allocator, &file_contents));
   executable_params.executable_data = file_contents->const_buffer;
 
   // Perform the load, which will fail if the executable cannot be loaded or
@@ -171,7 +171,7 @@ static iree_status_t iree_hal_executable_library_run(
   iree_byte_span_t local_memory = iree_make_byte_span(NULL, 0);
   iree_host_size_t local_memory_size =
       local_executable->dispatch_attrs
-          ? local_executable->dispatch_attrs[FLAG_entry_point]
+          ? local_executable->dispatch_attrs[FLAG_export_ordinal]
                     .local_memory_pages *
                 IREE_HAL_EXECUTABLE_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE
           : 0;
@@ -231,7 +231,8 @@ static iree_status_t iree_hal_executable_library_run(
   int64_t dispatch_count = 0;
   while (iree_benchmark_keep_running(benchmark_state, /*batch_count=*/1)) {
     IREE_RETURN_IF_ERROR(iree_hal_local_executable_issue_dispatch_inline(
-        local_executable, FLAG_entry_point, &dispatch_state, 0, local_memory));
+        local_executable, FLAG_export_ordinal, &dispatch_state, 0,
+        local_memory));
     ++dispatch_count;
   }
 
@@ -252,7 +253,7 @@ static iree_status_t iree_hal_executable_library_run(
   // Unload.
   iree_hal_executable_release(executable);
   iree_hal_executable_loader_release(executable_loader);
-  iree_file_contents_free(file_contents);
+  iree_io_file_contents_free(file_contents);
 
   return iree_ok_status();
 }
@@ -278,7 +279,7 @@ int main(int argc, char** argv) {
       "  --executable_format=embedded-elf\n"
       "  --executable_file=iree/hal/local/elf/testdata/"
       "elementwise_mul_x86_64.so\n"
-      "  --entry_point=0\n"
+      "  --export_ordinal=0\n"
       "  --workgroup_count_x=1\n"
       "  --workgroup_count_y=1\n"
       "  --workgroup_count_z=1\n"

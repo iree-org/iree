@@ -65,6 +65,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ThreadPool.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/TargetParser/Host.h"
 #include "mlir/Bytecode/BytecodeWriter.h"
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Wrap.h"
@@ -1161,11 +1162,11 @@ void llvmVersionPrinter(llvm::raw_ostream &os) {
   os << " with assertions";
 #endif
 #if LLVM_VERSION_PRINTER_SHOW_HOST_TARGET_INFO
-  std::string CPU = std::string(sys::getHostCPUName());
+  std::string CPU = std::string(llvm::sys::getHostCPUName());
   if (CPU == "generic")
     CPU = "(unknown)";
   os << ".\n"
-     << "  Default target: " << sys::getDefaultTargetTriple() << '\n'
+     << "  Default target: " << llvm::sys::getDefaultTargetTriple() << '\n'
      << "  Host CPU: " << CPU;
 #endif
   os << '\n';

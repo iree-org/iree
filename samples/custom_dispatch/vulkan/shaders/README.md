@@ -79,8 +79,7 @@ glslc -fshader-stage=compute simple_mul.glsl -o simple_mul.spv
           #hal.pipeline.binding<storage_buffer, ReadOnly>,
           #hal.pipeline.binding<storage_buffer, ReadOnly>,
           #hal.pipeline.binding<storage_buffer>
-        ]>) {
-    ^bb0(%device: !hal.device, %workload: index):
+        ]>) count(%device: !hal.device, %workload: index) -> (index, index, index) {
       %x = affine.apply affine_map<()[s0] -> (s0 ceildiv 64)>()[%workload]
       %c1 = arith.constant 1 : index
       hal.return %x, %c1, %c1 : index, index, index

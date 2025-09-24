@@ -9,7 +9,7 @@
 
 #include <functional>
 
-#include "iree/compiler/Pipelines/Options.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
@@ -17,14 +17,37 @@
 
 namespace mlir::iree_compiler::DispatchCreation {
 
+enum class EncodingOptions { Padding, Generic };
+
 //===----------------------------------------------------------------------===//
 // Pipelines
 //===----------------------------------------------------------------------===//
 
-/// This is a placeholder for future. We should pass all the options through the
-/// struct.
 struct TransformOptions : public PassPipelineOptions<TransformOptions> {
-  DispatchCreationOptions options;
+  Option<bool> enableAggressiveFusion{
+      *this,
+      "aggressive-fusion",
+      llvm::cl::desc("Enable aggressive fusion for dispatch creation pipeline"),
+      llvm::cl::init(false),
+  };
+  Option<bool> enableFuseMultiUse{
+      *this,
+      "fuse-multi-use",
+      llvm::cl::desc("Fuse operations with multiple uses."),
+      llvm::cl::init(true),
+  };
+  Option<bool> dataTiling{
+      *this,
+      "data-tiling",
+      llvm::cl::desc("Enable data-tiling for dispatch creation pipeline"),
+      llvm::cl::init(false),
+  };
+  Option<bool> enableSplitReduction{
+      *this,
+      "split-reduction",
+      llvm::cl::desc("Enable split reduction for dispatch creation pipeline"),
+      llvm::cl::init(false),
+  };
 };
 
 void buildDispatchCreationPassPipeline(

@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/DispatchCreation/FusionUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
+#include "iree/compiler/Utils/RegionOpUtils.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -179,8 +180,8 @@ static bool checkContractionOpEquivalence(MLIRContext *context, Operation *aOp,
     return false;
   }
 
-  SmallVector<int64_t, 4> aStaticDims = aLinalgOp.getStaticLoopRanges();
-  SmallVector<int64_t, 4> bStaticDims = bLinalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> aStaticDims = aLinalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> bStaticDims = bLinalgOp.getStaticLoopRanges();
   if (bPermutationVector) {
     applyPermutationToVector(bStaticDims, bPermutationVector.value());
   }
@@ -189,6 +190,16 @@ static bool checkContractionOpEquivalence(MLIRContext *context, Operation *aOp,
         ShapedType::isDynamic(aStaticDims[nDim])) {
       return false;
     }
+  }
+
+  // TODO(#20116): hack to prevent codegen failure for small horizontally fused
+  // matmuls that go down LLVMGPUDistribute.
+  unsigned mDimsSize = 1;
+  for (unsigned dim : aContractionDims.value().m) {
+    mDimsSize *= aStaticDims[dim];
+  }
+  if (mDimsSize < 16) {
+    return false;
   }
 
   auto checkSameRankAndElementType = [](Value aVal, Value bVal) {
@@ -240,7 +251,8 @@ static bool isHorizontalToGroup(Operation *op,
     return !dominanceInfo.properlyDominates(op, seedOp);
   };
   llvm::SetVector<Operation *> slice;
-  getBackwardSlice(op, &slice, options);
+  [[maybe_unused]] LogicalResult result = getBackwardSlice(op, &slice, options);
+  assert(result.succeeded());
   return !llvm::any_of(currGroup, [&](Operation *groupedOp) {
     return slice.contains(groupedOp);
   });
@@ -412,8 +424,8 @@ fuseContractionsHorizontally(RewriterBase &rewriter, Location loc,
 
   SmallVector<AffineMap> fusedIndexingMaps = std::move(fusedInsIndexingMaps);
   fusedIndexingMaps.append(fusedOutsIndexingMaps);
-  auto fusedOp = rewriter.create<linalg::GenericOp>(
-      loc, fusedResultTypes, fusedIns, fusedOuts, fusedIndexingMaps,
+  auto fusedOp = linalg::GenericOp::create(
+      rewriter, loc, fusedResultTypes, fusedIns, fusedOuts, fusedIndexingMaps,
       fusedIteratorTypes, [](OpBuilder &, Location, ValueRange) {});
 
   Block *fusedBody = fusedOp.getBlock();
@@ -449,7 +461,7 @@ fuseContractionsHorizontally(RewriterBase &rewriter, Location loc,
   }
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointToEnd(fusedBody);
-  rewriter.create<linalg::YieldOp>(loc, yieldVals);
+  linalg::YieldOp::create(rewriter, loc, yieldVals);
 
   unsigned resultsIndex = 0;
   for (auto linalgOp : linalgOps) {

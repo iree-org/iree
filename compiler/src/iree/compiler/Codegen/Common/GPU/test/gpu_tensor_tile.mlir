@@ -12,21 +12,21 @@
 module {
   func.func @add_tensor() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
-    %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<233x1024xf32>>
-    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<233x1024xf32>>
-    %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<233x1024xf32>>
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<233x1024xf32>>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<233x1024xf32>>
+    %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<233x1024xf32>>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %workgroup_id_y = hal.interface.workgroup.id[1] : index
     %3 = affine.apply #map()[%workgroup_id_x]
-    %4 = flow.dispatch.tensor.load %2, offsets = [%workgroup_id_y, %3], sizes = [1, 256], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<233x1024xf32>> -> tensor<1x256xf32>
-    %5 = flow.dispatch.tensor.load %0, offsets = [%workgroup_id_y, %3], sizes = [1, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<233x1024xf32>> -> tensor<1x256xf32>
-    %6 = flow.dispatch.tensor.load %1, offsets = [%workgroup_id_y, %3], sizes = [1, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<233x1024xf32>> -> tensor<1x256xf32>
+    %4 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [%workgroup_id_y, %3], sizes = [1, 256], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<233x1024xf32>> -> tensor<1x256xf32>
+    %5 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [%workgroup_id_y, %3], sizes = [1, 256], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<233x1024xf32>> -> tensor<1x256xf32>
+    %6 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [%workgroup_id_y, %3], sizes = [1, 256], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<233x1024xf32>> -> tensor<1x256xf32>
     %7 = linalg.generic {indexing_maps = [#map1, #map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%5, %6 : tensor<1x256xf32>, tensor<1x256xf32>) outs(%4 : tensor<1x256xf32>) attrs =  {lowering_config = #config} {
     ^bb0(%in: f32, %in_0: f32, %out: f32):
       %8 = arith.addf %in, %in_0 : f32
       linalg.yield %8 : f32
     } -> tensor<1x256xf32>
-    flow.dispatch.tensor.store %7, %2, offsets = [%workgroup_id_y, %3], sizes = [1, 256], strides = [1, 1] : tensor<1x256xf32> -> !flow.dispatch.tensor<writeonly:tensor<233x1024xf32>>
+    iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [%workgroup_id_y, %3], sizes = [1, 256], strides = [1, 1] : tensor<1x256xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<233x1024xf32>>
     return
   }
 }
@@ -36,9 +36,9 @@ module {
 //     CHECK-DAG:   %[[A:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //     CHECK-DAG:   %[[B:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //     CHECK-DAG:   %[[C:.*]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
-//     CHECK-DAG:   %[[LA:.*]] = flow.dispatch.tensor.load %[[A]]
-//     CHECK-DAG:   %[[LB:.*]] = flow.dispatch.tensor.load %[[B]]
-//     CHECK-DAG:   %[[LC:.*]] = flow.dispatch.tensor.load %[[C]]
+//     CHECK-DAG:   %[[LA:.*]] = iree_tensor_ext.dispatch.tensor.load %[[A]]
+//     CHECK-DAG:   %[[LB:.*]] = iree_tensor_ext.dispatch.tensor.load %[[B]]
+//     CHECK-DAG:   %[[LC:.*]] = iree_tensor_ext.dispatch.tensor.load %[[C]]
 //         CHECK:   %[[T:.*]] = scf.forall (%[[ARG:.*]]) in (64) shared_outs(%[[O:.*]] = %[[LC]]) -> (tensor<1x256xf32>) {
 //         CHECK:     %[[OFF:.*]] = affine.apply #[[$MAP]](%[[ARG]])
 //     CHECK-DAG:     %[[TA:.*]] = tensor.extract_slice %[[LA]][0, %[[OFF]]] [1, 4] [1, 1] : tensor<1x256xf32> to tensor<1x4xf32>
@@ -52,7 +52,7 @@ module {
 //         CHECK:       tensor.parallel_insert_slice %[[L]] into %[[O]][0, %[[OFF]]] [1, 4] [1, 1] : tensor<1x4xf32> into tensor<1x256xf32>
 //         CHECK:     }
 //         CHECK:   } {mapping = [#gpu.thread<x>]}
-//         CHECK:   flow.dispatch.tensor.store %[[T]], %{{.*}}, offsets = [%{{.*}}, %{{.*}}], sizes = [1, 256], strides = [1, 1] : tensor<1x256xf32> -> !flow.dispatch.tensor<writeonly:tensor<233x1024xf32>>
+//         CHECK:   iree_tensor_ext.dispatch.tensor.store %[[T]], %{{.*}}, offsets = [%{{.*}}, %{{.*}}], sizes = [1, 256], strides = [1, 1] : tensor<1x256xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<233x1024xf32>>
 
 // -----
 
@@ -69,19 +69,19 @@ module {
   func.func @reduction() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
-    %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<128x384xf32>>
-    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128xf32>>
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x384xf32>>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128xf32>>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %2 = affine.apply #map()[%workgroup_id_x]
-    %3 = flow.dispatch.tensor.load %1, offsets = [%2], sizes = [64], strides = [1] : !flow.dispatch.tensor<writeonly:tensor<128xf32>> -> tensor<64xf32>
-    %4 = flow.dispatch.tensor.load %0, offsets = [%2, 0], sizes = [64, 384], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<128x384xf32>> -> tensor<64x384xf32>
+    %3 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [%2], sizes = [64], strides = [1] : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128xf32>> -> tensor<64xf32>
+    %4 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [%2, 0], sizes = [64, 384], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x384xf32>> -> tensor<64x384xf32>
     %5 = linalg.fill {lowering_config = #config} ins(%cst : f32) outs(%3 : tensor<64xf32>) -> tensor<64xf32>
     %6 = linalg.generic {indexing_maps = [#map1, #map2], iterator_types = ["parallel", "reduction"]} ins(%4 : tensor<64x384xf32>) outs(%5 : tensor<64xf32>) attrs =  {lowering_config = #config} {
     ^bb0(%in: f32, %out: f32):
       %7 = arith.addf %in, %out : f32
       linalg.yield %7 : f32
     } -> tensor<64xf32>
-    flow.dispatch.tensor.store %6, %1, offsets = [%2], sizes = [64], strides = [1] : tensor<64xf32> -> !flow.dispatch.tensor<writeonly:tensor<128xf32>>
+    iree_tensor_ext.dispatch.tensor.store %6, %1, offsets = [%2], sizes = [64], strides = [1] : tensor<64xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128xf32>>
     return
   }
 }
@@ -108,7 +108,7 @@ module {
 //         CHECK:       tensor.parallel_insert_slice %[[R]] into %[[O]][%[[ARG]]] [1] [1] : tensor<1xf32> into tensor<64xf32>
 //         CHECK:     }
 //         CHECK:   } {mapping = [#gpu.thread<x>]}
-//         CHECK:   flow.dispatch.tensor.store %[[T]], %{{.}}, offsets = [%{{.*}}], sizes = [64], strides = [1] : tensor<64xf32> -> !flow.dispatch.tensor<writeonly:tensor<128xf32>>
+//         CHECK:   iree_tensor_ext.dispatch.tensor.store %[[T]], %{{.}}, offsets = [%{{.*}}], sizes = [64], strides = [1] : tensor<64xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128xf32>>
 
 // -----
 
@@ -125,13 +125,13 @@ module {
   func.func @reduction_broadcast() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
-    %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2x32x10x4096xf32>>
-    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x32x10x4096xf32>>
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x32x10x4096xf32>>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x32x10x4096xf32>>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %workgroup_id_y = hal.interface.workgroup.id[1] : index
     %2 = affine.apply #map()[%workgroup_id_x]
-    %3 = flow.dispatch.tensor.load %1, offsets = [%workgroup_id_y, %2, 0, 0], sizes = [1, 32, 10, 4096], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<2x32x10x4096xf32>> -> tensor<1x32x10x4096xf32>
-    %4 = flow.dispatch.tensor.load %0, offsets = [%workgroup_id_y, %2, 0, 0], sizes = [1, 32, 10, 4096], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x32x10x4096xf32>> -> tensor<1x32x10x4096xf32>
+    %3 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [%workgroup_id_y, %2, 0, 0], sizes = [1, 32, 10, 4096], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x32x10x4096xf32>> -> tensor<1x32x10x4096xf32>
+    %4 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [%workgroup_id_y, %2, 0, 0], sizes = [1, 32, 10, 4096], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x32x10x4096xf32>> -> tensor<1x32x10x4096xf32>
     %5 = tensor.empty() : tensor<1x32xf32>
     %6 = linalg.fill {lowering_config = #config} ins(%cst : f32) outs(%5 : tensor<1x32xf32>) -> tensor<1x32xf32>
     %7 = linalg.generic {indexing_maps = [#map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "reduction"]} ins(%4 : tensor<1x32x10x4096xf32>) outs(%6 : tensor<1x32xf32>) attrs =  {lowering_config = #config} {
@@ -144,7 +144,7 @@ module {
       %9 = arith.addf %in, %in_0 : f32
       linalg.yield %9 : f32
     } -> tensor<1x32x10x4096xf32>
-    flow.dispatch.tensor.store %8, %1, offsets = [%workgroup_id_y, %2, 0, 0], sizes = [1, 32, 10, 4096], strides = [1, 1, 1, 1] : tensor<1x32x10x4096xf32> -> !flow.dispatch.tensor<writeonly:tensor<2x32x10x4096xf32>>
+    iree_tensor_ext.dispatch.tensor.store %8, %1, offsets = [%workgroup_id_y, %2, 0, 0], sizes = [1, 32, 10, 4096], strides = [1, 1, 1, 1] : tensor<1x32x10x4096xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2x32x10x4096xf32>>
     return
   }
 }

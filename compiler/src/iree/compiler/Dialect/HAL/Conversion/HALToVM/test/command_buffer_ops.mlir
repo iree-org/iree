@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-vm-conversion --canonicalize --iree-vm-target-index-bits=32 %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-vm-conversion{index-bits=32},canonicalize)' %s | FileCheck %s
 
 // CHECK-LABEL: @command_buffer_create
 // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[AFFINITY:.+]]: i64)

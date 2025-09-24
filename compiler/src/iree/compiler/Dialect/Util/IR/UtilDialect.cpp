@@ -88,8 +88,8 @@ struct UtilInlinerInterface : public DialectInlinerInterface {
     if (!returnOp)
       return;
     OpBuilder builder(op);
-    builder.create<mlir::cf::BranchOp>(op->getLoc(), newDest,
-                                       returnOp.getOperands());
+    mlir::cf::BranchOp::create(builder, op->getLoc(), newDest,
+                               returnOp.getOperands());
     op->erase();
   }
 
@@ -128,9 +128,10 @@ UtilDialect::UtilDialect(MLIRContext *context)
 Operation *UtilDialect::materializeConstant(OpBuilder &builder, Attribute value,
                                             Type type, Location loc) {
   if (isa<IREE::Util::NullAttr>(value)) {
-    return builder.create<IREE::Util::NullOp>(loc, type);
+    return IREE::Util::NullOp::create(builder, loc, type);
   } else if (arith::ConstantOp::isBuildableWith(value, type)) {
-    return builder.create<arith::ConstantOp>(loc, type, cast<TypedAttr>(value));
+    return arith::ConstantOp::create(builder, loc, type,
+                                     cast<TypedAttr>(value));
   }
   return nullptr;
 }
@@ -140,8 +141,13 @@ struct FoldDimOp : public OpRewritePattern<DimOp> {
   using OpRewritePattern<DimOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(DimOp op,
                                 PatternRewriter &rewriter) const override {
+    Value source = op.getSource();
+    while (auto assumeAlignmentOp =
+               source.getDefiningOp<memref::AssumeAlignmentOp>()) {
+      source = assumeAlignmentOp.getViewSource();
+    }
     auto shapeAwareOp =
-        dyn_cast_or_null<ShapeAwareOpInterface>(op.getSource().getDefiningOp());
+        dyn_cast_or_null<ShapeAwareOpInterface>(source.getDefiningOp());
     if (!shapeAwareOp)
       return failure();
 
@@ -156,9 +162,9 @@ struct FoldDimOp : public OpRewritePattern<DimOp> {
     }
 
     // If it's a static dim then just fold to that.
-    auto type = llvm::cast<ShapedType>(op.getSource().getType());
+    auto type = llvm::cast<ShapedType>(source.getType());
     int64_t staticDim = type.getDimSize(index.getZExtValue());
-    if (!ShapedType::isDynamic(staticDim)) {
+    if (ShapedType::isStatic(staticDim)) {
       rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(op, staticDim);
       return success();
     }
@@ -166,8 +172,7 @@ struct FoldDimOp : public OpRewritePattern<DimOp> {
     // Otherwise try to get the dynamic dimension cheaply without the need to
     // insert new IR.
     unsigned dynamicIdx = type.getDynamicDimIndex(index.getZExtValue());
-    auto dynamicDims =
-        shapeAwareOp.getResultDynamicDimsFromValue(op.getSource());
+    auto dynamicDims = shapeAwareOp.getResultDynamicDimsFromValue(source);
     rewriter.replaceOp(op, dynamicDims[dynamicIdx]);
 
     return success();

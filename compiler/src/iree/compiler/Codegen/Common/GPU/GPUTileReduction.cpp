@@ -42,7 +42,7 @@ static LogicalResult tileReduction(linalg::LinalgOp op) {
       rewriter, cast<PartialReductionOpInterface>(op.getOperation()), sizes);
   if (failed(results))
     return failure();
-  rewriter.replaceOp(op, results->mergeResult.replacements);
+  rewriter.replaceOp(op, results->replacements);
   return success();
 }
 

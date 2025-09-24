@@ -27,21 +27,21 @@ transform_dialect::IREEGPUExtensions::IREEGPUExtensions() {
 }
 
 //===---------------------------------------------------------------------===//
-// ApplyDropMultiMmaOpUnitDims
+// ApplyDropInnerTiledOpUnitDims
 //===---------------------------------------------------------------------===//
 
-void transform_dialect::ApplyDropMultiMmaOpUnitDims::populatePatterns(
+void transform_dialect::ApplyDropInnerTiledOpUnitDims::populatePatterns(
     RewritePatternSet &patterns) {
   IREE::GPU::populateIREEGPUDropUnitDimsPatterns(patterns);
 }
 
 //===---------------------------------------------------------------------===//
-// ApplyLowerMultiMmaOp
+// ApplyLowerInnerTiledOp
 //===---------------------------------------------------------------------===//
 
-void transform_dialect::ApplyLowerMultiMmaOp::populatePatterns(
+void transform_dialect::ApplyLowerInnerTiledOp::populatePatterns(
     RewritePatternSet &patterns) {
-  IREE::GPU::populateIREEGPULowerMultiMmaPatterns(patterns);
+  IREE::GPU::populateIREEGPULowerInnerTiledPatterns(patterns);
 }
 
 //===---------------------------------------------------------------------===//
@@ -89,10 +89,11 @@ DiagnosedSilenceableFailure transform_dialect::ConvertToMultiMmaOp::applyToOne(
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   rewriter.setInsertionPoint(target);
-  auto multiMmaOp =
-      GPU::convertContractionToMultiMma(rewriter, target, getIntrinsicKind());
+  auto multiMmaOp = GPU::convertContractionToInnerTiledMma(rewriter, target,
+                                                           getIntrinsicKind());
   if (failed(multiMmaOp)) {
-    return mlir::emitDefiniteFailure(target, "conversion to multi_mma failed");
+    return mlir::emitDefiniteFailure(
+        target, "conversion to multi-MMA inner_tiled failed");
   }
   results.push_back(*multiMmaOp);
   return DiagnosedSilenceableFailure::success();
@@ -106,27 +107,29 @@ void transform_dialect::ConvertToMultiMmaOp::getEffects(
 }
 
 //===---------------------------------------------------------------------===//
-// DistributeMultiMmaOp
+// DistributeInnerTiledOp
 //===---------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure transform_dialect::DistributeMultiMmaOp::applyToOne(
+DiagnosedSilenceableFailure
+transform_dialect::DistributeInnerTiledOp::applyToOne(
     transform::TransformRewriter &rewriter, Operation *target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  auto mmaOp = dyn_cast<IREE::GPU::MultiMmaOp>(target);
-  if (!mmaOp) {
-    return mlir::emitDefiniteFailure(target, "target is not a multi_mma op");
+  auto tiledOp = dyn_cast<IREE::Codegen::InnerTiledOp>(target);
+  if (!tiledOp) {
+    return mlir::emitDefiniteFailure(target, "target is not an inner_tiled op");
   }
-  rewriter.setInsertionPoint(mmaOp);
-  auto maybeForall = IREE::GPU::distributeMultiMmaOp(rewriter, mmaOp);
+  rewriter.setInsertionPoint(tiledOp);
+  auto maybeForall = IREE::GPU::distributeInnerTiledOp(rewriter, tiledOp);
   if (failed(maybeForall)) {
-    return mlir::emitDefiniteFailure(mmaOp, "multi_mma distribution failed");
+    return mlir::emitDefiniteFailure(tiledOp,
+                                     "inner_tiled distribution failed");
   }
   results.push_back(*maybeForall);
   return DiagnosedSilenceableFailure::success();
 }
 
-void transform_dialect::DistributeMultiMmaOp::getEffects(
+void transform_dialect::DistributeInnerTiledOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::producesHandle(getOperation()->getOpResults(), effects);

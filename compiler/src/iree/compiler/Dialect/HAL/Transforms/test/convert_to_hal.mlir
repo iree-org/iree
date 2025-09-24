@@ -20,8 +20,9 @@ util.global private @device : !hal.device
 // CHECK: hal.executable private @ex
 hal.executable private @ex {
   hal.executable.variant public @embedded_elf_aarch64 target(#executable_target_embedded_elf_aarch64) {
-    hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
+    // CHECK: hal.executable.export public @dispatch
+    // CHECK-NOT: count
+    hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) count(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%arg0]
       hal.return %0, %c1, %c1 : index, index, index
@@ -31,8 +32,7 @@ hal.executable private @ex {
     }
   }
   hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64) {
-    hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
+    hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) count(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%arg0]
       hal.return %0, %c1, %c1 : index, index, index
@@ -77,9 +77,11 @@ util.func public @simpleDispatch(%arg0: !hal.buffer_view, %arg1: !hal.buffer_vie
   // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Dispatch{{.+}}")
   %arg1_resource = stream.tensor.import %arg1 : !hal.buffer_view -> tensor<4xf32> in !stream.resource<external>{%c16}
 
+  // CHECK: %[[MEMORY_TYPE:.+]], %[[BUFFER_USAGE:.+]] = hal.allocator.resolve_memory_properties
+  // CHECK-SAME: lifetime(external)
   // CHECK: %[[RESULT_BUFFER:.+]] = hal.allocator.allocate<%[[ALLOCATOR]] : !hal.allocator>
-  // CHECK-SAME: type("DeviceVisible|DeviceLocal")
-  // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Dispatch{{.+}}")
+  // CHECK-SAME: type(%[[MEMORY_TYPE]])
+  // CHECK-SAME: usage(%[[BUFFER_USAGE]])
   // CHECK-SAME: : !hal.buffer{%c16}
   %result_resource = stream.resource.alloc uninitialized : !stream.resource<external>{%c16}
 

@@ -20,7 +20,7 @@ struct InitializerOpConversion
   LogicalResult
   matchAndRewrite(IREE::Util::InitializerOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto newOp = rewriter.create<IREE::VM::InitializerOp>(op.getLoc());
+    auto newOp = IREE::VM::InitializerOp::create(rewriter, op.getLoc());
     rewriter.cloneRegionBefore(op.getBody(), newOp.getBody(),
                                newOp.getBody().begin());
 

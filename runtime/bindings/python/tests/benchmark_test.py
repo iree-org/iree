@@ -6,6 +6,8 @@
 
 import numpy as np
 import unittest
+import tempfile
+from pathlib import Path
 
 import iree.compiler
 import iree.runtime
@@ -83,6 +85,28 @@ class BenchmarkTest(unittest.TestCase):
             device=iree.compiler.core.DEFAULT_TESTING_DRIVER,
             inputs=[arg0, arg1],
         )
+
+        self.assertEqual(len(benchmark_results), 1)
+        benchmark_time = float(benchmark_results[0].time.split(" ")[0])
+        self.assertGreater(benchmark_time, 0)
+
+    def testBenchmarkModuleFromFilePath(self):
+        ctx = iree.runtime.SystemContext()
+        vm_module = create_simple_mul_module(ctx.instance)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            module_file_path = Path(tmp_dir) / "module.vmfb"
+            with open(module_file_path, "wb") as f:
+                f.write(vm_module.stashed_flatbuffer_blob)
+
+            arg0 = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+            arg1 = np.array([5.0, 6.0, 7.0, 8.0], dtype=np.float32)
+
+            benchmark_results = benchmark_module(
+                module_file_path,
+                entry_function="simple_mul",
+                device=iree.compiler.core.DEFAULT_TESTING_DRIVER,
+                inputs=[arg0, arg1],
+            )
 
         self.assertEqual(len(benchmark_results), 1)
         benchmark_time = float(benchmark_results[0].time.split(" ")[0])

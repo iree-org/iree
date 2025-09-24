@@ -16,7 +16,7 @@ include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtBase.td"
 def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
       [ DeclareAttrInterfaceMethods<VectorLayoutInterface> ]> {
   let mnemonic = "nested_layout";
-  let summary = [{A layout representing a mapping from GPU thread hierarchy to a shape}];
+  let summary = [{A layout representing a mapping from GPU thread hierarchy to a shape.}];
   let description = [{
     This layout explicitly defines how the shape of the associated vector
     is mapped to a compute hierarchy.

@@ -66,8 +66,8 @@ defaultConvBuilderFn(OpBuilder &b, Location loc, linalg::LinalgOp srcConv,
   }
   SmallVector<utils::IteratorType> iterators = srcConv.getIteratorTypesArray();
   iterators.append(newIteratorTypes);
-  auto genericConv = b.create<linalg::GenericOp>(
-      loc, output.getType(), ValueRange{input, filter}, output,
+  auto genericConv = linalg::GenericOp::create(
+      b, loc, output.getType(), ValueRange{input, filter}, output,
       ArrayRef<AffineMap>{newInputMap, newFilterMap, newOutputMap}, iterators);
   IRMapping mapper;
   srcConv->getRegion(0).cloneInto(&genericConv.getRegion(), mapper);
@@ -82,10 +82,9 @@ namedConvBuilderFn(OpBuilder &b, Location loc, linalg::LinalgOp srcConv,
                    SmallVector<unsigned> newDimOrder,
                    SmallVector<utils::IteratorType> newIteratorTypes) {
   sourceNamedConvTy namedConv = cast<sourceNamedConvTy>(srcConv);
-  return b
-      .create<targetNamedConvTy>(
-          loc, output.getType(), ValueRange{input, filter}, output,
-          namedConv.getStrides(), namedConv.getDilations())
+  return targetNamedConvTy::create(
+             b, loc, output.getType(), ValueRange{input, filter}, output,
+             namedConv.getStrides(), namedConv.getDilations())
       .getResult(0);
 }
 
@@ -200,7 +199,7 @@ createTransposeAsTensorPack(
     for (auto [index, i] : llvm::enumerate(targetIndices)) {
       if (ShapedType::isDynamic(inputShape[i])) {
         transposedTileSizes[index] =
-            rewriter.create<tensor::DimOp>(loc, input, i).getResult();
+            tensor::DimOp::create(rewriter, loc, input, i).getResult();
       } else {
         transposedTileSizes[index] = rewriter.getIndexAttr(inputShape[i]);
       }
@@ -211,8 +210,8 @@ createTransposeAsTensorPack(
   auto empty = linalg::PackOp::createDestinationTensor(
       rewriter, loc, input, transposedTileSizes, targetIndices,
       SmallVector<int64_t>{});
-  auto packedInput = rewriter.create<linalg::PackOp>(
-      loc, input, empty, targetIndices, transposedTileSizes,
+  auto packedInput = linalg::PackOp::create(
+      rewriter, loc, input, empty, targetIndices, transposedTileSizes,
       /*padding=*/std::nullopt, SmallVector<int64_t>{});
 
   SmallVector<AffineExpr> mapResults(inputMap.getResults());
@@ -227,10 +226,10 @@ createTransposeAsTensorPack(
     auto transposedInputShape =
         getPackedVector<int64_t>(llvm::to_vector(inputShape), targetIndices);
     packedOperand =
-        rewriter
-            .create<tensor::CollapseShapeOp>(
-                loc, RankedTensorType::get(transposedInputShape, elementType),
-                packedOperand, reassociationMap)
+        tensor::CollapseShapeOp::create(
+            rewriter, loc,
+            RankedTensorType::get(transposedInputShape, elementType),
+            packedOperand, reassociationMap)
             .getResult();
     transposedMap =
         AffineMap::get(inputMap.getNumDims(), inputMap.getNumSymbols(),
@@ -280,20 +279,19 @@ static Value createTransposeAsTensorUnPack(PatternRewriter &rewriter,
 
     auto reassociationMap =
         getUnitOuterDimPackReassociationMap(targetIndices, rank);
-    packedOutput =
-        rewriter
-            .create<tensor::ExpandShapeOp>(
-                loc, RankedTensorType::get(expandedOutputShape, elementType),
-                output, reassociationMap)
-            .getResult();
+    packedOutput = tensor::ExpandShapeOp::create(
+                       rewriter, loc,
+                       RankedTensorType::get(expandedOutputShape, elementType),
+                       output, reassociationMap)
+                       .getResult();
   }
 
   Value empty = linalg::UnPackOp::createDestinationTensor(
       rewriter, loc, packedOutput, packOp.getMixedTiles(),
       packOp.getInnerDimsPos(), packOp.getOuterDimsPerm());
 
-  auto unpackedOutput = rewriter.create<linalg::UnPackOp>(
-      loc, packedOutput, empty, packOp.getInnerDimsPos(),
+  auto unpackedOutput = linalg::UnPackOp::create(
+      rewriter, loc, packedOutput, empty, packOp.getInnerDimsPos(),
       packOp.getMixedTiles(), packOp.getOuterDimsPerm());
   return unpackedOutput.getResult();
 }
@@ -564,12 +562,11 @@ public:
     SmallVector<OpFoldResult> mixedSizes =
         tensor::getMixedSizes(rewriter, loc, packOp.getSource());
     applyPermutationToVector(mixedSizes, perm);
-    Value empty = rewriter.create<tensor::EmptyOp>(loc, mixedSizes,
-                                                   destType.getElementType());
-    Value transposed =
-        rewriter
-            .create<linalg::TransposeOp>(loc, packOp.getSource(), empty, perm)
-            .getResult()[0];
+    Value empty = tensor::EmptyOp::create(rewriter, loc, mixedSizes,
+                                          destType.getElementType());
+    Value transposed = linalg::TransposeOp::create(
+                           rewriter, loc, packOp.getSource(), empty, perm)
+                           .getResult()[0];
 
     // Expand the unit dimensions for the result of the pack.
     SmallVector<ReassociationIndices> reassocationIndices;
@@ -643,8 +640,8 @@ public:
     auto collapsedType = RankedTensorType::get(
         applyPermutation(destShape, perm), destType.getElementType());
 
-    auto collapse = rewriter.create<tensor::CollapseShapeOp>(
-        loc, collapsedType, unpackOp.getSource(),
+    auto collapse = tensor::CollapseShapeOp::create(
+        rewriter, loc, collapsedType, unpackOp.getSource(),
         getTilingReassociationMap(destType.getRank(), innerDims));
     rewriter.replaceOpWithNewOp<linalg::TransposeOp>(
         unpackOp, collapse, unpackOp.getDest(), invertPermutationVector(perm));
@@ -683,7 +680,7 @@ public:
     {
       RewritePatternSet patterns(context);
       GreedyRewriteConfig config;
-      config.maxIterations = GreedyRewriteConfig::kNoLimit;
+      config.setMaxIterations(GreedyRewriteConfig::kNoLimit);
       linalg::populateDataLayoutPropagationPatterns(
           patterns, [](OpOperand *opOperand) { return true; });
       if (failed(applyPatternsGreedily(op, std::move(patterns), config))) {

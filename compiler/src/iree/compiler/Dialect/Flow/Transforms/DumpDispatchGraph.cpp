@@ -14,7 +14,10 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/GraphWriter.h"
@@ -130,7 +133,8 @@ class GraphPrinter {
 public:
   GraphPrinter(raw_ostream &os, unsigned maxLabelLen, bool printAttrs,
                bool printControlFlowEdges, bool printDataFlowEdges,
-               bool printResultTypes)
+               bool printResultTypes, bool emitDispatchBody,
+               bool emitInitializers)
       : os(os), maxLabelLen(maxLabelLen), printAttrs(printAttrs),
         printControlFlowEdges(printControlFlowEdges),
         printDataFlowEdges(printDataFlowEdges),
@@ -142,8 +146,12 @@ public:
       return;
 
     emitGraph([&]() {
-      for (auto funcOp : funcOps)
+      for (auto funcOp : funcOps) {
+        if (!emitInitializers && isa<IREE::Util::InitializerOp>(funcOp)) {
+          continue;
+        }
         processOperation(funcOp);
+      }
       emitAllEdgeStmts();
     });
   }
@@ -295,7 +303,8 @@ private:
     os << " = " << op->getName();
   }
 
-  void printDispatchTensorLoad(raw_ostream &os, DispatchTensorLoadOp op,
+  void printDispatchTensorLoad(raw_ostream &os,
+                               IREE::TensorExt::DispatchTensorLoadOp op,
                                AsmState &state) {
     printResultsAndName(os, op.getOperation(), state);
     os << " ";
@@ -304,7 +313,8 @@ private:
     os << "\r";
   }
 
-  void printDispatchTensorStore(raw_ostream &os, DispatchTensorStoreOp op,
+  void printDispatchTensorStore(raw_ostream &os,
+                                IREE::TensorExt::DispatchTensorStoreOp op,
                                 AsmState &state) {
     os << op->getName() << " ";
     op.getValue().printAsOperand(os, state);
@@ -341,12 +351,12 @@ private:
         isa<mlir::FunctionOpInterface>(op->getParentOp()))
       return;
 
-    if (auto load = dyn_cast<DispatchTensorLoadOp>(op)) {
+    if (auto load = dyn_cast<IREE::TensorExt::DispatchTensorLoadOp>(op)) {
       printDispatchTensorLoad(os, load, state);
       return;
     }
 
-    if (auto store = dyn_cast<DispatchTensorStoreOp>(op)) {
+    if (auto store = dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(op)) {
       printDispatchTensorStore(os, store, state);
       return;
     }
@@ -460,13 +470,22 @@ private:
           printOperands(os, dispatch.getArguments(), state);
           os << ")\n";
 
-          printDispatchBody(os, dispatch);
+          if (emitDispatchBody) {
+            printDispatchBody(os, dispatch);
+          }
 
         } else {
           os << "\n";
         }
       } else {
         os << op->getName() << "\n";
+      }
+      if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op)) {
+        os << affinityOp.getAffinityAttr() << "\n";
+      } else if (auto transferOp = dyn_cast<IREE::Flow::TensorTransferOp>(op)) {
+        os << transferOp.getTarget() << "\n";
+      } else if (auto barrierOp = dyn_cast<IREE::Flow::TensorBarrierOp>(op)) {
+        os << barrierOp.getTarget() << "\n";
       }
 
       if (printResultTypes) {
@@ -515,8 +534,17 @@ private:
   Node processOperation(Operation *op) {
     Node node;
 
-    // Do not handle some noisy Operations.
-    if (isa<arith::ConstantOp>(op) || isa<Util::GlobalLoadOpInterface>(op)) {
+    // Do not handle some noisy Operations. Typically, the arith ops are used to
+    // compute offsets, sizes, etc.
+    if (op->getDialect() ==
+        op->getContext()->getLoadedDialect<arith::ArithDialect>()) {
+      return node;
+    }
+    if (isa<IREE::Util::AssumeIntOp>(op)) {
+      return node;
+    }
+    if (op->getNumResults() &&
+        llvm::all_of(op->getResultTypes(), llvm::IsaPred<IndexType>)) {
       return node;
     }
 
@@ -585,6 +613,8 @@ private:
   bool printControlFlowEdges = false;
   bool printDataFlowEdges = true;
   bool printResultTypes = true;
+  bool emitDispatchBody = false;
+  bool emitInitializers = false;
 };
 
 /// This pass generates a Graphviz dataflow visualization of an MLIR operation.
@@ -613,7 +643,7 @@ public:
 
     GraphPrinter printer(file->os(), maxLabelLen, printAttrs,
                          printControlFlowEdges, printDataFlowEdges,
-                         printResultTypes);
+                         printResultTypes, emitDispatchBody, emitInitializers);
     printer.emitFunctions(modOp);
 
     file->keep();

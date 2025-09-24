@@ -80,7 +80,6 @@ EXPLICIT_EXPORTS = [
     # MLIR registration functions that are part of generated code.
     "mlirRegisterGPUPasses",
     "mlirRegisterLinalgPasses",
-    "mlirGetDialectHandle__iree_input__",
     "mlirGetDialectHandle__transform__",
 ]
 

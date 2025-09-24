@@ -253,7 +253,8 @@ static void BenchmarkAsyncFunction(
     for (int32_t i = 0; i < batch_concurrency; ++i) {
       vm::ref<iree_hal_semaphore_t> timeline_semaphore;
       IREE_CHECK_OK(iree_hal_semaphore_create(
-          device, 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &timeline_semaphore));
+          device, IREE_HAL_QUEUE_AFFINITY_ANY, 0ull,
+          IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &timeline_semaphore));
       timeline_semaphores.push_back(std::move(timeline_semaphore));
     }
 
@@ -318,8 +319,9 @@ static void BenchmarkAsyncFunction(
                            /*policy=*/nullptr, invocation_inputs[i].get(),
                            invocation_outputs[i].get(), host_allocator));
       }
-      IREE_CHECK_OK(
-          iree_hal_fence_wait(completion_fence.get(), iree_infinite_timeout()));
+      IREE_CHECK_OK(iree_hal_fence_wait(completion_fence.get(),
+                                        iree_infinite_timeout(),
+                                        IREE_HAL_WAIT_FLAG_DEFAULT));
     }
     state.PauseTiming();
 
@@ -604,8 +606,7 @@ class IREEBenchmark {
 }  // namespace
 }  // namespace iree
 
-int main(int argc, char** argv) {
-  IREE_TRACE_APP_ENTER();
+static int runMain(int argc, char** argv) {
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree-benchmark-module");
 
   // Pass through flags to benchmark (allowing --help to fall through).
@@ -627,7 +628,6 @@ int main(int argc, char** argv) {
     int exit_code = static_cast<int>(iree_status_code(status));
     printf("%s\n", iree::Status(std::move(status)).ToString().c_str());
     IREE_TRACE_ZONE_END(z0);
-    IREE_TRACE_APP_EXIT(exit_code);
     return exit_code;
   }
   IREE_CHECK_OK(iree_hal_begin_profiling_from_flags(iree_benchmark.device()));
@@ -635,6 +635,12 @@ int main(int argc, char** argv) {
   IREE_CHECK_OK(iree_hal_end_profiling_from_flags(iree_benchmark.device()));
 
   IREE_TRACE_ZONE_END(z0);
-  IREE_TRACE_APP_EXIT(EXIT_SUCCESS);
   return EXIT_SUCCESS;
+}
+
+int main(int argc, char** argv) {
+  IREE_TRACE_APP_ENTER();
+  int exit_code = runMain(argc, argv);
+  IREE_TRACE_APP_EXIT(exit_code);
+  return exit_code;
 }

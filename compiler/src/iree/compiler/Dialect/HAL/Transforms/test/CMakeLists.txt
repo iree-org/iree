@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "annotate_target_devices.mlir"
     "assign_legacy_target_devices.mlir"
     "assign_target_devices.mlir"
     "capture_executable_sources.mlir"
@@ -29,6 +30,7 @@ iree_lit_test_suite(
     "materialize_resource_caches.mlir"
     "materialize_target_devices.mlir"
     "memoize_device_queries.mlir"
+    "memoize_device_selection.mlir"
     "outline_memoize_regions.mlir"
     "preprocess_executables.mlir"
     "prune_executables.mlir"
@@ -37,6 +39,7 @@ iree_lit_test_suite(
     "resolve_device_promises.mlir"
     "resolve_export_ordinals.mlir"
     "resolve_ranked_shaped_type.mlir"
+    "resolve_topology_queries.mlir"
     "strip_executable_contents.mlir"
     "substitute_executables.mlir"
     "verify_devices.mlir"

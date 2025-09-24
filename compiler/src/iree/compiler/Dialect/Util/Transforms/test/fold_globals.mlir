@@ -98,6 +98,21 @@ util.func @foo(%arg0: index) -> (index, index, index) {
 
 // -----
 
+// Tests that we don't inline immutable globals with dialect attrs.
+// We could support this with an attr interface but today are conservative. The
+// loss here is that CSE is unlikely to fold identical globals in local scopes.
+
+// CHECK: util.global private @dont_inline
+util.global private @dont_inline {some.attr = "hello!"} = 5 : index
+// CHECK: @ignore_dialect_attrs
+util.func @ignore_dialect_attrs() -> index {
+  // CHECK: util.global.load immutable @dont_inline
+  %0 = util.global.load immutable @dont_inline : index
+  util.return %0 : index
+}
+
+// -----
+
 // CHECK: util.global private @immutable_initializer_local
 util.global private mutable @immutable_initializer_local : index
 // CHECK: util.global private @immutable_initializer_callee
@@ -203,22 +218,33 @@ util.func @foo() -> (index, index) attributes {
 
 // -----
 
-// CHECK-NOT: util.global private @nondupeCst0
-util.global private @nondupeCst0 = 6 : index
-// CHECK-NOT: util.global private @nondupeCst1
-util.global private @nondupeCst1 = 6 : index
-// CHECK-NOT: util.initializer
+// Tests that uninitialized globals have stores folded into their initializer.
+// Initialized globals are not changed. This rule relies on globals having
+// undefined values until stored - if the initializer was 0 by default then this
+// would have correctness issues unless we could guarantee that no other
+// initialization-time code has potentially read the value before the store.
+
+// CHECK: util.global private @dontFoldInitialized = 6 : index
+util.global private @dontFoldInitialized = 6 : index
+// CHECK-NOT: util.global private @foldUnintialized
+util.global private @foldUnintialized : index
+// CHECK: util.initializer
 util.initializer {
+  // CHECK-DAG: %[[C7:.+]] = arith.constant 7
   %c7 = arith.constant 7 : index
-  util.global.store %c7, @nondupeCst1 : index
+  // CHECK-DAG: util.global.store %[[C7]], @dontFoldInitialized
+  util.global.store %c7, @dontFoldInitialized : index
+  %c8 = arith.constant 8 : index
+  // CHECK-NOT: util.global.store %{{.+}}, @foldUnintialized
+  util.global.store %c8, @foldUnintialized : index
   util.return
 }
 util.func @foo() -> (index, index) {
-  // CHECK-DAG: %[[C6:.+]] = arith.constant 6 : index
-  %0 = util.global.load @nondupeCst0 : index
-  // CHECK-DAG: %[[C7:.+]] = arith.constant 7 : index
-  %1 = util.global.load @nondupeCst1 : index
-  // CHECK: return %[[C6]], %[[C7]]
+  // CHECK-DAG: %[[UNFOLDED:.+]] = util.global.load immutable @dontFoldInitialized
+  %0 = util.global.load @dontFoldInitialized : index
+  // CHECK-DAG: %[[FOLDED:.+]] = arith.constant 8 : index
+  %1 = util.global.load @foldUnintialized : index
+  // CHECK: return %[[UNFOLDED]], %[[FOLDED]]
   util.return %0, %1 : index, index
 }
 

@@ -39,8 +39,8 @@ struct TestPartitionableLoopsInterfacePattern
     auto type =
         RankedTensorType::get(partitionableLoops.size(), rewriter.getI32Type());
     auto constantAttr = DenseIntElementsAttr::get(type, partitionableLoops);
-    rewriter.create<IREE::Util::UnfoldableConstantOp>(interfaceOp.getLoc(),
-                                                      constantAttr);
+    IREE::Util::UnfoldableConstantOp::create(rewriter, interfaceOp.getLoc(),
+                                             constantAttr);
     rewriter.modifyOpInPlace(interfaceOp,
                              [&] { interfaceOp->removeAttr(kAttributeName); });
     return success();

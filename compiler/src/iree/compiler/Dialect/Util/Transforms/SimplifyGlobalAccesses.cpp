@@ -260,7 +260,7 @@ class SimplifyGlobalAccessesPass
     : public impl::SimplifyGlobalAccessesPassBase<SimplifyGlobalAccessesPass> {
 public:
   void runOnOperation() override {
-    auto callableOp = getOperation();
+    mlir::CallableOpInterface callableOp = getOperation();
     if (!callableOp.getCallableRegion() ||
         callableOp.getCallableRegion()->empty()) {
       return;

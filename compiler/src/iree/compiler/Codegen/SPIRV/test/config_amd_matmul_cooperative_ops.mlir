@@ -14,16 +14,16 @@ func.func @matmul_256x1024x128_div_add() {
   %c1024 = arith.constant 1024 : index
   %c256 = arith.constant 256 : index
   %cst = arith.constant 0.000000e+00 : f16
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<256x1024xf16>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<256x1024xf16>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<readonly:tensor<256x128xf16>>
-  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) : !flow.dispatch.tensor<readonly:tensor<128x1024xf16>>
-  %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(4) : !flow.dispatch.tensor<writeonly:tensor<256x1024xf16>>
-  %5 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<256x1024xf16>> -> tensor<256x1024xf16>
-  %6 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<256x1024xf16>> -> tensor<256x1024xf16>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x1024xf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x1024xf16>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x128xf16>>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x1024xf16>>
+  %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(4) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<256x1024xf16>>
+  %5 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x1024xf16>> -> tensor<256x1024xf16>
+  %6 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x1024xf16>> -> tensor<256x1024xf16>
   %7 = tensor.empty() : tensor<256x1024xf16>
-  %8 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [256, 128], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<256x128xf16>> -> tensor<256x128xf16>
-  %9 = flow.dispatch.tensor.load %3, offsets = [0, 0], sizes = [128, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<128x1024xf16>> -> tensor<128x1024xf16>
+  %8 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0], sizes = [256, 128], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x128xf16>> -> tensor<256x128xf16>
+  %9 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0], sizes = [128, 1024], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x1024xf16>> -> tensor<128x1024xf16>
   %10 = tensor.empty() : tensor<256x1024xf16>
   %11 = linalg.fill ins(%cst : f16) outs(%10 : tensor<256x1024xf16>) -> tensor<256x1024xf16>
   %12 = linalg.matmul ins(%8, %9 : tensor<256x128xf16>, tensor<128x1024xf16>) outs(%11 : tensor<256x1024xf16>) -> tensor<256x1024xf16>
@@ -33,7 +33,7 @@ func.func @matmul_256x1024x128_div_add() {
     %15 = arith.addf %14, %in_1 : f16
     linalg.yield %15 : f16
   } -> tensor<256x1024xf16>
-  flow.dispatch.tensor.store %13, %4, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1] : tensor<256x1024xf16> -> !flow.dispatch.tensor<writeonly:tensor<256x1024xf16>>
+  iree_tensor_ext.dispatch.tensor.store %13, %4, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1] : tensor<256x1024xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<256x1024xf16>>
   return
 }
 
@@ -56,13 +56,13 @@ func.func @matmul_256x1024x128_div_add() {
 func.func @batch_matmul_16x128x256x512_div() {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<16x128x512xf16>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<16x512x256xf16>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<16x128x256xf16>>
-  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<16x128x256xf16>>
-  %4 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [16, 128, 512], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<16x128x512xf16>> -> tensor<16x128x512xf16>
-  %5 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [16, 512, 256], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<16x512x256xf16>> -> tensor<16x512x256xf16>
-  %6 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [16, 128, 256], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<16x128x256xf16>> -> tensor<16x128x256xf16>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x128x512xf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x512x256xf16>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x128x256xf16>>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16x128x256xf16>>
+  %4 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [16, 128, 512], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x128x512xf16>> -> tensor<16x128x512xf16>
+  %5 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [16, 512, 256], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x512x256xf16>> -> tensor<16x512x256xf16>
+  %6 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [16, 128, 256], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x128x256xf16>> -> tensor<16x128x256xf16>
   %7 = tensor.empty() : tensor<16x128x256xf16>
   %8 = linalg.fill ins(%cst : f16) outs(%7 : tensor<16x128x256xf16>) -> tensor<16x128x256xf16>
   %9 = linalg.batch_matmul ins(%4, %5 : tensor<16x128x512xf16>, tensor<16x512x256xf16>) outs(%8 : tensor<16x128x256xf16>) -> tensor<16x128x256xf16>
@@ -71,7 +71,7 @@ func.func @batch_matmul_16x128x256x512_div() {
     %11 = arith.divf %in, %in_0 : f16
     linalg.yield %11 : f16
   } -> tensor<16x128x256xf16>
-  flow.dispatch.tensor.store %10, %3, offsets = [0, 0, 0], sizes = [16, 128, 256], strides = [1, 1, 1] : tensor<16x128x256xf16> -> !flow.dispatch.tensor<writeonly:tensor<16x128x256xf16>>
+  iree_tensor_ext.dispatch.tensor.store %10, %3, offsets = [0, 0, 0], sizes = [16, 128, 256], strides = [1, 1, 1] : tensor<16x128x256xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16x128x256xf16>>
   return
 }
 
@@ -100,11 +100,11 @@ func.func @batch_matmul_16x128x256x512_div() {
 func.func @generic_batch_matmul_32x8x512x64() {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<128x32x64xf16>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<32x64x512xf16>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<32x128x512xf16>>
-  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [2, 32, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<128x32x64xf16>> -> tensor<128x32x64xf16>
-  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [32, 64, 512], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<32x64x512xf16>> -> tensor<32x64x512xf16>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x32x64xf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x64x512xf16>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x128x512xf16>>
+  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [2, 32, 64], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x32x64xf16>> -> tensor<128x32x64xf16>
+  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [32, 64, 512], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x64x512xf16>> -> tensor<32x64x512xf16>
   %5 = tensor.empty() : tensor<32x128x512xf16>
   %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<32x128x512xf16>) -> tensor<32x128x512xf16>
   %7 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%3, %4 : tensor<128x32x64xf16>, tensor<32x64x512xf16>) outs(%6 : tensor<32x128x512xf16>) attrs =  {linalg.memoized_indexing_maps = [#map3, #map4, #map5]} {
@@ -113,7 +113,7 @@ func.func @generic_batch_matmul_32x8x512x64() {
     %9 = arith.addf %out, %8 : f16
     linalg.yield %9 : f16
   } -> tensor<32x128x512xf16>
-  flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0], sizes = [32, 128, 512], strides = [1, 1, 1] : tensor<32x128x512xf16> -> !flow.dispatch.tensor<writeonly:tensor<32x128x512xf16>>
+  iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0, 0], sizes = [32, 128, 512], strides = [1, 1, 1] : tensor<32x128x512xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x128x512xf16>>
   return
 }
 
@@ -136,15 +136,15 @@ func.func @generic_batch_matmul_32x8x512x64() {
 func.func @batch_matmul_16x1024x1024x80() {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<16x1024x80xf16>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<16x80x1024xf16>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<16x1024x1024xf16>>
-  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [16, 1024, 80], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<16x1024x80xf16>> -> tensor<16x1024x80xf16>
-  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [16, 80, 1024], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<16x80x1024xf16>> -> tensor<16x80x1024xf16>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x1024x80xf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x80x1024xf16>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16x1024x1024xf16>>
+  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [16, 1024, 80], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x1024x80xf16>> -> tensor<16x1024x80xf16>
+  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [16, 80, 1024], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x80x1024xf16>> -> tensor<16x80x1024xf16>
   %5 = tensor.empty() : tensor<16x1024x1024xf16>
   %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<16x1024x1024xf16>) -> tensor<16x1024x1024xf16>
   %7 = linalg.batch_matmul ins(%3, %4 : tensor<16x1024x80xf16>, tensor<16x80x1024xf16>) outs(%6 : tensor<16x1024x1024xf16>) -> tensor<16x1024x1024xf16>
-  flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0], sizes = [16, 1024, 1024], strides = [1, 1, 1] : tensor<16x1024x1024xf16> -> !flow.dispatch.tensor<writeonly:tensor<16x1024x1024xf16>>
+  iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0, 0], sizes = [16, 1024, 1024], strides = [1, 1, 1] : tensor<16x1024x1024xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16x1024x1024xf16>>
   return
 }
 
@@ -169,15 +169,15 @@ func.func @matmul_256x1024x8() {
   %c1024 = arith.constant 1024 : index
   %c256 = arith.constant 256 : index
   %cst = arith.constant 0.000000e+00 : f16
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<256x8xf16>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<8x1024xf16>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<256x1024xf16>>
-  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [256, 8], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<256x8xf16>> -> tensor<256x8xf16>
-  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [8, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<8x1024xf16>> -> tensor<8x1024xf16>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x8xf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x1024xf16>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<256x1024xf16>>
+  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [256, 8], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x8xf16>> -> tensor<256x8xf16>
+  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [8, 1024], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x1024xf16>> -> tensor<8x1024xf16>
   %5 = tensor.empty() : tensor<256x1024xf16>
   %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<256x1024xf16>) -> tensor<256x1024xf16>
   %7 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%3, %4 : tensor<256x8xf16>, tensor<8x1024xf16>) outs(%6 : tensor<256x1024xf16>) -> tensor<256x1024xf16>
-  flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1] : tensor<256x1024xf16> -> !flow.dispatch.tensor<writeonly:tensor<256x1024xf16>>
+  iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1] : tensor<256x1024xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<256x1024xf16>>
   return
 }
 

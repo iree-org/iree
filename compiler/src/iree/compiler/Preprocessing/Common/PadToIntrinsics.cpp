@@ -21,6 +21,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/OpDefinition.h"
@@ -50,11 +51,11 @@ static Value getPaddedValue(RewriterBase &rewriter, Location loc,
       });
   auto paddedResultType =
       RankedTensorType::get(paddedShape, sourceType.getElementType());
-  Value paddingValue = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getZeroAttr(sourceType.getElementType()));
+  Value paddingValue = arith::ConstantOp::create(
+      rewriter, loc, rewriter.getZeroAttr(sourceType.getElementType()));
   SmallVector<OpFoldResult> low(padding.size(), rewriter.getIndexAttr(0));
-  Value paddedResult = rewriter.create<tensor::PadOp>(
-      loc, paddedResultType, padSource, low, padding, paddingValue);
+  Value paddedResult = tensor::PadOp::create(
+      rewriter, loc, paddedResultType, padSource, low, padding, paddingValue);
   return paddedResult;
 }
 
@@ -96,8 +97,8 @@ getExpandedValue(RewriterBase &rewriter, Location loc, Value expandSource,
     }
   }
 
-  return rewriter.create<tensor::ExpandShapeOp>(
-      loc, RankedTensorType::Builder(srcType).setShape(expandedShape),
+  return tensor::ExpandShapeOp::create(
+      rewriter, loc, RankedTensorType::Builder(srcType).setShape(expandedShape),
       expandSource, reassoc);
 }
 
@@ -146,13 +147,13 @@ expandMapsAndIterators(SmallVector<AffineMap> &expandedMaps,
   }
 }
 
-static SmallVector<GPUMatmulShapeType>
+static SmallVector<GPUIntrinsicType>
 getIntrinsics(linalg::LinalgOp linalgOp,
               ArrayRef<IREE::HAL::ExecutableTargetAttr> executableTargets) {
   IREE::GPU::TargetAttr target;
   if (executableTargets.size() == 1) {
     auto targetAttr = executableTargets.front();
-    target = getGPUTargetAttr(targetAttr);
+    target = getGPUTargetAttr(targetAttr.getConfiguration());
   } else {
     // For LIT testing, also directly search TargetAttr around the op.
     target = getGPUTargetAttr(linalgOp);
@@ -165,7 +166,7 @@ getIntrinsics(linalg::LinalgOp linalgOp,
   return llvm::map_to_vector(mmaKinds, [](IREE::GPU::MMAAttr mma) {
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
-    return GPUMatmulShapeType{mSize, nSize, kSize, aType, bType, cType};
+    return GPUIntrinsicType{mSize, nSize, kSize, aType, bType, cType, mma};
   });
 }
 
@@ -173,13 +174,13 @@ static void
 padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
           ArrayRef<IREE::HAL::ExecutableTargetAttr> executableTargets) {
   // Early exit if cannot find intrinsics or if multiple executable targets.
-  SmallVector<GPUMatmulShapeType> intrinsics =
+  SmallVector<GPUIntrinsicType> intrinsics =
       getIntrinsics(linalgOp, executableTargets);
   if (intrinsics.empty())
     return;
 
   // Check that conv has met conditions to go down mfma.
-  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
   FailureOr<mlir::linalg::ConvolutionDimensions> convolutionDims =
       mlir::linalg::inferConvolutionDims(linalgOp);
   assert(succeeded(convolutionDims) && "Could not infer contraction dims");
@@ -289,7 +290,7 @@ padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
   auto applyPadding = [&](AffineMap map, OpFoldResult padding1,
                           OpFoldResult padding2, unsigned dim1, unsigned dim2,
                           Value &paddingTarget) {
-    if (!isConstantIntValue(padding1, 0) || !isConstantIntValue(padding2, 0)) {
+    if (!isZeroInteger(padding1) || !isZeroInteger(padding2)) {
       llvm::SmallDenseMap<AffineExpr, unsigned> exprToIdMap =
           createExprToIdMap(map);
       auto id1 = exprToIdMap[getAffineDimExpr(dim1, map.getContext())];
@@ -345,7 +346,7 @@ static void padContractionLikeOp(
   }
 
   // Early exit if cannot find intrinsics or if multiple executable targets.
-  SmallVector<GPUMatmulShapeType> intrinsics =
+  SmallVector<GPUIntrinsicType> intrinsics =
       getIntrinsics(linalgOp, executableTargets);
   if (intrinsics.empty())
     return;
@@ -358,14 +359,14 @@ static void padContractionLikeOp(
   int64_t kDim = contractionDims->k.back();
 
   // If none of the shape is dynamic, we'd fallback to using pad to intrinsics.
-  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
   int64_t mSize = bounds[mDim];
   int64_t nSize = bounds[nDim];
   int64_t kSize = bounds[kDim];
 
   // Bail out on matvec-like/skinny matmul cases.
-  if ((!ShapedType::isDynamic(mSize) && mSize <= kVerySkinnyDimThreshold) ||
-      (!ShapedType::isDynamic(nSize) && nSize <= kVerySkinnyDimThreshold)) {
+  if ((ShapedType::isStatic(mSize) && mSize <= kVerySkinnyDimThreshold) ||
+      (ShapedType::isStatic(nSize) && nSize <= kVerySkinnyDimThreshold)) {
     return;
   }
 
@@ -407,7 +408,7 @@ static void padContractionLikeOp(
         if (!mOperandDimPair)
           return;
         auto [mOperand, mOperandDim] = mOperandDimPair.value();
-        mSizeExpr = rewriter.create<tensor::DimOp>(loc, mOperand, mOperandDim)
+        mSizeExpr = tensor::DimOp::create(rewriter, loc, mOperand, mOperandDim)
                         .getResult();
         dimsToExpandCandidate.emplace_back(mDim, intrinsic.mSizes[0]);
       }
@@ -421,7 +422,7 @@ static void padContractionLikeOp(
         if (!nOperandDimPair)
           return;
         auto [nOperand, nOperandDim] = nOperandDimPair.value();
-        nSizeExpr = rewriter.create<tensor::DimOp>(loc, nOperand, nOperandDim)
+        nSizeExpr = tensor::DimOp::create(rewriter, loc, nOperand, nOperandDim)
                         .getResult();
         dimsToExpandCandidate.emplace_back(nDim, intrinsic.nSizes[0]);
       }
@@ -435,7 +436,7 @@ static void padContractionLikeOp(
         if (!kOperandDimPair)
           return;
         auto [kOperand, kOperandDim] = kOperandDimPair.value();
-        kSizeExpr = rewriter.create<tensor::DimOp>(loc, kOperand, kOperandDim)
+        kSizeExpr = tensor::DimOp::create(rewriter, loc, kOperand, kOperandDim)
                         .getResult();
         dimsToExpandCandidate.emplace_back(kDim, intrinsic.kSizes[0]);
       }
@@ -517,17 +518,17 @@ static void padContractionLikeOp(
     newOuts = getExpandedValue(rewriter, loc, newOuts, outsMap, dimsToExpand);
 
     // Create expanded contractionOp.
-    auto expandedMatmulOp = rewriter.create<linalg::GenericOp>(
-        loc, newOuts.getType(), ValueRange{newLhs, newRhs}, ValueRange{newOuts},
-        expandedMaps, expandedIterators);
+    auto expandedMatmulOp = linalg::GenericOp::create(
+        rewriter, loc, newOuts.getType(), ValueRange{newLhs, newRhs},
+        ValueRange{newOuts}, expandedMaps, expandedIterators);
     expandedMatmulOp.getRegion().takeBody(linalgOp->getRegion(0));
     paddedCompute = expandedMatmulOp.getResults()[0];
 
     // Collapse back to non expanded shape if required.
     if (auto expandOutsOp =
             dyn_cast<tensor::ExpandShapeOp>(newOuts.getDefiningOp())) {
-      paddedCompute = rewriter.create<tensor::CollapseShapeOp>(
-          loc, expandOutsOp.getSrcType(), paddedCompute,
+      paddedCompute = tensor::CollapseShapeOp::create(
+          rewriter, loc, expandOutsOp.getSrcType(), paddedCompute,
           expandOutsOp.getReassociationIndices());
     }
   }
@@ -541,10 +542,10 @@ static void padContractionLikeOp(
       sizes;
   for (auto [dimIdx, dimSize] : llvm::enumerate(resultShape)) {
     if (ShapedType::isDynamic(dimSize))
-      sizes.push_back(rewriter
-                          .create<tensor::DimOp>(
-                              loc, linalgOp.getDpsInitOperand(0)->get(), dimIdx)
-                          .getResult());
+      sizes.push_back(
+          tensor::DimOp::create(rewriter, loc,
+                                linalgOp.getDpsInitOperand(0)->get(), dimIdx)
+              .getResult());
     else
       sizes.push_back(rewriter.getIndexAttr(dimSize));
   }
@@ -564,7 +565,7 @@ void PadToIntrinsicsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
 
-  auto moduleOp = getOperation();
+  mlir::ModuleOp moduleOp = getOperation();
   IREE::Stream::AffinityAnalysis affinityAnalysis(moduleOp);
   if (failed(affinityAnalysis.run())) {
     return signalPassFailure();

@@ -376,6 +376,13 @@ if(CMAKE_CXX_FLAGS AND "${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
   string(REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 endif()
 
+if(IREE_ENABLE_THREADING)
+  iree_select_compiler_opts(IREE_DEFAULT_COPTS
+    ALL
+      "-DIREE_THREADING_ENABLE=1"
+  )
+endif()
+
 # Find and add threads as dependency.
 if(NOT ANDROID AND IREE_ENABLE_THREADING)
   set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
@@ -385,7 +392,6 @@ if(NOT ANDROID AND IREE_ENABLE_THREADING)
 else()
   # Android provides its own pthreads support with no linking required.
 endif()
-
 
 # Emscripten needs -pthread specified in link _and_ compile options when using
 # atomics, shared memory, or pthreads. If we bring our own threading impl and
@@ -417,6 +423,10 @@ iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
     ${_IREE_LOGGING_LINKOPTS}
   MSVC
     "-natvis:${IREE_ROOT_DIR}/runtime/iree.natvis"
+
+    # Added to fix "LNK1318" error when "IREECompiler.pdb" exceeds 4GiB per:
+    # https://github.com/iree-org/iree/issues/20763#issuecomment-2902057042
+    "-pdbpagesize:32768"
 )
 
 if(EMSCRIPTEN AND IREE_EXTERNAL_WEBGPU_HAL_DRIVER_FOUND)

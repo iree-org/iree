@@ -6,8 +6,8 @@
 
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/SmallVector.h"
@@ -139,6 +139,35 @@ struct NoPartitionableLoops : public PartitionableLoopsInterface::ExternalModel<
   }
 };
 
+struct ConcatOpPartitionableLoops
+    : public PartitionableLoopsInterface::ExternalModel<
+          ConcatOpPartitionableLoops, tensor::ConcatOp> {
+  llvm::SmallVector<unsigned>
+  getPartitionableLoops(Operation *op,
+                        std::optional<unsigned> maxNumPartitionedLoops) const {
+    auto concatOp = cast<tensor::ConcatOp>(op);
+    int64_t rank = concatOp.getResultType().getRank();
+    uint64_t concatDim = concatOp.getDim();
+    SmallVector<unsigned> partitionableLoops;
+    partitionableLoops.reserve(rank - 1);
+
+    // All loops are partitionable except the concated dimension. Consider a
+    // concat 5 + 15 and trying to partition with a tile size of 10. This would
+    // mean that the first tile would operate on (5 + 5) and the second would
+    // operate on (0 + 10).
+    for (unsigned i = 0; i < rank; ++i) {
+      if (i != concatDim) {
+        partitionableLoops.push_back(i);
+      }
+    }
+    if (maxNumPartitionedLoops.has_value() &&
+        partitionableLoops.size() > maxNumPartitionedLoops.value()) {
+      partitionableLoops.truncate(maxNumPartitionedLoops.value());
+    }
+    return partitionableLoops;
+  }
+};
+
 /// External model implementation for specifying partitionable loops of FftOp.
 struct FftOpPartitionableLoops
     : public PartitionableLoopsInterface::ExternalModel<
@@ -147,8 +176,8 @@ struct FftOpPartitionableLoops
   getPartitionableLoops(Operation *op,
                         std::optional<unsigned> maxNumPartitionedLoops) const {
     auto fftOp = cast<IREE::LinalgExt::FftOp>(op);
-    auto range = llvm::seq<unsigned>(0, fftOp.getOperandRank());
-    SmallVector<unsigned> partitionableLoops(range.begin(), range.end());
+    auto partitionableLoops =
+        llvm::to_vector(llvm::seq<unsigned>(0, fftOp.getOperandRank()));
     // Indices matter for coeff computation.
     if (!fftOp.hasCoeff()) {
       partitionableLoops.pop_back();
@@ -240,11 +269,15 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
 
   registry.addExtension(+[](MLIRContext *ctx,
                             IREE::LinalgExt::IREELinalgExtDialect *dialect) {
+    IREE::LinalgExt::ArgCompareOp::attachInterface<
+        AllParallelAsPartitionableLoops<IREE::LinalgExt::ArgCompareOp>>(*ctx);
     IREE::LinalgExt::FftOp::attachInterface<FftOpPartitionableLoops>(*ctx);
     IREE::LinalgExt::ScanOp::attachInterface<
         AllParallelAsPartitionableLoops<IREE::LinalgExt::ScanOp>>(*ctx);
     IREE::LinalgExt::ScatterOp::attachInterface<
         OuterParallelAsPartitionableLoops<IREE::LinalgExt::ScatterOp>>(*ctx);
+    IREE::LinalgExt::GatherOp::attachInterface<
+        AllParallelAsPartitionableLoops<IREE::LinalgExt::GatherOp>>(*ctx);
     IREE::LinalgExt::SortOp::attachInterface<
         AllParallelAsPartitionableLoops<IREE::LinalgExt::SortOp>>(*ctx);
     IREE::LinalgExt::TopkOp::attachInterface<
@@ -265,16 +298,21 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
     IREE::LinalgExt::OnlineAttentionOp::attachInterface<
         AllParallelAsPartitionableLoops<IREE::LinalgExt::OnlineAttentionOp>>(
         *ctx);
+    IREE::LinalgExt::MapScatterOp::attachInterface<
+        AllParallelAsPartitionableLoops<IREE::LinalgExt::MapScatterOp>>(*ctx);
   });
   registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
     tensor::PadOp::attachInterface<
         OuterParallelAsPartitionableLoops<tensor::PadOp>>(*ctx);
   });
-  registry.addExtension(
-      +[](MLIRContext *ctx, IREE::GPU::IREEGPUDialect *dialect) {
-        IREE::GPU::MultiMmaOp::attachInterface<
-            OuterParallelAsPartitionableLoops<IREE::GPU::MultiMmaOp>>(*ctx);
-      });
+  registry.addExtension(+[](MLIRContext *ctx,
+                            IREE::Codegen::IREECodegenDialect *dialect) {
+    IREE::Codegen::InnerTiledOp::attachInterface<
+        OuterParallelAsPartitionableLoops<IREE::Codegen::InnerTiledOp>>(*ctx);
+  });
+  registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
+    tensor::ConcatOp::attachInterface<ConcatOpPartitionableLoops>(*ctx);
+  });
 }
 
 } // namespace mlir::iree_compiler

@@ -18,6 +18,9 @@
 
 namespace mlir::iree_compiler::IREE::VM {
 
+#define GEN_PASS_DEF_REIFYRODATATABLESPASS
+#include "iree/compiler/Dialect/VM/Transforms/Passes.h.inc"
+
 // Replaces a vm.rodata.table.inline op with two vm.rodata.inline ops, one for
 // the indexing table, and the second for the padded data.
 template <typename IntTy>
@@ -57,18 +60,18 @@ static void reifyRodataTable(RewriterBase &rewriter,
       IREE::VM::RefType::get(rewriter.getType<IREE::VM::BufferType>());
   IREE::VM::RodataInlineOp tableRodata;
   if constexpr (std::is_same<IntTy, int32_t>()) {
-    tableRodata = rewriter.create<IREE::VM::RodataInlineOp>(
-        tableOp.getLoc(), refType, rewriter.getI32VectorAttr(table));
+    tableRodata = IREE::VM::RodataInlineOp::create(
+        rewriter, tableOp.getLoc(), refType, rewriter.getI32VectorAttr(table));
   } else {
-    tableRodata = rewriter.create<IREE::VM::RodataInlineOp>(
-        tableOp.getLoc(), refType, rewriter.getI64VectorAttr(table));
+    tableRodata = IREE::VM::RodataInlineOp::create(
+        rewriter, tableOp.getLoc(), refType, rewriter.getI64VectorAttr(table));
   }
   if (auto tableNameAttr = tableOp.getTableNameAttr()) {
     tableRodata.setNameAttr(tableNameAttr);
   }
 
-  auto dataRodata = rewriter.create<IREE::VM::RodataInlineOp>(
-      tableOp.getLoc(), refType,
+  auto dataRodata = IREE::VM::RodataInlineOp::create(
+      rewriter, tableOp.getLoc(), refType,
       IREE::Util::CompositeAttr::get(rewriter.getContext(), dataAttrs));
   if (auto dataNameAttr = tableOp.getDataNameAttr()) {
     dataRodata.setNameAttr(dataNameAttr);
@@ -86,25 +89,9 @@ static void reifyRodataTable(RewriterBase &rewriter,
 }
 
 class ReifyRodataTablesPass
-    : public PassWrapper<ReifyRodataTablesPass,
-                         OperationPass<IREE::VM::ModuleOp>> {
-public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::VM::VMDialect>();
-  }
-
-  StringRef getArgument() const override {
-    return "iree-vm-reify-rodata-tables";
-  }
-
-  StringRef getDescription() const override {
-    return "Converts vm.rodata.table.inline into two rodata, one for the flat "
-           "data and"
-           "the other for a newly constructed table for the element subviews.";
-  }
-
+    : public IREE::VM::impl::ReifyRodataTablesPassBase<ReifyRodataTablesPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    IREE::VM::ModuleOp moduleOp = getOperation();
 
     // Walk all of the rodata table ops and convert to rodata.inline
     IRRewriter rewriter(moduleOp.getContext());
@@ -121,12 +108,5 @@ public:
     });
   }
 };
-
-std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
-createReifyRodataTablesPass() {
-  return std::make_unique<ReifyRodataTablesPass>();
-}
-
-static PassRegistration<ReifyRodataTablesPass> pass;
 
 } // namespace mlir::iree_compiler::IREE::VM

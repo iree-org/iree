@@ -15,10 +15,12 @@ iree_cc_library(
     Utils
   HDRS
     "IndexingUtils.h"
+    "MatchUtils.h"
     "Utils.h"
     "WinogradConstants.h"
   SRCS
     "IndexingUtils.cpp"
+    "MatchUtils.cpp"
     "Utils.cpp"
   DEPS
     LLVMSupport
@@ -28,11 +30,14 @@ iree_cc_library(
     MLIRComplexDialect
     MLIRIR
     MLIRLinalgDialect
+    MLIRLinalgInterfacesIncGenLib
     MLIRLinalgUtils
     MLIRMemRefDialect
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorUtils
+    MLIRTransformUtils
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
   PUBLIC
 )
 

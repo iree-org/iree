@@ -123,6 +123,14 @@ iree_test_utils_e2e_value_t iree_test_utils_value_make_f8E4M3FNUZ(
   return result;
 }
 
+iree_test_utils_e2e_value_t iree_test_utils_value_make_f8E8M0FNU(
+    uint8_t value) {
+  iree_test_utils_e2e_value_t result;
+  result.type = IREE_TEST_UTILS_VALUE_TYPE_F8E8M0FNU;
+  result.f8_u8 = value;
+  return result;
+}
+
 iree_test_utils_e2e_value_t iree_test_utils_value_make_f16(uint16_t value) {
   iree_test_utils_e2e_value_t result;
   result.type = IREE_TEST_UTILS_VALUE_TYPE_F16;
@@ -168,6 +176,8 @@ iree_test_utils_e2e_value_t iree_test_utils_read_buffer_element(
     return iree_test_utils_value_make_f8E5M2FNUZ(((uint8_t*)data)[index]);
   } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FNUZ) {
     return iree_test_utils_value_make_f8E4M3FNUZ(((uint8_t*)data)[index]);
+  } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8_E8M0_FNU) {
+    return iree_test_utils_value_make_f8E8M0FNU(((uint8_t*)data)[index]);
   } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16) {
     return iree_test_utils_value_make_f16(((uint16_t*)data)[index]);
   } else if (result_type == IREE_HAL_ELEMENT_TYPE_BFLOAT_16) {

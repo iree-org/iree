@@ -16,7 +16,11 @@ endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-project(IREE ASM C CXX)
+# NOTE: ASM is at the end of the list so CMake can test whether the C/CXX
+# compilers can be used for assembly.
+# See: https://cmake.org/cmake/help/latest/command/project.html#options
+project(IREE C CXX ASM)
+
 # If we find that the cache contains CMAKE_CXX_STANDARD it means that it's a old CMakeCache.txt
 # and we can just inform the user and then reset it.
 if(DEFINED CACHE{CMAKE_CXX_STANDARD})
@@ -78,6 +82,11 @@ option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 option(IREE_BUILD_TRACY "Enables building the 'iree-tracy-capture' CLI tool and includes it in runtime Python bindings." OFF)
 option(IREE_BUILD_BUNDLED_LLVM "Builds the bundled llvm-project (vs using installed)" ON)
+option(IREE_USE_SYSTEM_DEPS "Uses certain system libraries instead of building downloaded dependencies" OFF)
+
+if(IREE_USE_SYSTEM_DEPS)
+  message(WARNING "IREE_USE_SYSTEM_DEPS is on. This option is untested and may find incompatible dependencies.")
+endif()
 
 # Properties controlling version and naming of release artifacts.
 set(IREE_RELEASE_PACKAGE_SUFFIX "" CACHE STRING "Suffix to append to distributed package names")
@@ -121,6 +130,38 @@ set(IREE_RUNTIME_OPTIMIZATION_PROFILE "" CACHE STRING
     "Build optimization profile to apply. One of '', 'lto', 'size'.")
 set(IREE_LTO_MODE "full" CACHE STRING "LTO type, 'thin' or 'full'. Only consulted on clang-like compilers.")
 option(IREE_VISIBILITY_HIDDEN "Builds all C/C++ libraries with hidden visibility" ON)
+
+#-------------------------------------------------------------------------------
+# Custom runtime allocator configuration
+#-------------------------------------------------------------------------------
+# See iree/base/allocator.h for more information on `iree_allocator_system`.
+
+# A default allocator can be specified by C defines
+# (`IREE_ALLOCATOR_SYSTEM_CTL`) and linked in manually or by name with the
+# `IREE_ALLOCATOR_SYSTEM` option at the CMake level. If set in CMake additional
+# sources, copts, and dependencies can be added to iree::base in order to make
+# the allocator accessible.
+#
+# Built-in allocators available:
+# - `libc`: whatever `malloc`/`free` are defined as.
+# - `mimalloc`: https://github.com/microsoft/mimalloc (v3)
+#
+# Users adding their own allocators out of tree may define any of the following
+# CMake variables to control behavior:
+# - IREE_ALLOCATOR_{NAME}_SRCS:
+#       List of source files to add to iree::base. Must be an absolute/resolved
+#       path unless present in the iree/base/ directory. Defaults to empty.
+# - IREE_ALLOCATOR_{NAME}_COPTS:
+#       Compiler defines (`-DFOO`) private to iree::base. Defaults to empty.
+# - IREE_ALLOCATOR_{NAME}_DEPS:
+#       Dependencies (static/dynamic libraries) added to iree::base.
+#       Defaults to empty.
+# - IREE_ALLOCATOR_{NAME}_CTL:
+#       iree_allocator_ctl_fn_t name. Defaults to `iree_allocator_{NAME}_ctl`.
+# - IREE_ALLOCATOR_{NAME}_SELF:
+#       iree_allocator_t self void* name. Defaults to empty (NULL).
+set(IREE_ALLOCATOR_SYSTEM "libc" CACHE STRING
+    "Default named `iree_allocator_t` library and function base name.")
 
 #-------------------------------------------------------------------------------
 # IREE command-line tooling configuration
@@ -248,6 +289,9 @@ set(IREE_HAL_EXECUTABLE_PLUGIN_EXTRA_DEPS "" CACHE STRING "")
 
 option(IREE_HAL_DRIVER_DEFAULTS "Sets the default value for all runtime HAL drivers" ON)
 
+# AMDGPU support is disabled by default.
+set(IREE_HAL_DRIVER_AMDGPU_DEFAULT OFF)
+
 # CUDA support is disabled by default. Note: a CUDA-compatible GPU with drivers is still
 # required to actually run CUDA workloads.
 set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
@@ -268,7 +312,7 @@ endif()
 # binary sizes of minified builds.
 set(IREE_HAL_DRIVER_NULL_DEFAULT OFF)
 string(TOUPPER "${CMAKE_BUILD_TYPE}" _UPPERCASE_CMAKE_BUILD_TYPE)
-if (IREE_DEV_MODE OR (_UPPERCASE_CMAKE_BUILD_TYPE STREQUAL "DEBUG"))
+if(IREE_DEV_MODE OR (_UPPERCASE_CMAKE_BUILD_TYPE STREQUAL "DEBUG"))
   set(IREE_HAL_DRIVER_NULL_DEFAULT ON)
 endif()
 
@@ -279,6 +323,7 @@ if(APPLE)
   set(IREE_HAL_DRIVER_VULKAN_DEFAULT OFF)
 endif()
 
+option(IREE_HAL_DRIVER_AMDGPU "Enables the `amdgpu` runtime HAL driver" ${IREE_HAL_DRIVER_AMDGPU_DEFAULT})
 option(IREE_HAL_DRIVER_CUDA "Enables the 'cuda' runtime HAL driver" ${IREE_HAL_DRIVER_CUDA_DEFAULT})
 option(IREE_HAL_DRIVER_HIP "Enables the 'hip' runtime HAL driver" ${IREE_HAL_DRIVER_HIP_DEFAULT})
 option(IREE_HAL_DRIVER_LOCAL_SYNC "Enables the 'local-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
@@ -329,6 +374,9 @@ if(IREE_BUILD_COMPILER)
 endif()
 
 message(STATUS "IREE HAL drivers:")
+if(IREE_HAL_DRIVER_AMDGPU)
+  message(STATUS "  - amdgpu")
+endif()
 if(IREE_HAL_DRIVER_CUDA)
   message(STATUS "  - cuda")
 endif()
@@ -482,9 +530,21 @@ if(IREE_ENABLE_CCACHE)
   endif()
 endif()
 
-set (CMAKE_POSITION_INDEPENDENT_CODE ${IREE_ENABLE_POSITION_INDEPENDENT_CODE})
+set(CMAKE_POSITION_INDEPENDENT_CODE ${IREE_ENABLE_POSITION_INDEPENDENT_CODE})
 
 option(IREE_DEV_MODE "Configure settings to optimize for IREE development (as opposed to CI or release)" OFF)
+
+option(IREE_ENABLE_RUNTIME_COVERAGE "Enable LLVM code coverage of the runtime" OFF)
+set(IREE_RUNTIME_COVERAGE_OBJECTS "" CACHE STRING "List of archives (.a), objects (.o), or binaries to use as coverage data sources.")
+set_property(GLOBAL PROPERTY IREE_RUNTIME_COVERAGE_TARGETS "")
+
+# Verify we are in debug mode (coverage doesn't work well without it).
+# Coverage is possible (though very inaccurate) in other configurations but
+# optimizations must be disabled to get anything useful (otherwise source lines
+# and instrumented execution don't line up enough).
+if(IREE_ENABLE_RUNTIME_COVERAGE AND NOT _UPPERCASE_CMAKE_BUILD_TYPE STREQUAL "DEBUG")
+  message(FATAL_ERROR "IREE_ENABLE_*_COVERAGE requires building in Debug")
+endif()
 
 #-------------------------------------------------------------------------------
 # IREE assertions
@@ -552,6 +612,7 @@ include(iree_external_cmake_options)
 include(iree_tablegen_library)
 include(iree_tablegen_doc)
 include(iree_c_embed_data)
+include(iree_amdgpu_binary)
 include(iree_bitcode_library)
 include(iree_bytecode_module)
 include(iree_c_module)
@@ -775,13 +836,17 @@ endif()
 # Both the IREE and MLIR Python bindings require nanobind. We initialize it here
 # at the top level so that everything uses ours consistently.
 if(IREE_BUILD_PYTHON_BINDINGS)
-  include(FetchContent)
-  FetchContent_Declare(
-    nanobind
-    GIT_REPOSITORY https://github.com/wjakob/nanobind.git
-    GIT_TAG        0f9ce749b257fdfe701edb3cf6f7027ba029434a # v2.4.0
-  )
-  FetchContent_MakeAvailable(nanobind)
+  if(IREE_USE_SYSTEM_DEPS)
+    find_package(nanobind REQUIRED)
+  else()
+    include(FetchContent)
+    FetchContent_Declare(
+        nanobind
+        GIT_REPOSITORY https://github.com/wjakob/nanobind.git
+        GIT_TAG        cc860b2b771a0003ce70415fc56ea18f61b0a153 # v2.9.0
+    )
+    FetchContent_MakeAvailable(nanobind)
+  endif()
 endif()
 
 if(NOT IREE_BUILD_COMPILER)
@@ -910,6 +975,45 @@ endif()
 # This defines the iree-flatcc-cli target, so we don't use EXCLUDE_FROM_ALL.
 add_subdirectory(build_tools/third_party/flatcc)
 
+if(IREE_ALLOCATOR_SYSTEM STREQUAL "mimalloc")
+  set(IREE_ALLOCATOR_MIMALLOC_SRCS "allocator_mimalloc.c")
+  if(IREE_USE_SYSTEM_DEPS)
+    # NOTE: we don't know exactly what the user wants here and guess.
+    message(STATUS "iree_allocator_system using system mimalloc v3.*...")
+    set(MI_BUILD_STATIC ON)
+    find_package(mimalloc 3 REQUIRED)
+    set(IREE_ALLOCATOR_MIMALLOC_DEPS "mimalloc-static")
+  else()
+    # mimalloc is currently using the `dev3` branch (v3.*).
+    # Releases: https://github.com/microsoft/mimalloc/tags
+    #
+    # We directly inline the source into iree/base/allocator_mimalloc.c when
+    # fetching it ourselves and otherwise link against the static library. We
+    # do not want to override the global malloc/free implementations.
+    message(STATUS "Using fetched mimalloc v3.*...")
+    set(MI_OVERRIDE OFF)
+    set(MI_BUILD_STATIC OFF)
+    set(MI_BUILD_SHARED OFF)
+    set(MI_BUILD_OBJECT OFF)
+    set(MI_BUILD_TESTS OFF)
+    include(FetchContent)
+    FetchContent_Declare(
+      mimalloc
+      GIT_REPOSITORY https://github.com/microsoft/mimalloc.git
+      GIT_TAG        51c09e7b6a0ac5feeba998710f00c7dd7aa67bbf # v3.0.3
+    )
+    FetchContent_MakeAvailable(mimalloc)
+    list(APPEND IREE_ALLOCATOR_MIMALLOC_COPTS
+      "-I${mimalloc_SOURCE_DIR}/include"
+      "-DIREE_ALLOCATOR_MIMALLOC_STATIC_SRC=\"${mimalloc_SOURCE_DIR}/src/static.c\""
+    )
+  endif()
+endif()
+
+if(IREE_HAL_DRIVER_AMDGPU)
+  add_subdirectory(build_tools/third_party/hsa-runtime-headers EXCLUDE_FROM_ALL)
+endif()
+
 if(IREE_HAL_DRIVER_CUDA)
   add_subdirectory(build_tools/third_party/nccl EXCLUDE_FROM_ALL)
 endif()
@@ -1019,6 +1123,99 @@ endif()
 if(IREE_BUILD_TESTS)
   iree_create_ctest_customization()
 endif()
+
+#-------------------------------------------------------------------------------
+# Code coverage support
+#-------------------------------------------------------------------------------
+
+# LLVM coverage targets:
+#
+# - iree-runtime-coverage-export
+#   Merge and export coverage data to `coverage/runtime.lcov.info`.
+#   All of `coverage/runtime/*.profraw` files will be merged as if they had been
+#   produced in the same run, written to `coverage/runtime.profdata`, and then
+#   exported into LCOV format.
+#
+# - iree-runtime-coverage-clear-all
+#   Erases all `coverage/runtime*` files (*.profraw/*.profdata/*.info).
+#   Invoke this to completely clear all collected coverage data.
+#
+# - iree-runtime-coverage-clear-artifacts
+#   Erases only merged `coverage/runtime.*` files (*.profdata/*.info).
+#   Invoke this after adding more *.profraw files to update the coverage.
+#
+# To collect the source *.profraw files use the LLVM_PROFILE_FILE environment
+# variable on each invocation; tests run via ctest do this automatically:
+#  LLVM_PROFILE_FILE=coverage/runtime/binary_target_name[.whatever].profraw \
+#     my_binary_to_run --other --flags
+# The base name before the first `.` must be the target name for the tooling to
+# automatically detect the binaries used. Any additional `.foo` up to the
+# extension will be ignored and allow for multiple runs to be accumulated before
+# exporting. If the name is not target-name based then the
+# IREE_RUNTIME_COVERAGE_OBJECTS CMake variable must be populated with binaries,
+# archives (.a), or object files (.o).
+#
+# VSCode can be configured with these targets/artifacts to show coverage
+# information by adding the following workspace configuration:
+#   // Accumulate over multiple test runs:
+#   "cmake.preRunCoverageTarget": "iree-runtime-coverage-clear-artifacts",
+#   // Or only show coverage for the tests run in a single batch:
+#   "cmake.preRunCoverageTarget": "iree-runtime-coverage-clear-all",
+#   "cmake.postRunCoverageTarget": "iree-runtime-coverage-export",
+#   "cmake.coverageInfoFiles": [
+#     "${command:cmake.buildDirectory}/coverage/runtime.lcov.info"
+#  ],
+if(IREE_ENABLE_RUNTIME_COVERAGE)
+  set(_RUNTIME_COVERAGE_BASE "${IREE_BINARY_DIR}/coverage/runtime")
+  if(Python3_FOUND)
+    get_property(_RUNTIME_COVERAGE_TARGETS GLOBAL PROPERTY IREE_RUNTIME_COVERAGE_TARGETS)
+    file(GENERATE
+      OUTPUT
+        ${_RUNTIME_COVERAGE_BASE}.target.list
+      CONTENT
+        "${_RUNTIME_COVERAGE_TARGETS}"
+    )
+    add_custom_target(iree-runtime-coverage-export
+      COMMAND
+        ${Python3_EXECUTABLE}
+        ${IREE_ROOT_DIR}/build_tools/scripts/export_profdata_lcov.py
+        --base=${_RUNTIME_COVERAGE_BASE}
+        --objects=${IREE_RUNTIME_COVERAGE_OBJECTS}
+        --targets=${_RUNTIME_COVERAGE_BASE}.target.list
+        --output=${_RUNTIME_COVERAGE_BASE}.lcov.info
+        --llvm-profdata=${IREE_LLVM_PROFDATA_BINARY}
+        --llvm-cov=${IREE_LLVM_COV_BINARY}
+      BYPRODUCTS
+        ${_RUNTIME_COVERAGE_BASE}.lcov.info
+      DEPENDS
+        ${IREE_LLVM_COV_BINARY}
+        ${IREE_LLVM_PROFCOV_BINARY}
+      COMMENT
+        "Exporting runtime coverage data to ${_RUNTIME_COVERAGE_BASE}.lcov.info"
+    )
+  else()
+    message(WARNING "IREE_ENABLE_*_COVERAGE requires Python3 to export automatically via the iree-runtime-coverage-export target; coverage is still enabled but must be manually processed")
+  endif()
+  add_custom_target(iree-runtime-coverage-clear-all
+    COMMAND
+      ${CMAKE_COMMAND}
+      -E rm -f
+      "${_RUNTIME_COVERAGE_BASE}.profdata"
+      "${_RUNTIME_COVERAGE_BASE}.lcov.info"
+      "${_RUNTIME_COVERAGE_BASE}/*.profraw"
+    COMMENT
+      "Clearing ${_RUNTIME_COVERAGE_BASE}/* and related source coverage data"
+  )
+  add_custom_target(iree-runtime-coverage-clear-artifacts
+    COMMAND
+      ${CMAKE_COMMAND}
+      -E rm -f
+      "${_RUNTIME_COVERAGE_BASE}.profdata"
+      "${_RUNTIME_COVERAGE_BASE}.lcov.info"
+    COMMENT
+      "Clearing merged ${_RUNTIME_COVERAGE_BASE}.* files only"
+  )
+endif(IREE_ENABLE_RUNTIME_COVERAGE)
 
 #-------------------------------------------------------------------------------
 # Install/exports

@@ -7,10 +7,10 @@
 #include "iree/compiler/Codegen/ExternalInterfaces/Utils.h"
 
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
+#include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Attributes.h"
@@ -19,15 +19,17 @@
 #include "mlir/IR/MLIRContext.h"
 
 namespace mlir::iree_compiler::IREE {
-using Codegen::MaterializeEncodingInfo;
+using IREE::Codegen::MaterializeEncodingInfo;
 
-Value calculateStorageSizeInBytesImpl(Attribute attr, Location loc,
-                                      OpBuilder &builder, RankedTensorType type,
-                                      ValueRange dynamicDims) {
-  auto deviceLayoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(attr);
+Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
+                                            OpBuilder &builder,
+                                            RankedTensorType type,
+                                            ValueRange dynamicDims) {
+  auto deviceLayoutAttr =
+      cast<IREE::Codegen::PackedLayoutMaterializerAttr>(attr);
   MaterializeEncodingInfo encodingInfo = deviceLayoutAttr.getEncodingInfo(type);
   SmallVector<int64_t> paddedShape(type.getShape());
-  SmallVector<Value> paddedDynamicDims(dynamicDims.begin(), dynamicDims.end());
+  SmallVector<Value> paddedDynamicDims(dynamicDims);
   for (auto [dim, size] : llvm::zip_equal(encodingInfo.innerDimsPos,
                                           encodingInfo.innerTileSizes)) {
     // Only VMVX backend has dynamic inner tile sizes when ukernel is enabled.
@@ -35,7 +37,7 @@ Value calculateStorageSizeInBytesImpl(Attribute attr, Location loc,
     // moved to VMVX implementation details. However, we cook the logic here to
     // reduce code duplication.
     if (ShapedType::isDynamic(size)) {
-      assert(isa<IREE::CPU::VMVXEncodingLayoutAttr>(attr) &&
+      assert(isa<IREE::CPU::VMVXEncodingResolverAttr>(attr) &&
              "only VMVX backend attribute can handle dynamic tile sizes");
       size = 16;
     }
@@ -48,11 +50,11 @@ Value calculateStorageSizeInBytesImpl(Attribute attr, Location loc,
 
     if (type.isDynamicDim(dim)) {
       dim = type.getDynamicDimIndex(dim);
-      auto alignment = builder.create<arith::ConstantIndexOp>(loc, size);
-      paddedDynamicDims[dim] = builder.create<arith::CeilDivSIOp>(
-          loc, paddedDynamicDims[dim], alignment);
-      paddedDynamicDims[dim] =
-          builder.create<arith::MulIOp>(loc, paddedDynamicDims[dim], alignment);
+      auto alignment = arith::ConstantIndexOp::create(builder, loc, size);
+      paddedDynamicDims[dim] = arith::CeilDivSIOp::create(
+          builder, loc, paddedDynamicDims[dim], alignment);
+      paddedDynamicDims[dim] = arith::MulIOp::create(
+          builder, loc, paddedDynamicDims[dim], alignment);
     } else {
       paddedShape[dim] = llvm::alignTo(paddedShape[dim], size);
     }
@@ -73,9 +75,9 @@ Value calculateStorageSizeInBytesImpl(Attribute attr, Location loc,
   }
 
   Value result =
-      builder.create<arith::ConstantIndexOp>(loc, staticCount).getResult();
+      arith::ConstantIndexOp::create(builder, loc, staticCount).getResult();
   for (auto dim : paddedDynamicDims) {
-    result = builder.create<arith::MulIOp>(loc, result, dim);
+    result = arith::MulIOp::create(builder, loc, result, dim);
   }
 
   // Always pack the elements back-to-back for subtypes.
@@ -84,22 +86,29 @@ Value calculateStorageSizeInBytesImpl(Attribute attr, Location loc,
       assert(false && "unsupported subtype");
       return Value();
     }
-    Value divisor = builder.create<arith::ConstantIndexOp>(
-        loc, kNumBitsInByte / elementBits);
-    result = builder.create<arith::CeilDivUIOp>(loc, result, divisor);
+    Value divisor = arith::ConstantIndexOp::create(
+        builder, loc, kNumBitsInByte / elementBits);
+    result = arith::CeilDivUIOp::create(builder, loc, result, divisor);
   }
 
   return result;
 }
 
-DictionaryAttr getLayoutImpl(Attribute attr, RankedTensorType type) {
+DictionaryAttr getPackedLayoutImpl(Attribute attr, RankedTensorType type,
+                                   bool addEncodingAttr) {
   MLIRContext *ctx = attr.getContext();
-  auto deviceLayoutAttr = cast<IREE::Codegen::LayoutAttrInterface>(attr);
+  auto deviceLayoutAttr =
+      cast<IREE::Codegen::PackedLayoutMaterializerAttr>(attr);
   const MaterializeEncodingInfo info = deviceLayoutAttr.getEncodingInfo(type);
   Attribute encodingInfoAttr =
       IREE::Codegen::serializeEncodingInfo(attr.getContext(), info);
-  return DictionaryAttr::get(
-      ctx, NamedAttribute(kEncodingInfoAttrName, encodingInfoAttr));
+  SmallVector<NamedAttribute> items;
+  items.push_back(NamedAttribute(kEncodingInfoAttrName, encodingInfoAttr));
+  auto encodingAttr = IREE::Encoding::getEncodingAttr(type);
+  if (addEncodingAttr && encodingAttr) {
+    items.push_back(NamedAttribute("encoding_attr", encodingAttr));
+  }
+  return DictionaryAttr::get(ctx, items);
 }
 
 void storeNamedAttrIfPresent(SmallVectorImpl<NamedAttribute> &config,

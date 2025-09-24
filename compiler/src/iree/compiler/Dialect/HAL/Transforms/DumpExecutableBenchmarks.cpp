@@ -62,8 +62,10 @@ struct DispatchParams {
   SmallVector<TypedAttr> uniformOperands;
 };
 
+// Nested map of entry point -> workload -> DispatchParams.
 using DispatchParamsMap =
-    llvm::DenseMap<SymbolRefAttr, std::vector<DispatchParams>>;
+    llvm::DenseMap<SymbolRefAttr,
+                   llvm::MapVector<SmallVector<unsigned>, DispatchParams>>;
 
 // Walk |moduleOp| and gather all of the dispatches to each executable.
 // Dispatch parameters are deduplicated by workload so that there's only ever
@@ -118,7 +120,6 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp,
         uniformOperands.push_back(uniformOperand);
       }
 
-      // Work around needing a mutable key for the set; C++ was a mistake.
       dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
         SmallVector<Binding> bindings;
         for (auto [i, resourceLength] :
@@ -135,22 +136,12 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp,
         }
 
         auto &dispatchParamsSet = map[entryPointAttr];
-        DispatchParams *dispatchParams = nullptr;
-        for (auto &it : dispatchParamsSet) {
-          if (it.workload == workload) {
-            dispatchParams = &it;
-            break;
-          }
-        }
-        if (!dispatchParams) {
-          dispatchParamsSet.push_back({});
-          dispatchParams = &dispatchParamsSet.back();
-        }
-        dispatchParams->locs.push_back(dispatchOp.getLoc());
-        dispatchParams->affinities.insert(affinityAttr);
-        dispatchParams->workload = workload;
-        dispatchParams->bindings = std::move(bindings);
-        dispatchParams->uniformOperands = std::move(uniformOperands);
+        DispatchParams &dispatchParams = dispatchParamsSet[workload];
+        dispatchParams.locs.push_back(dispatchOp.getLoc());
+        dispatchParams.affinities.insert(affinityAttr);
+        dispatchParams.workload = workload;
+        dispatchParams.bindings = std::move(bindings);
+        dispatchParams.uniformOperands = std::move(uniformOperands);
       });
     });
   }
@@ -163,8 +154,8 @@ getDeviceAndQueueAffinity(Location loc, IREE::Stream::AffinityAttr affinityAttr,
                           OpBuilder &builder) {
   if (auto deviceAffinityAttr =
           dyn_cast_if_present<IREE::HAL::DeviceAffinityAttr>(affinityAttr)) {
-    auto resolveOp = builder.create<IREE::HAL::DeviceResolveOp>(
-        loc,
+    auto resolveOp = IREE::HAL::DeviceResolveOp::create(
+        builder, loc,
         TypeRange{
             builder.getType<IREE::HAL::DeviceType>(),
             builder.getI64Type(),
@@ -173,7 +164,7 @@ getDeviceAndQueueAffinity(Location loc, IREE::Stream::AffinityAttr affinityAttr,
     return std::make_pair(resolveOp.getResult(0), resolveOp.getResult(1));
   }
   auto device = IREE::HAL::DeviceType::resolveAny(loc, builder);
-  auto queueAffinity = builder.create<arith::ConstantIntOp>(loc, -1, 64);
+  auto queueAffinity = arith::ConstantIntOp::create(builder, loc, -1, 64);
   return std::make_pair(device, queueAffinity);
 }
 
@@ -183,8 +174,8 @@ static IREE::Util::GlobalOp appendGlobalBuffer(
     Location loc, StringRef baseName, const DispatchParams &dispatchParams,
     IREE::Stream::AffinityAttr affinityAttr, OpBuilder &moduleBuilder) {
   // Create a global to hold the HAL buffer.
-  auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
-      loc, (baseName + "_buffer").str(),
+  auto globalOp = IREE::Util::GlobalOp::create(
+      moduleBuilder, loc, (baseName + "_buffer").str(),
       /*isMutable=*/true,
       IREE::HAL::BufferType::get(moduleBuilder.getContext()));
   globalOp.setPrivate();
@@ -198,7 +189,7 @@ static IREE::Util::GlobalOp appendGlobalBuffer(
   }
 
   // Build an initializer to allocate the buffer.
-  auto initOp = moduleBuilder.create<IREE::Util::InitializerOp>(loc);
+  auto initOp = IREE::Util::InitializerOp::create(moduleBuilder, loc);
   auto initBuilder = OpBuilder::atBlockBegin(initOp.addEntryBlock());
   IndexSet indexSet(loc, initBuilder);
 
@@ -206,17 +197,22 @@ static IREE::Util::GlobalOp appendGlobalBuffer(
   auto [device, queueAffinity] =
       getDeviceAndQueueAffinity(loc, affinityAttr, initBuilder);
   auto allocator =
-      initBuilder.create<IREE::HAL::DeviceAllocatorOp>(loc, device).getResult();
+      IREE::HAL::DeviceAllocatorOp::create(initBuilder, loc, device)
+          .getResult();
 
   auto memoryTypes = IREE::HAL::MemoryTypeBitfield::DeviceLocal;
   auto bufferUsage = IREE::HAL::BufferUsageBitfield::Transfer |
                      IREE::HAL::BufferUsageBitfield::DispatchStorage;
-  auto allocateOp = initBuilder.create<IREE::HAL::AllocatorAllocateOp>(
-      loc, globalOp.getType(), allocator, queueAffinity, memoryTypes,
-      bufferUsage, indexSet.get(totalLength));
+  Value memoryTypeOp =
+      IREE::HAL::MemoryTypeOp::create(initBuilder, loc, memoryTypes);
+  Value bufferUsageOp =
+      IREE::HAL::BufferUsageOp::create(initBuilder, loc, bufferUsage);
+  auto allocateOp = IREE::HAL::AllocatorAllocateOp::create(
+      initBuilder, loc, globalOp.getType(), allocator, queueAffinity,
+      memoryTypeOp, bufferUsageOp, indexSet.get(totalLength));
 
   globalOp.createStoreOp(loc, allocateOp.getResult(), initBuilder);
-  initBuilder.create<IREE::Util::ReturnOp>(loc);
+  IREE::Util::ReturnOp::create(initBuilder, loc);
 
   return globalOp;
 }
@@ -252,7 +248,7 @@ static void appendDispatchBenchmark(IREE::Stream::AffinityAttr affinityAttr,
   auto funcType =
       moduleBuilder.getFunctionType({moduleBuilder.getI32Type()}, {});
   auto funcOp =
-      moduleBuilder.create<IREE::Util::FuncOp>(loc, baseName, funcType);
+      IREE::Util::FuncOp::create(moduleBuilder, loc, baseName, funcType);
   funcOp.setVisibility(SymbolTable::Visibility::Public);
 
   // Mark the function as being a dispatch benchmark.
@@ -269,8 +265,8 @@ static void appendDispatchBenchmark(IREE::Stream::AffinityAttr affinityAttr,
   auto *entryBlock = funcOp.addEntryBlock();
   OpBuilder funcBuilder = OpBuilder::atBlockBegin(entryBlock);
   IndexSet indexSet(loc, funcBuilder);
-  auto batchSizeArg = funcBuilder.create<arith::IndexCastOp>(
-      loc, funcBuilder.getIndexType(), entryBlock->getArgument(0));
+  auto batchSizeArg = arith::IndexCastOp::create(
+      funcBuilder, loc, funcBuilder.getIndexType(), entryBlock->getArgument(0));
 
   // Resolve device for this particular benchmark.
   auto [device, queueAffinity] =
@@ -282,12 +278,11 @@ static void appendDispatchBenchmark(IREE::Stream::AffinityAttr affinityAttr,
       IREE::HAL::CommandBufferModeBitfield::OneShot |
       IREE::HAL::CommandBufferModeBitfield::AllowInlineExecution;
   auto commandBuffer =
-      funcBuilder
-          .create<IREE::HAL::CommandBufferCreateOp>(
-              loc, funcBuilder.getType<IREE::HAL::CommandBufferType>(), device,
-              commandBufferModes, IREE::HAL::CommandCategoryBitfield::Dispatch,
-              queueAffinity,
-              /*binding_capacity=*/Value{})
+      IREE::HAL::CommandBufferCreateOp::create(
+          funcBuilder, loc, funcBuilder.getType<IREE::HAL::CommandBufferType>(),
+          device, commandBufferModes,
+          IREE::HAL::CommandCategoryBitfield::Dispatch, queueAffinity,
+          /*binding_capacity=*/Value{})
           .getResult();
 
   // Constant values.
@@ -296,8 +291,8 @@ static void appendDispatchBenchmark(IREE::Stream::AffinityAttr affinityAttr,
   if (int64_t pushConstantCount = layoutAttr.getConstants()) {
     constantValues.reserve(pushConstantCount);
     for (int64_t i = 0; i < pushConstantCount; ++i) {
-      constantValues.push_back(funcBuilder.create<arith::ConstantOp>(
-          loc, dispatchParams.uniformOperands[i]));
+      constantValues.push_back(arith::ConstantOp::create(
+          funcBuilder, loc, dispatchParams.uniformOperands[i]));
     }
   }
 
@@ -327,27 +322,27 @@ static void appendDispatchBenchmark(IREE::Stream::AffinityAttr affinityAttr,
   // Compute the workgroup parameters.
   auto workload = llvm::map_to_vector(
       dispatchParams.workload, [&](unsigned dim) { return indexSet.get(dim); });
-  auto workgroupCountOp =
-      funcBuilder.create<IREE::HAL::ExecutableCalculateWorkgroupsOp>(
-          loc, funcBuilder.getIndexType(), funcBuilder.getIndexType(),
-          funcBuilder.getIndexType(), device, exportRefAttr, workload);
+  auto workgroupCountOp = IREE::HAL::ExecutableCalculateWorkgroupsOp::create(
+      funcBuilder, loc, funcBuilder.getIndexType(), funcBuilder.getIndexType(),
+      funcBuilder.getIndexType(), device, exportRefAttr, workload);
 
   // Get the executable/entry point ordinal used to dispatch.
-  Value executable = funcBuilder.create<IREE::HAL::ExecutableLookupOp>(
-      loc, funcBuilder.getType<IREE::HAL::ExecutableType>(), device,
-      exportRefAttr.getRootReference().getValue());
-  Value ordinal = funcBuilder.create<IREE::HAL::ExecutableExportOrdinalOp>(
-      loc, funcBuilder.getIndexType(), exportRefAttr);
+  Value executable = IREE::HAL::ExecutableLookupOp::create(
+      funcBuilder, loc, funcBuilder.getType<IREE::HAL::ExecutableType>(),
+      device, exportRefAttr.getRootReference().getValue());
+  Value ordinal = IREE::HAL::ExecutableExportOrdinalOp::create(
+      funcBuilder, loc, funcBuilder.getIndexType(), exportRefAttr);
 
   // Loop around dispatches based on batch size.
   // Note that we insert a barrier between each dispatch - we could make this
   // optional so that concurrent utilization is measured.
-  funcBuilder.create<scf::ForOp>(
-      loc, indexSet.get(0), batchSizeArg, indexSet.get(1), ValueRange{},
+  scf::ForOp::create(
+      funcBuilder, loc, indexSet.get(0), batchSizeArg, indexSet.get(1),
+      ValueRange{},
       [&](OpBuilder &forBuilder, Location loc, Value iv, ValueRange iters) {
         // Dispatch.
-        forBuilder.create<IREE::HAL::CommandBufferDispatchOp>(
-            loc, commandBuffer, executable, ordinal,
+        IREE::HAL::CommandBufferDispatchOp::create(
+            forBuilder, loc, commandBuffer, executable, ordinal,
             workgroupCountOp.getResults(), constantValues, bindingValues,
             IREE::HAL::DispatchFlags::None);
 
@@ -357,36 +352,37 @@ static void appendDispatchBenchmark(IREE::Stream::AffinityAttr affinityAttr,
         auto targetStage = IREE::HAL::ExecutionStageBitfield::CommandIssue |
                            IREE::HAL::ExecutionStageBitfield::Dispatch;
         auto barrierFlags = IREE::HAL::ExecutionBarrierFlagBitfield::None;
-        forBuilder.create<IREE::HAL::CommandBufferExecutionBarrierOp>(
-            loc, commandBuffer, sourceStage, targetStage, barrierFlags);
+        IREE::HAL::CommandBufferExecutionBarrierOp::create(
+            forBuilder, loc, commandBuffer, sourceStage, targetStage,
+            barrierFlags);
 
-        forBuilder.create<scf::YieldOp>(loc);
+        scf::YieldOp::create(forBuilder, loc);
       });
 
-  funcBuilder.create<IREE::HAL::CommandBufferFinalizeOp>(loc, commandBuffer);
+  IREE::HAL::CommandBufferFinalizeOp::create(funcBuilder, loc, commandBuffer);
 
   // We begin executing immediately and then wait on a fence.
   // TODO(benvanik): add fences to ABI so the benchmark tool can pipeline.
-  Value waitFence = funcBuilder.create<IREE::Util::NullOp>(
-      loc, funcBuilder.getType<IREE::HAL::FenceType>());
-  Value signalFence = funcBuilder.create<IREE::HAL::FenceCreateOp>(
-      loc, funcBuilder.getType<IREE::HAL::FenceType>(), device,
+  Value waitFence = IREE::Util::NullOp::create(
+      funcBuilder, loc, funcBuilder.getType<IREE::HAL::FenceType>());
+  Value signalFence = IREE::HAL::FenceCreateOp::create(
+      funcBuilder, loc, funcBuilder.getType<IREE::HAL::FenceType>(), device,
       IREE::HAL::FenceFlagBitfield::None);
 
   // Queue execution.
-  funcBuilder.create<IREE::HAL::DeviceQueueExecuteOp>(
-      loc, device, queueAffinity, waitFence, signalFence, commandBuffer,
-      IREE::HAL::ExecuteFlagBitfield::None);
+  IREE::HAL::DeviceQueueExecuteOp::create(
+      funcBuilder, loc, device, queueAffinity, waitFence, signalFence,
+      commandBuffer, IREE::HAL::ExecuteFlagBitfield::None);
 
   // Block until it completes.
-  Value timeoutMillis = funcBuilder.create<arith::ConstantIntOp>(loc, -1, 32);
-  auto fenceOp = funcBuilder.create<IREE::HAL::FenceAwaitOp>(
-      loc, funcBuilder.getI32Type(), timeoutMillis,
+  Value timeoutMillis = arith::ConstantIntOp::create(funcBuilder, loc, -1, 32);
+  auto fenceOp = IREE::HAL::FenceAwaitOp::create(
+      funcBuilder, loc, funcBuilder.getI32Type(), timeoutMillis,
       IREE::HAL::WaitFlagBitfield::None, signalFence);
-  funcBuilder.create<IREE::Util::StatusCheckOkOp>(
-      loc, fenceOp.getStatus(), "failed to wait on timepoint");
+  IREE::Util::StatusCheckOkOp::create(funcBuilder, loc, fenceOp.getStatus(),
+                                      "failed to wait on timepoint");
 
-  funcBuilder.create<IREE::Util::ReturnOp>(loc);
+  IREE::Util::ReturnOp::create(funcBuilder, loc);
 }
 
 // Builds a module exporting one function for each dispatch configuration
@@ -412,8 +408,8 @@ buildBenchmarkModule(IREE::HAL::ExecutableOp sourceExecutableOp,
   }
 
   // Clone the executable variant into the new module.
-  auto executableOp = moduleBuilder.create<IREE::HAL::ExecutableOp>(
-      sourceExecutableOp.getLoc(), sourceExecutableOp.getName());
+  auto executableOp = IREE::HAL::ExecutableOp::create(
+      moduleBuilder, sourceExecutableOp.getLoc(), sourceExecutableOp.getName());
   executableOp.setVisibility(sourceExecutableOp.getVisibility());
   auto variantOp = cast<IREE::HAL::ExecutableVariantOp>(
       OpBuilder::atBlockBegin(&executableOp.getBlock())
@@ -431,7 +427,7 @@ buildBenchmarkModule(IREE::HAL::ExecutableOp sourceExecutableOp,
                            });
     auto dispatchParamsSet = dispatchParamsMap.find(symbolRefAttr);
     if (dispatchParamsSet != dispatchParamsMap.end()) {
-      for (auto &dispatchParams : dispatchParamsSet->second) {
+      for (auto &[_, dispatchParams] : dispatchParamsSet->second) {
         if (dispatchParams.affinities.empty()) {
           appendDispatchBenchmark({}, executableOp, variantOp, exportOp,
                                   dispatchParams, moduleBuilder);
@@ -475,7 +471,7 @@ struct DumpExecutableBenchmarksPass
   using IREE::HAL::impl::DumpExecutableBenchmarksPassBase<
       DumpExecutableBenchmarksPass>::DumpExecutableBenchmarksPassBase;
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     auto moduleName = moduleOp.getName().value_or("module");
     SymbolTable symbolTable(moduleOp);
 

@@ -77,7 +77,7 @@ def HAL_BufferUsage_None                         : I32BitEnumAttrCase<"None",   
 def HAL_BufferUsage_TransferSource               : I32BitEnumAttrCase<"TransferSource",               0x00000001>;
 def HAL_BufferUsage_TransferTarget               : I32BitEnumAttrCase<"TransferTarget",               0x00000002>;
 def HAL_BufferUsage_Transfer                     : I32BitEnumAttrCase<"Transfer",                     0x00000003>;
-def HAL_BufferUsage_DispatchIndirectParams       : I32BitEnumAttrCase<"DispatchIndirectParams",       0x00000100>;
+def HAL_BufferUsage_DispatchIndirectParameters   : I32BitEnumAttrCase<"DispatchIndirectParameters",   0x00000100>;
 def HAL_BufferUsage_DispatchUniformRead          : I32BitEnumAttrCase<"DispatchUniformRead",          0x00000200>;
 def HAL_BufferUsage_DispatchStorageRead          : I32BitEnumAttrCase<"DispatchStorageRead",          0x00000400>;
 def HAL_BufferUsage_DispatchStorageWrite         : I32BitEnumAttrCase<"DispatchStorageWrite",         0x00000800>;
@@ -101,7 +101,7 @@ def HAL_BufferUsageBitfieldAttr :
       HAL_BufferUsage_TransferSource,
       HAL_BufferUsage_TransferTarget,
       HAL_BufferUsage_Transfer,
-      HAL_BufferUsage_DispatchIndirectParams,
+      HAL_BufferUsage_DispatchIndirectParameters,
       HAL_BufferUsage_DispatchUniformRead,
       HAL_BufferUsage_DispatchStorageRead,
       HAL_BufferUsage_DispatchStorageWrite,
@@ -445,7 +445,7 @@ def HAL_CollectiveElementTypeAttr :
 def HAL_CollectiveAttr :
     AttrDef<HAL_Dialect, "Collective", []> {
   let mnemonic = "collective";
-  let summary = [{collective operation and specification}];
+  let summary = [{Collective operation and specification.}];
   let description = [{
     Specifies the collective operation to perform and any mode bits required.
   }];
@@ -470,7 +470,7 @@ def HAL_CollectiveAttr :
 def HAL_PipelineBindingAttr :
     AttrDef<HAL_Dialect, "PipelineBinding", []> {
   let mnemonic = "pipeline.binding";
-  let summary = [{pipeline binding specification}];
+  let summary = [{Pipeline binding specification.}];
   let description = [{
     Specifies a single binding within a pipeline layout.
   }];
@@ -490,21 +490,21 @@ def HAL_PipelineBindingAttr :
 def HAL_PipelineLayoutAttr :
     AttrDef<HAL_Dialect, "PipelineLayout", []> {
   let mnemonic = "pipeline.layout";
-  let summary = [{executable entry point layout specification}];
+  let summary = [{Executable entry point layout specification.}];
   let description = [{
     Specifies the layout information used for interacting with executable
     functions. This allows host code to correctly map parameters to the
     lower-level target-specific argument passing behavior.
   }];
   let parameters = (ins
-    ArrayRefParameter<"PipelineBindingAttr", "">:$bindings,
+    OptionalArrayRefParameter<"PipelineBindingAttr", "">:$bindings,
     OptionalParameter<"int64_t", "0">:$constants,
     OptionalParameter<"std::optional<PipelineLayoutFlags>">:$flags
   );
   let assemblyFormat = [{
     `<`
     (`constants` `=` $constants^ `,` ` `)?
-    `bindings` `=` `[` qualified($bindings) `]`
+    `bindings` `=` `[` (`]`) : (qualified($bindings)^ `]`)?
     (`,` `flags` `=` $flags^)?
     `>`
   }];
@@ -523,7 +523,7 @@ def HAL_PipelineLayoutAttr :
 def HAL_ExecutableTargetAttr :
     AttrDef<HAL_Dialect, "ExecutableTarget"> {
   let mnemonic = "executable.target";
-  let summary = [{generic executable target specification}];
+  let summary = [{Generic executable target specification.}];
   let description = [{
     Specifies how to compile an executable for a specific target backend.
     A backend is used to translate and serialize the executable into the final
@@ -577,7 +577,10 @@ def HAL_ExecutableTargetAttr :
     // This will recursively walk parent operations until one with the
     // `hal.executable.target` attribute is found or a `hal.executable.variant`
     // specifies a value. Returns nullptr if no target specification can be found.
-    static IREE::HAL::ExecutableTargetAttr lookup(Operation *op);
+    //
+    // If present, sets |annotationSite| to the operation where the target
+    // configuration was found.
+    static IREE::HAL::ExecutableTargetAttr lookup(Operation *op, Operation **annotationSite = nullptr);
   }];
 
   let hasCustomAssemblyFormat = 1;
@@ -589,7 +592,7 @@ def HAL_ExecutableTargetAttr :
 
 def HAL_ExecutableObjectAttr : AttrDef<HAL_Dialect, "ExecutableObject"> {
   let mnemonic = "executable.object";
-  let summary = [{object file reference}];
+  let summary = [{Object file reference.}];
   let description = [{
     Defines an object file that can be linked into executables.
     Today this is only supported for external file references with paths the
@@ -652,7 +655,7 @@ def HAL_ExecutableObjectArrayAttr :
 
 def HAL_ExecutableObjectsAttr : AttrDef<HAL_Dialect, "ExecutableObjects"> {
   let mnemonic = "executable.objects";
-  let summary = [{target-specific object file references}];
+  let summary = [{Target-specific object file references.}];
   let description = [{
     A dictionary mapping executable target specifications to a list of objects.
     This is used to allow layers of the stack that support multi-targeting to
@@ -701,7 +704,7 @@ def HAL_DeviceAliasAttr : AttrDef<HAL_Dialect, "DeviceAlias", [
   TypedAttrInterface,
 ]> {
   let mnemonic = "device.alias";
-  let summary = [{device target named alias}];
+  let summary = [{Device target named alias.}];
   let description = [{
     Specifies a device target by named alias whose configuration will be
     expanded based on compiler configuration and flags. Any configuration
@@ -752,7 +755,7 @@ def HAL_DeviceTargetAttr : AttrDef<HAL_Dialect, "DeviceTarget", [
   DeclareAttrInterfaceMethods<HAL_DeviceInitializationAttrInterface>,
 ]> {
   let mnemonic = "device.target";
-  let summary = [{generic device target specification}];
+  let summary = [{Generic device target specification.}];
   let description = [{
     Specifies the properties of a target runtime device.
     Target devices are specified with a canonical identifier matching those used
@@ -828,7 +831,7 @@ def HAL_DeviceOrdinalAttr : AttrDef<HAL_Dialect, "DeviceOrdinal", [
   DeclareAttrInterfaceMethods<HAL_DeviceInitializationAttrInterface>,
 ]> {
   let mnemonic = "device.ordinal";
-  let summary = [{specifies a device by runtime registration ordinal}];
+  let summary = [{Specifies a device by runtime registration ordinal.}];
   let description = [{
     Represents the device registered with the runtime in the order it was
     registered with ordinal 0 being the first registered. Returns null during
@@ -853,7 +856,7 @@ def HAL_DeviceFallbackAttr : AttrDef<HAL_Dialect, "DeviceFallback", [
   DeclareAttrInterfaceMethods<HAL_DeviceInitializationAttrInterface>,
 ]> {
   let mnemonic = "device.fallback";
-  let summary = [{specifies a reference to another device}];
+  let summary = [{Specifies a reference to another device.}];
   let description = [{
     Specifies by symbol a device that has already been initialized.
     Returns null during initialization if the device specified as a fallback is
@@ -878,7 +881,7 @@ def HAL_DeviceSelectAttr : AttrDef<HAL_Dialect, "DeviceSelect", [
   DeclareAttrInterfaceMethods<HAL_DeviceInitializationAttrInterface>,
 ]> {
   let mnemonic = "device.select";
-  let summary = [{selects a device from one or more options}];
+  let summary = [{Selects a device from one or more options.}];
   let description = [{
     Selects a HAL device at runtime by either enumerating and querying for
     target support or matching the given existing device by affinity.
@@ -941,7 +944,7 @@ def HAL_DeviceAffinityAttr : AttrDef<HAL_Dialect, "DeviceAffinity", [
   ]>,
 ]> {
   let mnemonic = "device.affinity";
-  let summary = [{specifies a named device and optional queue affinity}];
+  let summary = [{Specifies a named device and optional queue affinity.}];
   let description = [{
     Specifies that an annotated operation or scope is only allowed to execute on
     a specific device and optionally a set of queues (0-64) provided.
@@ -980,7 +983,7 @@ def HAL_DevicePromiseAttr : AttrDef<HAL_Dialect, "DevicePromise", [
   ]>,
 ]> {
   let mnemonic = "device.promise";
-  let summary = [{promises a named device and optional queue affinity}];
+  let summary = [{Promises a named device and optional queue affinity.}];
   let description = [{
     Specifies that an annotated operation or scope is only allowed to execute on
     a specific device that has not yet been declared and optionally a set of
@@ -1009,6 +1012,136 @@ def HAL_DevicePromiseAttr : AttrDef<HAL_Dialect, "DevicePromise", [
   );
 
   let hasCustomAssemblyFormat = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// #hal.device.optimal<*>
+//===----------------------------------------------------------------------===//
+
+def HAL_DeviceOptimalAttr : AttrDef<HAL_Dialect, "DeviceOptimal", [
+  DeclareAttrInterfaceMethods<Stream_AffinityAttr, [
+    "isExecutableWith",
+    "joinOR",
+    "joinAND",
+  ]>,
+  Util_HoistableAttrInterface,
+  DeclareAttrInterfaceMethods<Util_InliningPolicyAttrInterface, [
+    "isLegalToInline",
+  ]>,
+]> {
+  let mnemonic = "device.optimal";
+  let summary = [{Selects an optimal device for the assigned operation.}];
+  let description = [{
+    Specifies that an annotated operation or scope may execute on one device
+    in the provided affinity set based on whichever is "optimal" for the
+    operation. Resolution of the specific device may happen during compilation
+    if required information is available or be deferred to runtime.
+
+    Example:
+    ```mlir
+    // Run on either @device_a (any queue) or @device_b (queues 4 and 5).
+    #hal.device.optimal<[
+      #hal.device.affinity<@device_a>,
+      #hal.device.affinity<@device_b, [4, 5]>
+    ]>
+    ```
+  }];
+
+  let parameters = (ins
+    ArrayRefParameter<"IREE::Stream::AffinityAttr", "">:$affinities
+  );
+
+  let assemblyFormat = [{
+    `<` `[` $affinities `]` `>`
+  }];
+
+  let genVerifyDecl = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// #hal.device.topology<...>
+//===----------------------------------------------------------------------===//
+
+def HAL_DeviceTopologyAttr : AttrDef<HAL_Dialect, "DeviceTopology", [
+  DeclareAttrInterfaceMethods<Stream_AffinityTopologyAttr, [
+    "hasTransparentAccess",
+    "hasUnifiedMemory",
+  ]>
+]> {
+  let mnemonic = "device.topology";
+  let summary = [{Device connection topology specification.}];
+  let description = [{
+    Specifies the topology of connections between devices, including
+    information about memory sharing and access characteristics between devices.
+
+    This attribute is attached to the top-level module as `stream.topology`
+    to inform Stream dialect passes about device connectivity.
+
+    Example:
+    ```mlir
+    module {
+      stream.topology = #hal.device.topology<
+        links = [
+          (@device_gpu_0 -> @device_cpu = {transparent_access = true, unified_memory = true}),
+          (@device_gpu_1 -> @device_cpu = {transparent_access = true}),
+          (@device_cpu -> @device_gpu_0 = {unified_memory = true}),
+          (@device_cpu -> @device_gpu_1 = {})
+        ]
+      >
+    }
+    ```
+  }];
+
+  let parameters = (ins
+    ArrayRefParameter<"DeviceLinkAttr", "links">:$links
+  );
+
+  let assemblyFormat = [{
+    `<` `links` `=` `[` $links `]` `>`
+  }];
+}
+
+def HAL_DeviceLinkAttr : AttrDef<HAL_Dialect, "DeviceLink"> {
+  let mnemonic = "device.link";
+  let summary = [{Connection between devices.}];
+  let description = [{
+    Describes a directional relationship between devices in terms of memory
+    and access properties.
+
+    Currently the following properties are supported:
+    - `unified_memory`: Whether the devices share a unified memory space
+    - `transparent_access`: Whether the source device can access the target device's memory without staging
+
+    The assembly format uses directional links:
+    ```mlir
+    // GPU can access CPU memory transparently with unified memory
+    (@device_gpu -> @device_cpu = {transparent_access = true, unified_memory = true})
+    // CPU needs explicit transfers to access GPU memory (both properties false)
+    (@device_cpu -> @device_gpu = {})
+    // GPU can access CPU memory transparently but without unified memory
+    (@device_gpu -> @device_cpu = {transparent_access = true})
+    // Its possible to add arbitrary properties to the link that are not specified here
+    (@device_gpu -> @device_cpu = {}, {optional_flag = true})
+    ```
+
+    Future extensions may include properties like bandwidth, latency, and target-specific
+    information for specialized connections (e.g., GPUs sharing an SoC, InfiniBand, PCIe).
+  }];
+
+  let parameters = (ins
+    AttrParameter<"SymbolRefAttr", "source_device">:$sourceDevice,
+    AttrParameter<"SymbolRefAttr", "target_device">:$targetDevice,
+    OptionalParameter<"bool", "false">:$unified_memory,
+    OptionalParameter<"bool", "false">:$transparent_access,
+    OptionalParameter<"DictionaryAttr">:$extra_properties
+  );
+
+  let assemblyFormat = [{
+    `(` $sourceDevice `->` $targetDevice `=`
+   `{` struct($unified_memory, $transparent_access)`}`
+    (`,` $extra_properties^)?
+    `)`
+  }];
 }
 
 #endif  // IREE_DIALECT_HAL_IR_HAL_ATTRS

@@ -45,7 +45,7 @@ DiagnosedSilenceableFailure static mapNestedForallToThreadsImpl(
 
   // Create an early zero index value for replacements.
   Location loc = target->getLoc();
-  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
   DiagnosedSilenceableFailure diag = DiagnosedSilenceableFailure::success();
   WalkResult walkResult = target->walk([&](scf::ForallOp forallOp) {
     diag = mlir::transform::gpu::mapOneForallToThreadsImpl(
@@ -69,7 +69,7 @@ DiagnosedSilenceableFailure static mapNestedForallToThreadsImpl(
 struct GPUDistributePass final
     : impl::GPUDistributePassBase<GPUDistributePass> {
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     IRRewriter rewriter(funcOp->getContext());
 
     // First map all lane level forall loops to lanes.

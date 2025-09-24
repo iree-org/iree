@@ -10,6 +10,7 @@
 #include <numeric>
 
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -18,6 +19,12 @@
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
 namespace mlir::iree_compiler {
+
+static llvm::cl::opt<bool> clEnableScalableVectorization(
+    "iree-llvmcpu-enable-scalable-vectorization",
+    llvm::cl::desc("Enable scalable vectorization if it is supported by the "
+                   "target (e.g., +sve, +sve2 and/or +sme feature flags)"),
+    llvm::cl::init(false));
 
 FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
   Operation *rootOperation = nullptr;
@@ -80,5 +87,7 @@ bool isOptEnabled(FunctionOpInterface funcOp, StringRef label) {
   DictionaryAttr config = getTranslationInfo(funcOp).getConfiguration();
   return config && config.contains(label);
 }
+
+bool isScalableVectorizationEnabled() { return clEnableScalableVectorization; }
 
 } // namespace mlir::iree_compiler

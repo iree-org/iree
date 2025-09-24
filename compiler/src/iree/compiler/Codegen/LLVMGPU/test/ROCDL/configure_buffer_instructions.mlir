@@ -17,7 +17,7 @@
 func.func @const_size_no_offset() {
   %bind = hal.interface.binding.subspan layout(#pipeline_layout)
     binding(0) alignment(64)
-    : !flow.dispatch.tensor<readonly:tensor<256x256xf32>>
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x256xf32>>
   return
 }
 
@@ -28,7 +28,7 @@ func.func @const_size_zero_offset() {
   %c0 = arith.constant 0 : index
   %bind = hal.interface.binding.subspan layout(#pipeline_layout)
     binding(0) alignment(64) offset(%c0)
-    : !flow.dispatch.tensor<readonly:tensor<256x256xf32>>
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x256xf32>>
   return
 }
 
@@ -39,7 +39,7 @@ func.func @const_size_too_big() {
   %c0 = arith.constant 0 : index
   %bind = hal.interface.binding.subspan layout(#pipeline_layout)
     binding(0) alignment(64) offset(%c0)
-    : !flow.dispatch.tensor<readonly:tensor<1024x1024x1024xf16>>
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x1024x1024xf16>>
   return
 }
 
@@ -50,7 +50,7 @@ func.func @const_size_const_offset() {
   %c8192 = arith.constant 8192 : index
   %bind = hal.interface.binding.subspan layout(#pipeline_layout)
     binding(0) alignment(64) offset(%c8192)
-    : !flow.dispatch.tensor<readonly:tensor<256x256xf32>>
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x256xf32>>
   return
 }
 
@@ -62,7 +62,7 @@ func.func @const_size_i32_offset() {
   %off = arith.index_castui %off.low : i32 to index
   %bind = hal.interface.binding.subspan layout(#pipeline_layout)
     binding(0) alignment(64) offset(%off)
-    : !flow.dispatch.tensor<readonly:tensor<256x256xf32>>
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x256xf32>>
   return
 }
 
@@ -80,7 +80,7 @@ func.func @const_size_i64_offset() {
   %off = arith.index_castui %off.i64 : i64 to index
   %bind = hal.interface.binding.subspan layout(#pipeline_layout)
     binding(0) alignment(64) offset(%off)
-    : !flow.dispatch.tensor<readonly:tensor<256x256xf32>>
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x256xf32>>
   return
 }
 
@@ -93,7 +93,7 @@ func.func @const_size_nonuniform_offset_workgroup_id() {
   %off = arith.muli %wgid, %c8192 : index
   %bind = hal.interface.binding.subspan layout(#pipeline_layout)
     binding(0) alignment(64) offset(%off)
-    : !flow.dispatch.tensor<readonly:tensor<1x256xf32>>
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x256xf32>>
   return
 }
 
@@ -106,7 +106,7 @@ func.func @any_dyn_size() {
   %m = arith.index_castui %m.i32 : i32 to index
   %bind = hal.interface.binding.subspan layout(#pipeline_layout)
     binding(0) alignment(64) offset(%c0)
-    : !flow.dispatch.tensor<readonly:tensor<?x256xf32>>{%m}
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x256xf32>>{%m}
   return
 }
 
@@ -120,6 +120,6 @@ func.func @assume_dyn_size() {
   %m.assume = util.assume.int %m[<umin = 0, umax = 0>, <umin = 4, umax = 2048, udiv = 4>] : index
   %bind = hal.interface.binding.subspan layout(#pipeline_layout)
     binding(0) alignment(64) offset(%c0)
-    : !flow.dispatch.tensor<readonly:tensor<?x256xf32>>{%m.assume}
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x256xf32>>{%m.assume}
   return
 }

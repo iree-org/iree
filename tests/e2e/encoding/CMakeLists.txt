@@ -20,8 +20,8 @@ iree_check_single_backend_test_suite(
   DRIVER
     "hip"
   COMPILER_FLAGS
-    "--iree-global-opt-experimental-rocm-data-tiling"
-    "--iree-hip-encoding-layout-resolver=data-tiling"
+    "--iree-global-opt-enable-early-materialization=false"
+    "--iree-llvmgpu-test-combine-layout-transformation=true"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

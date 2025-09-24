@@ -16,13 +16,12 @@ hal.executable private @ex0 {
   // CHECK-SAME: sources({module_ex0_variant0.configured.mlir = dense_resource<module_ex0_variant0.configured.mlir
   hal.executable.variant public @variant0 target(#executable_target) {
     // CHECK: hal.executable.export public @dispatch0
-    // CHECK-SAME: source_locs = {configured = #[[EX0_VARIANT0_LOC]]}
-    hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout) attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
-    } {
-    ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
+    // CHECK: source_locs = {configured = #[[EX0_VARIANT0_LOC]]}
+    hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout) count(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
+    } attributes {
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     }
     builtin.module {
       func.func @dispatch0() {
@@ -38,13 +37,12 @@ hal.executable private @ex1 {
   // CHECK-SAME: sources({module_ex1_variant1.configured.mlir = dense_resource<module_ex1_variant1.configured.mlir
   hal.executable.variant public @variant1 target(#executable_target) {
     // CHECK: hal.executable.export public @dispatch1
-    // CHECK-SAME: source_locs = {configured = #[[EX1_VARIANT1_LOC]]}
-    hal.executable.export public @dispatch1 ordinal(0) layout(#pipeline_layout) attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
-    } {
-    ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
+    // CHECK: source_locs = {configured = #[[EX1_VARIANT1_LOC]]}
+    hal.executable.export public @dispatch1 ordinal(0) layout(#pipeline_layout) count(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
+    } attributes {
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     }
     builtin.module {
       func.func @dispatch1() {

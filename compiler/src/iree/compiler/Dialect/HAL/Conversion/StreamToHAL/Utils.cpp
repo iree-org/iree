@@ -5,27 +5,16 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/Conversion/StreamToHAL/Utils.h"
-
 #include "iree/compiler/Dialect/HAL/Analysis/Captures.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "llvm/Support/CommandLine.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-
-static llvm::cl::opt<bool> clExternalResourcesMappable(
-    "iree-stream-external-resources-mappable",
-    llvm::cl::desc("Allocates external resources as host-visible and mappable. "
-                   "This can degrade performance and introduce allocation "
-                   "overhead and staging buffers for readback on the host "
-                   "should be managed by the calling application instead."),
-    llvm::cl::init(false));
 
 namespace mlir::iree_compiler {
 
 Value lookupDeviceFor(Operation *op, OpBuilder &builder) {
   auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
-  auto resolveOp = builder.create<IREE::Stream::ContextResolveOp>(
-      op->getLoc(),
+  auto resolveOp = IREE::Stream::ContextResolveOp::create(
+      builder, op->getLoc(),
       TypeRange{
           builder.getType<IREE::HAL::DeviceType>(),
       },
@@ -33,23 +22,68 @@ Value lookupDeviceFor(Operation *op, OpBuilder &builder) {
   return resolveOp.getResult(0);
 }
 
-std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(Operation *op,
-                                                         OpBuilder &builder) {
-  auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
-  auto resolveOp = builder.create<IREE::Stream::ContextResolveOp>(
-      op->getLoc(),
+static std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(
+    Location loc, IREE::Stream::AffinityAttr affinityAttr, OpBuilder &builder) {
+  auto resolveOp = IREE::Stream::ContextResolveOp::create(
+      builder, loc,
       TypeRange{
           builder.getType<IREE::HAL::DeviceType>(),
           builder.getI64Type(),
       },
       affinityAttr);
-  return std::make_tuple(resolveOp.getResult(0), resolveOp.getResult(1));
+  return {resolveOp.getResult(0), resolveOp.getResult(1)};
+}
+
+static std::tuple<SmallVector<Value>, SmallVector<Value>>
+lookupDevicesAndQueueAffintiesFor(Operation *op, OpBuilder &builder) {
+  auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
+  SmallVector<Value> devices;
+  SmallVector<Value> queueAffinities;
+  if (auto optimalAttr = dyn_cast<IREE::HAL::DeviceOptimalAttr>(affinityAttr)) {
+    for (auto affinity : optimalAttr.getAffinities()) {
+      auto [device, queueAffinity] =
+          lookupDeviceAndQueueAffinityFor(op->getLoc(), affinity, builder);
+      devices.push_back(device);
+      queueAffinities.push_back(queueAffinity);
+    }
+  } else {
+    auto [device, queueAffinity] =
+        lookupDeviceAndQueueAffinityFor(op->getLoc(), affinityAttr, builder);
+    devices.push_back(device);
+    queueAffinities.push_back(queueAffinity);
+  }
+  return {devices, queueAffinities};
+}
+
+std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(Operation *op,
+                                                         OpBuilder &builder) {
+  auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
+  return lookupDeviceAndQueueAffinityFor(op->getLoc(), affinityAttr, builder);
+}
+
+std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(Operation *op,
+                                                         Value memoryTypes,
+                                                         Value bufferUsage,
+                                                         OpBuilder &builder) {
+  auto [devices, queueAffinities] =
+      lookupDevicesAndQueueAffintiesFor(op, builder);
+  // Returns the device and queue affinity for the first device, if only one
+  // exists.
+  if (devices.size() == 1) {
+    return {devices[0], queueAffinities[0]};
+  }
+  // Emit a select op to let the runtime decide which device/queue affinity to
+  // use, if required.
+  auto selectOp = IREE::HAL::AllocatorSelectOp::create(
+      builder, op->getLoc(), devices, queueAffinities, memoryTypes,
+      bufferUsage);
+  return {selectOp.getResult(0), selectOp.getResult(1)};
 }
 
 Value lookupAllocatorFor(Operation *op, OpBuilder &builder) {
   auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
-  auto resolveOp = builder.create<IREE::Stream::ContextResolveOp>(
-      op->getLoc(),
+  auto resolveOp = IREE::Stream::ContextResolveOp::create(
+      builder, op->getLoc(),
       TypeRange{
           builder.getType<IREE::HAL::AllocatorType>(),
       },
@@ -58,24 +92,21 @@ Value lookupAllocatorFor(Operation *op, OpBuilder &builder) {
 }
 
 std::tuple<Value, Value>
-lookupAllocatorAndQueueAffinityFor(Operation *op, OpBuilder &builder) {
-  auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
-  auto resolveOp = builder.create<IREE::Stream::ContextResolveOp>(
-      op->getLoc(),
-      TypeRange{
-          builder.getType<IREE::HAL::AllocatorType>(),
-          builder.getI64Type(),
-      },
-      affinityAttr);
-  return std::make_tuple(resolveOp.getResult(0), resolveOp.getResult(1));
+lookupAllocatorAndQueueAffinityFor(Operation *op, Value memoryTypes,
+                                   Value bufferUsage, OpBuilder &builder) {
+  auto [device, queueAffinity] =
+      lookupDeviceAndQueueAffinityFor(op, memoryTypes, bufferUsage, builder);
+  Value allocator =
+      IREE::HAL::DeviceAllocatorOp::create(builder, op->getLoc(), device);
+  return {allocator, queueAffinity};
 }
 
 Value getOrCreateWaitFence(Location loc, Value timepointFence,
                            PatternRewriter &rewriter) {
   if (timepointFence)
     return timepointFence;
-  return rewriter.create<IREE::Util::NullOp>(
-      loc, rewriter.getType<IREE::HAL::FenceType>());
+  return IREE::Util::NullOp::create(rewriter, loc,
+                                    rewriter.getType<IREE::HAL::FenceType>());
 }
 
 // Finds a !hal.fence bound to |timepoint| via a chain op and returns it if
@@ -118,8 +149,8 @@ Value getOrCreateSignalFence(Location loc, Value device, Value timepoint,
   // Check to see if anyone is consuming the timepoint - if not then we don't
   // need create a fence.
   if (timepoint.use_empty()) {
-    return rewriter.create<IREE::Util::NullOp>(
-        loc, rewriter.getType<IREE::HAL::FenceType>());
+    return IREE::Util::NullOp::create(rewriter, loc,
+                                      rewriter.getType<IREE::HAL::FenceType>());
   }
 
   // Check to see if the timepoint is associated with a fence. In common cases
@@ -129,8 +160,8 @@ Value getOrCreateSignalFence(Location loc, Value device, Value timepoint,
     return fence;
 
   // Create a new fence.
-  return rewriter.create<IREE::HAL::FenceCreateOp>(
-      loc, rewriter.getType<IREE::HAL::FenceType>(), device,
+  return IREE::HAL::FenceCreateOp::create(
+      rewriter, loc, rewriter.getType<IREE::HAL::FenceType>(), device,
       IREE::HAL::FenceFlagBitfield::None);
 }
 
@@ -158,28 +189,26 @@ IREE::HAL::CommandCategoryBitfield deriveCommandCategories(Region &region) {
 }
 
 LogicalResult
-deriveRequiredResourceBufferBits(Location loc,
-                                 IREE::Stream::ResourceType resourceType,
+deriveRequiredResourceBufferBits(Location loc, IREE::HAL::Lifetime lifetime,
                                  IREE::HAL::MemoryTypeBitfield &memoryTypes,
                                  IREE::HAL::BufferUsageBitfield &bufferUsage) {
   memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
   bufferUsage = IREE::HAL::BufferUsageBitfield::None;
-  switch (resourceType.getLifetime()) {
+  switch (lifetime) {
   default:
-    return mlir::emitError(loc)
-           << "unsupported resource lifetime: "
-           << IREE::Stream::stringifyLifetime(resourceType.getLifetime());
-  case IREE::Stream::Lifetime::Constant:
+    return mlir::emitError(loc) << "unsupported resource lifetime: "
+                                << IREE::HAL::stringifyLifetime(lifetime);
+  case IREE::HAL::Lifetime::Constant:
     // Device local; copies required to get into external resources.
     memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
     bufferUsage =
         bufferUsage | IREE::HAL::BufferUsageBitfield::SharingImmutable;
     break;
-  case IREE::Stream::Lifetime::Variable:
+  case IREE::HAL::Lifetime::Variable:
     // Device local; copies required to get into external resources.
     memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
     break;
-  case IREE::Stream::Lifetime::External:
+  case IREE::HAL::Lifetime::External:
     // We only require device-visible for external buffers (as we don't today
     // do anything else with them on the host). They may be mappable for user
     // convenience. Ideally they would have been placed in device-local memory
@@ -187,7 +216,7 @@ deriveRequiredResourceBufferBits(Location loc,
     // correctly.
     memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceVisible;
     break;
-  case IREE::Stream::Lifetime::Staging:
+  case IREE::HAL::Lifetime::Staging:
     // Host local; copies required to get into device resources.
     // We could vary this based on staging usage (upload/download) by
     // making it device-local|host-visible, but host-local means we have
@@ -197,7 +226,7 @@ deriveRequiredResourceBufferBits(Location loc,
     bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Transfer |
                   IREE::HAL::BufferUsageBitfield::Mapping;
     break;
-  case IREE::Stream::Lifetime::Transient:
+  case IREE::HAL::Lifetime::Transient:
     // Device local; copies required to get into external resources.
     memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
     break;
@@ -207,41 +236,6 @@ deriveRequiredResourceBufferBits(Location loc,
   bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Transfer |
                 IREE::HAL::BufferUsageBitfield::DispatchStorage;
 
-  return success();
-}
-
-LogicalResult
-deriveAllowedResourceBufferBits(Location loc,
-                                IREE::Stream::ResourceType resourceType,
-                                IREE::HAL::MemoryTypeBitfield &memoryTypes,
-                                IREE::HAL::BufferUsageBitfield &bufferUsage) {
-  memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
-  bufferUsage = IREE::HAL::BufferUsageBitfield::None;
-  if (failed(deriveRequiredResourceBufferBits(loc, resourceType, memoryTypes,
-                                              bufferUsage))) {
-    return failure();
-  }
-  switch (resourceType.getLifetime()) {
-  default:
-    break;
-  case IREE::Stream::Lifetime::External:
-    if (clExternalResourcesMappable) {
-      // #yolo; these come from/go to outside the program.
-      // Today we assume they are device-local|host-visible just for
-      // practical purposes but that does not have to be true. We really
-      // want this to be something we analyze and handle on the edges
-      // (transferring devices/etc if needed).
-      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal |
-                    IREE::HAL::MemoryTypeBitfield::HostVisible;
-      // NOTE: we may not map it but users may after they get them back.
-      // Another reason we should annotate this - having a buffer be
-      // mappable is potentially expensive (may get a 2nd copy in memory!).
-      bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Mapping;
-    } else {
-      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
-    }
-    break;
-  }
   return success();
 }
 

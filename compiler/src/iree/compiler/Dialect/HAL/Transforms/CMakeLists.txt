@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "AnnotateTargetDevices.cpp"
     "AssignLegacyTargetDevices.cpp"
     "AssignTargetDevices.cpp"
     "CaptureExecutableSources.cpp"
@@ -33,6 +34,7 @@ iree_cc_library(
     "MaterializeResourceCaches.cpp"
     "MaterializeTargetDevices.cpp"
     "MemoizeDeviceQueries.cpp"
+    "MemoizeDeviceSelection.cpp"
     "OutlineMemoizeRegions.cpp"
     "Passes.cpp"
     "Passes.h.inc"
@@ -42,6 +44,7 @@ iree_cc_library(
     "ResolveDeviceAliases.cpp"
     "ResolveDevicePromises.cpp"
     "ResolveExportOrdinals.cpp"
+    "ResolveTopologyQueries.cpp"
     "SerializeExecutables.cpp"
     "StripExecutableContents.cpp"
     "SubstituteExecutables.cpp"
@@ -74,6 +77,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::Conversion::HALToHAL
     iree::compiler::Dialect::HAL::Conversion::StandardToHAL
     iree::compiler::Dialect::HAL::Conversion::StreamToHAL
+    iree::compiler::Dialect::HAL::Conversion::StreamToHAL::Utils
     iree::compiler::Dialect::HAL::Conversion::UtilToHAL
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
@@ -98,6 +102,17 @@ iree_tablegen_library(
     "Passes.td"
   OUTS
     --gen-pass-decls Passes.h.inc
+)
+
+iree_tablegen_doc(
+  NAME
+    HALPassesDocGen
+  CATEGORY
+    "Passes"
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-doc HALPasses.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

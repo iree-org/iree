@@ -32,17 +32,23 @@ iree_cc_library(
     "ConvertToLoops.cpp"
     "DecomposeAttention.cpp"
     "DecomposeIm2col.cpp"
+    "DecomposeMapScatter.cpp"
     "DecomposeWinogradPass.cpp"
+    "FoldUnitExtentDims.cpp"
     "PadContractionToBlockSize.cpp"
     "Passes.cpp"
     "ReshapeFusion.cpp"
+    "RewriteFft.cpp"
     "SplitReduction.cpp"
+    "TestReshapeFusion.cpp"
     "TileAttention.cpp"
     "TransposeFusion.cpp"
+    "VectorizeIREELinalgExtOps.cpp"
   DEPS
     ::PassesIncGen
     LLVMSupport
     MLIRAffineDialect
+    MLIRAffineTransforms
     MLIRAffineUtils
     MLIRArithDialect
     MLIRArithUtils
@@ -69,6 +75,7 @@ iree_cc_library(
     MLIRTransformDialect
     MLIRTransformUtils
     MLIRTransforms
+    MLIRVectorDialect
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::Util::IR

@@ -7,13 +7,16 @@
 #include "iree/compiler/Preprocessing/TransformExtensions/PreprocessingExtensions.h"
 
 #include "iree/compiler/Utils/EquivalenceUtils.h"
-#include "llvm/Support/Debug.h"
+#include "iree/compiler/Utils/ShapeUtils.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
 namespace mlir::iree_compiler {
 
@@ -31,32 +34,6 @@ void registerTransformDialectPreprocessingExtension(DialectRegistry &registry) {
 //===----------------------------------------------------------------------===//
 // MatchCastCompatibleDagFromRootOp
 //===----------------------------------------------------------------------===//
-
-static bool isCastableToTensorType(Type from, RankedTensorType to) {
-  auto tensorType = dyn_cast<RankedTensorType>(from);
-  if (!tensorType) {
-    return false;
-  }
-  if (tensorType.getRank() != to.getRank()) {
-    return false;
-  }
-  if (tensorType.getElementType() != to.getElementType()) {
-    return false;
-  }
-  for (auto [fromSize, toSize] :
-       llvm::zip_equal(tensorType.getShape(), to.getShape())) {
-    // If the target dimension is dynamic we can always cast to it.
-    if (ShapedType::isDynamic(toSize)) {
-      continue;
-    }
-    // Casting a dynamic dimension to a static one is never valid, and static
-    // sizes must always match.
-    if (toSize != fromSize) {
-      return false;
-    }
-  }
-  return true;
-}
 
 // Compares the regions between two operations in lockstep for equality.
 static DiagnosedSilenceableFailure
@@ -248,6 +225,85 @@ IREE::transform_dialect::MatchCastCompatibleDagFromRootOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// MatchContractionOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+IREE::transform_dialect::MatchContractionOp::matchOperation(
+    Operation *current, transform::TransformResults &results,
+    transform::TransformState &state) {
+  Location loc = current->getLoc();
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(current);
+  if (!linalgOp) {
+    return emitSilenceableFailure(loc)
+           << "Operation " << *current << " is not a LinalgOp.";
+  }
+
+  if (!linalg::isaContractionOpInterface(linalgOp)) {
+    return emitSilenceableFailure(loc)
+           << "Operation " << *current << " is not a contraction operation.";
+  }
+
+  Type targetLhsType = getLhsType();
+  Type currentLhsType = getElementTypeOrSelf(linalgOp.getDpsInputs()[0]);
+  if (currentLhsType != targetLhsType) {
+    return emitSilenceableFailure(loc)
+           << "LHS type doesn't match: expected " << targetLhsType << ", got "
+           << currentLhsType;
+  }
+
+  Type targetRhsType = getRhsType();
+  Type currentRhsType = getElementTypeOrSelf(linalgOp.getDpsInputs()[1]);
+  if (currentRhsType != targetRhsType) {
+    return emitSilenceableFailure(loc)
+           << "RHS type doesn't match: expected " << targetRhsType << ", got "
+           << currentRhsType;
+  }
+
+  Type targetOutputType = getOutputType();
+  // Since linalg::isaContractionOpInterface already verified single output in
+  // above code, we can directly access it.
+  Type currentOutputType =
+      getElementTypeOrSelf(linalgOp.getDpsInits()[0].getType());
+  if (currentOutputType != targetOutputType) {
+    return emitSilenceableFailure(loc)
+           << "output type doesn't match: expected " << targetOutputType
+           << ", got " << currentOutputType;
+  }
+
+  ArrayAttr currentIndexingMaps = linalgOp.getIndexingMaps();
+  if (std::optional<ArrayAttr> targetIndexingMaps = getIndexingMaps()) {
+    if (currentIndexingMaps != *targetIndexingMaps) {
+      return emitSilenceableFailure(loc) << "indexing maps don't match";
+    }
+  }
+
+  // Get the actual size values for batch/m/n/k dimensions after verifying it's
+  // a contraction operation.
+  linalg::ContractionDimensions contractionDims =
+      linalg::inferContractionDims(linalgOp).value();
+  SmallVector<int64_t> iterationDomain = linalgOp.getStaticLoopRanges();
+  Builder builder(getContext());
+
+  auto iterationSizes = [&](ArrayRef<unsigned> dimIndices) {
+    return llvm::map_to_vector(dimIndices, [&](unsigned dimIdx) -> Attribute {
+      return builder.getI64IntegerAttr(iterationDomain[dimIdx]);
+    });
+  };
+
+  results.setParams(cast<OpResult>(getBatchDims()),
+                    iterationSizes(contractionDims.batch));
+  results.setParams(cast<OpResult>(getMDims()),
+                    iterationSizes(contractionDims.m));
+  results.setParams(cast<OpResult>(getNDims()),
+                    iterationSizes(contractionDims.n));
+  results.setParams(cast<OpResult>(getKDims()),
+                    iterationSizes(contractionDims.k));
+
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===----------------------------------------------------------------------===//
 // MatchCastCompatibleTypesOp
 //===----------------------------------------------------------------------===//
 
@@ -272,11 +328,11 @@ IREE::transform_dialect::MatchCastCompatibleTypesOp::matchValue(
 }
 
 //===----------------------------------------------------------------------===//
-// MatchDimIsMultipleOfOp
+// MatchDimBoundsOp
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure
-IREE::transform_dialect::MatchDimIsMultipleOfOp::matchValue(
+IREE::transform_dialect::MatchDimBoundsOp::matchValue(
     Value current, transform::TransformResults &results,
     transform::TransformState &state) {
   auto shapedType = dyn_cast<ShapedType>(current.getType());
@@ -285,12 +341,73 @@ IREE::transform_dialect::MatchDimIsMultipleOfOp::matchValue(
            << "type " << current.getType() << " is not a shaped type";
   }
   int64_t dim = getDim();
-  if (dim > shapedType.getRank()) {
+  if (dim >= shapedType.getRank()) {
+    return emitSilenceableError()
+           << "dim " << dim << " out of range for shaped type " << shapedType;
+  }
+  if (std::optional<int64_t> lb = getLowerBound()) {
+    auto constantLb = ValueBoundsConstraintSet::computeConstantBound(
+        presburger::BoundType::LB, {current, /*dim=*/dim},
+        /*stopCondition=*/nullptr, /*closedLB=*/true);
+    if (failed(constantLb)) {
+      return emitSilenceableError()
+             << "failed to compute constant lower bound for dim " << dim;
+    }
+    if (lb.value() > constantLb.value()) {
+      return emitSilenceableError()
+             << "dim " << dim << " is not >= " << lb.value();
+    }
+  }
+  if (std::optional<int64_t> ub = getUpperBound()) {
+    auto constantUb = ValueBoundsConstraintSet::computeConstantBound(
+        presburger::BoundType::UB, {current, /*dim=*/dim},
+        /*stopCondition=*/nullptr, /*closedUB=*/true);
+    if (failed(constantUb)) {
+      return emitSilenceableError()
+             << "failed to compute constant upper bound for dim " << dim;
+    }
+    if (ub.value() < constantUb.value()) {
+      return emitSilenceableError()
+             << "dim " << dim << " is not <= " << ub.value();
+    }
+  }
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===----------------------------------------------------------------------===//
+// MatchDimIsMultipleOfOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+IREE::transform_dialect::MatchDimIsMultipleOfOp::matchValue(
+    Value current, transform::TransformResults &results,
+    transform::TransformState &state) {
+  MLIRContext *ctx = current.getContext();
+  auto shapedType = dyn_cast<ShapedType>(current.getType());
+  if (!shapedType) {
+    return emitSilenceableError()
+           << "type " << current.getType() << " is not a shaped type";
+  }
+  int64_t dim = getDim();
+  if (dim >= shapedType.getRank()) {
     return emitSilenceableError()
            << "dim " << dim << " out of range for shaped type " << shapedType;
   }
   int64_t size = getSize();
-  if (shapedType.getShape()[dim] % size != 0) {
+  ValueBoundsConstraintSet::Variable dimVar(current, dim);
+
+  // Check if current[dim] % size == 0. There are a couple of options for how
+  // to do this (e.g. mul(floordiv)). Affine map canonicalizations are good
+  // at dropping terms that statically divide the mod RHS so we go with this
+  // one.
+  AffineMap modMap = AffineMap::get(/*dimCount=*/0, /*symbolCount=*/1,
+                                    getAffineSymbolExpr(0, ctx) %
+                                        getAffineConstantExpr(size, ctx));
+  ValueBoundsConstraintSet::Variable modVar(modMap, {dimVar});
+  Builder b(ctx);
+  FailureOr<bool> maybeFailed = ValueBoundsConstraintSet::areEqual(
+      modVar, OpFoldResult{b.getIndexAttr(0)});
+  if (failed(maybeFailed) || !maybeFailed.value()) {
     return emitSilenceableError()
            << "dim " << dim << " of shaped type " << shapedType
            << " is not a multiple of " << size;

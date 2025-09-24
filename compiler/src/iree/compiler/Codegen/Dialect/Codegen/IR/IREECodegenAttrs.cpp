@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
@@ -20,11 +21,12 @@
 
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.cpp.inc"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/LoweringConfigEnums.cpp.inc"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenEnums.cpp.inc"
 
 static const char kTranslationInfoAttrName[] = "translation_info";
 static const char kCompilationInfoAttrName[] = "compilation_info";
 static const char kRootOpInfoAttrName[] = "root_op";
+static const char kUKernelDescriptorName[] = "iree_codegen.ukernel";
 
 namespace mlir::iree_compiler {
 
@@ -228,8 +230,7 @@ LogicalResult LoweringConfigTilingLevelAttr::verify(
 LoweringConfigAttr
 LoweringConfigAttr::get(MLIRContext *context, TileSizesListTypeRef tileSizes,
                         ScalableTileFlagsListTypeRef scalableTileFlags,
-                        TileSizesListTypeRef tileInterchange,
-                        ArrayRef<int64_t> nativeVectorSize) {
+                        TileSizesListTypeRef tileInterchange) {
   SmallVector<LoweringConfigTilingLevelAttr> tilinglevels;
   for (auto [level, sizes] : llvm::enumerate(tileSizes)) {
     ArrayRef<int64_t> interchange = level < tileInterchange.size()
@@ -242,16 +243,13 @@ LoweringConfigAttr::get(MLIRContext *context, TileSizesListTypeRef tileSizes,
         context, sizes, interchange, scalableFlags));
   }
   return get(context,
-             LoweringConfigTilingLevelsAttr::get(context, tilinglevels),
-             nativeVectorSize);
+             LoweringConfigTilingLevelsAttr::get(context, tilinglevels));
 }
 
-LoweringConfigAttr LoweringConfigAttr::get(MLIRContext *context,
-                                           TileSizesListTypeRef tileSizes,
-                                           TileSizesListTypeRef tileInterchange,
-                                           ArrayRef<int64_t> nativeVectorSize) {
-
-  return get(context, tileSizes, {}, tileInterchange, nativeVectorSize);
+LoweringConfigAttr
+LoweringConfigAttr::get(MLIRContext *context, TileSizesListTypeRef tileSizes,
+                        TileSizesListTypeRef tileInterchange) {
+  return get(context, tileSizes, {}, tileInterchange);
 }
 
 TileSizesListType LoweringConfigAttr::getTileSizeVals() const {
@@ -307,10 +305,18 @@ SmallVector<int64_t> LoweringConfigAttr::getWorkgroupInterchange() const {
   return getTileInterchangeVals(0);
 }
 
+std::optional<unsigned> LoweringConfigAttr::getNumTilingLevels() const {
+  return getTilingLevels().size();
+}
+
 SmallVector<int64_t>
 LoweringConfigAttr::getStaticTilingLevelSizes(unsigned level,
                                               Operation *) const {
   return getTileSizeVals(level);
+}
+
+Attribute LoweringConfigAttr::getTilingLevelAttr(unsigned level) const {
+  return getTilingLevels()[level];
 }
 
 SmallVector<OpFoldResult>
@@ -331,9 +337,7 @@ bool LoweringConfigAttr::hasWorkgroupTilingLevel() const {
 
 LogicalResult
 LoweringConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
-                           LoweringConfigTilingLevelsAttr levels,
-                           ArrayRef<int64_t> nativeVectorSizes) {
-  (void)nativeVectorSizes;
+                           LoweringConfigTilingLevelsAttr levels) {
   if (!levels)
     return emitError() << "missing lowering config levels";
   return success();
@@ -351,9 +355,8 @@ CompilationInfoAttr::verify(function_ref<InFlightDiagnostic()> emitError,
     return emitError() << "missing lowering config";
   }
   if (auto defaultConfig = llvm::dyn_cast<LoweringConfigAttr>(loweringConfig)) {
-    if (failed(LoweringConfigAttr::verify(
-            emitError, defaultConfig.getTilingLevels(),
-            defaultConfig.getNativeVectorSize()))) {
+    if (failed(LoweringConfigAttr::verify(emitError,
+                                          defaultConfig.getTilingLevels()))) {
       return emitError() << "invalid lowering config: " << defaultConfig;
     }
   }
@@ -414,7 +417,7 @@ LogicalResult WorkgroupMappingAttr::verifyAttrList(MLIRContext *context,
   for (auto attr : attrs) {
     auto typedAttr =
         ::mlir::dyn_cast_or_null<IREE::Codegen::WorkgroupMappingAttr>(attr);
-    if (!attr) {
+    if (!typedAttr) {
       return emitError() << "expected all the mapping attribute to be of "
                             "`WorkgroupMappingAttr` type";
     }
@@ -462,19 +465,259 @@ int64_t WorkgroupMappingAttr::getRelativeIndex() const {
   return getMappingId();
 }
 
-//===---------------------------------------------------------------------===//
-// iree_codegen.encoding_nop_layout
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+// iree_codegen.simple_target
+//===----------------------------------------------------------------------===//
 
-MaterializeEncodingInfo
-EncodingNopLayoutAttr::getEncodingInfo(RankedTensorType type) const {
-  return MaterializeEncodingInfo{};
+LogicalResult
+SimpleTargetAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                         ArrayRef<int64_t> maxWorkgroupCount) {
+  if (maxWorkgroupCount.size() > 3) {
+    return emitError()
+           << "expected `max_workgroup_count` to have atmost 3 entries";
+  }
+  return success();
 }
 
-Operation *EncodingNopLayoutAttr::lowerOp(OpBuilder &b, Operation *op,
-                                          TypeRange convertedResTypes,
-                                          ValueRange convertedOperands) const {
-  return clone(b, op, convertedResTypes, convertedOperands);
+std::array<int64_t, 3> SimpleTargetAttr::getMaximumWorkgroupCount() const {
+  std::array<int64_t, 3> maxWorkgroupCount = {
+      ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
+  ArrayRef<int64_t> givenMaxWorkgroupCount = getMaxWorkgroupCount();
+  assert(givenMaxWorkgroupCount.size() <= 3 &&
+         "expected `max_workgroup_count` to have atmost 3 entries");
+  for (auto [index, value] : llvm::enumerate(givenMaxWorkgroupCount)) {
+    maxWorkgroupCount[index] = value;
+  }
+  return maxWorkgroupCount;
+}
+
+//===---------------------------------------------------------------------===//
+// iree_codegen.rotate_rows
+//===---------------------------------------------------------------------===//
+
+/// Given `r = |rotationInvariant|`, simplify additions of the following form:
+///
+/// %offset = arith.addi %0, c
+///
+/// Where `c` is a constant, to:
+///
+/// %offset = arith.addi %0, c % r
+static OpFoldResult getMinimumConstantOffsetValue(OpBuilder &b, Location loc,
+                                                  OpFoldResult offset,
+                                                  int64_t rotationInvariant) {
+  auto value = dyn_cast_if_present<Value>(offset);
+  if (!value)
+    return offset;
+
+  auto add = value.getDefiningOp<arith::AddIOp>();
+  if (!add)
+    return offset;
+
+  llvm::APInt constant;
+  if (!matchPattern(add.getRhs(), m_ConstantInt(&constant)))
+    return offset;
+
+  int64_t constantOffset = constant.getSExtValue();
+  int64_t baseMod = constantOffset % rotationInvariant;
+
+  // Skip constructing the new apply if it's not needed (c < rotationInvariant).
+  if (baseMod == constantOffset)
+    return offset;
+
+  Value modOffset = arith::ConstantIndexOp::create(b, loc, baseMod);
+  // If the original add is nsw/nuw, then the new add must also be given we're
+  // adding a smaller value.
+  return arith::AddIOp::create(b, loc, add.getLhs(), modOffset,
+                               add.getOverflowFlags())
+      .getResult();
+}
+
+OpFoldResult RotateRowsAttr::swizzleOffset(OpBuilder &b, Location loc,
+                                           OpFoldResult offset,
+                                           Value src) const {
+  // First normalize the producer of the offset if possible. Note that under
+  // this swizzling scheme, every `row_width ^ 2 / access_width` elements yields
+  // the same swizzling offset. This means we can modulo the id by this value
+  // to get the simplest offset possible in case we are accessing values from
+  // successive rows. This allows us to CSE the swizzling computation more
+  // effectively.
+  int64_t rotationInvariant =
+      getRowWidth() * (getRowWidth() / getAccessWidth());
+  OpFoldResult id =
+      getMinimumConstantOffsetValue(b, loc, offset, rotationInvariant);
+
+  // Number of elements per row.
+  Value rowAlignmentVal = arith::ConstantIndexOp::create(b, loc, getRowWidth());
+  // Number of contiguous groups of elements per row (swizzled together).
+  Value rowAccessAlignmentVal =
+      arith::ConstantIndexOp::create(b, loc, getRowWidth() / getAccessWidth());
+  // Number of elements per group.
+  Value accessWidthVal =
+      arith::ConstantIndexOp::create(b, loc, getAccessWidth());
+
+  Value idVal = getValueOrCreateConstantIndexOp(b, loc, id);
+  // i = row # = |offset| floordiv |Num elements per row|
+  Value i = arith::DivUIOp::create(b, loc, idVal, rowAlignmentVal);
+  // jByte = element column # = |offset| % |Num elements per row|
+  Value jElem = arith::RemUIOp::create(b, loc, idVal, rowAlignmentVal);
+  // j = group column # = jElem / |Num elements per group|
+  Value j = arith::DivUIOp::create(b, loc, jElem, accessWidthVal);
+
+  // New j = ((i + j) % |Num groups per row|) * |Num elements per group|
+  Value sum = arith::AddIOp::create(b, loc, i, j);
+  Value modByte = arith::RemUIOp::create(b, loc, sum, rowAccessAlignmentVal);
+  Value mod = arith::MulIOp::create(b, loc, modByte, accessWidthVal);
+
+  // Recompute the swizzled offset `(i * row width) + |new j|`
+  Value mul = arith::MulIOp::create(b, loc, i, rowAlignmentVal);
+  Value swizzledId = arith::AddIOp::create(b, loc, mod, mul);
+
+  // |swizzledId| is the new offset modulo the swizzle invariant, meaning to
+  // get the true swizzled offset take the difference between |swizzledId| and
+  // |id| to get change in offset and add it to |offset|.
+  //
+  // This increases the chance of being able to CSE the offset calculation. When
+  // multiple accesses to a memref only differ by a constant value (very common
+  // when working with statically shaped memrefs like shared/scratch memory).
+  Value diff = arith::SubIOp::create(b, loc, swizzledId, idVal);
+  return arith::AddIOp::create(
+             b, loc, getValueOrCreateConstantIndexOp(b, loc, offset), diff)
+      .getResult();
+}
+
+int64_t RotateRowsAttr::getAccessElementCount() const {
+  return getAccessWidth();
+}
+
+LogicalResult
+RotateRowsAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                       int64_t rowWidth, int64_t accessWidth) {
+  if (rowWidth % accessWidth != 0) {
+    return emitError() << "expected access width to divide row width";
+  }
+  return success();
+}
+
+//===---------------------------------------------------------------------===//
+// iree_codegen.symbolic_ukernel_provider
+//===---------------------------------------------------------------------===//
+
+FailureOr<Operation *>
+SymbolicUKernelProviderAttr::getMLIRUKernel(StringRef name, DictionaryAttr,
+                                            Operation *annotationSite) const {
+  auto *symbolTableOp = SymbolTable::getNearestSymbolTable(annotationSite);
+  SymbolTable symbolTable(symbolTableOp);
+  return symbolTable.lookup(name);
+}
+
+//===---------------------------------------------------------------------===//
+// iree_codegen.xor_shuffle
+//===---------------------------------------------------------------------===//
+
+/// Extract column index for XOR swizzling.
+/// ((id%rowStride) / accessWidth)
+static Value extractCol(OpBuilder &builder, Location loc, OpFoldResult id,
+                        OpFoldResult rowAlignment, OpFoldResult accessWidth) {
+  AffineExpr d0, s0, s1;
+  bindDims(builder.getContext(), d0);
+  bindSymbols(builder.getContext(), s0, s1);
+  AffineExpr result = (d0 % s0).floorDiv(s1);
+  return getValueOrCreateConstantIndexOp(
+      builder, loc,
+      affine::makeComposedFoldedAffineApply(builder, loc, result,
+                                            {id, rowAlignment, accessWidth}));
+}
+
+/// Extract row index for XOR swizzling.
+/// row = ((id/rowStride) / perPhase ) % rowAccessAlignment
+static Value extractRow(OpBuilder &builder, Location loc, OpFoldResult id,
+                        OpFoldResult rowStride, OpFoldResult perPhase,
+                        OpFoldResult rowAccessAlignment) {
+  AffineExpr d0, s0, s1, s2;
+  bindDims(builder.getContext(), d0);
+  bindSymbols(builder.getContext(), s0, s1, s2);
+  AffineExpr result = (d0.floorDiv(s0).floorDiv(s1)) % s2;
+  return getValueOrCreateConstantIndexOp(
+      builder, loc,
+      affine::makeComposedFoldedAffineApply(
+          builder, loc, result, {id, rowStride, perPhase, rowAccessAlignment}));
+}
+
+/// Swizzle column on id.
+/// new_id = id-id%rowAlignmentVal+colSwizzled*accessWidthVal
+static Value updateCol(OpBuilder &builder, Location loc, OpFoldResult id,
+                       Value colSwizzled, OpFoldResult rowAlignment,
+                       OpFoldResult accessWidth) {
+  AffineExpr d0, d1, s0, s1;
+  bindDims(builder.getContext(), d0, d1);
+  bindSymbols(builder.getContext(), s0, s1);
+  AffineExpr result = d0 - d0 % s0 + d1 * s1;
+  return getValueOrCreateConstantIndexOp(
+      builder, loc,
+      affine::makeComposedFoldedAffineApply(
+          builder, loc, result, {id, colSwizzled, rowAlignment, accessWidth}));
+}
+
+OpFoldResult XORShuffleAttr::swizzleOffset(OpBuilder &b, Location loc,
+                                           OpFoldResult offset,
+                                           Value src) const {
+  int64_t rotationInvariant =
+      getRowWidth() * (getRowWidth() / getAccessWidth());
+  int64_t rowStride =
+      getRowStride() != int64_t() ? getRowStride() : getRowWidth();
+  int64_t perPhase = getPerPhase() != int64_t() ? getPerPhase() : 1;
+
+  OpFoldResult id =
+      getMinimumConstantOffsetValue(b, loc, offset, rotationInvariant);
+  Value idVal = getValueOrCreateConstantIndexOp(b, loc, id);
+
+  // Number of elements per row.
+  Value rowAlignmentVal = arith::ConstantIndexOp::create(b, loc, getRowWidth());
+  // Number of elements per group.
+  Value accessWidthVal =
+      arith::ConstantIndexOp::create(b, loc, getAccessWidth());
+  // Number of rows per phase.
+  Value perPhaseVal = arith::ConstantIndexOp::create(b, loc, perPhase);
+  // Buffer stride.
+  Value rowStrideVal = arith::ConstantIndexOp::create(b, loc, rowStride);
+  // Number of contiguous groups of elements per row (swizzled together).
+  Value rowAccessAlignmentVal =
+      arith::ConstantIndexOp::create(b, loc, getRowWidth() / getAccessWidth());
+
+  Value colVal = extractCol(b, loc, idVal, rowAlignmentVal, accessWidthVal);
+  Value rowVal = extractRow(b, loc, idVal, rowStrideVal, perPhaseVal,
+                            rowAccessAlignmentVal);
+  auto colSwizzled = arith::XOrIOp::create(b, loc, rowVal, colVal);
+
+  // Update colSwizzled to initial id
+  Value swizzledIdVal =
+      updateCol(b, loc, idVal, colSwizzled, rowAlignmentVal, accessWidthVal);
+  Value diff = arith::SubIOp::create(b, loc, swizzledIdVal, idVal);
+  return arith::AddIOp::create(
+             b, loc, getValueOrCreateConstantIndexOp(b, loc, offset), diff)
+      .getResult();
+}
+
+int64_t XORShuffleAttr::getAccessElementCount() const {
+  return getAccessWidth();
+}
+
+LogicalResult
+XORShuffleAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                       int64_t rowWidth, int64_t accessWidth, int64_t rowStride,
+                       int64_t perPhase) {
+  if (rowWidth % accessWidth != 0) {
+    return emitError() << "expected access width to divide row width";
+  }
+  int64_t maxPhase = rowWidth / accessWidth;
+  if (perPhase > maxPhase) {
+    return emitError() << "per_phase must be smaller than max_phase";
+  }
+  if (rowStride % rowWidth != 0) {
+    return emitError() << "expected row width to divide row stride";
+  }
+
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -591,6 +834,32 @@ void eraseCompilationInfo(Operation *op) {
 
 void setRootOpInfo(Operation *op) {
   op->setAttr(kRootOpInfoAttrName, UnitAttr::get(op->getContext()));
+}
+
+bool hasRootOpInfo(Operation *op) {
+  return op->hasAttrOfType<UnitAttr>(kRootOpInfoAttrName);
+}
+
+//===----------------------------------------------------------------------===//
+// Helpers for getting/setting attributes related to ukernels.
+//===----------------------------------------------------------------------===//
+
+IREE::Codegen::UKernelProviderInterface
+getUKernelProviderFromTarget(DictionaryAttr dict) {
+  if (!dict)
+    return {};
+  return dict.getAs<IREE::Codegen::UKernelProviderInterface>(
+      kUKernelProviderName);
+}
+
+IREE::Codegen::UKernelDescriptorAttr getUKernelDescriptor(Operation *op) {
+  return op->getAttrOfType<IREE::Codegen::UKernelDescriptorAttr>(
+      kUKernelDescriptorName);
+}
+
+void setUKernelDescriptor(Operation *op,
+                          IREE::Codegen::UKernelDescriptorAttr descriptor) {
+  op->setAttr(kUKernelDescriptorName, descriptor);
 }
 
 } // namespace mlir::iree_compiler

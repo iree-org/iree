@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
+#include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
@@ -427,7 +428,7 @@ FailureOr<TileSwizzle> getEncodingSwizzle(IREE::Encoding::EncodingAttr encoding,
                                           IREE::GPU::MMAFragment fragment) {
   TileSwizzle swizzle = getSwizzle(mma, fragment);
   FailureOr<linalg::ContractionDimensions> cDims =
-      getEncodingContractionDims(encoding);
+      Encoding::getEncodingContractionDims(encoding);
   if (failed(cDims)) {
     return failure();
   }

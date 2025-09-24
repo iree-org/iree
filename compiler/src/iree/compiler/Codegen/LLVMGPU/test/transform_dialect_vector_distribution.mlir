@@ -14,7 +14,6 @@ func.func @reduce_dispatch_0() attributes {translation_info = #translation_info}
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<128xf32>
-  memref.assume_alignment %0, 64 : memref<128xf32>
   %1 = gpu.thread_id  x
   %2 = arith.cmpi ult, %1, %c1 : index
 

@@ -136,11 +136,11 @@ static std::pair<Value, Value> makeSplitColorAndKey(Location loc,
 
   // Lookup the color/key split parameters by indexing into the tables we
   // generated from the static op information.
-  Value rank = builder.create<IREE::Flow::ChannelRankOp>(loc, baseChannel);
+  Value rank = IREE::Flow::ChannelRankOp::create(builder, loc, baseChannel);
   Value color =
-      builder.create<IREE::Util::SwitchOp>(loc, rank, noColor, colorTable);
+      IREE::Util::SwitchOp::create(builder, loc, rank, noColor, colorTable);
   Value key =
-      builder.create<IREE::Util::SwitchOp>(loc, rank, noColor, keyTable);
+      IREE::Util::SwitchOp::create(builder, loc, rank, noColor, keyTable);
   return std::make_pair(color, key);
 }
 
@@ -315,8 +315,8 @@ static Value createChannelWithGroupInfo(
     numPartitions = 1;
 
   // Base channel that may be split by the group info.
-  Value baseChannel =
-      builder.create<IREE::Flow::ChannelDefaultOp>(loc, /*group=*/StringAttr{});
+  Value baseChannel = IREE::Flow::ChannelDefaultOp::create(
+      builder, loc, /*group=*/StringAttr{});
 
   // No need to split if there is a single group.
   ShapedType replicaGroupType = replicaGroups.getType();
@@ -351,8 +351,8 @@ static Value createChannelWithGroupInfo(
       makeSplitColorAndKey(loc, baseChannel, rankGroups, builder);
 
   // Split the channel. Note that this is an expensive operation.
-  return builder.create<IREE::Flow::ChannelSplitOp>(loc, baseChannel, color,
-                                                    key);
+  return IREE::Flow::ChannelSplitOp::create(builder, loc, baseChannel, color,
+                                            key);
 }
 
 static int32_t getNumReplicas(ModuleOp moduleOp) {
@@ -390,8 +390,9 @@ static Value emitTranspose(ConversionPatternRewriter &rewriter, Location loc,
   std::swap(permutation[srcDim], permutation[dstDim]);
   std::swap(inputShape[srcDim], inputShape[dstDim]);
   auto permutationAttr = rewriter.getDenseI64ArrayAttr(permutation);
-  return rewriter.create<mlir::stablehlo::TransposeOp>(
-      loc, RankedTensorType::get(inputShape, inputType.getElementType()), input,
+  return mlir::stablehlo::TransposeOp::create(
+      rewriter, loc,
+      RankedTensorType::get(inputShape, inputType.getElementType()), input,
       permutationAttr);
 }
 
@@ -410,24 +411,24 @@ struct PartitionIdOpConversion
     int32_t numPartitions = getNumPartitions(moduleOp);
     Value value;
     if (numPartitions <= 1) {
-      value = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+      value = arith::ConstantIndexOp::create(rewriter, loc, 0);
     } else {
-      auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
-          loc, /*group=*/StringAttr{});
-      Value rank = rewriter.create<IREE::Flow::ChannelRankOp>(loc, channel);
-      auto cst =
-          rewriter.create<arith::ConstantIndexOp>(loc,
-                                                  /*value=*/numPartitions);
-      value = rewriter.create<arith::RemUIOp>(loc, rank, cst);
+      auto channel = IREE::Flow::ChannelDefaultOp::create(
+          rewriter, loc, /*group=*/StringAttr{});
+      Value rank = IREE::Flow::ChannelRankOp::create(rewriter, loc, channel);
+      auto cst = arith::ConstantIndexOp::create(rewriter, loc,
+                                                /*value=*/numPartitions);
+      value = arith::RemUIOp::create(rewriter, loc, rank, cst);
     }
     auto resultType =
         llvm::cast<RankedTensorType>(op.getType()); // tensor<ui32>
     auto elemType = resultType.getElementType();
     // index -> ui32
-    auto rankElem = rewriter.create<arith::IndexCastUIOp>(loc, elemType, value);
+    auto rankElem =
+        arith::IndexCastUIOp::create(rewriter, loc, elemType, value);
     // tensor<ui32>
-    auto rankTensor = rewriter.create<tensor::FromElementsOp>(
-        loc, resultType, rankElem.getResult());
+    auto rankTensor = tensor::FromElementsOp::create(rewriter, loc, resultType,
+                                                     rankElem.getResult());
     rewriter.replaceOp(op, rankTensor.getResult());
     return success();
   }
@@ -442,27 +443,27 @@ struct ReplicaIdOpConversion
   matchAndRewrite(mlir::stablehlo::ReplicaIdOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
-    auto channel = rewriter.create<IREE::Flow::ChannelDefaultOp>(
-        loc, /*group=*/StringAttr{});
-    Value rank = rewriter.create<IREE::Flow::ChannelRankOp>(loc, channel);
+    auto channel = IREE::Flow::ChannelDefaultOp::create(rewriter, loc,
+                                                        /*group=*/StringAttr{});
+    Value rank = IREE::Flow::ChannelRankOp::create(rewriter, loc, channel);
 
     // ReplicaId = floor_div(rank, numPartitions)
     auto moduleOp = op->getParentOfType<ModuleOp>();
     int32_t numPartitions = getNumPartitions(moduleOp);
-    auto cst = rewriter.create<arith::ConstantIndexOp>(loc,
-                                                       /*value=*/numPartitions);
+    auto cst = arith::ConstantIndexOp::create(rewriter, loc,
+                                              /*value=*/numPartitions);
     if (numPartitions > 1) {
-      rank = rewriter.create<arith::DivUIOp>(loc, rank, cst);
+      rank = arith::DivUIOp::create(rewriter, loc, rank, cst);
     }
 
     auto resultType =
         llvm::cast<RankedTensorType>(op.getType()); // tensor<ui32>
     auto elemType = resultType.getElementType();
     // index -> ui32
-    auto rankElem = rewriter.create<arith::IndexCastUIOp>(loc, elemType, rank);
+    auto rankElem = arith::IndexCastUIOp::create(rewriter, loc, elemType, rank);
     // tensor<ui32>
-    auto rankTensor = rewriter.create<tensor::FromElementsOp>(
-        loc, resultType, rankElem.getResult());
+    auto rankTensor = tensor::FromElementsOp::create(rewriter, loc, resultType,
+                                                     rankElem.getResult());
     rewriter.replaceOp(op, rankTensor.getResult());
     return success();
   }
@@ -511,11 +512,11 @@ struct AllGatherOpConversion final
     }
 
     // Create an empty tensor for the result.
-    Value target = rewriter.create<tensor::EmptyOp>(
-        loc, gatherResultShape,
+    Value target = tensor::EmptyOp::create(
+        rewriter, loc, gatherResultShape,
         getElementTypeOrSelf(adaptor.getOperands()[0].getType()));
-    Value gatherResult = rewriter.create<IREE::Flow::CollectiveAllGatherOp>(
-        op.getLoc(), elementTypeAttr, target, gatherInput, channel);
+    Value gatherResult = IREE::Flow::CollectiveAllGatherOp::create(
+        rewriter, op.getLoc(), elementTypeAttr, target, gatherInput, channel);
 
     if (requiresTranspose) {
       gatherResult =
@@ -596,11 +597,11 @@ struct AllReduceOpConversion final
 
     // Create an empty tensor for the result.
     ArrayRef<int64_t> inputShape = inputType.getShape();
-    Value target = rewriter.create<tensor::EmptyOp>(
-        loc, inputShape,
+    Value target = tensor::EmptyOp::create(
+        rewriter, loc, inputShape,
         getElementTypeOrSelf(adaptor.getOperands()[0].getType()));
-    auto allReduceOp = rewriter.create<IREE::Flow::CollectiveAllReduceOp>(
-        op.getLoc(), reductionOpAttr, elementTypeAttr, target,
+    auto allReduceOp = IREE::Flow::CollectiveAllReduceOp::create(
+        rewriter, op.getLoc(), reductionOpAttr, elementTypeAttr, target,
         adaptor.getOperands()[0], channel);
     rewriter.replaceOp(op, allReduceOp.getResult());
     return success();
@@ -625,8 +626,9 @@ Value splitAndConcatForAllToAll(ConversionPatternRewriter &rewriter,
     newShape.push_back(splitCount);
     newShape.push_back(inputShape[i] / splitCount);
   }
-  Value result = rewriter.create<mlir::stablehlo::ReshapeOp>(
-      loc, RankedTensorType::get(newShape, inputType.getElementType()), input);
+  Value result = mlir::stablehlo::ReshapeOp::create(
+      rewriter, loc,
+      RankedTensorType::get(newShape, inputType.getElementType()), input);
 
   // Transpose
   SmallVector<int64_t> permutation;
@@ -644,8 +646,8 @@ Value splitAndConcatForAllToAll(ConversionPatternRewriter &rewriter,
     transposeResultShape.push_back(newShape[permutation[i]]);
   }
 
-  result = rewriter.create<mlir::stablehlo::TransposeOp>(
-      loc,
+  result = mlir::stablehlo::TransposeOp::create(
+      rewriter, loc,
       RankedTensorType::get(transposeResultShape, inputType.getElementType()),
       result, rewriter.getDenseI64ArrayAttr(permutation));
 
@@ -653,9 +655,9 @@ Value splitAndConcatForAllToAll(ConversionPatternRewriter &rewriter,
   llvm::SmallVector<int64_t> finalShape(inputShape);
   finalShape[concatDim] *= splitCount;
   finalShape[splitDim] /= splitCount;
-  return rewriter.create<mlir::stablehlo::ReshapeOp>(
-      loc, RankedTensorType::get(finalShape, inputType.getElementType()),
-      result);
+  return mlir::stablehlo::ReshapeOp::create(
+      rewriter, loc,
+      RankedTensorType::get(finalShape, inputType.getElementType()), result);
 }
 
 struct AllToAllOpConversion final
@@ -701,12 +703,13 @@ struct AllToAllOpConversion final
     }
 
     // Create an empty tensor for the result.
-    Value target = rewriter.create<tensor::EmptyOp>(
-        loc, cast<RankedTensorType>(allToAllInput.getType()).getShape(),
+    Value target = tensor::EmptyOp::create(
+        rewriter, loc,
+        cast<RankedTensorType>(allToAllInput.getType()).getShape(),
         getElementTypeOrSelf(allToAllInput.getType()));
     // Create all-to-all.
-    Value allToAllResult = rewriter.create<IREE::Flow::CollectiveAllToAllOp>(
-        op.getLoc(), elementTypeAttr, target, allToAllInput, channel);
+    Value allToAllResult = IREE::Flow::CollectiveAllToAllOp::create(
+        rewriter, op.getLoc(), elementTypeAttr, target, allToAllInput, channel);
 
     if (requiresTranspose) {
       allToAllResult =
@@ -807,22 +810,21 @@ struct ReduceScatterOpConversion final
       std::swap(reduceInputShape[0], reduceInputShape[scatterDim]);
       std::swap(scatterResultShape[0], scatterResultShape[scatterDim]);
       // Transpose the input.
-      reduceInput = rewriter.create<mlir::stablehlo::TransposeOp>(
-          loc, RankedTensorType::get(reduceInputShape, elemType), reduceInput,
-          permutationAttr);
+      reduceInput = mlir::stablehlo::TransposeOp::create(
+          rewriter, loc, RankedTensorType::get(reduceInputShape, elemType),
+          reduceInput, permutationAttr);
     }
 
     // Create an empty tensor for the result.
     Value target =
-        rewriter.create<tensor::EmptyOp>(loc, scatterResultShape, elemType);
-    Value scatterResult =
-        rewriter.create<IREE::Flow::CollectiveReduceScatterOp>(
-            op.getLoc(), reductionOpAttr, elementTypeAttr, target, reduceInput,
-            channel);
+        tensor::EmptyOp::create(rewriter, loc, scatterResultShape, elemType);
+    Value scatterResult = IREE::Flow::CollectiveReduceScatterOp::create(
+        rewriter, op.getLoc(), reductionOpAttr, elementTypeAttr, target,
+        reduceInput, channel);
 
     if (scatterDim != 0) {
-      scatterResult = rewriter.create<mlir::stablehlo::TransposeOp>(
-          loc, resultType, scatterResult, permutationAttr);
+      scatterResult = mlir::stablehlo::TransposeOp::create(
+          rewriter, loc, resultType, scatterResult, permutationAttr);
     }
 
     rewriter.replaceOp(op, scatterResult);
@@ -906,20 +908,20 @@ struct CollectivePermuteOpConversion
     }
     // Look up the local send/recv values using rank.
     Value rank =
-        rewriter.create<IREE::Flow::ChannelRankOp>(loc, channel).getResult();
-    Value send = rewriter.create<IREE::Util::SwitchOp>(loc, rank, noSendOrRecv,
-                                                       sendTable);
-    Value recv = rewriter.create<IREE::Util::SwitchOp>(loc, rank, noSendOrRecv,
-                                                       recvTable);
+        IREE::Flow::ChannelRankOp::create(rewriter, loc, channel).getResult();
+    Value send = IREE::Util::SwitchOp::create(rewriter, loc, rank, noSendOrRecv,
+                                              sendTable);
+    Value recv = IREE::Util::SwitchOp::create(rewriter, loc, rank, noSendOrRecv,
+                                              recvTable);
 
     // Create an empty tensor for the result.
     auto input = adaptor.getOperand();
     ArrayRef<int64_t> inputShape = inputType.getShape();
-    Value target = rewriter.create<tensor::EmptyOp>(
-        loc, inputShape, getElementTypeOrSelf(input.getType()));
-    auto collectiveSendRecvOp =
-        rewriter.create<IREE::Flow::CollectiveSendRecvOp>(
-            op.getLoc(), elementTypeAttr, target, input, channel, send, recv);
+    Value target = tensor::EmptyOp::create(
+        rewriter, loc, inputShape, getElementTypeOrSelf(input.getType()));
+    auto collectiveSendRecvOp = IREE::Flow::CollectiveSendRecvOp::create(
+        rewriter, op.getLoc(), elementTypeAttr, target, input, channel, send,
+        recv);
 
     rewriter.replaceOp(op, collectiveSendRecvOp.getResult());
     return success();

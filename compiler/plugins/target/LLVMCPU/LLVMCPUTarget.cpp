@@ -18,6 +18,7 @@
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -174,7 +175,7 @@ public:
     target.storeToConfigAttrs(context, configItems);
     configItems.emplace_back(
         b.getStringAttr(IREE::Encoding::kEncodingResolverAttrName),
-        IREE::CPU::CPUEncodingLayoutAttr::get(context, {}));
+        IREE::CPU::CPUEncodingResolverAttr::get(context, {}));
 
     // Compute the format used at runtime to select the executable loader.
     std::string format;
@@ -226,6 +227,7 @@ public:
     registry.insert<IREE::Codegen::IREECodegenDialect,
                     IREE::CPU::IREECPUDialect,
                     IREE::LinalgExt::IREELinalgExtDialect,
+                    IREE::VectorExt::IREEVectorExtDialect,
                     mlir::transform::TransformDialect,
                     pdl::PDLDialect,
                     pdl_interp::PDLInterpDialect,
@@ -243,7 +245,8 @@ public:
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) override {
-    bool enableAArch64SME = isAArch64(targetAttr) && hasSMEFeature(targetAttr);
+    bool enableAArch64SME = isAArch64(targetAttr.getConfiguration()) &&
+                            hasSMEFeature(targetAttr.getConfiguration());
     buildLLVMCPUCodegenPassPipeline(passManager, enableAArch64SME);
   }
 
@@ -394,7 +397,7 @@ public:
         llvmFunc->addParamAttr(i, align16);
       }
 
-      LibraryBuilder::DispatchAttrs dispatchAttrs = {0};
+      LibraryBuilder::DispatchAttrs dispatchAttrs = {};
 
       // Entry points may optionally specify that they require workgroup local
       // memory. We fetch that value here and plumb it through so the runtime
@@ -408,6 +411,17 @@ public:
       if (auto layoutAttr = exportOp.getLayout()) {
         dispatchAttrs.constantCount = layoutAttr.getConstants();
         dispatchAttrs.bindingCount = layoutAttr.getBindings().size();
+      }
+
+      // Extract workgroup size if specified at compile time.
+      if (auto workgroupSizeAttr = exportOp.getWorkgroupSize()) {
+        auto workgroupSizeValues = workgroupSizeAttr->getValue();
+        dispatchAttrs.workgroupSize[0] = static_cast<uint32_t>(
+            cast<IntegerAttr>(workgroupSizeValues[0]).getInt());
+        dispatchAttrs.workgroupSize[1] = static_cast<uint32_t>(
+            cast<IntegerAttr>(workgroupSizeValues[1]).getInt());
+        dispatchAttrs.workgroupSize[2] = static_cast<uint32_t>(
+            cast<IntegerAttr>(workgroupSizeValues[2]).getInt());
       }
 
       LibraryBuilder::SourceLocation sourceLocation;
@@ -554,7 +568,7 @@ public:
 
     if (target.linkUkernelBitcode) {
       // Link in ukernel bitcode.
-      if (hasUkernel(variantOp.getTarget())) {
+      if (hasUkernel(variantOp.getTarget().getConfiguration())) {
         llvm::Expected<std::unique_ptr<llvm::Module>> bitcode =
             loadUKernelBitcode(targetMachine.get(), context);
         if (!bitcode) {
@@ -718,9 +732,9 @@ public:
     // loader which static library to load for the target binary.
     std::vector<uint8_t> libraryNameVector(libraryName.begin(),
                                            libraryName.end());
-    executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        variantOp.getLoc(), variantOp.getSymName(), "static",
-        libraryNameVector);
+    IREE::HAL::ExecutableBinaryOp::create(executableBuilder, variantOp.getLoc(),
+                                          variantOp.getSymName(), "static",
+                                          libraryNameVector);
 
     return success();
   }
@@ -767,8 +781,8 @@ public:
           std::move(elfFile.value()));
 
       // Add the binary to the parent hal.executable.
-      auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-          variantOp.getLoc(), variantOp.getSymName(),
+      auto binaryOp = IREE::HAL::ExecutableBinaryOp::create(
+          executableBuilder, variantOp.getLoc(), variantOp.getSymName(),
           variantOp.getTarget().getFormat(), bufferAttr);
       binaryOp.setMimeTypeAttr(
           executableBuilder.getStringAttr("application/x-elf"));
@@ -824,8 +838,8 @@ public:
           std::move(libraryFile));
 
       // Add the binary to the parent hal.executable.
-      auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-          variantOp.getLoc(), variantOp.getSymName(),
+      auto binaryOp = IREE::HAL::ExecutableBinaryOp::create(
+          executableBuilder, variantOp.getLoc(), variantOp.getSymName(),
           variantOp.getTarget().getFormat(), bufferAttr);
       binaryOp.setMimeTypeAttr(executableBuilder.getStringAttr(mimeType));
     }

@@ -30,6 +30,7 @@
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRVPass.h"
 #include "mlir/Conversion/TosaToArith/TosaToArith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
@@ -66,8 +67,8 @@ static FailureOr<Value> gpuAllocateWorkgroupMemoryFn(OpBuilder &builder,
   MemRefType allocType =
       MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
                       AffineMap(), workgroupSpace);
-  auto allocOp = builder.create<memref::AllocOp>(
-      loc, allocType, dynamicSizes, builder.getI64IntegerAttr(alignment));
+  auto allocOp = memref::AllocOp::create(builder, loc, allocType, dynamicSizes,
+                                         builder.getI64IntegerAttr(alignment));
   return allocOp.getResult();
 }
 
@@ -80,8 +81,9 @@ static FailureOr<Value> gpuAllocateFunctionMemoryFn(OpBuilder &builder,
       spirv::mapVulkanStorageClassToMemorySpace(spirv::StorageClass::Function);
   MemRefType allocType = MemRefType::get(
       memRefType.getShape(), memRefType.getElementType(), {}, *space);
-  auto allocaOp = builder.create<memref::AllocaOp>(
-      loc, allocType, dynamicSizes, builder.getI64IntegerAttr(alignment));
+  auto allocaOp =
+      memref::AllocaOp::create(builder, loc, allocType, dynamicSizes,
+                               builder.getI64IntegerAttr(alignment));
   return allocaOp.getResult();
 }
 
@@ -93,11 +95,11 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
   bool needsBarrier = hasSharedMemoryAddressSpace(fromType) ||
                       hasSharedMemoryAddressSpace(toType);
   if (needsBarrier)
-    builder.create<gpu::BarrierOp>(loc);
-  Operation *copy = builder.create<memref::CopyOp>(loc, from, to);
+    gpu::BarrierOp::create(builder, loc);
+  Operation *copy = memref::CopyOp::create(builder, loc, from, to);
   if (needsBarrier) {
     setMarker(copy, getCopyToWorkgroupMemoryMarker());
-    builder.create<gpu::BarrierOp>(loc);
+    gpu::BarrierOp::create(builder, loc);
   }
   return success();
 }
@@ -194,7 +196,6 @@ static void addMemRefLoweringPasses(OpPassManager &modulePassManager) {
       // to handle subview ops.
       .addPass(memref::createFoldMemRefAliasOpsPass)
       .addPass(createEmulateNarrowTypePass)
-      .addPass(memref::createExpandOpsPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
 
@@ -220,7 +221,8 @@ static void addMemRefLoweringPasses(OpPassManager &modulePassManager) {
   modulePassManager.addPass(createFlattenMemRefSubspanPass());
 
   FunctionLikeNest(modulePassManager)
-      .addPass(createSPIRVEraseStorageBufferStaticShapePass);
+      .addPass(createSPIRVEraseStorageBufferStaticShapePass)
+      .addPass(createCSEPass);
 }
 
 /// Adds passes to perform the final SPIR-V conversion.
@@ -319,7 +321,6 @@ void addSPIRVBaseVectorizePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCSEPass());
   {
     GenericVectorizationPassOptions options;
-    options.vectorizeGatherAccesses = true;
     funcPassManager.addPass(createGenericVectorizationPass(options));
   }
   addSPIRVVectorLoweringPasses(funcPassManager);
@@ -360,7 +361,6 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCSEPass());
   {
     GenericVectorizationPassOptions options;
-    options.vectorizeGatherAccesses = true;
     options.enableCleanup = true;
     funcPassManager.addPass(createGenericVectorizationPass(options));
   }
@@ -402,6 +402,7 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(
 
   // Tile and distribute to GPU subgroups.
   funcPassManager.addPass(createSPIRVTileToCooperativeOpsPass());
+  funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -488,8 +489,6 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &funcPassManager,
   // unrolling or lowering, which is done later.
   {
     GenericVectorizationPassOptions options;
-    options.vectorizePadding = true;
-    options.vectorizeGatherAccesses = true;
     options.enableCleanup = false;
     options.maxVectorSize = 4096;
     funcPassManager.addPass(createGenericVectorizationPass(options));
@@ -571,8 +570,6 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &funcPassManager) {
     GenericVectorizationPassOptions options;
     options.enableVectorMasking = true;
     options.useConfiguredVectorSizes = false;
-    options.vectorizePadding = true;
-    options.vectorizeGatherAccesses = true;
     options.enableCleanup = false;
     options.generateContract = false;
     funcPassManager.addPass(createGenericVectorizationPass(options));
@@ -604,8 +601,9 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCanonicalizerPass());
 
   // Handle vector reduction operations specifically.
-  funcPassManager.addPass(createConvertVectorReductionToGPUPass(
-      /*expandSubgroupReduction=*/false));
+  VectorReductionToGPUPassOptions options;
+  options.expandSubgroupReduction = false;
+  funcPassManager.addPass(createVectorReductionToGPUPass(options));
   // Perform normal vector unrolling and lowering transformations. This breaks
   // vectors down to native machine size.
   addSPIRVVectorLoweringPasses(funcPassManager);
@@ -631,6 +629,7 @@ static void buildSPIRVCodegenConfigurationPassPipelineImpl(
 
 void buildSPIRVCodegenConfigurationPassPipeline(
     OpPassManager &variantPassManager) {
+  variantPassManager.addPass(createSpecializeExportsPass());
   OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
   buildSPIRVCodegenConfigurationPassPipelineImpl(modulePassManager);
 }
@@ -644,9 +643,11 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &variantPassManager) {
         .addPass(createSPIRVLowerExecutableTargetPass)
         .addPass(createVerifyWorkgroupDistributionPass);
     addMemRefLoweringPasses(modulePassManager);
+    FunctionLikeNest(modulePassManager).addPass(createGpuEliminateBarriers);
   }
   variantPassManager.addPass(createReconcileTranslationInfoPass());
-  variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass());
+  variantPassManager.addPass(IREE::Util::createDropCompilerHintsPass(
+      IREE::Util::DropCompilerHintsPassOptions{/*keepAssumeInt=*/true}));
 
   {
     OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();

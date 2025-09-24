@@ -6,14 +6,18 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Support/LLVM.h"
@@ -27,7 +31,72 @@
 namespace mlir::iree_compiler::IREE::Encoding {
 
 //===---------------------------------------------------------------------===//
-// encoding.encoding
+// iree_encoding.layout
+//===---------------------------------------------------------------------===//
+
+LayoutAttr
+LayoutAttr::getChecked(llvm::function_ref<InFlightDiagnostic()> emitError,
+                       MLIRContext *context, ArrayAttr layoutsAttr) {
+  if (failed(LayoutAttr::verify(emitError, layoutsAttr))) {
+    return LayoutAttr();
+  }
+  return LayoutAttr::get(context, layoutsAttr);
+}
+
+LayoutAttr LayoutAttr::get(MLIRContext *context, ArrayAttr layoutsAttr) {
+  auto emitError = mlir::detail::getDefaultDiagnosticEmitFn(context);
+  if (failed(LayoutAttr::verify(emitError, layoutsAttr))) {
+    return LayoutAttr();
+  }
+  return Base::get(context, layoutsAttr);
+}
+
+LogicalResult
+LayoutAttr::verify(function_ref<mlir::InFlightDiagnostic()> emitError,
+                   ArrayAttr layoutsAttr) {
+  ArrayRef<Attribute> layouts = layoutsAttr.getValue();
+  if (layouts.empty()) {
+    return emitError() << "expected non-empty layouts";
+  }
+  if (!llvm::all_of(layouts, llvm::IsaPred<SerializableAttr>)) {
+    return emitError() << "expected all the layout attributes to implement "
+                          "SerializableAttr";
+  }
+  return success();
+}
+
+bool LayoutAttr::isSerialized() const {
+  ArrayRef<Attribute> layouts = getLayouts().getValue();
+  return llvm::all_of(layouts, [](Attribute layout) {
+    return cast<SerializableAttr>(layout).isSerialized();
+  });
+}
+
+bool LayoutAttr::isIdentityLayout() const {
+  auto layouts = getLayouts().getAsRange<SerializableAttr>();
+  return llvm::all_of(layouts,
+                      [](auto attr) { return attr.isIdentityLayout(); });
+}
+
+Value LayoutAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
+                                              RankedTensorType type,
+                                              ValueRange dynamicDims) const {
+  ArrayAttr layoutsAttr = getLayouts();
+  Value res;
+  for (auto attr : layoutsAttr.getAsRange<SerializableAttr>()) {
+    Value requestedSize =
+        attr.calculateStorageSizeInBytes(loc, builder, type, dynamicDims);
+    if (!res) {
+      res = requestedSize;
+      continue;
+    }
+    res = arith::MaxUIOp::create(builder, loc, res, requestedSize);
+  }
+  return res;
+}
+
+//===---------------------------------------------------------------------===//
+// iree_encoding.encoding
 //===---------------------------------------------------------------------===//
 
 /// Returns a composed affine map from the provided attribute. `attr` can be
@@ -65,18 +134,68 @@ static FailureOr<AffineMap> getComposedAffineMap(Attribute attr) {
 EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
                                EncodingOpType opType, ArrayRef<Type> elemTypes,
                                ArrayRef<AffineMap> maps,
-                               ArrayRef<int64_t> roundDimsTo,
-                               ArrayRef<Attribute> layouts) {
+                               ArrayRef<int64_t> iterationSizes) {
   Builder b(ctx);
   auto opTypeAttr = EncodingOpTypeAttr::get(ctx, opType);
   auto mapsAttr = maps.empty() ? ArrayAttr() : b.getAffineMapArrayAttr(maps);
-  auto roundDimsToAttr = roundDimsTo.empty()
-                             ? DenseI64ArrayAttr()
-                             : b.getDenseI64ArrayAttr(roundDimsTo);
-  auto layoutsAttr = layouts.empty() ? ArrayAttr() : b.getArrayAttr(layouts);
+  auto iterationSizesAttr =
+      iterationSizes.empty() ? ArrayAttr() : b.getI64ArrayAttr(iterationSizes);
   return get(ctx, b.getIndexAttr(operandIndex), opTypeAttr,
-             b.getTypeArrayAttr(elemTypes), mapsAttr, roundDimsToAttr,
-             layoutsAttr);
+             b.getTypeArrayAttr(elemTypes), mapsAttr, iterationSizesAttr);
+}
+
+/// Parse a list of integer values and/or dynamic values ('?')
+static FailureOr<SmallVector<int64_t>>
+parseDynamicI64IntegerList(AsmParser &parser) {
+  SmallVector<int64_t> integerVals;
+  if (failed(parser.parseCommaSeparatedList(AsmParser::Delimiter::Square, [&] {
+        int64_t value = ShapedType::kDynamic;
+        if (failed(parser.parseOptionalQuestion()) &&
+            failed(parser.parseInteger(value))) {
+          return failure();
+        }
+        integerVals.push_back(value);
+        return success();
+      }))) {
+    return failure();
+  }
+  return integerVals;
+}
+
+/// Utility to parse an array of integer and/or dynamic values (`?`).
+static ParseResult parseDynamicI64ArrayAttr(AsmParser &p, ArrayAttr &attr) {
+  FailureOr<SmallVector<int64_t>> integerVals = parseDynamicI64IntegerList(p);
+  if (failed(integerVals)) {
+    return failure();
+  }
+  auto integerValsAttr =
+      llvm::map_to_vector(integerVals.value(), [&](int64_t val) -> Attribute {
+        return IntegerAttr::get(IntegerType::get(p.getContext(), 64), val);
+      });
+  attr = ArrayAttr::get(p.getContext(), integerValsAttr);
+  return success();
+}
+
+/// Print a list of integer values and/or dynamic values ('?')
+static void printDynamicI64IntegerList(AsmPrinter &printer,
+                                       ArrayRef<int64_t> vals) {
+  printer << "[";
+  llvm::interleaveComma(vals, printer, [&](int64_t val) {
+    if (ShapedType::isDynamic(val)) {
+      printer << "?";
+    } else {
+      printer << val;
+    }
+  });
+  printer << "]";
+}
+
+/// Utility to print an array of integer and/or dynamic values. Dynamic values
+/// are printed as `?`.
+static void printDynamicI64ArrayAttr(AsmPrinter &p, ArrayAttr attrs) {
+  SmallVector<int64_t> intVals = llvm::map_to_vector(
+      attrs, [&](Attribute attr) { return cast<IntegerAttr>(attr).getInt(); });
+  return printDynamicI64IntegerList(p, intVals);
 }
 
 LogicalResult
@@ -84,19 +203,38 @@ EncodingAttr::verify(function_ref<mlir::InFlightDiagnostic()> emitError,
                      IntegerAttr operandIndexAttr,
                      EncodingOpTypeAttr opTypeAttr, ArrayAttr elementTypesAttr,
                      ArrayAttr userIndexingMapsAttr,
-                     DenseArrayAttr roundDimsToAttr, ArrayAttr layoutsAttr) {
+                     ArrayAttr iterationSizesAttr) {
+  AffineMap indexingMap;
   if (userIndexingMapsAttr) {
-    unsigned index = operandIndexAttr.getValue().getZExtValue();
-    if (index >= userIndexingMapsAttr.size()) {
+    unsigned operandIndex = operandIndexAttr.getValue().getZExtValue();
+    if (operandIndex >= userIndexingMapsAttr.size()) {
       return emitError()
              << "`operandIndex` exceeds the size of `user_indexing_maps`";
     }
     for (auto &&[idx, attr] : llvm::enumerate(userIndexingMapsAttr)) {
-      if (failed(getComposedAffineMap(attr))) {
+      FailureOr<AffineMap> composedMap = getComposedAffineMap(attr);
+      if (failed(composedMap)) {
         return emitError() << "found a non-composable attribute in "
                               "`user_indexing_maps` at index: "
                            << idx;
       }
+      if (idx == operandIndex) {
+        // Keep track of the indexing map for later verification use.
+        indexingMap = composedMap.value();
+      }
+    }
+  }
+  if (iterationSizesAttr) {
+    if (!indexingMap) {
+      return emitError() << "found `iteration_sizes` without any corresponding "
+                            "`user_indexing_maps`";
+    }
+    if (iterationSizesAttr.size() != indexingMap.getNumDims()) {
+      return emitError() << "found an encoding with "
+                         << iterationSizesAttr.size()
+                         << " iteration sizes, but expected "
+                         << indexingMap.getNumDims()
+                         << " based on the user indexing maps";
     }
   }
   return success();
@@ -155,12 +293,14 @@ EncodingAttr::mapDimToOperandIndex(int64_t dimPos) const {
       getAffineDimExpr(dimPos, getContext()));
 }
 
-ArrayRef<int64_t> EncodingAttr::getRoundDimsToArray() const {
-  auto roundDimsTo = getRoundDimsTo();
-  if (!roundDimsTo) {
+SmallVector<int64_t> EncodingAttr::getIterationSizesArray() const {
+  ArrayAttr iterationSizes = getIterationSizes();
+  if (!iterationSizes) {
     return {};
   }
-  return llvm::cast<DenseI64ArrayAttr>(roundDimsTo).asArrayRef();
+  return llvm::map_to_vector(iterationSizes, [](Attribute attr) {
+    return llvm::cast<IntegerAttr>(attr).getInt();
+  });
 }
 
 SmallVector<Type> EncodingAttr::getElementTypesArray() {
@@ -188,41 +328,56 @@ EncodingAttr::cloneWithNewOperandIndexingMap(AffineMap newIndexingMap) {
   maps.push_back(AffineMapAttr::get(newIndexingMap));
   newMaps[operandIndex] = ArrayAttr::get(getContext(), maps);
   return get(getContext(), getOperandIndex(), getOpType(), getElementTypes(),
-             ArrayAttr::get(getContext(), newMaps), getRoundDimsTo(),
-             getLayouts());
+             ArrayAttr::get(getContext(), newMaps), getIterationSizes());
 }
 
-bool EncodingAttr::isSerialized() const { return getLayouts() ? true : false; }
-
-bool EncodingAttr::isIdentityLayout() const {
-  if (!isSerialized()) {
-    return false;
-  }
-  ArrayAttr layoutsAttr = getLayouts();
-  if (!llvm::all_of(layoutsAttr.getValue(),
-                    llvm::IsaPred<SerializableEncodingAttrInterface>)) {
-    return false;
-  }
-  return llvm::all_of(layoutsAttr.getValue(), [](Attribute attr) {
-    auto serializableAttr =
-        llvm::dyn_cast<SerializableEncodingAttrInterface>(attr);
-    if (!serializableAttr) {
-      return false;
-    }
-    return serializableAttr.isIdentityLayout();
-  });
-}
+bool EncodingAttr::isSerialized() const { return false; }
 
 Attribute EncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
   MLIRContext *ctx = getContext();
-  return get(ctx, getOperandIndex(), getOpType(), getElementTypes(),
-             /*user_indexing_maps=*/ArrayAttr(),
-             /*round_dims_to=*/DenseI64ArrayAttr(),
-             ArrayAttr::get(ctx, layouts));
+  return LayoutAttr::get(ctx, ArrayAttr::get(ctx, layouts));
 }
 
-/// Returns the bit-width of the scalar type. If the type is complex, it returns
-/// the type of individual elements * 2 (1 for real and 1 for complex).
+std::optional<SmallVector<int32_t>> EncodingAttr::getReductionDims() const {
+  if (!getUserIndexingMaps()) {
+    return std::nullopt;
+  }
+  SmallVector<AffineMap> indexingMaps = getRootMaps();
+  FailureOr<linalg::ContractionDimensions> contractionDims =
+      linalg::inferContractionDims(indexingMaps);
+  if (failed(contractionDims)) {
+    return std::nullopt;
+  }
+  SmallVector<int32_t> result;
+  for (unsigned k : contractionDims->k) {
+    if (std::optional<unsigned> dimIdx = mapDimToOperandIndex(k)) {
+      result.push_back(dimIdx.value());
+    }
+  }
+  return result;
+}
+
+//===---------------------------------------------------------------------===//
+// iree_encoding.padding
+//===---------------------------------------------------------------------===//
+
+/// Custom printer/parser methods to handle dynamic shapes.
+ParseResult parsePadding(AsmParser &parser, DenseI64ArrayAttr &padding) {
+  FailureOr<SmallVector<int64_t>> integerVals =
+      parseDynamicI64IntegerList(parser);
+  if (failed(integerVals)) {
+    return failure();
+  }
+  padding = DenseI64ArrayAttr::get(parser.getContext(), integerVals.value());
+  return success();
+}
+void printPadding(AsmPrinter &printer, DenseI64ArrayAttr padding) {
+  return printDynamicI64IntegerList(printer, padding.asArrayRef());
+}
+
+/// Returns the bit-width of the scalar type. If the type is complex, it
+/// returns the type of individual elements * 2 (1 for real and 1 for
+/// complex).
 static unsigned getTypeBitWidth(Type type) {
   if (auto complexType = dyn_cast<ComplexType>(type)) {
     return 2 * complexType.getElementType().getIntOrFloatBitWidth();
@@ -230,9 +385,9 @@ static unsigned getTypeBitWidth(Type type) {
   return type.getIntOrFloatBitWidth();
 }
 
-/// Returns the number of bytes an element of the given type occupies in memory.
-/// This is in the default dense conversion to machine words where sizes must be
-/// powers of two aligned to bytes.
+/// Returns the number of bytes an element of the given type occupies in
+/// memory. This is in the default dense conversion to machine words where
+/// sizes must be powers of two aligned to bytes.
 ///
 /// Examples:
 ///   getRoundedElementByteWidth(i1) = 1
@@ -250,70 +405,45 @@ static int32_t getRoundedElementByteWidth(Type type) {
   return llvm::PowerOf2Ceil(byteAligned);
 }
 
-Value EncodingAttr::calculateStorageSizeInBytes(Location loc,
-                                                OpBuilder &builder,
-                                                RankedTensorType type,
-                                                ValueRange dynamicDims) const {
-  if (!isSerialized()) {
-    return nullptr;
-  }
-
-  ArrayAttr layoutsAttr = getLayouts();
-  if (!llvm::all_of(layoutsAttr.getValue(),
-                    llvm::IsaPred<SerializableEncodingAttrInterface>)) {
-    return nullptr;
-  }
-
-  Value res;
-  for (auto attr :
-       layoutsAttr.getAsRange<SerializableEncodingAttrInterface>()) {
-    Value requestedSize =
-        attr.calculateStorageSizeInBytes(loc, builder, type, dynamicDims);
-    if (!res) {
-      res = requestedSize;
-      continue;
-    }
-    res = builder.create<arith::MaxUIOp>(loc, res, requestedSize);
-  }
-  return res;
+PaddingAttr PaddingAttr::get(MLIRContext *ctx, ArrayRef<int64_t> padding) {
+  return get(ctx, DenseI64ArrayAttr::get(ctx, padding));
 }
 
-//===---------------------------------------------------------------------===//
-// encoding.pad_encoding_layout
-//===---------------------------------------------------------------------===//
-
-PadEncodingLayoutAttr PadEncodingLayoutAttr::get(MLIRContext *ctx,
-                                                 ArrayRef<int32_t> padding) {
-  return get(ctx, DenseI32ArrayAttr::get(ctx, padding));
-}
-
-PadEncodingLayoutAttr PadEncodingLayoutAttr::getIdentityAttr(MLIRContext *ctx,
-                                                             int rank) {
-  SmallVector<int32_t> zeros(rank, 0);
+PaddingAttr PaddingAttr::getIdentityAttr(MLIRContext *ctx, int rank) {
+  SmallVector<int64_t> zeros(rank, 0);
   return get(ctx, zeros);
 }
 
-bool PadEncodingLayoutAttr::isIdentityLayout() const {
-  ArrayRef<int32_t> padding = getPadding().asArrayRef();
-  return llvm::all_of(padding, [](int32_t val) { return val == 0; });
+Attribute PaddingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
+  MLIRContext *ctx = getContext();
+  return LayoutAttr::get(ctx, ArrayAttr::get(ctx, layouts));
 }
 
-Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
-    Location loc, OpBuilder &builder, RankedTensorType type,
-    ValueRange dynamicDims) const {
-  ArrayRef<int32_t> padding = getPadding().asArrayRef();
+bool PaddingAttr::isSerialized() const {
+  return ShapedType::isStaticShape(getPadding().asArrayRef());
+}
+
+bool PaddingAttr::isIdentityLayout() const {
+  ArrayRef<int64_t> padding = getPadding().asArrayRef();
+  return llvm::all_of(padding, [](int64_t val) { return val == 0; });
+}
+
+Value PaddingAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
+                                               RankedTensorType type,
+                                               ValueRange dynamicDims) const {
+  ArrayRef<int64_t> padding = getPadding().asArrayRef();
   assert(padding.size() == type.getRank() && "Invalid padding");
-  LLVM_DEBUG(if (llvm::any_of(padding, [](int32_t x) { return x != 0; })) {
+  LLVM_DEBUG(if (llvm::any_of(padding, [](int64_t x) { return x != 0; })) {
     llvm::dbgs() << "Non-zero padding: " << type << "\n";
   });
 
   const int64_t elementSize = getRoundedElementByteWidth(type.getElementType());
   int64_t staticProduct = elementSize;
-  Value dynamicProduct = builder.create<arith::ConstantIndexOp>(loc, 1);
+  Value dynamicProduct = arith::ConstantIndexOp::create(builder, loc, 1);
 
   size_t dynamicDimIdx = 0;
   for (auto [dimSize, padValue] : llvm::zip_equal(type.getShape(), padding)) {
-    if (!ShapedType::isDynamic(dimSize)) {
+    if (ShapedType::isStatic(dimSize)) {
       staticProduct *= (dimSize + padValue);
       continue;
     }
@@ -322,9 +452,9 @@ Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
     ++dynamicDimIdx;
 
     if (padValue != 0) {
-      dynamicDimSize = builder.create<arith::AddIOp>(
-          loc, dynamicDimSize,
-          builder.create<arith::ConstantIndexOp>(loc, padValue),
+      dynamicDimSize = arith::AddIOp::create(
+          builder, loc, dynamicDimSize,
+          arith::ConstantIndexOp::create(builder, loc, padValue),
           arith::IntegerOverflowFlags::nsw);
     }
     dynamicProduct = builder.createOrFold<arith::MulIOp>(
@@ -332,36 +462,78 @@ Value PadEncodingLayoutAttr::calculateStorageSizeInBytes(
   }
 
   return builder.createOrFold<arith::MulIOp>(
-      loc, builder.create<arith::ConstantIndexOp>(loc, staticProduct),
+      loc, arith::ConstantIndexOp::create(builder, loc, staticProduct),
       dynamicProduct, arith::IntegerOverflowFlags::nsw);
 }
 
+LogicalResult PaddingAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                                  DenseI64ArrayAttr padding) {
+  // You can only verify that the value is non-negative or dynamic.
+  if (!llvm::all_of(padding.asArrayRef(), [](int64_t val) {
+        return val == ShapedType::kDynamic || val >= 0;
+      })) {
+    return emitError() << "expected all padding values need to be "
+                          "non-negative or dynamic";
+  }
+  return success();
+}
+
 //===---------------------------------------------------------------------===//
-// encoding.identity_encoding
+// iree_encoding.identity
+//===---------------------------------------------------------------------===//
+
+Value IdentityAttr::calculateStorageSizeInBytes(Location loc,
+                                                OpBuilder &builder,
+                                                RankedTensorType type,
+                                                ValueRange dynamicDims) const {
+  const int64_t elementSize = getRoundedElementByteWidth(type.getElementType());
+  int64_t staticProduct = elementSize;
+  Value dynamicProduct = arith::ConstantIndexOp::create(builder, loc, 1);
+
+  size_t dynamicDimIdx = 0;
+  for (int64_t dimSize : type.getShape()) {
+    if (ShapedType::isStatic(dimSize)) {
+      staticProduct *= dimSize;
+      continue;
+    }
+
+    Value dynamicDimSize = dynamicDims[dynamicDimIdx];
+    ++dynamicDimIdx;
+    dynamicProduct = builder.createOrFold<arith::MulIOp>(
+        loc, dynamicProduct, dynamicDimSize, arith::IntegerOverflowFlags::nsw);
+  }
+  return builder.createOrFold<arith::MulIOp>(
+      loc, arith::ConstantIndexOp::create(builder, loc, staticProduct),
+      dynamicProduct, arith::IntegerOverflowFlags::nsw);
+}
+
+bool IdentityAttr::isIdentityLayout() const { return true; }
+
+bool IdentityAttr::isSerialized() const { return true; }
+
+//===---------------------------------------------------------------------===//
+// iree_encoding.identity_resolver
 //===---------------------------------------------------------------------===//
 
 Attribute
-IdentityEncodingAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
+IdentityResolverAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
   return *this;
 }
 
-Attribute IdentityEncodingAttr::getLayout(RankedTensorType type) const {
-  MLIRContext *ctx = getContext();
-  SmallVector<int32_t> zeros(type.getRank(), 0);
-  return Encoding::PadEncodingLayoutAttr::get(
-      ctx, DenseI32ArrayAttr::get(ctx, zeros));
+Attribute IdentityResolverAttr::getLayout(RankedTensorType type) const {
+  return Encoding::IdentityAttr::get(getContext());
 }
 
 //===---------------------------------------------------------------------===//
-// encoding.unsupported_encoding
+// iree_encoding.unsupported_resolver
 //===---------------------------------------------------------------------===//
 
 Attribute
-UnsupportedEncodingAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
+UnsupportedResolverAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
   return *this;
 }
 
-Attribute UnsupportedEncodingAttr::getLayout(RankedTensorType) const {
+Attribute UnsupportedResolverAttr::getLayout(RankedTensorType) const {
   return nullptr;
 }
 
@@ -369,7 +541,7 @@ Attribute UnsupportedEncodingAttr::getLayout(RankedTensorType) const {
 // Encoding attributes that are mainly for testing purpose.
 //===---------------------------------------------------------------------===//
 
-Attribute TestingEncodingAttr::parse(AsmParser &p, Type type) {
+Attribute TestingAttr::parse(AsmParser &p, Type type) {
   if (failed(p.parseLess())) {
     return {};
   }
@@ -385,7 +557,7 @@ Attribute TestingEncodingAttr::parse(AsmParser &p, Type type) {
   return get(p.getContext(), layouts);
 }
 
-void TestingEncodingAttr::print(AsmPrinter &p) const {
+void TestingAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
   os << "<";
   if (auto layouts = getLayouts()) {
@@ -394,78 +566,34 @@ void TestingEncodingAttr::print(AsmPrinter &p) const {
   os << ">";
 }
 
-bool TestingEncodingAttr::isSerialized() const {
-  return getLayouts() ? true : false;
+bool TestingAttr::isSerialized() const { return getLayouts() ? true : false; }
+
+Attribute TestingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
+  MLIRContext *ctx = getContext();
+  return TestingAttr::get(ctx, ArrayAttr::get(ctx, layouts));
 }
 
 Attribute
-TestingEncodingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
+SpecializationResolverAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
+  return *this;
+}
+
+Attribute SpecializationResolverAttr::getLayout(RankedTensorType type) const {
   MLIRContext *ctx = getContext();
-  return TestingEncodingAttr::get(ctx, ArrayAttr::get(ctx, layouts));
-}
-
-Attribute UnspecializedEncodingAttr::parse(AsmParser &p, Type type) {
-  if (failed(p.parseLess())) {
-    return {};
-  }
-  IntegerAttr seed;
-  if (failed(p.parseAttribute(seed))) {
-    return {};
-  }
-  if (failed(p.parseGreater())) {
-    return {};
-  }
-  return get(p.getContext(), seed);
-}
-
-void UnspecializedEncodingAttr::print(AsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << "<";
-  p.printAttributeWithoutType(getSeed());
-  os << ">";
-}
-
-Attribute
-UnspecializedEncodingAttr::cloneWithSimplifiedConfig(DictionaryAttr) const {
-  MLIRContext *ctx = getContext();
-  return SpecializedEncodingAttr::get(ctx, getSeed(), /*type=*/{});
-}
-
-Attribute SpecializedEncodingAttr::parse(AsmParser &p, Type type) {
-  if (failed(p.parseLess())) {
-    return {};
-  }
-
-  IntegerAttr seed;
-  if (failed(p.parseAttribute(seed))) {
-    return {};
-  }
-
-  TypeAttr typeAttr;
-  if (succeeded(p.parseOptionalComma()) && failed(p.parseAttribute(typeAttr))) {
-    return {};
-  }
-
-  if (failed(p.parseGreater())) {
-    return {};
-  }
-  return get(p.getContext(), seed, typeAttr);
-}
-
-void SpecializedEncodingAttr::print(AsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << "<";
-  p.printAttributeWithoutType(getSeed());
-  if (auto typeAttr = getType()) {
-    os << ", ";
-    p.printAttribute(typeAttr);
-  }
-  os << ">";
-}
-
-Attribute SpecializedEncodingAttr::getLayout(RankedTensorType type) const {
-  MLIRContext *ctx = getContext();
-  return get(ctx, getSeed(), TypeAttr::get(type.dropEncoding()));
+  return SpecializedAttr::get(ctx, getSeed(),
+                              TypeAttr::get(type.dropEncoding()));
 }
 
 } // namespace mlir::iree_compiler::IREE::Encoding
+
+using namespace mlir::iree_compiler::IREE::Encoding;
+
+#define GET_ATTRDEF_CLASSES
+#include "iree/compiler/Dialect/Encoding/IR/EncodingAttrs.cpp.inc"
+
+void IREEEncodingDialect::registerAttributes() {
+  addAttributes<
+#define GET_ATTRDEF_LIST
+#include "iree/compiler/Dialect/Encoding/IR/EncodingAttrs.cpp.inc"
+      >();
+}

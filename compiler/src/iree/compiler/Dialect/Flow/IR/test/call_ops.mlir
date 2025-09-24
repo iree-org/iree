@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file %s --verify-diagnostics | FileCheck %s
+// RUN: iree-opt --split-input-file %s | FileCheck %s
 
 // CHECK: flow.func private @externArg0()
 flow.func private @externArg0()

@@ -10,14 +10,19 @@
 #include "iree/compiler/dialects/iree_codegen.h"
 #include "iree/compiler/dialects/iree_gpu.h"
 #include "mlir-c/BuiltinAttributes.h"
+#include "mlir-c/BuiltinTypes.h"
 #include "mlir-c/IR.h"
 #include "mlir/Bindings/Python/Nanobind.h"
 #include "mlir/Bindings/Python/NanobindAdaptors.h"
+#include "mlir/CAPI/IR.h"
 
 static const char *kCodegenModuleImportPath =
     MAKE_MLIR_PYTHON_QUALNAME("dialects.iree_codegen");
 static const char *kGpuModuleImportPath =
     MAKE_MLIR_PYTHON_QUALNAME("dialects.iree_gpu");
+
+static const char *kMMAIntrinsicEnumName = "MMAIntrinsic";
+static const char *kVirtualMMAIntrinsicEnumName = "VirtualMMAIntrinsic";
 
 namespace py = nanobind;
 using namespace nanobind::literals;
@@ -33,21 +38,29 @@ ireeCodegenGetExecutableVariantOpsBinding(MlirModule module) {
   return ops;
 }
 
-static std::vector<py::object>
-ireeCodegenQueryMMAIntrinsicsBinding(MlirOperation op) {
-  size_t numMMAs = 0;
-  ireeCodegenQueryMMAIntrinsics(op, &numMMAs, nullptr);
-  std::vector<uint32_t> mmaIntrinsics(numMMAs);
-  ireeCodegenQueryMMAIntrinsics(op, &numMMAs, mmaIntrinsics.data());
+static std::vector<MlirOperation>
+ireeCodegenGetTunerRootOpsBinding(MlirModule module) {
+  size_t numOps = 0;
+  ireeCodegenGetTunerRootOps(module, &numOps, nullptr);
+  std::vector<MlirOperation> ops(numOps);
+  ireeCodegenGetTunerRootOps(module, &numOps, ops.data());
 
-  py::object mmaIntrinsicEnum =
-      py::module_::import_(kGpuModuleImportPath).attr("MMAIntrinsic");
-  std::vector<py::object> mmaList(numMMAs);
-  for (size_t i = 0; i < numMMAs; ++i) {
-    mmaList[i] = mmaIntrinsicEnum(mmaIntrinsics[i]);
+  return ops;
+}
+
+static std::vector<int64_t> getIntArrayAttrValues(MlirAttribute attr) {
+  if (mlirAttributeIsNull(attr) || !mlirAttributeIsAArray(attr))
+    return {};
+
+  std::vector<int64_t> result;
+  size_t n = mlirArrayAttrGetNumElements(attr);
+  result.reserve(n);
+  for (size_t i = 0; i < n; ++i) {
+    MlirAttribute elem = mlirArrayAttrGetElement(attr, i);
+    int64_t val = mlirIntegerAttrGetValueInt(elem);
+    result.push_back(val);
   }
-
-  return mmaList;
+  return result;
 }
 
 NB_MODULE(_ireeCompilerDialects, m) {
@@ -299,7 +312,7 @@ NB_MODULE(_ireeCompilerDialects, m) {
                                uint32_t rawValue =
                                    ireeGPUMMAIntrinsicAttrGetValue(self);
                                return py::module_::import_(kGpuModuleImportPath)
-                                   .attr("MMAIntrinsic")(rawValue);
+                                   .attr(kMMAIntrinsicEnumName)(rawValue);
                              })
       .def_property_readonly("mma", [](MlirAttribute self) -> MlirAttribute {
         uint32_t value = ireeGPUMMAIntrinsicAttrGetValue(self);
@@ -319,6 +332,91 @@ NB_MODULE(_ireeCompilerDialects, m) {
           },
           "cls"_a, "value"_a, "ctx"_a = py::none(),
           "Gets an #iree_gpu.mma from parameters.")
+      .def_property_readonly(
+          "abc_element_types",
+          [](MlirAttribute self) -> py::tuple {
+            ireeGPUMMAInfo info = ireeGPUMMAAttrGetInfo(self);
+            return py::make_tuple(info.aElementType, info.bElementType,
+                                  info.cElementType);
+          })
+      .def_property_readonly(
+          "abc_vector_types",
+          [](MlirAttribute self) -> py::tuple {
+            ireeGPUMMAInfo info = ireeGPUMMAAttrGetInfo(self);
+            return py::make_tuple(info.aVectorType, info.bVectorType,
+                                  info.cVectorType);
+          })
+      .def_property_readonly(
+          "mnk_shape",
+          [](MlirAttribute self) -> py::tuple {
+            ireeGPUMMAInfo info = ireeGPUMMAAttrGetInfo(self);
+            return py::make_tuple(info.mElements, info.nElements,
+                                  info.kElements);
+          })
+      .def(
+          "get_virtual_intrinsics",
+          [](MlirAttribute self) {
+            MlirAttribute rawArrayAttr =
+                ireeGPUMMAAttrGetVirtualMMAIntrinsic(self);
+            if (mlirAttributeIsNull(rawArrayAttr)) {
+              return std::vector<py::object>{};
+            }
+
+            static py::object virtualEnum =
+                py::module_::import_(kGpuModuleImportPath)
+                    .attr(kVirtualMMAIntrinsicEnumName);
+
+            std::vector<py::object> result;
+            for (int64_t val : getIntArrayAttrValues(rawArrayAttr)) {
+              result.push_back(virtualEnum(static_cast<uint32_t>(val)));
+            }
+            return result;
+          },
+          "Returns a list of virtual intrinsics  associated with this "
+          "MMAAttr.");
+
+  //===-------------------------------------------------------------------===//
+  // GPUVirtualMMAIntrinsicAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_gpu_module, "VirtualMMAIntrinsicAttr",
+                          ireeAttributeIsAGPUVirtualMMAIntrinsicAttr,
+                          ireeGPUVirtualMMAIntrinsicAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, uint32_t value, MlirContext ctx) {
+            return ireeGPUVirtualMMAIntrinsicAttrGet(ctx, value);
+          },
+          "cls"_a, "value"_a, "ctx"_a = py::none(),
+          "Gets an #iree_gpu.virtual_mma_intrinsic from parameters.")
+      .def_property_readonly("raw_value",
+                             ireeGPUVirtualMMAIntrinsicAttrGetValue)
+      .def_property_readonly(
+          "value",
+          [](MlirAttribute self) -> py::object {
+            uint32_t rawValue = ireeGPUVirtualMMAIntrinsicAttrGetValue(self);
+            return py::module_::import_(kGpuModuleImportPath)
+                .attr(kVirtualMMAIntrinsicEnumName)(rawValue);
+          })
+      .def_property_readonly("mma", [](MlirAttribute self) -> MlirAttribute {
+        uint32_t value = ireeGPUVirtualMMAIntrinsicAttrGetValue(self);
+        return ireeGPUVirtualMMAAttrGet(mlirAttributeGetContext(self), value);
+      });
+
+  //===-------------------------------------------------------------------===//
+  // GPUVirtualMMAAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_gpu_module, "VirtualMMAAttr",
+                          ireeAttributeIsAGPUVirtualMMAAttr,
+                          ireeGPUVirtualMMAAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, uint32_t value, MlirContext ctx) {
+            return ireeGPUVirtualMMAAttrGet(ctx, value);
+          },
+          "cls"_a, "value"_a, "ctx"_a = py::none(),
+          "Gets an #iree_gpu.virtualmma from parameters.")
       .def_property_readonly(
           "abc_element_types",
           [](MlirAttribute self) -> py::tuple {
@@ -359,53 +457,29 @@ NB_MODULE(_ireeCompilerDialects, m) {
           "workgroup_tile_sizes",
           [](MlirAttribute self) -> std::vector<int64_t> {
             auto tilesizes = ireeGPULoweringConfigAttrGetTileSizes(self);
-            MlirAttribute workgroupAttr = tilesizes.workgroupAttr;
-            if (mlirAttributeIsNull(workgroupAttr)) {
-              return {};
-            }
-
-            size_t len = mlirArrayAttrGetNumElements(workgroupAttr);
-            std::vector<int64_t> workgroup(len);
-            for (size_t i = 0; i < len; ++i) {
-              MlirAttribute attr = mlirArrayAttrGetElement(workgroupAttr, i);
-              workgroup[i] = mlirIntegerAttrGetValueInt(attr);
-            }
-            return workgroup;
+            return getIntArrayAttrValues(tilesizes.workgroupAttr);
           })
       .def_property_readonly(
           "reduction_tile_sizes",
           [](MlirAttribute self) -> std::vector<int64_t> {
             auto tilesizes = ireeGPULoweringConfigAttrGetTileSizes(self);
-            MlirAttribute reductionAttr = tilesizes.reductionAttr;
-            if (mlirAttributeIsNull(reductionAttr)) {
-              return {};
-            }
-
-            size_t len = mlirArrayAttrGetNumElements(reductionAttr);
-            std::vector<int64_t> reduction(len);
-            for (size_t i = 0; i < len; ++i) {
-              MlirAttribute attr = mlirArrayAttrGetElement(reductionAttr, i);
-              reduction[i] = mlirIntegerAttrGetValueInt(attr);
-            }
-            return reduction;
+            return getIntArrayAttrValues(tilesizes.reductionAttr);
           })
       .def_property_readonly(
-          "subgroup_count_mn",
-          [](MlirAttribute self) -> py::tuple {
-            ireeGPUSubgroupCountInfo info =
-                ireeGPULoweringConfigAttrGetSubgroupCount(self);
-            MlirAttribute mCountAttr = info.subgroupMCountAttr;
-            MlirAttribute nCountAttr = info.subgroupNCountAttr;
-            std::optional<int64_t> mCount;
-            if (!mlirAttributeIsNull(mCountAttr)) {
-              mCount = mlirIntegerAttrGetValueInt(mCountAttr);
+          "subgroup_basis",
+          [](MlirAttribute self)
+              -> std::tuple<std::vector<int64_t>, std::vector<int64_t>> {
+            ireeGPUSubgroupBasisInfo basisInfo =
+                ireeGPULoweringConfigAttrGetSubgroupBasis(self);
+            std::vector<int64_t> counts;
+            std::vector<int64_t> mapping;
+            if (!mlirAttributeIsNull(basisInfo.countsAttr)) {
+              counts = getIntArrayAttrValues(basisInfo.countsAttr);
             }
-
-            std::optional<int64_t> nCount;
-            if (!mlirAttributeIsNull(nCountAttr)) {
-              nCount = mlirIntegerAttrGetValueInt(nCountAttr);
+            if (!mlirAttributeIsNull(basisInfo.mappingAttr)) {
+              mapping = getIntArrayAttrValues(basisInfo.mappingAttr);
             }
-            return py::make_tuple(mCount, nCount);
+            return std::make_tuple(counts, mapping);
           })
       .def_property_readonly(
           "mma_kind", [](MlirAttribute self) -> std::optional<MlirAttribute> {
@@ -414,6 +488,137 @@ NB_MODULE(_ireeCompilerDialects, m) {
               return attr;
             return std::nullopt;
           });
+
+  //===-------------------------------------------------------------------===//
+  // Binding to query target info
+  //===-------------------------------------------------------------------===//
+
+  py::class_<ireeGPUTargetInfo>(iree_gpu_module, "TargetInfo")
+      .def(
+          "__init__",
+          [](ireeGPUTargetInfo *self, MlirContext context,
+             const std::string &arch,
+             const std::vector<int32_t> &subgroupChoices,
+             const std::vector<int32_t> &workgroupSizes, int32_t threadCount,
+             int32_t memoryBytes, const py::list &mmaIntrinsicObjs) {
+            std::vector<mma_intrinsic_enum_t> mmaIntrinsicVals;
+            py::module_ gpuModule = py::module_::import_(kGpuModuleImportPath);
+            py::object mmaIntrinsicClass =
+                gpuModule.attr(kMMAIntrinsicEnumName);
+            py::object virtualMmaIntrinsicClass =
+                gpuModule.attr(kVirtualMMAIntrinsicEnumName);
+
+            for (py::handle item : mmaIntrinsicObjs) {
+              if (!py::isinstance(item, mmaIntrinsicClass) &&
+                  !py::isinstance(item, virtualMmaIntrinsicClass)) {
+                throw py::type_error("All items must be MMA atributes");
+              }
+              mmaIntrinsicVals.push_back(
+                  py::cast<mma_intrinsic_enum_t>(item.attr("value")));
+            }
+
+            *self = ireeGPUTargetInfoGet(
+                context, arch.c_str(), subgroupChoices.data(),
+                subgroupChoices.size(), workgroupSizes.data(),
+                workgroupSizes.size(), threadCount, memoryBytes,
+                mmaIntrinsicVals.data(), mmaIntrinsicVals.size());
+          },
+          "context"_a, "arch"_a, "subgroup_size_choices"_a,
+          "max_workgroup_sizes"_a, "max_thread_count_per_workgroup"_a,
+          "max_workgroup_memory_bytes"_a, "mma_intrinsics"_a = py::list{},
+          "Create a GPUTargetInfo with the given parameters")
+      .def_static(
+          "get_gpu_target_info", &ireeHALExecutableTargetAttrGetGPUTargetInfo,
+          "executable_target_attr"_a,
+          "Get GPU target information from an executable target attribute")
+      .def_prop_ro("arch",
+                   [](const ireeGPUTargetInfo &self) -> std::string {
+                     MlirStringRef strRef = mlirIdentifierStr(self.arch);
+                     return std::string(strRef.data, strRef.length);
+                   })
+      .def_prop_ro("subgroup_size_choices",
+                   [](const ireeGPUTargetInfo &self) -> std::vector<int64_t> {
+                     return getIntArrayAttrValues(self.subgroupSizeChoices);
+                   })
+      .def_prop_ro("max_thread_count_per_workgroup",
+                   [](const ireeGPUTargetInfo &self) -> int64_t {
+                     return self.maxThreadCountPerWorkgroup;
+                   })
+      .def_prop_ro("max_workgroup_sizes",
+                   [](const ireeGPUTargetInfo &self) -> std::vector<int64_t> {
+                     return getIntArrayAttrValues(self.maxWorkgroupSizes);
+                   })
+      .def_prop_ro("max_workgroup_memory_bytes",
+                   [](const ireeGPUTargetInfo &self) -> int64_t {
+                     return self.maxWorkgroupMemoryBytes;
+                   })
+      .def_prop_ro(
+          "mma_intrinsics", [](const ireeGPUTargetInfo &self) -> py::list {
+            if (mlirAttributeIsNull(self.mmaIntrinsics) ||
+                !mlirAttributeIsAArray(self.mmaIntrinsics)) {
+              return py::list();
+            }
+
+            size_t numElements =
+                mlirArrayAttrGetNumElements(self.mmaIntrinsics);
+
+            std::vector<mma_intrinsic_enum_t> mmaIntrinsicVals(numElements);
+            // Use uint8_t instead of bool because std::vector<bool> is a
+            // specialized template that doesn't provide .data() method.
+            std::vector<uint8_t> virtualMmaIntrinsicTags(numElements);
+            ireeGPUTargetInfoGetMMAIntrinsics(self.mmaIntrinsics,
+                                              mmaIntrinsicVals.data(),
+                                              virtualMmaIntrinsicTags.data());
+
+            py::list intrinsics;
+            py::module_ gpuModule = py::module_::import_(kGpuModuleImportPath);
+            py::object mmaIntrinsicEnum = gpuModule.attr(kMMAIntrinsicEnumName);
+            py::object virtualMmaIntrinsicEnum =
+                gpuModule.attr(kVirtualMMAIntrinsicEnumName);
+
+            for (size_t i = 0; i < numElements; ++i) {
+              if (virtualMmaIntrinsicTags[i]) {
+                py::object virtualMmaIntrinsic =
+                    virtualMmaIntrinsicEnum(mmaIntrinsicVals[i]);
+                intrinsics.append(virtualMmaIntrinsic);
+                continue;
+              }
+              py::object mmaIntrinsic = mmaIntrinsicEnum(mmaIntrinsicVals[i]);
+              intrinsics.append(mmaIntrinsic);
+            }
+
+            return intrinsics;
+          });
+
+  //===-------------------------------------------------------------------===//
+  // Binding to utility function getSingleSubgroupLayout
+  //===-------------------------------------------------------------------===//
+  py::class_<ireeGPUMMASingleSubgroupLayout>(iree_gpu_module,
+                                             "GPUMMASingleSubgroupLayout")
+      .def_prop_ro("outer",
+                   [](const ireeGPUMMASingleSubgroupLayout &self) {
+                     return getIntArrayAttrValues(self.outer);
+                   })
+      .def_prop_ro("thread",
+                   [](const ireeGPUMMASingleSubgroupLayout &self) {
+                     return getIntArrayAttrValues(self.thread);
+                   })
+      .def_prop_ro("tstrides",
+                   [](const ireeGPUMMASingleSubgroupLayout &self) {
+                     return getIntArrayAttrValues(self.tstrides);
+                   })
+      .def_prop_ro("element", [](const ireeGPUMMASingleSubgroupLayout &self) {
+        return getIntArrayAttrValues(self.element);
+      });
+
+  iree_gpu_module.def(
+      "get_single_subgroup_layout",
+      [](MlirAttribute attr, int fragment) {
+        return ireeGPUGetSingleSubgroupLayout(attr, fragment);
+      },
+      "Returns the single subgroup layout (element, thread, outer, "
+      "tstrides) for a given MMA or VirtualMMA intrinsic and fragment. ",
+      py::arg("attr"), py::arg("fragment"));
 
   //===-------------------------------------------------------------------===//
   // Binding to utility function getExecutableVariantOps
@@ -425,11 +630,52 @@ NB_MODULE(_ireeCompilerDialects, m) {
       py::arg("module"));
 
   //===-------------------------------------------------------------------===//
-  // Binding to utility function queryMMAIntrinsics
+  // Binding to utility function ireeCodegenGetTunerRootOps
   //===-------------------------------------------------------------------===//
 
+  iree_codegen_module.def("get_tuner_root_ops",
+                          &ireeCodegenGetTunerRootOpsBinding,
+                          "Get the operations marked with the tuner root op "
+                          "attribute from a module.",
+                          py::arg("module"));
+
+  //===-------------------------------------------------------------------===//
+  // Binding to utility function ireeCodegenGetAttentionOpDetail
+  //===-------------------------------------------------------------------===//
+  py::class_<ireeCodegenAttentionOpDetail>(iree_codegen_module,
+                                           "AttentionOpDetail")
+      .def_prop_ro("batch_dims",
+                   [](const ireeCodegenAttentionOpDetail &self) {
+                     return getIntArrayAttrValues(self.batch);
+                   })
+      .def_prop_ro("m_dims",
+                   [](const ireeCodegenAttentionOpDetail &self) {
+                     return getIntArrayAttrValues(self.m);
+                   })
+      .def_prop_ro("k1_dims",
+                   [](const ireeCodegenAttentionOpDetail &self) {
+                     return getIntArrayAttrValues(self.k1);
+                   })
+      .def_prop_ro("k2_dims",
+                   [](const ireeCodegenAttentionOpDetail &self) {
+                     return getIntArrayAttrValues(self.k2);
+                   })
+      .def_prop_ro("n_dims",
+                   [](const ireeCodegenAttentionOpDetail &self) {
+                     return getIntArrayAttrValues(self.n);
+                   })
+      .def_prop_ro("domain_rank", [](const ireeCodegenAttentionOpDetail &self) {
+        return self.domainRank;
+      });
+
   iree_codegen_module.def(
-      "query_mma_intrinsics", &ireeCodegenQueryMMAIntrinsicsBinding,
-      "Queries the MMA intrinsics from an executable variant op.",
+      "get_attention_op_detail", &ireeCodegenGetAttentionOpDetail,
+      "Infers the structure of an attention operation from affine indexing "
+      "maps.",
+      py::arg("q"), py::arg("k"), py::arg("v"), py::arg("o"));
+
+  iree_codegen_module.def(
+      "isa_attention_op", &ireeCodegenMlirOperationIsACodegenAttentionOp,
+      "Checks if the given operation is an IREE LinalgExt attention op.",
       py::arg("op"));
 }

@@ -16,6 +16,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "create_serialized_module.mlir",
             "symbol_transforms.mlir",
         ],
         include = ["*.mlir"],

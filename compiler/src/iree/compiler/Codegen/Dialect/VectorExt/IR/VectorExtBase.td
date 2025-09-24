@@ -32,6 +32,10 @@ def IREEVectorExt_Dialect : Dialect {
   let extraClassDeclaration = [{
     void registerAttributes();
   }];
+  let dependentDialects = [
+    "affine::AffineDialect",
+    "vector::VectorDialect"
+  ];
 }
 
 //===---------------------------------------------------------------------===//

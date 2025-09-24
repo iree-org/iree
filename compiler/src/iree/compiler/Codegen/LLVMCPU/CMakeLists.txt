@@ -32,6 +32,7 @@ iree_cc_library(
     MLIRPass
     MLIRTransformUtils
     MLIRTransforms
+    iree::compiler::Codegen::Dialect::CPU::IR::IREECPUDialect
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Utils
@@ -65,8 +66,8 @@ iree_cc_library(
     "LLVMCPUSplitReduction.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
     "LLVMCPUTile.cpp"
-    "LLVMCPUTileAndFuse.cpp"
-    "LLVMCPUTileRootAndFuseProducerConsumer.cpp"
+    "LLVMCPUTileAndFuseProducerConsumer.cpp"
+    "LLVMCPUTileToVectorSize.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
     "LLVMCPUVectorShapeCastLowering.cpp"
     "LLVMCPUVectorTransposeLowering.cpp"
@@ -87,6 +88,7 @@ iree_cc_library(
     LLVMTargetParser
     MLIRAffineDialect
     MLIRAffineToStandard
+    MLIRAffineTransforms
     MLIRAffineUtils
     MLIRAnalysis
     MLIRArithDialect
@@ -112,9 +114,11 @@ iree_cc_library(
     MLIRFunctionInterfaces
     MLIRIR
     MLIRIndexToLLVM
+    MLIRIndexingMapOpInterface
     MLIRLLVMCommonConversion
     MLIRLLVMDialect
     MLIRLinalgDialect
+    MLIRLinalgInterfacesIncGenLib
     MLIRLinalgTransforms
     MLIRLinalgUtils
     MLIRMathDialect
@@ -133,6 +137,7 @@ iree_cc_library(
     MLIRSCFUtils
     MLIRTensorDialect
     MLIRTensorTransforms
+    MLIRTilingInterface
     MLIRTosaDialect
     MLIRTosaToArith
     MLIRTransformDialect
@@ -150,11 +155,11 @@ iree_cc_library(
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::CPU::CommonCPUPasses
     iree::compiler::Codegen::Common::TransformDialectInterpreterPass
+    iree::compiler::Codegen::Dialect::CPU::IR::IREECPUDialect
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
-    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::LinalgExt::IR
@@ -166,6 +171,17 @@ iree_cc_library(
     iree::schemas::cpu_data
     iree::schemas::instruments
   PUBLIC
+)
+
+iree_tablegen_doc(
+  NAME
+    CodegenLLVMCPUPassesDocGen
+  CATEGORY
+    "Passes"
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-doc CodegenLLVMCPUPasses.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

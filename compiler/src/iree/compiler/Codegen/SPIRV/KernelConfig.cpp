@@ -13,13 +13,13 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/InterleavedRange.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -86,7 +86,7 @@ static bool fusedOpMayUseExtraSharedMemory(linalg::LinalgOp matmul) {
 //===----------------------------------------------------------------------===//
 
 /// Decides the tiling and distribution parameters for one convolution
-/// dimension. Returns true if we can succesfully deduce.
+/// dimension. Returns true if we can successfully deduce.
 ///
 /// - `inputDim` is the size of the dimension to be distributed.
 /// - `residualThreads` is the remaining threads we can distribute.
@@ -126,7 +126,7 @@ static bool tileConvOneDim(const int64_t inputDim, const bool isInnerMostDim,
 
 /// Decides the tiling and distribution parameters for two convolution window
 /// dimensions to two workgroup dimensions as a square. Returns true if we can
-/// succesfully deduce.
+/// successfully deduce.
 static bool tileConvSquare(const int64_t oh, const int64_t ow,
                            int64_t &residualThreads,
                            int64_t &residualTilingFactor,
@@ -174,22 +174,19 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   if (failed(convDimsOrFailure))
     return failure();
   const mlir::linalg::ConvolutionDimensions &convDims = *convDimsOrFailure;
-  LLVM_DEBUG({
-    llvm::dbgs() << "conv: " << linalgOp;
-    llvm::dbgs() << "\nconv batch dim: ";
-    llvm::interleaveComma(convDims.batch, llvm::dbgs());
-    llvm::dbgs() << "\nconv output window dims: ";
-    llvm::interleaveComma(convDims.outputImage, llvm::dbgs());
-    llvm::dbgs() << "\nconv output channel dim: ";
-    llvm::interleaveComma(convDims.outputChannel, llvm::dbgs());
-    llvm::dbgs() << "\nconv filter window dims: ";
-    llvm::interleaveComma(convDims.filterLoop, llvm::dbgs());
-    llvm::dbgs() << "\nconv input channel dims: ";
-    llvm::interleaveComma(convDims.inputChannel, llvm::dbgs());
-    llvm::dbgs() << "\nconv depth multiplier: ";
-    llvm::interleaveComma(convDims.depth, llvm::dbgs());
-    llvm::dbgs() << "\n";
-  });
+  LLVM_DEBUG(llvm::dbgs() << "conv: " << linalgOp << "\n"
+                          << "conv batch dim: "
+                          << llvm::interleaved(convDims.batch) << "\n"
+                          << "conv output window dims: "
+                          << llvm::interleaved(convDims.outputImage) << "\n"
+                          << "conv output channel dim: "
+                          << llvm::interleaved(convDims.outputChannel) << "\n"
+                          << "conv filter window dims: "
+                          << llvm::interleaved(convDims.filterLoop) << "\n"
+                          << "conv input channel dims: "
+                          << llvm::interleaved(convDims.inputChannel) << "\n"
+                          << "conv depth multiplier: "
+                          << llvm::interleaved(convDims.depth) << "\n");
   assert(convDims.outputImage.size() == 2);
   assert(convDims.filterLoop.size() == 2);
 
@@ -684,17 +681,12 @@ LogicalResult setMatmulOpConfig(IREE::GPU::TargetAttr target,
       !tileMatmulK(dimK, residualTilingFactor, reductionTileSizes[kIndex])) {
     return failure();
   }
-  LLVM_DEBUG({
-    llvm::dbgs() << "workgroup tile size before promotion = (";
-    llvm::interleaveComma(workgroupTileSizes, llvm::dbgs());
-    llvm::dbgs() << ")\n";
-    llvm::dbgs() << "reduction tile size before promotion = (";
-    llvm::interleaveComma(reductionTileSizes, llvm::dbgs());
-    llvm::dbgs() << ")\n";
-    llvm::dbgs() << "workgroup size before promotion = (";
-    llvm::interleaveComma(workgroupSize, llvm::dbgs());
-    llvm::dbgs() << ")\n";
-  });
+  LLVM_DEBUG(llvm::dbgs() << "workgroup tile size before promotion = "
+                          << llvm::interleaved_array(workgroupTileSizes)
+                          << "\nreduction tile size before promotion = "
+                          << llvm::interleaved_array(reductionTileSizes)
+                          << "\nworkgroup size before promotion = "
+                          << llvm::interleaved_array(workgroupSize) << "\n");
 
   int subgroupSize = target.getPreferredSubgroupSize();
   const int maxBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
@@ -770,6 +762,24 @@ LogicalResult setMatmulOpConfig(IREE::GPU::TargetAttr target,
       CodeGenPipeline::SPIRVBaseVectorize, workgroupSize);
 }
 
+static LogicalResult setTilingAndMatmulOpConfig(linalg::LinalgOp op,
+                                                IREE::GPU::TargetAttr target) {
+  if (!isMatmulOrBatchMatmul(op)) {
+    return failure();
+  }
+  // Try to tile and vectorize first. It's common to see 32 threads
+  // per subgroup for GPUs.
+  std::array<int64_t, 2> workgroupXY = {32, 2};
+  std::array<int64_t, 3> threadMNK;
+  auto inputType = cast<ShapedType>(op->getOperand(0).getType());
+  if (IREE::Util::getTypeBitWidth(inputType.getElementType()) == 16) {
+    threadMNK = {8, 8, 8};
+  } else {
+    threadMNK = {8, 8, 4};
+  }
+  return detail::setMatmulOpConfig(target, op, workgroupXY, threadMNK);
+}
+
 } // namespace detail
 
 //===----------------------------------------------------------------------===//
@@ -811,7 +821,7 @@ bool isCooperativeMatrixFusable(linalg::GenericOp genericOp) {
     while (auto subviewOp = input.getDefiningOp<memref::SubViewOp>()) {
       input = subviewOp.getViewSource();
     }
-    if (auto toMemrefOp = input.getDefiningOp<bufferization::ToMemrefOp>()) {
+    if (auto toMemrefOp = input.getDefiningOp<bufferization::ToBufferOp>()) {
       if (matchPattern(toMemrefOp.getTensor(), m_Constant()))
         return false;
     }
@@ -826,7 +836,7 @@ bool needToPrmoteCForCooperativeMatrix(linalg::LinalgOp matmulOp) {
   if (!result.hasOneUse())
     return true; // Be conservative.
   Operation *user = *result.getUsers().begin();
-  if (isa<IREE::Flow::DispatchTensorStoreOp>(user))
+  if (isa<IREE::TensorExt::DispatchTensorStoreOp>(user))
     return false;
   if (auto genericOp = dyn_cast<linalg::GenericOp>(user)) {
     return !isCooperativeMatrixFusable(genericOp);
@@ -891,12 +901,12 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
   // just the first element.
   GPUMatmulShapeType problem(dimM, dimN, dimK, lhsElem, rhsElem, initElem);
 
-  SmallVector<GPUMatmulShapeType> intrinsics;
+  SmallVector<GPUIntrinsicType> intrinsics;
   intrinsics.reserve(target.getWgp().getMma().size());
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
-    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
+    intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
   }
 
   GPUMMAHeuristicSeeds seeds{numSubgroupsPerWorkgroup, numMNTilesPerSubgroup,
@@ -1070,7 +1080,7 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
   op.getParallelDims(parallelDims);
   op.getReductionDims(reductionDims);
 
-  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  SmallVector<int64_t> bounds = op.getStaticLoopRanges();
   int64_t numParallelDims = op.getNumParallelLoops();
 
   // We should have reduction dimensions.
@@ -1201,7 +1211,7 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
 
   int64_t parallelSize = 1;
   for (int64_t dim : parallelDims) {
-    if (!ShapedType::isDynamic(bounds[dim]))
+    if (ShapedType::isStatic(bounds[dim]))
       parallelSize *= bounds[dim];
   }
   // Total parallel size that can fill the GPU with enough workgorups.
@@ -1389,11 +1399,8 @@ static LogicalResult setDefaultOpConfig(IREE::GPU::TargetAttr target,
       for (unsigned i = numThreads; i >= 1; i >>= 1) {
         candidates.push_back(i);
       }
-      LLVM_DEBUG({
-        llvm::dbgs() << "Base candidate tile sizes: [";
-        llvm::interleaveComma(candidates, llvm::dbgs());
-        llvm::dbgs() << "]\n";
-      });
+      LLVM_DEBUG(llvm::dbgs() << "Base candidate tile sizes: "
+                              << llvm::interleaved_array(candidates) << "\n");
 
       for (int64_t candidate : candidates) {
         int64_t scaledTileSize = candidate * scaleToByte;
@@ -1520,29 +1527,13 @@ static LogicalResult setSPIRVOpConfig(IREE::GPU::TargetAttr target,
   // Otherwise fallback to use a default configuration that tiles and
   // distributes/vectorizes.
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
-      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([&](auto op) {
-        // Try to tile and vectorize first. It's common to see 32 threads
-        // per subgroup for GPUs.
-        std::array<int64_t, 2> workgroupXY = {32, 2};
-        std::array<int64_t, 3> threadMNK;
-        auto inputType = llvm::cast<ShapedType>(op.getInputs()[0].getType());
-        if (IREE::Util::getTypeBitWidth(inputType.getElementType()) == 16) {
-          threadMNK = {8, 8, 8};
-        } else {
-          threadMNK = {8, 8, 4};
-        }
-        auto result =
-            detail::setMatmulOpConfig(target, op, workgroupXY, threadMNK);
-        if (succeeded(result))
-          return success();
-
-        LLVM_DEBUG(llvm::dbgs()
-                   << "failed to set matmul op config, trying reduction\n");
-        if (succeeded(setReductionConfig(target, op)))
-          return success();
-
-        // If unsuccessful, try to tile and distribute.
-        return setDefaultOpConfig(target, op);
+      .Case<linalg::MatmulOp, linalg::BatchMatmulOp>([](auto op) {
+        // Assertion is better than returning failure here to
+        // avoid unexpected configurations.
+        assert(false && "named matmul not supported here, pass expects it to "
+                        "generalized first");
+        return op->emitOpError(
+            "named matmul not supported, expected to be generalized first");
       })
       .Case<linalg::ConvolutionOpInterface>([target](auto op) {
         // Use the result type in case of larger bitwidth for accumulators.
@@ -1557,21 +1548,31 @@ static LogicalResult setSPIRVOpConfig(IREE::GPU::TargetAttr target,
           if (succeeded(result))
             return success();
         }
-
         // If unsuccessful, try to tile and distribute/vectorize.
         return setDefaultOpConfig(target, op);
       })
       .Case<linalg::GenericOp>([&](linalg::GenericOp op) {
-        LLVM_DEBUG(llvm::dbgs() << "figuring configuration for generic op\n");
-        if (succeeded(setReductionConfig(target, op)))
+        LLVM_DEBUG(llvm::dbgs() << "configuring for generic op\n");
+        if (succeeded(detail::setTilingAndMatmulOpConfig(op, target))) {
           return success();
+        }
+        LLVM_DEBUG(llvm::dbgs()
+                   << "failed to set matmul op config, trying reduction\n");
+
+        if (succeeded(setReductionConfig(target, op))) {
+          return success();
+        }
+        LLVM_DEBUG(llvm::dbgs() << "failed to set reduction op config");
 
         // If a generic op has reduction iterator types, it can be treated as a
         // root op for configuration as well. Use the default configuration,
         // which will mark it as a root.
         if (op.getNumLoops() != op.getNumParallelLoops()) {
+          LLVM_DEBUG(llvm::dbgs() << "trying default config for generic");
           return setDefaultOpConfig(target, op);
         }
+
+        LLVM_DEBUG(llvm::dbgs() << "failed to set config of generic");
         return failure();
       })
       .Case<IREE::LinalgExt::FftOp>([target](IREE::LinalgExt::FftOp op) {

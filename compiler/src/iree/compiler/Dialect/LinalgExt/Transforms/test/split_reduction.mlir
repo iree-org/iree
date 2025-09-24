@@ -7,7 +7,7 @@ func.func @topk_split_reduction_1d(%input_values: tensor<30xf32>, %out_values: t
         dimension(0)
         ins(%input_values: tensor<30xf32>)
         outs(%out_values, %out_indices : tensor<3xf32>, tensor<3xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+        ^bb0(%arg0: f32, %arg1: f32):
           %0 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %0 : i1
         } -> tensor<3xf32>, tensor<3xi32>
@@ -57,7 +57,7 @@ func.func @topk_split_reduction_nd(%input_values: tensor<3x10x40x8xf32>, %out_va
         dimension(2)
         ins(%input_values : tensor<3x10x40x8xf32>)
         outs(%out_values, %out_indices : tensor<3x10x4x8xf32>, tensor<3x10x4x8xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+        ^bb0(%arg0: f32, %arg1: f32):
           %0 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %0 : i1
         } -> tensor<3x10x4x8xf32>, tensor<3x10x4x8xi32>
@@ -107,7 +107,7 @@ func.func @topk_split_reduction_double(%input_values: tensor<400xf32>, %out_valu
         dimension(0)
         ins(%input_values: tensor<400xf32>)
         outs(%out_values, %out_indices : tensor<3xf32>, tensor<3xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+        ^bb0(%arg0: f32, %arg1: f32):
           %0 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %0 : i1
         } -> tensor<3xf32>, tensor<3xi32>

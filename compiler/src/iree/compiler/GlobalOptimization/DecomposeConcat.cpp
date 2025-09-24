@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -27,10 +28,10 @@ static Value createTranspose(OpBuilder &builder, Value source,
   applyPermutationToVector(mixedSizes, perm);
   Type elemType = cast<RankedTensorType>(source.getType()).getElementType();
   Value empty =
-      builder.create<tensor::EmptyOp>(source.getLoc(), mixedSizes, elemType)
+      tensor::EmptyOp::create(builder, source.getLoc(), mixedSizes, elemType)
           .getResult();
-  return builder
-      .create<linalg::TransposeOp>(source.getLoc(), source, empty, perm)
+  return linalg::TransposeOp::create(builder, source.getLoc(), source, empty,
+                                     perm)
       ->getResult(0);
 }
 
@@ -44,6 +45,10 @@ struct TransposeInnerConcatenation : public OpRewritePattern<tensor::ConcatOp> {
 
   LogicalResult matchAndRewrite(tensor::ConcatOp concatOp,
                                 PatternRewriter &rewriter) const override {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(concatOp)) {
+      return failure();
+    }
+
     // Get the outer most non-unit dim to transpose to.
     RankedTensorType concatType = concatOp.getResultType();
     ArrayRef<int64_t> concatShape = concatType.getShape();
@@ -70,9 +75,9 @@ struct TransposeInnerConcatenation : public OpRewritePattern<tensor::ConcatOp> {
     SmallVector<int64_t> newShape = applyPermutation(concatShape, permutation);
     auto newConcatType = RankedTensorType::get(
         newShape, concatOp.getResultType().getElementType());
-    Value newConcat = rewriter.create<tensor::ConcatOp>(
-        concatOp.getLoc(), newConcatType, /*dim=*/outerMostNonUnitDim,
-        transposedInputs);
+    Value newConcat =
+        tensor::ConcatOp::create(rewriter, concatOp.getLoc(), newConcatType,
+                                 /*dim=*/outerMostNonUnitDim, transposedInputs);
     auto invPerm = invertPermutationVector(permutation);
     Value transposedConcat = createTranspose(rewriter, newConcat, invPerm);
     rewriter.replaceOp(concatOp, transposedConcat);
@@ -89,6 +94,10 @@ struct DecomposeNonOuterDimConcats : public OpRewritePattern<tensor::ConcatOp> {
 
   LogicalResult matchAndRewrite(tensor::ConcatOp concatOp,
                                 PatternRewriter &rewriter) const override {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(concatOp)) {
+      return failure();
+    }
+
     if (concatOp.getDim() == 0) {
       return rewriter.notifyMatchFailure(
           concatOp, "non-outer dim concats are not decomposed");
@@ -108,8 +117,7 @@ struct DecomposeNonOuterDimConcats : public OpRewritePattern<tensor::ConcatOp> {
 
 struct DecomposeConcatPass
     : public impl::DecomposeConcatPassBase<DecomposeConcatPass> {
-  using impl::DecomposeConcatPassBase<
-      DecomposeConcatPass>::DecomposeConcatPassBase;
+  using Base::Base;
   explicit DecomposeConcatPass(bool enableConcatTransposition) {
     this->enableConcatTransposition = enableConcatTransposition;
   }

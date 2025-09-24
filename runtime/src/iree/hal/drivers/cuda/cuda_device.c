@@ -29,6 +29,8 @@
 #include "iree/hal/utils/deferred_work_queue.h"
 #include "iree/hal/utils/file_registry.h"
 #include "iree/hal/utils/file_transfer.h"
+#include "iree/hal/utils/queue_emulation.h"
+#include "iree/hal/utils/queue_host_call_emulation.h"
 #include "iree/hal/utils/stream_tracing.h"
 
 //===----------------------------------------------------------------------===//
@@ -902,8 +904,9 @@ static iree_status_t iree_hal_cuda_device_import_file(
 }
 
 static iree_status_t iree_hal_cuda_device_create_semaphore(
-    iree_hal_device_t* base_device, uint64_t initial_value,
-    iree_hal_semaphore_flags_t flags, iree_hal_semaphore_t** out_semaphore) {
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    uint64_t initial_value, iree_hal_semaphore_flags_t flags,
+    iree_hal_semaphore_t** out_semaphore) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   return iree_hal_cuda_event_semaphore_create(
       initial_value, device->cuda_symbols, device->timepoint_pool,
@@ -933,8 +936,9 @@ static iree_status_t iree_hal_cuda_device_queue_alloca(
   // NOTE: block on the semaphores here; we could avoid this by properly
   // sequencing device work with semaphores. The CUDA HAL is not currently
   // asynchronous.
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(wait_semaphore_list,
-                                                    iree_infinite_timeout()));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
+                                   IREE_HAL_WAIT_FLAG_DEFAULT));
 
   // Allocate from the pool; likely to fail in cases of virtual memory
   // exhaustion but the error may be deferred until a later synchronization.
@@ -975,8 +979,9 @@ static iree_status_t iree_hal_cuda_device_queue_dealloca(
   // NOTE: block on the semaphores here; we could avoid this by properly
   // sequencing device work with semaphores. The CUDA HAL is not currently
   // asynchronous.
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(wait_semaphore_list,
-                                                    iree_infinite_timeout()));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_semaphore_list_wait(wait_semaphore_list, iree_infinite_timeout(),
+                                   IREE_HAL_WAIT_FLAG_DEFAULT));
 
   // Schedule the buffer deallocation if we got it from a pool and otherwise
   // drop it on the floor and let it be freed when the buffer is released.
@@ -1078,10 +1083,11 @@ static iree_status_t iree_hal_cuda_device_queue_flush(
 
 static iree_status_t iree_hal_cuda_device_wait_semaphores(
     iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout) {
+    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
+    iree_hal_wait_flags_t flags) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   return iree_hal_cuda_semaphore_multi_wait(semaphore_list, wait_mode, timeout,
-                                            &device->block_pool);
+                                            flags, &device->block_pool);
 }
 
 static iree_status_t iree_hal_cuda_device_profiling_begin(
@@ -1128,6 +1134,8 @@ static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
     .queue_copy = iree_hal_device_queue_emulated_copy,
     .queue_read = iree_hal_cuda_device_queue_read,
     .queue_write = iree_hal_cuda_device_queue_write,
+    .queue_host_call = iree_hal_device_queue_emulated_host_call,
+    .queue_dispatch = iree_hal_device_queue_emulated_dispatch,
     .queue_execute = iree_hal_cuda_device_queue_execute,
     .queue_flush = iree_hal_cuda_device_queue_flush,
     .wait_semaphores = iree_hal_cuda_device_wait_semaphores,

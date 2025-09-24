@@ -43,7 +43,7 @@ static void iree_vm_invoke_release_io_refs(iree_string_view_t cconv_fragment,
         p += sizeof(int64_t);
         break;
       case IREE_VM_CCONV_TYPE_REF:
-        iree_vm_ref_release((iree_vm_ref_t*)p);
+        iree_vm_ref_release((iree_vm_ref_t*)p);  // safe unaligned
         p += sizeof(iree_vm_ref_t);
         break;
     }
@@ -132,8 +132,8 @@ static iree_status_t iree_vm_invoke_marshal_inputs(
       case IREE_VM_CCONV_TYPE_REF: {
         // TODO(benvanik): see if we can't remove this retain by instead relying
         // on the caller still owning the list.
-        IREE_RETURN_IF_ERROR(
-            iree_vm_list_get_ref_assign(inputs, arg_i, (iree_vm_ref_t*)p));
+        IREE_RETURN_IF_ERROR(iree_vm_list_get_ref_assign(
+            inputs, arg_i, (iree_vm_ref_t*)p));  // safe unaligned
         p += sizeof(iree_vm_ref_t);
       } break;
     }
@@ -176,7 +176,9 @@ static iree_status_t iree_vm_invoke_marshal_outputs(
         p += sizeof(int32_t);
       } break;
       case IREE_VM_CCONV_TYPE_I64: {
-        iree_vm_value_t value = iree_vm_value_make_i64(*(int64_t*)p);
+        int64_t result = 0;
+        memcpy(&result, p, sizeof(result));
+        iree_vm_value_t value = iree_vm_value_make_i64(result);
         IREE_RETURN_IF_ERROR(iree_vm_list_set_value(outputs, arg_i, &value));
         p += sizeof(int64_t);
       } break;
@@ -186,13 +188,15 @@ static iree_status_t iree_vm_invoke_marshal_outputs(
         p += sizeof(float);
       } break;
       case IREE_VM_CCONV_TYPE_F64: {
-        iree_vm_value_t value = iree_vm_value_make_f64(*(double*)p);
+        double result = 0;
+        memcpy(&result, p, sizeof(result));
+        iree_vm_value_t value = iree_vm_value_make_f64(result);
         IREE_RETURN_IF_ERROR(iree_vm_list_set_value(outputs, arg_i, &value));
         p += sizeof(double);
       } break;
       case IREE_VM_CCONV_TYPE_REF: {
-        IREE_RETURN_IF_ERROR(
-            iree_vm_list_set_ref_move(outputs, arg_i, (iree_vm_ref_t*)p));
+        IREE_RETURN_IF_ERROR(iree_vm_list_set_ref_move(
+            outputs, arg_i, (iree_vm_ref_t*)p));  // safe unaligned
         p += sizeof(iree_vm_ref_t);
       } break;
     }

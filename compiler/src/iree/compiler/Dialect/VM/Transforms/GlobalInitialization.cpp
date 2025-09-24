@@ -17,11 +17,13 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Transforms/Inliner.h"
 #include "mlir/Transforms/InliningUtils.h"
 
 namespace mlir::iree_compiler::IREE::VM {
 
-namespace {
+#define GEN_PASS_DEF_GLOBALINITIALIZATIONPASS
+#include "iree/compiler/Dialect/VM/Transforms/Passes.h.inc"
 
 // Finds a function with |name| and returns it ready for appending.
 // The returned op builder will be set at an insertion point where new
@@ -34,9 +36,9 @@ appendOrCreateInitFuncOp(IREE::VM::ModuleOp moduleOp, StringRef name,
   OpBuilder funcBuilder(moduleOp.getContext());
   if (!funcOp) {
     // Create a new empty function.
-    funcOp = moduleBuilder.create<IREE::VM::FuncOp>(
-        moduleBuilder.getUnknownLoc(), name,
-        moduleBuilder.getFunctionType({}, {}));
+    funcOp =
+        IREE::VM::FuncOp::create(moduleBuilder, moduleBuilder.getUnknownLoc(),
+                                 name, moduleBuilder.getFunctionType({}, {}));
     funcBuilder = OpBuilder::atBlockEnd(funcOp.addEntryBlock());
     return std::make_tuple(funcOp, funcBuilder);
   }
@@ -78,7 +80,7 @@ static void exportFuncIfNeeded(IREE::VM::ModuleOp moduleOp,
 
   // Add vm.export if needed.
   OpBuilder moduleBuilder(funcOp);
-  moduleBuilder.create<IREE::VM::ExportOp>(funcOp.getLoc(), funcOp);
+  IREE::VM::ExportOp::create(moduleBuilder, funcOp.getLoc(), funcOp);
 }
 
 // Updates the mutability of globals based on whether they are stored anywhere
@@ -111,8 +113,6 @@ static void fixupGlobalMutability(Operation *moduleOp,
   });
 }
 
-} // namespace
-
 // Finds all global variables and moves their inital values/initializer calls
 // into a single function. Relies on the inliner to later make the uber function
 // better.
@@ -126,19 +126,10 @@ static void fixupGlobalMutability(Operation *moduleOp,
 //
 // TODO(benvanik): combine i32 initializers to store more efficiently.
 class GlobalInitializationPass
-    : public PassWrapper<GlobalInitializationPass,
-                         OperationPass<IREE::VM::ModuleOp>> {
-public:
-  StringRef getArgument() const override {
-    return "iree-vm-global-initialization";
-  }
-
-  StringRef getDescription() const override {
-    return "Creates module-level global init/deinit functions";
-  }
-
+    : public IREE::VM::impl::GlobalInitializationPassBase<
+          GlobalInitializationPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    IREE::VM::ModuleOp moduleOp = getOperation();
     SymbolTable symbolTable(moduleOp);
 
     // Create the __init and __deinit functions. They may be empty if there are
@@ -194,8 +185,8 @@ public:
     }
 
     // Add returns to the initializers.
-    initBuilder.create<IREE::VM::ReturnOp>(initBuilder.getUnknownLoc());
-    deinitBuilder.create<IREE::VM::ReturnOp>(deinitBuilder.getUnknownLoc());
+    IREE::VM::ReturnOp::create(initBuilder, initBuilder.getUnknownLoc());
+    IREE::VM::ReturnOp::create(deinitBuilder, deinitBuilder.getUnknownLoc());
 
     // Correct mutability of all globals.
     fixupGlobalMutability(moduleOp, symbolTable);
@@ -206,7 +197,6 @@ public:
     exportFuncIfNeeded(moduleOp, deinitFuncOp);
   }
 
-private:
   LogicalResult
   appendPrimitiveInitialization(IREE::Util::GlobalOpInterface globalOp,
                                 OpBuilder &builder) {
@@ -275,10 +265,10 @@ private:
     if (auto integerType = llvm::dyn_cast<IntegerType>(value.getType())) {
       switch (integerType.getIntOrFloatBitWidth()) {
       case 32:
-        builder.create<IREE::VM::GlobalStoreI32Op>(loc, value, symName);
+        IREE::VM::GlobalStoreI32Op::create(builder, loc, value, symName);
         return success();
       case 64:
-        builder.create<IREE::VM::GlobalStoreI64Op>(loc, value, symName);
+        IREE::VM::GlobalStoreI64Op::create(builder, loc, value, symName);
         return success();
       default:
         return failure();
@@ -286,10 +276,10 @@ private:
     } else if (auto floatType = llvm::dyn_cast<FloatType>(value.getType())) {
       switch (floatType.getIntOrFloatBitWidth()) {
       case 32:
-        builder.create<IREE::VM::GlobalStoreF32Op>(loc, value, symName);
+        IREE::VM::GlobalStoreF32Op::create(builder, loc, value, symName);
         return success();
       case 64:
-        builder.create<IREE::VM::GlobalStoreF64Op>(loc, value, symName);
+        IREE::VM::GlobalStoreF64Op::create(builder, loc, value, symName);
         return success();
       default:
         return failure();
@@ -309,7 +299,8 @@ private:
                                   InlinerInterface &inlinerInterface,
                                   OpBuilder &builder) {
     auto result = mlir::inlineRegion(
-        inlinerInterface, &initializerOp.getBody(), builder.getInsertionBlock(),
+        inlinerInterface, InlinerConfig{}.getCloneCallback(),
+        &initializerOp.getBody(), builder.getInsertionBlock(),
         builder.getInsertionPoint(),
         /*inlinedOperands=*/ValueRange{},
         /*resultsToReplace=*/ValueRange{}, /*inlineLoc=*/std::nullopt,
@@ -318,12 +309,5 @@ private:
     return result;
   }
 };
-
-std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
-createGlobalInitializationPass() {
-  return std::make_unique<GlobalInitializationPass>();
-}
-
-static PassRegistration<GlobalInitializationPass> pass;
 
 } // namespace mlir::iree_compiler::IREE::VM

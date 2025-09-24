@@ -51,7 +51,7 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
     auto loc = transferReadOp.getLoc();
     Value vector = transferReadOp.getVector();
     VectorType vectorType = llvm::cast<VectorType>(vector.getType());
-    Value source = transferReadOp.getSource();
+    Value source = transferReadOp.getBase();
     MemRefType sourceType = llvm::dyn_cast<MemRefType>(source.getType());
     // Contiguity check is valid on tensors only.
     if (!sourceType)
@@ -123,15 +123,17 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
         llvm::cast<MemRefType>(memref::SubViewOp::inferRankReducedResultType(
             vectorShapeCollapse, sourceType, subViewOffsets, subViewSizes,
             subViewStrides));
-    Value subView = rewriter.create<memref::SubViewOp>(
-        loc, resultType, source, subViewOffsets, subViewSizes, subViewStrides);
-    Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    Value readCollapse = rewriter.create<vector::TransferReadOp>(
-        loc, vectorTypeCollapse, subView, ValueRange{c0, c0}, newidentityMap,
-        transferReadOp.getPadding(), transferReadOp.getMask(), newInBoundsAttr);
+    Value subView =
+        memref::SubViewOp::create(rewriter, loc, resultType, source,
+                                  subViewOffsets, subViewSizes, subViewStrides);
+    Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    Value readCollapse = vector::TransferReadOp::create(
+        rewriter, loc, vectorTypeCollapse, subView, ValueRange{c0, c0},
+        newidentityMap, transferReadOp.getPadding(), transferReadOp.getMask(),
+        newInBoundsAttr);
 
-    Value readBroadcast = rewriter.create<vector::BroadcastOp>(
-        loc, vectorTypeBroadcast, readCollapse);
+    Value readBroadcast = vector::BroadcastOp::create(
+        rewriter, loc, vectorTypeBroadcast, readCollapse);
     SmallVector<int64_t> transposePermutation;
     for (int i = 0; i < vectorType.getRank(); i++) {
       if (i == vectorType.getRank() - 2)
@@ -151,7 +153,7 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
 // MMA types but MMA load can transpose the matrix when loading.
 struct CombineTransferReadOpBroadcast final
     : public OpRewritePattern<vector::BroadcastOp> {
-  using OpRewritePattern<vector::BroadcastOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::BroadcastOp op,
                                 PatternRewriter &rewriter) const override {
@@ -174,9 +176,9 @@ struct CombineTransferReadOpBroadcast final
     ArrayAttr inBounds = rewriter.getBoolArrayAttr(
         SmallVector<bool>(op.getResultVectorType().getRank(), true));
     rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
-        op, op.getType(), transferReadOp.getSource(),
-        transferReadOp.getIndices(), newMap, transferReadOp.getPadding(),
-        transferReadOp.getMask(), inBounds);
+        op, op.getType(), transferReadOp.getBase(), transferReadOp.getIndices(),
+        newMap, transferReadOp.getPadding(), transferReadOp.getMask(),
+        inBounds);
     return success();
   }
 };

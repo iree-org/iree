@@ -41,7 +41,7 @@ iree_cc_library(
     "IREEGPUDialect.cpp"
     "IREEGPUInterfaces.cpp"
     "IREEGPUOps.cpp"
-    "TilingInterfaceImpl.cpp"
+    "PromotionImpls.cpp"
   DEPS
     ::IREEGPUAttrs
     ::IREEGPUDialectGen
@@ -54,8 +54,11 @@ iree_cc_library(
     MLIRArithDialect
     MLIRArithUtils
     MLIRControlFlowInterfaces
+    MLIRDestinationStyleOpInterface
+    MLIRGPUDialect
     MLIRIR
     MLIRLinalgDialect
+    MLIRParallelCombiningOpInterface
     MLIRParser
     MLIRSCFDialect
     MLIRSideEffectInterfaces
@@ -63,12 +66,13 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTilingInterface
     MLIRVectorDialect
-    MLIRVectorInterfaces
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::Codegen::Utils
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Utils::VectorOpUtils
+    iree::compiler::Dialect::Encoding::Utils
     iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Utils
     iree::compiler::bindings::c::headers
   PUBLIC
@@ -127,6 +131,8 @@ iree_tablegen_library(
 iree_tablegen_doc(
   NAME
     IREEGPUDialectDocGen
+  CATEGORY
+    "Dialects"
   TD_FILE
     "IREEGPUOps.td"
   OUTS

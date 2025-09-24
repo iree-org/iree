@@ -33,6 +33,31 @@ def IREECodegen_Dialect : Dialect {
     search to easily override the heuristics that are hard-coded
     within a backend.
   }];
+  let discardableAttrs = (ins
+    /// Discardable attribute for specializing kernels based on iteration
+    /// domain. For example,
+    ///
+    /// ```
+    /// %35 = linalg.matmul ins(%30, %31 : tensor<?x?xf16>, tensor<?x?xf16>) outs(%34 : tensor<?x?xf32>)
+    ///   {iree_codegen.specialization_ranges = #util<int.assumption.multi_array[
+    ///     [<umin = 128, umax = 4096, udiv = 128>, <umin = 128, umax = 4096, udiv = 128>, <umin = 64, udiv = 64>],
+    ///     [<umin = 4096, udiv = 256>, <umin = 4096, udiv = 256>, <udiv = 64>]
+    /// ]>} -> tensor<?x?xf32>
+    /// ```
+    ///
+    /// This matmul will be specialized into up to 3 variants, one default, and
+    /// two for each list of ranges. The lists of ranges are ordered with
+    /// respect to the iteration space of the op. So in this case, for the first
+    /// specialization, the first iteration dim (M) must be 128 <= M <= 4096 and
+    /// divisible by 128. All ranges in a list must be satisfied at the same
+    /// time for a workload to specialize.
+    ///
+    /// The specialization ranges are ordered by priority so the highest
+    /// priority ranges are listed first. Specializations that statically
+    /// never apply won't be generated, and specializations that always apply
+    /// will skip all subsequent specializations.
+    "::mlir::iree_compiler::IREE::Util::MultiIntAssumptionArrayAttr":$specialization_ranges
+  );
   let extraClassDeclaration = [{
     void initializeCodegenAttrs();
 
@@ -54,6 +79,12 @@ def IREECodegen_Dialect : Dialect {
     getOrParseTransformLibraryModule(StringRef libraryPath,
                                      StringRef libraryMLIRSource);
 
+    /// Returns the parsed module for the `path` that contains the patches for
+    /// func ops. If the module has already been parsed in the past, returns the
+    /// memorized module without parsing the source again.
+    FailureOr<::mlir::ModuleOp>
+    getOrLoadPatchedFuncOpsForDebugging(std::string path);
+
     private:
 
     /// Map containing modules containing symbols, e.g. named sequences, that
@@ -66,16 +97,37 @@ def IREECodegen_Dialect : Dialect {
     /// Lock to control the updating of the library modules such that we only load
     /// the module once and can reuse it across all invocations.
     std::mutex libraryMutex;
-  }];
-  let useDefaultTypePrinterParser = 1;
-  let useDefaultAttributePrinterParser = 1;
-  let hasOperationAttrVerify = 1;
-}
 
-def AnyRankedTensorOrMemRefType : AnyTypeOf<[AnyRankedTensor, AnyMemRef]>;
+    /// Map containing modules that contains the patches for func ops.
+    ::llvm::StringMap<::mlir::OwningOpRef<::mlir::ModuleOp>> moduleForPatches;
+
+    /// Lock to control the parsing patches function.
+    std::mutex moduleForPatchesMutex;
+    }];
+    // We use linalg.iterator_type to avoid clashing definitions for the
+    // enum attribute that wraps mlir::utils::IteratorType, so we need to be
+    // able to parse it.
+    let dependentDialects = ["::mlir::linalg::LinalgDialect"];
+    let useDefaultTypePrinterParser = 1;
+    let useDefaultAttributePrinterParser = 1;
+    let hasOperationAttrVerify = 1;
+  }
+
+  //===----------------------------------------------------------------------===//
+  // Type definitions
+  //===----------------------------------------------------------------------===//
+
+  def AnyRankedTensorOrMemRefType : AnyTypeOf<[AnyRankedTensor, AnyMemRef]>;
 
 class RankedTensorOrMemRefType<list<Type> allowedTypes, list<int> ranks>
     : AnyTypeOf<[TensorRankOf<allowedTypes, ranks>,
         MemRefRankOf<allowedTypes, ranks>]>;
+
+class RankedTensorOrVectorOf<list<Type> allowedTypes> :
+  ShapedContainerType<allowedTypes,
+      Or<[IsVectorOfNonZeroRankTypePred, And<[IsTensorTypePred, HasRankPred]>]>,
+  "ranked tensor or vector", "::mlir::ShapedType">;
+
+def AnyRankedTensorOrVector : RankedTensorOrVectorOf<[AnyType]>;
 
 #endif // IREE_CODEGEN_DIALECT_IREECODEGEN_DIALECT

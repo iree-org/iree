@@ -52,7 +52,8 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_syms_create_from_system_loader(
 
   iree::ref_ptr<iree::hal::vulkan::DynamicSymbols> syms;
   IREE_RETURN_IF_ERROR(
-      iree::hal::vulkan::DynamicSymbols::CreateFromSystemLoader(&syms));
+      iree::hal::vulkan::DynamicSymbols::CreateFromSystemLoader(host_allocator,
+                                                                &syms));
   *out_syms = reinterpret_cast<iree_hal_vulkan_syms_t*>(syms.release());
   return iree_ok_status();
 }

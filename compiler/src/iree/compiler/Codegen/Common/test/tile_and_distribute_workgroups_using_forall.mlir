@@ -136,19 +136,6 @@ func.func @gemm_unit_N(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x1xf32>,
 
 // -----
 
-func.func @gemm_unit_M_unit_N(%arg0 : tensor<1x1xf32>, %arg1 : tensor<1x1xf32>,
-    %arg2 : tensor<1x1xf32>) -> tensor<1x1xf32> {
-  %0 = linalg.matmul {
-      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 64]]>}
-      ins(%arg0, %arg1 : tensor<1x1xf32>, tensor<1x1xf32>)
-      outs(%arg2 : tensor<1x1xf32>) -> tensor<1x1xf32>
-  return %0 : tensor<1x1xf32>
-}
-// CHECK-LABEL: func.func @gemm_unit_M_unit_N(
-//   CHECK-NOT:   scf.forall
-
-// -----
-
 func.func @generic_unit_dims(%arg0 : tensor<1x?x1x1x?x?x1x?xf32>) -> tensor<1x?x1x1x?x?x1x?xf32> {
   %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index
@@ -262,8 +249,8 @@ func.func @matmul_interchange(%0 : tensor<?x?xf32>,
 // -----
 
 func.func @no_compute(%arg0 : memref<?x?x?xf32>, %arg1 : memref<?x?x?xf32>) {
-  memref.assume_alignment %arg0, 64 : memref<?x?x?xf32>
-  memref.assume_alignment %arg1, 64 : memref<?x?x?xf32>
+  util.optimization_barrier %arg0 : memref<?x?x?xf32>
+  util.optimization_barrier %arg1 : memref<?x?x?xf32>
   return
 }
 // CHECK-LABEL: @no_compute(
@@ -388,25 +375,6 @@ func.func @set_size_to_tilesize_when_divisible(
 //       CHECK:     scf.forall.in_parallel
 //       CHECK:       tensor.parallel_insert_slice %[[GENERIC]]
 //  CHECK-SAME:           tensor<1x16x128xf16> into tensor<?x16x4096xf16>
-
-// -----
-
-// This just verifies that constant dim propagation works as expected after tiling.
-func.func @generate_no_distribution(%arg0 : tensor<16xf16>) -> tensor<16xf16> {
-   %empty = tensor.empty() : tensor<16xf16>
-   %0 = linalg.generic {
-      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
-      iterator_types = ["parallel"]}
-      ins(%arg0 : tensor<16xf16>) outs(%empty : tensor<16xf16>)
-      attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[16]]>} {
-    ^bb0(%b0: f16, %b1: f16):
-      %1 = arith.mulf %b0, %b0 : f16
-      linalg.yield %1 : f16
-  } -> tensor<16xf16>
-  return %0 : tensor<16xf16>
-}
-// CHECK-LABEL: func @generate_no_distribution(
-//   CHECK-NOT:   scf.forall
 
 // -----
 
@@ -641,26 +609,26 @@ func.func @diamond_graph(%0: tensor<12xf32>, %1: tensor<12xf32>) -> tensor<12xf3
 func.func @v_shaped_graph(%0: tensor<12xf32>, %1: tensor<12xf32>) -> tensor<12xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %2 = tensor.empty() : tensor<12xf32>
-  %3 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]
+  %A = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]
   } ins(%0 : tensor<12xf32>) outs(%2 : tensor<12xf32>) attrs =  {
       lowering_config = #iree_codegen.lowering_config<tile_sizes = [[4]]>} {
   ^bb0(%in: f32, %out: f32):
     %6 = math.sqrt %in : f32
     linalg.yield %6 : f32
   } -> tensor<12xf32>
-  %4 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]
+  %B = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]
   } ins(%1 : tensor<12xf32>) outs(%2 : tensor<12xf32>) {
   ^bb0(%in: f32, %out: f32):
     %7 = math.sqrt %in : f32
     linalg.yield %7 : f32
   } -> tensor<12xf32>
-  %5 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel"]
-  } ins(%3, %4 : tensor<12xf32>, tensor<12xf32>) outs(%2 : tensor<12xf32>) {
+  %C = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel"]
+  } ins(%A, %B : tensor<12xf32>, tensor<12xf32>) outs(%2 : tensor<12xf32>) {
   ^bb0(%in: f32, %in_0: f32, %out: f32):
     %8 = arith.addf %in, %in_0 : f32
     linalg.yield %8 : f32
   } -> tensor<12xf32>
-  return %5 : tensor<12xf32>
+  return %C : tensor<12xf32>
 }
 
 // CHECK-LABEL: func @v_shaped_graph(
@@ -826,7 +794,7 @@ func.func @pad_fusion(%0 : tensor<?x?xf32>, %1 : tensor<?x?xf32>, %2 : tensor<?x
 
 // -----
 
-// Test 1 of 2 that are testing a work-around for SSA violation issue with consumer fusion upstream.
+// Test 1 of 2 that are testing fusion while considering multiple slices.
 
 func.func @horizontal_fusion_consumer_fusion1(%arg0 : tensor<2x4096x640xf16>,
     %arg1 : tensor<10x64x640xf16>, %arg2 : tensor<10x64x640xf16>, %arg3 : tensor<10x64x640xf16>)
@@ -893,7 +861,7 @@ func.func @horizontal_fusion_consumer_fusion1(%arg0 : tensor<2x4096x640xf16>,
 
 // -----
 
-// Test 2 of 2 that are testing a work-around for SSA violation issue with consumer fusion upstream.
+// Test 2 of 2 that are testing fusion while considering multiple slices.
 
 func.func @horizontal_fusion_consumer_fusion2(%arg0 : tensor<2x4096x640xi8>,
     %arg1 : tensor<2x640x640xi8>, %arg2 : tensor<2x640x640xi8>) -> tensor<2x4096x640xf16> {
@@ -945,3 +913,337 @@ func.func @horizontal_fusion_consumer_fusion2(%arg0 : tensor<2x4096x640xi8>,
 //       CHECK:     %[[CONSUMER:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[ROOT]]#1, %[[ROOT]]#0 :
 //   CHECK-DAG:     tensor.parallel_insert_slice %[[CONSUMER]] into %[[OUTS0]]
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+#map2 = affine_map<(d0, d1) -> (d1)>
+func.func @only_producer_fusion_multiple_result(%arg0: tensor<77x4096xf16>, %arg1: tensor<77x4096xf32>, %arg2: tensor<4096xf16>) -> (tensor<77x4096xf16>, tensor<77x4096xf16>) {
+  %cst = arith.constant 9.99999997E-7 : f32
+  %cst_0 = arith.constant 4.096000e+03 : f16
+  %cst_1 = arith.constant 0.000000e+00 : f16
+  %c2_i64 = arith.constant 2 : i64
+  %0 = tensor.empty() : tensor<77xf16>
+  %1 = tensor.empty() : tensor<77x4096xf16>
+  %2 = linalg.fill ins(%cst_1 : f16) outs(%0 : tensor<77xf16>) -> tensor<77xf16>
+  %3 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg0, %arg1 : tensor<77x4096xf16>, tensor<77x4096xf32>) outs(%1 : tensor<77x4096xf16>) {
+  ^bb0(%in: f16, %in_2: f32, %out: f16):
+    %6 = arith.truncf %in_2 : f32 to f16
+    %7 = arith.addf %in, %6 : f16
+    linalg.yield %7 : f16
+  } -> tensor<77x4096xf16>
+  %4 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]} ins(%3 : tensor<77x4096xf16>) outs(%2 : tensor<77xf16>)  {
+  ^bb0(%in: f16, %out: f16):
+    %6 = math.fpowi %in, %c2_i64 : f16, i64
+    %7 = arith.addf %6, %out : f16
+    linalg.yield %7 : f16
+  } -> tensor<77xf16>
+  %5 = linalg.generic {indexing_maps = [#map2, #map, #map1, #map], iterator_types = ["parallel", "parallel"]} ins(%arg2, %3, %4 : tensor<4096xf16>, tensor<77x4096xf16>, tensor<77xf16>) outs(%1 : tensor<77x4096xf16>) attrs =  {lowering_config = #iree_gpu.lowering_config<{workgroup = [1, 0]}>} {
+  ^bb0(%in: f16, %in_2: f16, %in_3: f16, %out: f16):
+    %6 = arith.divf %in_3, %cst_0 : f16
+    %7 = arith.truncf %cst : f32 to f16
+    %8 = arith.addf %6, %7 : f16
+    %9 = math.rsqrt %8 : f16
+    %10 = arith.mulf %in_2, %9 : f16
+    %11 = arith.mulf %in, %10 : f16
+    linalg.yield %11 : f16
+  } -> tensor<77x4096xf16>
+  return %3, %5 : tensor<77x4096xf16>, tensor<77x4096xf16>
+}
+// CHECK-LABEL: func @only_producer_fusion_multiple_result
+//       CHECK:   %[[RESULT:.+]]:2 = scf.forall
+//       CHECK:     linalg.generic
+//       CHECK:     linalg.generic
+//       CHECK:     linalg.generic
+//       CHECK:   return %[[RESULT]]#1, %[[RESULT]]#0
+
+// -----
+
+func.func @multi_slice_fusion_broadcast(%arg0: index, %arg1: tensor<3x?x32xi64>,
+     %arg2: tensor<256x32xf32>, %arg3: tensor<32xf32>)
+     -> (tensor<3x?x32x32xf32>, tensor<3x?x32x32xf32>) {
+  %c32 = arith.constant 32 : index
+  %c2_i64 = arith.constant 2 : i64
+  %cst = arith.constant 0.000000e+00 : f32
+  %cst_0 = arith.constant 3.200000e+01 : f32
+  %cst_1 = arith.constant 9.000000e+00 : f32
+  %0 = arith.divsi %arg0, %c32 : index
+  %1 = affine.apply affine_map<()[s0] -> (s0 floordiv 32)>()[%arg0]
+  %2 = tensor.empty(%1) : tensor<3x?x32x32xf32>
+  %3 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%arg1 : tensor<3x?x32xi64>) outs(%2 : tensor<3x?x32x32xf32>) {
+    ^bb0(%in: i64, %out: f32):
+      %8 = arith.index_cast %in : i64 to index
+      %9 = linalg.index 3 : index
+      %extracted = tensor.extract %arg2[%8, %9] : tensor<256x32xf32>
+      linalg.yield %extracted : f32
+    } -> tensor<3x?x32x32xf32>
+  %4 = tensor.empty(%0) : tensor<3x?x32xf32>
+  %5 = linalg.fill ins(%cst : f32)outs(%4 : tensor<3x?x32xf32>) -> tensor<3x?x32xf32>
+  %6 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+      ins(%3 : tensor<3x?x32x32xf32>) outs(%5 : tensor<3x?x32xf32>)
+      attrs = {lowering_config = #iree_gpu.lowering_config<{reduction = [0, 0, 0, 4], thread = [1, 1, 1, 0], workgroup = [1, 1, 32, 0]}>} {
+  ^bb0(%in: f32, %out: f32):
+    %8 = math.fpowi %in, %c2_i64 : f32, i64
+    %9 = arith.addf %8, %out : f32
+    linalg.yield %9 : f32
+  } -> tensor<3x?x32xf32>
+  %7 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%arg3, %3, %6 : tensor<32xf32>, tensor<3x?x32x32xf32>, tensor<3x?x32xf32>)
+      outs(%2 : tensor<3x?x32x32xf32>) {
+  ^bb0(%in: f32, %in_2: f32, %in_3: f32, %out: f32):
+    %8 = arith.divf %in_3, %cst_0 : f32
+    %9 = arith.addf %8, %cst_1 : f32
+    %10 = math.rsqrt %9 : f32
+    %11 = arith.mulf %in_2, %10 : f32
+    %12 = arith.mulf %in, %11 : f32
+    linalg.yield %12 : f32
+  } -> tensor<3x?x32x32xf32>
+  return %3, %7 : tensor<3x?x32x32xf32>, tensor<3x?x32x32xf32>
+}
+// CHECK-LABEL: func @multi_slice_fusion_broadcast
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<3x?x32xi64>
+//  CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: tensor<32xf32>
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty
+//       CHECK:    %[[RESULT:.+]]:2 = scf.forall (%[[IV0:[a-zA-Z0-9]+]], %[[IV1:[a-zA-Z0-9]+]])
+//  CHECK-SAME:        shared_outs(%[[INIT0:[a-zA-Z0-9]+]] = %[[EMPTY]], %[[INIT1:[a-zA-Z0-9]+]] = %[[EMPTY]])
+//   CHECK-DAG:      %[[INIT0_SLICE:.+]] = tensor.extract_slice %[[INIT0]][%[[IV0]], %[[IV1]], 0, 0] [1, 1, 32, 32]
+//   CHECK-DAG:      %[[ARG1_SLICE:.+]] = tensor.extract_slice %[[ARG1]][%[[IV0]], %[[IV1]], 0] [1, 1, 32]
+//       CHECK:      %[[GENERIC0:.+]] = linalg.generic
+//  CHECK-SAME:          ins(%[[ARG1_SLICE]] :
+//  CHECK-SAME:          outs(%[[INIT0_SLICE]] :
+//       CHECK:      %[[EMPTYTILE:.+]] = tensor.empty() : tensor<1x1x32xf32>
+//       CHECK:      %[[FILL:.+]] = linalg.fill
+//  CHECK-SAME:          outs(%[[EMPTYTILE]] :
+//       CHECK:      %[[GENERIC1:.+]] = linalg.generic
+//  CHECK-SAME:          ins(%[[GENERIC0]] :
+//  CHECK-SAME:          outs(%[[FILL]] :
+//       CHECK:      %[[INIT1_SLICE:.+]] = tensor.extract_slice %[[INIT1]][%[[IV0]], %[[IV1]], 0, 0] [1, 1, 32, 32] [1, 1, 1, 1]
+//       CHECK:      %[[GENERIC2:.+]] = linalg.generic
+//  CHECK-SAME:          ins(%[[ARG3]], %[[GENERIC0]], %[[GENERIC1]] :
+//  CHECK-SAME:          outs(%[[INIT1_SLICE]] :
+//   CHECK-DAG:      tensor.parallel_insert_slice %[[GENERIC0]] into %[[INIT0]][%[[IV0]], %[[IV1]], 0, 0] [1, 1, 32, 32]
+//   CHECK-DAG:      tensor.parallel_insert_slice %[[GENERIC2]] into %[[INIT1]][%[[IV0]], %[[IV1]], 0, 0] [1, 1, 32, 32]
+//       CHECK:    return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
+// Verify that the scf.forall is still generated when only one worker is needed
+// for distribution.
+func.func @single_trip_forall(%0 : tensor<64x64xf32>, %1 : tensor<64x64xf32>) -> tensor<64x64xf32> {
+  %2 = linalg.copy {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>}
+      ins(%0 : tensor<64x64xf32>)
+      outs(%1 : tensor<64x64xf32>) -> tensor<64x64xf32>
+  return %2 : tensor<64x64xf32>
+}
+//   CHECK-LABEL: func @single_trip_forall
+//         CHECK:   scf.forall
+
+// -----
+
+// Verify that the scf.forall is generated and the pack op is outside the op
+// without a crash. The consumer fusion is not available because it is not a
+// perfect tiling case.
+
+#config = #iree_cpu.lowering_config<distribution = [1, 16]>
+#map = affine_map<(d0, d1) -> (d0)>
+#map1 = affine_map<(d0, d1) -> (d1)>
+#map2 = affine_map<(d0, d1) -> (d0, d1)>
+func.func @infusible_pack(%arg0 : tensor<30xf32>) -> tensor<5x6xf32> {
+  %empty = tensor.empty() : tensor<30xf32>
+  %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%arg0 : tensor<30xf32>) outs(%empty : tensor<30xf32>)
+      attrs = {lowering_config = #config} {
+    ^bb0(%b0 : f32, %b1 : f32) :
+      %1 = arith.addf %b0, %b0 : f32
+      linalg.yield %1 : f32
+  } -> tensor<30xf32>
+  %empty1 = tensor.empty() : tensor<5x6xf32>
+  %pack = linalg.pack %0 outer_dims_perm = [0]
+      inner_dims_pos = [0] inner_tiles = [6] into %empty1
+      : tensor<30xf32> -> tensor<5x6xf32>
+  return %pack : tensor<5x6xf32>
+}
+// CHECK-LABEL: func @infusible_pack
+//       CHECK:   scf.forall
+//       CHECK:     linalg.generic
+//       CHECK:   scf.forall.in_parallel {
+//       CHECK:   linalg.pack
+
+// -----
+
+// Adapted from layer normalization. The graph structure is as follows
+//
+//              %14
+//           /   |   \
+//         /    %15   %17
+//        |      |   / |
+//        |    [%19]   |
+//       %21     |    %22
+//        |      |     |
+//        v      v     v
+//
+// In particular, %21 and %22 are not users of the "main" tilable
+// operation but we still want them to be fused. %19, %21 and %22
+// all produce results returned from the function.
+//
+// Check that everything is fused and that there are three results
+// from the loop being produced and returned.
+//
+// CHECK-LABEL: @multi_result_consumer_fusion
+//   CHECK-NOT: linalg.generic
+//       CHECK: %[[LOOP:.+]]:3 = scf.forall (%[[I:.+]], %[[J:.+]]) in (16, 256) shared_outs(%[[OUT0:.+]] = %{{.+}}, %[[OUT1:.+]] = %{{.+}}, %[[OUT2:.+]] = %{{.+}})
+//       CHECK: %[[v14:.+]] = linalg.generic
+//       CHECK:     arith.divf
+//       CHECK:   %[[v15:.+]] = linalg.generic
+//       CHECK:     arith.subf
+//       CHECK:   %[[v17:.+]] = linalg.generic
+//       CHECK:     arith.divf
+//       CHECK:     math.rsqrt
+//       CHECK:   %[[RES0:.+]] = linalg.generic
+//       CHECK:     arith.mulf
+//       CHECK:     arith.extf
+//       CHECK:     arith.mulf
+//       CHECK:     arith.extf
+//       CHECK:     arith.addf
+//       CHECK:     arith.truncf
+//       CHECK:   %[[RES1:.+]] = linalg.generic {{.*}} ins(%[[v14]] :
+//       CHECK:     arith.truncf
+//       CHECK:   %[[RES2:.+]] = linalg.generic {{.*}} ins(%[[v17]] :
+//       CHECK:     arith.truncf
+//       CHECK:   scf.forall.in_parallel
+//       CHECK:     tensor.parallel_insert_slice %[[RES0]] into %[[OUT0]]
+//       CHECK:     tensor.parallel_insert_slice %[[RES1]] into %[[OUT1]]
+//       CHECK:     tensor.parallel_insert_slice %[[RES2]] into %[[OUT2]]
+//   CHECK-NOT: linalg.generic
+//       CHECK: return %[[LOOP]]#0, %[[LOOP]]#1, %[[LOOP]]#2
+func.func @multi_result_consumer_fusion(
+  %6: tensor<16x256x2048xbf16>,
+  %7: tensor<2048xbf16>,
+  %8: tensor<2048xbf16>,
+  %10: tensor<16x256x2048xf32>,
+  %13: tensor<16x256xf32>
+) -> (
+  tensor<16x256x2048xbf16>,
+  tensor<16x256xbf16>,
+  tensor<16x256xbf16>
+) {
+  %cst = arith.constant 0.000000e+00 : f32
+  %cst_0 = arith.constant 2.048000e+03 : f32
+  %c0 = arith.constant 0 : index
+  %9 = tensor.empty() : tensor<16x256x2048xf32>
+  %11 = tensor.empty() : tensor<16x256xf32>
+  %14 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%13 : tensor<16x256xf32>) outs(%11 : tensor<16x256xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %23 = arith.divf %in, %cst_0 : f32
+    linalg.yield %23 : f32
+  } -> tensor<16x256xf32>
+  %15 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%10, %14 : tensor<16x256x2048xf32>, tensor<16x256xf32>) outs(%9 : tensor<16x256x2048xf32>) {
+  ^bb0(%in: f32, %in_1: f32, %out: f32):
+    %23 = arith.subf %in, %in_1 : f32
+    linalg.yield %23 : f32
+  } -> tensor<16x256x2048xf32>
+  %17 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%14 : tensor<16x256xf32>) outs(%11 : tensor<16x256xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %23 = arith.divf %in, %cst_0 : f32
+    %24 = math.rsqrt %23 : f32
+    linalg.yield %24 : f32
+  } -> tensor<16x256xf32>
+  %18 = tensor.empty() : tensor<16x256x2048xbf16>
+  %19 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d2)>, affine_map<(d0, d1, d2) -> (d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%15, %17, %7, %8 : tensor<16x256x2048xf32>, tensor<16x256xf32>, tensor<2048xbf16>, tensor<2048xbf16>) outs(%18 : tensor<16x256x2048xbf16>) attrs =  {lowering_config = #iree_gpu.lowering_config<{lane_basis = [[1, 1, 64], [0, 1, 2]], reduction = [0, 0, 256], subgroup_basis = [[1, 1, 1], [0, 1, 2]], thread = [0, 0, 4], workgroup = [1, 1, 0]}>} {
+  ^bb0(%in: f32, %in_1: f32, %in_2: bf16, %in_3: bf16, %out: bf16):
+    %23 = arith.mulf %in, %in_1 : f32
+    %24 = arith.extf %in_2 : bf16 to f32
+    %25 = arith.mulf %23, %24 : f32
+    %26 = arith.extf %in_3 : bf16 to f32
+    %27 = arith.addf %25, %26 : f32
+    %28 = arith.truncf %27 : f32 to bf16
+    linalg.yield %28 : bf16
+  } -> tensor<16x256x2048xbf16>
+  %20 = tensor.empty() : tensor<16x256xbf16>
+  %21 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%14 : tensor<16x256xf32>) outs(%20 : tensor<16x256xbf16>) {
+  ^bb0(%in: f32, %out: bf16):
+    %23 = arith.truncf %in : f32 to bf16
+    linalg.yield %23 : bf16
+  } -> tensor<16x256xbf16>
+  %22 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%17 : tensor<16x256xf32>) outs(%20 : tensor<16x256xbf16>) {
+  ^bb0(%in: f32, %out: bf16):
+    %23 = arith.truncf %in : f32 to bf16
+    linalg.yield %23 : bf16
+  } -> tensor<16x256xbf16>
+  return %19, %21, %22 : tensor<16x256x2048xbf16>, tensor<16x256xbf16>, tensor<16x256xbf16>
+}
+
+// -----
+
+// Adapted from a llama405b reduction dispatch. Tests that all fusable users (the generics with arith.scaling_truncf and arith.truncf) are visited and fused.
+
+// CHECK-LABEL: @multi_fusable_users
+//   CHECK-NOT: linalg.generic
+//       CHECK: %[[LOOP:.+]]:2 = scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (%{{.+}}, 65536) step (1, 256) shared_outs(%[[OUT0:.+]] = %{{.+}}, %[[OUT1:.+]] = %{{.+}})
+//       CHECK:   linalg.generic
+//       CHECK:     arith.extf
+//       CHECK:   linalg.generic
+//       CHECK:     math.absf
+//       CHECK:     arith.maximumf
+//       CHECK:   %[[RES0:.+]] = linalg.generic
+//       CHECK:     arith.mulf
+//       CHECK:     arith.scaling_truncf
+//       CHECK:   %[[RES1:.+]] = linalg.generic
+//       CHECK:     arith.mulf
+//       CHECK:     arith.truncf
+//       CHECK:     arith.bitcast
+//       CHECK:   scf.forall.in_parallel
+//       CHECK:     tensor.parallel_insert_slice %[[RES0]] into %[[OUT0]]
+//       CHECK:     tensor.parallel_insert_slice %[[RES1]] into %[[OUT1]]
+//   CHECK-NOT: linalg.generic
+//       CHECK: return %[[LOOP]]#1, %[[LOOP]]#0
+func.func @multi_fusable_users(%arg0: tensor<?x65536x32xf16>, %arg1: index, %arg2: index, %arg3: index) -> (tensor<?x65536xi8>, tensor<?x65536x32xf4E2M1FN>) {
+  %cst = arith.constant 2.500000e-01 : f32
+  %cst_0 = arith.constant 0xFF800000 : f32
+  %0 = tensor.empty(%arg1) : tensor<?x65536x32xf32>
+  %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0 : tensor<?x65536x32xf16>) outs(%0 : tensor<?x65536x32xf32>) {
+  ^bb0(%in: f16, %out: f32):
+    %9 = arith.extf %in : f16 to f32
+    linalg.yield %9 : f32
+  } -> tensor<?x65536x32xf32>
+  %2 = tensor.empty(%arg2) : tensor<?x65536xf32>
+  %3 = linalg.fill ins(%cst_0 : f32) outs(%2 : tensor<?x65536xf32>) -> tensor<?x65536xf32>
+  %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%1 : tensor<?x65536x32xf32>) outs(%3 : tensor<?x65536xf32>) attrs =  {lowering_config = #iree_gpu.lowering_config<{reduction = [0, 0, 4], thread = [1, 4, 0], workgroup = [1, 256, 0]}>} {
+  ^bb0(%in: f32, %out: f32):
+    %9 = math.absf %in : f32
+    %10 = arith.maximumf %9, %out : f32
+    linalg.yield %10 : f32
+  } -> tensor<?x65536xf32>
+  %5 = tensor.empty(%arg1) : tensor<?x65536x32xf4E2M1FN>
+  %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%1, %4 : tensor<?x65536x32xf32>, tensor<?x65536xf32>) outs(%5 : tensor<?x65536x32xf4E2M1FN>) {
+  ^bb0(%in: f32, %in_1: f32, %out: f4E2M1FN):
+    %9 = arith.mulf %in_1, %cst : f32
+    %10 = arith.scaling_truncf %in, %9 : f32, f32 to f4E2M1FN
+    linalg.yield %10 : f4E2M1FN
+  } -> tensor<?x65536x32xf4E2M1FN>
+  %7 = tensor.empty(%arg3) : tensor<?x65536xi8>
+  %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%4 : tensor<?x65536xf32>) outs(%7 : tensor<?x65536xi8>) {
+  ^bb0(%in: f32, %out: i8):
+    %9 = arith.mulf %in, %cst : f32
+    %10 = arith.truncf %9 : f32 to f8E8M0FNU
+    %11 = arith.bitcast %10 : f8E8M0FNU to i8
+    linalg.yield %11 : i8
+  } -> tensor<?x65536xi8>
+  return %8, %6 : tensor<?x65536xi8>, tensor<?x65536x32xf4E2M1FN>
+}
+//

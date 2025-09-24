@@ -30,6 +30,26 @@ def GPUCheckResourceUsagePass :
   let constructor = "mlir::iree_compiler::createGPUCheckResourceUsagePass()";
 }
 
+def GPUCombineLayoutTransformationPass :
+    InterfacePass<"iree-codegen-gpu-combine-layout-transformation", "mlir::FunctionOpInterface"> {
+  let summary =
+    "Combines layout transformation operations into a single map_scatter operation.";
+  let description = [{
+    Starting from iree_codegen.store_to_buffer ops, iteratively combine producer
+    layout/indexing transformation ops (linalg.transpose, tensor.collapse_shape,
+    etc.) into a single iree_linalg_ext.map_scatter operation. For tensor.pad
+    ops, the writing of pad values is distributed to workgroups and threads, and
+    then the padding values are written directly to the output buffer of the
+    store_to_buffer op.
+  }];
+  let dependentDialects = [
+    "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
+    "gpu::GPUDialect",
+    "scf::SCFDialect",
+    "tensor::TensorDialect"
+  ];
+}
+
 def GPUCombineValueBarriersPass :
     Pass<"iree-codegen-gpu-combine-value-barriers", ""> {
   let summary = "Combines `iree_gpu.value_barrier` ops";
@@ -47,6 +67,15 @@ def GPUDistributeCopyUsingForallPass :
   let summary = "Pass to distribute copies to threads.";
   let dependentDialects = [
     "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect", "::mlir::scf::SCFDialect"
+  ];
+}
+
+def GPULowerToGlobalLoadsPass :
+    InterfacePass<"iree-codegen-gpu-lower-to-global-loads", "mlir::FunctionOpInterface"> {
+  let summary = "Emit direct global loads instructions.";
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect", "::mlir::scf::SCFDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
   ];
 }
 
@@ -90,6 +119,14 @@ def GPUDistributeScfForPass :
   ];
 }
 
+def GPUBubbleResourceCastsPass :
+    Pass<"iree-codegen-gpu-bubble-resource-casts", ""> {
+  let summary = "Bubbles iree_gpu.buffer_resource_cast ops upwards.";
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
+  ];
+}
+
 def GPUFuseAndHoistParallelLoopsPass :
     InterfacePass<"iree-codegen-gpu-fuse-and-hoist-parallel-loops", "mlir::FunctionOpInterface"> {
   let summary = "Greedily fuses and hoists parallel loops.";
@@ -103,6 +140,13 @@ def GPUFuseAndHoistParallelLoopsPass :
 def GPUGeneralizeNamedOpsPass :
     InterfacePass<"iree-codegen-gpu-generalize-named-ops", "mlir::FunctionOpInterface"> {
   let summary = "Convert named Linalg ops to linalg.generic ops";
+
+  let description = [{
+    Convert a subset of named Linalg ops to linalg.generics. The subset does not
+    contain all named ops. The rule-of-thumb is that named ops whose operand
+    maps are projections are in the subset. For example convolutions and pooling ops
+    are not generalized by this pass, but matmuls are.
+  }];
 }
 
 def GPUGreedilyDistributeToThreadsPass :
@@ -124,19 +168,6 @@ def GPUInferMemorySpacePass :
   ];
 }
 
-def GPULowerToUKernelsPass :
-    Pass<"iree-codegen-gpu-lower-to-ukernels", ""> {
-  let summary = "Lower suitable ops to previously-selected microkernels";
-  let dependentDialects = [
-    "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
-    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
-    "::mlir::arith::ArithDialect",
-    "::mlir::bufferization::BufferizationDialect",
-    "::mlir::gpu::GPUDialect",
-    "::mlir::tensor::TensorDialect",
-  ];
-}
-
 def GPUMultiBufferingPass :
     InterfacePass<"iree-codegen-gpu-multi-buffering", "mlir::FunctionOpInterface"> {
   let summary = "Pass to do multi buffering.";
@@ -150,9 +181,20 @@ def GPUMultiBufferingPass :
 
 def GPUPackToIntrinsicsPass :
     InterfacePass<"iree-codegen-gpu-pack-to-intrinsics", "mlir::FunctionOpInterface"> {
-  let summary = "Packs matmul like operations and converts to iree_gpu.multi_mma";
+  let summary = "Packs matmul like operations and converts to iree_codegen.inner_tiled";
   let dependentDialects = [
     "::mlir::tensor::TensorDialect",
+    "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
+  ];
+}
+
+def GPUPadConvsPass :
+    InterfacePass<"iree-codegen-gpu-pad-convs",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Pass to pad operands of a convolution with padding configuration provided.";
+  let dependentDialects = [
+    "::mlir::linalg::LinalgDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
   ];
 }
@@ -191,13 +233,38 @@ def GPUPipeliningPass :
 def GPUPromoteMatmulOperandsPass :
     InterfacePass<"iree-codegen-gpu-promote-matmul-operands",
                   "mlir::FunctionOpInterface"> {
-  let summary = "Pass to insert copies with a different thread configuration "
+  let summary = "Pass to insert copies with a different lowering configuration "
                 "on matmul operands";
+  let description = [{
+    Looks for all matmuls annotated with `promote_operands = I64Array` and
+    inserts copies on the specified operands with a thread lowering config
+    optimized for coalesced loads.
+
+    If the matmul is also annotated with `promotion_types = ArrayAttr`, the
+    logic for "promoting" an operand is deferred to an attribute interface
+    allowing for custom logic.
+  }];
   let dependentDialects = [
     "::mlir::bufferization::BufferizationDialect",
     "::mlir::gpu::GPUDialect",
     "::mlir::linalg::LinalgDialect",
     "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
+  ];
+}
+
+def GPUAllocPrivateMemoryForDPSOpsPass :
+    InterfacePass<"iree-codegen-gpu-alloc-private-memory-for-dps-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to add private memory allocations prior to DPS interface ops.";
+  let description = [{
+    Creates a `bufferization.alloc_tensor` in private space for all DPS ops
+    with unused results that can't be removed. These unused results, if
+    originating from loads from global memory, trigger allocations in global
+    memory space during bufferization, which will fail. So, the allocations
+    must be made earlier to avoid failed bufferization.
+  }];
+  let dependentDialects = [
+    "::mlir::bufferization::BufferizationDialect",
+    "::mlir::gpu::GPUDialect"
   ];
 }
 
@@ -240,6 +307,17 @@ def GPUTensorTilePass :
   ];
 }
 
+def GPUTileAndConvertConvToMatmulPass :
+    InterfacePass<"iree-codegen-gpu-tile-and-convert-conv-to-matmul", "mlir::FunctionOpInterface"> {
+  let summary = "Convert convolution to matmul using tiling.";
+  let dependentDialects = [
+    "::mlir::tensor::TensorDialect",
+    "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+    "::mlir::scf::SCFDialect",
+  ];
+}
+
 def GPUApplyTilingLevelPass :
     InterfacePass<"iree-codegen-gpu-apply-tiling-level", "mlir::FunctionOpInterface"> {
   let summary = "Pass to tile tensor ops based on tiling configs";
@@ -263,7 +341,26 @@ def GPUApplyTilingLevelPass :
            )}]>,
     Option<"allowZeroSlices", "allow-zero-slices", "bool",
            /*default=*/"true",
-           "Allow pad fusion to generate zero size slices">
+           "Allow pad fusion to generate zero size slices">,
+    Option<"normalizeLoops", "normalize-loops", "bool", "false",
+           "Enable normalization for scf loops">
+  ];
+}
+
+def GPUApplyPaddingLevelPass :
+    InterfacePass<"iree-codegen-gpu-apply-padding-level", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to pad based on tiling configs";
+  let dependentDialects = ["::mlir::tensor::TensorDialect"];
+  let options = [
+    Option<"tilingLevel", "tiling-level", "IREE::GPU::TilingLevel",
+           /*default=*/"IREE::GPU::TilingLevel::Reduction",
+           "Tiling level to tile. Supported levels are 'reduction' and 'thread'",
+           [{llvm::cl::values(
+              clEnumValN(IREE::GPU::TilingLevel::Reduction, "reduction",
+                         "Tile and fuse all annotated ops to serial loops"),
+              clEnumValN(IREE::GPU::TilingLevel::PartialReduction, "partial_reduction",
+                         "Tile and fuse all annotated ops to partial reduuction loops")
+           )}]>
   ];
 }
 
@@ -321,10 +418,14 @@ def ReorderWorkgroupsPass :
 def VectorReductionToGPUPass :
     InterfacePass<"iree-codegen-vector-reduction-to-gpu", "mlir::FunctionOpInterface"> {
   let summary = "Convert vector reduction to GPU ops.";
-  let constructor = "mlir::iree_compiler::createConvertVectorReductionToGPUPass()";
   let dependentDialects = [
     "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect",
     "::mlir::memref::MemRefDialect", "::mlir::scf::SCFDialect",
+  ];
+  let options = [
+    Option<"expandSubgroupReduction", "expand-subgroup-reduction", "bool",
+           /*default=*/"true",
+           "Lower subgroup reductions to gpu ops immediately where possible.">,
   ];
 }
 

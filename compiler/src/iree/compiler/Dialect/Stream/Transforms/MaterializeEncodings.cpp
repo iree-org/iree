@@ -6,11 +6,10 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -108,31 +107,32 @@ static func::FuncOp createWorkgroupFunc(IREE::Stream::TensorEncodeOp encodeOp,
   for (auto argument : block.getArguments().drop_front(1).take_front(
            encodeOp.getSourceEncodingDims().size())) {
     sourceDynamicDims.push_back(
-        builder.create<IREE::Flow::DispatchWorkloadOrdinalOp>(
-            loc, argument, builder.getIndexAttr(ordinalCount++)));
+        IREE::TensorExt::DispatchWorkloadOrdinalOp::create(
+            builder, loc, argument, builder.getIndexAttr(ordinalCount++)));
   }
   for (auto argument : block.getArguments().drop_back(1).take_back(
            encodeOp.getResultEncodingDims().size())) {
     destinationDynamicDims.push_back(
-        builder.create<IREE::Flow::DispatchWorkloadOrdinalOp>(
-            loc, argument, builder.getIndexAttr(ordinalCount++)));
+        IREE::TensorExt::DispatchWorkloadOrdinalOp::create(
+            builder, loc, argument, builder.getIndexAttr(ordinalCount++)));
   }
 
-  auto zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  auto sourceDispatchType = IREE::Flow::DispatchTensorType::get(
-      IREE::Flow::TensorAccess::ReadOnly, encodeOp.getSourceEncoding());
-  Value source = builder.create<IREE::Stream::BindingSubspanOp>(
-      loc, sourceDispatchType, block.getArgument(0), zero, sourceDynamicDims);
-  auto destinationDispatchType = IREE::Flow::DispatchTensorType::get(
-      IREE::Flow::TensorAccess::WriteOnly, encodeOp.getResultEncoding());
-  Value destination = builder.create<IREE::Stream::BindingSubspanOp>(
-      loc, destinationDispatchType, block.getArguments().back(), zero,
+  auto zero = arith::ConstantIndexOp::create(builder, loc, 0);
+  auto sourceDispatchType = IREE::TensorExt::DispatchTensorType::get(
+      IREE::TensorExt::TensorAccess::ReadOnly, encodeOp.getSourceEncoding());
+  Value source = IREE::Stream::BindingSubspanOp::create(
+      builder, loc, sourceDispatchType, block.getArgument(0), zero,
+      sourceDynamicDims);
+  auto destinationDispatchType = IREE::TensorExt::DispatchTensorType::get(
+      IREE::TensorExt::TensorAccess::WriteOnly, encodeOp.getResultEncoding());
+  Value destination = IREE::Stream::BindingSubspanOp::create(
+      builder, loc, destinationDispatchType, block.getArguments().back(), zero,
       destinationDynamicDims);
 
   // Load the value from the source binding.
   RankedTensorType sourceType = sourceDispatchType.asRankedTensorType();
-  Value value = builder.create<IREE::Flow::DispatchTensorLoadOp>(
-      loc, sourceType, source, sourceDynamicDims);
+  Value value = IREE::TensorExt::DispatchTensorLoadOp::create(
+      builder, loc, sourceType, source, sourceDynamicDims);
 
   // We can only add/remove encodings using set_encoding/unset_encoding ops
   // today. Thus, we firstly need to bring the tensor encodings to pure tensor
@@ -141,19 +141,19 @@ static func::FuncOp createWorkgroupFunc(IREE::Stream::TensorEncodeOp encodeOp,
       destinationDispatchType.asRankedTensorType();
   if (sourceType != destinationType) {
     if (sourceType.getEncoding()) {
-      value = builder.create<IREE::Encoding::UnsetEncodingOp>(
-          loc, sourceType.dropEncoding(), value, sourceDynamicDims);
+      value = IREE::Encoding::UnsetEncodingOp::create(
+          builder, loc, sourceType.dropEncoding(), value, sourceDynamicDims);
     }
     if (destinationType.getEncoding()) {
-      value = builder.create<IREE::Encoding::SetEncodingOp>(
-          loc, destinationType, value);
+      value = IREE::Encoding::SetEncodingOp::create(builder, loc,
+                                                    destinationType, value);
     }
   }
 
   // Store the value to the destination binding.
-  builder.create<IREE::Flow::DispatchTensorStoreOp>(loc, value, destination,
-                                                    destinationDynamicDims);
-  builder.create<func::ReturnOp>(loc);
+  IREE::TensorExt::DispatchTensorStoreOp::create(
+      builder, loc, value, destination, destinationDynamicDims);
+  func::ReturnOp::create(builder, loc);
 
   return funcOp;
 }
@@ -184,16 +184,16 @@ createExportOp(RewriterBase &rewriter, Location loc,
 
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointToStart(&executableOp.getBody().front());
-  auto exportOp = rewriter.create<IREE::Stream::ExecutableExportOp>(
-      loc, funcOp.getName(), SymbolRefAttr::get(funcOp));
+  auto exportOp = IREE::Stream::ExecutableExportOp::create(
+      rewriter, loc, funcOp.getName(), SymbolRefAttr::get(funcOp));
   Block *block = rewriter.createBlock(&exportOp.getWorkgroupCount(),
                                       exportOp.getWorkgroupCount().end(),
                                       workloadTypes, workloadLocs);
   rewriter.setInsertionPointToStart(block);
   auto defaultCountOp =
-      rewriter.create<IREE::Flow::DispatchWorkgroupCountFromSliceOp>(
-          loc, block->getArguments());
-  rewriter.create<IREE::Stream::ReturnOp>(loc, defaultCountOp.getResults());
+      IREE::TensorExt::DispatchWorkgroupCountFromSliceOp::create(
+          rewriter, loc, block->getArguments());
+  IREE::Stream::ReturnOp::create(rewriter, loc, defaultCountOp.getResults());
   return exportOp;
 }
 
@@ -211,7 +211,7 @@ createExecutableAndExport(RewriterBase &rewriter,
   Location loc = encodeOp.getLoc();
   std::string executableName = "_encoding_" + std::to_string(executableId);
   auto executableOp =
-      rewriter.create<IREE::Stream::ExecutableOp>(loc, executableName);
+      IREE::Stream::ExecutableOp::create(rewriter, loc, executableName);
   executableOp.getOperation()->moveBefore(parentFuncOp);
   executableOp.setPrivate();
 
@@ -220,7 +220,7 @@ createExecutableAndExport(RewriterBase &rewriter,
   std::string funcName = executableName + "_" + getDispatchFuncName(encodeOp);
   auto funcOp = createWorkgroupFunc(encodeOp, funcName);
   rewriter.setInsertionPointToStart(&executableOp.getBody().front());
-  auto innerModule = rewriter.create<mlir::ModuleOp>(loc);
+  auto innerModule = mlir::ModuleOp::create(rewriter, loc);
   innerModule.push_back(funcOp);
   IREE::Stream::ExecutableExportOp exportOp =
       createExportOp(rewriter, loc, encodeOp, executableOp, funcOp);
@@ -244,7 +244,7 @@ replaceEncodeOpWithDispatchOp(RewriterBase &rewriter,
                               IREE::Stream::ExecutableExportOp exportOp) {
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(encodeOp);
-  Value zero = rewriter.create<arith::ConstantIndexOp>(encodeOp.getLoc(), 0);
+  Value zero = arith::ConstantIndexOp::create(rewriter, encodeOp.getLoc(), 0);
   SmallVector<Value> operandOffsets = {zero};
   SmallVector<Value> operandEnds = {encodeOp.getSourceSize()};
   SmallVector<Value> operandLengths = {encodeOp.getSourceSize()};

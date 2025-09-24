@@ -7,10 +7,8 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_CONVERSION_STREAMTOHAL_UTILS_H_
 #define IREE_COMPILER_DIALECT_HAL_CONVERSION_STREAMTOHAL_UTILS_H_
 
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
-#include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
@@ -25,12 +23,22 @@ Value lookupDeviceFor(Operation *op, OpBuilder &builder);
 std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(Operation *op,
                                                          OpBuilder &builder);
 
+// Returns a !hal.device and queue affinity i64 for the affinity specified on
+// |op| for use as an allocation. This may insert a runtime device selection
+// op to resolve the responsible allocator.
+std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(Operation *op,
+                                                         Value memoryTypes,
+                                                         Value bufferUsage,
+                                                         OpBuilder &builder);
+
 // Returns the !hal.allocator for the affinity specified on |op|.
 Value lookupAllocatorFor(Operation *op, OpBuilder &builder);
 
 // Returns a !hal.allocator and queue affinity i64 for the affinity specified on
 // |op|.
 std::tuple<Value, Value> lookupAllocatorAndQueueAffinityFor(Operation *op,
+                                                            Value memoryTypes,
+                                                            Value bufferUsage,
                                                             OpBuilder &builder);
 
 // Returns the |timepointFence| or a util.null if the wait is to be ignored.
@@ -51,21 +59,9 @@ IREE::HAL::CommandCategoryBitfield deriveCommandCategories(Region &region);
 // The bits set here are those that must be set for the buffer to be used as the
 // buffer within the program with its defined resource lifetime.
 LogicalResult
-deriveRequiredResourceBufferBits(Location loc,
-                                 IREE::Stream::ResourceType resourceType,
+deriveRequiredResourceBufferBits(Location loc, IREE::HAL::Lifetime lifetime,
                                  IREE::HAL::MemoryTypeBitfield &memoryTypes,
                                  IREE::HAL::BufferUsageBitfield &bufferUsage);
-
-// Maps a resource type to the corresponding HAL memory types and buffer usage.
-// This will fail if the resource type is not directly mappable to HAL bits.
-// The bits set here represent the superset of required and allowed bits and
-// are useful for providing buffers back to users via the ABI that may need to
-// be used for more than just what the internal program requires.
-LogicalResult
-deriveAllowedResourceBufferBits(Location loc,
-                                IREE::Stream::ResourceType resourceType,
-                                IREE::HAL::MemoryTypeBitfield &memoryTypes,
-                                IREE::HAL::BufferUsageBitfield &bufferUsage);
 
 class BindingTable {
 public:

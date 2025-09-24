@@ -15,7 +15,8 @@
 
 namespace mlir::iree_compiler::IREE::VM {
 
-namespace {
+#define GEN_PASS_DEF_DROPEMPTYMODULEINITIALIZERSPASS
+#include "iree/compiler/Dialect/VM/Transforms/Passes.h.inc"
 
 // Returns true if |funcOp| is empty.
 static bool isFuncEmpty(IREE::VM::FuncOp funcOp) {
@@ -24,22 +25,11 @@ static bool isFuncEmpty(IREE::VM::FuncOp funcOp) {
           &funcOp.front().front() == funcOp.front().getTerminator());
 }
 
-} // namespace
-
 class DropEmptyModuleInitializersPass
-    : public PassWrapper<DropEmptyModuleInitializersPass,
-                         OperationPass<IREE::VM::ModuleOp>> {
-public:
-  StringRef getArgument() const override {
-    return "iree-vm-drop-empty-module-initializers";
-  }
-
-  StringRef getDescription() const override {
-    return "Drops __init/__deinit functions that have no ops.";
-  }
-
+    : public IREE::VM::impl::DropEmptyModuleInitializersPassBase<
+          DropEmptyModuleInitializersPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    IREE::VM::ModuleOp moduleOp = getOperation();
     SymbolTable symbolTable(moduleOp);
 
     // Find all export ops so they are easier to remove.
@@ -67,12 +57,5 @@ public:
     }
   }
 };
-
-std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
-createDropEmptyModuleInitializersPass() {
-  return std::make_unique<DropEmptyModuleInitializersPass>();
-}
-
-static PassRegistration<DropEmptyModuleInitializersPass> pass;
 
 } // namespace mlir::iree_compiler::IREE::VM

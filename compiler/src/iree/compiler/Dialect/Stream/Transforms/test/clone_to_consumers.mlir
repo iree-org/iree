@@ -86,16 +86,18 @@ util.func private @splatLikeDispatchOp() -> (tensor<1xi32>, tensor<1xi32>) {
 
 // Tests that tied ops that do not have affinity of their own are cloned in
 // order to fully flatten out the dependency chain. Here we expect both the
-// splat dispatch and the reshape to be cloned for each target.
+// splat dispatch and the reshape to be cloned for each target. Note that
+// reshapes move past transfers because the pass applies canonicalization
+// patterns.
 
 // CHECK-LABEL: @reshapedDispatchOp
 util.func private @reshapedDispatchOp() -> (tensor<1x4xi32>, tensor<1x4xi32>) {
   %splat_value = arith.constant 123 : i32
   //      CHECK: %[[DISPATCH_A:.+]] = flow.dispatch
-  %splat = flow.dispatch @some::@splat_like(%splat_value) : (i32) -> tensor<4x1xi32>
   // CHECK-NEXT: %[[RESHAPE_A:.+]] = flow.tensor.reshape %[[DISPATCH_A]]
-  %reshape = flow.tensor.reshape %splat : tensor<4x1xi32> -> tensor<1x4xi32>
   // CHECK-NEXT: %[[TRANSFER_A:.+]] = flow.tensor.transfer %[[RESHAPE_A]]
+  %splat = flow.dispatch @some::@splat_like(%splat_value) : (i32) -> tensor<4x1xi32>
+  %reshape = flow.tensor.reshape %splat : tensor<4x1xi32> -> tensor<1x4xi32>
   %transfer_a = flow.tensor.transfer %reshape : tensor<1x4xi32> to #hal.device.promise<@dev_a>
   // CHECK-NEXT: %[[DISPATCH_B:.+]] = flow.dispatch
   // CHECK-NEXT: %[[RESHAPE_B:.+]] = flow.tensor.reshape %[[DISPATCH_B]]

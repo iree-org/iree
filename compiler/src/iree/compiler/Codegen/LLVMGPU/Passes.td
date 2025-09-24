@@ -13,6 +13,11 @@ include "mlir/Pass/PassBase.td"
 // LLVMGPU Passes (keep alphabetical)
 //------------------------------------------------------------------------------
 
+def AMDGPUEmulateNarrowTypePass :
+    Pass<"iree-amdgpu-emulate-narrow-type", ""> {
+  let summary = "Emulate narrow integer operations including amdgpu operations";
+}
+
 // TODO: Bring the argument in line with the names used elsewhere.
 def ConvertToNVVMPass :
     Pass<"iree-convert-to-nvvm", "ModuleOp"> {
@@ -74,6 +79,11 @@ def LLVMGPULinkExecutablesPass :
 def LLVMGPULowerExecutableTargetPass :
     InterfacePass<"iree-llvmgpu-lower-executable-target", "mlir::FunctionOpInterface"> {
   let summary = "Perform lowering of executable target using one of the IREE::HAL::DispatchLoweringPassPipeline";
+  let options = [
+    Option<"forROCDL", "for-rocdl", "bool",
+           /*default=*/"false",
+           "Enable features only supported on ROCDL such as delaying lowering of subgroup reduce.">,
+  ];
 }
 
 def LLVMGPUPackSharedMemoryAllocPass :
@@ -81,14 +91,11 @@ def LLVMGPUPackSharedMemoryAllocPass :
   let summary = "Pass pack shared memory allocation in order to reduce memory usage.";
 }
 
-def LLVMGPUPrefetchSharedMemoryPass :
+def ROCDLPrefetchSharedMemoryPass :
     InterfacePass<"iree-llvmgpu-prefetch-shared-memory", "mlir::FunctionOpInterface"> {
-  let summary = "Rotate scf.for loops to prefetch shared memory with distance 1";
-}
-
-def LLVMGPUPromoteMatmulToFitMMAPass :
-    InterfacePass<"iree-llvmgpu-promote-matmul-to-fit-mma", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to promote contraction ops to fit mma shapes";
+      let summary = "Rotate scf.for loops to prefetch shared memory with distance 1. This pass is only applicable"
+          "to ROCDL targets because its effectiveness on non-AMD GPUs lacks testing and evaluation.";
+  let dependentDialects = ["amdgpu::AMDGPUDialect"];
 }
 
 def LLVMGPUSelectLoweringStrategyPass :
@@ -99,11 +106,6 @@ def LLVMGPUSelectLoweringStrategyPass :
 def LLVMGPUTensorCoreVectorizationPass :
     InterfacePass<"iree-llvmgpu-tensorcore-vectorization", "mlir::FunctionOpInterface"> {
   let summary = "Pass to convert linalg into Vector and transform it to a form that can be lowered to GPU MMA ops";
-}
-
-def LLVMGPUTensorPadPass :
-    InterfacePass<"iree-llvmgpu-tensor-pad", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to pad out tensors up to static dimensions.";
 }
 
 def LLVMGPUTileAndDistributePass :
@@ -133,11 +135,6 @@ def LLVMGPUVectorToGPUPass :
 def TestLLVMGPUScalarizeMathOpPass :
     Pass<"iree-test-llvmgpu-legalize-ops", "ModuleOp"> {
   let summary = "Test pass for several legalization patterns.";
-}
-
-def TestLLVMGPUQueryMMAPass :
-    Pass<"iree-test-llvmgpu-query-mma", "ModuleOp"> {
-  let summary = "Test pass for querying the supported mma intrinsic instructions.";
 }
 
 #endif // IREE_CODEGEN_LLVMGPU_PASSES

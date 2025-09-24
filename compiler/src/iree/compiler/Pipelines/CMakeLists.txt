@@ -18,6 +18,7 @@ iree_cc_library(
   SRCS
     "Options.cpp"
   DEPS
+    LLVMPasses
     iree::compiler::Utils
   PUBLIC
 )

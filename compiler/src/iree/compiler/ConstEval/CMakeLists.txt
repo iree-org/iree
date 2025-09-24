@@ -49,6 +49,7 @@ iree_cc_library(
     MLIRFunctionInterfaces
     MLIRIR
     MLIRPass
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::Util::Analysis::Constant
     iree::compiler::Dialect::Util::IR
@@ -76,6 +77,17 @@ iree_cc_library(
     iree::vm
     iree::vm::bytecode::module
   PUBLIC
+)
+
+iree_tablegen_doc(
+  NAME
+    ConstEvalPassesDocGen
+  CATEGORY
+    "Passes"
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-doc ConstEvalPasses.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -9,6 +9,7 @@
 
 include "iree/compiler/Dialect/Flow/IR/FlowBase.td"
 include "iree/compiler/Dialect/Flow/IR/FlowInterfaces.td"
+include "iree/compiler/Dialect/TensorExt/IR/TensorExtBase.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
@@ -39,7 +40,7 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
     Util_ShapeAwareOp,
     AttrSizedOperandSegments]> {
-  let summary = [{a group of ops}];
+  let summary = [{A grouping of ops with implicit capture.}];
   let description = [{
     This op is a container/grouping of ops. It represents a fusion group before
     being lowered to a dispatch region. Ops are collected inside of the region
@@ -88,7 +89,7 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
   ]>,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{a dispatch of workgroups across a 3-dimensional grid}];
+  let summary = [{A dispatch of workgroups across a 3-dimensional grid.}];
   let description = [{
     Dispatches some number of workgroups across a 3-dimensional grid. The
     body region will be invoked for each workgroup with a unique
@@ -125,9 +126,9 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     ```mlir
     %r = flow.dispatch.workgroups[%c5, %c5](%0, %1)
         : (tensor<5x5xf32>, tensor<5xf32>) -> tensor<5x5xf32> =
-              (%arg0: !flow.dispatch.tensor<readonly:tensor<5x5xf32>>,
-               %arg1: !flow.dispatch.tensor<readonly:tensor<5xf32>>,
-               %arg2: !flow.dispatch.tensor<writeonly:tensor<5x5xf32>>) {
+              (%arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<5x5xf32>>,
+               %arg1: !iree_tensor_ext.dispatch.tensor<readonly:tensor<5xf32>>,
+               %arg2: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<5x5xf32>>) {
       ...
     }
     ```
@@ -135,7 +136,7 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     The number of results of the operation is equal to the number of results
     in the type signature (`(tensor<5x5xf32>, tensor<5xf32>) -> tensor<5x5xf32>`).
     Each tensor argument and result in the type signature has a corresponding
-    block argument of type `!flow.dispatch.tensor`. Furthermore, each argument
+    block argument of type `!iree_tensor_ext.dispatch.tensor`. Furthermore, each argument
     has a corresponding `arguments` operand.
 
     There are no `arguments` operands for results, but a result can be tied an
@@ -239,7 +240,7 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
 def FLOW_DispatchWorkgroupIDOp : FLOW_PureOp<"dispatch.workgroup.id", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{returns the index of the current workgroup in the grid}];
+  let summary = [{Returns the index of the current workgroup in the grid.}];
   let description = [{
     The global workgroup ID of the current workgroup in the range of
     `[0, flow.dispatch.workgroup.count)` along each dimension.
@@ -276,7 +277,7 @@ def FLOW_DispatchWorkgroupIDOp : FLOW_PureOp<"dispatch.workgroup.id", [
 def FLOW_DispatchWorkgroupCountOp : FLOW_PureOp<"dispatch.workgroup.count", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{returns the total workgroup count of the grid}];
+  let summary = [{Returns the total workgroup count of the grid.}];
   let description = [{
     The total number of workgroups along each dimension in the dispatch grid.
 
@@ -312,7 +313,7 @@ def FLOW_DispatchWorkgroupCountOp : FLOW_PureOp<"dispatch.workgroup.count", [
 def FLOW_DispatchWorkgroupSizeOp : FLOW_PureOp<"dispatch.workgroup.size", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{returns the size of each workgroup in invocations}];
+  let summary = [{Returns the size of each workgroup in invocations.}];
   let description = [{
     The number of local invocations within the current workgroup along each
     dimension. Depending on backend this may map to the SIMT thread count or
@@ -358,7 +359,7 @@ def FLOW_DispatchTieShapeOp : FLOW_PureOp<"dispatch.tie_shape", [
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{ties a runtime shape to a dispatch I/O argument}];
+  let summary = [{Ties a runtime shape to a dispatch I/O argument.}];
   let description = [{
     Metadata op used to tie a runtime-computed shape with dynamic dimensions to
     a dispatch input/output argument. All uses of the argument should use the
@@ -366,11 +367,11 @@ def FLOW_DispatchTieShapeOp : FLOW_PureOp<"dispatch.tie_shape", [
   }];
 
   let arguments = (ins
-    FLOW_DispatchTensor:$operand,
+    IREETensorExt_DispatchTensor:$operand,
     FLOW_ShapeDynamicDims:$dynamic_dims
   );
   let results = (outs
-    FLOW_DispatchTensor:$result
+    IREETensorExt_DispatchTensor:$result
   );
 
   let assemblyFormat = [{
@@ -388,239 +389,12 @@ def FLOW_DispatchTieShapeOp : FLOW_PureOp<"dispatch.tie_shape", [
   let hasFolder = 1;
 }
 
-def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
-  AttrSizedOperandSegments,
-  OffsetSizeAndStrideOpInterface,
-  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
-  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
-      "getTiedResult",
-      "getTiedResultOperandIndex",
-      "getTiedResultOperandIndices",
-  ]>,
-  Util_ShapeAwareOp,
-]> {
-  let summary = [{loads a tensor from a dispatch input placeholder}];
-  let description = [{
-    Loads an input tensor or subtensor from an input placeholder. As each
-    workgroup executes concurrently all workgroups will receive identical loaded
-    results of regions that may overlap.
-  }];
-
-  let arguments = (ins
-    FLOW_DispatchTensor:$source,
-    FLOW_ShapeDynamicDims:$source_dims,
-    Variadic<Index>:$offsets,
-    Variadic<Index>:$sizes,
-    Variadic<Index>:$strides,
-    DenseI64ArrayAttr:$static_offsets,
-    DenseI64ArrayAttr:$static_sizes,
-    DenseI64ArrayAttr:$static_strides
-  );
-  let results = (outs
-    AnyRankedTensor:$result
-  );
-
-  let assemblyFormat = [{
-    $source
-    `,` `offsets` `=` custom<DynamicIndexList>(
-      $offsets, $static_offsets)
-    `,` `sizes` `=` custom<DynamicIndexList>(
-      $sizes, $static_sizes)
-    `,` `strides` `=` custom<DynamicIndexList>(
-      $strides, $static_strides)
-    attr-dict `:` type($source) (`{` $source_dims^ `}`)?  `->` type($result)
-  }];
-
-  let builders = [
-    // Builder for tensor.load with empty offset, sizes and strides operands.
-    // This is used to load an entire tensor.
-    OpBuilder<(ins
-      "RankedTensorType":$resultType,
-      "Value":$source,
-      "ValueRange":$sourceDynamicDims,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
-    )>,
-    OpBuilder<(ins
-      "RankedTensorType":$resultType,
-      "Value":$source,
-      "ValueRange":$sourceDynamicDims,
-      "ArrayRef<OpFoldResult>":$offsets,
-      "ArrayRef<OpFoldResult>":$sizes,
-      "ArrayRef<OpFoldResult>":$strides,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
-    )>,
-    // Builder for tensor.load with mixed static/dynamic opperands.
-    OpBuilder<(ins
-      "Value":$source,
-      "ValueRange":$sourceDynamicDims,
-      "ArrayRef<OpFoldResult>":$offsets,
-      "ArrayRef<OpFoldResult>":$sizes,
-      "ArrayRef<OpFoldResult>":$strides,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
-    )>
-  ];
-
-  let extraClassDeclaration = [{
-    /// Return the expected rank of each of the `static_offsets`, `static_sizes`
-    /// and `static_strides` attributes.
-    std::array<unsigned, 3> getArrayAttrMaxRanks() {
-      unsigned sourceRank =
-          cast<DispatchTensorType>(getSource().getType()).asRankedTensorType().getRank();
-      return {sourceRank, sourceRank, sourceRank};
-    }
-
-    /// Return the number of leading operands before the `offsets`, `sizes` and
-    /// and `strides` operands.
-    static unsigned getOffsetSizeAndStrideStartOperandIndex() { return 2; }
-
-    // Workaround for OffsetSizeAndStrideOpInterface being incompatible with
-    // prefixed accessors.
-    OperandRange offsets() { return getOffsets(); }
-    OperandRange sizes() { return getSizes(); }
-    OperandRange strides() { return getStrides(); }
-
-    /// Returns the type of the result based on the sizes.
-    static RankedTensorType inferResultType
-        (IREE::Flow::DispatchTensorType sourceType,
-         ArrayRef<OpFoldResult> mixedSizes);
-
-    /// Returns the list of dimensions that are dropped if the
-    /// !flow.dispatch.tensor.load is rank-reducing.
-    llvm::SmallBitVector getDroppedDims();
-
-    /// Return the result type as a `RankedTensorType`.
-    RankedTensorType getType() {
-      return cast<RankedTensorType>(getResult().getType());
-    }
-
-    /// Return the type of the source as `IREE::Flow::DispatchTensorType`.
-    IREE::Flow::DispatchTensorType getSourceType() {
-      return cast<IREE::Flow::DispatchTensorType>(getSource().getType());
-    }
-
-    ValueRange getOperandDynamicDims(unsigned idx) { return getSourceDims(); }
-    ValueRange getResultDynamicDims(unsigned idx) { return getSizes(); }
-
-    /// Returns true if the load is loading the whole source. This is
-    /// best effort since this can miss some dynamic cases.
-    bool isLoadOfWholeSource();
-  }];
-
-  let hasVerifier = 1;
-
-  let hasCanonicalizer = 1;
-  let hasFolder = 1;
-}
-
-def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
-  AttrSizedOperandSegments,
-  OffsetSizeAndStrideOpInterface,
-  Util_ShapeAwareOp,
-]> {
-  let summary = [{stores a tensor into a dispatch output placeholder}];
-  let description = [{
-    Stores a tensor or subtensor into an output tensor placeholder. As each
-    workgroup executes concurrently behavior is undefined if more than one
-    workgroup stores into overlapping regions of the full output tensor.
-  }];
-
-  let arguments = (ins
-    AnyRankedTensor:$value,
-    FLOW_WritableDispatchTensor:$target,
-    FLOW_ShapeDynamicDims:$target_dims,
-    Variadic<Index>:$offsets,
-    Variadic<Index>:$sizes,
-    Variadic<Index>:$strides,
-    DenseI64ArrayAttr:$static_offsets,
-    DenseI64ArrayAttr:$static_sizes,
-    DenseI64ArrayAttr:$static_strides
-  );
-  let results = (outs);
-
-  let assemblyFormat = [{
-    $value `,` $target
-    `,` `offsets` `=` custom<DynamicIndexList>(
-      $offsets, $static_offsets)
-    `,` `sizes` `=` custom<DynamicIndexList>(
-      $sizes, $static_sizes)
-    `,` `strides` `=` custom<DynamicIndexList>(
-      $strides, $static_strides)
-    attr-dict `:` type($value) `->` type($target) (`{` $target_dims^ `}`)?
-  }];
-
-  let builders = [
-    // Builder for tensor.store with empty offset, sizes and strides operands.
-    // This is used to store an entire tensor.
-    OpBuilder<(ins
-      "Value":$value,
-      "Value":$target,
-      "ValueRange":$targetDynamicDims,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
-    )>,
-    // Builder for tensor.store with mixed static and dynamic offset, sizes and strides.
-    OpBuilder<(ins
-      "Value":$value,
-      "Value":$target,
-      "ValueRange":$targetDynamicDims,
-      "ArrayRef<OpFoldResult>":$mixedOffsets,
-      "ArrayRef<OpFoldResult>":$mixedSizes,
-      "ArrayRef<OpFoldResult>":$mixedStrides,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
-    )>
-  ];
-
-  let extraClassDeclaration = [{
-    /// Return the expected rank of each of the `static_offsets`, `static_sizes`
-    /// and `static_strides` attributes.
-    std::array<unsigned, 3> getArrayAttrMaxRanks() {
-      unsigned resultRank =
-           cast<DispatchTensorType>(getTarget().getType()).asRankedTensorType().getRank();
-      return {resultRank, resultRank, resultRank};
-    }
-
-    /// Return the type of the value type as a RankedTensorType.
-    RankedTensorType getValueType() { return cast<RankedTensorType>(getValue().getType()); }
-
-    /// Return the type of the target.
-    IREE::Flow::DispatchTensorType getTargetType() {
-      return cast<IREE::Flow::DispatchTensorType>(getTarget().getType());
-    }
-
-    /// Return the number of leading operands before the `offsets`, `sizes` and
-    /// and `strides` operands.
-    static unsigned getOffsetSizeAndStrideStartOperandIndex() { return 3; }
-
-    // Workaround for OffsetSizeAndStrideOpInterface being incompatible with
-    // prefixed accessors.
-    OperandRange offsets() { return getOffsets(); }
-    OperandRange sizes() { return getSizes(); }
-    OperandRange strides() { return getStrides(); }
-
-    ValueRange getOperandDynamicDims(unsigned idx) {
-      return idx == 0 ? getSizes() : getTargetDims();
-    }
-    ValueRange getResultDynamicDims(unsigned idx) { return {}; }
-
-    /// Returns the list of dimensions that are dropped if the
-    /// !flow.dispatch.tensor.load is rank-reducing.
-    llvm::SmallBitVector getDroppedDims();
-
-    /// Checks if the store covers the entire target. Note that
-    /// this is best effort, especially in cases where the the shapes are dynamic.
-    bool isStoreToWholeTarget();
-  }];
-
-  let hasVerifier = 1;
-
-  let hasCanonicalizer = 1;
-}
-
 def FLOW_ReturnOp : FLOW_Op<"return", [
   Pure,
   ReturnLike,
   Terminator,
 ]> {
-  let summary = [{return from a flow.dispatch_region}];
+  let summary = [{Return from a flow.dispatch_region.}];
   let description = [{
     Returns the given values from the region and back to the host code.
   }];
@@ -634,7 +408,7 @@ def FLOW_ReturnOp : FLOW_Op<"return", [
   let builders = [
     OpBuilder<(ins),
     [{
-      build($_builder, $_state, std::nullopt);
+      build($_builder, $_state, {});
     }]>,
   ];
 }
@@ -659,7 +433,7 @@ def FLOW_ExecutableOp : FLOW_Op<"executable", [
   SymbolTable,
   Util_ObjectLike,
 ]> {
-  let summary = [{generic executable module}];
+  let summary = [{Generic executable module.}];
   let description = [{
     An executable module containing one or more public functions. The contents
     of the functions are safe to dispatch and can be lowered further to
@@ -702,7 +476,7 @@ def FLOW_ExecutableEndOp : FLOW_Op<"executable_end", [
   HasParent<"IREE::Flow::ExecutableOp">,
   Terminator,
 ]> {
-  let summary = [{terminator pseudo-op for the executable op}];
+  let summary = [{Terminator pseudo-op for the executable op.}];
   let assemblyFormat = "attr-dict";
 }
 
@@ -711,7 +485,7 @@ def FLOW_ExecutableExportOp : FLOW_Op<"executable.export", [
   Symbol,
   IsolatedFromAbove,
 ]> {
-  let summary = [{defines an executable entry point for dispatch operations}];
+  let summary = [{Defines an executable entry point for dispatch operations.}];
   let description = [{
     Specifies an exported function with an externally-visible alias. Multiple
     exports can reference the same internal function.
@@ -766,7 +540,7 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   ]>,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{a dispatch of workgroups across a grid}];
+  let summary = [{A dispatch of workgroups across a grid.}];
   let description = [{
     Dispatches workgroups across an grid defined by the captured workload
     parameters carrying the information required to compute the workgroup count
@@ -880,7 +654,7 @@ def FLOW_FuncOp : FLOW_Op<"func", [
   FunctionOpInterface,
   IsolatedFromAbove,
 ]> {
-  let summary = [{streamable function declaration}];
+  let summary = [{Streamable function declaration.}];
   let description = [{
     Declares a function that can be called as an asynchronous streaming
     operation via `flow.call`. Today only external functions are allowed.
@@ -949,7 +723,7 @@ def FLOW_CallOp : FLOW_Op<"call", [
   ]>,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{calls a streamable external host function}];
+  let summary = [{Calls a streamable external host function.}];
   let description = [{
     Calls a function taking/returning tensor values with stream semantics.
     Tensors have their shapes captured and may be tied to denote in-place
@@ -1056,7 +830,7 @@ def FLOW_TensorConstantOp : FLOW_PureOp<"tensor.constant", [
   ConstantLike,
   AllTypesMatch<["value", "result"]>,
 ]> {
-  let summary = [{tensor constant that can have dynamic dimensions}];
+  let summary = [{Tensor constant that can have dynamic dimensions.}];
   let description = [{
     Allows specifying a tensor constant of IREE-specific types/attributes.
 
@@ -1081,7 +855,7 @@ def FLOW_TensorConstantOp : FLOW_PureOp<"tensor.constant", [
 }
 
 def FLOW_TensorDynamicConstantOp : FLOW_Op<"tensor.dynamic_constant"> {
-  let summary = [{tensor constant that can have dynamic dimensions}];
+  let summary = [{Tensor constant that can have dynamic dimensions.}];
   let description = [{
     Allows specifying a tensor constant of IREE-specific types/attributes with
     a dynamic shape that approximates a value as passed from the user. This
@@ -1115,7 +889,7 @@ def FLOW_TensorTieShapeOp : FLOW_PureOp<"tensor.tie_shape", [
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{ties a runtime shape to a tensor value}];
+  let summary = [{Ties a runtime shape to a tensor value.}];
   let description = [{
     Metadata op used to tie tensors with their runtime-computed dynamic
     dimensions. This only exists transiently in the IR as a witness to shape
@@ -1157,9 +931,17 @@ def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
   ]>,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{reshapes a tensor}];
+  let summary = [{Reshapes a tensor without modifying the contents.}];
   let description = [{
-    Reshapes a tensor to a new shape without modifying the contents.
+    Reshapes a tensor |source| to the shape implied by this operations result
+    type interleaved with |result_dims|. For example,
+
+    ```
+    result_dims = {%0, %1}
+    result_type = tensor<1x?x2x?x3>
+    ```
+
+    produces a tensor of shape [1, %0, 2, %1, 3] and the same element type.
   }];
 
   let arguments = (ins
@@ -1212,9 +994,19 @@ def FLOW_TensorBitCastOp : FLOW_PureOp<"tensor.bitcast", [
   ]>,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{bitcasts a tensor}];
+  let summary = [{Bitcasts a tensor without modifying the contents.}];
   let description = [{
-    Bitcasts a tensor to a new type without modifying the contents.
+    Bitcasts a tensor |source| to the shape implied by this operations result
+    type interleaved with |result_dims|, potentially with a different element
+    type. For example,
+
+    ```
+    result_dims = {%0, %1}
+    result_type = tensor<1x?x2x?x3 x!eltype>
+    ```
+
+    produces a tensor of shape [1, %0, 2, %1, 3] and element type `!eltype`.
+    Note that the source and result tensors must serialized to the same size.
   }];
 
   let arguments = (ins
@@ -1264,7 +1056,7 @@ def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load", [
   AttrSizedOperandSegments,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{loads a value from a tensor element}];
+  let summary = [{Loads a value from a tensor element.}];
   let description = [{
     Returns the element at the given location from within the tensor.
   }];
@@ -1315,7 +1107,7 @@ def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store", [
   AttrSizedOperandSegments,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{stores a value into a tensor element}];
+  let summary = [{Stores a value into a tensor element.}];
   let description = [{
     Returns a tensor with the element at the given index set to the given value.
   }];
@@ -1362,7 +1154,7 @@ def FLOW_TensorAllocaOp : FLOW_Op<"tensor.alloca", [
   Util_ShapeAwareOp,
   MemoryEffects<[MemAlloc]>,
 ]> {
-  let summary = [{an empty tensor allocation with undefined contents}];
+  let summary = [{An empty tensor allocation with undefined contents.}];
   let description = [{
     Returns a new transient tensor allocation with undefined contents.
     Subsequent writes must populate any ranges of the tensor that are later
@@ -1398,7 +1190,7 @@ def FLOW_TensorEmptyOp : FLOW_PureOp<"tensor.empty", [
   DeclareOpInterfaceMethods<Util_HoistableOpInterface>,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{an empty tensor carrying metadata but no contents}];
+  let summary = [{An empty tensor carrying metadata but no contents.}];
   let description = [{
     Returns a tensor with undefined contents. Subsequent writes must populate
     any ranges of the tensor that are later read.
@@ -1434,7 +1226,7 @@ def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
   DeclareOpInterfaceMethods<Util_HoistableOpInterface>,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{splats a value into a shaped tensor}];
+  let summary = [{Splats a value into a shaped tensor.}];
   let description = [{
     Returns a tensor initialized to the given primitive value.
   }];
@@ -1468,7 +1260,7 @@ def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
   DeclareOpInterfaceMethods<Util_HoistableOpInterface>,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{performs a full tensor clone operation}];
+  let summary = [{Performs a full tensor clone operation.}];
   let description = [{
     Clones the input tensor into an identical output tensor.
   }];
@@ -1514,7 +1306,7 @@ def FLOW_TensorEncodeOp : FLOW_PureOp<"tensor.encode", [
   AttrSizedOperandSegments,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{performs a full tensor encode operation}];
+  let summary = [{Performs a full tensor encode operation.}];
   let description = [{
     Encode the input tensor into an encoded output tensor.
   }];
@@ -1554,7 +1346,7 @@ def FLOW_TensorBarrierOp : FLOW_PureOp<"tensor.barrier", [
       "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{indicates a value that must have a specific affinity}];
+  let summary = [{Indicates a value that must have a specific affinity.}];
   let description = [{
     Prevents fusion and scheduling of a value across an affinity boundary.
     May introduce copy-on-write behavior if the operand value is used as well as
@@ -1604,7 +1396,7 @@ def FLOW_TensorTransferOp : FLOW_PureOp<"tensor.transfer", [
   DeclareOpInterfaceMethods<Util_HoistableOpInterface>,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{transfers a tensor to a target by copying if needed}];
+  let summary = [{Transfers a tensor to a target by copying if needed.}];
   let description = [{
     Transfers the tensor from whichever context it may be in to the specified
     target context. If the contexts are compatible and can access each others
@@ -1657,10 +1449,7 @@ def FLOW_TensorSliceOp : FLOW_PureOp<"tensor.slice", [
   AttrSizedOperandSegments,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{slices out a subregion of a tensor}];
-  let description = [{
-    Clones a subregion of a tensor.
-  }];
+  let summary = [{Clones a subregion of a tensor.}];
 
   let arguments = (ins
     FLOW_Tensor:$source,
@@ -1705,7 +1494,7 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
   ]>,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{updates a tensor with the contents of another tensor}];
+  let summary = [{Updates a tensor with the contents of another tensor.}];
   let description = [{
     Updates the target tensor with the contents of the update tensor at the
     given offset indices.
@@ -1755,7 +1544,7 @@ def FLOW_TensorTraceOp : FLOW_Op<"tensor.trace", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<Util_ShapeAwareOp>,
 ]> {
-  let summary = [{traces one or more tensor values at runtime}];
+  let summary = [{Traces one or more tensor values at runtime.}];
   let description = [{
     Traces out to a runtime trace sink (console, log file, etc) the given
     tensors. The key is arbitrary and can be used for identifying the set of
@@ -1784,99 +1573,6 @@ def FLOW_TensorTraceOp : FLOW_Op<"tensor.trace", [
   let hasVerifier = 1;
 }
 
-//===---------------------------------------------------------------------===//
-// Parameterization Ops
-//===---------------------------------------------------------------------===//
-
-class FLOW_DispatchWorkgroupCountOp<string mnemonic, list<Trait> traits = []> :
-    FLOW_PureOp<mnemonic, traits> {
-  let arguments = (ins Variadic<Index>:$operands);
-  let results = (outs Index:$x, Index:$y, Index:$z);
-
-  let assemblyFormat = [{
-    attr-dict $operands
-  }];
-}
-
-def FLOW_DispatchWorkgroupCountFromDagRootOp :
-    FLOW_DispatchWorkgroupCountOp<"dispatch.workgroup_count_from_dag_root"> {
-  let summary = [{
-    workgroup count computed based on iteration range of the root of the DAG
-    for ops within the dispatch.
-  }];
-  let description = [{
-    When using tile + distribution of the root of the DAG (Directed Acyclic
-    Graph) of ops within the dispatch to split the work amongst workgroups. The
-    workload captured is the size of the iteration space of the root of the DAG.
-    This op represents the computation that given the workload returns the
-    number of workgroups to use. The backends are responsible for lowering this
-    op into actual computation (typically based on the tile sizes used to tile
-    and distribute the root of the DAG).
-  }];
-}
-
-def FLOW_DispatchWorkgroupCountFromSliceOp :
-    FLOW_DispatchWorkgroupCountOp<"dispatch.workgroup_count_from_slice"> {
-  let summary = [{
-    Place holder to signify default workgroup count calculation.
-  }];
-  let description = [{
-    The default computation of the number of workgroups (or workgroup count)
-    assumes that the dispatch + captured values is enough to compute the
-    workgroup count. It does so by using a program slice of the values
-    within the dispatch that represent the number of workgroups when available
-    within the dispatch.
-    Currently the arguments of index types captured by the
-    `flow.dispatch.workgroups` is treated as the workload for the operation.
-    It is a requirement that the slice of the program that computes the
-    number of workgroups will need to have its leaves be these captured values.
-
-    TODO: This could be generalized in future to allow the slices to encompass
-    arbitrary computation. The computation of the workgroup count can then be
-    done on the device itself, if this is data dependent. In such cases the
-    workload could be more than just values of index types.
-  }];
-}
-
-def FLOW_DispatchWorkloadOrdinalOp :
-    FLOW_PureOp<"dispatch.workload.ordinal", [
-      DeclareOpInterfaceMethods<InferIntDivisibilityOpInterface>,
-      DeclareOpInterfaceMethods<InferIntRangeInterface,
-        ["inferResultRanges"]>
-    ]> {
-  let arguments = (ins
-    Index:$operand,
-    IndexAttr:$ordinal
-  );
-  let results = (outs Index:$result);
-
-  let summary = [{
-    Annotates the values captured as workload within the body of
-    `flow.dispatch.workgroups` op.
-  }];
-  let description = [{
-    The arguments that represent the captured/returned values of the
-    `flow.dispatch.workgroups, i.e. the signature of the body of the op is not
-    preserved during IREEs compilation. Since the workloads are derived from
-    the operands captured by the operation, this op denotes the values captured
-    as workloads. This can be used in the backends to map back to the workload
-    values while materializing the workgroup count computation.
-
-    TODO: Find a better way to represent this information, either by somehow
-    propagating the signature of the created dispatch workgroup op through
-    the compilation stack until the codegen backends, or as a separate
-    list/attribute that can be plumbed through without using explicit ops.
-  }];
-
-  let assemblyFormat = [{
-    attr-dict $operand `,` $ordinal `:` type($operand)
-  }];
-
-  let hasCanonicalizer = 1;
-
-  let hasFolder = 1;
-}
-
 } // OpGroupTensorOps
 
 //===----------------------------------------------------------------------===//
@@ -1893,7 +1589,7 @@ let opDocGroup = OpGroupCollectiveCommunicationOps in {
 def FLOW_ChannelDefaultOp : FLOW_PureOp<"channel.default", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
 ]> {
-  let summary = [{returns a default collective communication channel}];
+  let summary = [{Returns a default collective communication channel.}];
   let description = [{
     Returns a channel initialized using the runtime environment.
   }];
@@ -1920,7 +1616,7 @@ def FLOW_ChannelDefaultOp : FLOW_PureOp<"channel.default", [
 def FLOW_ChannelSplitOp : FLOW_Op<"channel.split", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
 ]> {
-  let summary = [{splits a collective communication channel}];
+  let summary = [{Splits a collective communication channel.}];
   let description = [{
     Partitions the group associated with the given channel into disjoint
     subgroups for each unique value of color. Each new subgroup contains all
@@ -1951,7 +1647,7 @@ def FLOW_ChannelSplitOp : FLOW_Op<"channel.split", [
 def FLOW_ChannelRankOp : FLOW_PureOp<"channel.rank", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{returns the rank of the local participant in the group}];
+  let summary = [{Returns the rank of the local participant in the group.}];
   let description = [{
     Returns the rank the channel represents as a participant in a collective
     group in `[0, count)`.
@@ -1973,7 +1669,7 @@ def FLOW_ChannelRankOp : FLOW_PureOp<"channel.rank", [
 def FLOW_ChannelCountOp : FLOW_PureOp<"channel.count", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{returns the total number of participants in the group}];
+  let summary = [{Returns the total number of participants in the group.}];
   let description = [{
     Returns the total participant count in the collective communicator group.
   }];
@@ -1999,8 +1695,8 @@ def FLOW_CollectiveAllGatherOp : FLOW_Op<"collective.all_gather", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{performs all-gather operation}];
-  let description = [{It gathers data from all ranks and concatenates them on the 0-th dimension.}];
+  let summary = [{Performs all-gather operation.}];
+  let description = [{Gathers data from all ranks and concatenates them on the 0-th dimension.}];
 
   let arguments = (ins
     FLOW_CollectiveElementTypeAttr:$element_type,
@@ -2036,8 +1732,8 @@ def FLOW_CollectiveAllReduceOp : FLOW_Op<"collective.all_reduce", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{performs all-reduce operation}];
-  let description = [{The operation reduces data across all the ranks in the channel.}];
+  let summary = [{Performs all-reduce operation.}];
+  let description = [{Reduces data across all the ranks in the channel.}];
 
   let arguments = (ins
     FLOW_CollectiveReductionOpAttr:$reduction_op,
@@ -2075,7 +1771,7 @@ def FLOW_CollectiveAllToAllOp : FLOW_Op<"collective.all_to_all", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{performs all-to-all operation}];
+  let summary = [{Performs all-to-all operation.}];
   let description = [{This operation mutually exchanges data acrosss all of the ranks in the channel.}];
 
   let arguments = (ins
@@ -2112,7 +1808,7 @@ def FLOW_CollectiveReduceScatterOp : FLOW_Op<"collective.reduce_scatter", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{performs reduce and scatter operations}];
+  let summary = [{Performs reduce and scatter operations.}];
   let description = [{The operation reduces data across all the ranks in the channel and
     scatters the result to each rank.}];
 
@@ -2152,7 +1848,7 @@ def FLOW_CollectiveSendRecvOp : FLOW_Op<"collective.send_recv", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{performs a grouped send and receive operation}];
+  let summary = [{Performs a grouped send and receive operation.}];
   let description = [{The operation sends data to the rank specificied by send
     and receives data from the rank specified by recv. If send is -1, this rank
     will not send any data. If recv is -1, this rank will not receive any data

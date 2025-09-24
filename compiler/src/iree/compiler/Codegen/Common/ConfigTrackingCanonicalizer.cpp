@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/IR/PatternMatch.h"
@@ -69,14 +68,13 @@ struct ConfigTrackingCanonicalizerPass final
     : impl::ConfigTrackingCanonicalizerPassBase<
           ConfigTrackingCanonicalizerPass> {
 public:
-  using impl::ConfigTrackingCanonicalizerPassBase<
-      ConfigTrackingCanonicalizerPass>::ConfigTrackingCanonicalizerPassBase;
+  using Base::Base;
   /// Initialize the canonicalizer by building the set of patterns used during
   /// execution.
   LogicalResult initialize(MLIRContext *context) override {
     // Inherit the same config defaults from the upstream canonicalizer pass.
-    config.useTopDownTraversal = true;
-    config.enableRegionSimplification = mlir::GreedySimplifyRegionLevel::Normal;
+    config.setUseTopDownTraversal().setRegionSimplificationLevel(
+        GreedySimplifyRegionLevel::Normal);
 
     RewritePatternSet owningPatterns(context);
     for (auto *dialect : context->getLoadedDialects())
@@ -93,10 +91,10 @@ public:
     // Canonicalization is best-effort. Non-convergence is not a pass failure.
     ConfigTrackingListener listener;
     {
-      config.listener = &listener;
+      config.setListener(&listener);
       LogicalResult didConverge =
           applyPatternsGreedily(getOperation(), *patterns, config);
-      config.listener = nullptr;
+      config.setListener(nullptr);
       if (this->testConvergence && failed(didConverge)) {
         getOperation()->emitError("Canonicalizer failed to converge");
         return signalPassFailure();

@@ -59,6 +59,7 @@ iree_compiler_cc_library(
         ":FlowExtensionsOpGen",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/Flow/Transforms",
+        "//compiler/src/iree/compiler/Dialect/TensorExt/IR",
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
         "@llvm-project//mlir:Analysis",

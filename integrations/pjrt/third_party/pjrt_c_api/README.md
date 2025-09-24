@@ -9,4 +9,5 @@ releases.
 Last synced from:
 
 * https://github.com/openxla/xla.git
-* commit: a454e14ab0b10e35fb8ad73bd6db7d93782114f6
+* commit: c30baa52372eb5f2560fb7159985b13c58f46860
+* PJRT API version: 0.68

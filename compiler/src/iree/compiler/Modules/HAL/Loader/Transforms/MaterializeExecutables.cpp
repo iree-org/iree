@@ -34,12 +34,13 @@ static void replaceExecutableWithGlobal(
   // This matches the executable name and is used to directly access the
   // executable reference during dispatches.
   auto executableType = moduleBuilder.getType<IREE::HAL::ExecutableType>();
-  auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
-      loc, executableOp.getName(), /*isMutable=*/false, executableType);
+  auto globalOp =
+      IREE::Util::GlobalOp::create(moduleBuilder, loc, executableOp.getName(),
+                                   /*isMutable=*/false, executableType);
   globalOp.setPrivate();
 
   // Create initializer that selects the right binary and loads it.
-  auto initializerOp = moduleBuilder.create<IREE::Util::InitializerOp>(loc);
+  auto initializerOp = IREE::Util::InitializerOp::create(moduleBuilder, loc);
   auto entryBuilder = OpBuilder::atBlockBegin(initializerOp.addEntryBlock());
 
   // Reserve one block per attempt to load a binary.
@@ -56,13 +57,14 @@ static void replaceExecutableWithGlobal(
   auto *failBlock = initializerOp.addBlock();
   {
     auto failBuilder = OpBuilder::atBlockBegin(failBlock);
-    Value status = failBuilder.create<arith::ConstantIntOp>(
-        loc, static_cast<int>(IREE::Util::StatusCode::Unavailable), 32);
-    failBuilder.create<IREE::Util::StatusCheckOkOp>(
-        loc, status,
+    Value status = arith::ConstantIntOp::create(
+        failBuilder, loc, static_cast<int>(IREE::Util::StatusCode::Unavailable),
+        32);
+    IREE::Util::StatusCheckOkOp::create(
+        failBuilder, loc, status,
         "none of the executable binaries in the module are supported by the "
         "runtime");
-    failBuilder.create<IREE::Util::ReturnOp>(loc);
+    IREE::Util::ReturnOp::create(failBuilder, loc);
   }
 
   // Exit block takes the loaded executable and stores it.
@@ -71,14 +73,14 @@ static void replaceExecutableWithGlobal(
     auto exitBuilder = OpBuilder::atBlockBegin(exitBlock);
     auto executableArg = exitBlock->addArgument(executableType, loc);
     globalOp.createStoreOp(loc, executableArg, exitBuilder);
-    exitBuilder.create<IREE::Util::ReturnOp>(loc);
+    IREE::Util::ReturnOp::create(exitBuilder, loc);
   }
 
   // Start with the first try.
   if (!queryBlocks.empty()) {
-    entryBuilder.create<cf::BranchOp>(loc, queryBlocks[0]);
+    cf::BranchOp::create(entryBuilder, loc, queryBlocks[0]);
   } else {
-    entryBuilder.create<cf::BranchOp>(loc, failBlock);
+    cf::BranchOp::create(entryBuilder, loc, failBlock);
   }
 
   // Build the full chain of try ops. An scf.switch would be nice...
@@ -102,27 +104,27 @@ static void replaceExecutableWithGlobal(
     // it is. Otherwise we go to the next query block or fail if at the end.
     auto queryBuilder = OpBuilder::atBlockBegin(queryBlocks[i]);
     auto *nextBlock = i + 1 < binaryOps.size() ? queryBlocks[i + 1] : failBlock;
-    Value isSupported =
-        queryBuilder.create<IREE::HAL::Loader::ExecutableQuerySupportOp>(
-            binaryLoc, queryBuilder.getI1Type(), binaryOp.getFormatAttr());
-    queryBuilder.create<cf::CondBranchOp>(binaryLoc, isSupported, loadBlocks[i],
-                                          ValueRange{}, nextBlock,
-                                          ValueRange{});
+    Value isSupported = IREE::HAL::Loader::ExecutableQuerySupportOp::create(
+        queryBuilder, binaryLoc, queryBuilder.getI1Type(),
+        binaryOp.getFormatAttr());
+    cf::CondBranchOp::create(queryBuilder, binaryLoc, isSupported,
+                             loadBlocks[i], ValueRange{}, nextBlock,
+                             ValueRange{});
 
     // Load the executable. This may still fail but it'll propagate the error
     // up to the user with the full status message instead of continuing
     // execution.
     auto loadBuilder = OpBuilder::atBlockBegin(loadBlocks[i]);
     auto alignmentAttr = loadBuilder.getIndexAttr(64);
-    Value binaryData = loadBuilder.create<IREE::Util::BufferConstantOp>(
-        binaryLoc, binaryOp.getNameAttr(), binaryOp.getData(), alignmentAttr,
-        binaryOp.getMimeTypeAttr());
+    Value binaryData = IREE::Util::BufferConstantOp::create(
+        loadBuilder, binaryLoc, binaryOp.getNameAttr(), binaryOp.getData(),
+        alignmentAttr, binaryOp.getMimeTypeAttr());
     SmallVector<Value> constants; // TBD
-    Value executable = loadBuilder.create<IREE::HAL::Loader::ExecutableLoadOp>(
-        binaryLoc, executableType, binaryOp.getFormatAttr(), binaryData,
-        constants);
-    loadBuilder.create<cf::BranchOp>(binaryLoc, exitBlock,
-                                     ValueRange{executable});
+    Value executable = IREE::HAL::Loader::ExecutableLoadOp::create(
+        loadBuilder, binaryLoc, executableType, binaryOp.getFormatAttr(),
+        binaryData, constants);
+    cf::BranchOp::create(loadBuilder, binaryLoc, exitBlock,
+                         ValueRange{executable});
   }
 
   // Stash for faster lookup when replacing using.

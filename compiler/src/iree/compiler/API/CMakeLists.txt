@@ -26,7 +26,9 @@ iree_cc_library(
     MLIRCAPITransformDialectTransforms
     MLIRCAPITransforms
     iree::compiler::API::Internal::CompilerDriver
+    iree::compiler::API::Internal::IREECodegenDialectCAPI
     iree::compiler::API::Internal::IREECompileToolEntryPoint
+    iree::compiler::API::Internal::IREEGPUDialectCAPI
     iree::compiler::API::Internal::IREEMLIRLSPServerToolEntryPoint
     iree::compiler::API::Internal::IREEOptToolEntryPoint
     iree::compiler::API::Internal::IREEReduceToolEntryPoint

@@ -7,13 +7,12 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/Math/IR/Math.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AffineExpr.h"
@@ -49,7 +48,7 @@ SmallVector<int64_t> getExpandedShape(ArrayRef<int64_t> shape,
 SmallVector<int64_t> getCollapsedShape(ArrayRef<int64_t> shape,
                                        int64_t splitReductionRatio, int64_t k,
                                        int64_t targetDim) {
-  SmallVector<int64_t> ans(shape.begin(), shape.end());
+  SmallVector<int64_t> ans(shape);
   ans[targetDim] = k * splitReductionRatio;
   return ans;
 }
@@ -116,8 +115,8 @@ computeParallelTopk(Location loc, RewriterBase &rewriter,
       RankedTensorType::get(expandedShape, valueElementType);
 
   // Expand input values shape for parallel processing
-  Value valuesExpanded = rewriter.create<tensor::ExpandShapeOp>(
-      loc, valuesExpandedType, valuesOrig, reassociationIndices);
+  Value valuesExpanded = tensor::ExpandShapeOp::create(
+      rewriter, loc, valuesExpandedType, valuesOrig, reassociationIndices);
 
   // Expand input indices shape for parallel processing if they exist
   std::optional<Value> indicesExpanded;
@@ -125,8 +124,9 @@ computeParallelTopk(Location loc, RewriterBase &rewriter,
     // Type inputElementType = cast<ShapedType>(inputIndices->getType());
     Type indicesExpandedType =
         RankedTensorType::get(expandedShape, indicesElementType);
-    indicesExpanded = rewriter.create<tensor::ExpandShapeOp>(
-        loc, indicesExpandedType, inputIndices.value(), reassociationIndices);
+    indicesExpanded = tensor::ExpandShapeOp::create(
+        rewriter, loc, indicesExpandedType, inputIndices.value(),
+        reassociationIndices);
   }
 
   // Define the expanded output types
@@ -142,13 +142,15 @@ computeParallelTopk(Location loc, RewriterBase &rewriter,
   for (auto i : llvm::seq<int64_t>(0, valuesExpandedType.getRank())) {
     if (valuesExpandedType.isDynamicDim(i)) {
       dynSizes.push_back(
-          rewriter.create<tensor::DimOp>(loc, valuesExpanded, i));
+          tensor::DimOp::create(rewriter, loc, valuesExpanded, i));
     }
   }
-  Value emptyTensorOutputValues = rewriter.create<tensor::EmptyOp>(
-      loc, outputValuesExpandedType.getShape(), valueElementType, dynSizes);
-  Value emptyTensorOutputIndices = rewriter.create<tensor::EmptyOp>(
-      loc, outputIndicesExpandedType.getShape(), indicesElementType, dynSizes);
+  Value emptyTensorOutputValues = tensor::EmptyOp::create(
+      rewriter, loc, outputValuesExpandedType.getShape(), valueElementType,
+      dynSizes);
+  Value emptyTensorOutputIndices = tensor::EmptyOp::create(
+      rewriter, loc, outputIndicesExpandedType.getShape(), indicesElementType,
+      dynSizes);
 
   // Initialize indices to positive infinity and values to negative infinity
   // for a top (maxk) comparison.
@@ -162,15 +164,15 @@ computeParallelTopk(Location loc, RewriterBase &rewriter,
                         /*Negative=*/true);
     negInfAttr = rewriter.getFloatAttr(valueElementType, negApFloat);
   }
-  Value negInf = rewriter.create<arith::ConstantOp>(loc, negInfAttr);
+  Value negInf = arith::ConstantOp::create(rewriter, loc, negInfAttr);
   TypedAttr posInfAttr =
       rewriter.getIntegerAttr(indicesElementType, APInt::getSignedMaxValue(32));
-  Value posInf = rewriter.create<arith::ConstantOp>(loc, posInfAttr);
+  Value posInf = arith::ConstantOp::create(rewriter, loc, posInfAttr);
   Value negInfTensor =
-      rewriter.create<linalg::FillOp>(loc, negInf, emptyTensorOutputValues)
+      linalg::FillOp::create(rewriter, loc, negInf, emptyTensorOutputValues)
           .result();
   Value posInfTensor =
-      rewriter.create<linalg::FillOp>(loc, posInf, emptyTensorOutputIndices)
+      linalg::FillOp::create(rewriter, loc, posInf, emptyTensorOutputIndices)
           .result();
 
   SmallVector<Type> parallelTopkResultTypes = {outputValuesExpandedType,
@@ -182,8 +184,8 @@ computeParallelTopk(Location loc, RewriterBase &rewriter,
   SmallVector<Value> parallelTopkOuts = {negInfTensor, posInfTensor};
 
   // Parallel topk
-  auto parallelTopkOp = rewriter.create<iree_compiler::IREE::LinalgExt::TopkOp>(
-      loc,
+  auto parallelTopkOp = iree_compiler::IREE::LinalgExt::TopkOp::create(
+      rewriter, loc,
       /*resultTypes=*/
       parallelTopkResultTypes,
       /*ins=*/parallelTopkIns,
@@ -209,24 +211,24 @@ Value offsetParallelIndices(Location loc, RewriterBase &rewriter,
   SmallVector<AffineMap> indexingMaps = {mapIdentity};
   SmallVector<utils::IteratorType> iterators(parallelIndicesRank,
                                              utils::IteratorType::parallel);
-  Value mSplitVal = rewriter.create<arith::ConstantIntOp>(
-      loc, kDimParallelSize, parallelIndicesType.getElementType());
-  return rewriter
-      .create<linalg::GenericOp>(
-          loc,
-          /*resultType=*/parallelIndicesType,
-          /*inputs=*/ValueRange{},
-          /*outputs=*/ValueRange{parallelIndices}, indexingMaps, iterators,
-          [&](OpBuilder &b, Location loc, ValueRange args) {
-            Value splitIndex = b.create<linalg::IndexOp>(loc, splitDimParallel);
-            Value splitIndexInt = b.create<arith::IndexCastOp>(
-                loc, parallelIndicesType.getElementType(), splitIndex);
-            Value mOffset =
-                b.create<arith::MulIOp>(loc, mSplitVal, splitIndexInt);
-            Value updatedParallelIndex =
-                b.create<arith::AddIOp>(loc, mOffset, args[0]);
-            b.create<linalg::YieldOp>(loc, updatedParallelIndex);
-          })
+  Value mSplitVal = arith::ConstantIntOp::create(
+      rewriter, loc, parallelIndicesType.getElementType(), kDimParallelSize);
+  return linalg::GenericOp::create(
+             rewriter, loc,
+             /*resultType=*/parallelIndicesType,
+             /*inputs=*/ValueRange{},
+             /*outputs=*/ValueRange{parallelIndices}, indexingMaps, iterators,
+             [&](OpBuilder &b, Location loc, ValueRange args) {
+               Value splitIndex =
+                   linalg::IndexOp::create(b, loc, splitDimParallel);
+               Value splitIndexInt = arith::IndexCastOp::create(
+                   b, loc, parallelIndicesType.getElementType(), splitIndex);
+               Value mOffset =
+                   arith::MulIOp::create(b, loc, mSplitVal, splitIndexInt);
+               Value updatedParallelIndex =
+                   arith::AddIOp::create(b, loc, mOffset, args[0]);
+               linalg::YieldOp::create(b, loc, updatedParallelIndex);
+             })
       .getResult(0);
 }
 
@@ -252,19 +254,19 @@ TopkOp computeReductionTopk(Location loc, RewriterBase &rewriter, TopkOp topkOp,
       RankedTensorType::get(collapsedShape, indicesElementType);
 
   // Collapse collapse parallel output for the input of final reduction
-  Value valuesCollapsed = rewriter.create<tensor::CollapseShapeOp>(
-      loc, valuesCollapsedType, parallelTopkOp.getResults()[0],
+  Value valuesCollapsed = tensor::CollapseShapeOp::create(
+      rewriter, loc, valuesCollapsedType, parallelTopkOp.getResults()[0],
       reassociationIndices);
-  Value indicesCollapsed = rewriter.create<tensor::CollapseShapeOp>(
-      loc, indicesCollapsedType, updatedParallelIndices, reassociationIndices);
+  Value indicesCollapsed = tensor::CollapseShapeOp::create(
+      rewriter, loc, indicesCollapsedType, updatedParallelIndices,
+      reassociationIndices);
 
   // Combined final topk
-  auto reductionTopkOp =
-      rewriter.create<iree_compiler::IREE::LinalgExt::TopkOp>(
-          loc,
-          /*resultTypes=*/topkOp->getResultTypes(),
-          /*ins=*/ValueRange{valuesCollapsed, indicesCollapsed},
-          /*outs=*/topkOp.getOutputs(), kDimOrig);
+  auto reductionTopkOp = iree_compiler::IREE::LinalgExt::TopkOp::create(
+      rewriter, loc,
+      /*resultTypes=*/topkOp->getResultTypes(),
+      /*ins=*/ValueRange{valuesCollapsed, indicesCollapsed},
+      /*outs=*/topkOp.getOutputs(), kDimOrig);
   rewriter.cloneRegionBefore(topkOp.getRegion(), reductionTopkOp.getRegion(),
                              reductionTopkOp.getRegion().end());
   return reductionTopkOp;
@@ -294,13 +296,11 @@ void setSplitReductionDepth(TopkOp topkOp, RewriterBase &rewriter,
 namespace {
 struct TopkSplitReductionPass final
     : impl::TopkSplitReductionPassBase<TopkSplitReductionPass> {
-  using impl::TopkSplitReductionPassBase<
-      TopkSplitReductionPass>::TopkSplitReductionPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
-        .insert<linalg::LinalgDialect, arith::ArithDialect, math::MathDialect,
-                memref::MemRefDialect, scf::SCFDialect>();
+        .insert<linalg::LinalgDialect, arith::ArithDialect, scf::SCFDialect>();
   }
 
   void runOnOperation() override {
@@ -310,8 +310,8 @@ struct TopkSplitReductionPass final
 
     TopkSplitReductionControlFn splitReductionFn =
         [&](int64_t splitReductionDepth) -> int64_t {
-      SmallVector<int64_t, 4> reductionRatios(splitRatios.begin(),
-                                              splitRatios.end());
+      SmallVector<int64_t> reductionRatios(splitRatios.begin(),
+                                           splitRatios.end());
       if (splitReductionDepth >= reductionRatios.size()) {
         return -1;
       } else {
@@ -320,7 +320,7 @@ struct TopkSplitReductionPass final
     };
 
     IRRewriter rewriter(&getContext());
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     SmallVector<LinalgExt::TopkOp> topkCandidates;
     funcOp->walk([&](LinalgExt::TopkOp op) { topkCandidates.push_back(op); });
     for (auto op : topkCandidates) {
@@ -330,17 +330,6 @@ struct TopkSplitReductionPass final
 };
 } // namespace
 
-// Transforms an applicable standard single reduction TopkOp into a parallel
-// reduction TopkOp with a reduce step following.
-//
-// Handles parallel reductions in 2 phases: A "map" parallel phase and the a
-// single "reduce" reduction phase. The first phase expands the input tensor
-// shape by breaking the reduction dimension into multiple parallel reductions
-// (upping the rank of the input). Topk is run on these dimensions in parallel
-// The second phase collapses the parallel results into a single final reduce.
-// Topk is run again on the combined output to produce a final output.
-//
-// Currently only topk operations without input indices are supported.
 LogicalResult
 splitReduction(RewriterBase &rewriter, LinalgExt::TopkOp topkOp,
                const TopkSplitReductionControlFn &splitReductionFn) {
@@ -401,6 +390,339 @@ splitReduction(RewriterBase &rewriter, LinalgExt::TopkOp topkOp,
   }
 
   return success();
+}
+
+struct ArgmaxCombinerOps {
+  Operation *maxOp = nullptr;    // arith.maximumf
+  Operation *selectOp = nullptr; // arith.select
+  Operation *cmpOp = nullptr;    // arith.cmpf
+};
+
+// Matches the combiner pattern in a linalg.generic argmax-style reduction:
+// Example MLIR:
+// %4:2 = linalg.generic {
+//     indexing_maps = [...],
+//     iterator_types = ["parallel", "reduction"]
+//   } ins(%arg0 : tensor<?x128xbf16>) outs(%1, %3 : tensor<?xbf16>,
+//   tensor<?xi64>) {
+// ^bb0(%in: bf16, %out: bf16, %out_0: i64):
+//   %5 = linalg.index 1 : index
+//   %6 = arith.index_cast %5 : index to i64
+//   %7 = arith.maximumf %in, %out : bf16
+//   %8 = arith.cmpf ogt, %in, %out : bf16
+//   %9 = arith.select %8, %6, %out_0 : i64
+//   linalg.yield %7, %9 : bf16, i64
+// } -> (tensor<?xbf16>, tensor<?xi64>)
+//
+// This function extracts the `arith.maximumf`, `arith.cmpf`, and `arith.select`
+// operations from the body to facilitate transformations such as split
+// reduction.
+static ArgmaxCombinerOps collectArgmaxCombinerOps(linalg::GenericOp genericOp) {
+  assert(isArgmaxOp(genericOp) && "expected operation to be an argmax op");
+
+  auto yieldOp = cast<linalg::YieldOp>(genericOp.getBody()->getTerminator());
+
+  // Extract max value producer: arith.maximumf.
+  Value maxResult = yieldOp.getOperand(0);
+  auto maxOp = cast<arith::MaximumFOp>(maxResult.getDefiningOp());
+
+  // Extract index result producer: arith.select.
+  Value indexResult = yieldOp.getOperand(1);
+  auto selectOp = cast<arith::SelectOp>(indexResult.getDefiningOp());
+
+  // Extract the condition of the select, expected to be arith.cmpf with
+  // predicate OGT.
+  auto cmpOp = cast<arith::CmpFOp>(selectOp.getCondition().getDefiningOp());
+
+  ArgmaxCombinerOps ops;
+  ops.maxOp = maxOp;
+  ops.selectOp = selectOp;
+  ops.cmpOp = cmpOp;
+  return ops;
+}
+
+static Value expandValue(OpBuilder &builder, Location loc, Value value,
+                         RankedTensorType expandedType) {
+  RankedTensorType originalType = cast<RankedTensorType>(value.getType());
+  if (originalType == expandedType) {
+    return value;
+  }
+  auto reassociation =
+      getReassociationIndicesForReshape(originalType, expandedType);
+  assert(reassociation && "failed to infer reassociation indices from types");
+  return tensor::ExpandShapeOp::create(builder, loc, expandedType, value,
+                                       *reassociation);
+}
+
+// Returns an expanded input AffineMap by splitting the given reduction
+// dimension into [parallel, reduction] or [reduction, parallel], inserting a
+// new dimension at `insertSplitDim`.
+static AffineMap getExpandedInputIndexingMap(AffineMap oldMap,
+                                             unsigned reductionDim,
+                                             unsigned insertSplitDim,
+                                             bool innerParallel,
+                                             MLIRContext *ctx) {
+  SmallVector<AffineExpr> exprs;
+  for (unsigned idx = 0; idx < oldMap.getNumResults(); ++idx) {
+    unsigned dim = oldMap.getDimPosition(idx);
+    if (dim != reductionDim) {
+      unsigned shifted = (dim < insertSplitDim) ? dim : dim + 1;
+      exprs.push_back(getAffineDimExpr(shifted, ctx));
+      continue;
+    }
+    // Expand the reduction dimension into [reduction, parallel] or [parallel,
+    // reduction].
+    if (innerParallel) {
+      exprs.push_back(
+          getAffineDimExpr(dim < insertSplitDim ? dim : dim + 1, ctx));
+      exprs.push_back(getAffineDimExpr(insertSplitDim, ctx));
+    } else {
+      exprs.push_back(getAffineDimExpr(insertSplitDim, ctx));
+      exprs.push_back(
+          getAffineDimExpr(dim < insertSplitDim ? dim : dim + 1, ctx));
+    }
+  }
+
+  return AffineMap::get(oldMap.getNumDims() + 1, oldMap.getNumSymbols(), exprs,
+                        ctx);
+}
+
+// Returns an expanded output AffineMap with a dimension inserted at
+// `insertSplitDim`.
+static AffineMap getExpandedOutputIndexingMap(AffineMap oldMap,
+                                              unsigned insertSplitDim,
+                                              MLIRContext *ctx) {
+  SmallVector<AffineExpr> exprs;
+  for (unsigned idx = 0; idx <= oldMap.getNumResults(); ++idx) {
+    if (idx == insertSplitDim) {
+      exprs.push_back(getAffineDimExpr(insertSplitDim, ctx));
+    }
+    if (idx < oldMap.getNumResults()) {
+      unsigned dim = oldMap.getDimPosition(idx);
+      unsigned shifted = (dim < insertSplitDim) ? dim : dim + 1;
+      exprs.push_back(getAffineDimExpr(shifted, ctx));
+    }
+  }
+
+  return AffineMap::get(oldMap.getNumDims() + 1, oldMap.getNumSymbols(), exprs,
+                        ctx);
+}
+
+static Value getSplitReductionInit(OpBuilder &builder, Location loc,
+                                   Value origInit, Attribute identityAttr,
+                                   int64_t insertDimSize,
+                                   unsigned insertSplitIndex) {
+  Type elemType = getElementTypeOrSelf(origInit.getType());
+  SmallVector<OpFoldResult> shape =
+      tensor::getMixedSizes(builder, loc, origInit);
+  shape.insert(shape.begin() + insertSplitIndex,
+               builder.getIndexAttr(insertDimSize));
+  Value identityVal = arith::ConstantOp::create(builder, loc, elemType,
+                                                cast<TypedAttr>(identityAttr));
+  Value empty = tensor::EmptyOp::create(builder, loc, shape, elemType);
+  return linalg::FillOp::create(builder, loc, identityVal, empty).getResult(0);
+}
+
+FailureOr<linalg::SplitReductionResult>
+splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
+                     linalg::ControlSplitReductionFn controlSplitReductionFn) {
+  assert(isArgmaxOp(genericOp) && "expected operation to be an argmax op");
+
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(genericOp);
+  Location loc = genericOp->getLoc();
+
+  linalg::SplitReductionOptions control = controlSplitReductionFn(genericOp);
+  if (control.innerParallel) {
+    // TODO(Bangtian): Currently bail out when innerParallel is true.
+    // Much of the logic is already in place based on the upstream
+    // implementation, but full support requires early detection and additional
+    // handling before performing the split. Will revisit when support becomes
+    // necessary.
+    return rewriter.notifyMatchFailure(
+        genericOp, "innerParallel split is not supported yet");
+  }
+
+  int64_t ratio = control.ratio;
+  unsigned insertSplitIndex = control.index;
+  unsigned insertSplitDimension = control.index;
+  if (ratio <= 1) {
+    return rewriter.notifyMatchFailure(
+        genericOp, "split ratio needs to be greater than 1");
+  }
+
+  SmallVector<unsigned> dims;
+  genericOp.getReductionDims(dims);
+  unsigned reductionDim = dims[0];
+  if (control.innerParallel) {
+    insertSplitDimension = reductionDim + 1;
+  }
+
+  SmallVector<int64_t> loopRanges = genericOp.getStaticLoopRanges();
+  int64_t reductionDimSize = loopRanges[reductionDim];
+  if (ShapedType::isDynamic(reductionDimSize) ||
+      reductionDimSize % ratio != 0) {
+    return rewriter.notifyMatchFailure(
+        genericOp, "Reduction dimension not divisible by split ratio");
+  }
+
+  if (insertSplitIndex >
+      genericOp.getShape(genericOp.getDpsInitOperand(0)).size()) {
+    return rewriter.notifyMatchFailure(genericOp,
+                                       "Insert dimension position too large "
+                                       "compared to intermediate tensor size");
+  }
+
+  ArgmaxCombinerOps combinerOps = collectArgmaxCombinerOps(genericOp);
+  Operation *reductionOp = combinerOps.maxOp;
+  std::optional<TypedAttr> identity = arith::getNeutralElement(reductionOp);
+  if (!identity.has_value()) {
+    return rewriter.notifyMatchFailure(
+        genericOp, "Unknown identity value for the reduction");
+  }
+
+  SmallVector<Value> newInputs;
+  for (OpOperand *operand : genericOp.getDpsInputOperands()) {
+    AffineMap map = genericOp.getMatchingIndexingMap(operand);
+    ArrayRef<int64_t> oldShape = genericOp.getShape(operand);
+    Type elementType = getElementTypeOrSelf(operand->get().getType());
+    SmallVector<int64_t> expandedShape;
+    for (auto idx : llvm::seq<unsigned>(0, map.getNumResults())) {
+      unsigned dim = map.getDimPosition(idx);
+      if (dim != reductionDim) {
+        expandedShape.push_back(oldShape[idx]);
+        continue;
+      }
+      int64_t orig = oldShape[idx];
+      int64_t outer = orig / ratio;
+      if (control.innerParallel) {
+        expandedShape.push_back(ratio); // reduction.
+        expandedShape.push_back(outer); // parallel.
+      } else {
+        expandedShape.push_back(outer); // parallel.
+        expandedShape.push_back(ratio); // reduction.
+      }
+    }
+
+    auto expandedType = RankedTensorType::get(expandedShape, elementType);
+    Value expanded = expandValue(rewriter, loc, operand->get(), expandedType);
+    newInputs.push_back(expanded);
+  }
+
+  // The total number of output elements along this new dimension is
+  // reductionDimSize / ratio.
+  int64_t outputDimSize = reductionDimSize / ratio;
+  OpOperand *valueInit = genericOp.getDpsInitOperand(0);
+  OpOperand *indexInit = genericOp.getDpsInitOperand(1);
+  // Value identity.
+  Value identityValue =
+      getSplitReductionInit(rewriter, loc, valueInit->get(), *identity,
+                            outputDimSize, insertSplitIndex);
+  // Index identity.
+  Type indexElemType = genericOp.getRegionOutputArgs()[1].getType();
+  Value identityIndex = getSplitReductionInit(
+      rewriter, loc, indexInit->get(), rewriter.getZeroAttr(indexElemType),
+      outputDimSize, insertSplitIndex);
+
+  SmallVector<utils::IteratorType> newIteratorTypes =
+      genericOp.getIteratorTypesArray();
+  newIteratorTypes.insert(newIteratorTypes.begin() + insertSplitDimension,
+                          utils::IteratorType::parallel);
+
+  SmallVector<AffineMap> newMaps;
+  unsigned numInputs = genericOp.getNumDpsInputs();
+  for (OpOperand &operand : genericOp->getOpOperands()) {
+    AffineMap map = genericOp.getMatchingIndexingMap(&operand);
+    if (operand.getOperandNumber() < numInputs) {
+      newMaps.push_back(getExpandedInputIndexingMap(
+          map, reductionDim, insertSplitDimension, control.innerParallel,
+          rewriter.getContext()));
+    } else {
+      newMaps.push_back(getExpandedOutputIndexingMap(map, insertSplitDimension,
+                                                     rewriter.getContext()));
+    }
+  }
+
+  // Step 1: Create a a structurally strict argmax that performs a partial
+  // reduction over the split (tile) dimension. The argmax matches the pattern
+  // expected by isArgmaxOp (maximumf, cmpf, select with index from
+  // linalg.index). The result yields the local maximum values and their
+  // corresponding local indices within each tile. These local indices will be
+  // adjusted to global indices in step 2.
+  auto partialArgmax = linalg::GenericOp::create(
+      rewriter, loc,
+      TypeRange{identityValue.getType(), identityIndex.getType()}, newInputs,
+      ValueRange{identityValue, identityIndex}, newMaps, newIteratorTypes,
+      [reductionDim](OpBuilder &b, Location loc, ValueRange args) {
+        Value in = args[0];
+        Value outVal = args[1];
+        Value outIdx = args[2];
+        Value reductionIdx = linalg::IndexOp::create(b, loc, reductionDim + 1);
+        if (outIdx.getType() != reductionIdx.getType())
+          reductionIdx = arith::IndexCastOp::create(b, loc, outIdx.getType(),
+                                                    reductionIdx);
+        Value maxVal = arith::MaximumFOp::create(b, loc, in, outVal);
+        Value cmp = arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OGT, in,
+                                          outVal);
+        Value selIdx =
+            arith::SelectOp::create(b, loc, cmp, reductionIdx, outIdx);
+        linalg::YieldOp::create(b, loc, ValueRange{maxVal, selIdx});
+      });
+
+  // Step 2: Final reduction that computes global indices and selects the one
+  // corresponding to the maximum value.
+  Value tileSize = arith::ConstantIndexOp::create(rewriter, loc, ratio);
+  unsigned intermRank =
+      cast<RankedTensorType>(identityValue.getType()).getRank();
+  AffineMap valueMap = rewriter.getMultiDimIdentityMap(intermRank);
+  AffineMap indexMap = valueMap;
+
+  SmallVector<AffineExpr> resultExprs;
+  SmallVector<utils::IteratorType> reductionIteratorTypes(
+      intermRank, utils::IteratorType::parallel);
+  reductionIteratorTypes[insertSplitIndex] = utils::IteratorType::reduction;
+  for (auto i : llvm::seq<unsigned>(0, intermRank)) {
+    if (i != insertSplitIndex) {
+      resultExprs.push_back(rewriter.getAffineDimExpr(i));
+    }
+  }
+
+  AffineMap outputMap =
+      AffineMap::get(intermRank, 0, resultExprs, rewriter.getContext());
+  SmallVector<AffineMap> finalReductionMaps = {valueMap, indexMap, outputMap,
+                                               outputMap};
+  auto finalReduction = linalg::GenericOp::create(
+      rewriter, loc, genericOp.getResultTypes(),
+      ValueRange{partialArgmax.getResult(0), partialArgmax.getResult(1)},
+      genericOp.getDpsInits(), finalReductionMaps, reductionIteratorTypes,
+      [combinerOps, tileSize, insertSplitDimension](OpBuilder &b, Location loc,
+                                                    ValueRange inputs) {
+        Value val = inputs[0];
+        Value local = inputs[1];
+        Value outVal = inputs[2];
+        Value outIdx = inputs[3];
+        Value outer = linalg::IndexOp::create(b, loc, insertSplitDimension);
+        Value offset = arith::MulIOp::create(b, loc, outer, tileSize);
+        if (offset.getType() != local.getType())
+          offset = arith::IndexCastOp::create(b, loc, local.getType(), offset);
+        // gidx = outer * ratio + local.
+        Value gidx = arith::AddIOp::create(b, loc, offset, local);
+        Operation *clonedMax = b.clone(*combinerOps.maxOp);
+        clonedMax->setOperands({val, outVal});
+        Operation *clonedCmp = b.clone(*combinerOps.cmpOp);
+        clonedCmp->setOperands({val, outVal});
+        Operation *clonedSel = b.clone(*combinerOps.selectOp);
+        clonedSel->setOperands({clonedCmp->getResult(0), gidx, outIdx});
+        linalg::YieldOp::create(
+            b, loc,
+            ValueRange{clonedMax->getResult(0), clonedSel->getResult(0)});
+      });
+
+  rewriter.replaceOp(genericOp, finalReduction.getResults());
+  // Init or alloc and fillOp are not applicable for argmax op; set to nullptr.
+  return linalg::SplitReductionResult{
+      /*initOrAlloc=*/nullptr, /*fillOp=*/nullptr,
+      cast<linalg::LinalgOp>(partialArgmax.getOperation()), finalReduction};
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

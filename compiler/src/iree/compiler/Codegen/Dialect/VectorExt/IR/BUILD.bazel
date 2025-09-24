@@ -34,6 +34,7 @@ iree_td_library(
     deps = [
         "@llvm-project//mlir:BuiltinDialectTdFiles",
         "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
+        "@llvm-project//mlir:MaskableOpInterfaceTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:SideEffectInterfacesTdFiles",
         "@llvm-project//mlir:VectorInterfacesTdFiles",
@@ -76,10 +77,12 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:MaskableOpInterface",
         "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:VectorDialect",
+        "@llvm-project//mlir:VectorInterfaces",
     ],
 )
 
@@ -176,6 +179,7 @@ iree_gentbl_cc_library(
 
 iree_tablegen_doc(
     name = "IREEVectorExtDialectDocGen",
+    category = "Dialects",
     tbl_outs = [
         (
             [

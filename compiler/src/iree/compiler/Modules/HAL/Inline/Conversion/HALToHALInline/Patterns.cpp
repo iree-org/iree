@@ -50,6 +50,30 @@ struct EncodingTypeOpConversion
   }
 };
 
+struct MemoryTypeOpConversion
+    : public OpConversionPattern<IREE::HAL::MemoryTypeOp> {
+  using OpConversionPattern<IREE::HAL::MemoryTypeOp>::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::HAL::MemoryTypeOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(
+        op, op.getTypeAttr().getInt(), 32);
+    return success();
+  }
+};
+
+struct BufferUsageOpConversion
+    : public OpConversionPattern<IREE::HAL::BufferUsageOp> {
+  using OpConversionPattern<IREE::HAL::BufferUsageOp>::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::HAL::BufferUsageOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(
+        op, op.getUsageAttr().getInt(), 32);
+    return success();
+  }
+};
+
 struct BufferSubspanOpPattern
     : public OpConversionPattern<IREE::HAL::BufferSubspanOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -86,8 +110,8 @@ struct BufferLoadOpPattern
     Value storageBuffer =
         rewriter.createOrFold<IREE::HAL::Inline::BufferStorageOp>(
             op.getLoc(), adaptor.getSourceBuffer());
-    Value storageSize = rewriter.create<IREE::HAL::Inline::BufferLengthOp>(
-        op.getLoc(), adaptor.getSourceBuffer());
+    Value storageSize = IREE::HAL::Inline::BufferLengthOp::create(
+        rewriter, op.getLoc(), adaptor.getSourceBuffer());
     auto loadType = getTypeConverter()->convertType(op.getResult().getType());
     auto elementSize =
         rewriter.createOrFold<IREE::Util::SizeOfOp>(op.getLoc(), loadType);
@@ -107,8 +131,8 @@ struct BufferStoreOpPattern
     Value storageBuffer =
         rewriter.createOrFold<IREE::HAL::Inline::BufferStorageOp>(
             op.getLoc(), adaptor.getTargetBuffer());
-    Value storageSize = rewriter.create<IREE::HAL::Inline::BufferLengthOp>(
-        op.getLoc(), adaptor.getTargetBuffer());
+    Value storageSize = IREE::HAL::Inline::BufferLengthOp::create(
+        rewriter, op.getLoc(), adaptor.getTargetBuffer());
     auto elementSize = rewriter.createOrFold<IREE::Util::SizeOfOp>(
         op.getLoc(), adaptor.getValue().getType());
     rewriter.replaceOpWithNewOp<IREE::Util::BufferStoreOp>(
@@ -250,6 +274,8 @@ void populateHALToHALInlinePatterns(MLIRContext *context,
 
   patterns.insert<ElementTypeOpConversion>(context);
   patterns.insert<EncodingTypeOpConversion>(context);
+  patterns.insert<MemoryTypeOpConversion>(context);
+  patterns.insert<BufferUsageOpConversion>(context);
 
   patterns.insert<BufferViewCreateOpPattern>(typeConverter, context);
   patterns.insert<BufferViewAssertOpPattern>(typeConverter, context);

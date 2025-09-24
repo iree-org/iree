@@ -8,7 +8,7 @@ tags:
 
 # HIP HAL driver
 
-This document lists technical details regarding the HIP implemenation of
+This document lists technical details regarding the HIP implementation of
 IREE's Hardware Abstraction Layer, called a HIP HAL driver.
 
 IREE provides a [Hardware Abstraction Layer (HAL)][iree-hal] as a common
@@ -197,7 +197,7 @@ Though, per the documentation of `hipLaunchHostFunc()`, "the host function must
 not make any HIP API calls." So we cannot do that directly inside
 `hipLaunchHostFunc()`; we need to notify another separate thread to call HIP
 APIs to push more work to the GPU. So the deferred/pending action queue should
-have an associcated thread.
+have an associated thread.
 
 For GPU waits, we can also leverage the same logic--using CPU signaling to
 unblock deferred GPU queue actions. Though this is performant, given that

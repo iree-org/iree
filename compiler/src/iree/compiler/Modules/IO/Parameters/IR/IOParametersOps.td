@@ -33,7 +33,7 @@ def IOParameters_LoadOp : IOParameters_Op<"load", [
   AttrSizedOperandSegments,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{reads one or more parameters from a parameter scope}];
+  let summary = [{Reads one or more parameters from a parameter scope.}];
   let description = [{
     Asynchronously reads one or more parameters from an external parameter
     provider and returns the resulting buffers. Depending on the parameter and
@@ -50,8 +50,8 @@ def IOParameters_LoadOp : IOParameters_Op<"load", [
     OptionalAttr<StrAttr>:$source_scope,
     StrArrayAttr:$source_keys,
     Variadic<I64>:$source_offsets,
-    HAL_MemoryTypeBitfieldAttr:$memory_types,
-    HAL_BufferUsageBitfieldAttr:$buffer_usage,
+    HAL_MemoryType:$memory_types,
+    HAL_BufferUsage:$buffer_usage,
     Variadic<HAL_DeviceSize>:$lengths
   );
   let results = (outs
@@ -86,7 +86,7 @@ def IOParameters_LoadOp : IOParameters_Op<"load", [
 def IOParameters_GatherOp : IOParameters_Op<"gather", [
   AttrSizedOperandSegments,
 ]> {
-  let summary = [{gathers multiple parameters from a parameter scope}];
+  let summary = [{Gathers multiple parameters from a parameter scope.}];
   let description = [{
     Asynchronously gathers one or more parameters into a single target buffer.
     This is equivalent to one read per parameter but allows implementations that
@@ -127,7 +127,7 @@ def IOParameters_GatherOp : IOParameters_Op<"gather", [
 def IOParameters_ScatterOp : IOParameters_Op<"scatter", [
   AttrSizedOperandSegments,
 ]> {
-  let summary = [{scatters multiple parameters to a parameter scope}];
+  let summary = [{Scatters multiple parameters to a parameter scope.}];
   let description = [{
     Asynchronously scatters one or more parameters from a single source buffer
     into one or more parameters. This is equivalent to one write per parameter

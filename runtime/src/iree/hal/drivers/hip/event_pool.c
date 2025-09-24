@@ -34,6 +34,15 @@ struct iree_hal_hip_event_t {
   // The symbols used to create and destroy hipEvent_t objects.
   const iree_hal_hip_dynamic_symbols_t* symbols;
 
+  // This event was imported, and should be disposed instead of
+  // pooled.
+  bool imported;
+
+  // This event has been exported, therefore we should drop it
+  // instead of re-adding it to the pool. We should not delete
+  // it.
+  bool exported;
+
   // The event pool that owns this event. This cannot be NULL. We retain it to
   // make sure the event outlive the pool.
   iree_hal_hip_event_pool_t* pool;
@@ -51,7 +60,11 @@ static inline void iree_hal_hip_event_destroy(iree_hal_hip_event_t* event) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   IREE_ASSERT_REF_COUNT_ZERO(&event->ref_count);
-  IREE_HIP_IGNORE_ERROR(symbols, hipEventDestroy(event->hip_event));
+  // If this event was exported, then we do not want to destroy it
+  // as ownership is transferred out.
+  if (!event->exported) {
+    IREE_HIP_IGNORE_ERROR(symbols, hipEventDestroy(event->hip_event));
+  }
   iree_allocator_free(host_allocator, event);
 
   IREE_TRACE_ZONE_END(z0);
@@ -60,7 +73,7 @@ static inline void iree_hal_hip_event_destroy(iree_hal_hip_event_t* event) {
 static inline iree_status_t iree_hal_hip_event_create(
     const iree_hal_hip_dynamic_symbols_t* symbols,
     iree_hal_hip_event_pool_t* pool, iree_allocator_t host_allocator,
-    iree_hal_hip_event_t** out_event) {
+    hipEvent_t imported_event, iree_hal_hip_event_t** out_event) {
   IREE_ASSERT_ARGUMENT(symbols);
   IREE_ASSERT_ARGUMENT(pool);
   IREE_ASSERT_ARGUMENT(out_event);
@@ -75,12 +88,19 @@ static inline iree_status_t iree_hal_hip_event_create(
   event->host_allocator = host_allocator;
   event->symbols = symbols;
   event->pool = pool;
-  event->hip_event = NULL;
+  event->hip_event = imported_event;
+  event->exported = false;
 
-  iree_status_t status = IREE_HIP_CALL_TO_STATUS(
-      symbols,
-      hipEventCreateWithFlags(&event->hip_event, hipEventDisableTiming),
-      "hipEventCreateWithFlags");
+  iree_status_t status = iree_ok_status();
+
+  if (event->hip_event) {
+    event->imported = true;
+  } else {
+    status = IREE_HIP_CALL_TO_STATUS(
+        symbols,
+        hipEventCreateWithFlags(&event->hip_event, hipEventDisableTiming),
+        "hipEventCreateWithFlags");
+  }
   if (iree_status_is_ok(status)) {
     *out_event = event;
   } else {
@@ -111,6 +131,15 @@ void iree_hal_hip_event_release(iree_hal_hip_event_t* event) {
     // Drop our reference to the pool itself when we return event to it.
     iree_hal_hip_event_pool_release(pool);  // -1
   }
+}
+
+iree_status_t iree_hal_hip_event_export(iree_hal_hip_event_t* event) {
+  if (event->imported) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "Cannot export an imported event");
+  }
+  event->exported = true;
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -175,7 +204,7 @@ iree_status_t iree_hal_hip_event_pool_allocate(
   if (iree_status_is_ok(status)) {
     for (iree_host_size_t i = 0; i < available_capacity; ++i) {
       status = iree_hal_hip_event_create(
-          symbols, event_pool, host_allocator,
+          symbols, event_pool, host_allocator, NULL,
           &event_pool->available_list[event_pool->available_count++]);
       if (!iree_status_is_ok(status)) break;
     }
@@ -187,6 +216,19 @@ iree_status_t iree_hal_hip_event_pool_allocate(
     iree_hal_hip_event_pool_free(event_pool);
   }
   IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+// Imports an external hip_event_t to the pool.
+iree_status_t iree_hal_hip_event_pool_import(
+    iree_hal_hip_event_pool_t* event_pool, hipEvent_t event,
+    iree_hal_hip_event_t** out_event) {
+  iree_status_t status =
+      iree_hal_hip_event_create(event_pool->symbols, event_pool,
+                                event_pool->host_allocator, event, out_event);
+  if (iree_status_is_ok(status)) {
+    iree_hal_hip_event_pool_retain(event_pool);
+  }
   return status;
 }
 
@@ -257,7 +299,7 @@ iree_status_t iree_hal_hip_event_pool_acquire(
                                      event_pool->device_context));
     for (iree_host_size_t i = 0; i < remaining_count; ++i) {
       iree_status_t status = iree_hal_hip_event_create(
-          event_pool->symbols, event_pool, event_pool->host_allocator,
+          event_pool->symbols, event_pool, event_pool->host_allocator, NULL,
           &out_events[from_pool_count + i]);
       if (!iree_status_is_ok(status)) {
         // Must release all events we've acquired so far.
@@ -287,36 +329,18 @@ static void iree_hal_hip_event_pool_release_event(
   IREE_ASSERT_ARGUMENT(events);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // We'll try to release all we can back to the pool and then deinitialize
-  // the ones that won't fit.
-  iree_host_size_t remaining_count = event_count;
-
   // Try first to release to the pool.
   iree_slim_mutex_lock(&event_pool->event_mutex);
-  iree_host_size_t to_pool_count =
-      iree_min(event_pool->available_capacity - event_pool->available_count,
-               event_count);
-  if (to_pool_count > 0) {
-    for (iree_host_size_t i = 0; i < to_pool_count; ++i) {
-      IREE_ASSERT_REF_COUNT_ZERO(&events[i]->ref_count);
-      iree_hal_hip_event_retain(events[i]);  // -> 1
+  for (iree_host_size_t i = 0; i < event_count; ++i) {
+    if (!events[i]->imported && !events[i]->exported &&
+        event_pool->available_capacity > event_pool->available_count) {
+      iree_hal_hip_event_retain(events[i]);
+      event_pool->available_list[event_pool->available_count] = events[i];
+      event_pool->available_count += 1;
+    } else {
+      iree_hal_hip_event_destroy(events[i]);
     }
-    iree_host_size_t pool_base_index = event_pool->available_count;
-    memcpy(&event_pool->available_list[pool_base_index], events,
-           to_pool_count * sizeof(*event_pool->available_list));
-    event_pool->available_count += to_pool_count;
-    remaining_count -= to_pool_count;
   }
   iree_slim_mutex_unlock(&event_pool->event_mutex);
-
-  // Deallocate the rest of the events. We don't bother resetting them as we are
-  // getting rid of them.
-  if (remaining_count > 0) {
-    IREE_TRACE_ZONE_APPEND_TEXT(z0, "unpooled release");
-    IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)remaining_count);
-    for (iree_host_size_t i = 0; i < remaining_count; ++i) {
-      iree_hal_hip_event_destroy(events[to_pool_count + i]);
-    }
-  }
   IREE_TRACE_ZONE_END(z0);
 }

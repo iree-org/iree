@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
+#include "llvm/Support/Casting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -25,11 +27,16 @@ static bool isScalarOrTensorOfSizeOne(Type t) {
   return t.isIntOrIndexOrFloat();
 }
 
+static bool hasDirectWriteResult(Operation *op) {
+  return llvm::any_of(op->getUsers(),
+                      llvm::IsaPred<IREE::TensorExt::DispatchTensorStoreOp>);
+}
+
 /// Rematerialize all parallel elementwise operations into its users within a
 /// `flow.dispatch.region`.
 struct RematerializeParallelOpsPattern
     : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
@@ -44,9 +51,16 @@ struct RematerializeParallelOpsPattern
 
     // Find the first operand that is defined by another generic op on tensors.
     for (OpOperand &opOperand : genericOp->getOpOperands()) {
-      if (!linalg::areElementwiseOpsFusable(&opOperand))
+      if (!linalg::areElementwiseOpsFusable(&opOperand)) {
         continue;
-
+      }
+      auto producer = opOperand.get().getDefiningOp<linalg::GenericOp>();
+      if (producer && hasExternalCapture(producer)) {
+        continue;
+      }
+      if (producer && hasDirectWriteResult(producer)) {
+        continue;
+      }
       FailureOr<linalg::ElementwiseOpFusionResult> fusionResult =
           linalg::fuseElementwiseOps(rewriter, &opOperand);
       if (succeeded(fusionResult)) {
@@ -66,7 +80,7 @@ struct RematerializeParallelOpsPattern
 struct RematerializeParallelOpsPass final
     : impl::RematerializeParallelOpsPassBase<RematerializeParallelOpsPass> {
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     RewritePatternSet fusionPatterns(funcOp.getContext());
     fusionPatterns.insert<RematerializeParallelOpsPattern>(funcOp.getContext());
     linalg::populateEraseUnusedOperandsAndResultsPatterns(fusionPatterns);

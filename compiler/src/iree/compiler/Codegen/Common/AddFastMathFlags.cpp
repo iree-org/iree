@@ -33,8 +33,7 @@ namespace {
 struct AddFastMathFlagsPass final
     : impl::AddFastMathFlagsPassBase<AddFastMathFlagsPass> {
 public:
-  using impl::AddFastMathFlagsPassBase<
-      AddFastMathFlagsPass>::AddFastMathFlagsPassBase;
+  using Base::Base;
 
   void runOnOperation() override {
     getOperation()->walk([](Operation *op) { addContractFMF(op); });

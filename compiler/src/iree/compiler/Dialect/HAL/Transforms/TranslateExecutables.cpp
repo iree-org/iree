@@ -50,7 +50,7 @@ struct TranslateTargetExecutableVariantsPass
   }
 
   void runOnOperation() override {
-    auto variantOp = getOperation();
+    IREE::HAL::ExecutableVariantOp variantOp = getOperation();
     if (variantOp.getTarget().getBackend().getValue() != target)
       return;
     if (variantOp.isExternal())
@@ -58,7 +58,8 @@ struct TranslateTargetExecutableVariantsPass
 
     auto targetBackend = targetRegistry->getTargetBackend(target);
     if (!targetBackend) {
-      variantOp.emitError() << "unregistered target backend '" << target << "'";
+      emitError(variantOp->getLoc())
+          << "unregistered target backend '" << target << "'";
       return signalPassFailure();
     }
 
@@ -66,9 +67,10 @@ struct TranslateTargetExecutableVariantsPass
     targetBackend->buildTranslationPassPipeline(variantOp.getTargetAttr(),
                                                 passManager);
     if (failed(runPipeline(passManager, variantOp))) {
-      variantOp.emitError() << "failed to run translation of source "
-                               "executable to target executable for backend "
-                            << variantOp.getTarget();
+      emitError(variantOp->getLoc())
+          << "failed to run translation of source executable to target "
+             "executable for backend "
+          << variantOp.getTarget();
       return signalPassFailure();
     }
   }
@@ -95,7 +97,7 @@ struct TranslateAllExecutablesPass
   }
 
   void runOnOperation() override {
-    auto executableOp = getOperation();
+    IREE::HAL::ExecutableOp executableOp = getOperation();
     OpPassManager passManager(executableOp.getOperationName());
     for (const auto &targetName : gatherExecutableTargetNames(executableOp)) {
       passManager.addNestedPass<IREE::HAL::ExecutableVariantOp>(
@@ -106,7 +108,6 @@ struct TranslateAllExecutablesPass
     IREE_COMPILER_TRACE_MESSAGE_DYNAMIC(INFO, executableOp.getSymName().str());
 
     if (failed(runPipeline(passManager, executableOp))) {
-      llvm::errs() << "failed to translate executables\n";
       return signalPassFailure();
     }
   }

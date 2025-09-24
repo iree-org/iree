@@ -80,6 +80,7 @@ def main(args):
         "IREEVectorExt.md": "compiler/src/iree/compiler/Codegen/Dialect/VectorExt/IR",
         "LinalgExt.md": "compiler/src/iree/compiler/Dialect/LinalgExt/IR",
         "Stream.md": "compiler/src/iree/compiler/Dialect/Stream/IR",
+        "TensorExt.md": "compiler/src/iree/compiler/Dialect/TensorExt/IR",
         "Util.md": "compiler/src/iree/compiler/Dialect/Util/IR",
         "VM.md": "compiler/src/iree/compiler/Dialect/VM/IR",
         "VMVX.md": "compiler/src/iree/compiler/Dialect/VMVX/IR",

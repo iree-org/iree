@@ -53,7 +53,7 @@ static Value allocateGlobalSharedMemory(Location loc, OpBuilder &builder,
     memrefType = MemRefType::get({1}, type, MemRefLayoutAttrInterface{},
                                  addressSpaceAttr);
   }
-  return builder.create<memref::AllocOp>(loc, memrefType);
+  return memref::AllocOp::create(builder, loc, memrefType);
 }
 
 /// Returns true if the given op is a memref.load from a uniform buffer or
@@ -158,14 +158,14 @@ struct InsertToBroadcast final : OpRewritePattern<vector::InsertOp> {
     if (insertOp.getDestVectorType().getNumElements() != 1)
       return failure();
     rewriter.replaceOpWithNewOp<vector::BroadcastOp>(
-        insertOp, insertOp.getDestVectorType(), insertOp.getSource());
+        insertOp, insertOp.getDestVectorType(), insertOp.getValueToStore());
     return success();
   }
 };
 
 /// Pattern to sink `gpu.barrier` ops out of a `warp_execute_on_lane_0` op.
 struct WarpOpBarrier final : OpRewritePattern<gpu::WarpExecuteOnLane0Op> {
-  using OpRewritePattern<gpu::WarpExecuteOnLane0Op>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(gpu::WarpExecuteOnLane0Op warpOp,
                                 PatternRewriter &rewriter) const override {
@@ -177,7 +177,7 @@ struct WarpOpBarrier final : OpRewritePattern<gpu::WarpExecuteOnLane0Op> {
       return failure();
 
     rewriter.setInsertionPointAfter(warpOp);
-    (void)rewriter.create<gpu::BarrierOp>(barrierOp.getLoc());
+    (void)gpu::BarrierOp::create(rewriter, barrierOp.getLoc());
     rewriter.eraseOp(barrierOp);
     return success();
   }
@@ -189,21 +189,18 @@ static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
   assert((val.getType().isF32() || val.getType().isInteger(32)) &&
          "unsupported shuffle type");
   Type i32Type = builder.getIntegerType(32);
-  Value srcIdxI32 = builder.create<arith::IndexCastOp>(loc, i32Type, srcIdx);
-  Value warpSzI32 = builder.create<arith::ConstantOp>(
-      loc, builder.getIntegerAttr(i32Type, warpSz));
-  Value result = builder
-                     .create<gpu::ShuffleOp>(loc, val, srcIdxI32, warpSzI32,
-                                             gpu::ShuffleMode::IDX)
+  Value srcIdxI32 = arith::IndexCastOp::create(builder, loc, i32Type, srcIdx);
+  Value warpSzI32 = arith::ConstantOp::create(
+      builder, loc, builder.getIntegerAttr(i32Type, warpSz));
+  Value result = gpu::ShuffleOp::create(builder, loc, val, srcIdxI32, warpSzI32,
+                                        gpu::ShuffleMode::IDX)
                      .getResult(0);
   return result;
 }
 
 struct VectorReductionToGPUPass final
     : impl::VectorReductionToGPUPassBase<VectorReductionToGPUPass> {
-  VectorReductionToGPUPass(bool expandSubgroupReduction)
-      : expandSubgroupReduction(expandSubgroupReduction) {}
-
+  using VectorReductionToGPUPassBase::VectorReductionToGPUPassBase;
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
     MLIRContext *ctx = &getContext();
@@ -239,11 +236,11 @@ struct VectorReductionToGPUPass final
     const int groupSize = workgroupSize[0];
     Location loc = funcOp.getLoc();
     OpBuilder builder(funcOp);
-    auto threadX = builder.create<gpu::ThreadIdOp>(loc, builder.getIndexType(),
-                                                   gpu::Dimension::x);
-    auto cstGroupSize = builder.create<arith::ConstantIndexOp>(loc, groupSize);
-    auto warpOp = builder.create<gpu::WarpExecuteOnLane0Op>(
-        loc, TypeRange(), threadX.getResult(), groupSize);
+    auto threadX = gpu::ThreadIdOp::create(builder, loc, builder.getIndexType(),
+                                           gpu::Dimension::x);
+    auto cstGroupSize = arith::ConstantIndexOp::create(builder, loc, groupSize);
+    auto warpOp = gpu::WarpExecuteOnLane0Op::create(
+        builder, loc, TypeRange(), threadX.getResult(), groupSize);
     warpOp.getWarpRegion().takeBody(funcOp.getFunctionBody());
     Block &newBlock = funcOp.getFunctionBody().emplaceBlock();
     threadX->moveBefore(&newBlock, newBlock.end());
@@ -252,7 +249,7 @@ struct VectorReductionToGPUPass final
     warpOp.getWarpRegion().getBlocks().back().back().moveBefore(&newBlock,
                                                                 newBlock.end());
     builder.setInsertionPointToEnd(&warpOp.getWarpRegion().getBlocks().back());
-    builder.create<gpu::YieldOp>(loc);
+    gpu::YieldOp::create(builder, loc);
 
     debugPrint(funcOp, "after step #2: wrapping code with the warp execute op");
 
@@ -310,7 +307,7 @@ struct VectorReductionToGPUPass final
       options.warpAllocationFn = allocateGlobalSharedMemory;
       options.warpSyncronizationFn = [](Location loc, OpBuilder &builder,
                                         gpu::WarpExecuteOnLane0Op warpOp) {
-        builder.create<gpu::BarrierOp>(loc);
+        gpu::BarrierOp::create(builder, loc);
       };
       vector::populateWarpExecuteOnLane0OpToScfForPattern(patterns, options);
       (void)applyPatternsGreedily(getOperation(), std::move(patterns));
@@ -318,16 +315,7 @@ struct VectorReductionToGPUPass final
 
     debugPrint(funcOp, "after step #5: lowering remaining ops");
   }
-
-private:
-  bool expandSubgroupReduction;
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createConvertVectorReductionToGPUPass(bool expandSubgroupReduction) {
-  return std::make_unique<VectorReductionToGPUPass>(expandSubgroupReduction);
-}
-
 } // namespace mlir::iree_compiler

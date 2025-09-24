@@ -17,7 +17,19 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 
+#define DEBUG_TYPE "iree-global-opt-generalize-linalg-named-ops"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
+
 namespace mlir::iree_compiler::GlobalOptimization {
+
+// TODO(#21955): Adapts the convolution transformations to work with generalized
+// linalg.generic form, but not only when they are named ops. E.g.,
+// DownscaleSizeOneWindowed2DConvolution patterns.
+static llvm::cl::opt<bool> clDisableConvGeneralization(
+    "iree-global-opt-experimental-disable-conv-generalization",
+    llvm::cl::desc("Disable generalization for some conv ops (experimental)."),
+    llvm::cl::init(false));
 
 #define GEN_PASS_DEF_GENERALIZELINALGNAMEDOPSPASS
 #include "iree/compiler/GlobalOptimization/Passes.h.inc"
@@ -31,52 +43,8 @@ struct GeneralizeLinalgNamedOpsPass
 };
 } // namespace
 
-/// Returns true if `linalgOp` can be simplified to a basic GEMM.
-static bool isConvFoldableToContraction(linalg::LinalgOp linalgOp) {
-  auto convDimsOrFailure = linalg::inferConvolutionDims(linalgOp);
-  if (failed(convDimsOrFailure)) {
-    return false;
-  }
-  auto &convDims = *convDimsOrFailure;
-
-  if (!llvm::all_of(convDims.strides,
-                    [](int64_t element) { return element == 1; })) {
-    return false;
-  }
-
-  // Dont generalize depthwise convolutions.
-  if (!convDims.depth.empty()) {
-    return false;
-  }
-
-  // Dont generalize pooling operations. For pooling ops, the input/output
-  // channel size will be categorized as the additional batch dimension
-  if (convDims.outputChannel.empty() || convDims.inputChannel.empty()) {
-    return false;
-  }
-
-  // Check if all filter dimensions are size 1.
-  const int64_t kFilterInputIdx = 1;
-  auto filterShapeType = llvm::dyn_cast<RankedTensorType>(
-      linalgOp.getDpsInputOperand(kFilterInputIdx)->get().getType());
-  if (!filterShapeType) {
-    return false;
-  }
-  auto filterShape = filterShapeType.getShape();
-  AffineMap filterMap = linalgOp.getIndexingMapsArray()[kFilterInputIdx];
-  for (auto filterLoop : convDims.filterLoop) {
-    std::optional<int64_t> maybeDim = filterMap.getResultPosition(
-        getAffineDimExpr(filterLoop, filterMap.getContext()));
-    if (!maybeDim || filterShape[*maybeDim] != 1) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
 void GeneralizeLinalgNamedOpsPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   SmallVector<linalg::LinalgOp> namedOpCandidates;
   funcOp.walk([&](linalg::LinalgOp linalgOp) {
     if (!IREE::Flow::isNonNullAndOutsideDispatch(linalgOp) ||
@@ -87,15 +55,24 @@ void GeneralizeLinalgNamedOpsPass::runOnOperation() {
       namedOpCandidates.push_back(linalgOp);
       return;
     }
+    bool generalizeConvOps = linalg::isaConvolutionOpInterface(linalgOp);
+    if (clDisableConvGeneralization &&
+        isa<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
+            linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
+            linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
+            linalg::PoolingNhwcMinUnsignedOp, linalg::PoolingNchwSumOp,
+            linalg::PoolingNchwMaxOp, linalg::DepthwiseConv2DNhwcHwcOp>(
+            linalgOp)) {
+      generalizeConvOps = false;
+    }
     if (isa_and_nonnull<linalg::AbsOp, linalg::AddOp, linalg::BroadcastOp,
                         linalg::CeilOp, linalg::CopyOp, linalg::DivOp,
-                        linalg::DivUnsignedOp, linalg::ElemwiseBinaryOp,
-                        linalg::ElemwiseUnaryOp, linalg::ExpOp, linalg::FloorOp,
+                        linalg::DivUnsignedOp, linalg::ExpOp, linalg::FloorOp,
                         linalg::LogOp, linalg::MapOp, linalg::MaxOp,
                         linalg::MulOp, linalg::NegFOp, linalg::ReduceOp,
                         linalg::SubOp, linalg::TransposeOp>(
             linalgOp.getOperation()) ||
-        isConvFoldableToContraction(linalgOp)) {
+        generalizeConvOps) {
       namedOpCandidates.push_back(linalgOp);
     }
   });

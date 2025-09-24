@@ -16,11 +16,8 @@ func.func @matmul() {
   %c32 = arith.constant 32 : index
   %cst_0 = arith.constant 0.000000e+00 : f32
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<32x32xf32>
-  memref.assume_alignment %0, 64 : memref<32x32xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<32x32xf32>
-  memref.assume_alignment %1, 64 : memref<32x32xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : memref<32x32xf32>
-  memref.assume_alignment %2, 64 : memref<32x32xf32>
   %3 = gpu.thread_id  x
   %4 = gpu.thread_id  y
   %5 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%4]
@@ -95,11 +92,8 @@ func.func @gathered_matmul() {
   %cst_1 = arith.constant dense<[0, 1, 2, 3]> : vector<4xindex>
   %cst_2 = arith.constant dense<1> : vector<4x4xindex>
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<32x32xf32>
-  memref.assume_alignment %0, 64 : memref<32x32xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<32x32xf32>
-  memref.assume_alignment %1, 64 : memref<32x32xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : memref<32x32xf32>
-  memref.assume_alignment %2, 64 : memref<32x32xf32>
   %alloc = memref.alloc() {alignment = 64 : i64} : memref<32x32xf32>
   %3 = gpu.thread_id  x
   %4 = gpu.thread_id  y

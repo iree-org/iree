@@ -20,6 +20,8 @@ transform.named_sequence @apply_attn_op_config(%attention: !transform.any_op {tr
 }
 
 transform.named_sequence @match_attention_f16(%attention: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param, !transform.any_param) {
+  transform.iree.match.has_no_lowering_config %attention : !transform.any_op
+
   transform.match.operation_name %attention ["iree_linalg_ext.attention"] : !transform.any_op
   %in0 = transform.get_operand %attention[0] : (!transform.any_op) -> !transform.any_value
   transform.iree.match.cast_compatible_type %in0 = tensor<?x?x?x?xf16> : !transform.any_value
@@ -27,18 +29,18 @@ transform.named_sequence @match_attention_f16(%attention: !transform.any_op {tra
   %config = transform.param.constant #iree_codegen.compilation_info<
           lowering_config = #iree_gpu.lowering_config<{workgroup = [1, 1, 64, 0, 0, 0], reduction=[0, 0, 0, 0, 0, 64], promote_operands = [1, 2]}>,
           translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
-                                                            workgroup_size = [64, 4]
+                                                            workgroup_size = [64, 2]
                                                             subgroup_size = 64 ,
             {llvm_func_attrs = { "amdgpu-waves-per-eu" = "2", "denormal-fp-math-f32" = "preserve-sign" }}>>
   -> !transform.any_param
 
   %decomposition_config = transform.param.constant {
     qk_attrs = {attention_qk_matmul,
-                lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.virtual_mma_layout<intrinsic = VMFMA_F32_32x32x16_F16>,
-                                                              subgroup_m_count = 4, subgroup_n_count = 1, promote_operands = [1] }>},
+                lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.virtual_mma_layout<VMFMA_F32_32x32x16_F16>,
+                                                              subgroup_basis = [[1, 1, 2, 1, 1, 1], [0, 1, 2, 4, 5]], promote_operands = [1] }>},
     pv_attrs = {attention_pv_matmul,
                 lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
-                                                              subgroup_m_count = 4, subgroup_n_count = 1, promote_operands = [1] }>}
+                                                              subgroup_basis = [[1, 1, 2, 1, 1, 1], [0, 1, 2, 3, 5]], promote_operands = [1] }>}
   } -> !transform.any_param
 
   transform.yield %attention, %config, %decomposition_config : !transform.any_op, !transform.any_param, !transform.any_param
@@ -72,6 +74,8 @@ transform.named_sequence @match_mmt_f16_f16_f32(%root: !transform.any_op {transf
 //===----------------------------------------------------------------------===//
 
 transform.named_sequence @match_mmt_1920x10240x1280(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+  transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
+
   %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
   %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
   %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
@@ -80,7 +84,7 @@ transform.named_sequence @match_mmt_1920x10240x1280(%matmul: !transform.any_op {
   %config = transform.param.constant #iree_codegen.compilation_info<
   lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
                                                 mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-                                                subgroup_m_count = 4, subgroup_n_count = 2,
+                                                subgroup_basis = [[4, 2, 1], [0, 1, 2]],
                                                 reduction = [0, 0, 32],
                                                 workgroup = [128, 128, 0]}>,
   translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
@@ -92,6 +96,8 @@ transform.named_sequence @match_mmt_1920x10240x1280(%matmul: !transform.any_op {
 }
 
 transform.named_sequence @match_mmt_1920x1280x1280(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+  transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
+
   %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
   %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
   %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
@@ -100,7 +106,7 @@ transform.named_sequence @match_mmt_1920x1280x1280(%matmul: !transform.any_op {t
   %config = transform.param.constant #iree_codegen.compilation_info<
   lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
                                                 mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-                                                subgroup_m_count = 4, subgroup_n_count = 2,
+                                                subgroup_basis = [[4, 2, 1], [0, 1, 2]],
                                                 reduction = [0, 0, 32],
                                                 workgroup = [128, 128, 0]}>,
   translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
@@ -112,6 +118,8 @@ transform.named_sequence @match_mmt_1920x1280x1280(%matmul: !transform.any_op {t
 }
 
 transform.named_sequence @match_mmt_1920x1280x5120(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+  transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
+
   %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
   %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
   %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
@@ -120,7 +128,7 @@ transform.named_sequence @match_mmt_1920x1280x5120(%matmul: !transform.any_op {t
   %config = transform.param.constant #iree_codegen.compilation_info<
   lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
                                                 mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-                                                subgroup_m_count = 4, subgroup_n_count = 2,
+                                                subgroup_basis = [[4, 2, 1], [0, 1, 2]],
                                                 reduction = [0, 0, 32],
                                                 workgroup = [128, 128, 0]}>,
   translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
@@ -132,6 +140,8 @@ transform.named_sequence @match_mmt_1920x1280x5120(%matmul: !transform.any_op {t
 }
 
 transform.named_sequence @match_mmt_7680x5120x640(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+  transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
+
   %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
   %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
   %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
@@ -140,7 +150,7 @@ transform.named_sequence @match_mmt_7680x5120x640(%matmul: !transform.any_op {tr
   %config = transform.param.constant #iree_codegen.compilation_info<
   lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
                                                 mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-                                                subgroup_m_count = 2, subgroup_n_count = 4,
+                                                subgroup_basis = [[2, 4, 1], [0, 1, 2]],
                                                 reduction = [0, 0, 32],
                                                 workgroup = [128, 256, 0]}>,
   translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
@@ -152,6 +162,8 @@ transform.named_sequence @match_mmt_7680x5120x640(%matmul: !transform.any_op {tr
 }
 
 transform.named_sequence @match_mmt_128x1280x2048(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+  transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
+
   %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
   %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
   %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
@@ -160,7 +172,7 @@ transform.named_sequence @match_mmt_128x1280x2048(%matmul: !transform.any_op {tr
   %config = transform.param.constant #iree_codegen.compilation_info<
   lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
                                                 mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-                                                subgroup_m_count = 2, subgroup_n_count = 1,
+                                                subgroup_basis = [[2, 1, 1], [0, 1, 2]],
                                                 reduction = [0, 0, 128],
                                                 workgroup = [64, 16, 0]}>,
   translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
@@ -172,6 +184,8 @@ transform.named_sequence @match_mmt_128x1280x2048(%matmul: !transform.any_op {tr
 }
 
 transform.named_sequence @match_mmt_7680x640x640(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+  transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
+
   %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
   %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
   %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
@@ -180,7 +194,7 @@ transform.named_sequence @match_mmt_7680x640x640(%matmul: !transform.any_op {tra
   %config = transform.param.constant #iree_codegen.compilation_info<
   lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
                                                 mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
-                                                subgroup_m_count = 1, subgroup_n_count = 4,
+                                                subgroup_basis = [[1, 4, 1], [0, 1, 2]],
                                                 reduction = [0, 0, 32],
                                                 workgroup = [256, 128, 0]}>,
   translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
@@ -192,6 +206,8 @@ transform.named_sequence @match_mmt_7680x640x640(%matmul: !transform.any_op {tra
 }
 
 transform.named_sequence @match_mmt_7680x640x2560(%matmul: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
+  transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
+
   %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul) : (!transform.any_op) -> !transform.any_op
   %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
   %rhs = transform.get_operand %matmul[1] : (!transform.any_op) -> !transform.any_value
@@ -200,7 +216,7 @@ transform.named_sequence @match_mmt_7680x640x2560(%matmul: !transform.any_op {tr
   %config = transform.param.constant #iree_codegen.compilation_info<
   lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
                                                 mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
-                                                subgroup_m_count = 4, subgroup_n_count = 2,
+                                                subgroup_basis = [[4, 2, 1], [0, 1, 2]],
                                                 reduction = [0, 0, 32],
                                                 workgroup = [256, 128, 0]}>,
   translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute

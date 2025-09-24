@@ -7,45 +7,35 @@
 name: CI - Windows x64 MSVC
 
 on:
-  schedule:
-    # Weekday mornings at 09:15 UTC = 01:15 PST (UTC - 8).
-    - cron: "15 9 * * 1-5"
+  workflow_call:
   workflow_dispatch:
-
-concurrency:
-  # A PR number if a pull request and otherwise the commit hash. This cancels
-  # queued and in-progress runs for the same PR (presubmit) or commit
-  # (postsubmit)
-  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
-  cancel-in-progress: true
 
 jobs:
   windows_x64_msvc:
-    if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
     runs-on: azure-windows-scale
     env:
-      BASE_BUILD_DIR_POWERSHELL: C:\mnt\azure\b
+      BASE_BUILD_DIR_POWERSHELL: B:\tmpbuild
       SCCACHE_AZURE_CONNECTION_STRING: "${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}"
       SCCACHE_AZURE_BLOB_CONTAINER: ccache-container
       SCCACHE_CCACHE_ZSTD_LEVEL: 10
       SCCACHE_AZURE_KEY_PREFIX: "ci_windows_x64_msvc"
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           submodules: true
+      # TODO(#18813): Remove this. Environment setup needs to happen on runners, not in workflows.
       - name: "Create build dir"
         run: |
-          $currentTime = (Get-Date).ToString('HHmmss')
-          $buildDir = "$env:BASE_BUILD_DIR_POWERSHELL\$currentTime"
+          $buildDir = "$env:BASE_BUILD_DIR_POWERSHELL\"
           echo "BUILD_DIR_POWERSHELL=$buildDir" >> $env:GITHUB_ENV
           mkdir "$buildDir"
           Write-Host "Generated Build Directory: $buildDir"
-          $bashBuildDir = $buildDir -replace '\\', '/' -replace '^C:', '/c'
+          $bashBuildDir = $buildDir -replace '\\', '/' -replace '^B:', '/b'
           echo  "BUILD_DIR_BASH=$bashBuildDir" >> $env:GITHUB_ENV
           Write-Host "Converted Build Directory For Bash: $bashBuildDir"
       - name: "Setting up Python"
-        uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5.5.0
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
         with:
           python-version: "3.11"
       - name: "Installing Python packages"
@@ -53,6 +43,8 @@ jobs:
           python3 -m venv .venv
           .venv/Scripts/activate.bat
           python3 -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
+      # TODO(#18813): Fix to actually use either ccache or sccache.
+      #               No need to install both, and neither is currently used.
       - name: "Installing requirements"
         run: choco install ccache --yes
       - name: "Configuring MSVC"
@@ -61,7 +53,9 @@ jobs:
         run: |
           choco install sccache
           choco install cmake
-          choco install ninja
+          # ninja pinned due to a bug in the 1.13.0 release:
+          # https://github.com/ninja-build/ninja/issues/2616
+          choco install ninja --version 1.12.1
           Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
           refreshenv
       - name: "Building IREE"
@@ -74,10 +68,4 @@ jobs:
         if: always()
         run: if (Test-Path -Path "$Env:BUILD_DIR_POWERSHELL") {Remove-Item -Path "$Env:BUILD_DIR_POWERSHELL" -Recurse -Force}
 
-      - name: Post to Discord on Failure
-        uses: sarisia/actions-status-discord@5ddd3b114a98457dd80a39b2f00b6a998cd69008 # v1.15.3
-        if: failure() && github.ref_name == 'main' && github.repository_owner == 'iree-org'
-        with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK }}
-          description: "The ${{ github.workflow }} workflow failed"
-          url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}"
+      # Alerting on failure is the responsibility of the calling job.

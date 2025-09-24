@@ -196,18 +196,18 @@ func.func @batch_matmul_fill_dynamic(%arg0 : tensor<?x?x?xf32>, %arg1 : tensor<?
 #encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>]>
 func.func @drop_encoding_for_hal_flow_ops_static() {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x1xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x1xf32, #encoding_lhs>>
-  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 1], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x1xf32>> -> tensor<1x1xf32>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x1xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x1xf32, #encoding_lhs>>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 1], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x1xf32>> -> tensor<1x1xf32>
   %3 = iree_encoding.set_encoding %2 : tensor<1x1xf32> -> tensor<1x1xf32, #encoding_lhs>
-  flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [1, 1], strides = [1, 1] : tensor<1x1xf32, #encoding_lhs> -> !flow.dispatch.tensor<writeonly:tensor<1x1xf32, #encoding_lhs>>
+  iree_tensor_ext.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [1, 1], strides = [1, 1] : tensor<1x1xf32, #encoding_lhs> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x1xf32, #encoding_lhs>>
   return
 }
 // CHECK-LABEL: func.func @drop_encoding_for_hal_flow_ops_static
-// CHECK-DAG:     %[[IN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) {{.+}} : !flow.dispatch.tensor<readonly:tensor<1x1xf32>>
-// CHECK-DAG:     %[[OUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) {{.+}} : !flow.dispatch.tensor<writeonly:tensor<1x1xf32>>
-// CHECK:         %[[LOAD:.+]] = flow.dispatch.tensor.load %[[IN]]
-// CHECK:         flow.dispatch.tensor.store %[[LOAD]], %[[OUT]]
+// CHECK-DAG:     %[[IN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) {{.+}} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x1xf32>>
+// CHECK-DAG:     %[[OUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) {{.+}} : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x1xf32>>
+// CHECK:         %[[LOAD:.+]] = iree_tensor_ext.dispatch.tensor.load %[[IN]]
+// CHECK:         iree_tensor_ext.dispatch.tensor.store %[[LOAD]], %[[OUT]]
 
 // -----
 
@@ -233,17 +233,17 @@ func.func @drop_encoding_for_hal_flow_ops_dynamic() {
   %11 = arith.shli %10, %c32_i64 : i64
   %12 = arith.ori %9, %11 : i64
   %13 = arith.index_castui %12 : i64 to index
-  %14 = flow.dispatch.workload.ordinal %8, 0 : index
-  %15 = flow.dispatch.workload.ordinal %13, 1 : index
-  %16 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?xbf16>>{%14, %15}
-  %17 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<?x?xbf16, #encoding_lhs>>{%14, %15}
-  %18 = flow.dispatch.tensor.load %16, offsets = [0, 0], sizes = [%14, %15], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xbf16>>{%14, %15} -> tensor<?x?xbf16>
+  %14 = iree_tensor_ext.dispatch.workload.ordinal %8, 0 : index
+  %15 = iree_tensor_ext.dispatch.workload.ordinal %13, 1 : index
+  %16 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xbf16>>{%14, %15}
+  %17 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xbf16, #encoding_lhs>>{%14, %15}
+  %18 = iree_tensor_ext.dispatch.tensor.load %16, offsets = [0, 0], sizes = [%14, %15], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xbf16>>{%14, %15} -> tensor<?x?xbf16>
   %19 = iree_encoding.set_encoding %18 : tensor<?x?xbf16> -> tensor<?x?xbf16, #encoding_lhs>
-  flow.dispatch.tensor.store %19, %17, offsets = [0, 0], sizes = [%14, %15], strides = [1, 1] : tensor<?x?xbf16, #encoding_lhs> -> !flow.dispatch.tensor<writeonly:tensor<?x?xbf16, #encoding_lhs>>{%14, %15}
+  iree_tensor_ext.dispatch.tensor.store %19, %17, offsets = [0, 0], sizes = [%14, %15], strides = [1, 1] : tensor<?x?xbf16, #encoding_lhs> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xbf16, #encoding_lhs>>{%14, %15}
   return
 }
 // CHECK-LABEL: func.func @drop_encoding_for_hal_flow_ops_dynamic
-// CHECK-DAG:     %[[IN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) {{.+}} : !flow.dispatch.tensor<readonly:tensor<?x?xbf16>>
-// CHECK-DAG:     %[[OUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) {{.+}} : !flow.dispatch.tensor<writeonly:tensor<?x?xbf16>>
-// CHECK:         %[[LOAD:.+]] = flow.dispatch.tensor.load %[[IN]]
-// CHECK:         flow.dispatch.tensor.store %[[LOAD]], %[[OUT]]
+// CHECK-DAG:     %[[IN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) {{.+}} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xbf16>>
+// CHECK-DAG:     %[[OUT:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) {{.+}} : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xbf16>>
+// CHECK:         %[[LOAD:.+]] = iree_tensor_ext.dispatch.tensor.load %[[IN]]
+// CHECK:         iree_tensor_ext.dispatch.tensor.store %[[LOAD]], %[[OUT]]

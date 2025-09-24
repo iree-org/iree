@@ -16,12 +16,12 @@ include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
 
-def ApplyDropMultiMmaOpUnitDims : Op<Transform_Dialect,
-    "apply_patterns.iree.drop_multi_mma_unit_dims",
+def ApplyDropInnerTiledOpUnitDims : Op<Transform_Dialect,
+    "apply_patterns.iree.drop_inner_tiled_unit_dims",
     [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
-    Populate patterns to drop the unit dims from multi_mma ops with
+    Populate patterns to drop the unit dims from inner_tiled ops with
     only unit iteration bounds.
   }];
 
@@ -29,12 +29,12 @@ def ApplyDropMultiMmaOpUnitDims : Op<Transform_Dialect,
   let assemblyFormat = "attr-dict";
 }
 
-def ApplyLowerMultiMmaOp : Op<Transform_Dialect,
-    "apply_patterns.iree.lower_multi_mma",
+def ApplyLowerInnerTiledOp : Op<Transform_Dialect,
+    "apply_patterns.iree.lower_inner_tiled",
     [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
-    Populate patterns to lowering multi_mma ops to the intrinsic specified by
+    Populate patterns to lowering inner_tiled ops to the intrinsic specified by
     the |kind| attribute.
   }];
 
@@ -127,16 +127,16 @@ def ConvertToMultiMmaOp : Op<Transform_Dialect, "iree.convert_to_multi_mma",
   }];
 }
 
-def DistributeMultiMmaOp : Op<Transform_Dialect, "iree.distribute_multi_mma",
+def DistributeInnerTiledOp : Op<Transform_Dialect, "iree.distribute_inner_tiled",
     [TransformEachOpTrait,
      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformOpInterface,
      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
-    Distributes the target multi_mma op to lanes.
+    Distributes the target inner_tiled op to lanes.
 
     #### Return modes
-    Emits a definite failure if the target is not an iree_gpu.multi_mma op or
+    Emits a definite failure if the target is not an iree_codegen.inner_tiled op or
     if it fails to distribute.
   }];
 

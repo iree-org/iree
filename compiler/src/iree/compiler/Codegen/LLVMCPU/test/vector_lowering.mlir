@@ -18,13 +18,9 @@ func.func @matmul_391x384x384_f32() {
   %cst_1 = arith.constant dense<6.000000e+00> : vector<8x32xf32>
   %alloca = memref.alloca() {alignment = 64 : i64} : memref<8x32xf32>
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<391x384xf32>
-  memref.assume_alignment %0, 64 : memref<391x384xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<384x384xf32>
-  memref.assume_alignment %1, 64 : memref<384x384xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : memref<384xf32>
-  memref.assume_alignment %2, 64 : memref<384xf32>
   %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : memref<391x384xf32>
-  memref.assume_alignment %3, 64 : memref<391x384xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %4 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%workgroup_id_y]
@@ -99,13 +95,9 @@ func.func @matmul_scalar_loads() {
   %cst_1 = arith.constant dense<6.000000e+00> : vector<8x32xf32>
   %alloca = memref.alloca() {alignment = 64 : i64} : memref<8x32xf32>
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<391x384xf32>
-  memref.assume_alignment %0, 64 : memref<391x384xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<384x384xf32>
-  memref.assume_alignment %1, 64 : memref<384x384xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : memref<384xf32>
-  memref.assume_alignment %2, 64 : memref<384xf32>
   %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : memref<391x384xf32>
-  memref.assume_alignment %3, 64 : memref<391x384xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %4 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%workgroup_id_y]
@@ -161,7 +153,9 @@ func.func @transpose_mask() {
 //   CHECK-NOT:   vector.constant_mask [2, 4]
 //   CHECK-NOT:   vector.transpose
 //   CHECK-NOT:   vector.shuffle
-//       CHECK:   vector.constant_mask [4, 2] : vector<4x2xi1>
+//   CHECK-DAG:   %[[MASK:.+]] = arith.constant dense<true>
+//   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan
+//       CHECK:   vector.store %[[MASK]], %[[OUTPUT]]
 
 // -----
 
@@ -180,11 +174,8 @@ func.func @gather_strided_memref() {
   %c4 = arith.constant 4 : index
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<2592000x3xf32, #hal.descriptor_type<storage_buffer>>
-  memref.assume_alignment %0, 64 : memref<2592000x3xf32, #hal.descriptor_type<storage_buffer>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<518400xi32, #hal.descriptor_type<storage_buffer>>
-  memref.assume_alignment %1, 64 : memref<518400xi32, #hal.descriptor_type<storage_buffer>>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : memref<518400xf32, #hal.descriptor_type<storage_buffer>>
-  memref.assume_alignment %2, 64 : memref<518400xf32, #hal.descriptor_type<storage_buffer>>
   %subview = memref.subview %0[0, 0] [2592000, 1] [1, 1] : memref<2592000x3xf32, #hal.descriptor_type<storage_buffer>> to memref<2592000xf32, strided<[3]>, #hal.descriptor_type<storage_buffer>>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %3 = affine.apply affine_map<()[s0] -> (s0 * 4096)>()[%workgroup_id_x]
@@ -220,3 +211,41 @@ func.func @scalable_transpose_store(%vec: vector<4x[4]xf32>, %dest: memref<?x?xf
 // CHECK-NOT: vector.transpose
 // CHECK: vector.store {{.*}} : memref<?x?xf32>, vector<4xf32>
 // CHECK-NOT: vector.transpose
+
+// -----
+
+// Make sure RISC-V by default (without V extension) lowers vector.gather into branches.
+
+module attributes {
+    hal.executable.target = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {target_triple="riscv64-unknown-elf"}>
+} {
+  func.func private @gather_lowering(%buffer : memref<32000x2048xf32>, %index : vector<2x64xindex>, %mask : vector<2x64xi1>) -> vector<2x64xf32> {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant dense<0.000000e+00> : vector<2x64xf32>
+    %r = vector.gather %buffer[%c0, %c0] [%index], %mask, %cst : memref<32000x2048xf32>, vector<2x64xindex>, vector<2x64xi1>, vector<2x64xf32> into vector<2x64xf32>
+    return %r : vector<2x64xf32>
+  }
+}
+
+// CHECK-LABEL:   func.func private @gather_lowering(
+// CHECK-NOT: vector.gather
+
+// -----
+
+// Make sure RISC-V with V extension (i.e. RVV) does not break vector.gather
+// into conditional branches (but still lower into 1-D vector.gather).
+
+module attributes {
+    hal.executable.target = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {target_triple="riscv64-unknown-elf", cpu_features ="+v"}>
+} {
+  func.func private @negative_no_gather_lowering(%buffer : memref<32000x2048xf32>, %index : vector<2x64xindex>, %mask : vector<2x64xi1>) -> vector<2x64xf32> {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant dense<0.000000e+00> : vector<2x64xf32>
+    %r = vector.gather %buffer[%c0, %c0] [%index], %mask, %cst : memref<32000x2048xf32>, vector<2x64xindex>, vector<2x64xi1>, vector<2x64xf32> into vector<2x64xf32>
+    return %r : vector<2x64xf32>
+  }
+}
+
+// CHECK-LABEL:   func.func private @negative_no_gather_lowering(
+// CHECK: vector.gather {{.+}} : memref<32000x2048xf32>, vector<64xindex>, vector<64xi1>, vector<64xf32> into vector<64xf32>
+// CHECK-NOT: scf.if

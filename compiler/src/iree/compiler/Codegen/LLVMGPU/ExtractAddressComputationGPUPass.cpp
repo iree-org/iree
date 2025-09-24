@@ -39,8 +39,8 @@ static nvgpu::LdMatrixOp rebuildLdMatrixOp(RewriterBase &rewriter,
                                            Value srcMemRef,
                                            ArrayRef<Value> indices) {
   Location loc = ldMatrixOp.getLoc();
-  return rewriter.create<nvgpu::LdMatrixOp>(
-      loc, ldMatrixOp.getResult().getType(), srcMemRef, indices,
+  return nvgpu::LdMatrixOp::create(
+      rewriter, loc, ldMatrixOp.getResult().getType(), srcMemRef, indices,
       ldMatrixOp.getTranspose(), ldMatrixOp.getNumTiles());
 }
 
@@ -48,9 +48,8 @@ SmallVector<OpFoldResult>
 getLdMatrixOpViewSizeForEachDim(RewriterBase &rewriter,
                                 nvgpu::LdMatrixOp ldMatrixOp) {
   Location loc = ldMatrixOp.getLoc();
-  auto extractStridedMetadataOp =
-      rewriter.create<memref::ExtractStridedMetadataOp>(
-          loc, ldMatrixOp.getSrcMemref());
+  auto extractStridedMetadataOp = memref::ExtractStridedMetadataOp::create(
+      rewriter, loc, ldMatrixOp.getSrcMemref());
   SmallVector<OpFoldResult> srcSizes =
       extractStridedMetadataOp.getConstifiedMixedSizes();
   SmallVector<OpFoldResult> indices =

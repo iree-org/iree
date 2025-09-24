@@ -30,17 +30,60 @@ class IREEEncoding_EnumAttr<EnumAttrInfo enumInfo, string name = "">
 
 // Enums for tagging operand operation in an EncodingAttr
 def MATMUL : I32EnumAttrCase<"matmul", 0>;
-def CONV   : I32EnumAttrCase<"conv", 1>;
+def SCALED_MATMUL : I32EnumAttrCase<"scaled_matmul", 1>;
+def CONV   : I32EnumAttrCase<"conv", 2>;
 
 def EncodingOpType : IREEEncoding_I32EnumAttr<"EncodingOpType",
     "Tracks the type of operation of the operand.", [
       MATMUL,
+      SCALED_MATMUL,
       CONV,
     ]>;
 
 def EncodingOpTypeAttr:
   IREEEncoding_EnumAttr<EncodingOpType, "optype">;
 
+//===---------------------------------------------------------------------===//
+// iree_encoding.packed_storage
+//===---------------------------------------------------------------------===//
+
+def LayoutAttr :
+    IREEEncoding_Attr<"Layout", [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
+        "isSerialized",
+        "isIdentityLayout",
+        "calculateStorageSizeInBytes",
+      ]>
+    ]> {
+  let mnemonic = "layout";
+  let assemblyFormat = "`<` $layouts `>`";
+
+  let summary = [{Indicates potential serialized layouts.}];
+  let description = [{
+    This attribute describes the potential layouts of the encoding. It is an
+    array because a device could have multiple target layouts.
+
+    It has a verifier that will ensure that all the attributes in layouts
+    implement SerializableAttr.
+  }];
+
+  let parameters = (ins
+    AttrParameter<"ArrayAttr", "Serialized layouts">:$layouts
+  );
+
+  // Implement custom builders to bypass the verification assertion in Base::get
+  // method, i.e., `assert(succeeded(ConcreteT::verifyInvariants(...)))`.
+  let skipDefaultBuilders = 1;
+  let builders = [
+    AttrBuilder<(ins "ArrayAttr":$layouts)>,
+  ];
+
+  let genVerifyDecl = 1;
+}
+
+//===---------------------------------------------------------------------===//
+// iree_encoding.packed_storage
+//===---------------------------------------------------------------------===//
 
 def PackedStorageAttr : IREEEncoding_Attr<"PackedStorage"> {
   let mnemonic = "packed_storage";
@@ -52,17 +95,22 @@ def PackedStorageAttr : IREEEncoding_Attr<"PackedStorage"> {
   let genVerifyDecl = 0;
 }
 
+//===---------------------------------------------------------------------===//
+// iree_encoding.encoding
+//===---------------------------------------------------------------------===//
+
 def EncodingAttr :
     IREEEncoding_Attr<"Encoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
-        "isIdentityLayout",
         "cloneWithLayouts",
-        "calculateStorageSizeInBytes",
+      ]>,
+      DeclareAttrInterfaceMethods<IREEEncoding_ContractionEncodingAttrInterface, [
+        "getReductionDims",
       ]>
     ]> {
   let mnemonic = "encoding";
-  let summary = [{information to decide how to data-tile a tensor}];
+  let summary = [{Information to decide how to data-tile a tensor.}];
   let description = [{
     This attribute describes the change in the layout for
     a given tensor to execute subsequent operations on
@@ -79,23 +127,20 @@ def EncodingAttr :
     - The maps in `user_indexing_maps` should be composable.
   }];
 
-  let assemblyFormat = "`<` struct(params) `>`";
+  let assemblyFormat = [{
+    `<`
+    struct($operand_index, $op_type, $element_types, $user_indexing_maps,
+           custom<DynamicI64ArrayAttr>($iteration_sizes))
+    `>`
+  }];
 
   let parameters = (ins
     AttrParameter<"IntegerAttr", "this tensor operand's index in the parameter list">:$operand_index,
     AttrParameter<"EncodingOpTypeAttr", "operand type">:$op_type,
     AttrParameter<"ArrayAttr", "element types of the user's operands">:$element_types,
     OptionalParameter<"ArrayAttr", "Indexing maps of the operation using this tensor">:$user_indexing_maps,
-    // TODO(#19897): Switch round_dims_to to iteration_sizes.
-    // Note that today we abuse the attribute to carry narrow matrix
-    // information. The end goal is deprecating the field and add a
-    // "iteration_sizes" field to describe the shape. It is useful to
-    // handle narrow matrix cases.
-    OptionalParameter<"DenseArrayAttr", "Values for padding M,N,K dimensions">:$round_dims_to,
-    OptionalParameter<"ArrayAttr", "An array of attributes that describes the "
-    "layouts of the encoding. It is an array because a device could have "
-    "multiple target device. Note that it can be any attribute that "
-    "implements SerializableEncodingAttrInterface.">:$layouts
+    OptionalParameter<"ArrayAttr", "The original operation's iteration sizes. "
+    "This is useful for handling skinny dimension sizes">:$iteration_sizes
   );
 
   let builders = [
@@ -103,8 +148,7 @@ def EncodingAttr :
         "EncodingOpType":$opType,
         "ArrayRef<Type>":$elemTypes,
         CArg<"ArrayRef<AffineMap>", "{}">:$maps,
-        CArg<"ArrayRef<int64_t>", "{}">:$roundDimsTo,
-        CArg<"ArrayRef<Attribute>", "{}">:$layouts)>
+        CArg<"ArrayRef<int64_t>", "{}">:$iterationSizes)>
   ];
 
   let extraClassDeclaration = [{
@@ -128,8 +172,8 @@ def EncodingAttr :
     /// matching index of the given encoding's tensor, using getMapForOperandIndex.
     std::optional<unsigned> mapDimToOperandIndex(int64_t dimPos) const;
 
-    /// Returns an integer array with values in `round_dims_to`.
-    ArrayRef<int64_t> getRoundDimsToArray() const;
+    /// Returns an integer array with values in `iteration_sizes`.
+    SmallVector<int64_t> getIterationSizesArray() const;
 
     /// Returns a vector with values in `element_types`.
     SmallVector<Type> getElementTypesArray();
@@ -143,25 +187,35 @@ def EncodingAttr :
 }
 
 //===---------------------------------------------------------------------===//
-// encoding.pad_encoding_layout
+// iree_encoding.padding
 //===---------------------------------------------------------------------===//
 
-def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
-      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
-         "calculateStorageSizeInBytes",
-         "isIdentityLayout",
+def PaddingAttr : IREEEncoding_Attr<"Padding", [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
+        "calculateStorageSizeInBytes",
+        "cloneWithLayouts",
+        "isIdentityLayout",
+        "isSerialized"
         ]>
     ]> {
-  let mnemonic = "pad_encoding_layout";
-  let assemblyFormat = "`<` $padding `>`";
+  let mnemonic = "padding";
+  let assemblyFormat = "`<` custom<Padding>($padding) `>`";
 
-  let summary = "An attribute that encodes padding values of tensor dimensions";
+  let summary = [{An attribute that encodes padding values of tensor dimensions.}];
   let description = [{
     Associates tensor dimensions with pad values (numbers of appended elements).
     The logical dimensions of the tensors do not change, and the elements in the
     padded regions are left uninitialized.
 
-    This attribute implements `Encoding::SerializedEncodingLayoutResolverAttrInterface`,
+    It is expected that the number of pad values specified is same as the rank of
+    the associated tensor.
+    - If the value is `0` no padding is done along that dimension
+    - If the value is positive static value, the tensor dimension is padded to that value
+    - If the value is `?`, the tensor dimension is padded to a value determined by the
+      backend, usually for better cache behavior.
+    Negative values for padding is illegal.
+
+    This attribute implements `Encoding::SerializedLayoutResolverAttr`,
     to provide a hook for tensor sizeof lowering. The implementation of this
     interface is backend-agnostic, but the emission of the pad encoding attribute
     itself can be target- or domain-specific.
@@ -169,32 +223,56 @@ def PadEncodingLayoutAttr : IREEEncoding_Attr<"PadEncodingLayout", [
 
   let parameters = (ins
     // How many padding elements to add along each tensor dimension.
-    "DenseI32ArrayAttr":$padding
+    "DenseI64ArrayAttr":$padding
   );
 
   let builders = [
-    AttrBuilder<(ins "ArrayRef<int32_t>":$padding)>
+    AttrBuilder<(ins "ArrayRef<int64_t>":$padding)>
   ];
 
   let extraClassDeclaration = [{
-    /// Returns a PadEncodingLayoutAttr attribute that pads zero elements.
-    static PadEncodingLayoutAttr getIdentityAttr(MLIRContext *ctx, int rank);
+    /// Returns a PaddingAttr attribute that pads zero elements.
+    static PaddingAttr getIdentityAttr(MLIRContext *ctx, int rank);
   }];
+
+  let genVerifyDecl = 1;
 }
 
 //===---------------------------------------------------------------------===//
-// encoding.identity_encoding
+// iree_encoding.identity
 //===---------------------------------------------------------------------===//
 
-def IdentityEncodingAttr :
-    IREEEncoding_Attr<"IdentityEncoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutResolverAttrInterface, [
+def IdentityAttr : IREEEncoding_Attr<"Identity", [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
+        "calculateStorageSizeInBytes",
+        "isIdentityLayout",
+        "isSerialized"
+        ]>
+    ]> {
+  let mnemonic = "identity";
+
+  let summary = [{The identity encoding.}];
+  let description = [{
+    An encoding attribute that represents the identity function on a type, i.e.
+    it represents the same type as if there was no encoding.
+  }];
+
+  let genVerifyDecl = 0;
+}
+
+//===---------------------------------------------------------------------===//
+// iree_encoding.identity_resolver
+//===---------------------------------------------------------------------===//
+
+def IdentityResolverAttr :
+    IREEEncoding_Attr<"IdentityResolver", [
+      DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
       ]>
     ]> {
-  let mnemonic = "identity_encoding";
-  let summary = "A layout resolver that behaves like an identity function";
+  let mnemonic = "identity_resolver";
+  let summary = [{A layout resolver that behaves like an identity function.}];
   let description = [{
     A layout resolver that behaves like an identity function. I.e., it resolves
     the layout to the same layout without encodings.
@@ -204,18 +282,18 @@ def IdentityEncodingAttr :
 }
 
 //===---------------------------------------------------------------------===//
-// encoding.unsupported_encoding
+// iree_encoding.unsupported_resolver
 //===---------------------------------------------------------------------===//
 
-def UnsupportedEncodingAttr :
-    IREEEncoding_Attr<"UnsupportedEncoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutResolverAttrInterface, [
+def UnsupportedResolverAttr :
+    IREEEncoding_Attr<"UnsupportedResolver", [
+      DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
       ]>
     ]> {
-  let mnemonic = "unsupported_encoding";
-  let summary = "A layout resolver attribute that always fails to get layout";
+  let mnemonic = "unsupported_resolver";
+  let summary = [{A layout resolver attribute that always fails to get layout.}];
   let description = [{
     An layout resolver that never resolves the layout. I.e., it always fails on
     getting a layout. It can be used in testing or a default unknown attribute
@@ -229,15 +307,15 @@ def UnsupportedEncodingAttr :
 // Encoding specialization attributes, which are mainly for testing purpose.
 //===---------------------------------------------------------------------===//
 
-def TestingEncodingAttr :
-    IREEEncoding_Attr<"TestingEncoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_SerializableEncodingAttrInterface, [
+def TestingAttr :
+    IREEEncoding_Attr<"Testing", [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
         "isSerialized",
         "cloneWithLayouts",
       ]>
     ]> {
-  let mnemonic = "testing_encoding";
-  let summary = "An encoding attribute for testing purpose";
+  let mnemonic = "testing";
+  let summary = [{An encoding attribute for testing purposes.}];
 
   let description = [{
     An attribute for testing purpose. It is intended to be attached on
@@ -253,9 +331,9 @@ def TestingEncodingAttr :
   let genVerifyDecl = 0;
 }
 
-def UnknownEncodingAttr : IREEEncoding_Attr<"UnknownEncoding"> {
-  let mnemonic = "unknown_encoding";
-  let summary = "A pure encoding attribute for testing purpose";
+def UnknownAttr : IREEEncoding_Attr<"Unknown"> {
+  let mnemonic = "unknown";
+  let summary = [{A pure encoding attribute for testing purpose.}];
 
   let description = [{
     An attribute for testing purpose. It is intended to be attached on
@@ -264,58 +342,55 @@ def UnknownEncodingAttr : IREEEncoding_Attr<"UnknownEncoding"> {
   let genVerifyDecl = 0;
 }
 
-def UnspecializedEncodingAttr :
-    IREEEncoding_Attr<"UnspecializedEncoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutResolverAttrInterface, [
+def SpecializationResolverAttr :
+    IREEEncoding_Attr<"SpecializationResolver", [
+      DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
-      ]>
-    ]> {
-  let mnemonic = "unspecialized_encoding";
-
-  let summary = "An attribute that indicates the encoding is not yet specialized";
-
-  let description = [{
-    This attribute indicates this is an unspecialized encoding. It implements
-    very basic interface methods of EncodingLayoutResolverAttrInterface that converts
-    it to the SpecializeEncodingAttr during encoding specialization. It is
-    mainly for testing purpose as some transformations do not depend on actual
-    dialects that implement the attribute interface.
-  }];
-
-  let parameters = (ins
-    AttrParameter<"IntegerAttr", "The seed that attached on the attribute. "
-    "Different seed values indicate different layouts.">:$seed
-  );
-
-  let hasCustomAssemblyFormat = 1;
-  let genVerifyDecl = 0;
-}
-
-def SpecializedEncodingAttr :
-    IREEEncoding_Attr<"SpecializedEncoding", [
-      DeclareAttrInterfaceMethods<IREEEncoding_EncodingLayoutResolverAttrInterface, [
         "getLayout",
       ]>
     ]> {
-  let mnemonic = "specialized_encoding";
+  let mnemonic = "specialization_resolver";
+  let assemblyFormat = "`<` $seed `>`";
 
-  let summary = "An attribute that indicates the encoding is specialized";
+  let summary = [{
+    A layout resolver that always generates iree_encoding.specialized<> with the seed.
+  }];
 
   let description = [{
-    This attribute is similar to UnspecializedEncodingAttr, but with an optional
-    type. The attribute denotes the layout of the type. Different seed values
-    indicate different layouts, which can be used to emulate different encoding
-    attributes.
+    This attribute implements very basic interface methods of LayoutResolverAttr
+    that returns the SpecializedAttr with the same seed as serialized layout in
+    encoding specialization.
+
+    Different seed values indicate different layouts.
+
+    It is mainly for testing purpose as some transformations do not depend on
+    actual dialects that implement the attribute interface.
+  }];
+
+  let parameters = (ins "int32_t":$seed);
+}
+
+def SpecializedAttr :
+    IREEEncoding_Attr<"Specialized", [
+      IREEEncoding_SerializableAttr
+    ]> {
+  let mnemonic = "specialized";
+  let assemblyFormat = "`<` $seed (`,` $type^)? `>`";
+
+  let summary = [{An attribute that indicates the encoding is specialized.}];
+
+  let description = [{
+    This attribute indicates this is a specialized encoding. Different seed
+    values indicate different layouts, which can be used to emulate different
+    encoding attributes.
+
+    It is intended to be used by SpecializationResolver for testing purpose.
   }];
 
   let parameters = (ins
-    AttrParameter<"IntegerAttr", "The seed that attached on the attribute. "
-    "Different seed values indicate different layouts.">:$seed,
-    AttrParameter<"TypeAttr", "">:$type
+    "int32_t":$seed,
+    OptionalParameter<"TypeAttr", "">:$type
   );
-
-  let hasCustomAssemblyFormat = 1;
-  let genVerifyDecl = 0;
 }
 
 #endif // IREE_DIALECT_ENCODING_ATTRS

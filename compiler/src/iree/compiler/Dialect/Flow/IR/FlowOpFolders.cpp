@@ -10,9 +10,11 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree/compiler/Utils/ShapeUtils.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -214,8 +216,8 @@ struct ReplaceDispatchResultIfZeroElements
         continue;
       if (isTensorResultZeroElements(result)) {
         auto dynamicDims = op.getResultDynamicDims(result.getResultNumber());
-        auto emptyOp = rewriter.create<IREE::Flow::TensorEmptyOp>(
-            result.getLoc(), result.getType(), dynamicDims);
+        auto emptyOp = IREE::Flow::TensorEmptyOp::create(
+            rewriter, result.getLoc(), result.getType(), dynamicDims);
         rewriter.replaceAllUsesWith(result, emptyOp);
         didReplaceAny = true;
       }
@@ -241,8 +243,8 @@ struct ElideRedundantWorkloadValues
 
     // Create a new flow.dispatch.workgroup op with new workloads.
     Location loc = op.getLoc();
-    auto newWorkgroupsOp = rewriter.create<DispatchWorkgroupsOp>(
-        loc, newWorkload, op.getResultTypes(), op.getResultDims(),
+    auto newWorkgroupsOp = DispatchWorkgroupsOp::create(
+        rewriter, loc, newWorkload, op.getResultTypes(), op.getResultDims(),
         op.getArguments(), op.getArgumentDims(),
         op.getTiedOperandsAsIntegerList(),
         getPrunedAttributeList(op, /*elidedAttrs=*/{}));
@@ -286,9 +288,9 @@ struct ElideRedundantWorkloadValues
 };
 
 /// Deduplicate operands of the `dispatch.workgroup_count_from_slice` op. This
-/// requires updating the `flow.dispatch.workload.ordinal` operation in
-/// the body of the `dispatch.workgroups` op to match the new positions
-/// of the operands in the `dispatch.workgroup_count_from_slice`.
+/// requires updating the `iree_tensor_ext.dispatch.workload.ordinal` operation
+/// in the body of the `dispatch.workgroups` op to match the new positions of
+/// the operands in the `dispatch.workgroup_count_from_slice`.
 struct ElideRedundantOperandsOfWorkgroupCountFromSliceOp
     : OpRewritePattern<DispatchWorkgroupsOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -307,7 +309,7 @@ struct ElideRedundantOperandsOfWorkgroupCountFromSliceOp
     // region.
     Block &countBody = count.front();
     auto countFromSliceOps =
-        countBody.getOps<DispatchWorkgroupCountFromSliceOp>();
+        countBody.getOps<IREE::TensorExt::DispatchWorkgroupCountFromSliceOp>();
     if (countFromSliceOps.empty()) {
       return failure();
     }
@@ -328,21 +330,22 @@ struct ElideRedundantOperandsOfWorkgroupCountFromSliceOp
     // with deduped operands.
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(countFromSliceOp);
-    rewriter.replaceOpWithNewOp<DispatchWorkgroupCountFromSliceOp>(
-        countFromSliceOp, newOrdinals);
+    rewriter
+        .replaceOpWithNewOp<IREE::TensorExt::DispatchWorkgroupCountFromSliceOp>(
+            countFromSliceOp, newOrdinals);
 
-    // Adjust the flow.dispatch.workload.ordinal ops in the body to use
-    // the new ordinal numbers.
+    // Adjust the iree_tensor_ext.dispatch.workload.ordinal ops in the body to
+    // use the new ordinal numbers.
     Region &body = op.getWorkgroupBody();
-    SmallVector<DispatchWorkloadOrdinalOp> ordinalOps;
-    body.walk([&](DispatchWorkloadOrdinalOp ordinalOp) {
+    SmallVector<IREE::TensorExt::DispatchWorkloadOrdinalOp> ordinalOps;
+    body.walk([&](IREE::TensorExt::DispatchWorkloadOrdinalOp ordinalOp) {
       ordinalOps.push_back(ordinalOp);
     });
 
     for (auto ordinalOp : ordinalOps) {
       int oldOrdinalPos = ordinalOp.getOrdinal().getSExtValue();
       rewriter.setInsertionPoint(ordinalOp);
-      rewriter.replaceOpWithNewOp<DispatchWorkloadOrdinalOp>(
+      rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchWorkloadOrdinalOp>(
           ordinalOp, ordinalOp.getOperand(),
           rewriter.getIndexAttr(
               oldOrdinalPosToNewOrdinalPos.lookup(oldOrdinalPos)));
@@ -366,71 +369,6 @@ void DispatchWorkgroupsOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
-// flow.dispatch.workload.ordinal
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-// Bubble up the ordinal ops so that all uses go through this operation.
-struct BubbleUpOrdinalOp : public OpRewritePattern<DispatchWorkloadOrdinalOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(DispatchWorkloadOrdinalOp ordinalOp,
-                                PatternRewriter &rewriter) const override {
-    auto blockArg = llvm::dyn_cast<BlockArgument>(ordinalOp.getOperand());
-    if (!blockArg) {
-      return failure();
-    }
-    if (blockArg.hasOneUse()) {
-      // Nothing to do.
-      return failure();
-    }
-    OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPointToStart(ordinalOp->getBlock());
-    // Adjust the insertion point to keep the ordinals in order
-    for (Operation &op : *ordinalOp->getBlock()) {
-      if (auto insertionPoint = dyn_cast<DispatchWorkloadOrdinalOp>(&op)) {
-        if (insertionPoint.getOrdinal().getZExtValue() <
-            ordinalOp.getOrdinal().getZExtValue()) {
-          rewriter.setInsertionPointAfter(insertionPoint);
-          continue;
-        }
-      }
-      break;
-    }
-    auto newOrdinalOp = rewriter.create<DispatchWorkloadOrdinalOp>(
-        ordinalOp.getLoc(), blockArg, ordinalOp.getOrdinalAttr());
-    rewriter.replaceAllUsesExcept(blockArg, newOrdinalOp, newOrdinalOp);
-    rewriter.replaceOp(ordinalOp, newOrdinalOp.getResult());
-    return success();
-  }
-};
-
-} // namespace
-
-/// Fold away following sequence of `flow.dispatch.workload.ordinal`.
-///
-/// ```mlir
-/// %1 = flow.dispatch.workload.ordinal %0 2
-/// %2 = flow.dispatch.workload.ordinal %1 2
-/// ```
-///
-/// This can happen when the operands get deduped.
-OpFoldResult DispatchWorkloadOrdinalOp::fold(FoldAdaptor operands) {
-  if (auto producerOrdinalOp = dyn_cast_or_null<DispatchWorkloadOrdinalOp>(
-          getOperand().getDefiningOp())) {
-    if (producerOrdinalOp.getOrdinal() == getOrdinal()) {
-      return producerOrdinalOp.getOperand();
-    }
-  }
-  return {};
-}
-
-void DispatchWorkloadOrdinalOp::getCanonicalizationPatterns(
-    RewritePatternSet &results, MLIRContext *context) {
-  results.insert<BubbleUpOrdinalOp>(context);
-}
-
-//===----------------------------------------------------------------------===//
 // flow.dispatch.tie_shape
 //===----------------------------------------------------------------------===//
 
@@ -439,267 +377,6 @@ OpFoldResult DispatchTieShapeOp::fold(FoldAdaptor operands) {
     return getOperand();
   }
   return {};
-}
-
-//===----------------------------------------------------------------------===//
-// flow.dispatch.tensor.load
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-// Updates the |dimValues| of |tensorValue| with dimensions inferred from IR.
-// The dimension values may be derived values that are redundant with captured
-// dimensions and by redirecting to the captured values we can simplify things.
-// Returns true if the dims were changed.
-static bool updateTensorOpDims(RewriterBase &rewriter, Operation *op,
-                               Value tensorValue,
-                               MutableOperandRange mutableDimValues) {
-  auto dynamicDimsOr = IREE::Util::findDynamicDims(tensorValue, op->getBlock(),
-                                                   Block::iterator(op));
-  if (!dynamicDimsOr.has_value())
-    return false;
-  auto dynamicDims = dynamicDimsOr.value();
-  bool anyChanged = false;
-  OperandRange oldValueRange = mutableDimValues;
-  auto oldValues = llvm::to_vector(oldValueRange);
-  for (unsigned i = 0; i < dynamicDims.size(); ++i) {
-    if (oldValues[i] != dynamicDims[i]) {
-      rewriter.modifyOpInPlace(
-          op, [&]() { mutableDimValues.slice(i, 1).assign(dynamicDims[i]); });
-      anyChanged = true;
-    }
-  }
-  return anyChanged;
-}
-
-struct ReuseDispatchTensorLoadShapeDims
-    : public OpRewritePattern<DispatchTensorLoadOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(DispatchTensorLoadOp loadOp,
-                                PatternRewriter &rewriter) const override {
-    return success(updateTensorOpDims(rewriter, loadOp, loadOp.getSource(),
-                                      loadOp.getSourceDimsMutable()));
-  }
-};
-
-// Inlining producers of an input to the dispatch region results in the
-// `flow.dispatch.input.load` having a `tensor` type as input. This fails
-// verification. Since inlining happens during canonicalization, add a pattern
-// to convert
-//
-// flow.dispatch.input.load %v, offsets .., sizes .., strides..
-//   : tensor<...> -> tensor<..>
-//
-// to
-//
-// subtensor %v[..] [..] [..]
-struct ConvertDispatchInputLoadOfTensorToSubTensor
-    : public OpRewritePattern<DispatchTensorLoadOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(DispatchTensorLoadOp loadOp,
-                                PatternRewriter &rewriter) const override {
-    if (!llvm::isa<RankedTensorType>(loadOp.getSource().getType())) {
-      return failure();
-    }
-    // If the offsets are empty rely on folding to take care of it.
-    if (loadOp.offsets().empty() && loadOp.sizes().empty() &&
-        loadOp.strides().empty()) {
-      return failure();
-    }
-    rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
-        loadOp, loadOp.getSource(), loadOp.getMixedOffsets(),
-        loadOp.getMixedSizes(), loadOp.getMixedStrides());
-    return success();
-  }
-};
-
-/// For `op` that implements the `OffsetsStridesAndSizesInterface`, canonicalize
-/// the `offsets`, `sizes` and `strides` by replacing aby value operand that is
-/// defined by a constant with the integer value directly. The type of the slice
-/// (result type for `flow.dispatch.tensor.load` and `value` type for
-/// `flow.dispatch.tensor.store`) is also passed in. The type of the slice to
-/// use in the canonicalized op is returned.
-template <typename OpTy>
-static FailureOr<RankedTensorType>
-canonicalizeSubViewParts(OpTy op, RankedTensorType sliceType,
-                         SmallVector<OpFoldResult> &mixedOffsets,
-                         SmallVector<OpFoldResult> &mixedSizes,
-                         SmallVector<OpFoldResult> &mixedStrides) {
-  // If there are no constant operands then we return early before the more
-  // expensive work below.
-  if (llvm::none_of(op.offsets(),
-                    [](Value operand) {
-                      return matchPattern(operand, matchConstantIndex());
-                    }) &&
-      llvm::none_of(op.sizes(),
-                    [](Value operand) {
-                      return matchPattern(operand, matchConstantIndex());
-                    }) &&
-      llvm::none_of(op.strides(), [](Value operand) {
-        return matchPattern(operand, matchConstantIndex());
-      })) {
-    return failure();
-  }
-
-  // At least one of offsets/sizes/strides is a new constant.
-  // Form the new list of operands and constant attributes from the existing.
-  mixedOffsets.assign(op.getMixedOffsets());
-  mixedSizes.assign(op.getMixedSizes());
-  mixedStrides.assign(op.getMixedStrides());
-  if (failed(foldDynamicIndexList(mixedOffsets)) &&
-      failed(foldDynamicIndexList(mixedSizes)) &&
-      failed(foldDynamicIndexList(mixedStrides))) {
-    return failure();
-  }
-
-  // Drop out the same dimensions form before.
-  llvm::SmallVector<int64_t> newShape;
-  llvm::SmallBitVector droppedDims = op.getDroppedDims();
-  for (auto size : llvm::enumerate(mixedSizes)) {
-    if (droppedDims.test(size.index()))
-      continue;
-    std::optional<int64_t> staticSize = getConstantIntValue(size.value());
-    newShape.push_back(staticSize ? staticSize.value() : ShapedType::kDynamic);
-  }
-
-  auto newSliceType =
-      RankedTensorType::get(newShape, sliceType.getElementType());
-  return newSliceType;
-}
-
-/// Pattern to rewrite a subview op with constant arguments.
-struct DispatchTensorLoadOpWithOffsetSizesAndStridesConstantArgumentFolder final
-    : public OpRewritePattern<DispatchTensorLoadOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(DispatchTensorLoadOp loadOp,
-                                PatternRewriter &rewriter) const override {
-    SmallVector<OpFoldResult> mixedOffsets, mixedSizes, mixedStrides;
-    RankedTensorType resultType = loadOp.getType();
-    auto newResultType = canonicalizeSubViewParts(
-        loadOp, resultType, mixedOffsets, mixedSizes, mixedStrides);
-    if (failed(newResultType))
-      return failure();
-
-    // We need to resolve the new inferred type with the specified type.
-    Location loc = loadOp.getLoc();
-    Value replacement = rewriter.create<DispatchTensorLoadOp>(
-        loc, newResultType.value(), loadOp.getSource(), loadOp.getSourceDims(),
-        mixedOffsets, mixedSizes, mixedStrides);
-    if (newResultType.value() != resultType) {
-      replacement =
-          rewriter.create<tensor::CastOp>(loc, resultType, replacement);
-    }
-    rewriter.replaceOp(loadOp, replacement);
-    return success();
-  }
-};
-
-} // namespace
-
-void DispatchTensorLoadOp::getCanonicalizationPatterns(
-    RewritePatternSet &results, MLIRContext *context) {
-  results.insert<ReuseDispatchTensorLoadShapeDims>(context);
-  results.insert<ConvertDispatchInputLoadOfTensorToSubTensor>(context);
-  results.insert<
-      DispatchTensorLoadOpWithOffsetSizesAndStridesConstantArgumentFolder>(
-      context);
-}
-
-// Inlining producers of an input to the dispatch region results in the
-// `flow.dispatch.input.load` having a `tensor` type as input. This fails
-// verification. Fold such uses of the offsets, size and strides are emtpy.
-// i.e, flow.dispatch.input.load %v -> %v
-OpFoldResult DispatchTensorLoadOp::fold(FoldAdaptor operands) {
-  if (getSource().getType() &&
-      llvm::isa<RankedTensorType>(getSource().getType()) &&
-      getMixedOffsets().empty() && getMixedSizes().empty() &&
-      getMixedStrides().empty()) {
-    return getSource();
-  }
-  return {};
-}
-
-//===----------------------------------------------------------------------===//
-// flow.dispatch.tensor.store
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-struct ReuseDispatchTensorStoreShapeDims
-    : public OpRewritePattern<DispatchTensorStoreOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
-                                PatternRewriter &rewriter) const override {
-    return success(updateTensorOpDims(rewriter, storeOp, storeOp.getTarget(),
-                                      storeOp.getTargetDimsMutable()));
-  }
-};
-
-struct FoldCastOpIntoDispatchStoreOp
-    : public OpRewritePattern<DispatchTensorStoreOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
-                                PatternRewriter &rewriter) const override {
-    auto parentOp = storeOp.getValue().getDefiningOp<tensor::CastOp>();
-    if (!parentOp || !tensor::canFoldIntoConsumerOp(parentOp)) {
-      return failure();
-    }
-
-    // Only fold a cast when the (rank-reduced) type is consistent with the
-    // static sizes.
-    auto sourceTensorType =
-        dyn_cast<RankedTensorType>(parentOp.getSource().getType());
-    if (!sourceTensorType) {
-      return failure();
-    }
-    auto inferredType = RankedTensorType::get(
-        storeOp.getStaticSizes(), sourceTensorType.getElementType());
-    if (isRankReducedType(inferredType, sourceTensorType) !=
-        SliceVerificationResult::Success) {
-      return failure();
-    }
-
-    rewriter.replaceOpWithNewOp<DispatchTensorStoreOp>(
-        storeOp, parentOp.getSource(), storeOp.getTarget(),
-        storeOp.getTargetDims(), storeOp.getOffsets(), storeOp.getSizes(),
-        storeOp.getStrides(), storeOp.getStaticOffsets(),
-        storeOp.getStaticSizes(), storeOp.getStaticStrides());
-    return success();
-  }
-};
-
-struct DispatchTensorStoreOpWithOffsetSizesAndStridesConstantArgumentFolder
-    final : public OpRewritePattern<DispatchTensorStoreOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
-                                PatternRewriter &rewriter) const override {
-    SmallVector<OpFoldResult> mixedOffsets, mixedSizes, mixedStrides;
-    RankedTensorType valueType = storeOp.getValueType();
-    auto newValueType = canonicalizeSubViewParts(
-        storeOp, valueType, mixedOffsets, mixedSizes, mixedStrides);
-    if (failed(newValueType))
-      return failure();
-
-    Value value = storeOp.getValue();
-    Location loc = storeOp.getLoc();
-    if (newValueType.value() != valueType) {
-      value = rewriter.create<tensor::CastOp>(loc, newValueType.value(), value);
-    }
-    rewriter.replaceOpWithNewOp<DispatchTensorStoreOp>(
-        storeOp, value, storeOp.getTarget(), storeOp.getTargetDims(),
-        mixedOffsets, mixedSizes, mixedStrides);
-    return success();
-  }
-};
-
-} // namespace
-
-void DispatchTensorStoreOp::getCanonicalizationPatterns(
-    RewritePatternSet &results, MLIRContext *context) {
-  results.insert<
-      DispatchTensorStoreOpWithOffsetSizesAndStridesConstantArgumentFolder,
-      FoldCastOpIntoDispatchStoreOp, ReuseDispatchTensorStoreShapeDims>(
-      context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -750,36 +427,6 @@ static uint64_t getFlattenedIndex(ShapedType type, ArrayRef<uint64_t> index) {
   return valueIndex;
 }
 
-static bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
-                               ShapedType rhsType, ValueRange rhsDynamicDims) {
-  if (lhsType.hasStaticShape() && rhsType.hasStaticShape()) {
-    // Static shape equivalence means we can fast-path the check.
-    return lhsType == rhsType;
-  }
-  if (lhsType.getRank() != rhsType.getRank()) {
-    return false;
-  }
-  unsigned dynamicDimIndex = 0;
-  unsigned numNonmatchingSSADims = 0;
-  for (unsigned i = 0; i < lhsType.getRank(); ++i) {
-    if (lhsType.isDynamicDim(i) != rhsType.isDynamicDim(i)) {
-      // Static/dynamic dimension mismatch - definitely differ.
-      return false;
-    } else if (lhsType.isDynamicDim(i)) {
-      unsigned j = dynamicDimIndex++;
-      if (lhsDynamicDims[j] != rhsDynamicDims[j]) {
-        numNonmatchingSSADims++;
-      }
-    } else {
-      if (lhsType.getDimSize(i) != rhsType.getDimSize(i)) {
-        // Static dimensions differ.
-        return false;
-      }
-    }
-  }
-  return numNonmatchingSSADims <= 1;
-}
-
 //===----------------------------------------------------------------------===//
 // flow.tensor.constant
 //===----------------------------------------------------------------------===//
@@ -802,23 +449,21 @@ namespace {
 
 struct ExpandDynamicShapeConstant
     : public OpRewritePattern<TensorDynamicConstantOp> {
-  using OpRewritePattern<TensorDynamicConstantOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorDynamicConstantOp op,
                                 PatternRewriter &rewriter) const override {
-    auto constantOp = rewriter.create<IREE::Flow::TensorConstantOp>(
-        op.getLoc(), op.getValue());
+    auto constantOp = IREE::Flow::TensorConstantOp::create(
+        rewriter, op.getLoc(), op.getValue());
     auto dynamicType = op.getType();
     auto staticType = cast<ShapedType>(op.getValue().getType());
     SmallVector<Value> dynamicDims;
     for (int64_t i = 0; i < dynamicType.getRank(); ++i) {
       if (dynamicType.isDynamicDim(i)) {
-        auto dimValue = rewriter
-                            .create<arith::ConstantIndexOp>(
-                                op.getLoc(), staticType.getDimSize(i))
+        auto dimValue = arith::ConstantIndexOp::create(rewriter, op.getLoc(),
+                                                       staticType.getDimSize(i))
                             .getResult();
-        dynamicDims.push_back(rewriter
-                                  .create<IREE::Util::OptimizationBarrierOp>(
-                                      op.getLoc(), dimValue)
+        dynamicDims.push_back(IREE::Util::OptimizationBarrierOp::create(
+                                  rewriter, op.getLoc(), dimValue)
                                   .getResult(0));
       }
     }
@@ -896,7 +541,6 @@ struct FlattenTensorCastLikeChain : public OpRewritePattern<CastOpTy> {
       source = sourceOp.getSource();
       sourceDims = sourceOp.getSourceDims();
     }
-
     if (!source) {
       return failure();
     }
@@ -920,7 +564,7 @@ struct FlattenTensorCastLikeChain : public OpRewritePattern<CastOpTy> {
 };
 
 struct ResolveShapedRank : public OpRewritePattern<tensor::RankOp> {
-  using OpRewritePattern<tensor::RankOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::RankOp op,
                                 PatternRewriter &rewriter) const override {
     auto shapedType = llvm::cast<ShapedType>(op.getTensor().getType());
@@ -931,7 +575,7 @@ struct ResolveShapedRank : public OpRewritePattern<tensor::RankOp> {
 };
 
 struct ResolveShapedDim : public OpRewritePattern<tensor::DimOp> {
-  using OpRewritePattern<tensor::DimOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::DimOp op,
                                 PatternRewriter &rewriter) const override {
     if (!op.getConstantIndex().has_value()) {
@@ -1031,7 +675,7 @@ namespace {
 // Replace `flow.tensor.splat`-`flow.tensor.load` op-pairs by the input
 // primitive value for the splat op.
 struct FoldSplatLoadIntoPrimitive : public OpRewritePattern<TensorLoadOp> {
-  using OpRewritePattern<TensorLoadOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
     auto sourceOp =
@@ -1104,7 +748,7 @@ void TensorEmptyOp::getCanonicalizationPatterns(RewritePatternSet &results,
 namespace {
 
 struct FoldSplatReshapeIntoSplat : public OpRewritePattern<TensorReshapeOp> {
-  using OpRewritePattern<TensorReshapeOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorReshapeOp reshapeOp,
                                 PatternRewriter &rewriter) const override {
     auto splatOp = dyn_cast_if_present<TensorSplatOp>(
@@ -1162,8 +806,60 @@ void TensorCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // flow.tensor.barrier
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+// Moves (or clones) cast-like ops after a transfer operation and possibly
+// updates the transfer op to match the new type.
+//
+// The cast-like behavior makes more sense near consumers: the producer does not
+// need the information as it has already extracted it if required before
+// converting into flow ops and if there are no consumers of the transfer that
+// cast-like op would have been removed anyway.
+//
+// Example:
+//  %reshape = flow.tensor.reshape %source : tensor<1x2xf32> -> tensor<2x1xf32>
+//  %target = flow.tensor.transfer %reshape : tensor<2x1xf32> to "foo"
+// ->
+//  %target = flow.tensor.transfer %source : tensor<1x2xf32> to "foo"
+//  %reshape = flow.tensor.reshape %target : tensor<1x2xf32> -> tensor<2x1xf32>
+template <typename TransferOpT, typename CastOpT>
+struct SinkCastLikeOpAcrossTransfer final : OpRewritePattern<TransferOpT> {
+  using OpRewritePattern<TransferOpT>::OpRewritePattern;
+  LogicalResult matchAndRewrite(TransferOpT transferOp,
+                                PatternRewriter &rewriter) const override {
+    auto sourceOp =
+        dyn_cast_if_present<CastOpT>(transferOp.getOperand().getDefiningOp());
+    if (!sourceOp) {
+      return rewriter.notifyMatchFailure(
+          transferOp, "source op not available or does not match");
+    }
+    Value originValue = sourceOp.getSource();
+    ValueRange originDims = sourceOp.getSourceDims();
+    auto newOp = TransferOpT::create(rewriter, transferOp.getLoc(), originValue,
+                                     originDims, transferOp.getTargetAttr());
+    IRMapping mapper;
+    mapper.map(originValue, newOp.getResult());
+    rewriter.setInsertionPointAfter(newOp);
+    auto clonedOp =
+        cast<CastOpT>(rewriter.clone(*sourceOp.getOperation(), mapper));
+    rewriter.replaceAllUsesExcept(transferOp.getResult(), clonedOp.getResult(),
+                                  newOp);
+    rewriter.eraseOp(transferOp);
+    return success();
+  }
+};
+
+} // namespace
+
 void TensorBarrierOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                  MLIRContext *context) {}
+                                                  MLIRContext *context) {
+  results.add<SinkCastLikeOpAcrossTransfer<IREE::Flow::TensorBarrierOp,
+                                           IREE::Flow::TensorBitCastOp>>(
+      context);
+  results.add<SinkCastLikeOpAcrossTransfer<IREE::Flow::TensorBarrierOp,
+                                           IREE::Flow::TensorReshapeOp>>(
+      context);
+}
 
 //===----------------------------------------------------------------------===//
 // flow.tensor.transfer
@@ -1192,11 +888,41 @@ struct ElideRedundantTransfer : public OpRewritePattern<TensorTransferOp> {
   }
 };
 
+// Attempts to identify trivial case of chained transfer ops (A -> B -> C) and
+// rewrite it as (A -> C). Writes it as A -> B and A -> C relying on dead code
+// elimination to remove the unused A -> B transfer.
+struct ElideIntermediateTransfer final : OpRewritePattern<TensorTransferOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(TensorTransferOp targetTransferOp,
+                                PatternRewriter &rewriter) const override {
+    auto sourceTransferOp = dyn_cast_if_present<IREE::Flow::TensorTransferOp>(
+        targetTransferOp.getOperand().getDefiningOp());
+    if (!sourceTransferOp) {
+      return failure();
+    }
+    if (sourceTransferOp.getTarget() == targetTransferOp.getTarget()) {
+      return failure();
+    }
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorTransferOp>(
+        targetTransferOp, targetTransferOp->getResultTypes(),
+        sourceTransferOp.getOperand(), targetTransferOp.getOperandDims(),
+        targetTransferOp.getTarget());
+    return success();
+  }
+};
+
 } // namespace
 
 void TensorTransferOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                    MLIRContext *context) {
-  results.insert<ElideRedundantTransfer>(context);
+  results.add<ElideRedundantTransfer>(context);
+  results.add<ElideIntermediateTransfer>(context);
+  results.add<SinkCastLikeOpAcrossTransfer<IREE::Flow::TensorTransferOp,
+                                           IREE::Flow::TensorBitCastOp>>(
+      context);
+  results.add<SinkCastLikeOpAcrossTransfer<IREE::Flow::TensorTransferOp,
+                                           IREE::Flow::TensorReshapeOp>>(
+      context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1340,7 +1066,7 @@ namespace {
 // When the target tensor is a result of a tensor.cast operation, the op needs
 // to be updated to use the source of the cast as the target tensor.
 struct FoldTensorUpdateOpWithCasts : public OpRewritePattern<TensorUpdateOp> {
-  using OpRewritePattern<TensorUpdateOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorUpdateOp updateOp,
                                 PatternRewriter &rewriter) const override {
     auto targetCastOp = updateOp.getTarget().getDefiningOp<tensor::CastOp>();
@@ -1351,8 +1077,8 @@ struct FoldTensorUpdateOpWithCasts : public OpRewritePattern<TensorUpdateOp> {
                                  : cast<Value>(updateOp.getTarget()));
     Value update = (updateCastOp ? cast<Value>(updateCastOp.getSource())
                                  : cast<Value>(updateOp.getUpdate()));
-    auto newOp = rewriter.create<TensorUpdateOp>(
-        updateOp.getLoc(), target.getType(), target,
+    auto newOp = TensorUpdateOp::create(
+        rewriter, updateOp.getLoc(), target.getType(), target,
         refreshDimsOnTypeChange(updateOp, updateOp.getTarget().getType(),
                                 target.getType(), updateOp.getTargetDims(),
                                 rewriter),
@@ -1368,7 +1094,7 @@ struct FoldTensorUpdateOpWithCasts : public OpRewritePattern<TensorUpdateOp> {
 
 struct ReplaceOpIfTensorUpdateOperandZeroElements
     : public OpRewritePattern<TensorUpdateOp> {
-  using OpRewritePattern<TensorUpdateOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorUpdateOp op,
                                 PatternRewriter &rewriter) const override {
     auto operand = op.getUpdate();

@@ -6,6 +6,7 @@
 
 #include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/ConstEval/Runtime.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetOptions.h"
 #include "iree/compiler/Dialect/Util/Analysis/Constant/ConstExpr.h"
 #include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
@@ -79,6 +80,13 @@ struct CompileOptions {
   IREEVMPipelineHooks hooks;
 };
 
+static inline bool isAttrParameterized(Attribute attr) {
+  if (!attr)
+    return false;
+  return !isa<IntegerAttr>(attr) && !isa<FloatAttr>(attr) &&
+         !isa<IREE::Util::SerializableAttrInterface>(attr);
+}
+
 template <typename AccessorTy>
 static inline bool isAccessorParameterized(const SymbolTable &moduleSymbols,
                                            AccessorTy op) {
@@ -86,12 +94,7 @@ static inline bool isAccessorParameterized(const SymbolTable &moduleSymbols,
       moduleSymbols.lookup<IREE::Util::GlobalOpInterface>(op.getGlobalName());
   if (!global)
     return true;
-  auto attr = global.getGlobalInitialValue();
-  if (!attr)
-    return false;
-  return !isa<IntegerAttr>(attr) && !isa<FloatAttr>(attr) &&
-         !isa<IREE::Util::SerializableAttrInterface>(
-             global.getGlobalInitialValue());
+  return isAttrParameterized(global.getGlobalInitialValue());
 }
 
 // Today the only way to interact with a global is with loads, stores, and
@@ -108,6 +111,9 @@ static bool isParameterized(const SymbolTable &moduleSymbols,
             })
             .Case([=](IREE::Util::GlobalStoreOpInterface accessor) {
               return isAccessorParameterized(moduleSymbols, accessor);
+            })
+            .Case([=](IREE::Flow::TensorConstantOp accessor) {
+              return isAttrParameterized(accessor.getValueAttr());
             })
             .Default([=](auto) { return false; });
     if (parameterized)
@@ -467,8 +473,8 @@ public:
                                 targetSymbolTable, moduleBuilder)))
       return failure();
 
-    auto funcOp = moduleBuilder.create<IREE::Util::FuncOp>(
-        initializerOp.getLoc(), "jit_eval",
+    auto funcOp = IREE::Util::FuncOp::create(
+        moduleBuilder, initializerOp.getLoc(), "jit_eval",
         moduleBuilder.getFunctionType({}, {}));
     targetSymbolTable.insert(funcOp);
     IRMapping unusedMapping;
@@ -483,7 +489,7 @@ public:
 private:
   static ModuleOp createInnerModule(ModuleOp sourceModuleOp) {
     OpBuilder builder = OpBuilder::atBlockEnd(sourceModuleOp.getBody());
-    auto m = builder.create<ModuleOp>(sourceModuleOp.getLoc());
+    auto m = ModuleOp::create(builder, sourceModuleOp.getLoc());
     m->setAttr("iree.consteval", builder.getUnitAttr());
     return m;
   }
@@ -577,7 +583,7 @@ private:
     // Rewrite the terminator and the function type.
     entryBlock->getTerminator()->erase();
     OpBuilder termBuilder = OpBuilder::atBlockEnd(entryBlock);
-    termBuilder.create<IREE::Util::ReturnOp>(funcOp.getLoc(), returns);
+    IREE::Util::ReturnOp::create(termBuilder, funcOp.getLoc(), returns);
     funcOp.setType(termBuilder.getFunctionType(argumentTypes, returnTypes));
 
     jitFunctions.push_back(std::move(desc));
@@ -715,7 +721,7 @@ public:
 
   void runOnOperation() override {
     llvm::TimerGroup tg("iree-consteval-jit", "Consteval Jit");
-    auto outerModule = getOperation();
+    mlir::ModuleOp outerModuleOp = getOperation();
 
     // Set the target.
     if (!targetDevice) {
@@ -752,14 +758,14 @@ public:
     }
 
     // Build the program.
-    ProgramBuilder programBuilder(outerModule, *deviceTargetAttr,
+    ProgramBuilder programBuilder(outerModuleOp, *deviceTargetAttr,
                                   supportedTypes,
                                   getAnalysis<IREE::Util::ConstExprAnalysis>());
 
     // Iterate over initializers.
     llvm::SmallVector<IREE::Util::InitializerOp> initializerOps;
     llvm::SmallVector<IREE::Util::InitializerOp> deadInitOps;
-    for (auto childOp : outerModule.getOps<IREE::Util::InitializerOp>()) {
+    for (auto childOp : outerModuleOp.getOps<IREE::Util::InitializerOp>()) {
       initializerOps.push_back(childOp);
     }
     for (auto initializerOp : initializerOps) {
@@ -800,7 +806,7 @@ public:
 
     // Process the functions.
     if (failed(processFunctions(binary, programBuilder.getJitFunctions(),
-                                outerModule, tg))) {
+                                outerModuleOp, tg))) {
       signalPassFailure();
       return;
     }

@@ -72,7 +72,6 @@ target_link_libraries(iree_runtime_bindings_python_PyExtRt
   iree::hal
   iree::hal::drivers
   iree::hal::utils::allocators
-  iree::base::internal::file_io
   iree::base::internal::path
   iree::io::file_handle
   iree::io::formats::irpa

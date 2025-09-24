@@ -136,7 +136,7 @@ LogicalResult setHIPGlobals(Location loc, llvm::Module *module,
   auto *int32Type = llvm::Type::getInt32Ty(module->getContext());
   overridePlatformGlobal(module, "__oclc_ISA_version", chipCode, int32Type);
 
-  overridePlatformGlobal(module, "__oclc_version", abiVersion, int32Type);
+  overridePlatformGlobal(module, "__oclc_ABI_version", abiVersion, int32Type);
 
   // Link oclc configurations as globals.
   auto *boolType = llvm::Type::getInt8Ty(module->getContext());

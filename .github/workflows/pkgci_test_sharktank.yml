@@ -43,7 +43,7 @@ jobs:
           - name: amdgpu_rocm_mi250_gfx90a
             rocm-chip: gfx90a
             backend: rocm
-            iree_test_files: /home/esaimana/iree_tests_cache
+            iree_test_files: /groups/aig_sharks/iree-tests-cache
             sku: mi250
             target: target_hip
             runs-on: nodai-amdgpu-mi250-x86-64
@@ -53,7 +53,7 @@ jobs:
             iree_test_files: /shark-cache/data/iree-regression-cache
             sku: mi300
             target: target_hip
-            runs-on: linux-mi300-1gpu-ossci-iree-org
+            runs-on: linux-mi325-1gpu-ossci-iree-org
           - name: amdgpu_rocm_mi308_gfx942
             rocm-chip: gfx942
             backend: rocm
@@ -69,26 +69,26 @@ jobs:
       IREE_TEST_FILES: ${{ matrix.iree_test_files }}
     steps:
       - name: Checking out IREE repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           submodules: false
 
-      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5.4.0
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v5.4.0
         with:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
 
-      - uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         if: ${{ inputs.artifact_run_id == '' }}
         with:
           name: linux_x86_64_release_packages
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
 
       - name: Checkout test suites repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           repository: iree-org/iree-test-suites
-          ref: 6be20a2471be24f6ddc8343dec49a76d6a7749f7
+          ref: 615c14ea2dd082d132cd64cd92806bcc7fdb5c75
           path: iree-test-suites
           lfs: true
 
@@ -176,26 +176,26 @@ jobs:
       TEST_OUTPUT_ARTIFACTS: ${{ github.workspace }}/model_output_artifacts
     steps:
       - name: Checking out IREE repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           submodules: false
 
-      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5.4.0
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v5.4.0
         with:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
 
-      - uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         if: ${{ inputs.artifact_run_id == '' }}
         with:
           name: linux_x86_64_release_packages
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
 
       - name: Checkout test suites repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           repository: iree-org/iree-test-suites
-          ref: 6be20a2471be24f6ddc8343dec49a76d6a7749f7
+          ref: 615c14ea2dd082d132cd64cd92806bcc7fdb5c75
           path: iree-test-suites
           lfs: true
 

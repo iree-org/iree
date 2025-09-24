@@ -152,7 +152,8 @@ bool iree_hal_query_any_executable_loader_support(
 // the runtime loader and system are required.
 //
 // Returns IREE_STATUS_CANCELLED when the loader cannot load the file in the
-// given format.
+// given format. Returns IREE_STATUS_NOT_FOUND if the executable requested is
+// not registered with the loader.
 iree_status_t iree_hal_executable_loader_try_load(
     iree_hal_executable_loader_t* executable_loader,
     const iree_hal_executable_params_t* executable_params,

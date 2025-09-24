@@ -51,7 +51,7 @@ getVMVXExecutableTarget(bool enableMicrokernels, MLIRContext *context,
       b.getStringAttr(enableMicrokernels ? "all" : "none"));
   configItems.emplace_back(
       b.getStringAttr(IREE::Encoding::kEncodingResolverAttrName),
-      IREE::CPU::VMVXEncodingLayoutAttr::get(context, {}));
+      IREE::CPU::VMVXEncodingResolverAttr::get(context, {}));
   return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
       b.getStringAttr(backend), b.getStringAttr(format),
       b.getDictionaryAttr(configItems));
@@ -174,6 +174,13 @@ public:
                                    executableBuilder.getI8IntegerAttr(
                                        static_cast<uint8_t>(bindingCount)));
         }
+        // TODO(benvanik): logical parameters and reflection information.
+        size_t paramCount = 0;
+        if (paramCount > 0) {
+          funcOp.setReflectionAttr("parameter_count",
+                                   executableBuilder.getI16IntegerAttr(
+                                       static_cast<uint16_t>(paramCount)));
+        }
       }
     }
 
@@ -206,8 +213,8 @@ public:
     // Add the binary data to the target executable.
     // NOTE: this snapshots the FlatBuffer builder data at the time it is called
     // and future changes to the target op will not be observed.
-    auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        variantOp.getLoc(), variantOp.getSymName(),
+    auto binaryOp = IREE::HAL::ExecutableBinaryOp::create(
+        executableBuilder, variantOp.getLoc(), variantOp.getSymName(),
         variantOp.getTarget().getFormat(), bufferAttr);
     binaryOp.setMimeTypeAttr(
         executableBuilder.getStringAttr("application/x-flatbuffers"));

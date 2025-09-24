@@ -117,7 +117,7 @@ struct ResolveDeviceAliasesPass
       ResolveDeviceAliasesPass>::ResolveDeviceAliasesPassBase;
   void runOnOperation() override {
     // Walks all device globals and resolve any aliases found.
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     for (auto globalOp : moduleOp.getOps<IREE::Util::GlobalOpInterface>()) {
       if (!isa<IREE::HAL::DeviceType>(globalOp.getGlobalType())) {
         continue;

@@ -42,7 +42,8 @@ VkInstanceCreateInfo GetInstanceCreateInfo(VkApplicationInfo* app_info) {
 
 TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
   iree::ref_ptr<iree::hal::vulkan::DynamicSymbols> syms;
-  IREE_ASSERT_OK(DynamicSymbols::CreateFromSystemLoader(&syms));
+  IREE_ASSERT_OK(
+      DynamicSymbols::CreateFromSystemLoader(iree_allocator_system(), &syms));
 
   // Create and destroy a VkInstance using the symbols. This is mainly testing
   // that the symbols were loaded successfully and are actually able to be used.

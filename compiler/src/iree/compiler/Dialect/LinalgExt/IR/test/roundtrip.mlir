@@ -4,7 +4,7 @@ func.func @sort_tensor(%arg0: tensor<128xi32>) -> tensor<128xi32> {
   %0 = iree_linalg_ext.sort
     dimension(0)
     outs(%arg0 : tensor<128xi32>) {
-  ^bb0(%arg1: i32, %arg2: i32):  // no predecessors
+  ^bb0(%arg1: i32, %arg2: i32):
     %1 = arith.cmpi sgt, %arg1, %arg2 : i32
     iree_linalg_ext.yield %1 : i1
   } -> tensor<128xi32>
@@ -21,7 +21,7 @@ func.func @sort_tensor(%arg0: tensor<128xi32>) -> tensor<128xi32> {
 func.func @sort_memref(%arg0: memref<128xi32>) {
   iree_linalg_ext.sort dimension(0)
     outs(%arg0 : memref<128xi32>) {
-  ^bb0(%arg1: i32, %arg2: i32):  // no predecessors
+  ^bb0(%arg1: i32, %arg2: i32):
     %0 = arith.cmpi sgt, %arg1, %arg2 : i32
     iree_linalg_ext.yield %0 : i1
   }
@@ -40,7 +40,7 @@ func.func @sort_multi_result_tensor(
     -> (tensor<?x?xi32>, tensor<?x?xf32>) {
   %0:2 = iree_linalg_ext.sort dimension(0)
       outs(%arg0, %arg1 : tensor<?x?xi32>, tensor<?x?xf32>) {
-      ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
+      ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):
         %1 = arith.cmpf ogt, %arg4, %arg5 : f32
         iree_linalg_ext.yield %1 : i1
       } -> tensor<?x?xi32>, tensor<?x?xf32>
@@ -59,7 +59,7 @@ func.func @sort_multi_result_memref(
     %arg0: memref<?x?xi32>, %arg1: memref<?x?xf32>) {
   iree_linalg_ext.sort dimension(0)
      outs(%arg0, %arg1 : memref<?x?xi32>, memref<?x?xf32>) {
-     ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
+     ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):
        %1 = arith.cmpf ogt, %arg4, %arg5 : f32
        iree_linalg_ext.yield %1 : i1
      }
@@ -361,7 +361,7 @@ func.func @scatter_update_scalar_1D(
     unique_indices(true)
     ins(%updates, %indices : tensor<3xi32>, tensor<3xi32>)
     outs(%original : tensor<8xi32>)  {
-    ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+    ^bb0(%arg0: i32, %arg1: i32):
       iree_linalg_ext.yield %arg0 : i32
     } -> tensor<8xi32>
   return %0 : tensor<8xi32>
@@ -388,7 +388,7 @@ func.func @scatter_update_i64_scalar_1D(
     unique_indices(true)
     ins(%updates, %indices : tensor<3xi32>, tensor<3x1xi64>)
     outs(%original : tensor<8xi32>)  {
-    ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+    ^bb0(%arg0: i32, %arg1: i32):
       iree_linalg_ext.yield %arg0 : i32
     } -> tensor<8xi32>
   return %0 : tensor<8xi32>
@@ -415,7 +415,7 @@ func.func @scatter_update_scalar_2D(
     unique_indices(true)
     ins(%updates, %indices : tensor<3xi32>, tensor<3x2xi32>)
     outs(%original : tensor<4x3xi32>)  {
-    ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+    ^bb0(%arg0: i32, %arg1: i32):
       iree_linalg_ext.yield %arg0 : i32
     } -> tensor<4x3xi32>
   return %0 : tensor<4x3xi32>
@@ -442,7 +442,7 @@ func.func @scatter_update_slice_2D(
     unique_indices(true)
     ins(%updates, %indices : tensor<1x3xi32>, tensor<1x1xi32>)
     outs(%original : tensor<4x3xi32>)  {
-    ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+    ^bb0(%arg0: i32, %arg1: i32):
       iree_linalg_ext.yield %arg0 : i32
     } -> tensor<4x3xi32>
   return %0 : tensor<4x3xi32>
@@ -573,7 +573,7 @@ func.func @scatter_update_slice_2D(
     unique_indices(true)
     ins(%updates, %indices : tensor<1x?xi32>, tensor<1x1xi32>)
     outs(%original : tensor<4x?xi32>)  {
-    ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
+    ^bb0(%arg0: i32, %arg1: i32):
       iree_linalg_ext.yield %arg0 : i32
     } -> tensor<4x?xi32>
   return %0 : tensor<4x?xi32>
@@ -589,6 +589,422 @@ func.func @scatter_update_slice_2D(
 //  CHECK-SAME:     outs(%[[ORIGINAL]]
 //       CHECK:     iree_linalg_ext.yield %{{.+}} : i32
 //       CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @gather_static(
+    %source : tensor<10xf32>, %idx : tensor<1xi32>,
+    %result : tensor<1xf32>) -> tensor<1xf32> {
+  %0 = iree_linalg_ext.gather
+    dimension_map = [0]
+    ins(%source, %idx : tensor<10xf32>, tensor<1xi32>)
+    outs(%result : tensor<1xf32>) -> tensor<1xf32>
+  return %0 : tensor<1xf32>
+}
+// CHECK-LABEL: func.func @gather_static(
+// CHECK-SAME:   %[[SOURCE:[a-zA-Z0-9_]+]]
+// CHECK-SAME:   %[[IDX:[a-zA-Z0-9_]+]]
+// CHECK-SAME:   %[[RESULT:[a-zA-Z0-9_]+]]
+//      CHECK:   %[[VAL:.+]] = iree_linalg_ext.gather
+// CHECK-SAME:     dimension_map = [0]
+// CHECK-SAME:     ins(%[[SOURCE]], %[[IDX]]
+// CHECK-SAME:     outs(%[[RESULT]]
+//      CHECK:   return %[[VAL]]
+
+// -----
+
+func.func @gather_static_2D_batch(
+    %source : tensor<4x3xf32>, %idx : tensor<1x1xi32>,
+    %result : tensor<1xf32>) -> tensor<1xf32> {
+  %0 = iree_linalg_ext.gather
+    dimension_map = [0, 1]
+    ins(%source, %idx : tensor<4x3xf32>, tensor<1x1xi32>)
+    outs(%result : tensor<1xf32>) -> tensor<1xf32>
+  return %0 : tensor<1xf32>
+}
+// CHECK-LABEL: func.func @gather_static_2D_batch(
+// CHECK-SAME:   %[[SOURCE:[a-zA-Z0-9_]+]]
+// CHECK-SAME:   %[[IDX:[a-zA-Z0-9_]+]]
+// CHECK-SAME:   %[[RESULT:[a-zA-Z0-9_]+]]
+//      CHECK:   %[[VAL:.+]] = iree_linalg_ext.gather
+// CHECK-SAME:     dimension_map = [0, 1]
+// CHECK-SAME:     ins(%[[SOURCE]], %[[IDX]]
+// CHECK-SAME:     outs(%[[RESULT]]
+//      CHECK:   return %[[VAL]]
+
+// -----
+
+func.func @gather_dynamic(
+    %source : tensor<?x?xf32>, %idx : tensor<?x1xi32>,
+    %result : tensor<?xf32>) -> tensor<?xf32> {
+  %0 = iree_linalg_ext.gather
+    dimension_map = [0, 1]
+    ins(%source, %idx : tensor<?x?xf32>, tensor<?x1xi32>)
+    outs(%result : tensor<?xf32>) -> tensor<?xf32>
+  return %0 : tensor<?xf32>
+}
+// CHECK-LABEL: func.func @gather_dynamic(
+// CHECK-SAME:   %[[SOURCE:[a-zA-Z0-9_]+]]
+// CHECK-SAME:   %[[IDX:[a-zA-Z0-9_]+]]
+// CHECK-SAME:   %[[RESULT:[a-zA-Z0-9_]+]]
+//      CHECK:   %[[VAL:.+]] = iree_linalg_ext.gather
+// CHECK-SAME:     dimension_map = [0, 1]
+// CHECK-SAME:     ins(%[[SOURCE]], %[[IDX]]
+// CHECK-SAME:     outs(%[[RESULT]]
+//      CHECK:   return %[[VAL]]
+
+// -----
+
+func.func @gather_static_memref(
+    %source : memref<10xf32>, %idx : memref<1xi32>,
+    %result : memref<1xf32>) {
+  iree_linalg_ext.gather
+    dimension_map = [0]
+    ins(%source, %idx : memref<10xf32>, memref<1xi32>)
+    outs(%result : memref<1xf32>)
+  return
+}
+// CHECK-LABEL: func.func @gather_static_memref(
+// CHECK-SAME:   %[[SOURCE:[a-zA-Z0-9_]+]]
+// CHECK-SAME:   %[[IDX:[a-zA-Z0-9_]+]]
+// CHECK-SAME:   %[[RESULT:[a-zA-Z0-9_]+]]
+//      CHECK:   iree_linalg_ext.gather
+// CHECK-SAME:     dimension_map = [0]
+// CHECK-SAME:     ins(%[[SOURCE]], %[[IDX]]
+// CHECK-SAME:     outs(%[[RESULT]]
+//      CHECK:   return
+
+
+// -----
+
+func.func @map_scatter_tensor_static(
+    %input: tensor<4x16x64xf32>, %output: tensor<4x16x64xf32>
+) -> tensor<4x16x64xf32> {
+  %0 = iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index, %idx1: index, %idx2: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %idx1, %idx2, %mask : index, index, index, i1
+  } : tensor<4x16x64xf32> into tensor<4x16x64xf32> -> tensor<4x16x64xf32>
+  return %0 : tensor<4x16x64xf32>
+}
+// CHECK-LABEL: func.func @map_scatter_tensor_static(
+//  CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[RES:.+]] = iree_linalg_ext.map_scatter %[[INPUT]] into %[[OUTPUT]] {
+//       CHECK:     ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index):
+//       CHECK:       %[[MASK:.+]] = arith.constant true
+//       CHECK:       iree_linalg_ext.yield %[[IDX0]], %[[IDX1]], %[[IDX2]], %[[MASK]]
+//       CHECK:   } : tensor<4x16x64xf32> into tensor<4x16x64xf32> -> tensor<4x16x64xf32>
+//       CHECK:   return %[[RES]] : tensor<4x16x64xf32>
+
+// -----
+
+func.func @map_scatter_tensor_dynamic(
+    %input: tensor<?x?xf32>, %output: tensor<?x?xf32>
+) -> tensor<?x?xf32> {
+  %0 = iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index, %idx1: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %idx1, %mask : index, index, i1
+  } : tensor<?x?xf32> into tensor<?x?xf32> -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+// CHECK-LABEL: func.func @map_scatter_tensor_dynamic(
+//  CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[RES:.+]] = iree_linalg_ext.map_scatter %[[INPUT]] into %[[OUTPUT]] {
+//       CHECK:     ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index):
+//       CHECK:       %[[MASK:.+]] = arith.constant true
+//       CHECK:       iree_linalg_ext.yield %[[IDX0]], %[[IDX1]], %[[MASK]]
+//       CHECK:   } : tensor<?x?xf32> into tensor<?x?xf32> -> tensor<?x?xf32>
+//       CHECK:   return %[[RES]] : tensor<?x?xf32>
+
+// -----
+
+func.func @map_scatter_input_sliced(
+    %input: tensor<63xf32>, %output: tensor<64xf32>
+) -> tensor<64xf32> {
+  %0 = iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %mask : index, i1
+  } : tensor<63xf32> into tensor<64xf32> -> tensor<64xf32>
+  return %0 : tensor<64xf32>
+}
+// CHECK-LABEL: func.func @map_scatter_input_sliced(
+//  CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[RES:.+]] = iree_linalg_ext.map_scatter %[[INPUT]] into %[[OUTPUT]] {
+//       CHECK:     ^bb0(%[[IDX0:.+]]: index):
+//       CHECK:       %[[MASK:.+]] = arith.constant true
+//       CHECK:       iree_linalg_ext.yield %[[IDX0]], %[[MASK]]
+//       CHECK:   } : tensor<63xf32> into tensor<64xf32> -> tensor<64xf32>
+//       CHECK:   return %[[RES]] : tensor<64xf32>
+
+// -----
+
+func.func @map_scatter_output_sliced(
+    %input: tensor<64xf32>, %output: tensor<63xf32>
+) -> tensor<63xf32> {
+  %0 = iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index):
+      %c63 = arith.constant 63 : index
+      %mask = arith.cmpi uge, %idx0, %c63 : index
+      iree_linalg_ext.yield %idx0, %mask : index, i1
+  } : tensor<64xf32> into tensor<63xf32> -> tensor<63xf32>
+  return %0 : tensor<63xf32>
+}
+// CHECK-LABEL: func.func @map_scatter_output_sliced(
+//  CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[RES:.+]] = iree_linalg_ext.map_scatter %[[INPUT]] into %[[OUTPUT]] {
+//       CHECK:     ^bb0(%[[IDX0:.+]]: index):
+//       CHECK:       %[[BOUND:.+]] = arith.constant 63 : index
+//       CHECK:       %[[MASK:.+]] = arith.cmpi uge, %[[IDX0]], %[[BOUND]] : index
+//       CHECK:       iree_linalg_ext.yield %[[IDX0]], %[[MASK]]
+//       CHECK:   } : tensor<64xf32> into tensor<63xf32> -> tensor<63xf32>
+//       CHECK:   return %[[RES]] : tensor<63xf32>
+
+// -----
+
+func.func @map_scatter_different_rank(
+    %input: tensor<64xf32>, %output: tensor<32x2xf32>
+) -> tensor<32x2xf32> {
+  %0 = iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index):
+      %mask = arith.constant true
+      %out_idx:2 = affine.delinearize_index %idx0 into (32, 2) : index, index
+      iree_linalg_ext.yield %out_idx#0, %out_idx#1, %mask : index, index, i1
+  } : tensor<64xf32> into tensor<32x2xf32> -> tensor<32x2xf32>
+  return %0 : tensor<32x2xf32>
+}
+// CHECK-LABEL: func.func @map_scatter_different_rank(
+//  CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[RES:.+]] = iree_linalg_ext.map_scatter %[[INPUT]] into %[[OUTPUT]] {
+//       CHECK:     ^bb0(%[[IDX0:.+]]: index):
+//       CHECK:       %[[MASK:.+]] = arith.constant true
+//       CHECK:       %[[OUT_IDX:.+]]:2 = affine.delinearize_index %[[IDX0]] into (32, 2) : index, index
+//       CHECK:       iree_linalg_ext.yield %[[OUT_IDX]]#0, %[[OUT_IDX]]#1, %[[MASK]]
+//       CHECK:   } : tensor<64xf32> into tensor<32x2xf32> -> tensor<32x2xf32>
+//       CHECK:   return %[[RES]] : tensor<32x2xf32>
+
+// -----
+
+func.func @map_scatter_memref_dynamic(
+    %input: memref<?x?xf32>, %output: memref<?x?xf32>) {
+  iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index, %idx1: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %idx1, %mask : index, index, i1
+  } : memref<?x?xf32> into memref<?x?xf32>
+  return
+}
+// CHECK-LABEL: func.func @map_scatter_memref_dynamic(
+//  CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]
+//       CHECK:   iree_linalg_ext.map_scatter %[[INPUT]] into %[[OUTPUT]] {
+//       CHECK:     ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index):
+//       CHECK:       %[[MASK:.+]] = arith.constant true
+//       CHECK:       iree_linalg_ext.yield %[[IDX0]], %[[IDX1]], %[[MASK]]
+//       CHECK:   } : memref<?x?xf32> into memref<?x?xf32>
+//       CHECK:   return
+
+// -----
+
+func.func @map_scatter_memref_static(
+    %input: memref<16xf32>, %output: memref<16xf32>) {
+  iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %mask : index, i1
+  } : memref<16xf32> into memref<16xf32>
+  return
+}
+// CHECK-LABEL: func.func @map_scatter_memref_static(
+//  CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]
+//       CHECK:   iree_linalg_ext.map_scatter %[[INPUT]] into %[[OUTPUT]] {
+//       CHECK:     ^bb0(%[[IDX0:.+]]: index):
+//       CHECK:       %[[MASK:.+]] = arith.constant true
+//       CHECK:       iree_linalg_ext.yield %[[IDX0]], %[[MASK]]
+//       CHECK:   } : memref<16xf32> into memref<16xf32>
+//       CHECK:   return
+
+// -----
+
+func.func @map_scatter_vector(
+    %input: vector<4x16x64xf32>, %output: tensor<4x16x64xf32>
+) -> tensor<4x16x64xf32> {
+  %0 = iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index, %idx1: index, %idx2: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %idx1, %idx2, %mask : index, index, index, i1
+  } : vector<4x16x64xf32> into tensor<4x16x64xf32> -> tensor<4x16x64xf32>
+  return %0 : tensor<4x16x64xf32>
+}
+// CHECK-LABEL: func.func @map_scatter_vector(
+//  CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]
+//       CHECK:   %[[RES:.+]] = iree_linalg_ext.map_scatter %[[INPUT]] into %[[OUTPUT]] {
+//       CHECK:     ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index):
+//       CHECK:       %[[MASK:.+]] = arith.constant true
+//       CHECK:       iree_linalg_ext.yield %[[IDX0]], %[[IDX1]], %[[IDX2]], %[[MASK]]
+//       CHECK:   } : vector<4x16x64xf32> into tensor<4x16x64xf32> -> tensor<4x16x64xf32>
+//       CHECK:   return %[[RES]] : tensor<4x16x64xf32>
+
+// -----
+
+func.func @arg_compare_static(
+    %input : tensor<2x6xf32>,
+    %outv : tensor<2xf32>, %outi : tensor<2xindex>
+) -> (tensor<2xf32>, tensor<2xindex>) {
+  %0:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input : tensor<2x6xf32>)
+    outs(%outv, %outi : tensor<2xf32>, tensor<2xindex>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2xf32>, tensor<2xindex>
+  return %0#0, %0#1 : tensor<2xf32>, tensor<2xindex>
+}
+
+// CHECK-LABEL: func.func @arg_compare_static(
+// CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]: tensor<2x6xf32>
+// CHECK-SAME:   %[[OUTV:[a-zA-Z0-9_]+]]: tensor<2xf32>
+// CHECK-SAME:   %[[OUTI:[a-zA-Z0-9_]+]]: tensor<2xindex>
+// CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.arg_compare
+// CHECK-SAME:     dimension(1)
+// CHECK-SAME:     ins(%[[INPUT]] : tensor<2x6xf32>)
+// CHECK-SAME:     outs(%[[OUTV]], %[[OUTI]] : tensor<2xf32>, tensor<2xindex>)
+// CHECK:   ^bb0(%[[A:.+]]: f32, %[[B:.+]]: f32):
+// CHECK:     %[[CMP:.+]] = arith.cmpf ogt, %[[A]], %[[B]] : f32
+// CHECK:     iree_linalg_ext.yield %[[CMP]] : i1
+// CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1 : tensor<2xf32>, tensor<2xindex>
+
+// -----
+
+func.func @arg_compare_dynamic(
+    %input : tensor<?x?xf32>,
+    %outv : tensor<?xf32>, %outi : tensor<?xindex>
+) -> (tensor<?xf32>, tensor<?xindex>) {
+  %0:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input : tensor<?x?xf32>)
+    outs(%outv, %outi : tensor<?xf32>, tensor<?xindex>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<?xf32>, tensor<?xindex>
+  return %0#0, %0#1 : tensor<?xf32>, tensor<?xindex>
+}
+
+// CHECK-LABEL: func.func @arg_compare_dynamic(
+// CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
+// CHECK-SAME:   %[[OUTV:[a-zA-Z0-9_]+]]: tensor<?xf32>
+// CHECK-SAME:   %[[OUTI:[a-zA-Z0-9_]+]]: tensor<?xindex>
+// CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.arg_compare
+// CHECK-SAME:     dimension(1)
+// CHECK-SAME:     ins(%[[INPUT]] : tensor<?x?xf32>)
+// CHECK-SAME:     outs(%[[OUTV]], %[[OUTI]] : tensor<?xf32>, tensor<?xindex>)
+// CHECK:   ^bb0(%[[A:.+]]: f32, %[[B:.+]]: f32):
+// CHECK:     %[[CMP:.+]] = arith.cmpf ogt, %[[A]], %[[B]] : f32
+// CHECK:     iree_linalg_ext.yield %[[CMP]] : i1
+// CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1 : tensor<?xf32>, tensor<?xindex>
+
+// -----
+
+func.func @arg_compare_static_memref(
+    %input : memref<2x6xf32>,
+    %outv : memref<2xf32>, %outi : memref<2xindex>
+) {
+  iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input : memref<2x6xf32>)
+    outs(%outv, %outi : memref<2xf32>, memref<2xindex>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  }
+  return
+}
+
+// CHECK-LABEL: func.func @arg_compare_static_memref(
+// CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]: memref<2x6xf32>
+// CHECK-SAME:   %[[OUTV:[a-zA-Z0-9_]+]]: memref<2xf32>
+// CHECK-SAME:   %[[OUTI:[a-zA-Z0-9_]+]]: memref<2xindex>
+// CHECK:   iree_linalg_ext.arg_compare
+// CHECK-SAME:     dimension(1)
+// CHECK-SAME:     ins(%[[INPUT]] : memref<2x6xf32>)
+// CHECK-SAME:     outs(%[[OUTV]], %[[OUTI]] : memref<2xf32>, memref<2xindex>)
+// CHECK:   ^bb0(%[[A:.+]]: f32, %[[B:.+]]: f32):
+// CHECK:     %[[CMP:.+]] = arith.cmpf ogt, %[[A]], %[[B]] : f32
+// CHECK:     iree_linalg_ext.yield %[[CMP]] : i1
+
+// -----
+
+func.func @arg_compare_dynamic_memref(
+    %input : memref<?x?xf32>,
+    %outv : memref<?xf32>, %outi : memref<?xindex>
+) {
+  iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input : memref<?x?xf32>)
+    outs(%outv, %outi : memref<?xf32>, memref<?xindex>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  }
+  return
+}
+
+// CHECK-LABEL: func.func @arg_compare_dynamic_memref(
+// CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]: memref<?x?xf32>
+// CHECK-SAME:   %[[OUTV:[a-zA-Z0-9_]+]]: memref<?xf32>
+// CHECK-SAME:   %[[OUTI:[a-zA-Z0-9_]+]]: memref<?xindex>
+// CHECK:   iree_linalg_ext.arg_compare
+// CHECK-SAME:     dimension(1)
+// CHECK-SAME:     ins(%[[INPUT]] : memref<?x?xf32>)
+// CHECK-SAME:     outs(%[[OUTV]], %[[OUTI]] : memref<?xf32>, memref<?xindex>)
+// CHECK:   ^bb0(%[[A:.+]]: f32, %[[B:.+]]: f32):
+// CHECK:     %[[CMP:.+]] = arith.cmpf ogt, %[[A]], %[[B]] : f32
+// CHECK:     iree_linalg_ext.yield %[[CMP]] : i1
+
+// -----
+
+func.func @arg_compare_with_base(
+    %input : tensor<2x6xf32>,
+    %outv : tensor<2xf32>,
+    %outi : tensor<2xindex>,
+    %base : index
+) -> (tensor<2xf32>, tensor<2xindex>) {
+  %0:2 = iree_linalg_ext.arg_compare
+    dimension(1)
+    ins(%input : tensor<2x6xf32>)
+    outs(%outv, %outi : tensor<2xf32>, tensor<2xindex>)
+    index_base(%base : index) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<2xf32>, tensor<2xindex>
+  return %0#0, %0#1 : tensor<2xf32>, tensor<2xindex>
+}
+
+// CHECK-LABEL: func.func @arg_compare_with_base(
+// CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]: tensor<2x6xf32>
+// CHECK-SAME:   %[[OUTV:[a-zA-Z0-9_]+]]: tensor<2xf32>
+// CHECK-SAME:   %[[OUTI:[a-zA-Z0-9_]+]]: tensor<2xindex>
+// CHECK-SAME:   %[[BASE:[a-zA-Z0-9_]+]]: index
+// CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.arg_compare
+// CHECK-SAME:     dimension(1)
+// CHECK-SAME:     ins(%[[INPUT]] : tensor<2x6xf32>)
+// CHECK-SAME:     outs(%[[OUTV]], %[[OUTI]] : tensor<2xf32>, tensor<2xindex>)
+// CHECK-SAME:     index_base(%[[BASE]] : index)
+// CHECK:   ^bb0(%[[A:.+]]: f32, %[[B:.+]]: f32):
+// CHECK:     %[[CMP:.+]] = arith.cmpf ogt, %[[A]], %[[B]] : f32
+// CHECK:     iree_linalg_ext.yield %[[CMP]] : i1
+// CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1 : tensor<2xf32>, tensor<2xindex>
 
 // -----
 
@@ -706,7 +1122,7 @@ func.func @topk_tensor(%input_values: tensor<20x10x8x4xf32>, %input_indices: ten
         dimension(2)
         ins(%input_values, %input_indices : tensor<20x10x8x4xf32> , tensor<20x10x8x4xi32>)
         outs(%out_values, %out_indices : tensor<20x10x3x4xf32>, tensor<20x10x3x4xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+        ^bb0(%arg0: f32, %arg1: f32):
           %0 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %0 : i1
         } -> tensor<20x10x3x4xf32>, tensor<20x10x3x4xi32>
@@ -731,7 +1147,7 @@ func.func @topk_memref(%input_values: memref<4x10xf32>, %input_indices: memref<4
         dimension(1)
         ins(%input_values, %input_indices : memref<4x10xf32> , memref<4x10xi32>)
         outs(%out_values, %out_indices : memref<4x3xf32>, memref<4x3xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+        ^bb0(%arg0: f32, %arg1: f32):
           %0 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %0 : i1
         }
@@ -755,7 +1171,7 @@ func.func @topk_dynamic_tensor(%input_values: tensor<?x?xf32>, %input_indices: t
         dimension(1)
         ins(%input_values, %input_indices : tensor<?x?xf32> , tensor<?x?xi32>)
         outs(%out_values, %out_indices : tensor<?x?xf32>, tensor<?x?xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+        ^bb0(%arg0: f32, %arg1: f32):
           %0 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %0 : i1
         } -> tensor<?x?xf32>, tensor<?x?xi32>
@@ -782,7 +1198,7 @@ func.func @topk_tensor_optional(%input_values: tensor<20x10x8x4xf32>) -> (tensor
         dimension(2)
         ins(%input_values : tensor<20x10x8x4xf32>)
         outs(%out_values, %out_indices : tensor<20x10x3x4xf32>, tensor<20x10x3x4xi32>) {
-        ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
+        ^bb0(%arg0: f32, %arg1: f32):
           %0 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %0 : i1
         } -> tensor<20x10x3x4xf32>, tensor<20x10x3x4xi32>
@@ -1009,6 +1425,7 @@ func.func @im2col(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
            m_offset = [0] * [1] k_offset = [0] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
            ins(%arg0 : tensor<2x34x34x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -1019,6 +1436,7 @@ func.func @im2col(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
 // CHECK:         %[[D1:.+]] = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
 // CHECK-SAME:      m_offset = [0] * [1] k_offset = [0] * [1]
 // CHECK-SAME:      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+// CHECK-SAME:      input_k_perm = [0, 1, 2]
 // CHECK-SAME:      ins(%[[ARG0]] : tensor<2x34x34x640xf32>)
 // CHECK-SAME:      outs(%[[D0]] : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
 // CHECK:         return %[[D1]] : tensor<2x1024x5760xf32>
@@ -1031,6 +1449,7 @@ func.func @im2col_dynamic(%arg0: tensor<?x?x?x?xf32>, %s0: index, %s1: index, %s
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
            m_offset = [%mOffset] * [1] k_offset = [%kOffset] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
            ins(%arg0 : tensor<?x?x?x?xf32>)
            outs(%0 : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
   return %1 : tensor<?x?x?xf32>
@@ -1042,6 +1461,7 @@ func.func @im2col_dynamic(%arg0: tensor<?x?x?x?xf32>, %s0: index, %s1: index, %s
 // CHECK:         %[[D1:.+]] = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
 // CHECK-SAME:      m_offset = [%[[MOFFSET]]] * [1] k_offset = [%[[KOFFSET]]] * [1]
 // CHECK-SAME:      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+// CHECK-SAME:      input_k_perm = [0, 1, 2]
 // CHECK-SAME:      ins(%[[ARG0]] : tensor<?x?x?x?xf32>)
 // CHECK-SAME:      outs(%[[D0]] : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
 // CHECK:         return %[[D1]] : tensor<?x?x?xf32>
@@ -1053,6 +1473,7 @@ func.func @im2col_strided(%arg0: tensor<2x65x96x640xf32>) -> tensor<2x1024x5760x
   %1 = iree_linalg_ext.im2col strides = [2, 3] dilations = [1, 1] kernel_size = [3, 3]
            m_offset = [0] * [1] k_offset = [0] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
            ins(%arg0 : tensor<2x65x96x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -1063,6 +1484,7 @@ func.func @im2col_strided(%arg0: tensor<2x65x96x640xf32>) -> tensor<2x1024x5760x
 // CHECK:         %[[D1:.+]] = iree_linalg_ext.im2col strides = [2, 3] dilations = [1, 1] kernel_size = [3, 3]
 // CHECK-SAME:      m_offset = [0] * [1] k_offset = [0] * [1]
 // CHECK-SAME:      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+// CHECK-SAME:      input_k_perm = [0, 1, 2]
 // CHECK-SAME:      ins(%[[ARG0]] : tensor<2x65x96x640xf32>)
 // CHECK-SAME:      outs(%[[D0]] : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
 // CHECK:         return %[[D1]] : tensor<2x1024x5760xf32>
@@ -1074,6 +1496,7 @@ func.func @im2col_dilated(%arg0: tensor<2x44x46x640xf32>) -> tensor<2x1024x5760x
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [6, 7] kernel_size = [3, 3]
            m_offset = [0] * [1] k_offset = [0] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
            ins(%arg0 : tensor<2x44x46x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -1084,6 +1507,7 @@ func.func @im2col_dilated(%arg0: tensor<2x44x46x640xf32>) -> tensor<2x1024x5760x
 // CHECK:         %[[D1:.+]] = iree_linalg_ext.im2col strides = [1, 1] dilations = [6, 7] kernel_size = [3, 3]
 // CHECK-SAME:      m_offset = [0] * [1] k_offset = [0] * [1]
 // CHECK-SAME:      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+// CHECK-SAME:      input_k_perm = [0, 1, 2]
 // CHECK-SAME:      ins(%[[ARG0]] : tensor<2x44x46x640xf32>)
 // CHECK-SAME:      outs(%[[D0]] : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
 // CHECK:         return %[[D1]] : tensor<2x1024x5760xf32>
@@ -1095,6 +1519,7 @@ func.func @im2col_strided_dilated_mixed_kernel(%arg0: tensor<2x172x101x640xf32>)
   %1 = iree_linalg_ext.im2col strides = [5, 3] dilations = [4, 7] kernel_size = [5, 2]
            m_offset = [0] * [1] k_offset = [0] * [1]
            batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           input_k_perm = [0, 1, 2]
            ins(%arg0 : tensor<2x172x101x640xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -1105,6 +1530,7 @@ func.func @im2col_strided_dilated_mixed_kernel(%arg0: tensor<2x172x101x640xf32>)
 // CHECK:         %[[D1:.+]] = iree_linalg_ext.im2col strides = [5, 3] dilations = [4, 7] kernel_size = [5, 2]
 // CHECK-SAME:      m_offset = [0] * [1] k_offset = [0] * [1]
 // CHECK-SAME:      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+// CHECK-SAME:      input_k_perm = [0, 1, 2]
 // CHECK-SAME:      ins(%[[ARG0]] : tensor<2x172x101x640xf32>)
 // CHECK-SAME:      outs(%[[D0]] : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
 // CHECK:         return %[[D1]] : tensor<2x1024x5760xf32>
@@ -1116,6 +1542,7 @@ func.func @im2col_transposed_m_pos(%arg0: tensor<640x2x101x172xf32>) -> tensor<2
   %1 = iree_linalg_ext.im2col strides = [5, 3] dilations = [4, 7] kernel_size = [5, 2]
            m_offset = [0] * [1] k_offset = [0] * [1]
            batch_pos = [1] m_pos = [3, 2] k_pos = [0]
+           input_k_perm = [0, 1, 2]
            ins(%arg0 : tensor<640x2x101x172xf32>)
            outs(%0 : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
   return %1 : tensor<2x1024x5760xf32>
@@ -1126,6 +1553,7 @@ func.func @im2col_transposed_m_pos(%arg0: tensor<640x2x101x172xf32>) -> tensor<2
 // CHECK:         %[[D1:.+]] = iree_linalg_ext.im2col strides = [5, 3] dilations = [4, 7] kernel_size = [5, 2]
 // CHECK-SAME:      m_offset = [0] * [1] k_offset = [0] * [1]
 // CHECK-SAME:      batch_pos = [1] m_pos = [3, 2] k_pos = [0]
+// CHECK-SAME:      input_k_perm = [0, 1, 2]
 // CHECK-SAME:      ins(%[[ARG0]] : tensor<640x2x101x172xf32>)
 // CHECK-SAME:      outs(%[[D0]] : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
 // CHECK:         return %[[D1]] : tensor<2x1024x5760xf32>
@@ -1137,6 +1565,7 @@ func.func @im2col_expanded(%arg0: tensor<2x3x34x34x640xf32>) -> tensor<2x3x128x8
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
            m_offset = [0, 0] * [8, 1] k_offset = [0, 0] * [64, 1]
            batch_pos = [0, 1] m_pos = [2, 3] k_pos = [4]
+           input_k_perm = [0, 1, 2]
            ins(%arg0 : tensor<2x3x34x34x640xf32>)
            outs(%0 : tensor<2x3x128x8x90x64xf32>) -> tensor<2x3x128x8x90x64xf32>
   return %1 : tensor<2x3x128x8x90x64xf32>
@@ -1147,6 +1576,7 @@ func.func @im2col_expanded(%arg0: tensor<2x3x34x34x640xf32>) -> tensor<2x3x128x8
 // CHECK:         %[[D1:.+]] = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
 // CHECK-SAME:      m_offset = [0, 0] * [8, 1] k_offset = [0, 0] * [64, 1]
 // CHECK-SAME:      batch_pos = [0, 1] m_pos = [2, 3] k_pos = [4]
+// CHECK-SAME:      input_k_perm = [0, 1, 2]
 // CHECK-SAME:      ins(%[[ARG0]] : tensor<2x3x34x34x640xf32>)
 // CHECK-SAME:      outs(%[[D0]] : tensor<2x3x128x8x90x64xf32>) -> tensor<2x3x128x8x90x64xf32>
 // CHECK:         return %[[D1]] : tensor<2x3x128x8x90x64xf32>
@@ -1657,3 +2087,20 @@ func.func @custom_op_index(%arg0 : tensor<?x?xindex>) -> tensor<?x?xindex> {
 //       CHECK:     iree_linalg_ext.index 0
 //       CHECK:     iree_linalg_ext.index 1
 //       CHECK:     iree_linalg_ext.yield
+
+// -----
+
+func.func @split_reduction_mapping(%arg0 : index,
+    %arg1 : index, %arg2 : index) {
+  scf.forall (%iv0, %iv1, %iv2) in (%arg0, %arg1, %arg2) {
+
+  } {mapping = [#iree_linalg_ext.split_reduction_mapping<1>,
+                #iree_linalg_ext.split_reduction_mapping<0>,
+                #iree_linalg_ext.split_reduction_mapping<2>]}
+  return
+}
+// CHECK-LABEL: func @split_reduction_mapping
+//       CHECK:   mapping = [
+//  CHECK-SAME:       #iree_linalg_ext.split_reduction_mapping<1>,
+//  CHECK-SAME:       #iree_linalg_ext.split_reduction_mapping<0>,
+//  CHECK-SAME:       #iree_linalg_ext.split_reduction_mapping<2>]

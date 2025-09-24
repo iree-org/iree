@@ -18,6 +18,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
+#include "mlir/Transforms/Inliner.h"
 #include "mlir/Transforms/InliningUtils.h"
 
 #define DEBUG_TYPE "iree-util-combine-initializers"
@@ -37,7 +38,7 @@ public:
   }
 
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     // Gather all of the initializers in the module.
     // Build a fused loc from all initializers we are combining.
@@ -55,13 +56,14 @@ public:
     // we are combining - this ensures that module initialization order is
     // preserved.
     OpBuilder builder(initializerOps.front());
-    auto newOp = builder.create<IREE::Util::InitializerOp>(fusedLoc);
+    auto newOp = IREE::Util::InitializerOp::create(builder, fusedLoc);
     builder.setInsertionPointToStart(newOp.addEntryBlock());
     InlinerInterface inlinerInterface(&getContext());
     for (auto initializerOp : initializerOps) {
       if (failed(mlir::inlineRegion(
-              inlinerInterface, &initializerOp.getBody(),
-              builder.getInsertionBlock(), builder.getInsertionPoint(),
+              inlinerInterface, InlinerConfig{}.getCloneCallback(),
+              &initializerOp.getBody(), builder.getInsertionBlock(),
+              builder.getInsertionPoint(),
               /*inlinedOperands=*/ValueRange{},
               /*resultsToReplace=*/ValueRange{}, /*inlineLoc=*/std::nullopt,
               /*shouldCloneInlinedRegion=*/false))) {
@@ -72,7 +74,7 @@ public:
       builder.setInsertionPointToEnd(&newOp.back());
       initializerOp.erase();
     }
-    builder.create<IREE::Util::ReturnOp>(fusedLoc);
+    IREE::Util::ReturnOp::create(builder, fusedLoc);
   }
 };
 

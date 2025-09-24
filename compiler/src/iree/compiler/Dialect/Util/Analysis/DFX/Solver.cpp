@@ -22,7 +22,7 @@ Solver::~Solver() {
   }
 }
 
-LogicalResult Solver::run() {
+LogicalResult Solver::run(int maxIterations) {
   LLVM_DEBUG(llvm::dbgs() << "[Solver] identified and initialized "
                           << depGraph.syntheticRoot.deps.size()
                           << " abstract elements\n");
@@ -30,7 +30,7 @@ LogicalResult Solver::run() {
   // Now that all abstract elements are collected and initialized we start
   // the abstract analysis.
   phase = Phase::UPDATE;
-  auto result = runTillFixpoint();
+  auto result = runTillFixpoint(maxIterations);
   phase = Phase::DONE;
 
   if (failed(result)) {
@@ -40,9 +40,8 @@ LogicalResult Solver::run() {
   return result;
 }
 
-LogicalResult Solver::runTillFixpoint() {
-  unsigned iterationCounter = 1;
-  unsigned maxIterations = maxFixpointIterations.value_or(32);
+LogicalResult Solver::runTillFixpoint(int maxIterations) {
+  int iterationCounter = 1;
 
   SmallVector<AbstractElement *, 32> changedElements;
   SetVector<AbstractElement *> worklist, invalidElements;
@@ -60,10 +59,10 @@ LogicalResult Solver::runTillFixpoint() {
     for (size_t i = 0; i < invalidElements.size(); ++i) {
       auto *invalidElement = invalidElements[i];
 
-      // Check the dependences to fast track invalidation.
+      // Check the dependencies to fast track invalidation.
       LLVM_DEBUG(llvm::dbgs() << "[Solver] invalidElement: " << *invalidElement
                               << " has " << invalidElement->deps.size()
-                              << " required & optional dependences\n");
+                              << " required & optional dependencies\n");
       while (!invalidElement->deps.empty()) {
         const auto &dep = invalidElement->deps.back();
         invalidElement->deps.pop_back();
@@ -173,7 +172,7 @@ ChangeStatus Solver::updateElement(AbstractElement &element) {
   // Use a new dependence vector for this update so we can possibly drop them
   // all if we reach a fixpoint.
   DependenceVector dependencies;
-  dependenceStack.push_back(&dependencies);
+  dependencyStack.push_back(&dependencies);
 
   // Perform the abstract element update.
   auto &elementState = element.getState();
@@ -185,10 +184,10 @@ ChangeStatus Solver::updateElement(AbstractElement &element) {
     elementState.indicateOptimisticFixpoint();
   }
   if (!elementState.isAtFixpoint())
-    rememberDependences();
+    rememberDependencies();
 
   // Verify the stack is balanced by ensuring we pop the vector we pushed above.
-  auto *poppedDependencies = dependenceStack.pop_back_val();
+  auto *poppedDependencies = dependencyStack.pop_back_val();
   (void)poppedDependencies;
   assert(poppedDependencies == &dependencies &&
          "inconsistent usage of the dependence stack");
@@ -196,24 +195,27 @@ ChangeStatus Solver::updateElement(AbstractElement &element) {
   return changeStatus;
 }
 
-void Solver::recordDependence(const AbstractElement &fromElement,
+void Solver::recordDependency(const AbstractElement &fromElement,
                               const AbstractElement &toElement,
                               Resolution resolution) {
   if (resolution == Resolution::NONE)
     return;
   // If we are outside of an update, thus before the actual fixpoint iteration
-  // started (= when we create elements), we do not track dependences because we
-  // will put all elements into the initial worklist anyway.
-  if (dependenceStack.empty())
+  // started (= when we create elements), we do not track dependencies because
+  // we will put all elements into the initial worklist anyway.
+  if (dependencyStack.empty())
     return;
   if (fromElement.getState().isAtFixpoint())
     return;
-  dependenceStack.back()->push_back({&fromElement, &toElement, resolution});
+  // NOTE: this may record several of the same dependency as there is no
+  // deduplication. Deduplication is more expensive than the rarer case of
+  // duplication, though, so we deal with it.
+  dependencyStack.back()->push_back({&fromElement, &toElement, resolution});
 }
 
-void Solver::rememberDependences() {
-  assert(!dependenceStack.empty() && "no dependences to remember");
-  for (auto &depInfo : *dependenceStack.back()) {
+void Solver::rememberDependencies() {
+  assert(!dependencyStack.empty() && "no dependencies to remember");
+  for (auto &depInfo : *dependencyStack.back()) {
     assert((depInfo.resolution == Resolution::REQUIRED ||
             depInfo.resolution == Resolution::OPTIONAL) &&
            "expected required or optional dependence (1 bit)");

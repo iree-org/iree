@@ -7,21 +7,19 @@
 //=== TileAndDistributeToWorkgroupsPass.cpp - Tile to workgroups pass ----===//
 //
 // This pass distributes the operations within the module to workgroups. This
-// pass is created to move tile and distribution out of flow level and into
-// the backends. For now this is mostly a bridge pass to connect things during
-// the transition, and eventually might just be deprecated in favor of a
+// pass is created to move tile and distribution out of `iree_tensor_ext` level
+// and into the backends. For now this is mostly a bridge pass to connect things
+// during the transition, and eventually might just be deprecated in favor of a
 // utility method.
 //
 //===---------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
@@ -126,13 +124,13 @@ getTileAndDistributeConfig(ArrayRef<Operation *> computeOps,
 // workgroups.
 //===---------------------------------------------------------------------===//
 
-/// The `flow.dispatch.workgroup_count_from_dag_root` op is lowered to
-/// a sequence of `affine.apply affine_map<()[s0, s1] -> ceildDiv(s0,
+/// The `iree_tensor_ext.dispatch.workgroup_count_from_dag_root` op is lowered
+/// to a sequence of `affine.apply affine_map<()[s0, s1] -> ceildDiv(s0,
 /// s1)>(workload, tileSize)`. for each of the dimensions. When tile size is
 /// zero, number of workgroups is set to 1.
 static LogicalResult lowerDispatchWorkgroupCountForDagRootOp(
     RewriterBase &rewriter,
-    IREE::Flow::DispatchWorkgroupCountFromDagRootOp workgroupCountOp,
+    IREE::TensorExt::DispatchWorkgroupCountFromDagRootOp workgroupCountOp,
     ArrayRef<int64_t> givenTileSizes, ArrayRef<int64_t> givenStaticLoopRanges,
     ArrayRef<int64_t> givenInterchange, ArrayRef<unsigned> partitionedLoops,
     int maxWorkgroupParallelDims) {
@@ -154,7 +152,7 @@ static LogicalResult lowerDispatchWorkgroupCountForDagRootOp(
       llvm::zip_equal(workloadValues, staticLoopRanges, tileSizes),
       [&](std::tuple<Value, int64_t, OpFoldResult> p) -> OpFoldResult {
         auto tileSize = std::get<2>(p);
-        if (isConstantIntValue(tileSize, 0)) {
+        if (isZeroInteger(tileSize)) {
           return rewriter.getIndexAttr(1);
         }
 
@@ -185,7 +183,7 @@ static LogicalResult lowerDispatchWorkgroupCountForDagRootOp(
   for (auto partitionedLoop : llvm::reverse(partitionedLoops)) {
     if (partitionedLoop >= tileSizes.size())
       continue;
-    if (isConstantIntValue(tileSizes[partitionedLoop], 0))
+    if (isZeroInteger(tileSizes[partitionedLoop]))
       continue;
     Value numTileAlongDim = getValueOrCreateConstantIndexOp(
         rewriter, loc, numTiles[partitionedLoop]);
@@ -200,7 +198,7 @@ static LogicalResult lowerDispatchWorkgroupCountForDagRootOp(
     }
     numWorkgroups.push_back(numTileAlongDim);
   }
-  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  Value one = arith::ConstantIndexOp::create(rewriter, loc, 1);
   numWorkgroups.resize(workgroupCountOp.getNumResults(), one);
   rewriter.replaceOp(workgroupCountOp, numWorkgroups);
   return success();
@@ -225,34 +223,38 @@ static LogicalResult lowerWorkgroupCount(
   }
   SmallVector<Operation *> countOps;
   for (Operation &op : *body) {
-    if (isa<IREE::Flow::DispatchWorkgroupCountFromSliceOp,
-            IREE::Flow::DispatchWorkgroupCountFromDagRootOp>(&op)) {
+    if (isa<IREE::TensorExt::DispatchWorkgroupCountFromSliceOp,
+            IREE::TensorExt::DispatchWorkgroupCountFromDagRootOp>(&op)) {
       countOps.push_back(&op);
     }
   }
   if (countOps.empty()) {
-    // If there are no default handled `flow.dispatch.workgroup_count`
-    // operation, do nothing. do nothing.
+    // If there are no default handled
+    // `iree_tensor_ext.dispatch.workgroup_count` operation, do nothing. do
+    // nothing.
     return success();
   }
   if (!llvm::hasSingleElement(countOps)) {
     return exportOp->emitOpError(
-        "unexpected multiple flow.dispatch.workgroup_count_from_dag_root "
+        "unexpected multiple "
+        "iree_tensor_ext.dispatch.workgroup_count_from_dag_root "
         "operations "
         "in body");
   }
 
   return TypeSwitch<Operation *, LogicalResult>(countOps[0])
-      .Case<IREE::Flow::DispatchWorkgroupCountFromSliceOp>([&](auto countOp) {
-        return lowerWorkgroupCountFromSliceOp(rewriter, countOp, entryPointFn,
-                                              workgroupCount,
-                                              maxWorkgroupParallelDims);
-      })
-      .Case<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>([&](auto countOp) {
-        return lowerDispatchWorkgroupCountForDagRootOp(
-            rewriter, countOp, tileSizes, staticLoopRanges, interchange,
-            partitionedLoops, maxWorkgroupParallelDims);
-      })
+      .Case<IREE::TensorExt::DispatchWorkgroupCountFromSliceOp>(
+          [&](auto countOp) {
+            return lowerWorkgroupCountFromSliceOp(rewriter, countOp,
+                                                  entryPointFn, workgroupCount,
+                                                  maxWorkgroupParallelDims);
+          })
+      .Case<IREE::TensorExt::DispatchWorkgroupCountFromDagRootOp>(
+          [&](auto countOp) {
+            return lowerDispatchWorkgroupCountForDagRootOp(
+                rewriter, countOp, tileSizes, staticLoopRanges, interchange,
+                partitionedLoops, maxWorkgroupParallelDims);
+          })
       .Default([&](Operation *) { return success(); });
 }
 
@@ -265,8 +267,7 @@ namespace {
 struct TileAndDistributeToWorkgroupsPass final
     : impl::TileAndDistributeToWorkgroupsPassBase<
           TileAndDistributeToWorkgroupsPass> {
-  using impl::TileAndDistributeToWorkgroupsPassBase<
-      TileAndDistributeToWorkgroupsPass>::TileAndDistributeToWorkgroupsPassBase;
+  using Base::Base;
 
   TileAndDistributeToWorkgroupsPass(
       int32_t maxWorkgroupParallelDims,
@@ -275,10 +276,10 @@ struct TileAndDistributeToWorkgroupsPass final
     this->distributionMethod = distributionMethod;
   }
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<affine::AffineDialect, IREE::Flow::FlowDialect,
-                    IREE::HAL::HALDialect, linalg::LinalgDialect,
-                    IREE::LinalgExt::IREELinalgExtDialect, scf::SCFDialect,
-                    tensor::TensorDialect>();
+    registry
+        .insert<affine::AffineDialect, IREE::HAL::HALDialect,
+                linalg::LinalgDialect, IREE::LinalgExt::IREELinalgExtDialect,
+                scf::SCFDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override;
@@ -288,7 +289,7 @@ struct TileAndDistributeToWorkgroupsPass final
 void TileAndDistributeToWorkgroupsPass::runOnOperation() {
   MLIRContext *context = &getContext();
 
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   {
     RewritePatternSet patterns(context);
@@ -314,8 +315,8 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     // If the function has already lowered the workgroup count region, infer
     // that tiling + distribution has already occurred.
     WalkResult res = body->walk([&](Operation *op) {
-      if (isa<IREE::Flow::DispatchWorkgroupCountFromSliceOp,
-              IREE::Flow::DispatchWorkgroupCountFromDagRootOp>(op)) {
+      if (isa<IREE::TensorExt::DispatchWorkgroupCountFromSliceOp,
+              IREE::TensorExt::DispatchWorkgroupCountFromDagRootOp>(op)) {
         return WalkResult::interrupt();
       }
       return WalkResult::advance();
@@ -363,7 +364,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     // Check if tile sizes are deduced from the configuration. If so use
     // those.
     return llvm::map_to_vector(tileSizes, [&](int64_t ts) -> Value {
-      return builder.create<arith::ConstantIndexOp>(op->getLoc(), ts);
+      return arith::ConstantIndexOp::create(builder, op->getLoc(), ts);
     });
   };
 

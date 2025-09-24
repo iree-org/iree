@@ -33,8 +33,8 @@ builtin.module {
 //    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
 //    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef, llvm.readnone})
 //         CHECK:    rocdl.workgroup.dim.x
-//         CHECK:    llvm.getelementptr %{{.*}} : (!llvm.ptr, i64) -> !llvm.ptr, f32
-//       INDEX32:    llvm.getelementptr %{{.*}} : (!llvm.ptr, i32) -> !llvm.ptr, f32
+//         CHECK:    llvm.getelementptr inbounds|nuw %{{.*}} : (!llvm.ptr, i64) -> !llvm.ptr, f32
+//       INDEX32:    llvm.getelementptr inbounds|nuw %{{.*}} : (!llvm.ptr, i32) -> !llvm.ptr, f32
 //         CHECK:    llvm.fadd
 
 
@@ -138,13 +138,9 @@ module {
     %c0 = arith.constant 0 : index
     %thread_id_x = gpu.thread_id  x upper_bound 64
     %0 = hal.interface.binding.subspan layout(<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<131072x192xf16, #gpu.address_space<global>>
-    memref.assume_alignment %0, 64 : memref<131072x192xf16, #gpu.address_space<global>>
     %1 = hal.interface.binding.subspan layout(<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<131072x192xf16, #gpu.address_space<global>>
-    memref.assume_alignment %1, 64 : memref<131072x192xf16, #gpu.address_space<global>>
     %2 = hal.interface.binding.subspan layout(<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : memref<402653184xi8, #gpu.address_space<global>>
-    memref.assume_alignment %2, 64 : memref<402653184xi8, #gpu.address_space<global>>
     %3 = hal.interface.binding.subspan layout(<constants = 1, bindings = [#hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, ReadOnly>, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(4) alignment(64) offset(%c0) flags(Indirect) : memref<131072x192x32xf16, #gpu.address_space<global>>
-    memref.assume_alignment %3, 64 : memref<131072x192x32xf16, #gpu.address_space<global>>
     %4 = arith.divui %thread_id_x, %c4 : index
     %5 = arith.remui %thread_id_x, %c4 : index
     %6 = arith.muli %5, %c8 : index
@@ -272,3 +268,63 @@ module {
 }
 //   CHECK-LABEL: llvm.func @null_pointer
 //   CHECK:       llvm.mlir.zero : !llvm.ptr
+
+// -----
+
+module {
+  func.func private @foo(vector<4xf32>)
+  func.func @swap_mfma() {
+    %in = arith.constant 1.0 : f32
+    %out = arith.constant dense<0.0> : vector<4xf32>
+    rocdl.s.setprio 1 { iree_gpu.swap_mfma = -10 }
+    rocdl.s.setprio 2 { iree_gpu.swap_mfma = 1 }
+    rocdl.s.setprio 3 { iree_gpu.swap_mfma = 2 }
+    rocdl.s.setprio 4 { iree_gpu.swap_mfma = 5 }
+    %0 = amdgpu.mfma %in * %in + %out {
+      abid = 0 : i32, cbsz = 0 : i32, k = 1 : i32, m = 4 : i32, n = 4 : i32, blocks = 16 : i32
+    }  blgp = none : f32, f32, vector<4xf32>
+    %1 = amdgpu.mfma %in * %in + %0 {
+      abid = 0 : i32, cbsz = 0 : i32, k = 1 : i32, m = 4 : i32, n = 4 : i32, blocks = 16 : i32
+    }  blgp = none : f32, f32, vector<4xf32>
+    %2 = amdgpu.mfma %in * %in + %1 {
+      abid = 0 : i32, cbsz = 0 : i32, k = 1 : i32, m = 4 : i32, n = 4 : i32, blocks = 16 : i32
+    }  blgp = none : f32, f32, vector<4xf32>
+    call @foo(%2) : (vector<4xf32>) -> ()
+    return
+  }
+}
+//   CHECK-LABEL: llvm.func @swap_mfma
+//   CHECK:         rocdl.s.setprio 1
+//   CHECK:         rocdl.mfma
+//   CHECK-NEXT:    rocdl.s.setprio 2
+//   CHECK:         rocdl.mfma
+//   CHECK-NEXT:    rocdl.s.setprio 3
+//   CHECK:         rocdl.mfma
+//   CHECK-NEXT:    rocdl.s.setprio 4
+
+// -----
+
+builtin.module {
+  func.func @shared_memory_lowering() {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant dense<0.000000e+00> : vector<4xf32>
+    %0 = memref.alloc() : memref<1x16x32xf32, #gpu.address_space<workgroup>>
+    %1 = memref.alloc() : memref<1x32x16xf32, #gpu.address_space<workgroup>>
+    %2 = memref.alloc() : memref<1x8x16xf32, #gpu.address_space<workgroup>>
+    vector.store %cst, %1[%c0, %c0, %c0] : memref<1x32x16xf32, #gpu.address_space<workgroup>>, vector<4xf32>
+    vector.store %cst, %2[%c0, %c0, %c0] : memref<1x8x16xf32, #gpu.address_space<workgroup>>, vector<4xf32>
+    vector.store %cst, %0[%c0, %c0, %c0] : memref<1x16x32xf32, #gpu.address_space<workgroup>>, vector<4xf32>
+    return
+  }
+}
+
+// CHECK-DAG: llvm.mlir.global private @__shared_memory___1() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<1 x array<16 x array<32 x f32>>>
+// CHECK-DAG: llvm.mlir.global private @__shared_memory___0() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<1 x array<32 x array<16 x f32>>>
+// CHECK-DAG: llvm.mlir.global private @__shared_memory__() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<1 x array<8 x array<16 x f32>>>
+// CHECK-LABEL: llvm.func @shared_memory_lowering() {
+//   CHECK-DAG: %[[A1:.+]] = llvm.mlir.addressof @__shared_memory___1
+//   CHECK-DAG: llvm.getelementptr %[[A1]][0, 0, 0, 0]
+//   CHECK-DAG: %[[A0:.+]] = llvm.mlir.addressof @__shared_memory___0
+//   CHECK-DAG: llvm.getelementptr %[[A0]][0, 0, 0, 0]
+//   CHECK-DAG: %[[A:.+]] = llvm.mlir.addressof @__shared_memory__
+//   CHECK-DAG: llvm.getelementptr %[[A]][0, 0, 0, 0]

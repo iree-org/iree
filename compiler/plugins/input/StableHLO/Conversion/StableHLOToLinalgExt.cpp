@@ -21,6 +21,8 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -81,7 +83,7 @@ Value materializeCast(OpBuilder &builder, Type toType, ValueRange inputs,
 
     if (castType != fromType) {
       fromValue =
-          builder.create<UnrealizedConversionCastOp>(loc, castType, fromValue)
+          UnrealizedConversionCastOp::create(builder, loc, castType, fromValue)
               ->getResult(0);
     }
   }
@@ -103,7 +105,6 @@ struct StableHloToStdTypeConverter final : TypeConverter {
     addConversion(convertRank0TensorToScalar);
     addConversion(convertIntegerToSignless);
 
-    addArgumentMaterialization(materializeCast);
     addSourceMaterialization(materializeCast);
     addTargetMaterialization(materializeCast);
   }
@@ -176,8 +177,8 @@ struct SortOpConversion final : OpConversionPattern<mlir::stablehlo::SortOp> {
                                                 resultTypes))) {
       return failure();
     };
-    auto sortOp = rewriter.create<IREE::LinalgExt::SortOp>(
-        loc, resultTypes,
+    auto sortOp = IREE::LinalgExt::SortOp::create(
+        rewriter, loc, resultTypes,
         /*inputs=*/ValueRange{}, adaptor.getOperands(), op.getDimensionAttr());
     rewriter.inlineRegionBefore(op.getComparator(), sortOp.getRegion(),
                                 sortOp.getRegion().begin());
@@ -267,8 +268,8 @@ struct ScatterOpConversion final
       scatterDimMap.push_back(dim);
     }
 
-    auto scatterOp = rewriter.create<IREE::LinalgExt::ScatterOp>(
-        op.getLoc(), originalType, ValueRange{updates, indices},
+    auto scatterOp = IREE::LinalgExt::ScatterOp::create(
+        rewriter, op.getLoc(), originalType, ValueRange{updates, indices},
         ValueRange{original}, scatterDimMap, op.getUniqueIndices());
 
     rewriter.inlineRegionBefore(op.getUpdateComputation(),
@@ -296,125 +297,27 @@ struct ScatterOpConversion final
 struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  static Value getBitReversalBuffer(ImplicitLocOpBuilder &b, int fftLength) {
-    SmallVector<Attribute> values;
-    int logn = std::log(fftLength) / std::log(2);
-    for (int i = 0; i < fftLength; ++i) {
-      int r = 0;
-      for (int j = 0; j < logn; ++j) {
-        r |= ((i >> j) & 1) << (logn - j - 1);
-      }
-      values.push_back(b.getI32IntegerAttr(r));
-    }
-    auto type = RankedTensorType::get({fftLength}, b.getI32Type());
-    return b.create<arith::ConstantOp>(type,
-                                       DenseIntElementsAttr::get(type, values));
-  }
-
-  static SmallVector<Value> getBitReversalOrder(ImplicitLocOpBuilder &b,
-                                                Value real, int fftLength) {
-    auto realType = llvm::cast<ShapedType>(real.getType());
-    auto rank = realType.getRank();
-
-    SmallVector<OpFoldResult> mixedSizes =
-        tensor::getMixedSizes(b, b.getLoc(), real);
-    Value emptyTensor =
-        b.create<tensor::EmptyOp>(mixedSizes, realType.getElementType());
-
-    SmallVector<AffineMap> maps;
-    maps.push_back(
-        AffineMap::get(rank, 0, b.getAffineDimExpr(rank - 1), b.getContext()));
-    maps.push_back(b.getMultiDimIdentityMap(rank));
-    SmallVector<utils::IteratorType> iterTypes(rank,
-                                               utils::IteratorType::parallel);
-
-    Value indices = getBitReversalBuffer(b, fftLength);
-    auto genericOp = b.create<linalg::GenericOp>(
-        TypeRange{realType}, indices, emptyTensor, maps, iterTypes,
-        [&](OpBuilder &b, Location loc, ValueRange args) {
-          SmallVector<Value> ivs;
-          for (auto i : llvm::seq<unsigned>(0, rank - 1)) {
-            ivs.push_back(b.create<linalg::IndexOp>(loc, i));
-          }
-          ivs.push_back(
-              b.create<arith::IndexCastOp>(loc, b.getIndexType(), args[0]));
-          b.create<linalg::YieldOp>(
-              loc, b.create<tensor::ExtractOp>(loc, real, ivs).getResult());
-        });
-    return {genericOp.getResult(0),
-            b.create<arith::ConstantOp>(
-                realType,
-                DenseFPElementsAttr::get(
-                    realType, llvm::cast<Attribute>(b.getF32FloatAttr(0.0))))};
-  }
-
-  static SmallVector<Value> getCoeffConstants(ImplicitLocOpBuilder &b,
-                                              int stage) {
-    constexpr std::complex<double> kI(0, 1);
-    int m = 1 << stage;
-    int mh = m >> 1;
-    SmallVector<Attribute> real, imag;
-    for (auto i : llvm::seq<unsigned>(0, mh)) {
-      auto v = std::exp(-2 * M_PI * i / m * kI);
-      real.push_back(b.getF32FloatAttr(v.real()));
-      imag.push_back(b.getF32FloatAttr(v.imag()));
-    }
-    auto type = RankedTensorType::get({mh}, b.getF32Type());
-    return {
-        b.create<arith::ConstantOp>(type, DenseFPElementsAttr::get(type, real)),
-        b.create<arith::ConstantOp>(type,
-                                    DenseFPElementsAttr::get(type, imag))};
-  }
-
   LogicalResult
   matchAndRewrite(mlir::stablehlo::FftOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Only handle 2^n fft length.
-    auto operandType =
-        llvm::dyn_cast<RankedTensorType>(adaptor.getOperand().getType());
-    if (!operandType || !operandType.hasStaticShape()) {
-      return failure();
-    }
     if (!llvm::all_equal(op.getFftLength())) {
       return rewriter.notifyMatchFailure(op, "non-splat length");
     }
-    int fftLength = op.getFftLength().front();
-    if (fftLength & (fftLength - 1)) {
+    int64_t fftLength = op.getFftLength().front();
+    if (!llvm::isPowerOf2_64(fftLength)) {
       return rewriter.notifyMatchFailure(
           op, "expected FFT length to be a power of two");
     }
 
-    ImplicitLocOpBuilder b(op.getLoc(), rewriter);
-    // Skip else getBitReversalOrder produces invalid dense elements attr.
-    if (isa<ComplexType>(getElementTypeOrSelf(adaptor.getOperand().getType())))
-      return rewriter.notifyMatchFailure(op, "expected real types");
-
-    SmallVector<Value> results =
-        getBitReversalOrder(b, adaptor.getOperand(), fftLength);
-    int lognPlus1 = std::log(fftLength) / std::log(2) + 1;
-    for (auto s : llvm::seq<unsigned>(1, lognPlus1)) {
-      SmallVector<Value> inputs;
-      inputs.push_back(b.create<arith::ConstantIndexOp>(s));
-      inputs.append(getCoeffConstants(b, s));
-      auto fft = b.create<IREE::LinalgExt::FftOp>(
-          TypeRange{results[0].getType(), results[1].getType()}, inputs,
-          results);
-      results = fft.getResults();
+    auto rewriteRes = IREE::LinalgExt::rewriteFft(op, adaptor.getOperand(),
+                                                  fftLength, rewriter);
+    if (failed(rewriteRes)) {
+      return failure();
     }
 
-    SmallVector<int64_t> shape(operandType.getShape().begin(),
-                               operandType.getShape().end());
-    shape.back() = fftLength / 2 + 1;
-    auto ty = RankedTensorType::get(shape, operandType.getElementType());
-    SmallVector<OpFoldResult> offsets(ty.getRank(), b.getIndexAttr(0));
-    SmallVector<OpFoldResult> strides(ty.getRank(), b.getIndexAttr(1));
-    SmallVector<OpFoldResult> sizes =
-        tensor::getMixedSizes(b, b.getLoc(), adaptor.getOperand());
-    sizes.back() = b.getIndexAttr(shape.back());
-    auto real = b.create<tensor::ExtractSliceOp>(ty, results[0], offsets, sizes,
-                                                 strides);
-    auto imag = b.create<tensor::ExtractSliceOp>(ty, results[1], offsets, sizes,
-                                                 strides);
+    auto [real, imag] = rewriteRes.value();
+
     rewriter.replaceOpWithNewOp<mlir::stablehlo::ComplexOp>(op, op.getType(),
                                                             real, imag);
     return success();
@@ -445,8 +348,8 @@ struct ReverseOpConversion final
     // First fill the output buffer with the init value.
     SmallVector<OpFoldResult> inputMixedSizes =
         tensor::getMixedSizes(rewriter, loc, input);
-    auto emptyTensor = rewriter.create<tensor::EmptyOp>(
-        loc, inputMixedSizes, inputTy.getElementType());
+    auto emptyTensor = tensor::EmptyOp::create(rewriter, loc, inputMixedSizes,
+                                               inputTy.getElementType());
     SmallVector<AffineMap> affineMaps = {
         rewriter.getMultiDimIdentityMap(resultTy.getRank())};
 
@@ -457,22 +360,23 @@ struct ReverseOpConversion final
           llvm::SmallVector<Value> indices;
           for (unsigned int i = 0; i < inputTyRank; i++) {
             Value index =
-                rewriter.create<linalg::IndexOp>(nestedLoc, i).getResult();
+                linalg::IndexOp::create(rewriter, nestedLoc, i).getResult();
             if (std::find(dims.begin(), dims.end(), i) != dims.end()) {
-              auto one = rewriter.create<arith::ConstantIndexOp>(nestedLoc, 1);
-              Value axisDimSize = rewriter.create<tensor::DimOp>(loc, input, i);
+              auto one = arith::ConstantIndexOp::create(rewriter, nestedLoc, 1);
+              Value axisDimSize =
+                  tensor::DimOp::create(rewriter, loc, input, i);
               auto sizeMinusOne =
-                  rewriter.create<arith::SubIOp>(nestedLoc, axisDimSize, one);
-              index = rewriter.create<arith::SubIOp>(nestedLoc, sizeMinusOne,
-                                                     index);
+                  arith::SubIOp::create(rewriter, nestedLoc, axisDimSize, one);
+              index = arith::SubIOp::create(rewriter, nestedLoc, sizeMinusOne,
+                                            index);
             }
             indices.push_back(index);
           }
 
-          auto extract = nestedBuilder.create<tensor::ExtractOp>(
-              nestedLoc, input, indices);
-          nestedBuilder.create<linalg::YieldOp>(op.getLoc(),
-                                                extract.getResult());
+          auto extract = tensor::ExtractOp::create(nestedBuilder, nestedLoc,
+                                                   input, indices);
+          linalg::YieldOp::create(nestedBuilder, op.getLoc(),
+                                  extract.getResult());
         });
     return success();
   }
@@ -589,12 +493,12 @@ struct ScanOpConversion final
       }
     }
 
-    outputs.push_back(rewriter.create<tensor::EmptyOp>(
-        op.getLoc(), input0Ty.getShape(), input0Ty.getElementType(),
-        outputDynDims));
+    outputs.push_back(
+        tensor::EmptyOp::create(rewriter, op.getLoc(), input0Ty.getShape(),
+                                input0Ty.getElementType(), outputDynDims));
 
-    Value newInit = rewriter.create<tensor::EmptyOp>(
-        op.getLoc(), initDims, init0Ty.getElementType(), initDynDims);
+    Value newInit = tensor::EmptyOp::create(
+        rewriter, op.getLoc(), initDims, init0Ty.getElementType(), initDynDims);
 
     SmallVector<AffineMap> indexingMaps{
         AffineMap::get(initDims.size(), /*symbolCount=*/0, {},
@@ -603,14 +507,14 @@ struct ScanOpConversion final
     SmallVector<utils::IteratorType> iterators(initDims.size(),
                                                utils::IteratorType::parallel);
 
-    newInit = rewriter
-                  .create<linalg::GenericOp>(
-                      op.getLoc(), init0Ty.clone(initDims), ValueRange{init0},
-                      ValueRange{newInit}, indexingMaps, iterators,
-                      [&](OpBuilder &b, Location loc, ValueRange args) {
-                        b.create<linalg::YieldOp>(loc, args[0]);
-                      })
-                  .getResult(0);
+    newInit =
+        linalg::GenericOp::create(
+            rewriter, op.getLoc(), init0Ty.clone(initDims), ValueRange{init0},
+            ValueRange{newInit}, indexingMaps, iterators,
+            [&](OpBuilder &b, Location loc, ValueRange args) {
+              linalg::YieldOp::create(b, loc, args[0]);
+            })
+            .getResult(0);
     outputs.push_back(newInit);
 
     llvm::SmallVector<Type> outputTys;
@@ -618,8 +522,8 @@ struct ScanOpConversion final
       outputTys.push_back(output.getType());
     }
 
-    auto scanOp = rewriter.create<IREE::LinalgExt::ScanOp>(
-        op.getLoc(), outputTys, inputs, outputs,
+    auto scanOp = IREE::LinalgExt::ScanOp::create(
+        rewriter, op.getLoc(), outputTys, inputs, outputs,
         rewriter.getI64IntegerAttr(reduceAxis), rewriter.getBoolAttr(1));
 
     rewriter.inlineRegionBefore(op.getRegion(), scanOp.getRegion(),
@@ -672,10 +576,10 @@ struct TopkOpConversion final : OpConversionPattern<chlo::TopKOp> {
     SmallVector<OpFoldResult> mixedSizes =
         tensor::getMixedSizes(rewriter, loc, adaptor.getOperand());
     mixedSizes.back() = rewriter.getIndexAttr(adaptor.getK());
-    Value emptyTensorOutputValues = rewriter.create<mlir::tensor::EmptyOp>(
-        loc, mixedSizes, valueElementType);
-    Value emptyTensorOutputIndices = rewriter.create<mlir::tensor::EmptyOp>(
-        loc, mixedSizes, indicesElementType);
+    Value emptyTensorOutputValues = mlir::tensor::EmptyOp::create(
+        rewriter, loc, mixedSizes, valueElementType);
+    Value emptyTensorOutputIndices = mlir::tensor::EmptyOp::create(
+        rewriter, loc, mixedSizes, indicesElementType);
     // Initialize indices to 0 and values to negative infinity
     TypedAttr negInfAttr;
     if (auto intType = llvm::dyn_cast<IntegerType>(valueElementType)) {
@@ -687,15 +591,15 @@ struct TopkOpConversion final : OpConversionPattern<chlo::TopKOp> {
           /*Negative=*/true);
       negInfAttr = rewriter.getFloatAttr(valueElementType, negApFloat);
     }
-    Value negInf = rewriter.create<arith::ConstantOp>(loc, negInfAttr);
+    Value negInf = arith::ConstantOp::create(rewriter, loc, negInfAttr);
     TypedAttr posInfAttr = rewriter.getIntegerAttr(
         indicesElementType, APInt::getSignedMaxValue(32));
-    Value posInf = rewriter.create<arith::ConstantOp>(loc, posInfAttr);
+    Value posInf = arith::ConstantOp::create(rewriter, loc, posInfAttr);
     Value negInfTensor =
-        rewriter.create<linalg::FillOp>(loc, negInf, emptyTensorOutputValues)
+        linalg::FillOp::create(rewriter, loc, negInf, emptyTensorOutputValues)
             .result();
     Value posInfTensor =
-        rewriter.create<linalg::FillOp>(loc, posInf, emptyTensorOutputIndices)
+        linalg::FillOp::create(rewriter, loc, posInf, emptyTensorOutputIndices)
             .result();
 
     // Replace the CHLO TopK with LinalgExt TopK
@@ -722,13 +626,13 @@ struct TopkOpConversion final : OpConversionPattern<chlo::TopKOp> {
       Value rhs = block->getArgument(1);
       Value condition;
       if (llvm::isa<IntegerType>(valueElementType)) {
-        condition = rewriter.create<arith::CmpIOp>(
-            loc, arith::CmpIPredicate::sge, lhs, rhs);
+        condition = arith::CmpIOp::create(rewriter, loc,
+                                          arith::CmpIPredicate::sge, lhs, rhs);
       } else {
-        condition = rewriter.create<arith::CmpFOp>(
-            loc, arith::CmpFPredicate::OGT, lhs, rhs);
+        condition = arith::CmpFOp::create(rewriter, loc,
+                                          arith::CmpFPredicate::OGT, lhs, rhs);
       }
-      rewriter.create<IREE::LinalgExt::YieldOp>(loc, condition);
+      IREE::LinalgExt::YieldOp::create(rewriter, loc, condition);
     }
 
     return success();

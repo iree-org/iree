@@ -28,7 +28,7 @@ func.func @sort_1d(%arg0: tensor<128xi32>) -> (tensor<128xi32>) {
 // CHECK-SAME:  )
 func.func @sort_1d_ui(%arg0: tensor<128xui32>) -> (tensor<128xui32>) {
   %0 = "stablehlo.sort"(%arg0) ( {
-  ^bb0(%arg2: tensor<ui32>, %arg3: tensor<ui32>):  // no predecessors
+  ^bb0(%arg2: tensor<ui32>, %arg3: tensor<ui32>):
     %1 = "stablehlo.compare"(%arg2, %arg3) {comparison_direction = #stablehlo<comparison_direction GT>} : (tensor<ui32>, tensor<ui32>) -> tensor<i1>
     "stablehlo.return"(%1) : (tensor<i1>) -> ()
   }) {dimension = 0 : i64, is_stable = false} : (tensor<128xui32>) -> (tensor<128xui32>)
@@ -380,15 +380,15 @@ func.func @rfft_1d(%input: tensor<8xf32>) -> (tensor<5xf32>, tensor<5xf32>) {
   return %1, %2 : tensor<5xf32>, tensor<5xf32>
 }
 // CHECK-SAME:   %[[REAL:[a-zA-Z0-9]+]]
-// CHECK-DAG:    %[[INDICES:.+]] = arith.constant dense<[0, 4, 2, 6, 1, 5, 3, 7]> : tensor<8xi32>
+// CHECK-DAG:    %[[INDICES:.+]] = arith.constant dense<[0, 4, 2, 6, 1, 5, 3, 7]> : tensor<8xi64>
 // CHECK-DAG:    %[[EMPTY:.+]] = tensor.empty() : tensor<8xf32>
 // CHECK:        %[[REORDERED:.+]] = linalg.generic
 // CHECK-SAME:     {indexing_maps = [#[[MAP]], #[[MAP]]]
 // CHECK-SAME:     iterator_types = ["parallel"]
 // CHECK-SAME:     ins(%[[INDICES]]
 // CHECK-SAME:     outs(%[[EMPTY]]
-// CHECK:        ^bb0(%[[IDX:.+]]: i32, %{{.+}}: f32):
-// CHECK:          %[[IDXVAL:.+]] = arith.index_cast %[[IDX]] : i32 to index
+// CHECK:        ^bb0(%[[IDX:.+]]: i64, %{{.+}}: f32):
+// CHECK:          %[[IDXVAL:.+]] = arith.index_cast %[[IDX]] : i64 to index
 // CHECK:          %[[LOAD:.+]] = tensor.extract %[[REAL]][%[[IDXVAL]]] : tensor<8xf32>
 // CHECK:          linalg.yield %[[LOAD]] : f32
 // CHECK-DAG:    %[[IMAG:.+]] = arith.constant dense<0.000000e+00> : tensor<8xf32>
@@ -428,16 +428,16 @@ func.func @rfft_2d(%input: tensor<4x8xf32>) -> (tensor<4x5xf32>, tensor<4x5xf32>
   return %1, %2 : tensor<4x5xf32>, tensor<4x5xf32>
 }
 // CHECK-SAME:   %[[REAL:[a-zA-Z0-9]+]]
-// CHECK-DAG:    %[[INDICES:.+]] = arith.constant dense<[0, 4, 2, 6, 1, 5, 3, 7]> : tensor<8xi32>
+// CHECK-DAG:    %[[INDICES:.+]] = arith.constant dense<[0, 4, 2, 6, 1, 5, 3, 7]> : tensor<8xi64>
 // CHECK-DAG:    %[[EMPTY:.+]] = tensor.empty() : tensor<4x8xf32>
 // CHECK:        %[[REORDERED:.+]] = linalg.generic
 // CHECK-SAME:     {indexing_maps = [#[[MAP0]], #[[MAP1]]]
 // CHECK-SAME:     iterator_types = ["parallel", "parallel"]
 // CHECK-SAME:     ins(%[[INDICES]]
 // CHECK-SAME:     outs(%[[EMPTY]]
-// CHECK:        ^bb0(%[[IDX:.+]]: i32, %{{.+}}: f32):
+// CHECK:        ^bb0(%[[IDX:.+]]: i64, %{{.+}}: f32):
 // CHECK:          %[[I:.+]] = linalg.index 0
-// CHECK:          %[[IDXVAL:.+]] = arith.index_cast %[[IDX]] : i32 to index
+// CHECK:          %[[IDXVAL:.+]] = arith.index_cast %[[IDX]] : i64 to index
 // CHECK:          %[[LOAD:.+]] = tensor.extract %[[REAL]][%[[I]], %[[IDXVAL]]] : tensor<4x8xf32>
 // CHECK:          linalg.yield %[[LOAD]] : f32
 // CHECK-DAG:    %[[IMAG:.+]] = arith.constant dense<0.000000e+00> : tensor<4x8xf32>

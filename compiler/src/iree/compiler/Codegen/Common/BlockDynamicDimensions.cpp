@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/TensorDynamicDimAnalysis.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -165,14 +166,13 @@ blockDynamicDimensionsOfValue(RewriterBase &rewriter,
   auto outputType = RankedTensorType::get(
       staticOutputShape, tensorType.getElementType(), tensorType.getEncoding());
 
-  auto expandShapeOp = rewriter.create<tensor::ExpandShapeOp>(
-      loc, outputType, v, reassociation, outputShape);
-  Value barrier = rewriter
-                      .create<IREE::Util::OptimizationBarrierOp>(
-                          loc, expandShapeOp.getResult())
+  auto expandShapeOp = tensor::ExpandShapeOp::create(
+      rewriter, loc, outputType, v, reassociation, outputShape);
+  Value barrier = IREE::Util::OptimizationBarrierOp::create(
+                      rewriter, loc, expandShapeOp.getResult())
                       .getResult(0);
-  auto collapseShapeOp = rewriter.create<tensor::CollapseShapeOp>(
-      loc, tensorType, barrier, reassociation);
+  auto collapseShapeOp = tensor::CollapseShapeOp::create(
+      rewriter, loc, tensorType, barrier, reassociation);
   return ReshapeOps{expandShapeOp, collapseShapeOp};
 }
 
@@ -321,6 +321,33 @@ blockDynamicDimensions(RewriterBase &rewriter,
 void BlockDynamicDimensionsPass::runOnOperation() {
   Operation *operation = getOperation();
   MLIRContext *context = &getContext();
+
+  {
+    // Bubble up/down reshape operations before blocking to avoid creating
+    // chains of reshape operations after blocking as much as possible.
+    RewritePatternSet patterns(context);
+    linalg::ControlFusionFn controlFusionFn = [](OpOperand *opOperand) {
+      return true;
+    };
+    linalg::populateFoldReshapeOpsByExpansionPatterns(patterns,
+                                                      controlFusionFn);
+    IREE::LinalgExt::populateFoldReshapeOpsByExpansionPatterns(patterns,
+                                                               controlFusionFn);
+    // Add patterns to fold `tensor.empty` operations with its consumers.
+    tensor::populateFoldTensorEmptyPatterns(patterns);
+    // Add some additional patterns that can simplify the IR.
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
+    if (failed(applyPatternsGreedily(operation, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "After initial reshape propagation:\n";
+    operation->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n";
+  });
+
   TensorDynamicDimAnalysis dynamicDimAnalysis(operation);
   if (failed(dynamicDimAnalysis.run())) {
     return signalPassFailure();
@@ -359,14 +386,16 @@ void BlockDynamicDimensionsPass::runOnOperation() {
     // "pushed-down" `tensor.collapse_shape` operation with their interface
     // bindings or `tensor.empty` operations.
     populateReshapeToInterfaceTensorPatterns(bubbleExpandShapePatterns);
+    populateCombineRelayoutOpPatterns(bubbleExpandShapePatterns);
+    populateFoldTensorReshapeIntoBufferPatterns(bubbleExpandShapePatterns);
     tensor::populateFoldTensorEmptyPatterns(bubbleExpandShapePatterns);
+    tensor::populateBubbleUpExpandShapePatterns(bubbleExpandShapePatterns);
     linalg::FillOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
                                                 context);
     // Add some additional patterns that can simplify the IR and remove dead
     // operations.
     memref::populateResolveRankedShapedTypeResultDimsPatterns(
         bubbleExpandShapePatterns);
-    populateRemoveDeadMemAllocPatterns(bubbleExpandShapePatterns);
     if (failed(applyPatternsGreedily(operation,
                                      std::move(bubbleExpandShapePatterns)))) {
       operation->emitOpError(
@@ -389,6 +418,11 @@ void BlockDynamicDimensionsPass::runOnOperation() {
                                                        context);
     tensor::CollapseShapeOp::getCanonicalizationPatterns(
         removeBarrierOpsPatterns, context);
+    // Add patterns to fold the remaining reshape operation with their interface
+    // bindings or `tensor.empty` operations.
+    populateReshapeToInterfaceTensorPatterns(removeBarrierOpsPatterns);
+    populateCombineRelayoutOpPatterns(removeBarrierOpsPatterns);
+    populateFoldTensorReshapeIntoBufferPatterns(removeBarrierOpsPatterns);
     tensor::populateFoldTensorEmptyPatterns(removeBarrierOpsPatterns);
     linalg::FillOp::getCanonicalizationPatterns(removeBarrierOpsPatterns,
                                                 context);
@@ -399,6 +433,7 @@ void BlockDynamicDimensionsPass::runOnOperation() {
       operation->emitOpError("failed in cleanup patterns");
       return signalPassFailure();
     }
+    moveUpMemrefReshapeOps(rewriter, operation);
   }
 
   return;

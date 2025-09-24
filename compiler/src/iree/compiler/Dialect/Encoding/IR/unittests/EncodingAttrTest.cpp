@@ -33,26 +33,23 @@ TEST_F(EncodingAttrsTest, EncodingAttr) {
   MLIRContext *ctx = getContext();
   Builder builder(ctx);
   SmallVector<Type> elemTypes(3, builder.getF32Type());
-  auto attr = cast<SerializableEncodingAttrInterface>(EncodingAttr::get(
+  auto attr = cast<SerializableAttr>(EncodingAttr::get(
       ctx, /*operandIndex=*/0, EncodingOpType::matmul, elemTypes));
   EXPECT_FALSE(attr.isIdentityLayout());
 
-  attr = cast<SerializableEncodingAttrInterface>(attr.cloneWithLayouts(
-      PadEncodingLayoutAttr::getIdentityAttr(ctx, /*rank=*/2)));
+  attr = cast<SerializableAttr>(
+      attr.cloneWithLayouts(PaddingAttr::getIdentityAttr(ctx, /*rank=*/2)));
   EXPECT_TRUE(attr.isIdentityLayout());
 }
 
-TEST_F(EncodingAttrsTest, PadEncodingLayoutAttr) {
+TEST_F(EncodingAttrsTest, PaddingAttr) {
   MLIRContext *ctx = getContext();
-  auto zeroPaddingAttr =
-      PadEncodingLayoutAttr::getIdentityAttr(ctx, /*rank=*/2);
-  EXPECT_TRUE(cast<SerializableEncodingAttrInterface>(zeroPaddingAttr)
-                  .isIdentityLayout());
+  auto zeroPaddingAttr = PaddingAttr::getIdentityAttr(ctx, /*rank=*/2);
+  EXPECT_TRUE(cast<SerializableAttr>(zeroPaddingAttr).isIdentityLayout());
 
-  SmallVector<int32_t> paddings = {4, 2};
-  auto nonZeroPaddingAttr = PadEncodingLayoutAttr::get(ctx, paddings);
-  EXPECT_FALSE(cast<SerializableEncodingAttrInterface>(nonZeroPaddingAttr)
-                   .isIdentityLayout());
+  SmallVector<int64_t> paddings = {4, 2};
+  auto nonZeroPaddingAttr = PaddingAttr::get(ctx, paddings);
+  EXPECT_FALSE(cast<SerializableAttr>(nonZeroPaddingAttr).isIdentityLayout());
 }
 
 } // namespace

@@ -17,13 +17,47 @@ namespace iree::pjrt {
 // Logger
 //===----------------------------------------------------------------------===//
 
-void Logger::debug(std::string_view message) {
-  std::cerr << "[IREE-PJRT] DEBUG: " << message << std::endl;
+std::optional<Logger::Level> Logger::LevelFromString(std::string_view level) {
+  constexpr auto equal_ignore_case = [](std::string_view a,
+                                        std::string_view b) {
+    return std::equal(a.begin(), a.end(), b.begin(), b.end(),
+                      [](char l, char r) { return tolower(l) == tolower(r); });
+  };
+
+  if (equal_ignore_case(level, "DEBUG")) {
+    return DEBUG;
+  } else if (equal_ignore_case(level, "ERROR")) {
+    return ERROR;
+  }
+
+  return std::nullopt;
 }
 
-void Logger::error(std::string_view message) {
-  std::cerr << "[IREE-PJRT] ERROR: " << message << std::endl;
+std::string_view Logger::LevelToString(Level level) {
+  switch (level) {
+    case DEBUG:
+      return "DEBUG";
+    case ERROR:
+      return "ERROR";
+  }
+
+  __builtin_unreachable();
 }
+
+void Logger::log(Level level, std::string_view message) {
+  if (level < level_) return;
+
+  auto t = std::time(nullptr);
+  std::tm tm = {};
+  localtime_r(&t, &tm);
+
+  std::cerr << "[IREE-PJRT][" << std::put_time(&tm, "%Y-%m-%d %H:%M:%S") << "]["
+            << LevelToString(level) << "] " << message << std::endl;
+}
+
+void Logger::debug(std::string_view message) { log(DEBUG, message); }
+
+void Logger::error(std::string_view message) { log(ERROR, message); }
 
 //===----------------------------------------------------------------------===//
 // ArtifactDumper

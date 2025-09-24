@@ -17,7 +17,7 @@
 ]>
 hal.executable private @matmul {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export @matmul layout(#pipeline_layout) attributes {
+    hal.executable.export public @matmul layout(#pipeline_layout) attributes {
       workgroup_size = [16: index, 8: index, 1: index],
       translation_info = #translation
     }
@@ -85,7 +85,7 @@ hal.executable private @matmul {
 ]>
 hal.executable private @conv_1d {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export @conv_1d layout(#pipeline_layout) attributes {
+    hal.executable.export public @conv_1d layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 4: index, 1: index],
       translation_info = #translation
     }
@@ -160,7 +160,7 @@ hal.executable private @conv_1d {
 ]>
 hal.executable private @conv_2d {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export @conv_2d layout(#pipeline_layout) attributes {
+    hal.executable.export public @conv_2d layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 4: index, 1: index],
       translation_info = #translation
     }
@@ -273,7 +273,7 @@ hal.executable private @conv_2d {
 ]>
 hal.executable private @conv_3d {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export @conv_3d layout(#pipeline_layout) attributes {
+    hal.executable.export public @conv_3d layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 4: index, 1: index],
       translation_info = #translation
     }
@@ -339,34 +339,32 @@ hal.executable private @conv_3d {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-module  {
-  hal.executable private @pooling_nhwc_max {
-    hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-      hal.executable.export @pooling_nhwc_max layout(#pipeline_layout) attributes {
-        workgroup_size = [32: index, 4: index, 1: index],
-        translation_info = #translation
-      }
-      builtin.module {
-        func.func @pooling_nhwc_max() {
-          %c0 = arith.constant 0 : index
-          %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<2x16x16x6xf32>
-          %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<3x4xf32>
-          %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<2x14x13x6xf32>
-          %3 = gpu.block_id x
-          %4 = gpu.block_id y
-          %5 = affine.apply #map0()[%4]
-          %6 = affine.min #map1()[%4]
-          %7 = affine.apply #map2()[%3]
-          %8 = affine.min #map3()[%3]
-          %9 = memref.subview %0[0, %5, %7, 0] [2, %6, %8, 6] [1, 1, 1, 1] : memref<2x16x16x6xf32> to memref<2x?x?x6xf32, #map4>
-          %10 = affine.min #map5()[%4]
-          %11 = affine.min #map6()[%3]
-          %12 = memref.subview %2[0, %5, %7, 0] [2, %10, %11, 6] [1, 1, 1, 1] : memref<2x14x13x6xf32> to memref<2x?x?x6xf32, #map7>
-          linalg.pooling_nhwc_max {lowering_config = #config, dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
-            ins(%9, %1 : memref<2x?x?x6xf32, #map4>, memref<3x4xf32>)
-            outs(%12 : memref<2x?x?x6xf32, #map7>)
-          return
-        }
+hal.executable private @pooling_nhwc_max {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
+    hal.executable.export public @pooling_nhwc_max layout(#pipeline_layout) attributes {
+      workgroup_size = [32: index, 4: index, 1: index],
+      translation_info = #translation
+    }
+    builtin.module {
+      func.func @pooling_nhwc_max() {
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<2x16x16x6xf32>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<3x4xf32>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<2x14x13x6xf32>
+        %3 = gpu.block_id x
+        %4 = gpu.block_id y
+        %5 = affine.apply #map0()[%4]
+        %6 = affine.min #map1()[%4]
+        %7 = affine.apply #map2()[%3]
+        %8 = affine.min #map3()[%3]
+        %9 = memref.subview %0[0, %5, %7, 0] [2, %6, %8, 6] [1, 1, 1, 1] : memref<2x16x16x6xf32> to memref<2x?x?x6xf32, #map4>
+        %10 = affine.min #map5()[%4]
+        %11 = affine.min #map6()[%3]
+        %12 = memref.subview %2[0, %5, %7, 0] [2, %10, %11, 6] [1, 1, 1, 1] : memref<2x14x13x6xf32> to memref<2x?x?x6xf32, #map7>
+        linalg.pooling_nhwc_max {lowering_config = #config, dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
+          ins(%9, %1 : memref<2x?x?x6xf32, #map4>, memref<3x4xf32>)
+          outs(%12 : memref<2x?x?x6xf32, #map7>)
+        return
       }
     }
   }

@@ -5,6 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -19,8 +21,6 @@
 #include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
 
 #define DEBUG_TYPE "iree-codegen-optimize-tensor-insert-extract-slices"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -222,6 +222,23 @@ void hoistSubsetWithLoopInvariantTensor(RewriterBase &rewriter,
   }
 }
 
+void moveLoopInvariantCodeFromGenericOps(Operation *op) {
+  // linalg.generic operations are also loop-like, but they don't have
+  // LoopLikeOpInterface implemented for them.
+  op->walk([&](linalg::GenericOp genericOp) {
+    moveLoopInvariantCode(
+        &genericOp.getBodyRegion(),
+        [&](Value value, Region *) {
+          return !genericOp->isAncestor(value.getParentRegion()->getParentOp());
+        },
+        [&](Operation *op, Region *) {
+          return !isa<linalg::IndexOp>(op) && isMemoryEffectFree(op) &&
+                 isSpeculatable(op);
+        },
+        [&](Operation *op, Region *) { op->moveBefore(genericOp); });
+  });
+}
+
 namespace {
 struct CastLikeExtractSliceOpFolder final
     : OpRewritePattern<tensor::ExtractSliceOp> {
@@ -252,6 +269,80 @@ struct CastLikeInsertSliceOpFolder final
     return success();
   }
 };
+
+/// Folds IR resembling:
+/// ```
+///   %20 = vector.transfer_write %19, %16[%c0], %17 {in_bounds = [true]}
+//      : vector<128xf16>, tensor<?xf16>
+//    %21 = vector.transfer_read %20[%c0], %cst_2, %17
+///     : tensor<?xf16>, vector<128xf16>
+/// ```
+/// into a simpler masked vector.transfer_read.
+/// After bufferization, this generally removes the need for materializing the
+/// write to memory.
+// TODO: Consider upstreaming
+struct FoldMaskedTransferRAW : OpRewritePattern<vector::TransferReadOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::TransferReadOp op,
+                                PatternRewriter &rewriter) const override {
+    // Fail to match if the read doesn't have pure tensor semantics.
+    if (!op.hasPureTensorSemantics()) {
+      return failure();
+    }
+
+    // Try to get the producing write op.
+    auto writeOp =
+        dyn_cast_or_null<vector::TransferWriteOp>(op.getBase().getDefiningOp());
+    // Fail to match if the write doesn't have pure tensor semantics.
+    if (!writeOp || !writeOp.hasPureTensorSemantics()) {
+      return failure();
+    }
+
+    Value valToStore = writeOp.getValueToStore();
+    // Fail to match if the in/out types are different
+    if (valToStore.getType() != op.getType()) {
+      return failure();
+    }
+
+    // Work only with trivial or equal indices.
+    if ((llvm::any_of(op.getIndices(),
+                      [](Value v) { return !isZeroInteger(v); }) ||
+         llvm::any_of(writeOp.getIndices(),
+                      [](Value v) { return !isZeroInteger(v); })) &&
+        (op.getIndices() != writeOp.getIndices()))
+      return failure();
+
+    // Work only with minor identity mappings.
+    if (!op.getPermutationMap().isMinorIdentity() ||
+        !writeOp.getPermutationMap().isMinorIdentity()) {
+      return failure();
+    }
+
+    TypedValue<VectorType> wMask = writeOp.getMask();
+    Value rPad = op.getPadding();
+
+    // Match only if the write and read op are masked and have the same mask.
+    if (!wMask || (wMask != op.getMask())) {
+      return failure();
+    }
+
+    // NOTE[FoldMaskedTransferRAW]: since masking is not supported on shaped
+    // types with vector element types (see `verifyTransferOp` in upstream MLIR
+    // VectorOps.cpp), and the write op has a mask, it can be assumed `rPad`
+    // never has a vector type. But for sanity add an assert in case things
+    // change upstream.
+    assert(!isa<VectorType>(rPad.getType()) &&
+           "search `NOTE[FoldMaskedTransferRAW]` in "
+           "GenericVectorization.cpp::FoldMaskedTransferRAW for information");
+
+    // Materialize the padding with a constant.
+    auto padVal = vector::BroadcastOp::create(rewriter, rPad.getLoc(),
+                                              valToStore.getType(), rPad);
+    rewriter.replaceOpWithNewOp<arith::SelectOp>(op, wMask, valToStore, padVal);
+    return success();
+  }
+};
 } // namespace
 
 // Find the earliest insertion point in the block for the given operation.
@@ -274,7 +365,7 @@ static Operation *getEarliestInsertionPointInsideBlock(Block *block,
 }
 
 void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   IRRewriter rewriter(funcOp->getContext());
 
   // TODO: This is a temporary hack enabled for bufferization to
@@ -288,18 +379,21 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
   });
 
   funcOp.walk([&](scf::ForOp forOp) { moveLoopInvariantCode(forOp); });
-  LDBG("after hoisting loop invariant code\n" << funcOp);
+  LDBG() << "after hoisting loop invariant code\n" << funcOp;
+
+  moveLoopInvariantCodeFromGenericOps(funcOp);
+  LDBG() << "after hoisting loop invariant code out of generic ops\n" << funcOp;
 
   // TODO: walking in some reverse / inside-out order would be more efficient
   // and would capture more cases.
   funcOp.walk(
       [&](scf::ForOp forOp) { hoistLoopInvariantSubsets(rewriter, forOp); });
-  LDBG("after hoisting loop invariant subsets\n" << funcOp);
+  LDBG() << "after hoisting loop invariant subsets\n" << funcOp;
 
   funcOp.walk([&](scf::ForOp forOp) {
     hoistSubsetWithLoopInvariantTensor(rewriter, forOp);
   });
-  LDBG("after hoisting subset loop invariant tensors" << funcOp);
+  LDBG() << "after hoisting subset loop invariant tensors" << funcOp;
 
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
@@ -310,12 +404,16 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
     patterns.add<CastLikeExtractSliceOpFolder>(context);
     patterns.add<CastLikeInsertSliceOpFolder>(context);
   }
+  // Apply masked transfer_write + transfer_read folding to avoid spurious
+  // (future) roundtrips to memory.
+  // TODO: consider upstreaming.
+  patterns.add<FoldMaskedTransferRAW>(context);
   if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
   }
 
-  LDBG("after folding tensor.extract_slice and vector.transfer_read Ops \n"
-       << funcOp);
+  LDBG() << "after folding tensor.extract_slice and vector.transfer_read Ops \n"
+         << funcOp;
 }
 
 } // namespace

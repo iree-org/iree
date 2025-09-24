@@ -44,7 +44,7 @@ let opDocGroup = OpGroupExperimentalOps in {
 def HAL_ExFileFromMemoryOp : HAL_Op<"ex.file.from_memory", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{creates a file mapped into a byte range of a host buffer}];
+  let summary = [{Creates a file mapped into a byte range of a host buffer.}];
   let description = [{
     Returns a file handle that is backed by the given `buffer` contents.
     Behavior is undefined if the buffer contents change while the accesses are
@@ -103,7 +103,7 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
   AttrSizedOperandSegments,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{imports a tensor from a HAL buffer view}];
+  let summary = [{Imports a tensor from a HAL buffer view.}];
   let description = [{
     Defines an import of an external HAL buffer view into a SSA-form tensor.
     An optional fence can be specified indicating when the buffer view is
@@ -180,7 +180,7 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
 def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{exports a tensor to a HAL buffer view}];
+  let summary = [{Exports a tensor to a HAL buffer view.}];
   let description = [{
     Defines an export of an SSA-form tensor to an external HAL buffer view.
 
@@ -245,7 +245,7 @@ def HAL_TensorAliasOp : HAL_PureOp<"tensor.alias", [
   ]>,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{hints that tensor storage should alias a HAL buffer view}];
+  let summary = [{Hints that tensor storage should alias a HAL buffer view.}];
   let description = [{
     Hints that the backing storage of an entire tensor aliases the given storage
     buffer. There's no guarantee that the storage will alias and instead only
@@ -314,7 +314,7 @@ def HAL_TensorBarrierOp : HAL_Op<"tensor.barrier", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{signals a fence when all tensors are available}];
+  let summary = [{Signals a fence when all tensors are available.}];
   let description = [{
     Defines a barrier that is used to indicate availability of an entire set of
     tensors by signaling a fence. The source tensors are returned for chaining.
@@ -353,7 +353,7 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
   ]>,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{a dispatch of workgroups across a 3-dimensional grid}];
+  let summary = [{A dispatch of workgroups across a 3-dimensional grid.}];
   let description = [{
     Dispatches some number of workgroups across a 3-dimensional grid using a
     function defined externally in one or more referenced objects. Objects are
@@ -428,7 +428,7 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
   }];
 
   let arguments = (ins
-    StrAttr:$export,
+    StrAttr:$export_name,
     Variadic<Index>:$workload,
     Variadic<AnyType>:$arguments,
     HAL_ShapeDynamicDims:$argument_dims,
@@ -452,7 +452,7 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
   );
 
   let assemblyFormat = [{
-    $export
+    $export_name
     (`[` $workload^ `]`)? ``
     `(` $arguments `)` `:`
     custom<ShapedFunctionType>(ref($arguments),
@@ -511,7 +511,7 @@ def HAL_DeviceMemoizeOp : HAL_Op<"device.memoize", [
   DeclareOpInterfaceMethods<RegionBranchOpInterface>,
   SingleBlockImplicitTerminator<"IREE::HAL::ReturnOp">,
 ]> {
-  let summary = [{memoizes resources for a particular device and queue affinity}];
+  let summary = [{Memoizes resources for a particular device and queue affinity.}];
   let description = [{
     Executes the nested region once per device and affinity mask and memoizes
     the results such that future references return the previously memoized
@@ -570,11 +570,46 @@ def OpGroupAllocatorOps : OpDocGroup {
 
 let opDocGroup = OpGroupAllocatorOps in {
 
+
+def HAL_AllocatorSelectOp : HAL_PureOp<"allocator.select", [
+  SameVariadicOperandSize,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{Selects a device/queue from the given set for allocations.}];
+  let description = [{
+    Chooses one device and queue affinity pair from the given optimal set that
+    can service the requested memory type and usage for all devices in the set.
+    Returns a null device if no pair is able to satisfy the conditions.
+  }];
+
+  let arguments = (ins
+    Variadic<HAL_Device>:$devices,
+    Variadic<HAL_DeviceQueueAffinity>:$queue_affinities,
+    HAL_MemoryType:$memory_types,
+    HAL_BufferUsage:$buffer_usage
+  );
+  let results = (outs
+    HAL_Device:$selected_device,
+    HAL_DeviceQueueAffinity:$selected_queue_affinity
+  );
+
+  let assemblyFormat = [{
+    `from` `(` custom<DeviceQueueAffinityList>($devices, type($devices), $queue_affinities) `)`
+    `type` `(` $memory_types `)`
+    `usage` `(` $buffer_usage `)`
+    `:`
+    type($selected_device) `,` type($selected_queue_affinity)
+    attr-dict-with-keyword
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
 def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   DeclareOpInterfaceMethods<Util_SizeAwareOp>,
 ]> {
-  let summary = [{empty buffer allocation operation}];
+  let summary = [{Empty buffer allocation operation.}];
   let description = [{
     Allocates a buffer of the given size from the allocator.
     The size of the buffer returned may be larger than the requested size if the
@@ -584,8 +619,8 @@ def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
   let arguments = (ins
     HAL_Allocator:$allocator,
     HAL_DeviceQueueAffinity:$queue_affinity,
-    HAL_MemoryTypeBitfieldAttr:$memory_types,
-    HAL_BufferUsageBitfieldAttr:$buffer_usage,
+    HAL_MemoryType:$memory_types,
+    HAL_BufferUsage:$buffer_usage,
     HAL_DeviceSize:$result_size
   );
   let results = (outs
@@ -607,7 +642,7 @@ def HAL_AllocatorImportOp : HAL_Op<"allocator.import", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   DeclareOpInterfaceMethods<Util_SizeAwareOp>,
 ]> {
-  let summary = [{allocator-supported host buffer import operation}];
+  let summary = [{Allocator-supported host buffer import operation.}];
   let description = [{
     Tries importing host memory backed by the given byte buffer into a
     device accessible `!hal.buffer`. The returned buffer may be host-only and
@@ -619,8 +654,8 @@ def HAL_AllocatorImportOp : HAL_Op<"allocator.import", [
   let arguments = (ins
     HAL_Allocator:$allocator,
     HAL_DeviceQueueAffinity:$queue_affinity,
-    HAL_MemoryTypeBitfieldAttr:$memory_types,
-    HAL_BufferUsageBitfieldAttr:$buffer_usage,
+    HAL_MemoryType:$memory_types,
+    HAL_BufferUsage:$buffer_usage,
     // TODO(benvanik): support other types (and mutable buffers).
     Util_BufferType:$source,
     HAL_DeviceSize:$offset,
@@ -643,6 +678,43 @@ def HAL_AllocatorImportOp : HAL_Op<"allocator.import", [
   }];
 }
 
+def HAL_AllocatorResolveMemoryPropertiesOp : HAL_PureOp<"allocator.resolve_memory_properties", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{Resolves memory properties from resource lifetime and affinity.}];
+  let description = [{
+    Resolves the required memory types and buffer usage for a resource with
+    the given lifetime and affinity. This operation encapsulates the logic
+    for deriving buffer properties based on stream resource semantics.
+
+    This operation can be resolved later in compilation either by canonicalization
+    for single device affinties or using the topology attribute for multiple devices.
+
+    Example:
+    ```mlir
+    %memory_types, %buffer_usage = hal.allocator.resolve_memory_properties
+        for(#hal.device.affinity<@device_a>)
+        lifetime(transient) : i32, i32
+    ```
+  }];
+
+  let arguments = (ins
+    OptionalAttr<AnyAttr>:$affinity,
+    HAL_LifetimeAttr:$lifetime
+  );
+  let results = (outs
+    HAL_MemoryType:$memory_types,
+    HAL_BufferUsage:$buffer_usage
+  );
+
+  let assemblyFormat = [{
+    (`for` `(` $affinity^ `)`)?
+    `lifetime` `(` $lifetime `)`
+    `:` type($memory_types) `,` type($buffer_usage)
+    attr-dict-with-keyword
+  }];
+}
+
 } // OpGroupAllocatorOps
 
 //===----------------------------------------------------------------------===//
@@ -657,7 +729,7 @@ def OpGroupBufferOps : OpDocGroup {
 let opDocGroup = OpGroupBufferOps in {
 
 def HAL_BufferAssertOp : HAL_Op<"buffer.assert"> {
-  let summary = [{buffer compatibility assertion}];
+  let summary = [{Buffer compatibility assertion.}];
   let description = [{
     Asserts that the buffer is compatible with the given allocator and usage.
     Program execution will abort as if `std.assert` had been used.
@@ -695,7 +767,7 @@ def HAL_BufferAssertOp : HAL_Op<"buffer.assert"> {
 }
 
 def HAL_BufferAllocationPreserveOp : HAL_Op<"buffer.allocation.preserve"> {
-  let summary = [{preserves the underlying buffer allocation for the caller}];
+  let summary = [{Preserves the underlying buffer allocation for the caller.}];
   let description = [{
     Preservation is a way to track lifetime of an asynchronously-allocated
     buffer on multiple device timelines. Incrementing the preserve count
@@ -738,7 +810,7 @@ def HAL_BufferAllocationPreserveOp : HAL_Op<"buffer.allocation.preserve"> {
 def HAL_BufferAllocationDiscardOp : HAL_Op<"buffer.allocation.discard", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{discards ownership of the underlying buffer allocation by the caller}];
+  let summary = [{Discards ownership of the underlying buffer allocation by the caller.}];
   let description = [{
     Decrementing the preserve count indicates that the owner is releasing its
     ownership. When the last owner discards their ownership it is safe to
@@ -775,7 +847,7 @@ def HAL_BufferAllocationDiscardOp : HAL_Op<"buffer.allocation.discard", [
 def HAL_BufferAllocationIsTerminalOp : HAL_Op<"buffer.allocation.is_terminal", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{returns true if the underlying buffer allocation has a single owner}];
+  let summary = [{Returns true if the underlying buffer allocation has a single owner.}];
   let description = [{
     This can be used to reuse a buffer that has no other owners.
 
@@ -808,7 +880,7 @@ def HAL_BufferSubspanOp : HAL_PureOp<"buffer.subspan", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   DeclareOpInterfaceMethods<Util_SizeAwareOp>,
 ]> {
-  let summary = [{buffer subspan operation}];
+  let summary = [{Buffer subspan operation.}];
   let description = [{
     Returns a reference to a subspan of the buffer.
   }];
@@ -833,7 +905,7 @@ def HAL_BufferSubspanOp : HAL_PureOp<"buffer.subspan", [
 def HAL_BufferLengthOp : HAL_PureOp<"buffer.length", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{buffer byte length accessor}];
+  let summary = [{Buffer byte length accessor.}];
   let description = [{
     Returns the allocated size of a buffer in bytes.
     May be less than the underlying buffer allocation if this is a subspan or
@@ -855,7 +927,7 @@ def HAL_BufferLengthOp : HAL_PureOp<"buffer.length", [
 }
 
 def HAL_BufferLoadOp : HAL_PureOp<"buffer.load"> {
-  let summary = [{buffer element load operation}];
+  let summary = [{Buffer element load operation.}];
   let description = [{
     Loads a value from a buffer by mapping it.
   }];
@@ -877,7 +949,7 @@ def HAL_BufferLoadOp : HAL_PureOp<"buffer.load"> {
 }
 
 def HAL_BufferStoreOp : HAL_Op<"buffer.store"> {
-  let summary = [{buffer element store operation}];
+  let summary = [{Buffer element store operation.}];
   let description = [{
     Stores a value into a buffer by mapping it.
   }];
@@ -896,6 +968,56 @@ def HAL_BufferStoreOp : HAL_Op<"buffer.store"> {
   }];
 }
 
+def HAL_BufferUsageOp : HAL_PureOp<"buffer_usage", [
+  ConstantLike,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{An iree_hal_buffer_usage_t for the given usage bits.}];
+  let description = [{
+    Maps buffer usage bits to a runtime `iree_hal_buffer_usage_t` value.
+  }];
+
+  let arguments = (ins
+    HAL_BufferUsageBitfieldAttr:$usage
+  );
+  let results = (outs
+    HAL_BufferUsage:$result
+  );
+
+  let assemblyFormat = [{
+    `<` $usage `>`
+    attr-dict
+    `:` type($result)
+  }];
+
+  let hasFolder = 1;
+}
+
+def HAL_MemoryTypeOp : HAL_PureOp<"memory_type", [
+  ConstantLike,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{An iree_hal_memory_type_t for the given memory type bits.}];
+  let description = [{
+    Maps memory type bits to a runtime `iree_hal_memory_type_t` value.
+  }];
+
+  let arguments = (ins
+    HAL_MemoryTypeBitfieldAttr:$type
+  );
+  let results = (outs
+    HAL_MemoryType:$result
+  );
+
+  let assemblyFormat = [{
+    `<` $type `>`
+    attr-dict
+    `:` type($result)
+  }];
+
+  let hasFolder = 1;
+}
+
 } // OpGroupBufferOps
 
 //===----------------------------------------------------------------------===//
@@ -912,7 +1034,7 @@ let opDocGroup = OpGroupBufferViewOps in {
 def HAL_ElementTypeOp : HAL_PureOp<"element_type", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{an iree_hal_element_type_t for the given MLIR type}];
+  let summary = [{An iree_hal_element_type_t for the given MLIR type.}];
   let description = [{
     Maps an MLIR type to a runtime `iree_hal_element_type_t` value for all types
     that are convertable.
@@ -943,7 +1065,7 @@ def HAL_ElementTypeOp : HAL_PureOp<"element_type", [
 def HAL_EncodingTypeOp : HAL_PureOp<"encoding_type", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{an iree_hal_encoding_type_t for the given MLIR encoding}];
+  let summary = [{An iree_hal_encoding_type_t for the given MLIR encoding.}];
   let description = [{
     Maps an MLIR encoding to a runtime `iree_hal_encoding_type_t` value for all
     encodings that are convertable.
@@ -974,7 +1096,7 @@ def HAL_EncodingTypeOp : HAL_PureOp<"encoding_type", [
 def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{buffer view reference initializer}];
+  let summary = [{Buffer view reference initializer.}];
   let description = [{
     Creates a reference to a buffer with a particular shape and element type.
     The buffer is not copied and both the original and view references must be
@@ -1028,7 +1150,7 @@ def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
 }
 
 def HAL_BufferViewAssertOp : HAL_Op<"buffer_view.assert"> {
-  let summary = [{buffer view contents assertion}];
+  let summary = [{Buffer view contents assertion.}];
   let description = [{
     Asserts that the buffer view contains a data compatible tensor with the
     given encoding. Program execution will abort as if `std.assert` had been
@@ -1060,7 +1182,7 @@ def HAL_BufferViewAssertOp : HAL_Op<"buffer_view.assert"> {
 def HAL_BufferViewBufferOp : HAL_PureOp<"buffer_view.buffer", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{buffer view buffer accessor}];
+  let summary = [{Buffer view buffer accessor.}];
   let description = [{
     Returns the buffer backing this view's contents.
   }];
@@ -1080,7 +1202,7 @@ def HAL_BufferViewBufferOp : HAL_PureOp<"buffer_view.buffer", [
 }
 
 def HAL_BufferViewElementTypeOp : HAL_PureOp<"buffer_view.element_type"> {
-  let summary = [{buffer view element type query}];
+  let summary = [{Buffer view element type query.}];
   let description = [{
     Returns the element type of the buffer view.
   }];
@@ -1100,7 +1222,7 @@ def HAL_BufferViewElementTypeOp : HAL_PureOp<"buffer_view.element_type"> {
 }
 
 def HAL_BufferViewEncodingTypeOp : HAL_PureOp<"buffer_view.encoding_type"> {
-  let summary = [{buffer view encoding type query}];
+  let summary = [{Buffer view encoding type query.}];
   let description = [{
     Returns the encoding type of the buffer view.
   }];
@@ -1123,7 +1245,7 @@ def HAL_BufferViewRankOp : HAL_PureOp<"buffer_view.rank", [
     DeclareOpInterfaceMethods<InferIntRangeInterface,
         ["inferResultRangesFromOptional"]>,
 ]> {
-  let summary = [{buffer view rank query}];
+  let summary = [{Buffer view rank query.}];
   let description = [{
     Returns the rank of the buffer view.
   }];
@@ -1146,7 +1268,7 @@ def HAL_BufferViewDimOp : HAL_PureOp<"buffer_view.dim", [
     DeclareOpInterfaceMethods<InferIntRangeInterface,
         ["inferResultRangesFromOptional"]>,
 ]> {
-  let summary = [{buffer view dimension value query}];
+  let summary = [{Buffer view dimension value query.}];
   let description = [{
     Returns the value of the given dimension.
   }];
@@ -1168,7 +1290,7 @@ def HAL_BufferViewDimOp : HAL_PureOp<"buffer_view.dim", [
 }
 
 def HAL_BufferViewTraceOp : HAL_Op<"buffer_view.trace", []> {
-  let summary = [{trace value(s) operation}];
+  let summary = [{Trace value(s) operation.}];
   let description = [{
     Traces out to a runtime trace sink (console, log file, etc) the given buffer
     views and titles them with the given key. The key is informational only and
@@ -1203,7 +1325,7 @@ let opDocGroup = OpGroupChannelOps in {
 def HAL_ChannelCreateOp : HAL_Op<"channel.create", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{creates a new channel for collective communication}];
+  let summary = [{Creates a new channel for collective communication.}];
   let description = [{
     Returns a new channel with the given rank associated with the given device
     queue. Collective operations using this channel must only be submitted on
@@ -1245,7 +1367,7 @@ def HAL_ChannelCreateOp : HAL_Op<"channel.create", [
 def HAL_ChannelSplitOp : HAL_Op<"channel.split", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{splits a collective communication channel}];
+  let summary = [{Splits a collective communication channel.}];
   let description = [{
     Partitions the group associated with the given channel into disjoint
     subgroups for each unique value of color. Each new subgroup contains all
@@ -1281,7 +1403,7 @@ def HAL_ChannelSplitOp : HAL_Op<"channel.split", [
 def HAL_ChannelRankAndCountOp : HAL_PureOp<"channel.rank_and_count", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{returns the rank of the local participant in the group}];
+  let summary = [{Returns the rank of the local participant in the group.}];
   let description = [{
     Returns the rank the channel represents as a participant in a collective
     group in `[0, count)` and the total participant count.
@@ -1318,7 +1440,7 @@ let opDocGroup = OpGroupCommandBufferOps in {
 def HAL_CommandBufferCreateOp : HAL_Op<"command_buffer.create", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{command buffer allocation operation}];
+  let summary = [{Command buffer allocation operation.}];
   let description = [{
     Returns a command buffer from the device pool ready to begin recording.
   }];
@@ -1346,7 +1468,7 @@ def HAL_CommandBufferCreateOp : HAL_Op<"command_buffer.create", [
 }
 
 def HAL_CommandBufferFinalizeOp : HAL_Op<"command_buffer.finalize"> {
-  let summary = [{finalizes command buffer recording}];
+  let summary = [{Finalizes command buffer recording.}];
   let description = [{
     Ends recording into the command buffer and prepares it for submission.
     No more commands may be recorded into the command buffer.
@@ -1363,7 +1485,7 @@ def HAL_CommandBufferFinalizeOp : HAL_Op<"command_buffer.finalize"> {
 }
 
 def HAL_CommandBufferDeviceOp : HAL_PureOp<"command_buffer.device"> {
-  let summary = [{command buffer device query operation}];
+  let summary = [{Command buffer device query operation.}];
   let description = [{
     Used during conversion to access the device used to create a command buffer.
   }];
@@ -1385,7 +1507,7 @@ def HAL_CommandBufferDeviceOp : HAL_PureOp<"command_buffer.device"> {
 }
 
 def HAL_CommandBufferBeginDebugGroupOp : HAL_Op<"command_buffer.begin_debug_group"> {
-  let summary = [{pushes a command buffer debug group label}];
+  let summary = [{Pushes a command buffer debug group label.}];
   let description = [{
     Pushes a new debug group with the given label.
     All commands between this and a mandatory matching call to
@@ -1406,7 +1528,7 @@ def HAL_CommandBufferBeginDebugGroupOp : HAL_Op<"command_buffer.begin_debug_grou
 }
 
 def HAL_CommandBufferEndDebugGroupOp : HAL_Op<"command_buffer.end_debug_group"> {
-  let summary = [{pops a command buffer debug group label}];
+  let summary = [{Pops a command buffer debug group label.}];
   let description = [{
     Pops a debug group from the stack.
   }];
@@ -1422,7 +1544,7 @@ def HAL_CommandBufferEndDebugGroupOp : HAL_Op<"command_buffer.end_debug_group"> 
 }
 
 def HAL_CommandBufferExecutionBarrierOp : HAL_Op<"command_buffer.execution_barrier"> {
-  let summary = [{command buffer execution barrier recording operation}];
+  let summary = [{Command buffer execution barrier recording operation.}];
   let description = [{
     Defines an execution dependency between all commands recorded before the
     barrier and all commands recorded after the barrier. Only the stages
@@ -1448,7 +1570,7 @@ def HAL_CommandBufferExecutionBarrierOp : HAL_Op<"command_buffer.execution_barri
 // TODO(benvanik): event ops.
 
 def HAL_CommandBufferFillBufferOp : HAL_Op<"command_buffer.fill_buffer"> {
-  let summary = [{command buffer buffer fill recording operation}];
+  let summary = [{Command buffer buffer fill recording operation.}];
   let description = [{
     Fills the target buffer with the given repeating value.
   }];
@@ -1483,7 +1605,7 @@ def HAL_CommandBufferUpdateBufferOp : HAL_Op<"command_buffer.update_buffer", [
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_SubrangeOperandOpInterface>,
 ]> {
-  let summary = [{command buffer buffer update recording operation}];
+  let summary = [{Command buffer buffer update recording operation.}];
   let description = [{
     Copies a range of a host buffer into a device buffer. The host buffer
     contents will be captured at the time of the call and embedded in the
@@ -1521,7 +1643,7 @@ def HAL_CommandBufferUpdateBufferOp : HAL_Op<"command_buffer.update_buffer", [
 }
 
 def HAL_CommandBufferCopyBufferOp : HAL_Op<"command_buffer.copy_buffer"> {
-  let summary = [{command buffer buffer copy recording operation}];
+  let summary = [{Command buffer buffer copy recording operation.}];
   let description = [{
     Copies a range of one buffer to another.
   }];
@@ -1553,7 +1675,7 @@ def HAL_CommandBufferCopyBufferOp : HAL_Op<"command_buffer.copy_buffer"> {
 def HAL_CommandBufferCollectiveOp : HAL_Op<"command_buffer.collective", [
   AttrSizedOperandSegments,
 ]> {
-  let summary = [{command buffer collective dispatch recording operation}];
+  let summary = [{Command buffer collective dispatch recording operation.}];
   let description = [{
     Dispatches a collective operation defined by op using the given buffers.
   }];
@@ -1591,7 +1713,7 @@ def HAL_CommandBufferCollectiveOp : HAL_Op<"command_buffer.collective", [
 def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch", [
   AttrSizedOperandSegments,
 ]> {
-  let summary = [{command buffer dispatch recording operation}];
+  let summary = [{Command buffer dispatch recording operation.}];
   let description = [{
     Dispatches an execution request.
     The request may execute overlapped with any other transfer operation or
@@ -1658,7 +1780,7 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch", [
 def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indirect", [
   AttrSizedOperandSegments,
 ]> {
-  let summary = [{command buffer indirect dispatch recording operation}];
+  let summary = [{Command buffer indirect dispatch recording operation.}];
   let description = [{
     Dispatches an execution request with a deferred workgroup count.
     This is the same as iree_hal_command_buffer_dispatch but the workgroup count
@@ -1739,7 +1861,7 @@ let opDocGroup = OpGroupDeviceOps in {
 def HAL_DeviceResolveOp : HAL_PureOp<"device.resolve", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{resolves device handles based on affinity}];
+  let summary = [{Resolves device handles based on affinity.}];
   let description = [{
     Examples:
     ```
@@ -1766,7 +1888,7 @@ def HAL_DeviceResolveOp : HAL_PureOp<"device.resolve", [
   );
 
   let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
+    (`on` `(` qualified($affinity)^ `)`)?
     attr-dict `:` type($results)
   }];
 }
@@ -1774,7 +1896,7 @@ def HAL_DeviceResolveOp : HAL_PureOp<"device.resolve", [
 def HAL_DeviceAllocatorOp : HAL_PureOp<"device.allocator", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{device allocator accessor operation}];
+  let summary = [{Device allocator accessor operation.}];
   let description = [{
     Returns the allocator that can be used to allocate buffers compatible with
     the device.
@@ -1804,7 +1926,7 @@ def HAL_DeviceAllocatorOp : HAL_PureOp<"device.allocator", [
 def HAL_ReturnOp : HAL_Op<"return", [
   Terminator,
 ]> {
-  let summary = [{return from a hal.* region}];
+  let summary = [{Return from a hal.* region.}];
   let description = [{
     Returns the given values from the region and back to the host code.
   }];
@@ -1820,7 +1942,7 @@ def HAL_ReturnOp : HAL_Op<"return", [
   let builders = [
     OpBuilder<(ins),
     [{
-      build($_builder, $_state, std::nullopt);
+      build($_builder, $_state, {});
     }]>,
   ];
 
@@ -1828,7 +1950,7 @@ def HAL_ReturnOp : HAL_Op<"return", [
 }
 
 def HAL_DeviceQueryOp : HAL_PureOp<"device.query"> {
-  let summary = [{returns a runtime configuration parameter from the device}];
+  let summary = [{Returns a runtime configuration parameter from the device.}];
   let description = [{
     Queries a device configuration parameter with the given key.
     Returns a status indicating whether the pair was recognized/available and if
@@ -1901,7 +2023,7 @@ def HAL_DeviceQueueAllocaOp : HAL_Op<"device.queue.alloca", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   DeclareOpInterfaceMethods<Util_SizeAwareOp>,
 ]> {
-  let summary = [{allocates a queue-ordered transient buffer}];
+  let summary = [{Allocates a queue-ordered transient buffer.}];
   let description = [{
     Returns a queue-ordered transient buffer that will be available for use when
     the signal fence is reached. The allocation will not be made until the
@@ -1921,8 +2043,8 @@ def HAL_DeviceQueueAllocaOp : HAL_Op<"device.queue.alloca", [
     HAL_Fence:$wait_fence,
     HAL_Fence:$signal_fence,
     HAL_DeviceQueuePool:$pool,
-    HAL_MemoryTypeBitfieldAttr:$memory_types,
-    HAL_BufferUsageBitfieldAttr:$buffer_usage,
+    HAL_MemoryType:$memory_types,
+    HAL_BufferUsage:$buffer_usage,
     HAL_DeviceSize:$result_size,
     HAL_AllocaFlagBitfieldAttr:$flags
   );
@@ -1950,7 +2072,7 @@ def HAL_DeviceQueueAllocaOp : HAL_Op<"device.queue.alloca", [
 def HAL_DeviceQueueDeallocaOp : HAL_Op<"device.queue.dealloca", [
   HAL_DeviceQueueOp,
 ]> {
-  let summary = [{deallocates a queue-ordered transient buffer}];
+  let summary = [{Deallocates a queue-ordered transient buffer.}];
   let description = [{
     Deallocates a queue-ordered transient buffer.
     The deallocation will not be made until the wait fence has been reached and
@@ -1986,7 +2108,7 @@ def HAL_DeviceQueueDeallocaOp : HAL_Op<"device.queue.dealloca", [
 def HAL_DeviceQueueFillOp : HAL_Op<"device.queue.fill", [
   HAL_DeviceQueueOp,
 ]> {
-  let summary = [{fills a buffer with a repeating pattern}];
+  let summary = [{Fills a buffer with a repeating pattern.}];
   let description = [{
     The target buffer must be visible to the device queue performing the update.
     In most cases the queue affinity should be set to where the target buffer
@@ -2028,7 +2150,7 @@ def HAL_DeviceQueueFillOp : HAL_Op<"device.queue.fill", [
 def HAL_DeviceQueueUpdateOp : HAL_Op<"device.queue.update", [
   HAL_DeviceQueueOp,
 ]> {
-  let summary = [{updates a buffer with the contents of a host buffer}];
+  let summary = [{Updates a buffer with the contents of a host buffer.}];
   let description = [{
     The provided host source buffer will be captured and need not remain live or
     unchanged while the operation is queued. The target buffer must be visible
@@ -2078,7 +2200,7 @@ def HAL_DeviceQueueUpdateOp : HAL_Op<"device.queue.update", [
 def HAL_DeviceQueueCopyOp : HAL_Op<"device.queue.copy", [
   HAL_DeviceQueueOp,
 ]> {
-  let summary = [{copies one device-visible buffer to another}];
+  let summary = [{Copies one device-visible buffer to another.}];
   let description = [{
     The source buffer and target buffer must both be visible to the device
     queue performing the copy. In most cases the queue affinity should be set to
@@ -2124,7 +2246,7 @@ def HAL_DeviceQueueCopyOp : HAL_Op<"device.queue.copy", [
 def HAL_DeviceQueueReadOp : HAL_Op<"device.queue.read", [
   HAL_DeviceQueueOp,
 ]> {
-  let summary = [{reads a segment from a file into a device buffer}];
+  let summary = [{Reads a segment from a file into a device buffer.}];
   let description = [{
     Enqueues a file read operation that streams a segment of the source file
     defined by the source offset and length into the target HAL buffer at the
@@ -2168,7 +2290,7 @@ def HAL_DeviceQueueReadOp : HAL_Op<"device.queue.read", [
 def HAL_DeviceQueueWriteOp : HAL_Op<"device.queue.write", [
   HAL_DeviceQueueOp,
 ]> {
-  let summary = [{writes a segment from a device buffer into a file}];
+  let summary = [{Writes a segment from a device buffer into a file.}];
   let description = [{
     Enqueues a file write operation that streams a segment of the source HAL
     buffer defined by the source offset and length into the target file at the
@@ -2212,7 +2334,7 @@ def HAL_DeviceQueueWriteOp : HAL_Op<"device.queue.write", [
 def HAL_DeviceQueueBarrierOp : HAL_Op<"device.queue.barrier", [
   HAL_DeviceQueueOp,
 ]> {
-  let summary = [{enqueues an execution barrier}];
+  let summary = [{Enqueues an execution barrier.}];
   let description = [{
     Signals the provided fence once the wait fence is reached.
   }];
@@ -2242,7 +2364,7 @@ def HAL_DeviceQueueBarrierOp : HAL_Op<"device.queue.barrier", [
 def HAL_DeviceQueueExecuteOp : HAL_Op<"device.queue.execute", [
   HAL_DeviceQueueOp,
 ]> {
-  let summary = [{enqueues command buffer execution}];
+  let summary = [{Enqueues command buffer execution.}];
   let description = [{
     Executes a command buffer on a device queue.
     No commands will execute until the wait fence has been reached and the
@@ -2276,7 +2398,7 @@ def HAL_DeviceQueueExecuteIndirectOp : HAL_Op<"device.queue.execute.indirect", [
   SameVariadicOperandSize,
   HAL_DeviceQueueOp,
 ]> {
-  let summary = [{enqueues command buffer execution}];
+  let summary = [{Enqueues command buffer execution.}];
   let description = [{
     Executes a command buffer on a device queue with the given binding table.
     No commands will execute until the wait fence has been reached and the
@@ -2329,7 +2451,7 @@ def HAL_DeviceQueueExecuteIndirectOp : HAL_Op<"device.queue.execute.indirect", [
 }
 
 def HAL_DeviceQueueFlushOp : HAL_Op<"device.queue.flush"> {
-  let summary = [{flushes locally-pending submissions to the queue}];
+  let summary = [{Flushes locally-pending submissions to the queue.}];
   let description = [{
     Flushes any locally-pending submissions in the queue.
     When submitting many queue operations this can be used to eagerly flush
@@ -2366,7 +2488,7 @@ let opDocGroup = OpGroupDeviceManagementOps in {
 def HAL_DevicesCountOp : HAL_PureOp<"devices.count", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{returns the number of available devices}];
+  let summary = [{Returns the number of available devices.}];
   let description = [{
     Returns the total number of available devices registered at runtime.
   }];
@@ -2383,7 +2505,7 @@ def HAL_DevicesCountOp : HAL_PureOp<"devices.count", [
 def HAL_DevicesGetOp : HAL_PureOp<"devices.get", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{returns the device with the given index}];
+  let summary = [{Returns the device with the given index.}];
   let description = [{
     Returns the device with the given index in the [0, hal.devices.count) range.
     Devices may be lazily initialized upon first use.
@@ -2420,7 +2542,7 @@ def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
   Symbol,
   SymbolTable,
 ]> {
-  let summary = [{generic source contents of an executable op}];
+  let summary = [{Generic source contents of an executable op.}];
   let description = [{
     This is an unspecialized source representation of an executable
     module without an assigned target. This is useful for hand-authoring
@@ -2478,7 +2600,7 @@ def HAL_ExecutableSourceEndOp : HAL_Op<"executable.source_end", [
   HasParent<"IREE::HAL::ExecutableSourceOp">,
   Terminator,
 ]> {
-  let summary = [{terminator pseudo-op for the executable source op}];
+  let summary = [{Terminator pseudo-op for the executable source op.}];
   let assemblyFormat = "attr-dict";
 }
 
@@ -2489,22 +2611,32 @@ def HAL_ExecutableOp : HAL_Op<"executable", [
   SymbolTable,
   Util_ObjectLike,
 ]> {
-  let summary = [{target-specific executable module}];
+  let summary = [{Target-specific executable module.}];
   let description = [{
     An executable module representing a target-specific compiled
-    kernel/shader/etc.
+    kernel/shader/etc. Executables are treated as independent compilation units
+    and may contain multiple exported entry points that are able to share code
+    internally. To support multi-targeting each executable may have one or more
+    target-specific variants that are lowered independently during compilation
+    while still appearing as one executable at runtime (ala fat binaries).
+
+    At runtime executables are loaded during module initialization and cached
+    for the lifetime of the module. If the `lazy` attribute is set the
+    executable _may_ have its loading deferred until first use.
   }];
 
   let arguments = (ins
     OptionalAttr<StrAttr>:$sym_visibility,
-    SymbolNameAttr:$sym_name
+    SymbolNameAttr:$sym_name,
     // TODO(benvanik): entry point types for verification.
+    UnitAttr:$lazy
   );
 
   let regions = (region SizedRegion<1>:$body);
 
   let assemblyFormat = [{
     custom<SymbolVisibility>($sym_visibility)
+    (`lazy` $lazy^)?
     $sym_name
     attr-dict-with-keyword
     regions
@@ -2526,19 +2658,20 @@ def HAL_ExecutableEndOp : HAL_Op<"executable_end", [
   HasParent<"IREE::HAL::ExecutableOp">,
   Terminator,
 ]> {
-  let summary = [{terminator pseudo-op for the executable op}];
+  let summary = [{Terminator pseudo-op for the executable op.}];
   let assemblyFormat = "attr-dict";
 }
 
 def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
   Symbol,
+  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
   ParentOneOf<[
     "IREE::HAL::ExecutableSourceOp",
     "IREE::HAL::ExecutableVariantOp",
   ]>,
   IsolatedFromAbove,
 ]> {
-  let summary = [{executable entry point declaration}];
+  let summary = [{Executable entry point declaration.}];
   let description = [{
     An entry point exported by the executable with statically-available
     information describing the IO interface it uses and other dispatch metadata.
@@ -2547,6 +2680,24 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
     returns the number of workgroups to use in the 3D grid dispatch.
     The arguments to the region represents the workload as captured by each
     dispatch. It returns the number of workgroups along x, y, and z.
+
+    The optional `condition` region provides boolean logic determining whether
+    the export should be dispatched given the device and workload or if a
+    specified fallback export in the same executable should be dispatched
+    instead. Multiple exports can be chained together as fallbacks to allow for
+    arbitrarily complex decisions trees. Fallbacks for an export must match the
+    layout and workload exactly but may vary any other attribute (such as
+    workgroup size or translation configuration).
+
+    Workgroup count and condition regions that have dependencies on dynamic
+    workload information will be executed using indirect dispatch. If the
+    information is available on the host at the time a command buffer containing
+    the dispatch is available the indirect dispatch _may_ have lower overhead
+    by using `IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_PARAMETERS`. If the
+    information required is data-dependent on work within the same command
+    buffer some backends will suffer a performance penalty. Condition regions
+    consuming dynamic workloads in particular may result in long chains of
+    indirect dispatches sent to the device or even host round-trips.
   }];
 
   let arguments = (ins
@@ -2554,13 +2705,28 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
     SymbolNameAttr:$sym_name,
     OptionalAttr<HAL_OrdinalAttr>:$ordinal,
     HAL_PipelineLayoutAttr:$layout,
+    OptionalAttr<FlatSymbolRefAttr>:$condition_fallback,
     OptionalAttr<HAL_WorkgroupSizeAttr>:$workgroup_size,
     OptionalAttr<HAL_SubgroupSizeAttr>:$subgroup_size,
     OptionalAttr<IndexAttr>:$workgroup_local_memory,
     OptionalAttr<DictionaryAttr>:$source_locs
   );
 
-  let regions = (region AnyRegion:$workgroup_count);
+  let regions = (region
+    AnyRegion:$workgroup_count,
+    AnyRegion:$condition
+  );
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    (`ordinal` `(` $ordinal^ `)`)?
+    `layout` `(` qualified($layout) `)`
+    (`condition` `` custom<ExportConditionRegion>($condition)^)?
+    (`fallback` `(` $condition_fallback^ `)`)?
+    (`count` `` custom<WorkgroupCountRegion>($workgroup_count)^)?
+    attr-dict-with-keyword
+  }];
 
   let builders = [
     OpBuilder<(ins
@@ -2572,14 +2738,26 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
       "::mlir::IntegerAttr":$workgroup_local_memory
     ), [{
       build($_builder, $_state, nullptr, sym_name, ordinal, layout,
+            /*condition_fallback=*/FlatSymbolRefAttr{},
             workgroup_size, subgroup_size, workgroup_local_memory,
-            DictionaryAttr{});
+            /*source_locs=*/DictionaryAttr{});
     }]>,
   ];
 
+  let hasCanonicalizer = 1;
   let hasVerifier = 1;
 
   let extraClassDeclaration = [{
+    Block* getConditionBody() {
+      if (getCondition().empty()) return nullptr;
+      return &getCondition().front();
+    }
+
+    // Calculates whether the condition region (if any) evaluates to true for
+    // the export.
+    Value calculateCondition(
+        Location loc, Value device, ValueRange workload, OpBuilder &builder);
+
     /// For now assume that the workload is at max 3D.
     /// Arguments to the region are workload along x, y and z.
     // TODO: Propogate this and avoid magic constants.
@@ -2616,7 +2794,7 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
   Symbol,
   SymbolTable,
 ]> {
-  let summary = [{target-specific variant of an executable op}];
+  let summary = [{Target-specific variant of an executable op.}];
   let description = [{
     The target IR for the executable. This can be preserved for debugging but
     is usually removed during transformation.
@@ -2702,7 +2880,7 @@ def HAL_ExecutableVariantEndOp : HAL_Op<"executable.variant_end", [
   HasParent<"IREE::HAL::ExecutableVariantOp">,
   Terminator,
 ]> {
-  let summary = [{terminator pseudo-op for the executable variant op}];
+  let summary = [{Terminator pseudo-op for the executable variant op.}];
   let assemblyFormat = "attr-dict";
 }
 
@@ -2711,7 +2889,7 @@ def HAL_ExecutableConditionOp : HAL_Op<"executable.condition", [
   FunctionOpInterface,
   CallableOpInterface,
 ]> {
-  let summary = [{host code to determine if the executable is enabled}];
+  let summary = [{Host code to determine if the executable is enabled.}];
   let description = [{
     Variants are selected based on their target and this optional condition
     op that returns true if the variant is valid for use on the provided
@@ -2768,7 +2946,7 @@ def HAL_ExecutableConstantBlockOp : HAL_Op<"executable.constant.block", [
   CallableOpInterface,
   FunctionOpInterface,
 ]> {
-  let summary = [{executable constant block initializer}];
+  let summary = [{Executable constant block initializer.}];
   let description = [{
     Initializes one or more constants in the executable constant block by
     returning one value per identified constant. Each constant block is
@@ -2819,13 +2997,6 @@ def HAL_ExecutableConstantBlockOp : HAL_Op<"executable.constant.block", [
 
   let regions = (region AnyRegion:$body);
 
-  let builders = [
-    OpBuilder<(ins
-      "FunctionType":$type,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs,
-      CArg<"ArrayRef<DictionaryAttr>", "{}">:$argAttrs)>,
-  ];
-
   let extraClassDeclaration = [{
     // CallableOpInterface:
     ::mlir::Region *getCallableRegion() { return &getBody(); }
@@ -2861,7 +3032,7 @@ def HAL_ExecutableConstantBlockOp : HAL_Op<"executable.constant.block", [
 }
 
 def HAL_ExecutableConstantLoadOp : HAL_PureOp<"executable.constant.load"> {
-  let summary = [{loads a constant value from the executable constant block}];
+  let summary = [{Loads a constant value from the executable constant block.}];
   let description = [{
     Loads a scalar constant value from the static executable constant block.
     The value provided by a constant block with the given key will be loaded and
@@ -2888,7 +3059,7 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
   HasParent<"IREE::HAL::ExecutableOp">,
   Symbol,
 ]> {
-  let summary = [{compiled executable binary data}];
+  let summary = [{Compiled executable binary data.}];
   let description = [{
     A compiled executable binary with an optional nested module containing the
     IR prior to serialization (for debugging).
@@ -2927,7 +3098,7 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
 def HAL_ExecutableCreateOp : HAL_PureOp<"executable.create", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{creates an executable}];
+  let summary = [{Creates an executable.}];
   let description = [{
     Creates a target-dependent executable cached on the provided device. Entry
     points contained within the executable can be dispatched using the resulting
@@ -2965,7 +3136,7 @@ def HAL_ExecutableCreateOp : HAL_PureOp<"executable.create", [
 def HAL_ExecutableLookupOp : HAL_PureOp<"executable.lookup", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{executable cache lookup pseudo-op}];
+  let summary = [{Executable cache lookup pseudo-op.}];
   let description = [{
     Used during conversion to provide a placeholder for a globally cached and
     possibly lazy-initialized executable.
@@ -2990,7 +3161,7 @@ def HAL_ExecutableLookupOp : HAL_PureOp<"executable.lookup", [
 def HAL_ExecutableExportOrdinalOp : HAL_PureOp<"executable.export.ordinal", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{executable export ordinal lookup pseudo-op}];
+  let summary = [{Executable export ordinal lookup pseudo-op.}];
   let description = [{
     Resolves an executable export ordinal to a value once ordinals have been
     assigned.
@@ -3011,7 +3182,7 @@ def HAL_ExecutableExportOrdinalOp : HAL_PureOp<"executable.export.ordinal", [
 }
 
 def HAL_ExecutableCalculateWorkgroupsOp : HAL_PureOp<"executable.calculate_workgroups"> {
-  let summary = [{calculates workgroup count from workload for an exported function}];
+  let summary = [{Calculates workgroup count from workload for an exported function.}];
   let description = [{
     Calculates the workgroup count (grid XYZ) based on the given workload using
     the workgroup count calculation region of the target
@@ -3052,7 +3223,7 @@ def OpGroupInstrumentOps : OpDocGroup {
 let opDocGroup = OpGroupInstrumentOps in {
 
 def HAL_InstrumentWorkgroupOp : HAL_Op<"instrument.workgroup"> {
-  let summary = [{emits a dispatch workgroup instrumentation event}];
+  let summary = [{Emits a dispatch workgroup instrumentation event.}];
   let description = [{
     Emits an `iree_instrument_dispatch_workgroup_t` event into the
     instrumentation stream. The workgroup event identifies the unique dispatch,
@@ -3086,7 +3257,7 @@ def HAL_InstrumentWorkgroupOp : HAL_Op<"instrument.workgroup"> {
 }
 
 def HAL_InstrumentPrintOp : HAL_Op<"instrument.print"> {
-  let summary = [{emits a human-readable printf-style string event}];
+  let summary = [{Emits a human-readable printf-style string event.}];
   let description = [{
     Formats a string using a limited subset of printf format specifiers and the
     provided values and then emits an `iree_instrument_dispatch_print_t` event. Final
@@ -3112,7 +3283,7 @@ def HAL_InstrumentPrintOp : HAL_Op<"instrument.print"> {
 def HAL_InstrumentValueOp : HAL_Op<"instrument.value", [
   AllTypesMatch<["operand", "result"]>,
 ]> {
-  let summary = [{emits a scalar value instrumentation event}];
+  let summary = [{Emits a scalar value instrumentation event.}];
   let description = [{
     Emits a workgroup-specific typed value with the given workgroup-relative
     ordinal.
@@ -3140,7 +3311,7 @@ def HAL_InstrumentValueOp : HAL_Op<"instrument.value", [
 def HAL_InstrumentMemoryLoadOp : HAL_PureOp<"instrument.memory.load", [
   AllTypesMatch<["loadValue", "result"]>,
 ]> {
-  let summary = [{emits a memory load instrumentation event}];
+  let summary = [{Emits a memory load instrumentation event.}];
   let description = [{
     Emits a workgroup-specific memory load event indicating that a number of
     bytes from the given resolved pointer have been loaded by the workgroup.
@@ -3167,7 +3338,7 @@ def HAL_InstrumentMemoryLoadOp : HAL_PureOp<"instrument.memory.load", [
 def HAL_InstrumentMemoryStoreOp : HAL_PureOp<"instrument.memory.store", [
   AllTypesMatch<["storeValue", "result"]>,
 ]> {
-  let summary = [{emits a memory store instrumentation event}];
+  let summary = [{Emits a memory store instrumentation event.}];
   let description = [{
     Emits a workgroup-specific memory store event indicating that a number of
     bytes have been stored to the given resolved pointer by the workgroup.
@@ -3214,7 +3385,7 @@ class HAL_InterfaceWorkgroupOp<string mnemonic, list<Trait> traits = []>
   let results = (outs HAL_Dim:$result);
 
   let builders = [
-    OpBuilder<(ins "unsigned":$dim, CArg<"std::optional<::llvm::APInt>", "std::nullopt">:$upper_bound),
+    OpBuilder<(ins "unsigned":$dim, CArg<"std::optional<::llvm::APInt>", "{}">:$upper_bound),
     [{
       build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim),
         upper_bound.has_value() ? $_builder.getIndexAttr(upper_bound->getSExtValue()) : ::mlir::IntegerAttr{});
@@ -3227,7 +3398,7 @@ class HAL_InterfaceWorkgroupOp<string mnemonic, list<Trait> traits = []>
 }
 
 def HAL_InterfaceWorkgroupIDOp : HAL_InterfaceWorkgroupOp<"interface.workgroup.id"> {
-  let summary = [{returns the index of the current workgroup in the grid}];
+  let summary = [{Returns the index of the current workgroup in the grid.}];
   let description = [{
     The global workgroup ID of the current tile in the range of
     `[0, hal.interface.workgroup.count)` along each XYZ dimension.
@@ -3244,7 +3415,7 @@ def HAL_InterfaceWorkgroupIDOp : HAL_InterfaceWorkgroupOp<"interface.workgroup.i
 }
 
 def HAL_InterfaceWorkgroupCountOp : HAL_InterfaceWorkgroupOp<"interface.workgroup.count"> {
-  let summary = [{returns the total workgroup count of the grid}];
+  let summary = [{Returns the total workgroup count of the grid.}];
   let description = [{
     The total number of workgroups along each dimension in the dispatch grid.
     Matches what was passed to the `hal.command_buffer.dispatch` command (or
@@ -3263,7 +3434,7 @@ def HAL_InterfaceWorkgroupCountOp : HAL_InterfaceWorkgroupOp<"interface.workgrou
 }
 
 def HAL_InterfaceWorkgroupSizeOp : HAL_InterfaceWorkgroupOp<"interface.workgroup.size"> {
-  let summary = [{returns the size of each workgroup in invocations}];
+  let summary = [{Returns the size of each workgroup in invocations.}];
   let description = [{
     The number of local invocations within the current workgroup along each
     dimension. Depending on backend this may map to the SIMT thread count or
@@ -3281,7 +3452,7 @@ def HAL_InterfaceWorkgroupSizeOp : HAL_InterfaceWorkgroupOp<"interface.workgroup
 }
 
 def HAL_InterfaceConstantLoadOp : HAL_PureOp<"interface.constant.load"> {
-  let summary = [{loads a constant value from the interface constant block}];
+  let summary = [{Loads a constant value from the interface constant block.}];
   let description = [{
     Loads a scalar constant value from an executable IO push constant block.
     The value will be loaded from the given constant offset and will be
@@ -3325,7 +3496,7 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   Util_ShapeAwareOp,
 ]> {
-  let summary = [{returns an alias to a subspan of interface binding data}];
+  let summary = [{Returns an alias to a subspan of interface binding data.}];
   let description = [{
     Returns a subspan of an interface binding storage buffer in a generic type.
     The exact shape, type, and alignment of the returned type are defined by
@@ -3409,7 +3580,7 @@ def HAL_FenceCreateOp : HAL_Op<"fence.create", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   MemoryEffects<[MemAlloc]>,
 ]> {
-  let summary = [{creates an unsignaled fence}];
+  let summary = [{Creates an unsignaled fence.}];
   let description = [{
     Returns a fence that defines a point in time. By default fences will remain
     unsignaled unless they are explicitly signaled with `hal.fence.signal` or
@@ -3438,7 +3609,7 @@ def HAL_FenceCreateOp : HAL_Op<"fence.create", [
 def HAL_FenceJoinOp : HAL_Op<"fence.join", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{creates a fence from the given timepoints}];
+  let summary = [{Creates a fence from the given timepoints.}];
   let description = [{
     Returns a fence that joins the input fences as a wait-all operation.
   }];
@@ -3463,7 +3634,7 @@ def HAL_FenceJoinOp : HAL_Op<"fence.join", [
 }
 
 def HAL_FenceQueryOp : HAL_Op<"fence.query"> {
-  let summary = [{fence query operation}];
+  let summary = [{Fence query operation.}];
   let description = [{
     Queries whether the fence has been reached and its status.
     Returns OK if the fence has been signaled successfully, DEFERRED if it is
@@ -3485,7 +3656,7 @@ def HAL_FenceQueryOp : HAL_Op<"fence.query"> {
 }
 
 def HAL_FenceSignalOp : HAL_Op<"fence.signal"> {
-  let summary = [{fence signal operation}];
+  let summary = [{Fence signal operation.}];
   let description = [{
     Signals the fence to indicate that the timepoints contained have been
     reached. Waiting work may begin immediately.
@@ -3504,7 +3675,7 @@ def HAL_FenceSignalOp : HAL_Op<"fence.signal"> {
 }
 
 def HAL_FenceFailOp : HAL_Op<"fence.fail"> {
-  let summary = [{fence failure operation}];
+  let summary = [{Fence failure operation.}];
   let description = [{
     Signals the fence with a failure. The `status` will be returned from
     each timepoint semaphores `hal.semaphore.query` and `hal.semaphore.signal`
@@ -3527,7 +3698,7 @@ def HAL_FenceAwaitOp : HAL_Op<"fence.await", [
   Util_YieldPoint,
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{asynchronous fence wait operation}];
+  let summary = [{Asynchronous fence wait operation.}];
   let description = [{
     Yields the caller until all fences is reached. Returns the `status` of the
     fence after the wait, with a non-zero value indicating failure.

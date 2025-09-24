@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "allocator_folding.mlir"
     "allocator_ops.mlir"
     "attributes.mlir"
     "buffer_ops.mlir"
@@ -32,6 +33,7 @@ iree_lit_test_suite(
     "fence_folding.mlir"
     "fence_ops.mlir"
     "interface_ops.mlir"
+    "interface_ops_folding.mlir"
     "invalid.mlir"
     "tensor_op_folding.mlir"
     "tensor_ops.mlir"

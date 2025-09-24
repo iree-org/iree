@@ -9,16 +9,13 @@
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/WinogradConstants.h"
-#include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
-#include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -115,7 +112,7 @@ struct FoldWinogradOpUnitDims : public OpRewritePattern<TransformOp> {
 /// ````
 struct DecomposeWinogradFilterTransform
     : public OpRewritePattern<WinogradFilterTransformOp> {
-  using OpRewritePattern<WinogradFilterTransformOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(WinogradFilterTransformOp transformOp,
                                 PatternRewriter &rewriter) const override {
@@ -130,8 +127,8 @@ struct DecomposeWinogradFilterTransform
     llvm::SmallSetVector<int64_t, 2> kernelDimsSet(kernelDims.begin(),
                                                    kernelDims.end());
     Type elementType = transformOp.getOutputType().getElementType();
-    Value zeroF32 = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(elementType));
+    Value zeroF32 = arith::ConstantOp::create(
+        rewriter, loc, rewriter.getZeroAttr(elementType));
     /// The two values below are the transpose(G) [GT]
     /// and G [G] constant matrices that convert the filter
     /// tile from the original domain to the Winograd domain.
@@ -148,18 +145,18 @@ struct DecomposeWinogradFilterTransform
     Value inputSlice = transformOp.getInput();
     Value outputSlice = transformOp.getOutput();
     auto tensorType = transformOp.getOutputType().clone(initShape);
-    Value init = rewriter.create<tensor::EmptyOp>(loc, initShape, elementType);
-    linalg::FillOp fillOp = rewriter.create<linalg::FillOp>(
-        loc, ValueRange{zeroF32}, ValueRange{init});
-    linalg::MatmulOp matmulOp = rewriter.create<linalg::MatmulOp>(
-        loc, tensorType, ValueRange{inputSlice, GT}, fillOp.result());
+    Value init = tensor::EmptyOp::create(rewriter, loc, initShape, elementType);
+    linalg::FillOp fillOp = linalg::FillOp::create(
+        rewriter, loc, ValueRange{zeroF32}, ValueRange{init});
+    linalg::MatmulOp matmulOp = linalg::MatmulOp::create(
+        rewriter, loc, tensorType, ValueRange{inputSlice, GT}, fillOp.result());
 
     // Create matmul(G, matmul(input, GT))
-    fillOp = rewriter.create<linalg::FillOp>(loc, ValueRange{zeroF32},
-                                             ValueRange{outputSlice});
-    matmulOp = rewriter.create<linalg::MatmulOp>(
-        loc, outputSlice.getType(), ValueRange{G, matmulOp.getResult(0)},
-        fillOp.result());
+    fillOp = linalg::FillOp::create(rewriter, loc, ValueRange{zeroF32},
+                                    ValueRange{outputSlice});
+    matmulOp = linalg::MatmulOp::create(rewriter, loc, outputSlice.getType(),
+                                        ValueRange{G, matmulOp.getResult(0)},
+                                        fillOp.result());
     rewriter.replaceOp(transformOp, matmulOp.getResult(0));
     return success();
   }
@@ -197,7 +194,7 @@ struct DecomposeWinogradFilterTransform
 /// ````
 struct DecomposeWinogradInputTransform
     : public OpRewritePattern<WinogradInputTransformOp> {
-  using OpRewritePattern<WinogradInputTransformOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(WinogradInputTransformOp transformOp,
                                 PatternRewriter &rewriter) const override {
@@ -220,8 +217,8 @@ struct DecomposeWinogradInputTransform
     // Pad the input slice.
     Value dynamicSlice = transformOp.getInput();
     Type elementType = transformOp.getOutputType().getElementType();
-    Value zero = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(elementType));
+    Value zero = arith::ConstantOp::create(rewriter, loc,
+                                           rewriter.getZeroAttr(elementType));
     SmallVector<int64_t> inputTileSquare(
         transformOp.getImageDimensions().size(), inputTileSize);
     auto inputSliceType = RankedTensorType::get(inputTileSquare, elementType);
@@ -232,8 +229,8 @@ struct DecomposeWinogradInputTransform
     Value result, AMatrix, BMatrix;
     linalg::MatmulOp matmulOp;
     for (int i = 0; i < 2; i++) {
-      auto fillOp = rewriter.create<linalg::FillOp>(
-          loc, ValueRange{zero}, ValueRange{transformOp.getOutput()});
+      auto fillOp = linalg::FillOp::create(rewriter, loc, ValueRange{zero},
+                                           ValueRange{transformOp.getOutput()});
       if (i == 0) {
         AMatrix = inputSlice;
         BMatrix = B;
@@ -241,9 +238,9 @@ struct DecomposeWinogradInputTransform
         AMatrix = BT;
         BMatrix = result;
       }
-      matmulOp = rewriter.create<linalg::MatmulOp>(
-          loc, transformOp.getOutputType(), ValueRange{AMatrix, BMatrix},
-          fillOp.result());
+      matmulOp = linalg::MatmulOp::create(
+          rewriter, loc, transformOp.getOutputType(),
+          ValueRange{AMatrix, BMatrix}, fillOp.result());
       result = matmulOp.getResult(0);
     }
     rewriter.replaceOp(transformOp, result);
@@ -280,7 +277,7 @@ struct DecomposeWinogradInputTransform
 /// ````
 struct DecomposeWinogradOutputTransform
     : public OpRewritePattern<WinogradOutputTransformOp> {
-  using OpRewritePattern<WinogradOutputTransformOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(WinogradOutputTransformOp transformOp,
                                 PatternRewriter &rewriter) const override {
@@ -303,11 +300,11 @@ struct DecomposeWinogradOutputTransform
     Value A = IREE::LinalgExt::createValueFrom2DConstant(
         IREE::LinalgExt::Winograd::A_6x6_3x3, inputTileSize, outputTileSize,
         loc, rewriter);
-    Value zeroF32 = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(elementType));
+    Value zeroF32 = arith::ConstantOp::create(
+        rewriter, loc, rewriter.getZeroAttr(elementType));
     SmallVector<int64_t> scratchShape = {inputTileSize, outputTileSize};
     Value scratch =
-        rewriter.create<tensor::EmptyOp>(loc, scratchShape, elementType);
+        tensor::EmptyOp::create(rewriter, loc, scratchShape, elementType);
     // Create computation
     Value result, AMatrix, BMatrix;
     linalg::MatmulOp matmulOp;
@@ -315,8 +312,8 @@ struct DecomposeWinogradOutputTransform
     Value tmp;
     for (int i = 0; i < 2; i++) {
       tmp = i == 0 ? scratch : outputSlice;
-      fillOp = rewriter.create<linalg::FillOp>(loc, ValueRange{zeroF32},
-                                               ValueRange{tmp});
+      fillOp = linalg::FillOp::create(rewriter, loc, ValueRange{zeroF32},
+                                      ValueRange{tmp});
       if (i == 0) {
         AMatrix = inputSlice;
         BMatrix = A;
@@ -324,8 +321,9 @@ struct DecomposeWinogradOutputTransform
         AMatrix = AT;
         BMatrix = result;
       }
-      matmulOp = rewriter.create<linalg::MatmulOp>(
-          loc, tmp.getType(), ValueRange{AMatrix, BMatrix}, fillOp.result());
+      matmulOp = linalg::MatmulOp::create(rewriter, loc, tmp.getType(),
+                                          ValueRange{AMatrix, BMatrix},
+                                          fillOp.result());
       result = matmulOp.getResult(0);
     }
     rewriter.replaceOp(transformOp, result);
@@ -339,9 +337,8 @@ namespace {
 struct DecomposeWinogradTransformPass final
     : impl::DecomposeWinogradTransformPassBase<DecomposeWinogradTransformPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<
-        affine::AffineDialect, IREE::LinalgExt::IREELinalgExtDialect,
-        linalg::LinalgDialect, scf::SCFDialect, tensor::TensorDialect>();
+    registry.insert<IREE::LinalgExt::IREELinalgExtDialect,
+                    linalg::LinalgDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override;

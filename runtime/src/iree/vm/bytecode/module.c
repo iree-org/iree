@@ -14,6 +14,10 @@
 #include "iree/vm/bytecode/module_impl.h"
 #include "iree/vm/bytecode/verifier.h"
 
+// Maximum size of an argument or result buffer used when marshaling ABI
+// arguments in bytes.
+#define IREE_VM_FUNCTION_MAX_ABI_BUFFER_SIZE (16 * 1024)
+
 // Perform an strcmp between a FlatBuffers string and an IREE string view.
 static bool iree_vm_flatbuffer_strcmp(flatbuffers_string_t lhs,
                                       iree_string_view_t rhs) {
@@ -784,7 +788,8 @@ static iree_status_t iree_vm_bytecode_module_resolve_import(
   }
   IREE_RETURN_IF_ERROR(iree_vm_function_call_compute_cconv_fragment_size(
       import->results, /*segment_size_list=*/NULL, &result_buffer_size));
-  if (argument_buffer_size > 16 * 1024 || result_buffer_size > 16 * 1024) {
+  if (argument_buffer_size > IREE_VM_FUNCTION_MAX_ABI_BUFFER_SIZE ||
+      result_buffer_size > IREE_VM_FUNCTION_MAX_ABI_BUFFER_SIZE) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "ABI marshaling buffer overflow on import %" PRIhsz,
                             ordinal);

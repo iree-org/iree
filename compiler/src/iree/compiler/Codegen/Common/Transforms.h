@@ -45,7 +45,8 @@ LogicalResult eliminateEmptyTensors(
 /// Bufferizes the given op with One-Shot Bufferize.
 LogicalResult
 runIREEOneShotBufferize(Operation *op,
-                        const IREEOneShotBufferizationOptions &options);
+                        const IREEOneShotBufferizationOptions &options,
+                        bufferization::BufferizationState &state);
 
 /// For a given operation within a dispatch, tile and distribute the operation
 /// to workgroups as well as tile + fuse its producers. Returns the
@@ -76,6 +77,33 @@ FailureOr<IREETilingResult>
 tileDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
                           linalg::LinalgTilingOptions options);
 
+/// Transform a `scf.for` loop with a strictly positive step
+///   for %i = %lb to %ub step %s
+/// into a 0-based loop with step 1
+///   for %ii = 0 to ceildiv(%ub - %lb, %s) step 1
+/// Insert an `affine.apply` operation to compute the denormalized index value.
+LogicalResult normalizeLoopBounds(RewriterBase &rewriter, scf::ForOp forOp);
+
+/// Transform a `scf.forall` loop with a strictly positive steps
+///   forall (%i, %j) = (%lb0, %lb1) to (%ub0, %ub1) step (%s0, %s1)
+/// into a 0-based loop with step 1 (normalized)
+///   forall (%i, %j) in (ceildiv(%ub0 - %lb0, %s0), ceildiv(%ub1 - %lb1, %s1))
+/// Insert `affine.apply` operations to compute the denormalized index values.
+LogicalResult normalizeLoopBounds(RewriterBase &rewriter,
+                                  scf::ForallOp forallOp);
+
+/// Move memref.expand_shape and memref.collapse_shape ops nested within the
+/// `op` up to just after their last operand producer.
+void moveUpMemrefReshapeOps(RewriterBase &rewriter, Operation *op);
+
+/// Populate patterns that fold tensor.expand/collapse_shape into the memref
+/// of iree_codegen.load_from_buffer or iree_codegen.store_to_buffer ops.
+void populateFoldTensorReshapeIntoBufferPatterns(RewritePatternSet &patterns);
+
+/// Populate patterns that fold reshaping and bitcasting ops into the source
+/// hal.interface.binding.subspan.
+void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns);
+
 /// Populate patterns related to clean up the IR after tile and distribute
 /// to workgroups.
 void populateTileAndDistributeToWorkgroupsCleanupPatterns(
@@ -84,14 +112,30 @@ void populateTileAndDistributeToWorkgroupsCleanupPatterns(
 /// Populate IREE patterns related to resolving
 /// `memref.extract_strided_metadata`.
 void populateIREEResolveExtractStridedMetadataPatterns(
-    RewritePatternSet &patterns);
+    RewritePatternSet &patterns, bool allowSubviewExpansion = false);
 
 /// Populate patterns that replaces maximumf/minimumf with minumf/maxnumf ops.
 /// This is supposed to be used for targets which have faulty codegen
 /// for maximumf/minimumf ops, e.g. LLVM NVIDIA-PTX.
 void populateReplaceSlowMinMaxOpsPatterns(RewritePatternSet &patterns);
 
+/// Populate pattern to convert `tensor.extract_slice(tensor.expand_shape)` to
+/// `tensor.expand_shape(tensor.extract_slice)`.
 void populateSwapExtractWithExpandPattern(RewritePatternSet &patterns);
+
+/// Populate pattern to convert `tensor.extract_slice(tensor.collapse_shape)` to
+/// `tensor.collapse_shape(tensor.extract_slice)`.
+void populateSwapExtractWithCollapsePattern(RewritePatternSet &patterns);
+
+/// Populate patterns to fold relayout operations into map_scatter ops. If a
+/// `padDistributionConfigFn` is passed, then the tensor.pad folding pattern
+/// will be added, using the padDistributionConfigFn for distribution.
+void populateCombineRelayoutOpPatterns(
+    RewritePatternSet &patterns,
+    PadDistributionConfigFn padDistributionConfigFn = nullptr);
+
+/// Populate patterns to fuse tilable consumers of forall ops into it.
+void populateFuseTilableForallConsumersPattern(RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler
 

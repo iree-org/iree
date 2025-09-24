@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <memory>
 #include <unordered_map>
 #include <utility>
 
@@ -216,7 +215,7 @@ struct SubstituteExecutablesPass
   using IREE::HAL::impl::SubstituteExecutablesPassBase<
       SubstituteExecutablesPass>::SubstituteExecutablesPassBase;
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     auto moduleName = moduleOp.getName().value_or("module");
     SymbolTable symbolTable(moduleOp);
 

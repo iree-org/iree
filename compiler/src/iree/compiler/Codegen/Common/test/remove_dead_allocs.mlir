@@ -24,7 +24,7 @@ func.func @alloc_keep(%arg0: index, %arg1: index) -> memref<?x?xf32> {
 ]>
 func.func @cleanup_only_assume_alignment_uses() {
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<42xf32>
-  memref.assume_alignment %0, 64 : memref<42xf32>
+  %1 = memref.assume_alignment %0, 64 : memref<42xf32>
   return
 }
 // CHECK-LABEL: func.func @cleanup_only_assume_alignment_uses()

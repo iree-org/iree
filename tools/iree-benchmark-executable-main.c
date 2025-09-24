@@ -10,9 +10,9 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
 #include "iree/hal/api.h"
+#include "iree/io/file_contents.h"
 #include "iree/modules/hal/types.h"
 #include "iree/testing/benchmark.h"
 #include "iree/tooling/device_util.h"
@@ -200,9 +200,9 @@ static iree_status_t iree_benchmark_executable_run(
 
   iree_hal_semaphore_t* fence_semaphore = NULL;
   uint64_t fence_value = 0ull;
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(args->device, fence_value,
-                                                 IREE_HAL_SEMAPHORE_FLAG_NONE,
-                                                 &fence_semaphore));
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(
+      args->device, IREE_HAL_QUEUE_AFFINITY_ANY, fence_value,
+      IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &fence_semaphore));
   iree_hal_semaphore_list_t wait_semaphore_list =
       iree_hal_semaphore_list_empty();
   iree_hal_semaphore_list_t signal_semaphore_list = {
@@ -226,11 +226,13 @@ static iree_status_t iree_benchmark_executable_run(
       .count = parsed_params.binding_count,
       .values = args->bindings,
   };
+  iree_hal_dispatch_config_t config = iree_hal_make_static_dispatch_config(
+      args->workgroup_count[0], args->workgroup_count[1],
+      args->workgroup_count[2]);
   for (int32_t i = 0; i < FLAG_batch_size; ++i) {
     IREE_RETURN_IF_ERROR(iree_hal_command_buffer_dispatch(
-        command_buffer, args->executable, FLAG_entry_point,
-        args->workgroup_count, constants, bindings,
-        IREE_HAL_DISPATCH_FLAG_NONE));
+        command_buffer, args->executable, FLAG_entry_point, config, constants,
+        bindings, IREE_HAL_DISPATCH_FLAG_NONE));
     IREE_RETURN_IF_ERROR(iree_hal_command_buffer_execution_barrier(
         command_buffer, IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE,
         IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE,
@@ -262,7 +264,8 @@ static iree_status_t iree_benchmark_executable_run(
     // Note that this will include round-trip overhead and if the dispatch or
     // batch size is small then the final time may end up being mostly overhead.
     IREE_RETURN_IF_ERROR(iree_hal_semaphore_wait(fence_semaphore, fence_value,
-                                                 iree_infinite_timeout()));
+                                                 iree_infinite_timeout(),
+                                                 IREE_HAL_WAIT_FLAG_DEFAULT));
 
     iree_benchmark_pause_timing(benchmark_state);
 
@@ -384,14 +387,14 @@ static iree_status_t iree_benchmark_executable_from_flags(
   // Load the executable data into memory.
   // In normal usage this would be mapped from the containing module file (which
   // itself may be mapped from disk).
-  iree_file_contents_t* file_contents = NULL;
+  iree_io_file_contents_t* file_contents = NULL;
   if (strcmp(FLAG_executable_file, "-") == 0) {
     IREE_RETURN_IF_ERROR(
-        iree_stdin_read_contents(host_allocator, &file_contents));
+        iree_io_file_contents_read_stdin(host_allocator, &file_contents));
   } else {
-    IREE_RETURN_IF_ERROR(iree_file_read_contents(
-        FLAG_executable_file, IREE_FILE_READ_FLAG_DEFAULT, host_allocator,
-        &file_contents));
+    IREE_RETURN_IF_ERROR(
+        iree_io_file_contents_read(iree_make_cstring_view(FLAG_executable_file),
+                                   host_allocator, &file_contents));
   }
   executable_params.executable_format =
       iree_make_cstring_view(FLAG_executable_format);
@@ -443,7 +446,7 @@ static iree_status_t iree_benchmark_executable_from_flags(
 
   iree_vm_list_release(binding_list);
   iree_hal_executable_release(executable);
-  iree_file_contents_free(file_contents);
+  iree_io_file_contents_free(file_contents);
   iree_hal_executable_cache_release(executable_cache);
   iree_hal_device_release(device);
   iree_vm_instance_release(instance);

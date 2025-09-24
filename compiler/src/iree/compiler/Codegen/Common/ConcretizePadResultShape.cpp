@@ -4,9 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -134,11 +133,11 @@ class ConcretizePadResultShapePass final
 public:
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
 
     ConfigTrackingListener listener;
     GreedyRewriteConfig config;
-    config.listener = &listener;
+    config.setListener(&listener);
 
     {
       RewritePatternSet patterns(context);
@@ -166,10 +165,10 @@ void populateConcretizePadResultShapePatterns(RewritePatternSet &patterns,
   // Pulling in upstream scf.for and affine.min canonicalization patterns.
   // They work on tiled (but not distributed) loops.
   scf::populateSCFForLoopCanonicalizationPatterns(patterns);
-  // Pulling in flow.dispatch.tensor.load op canonicalization patterns.
-  // Tiling can generate dim ops taking them as operands.
-  IREE::Flow::DispatchTensorLoadOp::getCanonicalizationPatterns(patterns,
-                                                                context);
+  // Pulling in iree_tensor_ext.dispatch.tensor.load op canonicalization
+  // patterns. Tiling can generate dim ops taking them as operands.
+  IREE::TensorExt::DispatchTensorLoadOp::getCanonicalizationPatterns(patterns,
+                                                                     context);
   // Pull in tensor dialect canonicalization patterns to fold tensor.cast
   // into producers when possible.
   context->getLoadedDialect<tensor::TensorDialect>()

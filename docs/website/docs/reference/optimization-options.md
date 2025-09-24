@@ -92,6 +92,37 @@ overridden.
 
 ## High level program optimizations
 
+### Data-Tiling (`--iree-opt-data-tiling` (off))
+
+Modifies data layout of operands for certain operations, such as matrix
+multiplication, that prefer specifics layouts. These layout preferences depend
+on the operations and the target hardware.
+
+The layout changes can be propagated as far as possible across the workload, so
+the entire workload can use the updated layouts, as opposed to having to perform
+layout transformations at runtime. This may involve fusions or
+constant-evaluation that can amortize or remove layout-transformation overheads.
+
+Data-tiling is an optional optimization technique, and it is not supported by
+all backends. Any backend does not develop data-tiling may result in worse
+performance if it is enabled. The targets that support data-tiling are:
+
+* CPU (x86)
+* CPU (AArch64)
+* CPU (RISC-V)
+* GPU (ROCm)
+* VMVX
+
+See the [blog post](https://iree.dev/community/blog/2025-08-25-data-tiling-walkthrough/)
+to learn more about details.
+
+!!! question - "Something missing or broken?"
+
+    Don't see the target here that you think should be? Reach out to [our
+    data-tiling Discord channel](https://discord.com/channels/689900678990135345/1254843174111678555);
+    we welcome contributions on
+    [our GitHub page](https://github.com/iree-org/iree)!
+
 ### Constant evaluation (`--iree-opt-const-eval` (on))
 
 Performs compile-time evaluation of any global initializers which produce
@@ -104,7 +135,7 @@ functions, not free-standing operations in the program which may produce
 constant-derived results. See `--iree-opt-const-expr-hoisting` for options to
 optimize these.
 
-### Constant expression hoisting (`--iree-opt-const-expr-hoisting` (off))
+### Constant expression hoisting (`--iree-opt-const-expr-hoisting` (on))
 
 Identifies all trees of constant expressions in the program and uses a
 heuristic to determine which would be profitable to hoist into global

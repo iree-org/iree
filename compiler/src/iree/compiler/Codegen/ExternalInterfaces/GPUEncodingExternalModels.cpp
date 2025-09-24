@@ -5,14 +5,19 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //===- GPUEncodingExternalModels.cpp --------------------------------------===//
 //
-// This file implements the IREE::Codegen::LayoutAttrInterface and
-// IREE::Encoding::EncodingLayoutResolverAttrInterface for GPU backends.
+// This file implements the following interfaces for GPU backends:
+//
+// - IREE::Encoding::LayoutResolverAttr
+// - IREE::Encoding::SerializableAttr
+// - IREE::Encoding::LayoutMaterializerAttr
+// - IREE::Codegen::PackedLayoutMaterializerAttr
+//
 // Different from CPU backends, we do not transpose narrow-N to narrow-M for a
 // combination of reasons:
 //
-//   1. As linalg.matmul materializes into iree_gpu.multi_mma, which inherits
-//      its semantics from the wrapped intrinsic, we can't rely on any kind of
-//      LHS<->RHS symmetry.
+//   1. As linalg.matmul materializes into iree_codegen.inner_tiled, which
+//      inherits its semantics from the wrapped intrinsic, we can't rely on any
+//      kind of LHS<->RHS symmetry.
 //   2. We do not currently use ukernels, which would be one of the main areas
 //      to benefit from transposeNarrowN.
 //   3. Heuristics for cache-friendly dispatch tiling are internal to the GPU
@@ -23,6 +28,7 @@
 #include "iree/compiler/Codegen/ExternalInterfaces/GPUEncodingExternalModels.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
@@ -33,7 +39,8 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
-#include "llvm/Support/Debug.h"
+#include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 
@@ -42,12 +49,12 @@
 #include <cstdint>
 #include <numeric>
 
-#define DEBUG_TYPE "iree-gpu-encoding-external-models"
+#define DEBUG_TYPE "iree-codegen-materialize-encoding"
 
 namespace mlir::iree_compiler::IREE::GPU {
 
-using Codegen::MaterializeEncodingInfo;
-using Codegen::TileMxNxK;
+using IREE::Codegen::MaterializeEncodingInfo;
+using IREE::Codegen::TileMxNxK;
 
 namespace {
 
@@ -76,10 +83,25 @@ static MMAAttr chooseIntrinsicMMAAttr(TypeRange eTypes, TargetWgpAttr wgp) {
 
 static DataTiledMMAAttr
 chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
-                       Encoding::EncodingAttr encoding) {
+                       IREE::Encoding::EncodingAttr encoding,
+                       GPUEncodingResolverAttr resolver) {
   if (!target) {
     return {};
   }
+  // First try finding a data-tiled MMA layout through the ukernel provider if
+  // one can be found in the config. The ukernel provider is only available in
+  // case ukernels are enabled, so we're sure we want to override the default
+  // logic.
+  DictionaryAttr config = resolver.getConfiguration();
+  if (IREE::Codegen::UKernelProviderInterface provider =
+          getUKernelProviderFromTarget(config)) {
+    auto mma = dyn_cast_if_present<IREE::GPU::DataTiledMMAAttr>(
+        provider.getDataLayoutForUKernel(encoding, config));
+    if (mma) {
+      return mma;
+    }
+  }
+
   MLIRContext *ctx = target.getContext();
   IREE::GPU::TargetWgpAttr wgp = target.getWgp();
   if (!wgp.getMaxLoadInstructionBits() || !wgp.getVgprSpaceBits() ||
@@ -203,7 +225,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   // TODO(#18850): dealing with narrow cases as a fix-up is suboptimal.
   //
   IREE::Encoding::MatmulNarrowDim narrowDim =
-      IREE::Encoding::getMatmulNarrowDim(encoding);
+      IREE::Encoding::getPo2MatmulNarrowDim(encoding);
   if (narrowDim.isM()) {
     intrinsicsM =
         std::min(intrinsicsM,
@@ -225,10 +247,15 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
                                intrinsicsK);
 }
 
-static Operation *lowerContractionOpToMultiMmaOp(OpBuilder &builder,
-                                                 linalg::LinalgOp linalgOp,
-                                                 ValueRange operands,
-                                                 TargetAttr targetAttr) {
+static Operation *
+lowerContractionOpToMultiMmaOp(OpBuilder &builder, linalg::LinalgOp linalgOp,
+                               ValueRange operands,
+                               GPUEncodingResolverAttr resolver) {
+  IREE::GPU::TargetAttr targetAttr =
+      getGPUTargetAttr(resolver.getConfiguration());
+  if (!targetAttr) {
+    return nullptr;
+  }
   if (!linalgOp.hasPureTensorSemantics()) {
     return nullptr;
   }
@@ -261,13 +288,14 @@ static Operation *lowerContractionOpToMultiMmaOp(OpBuilder &builder,
     return nullptr;
   }
 
-  IREE::GPU::DataTiledMMAAttr mma = chooseDataTiledMMAAttr(
-      resultEncoding.getElementTypesArray(), targetAttr, resultEncoding);
+  IREE::GPU::DataTiledMMAAttr mma =
+      chooseDataTiledMMAAttr(resultEncoding.getElementTypesArray(), targetAttr,
+                             resultEncoding, resolver);
   if (!mma) {
-    LLVM_DEBUG(llvm::dbgs() << "expect encodings on operand types\n");
+    LDBG() << "expect encodings on operand types";
     return nullptr;
   }
-  LLVM_DEBUG(llvm::dbgs() << "Target MMA: " << mma << "\n");
+  LDBG() << "Target MMA: " << mma;
 
   MLIRContext *ctx = builder.getContext();
   SmallVector<AffineExpr> lhsExprs, rhsExprs, accExprs;
@@ -295,23 +323,24 @@ static Operation *lowerContractionOpToMultiMmaOp(OpBuilder &builder,
       linalgOp.getIteratorTypesArray();
 
   Location loc = linalgOp.getLoc();
-  Operation *mmaOp = builder.create<MultiMmaOp>(
-      loc, operands[0], operands[1], operands[2],
+  Operation *mmaOp = Codegen::InnerTiledOp::create(
+      builder, loc, operands.take_front(inputs.size()),
+      operands.take_back(outputs.size()),
       ArrayRef<AffineMap>{lhsMap, rhsMap, accMap}, iteratorTypes, mma);
   return mmaOp;
 }
 
-struct GPUDeviceEncodingLayoutResolverAttrInterface
-    : public DeviceEncodingLayoutResolverExternalModelBase<
-          GPUDeviceEncodingLayoutResolverAttrInterface, GPUEncodingLayoutAttr> {
+struct GPUEncodingPackedLayoutMaterializerAttr
+    : public PackedLayoutMaterializerAttrExternalModelBase<
+          GPUEncodingPackedLayoutMaterializerAttr, GPUEncodingResolverAttr> {
   DictionaryAttr getConfiguration(Attribute attr) const {
-    return cast<GPUEncodingLayoutAttr>(attr).getConfiguration();
+    return cast<GPUEncodingResolverAttr>(attr).getConfiguration();
   }
 
   MaterializeEncodingInfo getEncodingInfoImpl(Attribute attr,
                                               RankedTensorType type) const {
-    auto layoutAttr = cast<GPUEncodingLayoutAttr>(attr);
-    DictionaryAttr config = layoutAttr.getConfiguration();
+    auto resolver = cast<GPUEncodingResolverAttr>(attr);
+    DictionaryAttr config = resolver.getConfiguration();
 
     auto encoding = llvm::dyn_cast_or_null<IREE::Encoding::EncodingAttr>(
         type.getEncoding());
@@ -325,8 +354,9 @@ struct GPUDeviceEncodingLayoutResolverAttrInterface
     if (!gpuAttr) {
       return info;
     }
+
     DataTiledMMAAttr mma = chooseDataTiledMMAAttr(
-        encoding.getElementTypesArray(), gpuAttr, encoding);
+        encoding.getElementTypesArray(), gpuAttr, encoding, resolver);
     if (!mma) {
       return info;
     }
@@ -343,7 +373,7 @@ struct GPUDeviceEncodingLayoutResolverAttrInterface
     info = std::move(maybeEncodingInfo.value());
     auto fragment = static_cast<IREE::GPU::MMAFragment>(
         encoding.getOperandIndex().getInt());
-    FailureOr<Codegen::TileSwizzle> maybeSwizzle =
+    FailureOr<IREE::Codegen::TileSwizzle> maybeSwizzle =
         getEncodingSwizzle(encoding, mma, fragment);
     if (failed(maybeSwizzle)) {
       return info;
@@ -351,64 +381,86 @@ struct GPUDeviceEncodingLayoutResolverAttrInterface
     info.swizzle = std::move(maybeSwizzle.value());
     return info;
   }
+};
 
+struct GPUEncodingResolverMaterializerAttr
+    : public EncodingLayoutMaterializerAttrExternalModelBase<
+          GPUEncodingResolverMaterializerAttr, GPUEncodingResolverAttr> {
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
                      ValueRange convertedOperands) const {
-    auto layoutAttr = cast<GPUEncodingLayoutAttr>(attr);
+    auto resolverAttr = cast<GPUEncodingResolverAttr>(attr);
     auto linalgOp = llvm::dyn_cast<linalg::LinalgOp>(op);
     if (!linalgOp) {
       return nullptr;
     }
-    DictionaryAttr config = layoutAttr.getConfiguration();
-    IREE::GPU::TargetAttr gpuAttr = getGPUTargetAttr(config);
-    if (!gpuAttr) {
-      return nullptr;
-    }
     return lowerContractionOpToMultiMmaOp(b, linalgOp, convertedOperands,
-                                          gpuAttr);
+                                          resolverAttr);
   }
 };
 
-struct GPUHostSerializableEncodingAttrInterface final
-    : IREE::Encoding::SerializableEncodingAttrInterface::ExternalModel<
-          GPUHostSerializableEncodingAttrInterface, GPUEncodingLayoutAttr> {
+struct GPUSerializableAttr final
+    : IREE::Encoding::SerializableAttr::ExternalModel<GPUSerializableAttr,
+                                                      GPUEncodingResolverAttr> {
+  bool isSerialized(Attribute attr) const {
+    auto configuration = cast<GPUEncodingResolverAttr>(attr).getConfiguration();
+    return configuration && configuration.contains(kEncodingInfoAttrName);
+  }
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
                                     ValueRange dynamicDims) const {
-    return calculateStorageSizeInBytesImpl(attr, loc, builder, type,
-                                           dynamicDims);
+    return calculatePackedStorageSizeInBytesImpl(attr, loc, builder, type,
+                                                 dynamicDims);
   }
 };
 
-struct GPUHostEncodingLayoutResolverAttrInterface final
-    : IREE::Encoding::EncodingLayoutResolverAttrInterface::ExternalModel<
-          GPUHostEncodingLayoutResolverAttrInterface, GPUEncodingLayoutAttr> {
+struct GPULayoutResolverAttr final
+    : IREE::Encoding::LayoutResolverAttr::ExternalModel<
+          GPULayoutResolverAttr, GPUEncodingResolverAttr> {
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
     SmallVector<NamedAttribute> configItems;
     DictionaryAttr existingConfig =
-        cast<GPUEncodingLayoutAttr>(attr).getConfiguration();
+        cast<GPUEncodingResolverAttr>(attr).getConfiguration();
     if (existingConfig) {
       configItems.append(existingConfig.getValue().begin(),
                          existingConfig.getValue().end());
     }
-    storeNamedAttrIfPresent(configItems, config, kGPUTargetAttrName);
-    return GPUEncodingLayoutAttr::get(ctx,
-                                      DictionaryAttr::get(ctx, configItems));
+    if (IREE::GPU::TargetAttr targetAttr = getGPUTargetAttr(config)) {
+      addConfigGPUTarget(ctx, targetAttr, configItems);
+    }
+    // Pass along the ukernel provider if one has been provided, so we can use
+    // it to choose the data tiling layouts.
+    if (IREE::Codegen::UKernelProviderInterface ukernelProvider =
+            getUKernelProviderFromTarget(config)) {
+      configItems.emplace_back(StringAttr::get(ctx, kUKernelProviderName),
+                               ukernelProvider);
+    }
+    return GPUEncodingResolverAttr::get(ctx,
+                                        DictionaryAttr::get(ctx, configItems));
   }
 
   Attribute getLayout(Attribute attr, RankedTensorType type) const {
     MLIRContext *ctx = attr.getContext();
-    return GPUEncodingLayoutAttr::get(ctx, getLayoutImpl(attr, type));
+    return GPUEncodingResolverAttr::get(ctx, getPackedLayoutImpl(attr, type));
   }
 };
 
-struct GPUPadEncodingLayoutResolverAttrInterface final
-    : Encoding::EncodingLayoutResolverAttrInterface::ExternalModel<
-          GPUPadEncodingLayoutResolverAttrInterface, GPUPadLayoutAttr> {
+struct GPUPadEncodingLayoutMaterializerAttr final
+    : IREE::Encoding::LayoutMaterializerAttr::ExternalModel<
+          GPUPadEncodingLayoutMaterializerAttr, GPUPaddingResolverAttr> {
+  Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
+                     TypeRange convertedResTypes,
+                     ValueRange convertedOperands) const {
+    return clone(b, op, convertedResTypes, convertedOperands);
+  }
+};
+
+struct GPUPadLayoutResolverAttr final
+    : IREE::Encoding::LayoutResolverAttr::ExternalModel<
+          GPUPadLayoutResolverAttr, GPUPaddingResolverAttr> {
   Attribute cloneWithSimplifiedConfig(Attribute attr,
                                       DictionaryAttr config) const {
     MLIRContext *ctx = attr.getContext();
@@ -416,82 +468,58 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
     std::optional<IREE::GPU::L1CacheInfo> cache =
         IREE::GPU::getL1CacheInfo(gpuTarget);
     if (!cache) {
-      return IREE::Encoding::IdentityEncodingAttr::get(ctx);
+      return GPUPaddingResolverAttr::get(ctx, std::nullopt, std::nullopt);
     }
-    return GPUPadLayoutAttr::get(ctx, cache->cacheLineBytes, cache->cacheSets);
+    return GPUPaddingResolverAttr::get(ctx, cache->cacheLineBytes,
+                                       cache->cacheSets);
   }
 
   Attribute getLayout(Attribute attr, RankedTensorType type) const {
     MLIRContext *ctx = attr.getContext();
-    auto padLayoutAttr = cast<GPUPadLayoutAttr>(attr);
-    auto encodingAttr = cast<Encoding::EncodingAttr>(type.getEncoding());
+    auto gpuPadLayoutAttr = cast<GPUPaddingResolverAttr>(attr);
 
-    const int64_t rank = type.getRank();
+    int64_t rank = type.getRank();
     auto noPaddingAttr =
-        Encoding::PadEncodingLayoutAttr::getIdentityAttr(ctx, rank);
-    if (encodingAttr.getOpType().getValue() !=
-        IREE::Encoding::EncodingOpType::matmul) {
-      // We only support simple matmuls for now.
+        IREE::Encoding::PaddingAttr::getIdentityAttr(ctx, rank);
+    if (!gpuPadLayoutAttr.getCacheLineBytes() ||
+        !gpuPadLayoutAttr.getCacheSets()) {
       return noPaddingAttr;
     }
 
-    if (!padLayoutAttr.getCacheLineBytes() || !padLayoutAttr.getCacheSets()) {
-      return noPaddingAttr;
+    auto paddingEncodingAttr =
+        dyn_cast_or_null<IREE::Encoding::PaddingAttr>(type.getEncoding());
+    if (!paddingEncodingAttr) {
+      return nullptr;
     }
 
-    const int64_t operandIndex = encodingAttr.getOperandIndex().getInt();
-    if (!llvm::is_contained({0, 1}, operandIndex)) {
-      // We only have to pad matmul operands.
-      return noPaddingAttr;
+    // If all the padding values are already static, just return the padding
+    // attribute as is.
+    ArrayRef<int64_t> givenPadValues =
+        paddingEncodingAttr.getPadding().asArrayRef();
+    if (llvm::none_of(givenPadValues, ShapedType::isDynamic)) {
+      return paddingEncodingAttr;
     }
 
-    // We only support simple matmuls for now. Filter out everything that
-    // does not have a simple row-major access pattern with a single static
-    // reduction dimension.
-    FailureOr<linalg::ContractionDimensions> contractionDims =
-        Encoding::getEncodingContractionDims(encodingAttr);
-    if (failed(contractionDims) || contractionDims->k.size() != 1) {
-      return noPaddingAttr;
+    // Currently only support case where the
+    // - innermost padding dimension is dynamic
+    // - all other padding values are zero.
+    if (llvm::any_of(givenPadValues.drop_back(),
+                     [](int64_t val) { return val != 0; }) ||
+        givenPadValues.back() != ShapedType::kDynamic) {
+      return nullptr;
     }
 
-    std::optional<unsigned> padDimensionIndex =
-        encodingAttr.mapDimToOperandIndex(contractionDims->k[0]);
-    if (!padDimensionIndex || padDimensionIndex != rank - 1) {
-      return noPaddingAttr;
+    if (rank != givenPadValues.size()) {
+      return nullptr;
     }
-    ArrayRef<int64_t> shape = type.getShape();
-    if (ShapedType::isDynamic(shape[*padDimensionIndex])) {
-      return noPaddingAttr;
-    }
-
-    // Bail out on matvec / vecmat and skinny matmul problems.
-    {
-      int64_t parallelDimSize = 1;
-      ArrayRef<unsigned> parallelDims =
-          (operandIndex == 0) ? contractionDims->m : contractionDims->n;
-      for (unsigned parallelDim : parallelDims) {
-        if (std::optional<unsigned> dimIdx =
-                encodingAttr.mapDimToOperandIndex(parallelDim)) {
-          int64_t dimSize = shape[*dimIdx];
-          if (ShapedType::isDynamic(dimSize)) {
-            parallelDimSize = ShapedType::kDynamic;
-            break;
-          }
-          parallelDimSize *= dimSize;
-        }
-      }
-
-      // TODO(#19897): Use `getMatmulNarrowDim`.
-      static constexpr int64_t kSkinnyMatmulThreshold = 64;
-      if (!ShapedType::isDynamic(parallelDimSize) &&
-          parallelDimSize < kSkinnyMatmulThreshold) {
-        // This matmul is skinny, do not pad.
-        return noPaddingAttr;
-      }
+    // TODO: Support dynamic shape of the inner tensor size.
+    ArrayRef<int64_t> tensorShape = type.getShape();
+    if (tensorShape.back() == ShapedType::kDynamic) {
+      return nullptr;
     }
 
     const int64_t elementBits = type.getElementTypeBitWidth();
-    const int64_t cacheLineBytes = *padLayoutAttr.getCacheLineBytes();
+    const int64_t cacheLineBytes = *gpuPadLayoutAttr.getCacheLineBytes();
     if (elementBits % 8 != 0 || elementBits > cacheLineBytes) {
       // We do not support unaligned element types.
       return noPaddingAttr;
@@ -502,9 +530,8 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
     // cache line, but not a multiple of cache line * cache sets. This way the
     // next 'row' will start at a different cache set.
     const int64_t cacheSetSpanBytes =
-        *padLayoutAttr.getCacheSets() * cacheLineBytes;
-    const int64_t dimSizeInBytes =
-        type.getDimSize(*padDimensionIndex) * (elementBits / 8);
+        *gpuPadLayoutAttr.getCacheSets() * cacheLineBytes;
+    const int64_t dimSizeInBytes = tensorShape.back() * (elementBits / 8);
     if (dimSizeInBytes < cacheSetSpanBytes) {
       // Very small dimension, leave as-is.
       return noPaddingAttr;
@@ -525,10 +552,10 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
     assert((dimSizeInBytes + padBytes) % cacheLineBytes == 0 &&
            "Incorrect pad amount");
     assert(padBytes < cacheSetSpanBytes && "Incorrect pad amount");
-    const int64_t numPadElements = (padBytes * 8) / elementBits;
-    SmallVector<int32_t> padValues(rank, 0);
-    padValues[*padDimensionIndex] = numPadElements;
-    auto padLayout = Encoding::PadEncodingLayoutAttr::get(ctx, padValues);
+    int64_t numPadElements = (padBytes * 8) / elementBits;
+    SmallVector<int64_t> padValues(rank, 0);
+    padValues.back() = numPadElements;
+    auto padLayout = IREE::Encoding::PaddingAttr::get(ctx, padValues);
     return padLayout;
   }
 };
@@ -536,15 +563,15 @@ struct GPUPadEncodingLayoutResolverAttrInterface final
 } // namespace
 
 void registerGPUEncodingExternalModels(DialectRegistry &registry) {
-  registry.addExtension(
-      +[](MLIRContext *ctx, IREE::GPU::IREEGPUDialect *dialect) {
-        IREE::GPU::GPUEncodingLayoutAttr::attachInterface<
-            GPUDeviceEncodingLayoutResolverAttrInterface,
-            GPUHostEncodingLayoutResolverAttrInterface,
-            GPUHostSerializableEncodingAttrInterface>(*ctx);
-        IREE::GPU::GPUPadLayoutAttr::attachInterface<
-            GPUPadEncodingLayoutResolverAttrInterface>(*ctx);
-      });
+  registry.addExtension(+[](MLIRContext *ctx,
+                            IREE::GPU::IREEGPUDialect *dialect) {
+    IREE::GPU::GPUEncodingResolverAttr::attachInterface<
+        GPUEncodingPackedLayoutMaterializerAttr,
+        GPUEncodingResolverMaterializerAttr, GPULayoutResolverAttr,
+        GPUSerializableAttr>(*ctx);
+    IREE::GPU::GPUPaddingResolverAttr::attachInterface<
+        GPUPadEncodingLayoutMaterializerAttr, GPUPadLayoutResolverAttr>(*ctx);
+  });
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU

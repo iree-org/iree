@@ -158,15 +158,19 @@ static iree_status_t iree_hal_loader_module_try_load(
       // Loader definitely can't handle the executable; no use trying so skip.
       continue;
     }
-    // The loader _may_ handle the executable; if the specific executable is not
-    // supported then the try will fail with IREE_STATUS_CANCELLED and we should
-    // continue trying other loaders.
+    // The loader _may_ handle the executable.
+    // If the specific executable is present but not supported then the try will
+    // fail with IREE_STATUS_CANCELLED and if and if the executable is not
+    // registered with the loader then it will fail with IREE_STATUS_NOT_FOUND.
+    // In either of those cases we continue trying to find a loader that can
+    // provide the executable.
     iree_status_t status = iree_hal_executable_loader_try_load(
         loader, executable_params, /*worker_capacity=*/1, out_executable);
     if (iree_status_is_ok(status)) {
       // Executable was successfully loaded.
       return status;
-    } else if (!iree_status_is_cancelled(status)) {
+    } else if (!iree_status_is_cancelled(status) &&
+               !iree_status_is_not_found(status)) {
       // Error beyond just the try failing due to unsupported formats.
       return status;
     }
@@ -229,7 +233,7 @@ typedef struct {
   union {
     struct {
       iree_vm_ref_t executable;
-      int32_t entry_point;
+      iree_hal_executable_export_ordinal_t export_ordinal;
       int32_t workgroup_x;
       int32_t workgroup_y;
       int32_t workgroup_z;
@@ -294,7 +298,7 @@ static iree_status_t iree_hal_loader_module_executable_dispatch(
   iree_byte_span_t local_memory = iree_byte_span_empty();
 
   return iree_hal_local_executable_issue_dispatch_inline(
-      (iree_hal_local_executable_t*)executable, args->entry_point,
+      (iree_hal_local_executable_t*)executable, args->export_ordinal,
       &dispatch_state, processor_id, local_memory);
 }
 

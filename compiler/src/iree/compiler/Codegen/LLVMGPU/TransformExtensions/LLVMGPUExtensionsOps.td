@@ -341,7 +341,7 @@ def VectorToMMAConversionOp : Op<Transform_Dialect, "iree.vector.vector_to_mma_c
      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     This converts slices of operations containing vector.contract op into
-    mma operations, targetting warp level tensorcore operations. If the vector
+    mma operations, targeting warp level tensorcore operations. If the vector
     operations are bigger than the native mma size it will first split up those
     vector operations.
 
@@ -559,10 +559,6 @@ def ReorderTransposeOp :
   let assemblyFormat = [{ $target attr-dict `:` functional-type(operands, results)}];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
-  let builders = [
-    OpBuilder<(ins "Value":$target)>
-  ];
-
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
@@ -615,7 +611,7 @@ def PackSharedMemoryAllocOp :  Op<Transform_Dialect, "iree.pack_shared_memory_al
      TransformEachOpTrait,
      TransformOpInterface,
      ReportTrackingListenerFailuresOpTrait]> {
-  let summary = "Pack shared memory allocation to reduce memory usage";
+  let summary = [{Pack shared memory allocation to reduce memory usage.}];
   let description = [{
     Looks for allocs in shared memory space with overlapping liveness and
     groups them, then packs all the allocations in each group into one i8

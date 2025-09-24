@@ -82,9 +82,10 @@ static LogicalResult checkGPUAllocationSize(
     cumSize += allocSize / 8;
   }
   if (cumSize > limit) {
-    return funcOp.emitOpError("uses ")
-           << cumSize << " bytes of shared memory; exceeded the limit of "
-           << limit << " bytes";
+    return emitError(funcOp->getLoc())
+           << "function '" << funcOp.getName() << "' uses " << cumSize
+           << " bytes of shared memory; exceeded the limit of " << limit
+           << " bytes";
   }
   return success();
 }

@@ -67,8 +67,8 @@ void mlir::iree_compiler::Reducer::reduceLinalgOnTensorsDelta(
   for (auto linalgOp : keepOps) {
     builder.setInsertionPointAfter(linalgOp);
     for (Value result : linalgOp->getResults()) {
-      builder.create<IREE::Util::OptimizationBarrierOp>(linalgOp.getLoc(),
-                                                        result);
+      IREE::Util::OptimizationBarrierOp::create(builder, linalgOp.getLoc(),
+                                                result);
     }
   }
 
@@ -106,13 +106,11 @@ void mlir::iree_compiler::Reducer::reduceLinalgOnTensorsDelta(
     Type elType = outType.getElementType();
     // Build a constant 0 of the type.
     builder.setInsertionPoint(linalgOp);
-    auto zero = builder
-                    .create<arith::ConstantOp>(linalgOp.getLoc(),
-                                               builder.getZeroAttr(elType))
-                    .getResult();
+    Value zero = arith::ConstantOp::create(builder, linalgOp.getLoc(),
+                                           builder.getZeroAttr(elType));
 
     // Build linalg.fill for this out.
-    newOut = builder.create<linalg::FillOp>(linalgOp.getLoc(), zero, init)
+    newOut = linalg::FillOp::create(builder, linalgOp.getLoc(), zero, init)
                  .getResult(0);
 
     out.replaceAllUsesWith(newOut);

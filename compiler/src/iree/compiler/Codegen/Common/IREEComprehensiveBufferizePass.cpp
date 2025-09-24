@@ -11,9 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
@@ -66,7 +66,7 @@ static FailureOr<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
       type = MemRefType::get(type.getShape(), type.getElementType(),
                              type.getLayout());
   }
-  return builder.create<memref::AllocOp>(loc, type, dynamicSizes).getResult();
+  return memref::AllocOp::create(builder, loc, type, dynamicSizes).getResult();
 }
 static LogicalResult defaultMemCpyFn(OpBuilder &builder, Location loc,
                                      Value from, Value to) {
@@ -79,7 +79,12 @@ class EliminateEmptyTensorsPass final
     : public impl::EliminateEmptyTensorsPassBase<EliminateEmptyTensorsPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect, tensor::TensorDialect>();
+    // BufferizationDialect is needed for using type interfaces, like
+    // TensorLikeType. Because the builtin types, e.g., RankedTensorType, etc.,
+    // implement the type interface in
+    // bufferization::BufferizationDialect::initialize().
+    registry
+        .insert<bufferization::BufferizationDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override;
@@ -90,8 +95,7 @@ class IREEComprehensiveBufferizePass final
     : public impl::IREEComprehensiveBufferizePassBase<
           IREEComprehensiveBufferizePass> {
 public:
-  using impl::IREEComprehensiveBufferizePassBase<
-      IREEComprehensiveBufferizePass>::IREEComprehensiveBufferizePassBase;
+  using Base::Base;
   explicit IREEComprehensiveBufferizePass(
       BufferizationOptions::AllocationFn allocationFn,
       BufferizationOptions::MemCpyFn memCpyFn)
@@ -106,7 +110,6 @@ public:
                 bufferization::BufferizationDialect,
                 func::FuncDialect,
                 gpu::GPUDialect,
-                IREE::Flow::FlowDialect,
                 IREE::LinalgExt::IREELinalgExtDialect,
                 IREE::Util::UtilDialect,
                 linalg::LinalgDialect,
@@ -128,8 +131,7 @@ private:
 class IREEBufferizeConstantsPass final
     : public impl::IREEBufferizeConstantsPassBase<IREEBufferizeConstantsPass> {
 public:
-  using impl::IREEBufferizeConstantsPassBase<
-      IREEBufferizeConstantsPass>::IREEBufferizeConstantsPassBase;
+  using Base::Base;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, bufferization::BufferizationDialect,
                     memref::MemRefDialect>();
@@ -142,24 +144,20 @@ public:
 static IREEOneShotBufferizationOptions getBufferizationOptions() {
   IREEOneShotBufferizationOptions options;
 
-  // bufferization.to_memref is used to bufferize constants in IREE. IREE has
+  // bufferization.to_buffer is used to bufferize constants in IREE. IREE has
   // it's own logic to handle constants. We'd like to leave the arith.constant
-  // as is and insert bufferization.to_memref to convert the tensor to memref.
+  // as is and insert bufferization.to_buffer to convert the tensor to memref.
   options.opFilter.denyOperation<arith::ConstantOp>();
-  options.opFilter.denyOperation<bufferization::ToMemrefOp>();
 
   // This type converter converts tensor types to memref types when no exact
   // memref type can be inferred from the context.
-  options.unknownTypeConverterFn = [](Value value, Attribute memorySpace,
+  options.unknownTypeConverterFn = [](TensorType tensorType,
+                                      Attribute memorySpace,
                                       const BufferizationOptions &options) {
-    auto tensorType = llvm::cast<TensorType>(value.getType());
-
-    // Special rule for ConstantOps: These always lower to some memref with a
-    // static identity layout.
-    if (value.getDefiningOp<arith::ConstantOp>())
+    if (tensorType.hasStaticShape()) {
       return bufferization::getMemRefTypeWithStaticIdentityLayout(tensorType,
                                                                   memorySpace);
-
+    }
     // Default case: Fully dynamic layout map for best compatibility.
     return bufferization::getMemRefTypeWithFullyDynamicLayout(tensorType,
                                                               memorySpace);
@@ -184,7 +182,7 @@ eliminateEmptyTensors(RewriterBase &rewriter, Operation *op,
 }
 
 void EliminateEmptyTensorsPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   MLIRContext *context = &getContext();
 
   OpBuilder b(context);
@@ -206,7 +204,13 @@ void EliminateEmptyTensorsPass::runOnOperation() {
     }
   }
 
+  // iree_codegen.store_to_buffer may consumer reshape operands that got stuck
+  // at the end of the funcOp, which will prevent the SubsetInsertionOpInterface
+  // implementation from eliminating empty tensors. Push up these reshape ops
+  // as far as possible to prevent the reshapes from blocking empty tensor
+  // elimination.
   IRRewriter rewriter(funcOp->getContext());
+  moveUpMemrefReshapeOps(rewriter, funcOp);
   auto bufferizationOptions = getBufferizationOptions();
   OneShotAnalysisState state(funcOp, bufferizationOptions);
   // Analyze IR.
@@ -221,18 +225,19 @@ void EliminateEmptyTensorsPass::runOnOperation() {
 // modifications.
 LogicalResult
 runIREEOneShotBufferize(Operation *op,
-                        const IREEOneShotBufferizationOptions &options) {
-  OneShotAnalysisState state(op, options);
-  if (failed(analyzeOp(op, state)))
+                        const IREEOneShotBufferizationOptions &options,
+                        bufferization::BufferizationState &state) {
+  OneShotAnalysisState analyzeState(op, options);
+  if (failed(analyzeOp(op, analyzeState)))
     return failure();
   if (options.testAnalysisOnly)
     return success();
-  return bufferization::runOneShotBufferize(op, options);
+  return bufferization::runOneShotBufferize(op, options, state);
 }
 
 /// Run comprehensive bufferize.
 void IREEComprehensiveBufferizePass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   IREEOneShotBufferizationOptions options = getBufferizationOptions();
   options.testAnalysisOnly = testAnalysisOnly;
   options.printConflicts = printConflicts;
@@ -244,9 +249,22 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   // data races on GPU.
   options.checkParallelRegions = false;
 
-  if (failed(runIREEOneShotBufferize(funcOp, options))) {
+  bufferization::BufferizationState bufferizationState;
+  if (failed(runIREEOneShotBufferize(funcOp, options, bufferizationState))) {
     return signalPassFailure();
   }
+
+  // All to_buffer ops on single use constants will have already had any
+  // write conflicts resolved by the analysis, so we can safely mark them as
+  // read only.
+  funcOp->walk([](bufferization::ToBufferOp toBuffer) {
+    if (auto constant =
+            toBuffer.getTensor().getDefiningOp<arith::ConstantOp>()) {
+      if (constant->hasOneUse()) {
+        toBuffer.setReadOnly(true);
+      }
+    }
+  });
 
   // Remove redundant args and unused results.
   {
@@ -262,9 +280,10 @@ void IREEBufferizeConstantsPass::runOnOperation() {
   mlir::bufferization::OneShotBufferizationOptions opt;
   opt.copyBeforeWrite = true;
   opt.opFilter.allowOperation(arith::ConstantOp::getOperationName());
-  if (failed(
-          mlir::bufferization::runOneShotBufferize(getOperation(), opt,
-                                                   /*statistics=*/nullptr))) {
+  bufferization::BufferizationState bufferizationState;
+  if (failed(mlir::bufferization::runOneShotBufferize(
+          getOperation(), opt, bufferizationState,
+          /*statistics=*/nullptr))) {
     signalPassFailure();
     return;
   }
@@ -283,13 +302,14 @@ createIREEComprehensiveBufferizePass(
 }
 
 void addIREEPostBufferizationPasses(OpPassManager &funcPassManager) {
+  funcPassManager.addPass(createIREEInjectAssumeAlignmentPass());
   funcPassManager.addPass(memref::createResolveShapedTypeResultDimsPass());
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createIREECodegenCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   // There are redundant memcpy (with linalg.generic form) ops created, which
   // can be deleted by canonicalizer. We have to run it again because the
   // memrefs are unified in CSE pass, so we can truely remove redundant memcpy.
-  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createIREECodegenCanonicalizerPass());
   funcPassManager.addPass(createCleanupBufferAllocViewPass());
 }
 

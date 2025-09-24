@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <optional>
 
-#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
+#include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -162,7 +162,7 @@ struct NarrowFillPattern : public OpRewritePattern<Op> {
 
     // Replace the pattern on the op with the new one.
     auto narrowValue =
-        rewriter.create<arith::ConstantOp>(fillOp.getLoc(), newPatternAttr);
+        arith::ConstantOp::create(rewriter, fillOp.getLoc(), newPatternAttr);
     rewriter.modifyOpInPlace(
         fillOp, [&]() { fillOp.getValueMutable().assign(narrowValue); });
     return success();
@@ -507,10 +507,158 @@ void ResourceAllocOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.resource.alloca
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+// Elides transient allocations that have no uses of their resource.
+// This sometimes arises when operations that were using the resource are
+// DCEd by other patterns or passes. The ElideAllocaDeallocaOp pattern will be
+// used after deallocations have been inserted but prior to that point this
+// pattern allows for more eager removal of unused allocations.
+struct ElideUnusedAllocaOp : public OpRewritePattern<ResourceAllocaOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(ResourceAllocaOp allocaOp,
+                                PatternRewriter &rewriter) const override {
+    if (!allocaOp.getResult().use_empty()) {
+      return failure(); // >= 1 user
+    }
+    Value newTimepoint = allocaOp.getAwaitTimepoint();
+    if (!newTimepoint) {
+      newTimepoint = IREE::Stream::TimepointImmediateOp::create(
+          rewriter, allocaOp.getLoc());
+    }
+    rewriter.replaceAllUsesWith(allocaOp.getResultTimepoint(), newTimepoint);
+    rewriter.eraseOp(allocaOp);
+    return success();
+  }
+};
+
+// Elides transient allocations that are only used by deallocations.
+// This sometimes arises when operations that were using the resource are
+// DCEd by other patterns or passes.
+//
+// Example:
+//   %resource, %alloca_t = stream.resource.alloca
+//   %dealloca_t = stream.resource.dealloca await(%alloca_t) %resource
+struct ElideAllocaDeallocaOp : public OpRewritePattern<ResourceAllocaOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(ResourceAllocaOp allocaOp,
+                                PatternRewriter &rewriter) const override {
+    if (!allocaOp.getResult().hasOneUse()) {
+      return failure(); // more than one user
+    }
+    auto user = *allocaOp.getResult().getUsers().begin();
+    auto deallocaOp = dyn_cast<IREE::Stream::ResourceDeallocaOp>(user);
+    if (!deallocaOp) {
+      return failure(); // not used by a dealloca
+    }
+
+    // Replace waiters on the alloca and dealloca.
+    // Note that the dealloca may be using the timepoint of the alloca so we
+    // replace that first.
+    Value newAllocaTimepoint = allocaOp.getAwaitTimepoint();
+    if (!newAllocaTimepoint) {
+      newAllocaTimepoint = IREE::Stream::TimepointImmediateOp::create(
+          rewriter, allocaOp.getLoc());
+    }
+    rewriter.replaceAllUsesWith(allocaOp.getResultTimepoint(),
+                                newAllocaTimepoint);
+    Value newDeallocaTimepoint = deallocaOp.getAwaitTimepoint();
+    if (!newDeallocaTimepoint) {
+      newDeallocaTimepoint = IREE::Stream::TimepointImmediateOp::create(
+          rewriter, deallocaOp.getLoc());
+    }
+    rewriter.replaceAllUsesWith(deallocaOp.getResultTimepoint(),
+                                newDeallocaTimepoint);
+
+    // Erase the deallocation first (its the only user of the allocated
+    // resource).
+    rewriter.eraseOp(deallocaOp);
+    rewriter.eraseOp(allocaOp);
+
+    return success();
+  }
+};
+
+// Finds sequences of chained allocas/deallocas and rewrites them to batch as
+// many as possible on a single timepoint. This is done as a canonicalization as
+// it is always intended that allocations and deallocations do not wait and we
+// can repeatedly optimize when run as part of a larger canonicalization pass
+// that cleans up timepoints with other patterns as we modify them here.
+//
+// Example:
+//   %d0 = dealloca await(%t)
+//   %d1 = dealloca await(%d0)
+//   %d2 = dealloca await(%d1)
+//   %d3 = dealloca await(%d2)
+//   ... await(%d3)
+// ->
+//   %d0 = dealloca await(%t)
+//   %d1 = dealloca await(%t)
+//   %d2 = dealloca await(%t)
+//   %d3 = dealloca await(%t)
+//   %j = join %d0, %d1, %d2, %d3
+//   ... await(%j)
+template <typename OpT>
+struct BatchAllocaOps : public OpRewritePattern<OpT> {
+  using OpRewritePattern<OpT>::OpRewritePattern;
+  LogicalResult matchAndRewrite(OpT op,
+                                PatternRewriter &rewriter) const override {
+    // Gather alloca ops chained on timepoints starting from this op.
+    SmallVector<OpT> allocaOps;
+    OpT nextOp = op;
+    while (nextOp) {
+      Value resultTimepoint = nextOp.getResultTimepoint();
+      allocaOps.push_back(nextOp);
+      if (!resultTimepoint.hasOneUse()) {
+        break;
+      }
+      nextOp = dyn_cast<OpT>(*resultTimepoint.user_begin());
+    }
+    if (allocaOps.size() <= 1) {
+      return failure(); // no-op if only one op
+    }
+
+    // Gather the result timepoints of all alloca ops so we can join on them.
+    // We'll issue all of them concurrently and only join after all
+    // deallocations complete.
+    SmallVector<Location> allocaLocs;
+    SmallVector<Value> allocaTimepoints;
+    for (auto allocaOp : allocaOps) {
+      allocaLocs.push_back(allocaOp.getLoc());
+      allocaTimepoints.push_back(allocaOp.getResultTimepoint());
+    }
+    rewriter.setInsertionPointAfter(allocaOps.back());
+    auto joinOp = IREE::Stream::TimepointJoinOp::create(
+        rewriter, rewriter.getFusedLoc(allocaLocs),
+        rewriter.getType<IREE::Stream::TimepointType>(), allocaTimepoints);
+
+    // Make all alloca ops wait on the earliest timepoint so they can proceed
+    // together. Note that the origin op may be waiting on an immediate
+    // timepoint and be nullptr.
+    Value awaitTimepoint = op.getAwaitTimepoint();
+    for (auto allocaOp : allocaOps) {
+      rewriter.modifyOpInPlace(allocaOp, [&]() {
+        allocaOp.getAwaitTimepointMutable().assign(awaitTimepoint);
+      });
+    }
+
+    // Replace the tail timepoint in the alloca chain with the join result so
+    // subsequent waiters are waiting on the batch.
+    rewriter.replaceAllUsesExcept(allocaOps.back().getResultTimepoint(),
+                                  joinOp.getResultTimepoint(), joinOp);
+
+    return success();
+  }
+};
+
+} // namespace
+
 void ResourceAllocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                    MLIRContext *context) {
   // TODO(benvanik): sink to first user.
-  // TODO(benvanik): elide if only user is dealloc.
+  results.insert<ElideUnusedAllocaOp>(context);
+  results.insert<ElideAllocaDeallocaOp>(context);
+  results.insert<BatchAllocaOps<ResourceAllocaOp>>(context);
   results.insert<ElideImmediateTimepointWait<ResourceAllocaOp>>(context);
 }
 
@@ -521,6 +669,7 @@ void ResourceAllocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
 void ResourceDeallocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                      MLIRContext *context) {
   // TODO(benvanik): move up to producer of timepoint.
+  results.insert<BatchAllocaOps<ResourceDeallocaOp>>(context);
   results.insert<ElideImmediateTimepointWait<ResourceDeallocaOp>>(context);
 }
 
@@ -733,7 +882,7 @@ struct PropagateResourcePackBaseOffset
     rewriter.setInsertionPointAfter(op);
     for (auto sliceOffset : op.getPackedOffsets()) {
       auto addOp =
-          rewriter.create<arith::AddIOp>(op.getLoc(), baseOffset, sliceOffset);
+          arith::AddIOp::create(rewriter, op.getLoc(), baseOffset, sliceOffset);
       rewriter.replaceAllUsesExcept(sliceOffset, addOp.getResult(), addOp);
     }
 
@@ -789,8 +938,8 @@ struct CanonicalizeResourcePackIntervals
       dynamicSliceSizes[i] = slice.dynamicSize;
     }
     SmallVector<Type> packedOffsetTypes(slices.size(), rewriter.getIndexType());
-    auto newOp = rewriter.create<ResourcePackOp>(
-        op.getLoc(), op.getTotalLength().getType(), packedOffsetTypes,
+    auto newOp = ResourcePackOp::create(
+        rewriter, op.getLoc(), op.getTotalLength().getType(), packedOffsetTypes,
         op.getOffset(), rewriter.getIndexArrayAttr(lifetimeIntervals),
         dynamicSliceSizes, op.getAffinityAttr());
 
@@ -840,9 +989,9 @@ struct FoldResourceSubviewOps : public OpRewritePattern<ResourceSubviewOp> {
     auto fusedLoc = rewriter.getFusedLoc({parentOp.getLoc(), op.getLoc()});
     auto newOffset = rewriter.createOrFold<arith::AddIOp>(
         fusedLoc, parentOp.getSourceOffset(), op.getSourceOffset());
-    auto newOp = rewriter.create<ResourceSubviewOp>(
-        fusedLoc, parentOp.getSource(), parentOp.getSourceSize(), newOffset,
-        op.getResultSize());
+    auto newOp = ResourceSubviewOp::create(
+        rewriter, fusedLoc, parentOp.getSource(), parentOp.getSourceSize(),
+        newOffset, op.getResultSize());
     rewriter.replaceOp(op, newOp.getResult());
     return success();
   }
@@ -875,8 +1024,8 @@ struct SinkSubviewAcrossSelectOps
         trueSubview.getResultSize() != falseSubview.getResultSize()) {
       return failure();
     }
-    auto offsetSelectOp = rewriter.create<mlir::arith::SelectOp>(
-        op.getLoc(), op.getCondition(), trueSubview.getSourceOffset(),
+    auto offsetSelectOp = mlir::arith::SelectOp::create(
+        rewriter, op.getLoc(), op.getCondition(), trueSubview.getSourceOffset(),
         falseSubview.getSourceOffset());
     rewriter.replaceOpWithNewOp<IREE::Stream::ResourceSubviewOp>(
         op, op.getResult().getType(), trueSubview.getSource(),
@@ -1193,8 +1342,8 @@ struct TensorConstantToEmpty : public OpRewritePattern<TensorConstantOp> {
       return failure();
 
     // Definitely empty if here.
-    Value resultSize = rewriter.create<IREE::Stream::TensorSizeOfOp>(
-        constantOp.getLoc(), rewriter.getIndexType(),
+    Value resultSize = IREE::Stream::TensorSizeOfOp::create(
+        rewriter, constantOp.getLoc(), rewriter.getIndexType(),
         TypeAttr::get(constantOp.getResultEncoding()),
         constantOp.getResultEncodingDims(), constantOp.getAffinityAttr());
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorEmptyOp>(
@@ -1219,22 +1368,24 @@ struct TensorConstantToSplat : public OpRewritePattern<TensorConstantOp> {
     Value splatValue;
     if (isa<ComplexType>(getElementTypeOrSelf(splatAttr.getType()))) {
       auto splatElementAttr = splatAttr.getSplatValue<ArrayAttr>();
-      splatValue = rewriter.create<complex::ConstantOp>(
-          constantOp.getLoc(), getElementTypeOrSelf(splatAttr.getType()),
-          cast<ArrayAttr>(splatElementAttr));
+      splatValue =
+          complex::ConstantOp::create(rewriter, constantOp.getLoc(),
+                                      getElementTypeOrSelf(splatAttr.getType()),
+                                      cast<ArrayAttr>(splatElementAttr));
     } else {
       auto splatElementAttr = splatAttr.getSplatValue<TypedAttr>();
-      splatValue = rewriter.create<arith::ConstantOp>(
-          constantOp.getLoc(), splatElementAttr.getType(), splatElementAttr);
+      splatValue = arith::ConstantOp::create(rewriter, constantOp.getLoc(),
+                                             splatElementAttr.getType(),
+                                             splatElementAttr);
     }
 
     auto resultType = IREE::Stream::ResourceType::get(constantOp.getContext());
-    Value resultSize = rewriter.create<IREE::Stream::TensorSizeOfOp>(
-        constantOp.getLoc(), rewriter.getIndexType(),
+    Value resultSize = IREE::Stream::TensorSizeOfOp::create(
+        rewriter, constantOp.getLoc(), rewriter.getIndexType(),
         TypeAttr::get(constantOp.getResultEncoding()),
         constantOp.getResultEncodingDims(), constantOp.getAffinityAttr());
-    auto splatOp = rewriter.create<TensorSplatOp>(
-        constantOp.getLoc(), resultType, splatValue,
+    auto splatOp = TensorSplatOp::create(
+        rewriter, constantOp.getLoc(), resultType, splatValue,
         constantOp.getResultEncoding(), constantOp.getResultEncodingDims(),
         resultSize, constantOp.getAffinityAttr());
     rewriter.replaceOpWithNewOp<AsyncTransferOp>(
@@ -1321,8 +1472,8 @@ OpFoldResult TensorEncodeOp::fold(FoldAdaptor adaptor) {
     if (!type.getEncoding()) {
       return true;
     }
-    IREE::Encoding::SerializableEncodingAttrInterface attr =
-        IREE::Encoding::getSerializableEncodingAttrInterface(type);
+    IREE::Encoding::SerializableAttr attr =
+        IREE::Encoding::getSerializableAttr(type);
     if (!attr) {
       return false;
     }
@@ -1528,8 +1679,9 @@ struct ConvertSplatConstantsIntoSplats
     }
     auto splatElementAttr =
         llvm::dyn_cast<SplatElementsAttr>(value).getSplatValue<TypedAttr>();
-    auto splatValue = rewriter.create<arith::ConstantOp>(
-        constantOp.getLoc(), splatElementAttr.getType(), splatElementAttr);
+    auto splatValue =
+        arith::ConstantOp::create(rewriter, constantOp.getLoc(),
+                                  splatElementAttr.getType(), splatElementAttr);
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncSplatOp>(
         constantOp, constantOp.getResult().getType(), splatValue,
         constantOp.getResultSize(), constantOp.getAffinityAttr());
@@ -2049,7 +2201,7 @@ void AsyncBarrierOp::getCanonicalizationPatterns(RewritePatternSet &results,
 OpFoldResult AsyncTransferOp::fold(FoldAdaptor operands) {
   if (auto sourceTransferOp = getSource().getDefiningOp<AsyncTransferOp>()) {
     if (sourceTransferOp.getSource().getType() == getResult().getType() &&
-        sourceTransferOp.getSourceAffinity() == getResultAffinity()) {
+        sourceTransferOp.getSourceAffinity() == getTargetAffinity()) {
       return sourceTransferOp.getSource();
     }
   }
@@ -2266,10 +2418,11 @@ struct CloneCapturedAsyncExecuteSubviewOps
       // Clone the subview into the region and wire it up to take the same
       // range as the original.
       auto arg = entryBlock.getArgument(capture.operandIdx);
-      auto newOp = rewriter.create<ResourceSubviewOp>(
-          capture.subviewOp.getLoc(), arg, capture.subviewOp.getSourceSize(),
-          capture.subviewOp.getSourceOffset(),
-          capture.subviewOp.getResultSize());
+      auto newOp =
+          ResourceSubviewOp::create(rewriter, capture.subviewOp.getLoc(), arg,
+                                    capture.subviewOp.getSourceSize(),
+                                    capture.subviewOp.getSourceOffset(),
+                                    capture.subviewOp.getResultSize());
       rewriter.replaceAllUsesExcept(arg, newOp.getResult(), newOp);
     }
 
@@ -2306,8 +2459,8 @@ struct ElideNoOpAsyncExecuteOp : public OpRewritePattern<AsyncExecuteOp> {
              "expect 1:1 types on captures to results");
       newResults.push_back(capture);
     }
-    auto immediateTimepoint = rewriter.create<TimepointImmediateOp>(
-        op.getLoc(), op.getResultTimepoint().getType());
+    auto immediateTimepoint = TimepointImmediateOp::create(
+        rewriter, op.getLoc(), op.getResultTimepoint().getType());
     newResults.push_back(immediateTimepoint);
     rewriter.replaceOp(op, newResults);
     return success();
@@ -2773,10 +2926,11 @@ struct CloneCapturedCmdExecuteSubviewOps
       // Clone the subview into the region and wire it up to take the same
       // range as the original.
       auto arg = entryBlock.getArgument(capture.operandIdx);
-      auto newOp = rewriter.create<ResourceSubviewOp>(
-          capture.subviewOp.getLoc(), arg, capture.subviewOp.getSourceSize(),
-          capture.subviewOp.getSourceOffset(),
-          capture.subviewOp.getResultSize());
+      auto newOp =
+          ResourceSubviewOp::create(rewriter, capture.subviewOp.getLoc(), arg,
+                                    capture.subviewOp.getSourceSize(),
+                                    capture.subviewOp.getSourceOffset(),
+                                    capture.subviewOp.getResultSize());
       rewriter.replaceAllUsesExcept(arg, newOp.getResult(), newOp);
     }
 
@@ -2827,10 +2981,10 @@ namespace {
 
 // Elides a region-carrying op when the region is empty.
 // Requires no results that need replacement.
-template <typename Op>
-struct ElideEmptyCmdRegionOp : public OpRewritePattern<Op> {
-  using OpRewritePattern<Op>::OpRewritePattern;
-  LogicalResult matchAndRewrite(Op op,
+template <typename OpT>
+struct ElideEmptyCmdRegionOp : public OpRewritePattern<OpT> {
+  using OpRewritePattern<OpT>::OpRewritePattern;
+  LogicalResult matchAndRewrite(OpT op,
                                 PatternRewriter &rewriter) const override {
     auto &entryBlock = op.getBody().front();
     auto yieldOp = getYieldIfOnlyOp(entryBlock);
@@ -3103,8 +3257,8 @@ struct ElideImmediateBarrier : public OpRewritePattern<TimepointBarrierOp> {
       // Could not analyze or found to be a timeline op.
       return failure();
     }
-    auto immediateTimepoint =
-        rewriter.create<IREE::Stream::TimepointImmediateOp>(barrierOp.getLoc());
+    auto immediateTimepoint = IREE::Stream::TimepointImmediateOp::create(
+        rewriter, barrierOp.getLoc());
     rewriter.replaceOp(barrierOp,
                        {barrierOp.getResource(), immediateTimepoint});
     return success();
@@ -3289,8 +3443,8 @@ struct SinkSubviewsAcrossAwaits : public OpRewritePattern<TimepointAwaitOp> {
       // Create a new subview op matching the original on our result and swap
       // users to it.
       auto result = op.getResults()[operandIdx];
-      auto newOp = rewriter.create<IREE::Stream::ResourceSubviewOp>(
-          subviewOp.getLoc(), result, subviewOp.getSourceSize(),
+      auto newOp = IREE::Stream::ResourceSubviewOp::create(
+          rewriter, subviewOp.getLoc(), result, subviewOp.getSourceSize(),
           subviewOp.getSourceOffset(), subviewOp.getResultSize());
       rewriter.replaceAllUsesExcept(result, newOp.getResult(), newOp);
 
@@ -3381,8 +3535,9 @@ struct GroupAwaitsByTimepoint : public OpRewritePattern<TimepointAwaitOp> {
       llvm::append_range(newOperands, coveredOp.getResourceOperands());
       llvm::append_range(newOperandSizes, coveredOp.getResourceOperandSizes());
     }
-    auto newOp = rewriter.create<TimepointAwaitOp>(
-        op.getLoc(), newOperands, newOperandSizes, op.getAwaitTimepoint());
+    auto newOp =
+        TimepointAwaitOp::create(rewriter, op.getLoc(), newOperands,
+                                 newOperandSizes, op.getAwaitTimepoint());
 
     // Replace covered ops with the new results.
     unsigned resultIdx = 0;
@@ -3428,8 +3583,9 @@ struct FoldDuplicateAwaitResources : public OpRewritePattern<TimepointAwaitOp> {
     }
 
     // Create replacement op with deduped operands/results.
-    auto newOp = rewriter.create<IREE::Stream::TimepointAwaitOp>(
-        op.getLoc(), newOperands, newOperandSizes, op.getAwaitTimepoint());
+    auto newOp = IREE::Stream::TimepointAwaitOp::create(
+        rewriter, op.getLoc(), newOperands, newOperandSizes,
+        op.getAwaitTimepoint());
     newOp.setSync(op.getSync());
 
     // Replace all duplicate results with the base results.

@@ -22,7 +22,7 @@ target_compile_options(${_NAME} PRIVATE ${IREE_DEFAULT_COPTS})
 
 target_link_libraries(${_NAME}
   iree_base_base
-  iree_base_internal_file_io
+  iree_io_file_handle
   iree_vm_vm
   iree_vm_bytecode_module
 )

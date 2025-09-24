@@ -20,6 +20,9 @@
 
 namespace mlir::iree_compiler::IREE::VM {
 
+#define GEN_PASS_DEF_RESOLVERODATALOADSPASS
+#include "iree/compiler/Dialect/VM/Transforms/Passes.h.inc"
+
 // TODO(benvanik): replace this entire pass with generic IPO - the rodata refs
 // are kind of constant like and should be trivial to inline, though they can't
 // be ConstantLike and will need a new interface so that IPO can materialize
@@ -75,8 +78,8 @@ static void processBufferGlobal(Explorer &explorer,
     for (auto loadOp : globalInfo->getLoads()) {
       OpBuilder builder(loadOp);
       auto loadedValue = loadOp.getLoadedGlobalValue();
-      auto zeroRefOp = builder.create<IREE::VM::ConstRefZeroOp>(
-          loadOp.getLoc(), loadedValue.getType());
+      auto zeroRefOp = IREE::VM::ConstRefZeroOp::create(
+          builder, loadOp.getLoc(), loadedValue.getType());
       loadedValue.replaceAllUsesWith(zeroRefOp.getResult());
       deadOps.insert(loadOp);
     }
@@ -96,7 +99,7 @@ static void processBufferGlobal(Explorer &explorer,
   for (auto loadOp : globalInfo->getLoads()) {
     OpBuilder builder(loadOp);
     auto rodataRefOp =
-        builder.create<IREE::VM::ConstRefRodataOp>(loadOp.getLoc(), rodataOp);
+        IREE::VM::ConstRefRodataOp::create(builder, loadOp.getLoc(), rodataOp);
     auto loadedValue = loadOp.getLoadedGlobalValue();
     loadedValue.replaceAllUsesWith(rodataRefOp.getResult());
     deadOps.insert(loadOp);
@@ -109,23 +112,10 @@ static void processBufferGlobal(Explorer &explorer,
 }
 
 class ResolveRodataLoadsPass
-    : public PassWrapper<ResolveRodataLoadsPass,
-                         OperationPass<IREE::VM::ModuleOp>> {
-public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::VM::VMDialect>();
-  }
-
-  StringRef getArgument() const override {
-    return "iree-vm-resolve-rodata-loads";
-  }
-
-  StringRef getDescription() const override {
-    return "Resolves global loads of rodata ops to direct rodata references.";
-  }
-
+    : public IREE::VM::impl::ResolveRodataLoadsPassBase<
+          ResolveRodataLoadsPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    IREE::VM::ModuleOp moduleOp = getOperation();
 
     Explorer explorer(moduleOp, TraversalAction::SHALLOW);
     explorer.setOpInterfaceAction<mlir::FunctionOpInterface>(
@@ -150,12 +140,5 @@ public:
       deadOp->erase();
   }
 };
-
-std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
-createResolveRodataLoadsPass() {
-  return std::make_unique<ResolveRodataLoadsPass>();
-}
-
-static PassRegistration<ResolveRodataLoadsPass> pass;
 
 } // namespace mlir::iree_compiler::IREE::VM

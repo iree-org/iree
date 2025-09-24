@@ -86,15 +86,46 @@ public:
   // If all affinities are compatible one will be chosen in an unspecified way.
   IREE::Stream::AffinityAttr lookupResourceAffinity(Value value);
 
-  // Populates all potential affinities of |value| in |affinities|.
+  // Populates all potential producer affinities of |value| in |affinities|.
   // Returns false if analysis failed and the set of affinities is unknown.
   bool tryLookupResourceAffinity(
       Value value, SmallVectorImpl<IREE::Stream::AffinityAttr> &affinities);
+
+  // Populates all potential consumer affinities of |value| in |affinities|.
+  // Returns false if analysis failed and the set of affinities is unknown.
+  bool tryLookupResourceUsageAffinity(
+      Value value, SmallVectorImpl<IREE::Stream::AffinityAttr> &affinities);
+
+  // Populates all affinities a value has been pinned to, if any.
+  // Returns true if the value had pinned affinities.
+  bool tryLookupPinnedAffinities(
+      Value value, SmallVectorImpl<IREE::Stream::AffinityAttr> &affinities);
+
+  // Precomputed IR properties that can be queried within the solver.
+  // Static information that will not change based on analysis can be placed
+  // here to amortize the costs required to calculate it.
+  //
+  // Usage within an element initialize/update:
+  //   auto &queries = AffinityAnalysis::PrecomputedQueries::get(solver);
+  //   queries.whatever;
+  struct PrecomputedQueries {
+    // Values mapped to ops that pin their affinity, if any.
+    // Omitted values are not pinned. Note that a single value may be pinned to
+    // multiple potential affinities.
+    DenseMap<Value, DenseSet<IREE::Stream::AffinityOpInterface>>
+        pinnedAffinities;
+
+    void compute(Explorer &explorer);
+    void inject(DFX::Solver &solver);
+    static const PrecomputedQueries &get(DFX::Solver &solver);
+    void print(llvm::raw_ostream &os, AsmState &asmState);
+  };
 
 private:
   Explorer explorer;
   llvm::BumpPtrAllocator allocator;
   DFX::Solver solver;
+  PrecomputedQueries precomputedQueries;
 };
 
 } // namespace mlir::iree_compiler::IREE::Stream

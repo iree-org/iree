@@ -45,11 +45,24 @@ namespace {
 // --iree-hal-conversion
 //===----------------------------------------------------------------------===//
 
+static void stripExportRegions(ModuleOp moduleOp) {
+  for (auto executableOp : moduleOp.getOps<IREE::HAL::ExecutableOp>()) {
+    for (auto variantOp :
+         executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
+      for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+        exportOp.removeConditionFallbackAttr();
+        exportOp.getCondition().getBlocks().clear();
+        exportOp.getWorkgroupCount().getBlocks().clear();
+      }
+    }
+  }
+}
+
 struct ConvertToHALPass
     : public IREE::HAL::impl::ConvertToHALPassBase<ConvertToHALPass> {
   void runOnOperation() override {
     auto *context = &getContext();
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     // Gather all interfaces from registered dialects.
     // These will perform the tensor->buffer mapping for their ops.
@@ -88,6 +101,10 @@ struct ConvertToHALPass
                                       std::move(patterns)))) {
       return signalPassFailure();
     }
+
+    // Drop executable export regions we no longer need. This reduces the
+    // visible IR and prevents confusion as to when they are required.
+    stripExportRegions(moduleOp);
 
     // Cleanup conversion attributes used for spooky action at a distance.
     moduleOp->removeAttr("stream.affinity.default");

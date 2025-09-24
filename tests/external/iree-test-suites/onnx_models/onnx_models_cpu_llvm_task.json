@@ -3,7 +3,8 @@
   "iree_compile_flags": [
     "--iree-hal-target-device=local",
     "--iree-hal-local-target-device-backends=llvm-cpu",
-    "--iree-llvmcpu-target-cpu=host"
+    "--iree-llvmcpu-target-cpu=host",
+    "--iree-opt-data-tiling"
   ],
   "iree_run_module_flags": [
     "--device=local-task"

@@ -4,8 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-include(CMakeParseArguments)
-
 # external_cc_library()
 #
 # CMake function to imitate Bazel's cc_library rule.

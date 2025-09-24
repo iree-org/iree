@@ -7,9 +7,12 @@
 
 module @iree_default_tuning_spec_gfx942 attributes { transform.with_named_sequence, iree_codegen.tuning_spec_with_default_entrypoint } {
 
+// ============================================================
+// * Tuning Configurations Start *
+// ============================================================
+
 transform.named_sequence @apply_op_config(%op: !transform.any_op {transform.readonly},
                                         %config: !transform.any_param {transform.readonly}) {
-  // transform.print %op {name="Apply on"} : !transform.any_op
   transform.annotate %op "compilation_info" = %config : !transform.any_op, !transform.any_param
   // Add a dummy unit attribute to be sure that the tuning spec applied.
   // Otherwise it would be difficult to tell if the lowering config attribute
@@ -27,10 +30,6 @@ transform.named_sequence @apply_attn_op_config(%attention: !transform.any_op {tr
   transform.annotate %attention "__tuning_spec_applied__" : !transform.any_op
   transform.yield
 }
-
-// ============================================================
-// * Tuning Configurations Start *
-// ============================================================
 
 transform.named_sequence @match_attention_f16(%root: !transform.any_op {transform.readonly})
   -> !transform.any_op {
@@ -62,6 +61,7 @@ transform.named_sequence @match_attention_f16(%root: !transform.any_op {transfor
 transform.named_sequence
 @match_attention_2x10x4096x64x64x64_f16(%attention: !transform.any_op {transform.readonly})
   -> (!transform.any_op, !transform.any_param, !transform.any_param) {
+  transform.iree.match.has_no_lowering_config %attention : !transform.any_op
 
   %matched = transform.include @match_attention_f16 failures(propagate) (%attention)
     : (!transform.any_op) -> !transform.any_op
@@ -102,11 +102,11 @@ transform.named_sequence
   //   which operate efficiently with `vector<8xf16>` from global memory.
   %decomposition_config = transform.param.constant {
     qk_attrs = {attention_qk_matmul,
-                lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.virtual_mma_layout<intrinsic = VMFMA_F32_32x32x16_F16>,
-                                                              subgroup_m_count = 4, subgroup_n_count = 1, promote_operands = [1] }>},
+                lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.virtual_mma_layout<VMFMA_F32_32x32x16_F16>,
+                                                              subgroup_basis = [[1, 1, 4, 1, 1, 1], [0, 1, 2, 4, 5]], promote_operands = [1] }>},
     pv_attrs = {attention_pv_matmul,
                 lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
-                                                              subgroup_m_count = 4, subgroup_n_count = 1, promote_operands = [1] }>}
+                                                              subgroup_basis = [[1, 1, 4, 1, 1, 1], [0, 1, 2, 3, 5]], promote_operands = [1] }>}
   } -> !transform.any_param
 
   transform.yield %attention, %config, %decomposition_config : !transform.any_op, !transform.any_param, !transform.any_param
@@ -114,7 +114,6 @@ transform.named_sequence
 
 transform.named_sequence @match_mmt_f16_f16_f32(%root: !transform.any_op {transform.readonly}) -> !transform.any_op {
   transform.match.operation_name %root ["linalg.generic"] : !transform.any_op
-  // transform.print %root {name = "Generic"} : !transform.any_op
   %ins, %outs = transform.iree.match.cast_compatible_dag_from_root %root {
     ^bb0(%lhs: tensor<?x?xf16>, %rhs: tensor<?x?xf16>, %out: tensor<?x?xf32>):
     %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
@@ -136,6 +135,8 @@ transform.named_sequence @match_mmt_f16_f16_f32(%root: !transform.any_op {transf
 transform.named_sequence
 @match_mmt_2048x1280x5120_f16_f16_f32(%matmul: !transform.any_op {transform.readonly})
   -> (!transform.any_op, !transform.any_param) {
+  transform.iree.match.has_no_lowering_config %matmul : !transform.any_op
+
   %mmt = transform.include @match_mmt_f16_f16_f32 failures(propagate) (%matmul)
     : (!transform.any_op) -> !transform.any_op
   %lhs = transform.get_operand %matmul[0] : (!transform.any_op) -> !transform.any_value
@@ -145,7 +146,7 @@ transform.named_sequence
   %config = transform.param.constant #iree_codegen.compilation_info<
     lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
                                                  mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-                                                 subgroup_m_count = 2, subgroup_n_count = 2,
+                                                 subgroup_basis = [[2, 2, 1], [0, 1, 2]],
                                                  reduction = [0, 0, 64],
                                                  workgroup = [64, 128, 0]}>,
     translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
@@ -160,8 +161,8 @@ transform.named_sequence
   attributes { iree_codegen.tuning_spec_entrypoint } {
   %res = transform.foreach_match in %variant_op
     // Expected speedup: 1.22x.
-    @match_attention_2x10x4096x64x64x64_f16 -> @apply_attn_op_config
-    , @match_mmt_2048x1280x5120_f16_f16_f32 -> @apply_op_config
+    @match_attention_2x10x4096x64x64x64_f16 -> @apply_attn_op_config,
+    @match_mmt_2048x1280x5120_f16_f16_f32 -> @apply_op_config
     : (!transform.any_op) -> !transform.any_op
   transform.yield %res : !transform.any_op
 }

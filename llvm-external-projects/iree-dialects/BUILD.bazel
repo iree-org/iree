@@ -72,6 +72,7 @@ cc_library(
         "@llvm-project//mlir:FunctionInterfaces",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:LinalgInterfaces",
         "@llvm-project//mlir:MathDialect",
         "@llvm-project//mlir:Rewrite",
         "@llvm-project//mlir:SCFDialect",

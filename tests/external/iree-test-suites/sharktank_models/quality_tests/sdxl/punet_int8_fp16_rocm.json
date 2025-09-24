@@ -1,38 +1,38 @@
 {
     "inputs": [
         {
-            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/inference_input.0.bin",
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_input0.bin",
             "value": "1x4x128x128xf16"
         },
         {
-            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/inference_input.1.bin",
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_input1.bin",
             "value": "1xf16"
         },
         {
-            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/inference_input.2.bin",
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_input2.bin",
             "value": "2x64x2048xf16"
         },
         {
-            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/inference_input.3.bin",
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_input3.bin",
             "value": "2x1280xf16"
         },
         {
-            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/inference_input.4.bin",
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_input4.bin",
             "value": "2x6xf16"
         },
         {
-            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/inference_input.5.bin",
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_input5.bin",
             "value": "1xf16"
         }
     ],
     "outputs": [
         {
-            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/11-13-2024/punet_fp16_out.0.bin",
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_fp16_out_v2.0.bin",
             "value": "1x4x128x128xf16"
         }
     ],
     "real_weights": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/punet_weights.irpa",
-    "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-punet/11-8-2024/punet_fp16.mlir",
+    "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/08042025/mlir/stable_diffusion_xl_base_1_0_punet_bs1_64_1024x1024_i8.mlir",
     "device": "hip",
     "compiler_flags": [
         "--iree-hal-target-device=hip",
@@ -42,8 +42,6 @@
         "--iree-vm-target-truncate-unsupported-floats",
         "--iree-llvmgpu-enable-prefetch=true",
         "--iree-opt-data-tiling=false",
-        "--iree-codegen-gpu-native-math-precision=true",
-        "--iree-codegen-llvmgpu-use-vector-distribution",
         "--iree-hip-waves-per-eu=2",
         "--iree-execution-model=async-external",
         "--iree-scheduling-dump-statistics-format=json",

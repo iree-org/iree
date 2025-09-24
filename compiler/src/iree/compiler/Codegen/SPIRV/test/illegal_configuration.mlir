@@ -9,8 +9,8 @@
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = []>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none,
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -36,8 +36,8 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none,
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -63,8 +63,8 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none,
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -90,8 +90,8 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 64], [4, 2], [0, 0, 4]]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none,
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -117,8 +117,8 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 64], [16, 8], [0, 0, 4]]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none,
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -144,8 +144,8 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 60], [4, 4], [0, 0, 4]]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none,
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -171,8 +171,8 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 64, 4]]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none,
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -198,8 +198,8 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 64, 4]]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none,
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -225,8 +225,8 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [32, 32], [0, 0, 16]]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|fp16|int32, storage = b32|b16, subgroup = none, dot = none,
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|fp16|int32, storage = b32|b16, subgroup = none,
     mma = [<WMMAR3_F32_16x16x16_F16>, <WMMAR3_F16_16x16x16_F16>],
     subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
@@ -237,16 +237,16 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 func.func @matmul_tensor() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<64x32xf16>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<32x128xf16>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<64x128xf16>>
-  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [64, 32], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<64x32xf16>> -> tensor<64x32xf16>
-  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [32, 128], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32x128xf16>> -> tensor<32x128xf16>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x32xf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x128xf16>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<64x128xf16>>
+  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [64, 32], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x32xf16>> -> tensor<64x32xf16>
+  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [32, 128], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x128xf16>> -> tensor<32x128xf16>
   %5 = tensor.empty() : tensor<64x128xf16>
   %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<64x128xf16>) -> tensor<64x128xf16>
   // expected-error @+1 {{expected 4 levels of tiling sizes, got 3}}
   %7 = linalg.matmul {compilation_info = #compilation} ins(%3, %4 : tensor<64x32xf16>, tensor<32x128xf16>) outs(%6 : tensor<64x128xf16>) -> tensor<64x128xf16>
-  flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [64, 128], strides = [1, 1] : tensor<64x128xf16> -> !flow.dispatch.tensor<writeonly:tensor<64x128xf16>>
+  iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [64, 128], strides = [1, 1] : tensor<64x128xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<64x128xf16>>
   return
 }
 
@@ -259,8 +259,8 @@ func.func @matmul_tensor() attributes {hal.executable.target = #executable_targe
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [32, 32], [0, 0, 16], [8, 8, 8]]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|fp16|int32, storage = b32|b16, subgroup = none, dot = none,
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|fp16|int32, storage = b32|b16, subgroup = none,
     mma = [<WMMAR3_F32_16x16x16_F16>, <WMMAR3_F16_16x16x16_F16>],
     subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
@@ -271,16 +271,16 @@ func.func @matmul_tensor() attributes {hal.executable.target = #executable_targe
 func.func @matmul_tensor() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<64x32xf16>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<32x128xf16>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<64x128xf16>>
-  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [64, 32], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<64x32xf16>> -> tensor<64x32xf16>
-  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [32, 128], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32x128xf16>> -> tensor<32x128xf16>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x32xf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x128xf16>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<64x128xf16>>
+  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [64, 32], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x32xf16>> -> tensor<64x32xf16>
+  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [32, 128], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x128xf16>> -> tensor<32x128xf16>
   %5 = tensor.empty() : tensor<64x128xf16>
   %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<64x128xf16>) -> tensor<64x128xf16>
   // expected-error @+1 {{expected the fourth level tile sizes to match cooperative matrix sizes}}
   %7 = linalg.matmul {compilation_info = #compilation} ins(%3, %4 : tensor<64x32xf16>, tensor<32x128xf16>) outs(%6 : tensor<64x128xf16>) -> tensor<64x128xf16>
-  flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [64, 128], strides = [1, 1] : tensor<64x128xf16> -> !flow.dispatch.tensor<writeonly:tensor<64x128xf16>>
+  iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [64, 128], strides = [1, 1] : tensor<64x128xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<64x128xf16>>
   return
 }
 
@@ -293,8 +293,8 @@ func.func @matmul_tensor() attributes {hal.executable.target = #executable_targe
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32], [8, 8], [0, 0, 4], [16, 16, 16]]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|fp16|int32, storage = b32|b16, subgroup = none, dot = none,
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|fp16|int32, storage = b32|b16, subgroup = none,
     mma = [<WMMAR3_F32_16x16x16_F16>, <WMMAR3_F16_16x16x16_F16>],
     subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
@@ -305,16 +305,16 @@ func.func @matmul_tensor() attributes {hal.executable.target = #executable_targe
 func.func @matmul_tensor() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<64x32xf16>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<32x128xf16>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<64x128xf16>>
-  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [64, 32], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<64x32xf16>> -> tensor<64x32xf16>
-  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [32, 128], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32x128xf16>> -> tensor<32x128xf16>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x32xf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x128xf16>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<64x128xf16>>
+  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [64, 32], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x32xf16>> -> tensor<64x32xf16>
+  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [32, 128], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x128xf16>> -> tensor<32x128xf16>
   %5 = tensor.empty() : tensor<64x128xf16>
   %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<64x128xf16>) -> tensor<64x128xf16>
   // expected-error @+1 {{expected subgroup tile sizes to be multiple of [16, 16, 16]}}
   %7 = linalg.matmul {compilation_info = #compilation} ins(%3, %4 : tensor<64x32xf16>, tensor<32x128xf16>) outs(%6 : tensor<64x128xf16>) -> tensor<64x128xf16>
-  flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [64, 128], strides = [1, 1] : tensor<64x128xf16> -> !flow.dispatch.tensor<writeonly:tensor<64x128xf16>>
+  iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [64, 128], strides = [1, 1] : tensor<64x128xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<64x128xf16>>
   return
 }
 
@@ -327,8 +327,8 @@ func.func @matmul_tensor() attributes {hal.executable.target = #executable_targe
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [32, 32], [0, 0, 16], [16, 16, 16]]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|fp16|int32, storage = b32|b16, subgroup = none, dot = none,
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|fp16|int32, storage = b32|b16, subgroup = none,
     mma = [<WMMAR3_F32_16x16x16_F16>, <WMMAR3_F16_16x16x16_F16>],
     subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
@@ -339,16 +339,16 @@ func.func @matmul_tensor() attributes {hal.executable.target = #executable_targe
 func.func @matmul_tensor() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<64x32xf16>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<32x128xf16>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<64x128xf16>>
-  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [64, 32], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<64x32xf16>> -> tensor<64x32xf16>
-  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [32, 128], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32x128xf16>> -> tensor<32x128xf16>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x32xf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x128xf16>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<64x128xf16>>
+  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [64, 32], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x32xf16>> -> tensor<64x32xf16>
+  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [32, 128], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x128xf16>> -> tensor<32x128xf16>
   %5 = tensor.empty() : tensor<64x128xf16>
   %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<64x128xf16>) -> tensor<64x128xf16>
   // expected-error @+1 {{expected workgroup x component equals to (warp_size * wg_tile_n / subgroup_tile_n)}}
   %7 = linalg.matmul {compilation_info = #compilation} ins(%3, %4 : tensor<64x32xf16>, tensor<32x128xf16>) outs(%6 : tensor<64x128xf16>) -> tensor<64x128xf16>
-  flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [64, 128], strides = [1, 1] : tensor<64x128xf16> -> !flow.dispatch.tensor<writeonly:tensor<64x128xf16>>
+  iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [64, 128], strides = [1, 1] : tensor<64x128xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<64x128xf16>>
   return
 }
 
@@ -361,8 +361,8 @@ func.func @matmul_tensor() attributes {hal.executable.target = #executable_targe
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [32, 32], [0, 0, 16], [16, 16, 16]]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|fp16|int32, storage = b32|b16, subgroup = none, dot = none,
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|fp16|int32, storage = b32|b16, subgroup = none,
     mma = [<WMMAR3_F32_16x16x16_F16>, <WMMAR3_F16_16x16x16_F16>],
     subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024],
     max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
@@ -373,16 +373,16 @@ func.func @matmul_tensor() attributes {hal.executable.target = #executable_targe
 func.func @matmul_tensor() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !flow.dispatch.tensor<readonly:tensor<64x32xf16>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !flow.dispatch.tensor<readonly:tensor<32x128xf16>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !flow.dispatch.tensor<writeonly:tensor<64x128xf16>>
-  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [64, 32], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<64x32xf16>> -> tensor<64x32xf16>
-  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [32, 128], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32x128xf16>> -> tensor<32x128xf16>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x32xf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x128xf16>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<64x128xf16>>
+  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [64, 32], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x32xf16>> -> tensor<64x32xf16>
+  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [32, 128], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x128xf16>> -> tensor<32x128xf16>
   %5 = tensor.empty() : tensor<64x128xf16>
   %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<64x128xf16>) -> tensor<64x128xf16>
   // expected-error @+1 {{expected workgroup y component equals to (wg_tile_m / subgroup_tile_m)}}
   %7 = linalg.matmul {compilation_info = #compilation} ins(%3, %4 : tensor<64x32xf16>, tensor<32x128xf16>) outs(%6 : tensor<64x128xf16>) -> tensor<64x128xf16>
-  flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [64, 128], strides = [1, 1] : tensor<64x128xf16> -> !flow.dispatch.tensor<writeonly:tensor<64x128xf16>>
+  iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [64, 128], strides = [1, 1] : tensor<64x128xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<64x128xf16>>
   return
 }
 
@@ -395,8 +395,8 @@ func.func @matmul_tensor() attributes {hal.executable.target = #executable_targe
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 4, 4, 16], [0, 2, 2, 2], [0, 0, 0, 0, 1, 1, 4]]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none,
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -411,9 +411,9 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
   %c16 = arith.constant 16 : index
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<1x225x225x8xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<3x3x8x16xf32>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x225x225x8xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x3x8x16xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -429,15 +429,15 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
       %7 = affine.apply #map1()[%workgroup_id_x]
       %8 = affine.apply #map1()[%workgroup_count_x]
       scf.for %arg2 = %7 to %c16 step %8 {
-        %9 = flow.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>> -> tensor<1x4x4x16xf32>
+        %9 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>> -> tensor<1x4x4x16xf32>
         %10 = affine.apply #map2(%arg0)
         %11 = affine.apply #map2(%arg1)
-        %12 = flow.dispatch.tensor.load %0, offsets = [0, %10, %11, 0], sizes = [1, 9, 9, 8], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x225x225x8xf32>> -> tensor<1x9x9x8xf32>
-        %13 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 3, 8, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x3x8x16xf32>> -> tensor<3x3x8x16xf32>
+        %12 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, %10, %11, 0], sizes = [1, 9, 9, 8], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x225x225x8xf32>> -> tensor<1x9x9x8xf32>
+        %13 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 3, 8, 16], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x3x8x16xf32>> -> tensor<3x3x8x16xf32>
         %14 = linalg.fill ins(%cst : f32) outs(%9 : tensor<1x4x4x16xf32>) -> tensor<1x4x4x16xf32>
         // expected-error @+1 {{expected 4 levels of tiling sizes, got 3}}
         %15 = linalg.conv_2d_nhwc_hwcf {compilation_info = #compilation, dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%12, %13 : tensor<1x9x9x8xf32>, tensor<3x3x8x16xf32>) outs(%14 : tensor<1x4x4x16xf32>) -> tensor<1x4x4x16xf32>
-        flow.dispatch.tensor.store %15, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : tensor<1x4x4x16xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>>
+        iree_tensor_ext.dispatch.tensor.store %15, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : tensor<1x4x4x16xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>>
       }
     }
   }
@@ -453,8 +453,8 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 6, 6, 16], [0, 3, 3, 2], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none,
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -469,9 +469,9 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
   %c16 = arith.constant 16 : index
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<1x225x225x8xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<3x3x8x16xf32>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x225x225x8xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x3x8x16xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -487,15 +487,15 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
       %7 = affine.apply #map1()[%workgroup_id_x]
       %8 = affine.apply #map1()[%workgroup_count_x]
       scf.for %arg2 = %7 to %c16 step %8 {
-        %9 = flow.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>> -> tensor<1x4x4x16xf32>
+        %9 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>> -> tensor<1x4x4x16xf32>
         %10 = affine.apply #map2(%arg0)
         %11 = affine.apply #map2(%arg1)
-        %12 = flow.dispatch.tensor.load %0, offsets = [0, %10, %11, 0], sizes = [1, 9, 9, 8], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x225x225x8xf32>> -> tensor<1x9x9x8xf32>
-        %13 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 3, 8, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x3x8x16xf32>> -> tensor<3x3x8x16xf32>
+        %12 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, %10, %11, 0], sizes = [1, 9, 9, 8], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x225x225x8xf32>> -> tensor<1x9x9x8xf32>
+        %13 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 3, 8, 16], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x3x8x16xf32>> -> tensor<3x3x8x16xf32>
         %14 = linalg.fill ins(%cst : f32) outs(%9 : tensor<1x4x4x16xf32>) -> tensor<1x4x4x16xf32>
         // expected-error @+1 {{expected first level tile size divides the output size [OH, OW, OC]}}
         %15 = linalg.conv_2d_nhwc_hwcf {compilation_info = #compilation, dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%12, %13 : tensor<1x9x9x8xf32>, tensor<3x3x8x16xf32>) outs(%14 : tensor<1x4x4x16xf32>) -> tensor<1x4x4x16xf32>
-        flow.dispatch.tensor.store %15, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : tensor<1x4x4x16xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>>
+        iree_tensor_ext.dispatch.tensor.store %15, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : tensor<1x4x4x16xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>>
       }
     }
   }
@@ -511,8 +511,8 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 4, 4, 16], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none,
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -527,9 +527,9 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
   %c16 = arith.constant 16 : index
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<1x225x225x8xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<3x3x8x16xf32>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x225x225x8xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x3x8x16xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -545,15 +545,15 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
       %7 = affine.apply #map1()[%workgroup_id_x]
       %8 = affine.apply #map1()[%workgroup_count_x]
       scf.for %arg2 = %7 to %c16 step %8 {
-        %9 = flow.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>> -> tensor<1x4x4x16xf32>
+        %9 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>> -> tensor<1x4x4x16xf32>
         %10 = affine.apply #map2(%arg0)
         %11 = affine.apply #map2(%arg1)
-        %12 = flow.dispatch.tensor.load %0, offsets = [0, %10, %11, 0], sizes = [1, 9, 9, 8], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x225x225x8xf32>> -> tensor<1x9x9x8xf32>
-        %13 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 3, 8, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x3x8x16xf32>> -> tensor<3x3x8x16xf32>
+        %12 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, %10, %11, 0], sizes = [1, 9, 9, 8], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x225x225x8xf32>> -> tensor<1x9x9x8xf32>
+        %13 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 3, 8, 16], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<3x3x8x16xf32>> -> tensor<3x3x8x16xf32>
         %14 = linalg.fill ins(%cst : f32) outs(%9 : tensor<1x4x4x16xf32>) -> tensor<1x4x4x16xf32>
         // expected-error @+1 {{expected workgroup tile sizes to be the product of thread tile size and workgroup size}}
         %15 = linalg.conv_2d_nhwc_hwcf {compilation_info = #compilation, dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%12, %13 : tensor<1x9x9x8xf32>, tensor<3x3x8x16xf32>) outs(%14 : tensor<1x4x4x16xf32>) -> tensor<1x4x4x16xf32>
-        flow.dispatch.tensor.store %15, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : tensor<1x4x4x16xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>>
+        iree_tensor_ext.dispatch.tensor.store %15, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : tensor<1x4x4x16xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>>
       }
     }
   }
@@ -569,8 +569,8 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 7, 64], [0, 1, 7, 2], [0, 0, 0, 0, 5, 5], [0, 1, 0, 0]]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none,
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>
@@ -596,8 +596,8 @@ func.func @illegal() attributes {hal.executable.target = #executable_target_vulk
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 7, 64], [0, 1, 7, 2], [0, 0, 0, 0, 1, 1], [0, 0, 1, 1]]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
-    compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none,
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
     max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
     max_workgroup_counts = [65535, 65535, 65535]>>

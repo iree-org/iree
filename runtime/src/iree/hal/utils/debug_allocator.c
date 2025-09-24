@@ -158,8 +158,9 @@ static iree_status_t iree_hal_debug_allocator_fill_on_device(
               IREE_HAL_QUEUE_AFFINITY_ANY, 1, &command, &command_buffer));
 
   iree_hal_semaphore_t* semaphore = NULL;
-  iree_status_t status = iree_hal_semaphore_create(
-      device, 0ull, IREE_HAL_SEMAPHORE_FLAG_NONE, &semaphore);
+  iree_status_t status =
+      iree_hal_semaphore_create(device, IREE_HAL_QUEUE_AFFINITY_ANY, 0ull,
+                                IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &semaphore);
 
   uint64_t signal_value = 1ull;
   if (iree_status_is_ok(status)) {
@@ -176,7 +177,8 @@ static iree_status_t iree_hal_debug_allocator_fill_on_device(
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_semaphore_wait(semaphore, signal_value,
-                                     iree_infinite_timeout());
+                                     iree_infinite_timeout(),
+                                     IREE_HAL_WAIT_FLAG_DEFAULT);
   }
 
   iree_hal_semaphore_release(semaphore);

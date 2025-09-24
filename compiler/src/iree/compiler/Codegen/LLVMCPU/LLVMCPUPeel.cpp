@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -46,7 +47,7 @@ void collectLoopsToPeel(Operation *op,
     if (!loop || iree_compiler::isTiledAndDistributedLoop(loop))
       break;
 
-    LLVM_DEBUG(llvm::dbgs() << "Loop to peel:\n" << *op << "\n");
+    LDBG() << "Loop to peel\n  " << *op;
     loopsToPeel.insert(loop);
   }
 }
@@ -62,18 +63,17 @@ public:
 
 void LLVMCPUPeelPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   llvm::SmallSetVector<scf::ForOp, 8> uniqueLoopsToPeel;
   funcOp.walk([&](Operation *op) {
     if (isa<linalg::LinalgOp, linalg::PackOp>(op)) {
-      LLVM_DEBUG(llvm::dbgs() << "Gather loops to peel from candidate op:\n"
-                              << *op << "\n");
+      LDBG() << "Gather loops to peel from candidate op\n  " << *op;
       collectLoopsToPeel(op, uniqueLoopsToPeel);
     }
   });
 
-  LLVM_DEBUG(llvm::dbgs() << "Peeling loops\n");
+  LDBG() << "Peeling loops";
   // Visiting the loops in outer-to-inner order will prevent loops nested in
   // partial iterations to be peeled again.
   SmallVector<scf::ForOp, 8> outerToInnerLoopsToPeel(uniqueLoopsToPeel.rbegin(),
@@ -81,7 +81,7 @@ void LLVMCPUPeelPass::runOnOperation() {
   IRRewriter rewriter(context);
   linalg::peelLoops(rewriter, outerToInnerLoopsToPeel);
 
-  LLVM_DEBUG(llvm::dbgs() << "Canonicalizing loops\n");
+  LDBG() << "Canonicalizing loops";
   RewritePatternSet patterns(context);
   linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
   scf::populateSCFForLoopCanonicalizationPatterns(patterns);
@@ -89,7 +89,7 @@ void LLVMCPUPeelPass::runOnOperation() {
   context->getLoadedDialect<tensor::TensorDialect>()
       ->getCanonicalizationPatterns(patterns);
   if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
-    LLVM_DEBUG(llvm::dbgs() << "----- cleanup failed -----\n");
+    LDBG() << "----- cleanup failed -----";
     return signalPassFailure();
   }
 }

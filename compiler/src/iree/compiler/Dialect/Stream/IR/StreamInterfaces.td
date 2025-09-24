@@ -16,7 +16,7 @@ include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 def Stream_AffinityAttr : AttrInterface<"AffinityAttr"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
 
-  let summary = [{defines execution context affinity}];
+  let summary = [{Defines execution context affinity.}];
   let description = [{
     WIP; see [#10765](https://github.com/iree-org/iree/issues/10765).
 
@@ -61,9 +61,10 @@ def Stream_AffinityAttr : AttrInterface<"AffinityAttr"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Returns an affinity describing the union with |other| constraints.
+        Returns an affinity describing the union with |other| constraints such
+        that the "optimal" affinity for the particular operation is selected.
         The returned affinity specifies that a particular operation may execute
-        on _either_ of the source affinities.
+        on _any_ of the source affinities.
       }],
       /*retTy=*/"IREE::Stream::AffinityAttr",
       /*methodName=*/"joinOR",
@@ -118,6 +119,12 @@ def Stream_AffinityAttr : AttrInterface<"AffinityAttr"> {
     // Returns true if |lhs| and |rhs| indicate that their operations can
     // execute together on the same execution queue.
     static bool canExecuteTogether(AffinityAttr lhs, AffinityAttr rhs);
+
+    // Returns an affinity representing the optimal affinity from the given set.
+    // The resulting affinity will have a single logical execution context
+    // resolved but doing so may be deferred until runtime.
+    // Returns nullptr if no optimal join is possible.
+    static AffinityAttr joinOR(ArrayRef<AffinityAttr> affinityAttrs);
   }];
 }
 
@@ -196,6 +203,19 @@ def Stream_AffinityOp : OpInterface<"AffinityOpInterface"> {
       /*defaultImplementation=*/[{
         if (value) $_op->setAttr("affinity", value);
         else $_op->removeAttr("affinity");
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the affinity of results from this operation. For most this will
+        be the same as their execution affinity.
+      }],
+      /*retTy=*/"IREE::Stream::AffinityAttr",
+      /*methodName=*/"getResultAffinityAttr",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return $_op.getAffinityAttr();
       }]
     >,
   ];
@@ -323,6 +343,46 @@ def Stream_TimelineOp : OpInterface<"TimelineOpInterface"> {
       /*methodName=*/"getResultTimepoint",
       /*args=*/(ins)
     >,
+  ];
+}
+
+//===----------------------------------------------------------------------===//
+// IREE::Stream::AffinityTopologyAttrInterface
+//===----------------------------------------------------------------------===//
+
+def Stream_AffinityTopologyAttr : AttrInterface<"AffinityTopologyAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
+
+  let summary = [{Defines device-device link topology for transfer elision.}];
+  let description = [{
+    Implementations can use this to query the connection topology between devices.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns whether source has transparent access to target.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"hasTransparentAccess",
+      /*args=*/(ins "IREE::Stream::AffinityAttr":$source, "IREE::Stream::AffinityAttr":$target),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return false; // By default, assume no transparent access
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns whether two devices are connected by a link with unified memory.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"hasUnifiedMemory",
+      /*args=*/(ins "IREE::Stream::AffinityAttr":$source, "IREE::Stream::AffinityAttr":$target),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return false; // By default, assume no unified memory
+      }]
+    >
   ];
 }
 

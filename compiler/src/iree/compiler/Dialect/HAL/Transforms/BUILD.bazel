@@ -4,7 +4,12 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_gentbl_cc_library")
+load(
+    "//build_tools/bazel:build_defs.oss.bzl",
+    "iree_compiler_cc_library",
+    "iree_gentbl_cc_library",
+    "iree_tablegen_doc",
+)
 
 package(
     default_visibility = ["//visibility:public"],
@@ -15,6 +20,7 @@ package(
 iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
+        "AnnotateTargetDevices.cpp",
         "AssignLegacyTargetDevices.cpp",
         "AssignTargetDevices.cpp",
         "CaptureExecutableSources.cpp",
@@ -32,6 +38,7 @@ iree_compiler_cc_library(
         "MaterializeResourceCaches.cpp",
         "MaterializeTargetDevices.cpp",
         "MemoizeDeviceQueries.cpp",
+        "MemoizeDeviceSelection.cpp",
         "OutlineMemoizeRegions.cpp",
         "Passes.cpp",
         "Passes.h.inc",
@@ -41,6 +48,7 @@ iree_compiler_cc_library(
         "ResolveDeviceAliases.cpp",
         "ResolveDevicePromises.cpp",
         "ResolveExportOrdinals.cpp",
+        "ResolveTopologyQueries.cpp",
         "SerializeExecutables.cpp",
         "StripExecutableContents.cpp",
         "SubstituteExecutables.cpp",
@@ -59,6 +67,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/HAL/Conversion/HALToHAL",
         "//compiler/src/iree/compiler/Dialect/HAL/Conversion/StandardToHAL",
         "//compiler/src/iree/compiler/Dialect/HAL/Conversion/StreamToHAL",
+        "//compiler/src/iree/compiler/Dialect/HAL/Conversion/StreamToHAL:Utils",
         "//compiler/src/iree/compiler/Dialect/HAL/Conversion/UtilToHAL",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//compiler/src/iree/compiler/Dialect/HAL/IR:HALDialect",
@@ -100,6 +109,24 @@ iree_gentbl_cc_library(
         (
             ["--gen-pass-decls"],
             "Passes.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    deps = [
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
+)
+
+iree_tablegen_doc(
+    name = "HALPassesDocGen",
+    category = "Passes",
+    tbl_outs = [
+        (
+            [
+                "--gen-pass-doc",
+            ],
+            "HALPasses.md",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",

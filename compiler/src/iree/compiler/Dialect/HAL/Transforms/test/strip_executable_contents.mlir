@@ -5,7 +5,7 @@ hal.executable @ex {
   // CHECK: hal.executable.variant public @backend
   hal.executable.variant @backend target(#hal.executable.target<"backend", "format">) {
     // CHECK: hal.executable.export public @entry0
-    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
+    hal.executable.export public @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
       #hal.pipeline.binding<storage_buffer>,
       #hal.pipeline.binding<storage_buffer>
     ]>)

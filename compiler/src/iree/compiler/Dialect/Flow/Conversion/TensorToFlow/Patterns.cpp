@@ -9,6 +9,8 @@
 #include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -16,6 +18,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
+#include "mlir/IR/OpDefinition.h"
 
 namespace mlir::iree_compiler::IREE::Flow {
 
@@ -47,7 +50,7 @@ struct ConvertLinalgFillPattern final
 /// Convert tensor.insert_slice ops into flow.tensor.update ops where possible.
 struct ConvertTensorInsertSlicePattern
     : public OpRewritePattern<tensor::InsertSliceOp> {
-  using OpRewritePattern<tensor::InsertSliceOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::InsertSliceOp insertOp,
                                 PatternRewriter &rewriter) const override {
     return convertInsertSliceOpToFlowUpdateOp(rewriter, insertOp);
@@ -56,7 +59,7 @@ struct ConvertTensorInsertSlicePattern
 
 /// Convert tensor.insert ops into flow.tensor.store ops where possible.
 struct ConvertTensorInsertPattern : public OpRewritePattern<tensor::InsertOp> {
-  using OpRewritePattern<tensor::InsertOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::InsertOp insertOp,
                                 PatternRewriter &rewriter) const override {
     if (insertOp->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
@@ -72,7 +75,7 @@ struct ConvertTensorInsertPattern : public OpRewritePattern<tensor::InsertOp> {
 /// Convert tensor.extract_slice ops into flow.tensor.slice ops where possible.
 struct ConvertTensorExtractSlicePattern
     : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
     return convertExtractSliceOpToFlowSliceOp(rewriter, sliceOp);
@@ -81,7 +84,7 @@ struct ConvertTensorExtractSlicePattern
 
 struct ConvertTensorExtractPattern
     : public OpRewritePattern<tensor::ExtractOp> {
-  using OpRewritePattern<tensor::ExtractOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tensor::ExtractOp op,
                                 PatternRewriter &rewriter) const override {
@@ -94,9 +97,24 @@ struct ConvertTensorExtractPattern
   }
 };
 
+struct ConvertTensorExtBitcastPattern
+    : public OpRewritePattern<TensorExt::BitCastOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(TensorExt::BitCastOp op,
+                                PatternRewriter &rewriter) const override {
+    if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
+      return failure();
+    }
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorBitCastOp>(
+        op, op.getResult().getType(), op.getSource(), op.getSourceDims(),
+        op.getResultDims());
+    return success();
+  }
+};
+
 struct ConvertTensorBitcastPattern
     : public OpRewritePattern<tensor::BitcastOp> {
-  using OpRewritePattern<tensor::BitcastOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::BitcastOp op,
                                 PatternRewriter &rewriter) const override {
     if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
@@ -112,7 +130,7 @@ struct ConvertTensorBitcastPattern
 };
 
 struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
-  using OpRewritePattern<tensor::CastOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::CastOp op,
                                 PatternRewriter &rewriter) const override {
     if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
@@ -146,11 +164,11 @@ struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
                                 ? inputType.getDimSize(position)
                                 : resultType.getDimSize(position);
           dimSizes[position] =
-              rewriter.create<arith::ConstantIndexOp>(loc, dimSize);
+              arith::ConstantIndexOp::create(rewriter, loc, dimSize);
         } else {
           // Dynamic dim.
           dimSizes[position] =
-              rewriter.create<tensor::DimOp>(loc, input, position);
+              tensor::DimOp::create(rewriter, loc, input, position);
         }
       }
 
@@ -176,7 +194,7 @@ struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
 };
 
 struct ConvertTensorConcatPattern : public OpRewritePattern<tensor::ConcatOp> {
-  using OpRewritePattern<tensor::ConcatOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tensor::ConcatOp concatOp,
                                 PatternRewriter &rewriter) const override {
@@ -213,18 +231,32 @@ struct ConvertTensorConcatPattern : public OpRewritePattern<tensor::ConcatOp> {
         concatOffsets.push_back(outputShape[0]);
         outputShape[0] = affine::makeComposedFoldedAffineApply(
             rewriter, loc, addExpr, {outputShape[0], inputShape[0]});
+
+        // Any dims outside of concatenation axis (only `0` supported currently)
+        // should be equal. Fill in any dynamic dims in `outputShape` known from
+        // other inputs.
+        // Ex. concat([?,?], [?,12]) -> [?,12]
+        for (auto [dimIdx, outDim] :
+             llvm::drop_begin(llvm::enumerate(outputShape))) {
+          OpFoldResult inDim = inputShape[dimIdx];
+          bool outDimIsDynamic = isa<Value>(outDim);
+          bool inDimIsDynamic = isa<Value>(inDim);
+          if (outDimIsDynamic && !inDimIsDynamic) {
+            outputShape[dimIdx] = inDim;
+          }
+        }
       }
       inputShapes.emplace_back(std::move(inputShape));
     }
 
-    Value replacement = rewriter.create<tensor::EmptyOp>(
-        loc, outputShape, concatOp.getType().getElementType());
+    Value replacement = tensor::EmptyOp::create(
+        rewriter, loc, outputShape, concatOp.getType().getElementType());
 
     SmallVector<int64_t> resultStaticDims;
     SmallVector<Value> resultDynamicDims;
     dispatchIndexOpFoldResults(outputShape, resultDynamicDims,
                                resultStaticDims);
-    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
     // Generate the `flow.tensor.update` operations for the concat.
     for (auto [index, input] : llvm::enumerate(concatOp.getInputs())) {
       SmallVector<int64_t> inputStaticShape;
@@ -234,9 +266,9 @@ struct ConvertTensorConcatPattern : public OpRewritePattern<tensor::ConcatOp> {
       SmallVector<Value> offsets(inputStaticShape.size(), zero);
       offsets[0] =
           getValueOrCreateConstantIndexOp(rewriter, loc, concatOffsets[index]);
-      replacement = rewriter.create<IREE::Flow::TensorUpdateOp>(
-          loc, replacement.getType(), replacement, resultDynamicDims, offsets,
-          input, inputDynamicShape);
+      replacement = IREE::Flow::TensorUpdateOp::create(
+          rewriter, loc, replacement.getType(), replacement, resultDynamicDims,
+          offsets, input, inputDynamicShape);
     }
     rewriter.replaceOp(concatOp, replacement);
     return success();
@@ -245,7 +277,7 @@ struct ConvertTensorConcatPattern : public OpRewritePattern<tensor::ConcatOp> {
 
 struct ConvertTensorFromElementsPattern
     : public OpRewritePattern<tensor::FromElementsOp> {
-  using OpRewritePattern<tensor::FromElementsOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::FromElementsOp op,
                                 PatternRewriter &rewriter) const override {
     // TODO: This pattern was mainly added to iron out some kinks specific to
@@ -267,19 +299,20 @@ struct ConvertTensorFromElementsPattern
     }
 
     const int64_t rank = tensorType.getRank();
-    Value result = rewriter.create<tensor::EmptyOp>(
-        op.getLoc(), tensorType.getShape(), tensorType.getElementType());
+    Value result =
+        tensor::EmptyOp::create(rewriter, op.getLoc(), tensorType.getShape(),
+                                tensorType.getElementType());
     SmallVector<Value> ivs(rank);
     for (int i = 0, s = op.getNumOperands(); i < s; ++i) {
       int64_t index = i;
       for (int j = rank - 1; j >= 0; --j) {
         int64_t iv = index % tensorType.getDimSize(j);
         index = index / tensorType.getDimSize(j);
-        ivs[j] = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), iv);
+        ivs[j] = arith::ConstantIndexOp::create(rewriter, op.getLoc(), iv);
       }
 
-      result = rewriter.create<Flow::TensorStoreOp>(
-          op.getLoc(), op.getOperand(i), result, ivs);
+      result = Flow::TensorStoreOp::create(rewriter, op.getLoc(),
+                                           op.getOperand(i), result, ivs);
     }
 
     rewriter.replaceOp(op, result);
@@ -295,7 +328,7 @@ static SmallVector<Value> getDynamicTensorSizes(OpBuilder &builder,
   SmallVector<Value> sizes;
   for (const auto [idx, size] : enumerate(type.getShape())) {
     if (type.isDynamicDim(idx)) {
-      Value dim = builder.create<tensor::DimOp>(loc, tensor, idx);
+      Value dim = tensor::DimOp::create(builder, loc, tensor, idx);
       sizes.push_back(dim);
     }
   }
@@ -305,7 +338,7 @@ static SmallVector<Value> getDynamicTensorSizes(OpBuilder &builder,
 /// Convert tensor.reshape ops into flow.tensor.reshape ops where possible.
 struct ConvertTensorDialectReshapeOpPattern
     : public OpRewritePattern<tensor::ReshapeOp> {
-  using OpRewritePattern<tensor::ReshapeOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::ReshapeOp op,
                                 PatternRewriter &rewriter) const override {
     if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
@@ -328,14 +361,14 @@ struct ConvertTensorDialectReshapeOpPattern
     // (ignore static dimensions)
     SmallVector<Value> destSizes;
     for (int i = 0; i < shapeOperandType.getShape()[0]; i++) {
-      Value idx = rewriter.create<arith::ConstantIndexOp>(loc, i);
-      Value element = rewriter.create<tensor::ExtractOp>(loc, op.getShape(),
-                                                         ValueRange({idx}));
+      Value idx = arith::ConstantIndexOp::create(rewriter, loc, i);
+      Value element = tensor::ExtractOp::create(rewriter, loc, op.getShape(),
+                                                ValueRange({idx}));
       if (ShapedType::isDynamic(resultType.getShape()[i])) {
         auto elementTy = element.getType();
         if (isa<IntegerType>(elementTy)) {
-          element = rewriter.create<arith::IndexCastOp>(
-              loc, rewriter.getIndexType(), element);
+          element = arith::IndexCastOp::create(
+              rewriter, loc, rewriter.getIndexType(), element);
         }
         destSizes.push_back(element);
       }
@@ -369,7 +402,7 @@ struct ConvertTensorReshapePattern : public OpRewritePattern<TensorReshapeOp> {
     SmallVector<Value> outputDynamicShapes;
     for (auto [resultShape, outputShp] : llvm::zip_equal(
              reshapeOp.getResultType().getShape(), outputShape[0])) {
-      if (!ShapedType::isDynamic(resultShape))
+      if (ShapedType::isStatic(resultShape))
         continue;
       outputDynamicShapes.push_back(getValueOrCreateConstantIndexOp(
           rewriter, reshapeOp.getLoc(), outputShp));
@@ -385,14 +418,15 @@ struct ConvertTensorReshapePattern : public OpRewritePattern<TensorReshapeOp> {
 
 void populateTensorToFlowConversionPatterns(MLIRContext *context,
                                             RewritePatternSet &patterns) {
-  patterns.insert<ConvertLinalgFillPattern, ConvertTensorBitcastPattern,
-                  ConvertTensorCastPattern, ConvertTensorConcatPattern,
-                  ConvertTensorExtractPattern, ConvertTensorExtractSlicePattern,
-                  ConvertTensorInsertSlicePattern, ConvertTensorInsertPattern,
-                  ConvertTensorFromElementsPattern,
-                  ConvertTensorDialectReshapeOpPattern,
-                  ConvertTensorReshapePattern<tensor::CollapseShapeOp>,
-                  ConvertTensorReshapePattern<tensor::ExpandShapeOp>>(context);
+  patterns
+      .insert<ConvertLinalgFillPattern, ConvertTensorBitcastPattern,
+              ConvertTensorExtBitcastPattern, ConvertTensorCastPattern,
+              ConvertTensorConcatPattern, ConvertTensorExtractPattern,
+              ConvertTensorExtractSlicePattern, ConvertTensorInsertSlicePattern,
+              ConvertTensorInsertPattern, ConvertTensorFromElementsPattern,
+              ConvertTensorDialectReshapeOpPattern,
+              ConvertTensorReshapePattern<tensor::CollapseShapeOp>,
+              ConvertTensorReshapePattern<tensor::ExpandShapeOp>>(context);
 }
 
 } // namespace mlir::iree_compiler::IREE::Flow

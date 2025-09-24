@@ -393,6 +393,21 @@ bool AffinityAttr::canExecuteTogether(AffinityAttr lhs, AffinityAttr rhs) {
   return lhs.isExecutableWith(rhs);
 }
 
+// static
+AffinityAttr AffinityAttr::joinOR(ArrayRef<AffinityAttr> affinityAttrs) {
+  if (affinityAttrs.empty()) {
+    return nullptr;
+  } else if (affinityAttrs.size() == 1) {
+    return affinityAttrs.front();
+  } else {
+    AffinityAttr resultAttr;
+    for (auto affinityAttr : affinityAttrs) {
+      resultAttr = resultAttr ? resultAttr.joinOR(affinityAttr) : affinityAttr;
+    }
+    return resultAttr;
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // #stream.partitioning_config
 //===----------------------------------------------------------------------===//
@@ -511,8 +526,8 @@ Value ResourceType::createSubrangeOp(Location loc, Value resource,
                                      Value resourceSize, Value subrangeOffset,
                                      Value subrangeLength,
                                      OpBuilder &builder) const {
-  return builder.create<IREE::Stream::ResourceSubviewOp>(
-      loc, resource, resourceSize, subrangeOffset, subrangeLength);
+  return IREE::Stream::ResourceSubviewOp::create(
+      builder, loc, resource, resourceSize, subrangeOffset, subrangeLength);
 }
 
 //===----------------------------------------------------------------------===//

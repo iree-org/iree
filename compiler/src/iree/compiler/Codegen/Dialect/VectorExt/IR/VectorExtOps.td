@@ -10,6 +10,7 @@
 include "mlir/Interfaces/VectorInterfaces.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtBase.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtAttrs.td"
+include "mlir/Dialect/Vector/Interfaces/MaskableOpInterface.td"
 include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtInterfaces.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -30,7 +31,7 @@ def IREEVectorExt_ToLayoutOp : IREEVectorExt_PureOp<"to_layout", [
   Pure,
   AllTypesMatch<["input", "output"]>
   ]> {
-  let summary = "Layout conversion operator";
+  let summary = [{Layout conversion operator.}];
   let description = [{
     The layout conversion operator takes a shaped value and a layout and
     transforms the value to have that layout.
@@ -78,7 +79,7 @@ def IREEVectorExt_ToLayoutOp : IREEVectorExt_PureOp<"to_layout", [
 
 def IREEVectorExt_ToSIMDOp : IREEVectorExt_PureOp<"to_simd",
     [SameOperandsAndResultElementType, Pure]> {
-  let summary = "SIMT to SIMD conversion operation";
+  let summary = [{SIMT to SIMD conversion operation.}];
   let description = [{
     This operation is a temporary operation useful for source/target
     materializations when doing type conversions between distributed and not
@@ -97,7 +98,7 @@ def IREEVectorExt_ToSIMDOp : IREEVectorExt_PureOp<"to_simd",
 
 def IREEVectorExt_ToSIMTOp : IREEVectorExt_PureOp<"to_simt",
     [SameOperandsAndResultElementType, Pure]> {
-  let summary = "SIMD to SIMT conversion operation";
+  let summary = [{SIMD to SIMT conversion operation.}];
   let description = [{
     This operation is a temporary operation useful for source/target
     materializations when doing type conversions between distributed and not
@@ -118,20 +119,21 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     DeclareOpInterfaceMethods<VectorTransferOpInterface>,
     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
     DeclareOpInterfaceMethods<ConditionallySpeculatable>,
+    DeclareOpInterfaceMethods<MaskableOpInterface>,
     AttrSizedOperandSegments
-  ]>,
-  Arguments<(ins AnyShaped:$source,
-                 Variadic<Index>:$indices,
-                 Variadic<VectorOfAnyRankOf<[Index]>>:$index_vecs,
-                 BoolArrayAttr:$indexed,
-                 AffineMapArrayAttr:$indexed_maps,
-                 AffineMapAttr:$permutation_map,
-                 AnyType:$padding,
-                 Optional<VectorOfNonZeroRankOf<[I1]>>:$mask,
-                 BoolArrayAttr:$in_bounds)>,
-  Results<(outs AnyVectorOfAnyRank:$vector)> {
+  ]> {
+  let arguments = (ins AnyShaped:$base,
+                       Variadic<Index>:$indices,
+                       Variadic<VectorOfAnyRankOf<[Index]>>:$index_vecs,
+                       BoolArrayAttr:$indexed,
+                       AffineMapArrayAttr:$indexed_maps,
+                       AffineMapAttr:$permutation_map,
+                       AnyType:$padding,
+                       Optional<VectorOfNonZeroRankOf<[I1]>>:$mask,
+                       BoolArrayAttr:$in_bounds);
+  let results = (outs AnyVectorOfAnyRank:$vector);
 
-  let summary = "Gathers a supervector from memory into an SSA vector value.";
+  let summary = [{Gathers a supervector from memory into an SSA vector value.}];
 
   let description = [{
     The iree_vector_ext.transfer_gather operation provides a structured
@@ -139,29 +141,29 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     the result vector and the memory dimensions being indexed.
 
     The operation is a generalization of `vector.transfer_read` op, where the
-    slice from which the read is performed is not guranteed to be contigious,
+    slice from which the read is performed is not guranteed to be contiguous,
     and instead how the slice is gathered is defined explicitly in the
     operation.
 
     The operation can be thought of as:
-      1. A contigious slice gathered from the source as described by the operation
-      2. A `vector.transfer_read` on the contigious slice
+      1. A contiguous slice gathered from the base as described by the operation
+      2. A `vector.transfer_read` on the contiguous slice
 
     The operation defines `permutation_map`, `padding`, `mask`, `in_bounds` in
     the same way as `vector.transfer_read` defines, but on the inferred
-    contigious slice.
+    contiguous slice.
 
-    The other parameters of the operation define how the contigious slice is
+    The other parameters of the operation define how the contiguous slice is
     gathered from the source. `indices` define a base to offset the source by.
     `indexed` defines for each dimension if the dimension is gathered or
-    contigious.
+    contiguous.
 
     The `indices` contains a base to offset the source by. The `indexed` array
     defines if a dimension is gathered or not. For example, for the following
     gather:
 
     ```
-    slice[i, j, k] = source[i + i_offset][j][indices[i][j][k]]
+    slice[i, j, k] = base[i + i_offset][j][indices[i][j][k]]
     ```
 
     The operation would represent this as:
@@ -178,7 +180,7 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     indexed. For example, for the following gather:
 
     ```
-    slice[i, j, k] = source[i][indices0[i] + offset][indices1[j, k]]
+    slice[i, j, k] = base[i][indices0[i] + offset][indices1[j, k]]
     ```
 
     The indexing would be described by:
@@ -194,21 +196,21 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     ```
 
     With these additional parameters, the operation can define a supervector
-    read from a non-contigious slice. For example:
+    read from a non-contiguous slice. For example:
 
     ```
-    source: memref<8192x8x16xf32>
+    base: memref<8192x8x16xf32>
     indices0 : vector<2xindex>
     indices1 : vector<4x8xindex>
 
-    slice[i, j, k] = source[indices0[k]][j][indices1[i, j]]
+    slice[i, j, k] = base[indices0[k]][j][indices1[i, j]]
     vector = read(slice) : memref<8192x8x16xf32> -> vector<16x8x2xf32>
     ```
 
     Can be represented by:
 
     ```
-    %vector = vector.transfer_gather %source[0, 0, 0](%indices0, %indices1) {
+    %vector = vector.transfer_gather %base[0, 0, 0](%indices0, %indices1) {
       gather_dims = [0, 2],
       index_maps = [
         affine_map<(i, j, k) -> (k)>,
@@ -222,7 +224,7 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     The crucial structure of the operation relies on the index_vec and
     the result vector's indexing being defined based on the dimensions of the
     memory. This mapping can be exploited to simplify gathered dimensions
-    to contigious dimensions.
+    to contiguous dimensions.
   }];
 
   let extraClassDeclaration = [{

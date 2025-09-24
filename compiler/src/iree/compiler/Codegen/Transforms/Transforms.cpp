@@ -14,13 +14,14 @@
 #include <cassert>
 #include <cstdint>
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/FormatVariadic.h"
 #include "mlir/Analysis/Liveness.h"
 #include "mlir/Analysis/Presburger/IntegerRelation.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -62,7 +63,9 @@ static SliceAndDynamicDims cloneOffsetsSizesAndStridesImpl(
     return sliceFilter(op, nonIndexComputationOperands, baseOp);
   };
   SetVector<Operation *> slice;
-  getBackwardSlice(baseOp, &slice, options);
+  [[maybe_unused]] LogicalResult ret =
+      getBackwardSlice(baseOp, &slice, options);
+  assert(ret.succeeded());
   IRMapping bvm;
   for (auto origOp : slice) {
     builder.clone(*origOp, bvm);
@@ -98,7 +101,7 @@ static SliceAndDynamicDims cloneOffsetsSizesAndStridesImpl(
 
 SliceAndDynamicDims
 cloneOffsetsSizesAndStrides(OpBuilder &builder,
-                            IREE::Flow::DispatchTensorStoreOp storeOp) {
+                            IREE::TensorExt::DispatchTensorStoreOp storeOp) {
   return cloneOffsetsSizesAndStridesImpl(
       builder, storeOp, ValueRange{storeOp.getValue(), storeOp.getTarget()},
       storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
@@ -107,7 +110,7 @@ cloneOffsetsSizesAndStrides(OpBuilder &builder,
 
 SliceAndDynamicDims
 cloneOffsetsSizesAndStrides(OpBuilder &builder,
-                            IREE::Flow::DispatchTensorLoadOp loadOp) {
+                            IREE::TensorExt::DispatchTensorLoadOp loadOp) {
   return cloneOffsetsSizesAndStridesImpl(
       builder, loadOp, ValueRange{loadOp.getSource()}, loadOp.getMixedOffsets(),
       loadOp.getMixedSizes(), loadOp.getMixedStrides(), loadOp.getSourceDims());
@@ -127,11 +130,11 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
     OpBuilder::InsertionGuard g(builder);
     builder.setInsertionPointToStart(&funcOp.getFunctionBody().front());
     Value allocation =
-        builder.create<AllocLikeOpType>(loc, allocLikeType, alignmentAttr);
+        AllocLikeOpType::create(builder, loc, allocLikeType, alignmentAttr);
     if (std::is_same<AllocLikeOpType, memref::AllocOp>::value) {
       builder.setInsertionPoint(
           funcOp.getFunctionBody().front().getTerminator());
-      builder.create<memref::DeallocOp>(loc, allocation);
+      memref::DeallocOp::create(builder, loc, allocation);
     }
     return allocation;
   }
@@ -160,7 +163,7 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
       }
 
       if (!vscale)
-        vscale = builder.create<vector::VectorScaleOp>(loc);
+        vscale = vector::VectorScaleOp::create(builder, loc);
       return affine::materializeComputedBound(
           builder, loc, ub->map, {std::make_pair(vscale, std::nullopt)});
     }
@@ -190,7 +193,7 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
 
     int index = 0;
     for (auto dimSize : allocLikeType.getShape()) {
-      if (!ShapedType::isDynamic(dimSize)) {
+      if (ShapedType::isStatic(dimSize)) {
         auto dimSizeAttr = builder.getIndexAttr(dimSize);
         allocSizes.push_back(dimSizeAttr);
         subviewSizes.push_back(dimSizeAttr);
@@ -213,26 +216,26 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
     dispatchIndexOpFoldResults(allocSizes, dynamicSizes, staticShape);
     auto allocationType = allocLikeType.clone(staticShape);
 
-    allocation = builder.create<AllocLikeOpType>(loc, allocationType,
-                                                 dynamicSizes, alignmentAttr);
+    allocation = AllocLikeOpType::create(builder, loc, allocationType,
+                                         dynamicSizes, alignmentAttr);
   }
 
   SmallVector<OpFoldResult> offsets(allocLikeType.getRank(),
                                     builder.getIndexAttr(0));
   SmallVector<OpFoldResult> strides(allocLikeType.getRank(),
                                     builder.getIndexAttr(1));
-  Value subviewOp = builder.create<memref::SubViewOp>(loc, allocation, offsets,
-                                                      subviewSizes, strides);
+  Value subviewOp = memref::SubViewOp::create(builder, loc, allocation, offsets,
+                                              subviewSizes, strides);
 
   // Cast it back to the original types to prevent consumer op's verification
   // error. It could happen when the consumer op is a memref.subview op.
   if (subviewOp.getType() != allocLikeType) {
-    subviewOp = builder.create<memref::CastOp>(loc, allocLikeType, subviewOp);
+    subviewOp = memref::CastOp::create(builder, loc, allocLikeType, subviewOp);
   }
 
   if (std::is_same<AllocLikeOpType, memref::AllocOp>::value) {
     builder.setInsertionPoint(funcOp.getFunctionBody().front().getTerminator());
-    builder.create<memref::DeallocOp>(loc, allocation);
+    memref::DeallocOp::create(builder, loc, allocation);
   }
 
   return subviewOp;
@@ -346,24 +349,30 @@ template void hoistStaticallyBoundAllocationsInFunc<memref::AllocaOp>(
     std::optional<vector::VscaleRange> vscaleRange);
 
 //===---------------------------------------------------------------------===//
-// Lowering `flow.dispatch.workgroup_count_from_slice` operation.
+// Lowering `iree_tensor_ext.dispatch.workgroup_count_from_slice` operation.
 //===---------------------------------------------------------------------===//
 
-LogicalResult lowerWorkgroupCountFromSliceOp(
-    RewriterBase &rewriter,
-    IREE::Flow::DispatchWorkgroupCountFromSliceOp workgroupCountOp,
-    mlir::FunctionOpInterface entryPointFn,
-    ArrayRef<OpFoldResult> workgroupCount, int maxWorkgroupParallelDims) {
+FailureOr<SmallVector<OpFoldResult>> materializeWorkgroupCountComputation(
+    RewriterBase &rewriter, mlir::FunctionOpInterface entryPointFn,
+    ArrayRef<OpFoldResult> workgroupCount, ValueRange workloadVals) {
   // Compute the backward slice of the workgroup count operations.
   BackwardSliceOptions options;
-  options.filter = [](Operation *op) {
-    return !isa<IREE::Flow::DispatchWorkloadOrdinalOp>(op);
+  SmallVector<IREE::TensorExt::DispatchWorkloadOrdinalOp> leaves;
+  options.filter = [&leaves](Operation *op) {
+    if (auto ordinalOp =
+            dyn_cast<IREE::TensorExt::DispatchWorkloadOrdinalOp>(op)) {
+      leaves.push_back(ordinalOp);
+      return false;
+    }
+    return true;
   };
   options.inclusive = true;
   llvm::SetVector<Operation *> slice;
   for (auto ofr : workgroupCount) {
     if (auto val = dyn_cast<Value>(ofr)) {
-      mlir::getBackwardSlice(val, &slice, options);
+      [[maybe_unused]] LogicalResult result =
+          getBackwardSlice(val, &slice, options);
+      assert(result.succeeded());
     }
   }
   // Since there are more than one slices, sort the operations again.
@@ -373,33 +382,26 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
   // Insert the slice into workgroup count region with all `hal.constant.index`
   // operations replaced with arguments (drop the front argument since that is
   // `hal.device`).
-  auto workloadVals = workgroupCountOp.getOperands();
   IRMapping map;
-  // Map `flow.dispatch.constant_ordinal` op with the corresponding operand of
-  // the `flow.dispatch.workgroup_count_default` operation.
-  SmallVector<IREE::Flow::DispatchWorkloadOrdinalOp> ordinalOps;
-  entryPointFn.walk([&](IREE::Flow::DispatchWorkloadOrdinalOp ordinalOp) {
-    ordinalOps.push_back(ordinalOp);
-  });
-  for (auto ordinalOp : ordinalOps) {
+  for (auto ordinalOp : leaves) {
+    // Map `flow.dispatch.constant_ordinal` op with the corresponding operand of
+    // the `flow.dispatch.workgroup_count_default` operation.
     int64_t ordinal = ordinalOp.getOrdinal().getSExtValue();
     if (ordinal >= workloadVals.size()) {
-      ordinalOp.emitOpError(
+      return ordinalOp.emitOpError(
           "ordinal number is higher than the number of workloads captured in "
           "the workgroup count region");
     }
     map.map(ordinalOp.getResult(),
             workloadVals[ordinalOp.getOrdinal().getSExtValue()]);
   }
-  OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPoint(workgroupCountOp);
   for (auto op : slice) {
     // TODO(#13038) This is a WAR for the these ops ending up in workgroup count
     // computation. They should not. Some pre-processing at MaterializeEncoding
     // time might make these go away.
     if (isa<IREE::Codegen::QueryTileSizesOp>(op)) {
       Value constVal =
-          rewriter.create<arith::ConstantIndexOp>(op->getLoc(), 16);
+          arith::ConstantIndexOp::create(rewriter, op->getLoc(), 16);
       for (auto result : op->getResults()) {
         map.map(result, constVal);
       }
@@ -416,6 +418,28 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
     } else {
       results.push_back(ofr);
     }
+  }
+  return results;
+}
+
+LogicalResult lowerWorkgroupCountFromSliceOp(
+    RewriterBase &rewriter,
+    IREE::TensorExt::DispatchWorkgroupCountFromSliceOp workgroupCountOp,
+    mlir::FunctionOpInterface entryPointFn,
+    ArrayRef<OpFoldResult> workgroupCount, int maxWorkgroupParallelDims) {
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(workgroupCountOp);
+
+  SmallVector<OpFoldResult> results;
+  {
+    FailureOr<SmallVector<OpFoldResult>> resultsOr =
+        materializeWorkgroupCountComputation(rewriter, entryPointFn,
+                                             workgroupCount,
+                                             workgroupCountOp.getOperands());
+    if (failed(resultsOr)) {
+      return failure();
+    }
+    std::swap(results, resultsOr.value());
   }
 
   // The `maxWorkgroupParallelDims` represents the maximum dimension number
@@ -447,10 +471,6 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
   }
   rewriter.replaceOp(workgroupCountOp,
                      getValueOrCreateConstantIndexOp(rewriter, loc, results));
-  for (auto ordinalOp : ordinalOps) {
-    rewriter.replaceOp(ordinalOp, ordinalOp.getOperand());
-  }
-
   return success();
 }
 
@@ -466,7 +486,8 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
   if (!body) {
     return success();
   }
-  auto countOps = body->getOps<IREE::Flow::DispatchWorkgroupCountFromSliceOp>();
+  auto countOps =
+      body->getOps<IREE::TensorExt::DispatchWorkgroupCountFromSliceOp>();
   if (countOps.empty()) {
     // If there are no `flow.dispatch.workgroup_count_default` operations
     // do nothing.
@@ -480,6 +501,167 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
   return lowerWorkgroupCountFromSliceOp(rewriter, *countOps.begin(),
                                         entryPointFn, workgroupCount,
                                         maxWorkgroupParallelDims);
+}
+
+/// Pattern to fold `scf.forall` created from split reduction with an
+/// `scf.forall` created by workgroup distribution
+namespace {
+
+// Given a list of workgroup mappings, finds the highest workgroup mapping
+// in the list and returns the workgroup mapping "one more" than the highest.
+static IREE::Codegen::WorkgroupMappingAttr
+getNextWorkgroupMapping(IREE::Codegen::WorkgroupMappingAttr mapping) {
+  MLIRContext *context = mapping.getContext();
+  switch (mapping.getId()) {
+  case IREE::Codegen::WorkgroupId::IdX:
+    return IREE::Codegen::WorkgroupMappingAttr::get(
+        context, IREE::Codegen::WorkgroupId::IdY);
+  case IREE::Codegen::WorkgroupId::IdY:
+    return IREE::Codegen::WorkgroupMappingAttr::get(
+        context, IREE::Codegen::WorkgroupId::IdZ);
+  case IREE::Codegen::WorkgroupId::IdZ:
+    return IREE::Codegen::WorkgroupMappingAttr::get(
+        context, IREE::Codegen::WorkgroupId::IdZ,
+        mapping.getDelinearizedDim() + 1);
+  }
+  llvm_unreachable("Unhandled WorkgroupId case");
+}
+
+static SmallVector<Attribute> appendSplitReductionMappingToWorkgroupMapping(
+    ArrayRef<Attribute> currWorkgroupMapping,
+    ArrayRef<Attribute> splitReductionMapping) {
+  auto castedCurrWorkgroupMapping =
+      llvm::map_to_vector(currWorkgroupMapping, [](Attribute attr) {
+        return cast<IREE::Codegen::WorkgroupMappingAttr>(attr);
+      });
+  llvm::sort(castedCurrWorkgroupMapping);
+
+  auto castedSplitReductionMapping =
+      llvm::map_to_vector(splitReductionMapping, [](Attribute attr) {
+        return cast<IREE::LinalgExt::SplitReductionMappingAttr>(attr);
+      });
+  llvm::sort(castedSplitReductionMapping);
+
+  IREE::Codegen::WorkgroupMappingAttr currHighestMapping =
+      castedCurrWorkgroupMapping.back();
+  DenseMap<IREE::LinalgExt::SplitReductionMappingAttr,
+           IREE::Codegen::WorkgroupMappingAttr>
+      splitToWorkgroupMap;
+
+  for (IREE::LinalgExt::SplitReductionMappingAttr mapping :
+       castedSplitReductionMapping) {
+    IREE::Codegen::WorkgroupMappingAttr nextHighestMapping =
+        getNextWorkgroupMapping(currHighestMapping);
+    splitToWorkgroupMap[mapping] = nextHighestMapping;
+    currHighestMapping = nextHighestMapping;
+  }
+
+  auto combinedMapping = llvm::map_to_vector(
+      splitReductionMapping, [&](Attribute attr) -> Attribute {
+        return splitToWorkgroupMap.lookup(
+            cast<IREE::LinalgExt::SplitReductionMappingAttr>(attr));
+      });
+  llvm::append_range(combinedMapping, currWorkgroupMapping);
+  return combinedMapping;
+}
+
+// Pattern to fold the `scf.forall` produced by split reduction
+// and the one produced by workgroup distribution. The newly created
+// `scf.forall` has rank equal to the sum of the two `scf.forall`s merged,
+// with the higher dimensions corresponding to the split-reduction loop
+// and lower corresponding to the workgoup mapping. The newly created
+// loop also has workgroup mapping.
+struct FoldSplitReductionForallWithWorkgroupForall
+    : public OpRewritePattern<scf::ForallOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(scf::ForallOp forallOp,
+                                PatternRewriter &rewriter) const override {
+    if (forallOp.getNumResults() != 0) {
+      return rewriter.notifyMatchFailure(
+          forallOp, "unhandled operation with return values");
+    }
+
+    std::optional<ArrayAttr> mappingAttr = forallOp.getMapping();
+    if (!mappingAttr) {
+      return rewriter.notifyMatchFailure(forallOp,
+                                         "not split reduction scf.forall");
+    }
+    if (failed(IREE::LinalgExt::SplitReductionMappingAttr::verifyAttrList(
+            rewriter.getContext(), forallOp.getLoc(), mappingAttr->getValue(),
+            /*emitDiagnosticsErrors =*/false))) {
+      return rewriter.notifyMatchFailure(
+          forallOp, "invalid split reduction mapping attribute list");
+    }
+
+    // Get all workgroup mapping loops. It is assumed that the workgroup mapping
+    // loop is nested within the split reduction loop.
+    auto nestedForallOps = forallOp.getOps<scf::ForallOp>();
+
+    // For now bail on more than one scf.forall ops.
+    if (!llvm::hasSingleElement(nestedForallOps)) {
+      return rewriter.notifyMatchFailure(
+          forallOp, "unhandled multiple `scf.forall` ops nested within the "
+                    "split-reduction loop");
+    }
+    scf::ForallOp workgroupLoop = *nestedForallOps.begin();
+    if (workgroupLoop.getNumResults() != 0) {
+      return rewriter.notifyMatchFailure(
+          workgroupLoop, "unhandled merging of workgourp mapping loop with "
+                         "results and split reduction mapped loop");
+    }
+    std::optional<ArrayAttr> workgroupMapping = workgroupLoop.getMapping();
+    if (!workgroupMapping ||
+        llvm::any_of(workgroupMapping->getValue(), [](Attribute attr) {
+          return !isa<IREE::Codegen::WorkgroupMappingAttr>(attr);
+        })) {
+      return rewriter.notifyMatchFailure(
+          workgroupLoop, "nested loop is not a workgroup mapping loop");
+    }
+
+    SmallVector<OpFoldResult> newLbs, newUbs, newSteps;
+    newLbs = forallOp.getMixedLowerBound();
+    newUbs = forallOp.getMixedUpperBound();
+    newSteps = forallOp.getMixedStep();
+    llvm::append_range(newLbs, workgroupLoop.getMixedLowerBound());
+    llvm::append_range(newUbs, workgroupLoop.getMixedUpperBound());
+    llvm::append_range(newSteps, workgroupLoop.getMixedStep());
+
+    SmallVector<Attribute> newMapping =
+        appendSplitReductionMappingToWorkgroupMapping(
+            workgroupMapping->getValue(), mappingAttr->getValue());
+
+    auto newMappingAttr = rewriter.getArrayAttr(newMapping);
+    auto newForallOp = scf::ForallOp::create(
+        rewriter, forallOp.getLoc(), newLbs, newUbs, newSteps,
+        /*outputs=*/ValueRange{}, newMappingAttr,
+        [](OpBuilder &, Location, ValueRange) {});
+    Block *oldBlock = forallOp.getBody();
+    Block *newForallBody = newForallOp.getBody();
+    SmallVector<Value> newInductionVars = newForallOp.getInductionVars();
+    ArrayRef<Value> newInductionVarsRef(newInductionVars);
+
+    rewriter.mergeBlocks(oldBlock, newForallBody,
+                         newInductionVarsRef.take_front(forallOp.getRank()));
+    rewriter.eraseOp(forallOp);
+
+    Block *workgroupLoopBody = workgroupLoop.getBody();
+    rewriter.eraseOp(workgroupLoopBody->getTerminator());
+    rewriter.inlineBlockBefore(
+        workgroupLoopBody, workgroupLoop,
+        newInductionVarsRef.take_back(workgroupLoop.getRank()));
+    rewriter.eraseOp(workgroupLoop);
+
+    return success();
+  }
+};
+
+} // namespace
+
+void populateFoldSplitReductionAndWorkgroupMappingLoops(
+    RewritePatternSet &patterns) {
+  patterns.insert<FoldSplitReductionForallWithWorkgroupForall>(
+      patterns.getContext());
 }
 
 //===---------------------------------------------------------------------===//
@@ -539,709 +721,33 @@ void moveLoopInvariantCodeFromGuaranteedLoops(Operation *target) {
 
     moveLoopInvariantCode(loopLike);
   });
-}
 
-//===---------------------------------------------------------------------===//
-// Patterns to fold tensor.expand/collapse_shape into
-// `hal.interface.binding.subspan`
-//===---------------------------------------------------------------------===//
-
-namespace {
-
-static SmallVector<OpFoldResult>
-inferCollapsedShape(RewriterBase &rewriter, Location loc,
-                    RankedTensorType expandedType,
-                    ArrayRef<ReassociationIndices> reassociations,
-                    ValueRange expandedDynamicDims) {
-  ArrayRef<int64_t> expandedStaticShape = expandedType.getShape();
-  SmallVector<OpFoldResult> expandedMixedShape =
-      mlir::getMixedValues(expandedStaticShape, expandedDynamicDims, rewriter);
-  SmallVector<OpFoldResult> collapsedShape;
-  unsigned expandedShapeDim = 0;
-  for (auto reassociation : reassociations) {
-    AffineExpr mulExpr = rewriter.getAffineSymbolExpr(0);
-    for (auto i : llvm::seq<unsigned>(1, reassociation.size())) {
-      mulExpr = mulExpr * rewriter.getAffineSymbolExpr(i);
-    }
-    auto collapsedDim = affine::makeComposedFoldedAffineApply(
-        rewriter, loc, mulExpr,
-        ArrayRef(expandedMixedShape)
-            .slice(expandedShapeDim, reassociation.size()));
-    collapsedShape.push_back(collapsedDim);
-    expandedShapeDim += reassociation.size();
-  }
-  return collapsedShape;
-}
-
-/// Folds tensor.expand/collapse_shape into the source
-/// hal.interface.binding.subspan.
-///
-/// For example, this matches the following pattern:
-///
-///   %subspan = hal.interface.binding.subspan ... :
-///       !flow.dispatch.tensor<readonly:tensor<3x3x1x96xf32>>
-///   %tensor = flow.dispatch.tensor.load %subspan :
-///       !flow.dispatch.tensor<readonly:tensor<3x3x1x96xf32>> ->
-///       tensor<3x3x1x96xf32>
-///   %0 = linalg.tensor_reshape %tensor [
-///         affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-///       ] : tensor<3x3x1x96xf32> into tensor<864xf32>
-///
-/// And turns it into:
-///
-///   %subspan = hal.interface.binding.subspan ... :
-///       !flow.dispatch.tensor<readonly:tensor<864xf32>>
-///   %0 = flow.dispatch.tensor.load %subspan :
-///       !flow.dispatch.tensor<readonly:tensor<864xf32>> -> tensor<864xf32>
-struct FoldCollapseShapeIntoInterfaceTensorLoad
-    : OpRewritePattern<tensor::CollapseShapeOp> {
-  using OpRewritePattern<tensor::CollapseShapeOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tensor::CollapseShapeOp reshapeOp,
-                                PatternRewriter &rewriter) const override {
-    Value reshapeSrc = reshapeOp.getSrc();
-    auto reshapeSrcType = cast<RankedTensorType>(reshapeSrc.getType());
-    auto loadOp = reshapeSrc.getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
-    if (!loadOp)
-      return failure();
-
-    // Make sure we are loading the full incoming subspan. Otherwise we cannot
-    // simply adjust the subspan's resultant type later.
-    if (!isFullSlice(loadOp, loadOp.getSourceType(), loadOp.getSourceDims())) {
-      return failure();
-    }
-
-    auto subspanOp = loadOp.getSource()
-                         .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
-    if (!subspanOp)
-      return failure();
-
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPoint(subspanOp);
-    SmallVector<OpFoldResult> collapsedShape = inferCollapsedShape(
-        rewriter, subspanOp.getLoc(), reshapeSrcType,
-        reshapeOp.getReassociationIndices(), subspanOp.getDynamicDims());
-    SmallVector<int64_t> collapsedStaticShape;
-    SmallVector<Value> collapsedDynamicShape;
-    dispatchIndexOpFoldResults(collapsedShape, collapsedDynamicShape,
-                               collapsedStaticShape);
-
-    auto tensorAccess =
-        llvm::cast<IREE::Flow::DispatchTensorType>(subspanOp.getType())
-            .getAccess();
-    auto newSubspanType = IREE::Flow::DispatchTensorType::get(
-        tensorAccess, reshapeOp.getResultType());
-
-    Value newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
-        subspanOp.getBinding(), subspanOp.getByteOffset(),
-        collapsedDynamicShape, subspanOp.getAlignmentAttr(),
-        subspanOp.getDescriptorFlagsAttr());
-
-    rewriter.setInsertionPoint(reshapeOp);
-    rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorLoadOp>(
-        reshapeOp, reshapeOp.getResultType(), newSubspanOp,
-        collapsedDynamicShape);
-
-    return success();
-  }
-};
-
-/// Folds tensor.expand_shape into the source
-/// hal.interface.binding.subspan.
-///
-/// For example, this matches the following pattern:
-///
-///   %subspan = hal.interface.binding.subspan ... :
-///       !flow.dispatch.tensor<readonly:tensor<3x3x1x96xf32>>
-///   %tensor = flow.dispatch.tensor.load %subspan :
-///       !flow.dispatch.tensor<readonly:tensor<3x3x1x96xf32>> ->
-///       tensor<3x3x1x96xf32>
-///   %0 = linalg.expand_reshape %tensor [
-///         affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-///       ] : tensor<3x3x1x96xf32> into tensor<864xf32>
-///
-/// And turns it into:
-///
-///   %subspan = hal.interface.binding.subspan ... :
-///       !flow.dispatch.tensor<readonly:tensor<864xf32>>
-///   %0 = flow.dispatch.tensor.load %subspan :
-///       !flow.dispatch.tensor<readonly:tensor<864xf32>> -> tensor<864xf32>
-struct FoldExpandShapeIntoInterfaceTensorLoad
-    : OpRewritePattern<tensor::ExpandShapeOp> {
-  using OpRewritePattern<tensor::ExpandShapeOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tensor::ExpandShapeOp reshapeOp,
-                                PatternRewriter &rewriter) const override {
-    Value reshapeSrc = reshapeOp.getSrc();
-    auto loadOp = reshapeSrc.getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
-    if (!loadOp) {
-      return failure();
-    }
-
-    // Make sure we are loading the full incoming subspan. Otherwise we cannot
-    // simply adjust the subspan's resultant type later.
-    if (!isFullSlice(loadOp, loadOp.getSourceType(), loadOp.getSourceDims())) {
-      return failure();
-    }
-
-    // In the corner case where the expand_shape is the source of a store, dont
-    // fold with the load. Instead fold with the store to reduce the
-    // dimensionality
-    if (reshapeOp->hasOneUse()) {
-      if (auto storeOp = dyn_cast<IREE::Flow::DispatchTensorStoreOp>(
-              *reshapeOp->getUsers().begin())) {
-        if (isFullSlice(storeOp, storeOp.getTargetType(),
-                        storeOp.getTargetDims())) {
-          return rewriter.notifyMatchFailure(reshapeOp,
-                                             "fold with store instead");
-        }
-      }
-    }
-
-    auto subspanOp = loadOp.getSource()
-                         .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
-    if (!subspanOp)
-      return failure();
-
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPoint(subspanOp);
-
-    auto currDynamicDims = subspanOp.getDynamicDims();
-    auto currStaticDims = loadOp.getType().getShape();
-    auto currOfrDynamicDims =
-        mlir::getMixedValues(currStaticDims, currDynamicDims, rewriter);
-    std::optional<SmallVector<OpFoldResult>> expandedDims =
-        mlir::inferExpandShapeOutputShape(
-            rewriter, subspanOp.getLoc(), reshapeOp.getType(),
-            reshapeOp.getReassociationIndices(), currOfrDynamicDims);
-    if (!expandedDims) {
-      return reshapeOp.emitOpError("failure in expanded shape");
-    }
-
-    auto tensorAccess =
-        llvm::cast<IREE::Flow::DispatchTensorType>(subspanOp.getType())
-            .getAccess();
-    auto newSubspanType = IREE::Flow::DispatchTensorType::get(
-        tensorAccess, reshapeOp.getResultType());
-
-    SmallVector<Value> expandedDynamicDims;
-    SmallVector<int64_t> expandedStaticDims;
-    dispatchIndexOpFoldResults(expandedDims.value(), expandedDynamicDims,
-                               expandedStaticDims);
-
-    Value newSubspanOp;
-    newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
-        subspanOp.getBinding(), subspanOp.getByteOffset(), expandedDynamicDims,
-        subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
-
-    rewriter.setInsertionPoint(reshapeOp);
-    rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorLoadOp>(
-        reshapeOp, reshapeOp.getResultType(), newSubspanOp,
-        expandedDynamicDims);
-
-    return success();
-  }
-};
-
-/// Folds tensor.expand into the source hal.interface.binding.subspan.
-///
-/// For example, this matches the following pattern:
-///
-///   %subspan = hal.interface.binding.subspan ... :
-///       !flow.dispatch.tensor<writeonly:tensor<3x3x1x96xf32>>
-///   %0 = tensor.expand_shape %tensor [[0, 1, 2, 3]]
-///       : tensor<864xf32> into tensor<3x3x1x96xf32>
-///   %tensor = flow.dispatch.tensor.store %0, %subspan :
-///       !flow.dispatch.tensor<writeonly:tensor<3x3x1x96xf32>> ->
-///       tensor<3x3x1x96xf32>
-///
-/// And turns it into:
-///
-///   %subspan = hal.interface.binding.subspan ... :
-///       !flow.dispatch.tensor<writeonly:tensor<864xf32>>
-///   %0 = flow.dispatch.tensor.store %tensor, %subspan :
-///       !flow.dispatch.tensor<writeonly:tensor<864xf32>> -> tensor<864xf32>
-struct FoldExpandShapeIntoInterfaceTensorStore
-    : OpRewritePattern<IREE::Flow::DispatchTensorStoreOp> {
-  using OpRewritePattern<IREE::Flow::DispatchTensorStoreOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(IREE::Flow::DispatchTensorStoreOp storeOp,
-                                PatternRewriter &rewriter) const override {
-    // Make sure we are storing the full incoming subspan. Otherwise we cannot
-    // simply adjust the subspan's resultant type later.
-    if (!isFullSlice(storeOp, storeOp.getTargetType(),
-                     storeOp.getTargetDims())) {
-      return failure();
-    }
-
-    auto reshapeOp = storeOp.getValue().getDefiningOp<tensor::ExpandShapeOp>();
-    if (!reshapeOp) {
-      return failure();
-    }
-
-    Value reshapeSrc = reshapeOp.getSrc();
-    // If the source is a `flow.dispatch.tensor.load`, fold with the load
-    // instead to reduce dimensionality of the problem
-    if (auto loadOp =
-            reshapeSrc.getDefiningOp<IREE::Flow::DispatchTensorLoadOp>()) {
-      if (isFullSlice(loadOp, loadOp.getSourceType(), loadOp.getSourceDims())) {
-        return rewriter.notifyMatchFailure(
-            storeOp, "fold expand_shape with load instead");
-      }
-    }
-
-    auto subspanOp = storeOp.getTarget()
-                         .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
-    if (!subspanOp)
-      return failure();
-
-    OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPoint(subspanOp);
-    SmallVector<OpFoldResult> collapsedShape = inferCollapsedShape(
-        rewriter, subspanOp.getLoc(), reshapeOp.getResultType(),
-        reshapeOp.getReassociationIndices(), subspanOp.getDynamicDims());
-    SmallVector<int64_t> collapsedStaticShape;
-    SmallVector<Value> collapsedDynamicShape;
-    dispatchIndexOpFoldResults(collapsedShape, collapsedDynamicShape,
-                               collapsedStaticShape);
-
-    auto tensorAccess =
-        llvm::cast<IREE::Flow::DispatchTensorType>(subspanOp.getType())
-            .getAccess();
-    auto newSubspanType =
-        IREE::Flow::DispatchTensorType::get(tensorAccess, reshapeSrc.getType());
-
-    Value newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
-        subspanOp.getBinding(), subspanOp.getByteOffset(),
-        collapsedDynamicShape, subspanOp.getAlignmentAttr(),
-        subspanOp.getDescriptorFlagsAttr());
-
-    rewriter.setInsertionPoint(storeOp);
-    rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorStoreOp>(
-        storeOp, reshapeSrc, newSubspanOp, collapsedDynamicShape);
-
-    return success();
-  }
-};
-
-// Helper function to fix-up expanded values using the original (collapsed)
-// index and the reassociation indices.
-template <typename T>
-static void transformOverReassociation(
-    MutableArrayRef<T> expandedValues,
-    ArrayRef<ReassociationIndices> reassocInfo,
-    llvm::function_ref<void(size_t /*collapsedIdx*/,
-                            ReassociationIndicesRef /*reassoc*/,
-                            MutableArrayRef<T> /*expandedValues*/)>
-        transformFn) {
-  for (auto [idx, reassoc] : llvm::enumerate(reassocInfo)) {
-    size_t reassocSize = reassoc.size();
-    SmallVector<T> collapsedValues;
-    collapsedValues.reserve(reassocSize);
-    for (int64_t expandedIdx : reassoc) {
-      collapsedValues.push_back(std::move(expandedValues[expandedIdx]));
-    }
-
-    transformFn(idx, reassoc, collapsedValues);
-
-    for (auto [newValue, expandedIdx] :
-         llvm::zip_equal(collapsedValues, reassoc)) {
-      expandedValues[expandedIdx] = std::move(newValue);
-    }
-  }
-}
-
-/// Folds tensor.collapse_shape into the source hal.interface.binding.subspan.
-///
-/// For example, this matches the following pattern:
-///
-///   %subspan = hal.interface.binding.subspan ... :
-///       !flow.dispatch.tensor<writeonly:tensor<3x3x1x96xf32>>
-///   %0 = tensor.collapse_shape %tensor [[0, 1, 2, 3]]
-///       : tensor<3x?x?x96xf32> into tensor<?xf32>
-///   %tensor = flow.dispatch.tensor.store %0, %subspan :
-///       tensor<?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?xf32>>{%dim}
-///
-/// And turns it into:
-///
-///   %subspan = hal.interface.binding.subspan ... :
-///       !flow.dispatch.tensor<writeonly:tensor<3x?x?x96xf32>>
-///   %0 = flow.dispatch.tensor.store %tensor, %subspan :
-///       tensor<3x?x?x96xf32> ->
-///       !flow.dispatch.tensor<writeonly:tensor<3x?x?x96xf32>>{%d0, %d1}
-///
-/// TODO: This handles full slices (along collapsed dims). The pattern below
-/// (`FoldCollapseShapeIntoTensorInsertSlice`) handles cases where the slice is
-/// not a full slice, but requires the shapes to be static. This pattern handles
-/// dynamic shapes as well. Combine the two (if possible, it isn't clear that it
-/// is possible)
-struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
-    : OpRewritePattern<IREE::Flow::DispatchTensorStoreOp> {
-  using OpRewritePattern<IREE::Flow::DispatchTensorStoreOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(IREE::Flow::DispatchTensorStoreOp storeOp,
-                                PatternRewriter &rewriter) const override {
-    auto reshapeOp =
-        storeOp.getValue().getDefiningOp<tensor::CollapseShapeOp>();
-    if (!reshapeOp) {
-      return failure();
-    }
-
-    auto subspanOp = storeOp.getTarget()
-                         .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
-    if (!subspanOp) {
-      return failure();
-    }
-
-    if (!areAllConstantIntValue(storeOp.getMixedStrides(), 1)) {
-      return rewriter.notifyMatchFailure(storeOp, "found a non-1 stride");
-    }
-
-    const SmallVector<ReassociationIndices> reassocInfo =
-        reshapeOp.getReassociationIndices();
-
-    // To support partial stores, keep track of collapsed and non-collapsed
-    // dimensions. We will need these to ensure that the collapse does not
-    // happen along partial store dimension and to update the store type.
-    SmallVector<int64_t> collapsedDstDims;
-    for (auto [index, reassocIndices] : llvm::enumerate(reassocInfo)) {
-      if (reassocIndices.size() > 1) {
-        collapsedDstDims.push_back(index);
-      }
-    }
-
-    // Make sure we are storing the full incoming subspan slice along the
-    // collapsed indices. Otherwise we cannot simply adjust the subspan's
-    // resultant type later.
-    const SmallVector<OpFoldResult, 4> origOffsets = storeOp.getMixedOffsets();
-    const SmallVector<OpFoldResult, 4> origSizes = storeOp.getMixedSizes();
-    const SmallVector<OpFoldResult> mixedTensorShape = getMixedValues(
-        storeOp.getTargetType().getShape(), storeOp.getTargetDims(), rewriter);
-
-    for (int64_t collapsedDim : collapsedDstDims) {
-      if (origSizes[collapsedDim] != mixedTensorShape[collapsedDim] ||
-          !isZeroIndex(origOffsets[collapsedDim])) {
-        return rewriter.notifyMatchFailure(
-            storeOp,
-            llvm::formatv(
-                "found a partial store along the collapsed dimension {}",
-                collapsedDim));
-      }
-    }
-
-    Value reshapeSrc = reshapeOp.getSrc();
-    auto reshapeSrcType = cast<RankedTensorType>(reshapeSrc.getType());
-
-    // Compute the type and dynamic dims of the interface binding.
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPoint(subspanOp);
-    auto dynamicDims = subspanOp.getDynamicDims();
-    ArrayRef<int64_t> staticShape = reshapeOp.getType().getShape();
-    SmallVector<OpFoldResult> mixedShape =
-        mlir::getMixedValues(staticShape, dynamicDims, rewriter);
-    std::optional<SmallVector<OpFoldResult>> expandedShape =
-        mlir::inferExpandShapeOutputShape(
-            rewriter, subspanOp.getLoc(),
-            cast<ShapedType>(reshapeSrc.getType()), reassocInfo, mixedShape);
-    if (!expandedShape) {
-      return rewriter.notifyMatchFailure(
-          storeOp, "failed to compute expand shape for interface binding");
-    }
-
-    transformOverReassociation<OpFoldResult>(
-        *expandedShape, reassocInfo,
-        [&mixedTensorShape](size_t collapsedIdx, ReassociationIndicesRef,
-                            MutableArrayRef<OpFoldResult> expandedValues) {
-          if (expandedValues.size() == 1) {
-            expandedValues[0] = mixedTensorShape[collapsedIdx];
-          }
-        });
-
-    SmallVector<int64_t> expandedStaticShape;
-    SmallVector<Value> expandedDynamicShape;
-    dispatchIndexOpFoldResults(*expandedShape, expandedDynamicShape,
-                               expandedStaticShape);
-
-    auto tensorAccess =
-        cast<IREE::Flow::DispatchTensorType>(subspanOp.getType()).getAccess();
-    auto newSubspanShape =
-        llvm::to_vector_of<int64_t>(reshapeSrcType.getShape());
-    transformOverReassociation<int64_t>(
-        newSubspanShape, reassocInfo,
-        [&storeOp](size_t collapsedIdx, ReassociationIndicesRef,
-                   MutableArrayRef<int64_t> expandedValues) {
-          if (expandedValues.size() == 1) {
-            // Restore the original non-collapsed subspan dim, which may be
-            // smaller than the reshape result in case of partial stores.
-            expandedValues[0] =
-                storeOp.getTargetType().getDimSize(collapsedIdx);
-            return;
-          }
-        });
-
-    auto newSubspanType = IREE::Flow::DispatchTensorType::get(
-        tensorAccess, reshapeSrcType.cloneWith(
-                          newSubspanShape, reshapeSrcType.getElementType()));
-    auto newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
-        subspanOp.getBinding(), subspanOp.getByteOffset(), expandedDynamicShape,
-        subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
-
-    rewriter.setInsertionPoint(storeOp);
-
-    const size_t expandedSize = newSubspanShape.size();
-    SmallVector<OpFoldResult> newOffsets(expandedSize,
-                                         rewriter.getIndexAttr(0));
-    SmallVector<OpFoldResult> newSizes(expandedSize);
-    const SmallVector<OpFoldResult> newStrides(expandedSize,
-                                               rewriter.getIndexAttr(1));
-    transformOverReassociation<OpFoldResult>(
-        newOffsets, reassocInfo,
-        [&origOffsets](size_t collapseIdx, ReassociationIndicesRef reassoc,
-                       MutableArrayRef<OpFoldResult> expandedValues) {
-          // Restore the original offsets of non-collapsed dimensions.
-          if (reassoc.size() == 1) {
-            expandedValues[0] = origOffsets[collapseIdx];
-          }
-        });
-
-    transformOverReassociation<OpFoldResult>(
-        newSizes, reassocInfo,
-        [&expandedShape,
-         &origSizes](size_t collapseIdx, ReassociationIndicesRef reassoc,
-                     MutableArrayRef<OpFoldResult> expandedValues) {
-          // Restore the original sizes of non-collapsed dimensions.
-          if (reassoc.size() == 1) {
-            expandedValues[0] = origSizes[collapseIdx];
-            return;
-          }
-
-          // Otherwise, use the shape dims for full slices along the collapsed
-          // dims.
-          for (auto [idx, expandedValue] :
-               llvm::zip_equal(reassoc, expandedValues)) {
-            expandedValue = (*expandedShape)[idx];
-          }
-        });
-
-    rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorStoreOp>(
-        storeOp, reshapeSrc, newSubspanOp, expandedDynamicShape, newOffsets,
-        newSizes, newStrides);
-
-    return success();
-  }
-};
-
-/// Folds tensor.collapse_shape with static shape into the source
-/// hal.interface.binding.subspan. The binding is currently required to be
-/// static as well, however it is impossible to generate a dispatch where
-/// this would not be true today.
-///
-/// For example, this matches the following pattern:
-///
-///   %subspan = hal.interface.binding.subspan ... :
-///       !flow.dispatch.tensor<writeonly:tensor<2592xf32>>
-///   %0 = tensor.collapse_shape %tensor [[0, 1, 2, 3]]
-///       : tensor<3x3x1x96xf32> into tensor<864xf32>
-///   %tensor = flow.dispatch.tensor.store %0, %subspan,
-///       offsets = [%x], sizes = [864], strides = [1]
-///       : tensor<864xf32> -> !flow.dispatch.tensor<writeonly:tensor<2592xf32>>
-///
-/// And turns it into:
-///
-///   %subspan = hal.interface.binding.subspan ... :
-///       !flow.dispatch.tensor<writeonly:tensor<9x3x1x96xf32>>
-///   %0 = flow.dispatch.tensor.store %tensor, %subspan :
-///       offsets = [%x * 286, 0, 0, 0], sizes = [3, 3, 1, 96]
-///       strides = [1, 1, 1, 1] : tensor<3x3x1x96xf32> ->
-///       !flow.dispatch.tensor<writeonly:tensor<9x3x1x96xf32>>
-struct FoldCollapseShapeIntoInterfaceTensorStore
-    : OpRewritePattern<IREE::Flow::DispatchTensorStoreOp> {
-  using OpRewritePattern<IREE::Flow::DispatchTensorStoreOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(IREE::Flow::DispatchTensorStoreOp storeOp,
-                                PatternRewriter &rewriter) const override {
-    // Bail out if the strides aren't unit.
-    if (!llvm::all_of(storeOp.getMixedStrides(), [](OpFoldResult s) {
-          return isConstantIntValue(s, 1);
-        })) {
-      return failure();
-    }
-
-    auto collapseShape =
-        storeOp.getValue().getDefiningOp<tensor::CollapseShapeOp>();
-    // TODO: Support dynamic shapes.
-    if (!collapseShape || !collapseShape.getSrcType().hasStaticShape()) {
-      return failure();
-    }
-
-    auto subspanOp =
-        storeOp.getTarget()
-            .template getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
-    // TODO: Support dynamic dims.
-    if (!subspanOp || !subspanOp.getDynamicDims().empty()) {
-      return failure();
-    }
-
-    auto subspanType =
-        llvm::cast<IREE::Flow::DispatchTensorType>(subspanOp.getType());
-
-    ArrayRef<int64_t> reshapeSrcShape = collapseShape.getSrcType().getShape();
-
-    // Verify the subspan shape against the shape of the slice being inserted.
-    for (auto [size, group] : llvm::zip_equal(
-             subspanType.getShape(), collapseShape.getReassociationIndices())) {
-      if (group.size() == 1) {
-        continue;
-      }
-
-      int64_t innerDimSize = 1;
-      for (auto i : llvm::drop_begin(group)) {
-        innerDimSize *= reshapeSrcShape[i];
-      }
-      if (size % innerDimSize != 0) {
-        return rewriter.notifyMatchFailure(
-            storeOp, "Subspan type indivisible by expanded shape");
-      }
-    }
-
-    AffineExpr d0, d1;
-    bindDims(rewriter.getContext(), d0, d1);
-    AffineExpr div = d0.ceilDiv(d1);
-
-    Location loc = collapseShape.getLoc();
-    SmallVector<int64_t> expandedSubspanShape;
-    SmallVector<OpFoldResult> expandedOffsets;
-    SmallVector<OpFoldResult> expandedSizes;
-    OpFoldResult zero = rewriter.getIndexAttr(0);
-    for (auto [size, group, offset] : llvm::zip_equal(
-             subspanType.getShape(), collapseShape.getReassociationIndices(),
-             storeOp.getMixedOffsets())) {
-      expandedSizes.push_back(rewriter.getIndexAttr(reshapeSrcShape[group[0]]));
-
-      // Special case for 1 to avoid going through arith folders.
-      if (group.size() == 1) {
-        expandedOffsets.push_back(offset);
-        expandedSubspanShape.push_back(size);
-        continue;
-      }
-
-      int64_t innerDimSize = 1;
-      for (auto i : llvm::drop_begin(group)) {
-        innerDimSize *= reshapeSrcShape[i];
-      }
-      OpFoldResult innerDimSizeAttr = rewriter.getIndexAttr(innerDimSize);
-      expandedOffsets.push_back(affine::makeComposedFoldedAffineApply(
-          rewriter, loc, div, {offset, innerDimSizeAttr}));
-      assert(size % innerDimSize == 0);
-      expandedSubspanShape.push_back(size / innerDimSize);
-      for (auto i : llvm::drop_begin(group)) {
-        expandedOffsets.push_back(zero);
-        int64_t dimSize = reshapeSrcShape[i];
-        expandedSubspanShape.push_back(dimSize);
-        expandedSizes.push_back(rewriter.getIndexAttr(dimSize));
-      }
-    }
-
-    auto newSubspanTensorType = RankedTensorType::get(
-        expandedSubspanShape, collapseShape.getSrcType().getElementType());
-    auto newSubspanType = IREE::Flow::DispatchTensorType::get(
-        subspanType.getAccess(), newSubspanTensorType);
-
-    Value newSubspanOp;
-    {
-      // NOTE: If there were any dynamic dims, they would need to be updated
-      // based on the newly introduced static sizes as well.
-      OpBuilder::InsertionGuard guard(rewriter);
-      rewriter.setInsertionPointAfter(subspanOp);
-      newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-          subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
-          subspanOp.getBinding(), subspanOp.getByteOffset(),
-          subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
-          subspanOp.getDescriptorFlagsAttr());
-    }
-
-    SmallVector<OpFoldResult> expandedStrides(reshapeSrcShape.size(),
-                                              rewriter.getIndexAttr(1));
-    rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorStoreOp>(
-        storeOp, collapseShape.getSrc(), newSubspanOp, storeOp.getTargetDims(),
-        expandedOffsets, expandedSizes, expandedStrides);
-    return success();
-  }
-};
-
-} // namespace
-
-void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns) {
-  patterns.insert<FoldCollapseShapeIntoInterfaceTensorLoad,
-                  FoldCollapseShapeIntoInterfaceTensorStore,
-                  FoldCollapseShapeIntoInterfaceTensorStoreFullSlice,
-                  FoldExpandShapeIntoInterfaceTensorLoad,
-                  FoldExpandShapeIntoInterfaceTensorStore>(
-      patterns.getContext());
+  // linalg.generic operations are also loop-like, but they don't have
+  // LoopLikeOpInterface implemented for them.
+  target->walk([&](linalg::GenericOp genericOp) {
+    // Ideally, we should be checking if the linalg.generic op has a trip count
+    // of zero, but while that is possible and can be written using
+    // ValueBoundsConstraintSet, it is usually not needed. Unlike loops, which
+    // can have arbitary operations inside them, the loop invariant operations
+    // inside a linalg.generic operations are usually operations performed on
+    // scalars. Hoisting scalar constants does not have a big cost even if the
+    // trip count is zero.
+    moveLoopInvariantCode(
+        &genericOp.getBodyRegion(),
+        [&](Value value, Region *) {
+          return !genericOp->isAncestor(value.getParentRegion()->getParentOp());
+        },
+        [&](Operation *op, Region *) {
+          return !isa<linalg::IndexOp>(op) && isMemoryEffectFree(op) &&
+                 isSpeculatable(op);
+        },
+        [&](Operation *op, Region *) { op->moveBefore(genericOp); });
+  });
 }
 
 //===--------------------------------------------------------------------====//
-// Pattern to remove dead allocations
+// Pattern to reduce dependencies from memref::AssumeAlignmentOp
 //===--------------------------------------------------------------------====//
-
-namespace {
-
-// Erases the operation if its only users are memref.assume_alignment ops.
-static LogicalResult eraseAlignmentOnlyDeadOp(PatternRewriter &rewriter,
-                                              Operation *op) {
-  SmallVector<Operation *> deadUsers;
-  for (OpOperand &use : op->getUses()) {
-    if (auto user = dyn_cast<memref::AssumeAlignmentOp>(use.getOwner())) {
-      deadUsers.push_back(user);
-      continue;
-    }
-    // For any other use, return failure;
-    return failure();
-  }
-  for (auto user : deadUsers) {
-    rewriter.eraseOp(user);
-  }
-  rewriter.eraseOp(op);
-  return success();
-}
-
-// Removes operations with Allocate MemoryEffects but no uses.
-struct RemoveDeadMemAllocs : RewritePattern {
-  RemoveDeadMemAllocs(MLIRContext *context, PatternBenefit benefit = 1)
-      : RewritePattern(MatchAnyOpTypeTag(), benefit, context) {}
-
-  LogicalResult matchAndRewrite(Operation *op,
-                                PatternRewriter &rewriter) const override {
-    auto memEffect = dyn_cast<MemoryEffectOpInterface>(op);
-    if (!memEffect || !memEffect.hasEffect<MemoryEffects::Allocate>()) {
-      return failure();
-    }
-    return eraseAlignmentOnlyDeadOp(rewriter, op);
-  }
-};
-
-// Removes hal.interface.binding.subspan ops with only assume_alignment uses.
-struct RemoveDeadInterfaceBindings
-    : OpRewritePattern<IREE::HAL::InterfaceBindingSubspanOp> {
-  RemoveDeadInterfaceBindings(MLIRContext *context, PatternBenefit benefit = 1)
-      : OpRewritePattern<IREE::HAL::InterfaceBindingSubspanOp>(context,
-                                                               benefit) {}
-
-  LogicalResult matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op,
-                                PatternRewriter &rewriter) const override {
-    return eraseAlignmentOnlyDeadOp(rewriter, op);
-  }
-};
-} // namespace
-
-void populateRemoveDeadMemAllocPatterns(RewritePatternSet &patterns) {
-  patterns.insert<RemoveDeadMemAllocs>(patterns.getContext());
-  patterns.insert<RemoveDeadInterfaceBindings>(patterns.getContext());
-}
 
 void analyseAllocsForPacking(mlir::FunctionOpInterface funcOp,
                              ArrayRef<Operation *> allocs,
@@ -1346,16 +852,16 @@ void packAllocs(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
   MemRefType allocType = MemRefType::get({maxAlloc}, builder.getI8Type(),
                                          AffineMap(), memorySpace);
   Value packedAlloc =
-      builder.create<memref::AllocOp>(funcOp.getLoc(), allocType);
+      memref::AllocOp::create(builder, funcOp.getLoc(), allocType);
   for (size_t i = 0; i < aliasGroups.size(); i++) {
     int64_t offset = 0;
     for (Operation *alloc : aliasGroups[i]) {
       Location loc = alloc->getLoc();
       builder.setInsertionPoint(alloc);
-      Value offsetValue = builder.create<arith::ConstantIndexOp>(loc, offset);
-      Value newAlloc = builder.create<memref::ViewOp>(
-          packedAlloc.getLoc(), alloc->getResultTypes()[0], packedAlloc,
-          offsetValue, ArrayRef<Value>({}));
+      Value offsetValue = arith::ConstantIndexOp::create(builder, loc, offset);
+      Value newAlloc = memref::ViewOp::create(
+          builder, packedAlloc.getLoc(), alloc->getResultTypes()[0],
+          packedAlloc, offsetValue, ArrayRef<Value>({}));
       offset += getAllocSize(alloc, dataLayout);
       alloc->replaceAllUsesWith(ArrayRef<Value>({newAlloc}));
       alloc->erase();
@@ -1392,7 +898,7 @@ LogicalResult tileLinalgOpsWithFilter(mlir::FunctionOpInterface funcOp,
     for (auto tiledOp : tiledResults->tiledOps) {
       filter.replaceLinalgTransformationFilter(rewriter, tiledOp);
     }
-    rewriter.replaceOp(op, tiledResults->mergeResult.replacements);
+    rewriter.replaceOp(op, tiledResults->replacements);
   }
 
   return success();
@@ -1434,7 +940,7 @@ distributeLinalgOpsWithFilter(mlir::FunctionOpInterface funcOp,
 
 namespace {
 struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
-  using OpRewritePattern<scf::ForOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(scf::ForOp loop,
                                 PatternRewriter &rewriter) const final {
     if (loop.getBody()->getOperations().size() == 1) {
@@ -1596,7 +1102,9 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
           }
         }
         SetVector<Operation *> tmpBackwardSlice;
-        getBackwardSlice(operand, &tmpBackwardSlice, backwardOptions);
+        [[maybe_unused]] LogicalResult result =
+            getBackwardSlice(operand, &tmpBackwardSlice, backwardOptions);
+        assert(result.succeeded());
         slice.set_union(tmpBackwardSlice);
       }
     }
@@ -1627,9 +1135,10 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
 
     // Step 3. Create the ForallOp.
     Location loc = forallOp.getLoc();
-    scf::ForallOp newForallOp = rewriter.create<scf::ForallOp>(
-        loc, forallOp.getMixedLowerBound(), forallOp.getMixedUpperBound(),
-        forallOp.getMixedStep(), loop.getInitArgs(), forallOp.getMappingAttr());
+    scf::ForallOp newForallOp = scf::ForallOp::create(
+        rewriter, loc, forallOp.getMixedLowerBound(),
+        forallOp.getMixedUpperBound(), forallOp.getMixedStep(),
+        loop.getInitArgs(), forallOp.getMappingAttr());
 
     {
       // RAII guard, inserting within forallOp, before terminator.
@@ -1648,10 +1157,10 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
       }
       // Step 4. Create a new for loop with new inits for the result of the
       // extracted slices.
-      auto newLoop = rewriter.create<scf::ForOp>(
-          loop.getLoc(), loop.getLowerBound(), loop.getUpperBound(),
-          loop.getStep(), newInits,
-          [](OpBuilder &, Location, Value, ValueRange) {});
+      auto newLoop =
+          scf::ForOp::create(rewriter, loop.getLoc(), loop.getLowerBound(),
+                             loop.getUpperBound(), loop.getStep(), newInits,
+                             [](OpBuilder &, Location, Value, ValueRange) {});
 
       {
         // Step 5. Inline the body of the original forall into the new for loop.
@@ -1687,7 +1196,7 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
           newYields.push_back(parallelSlice.getSource());
         }
         rewriter.setInsertionPointToEnd(newLoop.getBody());
-        rewriter.create<scf::YieldOp>(loop.getLoc(), newYields);
+        scf::YieldOp::create(rewriter, loop.getLoc(), newYields);
       }
 
       // Move all producers for the indices of the slices outside of the body
@@ -1707,11 +1216,11 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
       for (auto [parallelSlice, source, dest] :
            llvm::zip_equal(terminators, newLoop.getResults(),
                            newForallOp.getRegionIterArgs())) {
-        rewriter.create<tensor::ParallelInsertSliceOp>(
-            parallelSlice.getLoc(), source, dest, parallelSlice.getOffsets(),
-            parallelSlice.getSizes(), parallelSlice.getStrides(),
-            parallelSlice.getStaticOffsets(), parallelSlice.getStaticSizes(),
-            parallelSlice.getStaticStrides());
+        tensor::ParallelInsertSliceOp::create(
+            rewriter, parallelSlice.getLoc(), source, dest,
+            parallelSlice.getOffsets(), parallelSlice.getSizes(),
+            parallelSlice.getStrides(), parallelSlice.getStaticOffsets(),
+            parallelSlice.getStaticSizes(), parallelSlice.getStaticStrides());
       }
     }
 
@@ -1729,6 +1238,60 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
 
 void populateForallLoopHoistingPattern(RewritePatternSet &patterns) {
   patterns.insert<HoistForallFromFor>(patterns.getContext());
+}
+
+//===---------------------------------------------------------------------===//
+// ApplyFoldFillIntoPadPatternsOp
+//===---------------------------------------------------------------------===//
+
+namespace {
+/// Fold `tensor.pad(cst, tensor.extract*(linalg.fill(cst)))` into
+/// `linalg.fill(cst, empty)` when the padding constant and the fill constant
+/// are the same.
+/// This seems generally desirable as a folding but may be too intrusive, so we
+/// only apply it selectively for now.
+// TODO: atm hardcoded on linalg.fill but we could take any result of any
+// generic that yields a constant in that result.
+struct FoldFillIntoPad : public OpRewritePattern<tensor::PadOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::PadOp padOp,
+                                PatternRewriter &rewriter) const final {
+    Operation *currentOp = padOp.getSource().getDefiningOp();
+    auto maybeExtractSlice =
+        dyn_cast_or_null<tensor::ExtractSliceOp>(currentOp);
+    while (currentOp && maybeExtractSlice) {
+      currentOp = maybeExtractSlice.getSource().getDefiningOp();
+      maybeExtractSlice = dyn_cast_or_null<tensor::ExtractSliceOp>(currentOp);
+    }
+    auto fillOp = dyn_cast_or_null<linalg::FillOp>(currentOp);
+    if (!fillOp) {
+      return rewriter.notifyMatchFailure(
+          padOp, "not coming from a linalg.fill op via tensor.extract_slice*");
+    }
+
+    Value padValue = padOp.getConstantPaddingValue();
+    RankedTensorType resultType = padOp.getResultType();
+    if (!padValue ||
+        getAsOpFoldResult(padValue) !=
+            getAsOpFoldResult(fillOp.getDpsInputOperand(0)->get())) {
+      return rewriter.notifyMatchFailure(
+          padOp, "not a constant value matching the fill value");
+    }
+
+    Location loc = padOp.getLoc();
+    auto emptyOp = tensor::EmptyOp::create(
+        rewriter, loc, tensor::getMixedSizes(rewriter, loc, padOp),
+        resultType.getElementType());
+    rewriter.replaceOpWithNewOp<linalg::FillOp>(padOp, padValue,
+                                                emptyOp.getResult());
+
+    return success();
+  }
+};
+} // namespace
+
+void populateFoldFillIntoPadPattern(RewritePatternSet &patterns) {
+  patterns.insert<FoldFillIntoPad>(patterns.getContext());
 }
 
 } // namespace mlir::iree_compiler

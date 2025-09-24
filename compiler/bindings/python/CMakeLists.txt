@@ -159,7 +159,7 @@ if(IREE_INPUT_TORCH)
 
   declare_mlir_python_sources(IREEPythonSources.Torch.Importers
     ADD_TO_PARENT IREEPythonSources
-    ROOT_DIR "${IREE_SOURCE_DIR}/third_party/torch-mlir/python/torch_mlir"
+    ROOT_DIR "${TORCH_MLIR_ROOT_DIR}/python/torch_mlir"
     SOURCES
       extras/fx_importer.py
       extras/onnx_importer.py
@@ -222,6 +222,7 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.llvm
   MLIRPythonSources.Dialects.math
   MLIRPythonSources.Dialects.memref
+  MLIRPythonSources.Dialects.nvvm
   MLIRPythonSources.Dialects.pdl
   MLIRPythonSources.Dialects.rocdl
   MLIRPythonSources.Dialects.scf
@@ -234,6 +235,7 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.transform.interpreter
   MLIRPythonSources.Dialects.vector
   MLIRPythonSources.Dialects.vector_transform
+  MLIRPythonSources.Dialects.loop_transform
 
   # iree-dialects project.
   IREEDialectsPythonSources

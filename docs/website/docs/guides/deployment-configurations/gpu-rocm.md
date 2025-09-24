@@ -193,6 +193,8 @@ architectures:
 | AMD MI300X               | `mi300x`    | `gfx942`            | `cdna3`                |
 | AMD MI308X               | `mi308x`    | `gfx942`            | `cdna3`                |
 | AMD MI325X               | `mi325x`    | `gfx942`            | `cdna3`                |
+| AMD MI350X               | `mi350x`    | `gfx950`            | `cdna4`                |
+| AMD MI355X               | `mi355x`    | `gfx950`            | `cdna4`                |
 | AMD PRO V710             | `v710`      | `gfx1101`           | `rdna3`                |
 | AMD PRO W7700            | `w7700`     | `gfx1101`           | `rdna3`                |
 | AMD PRO W7800            | `w7800`     | `gfx1100`           | `rdna3`                |
@@ -201,8 +203,10 @@ architectures:
 | AMD RX 7800XT            | `rx7800xt`  | `gfx1101`           | `rdna3`                |
 | AMD RX 7900XT            | `rx7900xt`  | `gfx1100`           | `rdna3`                |
 | AMD RX 7900XTX           | `rx7900xtx` | `gfx1100`           | `rdna3`                |
+| AMD RX 9060XT            | `rx9060xt`  | `gfx1200`           | `rdna4`                |
 | AMD RX 9070              | `rx9070`    | `gfx1201`           | `rdna4`                |
 | AMD RX 9070XT            | `rx9070xt`  | `gfx1201`           | `rdna4`                |
+| AMD AI PRO R9700         | `r9700`     | `gfx1201`           | `rdna4`                |
 
 For a more comprehensive list of prior GPU generations, you can refer to the
 [LLVM AMDGPU backend](https://llvm.org/docs/AMDGPUUsage.html#processors).

@@ -11,7 +11,7 @@ include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.td"
 
 def NullPointer
   : TypeDef<IREECodegen_Dialect, "NullPointer", []> {
-  let summary = "Pseudo null-pointer type. Lowers to a null pointer.";
+  let summary = [{Pseudo null-pointer type. Lowers to a null pointer.}];
   let description = [{
     This is meant to be used only as arguments to microkernels.
   }];

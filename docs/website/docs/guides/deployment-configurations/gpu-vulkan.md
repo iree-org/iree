@@ -188,6 +188,7 @@ Here are a few examples showing how you can target various recent common GPUs:
 | AMD RX 7800XT       | `rx7800xt`     | `gfx1101`           | `rdna3`                |
 | AMD RX 7900XT       | `rx7900xt`     | `gfx1100`           | `rdna3`                |
 | AMD RX 7900XTX      | `rx7900xtx`    | `gfx1100`           | `rdna3`                |
+| AMD RX 9060XT       | `rx9060xt`     | `gfx1200`           | `rdna4`                |
 | AMD RX 9070         | `rx9070`       | `gfx1201`           | `rdna4`                |
 | AMD RX 9070XT       | `rx9070xt`     | `gfx1201`           | `rdna4`                |
 | ARM GPUs            |                |                     | `valhall`              |

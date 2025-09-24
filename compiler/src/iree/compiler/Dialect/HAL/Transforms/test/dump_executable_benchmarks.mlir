@@ -24,12 +24,11 @@ util.global private @device = #hal.device.target<"local", [
 // CHECK: hal.executable private @ex0
 hal.executable private @ex0 {
   hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64) {
-    hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout_0) attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
-    } {
-    ^bb0(%device: !hal.device, %arg0: index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
+    hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout_0) count(%device: !hal.device, %arg0: index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
       hal.return %x, %y, %z : index, index, index
+    } attributes {
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     }
     builtin.module {
       func.func @dispatch0() {
@@ -37,14 +36,13 @@ hal.executable private @ex0 {
       }
     }
 
-    hal.executable.export public @dispatch1 ordinal(1) layout(#pipeline_layout_1) attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
-    } {
-    ^bb0(%device: !hal.device, %arg0: index, %arg1: index):
+    hal.executable.export public @dispatch1 ordinal(1) layout(#pipeline_layout_1) count(%device: !hal.device, %arg0: index, %arg1: index) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%arg0]
       %1 = arith.addi %0, %arg1 : index
       hal.return %1, %c1, %c1 : index, index, index
+    } attributes {
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     }
     builtin.module {
       func.func @dispatch1() {
@@ -60,7 +58,9 @@ hal.executable private @ex0 {
 
 // CHECK: util.global private mutable @ex0_embedded_elf_x86_64_dispatch0_512_buffer : !hal.buffer
 // CHECK-NEXT: util.initializer {
-// CHECK: %[[BUFFER:.+]] = hal.allocator.allocate<%{{.+}} : !hal.allocator> affinity(%{{.+}}) type("DeviceVisible|DeviceLocal") usage("{{.+}}Dispatch{{.+}}") : !hal.buffer{%c768}
+// CHECK: %[[MEMORY_TYPE:.+]] = hal.memory_type<"DeviceVisible|DeviceLocal"> : i32
+// CHECK: %[[BUFFER_USAGE:.+]] = hal.buffer_usage<"{{.+}}Dispatch{{.+}}"> : i32
+// CHECK: %[[BUFFER:.+]] = hal.allocator.allocate<%{{.+}} : !hal.allocator> affinity(%{{.+}}) type(%[[MEMORY_TYPE]]) usage(%[[BUFFER_USAGE]]) : !hal.buffer{%c768}
 // CHECK-NEXT: util.global.store %[[BUFFER]], @ex0_embedded_elf_x86_64_dispatch0_512_buffer : !hal.buffer
 
 // CHECK: util.func public @ex0_embedded_elf_x86_64_dispatch0_512(%arg0: i32)
@@ -163,7 +163,7 @@ util.func public @main(%dynamic_arg: i32) -> !stream.timepoint attributes {
 }
 
 // -----
-// expected-warning@-2 {{multiple devices in the module}}
+// expected-warning@-1 {{multiple devices in the module}}
 
 // Tests that multiple devices fail today.
 // We should be creating one benchmark per executable with only the dispatches
@@ -184,24 +184,22 @@ util.global private @device_b = #hal.device.target<"local", [
 
 hal.executable private @ex_0 {
   hal.executable.variant public @variant_a target(#executable_target_embedded_elf_aarch64) {
-    hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout) attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
-    } {
-    ^bb0(%device: !hal.device, %arg0: index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
+    hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout) count(%device: !hal.device, %arg0: index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
       hal.return %x, %y, %z : index, index, index
+    } attributes {
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     }
     builtin.module {
       func.func @dispatch0() {
         func.return
       }
     }
-    hal.executable.export public @dispatch1 ordinal(1) layout(#pipeline_layout) attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
-    } {
-    ^bb0(%device: !hal.device, %arg0: index, %arg1: index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
+    hal.executable.export public @dispatch1 ordinal(1) layout(#pipeline_layout) count(%device: !hal.device, %arg0: index, %arg1: index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
       hal.return %x, %y, %z : index, index, index
+    } attributes {
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     }
     builtin.module {
       func.func @dispatch1() {
@@ -210,24 +208,22 @@ hal.executable private @ex_0 {
     }
   }
   hal.executable.variant public @variant_b target(#executable_target_embedded_elf_x86_64) {
-    hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout) attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
-    } {
-    ^bb0(%device: !hal.device, %arg0: index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
+    hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout) count(%device: !hal.device, %arg0: index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
       hal.return %x, %y, %z : index, index, index
+    } attributes {
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     }
     builtin.module {
       func.func @dispatch0() {
         func.return
       }
     }
-    hal.executable.export public @dispatch1 ordinal(1) layout(#pipeline_layout) attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
-    } {
-    ^bb0(%device: !hal.device, %arg0: index, %arg1: index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
+    hal.executable.export public @dispatch1 ordinal(1) layout(#pipeline_layout) count(%device: !hal.device, %arg0: index, %arg1: index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
       hal.return %x, %y, %z : index, index, index
+    } attributes {
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     }
     builtin.module {
       func.func @dispatch1() {
@@ -238,12 +234,11 @@ hal.executable private @ex_0 {
 }
 hal.executable private @ex_1 {
   hal.executable.variant public @variant_b target(#executable_target_embedded_elf_x86_64) {
-    hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout) attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
-    } {
-    ^bb0(%device: !hal.device, %arg0: index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
+    hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout) count(%device: !hal.device, %arg0: index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg0)
       hal.return %x, %y, %z : index, index, index
+    } attributes {
+      translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>
     }
     builtin.module {
       func.func @dispatch0() {

@@ -1,0 +1,85 @@
+# Copyright 2025 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load(
+    "//build_tools/bazel:build_defs.oss.bzl",
+    "iree_compiler_cc_library",
+    "iree_gentbl_cc_library",
+    "iree_tablegen_doc",
+)
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_gentbl_cc_library(
+    name = "PassesIncGen",
+    tbl_outs = [
+        (
+            ["--gen-pass-decls"],
+            "Passes.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    deps = [
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "Transforms",
+    srcs = [
+        "ApplyBuiltinPDLPatterns.cpp",
+        "Passes.cpp",
+    ],
+    hdrs = [
+        "Passes.h",
+        "Passes.h.inc",
+    ],
+    deps = [
+        ":PassesIncGen",
+        "//compiler/plugins/target/ROCM/Dialect/ROCM/IR:ROCMDialect",
+        "//compiler/plugins/target/ROCM/builtins/specialization:iree_specialization_patterns_amdgpu",
+        "//compiler/src/iree/compiler/Codegen/Common",
+        "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
+        "//compiler/src/iree/compiler/Codegen/Dialect/GPU/IR:IREEGPUDialect",
+        "//compiler/src/iree/compiler/Codegen/Utils",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Utils",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:PDLDialect",
+        "@llvm-project//mlir:PDLInterpDialect",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:ROCDLDialect",
+        "@llvm-project//mlir:TransformUtils",
+        "@llvm-project//mlir:ValueBoundsOpInterface",
+    ],
+)
+
+iree_tablegen_doc(
+    name = "ROCMPassesDocGen",
+    category = "Passes",
+    tbl_outs = [
+        (
+            [
+                "--gen-pass-doc",
+            ],
+            "ROCMPasses.md",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    deps = [
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
+)

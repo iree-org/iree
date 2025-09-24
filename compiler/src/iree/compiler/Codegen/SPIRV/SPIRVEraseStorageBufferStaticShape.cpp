@@ -82,11 +82,11 @@ rewriteStorageBufferSubspanOp(RewriterBase &rewriter,
 
   SmallVector<Value, 1> dynamicDims;
   assert(subspanOp.getDynamicDims().empty());
-  dynamicDims.push_back(rewriter.create<arith::ConstantIndexOp>(
-      subspanOp.getLoc(), oldType.getNumElements()));
+  dynamicDims.push_back(arith::ConstantIndexOp::create(
+      rewriter, subspanOp.getLoc(), oldType.getNumElements()));
 
-  auto newOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-      subspanOp.getLoc(), newType, subspanOp.getLayoutAttr(),
+  auto newOp = IREE::HAL::InterfaceBindingSubspanOp::create(
+      rewriter, subspanOp.getLoc(), newType, subspanOp.getLayoutAttr(),
       subspanOp.getBindingAttr(), subspanOp.getByteOffset(), dynamicDims,
       subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
 
@@ -118,14 +118,6 @@ void EraseStorageBufferStaticShapePass::runOnOperation() {
     auto newSubspanOp = rewriteStorageBufferSubspanOp(rewriter, subspanOp);
     replaceMemrefUsesAndPropagateType(rewriter, subspanOp.getLoc(), subspanOp,
                                       newSubspanOp);
-  }
-
-  {
-    RewritePatternSet patterns(&getContext());
-    populateRemoveDeadMemAllocPatterns(patterns);
-    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
-      return signalPassFailure();
-    }
   }
 }
 

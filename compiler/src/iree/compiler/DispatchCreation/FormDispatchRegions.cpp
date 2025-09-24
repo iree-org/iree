@@ -174,7 +174,8 @@ static bool isRootOp(Operation *op) {
     return !isa<linalg::FillOp>(op);
   }
   if (isa<TilingInterface>(op)) {
-    return !isa<tensor::PadOp, linalg::PackOp>(op);
+    return !isa<IREE::LinalgExt::GatherOp, tensor::PadOp, tensor::ConcatOp,
+                linalg::PackOp>(op);
   }
   return isa<linalg::UnPackOp>(op);
 }
@@ -402,6 +403,9 @@ static bool makeConsumerFusableViaInterchange(
   // indexing map in the producer, do nothing.
   AffineMap producerIndexingMap = producer.getIndexingMapMatchingResult(
       cast<OpResult>(fusableOperand.get()));
+  if (!producerIndexingMap) {
+    return false;
+  }
   producerIndexingMap = getProjectedMap(
       producerIndexingMap, getUnusedDimsBitVector(producerIndexingMap));
   AffineMap consumerIndexingMap =
@@ -452,6 +456,53 @@ static bool makeConsumerFusableViaInterchange(
   (void)interchangedOp;
   assert(succeeded(interchangedOp) && "expected interchange to succeed");
   assert(interchangedOp.value() == consumer &&
+         "expected interchange to happen in place");
+  return true;
+}
+
+static bool makeProducerFusableViaInterchange(
+    OpOperand &fusableOperand,
+    const llvm::SmallBitVector &rootOuterParallelLoops) {
+  auto producer = fusableOperand.get().getDefiningOp<linalg::GenericOp>();
+  if (!producer) {
+    return false;
+  }
+
+  auto consumer = dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(
+      fusableOperand.getOwner());
+  if (!consumer) {
+    return false;
+  }
+
+  if (!linalg::isElementwise(producer) || producer.getNumResults() != 1) {
+    return false;
+  }
+
+  AffineMap producerIndexingMap = producer.getIndexingMapMatchingResult(
+      cast<OpResult>(fusableOperand.get()));
+  producerIndexingMap = getProjectedMap(
+      producerIndexingMap, getUnusedDimsBitVector(producerIndexingMap));
+  AffineMap consumerIndexingMap =
+      consumer.getMatchingIndexingMap(&fusableOperand);
+  if (!consumerIndexingMap || !consumerIndexingMap.isPermutation() ||
+      producerIndexingMap == consumerIndexingMap) {
+    return false;
+  }
+
+  // Make the input map match the consumer map by applying a permutation map
+  AffineMap invProducerIndexingMap = inversePermutation(producerIndexingMap);
+  AffineMap permutationMap =
+      consumerIndexingMap.compose(invProducerIndexingMap);
+  auto perm = llvm::map_to_vector(permutationMap.getResults(),
+                                  [](AffineExpr e) -> unsigned {
+                                    return cast<AffineDimExpr>(e).getPosition();
+                                  });
+  IRRewriter rewriter(consumer->getContext());
+  FailureOr<linalg::GenericOp> interchangedOp =
+      linalg::interchangeGenericOp(rewriter, producer, perm);
+  (void)interchangedOp;
+  assert(succeeded(interchangedOp) && "expected interchange to succeed");
+  assert(interchangedOp.value() == producer &&
          "expected interchange to happen in place");
   return true;
 }
@@ -664,14 +715,19 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
       SmallVector<OpOperand *> fusableUses =
           getFusableUses(context, currRoot, dominanceInfo,
                          /*aggressiveFusion=*/options.aggressiveFusion);
-      if (fusableUses.empty())
+      if (fusableUses.empty()) {
         continue;
+      }
 
-      // For now disable the fusing with multiple consumers for all
-      // operations other than horizontally fused gemms. This should
-      // work in general but is causing time-outs on some CI examples.
-      if (!IREE::LinalgExt::isaHorizontallyFusedContraction(root)) {
-        fusableUses = {fusableUses.front()};
+      // For now prune the fusable uses due to codegen failures. Ideally we
+      // should just be taking the whole set of fusable uses.
+      if (IREE::LinalgExt::isBitTruncateOp(fusableUses.front()->getOwner())) {
+        fusableUses =
+            llvm::filter_to_vector(fusableUses, [](OpOperand *operand) {
+              return IREE::LinalgExt::isBitTruncateOp(operand->getOwner());
+            });
+      } else {
+        fusableUses.resize(1);
       }
 
       // Analyse the use to see if it is fusable.
@@ -695,12 +751,15 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
 }
 
 /// Method to check if the consumer of a use can be fused with its producer.
-static bool
-isFusableWithProducer(OpOperand &operand,
-                      const llvm::SmallBitVector &rootOuterParallelLoops,
-                      FormDispatchRegionsPassOptions const &options) {
+static bool isFusableWithProducer(
+    OpOperand &operand, const llvm::SmallBitVector &rootOuterParallelLoops,
+    FormDispatchRegionsPassOptions const &options, bool fuseWithTruncate) {
   Operation *producer = operand.get().getDefiningOp();
   Operation *consumer = operand.getOwner();
+
+  if (!fuseWithTruncate && IREE::LinalgExt::isBitTruncateOp(producer)) {
+    return false;
+  }
 
   if (auto padOp = dyn_cast<tensor::PadOp>(consumer)) {
     if (options.fusePadWithProducers) {
@@ -709,18 +768,14 @@ isFusableWithProducer(OpOperand &operand,
     return false;
   }
 
+  auto linalgConsumer = dyn_cast<linalg::LinalgOp>(consumer);
   if (options.fusePadWithConsumers && isa<tensor::PadOp>(producer) &&
-      isa<linalg::ConvolutionOpInterface>(consumer)) {
+      linalgConsumer && linalg::isaConvolutionOpInterface(linalgConsumer)) {
     return true;
   }
 
   if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(consumer)) {
-    // Fuse with the rope computation if the query is a gather operation.
-    if (IREE::LinalgExt::isGatherlikeOp(producer) &&
-        attentionOp.getQuery() == operand.get()) {
-      return true;
-    }
-    // Disable all other producer fusion. TODO: Enable other producer fusions.
+    // Disable all other producer fusion. TODO: Enable some producer fusions.
     return false;
   }
 
@@ -758,7 +813,12 @@ isFusableWithProducer(OpOperand &operand,
     }
   }
 
-  return areOpsFusable(producer, consumer, rootOuterParallelLoops);
+  if (!areOpsFusable(producer, consumer, rootOuterParallelLoops)) {
+    if (!makeProducerFusableViaInterchange(operand, rootOuterParallelLoops)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /// Starting from the `root` op, traverse the operand use-def chain
@@ -766,7 +826,8 @@ isFusableWithProducer(OpOperand &operand,
 static void
 fuseRootsWithProducers(MLIRContext *context, Operation *root, unsigned groupNum,
                        DominanceInfo const &dominanceInfo,
-                       FormDispatchRegionsPassOptions const &options) {
+                       FormDispatchRegionsPassOptions const &options,
+                       bool fuseWithTruncate) {
   SmallVector<Operation *> worklist;
   worklist.push_back(root);
   llvm::SmallBitVector rootOuterParallelLoops = getOuterParallelLoops(root);
@@ -783,7 +844,8 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root, unsigned groupNum,
         continue;
       }
 
-      if (!isFusableWithProducer(operand, rootOuterParallelLoops, options)) {
+      if (!isFusableWithProducer(operand, rootOuterParallelLoops, options,
+                                 fuseWithTruncate)) {
         continue;
       }
 
@@ -837,11 +899,17 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       unsigned newGroup = numRootOps++;
       setRootAttribute(context, &op, newGroup);
 
-      fuseRootsWithProducers(context, &op, newGroup, dominanceInfo, options);
+      fuseRootsWithProducers(context, &op, newGroup, dominanceInfo, options,
+                             /*fuseWithTruncate=*/false);
       roots.push_back(&op);
     }
     roots = llvm::to_vector(llvm::reverse(roots));
     fuseRootsWithConsumers(context, roots, dominanceInfo, options);
+    for (Operation *root : roots) {
+      int64_t rootNumber = getRootNumber(root);
+      fuseRootsWithProducers(context, root, rootNumber, dominanceInfo, options,
+                             /*fuseWithTruncate=*/true);
+    }
   }
 
   // Once all root linalg ops have been tagged, put all remaining generic ops
@@ -877,11 +945,17 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       unsigned newGroup = numRootOps++;
       setRootAttribute(context, &op, newGroup);
 
-      fuseRootsWithProducers(context, &op, newGroup, dominanceInfo, options);
+      fuseRootsWithProducers(context, &op, newGroup, dominanceInfo, options,
+                             /*fuseWithTruncate=*/false);
       roots.push_back(&op);
     }
     roots = llvm::to_vector(llvm::reverse(roots));
     fuseRootsWithConsumers(context, roots, dominanceInfo, options);
+    for (Operation *root : roots) {
+      int64_t rootNumber = getRootNumber(root);
+      fuseRootsWithProducers(context, root, rootNumber, dominanceInfo, options,
+                             /*fuseWithTruncate=*/true);
+    }
   }
 
   return numRootOps;
@@ -997,15 +1071,10 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
         }
       }
 
-      if (failed(moveOperandDefs(rewriter, consumer, regionOp, dominanceInfo,
-                                 regionOp.getOperation()))) {
-        continue;
-      }
-
       auto newRegionOp = IREE::Flow::moveFollowingOpIntoDispatchRegion(
           rewriter, consumer, regionOp);
       if (failed(newRegionOp)) {
-        return consumer->emitOpError("failed to move consumer into region");
+        continue;
       }
       regionOp = *newRegionOp;
     }
@@ -1055,8 +1124,7 @@ void FormDispatchRegionsPass::runOnOperation() {
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
   IREE::Flow::DispatchRegionOp::getCanonicalizationPatterns(patterns, context);
   GreedyRewriteConfig config;
-  config.maxIterations = GreedyRewriteConfig::kNoLimit;
-  config.fold = true;
+  config.setMaxIterations(GreedyRewriteConfig::kNoLimit).enableFolding(true);
   if (failed(applyPatternsGreedily(funcOp, std::move(patterns), config))) {
     funcOp.emitOpError("failed in cleanup patterns");
     return signalPassFailure();

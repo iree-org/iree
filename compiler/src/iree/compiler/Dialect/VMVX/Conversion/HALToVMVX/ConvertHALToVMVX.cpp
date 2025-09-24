@@ -117,8 +117,8 @@ struct ConvertHALInterfaceWorkgroupIDOp
     Value workgroupDimI32 =
         op->getParentOfType<mlir::FunctionOpInterface>().getArgument(
             kEntryArgWorkgroupX + dim);
-    Value workgroupDim = rewriter.create<arith::IndexCastOp>(
-        op.getLoc(), rewriter.getIndexType(), workgroupDimI32);
+    Value workgroupDim = arith::IndexCastOp::create(
+        rewriter, op.getLoc(), rewriter.getIndexType(), workgroupDimI32);
     rewriter.replaceOp(op, workgroupDim);
     return success();
   }
@@ -141,8 +141,8 @@ struct ConvertHALInterfaceWorkgroupSizeOp
     Value workgroupDimI32 =
         op->getParentOfType<mlir::FunctionOpInterface>().getArgument(
             kEntryArgWorkgroupSizeX + dim);
-    Value workgroupDim = rewriter.create<arith::IndexCastOp>(
-        op.getLoc(), rewriter.getIndexType(), workgroupDimI32);
+    Value workgroupDim = arith::IndexCastOp::create(
+        rewriter, op.getLoc(), rewriter.getIndexType(), workgroupDimI32);
     rewriter.replaceOp(op, workgroupDim);
     return success();
   }
@@ -165,8 +165,8 @@ struct ConvertHALInterfaceWorkgroupCountOp
     Value workgroupDimI32 =
         op->getParentOfType<mlir::FunctionOpInterface>().getArgument(
             kEntryArgWorkgroupCountX + dim);
-    Value workgroupDim = rewriter.create<arith::IndexCastOp>(
-        op.getLoc(), rewriter.getIndexType(), workgroupDimI32);
+    Value workgroupDim = arith::IndexCastOp::create(
+        rewriter, op.getLoc(), rewriter.getIndexType(), workgroupDimI32);
     rewriter.replaceOp(op, workgroupDim);
     return success();
   }
@@ -187,7 +187,7 @@ struct ConvertHALInterfaceConstantLoadOp
     // HACK: we could find the total push constant count and avoid this size op
     // but it'd require walking all the way up to the hal.executable export.
     auto constantsSize =
-        rewriter.create<IREE::Util::BufferSizeOp>(op.getLoc(), constantsArg);
+        IREE::Util::BufferSizeOp::create(rewriter, op.getLoc(), constantsArg);
     auto resultType = getTypeConverter()->convertType(op.getResult().getType());
 
     // Index -> byte offset.
@@ -247,13 +247,11 @@ struct ConvertHALInterfaceBindingSubspanOp
     IndexSet indexSet(op.getLoc(), rewriter);
     auto bindingType = llvm::cast<IREE::Util::ListType>(bindingsArg.getType())
                            .getElementType();
-    auto sourceBuffer =
-        rewriter
-            .create<IREE::Util::ListGetOp>(
-                op.getLoc(), bindingType, bindingsArg,
-                rewriter.createOrFold<arith::ConstantIndexOp>(
-                    op.getLoc(), op.getBinding().getSExtValue()))
-            .getResult();
+    auto sourceBuffer = IREE::Util::ListGetOp::create(
+                            rewriter, op.getLoc(), bindingType, bindingsArg,
+                            rewriter.createOrFold<arith::ConstantIndexOp>(
+                                op.getLoc(), op.getBinding().getSExtValue()))
+                            .getResult();
 
     if (op.getByteOffset() && !matchPattern(op.getByteOffset(), m_Zero())) {
       // Offsetted binding: replace with a BufferSubspanOp.

@@ -116,7 +116,7 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
 
   // Ensure we start with the right QoS class.
   qos_class_t qos_class;
-  if (params.initial_affinity.specified && params.initial_affinity.smt) {
+  if (params.initial_affinity.id_assigned && params.initial_affinity.smt) {
     qos_class = QOS_CLASS_BACKGROUND;
   } else {
     qos_class = iree_thread_qos_class_for_priority_class(params.priority_class);
@@ -148,7 +148,7 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
   }
 
   thread->mach_port = pthread_mach_thread_np(thread->handle);
-  if (params.initial_affinity.specified) {
+  if (!iree_thread_affinity_is_unspecified(params.initial_affinity)) {
     iree_thread_request_affinity(thread, params.initial_affinity);
   }
 
@@ -210,22 +210,29 @@ void iree_thread_override_end(iree_thread_override_t* override) {
 
 void iree_thread_request_affinity(iree_thread_t* thread,
                                   iree_thread_affinity_t affinity) {
-  if (!affinity.specified) return;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Use mach_task_self when the caller requesting the affinity change is the
-  // thread being changed.
-  mach_port_t thread_port =
-      thread->handle == pthread_self() ? mach_task_self() : thread->mach_port;
+  // NOTE: group affinity is not yet supported, only ID affinity.
+  // When the ID is not assigned we should really clear the policy but that
+  // doesn't seem possible. Today we don't migrate affinities in a way where
+  // we'd ever want to do anything but assign new ones so this is ok. The kernel
+  // is allowed to totally ignore the affinity request and interpret it however
+  // it likes so this is all not critical anyway.
+  if (affinity.id_assigned) {
+    // Use mach_task_self when the caller requesting the affinity change is the
+    // thread being changed.
+    mach_port_t thread_port =
+        thread->handle == pthread_self() ? mach_task_self() : thread->mach_port;
 
-  // See:
-  // https://gist.github.com/Coneko/4234842
-  // https://fergofrog.com/code/cbowser/xnu/osfmk/mach/thread_policy.h.html
-  // http://www.hybridkernel.com/2015/01/18/binding_threads_to_cores_osx.html
-  thread_affinity_policy_data_t policy_data = {affinity.id};
-  thread_policy_set(thread_port, THREAD_AFFINITY_POLICY,
-                    (thread_policy_t)(&policy_data),
-                    THREAD_AFFINITY_POLICY_COUNT);
+    // See:
+    // https://gist.github.com/Coneko/4234842
+    // https://fergofrog.com/code/cbowser/xnu/osfmk/mach/thread_policy.h.html
+    // http://www.hybridkernel.com/2015/01/18/binding_threads_to_cores_osx.html
+    thread_affinity_policy_data_t policy_data = {affinity.id};
+    thread_policy_set(thread_port, THREAD_AFFINITY_POLICY,
+                      (thread_policy_t)(&policy_data),
+                      THREAD_AFFINITY_POLICY_COUNT);
+  }
 
   IREE_TRACE_ZONE_END(z0);
 }

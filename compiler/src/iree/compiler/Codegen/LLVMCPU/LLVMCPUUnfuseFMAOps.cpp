@@ -21,15 +21,16 @@ namespace {
 // TODO(ataei): Upstream this pattern if needed ?
 class UnfusedFMAOpsPassConversion : public OpRewritePattern<LLVM::FMAOp> {
 public:
-  using OpRewritePattern<LLVM::FMAOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(LLVM::FMAOp op,
                                 PatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
-    auto mulPart = rewriter.create<LLVM::FMulOp>(loc, op.getResult().getType(),
-                                                 op.getA(), op.getB());
-    auto fmaResult = rewriter.create<LLVM::FAddOp>(
-        loc, mulPart.getResult().getType(), mulPart.getResult(), op.getC());
+    auto mulPart = LLVM::FMulOp::create(rewriter, loc, op.getResult().getType(),
+                                        op.getA(), op.getB());
+    auto fmaResult =
+        LLVM::FAddOp::create(rewriter, loc, mulPart.getResult().getType(),
+                             mulPart.getResult(), op.getC());
     rewriter.replaceOp(op, fmaResult.getResult());
     return success();
   }
@@ -52,7 +53,7 @@ void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
 }
 
 void LLVMCPUUnfuseFMAOpsPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   auto context = funcOp.getContext();
   RewritePatternSet patterns(&getContext());
   populateUnfusedFMAOpsPassPatterns(context, patterns);

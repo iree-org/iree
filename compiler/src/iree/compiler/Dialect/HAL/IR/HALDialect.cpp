@@ -9,21 +9,17 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/Conversion/HALToVM/Patterns.h"
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/HAL/hal.imports.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
-#include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/LogicalResult.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Transforms/InliningUtils.h"
@@ -124,11 +120,11 @@ class HALAffinityAnalysisDialectInterface
 public:
   using AffinityAnalysisDialectInterface::AffinityAnalysisDialectInterface;
 
-  // Returns a function that gathers the corresponding
-  // EncodingLayoutResolverAttrInterface attributes for each
-  // (IREE::Stream::Affinity, Operation) query. The attribute is extracted from
-  // the `encoding` field in the HAL::ExecutableTargetAttr configuration. If the
-  // `encoding` is not present, IdentityEncodingAttr is returned.
+  // Returns a function that gathers the corresponding LayoutResolverAttr
+  // attributes for each (IREE::Stream::Affinity, Operation) query. The
+  // attribute is extracted from the `encoding` field in the
+  // HAL::ExecutableTargetAttr configuration. If the `encoding` is not present,
+  // IdentityResolverAttr is returned.
   IREE::Stream::ResolveLayoutAttrFn
   makeLayoutAttrResolver(ModuleOp moduleOp) const {
     return [=](ArrayRef<IREE::Stream::AffinityAndOpPair> batchQueries,
@@ -142,12 +138,12 @@ public:
       }
 
       MLIRContext *ctx = getContext();
-      std::optional<IREE::Encoding::IdentityEncodingAttr> defaultAttr;
+      std::optional<IREE::Encoding::IdentityResolverAttr> defaultAttr;
       auto getDefaultAttr = [&]() {
         if (defaultAttr) {
           return defaultAttr.value();
         }
-        defaultAttr = IREE::Encoding::IdentityEncodingAttr::get(ctx);
+        defaultAttr = IREE::Encoding::IdentityResolverAttr::get(ctx);
         return defaultAttr.value();
       };
       for (IREE::Stream::AffinityAndOpPair key : batchQueries) {
@@ -163,7 +159,7 @@ public:
           }
           auto encodingLayoutAttr =
               targetAttr.getConfiguration()
-                  .getAs<IREE::Encoding::EncodingLayoutResolverAttrInterface>(
+                  .getAs<IREE::Encoding::LayoutResolverAttr>(
                       IREE::Encoding::kEncodingResolverAttrName);
           if (!encodingLayoutAttr) {
             layoutAttrs[key].insert(getDefaultAttr());
@@ -208,8 +204,8 @@ Operation *HALDialect::materializeConstant(OpBuilder &builder, Attribute value,
   if (llvm::isa<IndexType>(type)) {
     // Some folders materialize raw index types, which just become std
     // constants.
-    return builder.create<mlir::arith::ConstantIndexOp>(
-        loc, llvm::cast<IntegerAttr>(value).getValue().getSExtValue());
+    return mlir::arith::ConstantIndexOp::create(
+        builder, loc, llvm::cast<IntegerAttr>(value).getValue().getSExtValue());
   }
   return nullptr;
 }

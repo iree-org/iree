@@ -84,9 +84,8 @@ SmallVector<int64_t> getNativeVectorShapeImpl(VectorTransferOpInterface op) {
        llvm::enumerate(op.getPermutationMap().getResults())) {
     if (auto dimExpr = dyn_cast<AffineDimExpr>(dim)) {
       if (dimExpr.getPosition() == op.getPermutationMap().getNumDims() - 1) {
-        nativeSize[index] =
-            getMemoryVectorSize(op.getSource(), vecType.getElementType(),
-                                vecType.getShape()[index]);
+        nativeSize[index] = getMemoryVectorSize(
+            op.getBase(), vecType.getElementType(), vecType.getShape()[index]);
       }
     }
   }
@@ -100,12 +99,10 @@ Operation *stripElementBitPatternPreservingParents(Value op) {
             .Case<vector::BroadcastOp>([](vector::BroadcastOp broadcast) {
               return broadcast.getVector();
             })
-            .Case<vector::ExtractOp, vector::ExtractElementOp,
-                  vector::ExtractStridedSliceOp>(
-                [](auto extract) { return extract.getVector(); })
-            .Case<vector::InsertOp, vector::InsertElementOp,
-                  vector::InsertStridedSliceOp>(
-                [](auto insert) { return insert.getSource(); })
+            .Case<vector::ExtractOp, vector::ExtractStridedSliceOp>(
+                [](auto extract) { return extract.getSource(); })
+            .Case<vector::InsertOp, vector::InsertStridedSliceOp>(
+                [](auto insert) { return insert.getValueToStore(); })
             .Case<vector::TransposeOp>([](vector::TransposeOp transpose) {
               return transpose.getVector();
             })
@@ -264,10 +261,7 @@ void populateVectorUnrollPatterns(RewritePatternSet &patterns,
 bool supportsIntegerDotProductOps(mlir::FunctionOpInterface fn) {
   // First check if the function op itself has a target env attribute. This may
   // be preferred in tests.
-  auto targetEnvAttr =
-      fn->getAttrOfType<IREE::GPU::TargetAttr>(kGPUTargetAttrName);
-  if (!targetEnvAttr)
-    targetEnvAttr = getGPUTargetAttr(fn);
+  auto targetEnvAttr = getGPUTargetAttr(fn);
   if (!targetEnvAttr)
     return false;
 

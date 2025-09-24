@@ -106,6 +106,8 @@ iree_tablegen_library(
 iree_tablegen_doc(
   NAME
     SimpleIODialectDocGen
+  CATEGORY
+    "Dialects"
   TD_FILE
     "src/simple_io_sample/IR/SimpleIOOps.td"
   OUTS

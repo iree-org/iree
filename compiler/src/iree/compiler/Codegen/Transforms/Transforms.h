@@ -14,8 +14,8 @@
 
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
@@ -37,10 +37,10 @@ struct SliceAndDynamicDims {
 };
 SliceAndDynamicDims
 cloneOffsetsSizesAndStrides(OpBuilder &builder,
-                            IREE::Flow::DispatchTensorStoreOp storeOp);
+                            IREE::TensorExt::DispatchTensorStoreOp storeOp);
 SliceAndDynamicDims
 cloneOffsetsSizesAndStrides(OpBuilder &builder,
-                            IREE::Flow::DispatchTensorLoadOp loadOp);
+                            IREE::TensorExt::DispatchTensorLoadOp loadOp);
 
 /// Creates an allocation in the entry block of the function if the size is
 /// statically bounded. For a static allocation, it returns an allocation
@@ -90,6 +90,9 @@ void populateAffineMinSCFCanonicalizationPattern(RewritePatternSet &patterns);
 /// scf.for ops.
 void populateForallLoopHoistingPattern(RewritePatternSet &patterns);
 
+/// Populate pattern that folds fill into pad ops.
+void populateFoldFillIntoPadPattern(RewritePatternSet &patterns);
+
 using GetMinMaxExprFn =
     std::function<std::optional<std::pair<AffineExpr, AffineExpr>>(
         Value value, SmallVectorImpl<Value> &dims,
@@ -98,13 +101,6 @@ using GetMinMaxExprFn =
 /// Insert pattern to remove single iteration loop. The pattern will detect
 /// single iteration loops based on the range returned ValueBoundsOpInterface.
 void populateRemoveSingleIterationLoopPattern(RewritePatternSet &patterns);
-
-/// Populate patterns that fold tensor.expand/collapse_shape into the source
-/// hal.interface.binding.subspan.
-void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns);
-
-/// Populate patterns that remove dead allocations
-void populateRemoveDeadMemAllocPatterns(RewritePatternSet &patterns);
 
 // Group of Alloc operations that have overlapping liveranges.
 using AliasGroup = SmallVector<Operation *>;
@@ -126,6 +122,16 @@ void analyseAllocsForPacking(mlir::FunctionOpInterface funcOp,
 void packAllocs(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
                 ArrayRef<AliasGroup> aliasGroups);
 
+/// Materialize the backward slice starting at the values in `workgroupCount`
+/// at the current insertion point of the `rewriter`. The leaves of the slice
+/// are expected to be `iree_tensor_ext.workload.ordinal` ops that
+/// are replaced with the corresponding `workloadVals`. Returns the
+/// values corresponding to `workgroupCount` materialized at the insertion
+/// point.
+FailureOr<SmallVector<OpFoldResult>> materializeWorkgroupCountComputation(
+    RewriterBase &rewriter, mlir::FunctionOpInterface entryPointFn,
+    ArrayRef<OpFoldResult> workgroupCount, ValueRange workloadVals);
+
 /// Lower the workgroup count region for the default code-generation path in
 /// IREE. Given the list `workgroupCount` (fastest varying dimension innermost)
 /// as computed within the `entryPointFn`, clones a backward slice of the
@@ -135,21 +141,22 @@ void packAllocs(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
 /// the `flow.dispatch.constant_ordinal` operations from within the
 /// `entryPointFn`. Expects the workgroup count region of the corresponding
 /// `hal.executable.export` to contain the
-/// `flow.dispatch.workgroup_count_default` operation as a placeholder for the
+/// `flow.dispatch.workgroup_count_slice` operation as a placeholder for the
 /// computation to compute the number of workgroups. In absence of this
 /// operation, this method does nothing assuming that the workgroup count
 /// computation has already been resolved.
 LogicalResult lowerWorkgroupCountFromSliceOp(
     RewriterBase &rewriter,
-    IREE::Flow::DispatchWorkgroupCountFromSliceOp workgroupCountOp,
+    IREE::TensorExt::DispatchWorkgroupCountFromSliceOp workgroupCountOp,
     mlir::FunctionOpInterface entryPointFn,
     ArrayRef<OpFoldResult> workgroupCount,
     int maxWorkgroupParallelDims = kNumMaxParallelDims);
 
 /// Wrapper around `lowerWorkgroupCountFromSliceOp` method that
-/// takes the `flow.dispatch.workgroup_count_from_slice` op
+/// takes the `iree_tensor_ext.dispatch.workgroup_count_from_slice` op
 /// as an argument. Looks up the `hal.executable.export` operation
-/// and finds the `flow.dispatch.workgroup_count_from_slice` op to lower.
+/// and finds the `iree_tensor_ext.dispatch.workgroup_count_from_slice` op to
+/// lower.
 LogicalResult lowerWorkgroupCountFromSliceOp(
     RewriterBase &rewriter, mlir::FunctionOpInterface entryPointFn,
     ArrayRef<OpFoldResult> workgroupCount,
@@ -160,6 +167,11 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
 /// mapping attributes are excluded as their trip count is unclear until
 /// resolution.
 void moveLoopInvariantCodeFromGuaranteedLoops(Operation *target);
+
+/// Populate the pattern to fold `scf.forall` created by split reduction
+/// and scf.forall created from workgroup mapping.
+void populateFoldSplitReductionAndWorkgroupMappingLoops(
+    RewritePatternSet &patterns);
 
 //===----------------------------------------------------------------------===//
 // Transformations exposed as patterns, moved from upstream MLIR as IREE still

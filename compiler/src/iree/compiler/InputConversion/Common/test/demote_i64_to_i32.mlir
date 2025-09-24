@@ -165,7 +165,10 @@ util.initializer {
   util.return
 }
 // CHECK: util.func private @initializer() -> tensor<4xi32>
-util.func private @initializer() -> tensor<4xi64>
+util.func private @initializer() -> tensor<4xi64> {
+  %0 = arith.constant dense<123> : tensor<4xi64>
+  util.return %0 : tensor<4xi64>
+}
 
 // -----
 

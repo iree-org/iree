@@ -14,12 +14,11 @@
 #translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 hal.executable private @apply_scale_no_vector_feature {
   hal.executable.variant public @embedded_elf_riscv_64 target(#executable_target_embedded_elf_riscv_64_) {
-    hal.executable.export public @apply_scale_no_vector_feature ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+    hal.executable.export public @apply_scale_no_vector_feature ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       %0 = affine.apply #map()[%arg1]
       hal.return %0, %c1, %c1 : index, index, index
-    }
+    } attributes {translation_info = #translation}
     builtin.module {
       func.func @apply_scale_no_vector_feature() {
         %cst = arith.constant dense<19689> : vector<2xi32>
@@ -28,7 +27,7 @@ hal.executable private @apply_scale_no_vector_feature {
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<2xi32>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
-        %3 = tosa.apply_scale %2, %cst, %cst_0 {rounding_mode = "SINGLE_ROUND"} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        %3 = tosa.apply_scale %2, %cst, %cst_0 {rounding_mode = SINGLE_ROUND} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
         return
       }
@@ -60,12 +59,11 @@ hal.executable private @apply_scale_no_vector_feature {
 #translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 hal.executable private @apply_scale_v {
   hal.executable.variant public @embedded_elf_riscv_64 target(#executable_target_embedded_elf_riscv_64_) {
-    hal.executable.export public @apply_scale_v ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+    hal.executable.export public @apply_scale_v ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       %0 = affine.apply #map()[%arg1]
       hal.return %0, %c1, %c1 : index, index, index
-    }
+    } attributes {translation_info = #translation}
     builtin.module {
       func.func @apply_scale_v() {
         %cst = arith.constant dense<19689> : vector<2xi32>
@@ -74,7 +72,7 @@ hal.executable private @apply_scale_v {
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<2xi32>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
-        %3 = tosa.apply_scale %2, %cst, %cst_0 {rounding_mode = "SINGLE_ROUND"} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        %3 = tosa.apply_scale %2, %cst, %cst_0 {rounding_mode = SINGLE_ROUND} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
         return
       }
@@ -104,12 +102,11 @@ hal.executable private @apply_scale_v {
 #translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 hal.executable private @apply_scale_zve64x {
   hal.executable.variant public @embedded_elf_riscv_64 target(#executable_target_embedded_elf_riscv_64_) {
-    hal.executable.export public @apply_scale_zve64x ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+    hal.executable.export public @apply_scale_zve64x ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       %0 = affine.apply #map()[%arg1]
       hal.return %0, %c1, %c1 : index, index, index
-    }
+    } attributes {translation_info = #translation}
     builtin.module {
       func.func @apply_scale_zve64x() {
         %cst = arith.constant dense<19689> : vector<2xi32>
@@ -118,7 +115,7 @@ hal.executable private @apply_scale_zve64x {
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<2xi32>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
-        %3 = tosa.apply_scale %2, %cst, %cst_0 {rounding_mode = "SINGLE_ROUND"} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        %3 = tosa.apply_scale %2, %cst, %cst_0 {rounding_mode = SINGLE_ROUND} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
         return
       }
@@ -148,12 +145,11 @@ hal.executable private @apply_scale_zve64x {
 #translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 hal.executable private @apply_scale_zve32x {
   hal.executable.variant public @embedded_elf_riscv_64 target(#executable_target_embedded_elf_riscv_64_) {
-    hal.executable.export public @apply_scale_zve32x ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+    hal.executable.export public @apply_scale_zve32x ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       %0 = affine.apply #map()[%arg1]
       hal.return %0, %c1, %c1 : index, index, index
-    }
+    } attributes {translation_info = #translation}
     builtin.module {
       func.func @apply_scale_zve32x() {
         %cst = arith.constant dense<19689> : vector<2xi32>
@@ -162,7 +158,7 @@ hal.executable private @apply_scale_zve32x {
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<2xi32>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
-        %3 = tosa.apply_scale %2, %cst, %cst_0 {rounding_mode = "SINGLE_ROUND"} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        %3 = tosa.apply_scale %2, %cst, %cst_0 {rounding_mode = SINGLE_ROUND} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
         return
       }
@@ -199,12 +195,11 @@ hal.executable private @apply_scale_zve32x {
 #translation = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
 hal.executable private @apply_scale_zve32f {
   hal.executable.variant public @embedded_elf_riscv_64 target(#executable_target_embedded_elf_riscv_64_) {
-    hal.executable.export public @apply_scale_zve32f ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+    hal.executable.export public @apply_scale_zve32f ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       %0 = affine.apply #map()[%arg1]
       hal.return %0, %c1, %c1 : index, index, index
-    }
+    } attributes {translation_info = #translation}
     builtin.module {
       func.func @apply_scale_zve32f() {
         %cst = arith.constant dense<19689> : vector<2xi32>
@@ -213,7 +208,7 @@ hal.executable private @apply_scale_zve32f {
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<2xi32>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
-        %3 = tosa.apply_scale %2, %cst, %cst_0 {rounding_mode = "SINGLE_ROUND"} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        %3 = tosa.apply_scale %2, %cst, %cst_0 {rounding_mode = SINGLE_ROUND} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
         return
       }

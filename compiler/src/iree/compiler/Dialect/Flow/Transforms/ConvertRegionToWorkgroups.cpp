@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -35,7 +36,7 @@ static void appendDynamicDims(OpBuilder &b, Location loc,
   }
 
   for (auto dim : llvm::enumerate(tensorType.getShape())) {
-    if (!ShapedType::isDynamic(dim.value()))
+    if (ShapedType::isStatic(dim.value()))
       continue;
     argumentDims.push_back(
         b.createOrFold<tensor::DimOp>(loc, tensor, dim.index()));
@@ -142,7 +143,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   }
 
   // Create empty dispatch region.
-  SmallVector<Value> arguments(argumentsSet.begin(), argumentsSet.end());
+  auto arguments = llvm::to_vector_of<Value>(argumentsSet);
   arguments.append(argumentDims);
   for (unsigned i = 0; i < numResults; ++i) {
     // Tied arguments already have their dynamic result dims in `arguments`. Do
@@ -154,8 +155,8 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   }
 
   // Create the shell dispatch.workgroup ops.
-  auto workgroupsOp = rewriter.create<IREE::Flow::DispatchWorkgroupsOp>(
-      loc, regionOp.getWorkload(), regionOp.getResultTypes(),
+  auto workgroupsOp = IREE::Flow::DispatchWorkgroupsOp::create(
+      rewriter, loc, regionOp.getWorkload(), regionOp.getResultTypes(),
       regionOp.getResultDims(), arguments, argumentDims, tiedArguments);
   workgroupsOp->setDialectAttrs(regionOp->getDialectAttrs());
 
@@ -195,8 +196,8 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
            "dynamic dims not found among arguments");
     SmallVector<Value> bbArgDims =
         llvm::map_to_vector(dims, [&](Value v) { return bvm.lookup(v); });
-    Value loadedTensor = rewriter.create<IREE::Flow::DispatchTensorLoadOp>(
-        loc, tensorType, inputBbArg, bbArgDims);
+    Value loadedTensor = IREE::TensorExt::DispatchTensorLoadOp::create(
+        rewriter, loc, tensorType, inputBbArg, bbArgDims);
     bvm.map(it.value(), loadedTensor);
     argValues.push_back(loadedTensor);
   }
@@ -239,12 +240,12 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
 #endif // NDEBUG
       SmallVector<Value> bbArgDims =
           llvm::map_to_vector(dims, [&](Value v) { return bvm.lookup(v); });
-      rewriter.create<IREE::Flow::DispatchTensorStoreOp>(
-          loc, it.value(), outputBbArg, bbArgDims);
+      IREE::TensorExt::DispatchTensorStoreOp::create(rewriter, loc, it.value(),
+                                                     outputBbArg, bbArgDims);
     }
 
     // Delete the old terminator and create a new one.
-    rewriter.create<IREE::Flow::ReturnOp>(loc);
+    IREE::Flow::ReturnOp::create(rewriter, loc);
     rewriter.eraseOp(terminator);
   }
 

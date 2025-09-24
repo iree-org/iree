@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -46,7 +46,7 @@ namespace {
 /// A wrapper pattern that calls linalg::lowerPack on linalg::PackOp. It lowers
 /// a linalg.pack op to tensor.pad + tensor.expand_shape + linalg.transpose ops.
 struct LowerPackPattern : public OpRewritePattern<linalg::PackOp> {
-  using OpRewritePattern<linalg::PackOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   explicit LowerPackPattern(MLIRContext *context,
                             std::optional<PackUnPackControlFn> controlFn)
@@ -79,7 +79,7 @@ private:
 /// lowers a linalg.unpack op to tensor.empty + linalg.transpose +
 /// tensor.collapse_shape + tensor.extract_slice ops.
 struct LowerUnPackPattern : public OpRewritePattern<linalg::UnPackOp> {
-  using OpRewritePattern<linalg::UnPackOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   explicit LowerUnPackPattern(MLIRContext *context,
                               std::optional<PackUnPackControlFn> controlFn)
@@ -205,7 +205,7 @@ static LogicalResult commonRunOnOperation(
             unpackTilingOptions);
         if (failed(tilingResult))
           return WalkResult::interrupt();
-        rewriter.replaceOp(op, tilingResult->mergeResult.replacements);
+        rewriter.replaceOp(op, tilingResult->replacements);
         return WalkResult::advance();
       });
       if (status.wasInterrupted()) {
@@ -260,8 +260,7 @@ static LogicalResult commonRunOnOperation(
 
 struct DecomposePackUnPackOpsPass final
     : impl::DecomposePackUnPackOpsPassBase<DecomposePackUnPackOpsPass> {
-  using impl::DecomposePackUnPackOpsPassBase<
-      DecomposePackUnPackOpsPass>::DecomposePackUnPackOpsPassBase;
+  using Base::Base;
 
   void runOnOperation() override;
 };
@@ -336,14 +335,15 @@ static LogicalResult isUnpaddedAndAtBoundary(Operation *op) {
   // If the producer is a dispatch tensor load, then the `op` is decomposable
   // if it is a PackOp.
   if (isa<linalg::PackOp>(op) &&
-      op->getOperand(0).getDefiningOp<IREE::Flow::DispatchTensorLoadOp>()) {
+      op->getOperand(0)
+          .getDefiningOp<IREE::TensorExt::DispatchTensorLoadOp>()) {
     return success();
   }
   // If all consumers are dispatch tensor stores, then the `op` is decomposable
   // if it is an UnPackOp.
   if (isa<linalg::UnPackOp>(op) &&
       llvm::all_of(op->getUsers(), [&](Operation *user) {
-        return isa<IREE::Flow::DispatchTensorStoreOp>(user);
+        return isa<IREE::TensorExt::DispatchTensorStoreOp>(user);
       })) {
     return success();
   }

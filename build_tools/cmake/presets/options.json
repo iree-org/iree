@@ -14,10 +14,6 @@
       "displayName": "Minimal config",
       "description": "Project configured with minimal features enabled",
       "cacheVariables": {
-        "IREE_DEFAULT_CPU_LLVM_TARGETS": {
-          "type": "STRING",
-          "value": "host"
-        },
         "IREE_BUILD_SAMPLES": {
           "type": "BOOL",
           "value": "OFF"

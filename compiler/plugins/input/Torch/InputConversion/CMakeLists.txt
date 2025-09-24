@@ -35,8 +35,9 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "BindSymbolicShapes.cpp"
-    "BitCastQuantTensor.cpp"
+    "BitCastTensor.cpp"
     "ConvertTMTensorToLinalgExt.cpp"
+    "ConvertTorchUnstructuredToLinalgExt.cpp"
     "FuncConversion.cpp"
     "SetStrictSymbolicShapes.cpp"
     "Passes.cpp"
@@ -57,5 +58,6 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::Stream::IR
+    iree::compiler::Dialect::TensorExt::IR
   PUBLIC
 )

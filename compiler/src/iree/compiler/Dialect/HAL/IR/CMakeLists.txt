@@ -128,6 +128,8 @@ iree_tablegen_library(
 iree_tablegen_doc(
   NAME
     HALDialectDocGen
+  CATEGORY
+    "Dialects"
   TD_FILE
     "HALOps.td"
   OUTS

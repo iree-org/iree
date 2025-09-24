@@ -12,9 +12,10 @@ util.func public @parameterLoad(%wait: !stream.timepoint) -> (!stream.resource<c
   // CHECK-DAG: %[[DEVICE:.+]] = util.global.load immutable @device
   // CHECK-DAG: %[[AFFINITY:.+]] = arith.constant -1
   // CHECK-DAG: %[[SIGNAL:.+]] = hal.fence.create device(%[[DEVICE]] : !hal.device)
+  // CHECK-DAG: %[[MEMORY_TYPE:.+]], %[[BUFFER_USAGE:.+]] = hal.allocator.resolve_memory_properties for(#hal.device.affinity<@device>) lifetime(constant)
   // CHECK: %[[BUFFERS:.+]]:2 = io_parameters.load<%[[DEVICE]] : !hal.device> affinity(%[[AFFINITY]])
   // CHECK-SAME: wait(%[[WAIT]]) signal(%[[SIGNAL]])
-  // CHECK-SAME: type("DeviceVisible|DeviceLocal") usage("TransferSource|TransferTarget|Transfer|DispatchStorageRead|DispatchStorageWrite|DispatchStorage|SharingImmutable")
+  // CHECK-SAME: type(%[[MEMORY_TYPE]]) usage(%[[BUFFER_USAGE]])
   // CHECK-NEXT: "scope"::"key0"[%c50_i64] : !hal.buffer{%c100}
   // CHECK-NEXT: "scope"::"key1"[%c51_i64] : !hal.buffer{%c101}
   %results:2, %result_timepoint = stream.parameter.load on(#hal.device.affinity<@device>) await(%wait) => {
@@ -37,9 +38,10 @@ util.func public @parameterLoadNoScope(%wait: !stream.timepoint) -> (!stream.res
   // CHECK-DAG: %[[DEVICE:.+]] = util.global.load immutable @device
   // CHECK-DAG: %[[AFFINITY:.+]] = arith.constant -1
   // CHECK-DAG: %[[SIGNAL:.+]] = hal.fence.create device(%[[DEVICE]] : !hal.device)
+  // CHECK-DAG: %[[MEMORY_TYPE:.+]], %[[BUFFER_USAGE:.+]] = hal.allocator.resolve_memory_properties for(#hal.device.affinity<@device>) lifetime(constant)
   // CHECK: %[[BUFFER:.+]] = io_parameters.load<%[[DEVICE]] : !hal.device> affinity(%[[AFFINITY]])
   // CHECK-SAME: wait(%[[WAIT]]) signal(%[[SIGNAL]])
-  // CHECK-SAME: type("DeviceVisible|DeviceLocal") usage("TransferSource|TransferTarget|Transfer|DispatchStorageRead|DispatchStorageWrite|DispatchStorage|SharingImmutable")
+  // CHECK-SAME: type(%[[MEMORY_TYPE]]) usage(%[[BUFFER_USAGE]])
   // CHECK-NEXT: "key"[%c50_i64] : !hal.buffer{%c100}
   %result, %result_timepoint = stream.parameter.load on(#hal.device.affinity<@device>) await(%wait) => {
     "key"[%c50_i64] : !stream.resource<constant>{%c100}

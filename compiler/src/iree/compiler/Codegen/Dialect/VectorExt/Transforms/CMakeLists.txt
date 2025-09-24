@@ -23,9 +23,12 @@ iree_cc_library(
   NAME
     VectorExtTransforms
   HDRS
+    "BufferizationInterfaces.h"
     "Passes.h"
     "Passes.h.inc"
+    "Transforms.h"
   SRCS
+    "BufferizationInterfaces.cpp"
     "Passes.cpp"
     "VectorExtFoldUnitExtentDims.cpp"
     "VectorizeIREEVectorExtOps.cpp"
@@ -33,18 +36,36 @@ iree_cc_library(
     ::PassesIncGen
     LLVMSupport
     MLIRArithDialect
+    MLIRBufferizationDialect
+    MLIRBufferizationTransforms
     MLIRFunctionInterfaces
     MLIRIR
+    MLIRLinalgDialect
+    MLIRLinalgTransforms
     MLIRPass
     MLIRSupport
     MLIRTensorDialect
     MLIRTransformUtils
     MLIRTransforms
+    MLIRUBDialect
     MLIRVectorDialect
     MLIRVectorTransforms
     MLIRVectorUtils
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
+    iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::LinalgExt::Utils
   PUBLIC
+)
+
+iree_tablegen_doc(
+  NAME
+    CodegenDialectVectorExtPassesDocGen
+  CATEGORY
+    "Passes"
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-doc CodegenDialectVectorExtPasses.md
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

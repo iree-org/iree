@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -51,7 +52,17 @@ static bool getUsesIfAllTransferOp(Value value,
                                    SmallVectorImpl<Operation *> &uses) {
   assert(uses.empty() && "expected uses to be empty");
   for (Operation *userOp : value.getUsers()) {
-    if (isa<memref::DeallocOp, memref::AssumeAlignmentOp>(userOp))
+    if (auto assumeAlignmentOp =
+            dyn_cast_if_present<memref::AssumeAlignmentOp>(userOp)) {
+      if (!getUsesIfAllTransferOp(assumeAlignmentOp.getResult(), uses)) {
+        uses.clear();
+        LLVM_DEBUG(llvm::dbgs()
+                   << "failed: non-transfer-like user: " << *userOp << "\n");
+        return false;
+      }
+      continue;
+    }
+    if (isa<memref::DeallocOp>(userOp))
       continue;
 
     if (!isa<gpu::SubgroupMmaLoadMatrixOp, gpu::SubgroupMmaStoreMatrixOp,
@@ -81,8 +92,7 @@ static std::optional<unsigned> getBitWidth(Type type) {
   if (type.isIntOrFloat()) {
     return type.getIntOrFloatBitWidth();
   }
-  if (llvm::isa<VectorType>(type)) {
-    auto vecType = cast<VectorType>(type);
+  if (auto vecType = dyn_cast<VectorType>(type)) {
     auto elementType = vecType.getElementType();
     return elementType.getIntOrFloatBitWidth() * vecType.getNumElements();
   }
@@ -260,7 +270,8 @@ MemRefUsageAnalysis::MemRefUsageAnalysis(mlir::Operation *op) {
             analyzeMemRefValue(arg);
           }
         })
-        .Case<memref::AllocOp, IREE::HAL::InterfaceBindingSubspanOp>(
+        .Case<memref::AllocOp, IREE::HAL::InterfaceBindingSubspanOp,
+              memref::AssumeAlignmentOp>(
             [this](auto op) { analyzeMemRefValue(op); });
   });
 }
@@ -326,8 +337,8 @@ public:
 
     // Creates a new function with the update signature.
     rewriter.modifyOpInPlace(funcOp, [&] {
-      funcOp.setType(rewriter.getFunctionType(
-          signatureConverter.getConvertedTypes(), std::nullopt));
+      funcOp.setType(
+          rewriter.getFunctionType(signatureConverter.getConvertedTypes(), {}));
     });
     return success();
   }
@@ -350,8 +361,8 @@ public:
 
     Location loc = read.getLoc();
 
-    auto scalarMemrefType = dyn_cast<MemRefType>(read.getSource().getType());
-    auto vectorMemrefType = dyn_cast<MemRefType>(adaptor.getSource().getType());
+    auto scalarMemrefType = dyn_cast<MemRefType>(read.getBase().getType());
+    auto vectorMemrefType = dyn_cast<MemRefType>(adaptor.getBase().getType());
     auto memrefVectorType = cast<VectorType>(vectorMemrefType.getElementType());
     auto readVectorType = read.getVectorType();
     if (!scalarMemrefType || !vectorMemrefType) {
@@ -372,8 +383,8 @@ public:
     // If the transfer_read can be replaced by a load after vectorization use
     // LoadOp and cast back to the original type.
     if (*vectorMemrefElemSize == *readVecSize) {
-      Value newLoad = rewriter.create<memref::LoadOp>(
-          loc, memrefVectorType, adaptor.getSource(), indices.value());
+      Value newLoad = memref::LoadOp::create(
+          rewriter, loc, memrefVectorType, adaptor.getBase(), indices.value());
       rewriter.replaceOpWithNewOp<vector::BitCastOp>(read, readVectorType,
                                                      newLoad);
       return success();
@@ -401,11 +412,11 @@ public:
                         memrefVectorType.getElementType());
 
     for (int i = 0; i < vectorCount; ++i) {
-      Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
-      indices->back() = rewriter.create<affine::AffineApplyOp>(
-          loc, addMap, ValueRange{oldIndex, iVal});
+      Value iVal = arith::ConstantIndexOp::create(rewriter, loc, i);
+      indices->back() = affine::AffineApplyOp::create(
+          rewriter, loc, addMap, ValueRange{oldIndex, iVal});
       vectors.push_back(
-          rewriter.create<memref::LoadOp>(loc, adaptor.getSource(), *indices));
+          memref::LoadOp::create(rewriter, loc, adaptor.getBase(), *indices));
     }
 
     // If there is only two component vectors, we can use ShuffleOp, which is a
@@ -413,8 +424,8 @@ public:
     if (vectorCount == 2) {
       SmallVector<int64_t> seqIndices =
           llvm::to_vector(llvm::seq<int64_t>(readVectorType.getNumElements()));
-      auto ShuffleOp = rewriter.create<vector::ShuffleOp>(
-          loc, vectors[0], vectors[1], seqIndices);
+      auto ShuffleOp = vector::ShuffleOp::create(rewriter, loc, vectors[0],
+                                                 vectors[1], seqIndices);
       rewriter.replaceOpWithNewOp<vector::BitCastOp>(read, readVectorType,
                                                      ShuffleOp);
       return success();
@@ -423,12 +434,12 @@ public:
     SmallVector<int64_t> offsets(combinedType.getRank(), 0);
     SmallVector<int64_t> strides(combinedType.getRank(), 1);
 
-    Value newVector = rewriter.create<arith::ConstantOp>(
-        loc, combinedType, rewriter.getZeroAttr(combinedType));
+    Value newVector = arith::ConstantOp::create(
+        rewriter, loc, combinedType, rewriter.getZeroAttr(combinedType));
     for (int i = 0; i < vectorCount; ++i) {
       offsets.back() = i * memrefVectorType.getNumElements();
-      newVector = rewriter.create<vector::InsertStridedSliceOp>(
-          loc, vectors[i], newVector, offsets, strides);
+      newVector = vector::InsertStridedSliceOp::create(
+          rewriter, loc, vectors[i], newVector, offsets, strides);
     }
 
     rewriter.replaceOp(read, newVector);
@@ -453,8 +464,8 @@ public:
 
     Location loc = write.getLoc();
 
-    auto scalarMemrefType = dyn_cast<MemRefType>(write.getSource().getType());
-    auto vectorMemrefType = dyn_cast<MemRefType>(adaptor.getSource().getType());
+    auto scalarMemrefType = dyn_cast<MemRefType>(write.getBase().getType());
+    auto vectorMemrefType = dyn_cast<MemRefType>(adaptor.getBase().getType());
     auto memrefVectorType = cast<VectorType>(vectorMemrefType.getElementType());
     auto writeVectorType = write.getVectorType();
     if (!scalarMemrefType || !vectorMemrefType) {
@@ -475,10 +486,10 @@ public:
     // If the transfer_write can be replaced by a store after vectorization cast
     // the original value and use StoreOp.
     if (*vectorMemrefElemSize == *writeVecSize) {
-      Value data = rewriter.create<vector::BitCastOp>(loc, memrefVectorType,
-                                                      adaptor.getVector());
+      Value data = vector::BitCastOp::create(rewriter, loc, memrefVectorType,
+                                             adaptor.getValueToStore());
       rewriter.replaceOpWithNewOp<memref::StoreOp>(
-          write, data, adaptor.getSource(), indices.value());
+          write, data, adaptor.getBase(), indices.value());
       return success();
     }
 
@@ -505,15 +516,15 @@ public:
 
     for (int i = 0; i < vectorCount; ++i) {
       offsets.back() = i * memrefVectorType.getNumElements();
-      auto slice = rewriter.create<vector::ExtractStridedSliceOp>(
-          loc, adaptor.getVector(), offsets, sizes, strides);
+      auto slice = vector::ExtractStridedSliceOp::create(
+          rewriter, loc, adaptor.getValueToStore(), offsets, sizes, strides);
       auto component =
-          rewriter.create<vector::BitCastOp>(loc, memrefVectorType, slice);
-      Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
-      indices->back() = rewriter.create<affine::AffineApplyOp>(
-          loc, addMap, ValueRange{oldIndex, iVal});
-      rewriter.create<memref::StoreOp>(loc, component, adaptor.getSource(),
-                                       *indices);
+          vector::BitCastOp::create(rewriter, loc, memrefVectorType, slice);
+      Value iVal = arith::ConstantIndexOp::create(rewriter, loc, i);
+      indices->back() = affine::AffineApplyOp::create(
+          rewriter, loc, addMap, ValueRange{oldIndex, iVal});
+      memref::StoreOp::create(rewriter, loc, component, adaptor.getBase(),
+                              *indices);
     }
 
     rewriter.eraseOp(write);
@@ -568,7 +579,7 @@ MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
   MemRefLayoutAttrInterface layout = {};
   if (auto stridedLayout = dyn_cast<StridedLayoutAttr>(type.getLayout())) {
     auto offset = stridedLayout.getOffset();
-    if (!ShapedType::isDynamic(offset)) {
+    if (ShapedType::isStatic(offset)) {
       offset = offset / ratio;
     }
 
@@ -603,10 +614,10 @@ FailureOr<SmallVector<Value>> MemRefConversionPattern<OpTy>::adjustIndices(
   auto divMap = AffineMap::get(0, 2, {sym0.floorDiv(sym1)}, context);
 
   unsigned ratio = *vectorMemrefElemSize / *scalarMemrefElemSize;
-  Value valueRatio = rewriter.create<arith::ConstantIndexOp>(loc, ratio);
+  Value valueRatio = arith::ConstantIndexOp::create(rewriter, loc, ratio);
   auto newIndices = llvm::to_vector(indices);
-  newIndices.back() = rewriter.create<affine::AffineApplyOp>(
-      loc, divMap, ValueRange{indices.back(), valueRatio});
+  newIndices.back() = affine::AffineApplyOp::create(
+      rewriter, loc, divMap, ValueRange{indices.back(), valueRatio});
   return newIndices;
 }
 
@@ -641,7 +652,7 @@ public:
 
     // This should be guaranteed by the analysis step. But just double check.
     assert(memrefType.getRank() > 0 &&
-           !ShapedType::isDynamic(memrefType.getShape().back()));
+           ShapedType::isStatic(memrefType.getShape().back()));
 
     auto vecMemRef = getVectorizedMemRefType(rewriter, subspanOp.getResult());
     if (!vecMemRef) {
@@ -652,6 +663,20 @@ public:
         subspanOp, *vecMemRef, subspanOp.getLayout(), subspanOp.getBinding(),
         subspanOp.getByteOffset(), subspanOp.getDynamicDims(),
         subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
+    return success();
+  }
+};
+
+class ProcessAssumeAlignment final
+    : public MemRefConversionPattern<memref::AssumeAlignmentOp> {
+public:
+  using MemRefConversionPattern::MemRefConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(memref::AssumeAlignmentOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<memref::AssumeAlignmentOp>(
+        op, adaptor.getMemref(), op.getAlignmentAttr());
     return success();
   }
 };
@@ -752,14 +777,14 @@ static Value predicateMaybeMaskedScalarTransfer(
     auto thenBuilder = [&](OpBuilder &b, Location loc) {
       Value thenRes = thenConditionBuilder(b, loc);
       if (thenRes) {
-        b.create<scf::YieldOp>(loc, thenRes);
+        scf::YieldOp::create(b, loc, thenRes);
       } else {
-        b.create<scf::YieldOp>(loc);
+        scf::YieldOp::create(b, loc);
       }
     };
-    auto ifOp = b.create<scf::IfOp>(loc, maybeMaskBit,
-                                    /*thenBuilder=*/thenBuilder,
-                                    /*elseBuilder=*/elseConditionBuilder);
+    auto ifOp = scf::IfOp::create(b, loc, maybeMaskBit,
+                                  /*thenBuilder=*/thenBuilder,
+                                  /*elseBuilder=*/elseConditionBuilder);
 
     return !ifOp.getNumResults() ? Value() : ifOp->getResult(0);
   }
@@ -767,7 +792,7 @@ static Value predicateMaybeMaskedScalarTransfer(
 }
 
 /// Scalarizes remaining vector transfer that couldn't be converted to
-/// vevtor load operations.
+/// vector load operations.
 
 /// This is very specific to SPIR-V as pointer cannot be casted to vector type
 /// if any of the memory access is not vector.
@@ -787,23 +812,23 @@ struct ScalarizeVectorTransferRead final
     if (vectorType.getRank() == 0) {
       Value maybeMaskBit;
       if (maybeMask) {
-        maybeMaskBit = rewriter.create<vector::ExtractOp>(loc, maybeMask,
-                                                          ArrayRef<int64_t>{0});
+        maybeMaskBit = vector::ExtractOp::create(rewriter, loc, maybeMask,
+                                                 ArrayRef<int64_t>{0});
       }
 
       auto thenCond = [&](OpBuilder &b, Location loc) {
-        return b
-            .create<memref::LoadOp>(loc, readOp.getSource(),
-                                    readOp.getIndices())
+        return memref::LoadOp::create(b, loc, readOp.getBase(),
+                                      readOp.getIndices())
             .getResult();
       };
       auto elseCond = [&](OpBuilder &b, Location loc) {
-        b.create<scf::YieldOp>(loc, readOp.getPadding());
+        scf::YieldOp::create(b, loc, readOp.getPadding());
       };
 
       Value scalar = predicateMaybeMaskedScalarTransfer(
           rewriter, loc, maybeMaskBit, thenCond, elseCond);
-      rewriter.replaceOpWithNewOp<vector::SplatOp>(readOp, vectorType, scalar);
+      rewriter.replaceOpWithNewOp<vector::BroadcastOp>(readOp, vectorType,
+                                                       scalar);
       return success();
     }
 
@@ -818,8 +843,8 @@ struct ScalarizeVectorTransferRead final
     auto indices = llvm::to_vector(readOp.getIndices());
     Value oldIndex = indices[dimPos];
 
-    Value newVector = rewriter.create<arith::ConstantOp>(
-        loc, vectorType, rewriter.getZeroAttr(vectorType));
+    Value newVector = arith::ConstantOp::create(
+        rewriter, loc, vectorType, rewriter.getZeroAttr(vectorType));
     for (int i = 0; i < vectorType.getDimSize(0); ++i) {
       // Extract the mask bit for this value if present.
       Value maybeMaskBit;
@@ -827,25 +852,25 @@ struct ScalarizeVectorTransferRead final
         // The result vector is 1-D and we have a projected permutation, meaning
         // we can just extract the mask bit using the same index as the loaded
         // vector.
-        maybeMaskBit = rewriter.create<vector::ExtractOp>(loc, maybeMask,
-                                                          ArrayRef<int64_t>{i});
+        maybeMaskBit = vector::ExtractOp::create(rewriter, loc, maybeMask,
+                                                 ArrayRef<int64_t>{i});
       }
 
-      Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
+      Value iVal = arith::ConstantIndexOp::create(rewriter, loc, i);
       auto thenCond = [&](OpBuilder &b, Location loc) {
-        indices[dimPos] = b.create<affine::AffineApplyOp>(
-            loc, addMap, ValueRange{oldIndex, iVal});
+        indices[dimPos] = affine::AffineApplyOp::create(
+            b, loc, addMap, ValueRange{oldIndex, iVal});
         Value scalar =
-            b.create<memref::LoadOp>(loc, readOp.getSource(), indices);
+            memref::LoadOp::create(b, loc, readOp.getBase(), indices);
         return scalar;
       };
       auto elseCond = [&](OpBuilder &b, Location loc) {
-        b.create<scf::YieldOp>(loc, readOp.getPadding());
+        scf::YieldOp::create(b, loc, readOp.getPadding());
       };
 
       Value scalar = predicateMaybeMaskedScalarTransfer(
           rewriter, loc, maybeMaskBit, thenCond, elseCond);
-      newVector = rewriter.create<vector::InsertOp>(loc, scalar, newVector, i);
+      newVector = vector::InsertOp::create(rewriter, loc, scalar, newVector, i);
     }
     rewriter.replaceOp(readOp, newVector);
     return success();
@@ -863,9 +888,10 @@ struct ScalarizeVectorLoad final : public OpRewritePattern<vector::LoadOp> {
 
     Location loc = loadOp.getLoc();
     if (vectorType.getRank() == 0) {
-      Value scalar = rewriter.create<memref::LoadOp>(loc, loadOp.getBase(),
-                                                     loadOp.getIndices());
-      rewriter.replaceOpWithNewOp<vector::SplatOp>(loadOp, vectorType, scalar);
+      Value scalar = memref::LoadOp::create(rewriter, loc, loadOp.getBase(),
+                                            loadOp.getIndices());
+      rewriter.replaceOpWithNewOp<vector::BroadcastOp>(loadOp, vectorType,
+                                                       scalar);
       return success();
     }
 
@@ -880,15 +906,15 @@ struct ScalarizeVectorLoad final : public OpRewritePattern<vector::LoadOp> {
     auto indices = llvm::to_vector(loadOp.getIndices());
     Value oldIndex = indices[dimPos];
 
-    Value newVector = rewriter.create<arith::ConstantOp>(
-        loc, vectorType, rewriter.getZeroAttr(vectorType));
+    Value newVector = arith::ConstantOp::create(
+        rewriter, loc, vectorType, rewriter.getZeroAttr(vectorType));
     for (int i = 0; i < vectorType.getDimSize(0); ++i) {
-      Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
-      indices[dimPos] = rewriter.create<affine::AffineApplyOp>(
-          loc, addMap, ValueRange{oldIndex, iVal});
+      Value iVal = arith::ConstantIndexOp::create(rewriter, loc, i);
+      indices[dimPos] = affine::AffineApplyOp::create(
+          rewriter, loc, addMap, ValueRange{oldIndex, iVal});
       Value scalar =
-          rewriter.create<memref::LoadOp>(loc, loadOp.getBase(), indices);
-      newVector = rewriter.create<vector::InsertOp>(loc, scalar, newVector, i);
+          memref::LoadOp::create(rewriter, loc, loadOp.getBase(), indices);
+      newVector = vector::InsertOp::create(rewriter, loc, scalar, newVector, i);
     }
     rewriter.replaceOp(loadOp, newVector);
     return success();
@@ -912,15 +938,14 @@ struct ScalarizeVectorTransferWrite final
 
       Value maybeMaskBit;
       if (maybeMask) {
-        maybeMaskBit = rewriter.create<vector::ExtractOp>(loc, maybeMask,
-                                                          ArrayRef<int64_t>{0});
+        maybeMaskBit = vector::ExtractOp::create(rewriter, loc, maybeMask,
+                                                 ArrayRef<int64_t>{0});
       }
 
       auto thenCond = [&](OpBuilder &b, Location loc) {
-        Value scalar =
-            b.create<vector::ExtractElementOp>(loc, writeOp.getVector());
-        b.create<memref::StoreOp>(loc, scalar, writeOp.getSource(),
-                                  writeOp.getIndices());
+        Value scalar = vector::ExtractOp::create(b, loc, writeOp.getVector());
+        memref::StoreOp::create(b, loc, scalar, writeOp.getBase(),
+                                writeOp.getIndices());
         return Value();
       };
 
@@ -946,16 +971,17 @@ struct ScalarizeVectorTransferWrite final
         // The result vector is 1-D and we have a projected permutation, meaning
         // we can just extract the mask bit using the same index as the written
         // vector.
-        maybeMaskBit = rewriter.create<vector::ExtractOp>(loc, maybeMask,
-                                                          ArrayRef<int64_t>{i});
+        maybeMaskBit = vector::ExtractOp::create(rewriter, loc, maybeMask,
+                                                 ArrayRef<int64_t>{i});
       }
 
-      Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
+      Value iVal = arith::ConstantIndexOp::create(rewriter, loc, i);
       auto thenCond = [&](OpBuilder &b, Location loc) {
-        indices[dimPos] = b.create<affine::AffineApplyOp>(
-            loc, addMap, ValueRange{oldIndex, iVal});
-        Value scalar = b.create<vector::ExtractOp>(loc, writeOp.getVector(), i);
-        b.create<memref::StoreOp>(loc, scalar, writeOp.getSource(), indices);
+        indices[dimPos] = affine::AffineApplyOp::create(
+            b, loc, addMap, ValueRange{oldIndex, iVal});
+        Value scalar =
+            vector::ExtractOp::create(b, loc, writeOp.getVector(), i);
+        memref::StoreOp::create(b, loc, scalar, writeOp.getBase(), indices);
         return Value();
       };
       (void)predicateMaybeMaskedScalarTransfer(rewriter, loc, maybeMaskBit,
@@ -989,26 +1015,26 @@ struct ReifyExtractOfCreateMask final
     if (isa<VectorType>(extractOp.getResult().getType())) {
       return failure();
     }
-    auto maskOp = extractOp.getVector().getDefiningOp<vector::CreateMaskOp>();
+    auto maskOp = extractOp.getSource().getDefiningOp<vector::CreateMaskOp>();
     if (!maskOp) {
       return failure();
     }
 
     Location loc = maskOp.getLoc();
     Value maskBit =
-        rewriter.create<arith::ConstantOp>(loc, rewriter.getBoolAttr(true));
+        arith::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(true));
     for (auto [idx, size] :
          llvm::zip_equal(extractOp.getMixedPosition(), maskOp.getOperands())) {
       Value idxVal;
       if (auto attr = dyn_cast<Attribute>(idx)) {
-        idxVal = rewriter.create<arith::ConstantIndexOp>(
-            loc, dyn_cast<IntegerAttr>(attr).getInt());
+        idxVal = arith::ConstantIndexOp::create(
+            rewriter, loc, dyn_cast<IntegerAttr>(attr).getInt());
       } else {
         idxVal = dyn_cast<Value>(idx);
       }
-      Value cmpIdx = rewriter.create<arith::CmpIOp>(
-          loc, arith::CmpIPredicate::slt, idxVal, size);
-      maskBit = rewriter.create<arith::AndIOp>(loc, cmpIdx, maskBit);
+      Value cmpIdx = arith::CmpIOp::create(
+          rewriter, loc, arith::CmpIPredicate::slt, idxVal, size);
+      maskBit = arith::AndIOp::create(rewriter, loc, cmpIdx, maskBit);
     }
     rewriter.replaceOp(extractOp, maskBit);
     return success();
@@ -1036,7 +1062,7 @@ private:
 void SPIRVVectorizeLoadStorePass::runOnOperation() {
   // Uses the signature conversion methodology of the dialect conversion
   // framework to implement the conversion.
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   MLIRContext *context = &getContext();
 
   // Prior pass should have unrolled and broken down vectors with rank > 1.
@@ -1058,10 +1084,9 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
   conversionPatterns
       .add<ProcessFunctionArgument, ProcessTransferRead, ProcessTransferWrite,
            ProcessSubgroupMMALoad, ProcessSubgroupMMAStore, ProcessAlloc,
-           ProcessInterfaceBindingSubspan>(context, *memrefUsageAnalysis);
-  conversionPatterns.add<PassThroughConversion<memref::DeallocOp>,
-                         PassThroughConversion<memref::AssumeAlignmentOp>>(
-      context);
+           ProcessInterfaceBindingSubspan, ProcessAssumeAlignment>(
+          context, *memrefUsageAnalysis);
+  conversionPatterns.add<PassThroughConversion<memref::DeallocOp>>(context);
 
   ConversionTarget target(*context);
   target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp op) {
@@ -1081,7 +1106,7 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
       });
   target.addDynamicallyLegalOp<memref::AssumeAlignmentOp>(
       [&](memref::AssumeAlignmentOp op) {
-        return !memrefUsageAnalysis->shouldVectorizeMemRef(op.getMemref());
+        return !memrefUsageAnalysis->shouldVectorizeMemRef(op.getResult());
       });
   target.addDynamicallyLegalOp<gpu::SubgroupMmaLoadMatrixOp,
                                gpu::SubgroupMmaStoreMatrixOp,

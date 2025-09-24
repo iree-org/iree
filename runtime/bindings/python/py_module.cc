@@ -366,19 +366,23 @@ class PyModuleInterface {
               py::cast(*reinterpret_cast<float*>(packed_arguments)));
           packed_arguments += sizeof(float);
           break;
-        case IREE_VM_CCONV_TYPE_I64:
-          arguments.append(
-              py::cast(*reinterpret_cast<int64_t*>(packed_arguments)));
-          packed_arguments += sizeof(int64_t);
+        case IREE_VM_CCONV_TYPE_I64: {
+          int64_t arg = 0;
+          memcpy(&arg, packed_arguments, sizeof(arg));
+          arguments.append(py::cast(arg));
+          packed_arguments += sizeof(arg);
           break;
-        case IREE_VM_CCONV_TYPE_F64:
-          arguments.append(
-              py::cast(*reinterpret_cast<double*>(packed_arguments)));
-          packed_arguments += sizeof(double);
+        }
+        case IREE_VM_CCONV_TYPE_F64: {
+          double arg = 0;
+          memcpy(&arg, packed_arguments, sizeof(arg));
+          arguments.append(py::cast(arg));
+          packed_arguments += sizeof(arg);
           break;
+        }
         case IREE_VM_CCONV_TYPE_REF: {
-          iree_vm_ref_t ref =
-              *reinterpret_cast<iree_vm_ref_t*>(packed_arguments);
+          iree_vm_ref_t ref;
+          memcpy(&ref, packed_arguments, sizeof(ref));
           // Since the Python level VmRef can escape, it needs its own ref
           // count.
           VmRef py_ref;
@@ -417,15 +421,17 @@ class PyModuleInterface {
           *reinterpret_cast<float*>(packed_results) = py::cast<float>(value);
           packed_results += sizeof(float);
           break;
-        case IREE_VM_CCONV_TYPE_I64:
-          *reinterpret_cast<int64_t*>(packed_results) =
-              py::cast<int64_t>(value);
-          packed_results += sizeof(int64_t);
+        case IREE_VM_CCONV_TYPE_I64: {
+          int64_t result = py::cast<int64_t>(value);
+          memcpy(packed_results, &result, sizeof(result));
+          packed_results += sizeof(result);
           break;
-        case IREE_VM_CCONV_TYPE_F64:
-          *reinterpret_cast<double*>(packed_results) = py::cast<double>(value);
-          packed_results += sizeof(double);
+        }
+        case IREE_VM_CCONV_TYPE_F64: {
+          double result = py::cast<double>(value);
+          memcpy(packed_results, &result, sizeof(result));
           break;
+        }
         case IREE_VM_CCONV_TYPE_REF: {
           iree_vm_ref_t* result_ref =
               reinterpret_cast<iree_vm_ref_t*>(packed_results);
@@ -435,7 +441,7 @@ class PyModuleInterface {
                 "expected ref returned from Python function but got None");
           }
           VmRef* py_ref = py::cast<VmRef*>(value);
-          iree_vm_ref_retain(&py_ref->ref(), result_ref);
+          iree_vm_ref_retain(&py_ref->ref(), result_ref);  // safe unaligned
           packed_results += sizeof(iree_vm_ref_t);
           break;
         }

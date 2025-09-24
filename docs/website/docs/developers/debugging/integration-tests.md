@@ -22,8 +22,9 @@ flagfile.
 Once a suspicious dispatch is identified, we can create a test case based on
 the dispatch function. The dispatch function can be derived after the
 `OutlineDispatchRegions` pass. The function signatures have to be modified
-manually. You'll have to put `flow.dispatch.tensor.load` variables to function
-arguments, and replace `flow.dispatch.tensor.store` with `return` op.
+manually. You'll have to put `iree_tensor_ext.dispatch.tensor.load` variables to
+function arguments, and replace `iree_tensor_ext.dispatch.tensor.store` with
+`return` op.
 
 Note: This only works when dispatch formation logics are identical between runs.
 

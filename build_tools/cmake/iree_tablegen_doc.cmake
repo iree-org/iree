@@ -4,8 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-include(CMakeParseArguments)
-
 # iree_tablegen_doc()
 #
 # Runs iree-tablegen to produce documentation. For TableGen'ing others,
@@ -14,6 +12,7 @@ include(CMakeParseArguments)
 # One-value parameters:
 # * NAME: base name of the target. The real target name is mangled from this
 #         given name with the package name
+# * CATEGORY: documentation category (`Dialects`, `Passes`, etc)
 # * TBLGEN: the base project to pass to TableGen
 #
 # Multi-value parameters:
@@ -29,7 +28,7 @@ function(iree_tablegen_doc)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TBLGEN"
+    "NAME;CATEGORY;TBLGEN"
     "TD_FILE;OUTS"
     ${ARGN}
   )
@@ -77,7 +76,7 @@ function(iree_tablegen_doc)
   endwhile()
 
   # Put all dialect docs at one place.
-  set(_DOC_DIR ${IREE_BINARY_DIR}/doc/Dialects/)
+  set(_DOC_DIR ${IREE_BINARY_DIR}/doc/${_RULE_CATEGORY}/)
   # Set a target to drive copy.
   add_custom_target(${_NAME}_target
             ${CMAKE_COMMAND} -E make_directory ${_DOC_DIR}

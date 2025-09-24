@@ -55,6 +55,7 @@ static void annotateOperandsAndResults(Operation *op,
                                        AffinityAnalysis &affinityAnalysis) {
   auto emptyArray = ArrayAttr::get(op->getContext(), {});
   SmallVector<Attribute> operandAttrs;
+  SmallVector<Attribute> operandUsageAttrs;
   for (auto operand : op->getOperands()) {
     if (isa<IREE::Stream::AffinityTypeInterface>(operand.getType())) {
       SmallVector<IREE::Stream::AffinityAttr> affinities;
@@ -64,9 +65,18 @@ static void annotateOperandsAndResults(Operation *op,
       } else {
         operandAttrs.push_back(emptyArray);
       }
+      SmallVector<IREE::Stream::AffinityAttr> usageAffinities;
+      if (affinityAnalysis.tryLookupResourceUsageAffinity(operand,
+                                                          usageAffinities)) {
+        operandUsageAttrs.push_back(ArrayAttr::get(
+            op->getContext(), llvm::to_vector_of<Attribute>(usageAffinities)));
+      } else {
+        operandUsageAttrs.push_back(emptyArray);
+      }
     }
   }
   SmallVector<Attribute> resultAttrs;
+  SmallVector<Attribute> resultUsageAttrs;
   for (auto result : op->getResults()) {
     if (isa<IREE::Stream::AffinityTypeInterface>(result.getType())) {
       SmallVector<IREE::Stream::AffinityAttr> affinities;
@@ -76,15 +86,31 @@ static void annotateOperandsAndResults(Operation *op,
       } else {
         resultAttrs.push_back(emptyArray);
       }
+      SmallVector<IREE::Stream::AffinityAttr> usageAffinities;
+      if (affinityAnalysis.tryLookupResourceUsageAffinity(result,
+                                                          usageAffinities)) {
+        resultUsageAttrs.push_back(ArrayAttr::get(
+            op->getContext(), llvm::to_vector_of<Attribute>(usageAffinities)));
+      } else {
+        resultUsageAttrs.push_back(emptyArray);
+      }
     }
   }
   if (!operandAttrs.empty()) {
     op->setAttr("stream.affinities.operands",
                 ArrayAttr::get(op->getContext(), operandAttrs));
   }
+  if (!operandUsageAttrs.empty()) {
+    op->setAttr("stream.affinities.operands.usage",
+                ArrayAttr::get(op->getContext(), operandUsageAttrs));
+  }
   if (!resultAttrs.empty()) {
     op->setAttr("stream.affinities.results",
                 ArrayAttr::get(op->getContext(), resultAttrs));
+  }
+  if (!resultUsageAttrs.empty()) {
+    op->setAttr("stream.affinities.results.usage",
+                ArrayAttr::get(op->getContext(), resultUsageAttrs));
   }
 }
 

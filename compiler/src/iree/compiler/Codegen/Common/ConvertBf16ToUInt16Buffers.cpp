@@ -11,11 +11,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Utils/ConversionUtils.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -31,9 +29,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-convert-bf16-to-uint16-buffers"
 
@@ -256,7 +252,7 @@ struct ConvertAmdgpuFatRawBufferCast final
 
 Value materializeArithBitcast(OpBuilder &builder, Type resultTy,
                               mlir::ValueRange inputs, mlir::Location loc) {
-  return builder.create<arith::BitcastOp>(loc, resultTy, inputs);
+  return arith::BitcastOp::create(builder, loc, resultTy, inputs);
 }
 
 static void populateIreeBf16EmulationPatterns(RewritePatternSet &patterns,
@@ -286,7 +282,6 @@ struct ConvertBf16ToUInt16BuffersPass final
     MLIRContext *ctx = &getContext();
 
     Bf16EmulationConverter typeConverter;
-    typeConverter.addArgumentMaterialization(materializeArithBitcast);
     typeConverter.addTargetMaterialization(materializeArithBitcast);
     typeConverter.addSourceMaterialization(materializeArithBitcast);
 
@@ -313,15 +308,14 @@ struct ConvertBf16ToUInt16BuffersPass final
       // changes. Also handle amdgpu buffer casts:
       target.addDynamicallyLegalOp<
           amdgpu::FatRawBufferCastOp, vector::BroadcastOp, vector::ShuffleOp,
-          vector::ExtractElementOp, vector::ExtractOp, vector::InsertElementOp,
-          vector::InsertOp, vector::ScalableInsertOp, vector::ScalableExtractOp,
-          vector::InsertStridedSliceOp, vector::ExtractStridedSliceOp,
-          vector::TransferReadOp, vector::TransferWriteOp, vector::LoadOp,
-          vector::StoreOp, vector::MaskedLoadOp, vector::MaskedStoreOp,
-          vector::GatherOp, vector::ScatterOp, vector::ExpandLoadOp,
-          vector::CompressStoreOp, vector::ShapeCastOp, vector::ConstantMaskOp,
-          vector::CreateMaskOp, vector::MaskOp, vector::TransposeOp,
-          vector::FlatTransposeOp, vector::SplatOp, vector::YieldOp>(
+          vector::ExtractOp, vector::InsertOp, vector::ScalableInsertOp,
+          vector::ScalableExtractOp, vector::InsertStridedSliceOp,
+          vector::ExtractStridedSliceOp, vector::TransferReadOp,
+          vector::TransferWriteOp, vector::LoadOp, vector::StoreOp,
+          vector::MaskedLoadOp, vector::MaskedStoreOp, vector::GatherOp,
+          vector::ScatterOp, vector::ExpandLoadOp, vector::CompressStoreOp,
+          vector::ShapeCastOp, vector::ConstantMaskOp, vector::CreateMaskOp,
+          vector::MaskOp, vector::TransposeOp, vector::YieldOp>(
           [&typeConverter](Operation *op) {
             bool legal = typeConverter.isLegal(op);
             LLVM_DEBUG(if (!legal) llvm::dbgs()

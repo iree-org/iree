@@ -741,7 +741,7 @@ def Util_NumericCastOpInterface : OpInterface<"NumericCastOpInterface"> {
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
           return llvm::cast<NumericCastOpInterface>(
-            builder.create<ConcreteOp>($_op->getLoc(), resultType, input)
+            ConcreteOp::create(builder,$_op->getLoc(), resultType, input)
               .getOperation());
       }]
     >,
@@ -871,6 +871,24 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
             .getTiedResultOperandIndex(resultIndex);
         return operandIndex.has_value() ?
             $_op.getOperand(operandIndex.value()) :
+            nullptr;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the operand tied to the given result of the op or nullptr if
+        none.
+      }],
+      /*retTy=*/"mlir::OpOperand *",
+      /*methodName=*/"getTiedResultOpOperand",
+      /*args=*/(ins "Value":$result),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        auto resultIndex = cast<mlir::OpResult>(result).getResultNumber();
+        auto operandIndex = cast<TiedOpInterface>($_op.getOperation())
+            .getTiedResultOperandIndex(resultIndex);
+        return operandIndex.has_value() ?
+            &$_op->getOpOperand(operandIndex.value()) :
             nullptr;
       }]
     >,
@@ -1619,6 +1637,42 @@ def Util_SerializableAttrInterface :
         Location loc, Attribute elementAttr, int64_t count,
         llvm::endianness endian, llvm::raw_ostream &os);
   }];
+}
+
+//===----------------------------------------------------------------------===//
+// IREE::Util::StoredModuleAttrInterface
+//===----------------------------------------------------------------------===//
+
+def Util_StoredModuleAttrInterface : AttrInterface<"StoredModuleAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let description = [{
+    Interface allowing attributes to store a reference to an underlying readonly
+    module. Thread safety of accesses to the module are managed by the
+    attribute.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the underlying module given the annotation site where the
+        particular instance of this attribute was found. For example,
+
+        ```
+          hal.executable.variant attributes { foo = #bar.module_ref<"hello_world"> }
+        ```
+
+        The annotation site is the `hal.executable.variant`. This allows for
+        symbol backed references.
+      }],
+      /*retTy=*/"::mlir::FailureOr<::mlir::ModuleOp>",
+      /*methodName=*/"getModule",
+      /*args=*/(ins
+        "Operation *":$annotationSite
+      ),
+      /*methodBody=*/[{}]
+    >,
+  ];
 }
 
 #endif  // IREE_DIALECT_UTIL_IR_UTIL_INTERFACES

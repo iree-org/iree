@@ -328,7 +328,7 @@ def check_buffer_usage(errortxt, _, __):
     return (
         "requested buffer usage is not supported" in errortxt
         or "tensor requested usage was not specified when the buffer" in errortxt
-        or "PERMISSION_DENIED; requested usage was not specified when the buffer was allocated; buffer allows DISPATCH_INDIRECT_PARAMS"
+        or "PERMISSION_DENIED; requested usage was not specified when the buffer was allocated; buffer allows DISPATCH_INDIRECT_PARAMETERS"
         in errortxt
     )
 

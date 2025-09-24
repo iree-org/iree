@@ -44,7 +44,7 @@ void createTorchToIREEPipeline(
     // now be simplified.
     pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   }
-  pm.addNestedPass<func::FuncOp>(createBitCastQuantTensorPass());
+  pm.addNestedPass<func::FuncOp>(createBitCastTensorPass());
   pm.addNestedPass<func::FuncOp>(
       torch::Torch::createReduceOpVariantsPass(llvm::StringRef()));
   pm.addNestedPass<func::FuncOp>(
@@ -59,12 +59,13 @@ void createTorchToIREEPipeline(
   pm.addNestedPass<func::FuncOp>(
       TorchInput::createConvertTMTensorToLinalgExtPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToTensorPass());
+  pm.addNestedPass<func::FuncOp>(
+      TorchInput::createConvertTorchUnstructuredToLinalgExtPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToLinalgPass());
   pm.addNestedPass<func::FuncOp>(createCSEPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToSCFPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToArithPass());
   pm.addPass(torch::createConvertTorchConversionToMLProgramPass());
-  pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
 
   // Clean up any non-canonical code introduced above..
   pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());

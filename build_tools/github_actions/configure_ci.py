@@ -119,6 +119,7 @@ CONTROL_JOB_REGEXES = frozenset(
 DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
     [
         # None.
+        "windows_x64_msvc",
     ]
 )
 
@@ -128,7 +129,10 @@ DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
 #   ("test_nvidia_a100", ["compiler/plugins/target/CUDA/*"]),
 # Note: these jobs should also be included in DEFAULT_POSTSUBMIT_ONLY_JOBS.
 PRESUBMIT_TOUCH_ONLY_JOBS = [
-    # None.
+    (
+        "windows_x64_msvc",
+        ["*win32*", "*windows*", "*msvc*"],
+    ),
 ]
 
 PR_DESCRIPTION_TEMPLATE = string.Template("${title}\n\n${body}")

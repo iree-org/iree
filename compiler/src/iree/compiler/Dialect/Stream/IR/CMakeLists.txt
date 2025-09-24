@@ -55,6 +55,7 @@ iree_cc_library(
     MLIRTransformUtils
     MLIRViewLikeInterface
     iree::compiler::Dialect::Encoding::IR
+    iree::compiler::Dialect::Encoding::Utils
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
   PUBLIC
@@ -109,6 +110,8 @@ iree_tablegen_library(
 iree_tablegen_doc(
   NAME
     StreamDialectDocGen
+  CATEGORY
+    "Dialects"
   TD_FILE
     "StreamOps.td"
   OUTS

@@ -122,4 +122,4 @@ IREE_CPU_FEATURE_BIT(X86_64, 0, 52, AMXBF16, "amx-bf16")
 
 // General features and high-level switches.
 // RISCV vector extension.
-IREE_CPU_FEATURE_BIT(RISCV_64, 0, 0, RVV, "rvv")
+IREE_CPU_FEATURE_BIT(RISCV_64, 0, 0, V, "v")

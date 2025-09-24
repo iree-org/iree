@@ -4,7 +4,12 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_gentbl_cc_library")
+load(
+    "//build_tools/bazel:build_defs.oss.bzl",
+    "iree_compiler_cc_library",
+    "iree_gentbl_cc_library",
+    "iree_tablegen_doc",
+)
 
 package(
     default_visibility = ["//visibility:public"],
@@ -15,11 +20,11 @@ package(
 iree_compiler_cc_library(
     name = "DispatchCreation",
     srcs = [
+        "AnnotateDataTilingHints.cpp",
+        "BitcastUnsupportedElementTypes.cpp",
         "BubbleUpExpandShapes.cpp",
-        "BubbleUpExtractSlices.cpp",
         "CloneProducersIntoDispatchRegions.cpp",
         "CollapseDimensions.cpp",
-        "CollapseReductionDimensions.cpp",
         "ConvertDispatchRegionsToWorkgroups.cpp",
         "ConvertEncodingToFlow.cpp",
         "ConvertTensorToFlow.cpp",
@@ -27,15 +32,19 @@ iree_compiler_cc_library(
         "FoldUnitExtentDims.cpp",
         "FormDispatchRegions.cpp",
         "FormScalarDispatches.cpp",
+        "FormSplitReductionDispatches.cpp",
         "FuseEncodingOpsIntoDispatchRegions.cpp",
         "FuseHorizontalContractions.cpp",
         "FuseMultiUseElementwiseProducer.cpp",
         "FusionPreprocessing.cpp",
         "FusionUtils.cpp",
         "HoistEncodingOps.cpp",
+        "HoistUniformScalarCompute.cpp",
         "MaterializeDefaultWorkgroupCountRegion.cpp",
         "Passes.cpp",
+        "PropagateEncodings.cpp",
         "SetEncoding.cpp",
+        "SetSplitReductionSizes.cpp",
         "SinkReshapes.cpp",
         "SplitReduction.cpp",
         "TensorPadToTensorInsertSlice.cpp",
@@ -50,6 +59,7 @@ iree_compiler_cc_library(
         ":PassesIncGen",
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
         "//compiler/src/iree/compiler/Dialect/Encoding/IR",
+        "//compiler/src/iree/compiler/Dialect/Encoding/Utils",
         "//compiler/src/iree/compiler/Dialect/Flow/Conversion/TensorToFlow",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/Flow/Transforms",
@@ -57,8 +67,11 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/LinalgExt/Transforms",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/Utils",
         "//compiler/src/iree/compiler/Dialect/Stream/IR",
+        "//compiler/src/iree/compiler/Dialect/TensorExt/IR",
+        "//compiler/src/iree/compiler/Dialect/TensorExt/Transforms",
         "//compiler/src/iree/compiler/Dialect/Util/Analysis",
         "//compiler/src/iree/compiler/Dialect/Util/Analysis/Attributes",
+        "//compiler/src/iree/compiler/Dialect/Util/Analysis/Constant",
         "//compiler/src/iree/compiler/Dialect/Util/Analysis/DFX",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Dialect/Util/Transforms",
@@ -128,5 +141,23 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
+    ],
+)
+
+iree_tablegen_doc(
+    name = "DispatchCreationPassesDocGen",
+    category = "Passes",
+    tbl_outs = [
+        (
+            [
+                "--gen-pass-doc",
+            ],
+            "DispatchCreationPasses.md",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    deps = [
+        "@llvm-project//mlir:PassBaseTdFiles",
     ],
 )

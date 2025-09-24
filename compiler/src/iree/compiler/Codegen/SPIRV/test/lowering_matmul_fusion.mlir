@@ -22,21 +22,21 @@ func.func @matmul_i4_quant_weight() {
   %c128 = arith.constant 128 : index
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<86x128x2048xi4>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<86x2048xf32>>
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<86x2048xi4>>
-  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096x86x128xf32>>
-  %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(4) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<4096x2048xf32>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<86x128x2048xi4>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<86x2048xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<86x2048xi4>>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x86x128xf32>>
+  %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(4) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4096x2048xf32>>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
   %5 = affine.apply #map()[%workgroup_id_y]
-  %6 = flow.dispatch.tensor.load %3, offsets = [%5, 0, 0], sizes = [%c32, 86, 128], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<4096x86x128xf32>> -> tensor<?x86x128xf32>
+  %6 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [%5, 0, 0], sizes = [%c32, 86, 128], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096x86x128xf32>> -> tensor<?x86x128xf32>
   %7 = affine.apply #map1()[%workgroup_id_x]
-  %8 = flow.dispatch.tensor.load %0, offsets = [0, 0, %7], sizes = [86, 128, %c128], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<86x128x2048xi4>> -> tensor<86x128x?xi4>
+  %8 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, %7], sizes = [86, 128, %c128], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<86x128x2048xi4>> -> tensor<86x128x?xi4>
   %9 = affine.apply #map1()[%workgroup_id_x]
-  %10 = flow.dispatch.tensor.load %1, offsets = [0, %9], sizes = [86, %c128], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<86x2048xf32>> -> tensor<86x?xf32>
+  %10 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, %9], sizes = [86, %c128], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<86x2048xf32>> -> tensor<86x?xf32>
   %11 = affine.apply #map1()[%workgroup_id_x]
-  %12 = flow.dispatch.tensor.load %2, offsets = [0, %11], sizes = [86, %c128], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<86x2048xi4>> -> tensor<86x?xi4>
+  %12 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, %11], sizes = [86, %c128], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<86x2048xi4>> -> tensor<86x?xi4>
   %13 = tensor.empty() : tensor<86x128x128xf32>
   %cast = tensor.cast %8 : tensor<86x128x?xi4> to tensor<86x128x128xi4>
   %cast_0 = tensor.cast %10 : tensor<86x?xf32> to tensor<86x128xf32>
@@ -62,7 +62,7 @@ func.func @matmul_i4_quant_weight() {
   %cast_3 = tensor.cast %17 : tensor<32x128xf32> to tensor<?x?xf32>
   %18 = affine.apply #map()[%workgroup_id_y]
   %19 = affine.apply #map1()[%workgroup_id_x]
-  flow.dispatch.tensor.store %cast_3, %4, offsets = [%18, %19], sizes = [%c32, %c128], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<4096x2048xf32>>
+  iree_tensor_ext.dispatch.tensor.store %cast_3, %4, offsets = [%18, %19], sizes = [%c32, %c128], strides = [1, 1] : tensor<?x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4096x2048xf32>>
   return
 }
 
@@ -70,12 +70,15 @@ func.func @matmul_i4_quant_weight() {
 //           CHECK:   %[[A_ALLOC:.+]] = memref.alloc() : memref<32x1x36xf32, #gpu.address_space<workgroup>>
 //           CHECK:   %[[B_ALLOC:.+]] = memref.alloc() : memref<1x32x132xf32, #gpu.address_space<workgroup>>
 //           CHECK:   %[[WEIGHT_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//           CHECK:   %[[WEIGHT_ALIGNED:.+]] = memref.assume_alignment %[[WEIGHT_BINDING]]
 //           CHECK:   %[[SCALE_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//           CHECK:   %[[SCALE_ALIGNED:.+]] = memref.assume_alignment %[[SCALE_BINDING]]
 //           CHECK:   %[[ZP_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
+//           CHECK:   %[[ZP_ALIGNED:.+]] = memref.assume_alignment %[[ZP_BINDING]]
 //           CHECK:   scf.for %arg0 = %c0 to %c86 step %c1 iter_args({{.+}}) -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
-//           CHECK:     %[[SCALE0:.+]] = vector.transfer_read %[[SCALE_BINDING]]
-//           CHECK:     %[[SCALE1:.+]] = vector.transfer_read %[[SCALE_BINDING]]
-//           CHECK:     %[[ZP:.+]] = vector.transfer_read %[[ZP_BINDING]]
+//           CHECK:     %[[SCALE0:.+]] = vector.transfer_read %[[SCALE_ALIGNED]]
+//           CHECK:     %[[SCALE1:.+]] = vector.transfer_read %[[SCALE_ALIGNED]]
+//           CHECK:     %[[ZP:.+]] = vector.transfer_read %[[ZP_ALIGNED]]
 //           CHECK:     %[[SLICE0:.+]] = vector.extract_strided_slice %[[ZP]] {offsets = [0], sizes = [4], strides = [1]} : vector<8xi4> to vector<4xi4>
 //           CHECK:     %[[ZP_EXT0:.+]] = arith.extsi %[[SLICE0]] : vector<4xi4> to vector<4xi32>
 //           CHECK:     %[[SLICE1:.+]] = vector.extract_strided_slice %[[ZP]] {offsets = [4], sizes = [4], strides = [1]} : vector<8xi4> to vector<4xi4>
@@ -83,7 +86,7 @@ func.func @matmul_i4_quant_weight() {
 
 //           CHECK:     scf.for %arg5 = %c0 to %c96 step %c32 iter_args({{.+}}) -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
 
-//           CHECK:       vector.transfer_read %[[WEIGHT_BINDING]]
+//           CHECK:       vector.transfer_read %[[WEIGHT_ALIGNED]]
 //   CHECK-COUNT-2:       arith.extsi %{{.+}} : vector<4xi4> to vector<4xi32>
 //           CHECK:       arith.subi %{{.+}}, %[[ZP_EXT0]] : vector<4xi32>
 //           CHECK:       arith.subi %{{.+}}, %[[ZP_EXT1]] : vector<4xi32>
@@ -92,7 +95,7 @@ func.func @matmul_i4_quant_weight() {
 //           CHECK:       arith.mulf %{{.+}}, %[[SCALE1]] : vector<4xf32>
 //     CHECK-COUNT:       vector.transfer_write %{{.+}}, %[[B_ALLOC]]
 
-//           CHECK:       vector.transfer_read %[[WEIGHT_BINDING]]
+//           CHECK:       vector.transfer_read %[[WEIGHT_ALIGNED]]
 //   CHECK-COUNT-2:       arith.extsi %{{.+}} : vector<4xi4> to vector<4xi32>
 //           CHECK:       arith.subi %{{.+}}, %[[ZP_EXT0]] : vector<4xi32>
 //           CHECK:       arith.subi %{{.+}}, %[[ZP_EXT1]] : vector<4xi32>

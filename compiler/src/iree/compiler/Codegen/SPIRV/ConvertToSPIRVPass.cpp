@@ -99,15 +99,16 @@ createResourceVariable(Location loc, const SubspanResourceInfo &resource,
   if (!isIndirect) {
     std::string name =
         llvm::formatv("__resource_var_{}_{}_", resource.set, resource.binding);
-    variable = builder.create<spirv::GlobalVariableOp>(
-        loc, globalVariableType, name, resource.set, resource.binding);
+    variable = spirv::GlobalVariableOp::create(
+        builder, loc, globalVariableType, name, resource.set, resource.binding);
     if (resource.aliased)
       variable->setAttr("aliased", builder.getUnitAttr());
   } else {
     std::string name =
         llvm::formatv("__resource_var_indirect_{}_", resource.set);
-    variable = builder.create<spirv::GlobalVariableOp>(
-        loc, globalVariableType, name, kIndirectBindingsSetIndex, resource.set);
+    variable = spirv::GlobalVariableOp::create(builder, loc, globalVariableType,
+                                               name, kIndirectBindingsSetIndex,
+                                               resource.set);
   }
   assert(variable);
 
@@ -278,7 +279,12 @@ namespace {
 /// ops to load from a global variable representing the push constant storage.
 struct HALInterfaceLoadConstantConverter final
     : OpConversionPattern<IREE::HAL::InterfaceConstantLoadOp> {
-  using OpConversionPattern::OpConversionPattern;
+  bool supportsAssume = false;
+
+  HALInterfaceLoadConstantConverter(TypeConverter &typeConverter,
+                                    MLIRContext *context, bool supportsAssume)
+      : OpConversionPattern(typeConverter, context),
+        supportsAssume(supportsAssume) {}
 
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceConstantLoadOp loadOp, OpAdaptor adaptor,
@@ -300,7 +306,58 @@ struct HALInterfaceLoadConstantConverter final
     Value value = spirv::getPushConstantValue(loadOp, elementCount, index,
                                               i32Type, rewriter);
 
+    if (loadOp.getResult().hasOneUse() && supportsAssume) {
+      OpOperand *operand = loadOp.getResult().getUses().begin().getOperand();
+      auto assumeOp = dyn_cast<IREE::Util::AssumeIntOp>(operand->getOwner());
+      if (assumeOp) {
+        Location loc = assumeOp.getLoc();
+        unsigned opIdx = operand->getOperandNumber();
+
+        auto [min, max] = assumeOp.getUnionedUnsignedRange(opIdx);
+        if (min.has_value() && max.has_value()) {
+          Value minConst = spirv::ConstantOp::create(
+              rewriter, loc, i32Type, rewriter.getI32IntegerAttr(*min));
+          Value maxConst = spirv::ConstantOp::create(
+              rewriter, loc, i32Type, rewriter.getI32IntegerAttr(*max));
+          Value minBound = spirv::UGreaterThanEqualOp::create(rewriter, loc,
+                                                              value, minConst);
+          spirv::KHRAssumeTrueOp::create(rewriter, loc, minBound);
+          Value maxBound =
+              spirv::ULessThanEqualOp::create(rewriter, loc, value, maxConst);
+          spirv::KHRAssumeTrueOp::create(rewriter, loc, maxBound);
+        }
+
+        std::optional<uint64_t> divisibility =
+            assumeOp.getUnionedUnsignedDivisor(opIdx);
+        if (divisibility.has_value() && *divisibility > 1) {
+          Value divisor = spirv::ConstantOp::create(
+              rewriter, loc, i32Type,
+              rewriter.getI32IntegerAttr(*divisibility));
+          Value zero = spirv::ConstantOp::create(rewriter, loc, i32Type,
+                                                 rewriter.getI32IntegerAttr(0));
+          Value lowPart = spirv::UModOp::create(rewriter, loc, value, divisor);
+          Value dividesExactly =
+              spirv::IEqualOp::create(rewriter, loc, lowPart, zero);
+          spirv::KHRAssumeTrueOp::create(rewriter, loc, dividesExactly);
+        }
+      }
+    }
+
     rewriter.replaceOp(loadOp, value);
+    return success();
+  }
+};
+
+/// A pattern to convert util.assume.int into a noop, since we're using it
+/// to annotate push constants.
+struct UtilAssumeIntConverter final
+    : OpConversionPattern<IREE::Util::AssumeIntOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(IREE::Util::AssumeIntOp assumeOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOp(assumeOp, adaptor.getOperands());
     return success();
   }
 };
@@ -319,8 +376,8 @@ struct HALInterfaceWorkgroupOpsConverter final
     auto i32Type = rewriter.getIntegerType(32);
     Value spirvBuiltin =
         spirv::getBuiltinVariableValue(op, builtin, i32Type, rewriter);
-    Value spirvId = rewriter.create<spirv::CompositeExtractOp>(
-        spirvBuiltin.getLoc(), i32Type, spirvBuiltin,
+    Value spirvId = spirv::CompositeExtractOp::create(
+        rewriter, spirvBuiltin.getLoc(), i32Type, spirvBuiltin,
         rewriter.getI32ArrayAttr({index}));
 
     // Casting if Indexing type not 32-bit.
@@ -328,8 +385,8 @@ struct HALInterfaceWorkgroupOpsConverter final
         *this->template getTypeConverter<SPIRVTypeConverter>();
     Type indexType = typeConverter.getIndexType();
     if (indexType != i32Type) {
-      spirvId = rewriter.create<spirv::UConvertOp>(spirvId.getLoc(), indexType,
-                                                   spirvId);
+      spirvId = spirv::UConvertOp::create(rewriter, spirvId.getLoc(), indexType,
+                                          spirvId);
     }
     rewriter.replaceOp(op, spirvId);
     return success();
@@ -392,20 +449,20 @@ struct HALInterfaceBindingSubspanConverter final
     }
 
     Location loc = subspanOp.getLoc();
-    Value globalAddr = rewriter.create<spirv::AddressOfOp>(loc, varOp);
+    Value globalAddr = spirv::AddressOfOp::create(rewriter, loc, varOp);
     auto i32Ty = rewriter.getI32Type();
-    Value idx = rewriter.create<spirv::ConstantOp>(
-        loc, i32Ty, rewriter.getI32IntegerAttr(info.binding));
-    auto ptr = rewriter.create<spirv::AccessChainOp>(loc, globalAddr, idx);
-    auto addr = rewriter.create<spirv::LoadOp>(loc, ptr);
+    Value idx = spirv::ConstantOp::create(
+        rewriter, loc, i32Ty, rewriter.getI32IntegerAttr(info.binding));
+    auto ptr = spirv::AccessChainOp::create(rewriter, loc, globalAddr, idx);
+    auto addr = spirv::LoadOp::create(rewriter, loc, ptr);
     assert(cast<spirv::PointerType>(addr.getType()).getStorageClass() ==
                spirv::StorageClass::PhysicalStorageBuffer &&
            "Expected a physical storage buffer pointer");
 
     // Bitcast the pointer to the correct pointer type. This is allowed for
     // physical storage buffer addresses.
-    Value ptrInt = rewriter.create<spirv::ConvertPtrToUOp>(
-        loc, rewriter.getI64Type(), addr);
+    Value ptrInt = spirv::ConvertPtrToUOp::create(rewriter, loc,
+                                                  rewriter.getI64Type(), addr);
     rewriter.replaceOpWithNewOp<spirv::ConvertUToPtrOp>(subspanOp,
                                                         convertedType, ptrInt);
     return success();
@@ -476,8 +533,7 @@ struct RemoveIdentityConversionCast final
 class ConvertToSPIRVPass final
     : public impl::ConvertToSPIRVPassBase<ConvertToSPIRVPass> {
 public:
-  using impl::ConvertToSPIRVPassBase<
-      ConvertToSPIRVPass>::ConvertToSPIRVPassBase;
+  using Base::Base;
   explicit ConvertToSPIRVPass(unsigned indexBits) : indexBits(indexBits) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -614,6 +670,8 @@ void ConvertToSPIRVPass::runOnOperation() {
     return signalPassFailure();
   }
 
+  bool supportsAssume = targetEnv.allows(spirv::Capability::ExpectAssumeKHR);
+
   SPIRVConversionOptions options = {};
   options.use64bitIndex = use64bitIndex;
 
@@ -661,14 +719,16 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   // Add IREE HAL interface op conversions.
   patterns.add<
-      HALInterfaceLoadConstantConverter,
       HALInterfaceWorkgroupOpsConverter<IREE::HAL::InterfaceWorkgroupIDOp,
                                         spirv::BuiltIn::WorkgroupId>,
       HALInterfaceWorkgroupOpsConverter<IREE::HAL::InterfaceWorkgroupSizeOp,
                                         spirv::BuiltIn::WorkgroupSize>,
       HALInterfaceWorkgroupOpsConverter<IREE::HAL::InterfaceWorkgroupCountOp,
-                                        spirv::BuiltIn::NumWorkgroups>>(
-      typeConverter, context);
+                                        spirv::BuiltIn::NumWorkgroups>,
+      UtilAssumeIntConverter>(typeConverter, context);
+
+  patterns.add<HALInterfaceLoadConstantConverter>(typeConverter, context,
+                                                  supportsAssume);
 
   // Performs a prelimiary step to analyze all hal.interface.binding.subspan ops
   // and creates spirv.GlobalVariables.
@@ -687,7 +747,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   /// - unrealized_conversion_cast with the same source and target type.
   patterns.add<
       FoldAsNoOp<memref::CollapseShapeOp>, FoldAsNoOp<memref::ExpandShapeOp>,
-      FoldAsNoOp<bufferization::ToMemrefOp>, RemoveIdentityConversionCast>(
+      FoldAsNoOp<bufferization::ToBufferOp>, RemoveIdentityConversionCast>(
       typeConverter, context);
 
   std::unique_ptr<ConversionTarget> target =
@@ -715,8 +775,8 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   // Collect all SPIR-V ops into a spirv.module.
   OpBuilder builder = OpBuilder::atBlockBegin(moduleOp.getBody());
-  auto spvModule = builder.create<spirv::ModuleOp>(
-      moduleOp.getLoc(), addressingModel, spirv::MemoryModel::GLSL450);
+  auto spvModule = spirv::ModuleOp::create(
+      builder, moduleOp.getLoc(), addressingModel, spirv::MemoryModel::GLSL450);
   Block *body = spvModule.getBody();
   Dialect *spvDialect = spvModule->getDialect();
   for (Operation &op : llvm::make_early_inc_range(*moduleOp.getBody())) {

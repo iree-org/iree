@@ -6,7 +6,7 @@
 
 #include "iree/compiler/GlobalOptimization/Interfaces/HoistableTypeInterface.h"
 
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -24,8 +24,8 @@ static Value bitcastToStaticTypeImpl(OpBuilder &b, Location loc,
     return global;
   }
   // No dynamic dims because we are always bitcasting constants.
-  return b.create<IREE::Flow::TensorBitCastOp>(loc, targetType, global,
-                                               ValueRange(), ValueRange());
+  return IREE::TensorExt::BitCastOp::create(b, loc, targetType, global,
+                                            ValueRange(), ValueRange());
 }
 
 struct HoistableTensorTypeInterface
@@ -103,7 +103,7 @@ struct HoistableIndexTypeInterface
         !isa<IndexType>(init.getType())) {
       return init;
     }
-    return builder.create<arith::IndexCastOp>(loc, storageType, init);
+    return arith::IndexCastOp::create(builder, loc, storageType, init);
   }
   static Value decodeStorageType(OpBuilder &builder, Location loc,
                                  Type originalType, Value loadedGlobal) {
@@ -112,7 +112,7 @@ struct HoistableIndexTypeInterface
         !isa<IntegerType>(loadedGlobal.getType())) {
       return loadedGlobal;
     }
-    return builder.create<arith::IndexCastOp>(loc, originalType, loadedGlobal);
+    return arith::IndexCastOp::create(builder, loc, originalType, loadedGlobal);
   }
 };
 

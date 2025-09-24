@@ -262,7 +262,7 @@ static bool iree_hal_sync_semaphore_is_signaled(
 
 static iree_status_t iree_hal_sync_semaphore_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_timeout_t timeout) {
+    iree_timeout_t timeout, iree_hal_wait_flags_t flags) {
   iree_hal_sync_semaphore_t* semaphore =
       iree_hal_sync_semaphore_cast(base_semaphore);
 
@@ -395,13 +395,15 @@ static iree_status_t iree_hal_sync_semaphore_result_from_state(
 iree_status_t iree_hal_sync_semaphore_multi_wait(
     iree_hal_sync_semaphore_state_t* shared_state,
     iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout) {
+    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
+    iree_hal_wait_flags_t flags) {
   if (semaphore_list.count == 0) {
     return iree_ok_status();
   } else if (semaphore_list.count == 1) {
     // Fast-path for a single semaphore.
     return iree_hal_semaphore_wait(semaphore_list.semaphores[0],
-                                   semaphore_list.payload_values[0], timeout);
+                                   semaphore_list.payload_values[0], timeout,
+                                   flags);
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -430,10 +432,30 @@ iree_status_t iree_hal_sync_semaphore_multi_wait(
   return status;
 }
 
+static iree_status_t iree_hal_sync_semaphore_import_timepoint(
+    iree_hal_semaphore_t* base_semaphore, uint64_t value,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_external_timepoint_t external_timepoint) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "timepoint import is not yet implemented");
+}
+
+static iree_status_t iree_hal_sync_semaphore_export_timepoint(
+    iree_hal_semaphore_t* base_semaphore, uint64_t value,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_external_timepoint_type_t requested_type,
+    iree_hal_external_timepoint_flags_t requested_flags,
+    iree_hal_external_timepoint_t* IREE_RESTRICT out_external_timepoint) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "timepoint export is not yet implemented");
+}
+
 static const iree_hal_semaphore_vtable_t iree_hal_sync_semaphore_vtable = {
     .destroy = iree_hal_sync_semaphore_destroy,
     .query = iree_hal_sync_semaphore_query,
     .signal = iree_hal_sync_semaphore_signal,
     .fail = iree_hal_sync_semaphore_fail,
     .wait = iree_hal_sync_semaphore_wait,
+    .import_timepoint = iree_hal_sync_semaphore_import_timepoint,
+    .export_timepoint = iree_hal_sync_semaphore_export_timepoint,
 };

@@ -13,11 +13,11 @@
 //===----------------------------------------------------------------------===//
 #include "iree/compiler/Codegen/Common/BufferizationAnalysis.h"
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -58,7 +58,7 @@ static bool canUsersHandleSubviews(Operation *op) {
   // TODO(ravishankarm): Maybe this is too aggressive, might have to switch this
   // to have a white-list instead of blacklist.
   for (Operation *user : op->getUsers()) {
-    if (isa<IREE::Flow::DispatchTensorStoreOp, tensor::CollapseShapeOp,
+    if (isa<IREE::TensorExt::DispatchTensorStoreOp, tensor::CollapseShapeOp,
             tensor::ExpandShapeOp>(user)) {
       return false;
     }
@@ -94,10 +94,10 @@ static LogicalResult analyseConstantOp(arith::ConstantOp constantOp,
   return success();
 }
 
-/// Adds the result of the `flow.dispatch.tensor.load` op to the same
+/// Adds the result of the `iree_tensor_ext.dispatch.tensor.load` op to the same
 /// equivalence class as the source.
 static LogicalResult
-analyseInterfaceLoadTensorOp(IREE::Flow::DispatchTensorLoadOp loadOp,
+analyseInterfaceLoadTensorOp(IREE::TensorExt::DispatchTensorLoadOp loadOp,
                              BufferizationPlan &plan) {
   plan.unionSets(loadOp.getResult(), loadOp.getSource());
   return success();
@@ -147,8 +147,9 @@ static bool canSetsBeMerged(Value v1, Value v2, BufferizationPlan &plan) {
   return true;
 }
 
-/// Returns true if the value and target of a `flow.dispatch.tensor.store`
-/// operation can be added to the same equivalence set. This can be done only if
+/// Returns true if the value and target of a
+/// `iree_tensor_ext.dispatch.tensor.store` operation can be added to the same
+/// equivalence set. This can be done only if
 /// - The `value` is not from a equivalence set that contains a read-only
 ///   tensor.
 /// - All `hal.interface.binding.subspan` operations in the equivalence class of
@@ -156,9 +157,8 @@ static bool canSetsBeMerged(Value v1, Value v2, BufferizationPlan &plan) {
 ///   assumed that the equivalence classes contain only 1 such instruction.
 /// This method asserts that the `target` equivalence class already contains a
 /// `hal.interface.binding.subspan` op.'
-static bool
-canSetStoreValueAndTargetAsEquivalent(IREE::Flow::DispatchTensorStoreOp storeOp,
-                                      BufferizationPlan &plan) {
+static bool canSetStoreValueAndTargetAsEquivalent(
+    IREE::TensorExt::DispatchTensorStoreOp storeOp, BufferizationPlan &plan) {
   if (!canSetsBeMerged(storeOp.getValue(), storeOp.getTarget(), plan)) {
     return false;
   }
@@ -172,16 +172,16 @@ canSetStoreValueAndTargetAsEquivalent(IREE::Flow::DispatchTensorStoreOp storeOp,
     return true;
   }
   // If the binding and offsets are the same, make sure that the
-  // !flow.dispatch.tensor is read-write.
-  auto sourceType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
+  // !iree_tensor_ext.dispatch.tensor is read-write.
+  auto sourceType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
       valueInterfaceBinding.getType());
   return sourceType &&
-         sourceType.getAccess() == IREE::Flow::TensorAccess::ReadWrite;
+         sourceType.getAccess() == IREE::TensorExt::TensorAccess::ReadWrite;
 }
 
 /// Tries to add the `value` and `target` to the same equivalence class.
 static LogicalResult
-analyseInterfaceStoreTensorOp(IREE::Flow::DispatchTensorStoreOp storeOp,
+analyseInterfaceStoreTensorOp(IREE::TensorExt::DispatchTensorStoreOp storeOp,
                               BufferizationPlan &plan) {
   // The value and target can be union-ed if the set the value is part of does
   // not contain any hal.interface.binding.subspan from a different binding.
@@ -202,9 +202,24 @@ analyseInterfaceStoreTensorOp(IREE::Flow::DispatchTensorStoreOp storeOp,
   return success();
 }
 
+static LogicalResult analyseLoadFromBufferOp(IREE::Codegen::LoadFromBufferOp op,
+                                             BufferizationPlan &plan) {
+  plan.insert(op.getTensor());
+  return success();
+}
+
+static LogicalResult analyseStoreToBufferOp(IREE::Codegen::StoreToBufferOp op,
+                                            BufferizationPlan &plan) {
+  plan.storeSet(op.getTensor());
+  return success();
+}
+
 static LogicalResult
 analyseInterfaceBindingSubspanOp(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
                                  BufferizationPlan &plan) {
+  if (isa<MemRefType>(subspanOp.getResult().getType())) {
+    return success();
+  }
   plan.insert(subspanOp.getResult());
   return success();
 }
@@ -372,7 +387,7 @@ static void hasDestructiveUpdatePattern(Value source, BufferizationPlan &plan) {
       return insertSliceOp.getDest();
     }
     if (auto transferWriteOp = dyn_cast<vector::TransferWriteOp>(op)) {
-      return transferWriteOp.getSource();
+      return transferWriteOp.getBase();
     }
     return nullptr;
   };
@@ -381,7 +396,7 @@ static void hasDestructiveUpdatePattern(Value source, BufferizationPlan &plan) {
       return extractSliceOp.getSource();
     }
     if (auto transferReadOp = dyn_cast<vector::TransferReadOp>(op)) {
-      return transferReadOp.getSource();
+      return transferReadOp.getBase();
     }
     return nullptr;
   };
@@ -509,13 +524,21 @@ LogicalResult createTensorEquivalenceClasses(mlir::FunctionOpInterface funcOp,
         .Case<arith::ConstantOp>([&](arith::ConstantOp constantOp) {
           return analyseConstantOp(constantOp, plan);
         })
-        .Case<IREE::Flow::DispatchTensorLoadOp>(
-            [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
+        .Case<IREE::TensorExt::DispatchTensorLoadOp>(
+            [&](IREE::TensorExt::DispatchTensorLoadOp loadOp) {
               return analyseInterfaceLoadTensorOp(loadOp, plan);
             })
-        .Case<IREE::Flow::DispatchTensorStoreOp>(
-            [&](IREE::Flow::DispatchTensorStoreOp storeOp) {
+        .Case<IREE::TensorExt::DispatchTensorStoreOp>(
+            [&](IREE::TensorExt::DispatchTensorStoreOp storeOp) {
               return analyseInterfaceStoreTensorOp(storeOp, plan);
+            })
+        .Case<IREE::Codegen::LoadFromBufferOp>(
+            [&](IREE::Codegen::LoadFromBufferOp loadOp) {
+              return analyseLoadFromBufferOp(loadOp, plan);
+            })
+        .Case<IREE::Codegen::StoreToBufferOp>(
+            [&](IREE::Codegen::StoreToBufferOp storeOp) {
+              return analyseStoreToBufferOp(storeOp, plan);
             })
         .Case<IREE::HAL::InterfaceBindingSubspanOp>(
             [&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
@@ -562,19 +585,19 @@ LogicalResult createTensorEquivalenceClasses(mlir::FunctionOpInterface funcOp,
         .Case<vector::TransferReadOp>(
             [&](vector::TransferReadOp transferReadOp) {
               if (llvm::isa<RankedTensorType>(
-                      transferReadOp.getSource().getType())) {
-                plan.insert(transferReadOp.getSource());
+                      transferReadOp.getBase().getType())) {
+                plan.insert(transferReadOp.getBase());
               }
               return success();
             })
         .Case<vector::TransferWriteOp>(
             [&](vector::TransferWriteOp transferWriteOp) {
               if (!llvm::isa<RankedTensorType>(
-                      transferWriteOp.getSource().getType())) {
+                      transferWriteOp.getBase().getType())) {
                 return success();
               }
               return analyseDestructiveUpdateOp(
-                  transferWriteOp, nullptr, transferWriteOp.getSource(),
+                  transferWriteOp, nullptr, transferWriteOp.getBase(),
                   transferWriteOp.getResult(), plan);
             })
         .Case<scf::IfOp>(
@@ -582,7 +605,7 @@ LogicalResult createTensorEquivalenceClasses(mlir::FunctionOpInterface funcOp,
         .Case<scf::ForOp>(
             [&](scf::ForOp forOp) { return analyseScfForOp(forOp, plan); })
         .Case<scf::YieldOp, tensor::EmptyOp, tensor::DimOp, tensor::ExtractOp,
-              tensor::GenerateOp, tensor::PadOp, bufferization::ToMemrefOp,
+              tensor::GenerateOp, tensor::PadOp, bufferization::ToBufferOp,
               bufferization::AllocTensorOp>(
             [&](Operation *op) { return success(); })
         .Default([&](Operation *op) -> LogicalResult {
@@ -610,8 +633,8 @@ LogicalResult createTensorEquivalenceClasses(mlir::FunctionOpInterface funcOp,
       return;
     }
     if (auto vectorWriteOp = dyn_cast<vector::TransferWriteOp>(updateOp)) {
-      if (isa<RankedTensorType>(vectorWriteOp.getSource().getType())) {
-        hasDestructiveUpdatePattern(vectorWriteOp.getSource(), plan);
+      if (isa<RankedTensorType>(vectorWriteOp.getBase().getType())) {
+        hasDestructiveUpdatePattern(vectorWriteOp.getBase(), plan);
       }
     }
   });
@@ -621,7 +644,8 @@ LogicalResult createTensorEquivalenceClasses(mlir::FunctionOpInterface funcOp,
   });
 
   if (funcOp
-          .walk([&](IREE::Flow::DispatchTensorStoreOp storeOp) -> WalkResult {
+          .walk([&](IREE::TensorExt::DispatchTensorStoreOp storeOp)
+                    -> WalkResult {
             return analyseInterfaceStoreTensorOp(storeOp, plan);
           })
           .wasInterrupted()) {

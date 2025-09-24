@@ -54,7 +54,7 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
     // really used on Linux today anyway.
     iree_thread_affinity_t* affinity = &group->ideal_thread_affinity;
     memset(affinity, 0, sizeof(*affinity));
-    affinity->specified = 1;
+    affinity->id_assigned = 1;
     affinity->id = cpu_ids[i];
   }
 

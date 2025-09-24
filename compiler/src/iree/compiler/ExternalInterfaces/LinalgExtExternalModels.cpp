@@ -7,6 +7,7 @@
 #include "iree/compiler/ExternalInterfaces/LinalgExtExternalModels.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BuiltinAttributes.h"
 
@@ -43,8 +44,7 @@ public:
     return (llvm::cast<ConcreteType>(op).getNumLoops());
   }
 
-  FailureOr<SmallVector<int64_t>>
-  getStaticLoopRanges(mlir::Operation *op) const {
+  SmallVector<int64_t> getStaticLoopRanges(mlir::Operation *op) const {
     return SmallVector<int64_t>(
         llvm::cast<ConcreteType>(op).getStaticLoopRanges());
   }
@@ -90,7 +90,7 @@ public:
         }));
   }
 
-  FailureOr<SmallVector<int64_t>> getStaticLoopRanges(Operation *op) const {
+  SmallVector<int64_t> getStaticLoopRanges(Operation *op) const {
     auto softmaxOp = cast<linalg::SoftmaxOp>(op);
     // Softmax loop range is the input shape.
     return SmallVector<int64_t>(softmaxOp.getInputOperandType().getShape());
@@ -129,6 +129,9 @@ void registerLinalgExtExternalModels(DialectRegistry &registry) {
 #include "mlir/Dialect/Linalg/IR/LinalgStructuredOps.cpp.inc"
         >(ctx);
     linalg::SoftmaxOp::attachInterface<SoftmaxFusionOpInterfaceAdapter>(*ctx);
+  });
+  registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
+    IREE::LinalgExt::registerConcatOpTilingInterfaceExternalModel(ctx);
   });
 }
 

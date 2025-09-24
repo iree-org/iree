@@ -13,6 +13,7 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_GPU_TRANSFORMS_TRANSFORMS_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_GPU_TRANSFORMS_TRANSFORMS_H_
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -55,6 +56,30 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
                                      scf::ForallOp producer,
                                      scf::ForallOp consumer,
                                      SmallVector<Operation *> consumerChain);
+
+/// Function to combine nested warp and lane mapped scf.forall ops into a single
+/// thread mapped scf.forall op. The lane and warp foralls must be normalized,
+/// and there should only be arith/affine and tensor.extract_slice ops (and the
+/// nested lane forall) inside of the warp forall. The results of the lane
+/// mapped forall must be directly consumed by the combining ops of the warp
+/// forall, because in the resulting IR, the thread forall's terminator will be
+/// directly inserting into the output argument of the original warp forall. The
+/// resulting thread forall will have the combined rank of the warp and lane
+/// foralls, with descending linear dim mapping IDs. For example:
+///
+/// `[#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]`
+/// `[#iree_gpu.lane_id<0>]`
+///
+/// Will become:
+///
+/// `[#gpu.thread<linear_dim_2>,
+///   #gpu.thread<linear_dim_1>,
+///   #gpu.thread<linear_dim_0>]`
+///
+/// The lane ID will become the innermost thread loop ID.
+FailureOr<scf::ForallOp>
+fuseNestedLaneAndWarpForalls(RewriterBase &rewriter, scf::ForallOp warpForallOp,
+                             scf::ForallOp laneForallOp);
 
 /// Function to fuse a collapse shape op into a forall op producer. This
 /// rewrite effectively bubbles the collapse_shape op up through the forall
@@ -144,15 +169,16 @@ fuseExtractSliceIntoProducerForall(RewriterBase &rewriter,
                                    scf::ForallOp forallOp,
                                    tensor::ExtractSliceOp extractSliceOp);
 
-// Helper to convert a contraction-like linalg op to an iree_gpu.multi_mma.
-FailureOr<IREE::GPU::MultiMmaOp>
-convertContractionToMultiMma(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
-                             IREE::GPU::MmaInterfaceAttr mmaKind);
+// Helper to convert a contraction-like linalg op to an iree_codegen.inner_tiled
+// op with a multi-MMA-like intrinsic descriptor.
+FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
+    RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+    IREE::Codegen::InnerTileDescAttrInterface mmaKind);
 
-// Helper to distribute a multi_mma op to lanes.
-FailureOr<Operation *> distributeMultiMmaOp(
-    RewriterBase &rewriter, IREE::GPU::MultiMmaOp mmaOp,
-    std::optional<SmallVector<int64_t>> workgroupSize = std::nullopt);
+// Helper to distribute an inner_tiled op to lanes.
+FailureOr<Operation *>
+distributeInnerTiledOp(RewriterBase &rewriter,
+                       IREE::Codegen::InnerTiledOp tiledOp);
 
 // Helper to map all scf.forall ops on lanes.
 void mapLaneForalls(RewriterBase &rewriter, Operation *funcOp,
@@ -160,7 +186,7 @@ void mapLaneForalls(RewriterBase &rewriter, Operation *funcOp,
 
 // Various populate pattern methods.
 void populateIREEGPUDropUnitDimsPatterns(RewritePatternSet &patterns);
-void populateIREEGPULowerMultiMmaPatterns(RewritePatternSet &patterns);
+void populateIREEGPULowerInnerTiledPatterns(RewritePatternSet &patterns);
 void populateIREEGPULowerBarrierRegionPatterns(RewritePatternSet &patterns);
 void populateIREEGPULowerValueBarrierPatterns(RewritePatternSet &patterns);
 void populateIREEGPUVectorUnrollPatterns(
@@ -168,6 +194,7 @@ void populateIREEGPUVectorUnrollPatterns(
 // Version of unrolling with a preset configuration.
 void populateIREEGPUVectorUnrollPatterns(RewritePatternSet &patterns);
 void populateIREEGPUVectorizationPatterns(RewritePatternSet &patterns);
+void populateIREEGPULowerGlobalLoadDMAPatterns(RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler::IREE::GPU
 

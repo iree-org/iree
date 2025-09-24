@@ -27,10 +27,10 @@ util.func public @return_zero_init(%arg0 : index, %arg1 : index) -> (tensor<?x?x
 
 util.func public @empty_within_dispatch_workgroup(%arg0: index, %arg1: index) -> tensor<?x?xf32> {
   %0 = flow.dispatch.workgroups[%arg0, %arg1](%arg0, %arg1, %arg0, %arg1) : (index, index, index, index) -> tensor<?x?xf32>{%arg0, %arg1} =
-    (%arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>) {
+    (%arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>) {
       %1 = tensor.empty(%arg4, %arg5) : tensor<?x?xf32>
-      flow.dispatch.tensor.store %1, %arg6, offsets = [0, 0], sizes = [%arg4, %arg5], strides = [1, 1]
-          : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%arg4, %arg5}
+      iree_tensor_ext.dispatch.tensor.store %1, %arg6, offsets = [0, 0], sizes = [%arg4, %arg5], strides = [1, 1]
+          : tensor<?x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%arg4, %arg5}
       flow.return
     } count(%arg2: index, %arg3: index) -> (index, index, index) {
       %c1 = arith.constant 1 : index

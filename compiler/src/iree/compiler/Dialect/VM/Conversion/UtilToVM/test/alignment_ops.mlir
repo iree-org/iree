@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-vm-conversion --cse --iree-vm-target-index-bits=32 %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-vm-conversion{index-bits=32},cse)' %s | FileCheck %s
 
 // CHECK-LABEL: @utilAlign
 func.func @utilAlign(%arg0 : index, %arg1: index) ->  (index) {

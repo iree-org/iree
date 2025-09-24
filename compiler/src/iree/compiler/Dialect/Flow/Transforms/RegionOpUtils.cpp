@@ -6,11 +6,14 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree/compiler/Utils/RegionOpUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/CommandLine.h"
@@ -43,12 +46,6 @@ static llvm::cl::opt<int> clInlineConstantByteLength(
                    "into a dispatch region or 0 to disable inlining."),
     llvm::cl::init(256));
 
-// TODO(#18457, #18447): Remove once backends support gather fusion.
-static llvm::cl::opt<bool>
-    clEnableGatherFusion("iree-flow-enable-gather-fusion",
-                         llvm::cl::desc("Fuse gather-like ops with consumer."),
-                         llvm::cl::init(false));
-
 namespace mlir::iree_compiler::IREE::Flow {
 
 //===----------------------------------------------------------------------===//
@@ -58,7 +55,7 @@ namespace mlir::iree_compiler::IREE::Flow {
 static SmallVector<Range> getLoopRangesImpl(TilingInterface tilableOp,
                                             Location loc, OpBuilder &builder) {
   SmallVector<Range> loopRanges = tilableOp.getIterationDomain(builder);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  Value one = arith::ConstantIndexOp::create(builder, loc, 1);
   for (auto iteratorType : llvm::enumerate(tilableOp.getLoopIteratorTypes())) {
     if (iteratorType.value() == utils::IteratorType::reduction) {
       loopRanges[iteratorType.index()].size = one;
@@ -81,8 +78,8 @@ static SmallVector<Range> getLoopRangesFromValue(Value source, Location loc,
 static SmallVector<Range>
 getLoopRangesImpl(ReifyRankedShapedTypeOpInterface shapedOp, Location loc,
                   OpBuilder &builder) {
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  Value zero = arith::ConstantIndexOp::create(builder, loc, 0);
+  Value one = arith::ConstantIndexOp::create(builder, loc, 1);
   ReifiedRankedShapedTypeDims resultDims;
   LogicalResult status = shapedOp.reifyResultShapes(builder, resultDims);
   (void)status;
@@ -146,8 +143,8 @@ static SmallVector<Value> getWorkloadForRootOp(OpBuilder &builder,
     Value offset = getValueOrCreateConstantIndexOp(builder, loc, r.offset);
     Value size = getValueOrCreateConstantIndexOp(builder, loc, r.size);
     Value stride = getValueOrCreateConstantIndexOp(builder, loc, r.stride);
-    return builder.create<affine::AffineApplyOp>(
-        rootOp->getLoc(), workload, ValueRange{offset, size, stride});
+    return affine::AffineApplyOp::create(builder, rootOp->getLoc(), workload,
+                                         ValueRange{offset, size, stride});
   });
 }
 
@@ -191,7 +188,9 @@ static bool checkShapeIsDataDependant(Operation *op) {
     };
     llvm::SetVector<Operation *> slice;
     for (Value initOperand : linalgOp.getDpsInits()) {
-      mlir::getBackwardSlice(initOperand, &slice, options);
+      [[maybe_unused]] LogicalResult result =
+          getBackwardSlice(initOperand, &slice, options);
+      assert(result.succeeded());
     }
     return llvm::any_of(slice, llvm::IsaPred<tensor::ExtractOp>);
   }
@@ -213,10 +212,9 @@ static void createWorkgroupCountFromDagRootRegion(
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointToStart(body);
   Location loc = regionOp.getLoc();
-  auto countOp =
-      rewriter.create<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>(loc,
-                                                                       args);
-  rewriter.create<IREE::Flow::ReturnOp>(loc, countOp->getResults());
+  auto countOp = IREE::TensorExt::DispatchWorkgroupCountFromDagRootOp::create(
+      rewriter, loc, args);
+  IREE::Flow::ReturnOp::create(rewriter, loc, countOp->getResults());
 }
 
 /// Return `true` if the given type is a ShapedType and has at least one
@@ -246,7 +244,7 @@ reifyDynamicResultDimsImpl(OpBuilder &b, Value value,
   auto emitTensorDimOps = [&]() {
     for (int64_t i = 0; i < shapedType.getRank(); ++i) {
       if (shapedType.isDynamicDim(i)) {
-        Value dim = b.create<tensor::DimOp>(value.getLoc(), value, i);
+        Value dim = tensor::DimOp::create(b, value.getLoc(), value, i);
         dynamicDims.push_back(dim);
       }
     }
@@ -294,6 +292,15 @@ reifyDynamicResultDimsImpl(OpBuilder &b, Value value,
       if (shapedType.isDynamicDim(i))
         dynamicDims.push_back(cast<Value>(dims[opResult.getResultNumber()][i]));
     return success();
+  }
+
+  // Case 6: Value corresponds to a dps init. Reify the dimensions of the
+  // operand.
+  if (auto dpsOp = dyn_cast<DestinationStyleOpInterface>(op)) {
+    return reifyDynamicResultDimsImpl(
+        b, dpsOp.getDpsInitOperand(opResult.getResultNumber())->get(),
+        dynamicDims,
+        /*createTensorDimOps=*/true);
   }
 
   if (!createTensorDimOps)
@@ -363,8 +370,8 @@ FailureOr<IREE::Flow::DispatchRegionOp> appendDispatchRegionResults(
   rewriter.setInsertionPoint(regionOp);
 
   // Create new DispatchRegionOp and move over the body.
-  auto newRegionOp = rewriter.create<IREE::Flow::DispatchRegionOp>(
-      regionOp->getLoc(), resultTypes, regionDynamicDims,
+  auto newRegionOp = IREE::Flow::DispatchRegionOp::create(
+      rewriter, regionOp->getLoc(), resultTypes, regionDynamicDims,
       regionOp.getWorkload());
   rewriter.inlineRegionBefore(regionOp.getBody(), newRegionOp.getBody(),
                               newRegionOp.getBody().begin());
@@ -386,11 +393,12 @@ makeEmptyDispatchRegion(OpBuilder &builder, Location loc, ValueRange workload) {
   OpBuilder::InsertionGuard guard(builder);
 
   // Create RegionOp.
-  auto regionOp = builder.create<IREE::Flow::DispatchRegionOp>(
-      loc, /*resultTypes=*/TypeRange(), /*dynamicDims=*/ValueRange(), workload);
+  auto regionOp = IREE::Flow::DispatchRegionOp::create(
+      builder, loc, /*resultTypes=*/TypeRange(), /*dynamicDims=*/ValueRange(),
+      workload);
   Block &body = regionOp.getBody().emplaceBlock();
   builder.setInsertionPointToStart(&body);
-  builder.create<IREE::Flow::ReturnOp>(loc, ValueRange());
+  IREE::Flow::ReturnOp::create(builder, loc, ValueRange());
   return regionOp;
 }
 
@@ -513,14 +521,11 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
 FailureOr<IREE::Flow::DispatchRegionOp>
 moveFollowingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
                                   IREE::Flow::DispatchRegionOp regionOp) {
-  // Fail if any of the `target` operands do not dominate the dispatch region.
+  OpBuilder::InsertionGuard g(rewriter);
   mlir::DominanceInfo dominanceInfo(regionOp);
-  for (Value operand : target->getOperands()) {
-    Operation *definingOp = operand.getDefiningOp();
-    if (definingOp && !dominanceInfo.dominates(definingOp, regionOp)) {
-      return rewriter.notifyMatchFailure(
-          target, "target operands do not dominate the dispatch region op.");
-    }
+  if (failed(moveOperandDefs(rewriter, target, regionOp, dominanceInfo, {}))) {
+    return rewriter.notifyMatchFailure(
+        target, "target operands can't be moved before region");
   }
 
   // Values replaced by moving the `target` into the dispatch region.
@@ -535,7 +540,6 @@ moveFollowingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
 
   Block &body = regionOp.getBody().front();
   // Clone op into dispatch region.
-  OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(body.getTerminator());
   Operation *clonedTarget = rewriter.clone(*target);
 
@@ -745,9 +749,9 @@ FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
       llvm::map_to_vector(newDispatchReturnOperands,
                           [](Value operand) { return operand.getType(); });
   rewriter.setInsertionPoint(dispatchRegionOp);
-  auto newDispatchRegionOp = rewriter.create<IREE::Flow::DispatchRegionOp>(
-      dispatchRegionOp->getLoc(), newResultTypes, newDispatchResultDynamicDims,
-      dispatchRegionOp.getWorkload());
+  auto newDispatchRegionOp = IREE::Flow::DispatchRegionOp::create(
+      rewriter, dispatchRegionOp->getLoc(), newResultTypes,
+      newDispatchResultDynamicDims, dispatchRegionOp.getWorkload());
   rewriter.inlineRegionBefore(dispatchRegionOp.getBody(),
                               newDispatchRegionOp.getBody(),
                               newDispatchRegionOp.getBody().begin());
@@ -796,6 +800,27 @@ FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
 // Utilities to make a dispatch region isolated from above
 //===---------------------------------------------------------------------===//
 
+// White list of operations we could ever want to clone. All clonable operations
+// must be part of this white list before any other consideration. Any operation
+// that returns `true` here is never cloned.
+static bool isUnclonableOp(Operation *op) {
+  if (!op) {
+    return true;
+  }
+  if (!isa<affine::AffineDialect, arith::ArithDialect, complex::ComplexDialect,
+           IREE::Encoding::IREEEncodingDialect,
+           IREE::LinalgExt::IREELinalgExtDialect, linalg::LinalgDialect,
+           tensor::TensorDialect>(op->getDialect())) {
+    return true;
+  }
+
+  // Dont clone the following ops into its consumers.
+  if (isa<tensor::InsertSliceOp>(op)) {
+    return true;
+  }
+  return false;
+}
+
 static bool isAttentionMaskGenerator(Operation *op) {
   for (OpOperand &use : op->getUses()) {
     if (auto attention =
@@ -823,7 +848,7 @@ static bool isScatterIndicesGenerator(Operation *op) {
 /// operations as roots.
 bool isClonableIntoDispatchOp(Operation *op,
                               ClonableIntoDispatchOptions options) {
-  if (isa<Flow::FlowDialect>(op->getDialect())) {
+  if (isUnclonableOp(op)) {
     return false;
   }
 
@@ -838,9 +863,7 @@ bool isClonableIntoDispatchOp(Operation *op,
   if (LinalgExt::isBitExtendOp(op)) {
     return true;
   }
-  if (clEnableGatherFusion && LinalgExt::isGatherlikeOp(op)) {
-    return true;
-  }
+
   // If the operation is used for masking an AttentionOp, then we always
   // clone it. The Attention mask is usually big, and is always generated
   // from a small tensor, so it's always good to clone it.
@@ -851,6 +874,10 @@ bool isClonableIntoDispatchOp(Operation *op,
   // If the operation is used for the indices computation of a scatter op, it
   // should be cloned into the dispatch.
   if (options.aggressive && isScatterIndicesGenerator(op)) {
+    return true;
+  }
+
+  if (isa<IREE::LinalgExt::GatherOp>(op)) {
     return true;
   }
 
@@ -916,17 +943,6 @@ static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
     if (auto insertSliceUser = dyn_cast<tensor::InsertSliceOp>(user)) {
       if (insertSliceUser.getDest() == v)
         return true;
-    }
-
-    if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(user)) {
-      // Only clone if used by Query, Mask, or scale.
-      if (!LinalgExt::isBitExtendOp(v.getDefiningOp()) &&
-          !llvm::is_contained<Value>(
-              {attentionOp.getQuery(), attentionOp.getMask(),
-               attentionOp.getScale(), attentionOp.getOutput()},
-              v)) {
-        return true;
-      }
     }
   }
   return false;

@@ -200,47 +200,57 @@ static inline iree_status_t iree_vm_ref_check(const iree_vm_ref_t ref,
 }
 
 // Retains the reference-counted pointer |ref|.
+// Unsafe to call on unaligned refs.
 IREE_API_EXPORT void iree_vm_ref_retain_inplace(iree_vm_ref_t* ref);
 
 // Retains the reference-counted pointer |ref|.
 // |out_ref| will be released if it already contains a reference.
+// Safe to call on unaligned refs.
 IREE_API_EXPORT void iree_vm_ref_retain(iree_vm_ref_t* ref,
                                         iree_vm_ref_t* out_ref);
 
 // Retains the reference-counted pointer |ref| and checks that it is of |type|.
 // |out_ref| will be released if it already contains a reference.
+// Safe to call on unaligned refs.
 IREE_API_EXPORT iree_status_t iree_vm_ref_retain_checked(
     iree_vm_ref_t* ref, iree_vm_ref_type_t type, iree_vm_ref_t* out_ref);
 
 // Retains or moves |ref| to |out_ref|.
 // |out_ref| will be released if it already contains a reference.
+// Safe to call on unaligned refs.
 IREE_API_EXPORT void iree_vm_ref_retain_or_move(int is_move, iree_vm_ref_t* ref,
                                                 iree_vm_ref_t* out_ref);
 
 // Retains or moves |ref| to |out_ref| and checks that |ref| is of |type|.
 // |out_ref| will be released if it already contains a reference.
+// Safe to call on unaligned refs.
 IREE_API_EXPORT iree_status_t iree_vm_ref_retain_or_move_checked(
     int is_move, iree_vm_ref_t* ref, iree_vm_ref_type_t type,
     iree_vm_ref_t* out_ref);
 
 // Releases the reference-counted pointer |ref|, possibly freeing it.
+// Safe to call on unaligned refs.
 IREE_API_EXPORT void iree_vm_ref_release(iree_vm_ref_t* ref);
 
 // Assigns the reference-counted pointer |ref| without incrementing the count.
 // |out_ref| will be released if it already contains a reference.
+// Safe to call on unaligned refs.
 IREE_API_EXPORT void iree_vm_ref_assign(iree_vm_ref_t* ref,
                                         iree_vm_ref_t* out_ref);
 
 // Moves one reference to another without changing the reference count.
 // |out_ref| will be released if it already contains a reference.
+// Safe to call on unaligned refs.
 IREE_API_EXPORT void iree_vm_ref_move(iree_vm_ref_t* ref,
                                       iree_vm_ref_t* out_ref);
 
 // Returns true if the given |ref| is NULL.
+// Safe to call on unaligned refs.
 IREE_API_EXPORT bool iree_vm_ref_is_null(const iree_vm_ref_t* ref);
 
 // Returns true if the two references point at the same value (or are both
 // null).
+// Safe to call on unaligned refs.
 IREE_API_EXPORT bool iree_vm_ref_equal(const iree_vm_ref_t* lhs,
                                        const iree_vm_ref_t* rhs);
 

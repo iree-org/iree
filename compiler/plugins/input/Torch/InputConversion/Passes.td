@@ -14,14 +14,19 @@ def BindSymbolicShapesPass :
   let summary = "Process torch dynamic shape bindings into IREE analyzable forms";
 }
 
-def BitCastQuantTensorPass :
-    InterfacePass<"torch-iree-bitcast-quant-tensor", "mlir::FunctionOpInterface"> {
+def BitCastTensorPass :
+    InterfacePass<"torch-iree-bitcast-tensor", "mlir::FunctionOpInterface"> {
   let summary = "Bitcasts i8 packed tensors of sub-byte types to the actual bit width";
 }
 
 def ConvertTMTensorToLinalgExtPass :
     InterfacePass<"torch-iree-tm-tensor-to-linalg-ext", "mlir::FunctionOpInterface"> {
   let summary = "Convert from TMTensor ops to LinalgExt ops on tensors";
+}
+
+def ConvertTorchUnstructuredToLinalgExtPass :
+    InterfacePass<"torch-iree-torch-unstructured-to-linalg-ext", "mlir::FunctionOpInterface"> {
+  let summary = "Convert unstructured Torch ops to LinalgExt ops";
 }
 
 def SetStrictSymbolicShapesPass :

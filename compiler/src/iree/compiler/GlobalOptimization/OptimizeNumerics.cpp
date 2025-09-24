@@ -50,16 +50,16 @@ Value castNumeric(Value origValue, Type toType, bool isSigned,
   if (llvm::isa<FloatType>(origElementType) &&
       llvm::isa<IntegerType>(toElementType)) {
     if (isSigned) {
-      return builder.create<arith::FPToSIOp>(loc, toType, origValue);
+      return arith::FPToSIOp::create(builder, loc, toType, origValue);
     } else {
-      return builder.create<arith::FPToUIOp>(loc, toType, origValue);
+      return arith::FPToUIOp::create(builder, loc, toType, origValue);
     }
   } else if (llvm::isa<IntegerType>(origElementType) &&
              llvm::isa<FloatType>(toElementType)) {
     if (isSigned) {
-      return builder.create<arith::SIToFPOp>(loc, toType, origValue);
+      return arith::SIToFPOp::create(builder, loc, toType, origValue);
     } else {
-      return builder.create<arith::UIToFPOp>(loc, toType, origValue);
+      return arith::UIToFPOp::create(builder, loc, toType, origValue);
     }
   } else {
     // If we need int<->int and float<->float, implement those cases. Since
@@ -153,7 +153,7 @@ struct LinalgFillCast
                 fillInit)
             .getCasted();
     Value fillResult =
-        rewriter.create<linalg::FillOp>(loc, fillInput, fillInit).result();
+        linalg::FillOp::create(rewriter, loc, fillInput, fillInit).result();
     rewriter.replaceOp(castOp, fillResult);
     return success();
   }
@@ -242,8 +242,8 @@ struct LinalgFpMatmulToLowP : public OpRewritePattern<linalg::MatmulOp> {
     Value newAccum =
         castNumeric(accumParams->producer, accumLowPType, isSigned, rewriter);
 
-    auto newMatmulOp = rewriter.create<linalg::MatmulOp>(
-        loc, ValueRange{newLhs, newRhs}, ValueRange{newAccum});
+    auto newMatmulOp = linalg::MatmulOp::create(
+        rewriter, loc, ValueRange{newLhs, newRhs}, ValueRange{newAccum});
     if (!isSigned) {
       newMatmulOp.setCast(linalg::TypeFn::cast_unsigned);
     }

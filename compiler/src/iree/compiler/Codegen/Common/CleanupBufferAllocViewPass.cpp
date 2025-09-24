@@ -12,9 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -36,7 +35,7 @@ struct CleanupBufferAllocViewPass final
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     populateReshapeToInterfaceTensorPatterns(patterns);
-    populateRemoveDeadMemAllocPatterns(patterns);
+    populateFoldTensorReshapeIntoBufferPatterns(patterns);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }

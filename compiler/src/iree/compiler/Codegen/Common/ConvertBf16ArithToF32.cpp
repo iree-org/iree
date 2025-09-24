@@ -14,7 +14,6 @@
 #include <memory>
 #include <utility>
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Utils/ConversionUtils.h"
@@ -51,11 +50,11 @@ Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
     return nullptr;
 
   if (inputETy.getIntOrFloatBitWidth() > eTy.getIntOrFloatBitWidth()) {
-    return builder.create<arith::TruncFOp>(loc, type, inputs[0]);
+    return arith::TruncFOp::create(builder, loc, type, inputs[0]);
   }
 
   if (inputETy.getIntOrFloatBitWidth() < eTy.getIntOrFloatBitWidth()) {
-    return builder.create<arith::ExtFOp>(loc, type, inputs[0]);
+    return arith::ExtFOp::create(builder, loc, type, inputs[0]);
   }
 
   return nullptr;
@@ -104,7 +103,6 @@ template <typename SourceType, typename TargetType>
 struct FloatTypeConverter
     : public PrimitiveTypeConverter<SourceType, TargetType> {
   explicit FloatTypeConverter() {
-    this->addArgumentMaterialization(convertRankedFloat);
     this->addSourceMaterialization(convertRankedFloat);
     this->addTargetMaterialization(convertRankedFloat);
   }
@@ -239,8 +237,7 @@ struct PromoteBF16ToF32Converter
 
 struct ConvertBf16ArithToF32Pass final
     : impl::ConvertBf16ArithToF32PassBase<ConvertBf16ArithToF32Pass> {
-  using impl::ConvertBf16ArithToF32PassBase<
-      ConvertBf16ArithToF32Pass>::ConvertBf16ArithToF32PassBase;
+  using Base::Base;
   void runOnOperation() override {
     MLIRContext *context = &this->getContext();
     RewritePatternSet patterns(context);
@@ -286,8 +283,8 @@ struct ConvertBf16ArithToF32Pass final
     // Some arithmetic operations exist in the vector dialect.
     target.addDynamicallyLegalOp<vector::FMAOp, vector::ReductionOp,
                                  vector::MultiDimReductionOp, vector::MaskOp,
-                                 vector::MatmulOp, vector::OuterProductOp,
-                                 vector::YieldOp>(checkOp);
+                                 vector::OuterProductOp, vector::YieldOp>(
+        checkOp);
 
     // Some ops are always legal.
     target.addLegalOp<arith::BitcastOp>();

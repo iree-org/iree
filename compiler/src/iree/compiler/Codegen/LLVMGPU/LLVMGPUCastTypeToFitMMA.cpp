@@ -46,14 +46,14 @@ struct UpcastContractOutput final : OpRewritePattern<vector::ContractionOp> {
     auto srcAType = contractOp.getLhsType();
     auto srcBType = contractOp.getRhsType();
 
-    auto intrinsic = contractOp->getAttrOfType<IREE::GPU::MmaInterfaceAttr>(
+    auto mmaIntrinsic = contractOp->getAttrOfType<IREE::GPU::MmaInterfaceAttr>(
         "iree.amdgpu.mma");
-    if (!intrinsic) {
+    if (!mmaIntrinsic) {
       return rewriter.notifyMatchFailure(
           contractOp, "could not find iree.amdgpu.mma attribute on contract");
     }
     auto [dstAElemType, dstBElemType, dstCElemType] =
-        intrinsic.getABCElementTypes();
+        mmaIntrinsic.getABCElementTypes();
 
     auto srcCElemFType = dyn_cast<FloatType>(srcCType.getElementType());
     auto dstCElemFType = dyn_cast<FloatType>(dstCElemType);
@@ -71,9 +71,9 @@ struct UpcastContractOutput final : OpRewritePattern<vector::ContractionOp> {
     Location loc = contractOp.getLoc();
     auto dstCType = srcCType.clone(dstCElemFType);
     auto extOp =
-        rewriter.create<arith::ExtFOp>(loc, dstCType, contractOp.getAcc());
-    auto newContractOp = rewriter.create<vector::ContractionOp>(
-        loc, contractOp.getLhs(), contractOp.getRhs(), extOp,
+        arith::ExtFOp::create(rewriter, loc, dstCType, contractOp.getAcc());
+    auto newContractOp = vector::ContractionOp::create(
+        rewriter, loc, contractOp.getLhs(), contractOp.getRhs(), extOp,
         contractOp.getIndexingMaps(), contractOp.getIteratorTypes());
     newContractOp->setDiscardableAttrs(
         contractOp->getDiscardableAttrDictionary());
@@ -102,8 +102,8 @@ static void inferMmaKind(vector::ContractionOp contract) {
     return;
   }
 
-  auto intrinsic =
-      dyn_cast_or_null<IREE::GPU::MmaInterfaceAttr>(toLayout.getMmaKindAttr());
+  auto intrinsic = dyn_cast_or_null<IREE::Codegen::InnerTileDescAttrInterface>(
+      toLayout.getMmaKindAttr());
   if (!intrinsic) {
     return;
   }
@@ -119,16 +119,17 @@ struct LLVMGPUCastTypeToFitMMAPass final
   }
 
   void runOnOperation() override {
-    auto func = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
 
     // Set MMA type from config embedded in toLayoutOp of contraction.
-    func.walk([&](vector::ContractionOp contract) { inferMmaKind(contract); });
+    funcOp.walk(
+        [&](vector::ContractionOp contract) { inferMmaKind(contract); });
 
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
     patterns.add<UpcastContractOutput>(context);
 
-    if (failed(applyPatternsGreedily(func, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }

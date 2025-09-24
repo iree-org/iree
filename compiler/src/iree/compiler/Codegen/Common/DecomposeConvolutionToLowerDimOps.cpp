@@ -60,9 +60,8 @@ computeDecomposedLoweringConfig(ArrayRef<Operation *> computeOps,
   // ATM only 2D depthwise HWC convs are supported.
   // TODO: Add support for other convs
   linalg::DepthwiseConv2DNhwcHwcOp convOp;
-  for (auto op : computeOps) {
-    if (isa<linalg::DepthwiseConv2DNhwcHwcOp>(op)) {
-      convOp = cast<linalg::DepthwiseConv2DNhwcHwcOp>(op);
+  for (Operation *op : computeOps) {
+    if ((convOp = dyn_cast<linalg::DepthwiseConv2DNhwcHwcOp>(op))) {
       break;
     }
   }
@@ -117,9 +116,7 @@ computeDecomposedLoweringConfig(ArrayRef<Operation *> computeOps,
   // 4. Create and return a new lowering config attribute.
   auto newTilingLevels = IREE::Codegen::LoweringConfigTilingLevelsAttr::get(
       context, newTilingLevelsList);
-  return IREE::Codegen::LoweringConfigAttr::get(
-      context, newTilingLevels,
-      loweringConfigAttr.value().getNativeVectorSize());
+  return IREE::Codegen::LoweringConfigAttr::get(context, newTilingLevels);
 }
 
 class DecomposeConvolutionToLowerDimOpsPass final

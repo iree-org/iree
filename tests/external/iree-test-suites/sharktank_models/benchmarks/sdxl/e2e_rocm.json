@@ -10,9 +10,6 @@
     "compilation_required": true,
     "compiled_file_name": "sdxl_full_pipeline_fp16_rocm",
     "compile_flags": [
-        "--iree-global-opt-propagate-transposes=true",
-        "--iree-codegen-llvmgpu-use-vector-distribution",
-        "--iree-codegen-gpu-native-math-precision=true",
         "--iree-hip-waves-per-eu=2",
         "--iree-opt-outer-dim-concat=true",
         "--iree-llvmgpu-enable-prefetch",
@@ -37,8 +34,8 @@
         "mi308": 1.1
     },
     "golden_time_ms": {
-        "mi250": 1100,
-        "mi300": 305.0,
-        "mi308": 740.0
+        "mi250": 990.0,
+        "mi300": 241.2,
+        "mi308": 270.2
     }
 }

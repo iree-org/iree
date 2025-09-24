@@ -6,8 +6,6 @@
 
 #include "iree/compiler/ExternalInterfaces/UtilExternalModels.h"
 
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
@@ -126,11 +124,29 @@ struct UtilAssumeIntValueBoundsOpInterface
     auto [min, max] =
         assumeOp.getUnionedUnsignedRange(result.getResultNumber());
 
+    std::optional<int64_t> udiv =
+        assumeOp.getUnionedUnsignedDivisor(result.getResultNumber());
+
     if (min) {
       cstr.bound(result) >= *min;
     }
     if (max) {
       cstr.bound(result) <= *max;
+    }
+    if (udiv) {
+      // To represent the divisibility guarantee, emit a bound clamping the
+      // value to the udiv value. i.e.
+      //
+      // v == floordiv(v, udiv) * udiv
+      //
+      // Mod/divide folders can cleanup such terms with the appropriate bounds
+      // query.
+      AffineExpr expr =
+          cstr.getExpr(assumeOp.getOperand(result.getResultNumber()));
+      AffineExpr udivCst =
+          getAffineConstantExpr(udiv.value(), op->getContext());
+      AffineExpr clampExpr = expr.floorDiv(udivCst) * udivCst;
+      cstr.bound(result) == clampExpr;
     }
   }
 };
@@ -174,15 +190,14 @@ struct GlobalOpInterfaceExternalModel
     auto globalOp = cast<ml_program::GlobalOp>(op);
     if (globalOp.getIsMutable()) {
       return cast<IREE::Util::GlobalLoadOpInterface>(
-          builder
-              .create<ml_program::GlobalLoadOp>(
-                  loc, globalOp.getType(), FlatSymbolRefAttr::get(globalOp))
+          ml_program::GlobalLoadOp::create(builder, loc, globalOp.getType(),
+                                           FlatSymbolRefAttr::get(globalOp))
               .getOperation());
     } else {
       return cast<IREE::Util::GlobalLoadOpInterface>(
-          builder
-              .create<ml_program::GlobalLoadConstOp>(
-                  loc, globalOp.getType(), FlatSymbolRefAttr::get(globalOp))
+          ml_program::GlobalLoadConstOp::create(
+              builder, loc, globalOp.getType(),
+              FlatSymbolRefAttr::get(globalOp))
               .getOperation());
     }
   }
@@ -192,9 +207,8 @@ struct GlobalOpInterfaceExternalModel
                                                    OpBuilder &builder) const {
     auto globalOp = cast<ml_program::GlobalOp>(op);
     return cast<IREE::Util::GlobalStoreOpInterface>(
-        builder
-            .create<ml_program::GlobalStoreOp>(
-                loc, FlatSymbolRefAttr::get(globalOp), value)
+        ml_program::GlobalStoreOp ::create(
+            builder, loc, FlatSymbolRefAttr::get(globalOp), value)
             .getOperation());
   }
 };
@@ -283,27 +297,6 @@ struct LinalgOpTiedOpInterfaceHelper {
   }
 };
 
-// TODO(Max191): Remove this interface once GPU data tiling stops using early
-// materialization. This only exists for handling multi_mma ops before dispatch
-// workgroups are created, which only happens with early materialization.
-struct MultiMmaOpTiedOpInterface
-    : public IREE::Util::TiedOpInterface::ExternalModel<
-          MultiMmaOpTiedOpInterface, IREE::GPU::MultiMmaOp> {
-  Value getTiedResult(Operation *op, unsigned resultIndex) const {
-    auto linalgOp = cast<IREE::GPU::MultiMmaOp>(op);
-    return IREE::Util::TiedOpInterface::findTiedBaseValue(linalgOp.getAcc());
-  }
-
-  ::std::optional<unsigned>
-  getTiedResultOperandIndex(Operation *op, unsigned resultIndex) const {
-    return {2}; // acc
-  }
-
-  SmallVector<int64_t> getTiedResultOperandIndices(Operation *op) const {
-    return {2}; // acc
-  }
-};
-
 //===----------------------------------------------------------------------===//
 // HoistableOpInterface
 //===----------------------------------------------------------------------===//
@@ -353,13 +346,10 @@ struct HoistableLinalgOpInterface
       return !isa<linalg::FillOp>(op);
     }
 
-    // Don't hoist ops with no inputs, their result is defined by `linalg.index`
-    // ops and should be fused with their consumers.
-    if (genericOp.getNumDpsInputs() == 0) {
-      return false;
-    }
-
-    if (linalg::isaFillOpInterface(genericOp).has_value()) {
+    // Don't hoist ops with no tensor inputs. They are likely to be fill-like
+    // or sequences (from `linalg.index`) which can be fused with their
+    // consumers.
+    if (IREE::LinalgExt::hasOnlyScalarInputs(genericOp)) {
       return false;
     }
 
@@ -443,11 +433,6 @@ void registerUtilExternalModels(DialectRegistry &registry) {
         tensor::InsertSliceOp::attachInterface<InsertSliceOpTiedOpInterface>(
             *context);
       });
-
-  registry.addExtension(+[](MLIRContext *context,
-                            IREE::GPU::IREEGPUDialect *dialect) {
-    IREE::GPU::MultiMmaOp::attachInterface<MultiMmaOpTiedOpInterface>(*context);
-  });
 
   registry.addExtension(
       +[](MLIRContext *context, linalg::LinalgDialect *dialect) {

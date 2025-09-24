@@ -8,6 +8,7 @@
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/PatternMatch.h"
 
 using namespace mlir;
@@ -48,10 +49,7 @@ struct StoreLoadLikeOpRewriter : public OpRewritePattern<StoreLoadLikeOp> {
     // to do.
     SmallVector<OpFoldResult> indices =
         getAsOpFoldResult(storeLoadLikeOp.getIndices());
-    if (std::all_of(indices.begin(), indices.end(),
-                    [](const OpFoldResult &opFold) {
-                      return isConstantIntValue(opFold, 0);
-                    })) {
+    if (llvm::all_of(indices, isZeroInteger)) {
       return failure();
     }
 
@@ -63,12 +61,12 @@ struct StoreLoadLikeOpRewriter : public OpRewritePattern<StoreLoadLikeOp> {
            "Expected one size per load dimension");
     Location loc = storeLoadLikeOp.getLoc();
     auto subview =
-        rewriter.create<memref::SubViewOp>(loc, /*source=*/srcMemRef,
-                                           /*offsets=*/indices,
-                                           /*sizes=*/sizes, /*strides=*/ones);
+        memref::SubViewOp::create(rewriter, loc, /*source=*/srcMemRef,
+                                  /*offsets=*/indices,
+                                  /*sizes=*/sizes, /*strides=*/ones);
     // Rewrite the load with the subview as the base pointer.
     SmallVector<Value> zeros(storeLoadRank,
-                             rewriter.create<arith::ConstantIndexOp>(loc, 0));
+                             arith::ConstantIndexOp::create(rewriter, loc, 0));
     StoreLoadLikeOp newLoad = rebuildOpFromAddressAndIndices(
         rewriter, storeLoadLikeOp, subview.getResult(), zeros);
     rewriter.replaceOp(storeLoadLikeOp, newLoad->getResults());

@@ -51,255 +51,6 @@ func.func @multi_input_barrier_region(%x: index, %y: index) -> index {
 
 // -----
 
-#contraction_accesses = [
- affine_map<(i, j, k) -> (i, k)>,
- affine_map<(i, j, k) -> (k, j)>,
- affine_map<(i, j, k) -> (i, j)>
-]
-func.func @vector_multi_mma(%lhs: vector<2x3x4xf16>, %rhs: vector<3x5x4xf16>, %acc: vector<2x5x4xf32>) -> vector<2x5x4xf32> {
-  %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
-    indexing_maps = #contraction_accesses,
-    iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
-  } : vector<2x3x4xf16>, vector<3x5x4xf16> into vector<2x5x4xf32>
-  return %0 : vector<2x5x4xf32>
-}
-
-// CHECK: #[[$MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
-// CHECK: #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
-// CHECK: #[[$MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
-
-// CHECK-LABEL: func @vector_multi_mma
-//       CHECK:   iree_gpu.multi_mma %arg0, %arg1, %arg2
-//  CHECK-SAME:       indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]]
-//  CHECK-SAME:       iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>]
-//  CHECK-SAME:       kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
-//  CHECK-SAME:     : vector<2x3x4xf16>, vector<3x5x4xf16> into vector<2x5x4xf32>
-
-// -----
-
-#contraction_accesses = [
- affine_map<(i, j, k) -> (i, k)>,
- affine_map<(i, j, k) -> (k, j)>,
- affine_map<(i, j, k) -> (i, j)>
-]
-func.func @tensor_multi_mma(%lhs: tensor<?x?x4xf16>, %rhs: tensor<?x?x4xf16>, %acc: tensor<?x?x4xf32>) -> tensor<?x?x4xf32> {
-  %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
-    indexing_maps = #contraction_accesses,
-    iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
-  } : tensor<?x?x4xf16>, tensor<?x?x4xf16> into tensor<?x?x4xf32>
-  return %0 : tensor<?x?x4xf32>
-}
-
-// CHECK: #[[$MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
-// CHECK: #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
-// CHECK: #[[$MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
-
-// CHECK-LABEL: func @tensor_multi_mma
-//       CHECK:   iree_gpu.multi_mma %arg0, %arg1, %arg2
-//  CHECK-SAME:       indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]]
-//  CHECK-SAME:       iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>]
-//  CHECK-SAME:       kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
-//  CHECK-SAME:     : tensor<?x?x4xf16>, tensor<?x?x4xf16> into tensor<?x?x4xf32>
-
-// -----
-
-#contraction_accesses = [
- affine_map<() -> ()>,
- affine_map<() -> ()>,
- affine_map<() -> ()>
-]
-func.func @single_multi_mma(%lhs: vector<4xf16>, %rhs: vector<4xf16>, %acc: vector<4xf32>) -> vector<4xf32> {
-  %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
-    indexing_maps = #contraction_accesses,
-    iterator_types = [],
-    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
-  } : vector<4xf16>, vector<4xf16> into vector<4xf32>
-  return %0 : vector<4xf32>
-}
-
-// CHECK: #[[$MAP:.+]] = affine_map<() -> ()>
-
-// CHECK-LABEL: func @single_multi_mma
-//       CHECK:   iree_gpu.multi_mma %arg0, %arg1, %arg2
-//  CHECK-SAME:       indexing_maps = [#[[$MAP]], #[[$MAP]], #[[$MAP]]]
-//  CHECK-SAME:       iterator_types = []
-//  CHECK-SAME:       kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
-//  CHECK-SAME:     : vector<4xf16>, vector<4xf16> into vector<4xf32>
-
-// -----
-
-#contraction_accesses = [
- affine_map<(i, j, k) -> (i, k)>,
- affine_map<(i, j, k) -> (k, j)>,
- affine_map<(i, j, k) -> (i, j)>
-]
-func.func @tensor_subgroup_multi_mma(%lhs: tensor<?x?x16x16xf16>, %rhs: tensor<?x?x16x16xf16>, %acc: tensor<?x?x16x16xf32>) -> tensor<?x?x16x16xf32> {
-  %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
-    indexing_maps = #contraction_accesses,
-    iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
-  } : tensor<?x?x16x16xf16>, tensor<?x?x16x16xf16> into tensor<?x?x16x16xf32>
-  return %0 : tensor<?x?x16x16xf32>
-}
-
-// CHECK: #[[$MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
-// CHECK: #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
-// CHECK: #[[$MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
-
-// CHECK-LABEL: func @tensor_subgroup_multi_mma
-//       CHECK:   iree_gpu.multi_mma %arg0, %arg1, %arg2
-//  CHECK-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]],
-//  CHECK-SAME:     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
-//  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>}
-//  CHECK-SAME:     : tensor<?x?x16x16xf16>, tensor<?x?x16x16xf16> into tensor<?x?x16x16xf32>
-
-// -----
-
-#contraction_accesses = [
- affine_map<(i, j, k) -> (i, k)>,
- affine_map<(i, j, k) -> (k, j)>,
- affine_map<(i, j, k) -> (i, j)>
-]
-func.func @tensor_subgroup_matmul_transpose_b_multi_mma(%lhs: tensor<?x?x16x16xf16>, %rhs: tensor<?x?x16x16xf16>, %acc: tensor<?x?x16x16xf32>) -> tensor<?x?x16x16xf32> {
-  %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
-    indexing_maps = #contraction_accesses,
-    iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-    rhs_permutation = array<i64: 1, 0>
-  } : tensor<?x?x16x16xf16>, tensor<?x?x16x16xf16> into tensor<?x?x16x16xf32>
-  return %0 : tensor<?x?x16x16xf32>
-}
-
-// CHECK: #[[$MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
-// CHECK: #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
-// CHECK: #[[$MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
-
-// CHECK-LABEL: func @tensor_subgroup_matmul_transpose_b_multi_mma
-//       CHECK:   iree_gpu.multi_mma %arg0, %arg1, %arg2
-//  CHECK-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]],
-//  CHECK-SAME:     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
-//  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
-//  CHECK-SAME:     rhs_permutation = array<i64: 1, 0>}
-//  CHECK-SAME:     : tensor<?x?x16x16xf16>, tensor<?x?x16x16xf16> into tensor<?x?x16x16xf32>
-
-// -----
-
-#contraction_accesses = [
- affine_map<(i, j, k) -> (i, k)>,
- affine_map<(i, j, k) -> (k, j)>,
- affine_map<(i, j, k) -> (i, j)>
-]
-func.func @tensor_subgroup_matmul_transpose_b_32x32x8_multi_mma(
-  %lhs: tensor<?x?x32x8xf16>,
-  %rhs: tensor<?x?x32x8xf16>,
-  %acc: tensor<?x?x32x32xf32>) -> tensor<?x?x32x32xf32> {
-  %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
-    indexing_maps = #contraction_accesses,
-    iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
-    rhs_permutation = array<i64: 1, 0>
-  } : tensor<?x?x32x8xf16>, tensor<?x?x32x8xf16> into tensor<?x?x32x32xf32>
-  return %0 : tensor<?x?x32x32xf32>
-}
-
-// CHECK: #[[$MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
-// CHECK: #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
-// CHECK: #[[$MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
-
-// CHECK-LABEL: func @tensor_subgroup_matmul_transpose_b_32x32x8_multi_mma
-//       CHECK:   iree_gpu.multi_mma %arg0, %arg1, %arg2
-//  CHECK-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]],
-//  CHECK-SAME:     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
-//  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
-//  CHECK-SAME:     rhs_permutation = array<i64: 1, 0>}
-//  CHECK-SAME:     : tensor<?x?x32x8xf16>, tensor<?x?x32x8xf16> into tensor<?x?x32x32xf32>
-
-// -----
-
-#contraction_accesses = [
- affine_map<(i, j, k) -> (i, k)>,
- affine_map<(i, j, k) -> (k, j)>,
- affine_map<(i, j, k) -> (i, j)>
-]
-func.func @data_tiled_1x1x1_tensor_multi_mma(%lhs: tensor<?x?x4x16x1x1xf32>, %rhs: tensor<?x?x4x16x1x1xf32>, %acc: tensor<?x?x4x16x4x1xf32>) -> tensor<?x?x4x16x4x1xf32> {
-  %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
-    indexing_maps = #contraction_accesses,
-    iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
-    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32>
-  } : tensor<?x?x4x16x1x1xf32>, tensor<?x?x4x16x1x1xf32> into tensor<?x?x4x16x4x1xf32>
-  return %0 : tensor<?x?x4x16x4x1xf32>
-}
-
-// CHECK: #[[$MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
-// CHECK: #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
-// CHECK: #[[$MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
-
-// CHECK-LABEL: func @data_tiled_1x1x1_tensor_multi_mma
-//       CHECK:   iree_gpu.multi_mma %arg0, %arg1, %arg2
-//  CHECK-SAME:       indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]]
-//  CHECK-SAME:       iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>]
-//  CHECK-SAME:       kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32>
-//  CHECK-SAME:     : tensor<?x?x4x16x1x1xf32>, tensor<?x?x4x16x1x1xf32> into tensor<?x?x4x16x4x1xf32>
-
-// -----
-
-#contraction_accesses = [
- affine_map<(i, j, k) -> (i, k)>,
- affine_map<(i, j, k) -> (k, j)>,
- affine_map<(i, j, k) -> (i, j)>
-]
-func.func @data_tiled_2x2x4_tensor_multi_mma(%lhs: tensor<?x?x2x4x16x1x4xf32>, %rhs: tensor<?x?x2x4x16x1x4xf32>, %acc: tensor<?x?x2x2x4x16x4x1xf32>) -> tensor<?x?x2x2x4x16x4x1xf32> {
-  %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
-    indexing_maps = #contraction_accesses,
-    iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
-    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32, intrinsics_m = 2, intrinsics_n = 2, intrinsics_k = 4>
-  } : tensor<?x?x2x4x16x1x4xf32>, tensor<?x?x2x4x16x1x4xf32> into tensor<?x?x2x2x4x16x4x1xf32>
-  return %0 : tensor<?x?x2x2x4x16x4x1xf32>
-}
-
-// CHECK: #[[$MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
-// CHECK: #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
-// CHECK: #[[$MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
-
-// CHECK-LABEL: func @data_tiled_2x2x4_tensor_multi_mma
-//       CHECK:   iree_gpu.multi_mma %arg0, %arg1, %arg2
-//  CHECK-SAME:       indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]]
-//  CHECK-SAME:       iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>]
-//  CHECK-SAME:       kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32, intrinsics_m = 2, intrinsics_n = 2, intrinsics_k = 4>
-//  CHECK-SAME:     : tensor<?x?x2x4x16x1x4xf32>, tensor<?x?x2x4x16x1x4xf32> into tensor<?x?x2x2x4x16x4x1xf32>
-
-// -----
-
-#contraction_accesses = [
- affine_map<(i, j, k) -> (i, k)>,
- affine_map<(i, j, k) -> (k, j)>,
- affine_map<(i, j, k) -> (i, j)>
-]
-func.func @data_tiled_2x2x4_tensor_multi_mma(%lhs: tensor<?x?x2x4x16x1x4xf32>, %rhs: tensor<?x?x2x4x16x1x4xf32>, %acc: tensor<?x?x2x2x4x16x4x1xf32>) -> tensor<?x?x2x2x4x16x4x1xf32> {
-  %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
-    indexing_maps = #contraction_accesses,
-    iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
-    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32, subgroups_m = 2, subgroups_n = 2, intrinsics_k = 4>
-  } : tensor<?x?x2x4x16x1x4xf32>, tensor<?x?x2x4x16x1x4xf32> into tensor<?x?x2x2x4x16x4x1xf32>
-  return %0 : tensor<?x?x2x2x4x16x4x1xf32>
-}
-
-// CHECK: #[[$MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
-// CHECK: #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
-// CHECK: #[[$MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
-
-// CHECK-LABEL: func @data_tiled_2x2x4_tensor_multi_mma
-//       CHECK:   iree_gpu.multi_mma %arg0, %arg1, %arg2
-//  CHECK-SAME:       indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]]
-//  CHECK-SAME:       iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>]
-//  CHECK-SAME:       kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32, subgroups_m = 2, subgroups_n = 2, intrinsics_k = 4>
-//  CHECK-SAME:     : tensor<?x?x2x4x16x1x4xf32>, tensor<?x?x2x4x16x1x4xf32> into tensor<?x?x2x2x4x16x4x1xf32>
-
-
-// -----
-
 func.func @tensor_barrier(%input: tensor<?xf16>) -> tensor<?xf16> {
   %out = iree_gpu.value_barrier %input : tensor<?xf16>
   return %out : tensor<?xf16>
@@ -341,3 +92,91 @@ func.func @tensor_barrier_multiple_inputs(%input: tensor<?xf16>) -> (tensor<?xf1
 // CHECK-LABEL: func @tensor_barrier_multiple_inputs
 //  CHECK-SAME:   %[[INPUT:[A-Za-z0-9]+]]: tensor<?xf16>
 //       CHECK:   iree_gpu.value_barrier %[[INPUT]], %[[INPUT]] : tensor<?xf16>, tensor<?xf16>
+
+// -----
+
+// Test basic coalesced_gather_dma with static shapes
+// indices: 64x32 = 2048 elements, dest: 64x32xf32 = 2048 * 4 bytes = 8192 bytes, ratio = 8192/2048 = 4
+func.func @coalesced_gather_dma_static(%indices: tensor<64x32xindex>, %source: tensor<1024x64xf32>, %dest: tensor<64x32xf32>) -> tensor<64x32xf32> {
+  %c1 = arith.constant 1 : index
+  %result = scf.forall (%i) in (%c1) shared_outs(%out = %dest) -> (tensor<64x32xf32>) {
+    scf.forall.in_parallel {
+      iree_gpu.coalesced_gather_dma %indices, %source into %out
+        : tensor<64x32xindex>, tensor<1024x64xf32>, tensor<64x32xf32> -> tensor<64x32xf32>
+    }
+  }
+  return %result : tensor<64x32xf32>
+}
+
+// CHECK-LABEL: func @coalesced_gather_dma_static
+//  CHECK-SAME:   %[[INDICES:[A-Za-z0-9]+]]: tensor<64x32xindex>
+//  CHECK-SAME:   %[[SOURCE:[A-Za-z0-9]+]]: tensor<1024x64xf32>
+//  CHECK-SAME:   %[[DEST:[A-Za-z0-9]+]]: tensor<64x32xf32>
+//       CHECK:   scf.forall
+//       CHECK:     scf.forall.in_parallel
+//       CHECK:       iree_gpu.coalesced_gather_dma %[[INDICES]], %[[SOURCE]] into %{{.+}} : tensor<64x32xindex>, tensor<1024x64xf32>, tensor<64x32xf32> -> tensor<64x32xf32>
+
+// -----
+
+// Test coalesced_gather_dma with dynamic shapes
+func.func @coalesced_gather_dma_dynamic(%indices: tensor<?x?xindex>, %source: tensor<?x?xf32>, %dest: tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %c1 = arith.constant 1 : index
+  %result = scf.forall (%i) in (%c1) shared_outs(%out = %dest) -> (tensor<?x?xf32>) {
+    scf.forall.in_parallel {
+      iree_gpu.coalesced_gather_dma %indices, %source into %out
+        : tensor<?x?xindex>, tensor<?x?xf32>, tensor<?x?xf32> -> tensor<?x?xf32>
+    }
+  }
+  return %result : tensor<?x?xf32>
+}
+
+// CHECK-LABEL: func @coalesced_gather_dma_dynamic
+//  CHECK-SAME:   %[[INDICES:[A-Za-z0-9]+]]: tensor<?x?xindex>
+//  CHECK-SAME:   %[[SOURCE:[A-Za-z0-9]+]]: tensor<?x?xf32>
+//  CHECK-SAME:   %[[DEST:[A-Za-z0-9]+]]: tensor<?x?xf32>
+//       CHECK:   scf.forall
+//       CHECK:     scf.forall.in_parallel
+//       CHECK:       iree_gpu.coalesced_gather_dma %[[INDICES]], %[[SOURCE]] into %{{.+}} : tensor<?x?xindex>, tensor<?x?xf32>, tensor<?x?xf32> -> tensor<?x?xf32>
+
+// -----
+
+func.func @coalesced_gather_dma_f16(%indices: tensor<128x64xindex>, %source: tensor<2048x64xf16>, %dest: tensor<128x64xf16>) -> tensor<128x64xf16> {
+  %c1 = arith.constant 1 : index
+  %result = scf.forall (%i) in (%c1) shared_outs(%out = %dest) -> (tensor<128x64xf16>) {
+    scf.forall.in_parallel {
+      iree_gpu.coalesced_gather_dma %indices, %source into %out
+        : tensor<128x64xindex>, tensor<2048x64xf16>, tensor<128x64xf16> -> tensor<128x64xf16>
+    }
+  }
+  return %result : tensor<128x64xf16>
+}
+
+// CHECK-LABEL: func @coalesced_gather_dma_f16
+//  CHECK-SAME:   %[[INDICES:[A-Za-z0-9]+]]: tensor<128x64xindex>
+//  CHECK-SAME:   %[[SOURCE:[A-Za-z0-9]+]]: tensor<2048x64xf16>
+//  CHECK-SAME:   %[[DEST:[A-Za-z0-9]+]]: tensor<128x64xf16>
+//       CHECK:   scf.forall
+//       CHECK:     scf.forall.in_parallel
+//       CHECK:       iree_gpu.coalesced_gather_dma %[[INDICES]], %[[SOURCE]] into %{{.+}} : tensor<128x64xindex>, tensor<2048x64xf16>, tensor<128x64xf16> -> tensor<128x64xf16>
+
+// -----
+
+func.func @coalesced_gather_dma_1d(%indices: tensor<32xindex>, %source: tensor<1024xf32>, %dest: tensor<1024xf32>) -> tensor<1024xf32> {
+  %c32 = arith.constant 32 : index
+  %result = scf.forall (%i) in (%c32) shared_outs(%out = %dest) -> (tensor<1024xf32>) {
+    scf.forall.in_parallel {
+      iree_gpu.coalesced_gather_dma %indices, %source into %out
+        : tensor<32xindex>, tensor<1024xf32>, tensor<1024xf32> -> tensor<1024xf32>
+    }
+  }
+  return %result : tensor<1024xf32>
+}
+
+// CHECK-LABEL: func @coalesced_gather_dma_1d
+//  CHECK-SAME:   %[[INDICES:[A-Za-z0-9]+]]: tensor<32xindex>
+//  CHECK-SAME:   %[[SOURCE:[A-Za-z0-9]+]]: tensor<1024xf32>
+//  CHECK-SAME:   %[[DEST:[A-Za-z0-9]+]]: tensor<1024xf32>
+//       CHECK:   %[[C32:.+]] = arith.constant 32 : index
+//       CHECK:   scf.forall (%{{.+}}) in (%[[C32]])
+//       CHECK:     scf.forall.in_parallel
+//       CHECK:       iree_gpu.coalesced_gather_dma %[[INDICES]], %[[SOURCE]] into %{{.+}} : tensor<32xindex>, tensor<1024xf32>, tensor<1024xf32> -> tensor<1024xf32>

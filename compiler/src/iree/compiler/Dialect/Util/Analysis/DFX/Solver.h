@@ -83,6 +83,26 @@ public:
                                            /*forceUpdate=*/true);
   }
 
+  // Creates (if needed) an element and adds it to the solver.
+  // Use during initialization for elements that may recursively initialize
+  // themselves.
+  template <typename ElementT>
+  void cacheElementFor(Position pos) {
+    cacheElementFor<ElementT>(pos, /*queryingElement=*/nullptr,
+                              Resolution::NONE);
+  }
+
+  // Creates (if needed) an element and adds it to the solver.
+  // Use during initialization for elements that may recursively initialize
+  // themselves.
+  template <typename ElementT>
+  void cacheElementFor(Position pos, const AbstractElement *queryingElement,
+                       Resolution resolution) {
+    getOrCreateElementFor<ElementT>(pos, queryingElement, resolution,
+                                    /*forceUpdate=*/false,
+                                    /*updateAfterInit=*/false);
+  }
+
   // Returns the element of |ElementT| for |pos| and optionally adds a
   // dependency from |queryingElement| to the returned element with the given
   // |resolution|.
@@ -132,15 +152,20 @@ public:
 
     // Allow seeded elements to declare dependencies that are preserved for
     // use during fixed point iteration.
+    static const int maxUpdateChainLength = 16;
     if (updateAfterInit) {
-      auto oldPhase = phase;
-      phase = Phase::UPDATE;
-      updateElement(element);
-      phase = oldPhase;
+      if (updateChainLength < maxUpdateChainLength) {
+        auto oldPhase = phase;
+        phase = Phase::UPDATE;
+        ++updateChainLength;
+        updateElement(element);
+        --updateChainLength;
+        phase = oldPhase;
+      }
     }
 
     if (queryingElement && element.getState().isValidState()) {
-      recordDependence(element, const_cast<AbstractElement &>(*queryingElement),
+      recordDependency(element, const_cast<AbstractElement &>(*queryingElement),
                        resolution);
     }
     return element;
@@ -175,7 +200,7 @@ public:
     // Do not register a dependence on an element with an invalid state.
     if (resolution != Resolution::NONE && queryingElement &&
         element->getState().isValidState()) {
-      recordDependence(*element,
+      recordDependency(*element,
                        const_cast<AbstractElement &>(*queryingElement),
                        resolution);
     }
@@ -196,10 +221,10 @@ public:
   // beneficial to avoid false dependencies but it requires the users of
   // `getElementFor` to explicitly record true dependencies through this method.
   // The |resolution| flag indicates if the dependence is strictly necessary.
-  // That means for required dependences if |fromElement| changes to an invalid
+  // That means for required dependencies if |fromElement| changes to an invalid
   // state |toElement| can be moved to a pessimistic fixpoint because it
   // required information from |fromElement| but none are available anymore.
-  void recordDependence(const AbstractElement &fromElement,
+  void recordDependency(const AbstractElement &fromElement,
                         const AbstractElement &toElement,
                         Resolution resolution);
 
@@ -234,7 +259,7 @@ public:
 
   // Runs the solver until either it converges to a fixed point or exceeds the
   // maximum iteration count. Returns success() if it converges in time.
-  LogicalResult run();
+  LogicalResult run(int maxIterations = 32);
 
   // Prints the constraint dependency graph to |os|.
   void print(llvm::raw_ostream &os);
@@ -254,18 +279,15 @@ protected:
   // If the maximum iteration count is reached this method will
   // indicate pessimistic fixpoint on elements that transitively depend on
   // elements that were still scheduled for an update.
-  LogicalResult runTillFixpoint();
+  LogicalResult runTillFixpoint(int maxIterations);
 
   // Runs update on |element| and tracks the dependencies queried while doing
   // so. Also adjusts the state if we know further updates are not necessary.
   ChangeStatus updateElement(AbstractElement &element);
 
-  // Remembers the dependences on the top of the dependence stack such that they
-  // may trigger further updates.
-  void rememberDependences();
-
-  // Maximum number of fixed point iterations or None for default.
-  std::optional<unsigned> maxFixpointIterations;
+  // Remembers the dependencies on the top of the dependence stack such that
+  // they may trigger further updates.
+  void rememberDependencies();
 
   // A flag that indicates which stage of the process we are in.
   enum class Phase {
@@ -280,6 +302,10 @@ protected:
   // The current initialization chain length. Tracked to avoid stack overflows
   // during recursive initialization.
   unsigned initializationChainLength = 0;
+  // The current update chain length. Tracked to avoid stack overflows during
+  // recursive updates. When reached the update of the element will be deferred
+  // until the next iteration.
+  unsigned updateChainLength = 0;
 
   using ElementMapKeyTy = std::pair<const char *, Position>;
   DenseMap<ElementMapKeyTy, AbstractElement *> elementMap;
@@ -296,15 +322,15 @@ protected:
     Resolution resolution;
   };
 
-  // The dependence stack is used to track dependences during an
+  // The dependency stack is used to track dependencies during an
   // `AbstractElement::update` call. As `AbstractElement::update` can be
-  // recursive we might have multiple vectors of dependences in here. The stack
-  // size, should be adjusted according to the expected recursion depth and the
-  // inner dependence vector size to the expected number of dependences per
+  // recursive we might have multiple vectors of dependencies in here. The stack
+  // size should be adjusted according to the expected recursion depth and the
+  // inner dependence vector size to the expected number of dependencies per
   // abstract element. Since the inner vectors are actually allocated on the
-  // stack we can be generous with their size.
+  // heap we can be generous with their size.
   using DependenceVector = SmallVector<DepInfo, 8>;
-  SmallVector<DependenceVector *, 16> dependenceStack;
+  SmallVector<DependenceVector *, 16> dependencyStack;
 };
 
 } // namespace mlir::iree_compiler::DFX

@@ -9,6 +9,8 @@
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
 #include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
@@ -39,14 +41,14 @@ namespace mlir::iree_compiler::DispatchCreation {
 ///   op `flow.dispatch.workgroups_count_from_body_slice`. This op is
 ///   resolved in the backends into the actual workgroup count computation.
 /// - To correlate back to the captured workload,
-/// `flow.dispatch.workload.ordinal`
+/// `iree_tensor_ext.dispatch.workload.ordinal`
 ///   to map the captured operand to the position in the workload list.
-static void createDefaultWorkgroupCountRegion(
+static LogicalResult createDefaultWorkgroupCountRegion(
     RewriterBase &rewriter, IREE::Flow::DispatchWorkgroupsOp workgroupsOp) {
   Region &workgroupCountBody = workgroupsOp.getWorkgroupCount();
   if (!workgroupCountBody.empty()) {
     // Preserve pre-existing workgroup count region.
-    return;
+    return success();
   }
 
   // Compute the `workload`. For now all `IndexType` are treated as workload.
@@ -69,10 +71,34 @@ static void createDefaultWorkgroupCountRegion(
   Location loc = workgroupsOp.getLoc();
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointToStart(block);
-  auto defaultCountOp =
-      rewriter.create<IREE::Flow::DispatchWorkgroupCountFromSliceOp>(
-          loc, block->getArguments());
-  rewriter.create<IREE::Flow::ReturnOp>(loc, defaultCountOp.getResults());
+  Operation *defaultCountOp =
+      IREE::TensorExt::DispatchWorkgroupCountFromSliceOp::create(
+          rewriter, loc, block->getArguments());
+
+  // Check for presence of `scf.forall` operations created by partial reduction
+  // tiling.
+  auto forallOps = workgroupsOp.getClosureBodyRegion().getOps<scf::ForallOp>();
+  if (!forallOps.empty()) {
+    if (!llvm::hasSingleElement(forallOps)) {
+      return workgroupsOp->emitOpError(
+          "unhandled multiple scf.forall ops in a dispatch");
+    }
+    auto forallOp = *forallOps.begin();
+    std::optional<ArrayAttr> mapping = forallOp.getMapping();
+    if (!mapping) {
+      return workgroupsOp->emitOpError(
+          "unhandled scf.forall op that doesnt have a mapping of "
+          "`[#iree_linalg_ext.split_reduction_mapping]`");
+    }
+    if (failed(IREE::LinalgExt::SplitReductionMappingAttr::verifyAttrList(
+            rewriter.getContext(), forallOp.getLoc(), mapping->getValue()))) {
+      return failure();
+    }
+    defaultCountOp =
+        IREE::TensorExt::DispatchWorkgroupCountSplitReductionModifierOp::create(
+            rewriter, loc, defaultCountOp->getResults(), block->getArguments());
+  }
+  IREE::Flow::ReturnOp::create(rewriter, loc, defaultCountOp->getResults());
 
   // Update the `workgroupsOp` region.
   rewriter.modifyOpInPlace(workgroupsOp, [&]() {
@@ -91,11 +117,12 @@ static void createDefaultWorkgroupCountRegion(
       if (!llvm::isa<IndexType>(operand.getType()))
         continue;
       BlockArgument arg = workgroupsOp.getInputBlockArgument(index);
-      auto ordinalOp = rewriter.create<IREE::Flow::DispatchWorkloadOrdinalOp>(
-          loc, arg, rewriter.getIndexAttr(ordinalNumber++));
+      auto ordinalOp = IREE::TensorExt::DispatchWorkloadOrdinalOp::create(
+          rewriter, loc, arg, rewriter.getIndexAttr(ordinalNumber++));
       rewriter.replaceAllUsesExcept(arg, ordinalOp, ordinalOp);
     }
   });
+  return success();
 }
 
 namespace {
@@ -114,9 +141,16 @@ void MaterializeDefaultWorkgroupCountRegionPass::runOnOperation() {
 
   // Populate the workgroup_count region of flow.dispatch.workgroups operation
   // that dont already have a region
-  funcOp.walk([&](IREE::Flow::DispatchWorkgroupsOp workgroupsOp) {
-    createDefaultWorkgroupCountRegion(rewriter, workgroupsOp);
-  });
+  auto walkResult = funcOp.walk(
+      [&](IREE::Flow::DispatchWorkgroupsOp workgroupsOp) -> WalkResult {
+        if (failed(createDefaultWorkgroupCountRegion(rewriter, workgroupsOp))) {
+          return WalkResult::interrupt();
+        }
+        return WalkResult::advance();
+      });
+  if (walkResult.wasInterrupted()) {
+    return signalPassFailure();
+  }
 }
 
 } // namespace mlir::iree_compiler::DispatchCreation

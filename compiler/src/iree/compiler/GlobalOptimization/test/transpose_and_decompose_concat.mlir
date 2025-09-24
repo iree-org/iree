@@ -39,3 +39,21 @@ util.func public @test_outer_dim_concat(%arg0: tensor<32x?x64xf16>, %arg1: tenso
 // MAKEOUTER-LABEL: util.func public @test_outer_dim_concat
 //       MAKEOUTER:   %[[CONCAT:.+]] = tensor.concat
 //       MAKEOUTER:   util.return %[[CONCAT]] : tensor<64x?x64xf16>
+
+// -----
+
+// Do not modify concat in `flow.dispatch.region`.
+util.func public @test_concat_in_dispatch(%arg0: tensor<32x8x64xf16>, %arg1: tensor<32x8x64xf16>) -> tensor<32x8x128xf16> {
+  %dispatch = flow.dispatch.region -> (tensor<32x8x128xf16>) {
+    %concat = tensor.concat dim(2) %arg0, %arg1 : (tensor<32x8x64xf16>, tensor<32x8x64xf16>) -> tensor<32x8x128xf16>
+    flow.return %concat : tensor<32x8x128xf16>
+  }
+  util.return %dispatch : tensor<32x8x128xf16>
+}
+// CHECK-LABEL: util.func public @test_concat_in_dispatch
+//       CHECK:   %[[CONCAT:.+]] = tensor.concat dim(2)
+//       CHECK:   flow.return %[[CONCAT]] : tensor<32x8x128xf16>
+
+// MAKEOUTER-LABEL: util.func public @test_concat_in_dispatch
+//       MAKEOUTER:   %[[CONCAT:.+]] = tensor.concat dim(2)
+//       MAKEOUTER:   flow.return %[[CONCAT]] : tensor<32x8x128xf16>

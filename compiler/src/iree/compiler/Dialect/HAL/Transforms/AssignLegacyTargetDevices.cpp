@@ -45,7 +45,7 @@ struct AssignLegacyTargetDevicesPass
   }
 
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     auto *context = moduleOp.getContext();
 
     // If no targets are specified we can't do anything - another pass earlier

@@ -19,7 +19,7 @@ def CHECK_Dialect : Dialect {
 }
 
 def CHECK_ExpectTrueOp : Op<CHECK_Dialect, "expect_true"> {
-  let summary = [{Checks that the operand is true}];
+  let summary = [{Checks that the operand is true.}];
   let description = [{
     Verifies that the operand contains a true value, which is represented by
     any non-zero integer.
@@ -37,7 +37,7 @@ def CHECK_ExpectTrueOp : Op<CHECK_Dialect, "expect_true"> {
 }
 
 def CHECK_ExpectFalseOp : Op<CHECK_Dialect, "expect_false"> {
-  let summary = [{Checks that the operand is false}];
+  let summary = [{Checks that the operand is false.}];
   let description = [{
     Verifies that the operand contains a false value, which is represented by
     zero.
@@ -55,7 +55,7 @@ def CHECK_ExpectFalseOp : Op<CHECK_Dialect, "expect_false"> {
 }
 
 def CHECK_ExpectAllTrueOp : Op<CHECK_Dialect, "expect_all_true"> {
-  let summary = [{Checks that the operand contains only values that are true}];
+  let summary = [{Checks that the operand contains only values that are true.}];
   let description = [{
     Verifies that the operand contains true values, which are represented by any
     non-zero integer.
@@ -81,7 +81,7 @@ def CHECK_ExpectAllTrueOp : Op<CHECK_Dialect, "expect_all_true"> {
 
 def CHECK_ExpectEqOp :
     Op<CHECK_Dialect, "expect_eq", [AllTypesMatch<["lhs", "rhs"]>]> {
-  let summary = [{Checks that the tensor or buffer view operands are equal}];
+  let summary = [{Checks that the tensor or buffer view operands are equal.}];
   let description = [{
     Verifies that the operands are exactly equal.
 
@@ -106,7 +106,7 @@ def CHECK_ExpectEqOp :
 
 def CHECK_ExpectEqConstOp :
     Op<CHECK_Dialect, "expect_eq_const", [AllTypesMatch<["lhs", "value"]>]> {
-  let summary = [{Checks that the tensor operand is equal to some constant}];
+  let summary = [{Checks that the tensor operand is equal to some constant.}];
   let description =  [{
     Verifies that the tensor operand is exactly equal to a constant attribute.
 
@@ -135,7 +135,7 @@ def CHECK_ExpectEqConstOp :
 
 def CHECK_ExpectAlmostEqOp :
     Op<CHECK_Dialect, "expect_almost_eq", [AllTypesMatch<["lhs", "rhs"]>]> {
-  let summary = [{Checks that the operands are almost equal}];
+  let summary = [{Checks that the operands are almost equal.}];
   let description = [{
     Verifies that the buffer view or tensor operands with float elements satisfy
     the Numpy-style fuzzy-comparision condition with parameters `atol`,
@@ -181,7 +181,7 @@ def CHECK_ExpectAlmostEqOp :
 def CHECK_ExpectAlmostEqConstOp :
     Op<CHECK_Dialect,
        "expect_almost_eq_const", [AllTypesMatch<["lhs", "value"]>]> {
-  let summary = [{Checks that the tensor operand is almost equal to some constant}];
+  let summary = [{Checks that the tensor operand is almost equal to some constant.}];
   let description =  [{
     This op is just a convenience wrapper around the expect_almost_eq op.
 

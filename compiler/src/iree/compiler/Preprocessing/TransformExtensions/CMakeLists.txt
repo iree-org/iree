@@ -35,11 +35,13 @@ iree_cc_library(
     IREELinalgTransformDialect
     LLVMSupport
     MLIRIR
+    MLIRLinalgInterfacesIncGenLib
     MLIRPDLDialect
     MLIRSupport
     MLIRTransformDialect
     MLIRTransformDialectInterfaces
     MLIRTransformUtils
+    MLIRValueBoundsOpInterface
     iree::compiler::Utils
   PUBLIC
 )

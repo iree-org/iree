@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Utils.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "llvm/Support/Debug.h"
@@ -58,7 +59,7 @@ static Value createTransposeInit(OpBuilder &builder, Value source,
   applyPermutationToVector(mixedSizes, perm);
   Type elemType = cast<RankedTensorType>(source.getType()).getElementType();
   Value empty =
-      builder.create<tensor::EmptyOp>(source.getLoc(), mixedSizes, elemType)
+      tensor::EmptyOp::create(builder, source.getLoc(), mixedSizes, elemType)
           .getResult();
   return empty;
 }
@@ -71,12 +72,12 @@ static Value createTranspose(OpBuilder &builder, Value source,
     Type elementType = empty.getType().getElementType();
     SmallVector<OpFoldResult> mixedSizes = empty.getMixedSizes();
     applyPermutationToVector(mixedSizes, perm);
-    return builder.create<tensor::EmptyOp>(empty.getLoc(), mixedSizes,
-                                           elementType);
+    return tensor::EmptyOp::create(builder, empty.getLoc(), mixedSizes,
+                                   elementType);
   }
   Value empty = createTransposeInit(builder, source, perm);
-  return builder
-      .create<linalg::TransposeOp>(source.getLoc(), source, empty, perm)
+  return linalg::TransposeOp::create(builder, source.getLoc(), source, empty,
+                                     perm)
       ->getResult(0);
 }
 
@@ -190,7 +191,7 @@ namespace {
 class FuseTransposeWithProducerLinalgOp
     : public OpRewritePattern<linalg::TransposeOp> {
 public:
-  using OpRewritePattern<linalg::TransposeOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
   FuseTransposeWithProducerLinalgOp(MLIRContext *ctx, bool aggressiveProp,
                                     bool convProp, PatternBenefit b = 1)
       : OpRewritePattern<linalg::TransposeOp>(ctx, b),
@@ -252,9 +253,9 @@ public:
     newIndexingMaps[genericOp.getNumDpsInputs() + resultIndex] = transposedMap;
 
     // 3. Create the new generic with the same iteration order.
-    auto newGenericOp = rewriter.create<linalg::GenericOp>(
-        genericOp.getLoc(), resultTypes, genericOp.getDpsInputs(), newInit,
-        newIndexingMaps, genericOp.getIteratorTypesArray(),
+    auto newGenericOp = linalg::GenericOp::create(
+        rewriter, genericOp.getLoc(), resultTypes, genericOp.getDpsInputs(),
+        newInit, newIndexingMaps, genericOp.getIteratorTypesArray(),
         /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(genericOp));
     rewriter.cloneRegionBefore(genericOp.getRegion(), newGenericOp.getRegion(),
                                newGenericOp.getRegion().begin());
@@ -306,7 +307,7 @@ private:
 class BubbleTransposeThroughCollapseShape
     : public OpRewritePattern<linalg::TransposeOp> {
 public:
-  using OpRewritePattern<linalg::TransposeOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::TransposeOp transposeOp,
                                 PatternRewriter &rewriter) const override {
@@ -354,9 +355,9 @@ public:
 
     Value newTranspose =
         createTranspose(rewriter, collapseOp.getSrc(), newPerm);
-    Value newReshape = rewriter.create<tensor::CollapseShapeOp>(
-        collapseOp.getLoc(), transposeOp.getResultTypes()[0], newTranspose,
-        newReassociations);
+    Value newReshape = tensor::CollapseShapeOp::create(
+        rewriter, collapseOp.getLoc(), transposeOp.getResultTypes()[0],
+        newTranspose, newReassociations);
     rewriter.replaceOp(transposeOp, newReshape);
     return success();
   }
@@ -375,7 +376,7 @@ namespace {
 // new propagation opportunities and eases the analysis in fusion/later passes.
 class ComposeTransposes : public OpRewritePattern<linalg::TransposeOp> {
 public:
-  using OpRewritePattern<linalg::TransposeOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::TransposeOp consumer,
                                 PatternRewriter &rewriter) const override {
@@ -408,7 +409,7 @@ public:
 class SinkTransposeThroughExtractSlice
     : public OpRewritePattern<tensor::ExtractSliceOp> {
 public:
-  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractOp,
                                 PatternRewriter &rewriter) const override {
@@ -487,9 +488,9 @@ public:
 
     RankedTensorType sliceType = getPermutedTensorType(
         cast<RankedTensorType>(extractOp.getType()), rankReducedInvPerm);
-    Value slice = rewriter.create<tensor::ExtractSliceOp>(
-        extractOp.getLoc(), sliceType, transposeOp.getInput(), offsets, sizes,
-        strides);
+    Value slice = tensor::ExtractSliceOp::create(
+        rewriter, extractOp.getLoc(), sliceType, transposeOp.getInput(),
+        offsets, sizes, strides);
     // Transpose back to the original slice.
     if (!isIdentityPermutation(rankReducedPerm)) {
       slice = createTranspose(rewriter, slice, rankReducedPerm);
@@ -503,7 +504,7 @@ public:
 class SinkTransposeThroughExpandShape
     : public OpRewritePattern<tensor::ExpandShapeOp> {
 public:
-  using OpRewritePattern<tensor::ExpandShapeOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tensor::ExpandShapeOp expandOp,
                                 PatternRewriter &rewriter) const override {
@@ -554,8 +555,8 @@ public:
 
     RankedTensorType expandedType = getPermutedTensorType(
         cast<RankedTensorType>(expandOp.getType()), newInvPerm);
-    Value transposedReshape = rewriter.create<tensor::ExpandShapeOp>(
-        expandOp.getLoc(), expandedType, transposeOp.getInput(),
+    Value transposedReshape = tensor::ExpandShapeOp::create(
+        rewriter, expandOp.getLoc(), expandedType, transposeOp.getInput(),
         newReassociations);
     Value originalReshape =
         createTranspose(rewriter, transposedReshape, newPerm);
@@ -723,7 +724,7 @@ getTransposedIndexingMaps(linalg::GenericOp genericOp,
 class SinkTransposeThroughUnaryElementwiseInput
     : public OpRewritePattern<linalg::GenericOp> {
 public:
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
@@ -815,7 +816,7 @@ public:
 class BubbleTransposeThroughUnaryElementwiseDpsInit
     : public OpRewritePattern<linalg::TransposeOp> {
 public:
-  using OpRewritePattern<linalg::TransposeOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::TransposeOp transposeOp,
                                 PatternRewriter &rewriter) const override {
@@ -892,7 +893,7 @@ public:
 
 namespace {
 
-template <typename OpTy, typename ReplTy, int64_t inputIdx>
+template <typename OpTy, int64_t inputIdx>
 class NamedOpConversion : public OpRewritePattern<OpTy> {
 public:
   using OpRewritePattern<OpTy>::OpRewritePattern;
@@ -920,8 +921,32 @@ public:
     SmallVector<NamedAttribute> attrs = getPrunedAttributeList(namedOp);
     SmallVector<Value> newInputs = namedOp.getInputs();
     newInputs[inputIdx] = transpose.getInput();
-    rewriter.replaceOpWithNewOp<ReplTy>(namedOp, newInputs,
-                                        namedOp.getDpsInits(), attrs);
+
+    auto replaceOp = [&](auto *typePtr) {
+      rewriter.replaceOpWithNewOp<std::remove_pointer_t<decltype(typePtr)>>(
+          namedOp, newInputs, namedOp.getDpsInits(), attrs);
+    };
+
+    Operation *op = namedOp.getOperation();
+    if (isa<linalg::MatmulTransposeAOp>(op) && inputIdx == 0) {
+      replaceOp(static_cast<linalg::MatmulOp *>(nullptr));
+    } else if (isa<linalg::MatmulTransposeBOp>(op) && inputIdx == 1) {
+      replaceOp(static_cast<linalg::MatmulOp *>(nullptr));
+    } else if (IREE::LinalgExt::isPureMatmul(op) && inputIdx == 0) {
+      replaceOp(static_cast<linalg::MatmulTransposeAOp *>(nullptr));
+    } else if (IREE::LinalgExt::isPureMatmul(op) && inputIdx == 1) {
+      replaceOp(static_cast<linalg::MatmulTransposeBOp *>(nullptr));
+    } else if (isa<linalg::BatchMatmulTransposeAOp>(op) && inputIdx == 0) {
+      replaceOp(static_cast<linalg::BatchMatmulOp *>(nullptr));
+    } else if (isa<linalg::BatchMatmulTransposeBOp>(op) && inputIdx == 1) {
+      replaceOp(static_cast<linalg::BatchMatmulOp *>(nullptr));
+    } else if (IREE::LinalgExt::isPureBatchMatmul(op) && inputIdx == 0) {
+      replaceOp(static_cast<linalg::BatchMatmulTransposeAOp *>(nullptr));
+    } else if (IREE::LinalgExt::isPureBatchMatmul(op) && inputIdx == 1) {
+      replaceOp(static_cast<linalg::BatchMatmulTransposeBOp *>(nullptr));
+    } else {
+      return failure();
+    }
     return success();
   }
 
@@ -942,8 +967,7 @@ namespace {
 struct PropagateLinalgTransposePass
     : public impl::PropagateLinalgTransposePassBase<
           PropagateLinalgTransposePass> {
-  using impl::PropagateLinalgTransposePassBase<
-      PropagateLinalgTransposePass>::PropagateLinalgTransposePassBase;
+  using Base::Base;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, tensor::TensorDialect>();
   }
@@ -957,46 +981,18 @@ struct PropagateLinalgTransposePass
 
 static void populateNamedOpSinkingPatterns(MLIRContext *context,
                                            RewritePatternSet &sinkingPatterns) {
-  sinkingPatterns
-      .insert<NamedOpConversion</*OpType=*/linalg::MatmulOp,
-                                /*ReplacementType=*/linalg::MatmulTransposeBOp,
-                                /*inputIdx=*/1>>(context,
-                                                 SmallVector<int64_t>{1, 0});
-  sinkingPatterns
-      .insert<NamedOpConversion</*OpType=*/linalg::MatmulOp,
-                                /*ReplacementType=*/linalg::MatmulTransposeAOp,
-                                /*inputIdx=*/0>>(context,
-                                                 SmallVector<int64_t>{1, 0});
-  sinkingPatterns
-      .insert<NamedOpConversion</*OpType=*/linalg::MatmulTransposeBOp,
-                                /*ReplacementType=*/linalg::MatmulOp,
-                                /*inputIdx=*/1>>(context,
-                                                 SmallVector<int64_t>{1, 0});
-  sinkingPatterns
-      .insert<NamedOpConversion</*OpType=*/linalg::MatmulTransposeAOp,
-                                /*ReplacementType=*/linalg::MatmulOp,
-                                /*inputIdx=*/0>>(context,
-                                                 SmallVector<int64_t>{1, 0});
-  sinkingPatterns.insert<
-      NamedOpConversion</*OpType=*/linalg::BatchMatmulOp,
-                        /*ReplacementType=*/linalg::BatchMatmulTransposeBOp,
-                        /*inputIdx=*/1>>(context,
-                                         SmallVector<int64_t>{0, 2, 1});
-  sinkingPatterns.insert<
-      NamedOpConversion</*OpType=*/linalg::BatchMatmulOp,
-                        /*ReplacementType=*/linalg::BatchMatmulTransposeAOp,
-                        /*inputIdx=*/0>>(context,
-                                         SmallVector<int64_t>{0, 2, 1});
-  sinkingPatterns
-      .insert<NamedOpConversion</*OpType=*/linalg::BatchMatmulTransposeBOp,
-                                /*ReplacementType=*/linalg::BatchMatmulOp,
-                                /*inputIdx=*/1>>(context,
-                                                 SmallVector<int64_t>{0, 2, 1});
-  sinkingPatterns
-      .insert<NamedOpConversion</*OpType=*/linalg::BatchMatmulTransposeAOp,
-                                /*ReplacementType=*/linalg::BatchMatmulOp,
-                                /*inputIdx=*/0>>(context,
-                                                 SmallVector<int64_t>{0, 2, 1});
+  sinkingPatterns.insert<NamedOpConversion</*OpType=*/linalg::MatmulOp,
+                                           /*inputIdx=*/1>>(
+      context, SmallVector<int64_t>{1, 0});
+  sinkingPatterns.insert<NamedOpConversion</*OpType=*/linalg::MatmulOp,
+                                           /*inputIdx=*/0>>(
+      context, SmallVector<int64_t>{1, 0});
+  sinkingPatterns.insert<NamedOpConversion</*OpType=*/linalg::BatchMatmulOp,
+                                           /*inputIdx=*/1>>(
+      context, SmallVector<int64_t>{0, 2, 1});
+  sinkingPatterns.insert<NamedOpConversion</*OpType=*/linalg::BatchMatmulOp,
+                                           /*inputIdx=*/0>>(
+      context, SmallVector<int64_t>{0, 2, 1});
 }
 
 static void
@@ -1013,7 +1009,7 @@ populateCommonCanonicalizationPatterns(MLIRContext *context,
 
 void PropagateLinalgTransposePass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   // First, specialize all transposes to `linalg.transpose`. This dramatically
   // simplifies all subsequent propagation patterns, both in matching and
   // rewriting.
@@ -1119,7 +1115,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
     populateCommonCanonicalizationPatterns(context, bubblingPatterns);
 
     GreedyRewriteConfig config;
-    config.maxIterations = GreedyRewriteConfig::kNoLimit;
+    config.setMaxIterations(GreedyRewriteConfig::kNoLimit);
     if (failed(applyPatternsGreedily(funcOp, std::move(bubblingPatterns),
                                      config))) {
       funcOp.emitError("Transpose bubbling patterns failed");
@@ -1178,7 +1174,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
     GreedyRewriteConfig config;
     // TODO: This is inefficient. Consider rewriting this pass to use a
     // worklist of just the transpose operations.
-    config.maxIterations = GreedyRewriteConfig::kNoLimit;
+    config.setMaxIterations(GreedyRewriteConfig::kNoLimit);
     if (failed(applyPatternsGreedily(funcOp, std::move(sinkingPatterns),
                                      config))) {
       funcOp.emitError("Transpose sinking patterns failed");

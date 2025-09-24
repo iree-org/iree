@@ -49,7 +49,7 @@ let opDocGroup = OpGroupTypeManipulationOps in {
 def Util_NullOp : Util_PureOp<"null", [
   ConstantLike,
 ]> {
-  let summary = [{returns a null type value}];
+  let summary = [{Returns a null type value.}];
   let description = [{
     Defines an SSA value that is lowered into dialects supporting
     null/undefined/optional/etc values.
@@ -75,7 +75,7 @@ def Util_CastOp : Util_PureOp<"cast", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{casts one util type to another ala static_cast/dynamic_cast}];
+  let summary = [{Casts one util type to another ala static_cast/dynamic_cast.}];
   let description = [{
     Performs a type cast between object types known to the util dialect.
   }];
@@ -100,7 +100,7 @@ def Util_CmpEQOp : Util_PureOp<"cmp.eq", [
   AllTypesMatch<["lhs", "rhs"]>,
   Commutative,
 ]> {
-  let summary = [{compares two values for equality}];
+  let summary = [{Compares two values for equality.}];
   let description = [{
     Compares two operands for equality. This is intended for comparing IREE
     reference types (like !util.buffer) that cannot be used with std.cmpi.
@@ -125,7 +125,7 @@ def Util_CmpNEOp : Util_PureOp<"cmp.ne", [
   AllTypesMatch<["lhs", "rhs"]>,
   Commutative,
 ]> {
-  let summary = [{compares two values for inequality}];
+  let summary = [{Compares two values for inequality.}];
   let description = [{
     Compares two operands for inequality. This is intended for comparing IREE
     reference types (like !util.buffer) that cannot be used with std.cmpi.
@@ -162,7 +162,7 @@ let opDocGroup = OpGroupDataTypeConversionOps in {
 def Util_NumericOptionalNarrowOp : Util_PureOp<"numeric.optional_narrow", [
   SameOperandsAndResultType
 ]> {
-  let summary = "memorializes an optional numeric narrowing that is valid";
+  let summary = [{memorializes an optional numeric narrowing that is valid.}];
   let description = [{
     Serves as a placeholder for points in the computation where an optional
     numeric narrowing can be performed without loss of information. Such ops
@@ -247,7 +247,7 @@ def Util_RangeMinOp : Util_PureOp<"range.min", [
   SameOperandsAndResultType,
   SameVariadicOperandSize,
 ]> {
-  let summary = [{returns the min of all values}];
+  let summary = [{Returns the min of all values.}];
   let description = [{
     Computes the min of a variadic list of operands. Though it's possible to
     express this with standard arithmetic this op enables more semantically
@@ -273,7 +273,7 @@ def Util_RangeMaxOp : Util_PureOp<"range.max", [
   SameOperandsAndResultType,
   SameVariadicOperandSize,
 ]> {
-  let summary = [{returns the max of all values}];
+  let summary = [{Returns the max of all values.}];
   let description = [{
     Computes the max of a variadic list of operands. Though it's possible to
     express this with standard arithmetic this op enables more semantically
@@ -299,7 +299,7 @@ def Util_RangeExtentsOp : Util_PureOp<"range.extents", [
   SameOperandsAndResultType,
   SameVariadicOperandSize,
 ]> {
-  let summary = [{returns the min/max of a union of a set of ranges}];
+  let summary = [{Returns the min/max of a union of a set of ranges.}];
   let description = [{
     Computes min(offsets) and max(offsets + lengths). Though it's possible to
     express this with standard arithmetic this op enables more semantically
@@ -340,7 +340,7 @@ def Util_AlignOp : Util_PureOp<"align", [
     DeclareOpInterfaceMethods<InferIntRangeInterface, ["inferResultRanges"]>,
     DeclareOpInterfaceMethods<InferIntDivisibilityOpInterface, ["inferResultRanges"]>
 ]> {
-  let summary = "Aligns up to a power-of-two alignment if required";
+  let summary = [{Aligns up to a power-of-two alignment if required.}];
   let description = [{
      Aligns |value| up to the given power-of-two |alignment| if required.
   }];
@@ -373,7 +373,7 @@ def Util_AlignOp : Util_PureOp<"align", [
 }
 
 def Util_SizeOfOp : Util_PureOp<"sizeof"> {
-  let summary = [{returns the size in bytes of a datatype}];
+  let summary = [{Returns the size in bytes of a datatype.}];
   let description = [{
     Most datatypes have a static size at all layers of the compilation stack.
     However, those that only have a size for certain lowering flows can be
@@ -415,7 +415,7 @@ let opDocGroup = OpGroupValueUtilityOps in {
 def Util_SwitchOp : Util_PureOp<"switch", [
   AllTypesMatch<["default_value", "result"]>,
 ]> {
-  let summary = [{primitive switch operation}];
+  let summary = [{Primitive switch operation.}];
   let description = [{
     Returns the value with the given `index` in `values` or `default_value` if
     the index is out of bounds.
@@ -466,7 +466,7 @@ def Util_AssumeIntOp : Util_PureOp<"assume.int", [
     DeclareOpInterfaceMethods<InferIntDivisibilityOpInterface, ["inferResultRanges"]>,
     AllTypesMatch<["operands", "results"]>
 ]> {
-  let summary = "memorializes assumptions about index/integer values.";
+  let summary = [{Memorializes assumptions about index/integer values.}];
   let description = [{
     This op is used to memorialize the result of some integer analysis or
     outside knowledge across a boundary beyond which such information can
@@ -519,15 +519,15 @@ def Util_AssumeIntOp : Util_PureOp<"assume.int", [
     std::optional<uint64_t> getUnionedUnsignedDivisor(unsigned operandIndex);
   }];
 
-  let hasCanonicalizeMethod  = 1;
+  let hasCanonicalizer = 1;
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
 }
 
 def Util_OptimizationBarrierOp : Util_Op<"optimization_barrier", [
-  SameOperandsAndResultType,
+  AllTypesMatch<["operands", "results"]>,
 ]> {
-  let summary = "Prevents compiler optimizations across a value.";
+  let summary = [{Prevents compiler optimizations across a value.}];
   let description = [{
     Wraps any operands in an unoptimizable identity to prevent its results from
     being folded. It will be dropped during the final step in compilation and
@@ -547,12 +547,10 @@ def Util_OptimizationBarrierOp : Util_Op<"optimization_barrier", [
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes
     )>,
   ];
-
-  let hasVerifier = 1;
 }
 
 def Util_UnfoldableConstantOp : Util_Op<"unfoldable_constant"> {
-  let summary = "A constant that cannot be folded by the compiler.";
+  let summary = [{A constant that cannot be folded by the compiler.}];
   let description = [{
     Similar to a std.constant, but is declared as having a side effect and has
     no folder. This is really just syntactic sugar as it is canonicalized to a
@@ -574,7 +572,7 @@ def Util_UnreachableOp : Util_Op<"unreachable", [
   ReturnLike,
   Terminator
 ]> {
-  let summary = [{unreachable assertion op}];
+  let summary = [{Unreachable assertion op.}];
   let description = [{
     Signals to the compiler that the parent block should not be reachable.
     This may be converted into a runtime assertion, though ideally they are
@@ -617,7 +615,7 @@ def Util_InitializerOp : Util_Op<"initializer", [
   CallableOpInterface,
   Util_InitializerOpInterface,
 ]> {
-  let summary = [{global initialization function}];
+  let summary = [{Global initialization function.}];
   let description = [{
     A function that is called in definition order upon module initialization.
     Must not load any globals that are defined or initialized after it in the
@@ -682,7 +680,7 @@ def Util_FuncOp : Util_Op<"func", [
   IsolatedFromAbove,
   OpAsmOpInterface,
 ]> {
-  let summary = [{function operation containing a CFG region}];
+  let summary = [{Function operation containing a CFG region.}];
   let description = [{
     An operation declaring a callable function.
 
@@ -757,7 +755,7 @@ def Util_CallOp : Util_Op<"call", [
   Util_TiedOpInterface,
   DeclareOpInterfaceMethods<SymbolUserOpInterface>,
 ]> {
-  let summary = [{function call operation}];
+  let summary = [{Function call operation.}];
   let description = [{
     Represents a direct call to a function that is within the same symbol scope
     as the call. The operands and result types of the call must match the
@@ -845,7 +843,7 @@ def Util_ReturnOp : Util_Op<"return", [
   ReturnLike,
   Terminator,
 ]> {
-  let summary = [{return from a util.initializer}];
+  let summary = [{Return from a util.initializer.}];
   let description = [{
     Returns control from an initializer function.
   }];
@@ -856,7 +854,7 @@ def Util_ReturnOp : Util_Op<"return", [
 
   let builders = [
     OpBuilder<(ins), [{
-      build($_builder, $_state, std::nullopt);
+      build($_builder, $_state, {});
     }]>,
   ];
 
@@ -885,7 +883,7 @@ def Util_GlobalOp : Util_Op<"global", [
   Symbol,
   Util_GlobalOpInterface,
 ]> {
-  let summary = [{stateful global variable declaration}];
+  let summary = [{Stateful global variable declaration.}];
   let description = [{
     Declares a global variable that maintains its value across invocations.
     The value is tied to the execution context of the module and different
@@ -940,7 +938,7 @@ def Util_GlobalAddressOp : Util_PureOp<"global.address", [
   SymbolUserOpInterface,
   Util_GlobalAddressOpInterface,
 ]> {
-  let summary = [{returns an address reference to a global}];
+  let summary = [{Returns an address reference to a global.}];
   let description = [{
     Returns the address of a global as a typed reference. Can be used with the
     global load and store indirect ops.
@@ -973,9 +971,11 @@ def Util_GlobalLoadOp : Util_Op<"global.load", [
   SymbolUserOpInterface,
   Util_GlobalLoadOpInterface,
 ]> {
-  let summary = [{loads a value from a global variable}];
+  let summary = [{Loads a value from a global variable.}];
   let description = [{
-    Returns a global variable value.
+    Returns a global variable value. |is_immutable| is a reflection of the
+    mutability of the loaded global to minimize the need to traverse symbol
+    tables.
   }];
 
   let arguments = (ins
@@ -1008,7 +1008,7 @@ def Util_GlobalLoadOp : Util_Op<"global.load", [
 def Util_GlobalLoadIndirectOp : Util_Op<"global.load.indirect", [
   Util_GlobalLoadIndirectOpInterface,
 ]> {
-  let summary = [{loads a value from a global variable}];
+  let summary = [{Loads a value from a global variable.}];
   let description = [{
     Returns a copy of the global variable value.
   }];
@@ -1035,7 +1035,7 @@ def Util_GlobalStoreOp : Util_Op<"global.store", [
   SymbolUserOpInterface,
   Util_GlobalStoreOpInterface,
 ]> {
-  let summary = [{stores a value into a global variable}];
+  let summary = [{Stores a value into a global variable.}];
   let description = [{
     Stores a copy of the value into a global variable.
   }];
@@ -1069,7 +1069,7 @@ def Util_GlobalStoreOp : Util_Op<"global.store", [
 def Util_GlobalStoreIndirectOp : Util_Op<"global.store.indirect", [
   Util_GlobalStoreIndirectOpInterface,
 ]> {
-  let summary = [{stores a value into a global variable}];
+  let summary = [{Stores a value into a global variable.}];
   let description = [{
     Stores a copy of the value into a global variable.
   }];
@@ -1110,7 +1110,7 @@ let opDocGroup = OpGroupListOps in {
 def Util_ListCreateOp : Util_PureOp<"list.create", [
   MemoryEffects<[MemAlloc]>,
 ]> {
-  let summary = [{creates a new empty list}];
+  let summary = [{Creates a new empty list.}];
   let description = [{
     Creates a new empty list with an optional initial capacity.
   }];
@@ -1125,10 +1125,36 @@ def Util_ListCreateOp : Util_PureOp<"list.create", [
   let assemblyFormat = "($initial_capacity^)? attr-dict `:` qualified(type($result))";
 }
 
+def Util_ListConstructOp : Util_PureOp<"list.construct", [
+  MemoryEffects<[MemAlloc]>,
+]> {
+  let summary = [{Constructs a list with the given initial values.}];
+  let description = [{
+    Creates a new list with the given values added in order. The list will be
+    allocated with an initial capacity equal to the number of values. This is a
+    pseudo-operation that expands to a list create, resize, and a series of
+    sets.
+  }];
+
+  let arguments = (ins
+    Variadic<AnyType>:$values
+  );
+  let results = (outs
+    Util_AnyListType:$result
+  );
+
+  let assemblyFormat = [{
+    custom<ValueTypeList>($values, type($values))
+    attr-dict `:` qualified(type($result))
+  }];
+
+  let hasVerifier = 1;
+}
+
 def Util_ListSizeOp : Util_Op<"list.size", [
   MemoryEffects<[MemRead]>,
 ]> {
-  let summary = [{the size of the list in elements}];
+  let summary = [{The size of the list in elements.}];
   let description = [{
     Returns the current size of the list in elements.
   }];
@@ -1146,7 +1172,7 @@ def Util_ListSizeOp : Util_Op<"list.size", [
 def Util_ListResizeOp : Util_Op<"list.resize", [
   MemoryEffects<[MemWrite]>,
 ]> {
-  let summary = [{resizes the list to a new count in elements}];
+  let summary = [{Resizes the list to a new count in elements.}];
   let description = [{
     Resizes the list to contain `new_size` elements. This will either truncate
     the list if the existing size is greater than `new_size` or extend the list
@@ -1164,7 +1190,7 @@ def Util_ListResizeOp : Util_Op<"list.resize", [
 def Util_ListGetOp : Util_Op<"list.get", [
   MemoryEffects<[MemRead]>,
 ]> {
-  let summary = [{element accessor}];
+  let summary = [{Element accessor.}];
   let description = [{
     Returns the value of the element at the given index. Note that the value
     may be null if the element is null or the type does not match.
@@ -1186,7 +1212,7 @@ def Util_ListGetOp : Util_Op<"list.get", [
 def Util_ListSetOp : Util_Op<"list.set", [
   MemoryEffects<[MemWrite]>,
 ]> {
-  let summary = [{element mutator}];
+  let summary = [{Element mutator.}];
   let description = [{
     Sets the element at the given index to the new value.
   }];
@@ -1218,7 +1244,7 @@ let opDocGroup = OpGroupBufferOps in {
 def Util_BufferConstantOp : Util_PureOp<"buffer.constant", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
-  let summary = [{constant host-side byte buffer}];
+  let summary = [{Constant host-side byte buffer.}];
   let description = [{
     Defines a compile-time byte buffer based on the given attribute value.
     The attribute will be serialized into the canonical IREE format for the
@@ -1247,7 +1273,7 @@ def Util_BufferAllocOp : Util_PureOp<"buffer.alloc", [
   MemoryEffects<[MemAlloc]>,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{allocates a buffer with undefined contents}];
+  let summary = [{Allocates a buffer with undefined contents.}];
   let description = [{
     Allocates a buffer with undefined contents. Consumers of the allocated
     result must assume nothing of the contents.
@@ -1281,7 +1307,7 @@ def Util_BufferDeallocOp : Util_PureOp<"buffer.dealloc", [
   MemoryEffects<[MemFree]>,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{deallocates a buffer}];
+  let summary = [{Deallocates a buffer.}];
   let description = [{
     Hints that the buffer contents can be discarded. Buffers are reference
     counted and other owners may keep it live beyond the dealloc.
@@ -1310,7 +1336,7 @@ def Util_BufferSliceOp : Util_PureOp<"buffer.slice", [
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_SubrangeOperandOpInterface>,
 ]> {
-  let summary = [{clones a subregion of a buffer}];
+  let summary = [{Clones a subregion of a buffer.}];
   let description = [{
     Returns a copy of the contents from the source buffer.
   }];
@@ -1351,7 +1377,7 @@ def Util_BufferSubspanOp : Util_PureOp<"buffer.subspan", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{returns a reference to a subrange of a buffer}];
+  let summary = [{Returns a reference to a subrange of a buffer.}];
   let description = [{
     Returns a logical view into an underlying source buffer. This induces
     aliasing and multiple SSA values may allow access to the same underlying
@@ -1401,7 +1427,7 @@ def Util_BufferSizeOp : Util_PureOp<"buffer.size", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{returns the total buffer storage size in bytes}];
+  let summary = [{Returns the total buffer storage size in bytes.}];
   let description = [{
     Returns the total length of the buffer in bytes from its base offset.
   }];
@@ -1432,7 +1458,7 @@ def Util_BufferStorageOp : Util_PureOp<"buffer.storage", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{returns the underlying buffer storage range}];
+  let summary = [{Returns the underlying buffer storage range.}];
   let description = [{
     Returns the buffer storage as a memref that must be offset and restricted to
     the returned range. The memref may be of any type and the user is
@@ -1468,7 +1494,7 @@ def Util_BufferCopyOp : Util_Op<"buffer.copy", [
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_SubrangeOperandOpInterface>,
 ]> {
-  let summary = [{copies a range of bytes between buffers}];
+  let summary = [{Copies a range of bytes between buffers.}];
   let description = [{
     Copies a range of bytes as with memcpy (no overlapping).
   }];
@@ -1503,7 +1529,7 @@ def Util_BufferCompareOp : Util_PureOp<"buffer.compare", [
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_SubrangeOperandOpInterface>,
 ]> {
-  let summary = [{compares a range of two buffers}];
+  let summary = [{Compares a range of two buffers.}];
   let description = [{
     Returns true if the two ranges are bitwise equivalent, somewhat like memcmp.
   }];
@@ -1541,7 +1567,7 @@ def Util_BufferFillOp : Util_Op<"buffer.fill", [
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_SubrangeOperandOpInterface>,
 ]> {
-  let summary = [{fills a range of bytes with a value}];
+  let summary = [{Fills a range of bytes with a value.}];
   let description = [{
     Fills the contents of the buffer in the given byte range with a pattern.
     The offset and length must match the natural alignment of the pattern type.
@@ -1574,7 +1600,7 @@ def Util_BufferLoadOp : Util_Op<"buffer.load", [
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_SubrangeOperandOpInterface>,
 ]> {
-  let summary = [{loads a value from a buffer}];
+  let summary = [{Loads a value from a buffer.}];
   let description = [{
     Loads a value at a byte offset. Must be aligned to the natural size of the
     result type.
@@ -1609,7 +1635,7 @@ def Util_BufferStoreOp : Util_Op<"buffer.store", [
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_SubrangeOperandOpInterface>,
 ]> {
-  let summary = [{stores a value into a buffer}];
+  let summary = [{Stores a value into a buffer.}];
   let description = [{
     Stores a value at a byte offset. Must be aligned to the natural size of the
     source type.
@@ -1641,7 +1667,7 @@ def Util_BufferHashOp : Util_Op<"buffer.hash", [
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_SubrangeOperandOpInterface>,
 ]> {
-  let summary = [{computes the hash of a byte range of a buffer}];
+  let summary = [{Computes the hash of a byte range of a buffer.}];
   let description = [{
     Computes the SipHash-2-4 of a value at a byte offset with the given length.
     This always uses a seed of `0x0001020304...0e0f` and produces a single 64
@@ -1684,7 +1710,7 @@ def OpGroupStatusOps : OpDocGroup {
 let opDocGroup = OpGroupStatusOps in {
 
 def Util_StatusCheckOkOp : Util_Op<"status.check_ok"> {
-  let summary = [{raises a global failure if a status is not 'ok'}];
+  let summary = [{Raises a global failure if a status is not 'ok'.}];
   let description = [{
     When the status is not 'ok' this signals a runtime failure that causes the
     entire active invocation - and possibly *all* in-flight and pending

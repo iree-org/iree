@@ -21,9 +21,10 @@ def MatchCastCompatibleDagFromRootOp : Op<Transform_Dialect, "iree.match.cast_co
      SingleOpMatcher,
      SingleBlockImplicitTerminator<"::mlir::transform::YieldOp">,
      MemoryEffectsOpInterface]> {
-  let summary =
-      "Checks if the body of the target op matches an operation dag starting "
-      "at the given root";
+  let summary = [{
+      Checks if the body of the target op matches an operation dag starting
+      at the given root.
+  }];
   let description = [{
     Checks whether the given root op matches an operation dag specified in the
     body of this op. Enforces cast compatibilty between types rather than a
@@ -62,8 +63,7 @@ def MatchCastCompatibleTypesOp : Op<Transform_Dialect, "iree.match.cast_compatib
      MatchOpInterface,
      SingleValueMatcher,
      MemoryEffectsOpInterface]> {
-  let summary =
-      "Checks if the body of the target op matches the body of the single contained op";
+  let summary = [{Checks if the payload value is cast compatible with a target type.}];
   let description = [{
     Checks whether the given value is cast-compatible with the given target
     type attribute.
@@ -86,13 +86,44 @@ def MatchCastCompatibleTypesOp : Op<Transform_Dialect, "iree.match.cast_compatib
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
+def MatchDimBoundsOp : Op<Transform_Dialect, "iree.match.dim_bounds",
+    [IsolatedFromAbove,
+     MatchOpInterface,
+     SingleValueMatcher,
+     MemoryEffectsOpInterface]> {
+  let summary = [{Checks whether the size of a dim is within given bounds.}];
+  let description = [{
+    Checks whether a dim is within a specified lower and upper bound.
+
+    #### Return modes
+
+    Succeeds if the value's type is compatible with the target type, and
+    produces a silenceable failure otherwise. Produces a definite failure
+    if the operand is not associated with a single payload value.
+  }];
+
+  let arguments = (ins TransformValueHandleTypeInterface:$operand_handle,
+                       I64Attr:$dim,
+                       OptionalAttr<I64Attr>:$lower_bound,
+                       OptionalAttr<I64Attr>:$upper_bound);
+
+  // `<=` isn't a valid literal so use `le` instead.
+  let assemblyFormat = [{
+    $operand_handle `[` $dim `]` `,` (`umin` `=` $lower_bound^):(`none`)?
+    `,` (`umax` `=` $upper_bound^):(`none`)?  attr-dict `:` type($operand_handle)
+  }];
+  let extraClassDeclaration = SingleValueMatcher.extraDeclaration;
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+}
+
+// TODO: Combine with MatchDimBounds.
 def MatchDimIsMultipleOfOp : Op<Transform_Dialect, "iree.match.dim_is_multiple_of",
     [IsolatedFromAbove,
      MatchOpInterface,
      SingleValueMatcher,
      MemoryEffectsOpInterface]> {
-  let summary =
-      "Checks if the body of the target op matches the body of the single contained op";
+  let summary = [{Checks the static size of a dim is divisible by a given value.}];
   let description = [{
     Checks whether the given dimension given shaped value is a multiple of the
     given size.
@@ -120,8 +151,7 @@ def MatchRegionsOp : Op<Transform_Dialect, "iree.match.regions",
      SingleOpMatcher,
      SingleBlockImplicitTerminator<"::mlir::transform::YieldOp">,
      MemoryEffectsOpInterface]> {
-  let summary =
-      "Checks if the body of the target op matches the body of the single contained op";
+  let summary = [{Checks if the body of the target op matches the body of the single contained op.}];
   let description = [{
     Does a structural comparison of the regions of the single op contained
     within the region of this op against the regions of the target operation.
@@ -140,6 +170,59 @@ def MatchRegionsOp : Op<Transform_Dialect, "iree.match.regions",
 
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let hasVerifier = 1;
+}
+
+def MatchContractionOp : Op<Transform_Dialect, "iree.match.contraction",
+    [MatchOpInterface,
+     SingleOpMatcher,
+     MemoryEffectsOpInterface]> {
+  let summary = [{Check whether the op is a contraction operation.}];
+  let description = [{
+    Matches operations that implement the ContractionOpInterface.
+    This includes operations like linalg.matmul, linalg.batch_matmul, etc.
+
+    Optionally matches specific indexing maps patterns.
+
+    #### Return modes
+
+    Succeeds if the operation is a contraction operation, and
+    produces a silenceable failure otherwise.
+
+    #### Results
+
+    Returns arrays of dimension sizes for each contraction dimension:
+    - batch_dims: Array of batch dimension sizes.
+    - m_dims: Array of M dimension sizes.
+    - n_dims: Array of N dimension sizes.
+    - k_dims: Array of K dimension sizes.
+  }];
+
+  let arguments = (ins
+    TransformHandleTypeInterface:$operand_handle,
+    TypeAttr:$lhs_type,                    // LHS input type.
+    TypeAttr:$rhs_type,                    // RHS input type.
+    TypeAttr:$output_type,                 // Output type.
+    OptionalAttr<AffineMapArrayAttr>:$indexing_maps
+  );
+
+  let results = (outs
+    TransformParamTypeInterface:$batch_dims,
+    TransformParamTypeInterface:$m_dims,
+    TransformParamTypeInterface:$n_dims,
+    TransformParamTypeInterface:$k_dims
+  );
+
+  let assemblyFormat = [{
+    $operand_handle
+    `,` `lhs_type` `=` $lhs_type
+    `,` `rhs_type` `=` $rhs_type
+    `,` `output_type` `=` $output_type
+    (`indexing_maps` $indexing_maps^)?
+    attr-dict `:` functional-type(operands, results)
+  }];
+  let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
 #endif // IREE_COMPILER_DIALECT_PREPROCESSING_TRANSFORMEXTENSIONS_PREPROCESSINGEXTENSIONS

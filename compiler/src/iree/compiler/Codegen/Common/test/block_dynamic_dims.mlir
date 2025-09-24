@@ -15,26 +15,26 @@ func.func @block_attention_dims() {
       %m_in<umin = 16, umax = 4080, udiv = 16>,
       %k2_in<umin = 16, umax = 4080, udiv = 32>
     : index, index
-  %m = flow.dispatch.workload.ordinal %0#0, 0 : index
-  %k2 = flow.dispatch.workload.ordinal %0#1, 1 : index
+  %m = iree_tensor_ext.dispatch.workload.ordinal %0#0, 0 : index
+  %k2 = iree_tensor_ext.dispatch.workload.ordinal %0#1, 1 : index
   %q_in = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect")
-      : !flow.dispatch.tensor<readonly:tensor<4x?x32x128xf16>>{%m}
+      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?x32x128xf16>>{%m}
   %key_in = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect")
-      : !flow.dispatch.tensor<readonly:tensor<4x?x32x128xf16>>{%k2}
+      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?x32x128xf16>>{%k2}
   %value_in = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags("ReadOnly|Indirect")
-      : !flow.dispatch.tensor<readonly:tensor<4x?x32x128xf16>>{%k2}
+      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?x32x128xf16>>{%k2}
   %mask_in = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) flags("ReadOnly|Indirect")
-      : !flow.dispatch.tensor<readonly:tensor<4x32x?x?xf16>>{%m, %k2}
+      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x32x?x?xf16>>{%m, %k2}
   %output_in = hal.interface.binding.subspan layout(#pipeline_layout) binding(4) alignment(64) offset(%c0) flags(Indirect)
-      : !flow.dispatch.tensor<writeonly:tensor<4x?x32x128xf16>>{%m}
-  %q = flow.dispatch.tensor.load %q_in, offsets = [0, 0, 0, 0], sizes = [4, %m, 32, 128], strides = [1, 1, 1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<4x?x32x128xf16>>{%m} -> tensor<4x?x32x128xf16>
-  %key = flow.dispatch.tensor.load %key_in, offsets = [0, 0, 0, 0], sizes = [4, %k2, 32, 128], strides = [1, 1, 1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<4x?x32x128xf16>>{%k2} -> tensor<4x?x32x128xf16>
-  %value = flow.dispatch.tensor.load %value_in, offsets = [0, 0, 0, 0], sizes = [4, %k2, 32, 128], strides = [1, 1, 1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<4x?x32x128xf16>>{%k2} -> tensor<4x?x32x128xf16>
-  %mask = flow.dispatch.tensor.load %mask_in, offsets = [0, 0, 0, 0], sizes = [4, 32, %m, %k2], strides = [1, 1, 1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<4x32x?x?xf16>>{%m, %k2} -> tensor<4x32x?x?xf16>
+      : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x?x32x128xf16>>{%m}
+  %q = iree_tensor_ext.dispatch.tensor.load %q_in, offsets = [0, 0, 0, 0], sizes = [4, %m, 32, 128], strides = [1, 1, 1, 1]
+      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?x32x128xf16>>{%m} -> tensor<4x?x32x128xf16>
+  %key = iree_tensor_ext.dispatch.tensor.load %key_in, offsets = [0, 0, 0, 0], sizes = [4, %k2, 32, 128], strides = [1, 1, 1, 1]
+      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?x32x128xf16>>{%k2} -> tensor<4x?x32x128xf16>
+  %value = iree_tensor_ext.dispatch.tensor.load %value_in, offsets = [0, 0, 0, 0], sizes = [4, %k2, 32, 128], strides = [1, 1, 1, 1]
+      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?x32x128xf16>>{%k2} -> tensor<4x?x32x128xf16>
+  %mask = iree_tensor_ext.dispatch.tensor.load %mask_in, offsets = [0, 0, 0, 0], sizes = [4, 32, %m, %k2], strides = [1, 1, 1, 1]
+      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x32x?x?xf16>>{%m, %k2} -> tensor<4x32x?x?xf16>
   %1 = tensor.empty(%m) : tensor<4x?x32x128xf16>
   %2 = tensor.empty(%m) : tensor<4x32x?x128xf16>
   %attn = iree_linalg_ext.attention {
@@ -57,48 +57,49 @@ func.func @block_attention_dims() {
   ^bb0(%in: f16, %out: f16):
     linalg.yield %in : f16
   } -> tensor<4x?x32x128xf16>
-  flow.dispatch.tensor.store %result, %output_in, offsets = [0, 0, 0, 0], sizes = [4, %m, 32, 128], strides = [1, 1, 1, 1]
-      : tensor<4x?x32x128xf16> -> !flow.dispatch.tensor<writeonly:tensor<4x?x32x128xf16>>{%m}
+  iree_tensor_ext.dispatch.tensor.store %result, %output_in, offsets = [0, 0, 0, 0], sizes = [4, %m, 32, 128], strides = [1, 1, 1, 1]
+      : tensor<4x?x32x128xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x?x32x128xf16>>{%m}
   return
 }
 // CHECK-LABEL: func @block_attention_dims()
 //   CHECK-DAG:   %[[C32:.+]] = arith.constant 32 : index
 //   CHECK-DAG:   %[[C16:.+]] = arith.constant 16 : index
-//   CHECK-DAG:   %[[M:.+]] = flow.dispatch.workload.ordinal %{{.+}}, 0 : index
-//   CHECK-DAG:   %[[K2:.+]] = flow.dispatch.workload.ordinal %{{.+}}, 1 : index
+//   CHECK-DAG:   %[[M:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 0 : index
+//   CHECK-DAG:   %[[K2:.+]] = iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 1 : index
 //   CHECK-DAG:   %[[M_DYNAMIC:.+]] = arith.divsi %[[M]], %[[C16]]
 //       CHECK:   %[[Q_BINDING:.+]] = hal.interface.binding.subspan
 //  CHECK-SAME:       binding(0)
-//  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<4x?x16x32x128xf16>>{%[[M_DYNAMIC]]}
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?x16x32x128xf16>>{%[[M_DYNAMIC]]}
 //       CHECK:   %[[K2_DYNAMIC:.+]] = arith.divsi %[[K2]], %[[C32]]
 //       CHECK:   %[[K_BINDING:.+]] = hal.interface.binding.subspan
 //  CHECK-SAME:       binding(1)
-//  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<4x?x32x32x128xf16>>{%[[K2_DYNAMIC]]}
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?x32x32x128xf16>>{%[[K2_DYNAMIC]]}
 //       CHECK:   %[[V_BINDING:.+]] = hal.interface.binding.subspan
 //  CHECK-SAME:       binding(2)
-//  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<4x?x32x32x128xf16>>{%[[K2_DYNAMIC]]}
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?x32x32x128xf16>>{%[[K2_DYNAMIC]]}
 //       CHECK:   %[[MASK_BINDING:.+]] = hal.interface.binding.subspan
 //  CHECK-SAME:       binding(3)
-//  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<4x32x?x16x?x32xf16>>{%[[M_DYNAMIC]], %[[K2_DYNAMIC]]}
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x32x?x16x?x32xf16>>{%[[M_DYNAMIC]], %[[K2_DYNAMIC]]}
+//       CHECK:   %[[M_DYNAMIC2:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 16)>()[%[[M]]]
 //       CHECK:   %[[OUTPUT_BINDING:.+]] = hal.interface.binding.subspan
 //  CHECK-SAME:       binding(4)
-//  CHECK-SAME:       !flow.dispatch.tensor<writeonly:tensor<4x?x16x32x128xf16>>{%[[M_DYNAMIC]]}
-//       CHECK:   %[[Q:.+]] = flow.dispatch.tensor.load %[[Q_BINDING]]
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x?x16x32x128xf16>>{%[[M_DYNAMIC2]]}
+//       CHECK:   %[[Q:.+]] = iree_tensor_ext.dispatch.tensor.load %[[Q_BINDING]]
 //  CHECK-SAME:       sizes = [4, %[[M_DYNAMIC]], 16, 32, 128]
-//  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<4x?x16x32x128xf16>>{%[[M_DYNAMIC]]}
-//       CHECK:   %[[K:.+]] = flow.dispatch.tensor.load %[[K_BINDING]]
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?x16x32x128xf16>>{%[[M_DYNAMIC]]}
+//       CHECK:   %[[K:.+]] = iree_tensor_ext.dispatch.tensor.load %[[K_BINDING]]
 //  CHECK-SAME:       sizes = [4, %[[K2_DYNAMIC]], 32, 32, 128]
-//  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<4x?x32x32x128xf16>>{%[[K2_DYNAMIC]]}
-//       CHECK:   %[[V:.+]] = flow.dispatch.tensor.load %[[V_BINDING]]
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?x32x32x128xf16>>{%[[K2_DYNAMIC]]}
+//       CHECK:   %[[V:.+]] = iree_tensor_ext.dispatch.tensor.load %[[V_BINDING]]
 //  CHECK-SAME:       sizes = [4, %[[K2_DYNAMIC]], 32, 32, 128]
-//  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<4x?x32x32x128xf16>>{%[[K2_DYNAMIC]]}
-//       CHECK:   %[[MASK:.+]] = flow.dispatch.tensor.load %[[MASK_BINDING]]
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x?x32x32x128xf16>>{%[[K2_DYNAMIC]]}
+//       CHECK:   %[[MASK:.+]] = iree_tensor_ext.dispatch.tensor.load %[[MASK_BINDING]]
 //  CHECK-SAME:       sizes = [4, 32, %[[M_DYNAMIC]], 16, %[[K2_DYNAMIC]], 32]
-//  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<4x32x?x16x?x32xf16>>{%[[M_DYNAMIC]], %[[K2_DYNAMIC]]}
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x32x?x16x?x32xf16>>{%[[M_DYNAMIC]], %[[K2_DYNAMIC]]}
 //       CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
 //       CHECK:       ins(%[[Q]], %[[K]], %[[V]], %{{.+}}, %[[MASK]] :
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
-//       CHECK:   flow.dispatch.tensor.store %[[GENERIC]], %[[OUTPUT_BINDING]]
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[GENERIC]], %[[OUTPUT_BINDING]]
 
 // -----
 
@@ -200,7 +201,12 @@ func.func @reshape_propagation_test(%rhs : tensor<2048x4096xf16>, %m : index)
   %init = tensor.empty(%0) : tensor<?x2048xf32>
   %init2 = tensor.empty(%0) : tensor<?x2048xf16>
   %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<?x2048xf32>) -> tensor<?x2048xf32>
-  %1 = linalg.matmul_transpose_b
+  %1 = linalg.matmul
+      indexing_maps = [
+        affine_map<(d0, d1, d2) -> (d0, d2)>,
+        affine_map<(d0, d1, d2) -> (d1, d2)>,
+        affine_map<(d0, d1, d2) -> (d0, d1)>
+      ]
       ins(%lhs, %rhs : tensor<?x4096xf16>, tensor<2048x4096xf16>)
       outs(%fill : tensor<?x2048xf32>) -> tensor<?x2048xf32>
   %2 = linalg.generic {
@@ -308,3 +314,140 @@ func.func @check_ssa_violation(%dim : index,
 //  CHECK-SAME:       ins(%[[EXPANDED0]], %[[EXPANDED1]] :
 //       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[GENERIC]]
 //       CHECK:   return %[[COLLAPSE]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 4, bindings = [
+    #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+    #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+func.func @fold_reshapes_with_bindings() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
+  %2 = util.assume.int
+      %0<umin = 16, umax = 4080, udiv = 16>
+    : index
+  %3 = iree_tensor_ext.dispatch.workload.ordinal %2, 0 : index
+  %4 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf32>>{%3}
+  %5 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?xf32>>{%3}
+  %6 = iree_tensor_ext.dispatch.tensor.load %4, offsets = [0], sizes = [%3], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf32>>{%3} -> tensor<?xf32>
+  %7 = tensor.empty(%3) : tensor<?xf32>
+  %8 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0 floordiv 2)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%6 : tensor<?xf32>) outs(%7 : tensor<?xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<?xf32>
+  iree_tensor_ext.dispatch.tensor.store %8, %5, offsets = [0], sizes = [%3], strides = [1] : tensor<?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?xf32>>{%3}
+  return
+}
+// Reshapes can't fuse with non-projected permutation indexing maps. Check that
+// the reshapes are folded back into the bindings.
+//
+// CHECK-LABEL: func @fold_reshapes_with_bindings()
+//       CHECK:   %[[INPUT_BINDING:.+]] = hal.interface.binding.subspan
+//  CHECK-SAME:       binding(0)
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf32>>{%[[DIM:.+]]}
+//       CHECK:   %[[OUTPUT_BINDING:.+]] = hal.interface.binding.subspan
+//  CHECK-SAME:       binding(1)
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?xf32>>{%[[DIM2:.+]]}
+//       CHECK:   %[[INPUT_TENSOR:.+]] = iree_tensor_ext.dispatch.tensor.load %[[INPUT_BINDING]]
+//  CHECK-SAME:       sizes = [%[[DIM]]]
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf32>>{%[[DIM]]}
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:     ins(%[[INPUT_TENSOR]] : tensor<?xf32>)
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[GENERIC]], %[[OUTPUT_BINDING]]
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?xf32>>{%[[DIM2]]}
+
+// -----
+
+func.func @block_dims_with_early_bufferization_ops(%input: memref<?xf32>, %size: index) {
+  %0 = util.assume.int %size<umin = 16, umax = 4080, udiv = 16> : index
+  %1 = memref.alloc(%0) : memref<?xf32>
+  %2 = iree_codegen.load_from_buffer %input : memref<?xf32> -> tensor<?xf32>
+  %3 = tensor.empty(%0) : tensor<?xf32>
+  %4 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>,
+                                        affine_map<(d0) -> (d0)>],
+                       iterator_types = ["parallel"]}
+                       ins(%2 : tensor<?xf32>) outs(%3 : tensor<?xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<?xf32>
+  iree_codegen.store_to_buffer %4, %1 : tensor<?xf32> into memref<?xf32>
+  return
+}
+// Check that the reshapes are able to be folded into load_from_buffer and
+// store_to_buffer ops.
+//
+// CHECK-LABEL: func @block_dims_with_early_bufferization_ops(
+//  CHECK-SAME:   %[[INPUT_BUFFER:[a-zA-Z0-9_]+]]
+//   CHECK-DAG:   %[[ALLOC:.+]] = memref.alloc
+//   CHECK-DAG:   %[[ALLOC_EXPAND:.+]] = memref.expand_shape %[[ALLOC]]
+//   CHECK-DAG:   %[[INPUT_EXPAND:.+]] = memref.expand_shape %[[INPUT_BUFFER]]
+//   CHECK-DAG:   %[[INPUT_TENSOR:.+]] = iree_codegen.load_from_buffer %[[INPUT_EXPAND]]
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:     ins(%[[INPUT_TENSOR]] : tensor<?x16xf32>)
+//       CHECK:   iree_codegen.store_to_buffer %[[GENERIC]], %[[ALLOC_EXPAND]]
+//  CHECK-SAME:       tensor<?x16xf32> into memref<?x16xf32>
+
+// -----
+
+// Check that patterns that bubble expand shapes past collapse shape kick in.
+func.func @check_bubble_up_patterns(%arg0 : tensor<4x32x?x32x?x32xf32>, %arg1 : index)
+    -> tensor<4x32x?x32x?xf32> {
+  %collapsed = tensor.collapse_shape %arg0 [[0], [1], [2, 3], [4, 5]]
+      : tensor<4x32x?x32x?x32xf32> into tensor<4x32x?x?xf32>
+  %0 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%arg1]
+  %expanded = tensor.expand_shape %collapsed [[0], [1], [2, 3], [4]]
+      output_shape [4, 32, %arg1, 32, %0]
+      : tensor<4x32x?x?xf32> into tensor<4x32x?x32x?xf32>
+  return %expanded : tensor<4x32x?x32x?xf32>
+}
+// CHECK-LABEL: func @check_bubble_up_patterns
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<4x32x?x32x?x32xf32>
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]]
+//       CHECK:   return %[[COLLAPSED]]
+
+// -----
+
+func.func @block_dims_with_map_scatter(%size: index) -> tensor<?xf32> {
+  %0 = util.assume.int %size<umin = 16, umax = 4080, udiv = 16> : index
+  %cst = arith.constant 0.0 : f32
+  %1 = tensor.empty(%0) : tensor<?xf32>
+  %2 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>],
+                       iterator_types = ["parallel"]}
+                       outs(%1 : tensor<?xf32>) {
+  ^bb0(%out: f32):
+    linalg.yield %cst : f32
+  } -> tensor<?xf32>
+  %3 = iree_linalg_ext.map_scatter %2 into %1 {
+  ^bb0(%arg0: index):
+    %true = arith.constant true
+    iree_linalg_ext.yield %arg0, %true : index, i1
+  } : tensor<?xf32> into tensor<?xf32> -> tensor<?xf32>
+  return %3 : tensor<?xf32>
+}
+// Check that the reshapes are able to be folded into the map_scatter op
+//
+// CHECK-LABEL: func @block_dims_with_map_scatter(
+//   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty{{.*}} tensor<?x16xf32>
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:     outs(%[[EMPTY]] : tensor<?x16xf32>)
+//       CHECK:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter
+//       CHECK:   return %[[MAP_SCATTER]]
+
+// -----
+
+func.func @reshape_propagation_before_blocking_test(%arg0: index, %arg1: index, %arg2: tensor<?xbf16>) -> tensor<?x4096xf8E4M3FNUZ> {
+  %0 = util.assume.int %arg1<umin = 128, umax = 524160, udiv = 128> : index
+  %1 = tensor.empty(%0) : tensor<?xf8E4M3FNUZ>
+  %2 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%arg2 : tensor<?xbf16>) outs(%1 : tensor<?xf8E4M3FNUZ>) {
+  ^bb0(%in: bf16, %out: f8E4M3FNUZ):
+    %3 = arith.truncf %in : bf16 to f8E4M3FNUZ
+    linalg.yield %3 : f8E4M3FNUZ
+  } -> tensor<?xf8E4M3FNUZ>
+  %expanded = tensor.expand_shape %2 [[0, 1]] output_shape [%0, 4096] : tensor<?xf8E4M3FNUZ> into tensor<?x4096xf8E4M3FNUZ>
+  return %expanded : tensor<?x4096xf8E4M3FNUZ>
+}
+// CHECK-LABEL: func @reshape_propagation_before_blocking_test(
+//   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty{{.*}} tensor<?x128x4096xf8E4M3FNUZ>
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:     outs(%[[EMPTY]] : tensor<?x128x4096xf8E4M3FNUZ>)

@@ -129,11 +129,18 @@ struct TorchSession
       return WalkResult::advance();
     });
 
+    auto isTorchType = [&](Type type) {
+      return &type.getDialect() == torchDialect;
+    };
     for (auto funcOp : module.getOps<func::FuncOp>()) {
+      auto funcType = funcOp.getFunctionType();
+      if (llvm::any_of(funcType.getInputs(), isTorchType) ||
+          llvm::any_of(funcType.getResults(), isTorchType)) {
+        hasTorch = true;
+      }
       if (funcOp->getAttrOfType<mlir::IntegerAttr>(
               "torch.onnx_meta.opset_version")) {
         hasOnnx = true;
-        break;
       }
     }
 

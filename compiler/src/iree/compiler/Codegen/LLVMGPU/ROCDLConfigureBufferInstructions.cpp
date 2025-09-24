@@ -7,18 +7,16 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
-#include "llvm/Support/Debug.h"
 #define DEBUG_TYPE "iree-codegen-rocdl-configure-buffer-instructions"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
-#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -53,7 +51,9 @@ static bool isDefinitelyWorkgroupUniform(Value arg) {
   }
   // Note: this is a bit conservative, in that it will traverse all the
   // arguments to a util.assume.int that isn't the immediate parent of val.
-  mlir::getBackwardSlice(arg, &dependencies, opts);
+  [[maybe_unused]] LogicalResult result =
+      getBackwardSlice(arg, &dependencies, opts);
+  assert(result.succeeded());
   return llvm::all_of(dependencies, [&](Operation *op) {
     if (matchPattern(op, m_Constant()))
       return true;
@@ -92,7 +92,7 @@ getSpannedBytes(IREE::HAL::InterfaceBindingSubspanOp binding) {
   int64_t maxNumElems = 1;
   ShapedType resultTy = dyn_cast<ShapedType>(binding.getType());
   if (auto tensorType =
-          dyn_cast<IREE::Flow::DispatchTensorType>(binding.getType())) {
+          dyn_cast<IREE::TensorExt::DispatchTensorType>(binding.getType())) {
     resultTy = tensorType.asRankedTensorType();
   }
   if (!resultTy || !resultTy.hasRank())
@@ -120,9 +120,9 @@ struct ROCDLConfigureBufferInstructionsPass final
   void runOnOperation() override {
     if (!clROCDLlEnableBufferInstructions)
       return;
-    FunctionOpInterface func = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     // Is this really he best way to skip this pass on non-rocdl targets?
-    IREE::GPU::TargetAttr target = getGPUTargetAttr(func);
+    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
     if (!target || !target.isAMD())
       return;
     auto *gpuDialect =
@@ -130,20 +130,22 @@ struct ROCDLConfigureBufferInstructionsPass final
     auto annotationHelper =
         gpuDialect->getUseRocdlBufferInstructionsAttrHelper();
     auto unitAttr = UnitAttr::get(&getContext());
-    func.walk([&](IREE::HAL::InterfaceBindingSubspanOp binding) {
+    funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp binding) {
       Value offset = binding.getByteOffset();
       if (offset && !isDefinitelyWorkgroupUniform(offset)) {
-        LDBG("Binding offset " << offset << " not known workgroup-uniform\n");
+        LDBG() << "Binding offset " << offset
+               << " not known workgroup-uniform\n";
         return;
       }
       std::optional<int64_t> maxBytes = getSpannedBytes(binding);
       if (!maxBytes) {
-        LDBG("Couldn't bound binding size for " << binding);
+        LDBG() << "Couldn't bound binding size for " << binding;
         return;
       }
       if (*maxBytes >=
           static_cast<int64_t>(std::numeric_limits<int32_t>::max())) {
-        LDBG("Size of " << binding << " too large (" << *maxBytes << " bytes)");
+        LDBG() << "Size of " << binding << " too large (" << *maxBytes
+               << " bytes)";
         return;
       }
       annotationHelper.setAttr(binding, unitAttr);

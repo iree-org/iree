@@ -16,6 +16,7 @@ package(
 string_list_flag(
     name = "enabled_drivers",
     build_setting_default = [
+        "amdgpu",
         "cuda",
         "local-sync",
         "local-task",
@@ -41,6 +42,14 @@ UNCONDITIONAL_DRIVERS = [
     for driver in UNCONDITIONAL_DRIVERS
 ]
 
+# AMDGPU is special and is conditioned on availability of ROCM.
+config_setting(
+    name = "amdgpu_enabled",
+    flag_values = {
+        ":enabled_drivers": "amdgpu",
+    },
+)
+
 # CUDA is special and is conditioned on availability of the CUDA toolkit.
 config_setting(
     name = "cuda_enabled",
@@ -58,6 +67,9 @@ iree_runtime_cc_library(
                "//runtime/src/iree/base",
                "//runtime/src/iree/hal",
            ] + select({
+               ":amdgpu_enabled": ["//runtime/src/iree/hal/drivers/amdgpu/registration"],
+               "//conditions:default": [],
+           }) + select({
                ":cuda_enabled": ["//runtime/src/iree/hal/drivers/cuda/registration"],
                "//conditions:default": [],
            }) +

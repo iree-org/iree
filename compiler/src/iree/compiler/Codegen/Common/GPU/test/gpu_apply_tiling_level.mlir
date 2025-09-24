@@ -3,6 +3,7 @@
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=thread}, canonicalize, cse))" %s | FileCheck %s --check-prefix=THREAD
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=subgroup}, canonicalize, cse))" %s | FileCheck %s --check-prefix=SUBGROUP
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=partial_reduction}, canonicalize, cse))" %s | FileCheck %s --check-prefix=PARTRED
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{normalize-loops}, canonicalize, cse))" %s | FileCheck %s --check-prefix=NORM-REDUCTION
 
 #config = #iree_gpu.lowering_config<{thread = [2, 16], subgroup = [2, 16]}>
 #map = affine_map<(d0, d1) -> (d0, d1)>
@@ -81,7 +82,15 @@ func.func @matmul_transpose_b(%5: tensor<64x64xf32>, %6: tensor<64x1280xf16>, %7
     %extracted_slice_1 = tensor.extract_slice %7[0, %arg0] [64, 4] [1, 1] : tensor<64x1280xf16> to tensor<64x4xf16>
     %extracted_slice_2 = tensor.extract_slice %10[0, %arg0] [64, 4] [1, 1] : tensor<64x1280xf16> to tensor<64x4xf16>
     %13 = linalg.copy {lowering_config = #iree_gpu.lowering_config<{thread = [1, 1]}>} ins(%extracted_slice_1 : tensor<64x4xf16>) outs(%extracted_slice_2 : tensor<64x4xf16>) -> tensor<64x4xf16>
-    %14 = linalg.matmul_transpose_b {lowering_config = #iree_gpu.lowering_config<{thread = [4, 4]}>} ins(%12, %13 : tensor<64x4xf16>, tensor<64x4xf16>) outs(%arg1 : tensor<64x64xf32>) -> tensor<64x64xf32>
+    %14 = linalg.matmul
+      indexing_maps = [
+        affine_map<(d0, d1, d2) -> (d0, d2)>,
+        affine_map<(d0, d1, d2) -> (d1, d2)>,
+        affine_map<(d0, d1, d2) -> (d0, d1)>
+      ]
+      {lowering_config = #iree_gpu.lowering_config<{thread = [4, 4]}>}
+      ins(%12, %13 : tensor<64x4xf16>, tensor<64x4xf16>)
+      outs(%arg1 : tensor<64x64xf32>) -> tensor<64x64xf32>
     scf.yield %14 : tensor<64x64xf32>
   }
   return %11 : tensor<64x64xf32>
@@ -214,10 +223,10 @@ func.func @matmul_cleanup(%3: tensor<64x64xf32>, %4: tensor<64x64xf32>, %5: tens
 ]
 
 module {
-  func.func @tensor_multi_mma(%lhs: tensor<?x?x4xf16>, %rhs: tensor<?x?x4xf16>, %acc: tensor<?x?x4xf32>) -> tensor<?x?x4xf32> {
-    %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
+  func.func @tensor_multi_mma_inner_tiled(%lhs: tensor<?x?x4xf16>, %rhs: tensor<?x?x4xf16>, %acc: tensor<?x?x4xf32>) -> tensor<?x?x4xf32> {
+    %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
       indexing_maps = #contraction_accesses,
-      iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
+      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
       kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
       lowering_config = #config
     } : tensor<?x?x4xf16>, tensor<?x?x4xf16> into tensor<?x?x4xf32>
@@ -225,7 +234,7 @@ module {
   }
 }
 
-// CHECK-LABEL: func.func @tensor_multi_mma
+// CHECK-LABEL: func.func @tensor_multi_mma_inner_tiled
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: tensor<?x?x4xf16>
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: tensor<?x?x4xf16>
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: tensor<?x?x4xf32>
@@ -241,13 +250,13 @@ module {
 //  CHECK-SAME:       [%[[I]], 0, 0] [%[[MIN]], %[[NDIM]], 4] [1, 1, 1] : tensor<?x?x4xf16> to tensor<?x?x4xf16>
 //       CHECK:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[INIT]]
 //  CHECK-SAME:       [0, 0, 0] [%[[MDIM]], %[[NDIM]], 4] [1, 1, 1] : tensor<?x?x4xf32> to tensor<?x?x4xf32>
-//       CHECK:     %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS_SLICE]], %[[RHS_SLICE]], %[[ACC_SLICE]] {{.*}} lowering_config
+//       CHECK:     %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_SLICE]], %[[RHS_SLICE]]) outs(%[[ACC_SLICE]]) {{.*}} lowering_config
 //       CHECK:     tensor.insert_slice %[[MMA]] into %[[INIT]]
 //  CHECK-SAME:       [0, 0, 0] [%[[MDIM]], %[[NDIM]], 4] [1, 1, 1]
 //       CHECK:     scf.yield
 //       CHECK:   return
 
-// SUBGROUP-LABEL: func.func @tensor_multi_mma
+// SUBGROUP-LABEL: func.func @tensor_multi_mma_inner_tiled
 //  SUBGROUP-SAME:   %[[LHS:[A-Za-z0-9]+]]: tensor<?x?x4xf16>
 //  SUBGROUP-SAME:   %[[RHS:[A-Za-z0-9]+]]: tensor<?x?x4xf16>
 //  SUBGROUP-SAME:   %[[ACC:[A-Za-z0-9]+]]: tensor<?x?x4xf32>
@@ -267,7 +276,7 @@ module {
 //  SUBGROUP-SAME:       [0, %[[IDY]], 0] [%[[KDIM]], %[[NMIN]], 4] [1, 1, 1] : tensor<?x?x4xf16> to tensor<?x?x4xf16>
 //       SUBGROUP:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[INIT]]
 //  SUBGROUP-SAME:       [%[[IDX]], %[[IDY]], 0] [%[[MMIN]], %[[NMIN]], 4] [1, 1, 1] : tensor<?x?x4xf32> to tensor<?x?x4xf32>
-//       SUBGROUP:     %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS_SLICE]], %[[RHS_SLICE]], %[[ACC_SLICE]] {{.*}} lowering_config
+//       SUBGROUP:     %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_SLICE]], %[[RHS_SLICE]]) outs(%[[ACC_SLICE]]) {{.*}} lowering_config
 //       SUBGROUP:     scf.forall.in_parallel
 //       SUBGROUP:       tensor.parallel_insert_slice %[[MMA]] into %[[INIT]]
 //       SUBGROUP:   return
@@ -536,3 +545,93 @@ func.func @partial_reduction(%3: tensor<?x?xf32>) -> tensor<?xf32> {
 //       PARTRED:   scf.yield
 //       PARTRED:   linalg.reduce ins(%[[OUT]] : tensor<?x8xf32>)
 //  PARTRED-SAME:                 outs(%[[FULL]] : tensor<?xf32>)
+
+// -----
+
+#config = #iree_gpu.lowering_config<{reduction = [0, 1]}>
+func.func @swap_collapse_shape_with_extract_slice_block_arg(%arg0: tensor<16x1x1x16xf32>) -> tensor<16x16xf32> {
+  %collapsed = tensor.collapse_shape %arg0 [[0], [1, 2, 3]] : tensor<16x1x1x16xf32> into tensor<16x16xf32>
+  %empty = tensor.empty() : tensor<16x16xf32>
+  %0 = linalg.copy {lowering_config = #config} ins(%collapsed : tensor<16x16xf32>) outs(%empty : tensor<16x16xf32>) -> tensor<16x16xf32>
+  return %0: tensor<16x16xf32>
+}
+
+// NORM-REDUCTION-LABEL: func.func @swap_collapse_shape_with_extract_slice_block_arg
+//   NORM-REDUCTION-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   NORM-REDUCTION-DAG:   %[[C16:.+]] = arith.constant 16 : index
+//   NORM-REDUCTION-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//       NORM-REDUCTION:   scf.for %[[ARG1:.+]] = %[[C0]] to %[[C16]] step %[[C1]]
+//       NORM-REDUCTION:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[0, 0, 0, %[[ARG1]]] [16, 1, 1, 1] [1, 1, 1, 1] : tensor<16x1x1x16xf32> to tensor<16x1x1x1xf32>
+//       NORM-REDUCTION:     %[[COLLAPSE:.+]] = tensor.collapse_shape %[[SLICE]] {{\[}}[0], [1, 2, 3]] : tensor<16x1x1x1xf32> into tensor<16x1xf32>
+//       NORM-REDUCTION:     linalg.copy {{.*}} ins(%[[COLLAPSE]]
+
+// Without loop normalization, no swap would happen.
+//                CHECK:   tensor.collapse_shape
+//                CHECK:   scf.for
+//                CHECK:     tensor.extract_slice
+//            CHECK-NOT:     tensor.collapse_shape
+//                CHECK:     linalg.copy
+
+// -----
+
+#config = #iree_gpu.lowering_config<{reduction = [0, 32]}>
+func.func @swap_collapse_shape_with_extract_slice_apply_op(%arg0: tensor<32x3x3x288xf32>) -> tensor<32x2592xf32> {
+  %collapsed = tensor.collapse_shape %arg0 [[0], [1, 2, 3]] : tensor<32x3x3x288xf32> into tensor<32x2592xf32>
+  %empty = tensor.empty() : tensor<32x2592xf32>
+  %0 = linalg.copy {lowering_config = #config} ins(%collapsed : tensor<32x2592xf32>) outs(%empty : tensor<32x2592xf32>) -> tensor<32x2592xf32>
+  return %0: tensor<32x2592xf32>
+}
+
+// NORM-REDUCTION-LABEL: func.func @swap_collapse_shape_with_extract_slice_apply_op
+//   NORM-REDUCTION-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   NORM-REDUCTION-DAG:   %[[C81:.+]] = arith.constant 81 : index
+//   NORM-REDUCTION-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//       NORM-REDUCTION:   scf.for %[[ARG1:.+]] = %[[C0]] to %[[C81]] step %[[C1]]
+//       NORM-REDUCTION:     %[[APPLY:.+]] = affine.apply affine_map<(d0) -> (d0 * 32)>(%[[ARG1]])
+//       NORM-REDUCTION:     %[[IDX:.+]]:3 = affine.delinearize_index %[[APPLY]] into (3, 3, 288) : index, index, index
+//       NORM-REDUCTION:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[0, %[[IDX]]#0, %[[IDX]]#1, %[[IDX]]#2] [32, 1, 1, 32] [1, 1, 1, 1] : tensor<32x3x3x288xf32> to tensor<32x1x1x32xf32>
+//       NORM-REDUCTION:     %[[COLLAPSE:.+]] = tensor.collapse_shape %[[SLICE]] {{\[}}[0], [1, 2, 3]] : tensor<32x1x1x32xf32> into tensor<32x32xf32>
+//       NORM-REDUCTION:     linalg.copy {{.*}} ins(%[[COLLAPSE]]
+
+// Without loop normalization, no swap would happen.
+//                CHECK:   tensor.collapse_shape
+//                CHECK:   scf.for
+//                CHECK:     tensor.extract_slice
+//            CHECK-NOT:     tensor.collapse_shape
+//                CHECK:     linalg.copy
+
+// -----
+
+#config = #iree_gpu.lowering_config<{reduction = [0, 30]}>
+func.func @no_swap_collapse_shape_with_extract_slice(%arg0: tensor<32x3x3x288xf32>) -> tensor<32x2592xf32> {
+  %collapsed = tensor.collapse_shape %arg0 [[0], [1, 2, 3]] : tensor<32x3x3x288xf32> into tensor<32x2592xf32>
+  %empty = tensor.empty() : tensor<32x2592xf32>
+  %0 = linalg.copy {lowering_config = #config} ins(%collapsed : tensor<32x2592xf32>) outs(%empty : tensor<32x2592xf32>) -> tensor<32x2592xf32>
+  return %0: tensor<32x2592xf32>
+}
+
+// No swap would happen when collapsed size is not divisible by offset multiplier.
+// NORM-REDUCTION-LABEL: func.func @no_swap_collapse_shape_with_extract_slice
+//       NORM-REDUCTION:   tensor.collapse_shape
+//       NORM-REDUCTION:   scf.for
+//       NORM-REDUCTION:     tensor.extract_slice
+//   NORM-REDUCTION-NOT:     tensor.collapse_shape
+//       NORM-REDUCTION:     linalg.copy
+
+// -----
+
+#config = #iree_gpu.lowering_config<{reduction = [0, 32]}>
+func.func @no_swap_collapse_shape_with_extract_slice_2(%arg0: tensor<32x2x2x16xf32>) -> tensor<32x64xf32> {
+  %collapsed = tensor.collapse_shape %arg0 [[0], [1, 2, 3]] : tensor<32x2x2x16xf32> into tensor<32x64xf32>
+  %empty = tensor.empty() : tensor<32x64xf32>
+  %0 = linalg.copy {lowering_config = #config} ins(%collapsed : tensor<32x64xf32>) outs(%empty : tensor<32x64xf32>) -> tensor<32x64xf32>
+  return %0: tensor<32x64xf32>
+}
+
+// No swap would happen when the last expanded size is not divisible by collapse size.
+// NORM-REDUCTION-LABEL: func.func @no_swap_collapse_shape_with_extract_slice_2
+//       NORM-REDUCTION:   tensor.collapse_shape
+//       NORM-REDUCTION:   scf.for
+//       NORM-REDUCTION:     tensor.extract_slice
+//   NORM-REDUCTION-NOT:     tensor.collapse_shape
+//       NORM-REDUCTION:     linalg.copy
