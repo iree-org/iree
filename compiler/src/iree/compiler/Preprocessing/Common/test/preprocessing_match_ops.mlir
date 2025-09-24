@@ -527,9 +527,9 @@ module attributes {transform.with_named_sequence} {
       lhs_type = f16, rhs_type = f16, output_type = f32 :
       (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
 
-    transform.iree.match.size_equals %op, %m, [4096] : !transform.any_op, !transform.param<i64>
-    transform.iree.match.size_equals %op, %n, [2048] : !transform.any_op, !transform.param<i64>
-    transform.iree.match.size_equals %op, %k, [8192] : !transform.any_op, !transform.param<i64>
+    transform.iree.match.size_equals %m, [4096] : !transform.param<i64>
+    transform.iree.match.size_equals %n, [2048] : !transform.param<i64>
+    transform.iree.match.size_equals %k, [8192] : !transform.param<i64>
 
     transform.yield %op : !transform.any_op
   }
@@ -585,10 +585,10 @@ module attributes {transform.with_named_sequence} {
       (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
     // Test multiple dimensions.
     // %batch_dims = [2, 4] - check if first batch dim is 2 and second is 4.
-    transform.iree.match.size_equals %op, %batch_dims, [2, 4] : !transform.any_op, !transform.param<i64>
-    transform.iree.match.size_equals %op, %m_dims, [32] : !transform.any_op, !transform.param<i64>
-    transform.iree.match.size_equals %op, %n_dims, [32] : !transform.any_op, !transform.param<i64>
-    transform.iree.match.size_equals %op, %k_dims, [64] : !transform.any_op, !transform.param<i64>
+    transform.iree.match.size_equals %batch_dims, [2, 4] : !transform.param<i64>
+    transform.iree.match.size_equals %m_dims, [32] : !transform.param<i64>
+    transform.iree.match.size_equals %n_dims, [32] : !transform.param<i64>
+    transform.iree.match.size_equals %k_dims, [64] : !transform.param<i64>
 
     transform.yield %op : !transform.any_op
   }
@@ -627,7 +627,7 @@ module attributes {transform.with_named_sequence} {
       lhs_type = f16, rhs_type = f16, output_type = f32 :
       (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
     // This should fail because %m contains [512] but we expect [512, 256] (different array lengths).
-    transform.iree.match.size_equals %op, %m, [512, 256] : !transform.any_op, !transform.param<i64>
+    transform.iree.match.size_equals %m, [512, 256] : !transform.param<i64>
     transform.yield %op : !transform.any_op
   }
 

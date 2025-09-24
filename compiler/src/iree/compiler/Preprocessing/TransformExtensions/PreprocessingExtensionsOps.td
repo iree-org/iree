@@ -226,9 +226,9 @@ def MatchContractionOp : Op<Transform_Dialect, "iree.match.contraction",
 }
 
 def MatchSizeEqualsOp : Op<Transform_Dialect, "iree.match.size_equals",
-    [MatchOpInterface,
-     SingleOpMatcher,
-     MemoryEffectsOpInterface]> {
+    [DeclareOpInterfaceMethods<TransformOpInterface>,
+     MatchOpInterface,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
   let summary = [{Check whether transform parameters match expected size values exactly.}];
   let description = [{
     Matches dimension sizes against expected values.
@@ -247,14 +247,13 @@ def MatchSizeEqualsOp : Op<Transform_Dialect, "iree.match.size_equals",
   }];
 
   let arguments = (ins
-    TransformHandleTypeInterface:$operand_handle, // 1) The operation to check.
-    TransformParamTypeInterface:$dimension_sizes, // 2) Array of dimension parameters.
-    ArrayAttr:$expected_values                    // 3) Array of expected values.
+    TransformParamTypeInterface:$dimension_sizes, // Array of dimension parameters.
+    ArrayAttr:$expected_values                    // Array of expected values.
   );
 
   let assemblyFormat = [{
-    $operand_handle `,` $dimension_sizes `,` $expected_values
-    attr-dict `:` type($operand_handle) `,` type($dimension_sizes)
+    $dimension_sizes `,` $expected_values
+    attr-dict `:` type($dimension_sizes)
   }];
 
   let extraClassDeclaration = SingleOpMatcher.extraDeclaration;

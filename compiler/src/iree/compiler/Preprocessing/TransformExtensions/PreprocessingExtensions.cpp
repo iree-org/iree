@@ -307,19 +307,17 @@ IREE::transform_dialect::MatchContractionOp::matchOperation(
 // MatchSizeEqualsOp
 //===----------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure
-IREE::transform_dialect::MatchSizeEqualsOp::matchOperation(
-    Operation *current, transform::TransformResults &results,
-    transform::TransformState &state) {
-  Location loc = current->getLoc();
+DiagnosedSilenceableFailure IREE::transform_dialect::MatchSizeEqualsOp::apply(
+    transform::TransformRewriter &rewriter,
+    transform::TransformResults &results, transform::TransformState &state) {
   ArrayRef<transform::Param> currentDimSizes =
       state.getParams(getDimensionSizes());
   ArrayAttr targetDimensionSizes = getExpectedValues();
 
   if (currentDimSizes.size() != targetDimensionSizes.size()) {
-    return emitSilenceableFailure(loc)
-           << "Dimension sizes array and target sizes array have different "
-              "lengths";
+    return emitSilenceableError() << "dimension sizes have different lengths ("
+                                  << currentDimSizes.size() << " vs "
+                                  << targetDimensionSizes.size() << ")";
   }
 
   for (auto [currentDimSizeAttr, targetDimSizeAttr] :
@@ -327,13 +325,18 @@ IREE::transform_dialect::MatchSizeEqualsOp::matchOperation(
     int64_t currentDimSize = cast<IntegerAttr>(currentDimSizeAttr).getInt();
     int64_t targetDimSize = cast<IntegerAttr>(targetDimSizeAttr).getInt();
     if (currentDimSize != targetDimSize) {
-      return emitSilenceableFailure(loc)
+      return emitSilenceableError()
              << "Dimension size " << currentDimSize
              << " does not match expected size " << targetDimSize;
     }
   }
 
   return DiagnosedSilenceableFailure::success();
+}
+
+void IREE::transform_dialect::MatchSizeEqualsOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getDimensionSizesMutable(), effects);
 }
 
 //===----------------------------------------------------------------------===//
