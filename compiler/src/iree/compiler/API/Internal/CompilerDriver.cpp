@@ -948,7 +948,8 @@ void Invocation::dumpCompilationPhase(IREEVMPipelinePhase phase,
   llvm::sys::path::append(path, fileName);
 
   passManager.addPass(
-      IREE::Util::createDumpModulePass(std::string(path.begin(), path.end())));
+      IREE::Util::createDumpModulePass(IREE::Util::DumpModulePassOptions{
+          std::string(path.begin(), path.end())}));
 }
 
 bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
