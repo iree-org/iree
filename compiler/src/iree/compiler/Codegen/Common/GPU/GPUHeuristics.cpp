@@ -572,7 +572,7 @@ bool compareIntrinsics(const GPUMatmulShapeType &problem,
 static SmallVector<GPUIntrinsicType>
 sortMMAIntrinsics(GPUMatmulShapeType problem,
                   ArrayRef<GPUIntrinsicType> intrinsics) {
-  SmallVector<GPUIntrinsicType> sortedIntrinsics;
+  SmallVector<GPUIntrinsicType> sortedIntrinsics(intrinsics);
   llvm::sort(sortedIntrinsics,
              [&](const GPUMatmulShapeType &lhs, const GPUMatmulShapeType &rhs) {
                return compareIntrinsics(problem, lhs, rhs);
@@ -635,9 +635,10 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     bool transposedRhs, bool canUpcastAcc, bool mustBeAligned,
     bool doCPromotion) {
 
-  sortMMAIntrinsics(problem, intrinsics);
+  SmallVector<GPUIntrinsicType> sortedIntrinsics =
+      sortMMAIntrinsics(problem, intrinsics);
 
-  for (const GPUIntrinsicType &intrinsic : intrinsics) {
+  for (const GPUIntrinsicType &intrinsic : sortedIntrinsics) {
     if (failed(canTargetIntrinsic(problem, intrinsic, subgroupSize,
                                   canUpcastAcc, mustBeAligned))) {
       continue;
