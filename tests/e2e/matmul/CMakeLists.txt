@@ -1003,7 +1003,6 @@ iree_generated_e2e_runner_test(
     "--lhs_rhs_type=i8"
     "--acc_type=i32"
     "--shapes=easy_large_static"
-    "--compilation_info=SPIRVVectorizeMali"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -1028,7 +1027,6 @@ iree_generated_e2e_runner_test(
     "--lhs_rhs_type=f16"
     "--acc_type=f32"
     "--shapes=easy_large_static"
-    "--compilation_info=SPIRVVectorizeMali"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -1053,7 +1051,6 @@ iree_generated_e2e_runner_test(
     "--lhs_rhs_type=f32"
     "--acc_type=f32"
     "--shapes=easy_large_static"
-    "--compilation_info=SPIRVVectorizeMali"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -1078,7 +1075,6 @@ iree_generated_e2e_runner_test(
     "--lhs_rhs_type=i8"
     "--acc_type=i32"
     "--shapes=easy_large_static"
-    "--compilation_info=SPIRVVectorizeNVIDIA"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -1103,7 +1099,6 @@ iree_generated_e2e_runner_test(
     "--lhs_rhs_type=f16"
     "--acc_type=f32"
     "--shapes=easy_large_static"
-    "--compilation_info=SPIRVVectorizeNVIDIA"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -1128,7 +1123,6 @@ iree_generated_e2e_runner_test(
     "--lhs_rhs_type=f32"
     "--acc_type=f32"
     "--shapes=easy_large_static"
-    "--compilation_info=SPIRVVectorizeNVIDIA"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -1154,7 +1148,7 @@ list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_matmul_cdna3_vecdistmfma_f16
+    e2e_matmul_cdna3_f16
   TEST_TYPE
     matmul
   GENERATOR
@@ -1163,7 +1157,6 @@ iree_generated_e2e_runner_test(
     "--lhs_rhs_type=f16"
     "--acc_type=f32"
     "--shapes=easy_large_static"
-    "--compilation_info=LLVMGPUVectorDistributeMFMA"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -1182,7 +1175,7 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_matmul_cdna3_vecdistmfma_f32
+    e2e_matmul_cdna3_f32
   TEST_TYPE
     matmul
   GENERATOR
@@ -1191,7 +1184,6 @@ iree_generated_e2e_runner_test(
     "--lhs_rhs_type=f32"
     "--acc_type=f32"
     "--shapes=easy_large_static"
-    "--compilation_info=LLVMGPUVectorDistributeMFMA"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -1210,7 +1202,7 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_matmul_cdna3_vecdistmfma_tb_f16
+    e2e_matmul_cdna3_tb_f16
   TEST_TYPE
     matmul
   GENERATOR
@@ -1220,7 +1212,6 @@ iree_generated_e2e_runner_test(
     "--acc_type=f32"
     "--transpose_rhs"
     "--shapes=easy_large_static"
-    "--compilation_info=LLVMGPUVectorDistributeMFMA"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -1244,7 +1235,7 @@ if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx94")
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_matmul_cdna3_vecdistmfma_f8E4M3FNUZ
+    e2e_matmul_cdna3_f8E4M3FNUZ
   TEST_TYPE
     matmul
   GENERATOR
@@ -1253,7 +1244,6 @@ iree_generated_e2e_runner_test(
     "--lhs_rhs_type=f8E4M3FNUZ"
     "--acc_type=f32"
     "--shapes=easy_large_static"
-    "--compilation_info=LLVMGPUVectorDistributeMFMA"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -1272,7 +1262,7 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_matmul_cdna3_vecdistmfma_i8
+    e2e_matmul_cdna3_i8
   TEST_TYPE
     matmul
   GENERATOR
@@ -1282,7 +1272,6 @@ iree_generated_e2e_runner_test(
     "--acc_type=i32"
     "--transpose_rhs"
     "--shapes=easy_large_static"
-    "--compilation_info=LLVMGPUVectorDistributeMFMA"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
   TARGET_BACKENDS
@@ -1780,7 +1769,6 @@ iree_generated_e2e_runner_test(
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
     "--acc_type=f32"
-    "--compilation_info=LLVMGPUVectorDistributeWMMAR3"
     "--shapes=easy_large_static"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
@@ -1812,7 +1800,6 @@ iree_generated_e2e_runner_test(
     "--lhs_rhs_type=f16"
     "--acc_type=f32"
     "--transpose_rhs"
-    "--compilation_info=LLVMGPUVectorDistributeWMMAR3"
     "--shapes=easy_large_static"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
@@ -1844,7 +1831,6 @@ iree_generated_e2e_runner_test(
     "--lhs_rhs_type=i8"
     "--acc_type=i32"
     "--transpose_rhs"
-    "--compilation_info=LLVMGPUVectorDistributeWMMAR3"
     "--shapes=easy_large_static"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
@@ -1940,7 +1926,6 @@ iree_generated_e2e_runner_test(
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
     "--acc_type=f32"
-    "--compilation_info=LLVMGPUVectorDistributeWMMAR4"
     "--shapes=easy_large_static"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
@@ -1972,7 +1957,6 @@ iree_generated_e2e_runner_test(
     "--lhs_rhs_type=f16"
     "--acc_type=f32"
     "--transpose_rhs"
-    "--compilation_info=LLVMGPUVectorDistributeWMMAR4"
     "--shapes=easy_large_static"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
@@ -2003,7 +1987,6 @@ iree_generated_e2e_runner_test(
   GENERATOR_ARGS
     "--lhs_rhs_type=f8E4M3FN"
     "--acc_type=f32"
-    "--compilation_info=LLVMGPUVectorDistributeWMMAR4"
     "--shapes=easy_large_static"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
@@ -2035,7 +2018,6 @@ iree_generated_e2e_runner_test(
     "--lhs_rhs_type=f8E4M3FN"
     "--acc_type=f32"
     "--transpose_rhs"
-    "--compilation_info=LLVMGPUVectorDistributeWMMAR4"
     "--shapes=easy_large_static"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
@@ -2067,7 +2049,6 @@ iree_generated_e2e_runner_test(
     "--lhs_rhs_type=i8"
     "--acc_type=i32"
     "--transpose_rhs"
-    "--compilation_info=LLVMGPUVectorDistributeWMMAR4"
     "--shapes=easy_large_static"
   TEST_RUNNER
     iree_tools_testing_e2e_iree-e2e-matmul-test
