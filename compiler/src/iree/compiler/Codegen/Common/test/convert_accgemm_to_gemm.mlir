@@ -36,6 +36,42 @@ func.func @accumulate_gemm(%1 : tensor<512x128xi8>, %2 : tensor<512x128xi8>) {
 
 // -----
 
+#lhs_map = affine_map<(M, N, Ko, Kb) -> (M, Ko, Kb)>
+#rhs_map = affine_map<(M, N, Ko, Kb) -> (N, Ko, Kb)>
+#scale_m = affine_map<(M, N, Ko, Kb) -> (M, Ko)>
+#scale_n = affine_map<(M, N, Ko, Kb) -> (N, Ko)>
+#out_map = affine_map<(M, N, Ko, Kb) -> (M, N)>
+func.func @accumulate_scaled_gemm(
+    %A: tensor<1024x512x32xf4E2M1FN>, %B: tensor<1024x512x32xf4E2M1FN>,
+    %A_scales: tensor<1024x512xf8E8M0FNU>, %B_scales: tensor<1024x512xf8E8M0FNU>,
+    %C_buffer: memref<1024x1024xf32>) {
+  %C = iree_codegen.load_from_buffer %C_buffer : memref<1024x1024xf32> -> tensor<1024x1024xf32>
+  %0 = linalg.generic {
+    indexing_maps = [#lhs_map, #rhs_map, #scale_m, #scale_n, #out_map],
+    iterator_types = ["parallel", "parallel", "reduction", "reduction"]
+  } ins(%A, %B, %A_scales, %B_scales : tensor<1024x512x32xf4E2M1FN>, tensor<1024x512x32xf4E2M1FN>, tensor<1024x512xf8E8M0FNU>, tensor<1024x512xf8E8M0FNU>) outs(%C : tensor<1024x1024xf32>) {
+  ^bb0(%a: f4E2M1FN, %b: f4E2M1FN, %a_scale: f8E8M0FNU, %b_scale: f8E8M0FNU, %out: f32):
+    %1 = arith.scaling_extf %a, %a_scale : f4E2M1FN, f8E8M0FNU to f32
+    %2 = arith.scaling_extf %b, %b_scale : f4E2M1FN, f8E8M0FNU to f32
+    %3 = arith.mulf %1, %2 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<1024x1024xf32>
+  iree_codegen.store_to_buffer %0, %C_buffer : tensor<1024x1024xf32> into memref<1024x1024xf32>
+  return
+}
+
+// CHECK-LABEL: func.func @accumulate_scaled_gemm
+//   CHECK-DAG: %[[C0:.+]] = arith.constant 0.000000e+00 : f32
+//   CHECK-DAG: %[[EMPTY:.+]] = tensor.empty() : tensor<1024x1024xf32>
+//       CHECK: %[[FILL:.+]] = linalg.fill ins(%[[C0]] : f32) outs(%[[EMPTY]] : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
+//       CHECK: %[[GEMM:.+]] = linalg.generic {{.*}} outs(%[[FILL]] : tensor<1024x1024xf32>) {
+//       CHECK: %[[ADD:.+]] = linalg.generic {{.+}} ins(%[[GEMM]]
+//  CHECK-SAME:   outs(%[[EMPTY]]
+//       CHECK: iree_codegen.store_to_buffer %[[ADD]]
+
+// -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>
 ]>

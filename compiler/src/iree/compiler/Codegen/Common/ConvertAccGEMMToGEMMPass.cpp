@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -40,7 +41,8 @@ static bool accGemmToGemmPrecondition(Operation *op) {
     return false;
   }
   if (!linalg::isaContractionOpInterface(linalgOp) &&
-      !isa<linalg::ConvolutionOpInterface>(*linalgOp)) {
+      !isa<linalg::ConvolutionOpInterface>(*linalgOp) &&
+      !IREE::LinalgExt::isaScaledContractionOpInterface(linalgOp)) {
     return false;
   }
   if (!linalgOp.hasPureTensorSemantics()) {
