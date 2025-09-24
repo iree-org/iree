@@ -368,7 +368,6 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--acc_type=%s" % acc_type,
         "--shapes=easy_large_static",
-        "--compilation_info=SPIRVVectorizeMali",
     ],
     tags = [
         # Nvidia GPUs support a superset of Valhall features
@@ -396,7 +395,6 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--acc_type=%s" % acc_type,
         "--shapes=easy_large_static",
-        "--compilation_info=SPIRVVectorizeNVIDIA",
     ],
     tags = [
         "requires-gpu-sm80",
