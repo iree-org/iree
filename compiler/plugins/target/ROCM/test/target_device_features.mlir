@@ -43,6 +43,9 @@
 //
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-hip-target=r9700 %s | FileCheck %s --check-prefixes=GFX1201,R9700
+//
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-hip-target=gfx1250 %s | FileCheck %s --check-prefixes=GFX1250
 
 // GFX942: target_info = #iree_gpu.target<arch = "gfx942",
 // GFX942-SAME: wgp = <compute =  fp64|fp32|fp16|int64|int32|int16|int8, storage =  b64|b32|b16|b8,
@@ -85,6 +88,11 @@
 // RX9070XT: chip = <wgp_count = 32, sku = "rx9070xt", memory_bandwidth_tbps = 6.400000e-01 : f32, perf_tflops = {fp16 = 1.950000e+02 : f32, fp32 = 4.870000e+01 : f32, fp8 = 3.890000e+02 : f32, int8 = 3.890000e+02 : f32}>>
 // RX9070:   chip = <wgp_count = 28, sku = "rx9070", memory_bandwidth_tbps = 6.400000e-01 : f32, perf_tflops = {fp16 = 1.450000e+02 : f32, fp32 = 3.610000e+01 : f32, fp8 = 2.890000e+02 : f32, int8 = 2.890000e+02 : f32}>>
 // R9700:    chip = <wgp_count = 32, sku = "r9700", memory_bandwidth_tbps = 6.400000e-01 : f32, perf_tflops = {fp16 = 1.910000e+02 : f32, fp32 = 4.780000e+01 : f32, fp8 = 3.830000e+02 : f32, int8 = 3.830000e+02 : f32}>>
+
+// Note: The gfx1250 target is experimental and contains placeholder values.
+// GFX1250: target_info = #iree_gpu.target<arch = "gfx1250",
+// GFX1250-SAME:        subgroup_size_choices = [32, 64]
+// GFX1250-SAME:        max_load_instruction_bits = 128, simds_per_wgp = 4
 
 stream.executable public @reduce_dispatch {
   stream.executable.export @reduce_dispatch workgroups(%arg0: index) -> (index, index, index) {

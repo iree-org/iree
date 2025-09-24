@@ -441,6 +441,27 @@ const WgpDetails *getRDNA1WgpDetails() {
   return &rdna1Wgp;
 }
 
+// Experimental gfx1250 WGP details. This uses placeholder values from RDNA4.
+const WgpDetails *getGfx1250WgpDetails() {
+  static const WgpDetails gfx1250Wgp = {allComputeBits,
+                                        allStorageBits,
+                                        allSubgroupOps,
+                                        DotProductOps::None,
+                                        /*mmaCount=*/0,
+                                        /*mmaOps=*/nullptr,
+                                        /*scaledMmaCount=*/0,
+                                        /*scaledMmaOps=*/nullptr,
+                                        {32, 64},
+                                        {1024, 1024, 1024},
+                                        1024,
+                                        64 * 1024,
+                                        {0x7fffffff, 0x7fffffff, 0x7fffffff},
+                                        /*maxLoadInstructionBits=*/128,
+                                        /*simdsPerWgp=*/4,
+                                        /*vgprSpaceBits=*/256 * 32};
+  return &gfx1250Wgp;
+}
+
 std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   const WgpDetails *cdna4Wgp = getCDNA4WgpDetails();
   const WgpDetails *cdna3Wgp = getCDNA3WgpDetails();
@@ -450,6 +471,7 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   const WgpDetails *rdna3Wgp = getRDNA3WgpDetails();
   const WgpDetails *rdna2Wgp = getRDNA2WgpDetails();
   const WgpDetails *rdna1Wgp = getRDNA1WgpDetails();
+  const WgpDetails *gfx1250Wgp = getGfx1250WgpDetails(); // Experimental.
 
   // --- CDNA --- //
   // "AMD Instinct MI350 Series Product Offerings" in Page 18 of
@@ -646,6 +668,7 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
              "gfx1035", "gfx1036", TargetDetails{rdna2Wgp, nullptr})
       .Cases("rdna1", "gfx1010", "gfx1011", "gfx1012", "gfx1013",
              TargetDetails{rdna1Wgp, nullptr})
+      .Case("gfx1250", TargetDetails{gfx1250Wgp, nullptr})
       .Default(std::nullopt);
 }
 
@@ -662,6 +685,7 @@ StringRef normalizeAMDGPUTarget(StringRef target) {
              /*Value=*/"gfx1100")
       .Cases("rx7800xt", "rx7700xt", "v710", "w7700", "gfx1101",
              /*Value=*/"gfx1101")
+      .Case("gfx1250", /*Value=*/"gfx1250")
       .Default("");
 }
 
