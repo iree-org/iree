@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/HAL/Analysis/BindingLayout.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -303,10 +304,19 @@ convertBindingUsage(mlir::FunctionOpInterface sourceFuncOp, BlockArgument arg,
     OpBuilder builder(oldOp);
     auto alignmentAttr = sourceFuncOp.getArgAttrOfType<IntegerAttr>(
         arg.getArgNumber(), "stream.alignment");
+    bool isWriteOnly = false;
+    if (auto dispatchTensorType =
+            dyn_cast<IREE::TensorExt::DispatchTensorType>(oldOp.getType())) {
+      if (dispatchTensorType.getAccess() ==
+          IREE::TensorExt::TensorAccess::WriteOnly) {
+        isWriteOnly = true;
+      }
+    }
     auto newOp = IREE::HAL::InterfaceBindingSubspanOp::create(
         builder, oldOp.getLoc(), oldOp.getType(), pipelineLayoutAttr,
         APInt(64, bindingOrdinal), oldOp.getByteOffset(),
-        oldOp.getDynamicDims(), alignmentAttr, bindingAttr.getFlags());
+        oldOp.getDynamicDims(), alignmentAttr, bindingAttr.getFlags(),
+        isWriteOnly);
     oldOp.replaceAllUsesWith(newOp.getResult());
     oldOp.erase();
   }

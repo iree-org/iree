@@ -2228,20 +2228,18 @@ LogicalResult InterfaceConstantLoadOp::verify() {
 // hal.interface.binding.subspan
 //===----------------------------------------------------------------------===//
 
-void InterfaceBindingSubspanOp::build(OpBuilder &builder,
-                                      OperationState &result, Type resultType,
-                                      IREE::HAL::PipelineLayoutAttr layout,
-                                      APInt binding, Value byte_offset,
-                                      ValueRange dynamic_dims,
-                                      IntegerAttr alignment,
-                                      std::optional<DescriptorFlags> flags) {
+void InterfaceBindingSubspanOp::build(
+    OpBuilder &builder, OperationState &result, Type resultType,
+    IREE::HAL::PipelineLayoutAttr layout, APInt binding, Value byte_offset,
+    ValueRange dynamic_dims, IntegerAttr alignment,
+    std::optional<DescriptorFlags> flags, bool writeonly) {
   IREE::HAL::DescriptorFlagsAttr descriptorAttr;
   if (flags.has_value()) {
     descriptorAttr = IREE::HAL::DescriptorFlagsAttr::get(builder.getContext(),
                                                          flags.value());
   }
   build(builder, result, resultType, layout, binding, byte_offset, dynamic_dims,
-        alignment, descriptorAttr);
+        alignment, descriptorAttr, writeonly ? builder.getUnitAttr() : nullptr);
 }
 
 LogicalResult InterfaceBindingSubspanOp::verify() {

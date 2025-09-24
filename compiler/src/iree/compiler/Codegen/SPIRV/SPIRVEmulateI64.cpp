@@ -64,7 +64,8 @@ struct ConvertHalInterfaceBindingSubspan final
         rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
             op, newResultTy, adaptor.getLayout(), adaptor.getBinding(),
             adaptor.getByteOffset(), adaptor.getDynamicDims(),
-            adaptor.getAlignmentAttr(), adaptor.getDescriptorFlagsAttr());
+            adaptor.getAlignmentAttr(), adaptor.getDescriptorFlagsAttr(),
+            op.getWriteonlyAttr());
     LLVM_DEBUG(llvm::dbgs()
                << "WideIntegerEmulation: new op: " << newOp << "\n");
     (void)newOp;

@@ -3513,7 +3513,8 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
     Optional<HAL_DeviceSize>:$byte_offset,
     HAL_ShapeDynamicDims:$dynamic_dims,
     OptionalAttr<IndexAttr>:$alignment,
-    OptionalAttr<HAL_DescriptorFlagsAttr>:$descriptor_flags
+    OptionalAttr<HAL_DescriptorFlagsAttr>:$descriptor_flags,
+    OptionalAttr<UnitAttr>:$writeonly
   );
   let results = (outs
     AnyType:$result
@@ -3525,6 +3526,7 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
     (`alignment` `(` $alignment^ `)`)?
     (`offset` `(` $byte_offset^ `)`)?
     (`flags` `(` $descriptor_flags^ `)`)?
+    (`writeonly` $writeonly^)?
     attr-dict `:` type($result) (`{` $dynamic_dims^ `}`)?
   }];
 
@@ -3536,8 +3538,8 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
       "Value":$byte_offset,
       "ValueRange":$dynamic_dims,
       "IntegerAttr":$alignment,
-      CArg<"std::optional<DescriptorFlags>", "std::nullopt">:$flags
-    )>,
+      CArg<"std::optional<DescriptorFlags>", "std::nullopt">:$flags,
+      CArg<"bool", "false">:$writeonly)>,
   ];
 
   let hasVerifier = 1;

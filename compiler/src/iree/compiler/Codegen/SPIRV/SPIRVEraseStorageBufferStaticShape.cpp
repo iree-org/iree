@@ -88,7 +88,8 @@ rewriteStorageBufferSubspanOp(RewriterBase &rewriter,
   auto newOp = IREE::HAL::InterfaceBindingSubspanOp::create(
       rewriter, subspanOp.getLoc(), newType, subspanOp.getLayoutAttr(),
       subspanOp.getBindingAttr(), subspanOp.getByteOffset(), dynamicDims,
-      subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
+      subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr(),
+      subspanOp.getWriteonlyAttr());
 
   LLVM_DEBUG({
     llvm::dbgs() << "Rewritten to: ";

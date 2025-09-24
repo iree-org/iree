@@ -97,6 +97,33 @@ stream.executable private @ex {
   }
 }
 
+// Expect materialize-interfaces to replace stream.subspan with HAL subspan,
+// preserving writeonly and assigning binding(2) to the 3rd parameter.
+  stream.executable public @dispatch_lowering {
+    stream.executable.export public @entry workgroups(%n: index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%n)
+      stream.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      // Three bindings; the 3rd is writeonly.
+      func.func @entry(%arg0: !stream.binding, %arg1: !stream.binding, %arg2: !stream.binding) {
+        %c0 = arith.constant 0 : index
+        %out = stream.binding.subspan %arg2[%c0]
+          : !stream.binding
+          -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16xf32>>
+        %zeros = arith.constant dense<0.0> : tensor<16xf32>
+        iree_tensor_ext.dispatch.tensor.store %zeros, %out,
+          offsets = [0], sizes = [16], strides = [1]
+          : tensor<16xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16xf32>>
+        return
+      }
+    }
+  }
+// CHECK: hal.interface.binding.subspan
+// CHECK-SAME: binding(2)
+// CHECK-SAME: writeonly
+// CHECK-SAME: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16xf32>>
+
 // This function uses the default HAL device targeting arm_64 and x86_64.
 // CHECK-LABEL: @using_default
 util.func public @using_default(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.timepoint attributes {
