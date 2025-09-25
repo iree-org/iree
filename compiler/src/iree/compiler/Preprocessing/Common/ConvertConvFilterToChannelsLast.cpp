@@ -104,7 +104,7 @@ struct ConvertHwcfToFhwc : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
   }
 };
 
-struct ConvertChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
+struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::GenericOp op,
@@ -134,6 +134,18 @@ struct ConvertChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
         llvm::cast<ShapedType>(filter.getType()).getShape();
     ArrayRef<int64_t> outputShape =
         llvm::cast<ShapedType>(output.getType()).getShape();
+
+    auto hasDynamic = [](ArrayRef<int64_t> shape) {
+      return llvm::any_of(shape,
+                          [](int64_t d) { return ShapedType::isDynamic(d); });
+    };
+
+    // TODO(vivian): Once the matmul shape check below is dropped, the
+    // dynamic-shape check can also be removed.
+    if (hasDynamic(inputShape) || hasDynamic(filterShape) ||
+        hasDynamic(outputShape)) {
+      return failure();
+    }
 
     auto getDimPositions = [&](ArrayRef<unsigned> dims, const AffineMap &map) {
       SmallVector<int64_t> positions;
@@ -240,7 +252,7 @@ public:
       patterns.add<ConvertHwcfToHwfc>(context);
     } else if (filterLayout == "fhwc") {
       LDBG("Converting filter layout to fhwc.");
-      patterns.add<ConvertHwcfToFhwc, ConvertChwfToFhwc>(context);
+      patterns.add<ConvertHwcfToFhwc, ConvertGenericChwfToFhwc>(context);
     } else {
       LDBG("convert-filter-to-channels-last pass didn't apply since an "
            "unsupported layout is given. Please use hwfc or fhwc as pass "
