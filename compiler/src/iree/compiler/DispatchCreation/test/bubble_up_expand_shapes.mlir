@@ -12,14 +12,15 @@ util.func public @bubbble_expand_through_extract(%arg0 : tensor<2x4096x5120xf16>
 
 // -----
 
-util.func public @unsupported_bubbble_expand_through_extract(%arg0 : tensor<2x4096x5120xf16>) -> (tensor<2x32x64x2560xf16>) {
+util.func public @bubbble_expand_through_sliced_dim(%arg0 : tensor<2x4096x5120xf16>) -> (tensor<2x32x64x2560xf16>) {
   %extracted_slice_237 = tensor.extract_slice %arg0[0, 0, 0] [2, 2048, 2560] [1, 1, 1] : tensor<2x4096x5120xf16> to tensor<2x2048x2560xf16>
   %expanded_239 = tensor.expand_shape %extracted_slice_237 [[0], [1, 2], [3]] output_shape [2, 32, 64, 2560] : tensor<2x2048x2560xf16> into tensor<2x32x64x2560xf16>
   util.return %expanded_239 : tensor<2x32x64x2560xf16>
 }
-// CHECK-LABEL:  @unsupported_bubbble_expand_through_extract
-//       CHECK:    %[[EXTRACT:.+]] = tensor.extract_slice
-//       CHECK:    %[[EXPAND:.+]] = tensor.expand_shape %[[EXTRACT]]
+// CHECK-LABEL:  @bubbble_expand_through_sliced_dim
+//       CHECK:    %[[EXPAND:.+]] = tensor.expand_shape
+//       CHECK:    %[[EXTRACT:.+]] = tensor.extract_slice %[[EXPAND]]
+//  CHECK-SAME:      [0, 0, 0, 0] [2, 32, 64, 2560] [1, 1, 1, 1]
 
 // -----
 
