@@ -63,7 +63,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           repository: iree-org/iree-test-suites
-          ref: 85e5ed1f20833bde1001114260d13b8121f85fd9
+          ref: 84121cf838d4277a067ce94f22e0bfd029b5cd0b
           path: iree-test-suites
           # Don't need lfs for torch models yet.
           lfs: false
