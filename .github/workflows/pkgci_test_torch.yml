@@ -40,7 +40,7 @@ jobs:
             cache-dir: /shark-cache/data/iree-regression-cache
             runs-on: linux-mi325-1gpu-ossci-iree-org
     env:
-      VENV_PATH: ${{ github.workspace }}/.venv
+      VENV_DIR: ${{ github.workspace }}/.venv
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
     steps:
       - name: Checking out IREE repository
