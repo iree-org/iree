@@ -1090,30 +1090,6 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_matmul_vulkan_f16_large_ampere
-  TEST_TYPE
-    matmul
-  GENERATOR
-    "generate_e2e_matmul_tests.py"
-  GENERATOR_ARGS
-    "--lhs_rhs_type=f16"
-    "--acc_type=f32"
-    "--shapes=easy_large_static"
-  TEST_RUNNER
-    iree_tools_testing_e2e_iree-e2e-matmul-test
-  TARGET_BACKENDS
-    "vulkan-spirv"
-  DRIVERS
-    "vulkan"
-  COMPILER_FLAGS
-    "--iree-vulkan-target=ampere"
-  LABELS
-    "requires-gpu-sm80"
-    "vulkan_uses_vk_khr_shader_float16_int8"
-)
-
-iree_generated_e2e_runner_test(
-  NAME
     e2e_matmul_vulkan_f32_large_ampere
   TEST_TYPE
     matmul

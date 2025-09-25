@@ -407,8 +407,8 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     test_type = "matmul",
 ) for (lhs_rhs_type, acc_type) in [
     ("i8", "i32"),
-    ("f16", "f32"),
     ("f32", "f32"),
 ]]
 
-# TODO(#19465): add large matmul tests for rdna3 and rdna4.
+# TODO(#22108): Reenable large ampere matmul f16.
+# TODO(#19465): Add large matmul tests for rdna3 and rdna4.
