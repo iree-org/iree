@@ -88,7 +88,7 @@ jobs:
             --timeout=1200 \
             --capture=no \
             --test-file-directory=${{ github.workspace }}/tests/external/iree-test-suites/torch_models \
-            --external-file-directory=${{ github.workspace }}/tests/external/iree-test-suites/test_suite_files
+            --external-file-directory=${{ github.workspace }}/tests/external/iree-test-suites/test_suite_files \
             --module-directory=${{ github.workspace }}/tests/external/iree-test-suites/torch_models \
             --artifact-directory=${{ matrix.cache-dir }}/torch_models/artifacts \
             --force-recompile \
