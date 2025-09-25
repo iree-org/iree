@@ -60,7 +60,7 @@ util.func public @infinite_loop() {
 }
 // CHECK-LABEL: util.func public @infinite_loop
 // CHECK: scf.while
-// CHECK: util.unreachable
+// CHECK: util.scf.unreachable "infinite loop"
 
 // -----
 
@@ -780,9 +780,8 @@ util.func public @conditional_infinite_loop(%arg: f32, %cond: i1) -> f32 {
 }
 // CHECK-LABEL: util.func public @conditional_infinite_loop
 // CHECK-SAME: %[[ARG:.+]]: f32, %[[COND:.+]]: i1
-// CHECK: cf.cond_br %[[COND]], ^bb1(%[[ARG]] : f32), ^bb2(%[[ARG]] : f32)
-// CHECK: ^bb1(%[[ARG1:.+]]: f32):
-// CHECK:   scf.while (%[[ITER:.+]] = %[[ARG1]]) : (f32) -> f32 {
+// CHECK: %[[RES:.+]] = scf.if %[[COND]] -> (f32) {
+// CHECK:   scf.while (%[[ITER:.+]] = %[[ARG]]) : (f32) -> f32 {
 // CHECK:     %[[CALL:.+]] = util.call @callee(%[[ITER]])
 // CHECK:     arith.index_castui %c1{{.*}} : index to i64
 // CHECK:     %{{.*}} = arith.trunci %{{.*}} : i64 to i1
@@ -791,10 +790,14 @@ util.func public @conditional_infinite_loop(%arg: f32, %cond: i1) -> f32 {
 // CHECK:   ^bb{{.*}}(%[[VAL:.+]]: f32):
 // CHECK:     scf.yield %[[VAL]]
 // CHECK:   }
-// CHECK:   util.unreachable
-// CHECK: ^bb2(%[[ARG2:.+]]: f32):
-// CHECK:   %[[CALL2:.+]] = util.call @callee(%[[ARG2]])
-// CHECK:   util.return %[[CALL2]]
+// CHECK:   util.scf.unreachable "infinite loop"
+// CHECK:   %[[POISON:.+]] = ub.poison : f32
+// CHECK:   scf.yield %[[POISON]]
+// CHECK: } else {
+// CHECK:   %[[CALL2:.+]] = util.call @callee(%[[ARG]])
+// CHECK:   scf.yield %[[CALL2]]
+// CHECK: }
+// CHECK: util.return %[[RES]]
 
 // -----
 

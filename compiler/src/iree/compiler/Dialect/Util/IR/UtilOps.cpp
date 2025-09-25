@@ -11,6 +11,8 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SMLoc.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
@@ -2475,6 +2477,57 @@ void BufferHashOp::setSubrangeOperand(unsigned operandIndex,
   getSourceSizeMutable().assign(operand.resourceSize);
   getSourceOffsetMutable().assign(operand.offset);
   getLengthMutable().assign(operand.length);
+}
+
+//===----------------------------------------------------------------------===//
+// util.scf.unreachable
+//===----------------------------------------------------------------------===//
+
+// static
+SmallVector<Value> SCFUnreachableOp::createPoisonValues(OpBuilder &builder,
+                                                        Location loc,
+                                                        TypeRange resultTypes) {
+  SmallVector<Value> poisonValues;
+  for (Type type : resultTypes) {
+    poisonValues.push_back(
+        mlir::ub::PoisonOp::create(builder, loc, type, nullptr).getResult());
+  }
+  return poisonValues;
+}
+
+// static
+scf::YieldOp SCFUnreachableOp::createRegionTerminator(OpBuilder &builder,
+                                                      Location loc,
+                                                      TypeRange resultTypes,
+                                                      StringAttr message) {
+  SCFUnreachableOp::create(builder, loc, message);
+  return mlir::scf::YieldOp::create(
+      builder, loc, createPoisonValues(builder, loc, resultTypes));
+}
+
+// static
+scf::YieldOp SCFUnreachableOp::createRegionTerminator(OpBuilder &builder,
+                                                      Location loc,
+                                                      TypeRange resultTypes,
+                                                      StringRef message) {
+  return createRegionTerminator(
+      builder, loc, resultTypes,
+      message.empty() ? StringAttr{} : builder.getStringAttr(message));
+}
+
+// static
+Operation *SCFUnreachableOp::createWithTerminator(OpBuilder &builder,
+                                                  Location loc,
+                                                  TypeRange resultTypes,
+                                                  StringAttr message) {
+  // Create scf.yield with poison values for SCF regions.
+  auto *parentOp = builder.getInsertionPoint()->getParentOp();
+  if (parentOp && isa<scf::SCFDialect>(parentOp->getDialect())) {
+    return createRegionTerminator(builder, loc, resultTypes, message);
+  }
+
+  // For non-SCF regions, convert to util.unreachable terminator.
+  return IREE::Util::UnreachableOp::create(builder, loc, message);
 }
 
 } // namespace mlir::iree_compiler::IREE::Util

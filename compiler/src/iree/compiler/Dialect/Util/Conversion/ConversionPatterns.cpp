@@ -169,6 +169,30 @@ struct ConvertReturnOp : public OpConversionPattern<IREE::Util::ReturnOp> {
   }
 };
 
+struct ConvertUnreachableOp
+    : public OpConversionPattern<IREE::Util::UnreachableOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Util::UnreachableOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::Util::UnreachableOp>(op,
+                                                           op.getMessageAttr());
+    return success();
+  }
+};
+
+struct ConvertSCFUnreachableOp
+    : public OpConversionPattern<IREE::Util::SCFUnreachableOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Util::SCFUnreachableOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::Util::SCFUnreachableOp>(
+        op, op.getMessageAttr());
+    return success();
+  }
+};
+
 struct ConvertFuncFuncOp : public OpConversionPattern<mlir::func::FuncOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult
@@ -346,8 +370,12 @@ void populateGenericStructuralConversionPatterns(
       });
   addGenericLegalOp<IREE::Util::CallOp>(conversionTarget, typeConverter);
   addGenericLegalOp<IREE::Util::ReturnOp>(conversionTarget, typeConverter);
-  patterns.insert<ConvertInitializerOp, ConvertFuncOp, ConvertCallOp,
-                  ConvertReturnOp>(typeConverter, context);
+  conversionTarget
+      .addLegalOp<IREE::Util::UnreachableOp, IREE::Util::SCFUnreachableOp>();
+  patterns
+      .insert<ConvertInitializerOp, ConvertFuncOp, ConvertCallOp,
+              ConvertReturnOp, ConvertUnreachableOp, ConvertSCFUnreachableOp>(
+          typeConverter, context);
 
   conversionTarget.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp op) {
     return typeConverter.isSignatureLegal(op.getFunctionType()) &&

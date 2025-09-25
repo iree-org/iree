@@ -113,4 +113,9 @@ def Util_DebugOnly : NativeOpTrait<"IREE::Util::DebugOnly">;
 // (instantiatable and only referenced by symbols instead of SSA values).
 def Util_ObjectLike : NativeOpTrait<"IREE::Util::ObjectLike">;
 
+// Denotes an op that marks unreachable code at runtime.
+// Used for both terminator (util.unreachable) and non-terminator
+// (util.scf.unreachable) unreachable operations.
+def Util_UnreachableLike : NativeOpTrait<"IREE::Util::UnreachableLike">;
+
 #endif  // IREE_DIALECT_UTIL_IR_UTIL_BASE

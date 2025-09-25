@@ -126,3 +126,66 @@ util.func public @inplaceTypeChangeCall(%arg0: tensor<?x4xf32>) -> tensor<4x?xi3
   // CHECK: util.return %[[CALL]]
   util.return %call : tensor<4x?xi32>
 }
+
+// -----
+
+// CHECK-LABEL: util.func public @unreachable_with_message
+util.func @unreachable_with_message() {
+  // CHECK: util.unreachable "this should never happen"
+  util.unreachable "this should never happen"
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @unreachable_no_message
+util.func @unreachable_no_message() {
+  // CHECK: util.unreachable{{$}}
+  util.unreachable
+}
+
+// -----
+
+// CHECK-LABEL: util.initializer
+util.initializer {
+  %true = arith.constant true
+  cf.cond_br %true, ^bb1, ^bb2
+^bb1:
+  // CHECK: util.return
+  util.return
+^bb2:
+  // CHECK: util.unreachable
+  util.unreachable
+}
+
+// -----
+
+// Tests that the SCF-compatible unreachable op can live inside an SCF region.
+
+// CHECK-LABEL: util.func public @scf_unreachable_in_if
+util.func @scf_unreachable_in_if(%cond: i1) -> i32 {
+  // CHECK: scf.if
+  %result = scf.if %cond -> i32 {
+    // CHECK: util.scf.unreachable "then branch"
+    util.scf.unreachable "then branch"
+    // CHECK: %[[POISON:.+]] = ub.poison : i32
+    %poison = ub.poison : i32
+    // CHECK: scf.yield %[[POISON]]
+    scf.yield %poison : i32
+  } else {
+    %val = arith.constant 42 : i32
+    scf.yield %val : i32
+  }
+  util.return %result : i32
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @scf_unreachable_no_message
+util.func @scf_unreachable_no_message(%cond: i1) {
+  scf.if %cond {
+    // CHECK: util.scf.unreachable{{$}}
+    util.scf.unreachable
+    scf.yield
+  }
+  util.return
+}
