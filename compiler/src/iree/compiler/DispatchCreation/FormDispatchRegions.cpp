@@ -125,7 +125,19 @@ public:
   FailureOr<AffineMap> getRootParallelLoopToOpMap(Operation *op) const;
 
   bool isFusable(Operation *op) const {
-    return succeeded(getRootParallelLoopToOpMap(op));
+    FailureOr<AffineMap> maybeMap = getRootParallelLoopToOpMap(op);
+    if (failed(maybeMap)) {
+      return false;
+    }
+
+    // If the candidate is not all parallel, then its loop configuration should
+    // be the same as the root.
+    auto candidateOuterParallelLoop = getOuterParallelLoops(op);
+    if (candidateOuterParallelLoop.size() !=
+        candidateOuterParallelLoop.count()) {
+      return loopMaps.lookup(rootOp) == maybeMap.value();
+    }
+    return true;
   }
 
   bool contains(Operation *op) const { return loopMaps.contains(op); }
