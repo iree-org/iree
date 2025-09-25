@@ -94,4 +94,4 @@ jobs:
             --job-summary-path=${{ github.workspace }}/iree-test-suites \
             --force-recompile \
             -m "${{ matrix.markers }}"
-          echo ${{ github.workspace }}/iree-test-suites/job_summary.md >> $GITHUB_STEP_SUMMARY
+          cat ${{ github.workspace }}/iree-test-suites/job_summary.md >> $GITHUB_STEP_SUMMARY
