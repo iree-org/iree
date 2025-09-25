@@ -259,8 +259,6 @@ def MatchDimsEqualOp : Op<Transform_Dialect, "iree.match.dims_equal",
     attr-dict `:` type($dimension_sizes)
   }];
 
-  let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
-
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
