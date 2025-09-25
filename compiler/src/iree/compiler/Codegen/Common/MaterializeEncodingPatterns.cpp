@@ -528,9 +528,9 @@ struct MaterializeInterfaceBindingEncoding
 
     auto newResultType = IREE::TensorExt::DispatchTensorType::get(
         resultType.getAccess(), convertedBoundType);
-    auto oldAttrs = subspanOp->getAttrs();
-    auto newOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp->getLoc(), newResultType, subspanOp.getLayout(),
+    llvm::ArrayRef<NamedAttribute> oldAttrs = subspanOp->getAttrs();
+    auto newOp = IREE::HAL::InterfaceBindingSubspanOp::create(
+        rewriter, subspanOp->getLoc(), newResultType, subspanOp.getLayout(),
         subspanOp.getBinding(), subspanOp.getByteOffset(), newDynamicDims,
         subspanOp.getAlignmentAttr(), adaptor.getDescriptorFlagsAttr());
     newOp->setAttrs(oldAttrs);
