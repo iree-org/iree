@@ -278,9 +278,8 @@ def Util_GlobalOpInterface : OpInterface<"GlobalOpInterface"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Returns true if the global is mutable outside of initializers. Even if
-        immutable initializers can store to the global and may do so multiple
-        times.
+        Returns true if the global is mutable. Immutable globals are only
+        allowed in initializers or initializer-only functions.
       }],
       /*retTy=*/"bool",
       /*methodName=*/"isGlobalMutable",
