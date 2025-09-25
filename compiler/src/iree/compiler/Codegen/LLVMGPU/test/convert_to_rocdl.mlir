@@ -73,8 +73,11 @@ builtin.module {
     return
   }
 }
+// CHECK: #[[$MMRA:.+]] = #llvm.mmra_tag<"amdgpu-synchronize-as":"local">
 // CHECK-LABEL: llvm.func @simple_barrier
-// CHECK: llvm.inline_asm has_side_effects asm_dialect = att ";;;WARNING: BREAKS DEBUG WATCHES\0As_waitcnt lgkmcnt(0)\0As_barrier", ""  : () -> ()
+// CHECK: llvm.fence syncscope("workgroup") release {llvm.mmra = #[[$MMRA]]}
+// CHECK: llvm.inline_asm has_side_effects asm_dialect = att ";;;WARNING: BREAKS DEBUG WATCHES\0As_barrier", ""  : () -> ()
+// CHECK: llvm.fence syncscope("workgroup") acquire {llvm.mmra = #[[$MMRA]]}
 
 // -----
 #pipeline_layout = #hal.pipeline.layout<bindings = [
