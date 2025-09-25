@@ -30,6 +30,7 @@ iree_cc_library(
   SRCS
     "BufferizationInterfaces.cpp"
     "Passes.cpp"
+    "SLPVectorizer.cpp"
     "VectorExtFoldUnitExtentDims.cpp"
     "VectorizeIREEVectorExtOps.cpp"
   DEPS
