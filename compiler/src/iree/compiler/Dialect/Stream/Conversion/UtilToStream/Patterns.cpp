@@ -248,6 +248,10 @@ struct GlobalOpExpansion
 
     // Materialize the initializer if we need to setup a tensor-like constant.
     if (tensorInitializerRequired) {
+      // Use an insertion guard to ensure the initializer is placed after the
+      // globals it initializes, then restore the rewriter's insertion point.
+      OpBuilder::InsertionGuard guard(rewriter);
+      rewriter.setInsertionPointAfter(resourceSizeOp);
       auto initializerOp =
           IREE::Util::InitializerOp::create(rewriter, globalOp.getLoc());
       auto *entryBlock = rewriter.createBlock(&initializerOp.getBody());

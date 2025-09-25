@@ -11,6 +11,7 @@
 #include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/MD5.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Matchers.h"
@@ -826,9 +827,11 @@ void ConstRefRodataOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
 // This is not uniqued and may need uniquing before being added to the symbol
 // table.
 //
+// Uses MD5 to ensure the hash suffix is stable across builds.
+//
 // For example:
-//   'Some string!' -> '_utf8_some_string'
-//   'I'm a really long'... -> '_utf8_im_a_really_long'
+//   'Some string!' -> '_utf8_some_string_<MD5>'
+//   'I'm a really long'... -> '_utf8_im_a_really_long_<MD5>'
 static std::string makeSafeIdentifier(StringRef unsafeIdentifier) {
   std::string result = "_utf8_";
   llvm::raw_string_ostream os(result);
@@ -848,8 +851,11 @@ static std::string makeSafeIdentifier(StringRef unsafeIdentifier) {
   if (!StringRef(prefix).ends_with("_")) {
     prefix += "_";
   }
-  return prefix + llvm::utohexstr(static_cast<uint64_t>(
-                      llvm::hash_value(unsafeIdentifier)));
+  // Use MD5 for a stable hash across builds.
+  llvm::MD5 hasher;
+  hasher.update(unsafeIdentifier);
+  llvm::MD5::MD5Result hash = hasher.final();
+  return prefix + llvm::utohexstr(hash.low());
 }
 
 void RodataInlineOp::build(OpBuilder &builder, OperationState &result,

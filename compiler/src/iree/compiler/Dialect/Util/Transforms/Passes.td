@@ -19,6 +19,9 @@ def ApplyPatternsPass : Pass<"iree-util-apply-patterns", ""> {
 
 def CombineInitializersPass : Pass<"iree-util-combine-initializers", "mlir::ModuleOp"> {
   let summary = "Combines global initializers into one.";
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::Util::UtilDialect"
+  ];
 }
 
 def DropCompilerHintsPass : Pass<"iree-util-drop-compiler-hints", ""> {
@@ -142,6 +145,27 @@ def StripAndSplatConstantsPass :
 
 def StripDebugOpsPass : Pass<"iree-util-strip-debug-ops", ""> {
   let summary = "Strips debug ops, like assertions.";
+}
+
+def VerifyInitializationOrderPass :
+    Pass<"iree-util-verify-initialization-order", "mlir::ModuleOp"> {
+  let summary = "Verifies module initialization order constraints.";
+  let description = [{
+    Verifies that module initialization follows the rules documented in the
+    util.initializer and util.global operations:
+
+    1. Initializers can only access globals defined before them in module order.
+    2. Immutable globals can only be initialized once (either by initial_value
+       OR by stores in initializers, never both).
+    3. Globals with initial values cannot be modified by initializers that
+       precede them in module order.
+    4. Stores to immutable globals must occur in initializers or functions
+       only reachable from initializers.
+
+    The pass uses conservative analysis and emits warnings for patterns it
+    cannot definitively verify (e.g. conditional stores in initializer-only
+    functions).
+  }];
 }
 
 def VerifyStructuredControlFlowPass :

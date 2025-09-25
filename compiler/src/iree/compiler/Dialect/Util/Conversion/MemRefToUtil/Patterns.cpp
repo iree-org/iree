@@ -134,6 +134,8 @@ struct ConvertMemRefGlobalOp : public OpConversionPattern<memref::GlobalOp> {
         rewriter.getType<IREE::Util::BufferType>());
     newOp.setPrivate();
 
+    // Ensure initializer comes after the global.
+    rewriter.setInsertionPointAfter(newOp);
     auto initializerOp =
         IREE::Util::InitializerOp::create(rewriter, globalOp.getLoc());
     auto initializerBuilder =
