@@ -228,10 +228,13 @@ struct MaterializeInterfaceBindingEncoding final
     }
     auto newResultType = getTypeConverter()->convertType(resultType);
     SmallVector<Value> newDynamicDims = subspanOp.getDynamicDims();
-    rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp, newResultType, subspanOp.getLayout(), subspanOp.getBinding(),
-        subspanOp.getByteOffset(), newDynamicDims, subspanOp.getAlignmentAttr(),
-        subspanOp.getDescriptorFlagsAttr());
+    auto oldAttrs = subspanOp->getAttrs();
+    auto newOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
+        subspanOp->getLoc(), newResultType, subspanOp.getLayout(),
+        subspanOp.getBinding(), subspanOp.getByteOffset(), newDynamicDims,
+        subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
+    newOp->setAttrs(oldAttrs);
+    rewriter.replaceOp(subspanOp, newOp.getResult());
     return success();
   }
 };

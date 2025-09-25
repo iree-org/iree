@@ -16,6 +16,8 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -303,10 +305,26 @@ convertBindingUsage(mlir::FunctionOpInterface sourceFuncOp, BlockArgument arg,
     OpBuilder builder(oldOp);
     auto alignmentAttr = sourceFuncOp.getArgAttrOfType<IntegerAttr>(
         arg.getArgNumber(), "stream.alignment");
+
+    constexpr llvm::StringRef subSpanAccessAttr = "iree.codegen.access";
+    StringAttr subspanAccessAttr;
+
+    if (auto dispatchTensorType =
+            dyn_cast<IREE::TensorExt::DispatchTensorType>(oldOp.getType())) {
+      if (dispatchTensorType.getAccess() ==
+          IREE::TensorExt::TensorAccess::WriteOnly) {
+        subspanAccessAttr = builder.getStringAttr("writeonly");
+      }
+    }
+
     auto newOp = IREE::HAL::InterfaceBindingSubspanOp::create(
         builder, oldOp.getLoc(), oldOp.getType(), pipelineLayoutAttr,
         APInt(64, bindingOrdinal), oldOp.getByteOffset(),
         oldOp.getDynamicDims(), alignmentAttr, bindingAttr.getFlags());
+
+    if (subspanAccessAttr)
+      newOp->setDiscardableAttr(subSpanAccessAttr, subspanAccessAttr);
+
     oldOp.replaceAllUsesWith(newOp.getResult());
     oldOp.erase();
   }

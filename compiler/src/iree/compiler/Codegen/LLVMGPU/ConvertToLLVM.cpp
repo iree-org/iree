@@ -220,6 +220,7 @@ namespace {
 /// binding, which is read-only, unused, and in address space 0.
 struct BindingProperties {
   bool readonly = true;
+  bool writeonly = false;
   bool unused = true;
   unsigned addressSpace = 0;
 };
@@ -236,6 +237,8 @@ analyzeSubspans(llvm::SetVector<IREE::HAL::InterfaceBindingSubspanOp> &subspans,
     result[binding].readonly &= IREE::HAL::bitEnumContainsAny(
         subspan.getDescriptorFlags().value_or(IREE::HAL::DescriptorFlags::None),
         IREE::HAL::DescriptorFlags::ReadOnly);
+    result[binding].writeonly =
+        subspan->getDiscardableAttr("iree.codegen.access") ? true : false;
     unsigned bindingAddrSpace = 0;
     auto bindingType = dyn_cast<BaseMemRefType>(subspan.getType());
     if (bindingType) {
@@ -360,6 +363,9 @@ public:
         // Setting the readonly attribute here will generate non-coherent cache
         // loads.
         newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getReadonlyAttrName(),
+                             unit);
+      } else if (info.writeonly) {
+        newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getWriteOnlyAttrName(),
                              unit);
       }
     }

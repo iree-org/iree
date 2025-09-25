@@ -92,6 +92,7 @@ struct ConvertHalInterfaceBindingSubspan final
             op, newResultTy, adaptor.getLayout(), adaptor.getBinding(),
             adaptor.getByteOffset(), adaptor.getDynamicDims(),
             adaptor.getAlignmentAttr(), adaptor.getDescriptorFlagsAttr());
+    newOp->setAttrs(op->getAttrs());
     LLVM_DEBUG(llvm::dbgs() << "Bf16Emulation: new op: " << newOp << "\n");
     (void)newOp;
     return success();

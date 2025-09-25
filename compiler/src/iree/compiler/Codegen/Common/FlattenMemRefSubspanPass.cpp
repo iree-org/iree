@@ -293,6 +293,7 @@ struct FlattenBindingSubspan final
         rewriter, subspanOp.getLoc(), newType, subspanOp.getLayout(),
         subspanOp.getBinding(), newOffset, dynamicShape,
         subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
+    newOp->setAttrs(subspanOp->getAttrs());
 
     Value replacement = newOp;
     if (!isZeroInteger(elementOffset)) {

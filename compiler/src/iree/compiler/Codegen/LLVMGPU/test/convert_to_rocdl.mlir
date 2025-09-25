@@ -241,7 +241,7 @@ builtin.module {
     %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
     %1 = arith.index_castui %0 : i32 to index
     %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) offset(%1) flags(ReadOnly) : memref<16xf32, strided<[1], offset : ?>, #gpu.address_space<global>>
-    %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<16xf32, #gpu.address_space<global>>
+    %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) {iree.codegen.access = "writeonly"} : memref<16xf32, #gpu.address_space<global>>
     %4 = memref.load %2[%c0] : memref<16xf32, strided<[1], offset : ?>, #gpu.address_space<global>>
     memref.store %4, %3[%c0] : memref<16xf32, #gpu.address_space<global>>
     return
@@ -250,7 +250,7 @@ builtin.module {
 //   CHECK-LABEL: llvm.func @missing_ptr_dispatch_copy_idx_0
 //    CHECK-SAME: (%[[arg0:.+]]: !llvm.ptr<1> {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef, llvm.readonly},
 //    CHECK-SAME:  %[[arg1:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef, llvm.readnone},
-//    CHECK-SAME:  %[[arg2:.+]]: !llvm.ptr<1> {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
+//    CHECK-SAME:  %[[arg2:.+]]: !llvm.ptr<1> {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef, llvm.writeonly},
 //    CHECK-SAME:  %[[arg3:.+]]: i32 {llvm.noundef})
 //         CHECK:   llvm.zext %[[arg3]] : i32 to i64
 //         CHECK:   llvm.insertvalue %[[arg0]]

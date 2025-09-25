@@ -80,10 +80,15 @@ struct ConvertHalInterfaceBindingSubspan final
           rewriter, loc, linearizedMemRefInfo.linearizedSize));
     }
 
-    rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
-        op, newResultType, adaptor.getLayout(), adaptor.getBinding(),
+    auto oldAttrs = op->getAttrs();
+
+    auto newOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
+        op.getLoc(), newResultType, adaptor.getLayout(), adaptor.getBinding(),
         byteOffset, dynamicLinearizedSize, adaptor.getAlignmentAttr(),
         adaptor.getDescriptorFlagsAttr());
+
+    newOp->setAttrs(oldAttrs);
+    rewriter.replaceOp(op, newOp->getResults());
     return success();
   }
 };

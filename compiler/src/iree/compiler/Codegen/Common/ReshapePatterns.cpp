@@ -132,6 +132,7 @@ struct FoldCollapseShapeIntoInterfaceTensorLoad
         subspanOp.getBinding(), subspanOp.getByteOffset(),
         collapsedDynamicShape, subspanOp.getAlignmentAttr(),
         subspanOp.getDescriptorFlagsAttr());
+    newSubspanOp.getDefiningOp()->setAttrs(subspanOp->getAttrs());
 
     rewriter.setInsertionPoint(reshapeOp);
     rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorLoadOp>(
@@ -232,6 +233,7 @@ struct FoldExpandShapeIntoInterfaceTensorLoad
         rewriter, subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
         subspanOp.getBinding(), subspanOp.getByteOffset(), expandedDynamicDims,
         subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
+    newSubspanOp.getDefiningOp()->setAttrs(subspanOp->getAttrs());
 
     rewriter.setInsertionPoint(reshapeOp);
     rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorLoadOp>(
@@ -317,6 +319,7 @@ struct FoldExpandShapeIntoInterfaceTensorStore
         subspanOp.getBinding(), subspanOp.getByteOffset(),
         collapsedDynamicShape, subspanOp.getAlignmentAttr(),
         subspanOp.getDescriptorFlagsAttr());
+    newSubspanOp.getDefiningOp()->setAttrs(subspanOp->getAttrs());
 
     rewriter.setInsertionPoint(storeOp);
     rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorStoreOp>(
@@ -500,6 +503,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
         rewriter, subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
         subspanOp.getBinding(), subspanOp.getByteOffset(), expandedDynamicShape,
         subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
+    newSubspanOp->setAttrs(subspanOp->getAttrs());
 
     rewriter.setInsertionPoint(storeOp);
 
@@ -799,6 +803,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
           subspanOp.getBinding(), subspanOp.getByteOffset(),
           newSubspanDynamicDims, subspanOp.getAlignmentAttr(),
           subspanOp.getDescriptorFlagsAttr());
+      newSubspanOp.getDefiningOp()->setAttrs(subspanOp->getAttrs());
     }
 
     SmallVector<OpFoldResult> expandedStrides(reshapeSrcShape.size(),
@@ -877,6 +882,8 @@ struct FoldInnerBitcastIntoInterfaceTensorLoad
         subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
         subspanOp.getDescriptorFlagsAttr());
 
+    newSubspanOp.getDefiningOp()->setAttrs(subspanOp->getAttrs());
+
     rewriter.setInsertionPoint(bitcastOp);
     SmallVector<int64_t> newSizes(loadOp.getStaticSizes());
     newSizes.back() = newInnerSize;
@@ -946,6 +953,7 @@ struct FoldInnerBitcastIntoInterfaceTensorStore
         subspanOp.getBinding(), subspanOp.getByteOffset(),
         subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
         subspanOp.getDescriptorFlagsAttr());
+    newSubspanOp.getDefiningOp()->setAttrs(subspanOp->getAttrs());
 
     SmallVector<int64_t> newSizes(storeOp.getStaticSizes());
     newSizes.back() = newInnerSize;
