@@ -307,11 +307,11 @@ func.func @i4_dequant_matvec() {
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
 //       CHECK:   linalg.generic
-//  CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
+//  CHECK-SAME:    attrs = {lowering_config = #iree_gpu.lowering_config<{
 //  CHECK-SAME:               lane_basis = {{\[}}[1, 1, 64], [0, 1, 2]],
-//  CHECK-SAME:               partial_reduction = [0, 1, 128],
+//  CHECK-SAME:               partial_reduction = [0, 1, 2048],
 //  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1], [0, 1, 2]],
-//  CHECK-SAME:               thread = [0, 1, 2],
+//  CHECK-SAME:               thread = [0, 1, 32],
 //  CHECK-SAME:               workgroup = [8, 0, 0]
 
 // -----
@@ -439,45 +439,44 @@ func.func @not_vmt() {
 
 // -----
 
-
-  func.func @dynamic_parallel_dims_dispatch_0_reduction_Dx4096_f16xf32() {
-    %c32_i64 = arith.constant 32 : i64
-    %cst = arith.constant 0.000000e+00 : f32
-    %c0 = arith.constant 0 : index
-    %0 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(0) : i32
-    %1 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(1) : i32
-    %2 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(2) : i32
-    %3 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(3) : i32
-    %4 = arith.extui %0 : i32 to i64
-    %5 = arith.extui %1 : i32 to i64
-    %6 = arith.shli %5, %c32_i64 : i64
-    %7 = arith.ori %4, %6 : i64
-    %8 = arith.index_castui %7 : i64 to index
-    %9 = arith.extui %2 : i32 to i64
-    %10 = arith.extui %3 : i32 to i64
-    %11 = arith.shli %10, %c32_i64 : i64
-    %12 = arith.ori %9, %11 : i64
-    %13 = arith.index_castui %12 : i64 to index
-    %14:2 = util.assume.int
-        %8<udiv = 4>,
-        %13<umin = 0, umax = 36028797018963964, udiv = 4>
-      : index, index
-    %15 = iree_tensor_ext.dispatch.workload.ordinal %14#0, 0 : index
-    %16 = iree_tensor_ext.dispatch.workload.ordinal %14#1, 1 : index
-    %17 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x4096xf16>>{%16}
-    %18 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?xf32>>{%15}
-    %19 = iree_tensor_ext.dispatch.tensor.load %17, offsets = [0, 0], sizes = [%16, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x4096xf16>>{%16} -> tensor<?x4096xf16>
-    %20 = tensor.empty(%15) : tensor<?xf32>
-    %21 = linalg.fill ins(%cst : f32) outs(%20 : tensor<?xf32>) -> tensor<?xf32>
-    %22 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%19 : tensor<?x4096xf16>) outs(%21 : tensor<?xf32>) {
-    ^bb0(%in: f16, %out: f32):
-      %23 = arith.extf %in : f16 to f32
-      %24 = arith.addf %23, %out : f32
-      linalg.yield %24 : f32
-    } -> tensor<?xf32>
-    iree_tensor_ext.dispatch.tensor.store %22, %18, offsets = [0], sizes = [%15], strides = [1] : tensor<?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?xf32>>{%15}
-    return
-  }
+func.func @dynamic_parallel_dims_dispatch_0_reduction_Dx4096_f16xf32() {
+  %c32_i64 = arith.constant 32 : i64
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(0) : i32
+  %1 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(1) : i32
+  %2 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(2) : i32
+  %3 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(3) : i32
+  %4 = arith.extui %0 : i32 to i64
+  %5 = arith.extui %1 : i32 to i64
+  %6 = arith.shli %5, %c32_i64 : i64
+  %7 = arith.ori %4, %6 : i64
+  %8 = arith.index_castui %7 : i64 to index
+  %9 = arith.extui %2 : i32 to i64
+  %10 = arith.extui %3 : i32 to i64
+  %11 = arith.shli %10, %c32_i64 : i64
+  %12 = arith.ori %9, %11 : i64
+  %13 = arith.index_castui %12 : i64 to index
+  %14:2 = util.assume.int
+      %8<udiv = 4>,
+      %13<umin = 0, umax = 36028797018963964, udiv = 4>
+    : index, index
+  %15 = iree_tensor_ext.dispatch.workload.ordinal %14#0, 0 : index
+  %16 = iree_tensor_ext.dispatch.workload.ordinal %14#1, 1 : index
+  %17 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x4096xf16>>{%16}
+  %18 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?xf32>>{%15}
+  %19 = iree_tensor_ext.dispatch.tensor.load %17, offsets = [0, 0], sizes = [%16, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x4096xf16>>{%16} -> tensor<?x4096xf16>
+  %20 = tensor.empty(%15) : tensor<?xf32>
+  %21 = linalg.fill ins(%cst : f32) outs(%20 : tensor<?xf32>) -> tensor<?xf32>
+  %22 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%19 : tensor<?x4096xf16>) outs(%21 : tensor<?xf32>) {
+  ^bb0(%in: f16, %out: f32):
+    %23 = arith.extf %in : f16 to f32
+    %24 = arith.addf %23, %out : f32
+    linalg.yield %24 : f32
+  } -> tensor<?xf32>
+  iree_tensor_ext.dispatch.tensor.store %22, %18, offsets = [0], sizes = [%15], strides = [1] : tensor<?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?xf32>>{%15}
+  return
+}
 
 //      CHECK:   #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
 // CHECK-SAME:   workgroup_size = [512, 1, 1] subgroup_size = 64
@@ -485,10 +484,9 @@ func.func @not_vmt() {
 //      CDNA:   #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
 // CDNA-SAME:   workgroup_size = [512, 1, 1] subgroup_size = 64
 
-
 // -----
 
-func.func @test_dyn_reduction() {
+func.func @test_dyn_small_reduction() {
   %c32 = arith.constant 32 : index
   %c32_i64 = arith.constant 32 : i64
   %cst = arith.constant 0.000000e+00 : f32
@@ -549,6 +547,7 @@ func.func @test_dyn_reduction() {
   iree_tensor_ext.dispatch.tensor.store %30, %16, offsets = [0, 0], sizes = [128, 128], strides = [1, 1] : tensor<128x128xf8E4M3FNUZ> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x128xf8E4M3FNUZ>>
   return
 }
+// CHECK: #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+// CHECK-LABEL: func.func @test_dyn_small_reduction()
 
-//      CHECK: #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
-// CHECK-SAME: workgroup_size = [2, 1, 1] subgroup_size = 64,
+// -----
