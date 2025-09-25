@@ -70,6 +70,8 @@ createBufferLikeGlobalOp(std::string name, Location loc, Type globalType,
   // Create an initializer that allocates the buffer storage.
   // We do this by splatting and exporting to a buffer so that it looks like it
   // was created by the user.
+  // Ensure initializer comes after the global.
+  moduleBuilder.setInsertionPointAfter(globalOp);
   auto initializerOp = IREE::Util::InitializerOp::create(moduleBuilder, loc);
   auto initializerBuilder =
       OpBuilder::atBlockBegin(initializerOp.addEntryBlock());

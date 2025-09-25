@@ -270,7 +270,8 @@ static SmallVector<IREE::Util::GlobalOpInterface> createMemoizedDeviceGlobals(
   }
 
   // Create an initializer to call the apply function and store the results into
-  // globals.
+  // globals. Ensure it's placed after the globals it initializes.
+  moduleBuilder.setInsertionPointAfter(resultGlobalOps.back());
   auto initializerOp =
       IREE::Util::InitializerOp::create(moduleBuilder, memoizeOp.getLoc());
   auto initializerBuilder =
