@@ -304,6 +304,30 @@ IREE::transform_dialect::MatchContractionOp::matchOperation(
 }
 
 //===----------------------------------------------------------------------===//
+// MatchDimsEqualOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure IREE::transform_dialect::MatchDimsEqualOp::apply(
+    transform::TransformRewriter &rewriter,
+    transform::TransformResults &results, transform::TransformState &state) {
+  ArrayRef<transform::Param> currentDimSizes =
+      state.getParams(getDimensionSizes());
+  ArrayAttr targetDimensionSizes = getExpectedValues();
+
+  if (!llvm::equal(currentDimSizes, targetDimensionSizes)) {
+    return emitSilenceableError()
+           << "Dimension sizes do not match expected values";
+  }
+
+  return DiagnosedSilenceableFailure::success();
+}
+
+void IREE::transform_dialect::MatchDimsEqualOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getDimensionSizesMutable(), effects);
+}
+
+//===----------------------------------------------------------------------===//
 // MatchCastCompatibleTypesOp
 //===----------------------------------------------------------------------===//
 

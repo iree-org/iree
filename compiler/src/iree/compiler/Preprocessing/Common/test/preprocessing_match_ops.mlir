@@ -496,3 +496,151 @@ module attributes {transform.with_named_sequence} {
     transform.yield
   }
 }
+
+// -----
+
+// Verify MatchSizeEqualsOp with dimension size constraints.
+
+// CHECK-LABEL: func.func @op_matmul_4096x2048x8192
+func.func @op_matmul_4096x2048x8192(%input0: tensor<4096x8192xf16>, %input1: tensor<8192x2048xf16>, %dest: tensor<4096x2048xf32>) -> tensor<4096x2048xf32> {
+  // CHECK-NEXT: linalg.matmul
+  // CHECK-SAME:   match_status = "matched"
+  %res = linalg.matmul
+        ins(%input0, %input1 : tensor<4096x8192xf16>, tensor<8192x2048xf16>)
+        outs(%dest : tensor<4096x2048xf32>) {match_status = "unmatched"} -> tensor<4096x2048xf32>
+  return %res : tensor<4096x2048xf32>
+}
+
+// CHECK-LABEL: func.func @op_matmul_1024x512x2048
+func.func @op_matmul_1024x512x2048(%input0: tensor<1024x2048xf16>, %input1: tensor<2048x512xf16>, %dest: tensor<1024x512xf32>) -> tensor<1024x512xf32> {
+  // CHECK-NEXT: linalg.matmul
+  // CHECK-SAME:   match_status = "unmatched"
+  %res = linalg.matmul
+        ins(%input0, %input1 : tensor<1024x2048xf16>, tensor<2048x512xf16>)
+        outs(%dest : tensor<1024x512xf32>) {match_status = "unmatched"} -> tensor<1024x512xf32>
+  return %res : tensor<1024x512xf32>
+}
+
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @match_contraction_and_size(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
+    %batch, %m, %n, %k = transform.iree.match.contraction %op,
+      lhs_type = f16, rhs_type = f16, output_type = f32 :
+      (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+
+    transform.iree.match.dims_equal %m, [4096] : !transform.param<i64>
+    transform.iree.match.dims_equal %n, [2048] : !transform.param<i64>
+    transform.iree.match.dims_equal %k, [8192] : !transform.param<i64>
+
+    transform.yield %op : !transform.any_op
+  }
+
+  transform.named_sequence @annotate(%op: !transform.any_op {transform.readonly}) {
+    %0 = transform.param.constant "matched" -> !transform.any_param
+    transform.annotate %op "match_status" = %0 : !transform.any_op, !transform.any_param
+    transform.yield
+  }
+
+  transform.named_sequence @__transform_main(%module: !transform.any_op) {
+    transform.foreach_match in %module
+        @match_contraction_and_size -> @annotate
+      : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
+  }
+}
+
+// -----
+
+// Verify MatchSizeEqualsOp with multiple batch dimensions.
+
+#map0 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
+#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
+
+// CHECK-LABEL: func.func @op_contract_multi_dims
+func.func @op_contract_multi_dims(%input0: tensor<2x4x32x64xf16>, %input1: tensor<2x4x32x64xf16>, %dest: tensor<2x4x32x32xf32>) -> tensor<2x4x32x32xf32> {
+  // CHECK-NEXT: linalg.contract
+  // CHECK-SAME:   match_status = "matched"
+  %res = linalg.contract
+        indexing_maps = [#map0, #map1, #map2]
+        ins(%input0, %input1 : tensor<2x4x32x64xf16>, tensor<2x4x32x64xf16>)
+        outs(%dest : tensor<2x4x32x32xf32>) {match_status = "unmatched"} -> tensor<2x4x32x32xf32>
+  return %res : tensor<2x4x32x32xf32>
+}
+
+// CHECK-LABEL: func.func @op_contract_mismatch_dims
+func.func @op_contract_mismatch_dims(%input0: tensor<3x5x16x128xf16>, %input1: tensor<3x5x16x128xf16>, %dest: tensor<3x5x16x16xf32>) -> tensor<3x5x16x16xf32> {
+  // CHECK-NEXT: linalg.contract
+  // CHECK-SAME:   match_status = "unmatched"
+  %res = linalg.contract
+        indexing_maps = [#map0, #map1, #map2]
+        ins(%input0, %input1 : tensor<3x5x16x128xf16>, tensor<3x5x16x128xf16>)
+        outs(%dest : tensor<3x5x16x16xf32>) {match_status = "unmatched"} -> tensor<3x5x16x16xf32>
+  return %res : tensor<3x5x16x16xf32>
+}
+
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @match_multi_dimensions(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
+    %batch_dims, %m_dims, %n_dims, %k_dims = transform.iree.match.contraction %op,
+      lhs_type = f16, rhs_type = f16, output_type = f32 :
+      (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+    // Test multiple dimensions.
+    // %batch_dims = [2, 4] - check if first batch dim is 2 and second is 4.
+    transform.iree.match.dims_equal %batch_dims, [2, 4] : !transform.param<i64>
+    transform.iree.match.dims_equal %m_dims, [32] : !transform.param<i64>
+    transform.iree.match.dims_equal %n_dims, [32] : !transform.param<i64>
+    transform.iree.match.dims_equal %k_dims, [64] : !transform.param<i64>
+
+    transform.yield %op : !transform.any_op
+  }
+
+  transform.named_sequence @annotate(%op: !transform.any_op {transform.readonly}) {
+    %0 = transform.param.constant "matched" -> !transform.any_param
+    transform.annotate %op "match_status" = %0 : !transform.any_op, !transform.any_param
+    transform.yield
+  }
+
+  transform.named_sequence @__transform_main(%module: !transform.any_op) {
+    transform.foreach_match in %module
+        @match_multi_dimensions -> @annotate
+      : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
+  }
+}
+
+// -----
+
+// Verify MatchSizeEqualsOp fails when array lengths don't match.
+
+// CHECK-LABEL: func.func @op_matmul_size_mismatch
+func.func @op_matmul_size_mismatch(%input0: tensor<512x1024xf16>, %input1: tensor<1024x256xf16>, %dest: tensor<512x256xf32>) -> tensor<512x256xf32> {
+  // CHECK-NEXT: linalg.matmul
+  // CHECK-SAME:   match_status = "unmatched"
+  %res = linalg.matmul
+        ins(%input0, %input1 : tensor<512x1024xf16>, tensor<1024x256xf16>)
+        outs(%dest : tensor<512x256xf32>) {match_status = "unmatched"} -> tensor<512x256xf32>
+  return %res : tensor<512x256xf32>
+}
+
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @match_size_mismatch(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
+    %batch, %m, %n, %k = transform.iree.match.contraction %op,
+      lhs_type = f16, rhs_type = f16, output_type = f32 :
+      (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+    // This should fail because %m contains [512] but we expect [512, 256] (different array lengths).
+    transform.iree.match.dims_equal %m, [512, 256] : !transform.param<i64>
+    transform.yield %op : !transform.any_op
+  }
+
+  transform.named_sequence @annotate(%op: !transform.any_op {transform.readonly}) {
+    %0 = transform.param.constant "matched" -> !transform.any_param
+    transform.annotate %op "match_status" = %0 : !transform.any_op, !transform.any_param
+    transform.yield
+  }
+
+  transform.named_sequence @__transform_main(%module: !transform.any_op) {
+    transform.foreach_match in %module
+        @match_size_mismatch -> @annotate
+      : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
+  }
+}
