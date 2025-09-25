@@ -39,9 +39,9 @@ jobs:
             markers: "hip or gfx942 or mi325"
             cache-dir: /shark-cache/data/iree-regression-cache
             runs-on: linux-mi325-1gpu-ossci-iree-org
-      env:
-        VENV_PATH: ${{ github.workspace }}/.venv
-        PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
+    env:
+      VENV_PATH: ${{ github.workspace }}/.venv
+      PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
     steps:
       - name: Checking out IREE repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
