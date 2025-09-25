@@ -42,54 +42,54 @@ jobs:
       env:
         VENV_PATH: ${{ github.workspace }}/.venv
         PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
-      steps:
-        - name: Checking out IREE repository
-          uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-          with:
-            submodules: false
+    steps:
+      - name: Checking out IREE repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          submodules: false
 
-        - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v5.4.0
-          with:
-            # Must match the subset of versions built in pkgci_build_packages.
-            python-version: "3.11"
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v5.4.0
+        with:
+          # Must match the subset of versions built in pkgci_build_packages.
+          python-version: "3.11"
 
-        - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
-          if: ${{ inputs.artifact_run_id == '' }}
-          with:
-            name: linux_x86_64_release_packages
-            path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        if: ${{ inputs.artifact_run_id == '' }}
+        with:
+          name: linux_x86_64_release_packages
+          path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
 
-        - name: Checkout test suites repository
-          uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-          with:
-            repository: iree-org/iree-test-suites
-            ref: e0bf8081391637b191d6f8cf4f1c91dfab813bb5
-            path: iree-test-suites
-            # Don't need lfs for torch models yet.
-            lfs: false
+      - name: Checkout test suites repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          repository: iree-org/iree-test-suites
+          ref: e0bf8081391637b191d6f8cf4f1c91dfab813bb5
+          path: iree-test-suites
+          # Don't need lfs for torch models yet.
+          lfs: false
 
-        - name: Setup Python virtual environment
-          run: |
-            ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
-              --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
-              --fetch-gh-workflow=${{ inputs.artifact_run_id }}
-            source ${VENV_DIR}/bin/activate
-            pip install -r ${{ github.workspace }}/iree-test-suites/requirements.txt
+      - name: Setup Python virtual environment
+        run: |
+          ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
+            --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
+            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+          source ${VENV_DIR}/bin/activate
+          pip install -r ${{ github.workspace }}/iree-test-suites/requirements.txt
 
-        - name: Run Torch Model tests
-          run: |
-            source ${VENV_DIR}/bin/activate
-            pytest \
-              iree-test-suites/torch_models \
-              -rpFe \
-              --log-cli-level=info \
-              -o log_cli=True \
-              --durations=0 \
-              --timeout=1200 \
-              --capture=no \
-              --test-file-directory=${{ github.workspace }}/tests/external/iree-test-suites/torch_models \
-              --external-file-directory=${{ github.workspace }}/tests/external/iree-test-suites/test_suite_files
-              --module-directory=${{ github.workspace }}/tests/external/iree-test-suites/torch_models \
-              --artifact-directory=${{ matrix.cache-dir }}/torch_models/artifacts \
-              --force-recompile \
-              -m "${{ matrix.markers }}"
+      - name: Run Torch Model tests
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest \
+            iree-test-suites/torch_models \
+            -rpFe \
+            --log-cli-level=info \
+            -o log_cli=True \
+            --durations=0 \
+            --timeout=1200 \
+            --capture=no \
+            --test-file-directory=${{ github.workspace }}/tests/external/iree-test-suites/torch_models \
+            --external-file-directory=${{ github.workspace }}/tests/external/iree-test-suites/test_suite_files
+            --module-directory=${{ github.workspace }}/tests/external/iree-test-suites/torch_models \
+            --artifact-directory=${{ matrix.cache-dir }}/torch_models/artifacts \
+            --force-recompile \
+            -m "${{ matrix.markers }}"
