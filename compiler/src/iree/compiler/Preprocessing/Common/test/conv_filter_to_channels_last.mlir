@@ -101,16 +101,14 @@ util.func public @conv_2d_nhwc_chwf(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1 + d5, d2 + d6, d3, d7)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d3, d7, d5, d6, d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>
-module {
-  util.func public @conv_2d_nhwgc_gchwf(%arg0: tensor<2x10x10x7x4xf32>, %arg1: tensor<7x4x3x3x16xf32>, %arg2: tensor<2x8x8x7x16xf32>) -> tensor<2x8x8x7x16xf32> {
-    %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<2x10x10x7x4xf32>, tensor<7x4x3x3x16xf32>) outs(%arg2 : tensor<2x8x8x7x16xf32>) {
-    ^bb0(%in: f32, %in_0: f32, %out: f32):
-      %1 = arith.mulf %in, %in_0 : f32
-      %2 = arith.addf %out, %1 : f32
-      linalg.yield %2 : f32
-    } -> tensor<2x8x8x7x16xf32>
-    util.return %0 : tensor<2x8x8x7x16xf32>
-  }
+util.func public @conv_2d_nhwgc_gchwf(%arg0: tensor<2x10x10x7x4xf32>, %arg1: tensor<7x4x3x3x16xf32>, %arg2: tensor<2x8x8x7x16xf32>) -> tensor<2x8x8x7x16xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<2x10x10x7x4xf32>, tensor<7x4x3x3x16xf32>) outs(%arg2 : tensor<2x8x8x7x16xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %1 = arith.mulf %in, %in_0 : f32
+    %2 = arith.addf %out, %1 : f32
+    linalg.yield %2 : f32
+  } -> tensor<2x8x8x7x16xf32>
+  util.return %0 : tensor<2x8x8x7x16xf32>
 }
 
 // CHECK-FHWC: #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d3, d4, d5, d6, d7)>
