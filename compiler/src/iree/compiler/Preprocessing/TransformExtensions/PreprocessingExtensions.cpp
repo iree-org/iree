@@ -305,21 +305,15 @@ IREE::transform_dialect::MatchContractionOp::matchOperation(
 }
 
 //===----------------------------------------------------------------------===//
-// MatchSizeEqualsOp
+// MatchDimsEqualOp
 //===----------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure IREE::transform_dialect::MatchSizeEqualsOp::apply(
+DiagnosedSilenceableFailure IREE::transform_dialect::MatchDimsEqualOp::apply(
     transform::TransformRewriter &rewriter,
     transform::TransformResults &results, transform::TransformState &state) {
   ArrayRef<transform::Param> currentDimSizes =
       state.getParams(getDimensionSizes());
   ArrayAttr targetDimensionSizes = getExpectedValues();
-
-  if (currentDimSizes.size() != targetDimensionSizes.size()) {
-    return emitSilenceableError() << "dimension sizes have different lengths ("
-                                  << currentDimSizes.size() << " vs "
-                                  << targetDimensionSizes.size() << ")";
-  }
 
   if (!llvm::equal(currentDimSizes, targetDimensionSizes)) {
     return emitSilenceableError()
@@ -329,7 +323,7 @@ DiagnosedSilenceableFailure IREE::transform_dialect::MatchSizeEqualsOp::apply(
   return DiagnosedSilenceableFailure::success();
 }
 
-void IREE::transform_dialect::MatchSizeEqualsOp::getEffects(
+void IREE::transform_dialect::MatchDimsEqualOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getDimensionSizesMutable(), effects);
 }

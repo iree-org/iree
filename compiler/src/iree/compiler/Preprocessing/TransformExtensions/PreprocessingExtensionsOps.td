@@ -225,7 +225,7 @@ def MatchContractionOp : Op<Transform_Dialect, "iree.match.contraction",
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
-def MatchSizeEqualsOp : Op<Transform_Dialect, "iree.match.size_equals",
+def MatchDimsEqualOp : Op<Transform_Dialect, "iree.match.dims_equal",
     [DeclareOpInterfaceMethods<TransformOpInterface>,
      MatchOpInterface,
      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
@@ -237,8 +237,11 @@ def MatchSizeEqualsOp : Op<Transform_Dialect, "iree.match.size_equals",
 
     ### Example
 
-    `transform.iree.match.size_equals %m, [512, 256] : !transform.param<i64>`
-    succeeds when `%m` has exactly two dimensions, 512 and 256.
+    ```mlir
+    transform.iree.match.size_equals %m, [512, 256] : !transform.param<i64>
+    ```
+
+    This succeeds when `%m` has exactly two dimensions, 512 and 256.
 
     #### Return modes
 
