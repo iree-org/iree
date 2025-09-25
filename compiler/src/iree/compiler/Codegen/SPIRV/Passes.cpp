@@ -619,6 +619,14 @@ static void buildSPIRVCodegenConfigurationPassPipelineImpl(
     OpPassManager &modulePassManager) {
   {
     FunctionLikeNest funcPassManager(modulePassManager);
+    // Transform Conv2D ops to Winograd ops if heuristically convenient for the
+    // target GPU.
+    {
+      funcPassManager.addPass(createSPIRVAnnotateEligibleForWinogradPass);
+      funcPassManager.addPass(
+          IREE::LinalgExt::createConvertConv2DToWinogradPass);
+    }
+
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
     addEncodingToNopPasses(funcPassManager);
