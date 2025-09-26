@@ -240,7 +240,6 @@ def generate_function(
     if transpose_rhs:
         indexing_maps_attr = "indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>]"
 
-
     func_definition += (
         f"  %result = linalg.matmul {indexing_maps_attr} {compilation_info_attr} ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
         f"  util.return %result: {acc_tensor_type}\n"
