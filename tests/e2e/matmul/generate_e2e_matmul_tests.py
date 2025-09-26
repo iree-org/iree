@@ -209,9 +209,10 @@ def generate_function(
         op_name = "linalg.matmul"
 
     # Compilation info is optional; prints empty string by default.
-    compilation_info_string, compilation_info_attr = (
-        generate_compilation_info_string_and_attr(compilation_info)
-    )
+    (
+        compilation_info_string,
+        compilation_info_attr,
+    ) = generate_compilation_info_string_and_attr(compilation_info)
     func_definition = compilation_info_string
     compute = f"  %result = {op_name} {compilation_info_attr}ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
     if shape.accumulate:
