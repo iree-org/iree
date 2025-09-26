@@ -17,9 +17,9 @@
         "mi308": 1.1
     },
     "golden_time_ms": {
-        "mi250": 192.506,
-        "mi300": 192.506,
-        "mi308": 192.506
+        "mi250": 203.611,
+        "mi300": 203.611,
+        "mi308": 203.611
     },
     "compilation_required": true,
     "mlir_url": "https://sharkpublic.blob.core.windows.net/sharkpublic/yrathore/output_8b_fp8_2025-09-22.mlir",
