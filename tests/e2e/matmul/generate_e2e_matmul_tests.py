@@ -4,202 +4,15 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""iree_generated_e2e_matmul_test generator for e2e matmul tests.
-"""
+"""iree_generated_e2e_matmul_test generator for e2e matmul tests."""
 
 from typing import Optional
 import argparse
-import os
-import re
-import enum
 import dataclasses
 import typing
-import itertools
 
-
-# Data type of matrix entries. The string values must match MLIR data types.
-# This is a superset of the values accepted for the --lhs_rhs_types= flag,
-# as this also includes accumulator-specific types like i32.
-@enum.unique
-class MatrixElemTypeId(enum.Enum):
-    NONE = ""
-    I8 = "i8"
-    I32 = "i32"
-    F64 = "f64"
-    F32 = "f32"
-    F16 = "f16"
-    BF16 = "bf16"
-    F8E5M2 = "f8E5M2"
-    F8E4M3FN = "f8E4M3FN"
-    F8E5M2FNUZ = "f8E5M2FNUZ"
-    F8E4M3FNUZ = "f8E4M3FNUZ"
-
-
-# Enumerates of the collections of shapes that we can generate tests for.
-# The values are the accepted values for the --shapes= flag.
-@enum.unique
-class ShapesId(enum.Enum):
-    DEFAULT = "default"
-    SMALL = "small"
-    LARGE = "large"
-    EASY_LARGE_STATIC = "easy_large_static"
-    CUSTOM_MNK = "custom_mnk"  # Used for custom shapes specified by --mnk= flag.
-
-    @classmethod
-    def set_custom_mnk(cls, shapes_id, mnk_string):
-        """Parse and set custom MNK values from command line argument."""
-        if shapes_id != cls.CUSTOM_MNK:
-            if mnk_string:
-                raise ValueError("--mnk can only be used with --shapes=custom_mnk")
-            return
-
-        # shapes_id is CUSTOM_MNK
-        if not mnk_string:
-            raise ValueError("--mnk must be specified when using --shapes=custom_mnk")
-        try:
-            mnk_parts = mnk_string.split(",")
-            if len(mnk_parts) != 3:
-                raise ValueError("--mnk must have exactly 3 values: m,n,k")
-            cls.custom_mnk_values = tuple(int(x) for x in mnk_parts)
-        except ValueError as e:
-            raise ValueError(f"Invalid --mnk format: {e}")
-
-
-# Class attribute to store custom MNK values
-ShapesId.custom_mnk_values = None
-
-
-# Enumerates of the collections of compilation info that we can generate tests
-# for. The values are the accepted values for the --compilation_info= flag.
-@enum.unique
-class CompilationInfoId(enum.Enum):
-    NONE = ""
-    LLVMGPUMatmulTensorCore = "LLVMGPUMatmulTensorCore"
-    LLVMGPUMatmulTensorCoreMmaSync = "LLVMGPUMatmulTensorCoreMmaSync"
-    LLVMGPUVectorDistributeMFMA = "LLVMGPUVectorDistributeMFMA"
-    LLVMGPUVectorDistributeWMMAR3 = "LLVMGPUVectorDistributeWMMAR3"
-    LLVMGPUVectorDistributeWMMAR4 = "LLVMGPUVectorDistributeWMMAR4"
-    SPIRVCooperativeMatrixVectorize = "SPIRVCooperativeMatrixVectorize"
-    SPIRVVectorizeMali = "SPIRVVectorizeMali"
-    SPIRVVectorizeNVIDIA = "SPIRVVectorizeNVIDIA"
-
-
-# Enumerates ways to construct MLIR tensor types.
-@enum.unique
-class Dynamicity(enum.Enum):
-    DYNAMIC = "dynamic"  # Use '?' everywhere. Example: tensor<?x?xf32>.
-    STATIC = "static"  # Use fixed values everywhere. Example: tensor<4x6xf32>.
-    MIXED = "mixed"  # Randomly mix '?' and values. Example: tensor<?x4xf32>.
-
-
-# Enumerates ways to initialize matrix buffer contents.
-@enum.unique
-class MatrixGenerator(enum.Enum):
-    ZERO = "zero"  # Fill with zeros
-    RANDOM = "random"  # Fill with (deterministic) pseudorandom values.
-
-
-# Describes the shape of a matrix multiplication in the usual convention:
-# the LHS is {m}x{k}, the RHS is {k}x{n}, the accumulator/result is {m}x{n}.
-# The extra `accumulate` boolean tells whether the matmul is accumulating into
-# an existing accumulator (C += A * B) or just overwriting the result
-# (C = A * B).
-@dataclasses.dataclass
-class TestShape:
-    m: int
-    k: int
-    n: int
-    accumulate: bool
-
-
-# Describes a workgroup and tiling schedule to target a specific MMA intrinsic.
-@dataclasses.dataclass
-class MMASchedule:
-    intrinsic: str
-    m_count: int  # Number of subgroups per workgroup along M
-    n_count: int  # Number of subgroups per workgroup along N
-    m_tile_count: int
-    n_tile_count: int
-    k_tile_count: int
-
-    def get_subgroup_basis(self) -> str:
-        return f"[[{self.m_count}, {self.n_count}, 1], [0, 1, 2]]"
-
-
-# Describes how to construct compilation info for the testcase.
-@dataclasses.dataclass
-class CompilationInfo:
-    # Compilation info
-    workgroup_size: typing.List[int]
-    subgroup_size: Optional[int]
-    # Translation info
-    dispatch_lowering_pass_pipeline: str
-
-    # Prints the workgroup size
-    def workgroup_size_str(self):
-        return "workgroup_size = [" + ", ".join(map(str, self.workgroup_size)) + "]"
-
-    def get_compilation_info_attr(self) -> str:
-        ...
-
-
-@dataclasses.dataclass
-class IREEGPUCompilationInfo(CompilationInfo):
-    # Lowering Config
-    workgroup_tile: list[int]
-    reduction_tile: list[int]
-    # Translation Info
-    mma_schedule: Optional[MMASchedule]
-
-    def get_compilation_info_attr(self) -> str:
-        requested_pipeline = self.dispatch_lowering_pass_pipeline
-        compiler_pipeline = requested_pipeline
-
-        subgroup_size_str = ""
-        if self.subgroup_size is not None:
-            subgroup_size_str = f"subgroup_size = {self.subgroup_size}"
-
-        return (
-            "#iree_codegen.compilation_info<\n"
-            f"  lowering_config = #iree_gpu.lowering_config<{{"
-            f"  mma_kind = #iree_gpu.mma_layout<{self.mma_schedule.intrinsic}>, "
-            f"  subgroup_basis = {self.mma_schedule.get_subgroup_basis()}, "
-            f"  workgroup = {self.workgroup_tile}, "
-            f"  reduction = {self.reduction_tile} }}>,\n"
-            f"  translation_info = #iree_codegen.translation_info<pipeline = {compiler_pipeline} {self.workgroup_size_str()}\n"
-            f"  {subgroup_size_str}>>\n"
-        )
-
-
-@dataclasses.dataclass
-class LegacyCompilationInfo(CompilationInfo):
-    # Lowering Config
-    tile_sizes: typing.List[typing.List[int]]
-    # Translation Info
-    software_pipeline_depth: int
-
-    def get_compilation_info_attr(self) -> str:
-        requested_pipeline = self.dispatch_lowering_pass_pipeline
-        compiler_pipeline = requested_pipeline
-        if requested_pipeline == "SPIRVVectorizeMali":
-            compiler_pipeline = "SPIRVBaseVectorize"
-        elif requested_pipeline == "SPIRVCooperativeMatrixVectorize":
-            compiler_pipeline = "SPIRVCooperativeMatrixVectorize"
-        elif requested_pipeline == "SPIRVVectorizeNVIDIA":
-            # TODO: change to test SPIRVMatmulPromoteVectorize too
-            compiler_pipeline = "SPIRVBaseVectorize"
-
-        subgroup_size_str = ""
-        if self.subgroup_size is not None:
-            subgroup_size_str = f"subgroup_size = {self.subgroup_size}"
-
-        return (
-            "#iree_codegen.compilation_info<\n"
-            f"  lowering_config = #iree_codegen.lowering_config<tile_sizes = {self.tile_sizes}>,\n"
-            f"  translation_info = #iree_codegen.translation_info<pipeline = {compiler_pipeline} {self.workgroup_size_str()}\n"
-            f"  {subgroup_size_str},\n"
-            f"  {{ pipeline_depth = {self.software_pipeline_depth}, store_stage = 1}}>>"
-        )
+from tests.e2e.matmul.common import *
+from tests.e2e.matmul.compilation_info import *
 
 
 # Returns the list of TestShape's to use for the collection of shapes
@@ -284,328 +97,6 @@ def get_test_shapes(shapes_id: ShapesId):
         ]
 
     raise ValueError(shapes_id)
-
-
-# Returns the list of Dynamicity's to use for the collection of shapes
-# identified by shapes_id.
-def get_dynamicities(shapes_id: ShapesId):
-    if shapes_id == ShapesId.EASY_LARGE_STATIC:
-        return [
-            Dynamicity.STATIC,
-        ]
-    else:
-        return [
-            Dynamicity.DYNAMIC,
-            Dynamicity.STATIC,
-        ]
-    raise ValueError(shapes_id)
-
-
-@dataclasses.dataclass
-class TileWorkgroupSizePair:
-    tile_size: typing.List[typing.List[int]]
-    workgroup_size: typing.List[int]
-
-
-# Constructs a TileWorkgroupSizePair for SPIR-V targets enforcing the
-# constraints between the workgroup_size and tile size
-def get_spirv_tile_workgroup_size_pair(
-    workgroup_size, t_tile_k, t_tile_m=4, t_tile_n=4
-):
-    x, y, z = workgroup_size
-    wg_tile_m = y * t_tile_m
-    wg_tile_n = x * t_tile_n
-    return TileWorkgroupSizePair(
-        [[wg_tile_m, wg_tile_n], [t_tile_m, t_tile_n], [0, 0, t_tile_k]], workgroup_size
-    )
-
-
-# Returns all the TileWorkgroupSizePairs for a given SPIRV Target
-def get_all_spirv_tile_workgroup_size_pairs(t_tile_k):
-    tile_workgroup_size_pairs = [
-        get_spirv_tile_workgroup_size_pair([32, 8, 1], t_tile_k),
-        get_spirv_tile_workgroup_size_pair([16, 8, 1], t_tile_k),
-        get_spirv_tile_workgroup_size_pair([64, 2, 1], t_tile_k),
-        get_spirv_tile_workgroup_size_pair([8, 8, 1], t_tile_k),
-        get_spirv_tile_workgroup_size_pair([32, 1, 1], t_tile_k),
-        get_spirv_tile_workgroup_size_pair([16, 2, 1], t_tile_k),
-        get_spirv_tile_workgroup_size_pair([32, 1, 1], t_tile_k),
-    ]
-    return tile_workgroup_size_pairs
-
-
-def get_rocm_test_compilation_infos(
-    compilation_info_id: CompilationInfoId, lhs_rhs_type: MatrixElemTypeId
-):
-    intrinsic = ""
-    if compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeMFMA:
-        intrinsic = "MFMA"
-    elif compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeWMMAR3:
-        intrinsic = "WMMAR3"
-    elif compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeWMMAR4:
-        intrinsic = "WMMAR4"
-    else:
-        raise ValueError("Unknown pipeline for rocm")
-
-    schedules = []
-    if intrinsic == "MFMA":
-        schedules = [
-            MMASchedule("MFMA_F32_16x16x4_F32", 1, 1, 1, 1, 1),
-            MMASchedule("MFMA_F32_16x16x4_F32", 1, 1, 1, 1, 2),
-            MMASchedule("MFMA_F32_16x16x4_F32", 1, 1, 1, 2, 1),
-            MMASchedule("MFMA_F32_16x16x4_F32", 1, 1, 2, 1, 1),
-            MMASchedule("MFMA_F32_16x16x4_F32", 2, 2, 1, 1, 2),
-            MMASchedule("MFMA_F32_16x16x16_F16", 1, 1, 1, 1, 1),
-            MMASchedule("MFMA_F32_16x16x16_F16", 1, 1, 1, 1, 2),
-            MMASchedule("MFMA_F32_16x16x16_F16", 1, 1, 1, 2, 1),
-            MMASchedule("MFMA_F32_16x16x16_F16", 1, 1, 2, 1, 1),
-            MMASchedule("MFMA_F32_16x16x16_F16", 2, 2, 1, 1, 1),
-            MMASchedule("MFMA_F32_16x16x16_F16", 2, 4, 2, 1, 2),
-            MMASchedule("MFMA_F32_16x16x16_F16", 4, 2, 4, 2, 2),
-            MMASchedule("MFMA_F32_32x32x8_F16", 1, 1, 1, 2, 2),
-            MMASchedule("MFMA_F32_32x32x8_F16", 2, 2, 1, 1, 1),
-            MMASchedule("MFMA_F32_32x32x8_F16", 1, 4, 2, 1, 2),
-            MMASchedule("MFMA_F32_32x32x8_F16", 4, 2, 1, 2, 4),
-            MMASchedule("MFMA_F32_16x16x32_F8E4M3FNUZ", 1, 1, 1, 1, 1),
-            MMASchedule("MFMA_F32_16x16x32_F8E4M3FNUZ", 2, 2, 1, 1, 2),
-            MMASchedule("MFMA_F32_16x16x32_F8E4M3FNUZ", 4, 1, 4, 1, 1),
-            MMASchedule("MFMA_F32_16x16x32_F8E4M3FNUZ", 4, 2, 4, 2, 1),
-            MMASchedule("MFMA_F32_32x32x16_F8E4M3FNUZ", 1, 1, 1, 1, 1),
-            MMASchedule("MFMA_F32_32x32x16_F8E4M3FNUZ", 2, 2, 1, 1, 2),
-            MMASchedule("MFMA_F32_32x32x16_F8E4M3FNUZ", 4, 1, 1, 2, 2),
-            MMASchedule("MFMA_F32_32x32x16_F8E4M3FNUZ", 4, 2, 2, 2, 2),
-            MMASchedule("MFMA_I32_16x16x32_I8", 1, 1, 1, 1, 1),
-            MMASchedule("MFMA_I32_16x16x32_I8", 2, 2, 1, 1, 2),
-            MMASchedule("MFMA_I32_16x16x32_I8", 4, 1, 4, 1, 1),
-            MMASchedule("MFMA_I32_16x16x32_I8", 4, 2, 4, 2, 1),
-            MMASchedule("MFMA_I32_32x32x16_I8", 1, 1, 1, 1, 1),
-            MMASchedule("MFMA_I32_32x32x16_I8", 2, 2, 1, 1, 2),
-            MMASchedule("MFMA_I32_32x32x16_I8", 4, 1, 1, 2, 2),
-            MMASchedule("MFMA_I32_32x32x16_I8", 4, 2, 2, 2, 2),
-            MMASchedule("VMFMA_F32_16x16x32_F16", 1, 1, 1, 1, 1),
-            MMASchedule("VMFMA_F32_16x16x32_F16", 4, 2, 1, 2, 4),
-            MMASchedule("VMFMA_F32_32x32x16_F16", 1, 1, 1, 1, 1),
-            MMASchedule("VMFMA_F32_32x32x16_F16", 4, 2, 1, 2, 4),
-            MMASchedule("VMFMA_F32_16x16x32_F8E4M3FNUZ", 1, 1, 1, 1, 1),
-            MMASchedule("VMFMA_F32_16x16x32_F8E4M3FNUZ", 4, 1, 4, 1, 1),
-        ]
-    elif intrinsic == "WMMAR3":
-        schedules = [
-            MMASchedule("WMMAR3_F32_16x16x16_F16", 1, 1, 1, 1, 1),
-            MMASchedule("WMMAR3_F32_16x16x16_F16", 1, 1, 1, 1, 2),
-            MMASchedule("WMMAR3_F32_16x16x16_F16", 1, 1, 1, 2, 1),
-            MMASchedule("WMMAR3_F32_16x16x16_F16", 1, 1, 2, 1, 1),
-            MMASchedule("WMMAR3_F32_16x16x16_F16", 2, 2, 1, 1, 1),
-            MMASchedule("WMMAR3_F32_16x16x16_F16", 2, 4, 2, 1, 2),
-            MMASchedule("WMMAR3_F32_16x16x16_F16", 4, 2, 4, 2, 2),
-            MMASchedule("WMMAR3_I32_16x16x16_I8", 1, 1, 1, 1, 1),
-            MMASchedule("WMMAR3_I32_16x16x16_I8", 1, 1, 1, 1, 2),
-            MMASchedule("WMMAR3_I32_16x16x16_I8", 1, 1, 1, 2, 1),
-            MMASchedule("WMMAR3_I32_16x16x16_I8", 1, 1, 2, 1, 1),
-            MMASchedule("WMMAR3_I32_16x16x16_I8", 2, 2, 1, 1, 1),
-            MMASchedule("WMMAR3_I32_16x16x16_I8", 2, 4, 2, 1, 2),
-            MMASchedule("WMMAR3_I32_16x16x16_I8", 4, 2, 4, 2, 2),
-        ]
-    elif intrinsic == "WMMAR4":
-        schedules = [
-            MMASchedule("WMMAR4_F32_16x16x16_F16", 1, 1, 1, 1, 1),
-            MMASchedule("WMMAR4_F32_16x16x16_F16", 1, 1, 1, 1, 2),
-            MMASchedule("WMMAR4_F32_16x16x16_F16", 1, 1, 1, 2, 1),
-            MMASchedule("WMMAR4_F32_16x16x16_F16", 1, 1, 2, 1, 1),
-            MMASchedule("WMMAR4_F32_16x16x16_F16", 2, 2, 1, 1, 1),
-            MMASchedule("WMMAR4_F32_16x16x16_F16", 2, 4, 2, 1, 2),
-            MMASchedule("WMMAR4_F32_16x16x16_F16", 4, 2, 4, 2, 2),
-            MMASchedule("WMMAR4_F32_16x16x16_F8E4M3FN", 1, 1, 1, 1, 1),
-            MMASchedule("WMMAR4_F32_16x16x16_F8E4M3FN", 1, 1, 1, 1, 2),
-            MMASchedule("WMMAR4_F32_16x16x16_F8E4M3FN", 1, 1, 1, 2, 1),
-            MMASchedule("WMMAR4_F32_16x16x16_F8E4M3FN", 1, 1, 2, 1, 1),
-            MMASchedule("WMMAR4_F32_16x16x16_F8E4M3FN", 2, 2, 1, 1, 1),
-            MMASchedule("WMMAR4_F32_16x16x16_F8E4M3FN", 2, 4, 2, 1, 2),
-            MMASchedule("WMMAR4_F32_16x16x16_F8E4M3FN", 4, 2, 4, 2, 2),
-            MMASchedule("WMMAR4_I32_16x16x16_I8", 1, 1, 1, 1, 1),
-            MMASchedule("WMMAR4_I32_16x16x16_I8", 1, 1, 1, 1, 2),
-            MMASchedule("WMMAR4_I32_16x16x16_I8", 1, 1, 1, 2, 1),
-            MMASchedule("WMMAR4_I32_16x16x16_I8", 1, 1, 2, 1, 1),
-            MMASchedule("WMMAR4_I32_16x16x16_I8", 2, 2, 1, 1, 1),
-            MMASchedule("WMMAR4_I32_16x16x16_I8", 2, 4, 2, 1, 2),
-            MMASchedule("WMMAR4_I32_16x16x16_I8", 4, 2, 4, 2, 2),
-        ]
-    else:
-        raise NotImplementedError("unhandled intrinsic case")
-
-    subgroup_size = 64 if intrinsic == "MFMA" else 32
-
-    infos = []
-    for schedule in schedules:
-        # Skip schedules with an intrinsic which element type does not
-        # match the requested one.
-        # Extracts the input type from strings. The naming convention is
-        # [output_type]_MxNxK_[input_type].
-        input_type = schedule.intrinsic.split("_")[-1]
-        if lhs_rhs_type.value.upper() != input_type:
-            continue
-
-        if schedule.intrinsic == "MFMA_F32_16x16x4_F32":
-            wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
-            wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
-            wg_tile_k = schedule.k_tile_count * 4
-        elif schedule.intrinsic == "MFMA_F32_16x16x16_F16":
-            wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
-            wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
-            wg_tile_k = schedule.k_tile_count * 16
-        elif schedule.intrinsic == "MFMA_F32_32x32x8_F16":
-            wg_tile_m = schedule.m_count * schedule.m_tile_count * 32
-            wg_tile_n = schedule.n_count * schedule.n_tile_count * 32
-            wg_tile_k = schedule.k_tile_count * 8
-        elif (
-            schedule.intrinsic == "VMFMA_F32_16x16x32_F16"
-            or schedule.intrinsic == "MFMA_I32_16x16x32_I8"
-            or schedule.intrinsic == "MFMA_F32_16x16x32_F8E4M3FNUZ"
-            or schedule.intrinsic == "VMFMA_F32_16x16x32_F8E4M3FNUZ"
-        ):
-            wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
-            wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
-            wg_tile_k = schedule.k_tile_count * 32
-        elif (
-            schedule.intrinsic == "VMFMA_F32_32x32x16_F16"
-            or schedule.intrinsic == "MFMA_F32_32x32x16_F8E4M3FNUZ"
-            or schedule.intrinsic == "MFMA_I32_32x32x16_I8"
-        ):
-            wg_tile_m = schedule.m_count * schedule.m_tile_count * 32
-            wg_tile_n = schedule.n_count * schedule.n_tile_count * 32
-            wg_tile_k = schedule.k_tile_count * 16
-        elif schedule.intrinsic in (
-            "WMMAR3_F32_16x16x16_F16",
-            "WMMAR3_I32_16x16x16_I8",
-            "WMMAR4_F32_16x16x16_F16",
-            "WMMAR4_F32_16x16x16_F8E4M3FN",
-            "WMMAR4_I32_16x16x16_I8",
-        ):
-            wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
-            wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
-            wg_tile_k = schedule.k_tile_count * 16
-        else:
-            raise NotImplementedError("unhandled intrinsic case")
-
-        workgroup_tile = [wg_tile_m, wg_tile_n, 0]
-        reduction_tile = [0, 0, wg_tile_k]
-        workgroup_size = [schedule.n_count * subgroup_size, schedule.m_count, 1]
-        infos.append(
-            IREEGPUCompilationInfo(
-                workgroup_tile=workgroup_tile,
-                reduction_tile=reduction_tile,
-                dispatch_lowering_pass_pipeline="LLVMGPUVectorDistribute",
-                workgroup_size=workgroup_size,
-                mma_schedule=schedule,
-                subgroup_size=subgroup_size,
-            )
-        )
-    return infos
-
-
-# Returns the list of CompilationInfo's to use for the CompilationInfoId.
-def get_test_compilation_infos(
-    compilation_info_id: CompilationInfoId, lhs_rhs_type: MatrixElemTypeId
-) -> typing.List[typing.Optional[CompilationInfo]]:
-    if compilation_info_id == CompilationInfoId.NONE:
-        return [None]
-
-    if compilation_info_id in [
-        CompilationInfoId.LLVMGPUVectorDistributeMFMA,
-        CompilationInfoId.LLVMGPUVectorDistributeWMMAR3,
-        CompilationInfoId.LLVMGPUVectorDistributeWMMAR4,
-    ]:
-        return get_rocm_test_compilation_infos(compilation_info_id, lhs_rhs_type)
-
-    software_pipeline_depth = 0
-    tile_workgroup_size_pairs = []
-    if compilation_info_id == CompilationInfoId.SPIRVCooperativeMatrixVectorize:
-        tile_workgroup_size_pairs = [
-            TileWorkgroupSizePair(
-                [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]], [64, 2, 1]
-            )
-        ]
-    elif compilation_info_id == CompilationInfoId.SPIRVVectorizeNVIDIA:
-        tile_workgroup_size_pairs = get_all_spirv_tile_workgroup_size_pairs(32)
-    elif compilation_info_id == CompilationInfoId.SPIRVVectorizeMali:
-        tile_workgroup_size_pairs = get_all_spirv_tile_workgroup_size_pairs(4)
-    elif (
-        compilation_info_id == CompilationInfoId.LLVMGPUMatmulTensorCore
-        or compilation_info_id == CompilationInfoId.LLVMGPUMatmulTensorCoreMmaSync
-    ):
-        tile_workgroup_size_pairs = []
-        ## WarpShape = 2x2
-        tile_workgroup_size_pairs.append(
-            TileWorkgroupSizePair([[32, 32, 16]], [64, 2, 1])
-        )
-        tile_workgroup_size_pairs.append(
-            TileWorkgroupSizePair([[64, 64, 64]], [64, 2, 1])
-        )
-
-        ## WarpShape = 4x1
-        tile_workgroup_size_pairs.append(
-            TileWorkgroupSizePair([[32, 32, 32]], [64, 1, 1])
-        )
-
-        ## WarpShape = 2x2 with large tiles using larger Shared Memory capacity.
-        if lhs_rhs_type == MatrixElemTypeId.F16:
-            tile_workgroup_size_pairs.append(
-                TileWorkgroupSizePair([[128, 128, 64]], [64, 2, 1])
-            )
-        elif lhs_rhs_type == MatrixElemTypeId.F32:
-            tile_workgroup_size_pairs.append(
-                TileWorkgroupSizePair([[128, 128, 16]], [64, 2, 1])
-            )
-        software_pipeline_depth = 3
-
-    compilation_infos = []
-    for tile_workgroup_size_pair in tile_workgroup_size_pairs:
-        compilation_infos.append(
-            LegacyCompilationInfo(
-                tile_sizes=tile_workgroup_size_pair.tile_size,
-                dispatch_lowering_pass_pipeline=compilation_info_id.value,
-                workgroup_size=tile_workgroup_size_pair.workgroup_size,
-                subgroup_size=None,
-                software_pipeline_depth=software_pipeline_depth,
-            )
-        )
-    return compilation_infos
-
-
-# Intentionally fixed seed! We want full reproducibility here, both across runs
-# and across machines.
-# Intentionally not shared with pseudorandom_generator_seed to limit the ways
-# in which shuffling testcases changes which random values are generated.
-local_pseudorandom_state = 1
-
-
-# A shape dimension value, i.e. a size value that could appear in a MLIR type
-# such as 'tensor<?x4xf32>'. None means a dynamic size, similar to '?' in MLIR.
-@dataclasses.dataclass
-class DimSize:
-    value: typing.Optional[int]
-
-
-# Generates a compile-time MLIR size value, i.e. either a fixed positive integer
-# or None (which maps to MLIR '?') depending on dynamicity.
-def shape_dim(x: int, dynamicity: Dynamicity):
-    if dynamicity == Dynamicity.DYNAMIC:
-        return DimSize(None)
-    elif dynamicity == Dynamicity.STATIC:
-        return DimSize(x)
-    else:
-        raise ValueError(dynamicity)
-
-
-# Stringification used for generating MLIR types, e.g. tensor<?x?xf32>.
-def int_or_question_mark(s: DimSize):
-    return s.value or "?"
-
-
-# Stringification used for generating alphanumeric identifiers, e.g.
-# util.func @somefunction_DYNxDYNxf32, where we can't use "?" characters.
-def int_or_DYN(s: DimSize):
-    return s.value or "DYN"
 
 
 # Describes the fully resolved shape dimensions of all 3 input matrices,
@@ -718,15 +209,11 @@ def generate_function(
         op_name = "linalg.matmul"
 
     # Compilation info is optional; prints empty string by default.
-    func_definition = ""
-    compilation_info_attr = ""
-    if compilation_info:
-        compilation_info_string = f"#compilation{generate_function.compilation_index} = {compilation_info.get_compilation_info_attr()}"
-        compilation_info_attr = (
-            f"{{compilation_info = #compilation{generate_function.compilation_index}}} "
-        )
-        func_definition = func_definition + compilation_info_string
-        generate_function.compilation_index += 1
+    (
+        compilation_info_string,
+        compilation_info_attr,
+    ) = generate_compilation_info_string_and_attr(compilation_info)
+    func_definition = compilation_info_string
     compute = f"  %result = {op_name} {compilation_info_attr}ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
     if shape.accumulate:
         signature = f"({lhs_tensor_type}, {rhs_tensor_type}, {acc_tensor_type}) -> {acc_tensor_type}"
@@ -775,10 +262,6 @@ def generate_function(
     )
 
 
-# Counter for producing unique compilation info attrs
-generate_function.compilation_index = 0
-
-
 # Represents a call to a generated test function.
 @dataclasses.dataclass
 class TestCall:
@@ -786,22 +269,7 @@ class TestCall:
     op: str
 
 
-# Intentionally fixed seed! We want full reproducibility here, both across runs
-# and across machines.
-# Intentionally not shared with local_pseudorandom_state to limit the ways
-# in which shuffling testcases changes which random values are generated.
-pseudorandom_generator_seed = 1
-
-
-def contents_generator_tag(generator: MatrixGenerator):
-    if generator == MatrixGenerator.ZERO:
-        return ""
-    elif generator == MatrixGenerator.RANDOM:
-        global pseudorandom_generator_seed
-        pseudorandom_generator_seed = pseudorandom_generator_seed + 1
-        return f"!tag:iree:fully_specified_pseudorandom {pseudorandom_generator_seed}"
-    else:
-        raise ValueError(generator)
+random_matrix_index = 0
 
 
 # Generate a matrix function argument of the given size as `%name`.
@@ -810,13 +278,13 @@ def generate_random_matrix(
     matrix_shape: list,
     element_type: MatrixElemTypeId,
 ):
-    global pseudorandom_generator_seed
-    pseudorandom_generator_seed = pseudorandom_generator_seed + 1
+    global random_matrix_index
+    random_matrix_index += 1
     return (
         f"  %{name}_dim0 = arith.constant {matrix_shape[0]} : i64\n"
         f"  %{name}_dim1 = arith.constant {matrix_shape[1]} : i64\n"
         f"  %{name}_element_type = hal.element_type<{element_type.value}> : i32\n"
-        f"  %{name}_seed = arith.constant {pseudorandom_generator_seed} : i32\n"
+        f"  %{name}_seed = arith.constant {random_matrix_index} : i32\n"
         f"  %{name} = util.call @matmul_test.generate_random_matrix(%device, %{name}_dim0, %{name}_dim1, %{name}_element_type, %{name}_seed) : (!hal.device, i64, i64, i32, i32) -> !hal.buffer_view\n"
     )
 
@@ -863,8 +331,8 @@ def generate_call(
         op = op + generate_random_matrix("acc", [shape.m, shape.n], acc_type)
         # TODO(#16168): there's a bug with in-place input->output aliasing and
         # we work around it here by passing in a unique copy.
-        global pseudorandom_generator_seed
-        pseudorandom_generator_seed = pseudorandom_generator_seed - 1
+        global random_matrix_index
+        random_matrix_index -= 1
         op = op + generate_random_matrix("acc_copy", [shape.m, shape.n], acc_type)
         op = op + (
             f"  %result = util.call @module.{function.name}(%lhs, %rhs, %acc_copy) : (!hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view\n"
