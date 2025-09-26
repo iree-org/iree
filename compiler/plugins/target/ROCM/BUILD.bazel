@@ -51,6 +51,7 @@ iree_compiler_cc_library(
         "@llvm-project//llvm:Analysis",
         "@llvm-project//llvm:BitWriter",
         "@llvm-project//llvm:Core",
+        "@llvm-project//llvm:FrontendOffloading",
         "@llvm-project//llvm:IPO",
         "@llvm-project//llvm:IRReader",
         "@llvm-project//llvm:Linker",
