@@ -94,7 +94,7 @@ func.func @dot_static() attributes {hal.executable.target = #executable_target_e
   iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [], sizes = [], strides = [] : tensor<f32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<f32>>
   return
 }
-//  CHECK-DAG: #iree_cpu.lowering_config<distribution = [0], vector_reduction = [16]
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0], vector_reduction = [16]
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @dot_static()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -2178,18 +2178,18 @@ func.func @mmt4d_generic_unpack_pack(%arg0: tensor<5x4096x16x1xf16>, %arg1: tens
   %pack = linalg.pack %unpack padding_value(%cst : f16) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %6 : tensor<77x10240xf16> -> tensor<5x10240x16x1xf16>
   return %pack : tensor<5x10240x16x1xf16>
 }
-// CHECK-DAG:   #[[$CONFIG0:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 0, 0], vector_inner_parallel = [0, 0, 16, 16]>
-// CHECK-DAG:   #[[$CONFIG1:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 0, 0, 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
-// CHECK-DAG:   #[[$CONFIG2:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1]>
+// CHECK-DAG:   #[[CONFIG0:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 0, 0], vector_inner_parallel = [0, 0, 16, 16]>
+// CHECK-DAG:   #[[CONFIG1:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 0, 0, 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
+// CHECK-DAG:   #[[CONFIG2:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1]>
 // CHECK-LABEL: func.func @mmt4d_generic_unpack_pack(
 // CHECK:         linalg.fill
-// CHECK-SAME:      {lowering_config = #[[$CONFIG0]]}
+// CHECK-SAME:      {lowering_config = #[[CONFIG0]]}
 // CHECK:         linalg.mmt4d
-// CHECK-SAME:      {lowering_config = #[[$CONFIG1]]}
+// CHECK-SAME:      {lowering_config = #[[CONFIG1]]}
 // CHECK:         linalg.generic
-// CHECK-SAME:      {lowering_config = #[[$CONFIG0]]}
+// CHECK-SAME:      {lowering_config = #[[CONFIG0]]}
 // CHECK:         linalg.unpack
-// CHECK-SAME:      {lowering_config = #[[$CONFIG2]]}
+// CHECK-SAME:      {lowering_config = #[[CONFIG2]]}
 // CHECK:         linalg.pack
 // CHECK-NOT:      lowering_config
 
@@ -2210,7 +2210,7 @@ func.func @batch_mmt4d_generic_form(%lhs: tensor<128x10x32x8x1xf32>, %rhs: tenso
   } -> tensor<128x10x80x8x4xf32>
   return %0 : tensor<128x10x80x8x4xf32>
 }
-// CHECK:       #[[$CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [32, 10, 20, 0, 8, 4, 0], vector_common_parallel = [1, 1, 1, 0, 1, 4, 0], vector_reduction = [0, 0, 0, 1, 0, 0, 0]>
+// CHECK:       #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [32, 10, 20, 0, 8, 4, 0], vector_common_parallel = [1, 1, 1, 0, 1, 4, 0], vector_reduction = [0, 0, 0, 1, 0, 0, 0]>
 // CHECK-LABEL: func.func @batch_mmt4d_generic_form(
 // CHECK:         linalg.generic
-// CHECK-SAME:      {lowering_config = #[[$CONFIG]]}
+// CHECK-SAME:      {lowering_config = #[[CONFIG]]}
