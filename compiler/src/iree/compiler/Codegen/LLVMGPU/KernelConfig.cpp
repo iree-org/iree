@@ -1124,6 +1124,10 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   SmallVector<int64_t> bounds = op.getStaticLoopRanges();
   FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
       mlir::linalg::inferContractionDims(op);
+
+  // Used for calculating correct shared memory usage when the op is a
+  // horizontally fused contraction.
+  int64_t numHorizontallyFusedOps = 1;
   if (failed(contractionDims)) {
     assert(IREE::LinalgExt::isaHorizontallyFusedContraction(op) &&
            "expected horizontally fused contraction op");
@@ -1132,6 +1136,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
     indexingMaps.push_back(op.getMatchingIndexingMap(op.getDpsInputOperand(1)));
     indexingMaps.push_back(op.getMatchingIndexingMap(op.getDpsInitOperand(0)));
     contractionDims = mlir::linalg::inferContractionDims(indexingMaps);
+    numHorizontallyFusedOps = op.getNumDpsInputs() - 1;
   }
   assert(succeeded(contractionDims) && "Could not infer contraction dims");
 
@@ -1187,7 +1192,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // just the first element.
   GPUMatmulShapeType problem{
       {bounds[mDim]}, {bounds[nDim]}, {bounds[kDim]}, getDimBounds(batchDims),
-      lhsElemType,    rhsElemType,    initElemType};
+      lhsElemType,    rhsElemType,    initElemType,   numHorizontallyFusedOps};
 
   // Helper fn to store mma information.
   auto storeMmaInfo = [](IREE::GPU::MmaInterfaceAttr mma,

@@ -78,14 +78,14 @@ func.func @group_conv_hwgc_gfhwc_unaligned(%arg0: tensor<61x93x16x56xbf16>, %arg
 }
 
 // CHECK-LABEL: func.func @group_conv_hwgc_gfhwc_unaligned
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64
 //  CHECK-SAME:   #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = false
 //  CHECK-SAME:   use_igemm_convolution = false
 
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
-//  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_BF16>
-//  CHECK-SAME:     padding_conv = [1, 32, 1, 64, 0, 0, 64]
+//  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_BF16>
+//  CHECK-SAME:     padding_conv = [1, 32, 1, 64, 0, 0, 8]
 //  CHECK-SAME:     promote_operands = [0, 1]
-//  CHECK-SAME:     reduction = [0, 0, 0, 0, 1, 1, 4]
+//  CHECK-SAME:     reduction = [0, 0, 0, 0, 1, 1, 1]
 //  CHECK-SAME:     subgroup = [0, 1, 0, 1, 0, 0, 0]
 //  CHECK-SAME:     workgroup = [1, 32, 1, 64, 0, 0, 0]
