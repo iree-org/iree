@@ -24,7 +24,10 @@ static llvm::cl::opt<bool> clAnnotateInputAffinities(
 
 static llvm::cl::opt<bool> clInsertTransferForGlobals(
     "iree-stream-experimental-insert-transfer-for-globals",
-    llvm::cl::desc("TBD"), llvm::cl::init(false));
+    llvm::cl::desc(
+        "Injects flow.tensor.transfer for global's uses, if the use has "
+        "multiple resource affinities or mismatch the global affinity."),
+    llvm::cl::init(false));
 
 namespace mlir::iree_compiler::IREE::Stream {
 
@@ -104,7 +107,7 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
     passManager.addPass(IREE::Stream::createAnnotateAffinitiesPass());
   }
 
-  // TODO(#22081): Properly insert transfer ops with topology information.
+  // TODO(#22081): Properly inject transfer ops with topology information.
   if (clInsertTransferForGlobals) {
     passManager.addPass(IREE::Stream::createInjectTransferForGlobalsPass());
   }

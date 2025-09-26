@@ -15,9 +15,10 @@ include "mlir/Pass/PassBase.td"
 
 def InjectTransferForGlobalsPass :
     Pass<"iree-stream-inject-transfor-for-globals", "mlir::ModuleOp"> {
-  let summary = "TBD.";
+  let summary = "Injects flow.tensor.transfer ops for global's uses.";
   let description = [{
-    TBD.
+    Injects flow.tensor.transfer for global's uses, if the use has multiple
+    resource affinities or mismatch the global affinity.
   }];
   let dependentDialects = [
     "IREE::Flow::FlowDialect",
