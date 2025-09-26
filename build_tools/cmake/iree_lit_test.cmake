@@ -41,6 +41,11 @@ function(iree_lit_test)
     return()
   endif()
 
+  if((NOT (IREE_ARCH MATCHES "^riscv_64$")) AND ("requires-riscv_64" IN_LIST _RULE_LABELS))
+    # TODO: mark test DISABLED instead of skipping entirely.
+    return()
+  endif()
+
   iree_package_ns(_PACKAGE_NS)
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")

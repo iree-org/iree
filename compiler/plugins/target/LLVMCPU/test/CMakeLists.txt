@@ -16,7 +16,6 @@ iree_lit_test_suite(
   SRCS
     "hal_target_device_attributes.mlir"
     "materialize_homogeneous_encodings.mlir"
-    "serialize_module.mlir"
     "smoketest_embedded.mlir"
     "smoketest_system.mlir"
   TOOLS
@@ -25,6 +24,18 @@ iree_lit_test_suite(
     iree-compile
     iree-opt
     not
+)
+
+iree_lit_test_suite(
+  NAME
+    lit-riscv_64
+  SRCS
+    "serialize_module.mlir"
+  TOOLS
+    FileCheck
+    iree-opt
+  LABELS
+    "requires-riscv_64"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
