@@ -241,7 +241,7 @@ builtin.module {
     %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
     %1 = arith.index_castui %0 : i32 to index
     %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) offset(%1) flags(ReadOnly) : memref<16xf32, strided<[1], offset : ?>, #gpu.address_space<global>>
-    %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) {iree.codegen.access = "writeonly"} : memref<16xf32, #gpu.address_space<global>>
+    %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) {iree_codegen.access = "writeonly"} : memref<16xf32, #gpu.address_space<global>>
     %4 = memref.load %2[%c0] : memref<16xf32, strided<[1], offset : ?>, #gpu.address_space<global>>
     memref.store %4, %3[%c0] : memref<16xf32, #gpu.address_space<global>>
     return

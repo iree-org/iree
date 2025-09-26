@@ -293,8 +293,8 @@ struct FlattenBindingSubspan final
         rewriter, subspanOp.getLoc(), newType, subspanOp.getLayout(),
         subspanOp.getBinding(), newOffset, dynamicShape,
         subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
-    if (auto accessAttr = newOp->getDiscardableAttr("iree.codegen.access"))
-      newOp->setDiscardableAttr("iree.codegen.access", accessAttr);
+    if (auto accessAttr = newOp->getDiscardableAttr(kSubspanAccessAttrName))
+      newOp->setDiscardableAttr(kSubspanAccessAttrName, accessAttr);
 
     Value replacement = newOp;
     if (!isZeroInteger(elementOffset)) {

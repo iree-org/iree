@@ -17,7 +17,6 @@
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -306,7 +305,6 @@ convertBindingUsage(mlir::FunctionOpInterface sourceFuncOp, BlockArgument arg,
     auto alignmentAttr = sourceFuncOp.getArgAttrOfType<IntegerAttr>(
         arg.getArgNumber(), "stream.alignment");
 
-    constexpr llvm::StringRef subSpanAccessAttr = "iree.codegen.access";
     StringAttr subspanAccessAttr;
 
     if (auto dispatchTensorType =
@@ -323,7 +321,7 @@ convertBindingUsage(mlir::FunctionOpInterface sourceFuncOp, BlockArgument arg,
         oldOp.getDynamicDims(), alignmentAttr, bindingAttr.getFlags());
 
     if (subspanAccessAttr)
-      newOp->setDiscardableAttr(subSpanAccessAttr, subspanAccessAttr);
+      newOp->setDiscardableAttr(kSubspanAccessAttrName, subspanAccessAttr);
 
     oldOp.replaceAllUsesWith(newOp.getResult());
     oldOp.erase();

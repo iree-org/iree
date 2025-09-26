@@ -15,7 +15,7 @@ hal.executable @abs_ex_dispatch_0 {
         %c128 = arith.constant 128 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) offset(%c128) flags(ReadOnly) : memref<16xf32, strided<[1], offset: ?>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<16xi32>
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) {iree.codegen.access = "writeonly"} : memref<16xf32>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) {iree_codegen.access = "writeonly"} : memref<16xf32>
         %3 = gpu.block_id x
         %4 = gpu.block_dim x
         %5 = gpu.thread_id x
@@ -174,7 +174,7 @@ hal.executable @mixed_type {
         %c128 = arith.constant 128 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) offset(%c128) : memref<16xf32, strided<[1], offset: ?>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) offset(%c0) : memref<16xi32>
-        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) {iree.codegen.access = "writeonly"} : memref<16xf32>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) {iree_codegen.access = "writeonly"} : memref<16xf32>
         %3 = gpu.block_id x
         %4 = gpu.block_dim x
         %5 = gpu.thread_id x

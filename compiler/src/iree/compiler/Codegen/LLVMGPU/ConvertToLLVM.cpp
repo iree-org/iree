@@ -238,7 +238,7 @@ analyzeSubspans(llvm::SetVector<IREE::HAL::InterfaceBindingSubspanOp> &subspans,
         subspan.getDescriptorFlags().value_or(IREE::HAL::DescriptorFlags::None),
         IREE::HAL::DescriptorFlags::ReadOnly);
     result[binding].writeonly =
-        subspan->getDiscardableAttr("iree.codegen.access") ? true : false;
+        subspan->getDiscardableAttr(kSubspanAccessAttrName) ? true : false;
     unsigned bindingAddrSpace = 0;
     auto bindingType = dyn_cast<BaseMemRefType>(subspan.getType());
     if (bindingType) {

@@ -121,7 +121,7 @@ stream.executable private @ex {
   }
 // CHECK: hal.interface.binding.subspan
 // CHECK-SAME: binding(2)
-// CHECK-SAME: {iree.codegen.access = "writeonly"}
+// CHECK-SAME: {iree_codegen.access = "writeonly"}
 // CHECK-SAME: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16xf32>>
 
 // This function uses the default HAL device targeting arm_64 and x86_64.

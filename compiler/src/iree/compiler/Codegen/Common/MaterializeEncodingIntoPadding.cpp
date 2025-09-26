@@ -232,8 +232,8 @@ struct MaterializeInterfaceBindingEncoding final
         rewriter, subspanOp->getLoc(), newResultType, subspanOp.getLayout(),
         subspanOp.getBinding(), subspanOp.getByteOffset(), newDynamicDims,
         subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
-    if (auto accessAttr = subspanOp->getDiscardableAttr("iree.codegen.access"))
-      newOp->setDiscardableAttr("iree.codegen.access", accessAttr);
+    if (auto accessAttr = subspanOp->getDiscardableAttr(kSubspanAccessAttrName))
+      newOp->setDiscardableAttr(kSubspanAccessAttrName, accessAttr);
     rewriter.replaceOp(subspanOp, newOp.getResult());
     return success();
   }

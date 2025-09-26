@@ -85,8 +85,8 @@ struct ConvertHalInterfaceBindingSubspan final
         adaptor.getBinding(), byteOffset, dynamicLinearizedSize,
         adaptor.getAlignmentAttr(), adaptor.getDescriptorFlagsAttr());
 
-    if (auto accessAttr = op->getDiscardableAttr("iree.codegen.access"))
-      newOp->setDiscardableAttr("iree.codegen.access", accessAttr);
+    if (auto accessAttr = op->getDiscardableAttr(kSubspanAccessAttrName))
+      newOp->setDiscardableAttr(kSubspanAccessAttrName, accessAttr);
 
     rewriter.replaceOp(op, newOp->getResults());
     return success();
