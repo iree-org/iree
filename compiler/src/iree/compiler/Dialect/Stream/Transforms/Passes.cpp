@@ -22,6 +22,10 @@ static llvm::cl::opt<bool> clAnnotateInputAffinities(
                    "the pipeline for debugging."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clInsertTransferForGlobals(
+    "iree-stream-experimental-insert-transfer-for-globals",
+    llvm::cl::desc("TBD"), llvm::cl::init(false));
+
 namespace mlir::iree_compiler::IREE::Stream {
 
 using FunctionLikeNest =
@@ -98,6 +102,11 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   // debugging of analysis errors in end-user tooling.
   if (clAnnotateInputAffinities) {
     passManager.addPass(IREE::Stream::createAnnotateAffinitiesPass());
+  }
+
+  // TODO(#22081): Properly insert transfer ops with topology information.
+  if (clInsertTransferForGlobals) {
+    passManager.addPass(IREE::Stream::createInjectTransferForGlobalsPass());
   }
 
   // Converts from all input dialects into various levels of the stream dialect.

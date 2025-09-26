@@ -13,6 +13,17 @@ include "mlir/Pass/PassBase.td"
 // Tensor lowering and resource management
 //===----------------------------------------------------------------------===//
 
+def InjectTransferForGlobalsPass :
+    Pass<"iree-stream-inject-transfor-for-globals", "mlir::ModuleOp"> {
+  let summary = "TBD.";
+  let description = [{
+    TBD.
+  }];
+  let dependentDialects = [
+    "IREE::Flow::FlowDialect",
+  ];
+}
+
 def ConvertToStreamPass :
     Pass<"iree-stream-conversion", "mlir::ModuleOp"> {
   let summary = "Converts from flow and other input dialects into the stream dialect.";
