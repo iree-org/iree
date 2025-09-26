@@ -733,7 +733,10 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   SmallVector<Attribute> promotionArray = {useGlobalDma, useGlobalDma};
   SmallVector<int64_t> promotionList = {0, 1};
   if (scaled) {
-    promotionArray.append({useGlobalDma, useGlobalDma});
+    // TODO(#22119): We don't use global load DMA for scaled matmuls, because
+    // compilation doesn't support it. Once this is fixed, we should use global
+    // load DMA here when possible.
+    promotionArray = {};
     promotionList.append({2, 3});
   }
   ArrayRef<Attribute> promotionTypes = useDirectLoad
