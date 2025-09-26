@@ -121,9 +121,6 @@ buildTransposeConvolutionFilterPassPipeline(OpPassManager &passManager,
                                             const TransformOptions &options) {
   FunctionLikeNest(passManager)
       .addPass(createConvertConvFilterToChannelsLastPass);
-  passManager.addPass(DispatchCreation::createFoldUnitExtentDimsPass());
-  passManager.addPass(createCanonicalizerPass());
-  passManager.addPass(createCSEPass());
 }
 
 static void

@@ -120,20 +120,24 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
       return failure();
     }
 
-    Value input = linalgOp.getDpsInputOperand(0)->get();
-    Value filter = linalgOp.getDpsInputOperand(1)->get();
-    Value output = linalgOp.getDpsInitOperand(0)->get();
+    OpOperand *input = linalgOp.getDpsInputOperand(0);
+    OpOperand *filter = linalgOp.getDpsInputOperand(1);
+    OpOperand *output = linalgOp.getDpsInitOperand(0);
 
-    AffineMap inputMap = linalgOp.getIndexingMapsArray()[0];
-    AffineMap filterMap = linalgOp.getIndexingMapsArray()[1];
-    AffineMap outputMap = linalgOp.getIndexingMapsArray()[2];
+    AffineMap inputMap = linalgOp.getMatchingIndexingMap(input);
+    AffineMap filterMap = linalgOp.getMatchingIndexingMap(filter);
+    AffineMap outputMap = linalgOp.getMatchingIndexingMap(output);
+
+    Value inputVal = input->get();
+    Value filterVal = filter->get();
+    Value outputVal = output->get();
 
     ArrayRef<int64_t> inputShape =
-        llvm::cast<ShapedType>(input.getType()).getShape();
+        llvm::cast<ShapedType>(inputVal.getType()).getShape();
     ArrayRef<int64_t> filterShape =
-        llvm::cast<ShapedType>(filter.getType()).getShape();
+        llvm::cast<ShapedType>(filterVal.getType()).getShape();
     ArrayRef<int64_t> outputShape =
-        llvm::cast<ShapedType>(output.getType()).getShape();
+        llvm::cast<ShapedType>(outputVal.getType()).getShape();
 
     // TODO(vivian): Once the matmul shape check below is dropped, the
     // dynamic-shape check can also be removed.
@@ -209,14 +213,15 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
     Location loc = linalgOp.getLoc();
 
     AffineMap transposedFilterMap = applyPermutationToResults(filterMap, perm);
-    Value transposedFilter = createTransposeOp(rewriter, loc, filter, perm);
+    Value transposedFilter = createTransposeOp(rewriter, loc, filterVal, perm);
 
     SmallVector<utils::IteratorType> iterators =
         linalgOp.getIteratorTypesArray();
 
     auto genericOp = linalg::GenericOp::create(
-        rewriter, loc, output.getType(), ValueRange{input, transposedFilter},
-        output, ArrayRef<AffineMap>{inputMap, transposedFilterMap, outputMap},
+        rewriter, loc, outputVal.getType(),
+        ValueRange{inputVal, transposedFilter}, outputVal,
+        ArrayRef<AffineMap>{inputMap, transposedFilterMap, outputMap},
         iterators);
 
     // Reuse the same payload as the original convolution op.
