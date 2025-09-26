@@ -22,8 +22,8 @@ static llvm::cl::opt<bool> clAnnotateInputAffinities(
                    "the pipeline for debugging."),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clInsertTransferForGlobals(
-    "iree-stream-experimental-insert-transfer-for-globals",
+static llvm::cl::opt<bool> clInjectTransferForGlobals(
+    "iree-stream-experimental-inject-transfer-for-globals",
     llvm::cl::desc(
         "Injects flow.tensor.transfer for global's uses, if the use has "
         "multiple resource affinities or mismatch the global affinity."),
@@ -108,7 +108,7 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   }
 
   // TODO(#22081): Properly inject transfer ops with topology information.
-  if (clInsertTransferForGlobals) {
+  if (clInjectTransferForGlobals) {
     passManager.addPass(IREE::Stream::createInjectTransferForGlobalsPass());
   }
 
