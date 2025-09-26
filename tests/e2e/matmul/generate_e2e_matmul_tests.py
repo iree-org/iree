@@ -11,8 +11,8 @@ import argparse
 import dataclasses
 import typing
 
-from common import *
-from compilation_info import *
+from tests.e2e.matmul.common import *
+from tests.e2e.matmul.compilation_info import *
 
 
 # Returns the list of TestShape's to use for the collection of shapes

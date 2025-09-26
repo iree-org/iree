@@ -11,7 +11,7 @@ import enum
 import dataclasses
 import typing
 
-from common import *
+from tests.e2e.matmul.common import *
 
 
 # Describes a workgroup and tiling schedule to target a specific MMA intrinsic.
