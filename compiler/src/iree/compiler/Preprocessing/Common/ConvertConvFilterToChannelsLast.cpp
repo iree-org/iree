@@ -135,15 +135,11 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
     ArrayRef<int64_t> outputShape =
         llvm::cast<ShapedType>(output.getType()).getShape();
 
-    auto hasDynamic = [](ArrayRef<int64_t> shape) {
-      return llvm::any_of(shape,
-                          [](int64_t d) { return ShapedType::isDynamic(d); });
-    };
-
     // TODO(vivian): Once the matmul shape check below is dropped, the
     // dynamic-shape check can also be removed.
-    if (hasDynamic(inputShape) || hasDynamic(filterShape) ||
-        hasDynamic(outputShape)) {
+    if (ShapedType::isDynamicShape(inputShape) ||
+        ShapedType::isDynamicShape(filterShape) ||
+        ShapedType::isDynamicShape(outputShape)) {
       return failure();
     }
 

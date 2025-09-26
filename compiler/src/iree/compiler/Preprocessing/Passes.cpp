@@ -114,6 +114,8 @@ void buildPreprocessingPassPipeline(
   FunctionLikeNest(passManager).addPass(createAttrBasedPipelinePass);
 }
 
+// Pass pipeline to transpose the NHWC convolution filter from CHWF to FHWC
+// layout.
 static void
 buildTransposeConvolutionFilterPassPipeline(OpPassManager &passManager,
                                             const TransformOptions &options) {
