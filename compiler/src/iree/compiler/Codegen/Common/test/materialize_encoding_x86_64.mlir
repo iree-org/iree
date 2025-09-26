@@ -128,35 +128,18 @@ func.func @set_encoding_128x32x320_batch_matmul_RHS() attributes {
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [128, 80, 320, ?]>
-func.func @unset_encoding_128x80x320_batch_matmul_RESULT() attributes {
+func.func @unset_encoding_128x80x320_batch_matmul_RESULT(%arg0: tensor<128x80x320xf32, #encoding>) -> tensor<128x80x320xf32> attributes {
    hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx,+avx2,+fma", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
-  %c0 = arith.constant 0 : index
-  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
-  %3 = arith.index_castui %0 : i32 to index
-  %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x80x320xf32>>
-  %9 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%3) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x80x320xf32, #encoding>>
-  %10 = iree_tensor_ext.dispatch.tensor.load %9, offsets = [0, 0, 0], sizes = [128, 80, 320], strides = [1, 1, 1]
-      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x80x320xf32, #encoding>>
-      -> tensor<128x80x320xf32, #encoding>
-  %11 = iree_encoding.unset_encoding %10 : tensor<128x80x320xf32, #encoding> -> tensor<128x80x320xf32>
-  iree_tensor_ext.dispatch.tensor.store %11, %6, offsets = [0, 0, 0], sizes = [128, 80, 320], strides = [1, 1, 1] : tensor<128x80x320xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x80x320xf32>>
-  return
+  %0 = iree_encoding.unset_encoding %arg0 : tensor<128x80x320xf32, #encoding> -> tensor<128x80x320xf32>
+  return %0 : tensor<128x80x320xf32>
 }
-// CHECK-LABEL: func @unset_encoding_128x80x320_batch_matmul_RESULT()
-//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//   CHECK-DAG:   %[[D0:.+]] = hal.interface.constant.load layout(#pipeline_layout) ordinal(0)
-//       CHECK:   %[[CAST:.+]] = arith.index_castui %[[D0]] : i32 to index
-//       CHECK:   %[[OUTPUT_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%[[C0]])
-//  CHECK-SAME:       : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128x80x320xf32>>
-//       CHECK:   %[[INPUT_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[CAST]])
-//  CHECK-SAME:       : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128x10x40x8x8xf32>>
-//       CHECK:   %[[INPUT:.+]] = iree_tensor_ext.dispatch.tensor.load %[[INPUT_BINDING]]
-//  CHECK-SAME:       offsets = [0, 0, 0, 0, 0], sizes = [128, 10, 40, 8, 8], strides = [1, 1, 1, 1, 1]
-//       CHECK:   %[[EMPTY:.+]] = tensor.empty()
-//       CHECK:   %[[UNPACK:.+]] = linalg.unpack %[[INPUT]]
+// CHECK-LABEL: func @unset_encoding_128x80x320_batch_matmul_RESULT(
+//  CHECK-SAME:   %[[ARG0:.+]]: tensor<128x10x40x8x8xf32>
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<128x80x320xf32>
+//       CHECK:   %[[UNPACK:.+]] = linalg.unpack %[[ARG0]]
 //  CHECK-SAME:       outer_dims_perm = [0, 1, 2] inner_dims_pos = [1, 2] inner_tiles = [8, 8] into %[[EMPTY]]
-//   CHECK-DAG:   iree_tensor_ext.dispatch.tensor.store %[[UNPACK]], %[[OUTPUT_BINDING]]
+//       CHECK:   return %[[UNPACK]]
 
 // -----
 
