@@ -382,6 +382,7 @@ static void addGPUBufferizePasses(OpPassManager &funcPassManager) {
 
   // Convert linalg.copy to direct loads. This has to be before any
   // canonicalization.
+  funcPassManager.addPass(createGPULowerCoalescedDMAToGlobalLoadsPass());
   funcPassManager.addPass(createGPULowerToGlobalLoadsPass());
 
   addIREEPostBufferizationPasses(funcPassManager);
