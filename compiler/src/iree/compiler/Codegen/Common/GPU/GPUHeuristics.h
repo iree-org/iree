@@ -28,24 +28,13 @@ struct GPUMatmulShapeType {
   // Default 1 for regular matmul: C = A @ B.
   int64_t numHorizontallyFusedOps = 1;
 
-  GPUMatmulShapeType(int64_t m, int64_t n, int64_t k, Type a, Type b, Type c)
-      : mSizes({m}), nSizes({n}), kSizes({k}), batchSizes({}), aType(a),
-        bType(b), cType(c) {}
-  GPUMatmulShapeType(ArrayRef<int64_t> m, ArrayRef<int64_t> n,
-                     ArrayRef<int64_t> k, ArrayRef<int64_t> batch, Type a,
-                     Type b, Type c)
-      : mSizes(m), nSizes(n), kSizes(k), batchSizes(batch), aType(a), bType(b),
-        cType(c) {}
-
-  // Constructor with the num_rhs parameter.
   GPUMatmulShapeType(int64_t m, int64_t n, int64_t k, Type a, Type b, Type c,
-                     int64_t numHorizontallyFusedOps)
+                     int64_t numHorizontallyFusedOps = 1)
       : mSizes({m}), nSizes({n}), kSizes({k}), batchSizes({}), aType(a),
         bType(b), cType(c), numHorizontallyFusedOps(numHorizontallyFusedOps) {}
-
   GPUMatmulShapeType(ArrayRef<int64_t> m, ArrayRef<int64_t> n,
                      ArrayRef<int64_t> k, ArrayRef<int64_t> batch, Type a,
-                     Type b, Type c, int64_t numHorizontallyFusedOps)
+                     Type b, Type c, int64_t numHorizontallyFusedOps = 1)
       : mSizes(m), nSizes(n), kSizes(k), batchSizes(batch), aType(a), bType(b),
         cType(c), numHorizontallyFusedOps(numHorizontallyFusedOps) {}
 };
