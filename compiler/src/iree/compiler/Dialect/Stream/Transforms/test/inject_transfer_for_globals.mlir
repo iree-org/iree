@@ -126,3 +126,27 @@ util.func private @known_global_device_load_from_func_call(%arg0: tensor<f16>) -
   %2 = flow.dispatch @dispatch(%0, %1) : (tensor<f16>, tensor<f16>) -> tensor<f16>
   util.return %1 : tensor<f16>
 }
+
+// -----
+
+// CHECK: util.global private @[[$DEVICE_A:.+]] : !hal.device
+// CHECK: util.global private @[[DEVICE_B:.+]] : !hal.device
+// CHECK: util.global private @[[$GLOBAL:.+]] {stream.affinity = #hal.device.affinity<@[[DEVICE_B]]>} : tensor<f16>
+util.global private @device_a : !hal.device
+util.global private @device_b : !hal.device
+util.global private @global {stream.affinity = #hal.device.affinity<@device_b>} : tensor<f16>
+
+// CHECK-LABEL: @negative_invalid_program(
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+util.func private @negative_invalid_program(%arg0: tensor<f16>, %arg1: tensor<f16>) -> tensor<f16> {
+  // CHECK: %[[OPERAND0:.+]] = flow.tensor.transfer %[[ARG0]] {{.+}} to #hal.device.affinity<@[[$DEVICE_A]]>
+  %0 = flow.tensor.transfer %arg0 : tensor<f16> to #hal.device.affinity<@device_a>
+  // CHECK: %[[OPERAND1:.+]] = flow.tensor.transfer %[[ARG1]] {{.+}} to #hal.device.affinity<@[[$DEVICE_B]]>
+  %1 = flow.tensor.transfer %arg1 : tensor<f16> to #hal.device.affinity<@device_b>
+  // CHECK: %[[LOAD:.+]] = util.global.load immutable @[[$GLOBAL]]
+  %global = util.global.load immutable @global : tensor<f16>
+  // CHECK: flow.dispatch @dispatch(%[[OPERAND0]], %[[OPERAND1]], %[[LOAD]])
+  %2 = flow.dispatch @dispatch(%0, %1, %global) : (tensor<f16>, tensor<f16>, tensor<f16>) -> tensor<f16>
+  util.return %1 : tensor<f16>
+}
