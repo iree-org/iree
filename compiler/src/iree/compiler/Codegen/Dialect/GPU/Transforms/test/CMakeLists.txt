@@ -17,6 +17,7 @@ iree_lit_test_suite(
     "combine_barrier_regions.mlir"
     "distribute_inner_tiled_to_lanes.mlir"
     "expand_undistributed_inner_tiles.mlir"
+    "lower_iree_gpu_ops.mlir"
   TOOLS
     FileCheck
     iree-opt

@@ -49,6 +49,7 @@ def LowerIREEGPUOpsPass :
   let summary = "Post bufferization lowerings of iree_gpu ops before late lowerings";
   let dependentDialects = [
     "::mlir::gpu::GPUDialect",
+    "::mlir::amdgpu::AMDGPUDialect",
   ];
 }
 
