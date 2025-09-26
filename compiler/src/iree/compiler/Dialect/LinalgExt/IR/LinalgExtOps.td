@@ -1054,40 +1054,40 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction"> {
   let summary = [{
     A linalg.generic extension with support for exponential reduction.
   }];
-  
+
   let description = [{
-    This operation is a restricted form of a linalg.generic operation, 
+    This operation is a restricted form of a linalg.generic operation,
     representing a reduction over `e^{x}` where `x` is an input, and it is known
-    that the function's result is independent of translation over x,      
+    that the function's result is independent of translation over x,
       i.e. f(x) = f(x + c).
 
-    Since `e{x}` grows exponentially for `x > 0`, if the values of `x` are 
+    Since `e{x}` grows exponentially for `x > 0`, if the values of `x` are
     unbounded, the intermediate computation for `e^{x}` in `f(x)`, may not fit
-    in the floating point range, even if the result does. To prevent such 
+    in the floating point range, even if the result does. To prevent such
     numerical inaccuracies, we can instead compute `f(max(x) - x)`, which will
-    ensure that `e{max(x) - x}` always fits in the range (0, 1], because 
+    ensure that `e{max(x) - x}` always fits in the range (0, 1], because
     0 < e{negative} <= 1.
 
-    These properties allow us to compute an online normalization of this 
+    These properties allow us to compute an online normalization of this
     function, in which we don't have to compute the `max(x)` as a seperate
     reduction, but as a running max.
 
     Generally, these properties are hard to infer from a linalg.generic, because
-    two back-to-back reduction combiners in a linalg.generic can have hard to 
-    infer properties. This restricted form ensures we don't have to do 
+    two back-to-back reduction combiners in a linalg.generic can have hard to
+    infer properties. This restricted form ensures we don't have to do
     complicated analysis to infer these properties.
 
     The first input and output operands are intrinsically linked.
     - The first output operand is always the maximum of the first input operand,
       henceforth 'nmax'.
-    - The first input operand in the basic block is always `2^{nmax-x}`, where 
+    - The first input operand in the basic block is always `2^{nmax-x}`, where
       `x` is the value
-    
+
     `norm` is calculated by `2^{nmax - pmax}`, where
     - `pmax` is the value from the previous iteration.
-    - `nmax` is the new maximum, read from the current element from the input 
-      tensor 
-    
+    - `nmax` is the new maximum, read from the current element from the input
+      tensor
+
     The operands listed in `exp_reduced_operands` will be multiplied by `norm`
     before executing the basic block.
 
@@ -1110,7 +1110,7 @@ def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction"> {
       ^bb0(%exp_v: f32, %m: f32, %s: f32):
         // take note of the operand names when comparing with the subsequent
         // code snippets
-        %add = arith.addf %exp_v, %s : f32 
+        %add = arith.addf %exp_v, %s : f32
         linalg.yield %m, %add        : f32, f32
     } -> tensor<f32>, tensor<f32>
   ```

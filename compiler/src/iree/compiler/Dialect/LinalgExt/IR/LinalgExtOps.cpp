@@ -2237,11 +2237,10 @@ LogicalResult ExpReductionOp::verify() {
           "always contains the maximum value");
     }
     if (reducedOperand >= getNumDpsInits()) {
-      return op->emitOpError(
-          "operand index in exp_reduced_operands must index the outs operands ("
-          "outs has ")
-        << getNumDpsInits()
-        << " operands)";
+      return op->emitOpError("operand index in exp_reduced_operands must index "
+                             "the outs operands ("
+                             "outs has ")
+             << getNumDpsInits() << " operands)";
     }
   }
 
