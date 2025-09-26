@@ -1230,7 +1230,9 @@ Value findOrCreateSubspanBuffer(
       subspanOp.getBinding(), subspanOp.getByteOffset(),
       subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
       subspanOp.getDescriptorFlagsAttr());
-  buffer.getDefiningOp()->setAttrs(subspanOp->getAttrs());
+  if (auto accessAttr = subspanOp->getDiscardableAttr("iree.codegen.access"))
+    buffer.getDefiningOp()->setDiscardableAttr("iree.codegen.access",
+                                               accessAttr);
   if (useRocdlBuffers) {
     buffer = amdgpu::FatRawBufferCastOp::create(
         rewriter, subspanOp->getLoc(), buffer, /*validBytes=*/Value{},

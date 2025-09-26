@@ -206,7 +206,8 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
           rewriter, loc, newBufferType, binding.getLayoutAttr(),
           binding.getBindingAttr(), zero, dynamicLinearShape,
           binding.getAlignmentAttr(), binding.getDescriptorFlagsAttr());
-      newBinding->setAttrs(binding->getAttrs());
+      if (auto accessAttr = binding->getDiscardableAttr("iree.codegen.access"))
+        newBinding->setDiscardableAttr("iree.codegen.access", accessAttr);
     }
     SmallVector<Value> results;
     results.reserve(memRefType.getRank() * 2 + 2);

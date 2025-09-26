@@ -228,12 +228,12 @@ struct MaterializeInterfaceBindingEncoding final
     }
     auto newResultType = getTypeConverter()->convertType(resultType);
     SmallVector<Value> newDynamicDims = subspanOp.getDynamicDims();
-    llvm::ArrayRef<NamedAttribute> oldAttrs = subspanOp->getAttrs();
     auto newOp = IREE::HAL::InterfaceBindingSubspanOp::create(
         rewriter, subspanOp->getLoc(), newResultType, subspanOp.getLayout(),
         subspanOp.getBinding(), subspanOp.getByteOffset(), newDynamicDims,
         subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
-    newOp->setAttrs(oldAttrs);
+    if (auto accessAttr = subspanOp->getDiscardableAttr("iree.codegen.access"))
+      newOp->setDiscardableAttr("iree.codegen.access", accessAttr);
     rewriter.replaceOp(subspanOp, newOp.getResult());
     return success();
   }

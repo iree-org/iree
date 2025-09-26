@@ -92,7 +92,9 @@ struct ConvertHalInterfaceBindingSubspan final
             op, newResultTy, adaptor.getLayout(), adaptor.getBinding(),
             adaptor.getByteOffset(), adaptor.getDynamicDims(),
             adaptor.getAlignmentAttr(), adaptor.getDescriptorFlagsAttr());
-    newOp->setAttrs(op->getAttrs());
+    if (auto accessAttr = op->getDiscardableAttr("iree.codegen.access")) {
+      newOp->setDiscardableAttr("iree.codegen.access", accessAttr);
+    }
     LLVM_DEBUG(llvm::dbgs() << "Bf16Emulation: new op: " << newOp << "\n");
     (void)newOp;
     return success();

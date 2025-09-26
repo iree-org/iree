@@ -132,7 +132,9 @@ struct FoldCollapseShapeIntoInterfaceTensorLoad
         subspanOp.getBinding(), subspanOp.getByteOffset(),
         collapsedDynamicShape, subspanOp.getAlignmentAttr(),
         subspanOp.getDescriptorFlagsAttr());
-    newSubspanOp.getDefiningOp()->setAttrs(subspanOp->getAttrs());
+    if (auto accessAttr = subspanOp->getDiscardableAttr("iree.codegen.access"))
+      newSubspanOp.getDefiningOp()->setDiscardableAttr("iree.codegen.access",
+                                                       accessAttr);
 
     rewriter.setInsertionPoint(reshapeOp);
     rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorLoadOp>(
@@ -233,7 +235,9 @@ struct FoldExpandShapeIntoInterfaceTensorLoad
         rewriter, subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
         subspanOp.getBinding(), subspanOp.getByteOffset(), expandedDynamicDims,
         subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
-    newSubspanOp.getDefiningOp()->setAttrs(subspanOp->getAttrs());
+    if (auto accessAttr = subspanOp->getDiscardableAttr("iree.codegen.access"))
+      newSubspanOp.getDefiningOp()->setDiscardableAttr("iree.codegen.access",
+                                                       accessAttr);
 
     rewriter.setInsertionPoint(reshapeOp);
     rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorLoadOp>(
@@ -319,7 +323,9 @@ struct FoldExpandShapeIntoInterfaceTensorStore
         subspanOp.getBinding(), subspanOp.getByteOffset(),
         collapsedDynamicShape, subspanOp.getAlignmentAttr(),
         subspanOp.getDescriptorFlagsAttr());
-    newSubspanOp.getDefiningOp()->setAttrs(subspanOp->getAttrs());
+    if (auto accessAttr = subspanOp->getDiscardableAttr("iree.codegen.access"))
+      newSubspanOp.getDefiningOp()->setDiscardableAttr("iree.codegen.access",
+                                                       accessAttr);
 
     rewriter.setInsertionPoint(storeOp);
     rewriter.replaceOpWithNewOp<IREE::TensorExt::DispatchTensorStoreOp>(
@@ -503,7 +509,8 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
         rewriter, subspanOp.getLoc(), newSubspanType, subspanOp.getLayout(),
         subspanOp.getBinding(), subspanOp.getByteOffset(), expandedDynamicShape,
         subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
-    newSubspanOp->setAttrs(subspanOp->getAttrs());
+    if (auto accessAttr = subspanOp->getDiscardableAttr("iree.codegen.access"))
+      newSubspanOp->setDiscardableAttr("iree.codegen.access", accessAttr);
 
     rewriter.setInsertionPoint(storeOp);
 
@@ -803,7 +810,10 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
           subspanOp.getBinding(), subspanOp.getByteOffset(),
           newSubspanDynamicDims, subspanOp.getAlignmentAttr(),
           subspanOp.getDescriptorFlagsAttr());
-      newSubspanOp.getDefiningOp()->setAttrs(subspanOp->getAttrs());
+      if (auto accessAttr =
+              subspanOp->getDiscardableAttr("iree.codegen.access"))
+        newSubspanOp.getDefiningOp()->setDiscardableAttr("iree.codegen.access",
+                                                         accessAttr);
     }
 
     SmallVector<OpFoldResult> expandedStrides(reshapeSrcShape.size(),
@@ -882,7 +892,9 @@ struct FoldInnerBitcastIntoInterfaceTensorLoad
         subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
         subspanOp.getDescriptorFlagsAttr());
 
-    newSubspanOp.getDefiningOp()->setAttrs(subspanOp->getAttrs());
+    if (auto accessAttr = subspanOp->getDiscardableAttr("iree.codegen.access"))
+      newSubspanOp.getDefiningOp()->setDiscardableAttr("iree.codegen.access",
+                                                       accessAttr);
 
     rewriter.setInsertionPoint(bitcastOp);
     SmallVector<int64_t> newSizes(loadOp.getStaticSizes());
@@ -953,7 +965,9 @@ struct FoldInnerBitcastIntoInterfaceTensorStore
         subspanOp.getBinding(), subspanOp.getByteOffset(),
         subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
         subspanOp.getDescriptorFlagsAttr());
-    newSubspanOp.getDefiningOp()->setAttrs(subspanOp->getAttrs());
+    if (auto accessAttr = subspanOp->getDiscardableAttr("iree.codegen.access"))
+      newSubspanOp.getDefiningOp()->setDiscardableAttr("iree.codegen.access",
+                                                       accessAttr);
 
     SmallVector<int64_t> newSizes(storeOp.getStaticSizes());
     newSizes.back() = newInnerSize;

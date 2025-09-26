@@ -528,12 +528,12 @@ struct MaterializeInterfaceBindingEncoding
 
     auto newResultType = IREE::TensorExt::DispatchTensorType::get(
         resultType.getAccess(), convertedBoundType);
-    llvm::ArrayRef<NamedAttribute> oldAttrs = subspanOp->getAttrs();
     auto newOp = IREE::HAL::InterfaceBindingSubspanOp::create(
         rewriter, subspanOp->getLoc(), newResultType, subspanOp.getLayout(),
         subspanOp.getBinding(), subspanOp.getByteOffset(), newDynamicDims,
         subspanOp.getAlignmentAttr(), adaptor.getDescriptorFlagsAttr());
-    newOp->setAttrs(oldAttrs);
+    if (auto accessAttr = subspanOp->getDiscardableAttr("iree.codegen.access"))
+      newOp->setDiscardableAttr("iree.codegen.access", accessAttr);
     rewriter.replaceOp(subspanOp, newOp->getResults());
     return success();
   }

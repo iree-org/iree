@@ -80,14 +80,14 @@ struct ConvertHalInterfaceBindingSubspan final
           rewriter, loc, linearizedMemRefInfo.linearizedSize));
     }
 
-    llvm::ArrayRef<NamedAttribute> oldAttrs = op->getAttrs();
-
     auto newOp = IREE::HAL::InterfaceBindingSubspanOp::create(
         rewriter, op.getLoc(), newResultType, adaptor.getLayout(),
         adaptor.getBinding(), byteOffset, dynamicLinearizedSize,
         adaptor.getAlignmentAttr(), adaptor.getDescriptorFlagsAttr());
 
-    newOp->setAttrs(oldAttrs);
+    if (auto accessAttr = op->getDiscardableAttr("iree.codegen.access"))
+      newOp->setDiscardableAttr("iree.codegen.access", accessAttr);
+
     rewriter.replaceOp(op, newOp->getResults());
     return success();
   }
