@@ -16,7 +16,6 @@
 #include "llvm/Support/InterleavedRange.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
-#include "mlir/IR/BuiltinTypes.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-heuristics"
 
@@ -55,25 +54,28 @@ static int64_t prod(ArrayRef<int64_t> values) {
 }
 
 static int64_t calculateOperandsSharedMemoryUsedInBytes(
-    const GPUMMASchedule &schedule, int64_t lhsBitwidth, int64_t rhsBitwidth) {
+    const GPUMMASchedule &schedule, int64_t lhsBitwidth, int64_t rhsBitwidth,
+    int64_t numRhs = 1) {
 
   int64_t tileM = schedule.mSize * prod(schedule.mTileSizes) *
                   prod(schedule.mSubgroupCounts);
   int64_t tileN = schedule.nSize * prod(schedule.nTileSizes) *
                   prod(schedule.nSubgroupCounts);
   int64_t tileK = schedule.kSize * prod(schedule.kTileSizes);
-  return (tileM * tileK * lhsBitwidth + tileN * tileK * rhsBitwidth) / 8;
+  return (tileM * tileK * lhsBitwidth + numRhs * tileN * tileK * rhsBitwidth) /
+         8;
 }
 
 static int64_t
 calculateResultSharedMemoryUsedInBytes(const GPUMMASchedule &schedule,
-                                       int64_t resultBitwidth) {
+                                       int64_t resultBitwidth,
+                                       int64_t numRes = 1) {
 
   int64_t tileM = schedule.mSize * prod(schedule.mTileSizes) *
                   prod(schedule.mSubgroupCounts);
   int64_t tileN = schedule.nSize * prod(schedule.nTileSizes) *
                   prod(schedule.nSubgroupCounts);
-  return (tileM * tileN * resultBitwidth) / 8;
+  return (numRes * tileM * tileN * resultBitwidth) / 8;
 }
 
 /// Check that a GPUMMASchedule fits alignment restrictions. To be aligned,
@@ -664,10 +666,10 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
           isValidMMASchedule(problem, schedule, mustBeAligned, subgroupSize,
                              transposedLhs, transposedRhs);
       int64_t sharedMemoryUsed = calculateOperandsSharedMemoryUsedInBytes(
-          schedule, lhsBitwidth, rhsBitwidth);
+          schedule, lhsBitwidth, rhsBitwidth, problem.numHorizontallyFusedOps);
       if (doCPromotion) {
-        sharedMemoryUsed +=
-            calculateResultSharedMemoryUsedInBytes(schedule, resultBitwidth);
+        sharedMemoryUsed += calculateResultSharedMemoryUsedInBytes(
+            schedule, resultBitwidth, problem.numHorizontallyFusedOps);
       }
 
       LDBG() << "Available Shared Memory: " << sharedMemLimitInBytes << " bytes"

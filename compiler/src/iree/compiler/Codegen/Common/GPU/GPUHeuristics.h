@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cstdint>
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "mlir/IR/Types.h"
 
@@ -22,6 +23,11 @@ struct GPUMatmulShapeType {
   Type cType;
   GemmSize gemmSize = GemmSize::NotSet;
 
+  // Number of horizontally fused operations.
+  // Horizontal fusion: C1,C2 = fused_matmul(A, B1, B2) where A is shared.
+  // Default 1 for regular matmul: C = A @ B.
+  int64_t numHorizontallyFusedOps = 1;
+
   GPUMatmulShapeType(int64_t m, int64_t n, int64_t k, Type a, Type b, Type c)
       : mSizes({m}), nSizes({n}), kSizes({k}), batchSizes({}), aType(a),
         bType(b), cType(c) {}
@@ -30,6 +36,18 @@ struct GPUMatmulShapeType {
                      Type b, Type c)
       : mSizes(m), nSizes(n), kSizes(k), batchSizes(batch), aType(a), bType(b),
         cType(c) {}
+
+  // Constructor with the num_rhs parameter.
+  GPUMatmulShapeType(int64_t m, int64_t n, int64_t k, Type a, Type b, Type c,
+                     int64_t numHorizontallyFusedOps)
+      : mSizes({m}), nSizes({n}), kSizes({k}), batchSizes({}), aType(a),
+        bType(b), cType(c), numHorizontallyFusedOps(numHorizontallyFusedOps) {}
+
+  GPUMatmulShapeType(ArrayRef<int64_t> m, ArrayRef<int64_t> n,
+                     ArrayRef<int64_t> k, ArrayRef<int64_t> batch, Type a,
+                     Type b, Type c, int64_t numHorizontallyFusedOps)
+      : mSizes(m), nSizes(n), kSizes(k), batchSizes(batch), aType(a), bType(b),
+        cType(c), numHorizontallyFusedOps(numHorizontallyFusedOps) {}
 };
 
 /// Struct containing information about a GPU MMA intrinsic type.
