@@ -208,22 +208,9 @@ def generate_function(
         compilation_info_attr,
     ) = generate_compilation_info_string_and_attr(compilation_info)
 
-    indexing_maps_attr = ""
-
-    if transpose_rhs:
-        indexing_maps_attr = "indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>]"
-
-    compute = f"  %result = linalg.matmul {indexing_maps_attr} {compilation_info_attr} ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
-
     args = [("%lhs", lhs_tensor_type), ("%rhs", rhs_tensor_type)]
     if shape.accumulate:
         args += [("%acc", acc_tensor_type)]
-    signature = ", ".join([ty for name, ty in args]) + " -> {acc_tensor_type}"
-    import_declaration = (
-        f"util.func private @module.{func_name}("
-        + ", ".join([name + ": !hal.buffer_view" for name, ty in args])
-        + ") -> !hal.buffer_view"
-    )
 
     func_definition = compilation_info_string + (
         f"util.func @{func_name}("
@@ -248,10 +235,24 @@ def generate_function(
             f"  %acc = linalg.fill ins(%c0_acc_type : {acc_type.value}) outs(%init_acc : {acc_tensor_type}) -> {acc_tensor_type}\n"
         )
 
+    indexing_maps_attr = ""
+
+    if transpose_rhs:
+        indexing_maps_attr = "indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>]"
+
+
     func_definition += (
-        f"{compute}\n" f"  util.return %result: {acc_tensor_type}\n" f"}}\n"
+        f"  %result = linalg.matmul {indexing_maps_attr} {compilation_info_attr} ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
+        f"  util.return %result: {acc_tensor_type}\n"
+        f"}}\n"
     )
 
+    signature = ", ".join([ty for name, ty in args]) + " -> {acc_tensor_type}"
+    import_declaration = (
+        f"util.func private @module.{func_name}("
+        + ", ".join([name + ": !hal.buffer_view" for name, ty in args])
+        + ") -> !hal.buffer_view"
+    )
     return MLIRFunction(
         name=func_name,
         signature=signature,
