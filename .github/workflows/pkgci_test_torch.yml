@@ -63,7 +63,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           repository: iree-org/iree-test-suites
-          ref: 54fb54eaa16da05842f26052f51c84595f9e6662
+          ref: da9a388ba923797e0eceab3b61afd12e16dafa57
           path: iree-test-suites
           # Don't need lfs for torch models yet.
           lfs: false
@@ -94,4 +94,8 @@ jobs:
             --job-summary-path=${{ github.workspace }}/iree-test-suites \
             --force-recompile \
             -m "${{ matrix.markers }}"
+
+      - name: Upload Torch Model Job Summary
+        if: always()
+        run: |
           cat ${{ github.workspace }}/iree-test-suites/job_summary.md >> $GITHUB_STEP_SUMMARY

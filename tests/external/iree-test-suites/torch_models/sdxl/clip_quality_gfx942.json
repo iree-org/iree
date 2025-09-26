@@ -1,8 +1,8 @@
 {
     "type": "quality",
     "markers": [
-      "gfx942",
-      "local-task"
+      "hip",
+      "gfx942"
     ],
     "modules": [
       "sdxl/modules/clip_gfx942"
