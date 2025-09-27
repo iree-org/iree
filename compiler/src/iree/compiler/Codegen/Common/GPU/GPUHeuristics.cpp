@@ -254,6 +254,7 @@ static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
 
   // Send very skinny, {2-4}xNxK and Mx{2-4}xK, matmuls to the vector reduction
   // pipeline, similar to matvec.
+  // NOTE: `kSizes.size() == 2` is needed to support scaled matmul.
   // TODO: Figure out what the precise cutoff is, this may be machine dependent.
   // In situation when alignment isn't required, we disallow intrinsics to be
   // picked if the tile size is too small. For example, this will force a matmul
@@ -263,8 +264,9 @@ static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
   // established after we sweep the different tile sizes for a problem config.
   // Once a precise threshold is established, replace 4 with the threshold and
   // remove this todo.
-  if (llvm::all_equal({problem.mSizes.size(), problem.nSizes.size(),
-                       problem.kSizes.size(), size_t{1}}) &&
+  if (llvm::all_equal(
+          {problem.mSizes.size(), problem.nSizes.size(), size_t{1}}) &&
+      (problem.kSizes.size() == 1 || problem.kSizes.size() == 2) &&
       problem.batchSizes.empty()) {
     int64_t mSize = problem.mSizes.back();
     int64_t nSize = problem.nSizes.back();
