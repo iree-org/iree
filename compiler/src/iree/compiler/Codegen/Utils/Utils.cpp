@@ -1230,6 +1230,9 @@ Value findOrCreateSubspanBuffer(
       subspanOp.getBinding(), subspanOp.getByteOffset(),
       subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
       subspanOp.getDescriptorFlagsAttr());
+  if (auto accessAttr = subspanOp->getDiscardableAttr(kSubspanAccessAttrName))
+    buffer.getDefiningOp()->setDiscardableAttr(kSubspanAccessAttrName,
+                                               accessAttr);
   if (useRocdlBuffers) {
     buffer = amdgpu::FatRawBufferCastOp::create(
         rewriter, subspanOp->getLoc(), buffer, /*validBytes=*/Value{},
