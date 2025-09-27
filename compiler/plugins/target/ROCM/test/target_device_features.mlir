@@ -91,7 +91,7 @@
 
 // Note: The gfx1250 target is experimental and contains placeholder values.
 // GFX1250: target_info = #iree_gpu.target<arch = "gfx1250",
-// GFX1250-SAME:        subgroup_size_choices = [32, 64]
+// GFX1250-SAME:        subgroup_size_choices = [32]
 // GFX1250-SAME:        max_load_instruction_bits = 128, simds_per_wgp = 4
 
 stream.executable public @reduce_dispatch {
