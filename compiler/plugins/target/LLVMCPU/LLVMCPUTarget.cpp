@@ -25,6 +25,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/Target/Devices/LocalDevice.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
+#include "iree/compiler/Dialect/HAL/Utils/LLVMCodeGenUtils.h"
 #include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/PluginAPI/Client.h"
@@ -312,10 +313,14 @@ public:
         LLVM::LLVMDialect::getTargetTripleAttrName(),
         executableBuilder.getStringAttr(targetTriple.str()));
 
+    auto variantModOp = variantOp.getInnerModule();
+    // Propagate target features and cpu to function ops.
+    populateLLVMFuncTargetAttrs(variantModOp, *targetMachine);
+
     // At this moment we are leaving MLIR LLVM dialect land translating module
     // into target independent LLVMIR.
-    auto llvmModule = mlir::translateModuleToLLVMIR(variantOp.getInnerModule(),
-                                                    context, libraryName);
+    auto llvmModule =
+        mlir::translateModuleToLLVMIR(variantModOp, context, libraryName);
     if (!llvmModule) {
       return variantOp.emitError() << "failed to translate the MLIR LLVM "
                                       "dialect to the native llvm::Module";

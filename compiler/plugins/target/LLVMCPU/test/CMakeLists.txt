@@ -26,4 +26,16 @@ iree_lit_test_suite(
     not
 )
 
+iree_lit_test_suite(
+  NAME
+    lit-riscv_64
+  SRCS
+    "serialize_module.mlir"
+  TOOLS
+    FileCheck
+    iree-opt
+  LABELS
+    "requires-riscv_64"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

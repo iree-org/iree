@@ -32,3 +32,19 @@ iree_lit_test_suite(
         "@llvm-project//llvm:not",
     ],
 )
+
+iree_lit_test_suite(
+    name = "lit-riscv_64",
+    srcs = enforce_glob(
+        [
+            "serialize_module.mlir",
+        ],
+        include = ["*.mlir"],
+    ),
+    tags = ["requires-riscv_64"],
+    cfg = "//compiler:lit.cfg.py",
+    tools = [
+        "//tools:iree-opt",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)
