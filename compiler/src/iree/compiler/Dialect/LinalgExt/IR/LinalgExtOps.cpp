@@ -2224,6 +2224,30 @@ void OnlineAttentionOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
 }
 
 //===----------------------------------------------------------------------===//
+// ExpReductionOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult ExpReductionOp::verify() {
+  Operation *op = getOperation();
+
+  for (int64_t reducedOperand : getExpReducedOperands()) {
+    if (reducedOperand == 0) {
+      return op->emitOpError(
+          "operand index in exp_reduced_operands cannot be the 0th operand, it "
+          "always contains the maximum value");
+    }
+    if (reducedOperand >= getNumDpsInits()) {
+      return op->emitOpError("operand index in exp_reduced_operands must index "
+                             "the outs operands ("
+                             "outs has ")
+             << getNumDpsInits() << " operands)";
+    }
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // Im2colOp
 //===----------------------------------------------------------------------===//
 
@@ -2678,6 +2702,7 @@ DEFINE_OP_GET_EFFECTS(WinogradFilterTransformOp)
 DEFINE_OP_GET_EFFECTS(WinogradOutputTransformOp)
 DEFINE_OP_GET_EFFECTS(AttentionOp)
 DEFINE_OP_GET_EFFECTS(OnlineAttentionOp)
+DEFINE_OP_GET_EFFECTS(ExpReductionOp)
 DEFINE_OP_GET_EFFECTS(Im2colOp)
 DEFINE_OP_GET_EFFECTS(CustomOp)
 
