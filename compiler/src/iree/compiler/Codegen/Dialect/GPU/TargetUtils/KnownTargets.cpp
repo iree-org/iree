@@ -102,8 +102,6 @@ const SubgroupOps allSubgroupOps =
 
 const DotProductOps allDotProductOps = DotProductOps::DP4xI8ToI32;
 
-#define ARRAY_SIZE(array) (sizeof(array) / sizeof(array[0]))
-
 // Creates the corresponding TargetAttr from the given target |details|.
 TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
                             StringRef features, MLIRContext *context) {
@@ -232,9 +230,9 @@ const WgpDetails *getCDNA4WgpDetails() {
                                       allStorageBits,
                                       allSubgroupOps,
                                       allDotProductOps,
-                                      ARRAY_SIZE(cdna4MMAOps),
+                                      std::size(cdna4MMAOps),
                                       cdna4MMAOps,
-                                      ARRAY_SIZE(cdna4ScaledMMAOps),
+                                      std::size(cdna4ScaledMMAOps),
                                       cdna4ScaledMMAOps,
                                       {64, 64},
                                       {1024, 1024, 1024},
@@ -275,7 +273,7 @@ const WgpDetails *getCDNA3WgpDetails() {
                                       allStorageBits,
                                       allSubgroupOps,
                                       allDotProductOps,
-                                      ARRAY_SIZE(cdna3MMAOps),
+                                      std::size(cdna3MMAOps),
                                       cdna3MMAOps,
                                       0,
                                       nullptr,
@@ -307,7 +305,7 @@ const WgpDetails *getCDNA2WgpDetails() {
                                       allStorageBits,
                                       allSubgroupOps,
                                       allDotProductOps,
-                                      ARRAY_SIZE(cdna2MMAOps),
+                                      std::size(cdna2MMAOps),
                                       cdna2MMAOps,
                                       0,
                                       nullptr,
@@ -332,7 +330,7 @@ const WgpDetails *getCDNA1WgpDetails() {
                                       allStorageBits,
                                       allSubgroupOps,
                                       allDotProductOps,
-                                      ARRAY_SIZE(cdna1MMAOps),
+                                      std::size(cdna1MMAOps),
                                       cdna1MMAOps,
                                       0,
                                       nullptr,
@@ -364,7 +362,7 @@ const WgpDetails *getRDNA4WgpDetails() {
                                       allStorageBits,
                                       allSubgroupOps,
                                       allDotProductOps,
-                                      ARRAY_SIZE(rdna4MMAOps),
+                                      std::size(rdna4MMAOps),
                                       rdna4MMAOps,
                                       0,
                                       nullptr,
@@ -392,7 +390,7 @@ const WgpDetails *getRDNA3WgpDetails() {
                                       allStorageBits,
                                       allSubgroupOps,
                                       allDotProductOps,
-                                      ARRAY_SIZE(rdna3MMAOps),
+                                      std::size(rdna3MMAOps),
                                       rdna3MMAOps,
                                       0,
                                       nullptr,
@@ -720,15 +718,21 @@ const WgpDetails *getValhallWgpDetails() {
   ComputeBitwidths computeBitwdiths =
       ComputeBitwidths::Int32 | ComputeBitwidths::Int16 |
       ComputeBitwidths::Int8 | ComputeBitwidths::FP32 | ComputeBitwidths::FP16;
-  // clang-format off
   static const WgpDetails valhallWgp = {
-      computeBitwdiths,   allStorageBits,     allSubgroupOps,  allDotProductOps,
-      /*mmaCount=*/0,     /*mmaOps=*/nullptr, /*scaledMmaCount=*/0,
-      /*scaledMmaOps=*/nullptr,               {16, 16},        {512, 512, 512},
-      512,                32 * 1024,
-      // Note: These values have not been checked and may be higher
+      computeBitwdiths,
+      allStorageBits,
+      allSubgroupOps,
+      allDotProductOps,
+      /*mmaCount=*/0,
+      /*mmaOps=*/nullptr,
+      /*scaledMmaCount=*/0,
+      /*scaledMmaOps=*/nullptr,
+      {16, 16},
+      {512, 512, 512},
+      512,
+      32 * 1024,
+      // Note: These values have not been checked and may be higher.
       {0xffff, 0xffff, 0xffff}};
-  // clang-format on
   return &valhallWgp;
 }
 
@@ -787,7 +791,7 @@ const WgpDetails *getAmpereWgpDetails() {
                                        allStorageBits,
                                        allSubgroupOps,
                                        allDotProductOps,
-                                       ARRAY_SIZE(mmaOps),
+                                       std::size(mmaOps),
                                        mmaOps,
                                        0,
                                        nullptr,
@@ -808,7 +812,7 @@ const WgpDetails *getTuringWgpDetails() {
                                        allStorageBits,
                                        allSubgroupOps,
                                        allDotProductOps,
-                                       ARRAY_SIZE(mmaOps),
+                                       std::size(mmaOps),
                                        mmaOps,
                                        0,
                                        nullptr,
@@ -825,14 +829,19 @@ const WgpDetails *getVoltaWgpDetails() {
       MMAIntrinsic::NV_WMMA_F32_16x16x16_F16,
       MMAIntrinsic::NV_WMMA_F16_16x16x16_F16,
   };
-  // clang-format off
-  static const WgpDetails voltaWgp = {
-      allComputeBits,       allStorageBits,     allSubgroupOps,
-      DotProductOps::None,  ARRAY_SIZE(mmaOps), mmaOps,
-      0,                    nullptr,            {32, 32},
-      {1024, 1024, 1024},   1024,               96 * 1024,
-      {0x7fffffff, 0xffff, 0xffff}};
-  // clang-format on
+  static const WgpDetails voltaWgp = {allComputeBits,
+                                      allStorageBits,
+                                      allSubgroupOps,
+                                      DotProductOps::None,
+                                      std::size(mmaOps),
+                                      mmaOps,
+                                      0,
+                                      nullptr,
+                                      {32, 32},
+                                      {1024, 1024, 1024},
+                                      1024,
+                                      96 * 1024,
+                                      {0x7fffffff, 0xffff, 0xffff}};
   return &voltaWgp;
 }
 
@@ -902,10 +911,10 @@ StringRef normalizeNVIDIAGPUTarget(StringRef target) {
 
   return llvm::StringSwitch<StringRef>(target.lower())
       .Case("a100", "sm_80")
-      .Case("ampere", "sm_80") // Or sm_86/87; use smaller version
+      .Case("ampere", "sm_80") // Or sm_86/87; use smaller version.
       .Case("turing", "sm_75")
-      .Case("volta", "sm_70")  // Or sm_72; use smaller version
-      .Case("pascal", "sm_60") // Or sm_61/62; use smaller version
+      .Case("volta", "sm_70")  // Or sm_72; use smaller version.
+      .Case("pascal", "sm_60") // Or sm_61/62; use smaller version.
       .Default("");
 }
 
@@ -919,16 +928,21 @@ const WgpDetails *getAdrenoWgpDetails() {
                           ComputeBitwidths::FP16;
   auto storageBitwidths =
       StorageBitwidths::B64 | StorageBitwidths::B32 | StorageBitwidths::B16;
-  // clang-format off
   static const WgpDetails adrenoWgp = {
-      computeBitwdiths,   storageBitwidths,   allSubgroupOps,
-      allDotProductOps,   /*mmaCount=*/0,     /*mmaOps=*/nullptr,
-      /*scaledMmaCount=*/0,                   /*scaledMmaOps=*/nullptr,
-      {64, 64},           {1024, 1024, 1024}, 1024,
+      computeBitwdiths,
+      storageBitwidths,
+      allSubgroupOps,
+      allDotProductOps,
+      /*mmaCount=*/0,
+      /*mmaOps=*/nullptr,
+      /*scaledMmaCount=*/0,
+      /*scaledMmaOps=*/nullptr,
+      {64, 64},
+      {1024, 1024, 1024},
+      1024,
       32 * 1024,
       // Note: These values have not been checked and may be higher
       {0xffff, 0xffff, 0xffff}};
-  // clang-format on
   return &adrenoWgp;
 }
 
@@ -986,17 +1000,21 @@ const WgpDetails *getAndroidBaseline2022WgpDetails() {
   // FIXME: We cannot have a fixed subgroup size to target a profile; need to
   // have different targets for different subgroup sizes, or change CodeGen to
   // use symbolic subgroup size values, which can be hard for reduction.
-  // It's kinda fine now given we don't allow any subgroup ops anyway here..
+  // It's kinda fine now given we don't allow any subgroup ops anyway here.
 
-  // clang-format off
-  static const WgpDetails androidWgp = {
-      computeBitwdiths,    storageBitwidths,   SubgroupOps::None,
-      DotProductOps::None, /*mmaCount=*/0,     /*mmaOps=*/nullptr,
-      /*scaledMmaCount=*/0,                    /*scaledMmaOps=*/nullptr,
-      {64, 64},            {128, 128, 64},     128,
-      16 * 1024,
-      {0xffff, 0xffff, 0xffff}};
-  // clang-format on
+  static const WgpDetails androidWgp = {computeBitwdiths,
+                                        storageBitwidths,
+                                        SubgroupOps::None,
+                                        DotProductOps::None,
+                                        /*mmaCount=*/0,
+                                        /*mmaOps=*/nullptr,
+                                        /*scaledMmaCount=*/0,
+                                        /*scaledMmaOps=*/nullptr,
+                                        {64, 64},
+                                        {128, 128, 64},
+                                        128,
+                                        16 * 1024,
+                                        {0xffff, 0xffff, 0xffff}};
   return &androidWgp;
 }
 
@@ -1016,7 +1034,8 @@ std::optional<TargetDetails> getAndroidProfileDetails(StringRef target) {
 
 std::optional<L1CacheInfo> getL1CacheInfo(TargetAttr target) {
   // TODO(kuhar): Add L1 cache query for other HIP targets.
-  if (!target || !llvm::is_contained({"gfx90a", "gfx942"}, target.getArch())) {
+  if (!target ||
+      !llvm::is_contained({"gfx90a", "gfx942", "gfx950"}, target.getArch())) {
     return std::nullopt;
   }
   return L1CacheInfo{/*cacheLineBytes=*/128, /*cacheSets=*/4};
