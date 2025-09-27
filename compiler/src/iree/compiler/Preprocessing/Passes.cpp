@@ -114,6 +114,15 @@ void buildPreprocessingPassPipeline(
   FunctionLikeNest(passManager).addPass(createAttrBasedPipelinePass);
 }
 
+// Pass pipeline to transpose the NHWC convolution filter from CHWF to FHWC
+// layout.
+static void
+buildTransposeConvolutionFilterPassPipeline(OpPassManager &passManager,
+                                            const TransformOptions &options) {
+  FunctionLikeNest(passManager)
+      .addPass(createConvertConvFilterToChannelsLastPass);
+}
+
 static void
 buildTransposeConvolutionPassPipeline(OpPassManager &passManager,
                                       const TransformOptions &options) {
@@ -182,6 +191,17 @@ void registerPreprocessingPasses() {
              const TransformOptions &transformOptions) {
             buildTransposeConvolutionPassPipeline(passManager,
                                                   transformOptions);
+          });
+
+  PassPipelineRegistration<TransformOptions>
+      preprocessingTransposeConvolutionFilterPassPipeline(
+          "iree-preprocessing-transpose-convolution-filter-pipeline",
+          "Runs a pass pipeline to transpose NHWC convolution filter "
+          "from CHWF to FHWC layout",
+          [](OpPassManager &passManager,
+             const TransformOptions &transformOptions) {
+            buildTransposeConvolutionFilterPassPipeline(passManager,
+                                                        transformOptions);
           });
 
   PassPipelineRegistration<TransformOptions>
