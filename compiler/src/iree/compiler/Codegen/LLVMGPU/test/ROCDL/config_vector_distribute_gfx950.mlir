@@ -151,7 +151,7 @@ func.func @conv_nchwc() {
 
 // CHECK-LABEL: func.func @conv_nchwc()
 // CHECK: linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
-// CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16>
+// CHECK-SAME:                           mma_kind = #iree_gpu.virtual_mma_layout<VMFMA_F32_16x16x32_F16>
 // CHECK-SAME:                           reduction =  [0, 0, 0, 0, 0, 1, 1, 1, 64]
 // CHECK-SAME{LITERAL}:                  subgroup_basis = [[1, 1, 1, 2, 2, 1, 1, 1, 1], [0, 1, 2, 3, 4, 5, 6, 7, 8]]
 // CHECK-SAME:                           workgroup =  [1, 1, 1, 32, 32, 0, 0, 0, 0]

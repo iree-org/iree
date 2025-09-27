@@ -30,6 +30,7 @@ iree_cc_library(
     LLVMAnalysis
     LLVMBitWriter
     LLVMCore
+    LLVMFrontendOffloading
     LLVMIRReader
     LLVMLinker
     LLVMMC

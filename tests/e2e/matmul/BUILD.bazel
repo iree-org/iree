@@ -13,9 +13,32 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+py_library(
+    name = "common",
+    srcs = [
+        "common.py",
+    ],
+)
+
+py_library(
+    name = "compilation_info",
+    srcs = [
+        "compilation_info.py",
+    ],
+    deps = [
+        ":common",
+    ],
+)
+
 py_binary(
     name = "generate_e2e_matmul_tests",
-    srcs = ["generate_e2e_matmul_tests.py"],
+    srcs = [
+        "generate_e2e_matmul_tests.py",
+    ],
+    deps = [
+        ":common",
+        ":compilation_info",
+    ],
 )
 
 ###########################################################################
@@ -368,6 +391,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--acc_type=%s" % acc_type,
         "--shapes=easy_large_static",
+        "--compilation_info=SPIRVVectorizeMali",
     ],
     tags = [
         # Nvidia GPUs support a superset of Valhall features
@@ -395,6 +419,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--acc_type=%s" % acc_type,
         "--shapes=easy_large_static",
+        "--compilation_info=SPIRVVectorizeNVIDIA",
     ],
     tags = [
         "requires-gpu-sm80",

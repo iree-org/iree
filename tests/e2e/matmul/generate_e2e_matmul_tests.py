@@ -8,106 +8,11 @@
 
 from typing import Optional
 import argparse
-import os
-import re
-import enum
 import dataclasses
 import typing
-import itertools
 
-
-# Data type of matrix entries. The string values must match MLIR data types.
-# This is a superset of the values accepted for the --lhs_rhs_types= flag,
-# as this also includes accumulator-specific types like i32.
-@enum.unique
-class MatrixElemTypeId(enum.Enum):
-    NONE = ""
-    I8 = "i8"
-    I32 = "i32"
-    F64 = "f64"
-    F32 = "f32"
-    F16 = "f16"
-    BF16 = "bf16"
-    F8E5M2 = "f8E5M2"
-    F8E4M3FN = "f8E4M3FN"
-    F8E5M2FNUZ = "f8E5M2FNUZ"
-    F8E4M3FNUZ = "f8E4M3FNUZ"
-
-
-# Enumerates of the collections of shapes that we can generate tests for.
-# The values are the accepted values for the --shapes= flag.
-@enum.unique
-class ShapesId(enum.Enum):
-    DEFAULT = "default"
-    SMALL = "small"
-    LARGE = "large"
-    EASY_LARGE_STATIC = "easy_large_static"
-    CUSTOM_MNK = "custom_mnk"  # Used for custom shapes specified by --mnk= flag.
-
-    @classmethod
-    def set_custom_mnk(cls, shapes_id, mnk_string):
-        """Parse and set custom MNK values from command line argument."""
-        if shapes_id != cls.CUSTOM_MNK:
-            if mnk_string:
-                raise ValueError("--mnk can only be used with --shapes=custom_mnk")
-            return
-
-        # shapes_id is CUSTOM_MNK
-        if not mnk_string:
-            raise ValueError("--mnk must be specified when using --shapes=custom_mnk")
-        try:
-            mnk_parts = mnk_string.split(",")
-            if len(mnk_parts) != 3:
-                raise ValueError("--mnk must have exactly 3 values: m,n,k")
-            cls.custom_mnk_values = tuple(int(x) for x in mnk_parts)
-        except ValueError as e:
-            raise ValueError(f"Invalid --mnk format: {e}")
-
-
-# Class attribute to store custom MNK values
-ShapesId.custom_mnk_values = None
-
-
-# Enumerates ways to construct MLIR tensor types.
-@enum.unique
-class Dynamicity(enum.Enum):
-    DYNAMIC = "dynamic"  # Use '?' everywhere. Example: tensor<?x?xf32>.
-    STATIC = "static"  # Use fixed values everywhere. Example: tensor<4x6xf32>.
-    MIXED = "mixed"  # Randomly mix '?' and values. Example: tensor<?x4xf32>.
-
-
-# Enumerates ways to initialize matrix buffer contents.
-@enum.unique
-class MatrixGenerator(enum.Enum):
-    ZERO = "zero"  # Fill with zeros
-    RANDOM = "random"  # Fill with (deterministic) pseudorandom values.
-
-
-# Describes the shape of a matrix multiplication in the usual convention:
-# the LHS is {m}x{k}, the RHS is {k}x{n}, the accumulator/result is {m}x{n}.
-# The extra `accumulate` boolean tells whether the matmul is accumulating into
-# an existing accumulator (C += A * B) or just overwriting the result
-# (C = A * B).
-@dataclasses.dataclass
-class TestShape:
-    m: int
-    k: int
-    n: int
-    accumulate: bool
-
-
-# Describes a workgroup and tiling schedule to target a specific MMA intrinsic.
-@dataclasses.dataclass
-class MMASchedule:
-    intrinsic: str
-    m_count: int  # Number of subgroups per workgroup along M
-    n_count: int  # Number of subgroups per workgroup along N
-    m_tile_count: int
-    n_tile_count: int
-    k_tile_count: int
-
-    def get_subgroup_basis(self) -> str:
-        return f"[[{self.m_count}, {self.n_count}, 1], [0, 1, 2]]"
+from tests.e2e.matmul.common import *
+from tests.e2e.matmul.compilation_info import *
 
 
 # Returns the list of TestShape's to use for the collection of shapes
@@ -194,90 +99,6 @@ def get_test_shapes(shapes_id: ShapesId):
     raise ValueError(shapes_id)
 
 
-# Returns the list of Dynamicity's to use for the collection of shapes
-# identified by shapes_id.
-def get_dynamicities(shapes_id: ShapesId):
-    if shapes_id == ShapesId.EASY_LARGE_STATIC:
-        return [
-            Dynamicity.STATIC,
-        ]
-    else:
-        return [
-            Dynamicity.DYNAMIC,
-            Dynamicity.STATIC,
-        ]
-    raise ValueError(shapes_id)
-
-
-@dataclasses.dataclass
-class TileWorkgroupSizePair:
-    tile_size: typing.List[typing.List[int]]
-    workgroup_size: typing.List[int]
-
-
-# Constructs a TileWorkgroupSizePair for SPIR-V targets enforcing the
-# constraints between the workgroup_size and tile size
-def get_spirv_tile_workgroup_size_pair(
-    workgroup_size, t_tile_k, t_tile_m=4, t_tile_n=4
-):
-    x, y, z = workgroup_size
-    wg_tile_m = y * t_tile_m
-    wg_tile_n = x * t_tile_n
-    return TileWorkgroupSizePair(
-        [[wg_tile_m, wg_tile_n], [t_tile_m, t_tile_n], [0, 0, t_tile_k]], workgroup_size
-    )
-
-
-# Returns all the TileWorkgroupSizePairs for a given SPIRV Target
-def get_all_spirv_tile_workgroup_size_pairs(t_tile_k):
-    tile_workgroup_size_pairs = [
-        get_spirv_tile_workgroup_size_pair([32, 8, 1], t_tile_k),
-        get_spirv_tile_workgroup_size_pair([16, 8, 1], t_tile_k),
-        get_spirv_tile_workgroup_size_pair([64, 2, 1], t_tile_k),
-        get_spirv_tile_workgroup_size_pair([8, 8, 1], t_tile_k),
-        get_spirv_tile_workgroup_size_pair([32, 1, 1], t_tile_k),
-        get_spirv_tile_workgroup_size_pair([16, 2, 1], t_tile_k),
-        get_spirv_tile_workgroup_size_pair([32, 1, 1], t_tile_k),
-    ]
-    return tile_workgroup_size_pairs
-
-
-# Intentionally fixed seed! We want full reproducibility here, both across runs
-# and across machines.
-# Intentionally not shared with pseudorandom_generator_seed to limit the ways
-# in which shuffling testcases changes which random values are generated.
-local_pseudorandom_state = 1
-
-
-# A shape dimension value, i.e. a size value that could appear in a MLIR type
-# such as 'tensor<?x4xf32>'. None means a dynamic size, similar to '?' in MLIR.
-@dataclasses.dataclass
-class DimSize:
-    value: typing.Optional[int]
-
-
-# Generates a compile-time MLIR size value, i.e. either a fixed positive integer
-# or None (which maps to MLIR '?') depending on dynamicity.
-def shape_dim(x: int, dynamicity: Dynamicity):
-    if dynamicity == Dynamicity.DYNAMIC:
-        return DimSize(None)
-    elif dynamicity == Dynamicity.STATIC:
-        return DimSize(x)
-    else:
-        raise ValueError(dynamicity)
-
-
-# Stringification used for generating MLIR types, e.g. tensor<?x?xf32>.
-def int_or_question_mark(s: DimSize):
-    return s.value or "?"
-
-
-# Stringification used for generating alphanumeric identifiers, e.g.
-# util.func @somefunction_DYNxDYNxf32, where we can't use "?" characters.
-def int_or_DYN(s: DimSize):
-    return s.value or "DYN"
-
-
 # Describes the fully resolved shape dimensions of all 3 input matrices,
 # LHS, RHS, and Accumulator, in a testcase.
 # Each value is a string, which may either represent a positive integer such as "123",
@@ -325,6 +146,7 @@ def generate_function_name(
     acc_type: MatrixElemTypeId,
     shapes: TestInputMatricesShapes,
     accumulate: bool,
+    compilation_info: typing.Optional[CompilationInfo] = None,
 ):
     input_t = lhs_rhs_type.value
     acc_t = acc_type.value
@@ -335,10 +157,14 @@ def generate_function_name(
     acc_r = int_or_DYN(shapes.acc_rows)
     acc_c = int_or_DYN(shapes.acc_cols)
 
+    info = ""
+    if compilation_info:
+        info = f"_for_{compilation_info.dispatch_lowering_pass_pipeline}"
+
     matmul_kind = "matmul_accumulate" if accumulate else "matmul"
     return (
         f"{matmul_kind}_{lhs_r}x{lhs_c}x{input_t}_times_"
-        + f"{rhs_r}x{rhs_c}x{input_t}_into_{acc_r}x{acc_c}x{acc_t}"
+        + f"{rhs_r}x{rhs_c}x{input_t}_into_{acc_r}x{acc_c}x{acc_t}{info}"
     )
 
 
@@ -360,13 +186,11 @@ def generate_function(
     shape: TestShape,
     transpose_rhs: bool,
     dynamicity: Dynamicity,
+    compilation_info: Optional[CompilationInfo] = None,
 ):
     shapes = generate_shapes(shape, transpose_rhs, dynamicity)
     func_name = generate_function_name(
-        lhs_rhs_type,
-        acc_type,
-        shapes,
-        shape.accumulate,
+        lhs_rhs_type, acc_type, shapes, shape.accumulate, compilation_info
     )
     lhs_r = int_or_question_mark(shapes.lhs_rows)
     lhs_c = int_or_question_mark(shapes.lhs_cols)
@@ -379,52 +203,55 @@ def generate_function(
     rhs_tensor_type = f"tensor<{rhs_r}x{rhs_c}x{lhs_rhs_type.value}>"
     acc_tensor_type = f"tensor<{acc_r}x{acc_c}x{acc_type.value}>"
 
-    if transpose_rhs:
-        op_name = "linalg.matmul indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>]"
-    else:
-        op_name = "linalg.matmul"
+    (
+        compilation_info_string,
+        compilation_info_attr,
+    ) = generate_compilation_info_string_and_attr(compilation_info)
 
-    func_definition = ""
-    compute = f"  %result = {op_name} ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
+    args = [("%lhs", lhs_tensor_type), ("%rhs", rhs_tensor_type)]
     if shape.accumulate:
-        signature = f"({lhs_tensor_type}, {rhs_tensor_type}, {acc_tensor_type}) -> {acc_tensor_type}"
-        import_declaration = f"util.func private @module.{func_name}(%lhs: !hal.buffer_view, %rhs: !hal.buffer_view, %acc: !hal.buffer_view) -> !hal.buffer_view"
-        func_definition = func_definition + (
-            f"util.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}, %acc: {acc_tensor_type}) -> {acc_tensor_type} {{\n"
-            f"{compute}\n"
-            f"  util.return %result: {acc_tensor_type}\n"
-            f"}}\n"
-        )
-    else:
+        args += [("%acc", acc_tensor_type)]
+
+    func_definition = compilation_info_string + (
+        f"util.func @{func_name}("
+        + ", ".join([name + ": " + ty for name, ty in args])
+        + f") -> {acc_tensor_type} {{\n"
+    )
+
+    if not shape.accumulate:
         literal_zero_for_acc_type = "0.0" if "f" in acc_type.value else "0"
         if acc_r == "?":
-            signature = f"({lhs_tensor_type}, {rhs_tensor_type}) -> {acc_tensor_type}"
-            import_declaration = f"util.func private @module.{func_name}(%lhs: !hal.buffer_view, %rhs: !hal.buffer_view) -> !hal.buffer_view"
-            func_definition = func_definition + (
-                f"util.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}) -> {acc_tensor_type} {{\n"
+            func_definition += (
                 f"  %c0 = arith.constant 0 : index\n"
                 f"  %c1 = arith.constant 1 : index\n"
                 f"  %acc_dim0 = tensor.dim %lhs, %c0 : {lhs_tensor_type}\n"
                 f"  %acc_dim1 = tensor.dim %rhs, %c1 : {rhs_tensor_type}\n"
                 f"  %init_acc = tensor.empty(%acc_dim0, %acc_dim1) : {acc_tensor_type}\n"
-                f"  %c0_acc_type = arith.constant {literal_zero_for_acc_type}: {acc_type.value}\n"
-                f"  %acc = linalg.fill ins(%c0_acc_type : {acc_type.value}) outs(%init_acc : {acc_tensor_type}) -> {acc_tensor_type}\n"
-                f"{compute}"
-                f"  util.return %result: {acc_tensor_type}\n"
-                f"}}\n"
             )
         else:
-            signature = f"({lhs_tensor_type}, {rhs_tensor_type}) -> {acc_tensor_type}"
-            import_declaration = f"util.func private @module.{func_name}(%lhs: !hal.buffer_view, %rhs: !hal.buffer_view) -> !hal.buffer_view"
-            func_definition = func_definition + (
-                f"util.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}) -> {acc_tensor_type} {{\n"
-                f"  %init_acc = tensor.empty() : {acc_tensor_type}\n"
-                f"  %c0_acc_type = arith.constant {literal_zero_for_acc_type}: {acc_type.value}\n"
-                f"  %acc = linalg.fill ins(%c0_acc_type : {acc_type.value}) outs(%init_acc : {acc_tensor_type}) -> {acc_tensor_type}\n"
-                f"{compute}"
-                f"  util.return %result: {acc_tensor_type}\n"
-                f"}}\n"
-            )
+            func_definition += f"  %init_acc = tensor.empty() : {acc_tensor_type}\n"
+        func_definition += (
+            f"  %c0_acc_type = arith.constant {literal_zero_for_acc_type}: {acc_type.value}\n"
+            f"  %acc = linalg.fill ins(%c0_acc_type : {acc_type.value}) outs(%init_acc : {acc_tensor_type}) -> {acc_tensor_type}\n"
+        )
+
+    indexing_maps_attr = ""
+
+    if transpose_rhs:
+        indexing_maps_attr = "indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>]"
+
+    func_definition += (
+        f"  %result = linalg.matmul {indexing_maps_attr} {compilation_info_attr} ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
+        f"  util.return %result: {acc_tensor_type}\n"
+        f"}}\n"
+    )
+
+    signature = ", ".join([ty for name, ty in args]) + " -> {acc_tensor_type}"
+    import_declaration = (
+        f"util.func private @module.{func_name}("
+        + ", ".join([name + ": !hal.buffer_view" for name, ty in args])
+        + ") -> !hal.buffer_view"
+    )
     return MLIRFunction(
         name=func_name,
         signature=signature,
@@ -440,22 +267,7 @@ class TestCall:
     op: str
 
 
-# Intentionally fixed seed! We want full reproducibility here, both across runs
-# and across machines.
-# Intentionally not shared with local_pseudorandom_state to limit the ways
-# in which shuffling testcases changes which random values are generated.
-pseudorandom_generator_seed = 1
-
-
-def contents_generator_tag(generator: MatrixGenerator):
-    if generator == MatrixGenerator.ZERO:
-        return ""
-    elif generator == MatrixGenerator.RANDOM:
-        global pseudorandom_generator_seed
-        pseudorandom_generator_seed = pseudorandom_generator_seed + 1
-        return f"!tag:iree:fully_specified_pseudorandom {pseudorandom_generator_seed}"
-    else:
-        raise ValueError(generator)
+random_matrix_index = 0
 
 
 # Generate a matrix function argument of the given size as `%name`.
@@ -464,13 +276,13 @@ def generate_random_matrix(
     matrix_shape: list,
     element_type: MatrixElemTypeId,
 ):
-    global pseudorandom_generator_seed
-    pseudorandom_generator_seed = pseudorandom_generator_seed + 1
+    global random_matrix_index
+    random_matrix_index += 1
     return (
         f"  %{name}_dim0 = arith.constant {matrix_shape[0]} : i64\n"
         f"  %{name}_dim1 = arith.constant {matrix_shape[1]} : i64\n"
         f"  %{name}_element_type = hal.element_type<{element_type.value}> : i32\n"
-        f"  %{name}_seed = arith.constant {pseudorandom_generator_seed} : i32\n"
+        f"  %{name}_seed = arith.constant {random_matrix_index} : i32\n"
         f"  %{name} = util.call @matmul_test.generate_random_matrix(%device, %{name}_dim0, %{name}_dim1, %{name}_element_type, %{name}_seed) : (!hal.device, i64, i64, i32, i32) -> !hal.buffer_view\n"
     )
 
@@ -517,8 +329,8 @@ def generate_call(
         op = op + generate_random_matrix("acc", [shape.m, shape.n], acc_type)
         # TODO(#16168): there's a bug with in-place input->output aliasing and
         # we work around it here by passing in a unique copy.
-        global pseudorandom_generator_seed
-        pseudorandom_generator_seed = pseudorandom_generator_seed - 1
+        global random_matrix_index
+        random_matrix_index -= 1
         op = op + generate_random_matrix("acc_copy", [shape.m, shape.n], acc_type)
         op = op + (
             f"  %result = util.call @module.{function.name}(%lhs, %rhs, %acc_copy) : (!hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view\n"
@@ -549,29 +361,36 @@ def generate(
     acc_type: MatrixElemTypeId,
     shapes_id: ShapesId,
     transpose_rhs: bool,
+    compilation_info_id: CompilationInfoId,
 ):
     functions = {}
     calls = []
 
-    for shape in get_test_shapes(shapes_id):
-        for dynamicity in get_dynamicities(shapes_id):
-            function = generate_function(
-                lhs_rhs_type,
-                acc_type,
-                shape,
-                transpose_rhs,
-                dynamicity,
-            )
-            # Different testcases may differ only by runtime parameters but
-            # share the same code. For example, dynamic-shapes testcases
-            # share the same code involing tensor<?x?xf32> even though the runtime
-            # value in the trace are different. That's why we append conditionally
-            # to calls, but unconditionally to function_definitions.
-            if function.name not in functions:
-                functions[function.name] = function
-            calls.append(
-                generate_call(function, lhs_rhs_type, acc_type, shape, transpose_rhs)
-            )
+    for compilation_info in get_test_compilation_infos(
+        compilation_info_id, lhs_rhs_type
+    ):
+        for shape in get_test_shapes(shapes_id):
+            for dynamicity in get_dynamicities(shapes_id):
+                function = generate_function(
+                    lhs_rhs_type,
+                    acc_type,
+                    shape,
+                    transpose_rhs,
+                    dynamicity,
+                    compilation_info,
+                )
+                # Different testcases may differ only by runtime parameters but
+                # share the same code. For example, dynamic-shapes testcases
+                # share the same code involing tensor<?x?xf32> even though the runtime
+                # value in the trace are different. That's why we append conditionally
+                # to calls, but unconditionally to function_definitions.
+                if function.name not in functions:
+                    functions[function.name] = function
+                calls.append(
+                    generate_call(
+                        function, lhs_rhs_type, acc_type, shape, transpose_rhs
+                    )
+                )
 
     return (functions, calls)
 
@@ -628,6 +447,14 @@ def parse_arguments():
         action="store_true",
         help="Whether to transpose RHS",
         default=False,
+        required=False,
+    )
+    parser.add_argument(
+        "--compilation_info",
+        type=str,
+        choices=[i.value for i in CompilationInfoId],
+        help="Collection of compilation info setups to test",
+        default="",
         required=False,
     )
     parser.add_argument(
@@ -692,11 +519,14 @@ def main(args):
     lhs_rhs_type = MatrixElemTypeId(args.lhs_rhs_type)
     acc_type = MatrixElemTypeId(args.acc_type)
     shapes_id = ShapesId(args.shapes)
+    compilation_info_id = CompilationInfoId(args.compilation_info)
 
     # Parse custom MNK values if provided
     ShapesId.set_custom_mnk(shapes_id, args.mnk)
 
-    (functions, calls) = generate(lhs_rhs_type, acc_type, shapes_id, args.transpose_rhs)
+    (functions, calls) = generate(
+        lhs_rhs_type, acc_type, shapes_id, args.transpose_rhs, compilation_info_id
+    )
 
     write_code_file(functions, args.output_matmul_mlir)
     write_calls_file(
