@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Value.h"
 
@@ -293,6 +294,77 @@ struct YieldOpBufferizationInterface
   }
 };
 
+/// Bufferization of iree_gpu.coalesced_gather_dma. This op bufferizes to itself
+/// with memref operands instead of tensor operands.
+struct CoalescedGatherDMAOpBufferizationInterface
+    : public BufferizableOpInterface::ExternalModel<
+          CoalescedGatherDMAOpBufferizationInterface,
+          IREE::GPU::CoalescedGatherDMAOp> {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const AnalysisState &state) const {
+    // This op reads from the source and indices tensors.
+    auto gatherOp = cast<IREE::GPU::CoalescedGatherDMAOp>(op);
+    return opOperand.get() == gatherOp.getIndices() ||
+           opOperand.get() == gatherOp.getSource();
+  }
+
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const AnalysisState &state) const {
+    // This op writes to the init/destination tensor.
+    auto gatherOp = cast<IREE::GPU::CoalescedGatherDMAOp>(op);
+    return opOperand.get() == gatherOp.getInit();
+  }
+
+  bufferization::AliasingValueList
+  getAliasingValues(Operation *op, OpOperand &opOperand,
+                    const AnalysisState &state) const {
+    auto gatherOp = cast<IREE::GPU::CoalescedGatherDMAOp>(op);
+    SmallVector<bufferization::AliasingValue> alist;
+    // The result aliases with the init operand.
+    if (opOperand.get() == gatherOp.getInit()) {
+      alist.push_back({gatherOp.getResult(), BufferRelation::Equivalent});
+    }
+    return alist;
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          const BufferizationOptions &options,
+                          bufferization::BufferizationState &state) const {
+    auto gatherOp = cast<IREE::GPU::CoalescedGatherDMAOp>(op);
+
+    // Get the bufferized operands.
+    FailureOr<Value> indicesBuffer =
+        getBuffer(rewriter, gatherOp.getIndices(), options, state);
+    FailureOr<Value> sourceBuffer =
+        getBuffer(rewriter, gatherOp.getSource(), options, state);
+    FailureOr<Value> initBuffer =
+        getBuffer(rewriter, gatherOp.getInit(), options, state);
+
+    if (failed(indicesBuffer) || failed(sourceBuffer) || failed(initBuffer)) {
+      return failure();
+    }
+
+    // Check if we're inside an scf.forall.in_parallel block.
+    // If so, we need to move the op outside of it.
+    Operation *parentOp = gatherOp->getParentOp();
+    if (isa_and_nonnull<scf::InParallelOp>(parentOp)) {
+      // Get the forall op containing the in_parallel.
+      auto forallOp = parentOp->getParentOfType<scf::ForallOp>();
+      if (forallOp) {
+        // Insert the memref version before the in_parallel block.
+        rewriter.setInsertionPoint(parentOp);
+        rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
+            gatherOp.getLoc(), initBuffer->getType(), *indicesBuffer,
+            *sourceBuffer, *initBuffer);
+        // The result is the same as the init buffer.
+        bufferization::replaceOpWithBufferizedValues(rewriter, op, *initBuffer);
+        return success();
+      }
+    }
+    return failure();
+  }
+};
+
 /// AMD Specific Ops
 
 static bool hasStorageBufferMemSpace(BaseMemRefType m) {
@@ -412,6 +484,8 @@ void registerIREEGPUBufferizationInterfaces(DialectRegistry &registry) {
             ValueBarrierOpBufferizationInterface>(*context);
         IREE::GPU::YieldOp::attachInterface<YieldOpBufferizationInterface>(
             *context);
+        IREE::GPU::CoalescedGatherDMAOp::attachInterface<
+            CoalescedGatherDMAOpBufferizationInterface>(*context);
 
         IREE::GPU::BufferResourceCastOp::attachInterface<
             BufferResourceCastOpBufferizationInterface>(*context);
