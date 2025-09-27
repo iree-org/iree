@@ -555,8 +555,8 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
           return consumerOperand.getDefiningOp<tensor::EmptyOp>();
         });
   };
-  linalg::populateDataLayoutPropagationPatterns(propagationPatterns,
-                                                controlPropagationFn);
+  linalg::populateDataLayoutPropagationPatterns(
+      propagationPatterns, controlPropagationFn, /*PoisonPaddingOk=*/true);
   // TODO(Max191): The propagation patterns could be applied at the same time as
   // relayout ops are folded into the map_scatter, which may enable even more
   // folding. This requires the relayout op folding to be done as pattern
