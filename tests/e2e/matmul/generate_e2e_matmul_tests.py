@@ -203,57 +203,55 @@ def generate_function(
     rhs_tensor_type = f"tensor<{rhs_r}x{rhs_c}x{lhs_rhs_type.value}>"
     acc_tensor_type = f"tensor<{acc_r}x{acc_c}x{acc_type.value}>"
 
-    if transpose_rhs:
-        op_name = "linalg.matmul indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>]"
-    else:
-        op_name = "linalg.matmul"
-
-    # Compilation info is optional; prints empty string by default.
     (
         compilation_info_string,
         compilation_info_attr,
     ) = generate_compilation_info_string_and_attr(compilation_info)
-    func_definition = compilation_info_string
-    compute = f"  %result = {op_name} {compilation_info_attr}ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
+
+    args = [("%lhs", lhs_tensor_type), ("%rhs", rhs_tensor_type)]
     if shape.accumulate:
-        signature = f"({lhs_tensor_type}, {rhs_tensor_type}, {acc_tensor_type}) -> {acc_tensor_type}"
-        import_declaration = f"util.func private @module.{func_name}(%lhs: !hal.buffer_view, %rhs: !hal.buffer_view, %acc: !hal.buffer_view) -> !hal.buffer_view"
-        func_definition = func_definition + (
-            f"util.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}, %acc: {acc_tensor_type}) -> {acc_tensor_type} {{\n"
-            f"{compute}\n"
-            f"  util.return %result: {acc_tensor_type}\n"
-            f"}}\n"
-        )
-    else:
+        args += [("%acc", acc_tensor_type)]
+
+    func_definition = compilation_info_string + (
+        f"util.func @{func_name}("
+        + ", ".join([name + ": " + ty for name, ty in args])
+        + f") -> {acc_tensor_type} {{\n"
+    )
+
+    if not shape.accumulate:
         literal_zero_for_acc_type = "0.0" if "f" in acc_type.value else "0"
         if acc_r == "?":
-            signature = f"({lhs_tensor_type}, {rhs_tensor_type}) -> {acc_tensor_type}"
-            import_declaration = f"util.func private @module.{func_name}(%lhs: !hal.buffer_view, %rhs: !hal.buffer_view) -> !hal.buffer_view"
-            func_definition = func_definition + (
-                f"util.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}) -> {acc_tensor_type} {{\n"
+            func_definition += (
                 f"  %c0 = arith.constant 0 : index\n"
                 f"  %c1 = arith.constant 1 : index\n"
                 f"  %acc_dim0 = tensor.dim %lhs, %c0 : {lhs_tensor_type}\n"
                 f"  %acc_dim1 = tensor.dim %rhs, %c1 : {rhs_tensor_type}\n"
                 f"  %init_acc = tensor.empty(%acc_dim0, %acc_dim1) : {acc_tensor_type}\n"
-                f"  %c0_acc_type = arith.constant {literal_zero_for_acc_type}: {acc_type.value}\n"
-                f"  %acc = linalg.fill ins(%c0_acc_type : {acc_type.value}) outs(%init_acc : {acc_tensor_type}) -> {acc_tensor_type}\n"
-                f"{compute}"
-                f"  util.return %result: {acc_tensor_type}\n"
-                f"}}\n"
             )
         else:
-            signature = f"({lhs_tensor_type}, {rhs_tensor_type}) -> {acc_tensor_type}"
-            import_declaration = f"util.func private @module.{func_name}(%lhs: !hal.buffer_view, %rhs: !hal.buffer_view) -> !hal.buffer_view"
-            func_definition = func_definition + (
-                f"util.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}) -> {acc_tensor_type} {{\n"
-                f"  %init_acc = tensor.empty() : {acc_tensor_type}\n"
-                f"  %c0_acc_type = arith.constant {literal_zero_for_acc_type}: {acc_type.value}\n"
-                f"  %acc = linalg.fill ins(%c0_acc_type : {acc_type.value}) outs(%init_acc : {acc_tensor_type}) -> {acc_tensor_type}\n"
-                f"{compute}"
-                f"  util.return %result: {acc_tensor_type}\n"
-                f"}}\n"
-            )
+            func_definition += f"  %init_acc = tensor.empty() : {acc_tensor_type}\n"
+        func_definition += (
+            f"  %c0_acc_type = arith.constant {literal_zero_for_acc_type}: {acc_type.value}\n"
+            f"  %acc = linalg.fill ins(%c0_acc_type : {acc_type.value}) outs(%init_acc : {acc_tensor_type}) -> {acc_tensor_type}\n"
+        )
+
+    indexing_maps_attr = ""
+
+    if transpose_rhs:
+        indexing_maps_attr = "indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>]"
+
+    func_definition += (
+        f"  %result = linalg.matmul {indexing_maps_attr} {compilation_info_attr} ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
+        f"  util.return %result: {acc_tensor_type}\n"
+        f"}}\n"
+    )
+
+    signature = ", ".join([ty for name, ty in args]) + " -> {acc_tensor_type}"
+    import_declaration = (
+        f"util.func private @module.{func_name}("
+        + ", ".join([name + ": !hal.buffer_view" for name, ty in args])
+        + ") -> !hal.buffer_view"
+    )
     return MLIRFunction(
         name=func_name,
         signature=signature,
