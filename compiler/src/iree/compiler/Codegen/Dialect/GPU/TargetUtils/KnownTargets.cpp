@@ -451,7 +451,7 @@ const WgpDetails *getGfx1250WgpDetails() {
                                         /*mmaOps=*/nullptr,
                                         /*scaledMmaCount=*/0,
                                         /*scaledMmaOps=*/nullptr,
-                                        {32, 64},
+                                        {32, 32},
                                         {1024, 1024, 1024},
                                         1024,
                                         64 * 1024,

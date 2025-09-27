@@ -123,9 +123,8 @@ LogicalResult setHIPGlobals(Location loc, llvm::Module *module,
   if (chipset.majorVersion < 6) {
     return emitError(loc, "pre-gfx6 chipsets are not supported");
   }
-  // Latest GFX arch supported is gfx120x.
-  if (chipset.majorVersion > 12 ||
-      (chipset.majorVersion == 12 && chipset.minorVersion > 0)) {
+  // Latest GFX arch supported is gfx1250.
+  if (chipset > amdgpu::Chipset(12, 5, 0)) {
     return emitError(loc)
            << "a chipset with major version = " << chipset.majorVersion
            << " and minor version = " << chipset.minorVersion
@@ -140,14 +139,13 @@ LogicalResult setHIPGlobals(Location loc, llvm::Module *module,
 
   // Link oclc configurations as globals.
   auto *boolType = llvm::Type::getInt8Ty(module->getContext());
-  static const std::vector<std::pair<std::string, bool>> rocdlGlobalParams(
-      {{"__oclc_finite_only_opt", false},
-       {"__oclc_daz_opt", false},
-       {"__oclc_correctly_rounded_sqrt32", true},
-       {"__oclc_unsafe_math_opt", false}});
-  for (auto &globalParam : rocdlGlobalParams) {
-    overridePlatformGlobal(module, globalParam.first, globalParam.second,
-                           boolType);
+  static constexpr std::pair<llvm::StringLiteral, bool> rocdlGlobalParams[] = {
+      {"__oclc_finite_only_opt", false},
+      {"__oclc_daz_opt", false},
+      {"__oclc_correctly_rounded_sqrt32", true},
+      {"__oclc_unsafe_math_opt", false}};
+  for (auto [param, value] : rocdlGlobalParams) {
+    overridePlatformGlobal(module, param, value, boolType);
   }
   overridePlatformGlobal(module, "__oclc_wavefrontsize64", isWave64, boolType);
 
