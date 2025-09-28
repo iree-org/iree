@@ -532,9 +532,9 @@ static GPUMMASchedule getOptimalMMASchedule(const GPUMatmulShapeType &problem,
 ///
 /// This function acts as a comparison function object for std::sort, which
 /// returns true if the lhs is ordered before rhs.
-bool compareIntrinsics(const GPUMatmulShapeType &problem,
-                       const GPUMatmulShapeType &lhs,
-                       const GPUMatmulShapeType &rhs) {
+static bool compareIntrinsics(const GPUMatmulShapeType &problem,
+                              const GPUMatmulShapeType &lhs,
+                              const GPUMatmulShapeType &rhs) {
   // Prefer K-aligned intrinsics.
   int lhsKAligned = problem.kSizes.back() % lhs.kSizes.back() == 0 ? 1 : 0;
   int rhsKAligned = problem.kSizes.back() % rhs.kSizes.back() == 0 ? 1 : 0;
@@ -575,10 +575,10 @@ static SmallVector<GPUIntrinsicType>
 sortMMAIntrinsics(GPUMatmulShapeType problem,
                   ArrayRef<GPUIntrinsicType> intrinsics) {
   SmallVector<GPUIntrinsicType> sortedIntrinsics(intrinsics);
-  llvm::sort(sortedIntrinsics,
-             [&](const GPUMatmulShapeType &lhs, const GPUMatmulShapeType &rhs) {
-               return compareIntrinsics(problem, lhs, rhs);
-             });
+  llvm::stable_sort(sortedIntrinsics, [&](const GPUMatmulShapeType &lhs,
+                                          const GPUMatmulShapeType &rhs) {
+    return compareIntrinsics(problem, lhs, rhs);
+  });
   return sortedIntrinsics;
 }
 
