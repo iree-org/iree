@@ -55,7 +55,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 struct NullOpConversion : public OpConversionPattern<IREE::Util::NullOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::NullOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -70,7 +70,7 @@ struct NullOpConversion : public OpConversionPattern<IREE::Util::NullOp> {
 //===----------------------------------------------------------------------===//
 
 struct CmpEQOpConversion : public OpConversionPattern<IREE::Util::CmpEQOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::CmpEQOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -89,7 +89,7 @@ struct CmpEQOpConversion : public OpConversionPattern<IREE::Util::CmpEQOp> {
 //===----------------------------------------------------------------------===//
 
 struct CmpNEOpConversion : public OpConversionPattern<IREE::Util::CmpNEOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::CmpNEOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -109,7 +109,7 @@ struct CmpNEOpConversion : public OpConversionPattern<IREE::Util::CmpNEOp> {
 
 struct UnreachableOpConversion
     : public OpConversionPattern<IREE::Util::UnreachableOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::UnreachableOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {

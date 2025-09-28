@@ -26,7 +26,7 @@ namespace mlir::iree_compiler {
 namespace {
 
 struct ModuleOpConversion : public OpConversionPattern<ModuleOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(ModuleOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -110,7 +110,7 @@ static void copyFuncAttrs(func::FuncOp srcOp, Operation *dstOp) {
 }
 
 struct FuncOpConversion : public OpConversionPattern<func::FuncOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(func::FuncOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -184,7 +184,7 @@ static void copyImportAttrs(func::FuncOp srcOp, IREE::VM::ImportOp dstOp) {
 }
 
 struct ExternalFuncOpConversion : public OpConversionPattern<func::FuncOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(func::FuncOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -392,7 +392,7 @@ struct CallOpConversion : public OpConversionPattern<func::CallOp> {
 };
 
 struct ReturnOpConversion : public OpConversionPattern<mlir::func::ReturnOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(mlir::func::ReturnOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -403,7 +403,7 @@ struct ReturnOpConversion : public OpConversionPattern<mlir::func::ReturnOp> {
 };
 
 template <typename StdOp>
-struct CastingOpConversion : public OpConversionPattern<StdOp> {
+struct CastingOpConversion final : public OpConversionPattern<StdOp> {
   using OpConversionPattern<StdOp>::OpConversionPattern;
   LogicalResult
   matchAndRewrite(StdOp srcOp, typename StdOp::Adaptor adaptor,
@@ -414,7 +414,7 @@ struct CastingOpConversion : public OpConversionPattern<StdOp> {
 };
 
 struct AssertOpConversion : public OpConversionPattern<cf::AssertOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(cf::AssertOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -434,7 +434,7 @@ struct AssertOpConversion : public OpConversionPattern<cf::AssertOp> {
 };
 
 struct BranchOpConversion : public OpConversionPattern<cf::BranchOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(cf::BranchOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -445,7 +445,7 @@ struct BranchOpConversion : public OpConversionPattern<cf::BranchOp> {
 };
 
 struct CondBranchOpConversion : public OpConversionPattern<cf::CondBranchOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(cf::CondBranchOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -458,7 +458,7 @@ struct CondBranchOpConversion : public OpConversionPattern<cf::CondBranchOp> {
 };
 
 struct SwitchOpConversion : public OpConversionPattern<cf::SwitchOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(cf::SwitchOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {

@@ -112,7 +112,7 @@ struct ElideNoOp final : public OpConversionPattern<OpTy> {
 };
 
 struct ConvertMemRefGlobalOp : public OpConversionPattern<memref::GlobalOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(memref::GlobalOp globalOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -155,7 +155,7 @@ struct ConvertMemRefGlobalOp : public OpConversionPattern<memref::GlobalOp> {
 
 struct ConvertMemRefGetGlobalOp
     : public OpConversionPattern<memref::GetGlobalOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(memref::GetGlobalOp getOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -170,7 +170,7 @@ struct ConvertMemRefGetGlobalOp
 };
 
 struct ConvertMemRefAllocaOp : public OpConversionPattern<memref::AllocaOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(memref::AllocaOp allocaOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -185,7 +185,7 @@ struct ConvertMemRefAllocaOp : public OpConversionPattern<memref::AllocaOp> {
 };
 
 struct ConvertMemRefDimOp : public OpConversionPattern<memref::DimOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(memref::DimOp dimOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -206,7 +206,7 @@ struct ConvertMemRefDimOp : public OpConversionPattern<memref::DimOp> {
 };
 
 struct ConvertMemRefLoadOp : public OpConversionPattern<memref::LoadOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(memref::LoadOp loadOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -245,7 +245,7 @@ struct ConvertMemRefLoadOp : public OpConversionPattern<memref::LoadOp> {
 };
 
 struct ConvertMemRefStoreOp : public OpConversionPattern<memref::StoreOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(memref::StoreOp storeOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -284,7 +284,7 @@ struct ConvertMemRefStoreOp : public OpConversionPattern<memref::StoreOp> {
 // Make `reinterpret_cast` a no-op.
 struct ConvertMemRefReinterpretCastOp
     : public OpConversionPattern<memref::ReinterpretCastOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(memref::ReinterpretCastOp castOp, OpAdaptor adaptor,

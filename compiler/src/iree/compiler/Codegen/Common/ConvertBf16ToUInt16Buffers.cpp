@@ -76,7 +76,7 @@ public:
 //===----------------------------------------------------------------------===//
 struct ConvertHalInterfaceBindingSubspan final
     : OpConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op, OpAdaptor adaptor,
@@ -99,7 +99,7 @@ struct ConvertHalInterfaceBindingSubspan final
 };
 
 struct ConvertMemRefAlloc final : OpConversionPattern<memref::AllocOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(memref::AllocOp op, OpAdaptor adaptor,
@@ -185,7 +185,7 @@ struct GenericTypeConversionPattern : public ConversionPattern {
 };
 
 struct ConvertMemRefLoad final : OpConversionPattern<memref::LoadOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(memref::LoadOp op, OpAdaptor adaptor,
@@ -204,7 +204,7 @@ struct ConvertMemRefLoad final : OpConversionPattern<memref::LoadOp> {
 };
 
 struct ConvertMemRefStore final : OpConversionPattern<memref::StoreOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(memref::StoreOp op, OpAdaptor adaptor,
@@ -224,7 +224,7 @@ struct ConvertMemRefStore final : OpConversionPattern<memref::StoreOp> {
 
 struct ConvertAmdgpuFatRawBufferCast final
     : OpConversionPattern<amdgpu::FatRawBufferCastOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(amdgpu::FatRawBufferCastOp op, OpAdaptor adaptor,

@@ -107,7 +107,7 @@ std::optional<ScfForBounds> extractForBounds(mlir::stablehlo::WhileOp op) {
 
 // Rewrites `stablehlo.while` to `scf.while` or `scf.for`.
 struct WhileOpPattern final : OpConversionPattern<mlir::stablehlo::WhileOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(mlir::stablehlo::WhileOp op, OpAdaptor adaptor,
@@ -164,7 +164,7 @@ struct WhileOpPattern final : OpConversionPattern<mlir::stablehlo::WhileOp> {
 
 // Rewrites `stablehlo.if` to `scf.if`.
 struct IfOpPattern final : OpConversionPattern<mlir::stablehlo::IfOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(mlir::stablehlo::IfOp op, OpAdaptor adaptor,
@@ -184,7 +184,7 @@ struct IfOpPattern final : OpConversionPattern<mlir::stablehlo::IfOp> {
 
 // Rewrites `stablehlo.case` to a nested `scf.if`.
 struct CaseOpPattern : public OpConversionPattern<mlir::stablehlo::CaseOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   // Recursively create if/else ops to handle each possible value in a case op.
   scf::IfOp createNestedCases(int currentIdx, mlir::stablehlo::CaseOp op,

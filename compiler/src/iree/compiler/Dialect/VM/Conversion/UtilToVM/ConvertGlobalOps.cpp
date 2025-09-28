@@ -16,7 +16,7 @@ namespace {
 
 struct InitializerOpConversion
     : public OpConversionPattern<IREE::Util::InitializerOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::InitializerOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -38,7 +38,7 @@ struct InitializerOpConversion
 };
 
 struct ReturnOpConversion : public OpConversionPattern<IREE::Util::ReturnOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::ReturnOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {

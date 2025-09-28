@@ -180,7 +180,7 @@ private:
 
 struct MemoryTypeOpConversion
     : public OpConversionPattern<IREE::HAL::MemoryTypeOp> {
-  using OpConversionPattern<IREE::HAL::MemoryTypeOp>::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::MemoryTypeOp op,
                   IREE::HAL::MemoryTypeOp::Adaptor adaptor,
@@ -193,7 +193,7 @@ struct MemoryTypeOpConversion
 
 struct BufferUsageOpConversion
     : public OpConversionPattern<IREE::HAL::BufferUsageOp> {
-  using OpConversionPattern<IREE::HAL::BufferUsageOp>::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::BufferUsageOp op,
                   IREE::HAL::BufferUsageOp::Adaptor adaptor,

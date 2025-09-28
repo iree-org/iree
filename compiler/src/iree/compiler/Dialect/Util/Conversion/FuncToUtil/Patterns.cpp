@@ -21,7 +21,7 @@ namespace mlir::iree_compiler {
 namespace {
 
 struct FuncFuncOpPattern : public OpConversionPattern<func::FuncOp> {
-  using OpConversionPattern<func::FuncOp>::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(func::FuncOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -124,7 +124,7 @@ struct FuncFuncOpPattern : public OpConversionPattern<func::FuncOp> {
 };
 
 struct FuncCallOpPattern : public OpConversionPattern<func::CallOp> {
-  using OpConversionPattern<func::CallOp>::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(func::CallOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -143,7 +143,7 @@ struct FuncCallOpPattern : public OpConversionPattern<func::CallOp> {
 };
 
 struct FuncReturnOpPattern : public OpConversionPattern<func::ReturnOp> {
-  using OpConversionPattern<func::ReturnOp>::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(func::ReturnOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {

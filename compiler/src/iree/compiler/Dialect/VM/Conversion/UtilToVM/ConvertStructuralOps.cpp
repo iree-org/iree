@@ -17,7 +17,7 @@ namespace {
 
 struct InitializerOpConversion
     : public OpConversionPattern<IREE::Util::InitializerOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(IREE::Util::InitializerOp op, OpAdaptor adaptor,
@@ -85,7 +85,7 @@ static void copyFuncAttrs(IREE::Util::FuncOp srcOp, Operation *dstOp) {
 }
 
 class FuncOpConversion : public OpConversionPattern<IREE::Util::FuncOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::FuncOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -161,7 +161,7 @@ static void copyImportAttrs(IREE::Util::FuncOp srcOp,
 
 class ExternalFuncOpConversion
     : public OpConversionPattern<IREE::Util::FuncOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::FuncOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -367,7 +367,7 @@ struct CallOpConversion : public OpConversionPattern<IREE::Util::CallOp> {
 };
 
 struct ReturnOpConversion : public OpConversionPattern<IREE::Util::ReturnOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(IREE::Util::ReturnOp op, OpAdaptor adaptor,
