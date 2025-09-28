@@ -575,10 +575,10 @@ static SmallVector<GPUIntrinsicType>
 sortMMAIntrinsics(GPUMatmulShapeType problem,
                   ArrayRef<GPUIntrinsicType> intrinsics) {
   SmallVector<GPUIntrinsicType> sortedIntrinsics(intrinsics);
-  llvm::stable_sort(sortedIntrinsics,
-             [&](const GPUMatmulShapeType &lhs, const GPUMatmulShapeType &rhs) {
-               return compareIntrinsics(problem, lhs, rhs);
-             });
+  llvm::stable_sort(sortedIntrinsics, [&](const GPUMatmulShapeType &lhs,
+                                          const GPUMatmulShapeType &rhs) {
+    return compareIntrinsics(problem, lhs, rhs);
+  });
   return sortedIntrinsics;
 }
 
