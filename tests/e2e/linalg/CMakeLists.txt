@@ -154,6 +154,7 @@ iree_check_single_backend_test_suite(
   SRCS
     "argmax.mlir"
     "pack_i8.mlir"
+    "scaled_matmul.mlir"
     "softmax.mlir"
     "unpack.mlir"
   TARGET_BACKEND
