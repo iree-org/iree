@@ -243,7 +243,7 @@ jobs:
 
   windows_x64_msvc:
     needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'windows_x64_msvc')
+    if: always()
     uses: ./.github/workflows/ci_windows_x64_msvc.yml
     secrets: inherit
 
