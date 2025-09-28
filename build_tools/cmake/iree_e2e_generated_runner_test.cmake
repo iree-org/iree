@@ -255,11 +255,12 @@ function(iree_single_backend_e2e_runner_test)
 
   add_custom_command(
     COMMAND
-      "PYTHONPATH=${PROJECT_SOURCE_DIR}"
-      "${Python3_EXECUTABLE}"
-      "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_GENERATOR}"
-      ${_GENERATOR_STANDARD_FLAGS}
-      ${_RULE_GENERATOR_ARGS}
+      ${CMAKE_COMMAND} -E env
+        "PYTHONPATH=$<SHELL_PATH:${PROJECT_SOURCE_DIR}>"
+        "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_GENERATOR}"
+        ${_GENERATOR_STANDARD_FLAGS}
+        ${_RULE_GENERATOR_ARGS}
     OUTPUT
       ${_TESTS_SRC}
       ${_CALLS_SRC}
