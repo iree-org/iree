@@ -566,9 +566,30 @@ bool compareIntrinsics(const GPUMatmulShapeType &problem,
     return lhsArea > rhsArea;
   }
 
-  // Finally if everything else is the same, prefer large K size.
-  return ShapedType::getNumElements(lhs.kSizes) >
-         ShapedType::getNumElements(rhs.kSizes);
+  // Prefer large K size here.
+  int64_t lhsKSize = ShapedType::getNumElements(lhs.kSizes);
+  int64_t rhsKSize = ShapedType::getNumElements(rhs.kSizes);
+  if (lhsKSize != rhsKSize) {
+    return lhsKSize > rhsKSize;
+  }
+
+  const GPUIntrinsicType *lhsIntrinsic =
+      static_cast<const GPUIntrinsicType *>(&lhs);
+  const GPUIntrinsicType *rhsIntrinsic =
+      static_cast<const GPUIntrinsicType *>(&rhs);
+
+  if (lhsIntrinsic && rhsIntrinsic) {
+    bool lhsIsVirtual = isa<IREE::GPU::VirtualMMAAttr>(lhsIntrinsic->mmaKind);
+    bool rhsIsVirtual = isa<IREE::GPU::VirtualMMAAttr>(rhsIntrinsic->mmaKind);
+
+    // Perfer MMA over virtualMMA.
+    if (lhsIsVirtual != rhsIsVirtual) {
+      return !lhsIsVirtual;
+    }
+  }
+
+  // All comparison criteria are identical, no reordering needed.
+  return false;
 }
 
 static SmallVector<GPUIntrinsicType>
