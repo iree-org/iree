@@ -161,7 +161,7 @@ struct LinalgFillCast
 
 // For narrowable inputs, selects
 struct LinalgFpMatmulToLowP : public OpRewritePattern<linalg::MatmulOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {

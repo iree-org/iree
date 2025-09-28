@@ -207,7 +207,7 @@ namespace {
 /// operation into a `linalg.fill` of the encoded type.
 struct FoldFillWithSetEncoding final
     : OpRewritePattern<IREE::Encoding::SetEncodingOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp,
                                 PatternRewriter &rewriter) const override {

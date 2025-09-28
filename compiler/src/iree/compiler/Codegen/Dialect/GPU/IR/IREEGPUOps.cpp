@@ -144,7 +144,7 @@ static RankedTensorType getMaximumStaticType(tensor::CastOp castOp) {
 
 struct FoldBufferCastOfTensorCast final
     : OpRewritePattern<BufferResourceCastOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(BufferResourceCastOp castOp,
                                 PatternRewriter &rewriter) const override {

@@ -392,7 +392,7 @@ void expandAffineOps(Operation *rootOp) {
 //===----------------------------------------------------------------------===//
 
 struct ElideTruncOfIndexCast : public OpRewritePattern<arith::TruncIOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(arith::TruncIOp truncOp,
                                 PatternRewriter &rewriter) const override {

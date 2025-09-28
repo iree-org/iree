@@ -82,7 +82,7 @@ namespace {
 /// bound so that we can replace them with the tight bound.
 struct FoldAffineMinOverDistributedLoopInductionVariable final
     : public OpRewritePattern<affine::AffineMinOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(affine::AffineMinOp minOp,
                                 PatternRewriter &rewriter) const override {

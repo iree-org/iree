@@ -31,7 +31,7 @@ static Value evalErfPolynomial(Value x, Value t, ArrayRef<Value> coeffs,
 // (from
 // https://github.com/ROCm/llvm-project/blob/amd-staging/amd/device-libs/ocml/src/erfF.cl#L11)
 struct FastErfPattern : public OpRewritePattern<math::ErfOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(math::ErfOp op,
                                 PatternRewriter &rewriter) const override {

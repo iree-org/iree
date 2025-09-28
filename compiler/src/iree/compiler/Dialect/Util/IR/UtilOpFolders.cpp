@@ -207,7 +207,7 @@ namespace {
 
 /// Deduplicates operands, merging assume ranges along the way.
 struct DeduplicateOperands : public OpRewritePattern<AssumeIntOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(AssumeIntOp op,
                                 PatternRewriter &rewriter) const override {
     ArrayAttr assumptions = op.getAssumptions();
@@ -269,7 +269,7 @@ struct DeduplicateOperands : public OpRewritePattern<AssumeIntOp> {
 ///
 /// Where X | Y.
 struct FoldDivMulOfAssume : public OpRewritePattern<arith::MulIOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(arith::MulIOp mulOp,
                                 PatternRewriter &rewriter) const override {
     APInt mulConstantInt;
@@ -343,7 +343,7 @@ namespace {
 /// Folds cast ops into the result of other ops.
 /// Only safe to apply to ops that don't care about their types.
 struct FoldCastIntoNullOp : public OpRewritePattern<CastOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(CastOp castOp,
                                 PatternRewriter &rewriter) const override {
     auto nullOp = dyn_cast_or_null<NullOp>(castOp.getOperand().getDefiningOp());
@@ -538,7 +538,7 @@ static Value makeRangeEnd(Location loc, Value offset, Value length,
 namespace {
 
 struct FoldConstantRanges : public OpRewritePattern<RangeExtentsOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(RangeExtentsOp op,
                                 PatternRewriter &rewriter) const override {
     // Build a constant range for all we find and preserve the dynamic pairs.
@@ -601,7 +601,7 @@ struct FoldConstantRanges : public OpRewritePattern<RangeExtentsOp> {
 };
 
 struct ExpandSimpleRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(RangeExtentsOp op,
                                 PatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
@@ -632,7 +632,7 @@ struct ExpandSimpleRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
 };
 
 struct DeduplicateRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(RangeExtentsOp op,
                                 PatternRewriter &rewriter) const override {
     // First filter out any pure duplicates. Note SetVector so order is
@@ -826,7 +826,7 @@ namespace {
 
 struct ExpandUnfoldableConstantOp
     : public OpRewritePattern<UnfoldableConstantOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(UnfoldableConstantOp op,
                                 PatternRewriter &rewriter) const override {
     auto stdConst = arith::ConstantOp::create(rewriter, op.getLoc(),
@@ -852,7 +852,7 @@ namespace {
 
 // Deletes empty vm.initializer ops.
 struct DropEmptyInitializerOp : public OpRewritePattern<InitializerOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(InitializerOp op,
                                 PatternRewriter &rewriter) const override {
@@ -911,7 +911,7 @@ namespace {
 /// store back to the same global: we want to be able to elide the entire load
 /// and store.
 struct EraseUnusedGlobalStoreOp : public OpRewritePattern<GlobalStoreOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(GlobalStoreOp op,
                                 PatternRewriter &rewriter) const override {
@@ -938,7 +938,7 @@ namespace {
 /// Turns util.global.address -> util.global.store.indirect into a direct store.
 class PropagateGlobalStoreAddress
     : public OpRewritePattern<GlobalStoreIndirectOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
 public:
   LogicalResult matchAndRewrite(GlobalStoreIndirectOp op,
@@ -986,7 +986,7 @@ namespace {
 // Folds subspan -> subspan to point at the original source buffer with an
 // updated range.
 struct FoldBufferSubspanOps : public OpRewritePattern<BufferSubspanOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(BufferSubspanOp op,
                                 PatternRewriter &rewriter) const override {
     auto parentOp = BufferSubspanOp::findSubspanOp(op.getSource());
@@ -1014,7 +1014,7 @@ struct FoldBufferSubspanOps : public OpRewritePattern<BufferSubspanOp> {
 //  util.buffer.copy %src[%new_offset], %dst[%new_offset], %subspan_length
 struct FoldBufferSubspanOpsIntoConsumers
     : public OpRewritePattern<BufferSubspanOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(BufferSubspanOp op,
                                 PatternRewriter &rewriter) const override {
     bool didUpdateAny = false;
@@ -1052,7 +1052,7 @@ struct FoldBufferSubspanOpsIntoConsumers
 //  %subspan = util.buffer.subspan %src[%offset]
 struct SinkSubspanAcrossSelectOps
     : public OpRewritePattern<mlir::arith::SelectOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(mlir::arith::SelectOp op,
                                 PatternRewriter &rewriter) const override {
     if (!llvm::isa<IREE::Util::BufferType>(op.getType()))
@@ -1133,7 +1133,7 @@ namespace {
 //  %c = select %cond, %a, %b : !util.buffer
 //  %c_sz = select %cond, %a_sz, %b_sz : index
 struct SelectBufferSizeOp : public OpRewritePattern<BufferSizeOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(BufferSizeOp op,
                                 PatternRewriter &rewriter) const override {
     auto selectOp = op.getOperand().getDefiningOp<mlir::arith::SelectOp>();
@@ -1171,7 +1171,7 @@ namespace {
 //  %storage, %raw_offset = util.buffer.storage %src
 //  %offset = arith.addi %raw_offset, %subspan_offset
 struct FoldSubspansIntoStorageOp : public OpRewritePattern<BufferStorageOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(BufferStorageOp op,
                                 PatternRewriter &rewriter) const override {
     auto subspanOp = BufferSubspanOp::findSubspanOp(op.getOperand());

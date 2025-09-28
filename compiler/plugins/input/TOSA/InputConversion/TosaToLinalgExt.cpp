@@ -30,7 +30,7 @@ namespace {
 // for each update.
 class ScatterConversion : public OpRewritePattern<tosa::ScatterOp> {
 public:
-  using OpRewritePattern<tosa::ScatterOp>::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tosa::ScatterOp op,
                                 PatternRewriter &rewriter) const final {

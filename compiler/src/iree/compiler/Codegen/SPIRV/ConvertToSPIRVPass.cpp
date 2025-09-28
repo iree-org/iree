@@ -487,7 +487,7 @@ struct FoldAsNoOp final : OpConversionPattern<OpTy> {
 
 /// Removes memref.cast that converts static and dynamic shapes.
 struct RemoveStaticDynamicCast final : OpRewritePattern<memref::CastOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(memref::CastOp castOp,
                                 PatternRewriter &rewriter) const override {

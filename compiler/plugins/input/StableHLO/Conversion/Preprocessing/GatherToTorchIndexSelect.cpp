@@ -21,7 +21,7 @@ namespace mlir::iree_compiler::stablehlo {
 namespace {
 struct GatherIsTorchIndexSelectPattern final
     : OpRewritePattern<mlir::stablehlo::GatherOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::GatherOp gather,
                                 PatternRewriter &rewriter) const override {

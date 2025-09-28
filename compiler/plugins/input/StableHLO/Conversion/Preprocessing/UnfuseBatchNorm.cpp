@@ -233,7 +233,7 @@ Value calculateReduceSize(Operation *op, Value operand,
 //    ((X - E[X]) / Sqrt(Var[X] + epsilon)) * scale + offset.
 struct UnfuseBatchNormTrainingPattern final
     : OpRewritePattern<mlir::stablehlo::BatchNormTrainingOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::BatchNormTrainingOp bnOp,
                                 PatternRewriter &rewriter) const override {

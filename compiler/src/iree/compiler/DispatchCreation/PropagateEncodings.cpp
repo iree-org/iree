@@ -75,7 +75,7 @@ namespace {
 /// Pattern to swap `tensor.cast` -> `iree_encoding.set_encoding`.
 struct SwapEncodingOpWithTensorCastOp
     : public OpRewritePattern<IREE::Encoding::SetEncodingOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp,
                                 PatternRewriter &rewriter) const override {
     auto castOp = encodingOp.getSource().getDefiningOp<tensor::CastOp>();

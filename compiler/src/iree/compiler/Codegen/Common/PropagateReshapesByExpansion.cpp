@@ -177,7 +177,7 @@ expandVerifiedUsers(PatternRewriter &rewriter, Location loc, MLIRContext *ctx,
 /// hoisting out collapse_shape op consumed by its parallel.insert_slice op.
 struct ExpandDestinationForallOp final
     : OpRewritePattern<tensor::ParallelInsertSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(tensor::ParallelInsertSliceOp parallelInsertOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = parallelInsertOp.getLoc();
@@ -312,7 +312,7 @@ struct ExpandDestinationForallOp final
 /// should be applied later.
 struct SwapInnerBitcastWithExtractSlice
     : OpRewritePattern<IREE::TensorExt::BitCastOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::TensorExt::BitCastOp bitcastOp,
                                 PatternRewriter &rewriter) const override {

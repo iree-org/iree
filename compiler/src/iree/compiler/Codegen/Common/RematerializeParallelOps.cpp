@@ -36,7 +36,7 @@ static bool hasDirectWriteResult(Operation *op) {
 /// `flow.dispatch.region`.
 struct RematerializeParallelOpsPattern
     : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {

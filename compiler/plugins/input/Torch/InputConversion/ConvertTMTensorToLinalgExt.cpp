@@ -47,7 +47,7 @@ struct TMTensorOpConversion : public OpRewritePattern<SrcOpTy> {
 
 struct ScatterOpConversion
     : public OpRewritePattern<mlir::torch::TMTensor::ScatterOp> {
-  using OpRewritePattern<mlir::torch::TMTensor::ScatterOp>::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(mlir::torch::TMTensor::ScatterOp op,
                                 PatternRewriter &rewriter) const override {
     auto indicesTy = op.getIndicesType();
@@ -119,7 +119,7 @@ static SmallVector<AffineMap> getStandardAttentionIndexingMaps(MLIRContext *ctx,
 
 struct AttentionOpConversion
     : public OpRewritePattern<mlir::torch::TMTensor::AttentionOp> {
-  using OpRewritePattern<mlir::torch::TMTensor::AttentionOp>::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(mlir::torch::TMTensor::AttentionOp op,
                                 PatternRewriter &rewriter) const override {
     MLIRContext *ctx = getContext();

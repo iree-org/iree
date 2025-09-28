@@ -123,7 +123,7 @@ struct ConvertToMultiMma final : OpInterfaceRewritePattern<linalg::LinalgOp> {
 
 // This pattern hoists pack & unpack ops out of scf.for op.
 struct PackDestinationForOp final : OpRewritePattern<scf::YieldOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(scf::YieldOp yieldOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = yieldOp.getLoc();

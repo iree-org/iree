@@ -498,7 +498,7 @@ SmallVector<AffineMap> GatherOp::getIndexingMapsForResults() {
 namespace {
 struct ConvertGatherToExtract
     : public OpRewritePattern<IREE::LinalgExt::GatherOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::LinalgExt::GatherOp gatherOp,
                                 PatternRewriter &rewriter) const override {
     // TODO: support memref case.
@@ -740,7 +740,7 @@ bool MapScatterOp::isIdentity() {
 namespace {
 struct ConvertIdentityMapScatterToCopy
     : public OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
                                 PatternRewriter &rewriter) const override {
     if (!mapScatterOp.isIdentity()) {
@@ -862,7 +862,7 @@ namespace {
 /// functionality.
 struct RemoveUnusedSortOpResults
     : public OpRewritePattern<IREE::LinalgExt::SortOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::LinalgExt::SortOp sortOp,
                                 PatternRewriter &rewriter) const override {
     // To avoid problems in dispatches associated with unused results, prune

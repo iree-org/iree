@@ -21,7 +21,7 @@ namespace {
 // TODO(ataei): Upstream this pattern if needed ?
 class UnfusedFMAOpsPassConversion : public OpRewritePattern<LLVM::FMAOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(LLVM::FMAOp op,
                                 PatternRewriter &rewriter) const override {

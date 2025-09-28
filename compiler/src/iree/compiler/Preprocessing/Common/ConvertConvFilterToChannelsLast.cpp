@@ -85,7 +85,7 @@ convertConvFilterToTargetLayout(linalg::Conv2DNhwcHwcfOp convOp,
 
 namespace {
 struct ConvertHwcfToHwfc : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
                                 PatternRewriter &rewriter) const override {
@@ -95,7 +95,7 @@ struct ConvertHwcfToHwfc : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
 };
 
 struct ConvertHwcfToFhwc : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
                                 PatternRewriter &rewriter) const override {

@@ -27,7 +27,7 @@ namespace {
 
 struct VectorizeToLayoutOpPattern final
     : OpRewritePattern<IREE::VectorExt::ToLayoutOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   vector::TransferReadOp
   createReadOp(PatternRewriter &rewriter,
@@ -593,7 +593,7 @@ vectorizeLinalgExtGatherToTransferGather(RewriterBase &rewriter,
 /// but this is done this way to match upstream vector.transfer_read masking.
 struct MaskedTransferGatherOpPattern : public OpRewritePattern<vector::MaskOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::MaskOp maskOp,
                                 PatternRewriter &rewriter) const override {

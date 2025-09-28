@@ -477,7 +477,7 @@ matchATransposeBBatchMatmul(linalg::LinalgOp bmmOp) {
 
 class FuseMatmulTranspose : public OpRewritePattern<linalg::MatmulOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
     if (!IREE::Flow::isNonNullAndOutsideDispatch(matmulOp)) {
@@ -503,7 +503,7 @@ public:
 class FuseBatchMatmulTranspose
     : public OpRewritePattern<linalg::BatchMatmulOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(linalg::BatchMatmulOp bmmOp,
                                 PatternRewriter &rewriter) const override {
     if (!IREE::Flow::isNonNullAndOutsideDispatch(bmmOp)) {
@@ -559,7 +559,7 @@ static std::optional<Value> matchGenericFill(linalg::LinalgOp linalgOp) {
 
 class RaiseGenericFill : public OpRewritePattern<linalg::GenericOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
     if (!IREE::Flow::isNonNullAndOutsideDispatch(genericOp)) {
@@ -588,7 +588,7 @@ public:
 
 class RaiseInsertSliceToPad : public OpRewritePattern<tensor::InsertSliceOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(tensor::InsertSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
     if (!IREE::Flow::isNonNullAndOutsideDispatch(sliceOp)) {
@@ -962,7 +962,7 @@ static Value rewriteCatNegateAndSlice(RewriterBase &rewriter,
 class InsertSliceNegateAndSlicePattern
     : public OpRewritePattern<tensor::InsertSliceOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(tensor::InsertSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
     if (!IREE::Flow::isNonNullAndOutsideDispatch(sliceOp)) {
@@ -982,7 +982,7 @@ public:
 class ConcatenateNegateAndSlicePattern
     : public OpRewritePattern<tensor::ConcatOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(tensor::ConcatOp concatOp,
                                 PatternRewriter &rewriter) const override {
     if (!IREE::Flow::isNonNullAndOutsideDispatch(concatOp)) {

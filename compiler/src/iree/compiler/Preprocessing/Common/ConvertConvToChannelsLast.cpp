@@ -447,7 +447,7 @@ namespace {
 // Named op -> named op conversions if a default inner tile size is specified.
 
 struct ConvertLinalgConvNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   ConvertLinalgConvNchwFchw(MLIRContext *context, PatternBenefit benefit = 2)
       : OpRewritePattern<linalg::Conv2DNchwFchwOp>(context, benefit) {}
 
@@ -516,7 +516,7 @@ getTilingReassociationMap(const int64_t rank, SetTy innerDims) {
 class GeneralizeOuterUnitDimsPackOp final
     : public OpRewritePattern<linalg::PackOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   GeneralizeOuterUnitDimsPackOp(MLIRContext *context,
                                 PatternBenefit benefit = 2)
       : OpRewritePattern<linalg::PackOp>(context, benefit) {}
@@ -597,7 +597,7 @@ public:
 class GeneralizeOuterUnitDimsUnPackOp final
     : public OpRewritePattern<linalg::UnPackOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   GeneralizeOuterUnitDimsUnPackOp(MLIRContext *context,
                                   PatternBenefit benefit = 2)
       : OpRewritePattern<linalg::UnPackOp>(context, benefit) {}

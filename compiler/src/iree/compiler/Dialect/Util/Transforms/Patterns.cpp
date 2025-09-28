@@ -329,7 +329,7 @@ struct ElideBranchOperandsPattern
 //    scf.yield %default : i32
 //  }
 struct IndexSwitchToIfPattern : public OpRewritePattern<scf::IndexSwitchOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(scf::IndexSwitchOp switchOp,
                                 PatternRewriter &rewriter) const override {
     if (switchOp.getNumCases() != 1)

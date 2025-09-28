@@ -950,7 +950,7 @@ fuseExtractSliceIntoProducerForall(RewriterBase &rewriter,
 namespace {
 struct LowerInnerTiledPattern
     : public OpRewritePattern<IREE::Codegen::InnerTiledOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
     if (tiledOp.hasTensorSemantics()) {
@@ -1425,7 +1425,7 @@ distributeInnerTiledOp(RewriterBase &rewriter,
 namespace {
 struct DropInnerTiledUnitDimsPattern
     : public OpRewritePattern<IREE::Codegen::InnerTiledOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
     if (tiledOp.hasTensorSemantics()) {
@@ -1785,7 +1785,7 @@ void mapLaneForalls(RewriterBase &rewriter, Operation *funcOp,
 namespace {
 struct LowerBarrierRegion
     : public OpRewritePattern<IREE::GPU::BarrierRegionOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::GPU::BarrierRegionOp barrierRegionOp,
                                 PatternRewriter &rewriter) const final {
     Location loc = barrierRegionOp.getLoc();
@@ -1876,7 +1876,7 @@ vectorizeStaticInnerTiledOp(RewriterBase &rewriter,
 namespace {
 struct VectorizeStaticInnerTiledOpPattern final
     : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
     return vectorizeStaticInnerTiledOp(rewriter, tiledOp);
@@ -1895,7 +1895,7 @@ void populateIREEGPUVectorizationPatterns(RewritePatternSet &patterns) {
 namespace {
 struct LowerValueBarrierPattern
     : public OpRewritePattern<IREE::GPU::ValueBarrierOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::GPU::ValueBarrierOp barrier,
                                 PatternRewriter &rewriter) const override {
     if (barrier.hasTensorSemantics()) {
@@ -1912,7 +1912,7 @@ struct LowerValueBarrierPattern
 
 struct LowerGlobalLoadDMAPattern
     : public OpRewritePattern<IREE::GPU::GlobalLoadDMAOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::GPU::GlobalLoadDMAOp dmaOp,
                                 PatternRewriter &rewriter) const override {
     Type transferType = rewriter.getI32Type();

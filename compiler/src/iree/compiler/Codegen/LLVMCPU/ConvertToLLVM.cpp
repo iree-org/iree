@@ -887,7 +887,7 @@ struct RewriteExternCallOpToDynamicImportCallOp
 /// vectorized.
 class ExpandMulSIExtended : public OpRewritePattern<arith::MulSIExtendedOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(arith::MulSIExtendedOp op,
                                 PatternRewriter &rewriter) const override {

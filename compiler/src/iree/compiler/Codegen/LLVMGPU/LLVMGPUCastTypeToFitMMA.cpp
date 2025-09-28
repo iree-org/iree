@@ -28,7 +28,7 @@ namespace mlir::iree_compiler {
 namespace {
 
 struct UpcastContractOutput final : OpRewritePattern<vector::ContractionOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::ContractionOp contractOp,
                                 PatternRewriter &rewriter) const override {

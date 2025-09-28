@@ -53,7 +53,7 @@ namespace {
 class FoldExtractSliceIntoTransferRead final
     : public OpRewritePattern<vector::TransferReadOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::TransferReadOp xferOp,
                                 PatternRewriter &rewriter) const override {
@@ -195,7 +195,7 @@ static bool isDestinationFullyOverwritten(vector::TransferWriteOp writeOp) {
 class FoldInsertSliceIntoTransferWrite final
     : public OpRewritePattern<tensor::InsertSliceOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::InsertSliceOp insertOp,
                                 PatternRewriter &rewriter) const override {
@@ -280,7 +280,7 @@ public:
 class FoldExtractSliceIntoTransferWrite final
     : public OpRewritePattern<tensor::ExtractSliceOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractSliceOp,
                                 PatternRewriter &rewriter) const override {

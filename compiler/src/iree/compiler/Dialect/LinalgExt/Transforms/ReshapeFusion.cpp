@@ -528,7 +528,7 @@ fuseWithReshapeByExpansion(OpTy op, Operation *reshapeOp,
 namespace {
 
 struct DropScatterUnitIndexDepth final : public OpRewritePattern<ScatterOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(ScatterOp scatterOp,
                                 PatternRewriter &rewriter) const override {
     llvm::ArrayRef<int64_t> indicesShape =
@@ -640,7 +640,7 @@ Value rankExpandValue(RewriterBase &rewriter, Location loc, Value destVal,
 }
 
 struct DropMapScatterUnitDims final : public OpRewritePattern<MapScatterOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   DropMapScatterUnitDims(MLIRContext *context,
                          linalg::ControlDropUnitDims options,
                          PatternBenefit benefit = 1)
