@@ -63,9 +63,10 @@ struct TileSwizzle {
     // The size of the dimension for distribution. This is used for CrossThread
     // dimensions, because we may want to distribute more than `size` threads to
     // this dimension. The `distributionSize` is expected to be greater than or
-    // equal to `size`, and the mapping of thread ID to offset for a Dim is
-    // `tid / (distributionSize / size)`. The `distributionSize` for
-    // non-CrossThread dimensions should always be 1, since there is no
+    // equal to `size`, and the mapping of the delinearized (by the distribution
+    // sizes) thread ID index to the offset into the Dim is
+    // `delinearized_tid / (distributionSize / size)`. The `distributionSize`
+    // for non-CrossThread dimensions should always be 1, since there is no
     // distribution for these dimensions.
     int16_t distributionSize = 1;
 

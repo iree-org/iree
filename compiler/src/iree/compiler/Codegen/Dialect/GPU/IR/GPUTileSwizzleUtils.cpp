@@ -129,7 +129,7 @@ static TileSwizzle getIntrinsicSwizzleBeforeMovingCrossThreadOutermost(
   // Next come `layout.thread` dims.
   int64_t subgroupSize = getIntrinsicSubgroupSize(intrinsic);
   int64_t numThreadsInLayout =
-      std::reduce(layout.thread.begin(), layout.thread.end(), 1,
+      std::reduce(layout.thread.begin(), layout.thread.end(), 1LL,
                   std::multiplies<int64_t>());
   assert(subgroupSize % numThreadsInLayout == 0 &&
          "expected subgroupSize to be divisible by numThreadsInLayout");

@@ -9,7 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/Support/DebugLog.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -19,7 +19,6 @@
 #include "mlir/IR/DialectImplementation.h"
 
 #define DEBUG_TYPE "iree-gpu-interfaces"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.cpp.inc"
 
@@ -90,11 +89,9 @@ LogicalResult DataTiledMMAInterfaceAttr::populateOperandOffsetsSizesStrides(
     SmallVectorImpl<OpFoldResult> &strides) {
   TileSwizzle swizzle = getTileSwizzle(operandIndex);
 
-  LLVM_DEBUG({
-    DBGS() << "DataTiledMMAInterfaceAttr::populateOperandOffsetsSizesStrides\n";
-    DBGS() << "    operand: " << operandIndex << "\n";
-    DBGS() << "    swizzle: " << swizzle << "\n";
-  });
+  LDBG() << "DataTiledMMAInterfaceAttr::populateOperandOffsetsSizesStrides\n"
+         << "    operand: " << operandIndex << "\n"
+         << "    swizzle: " << swizzle << "\n";
 
   SmallVector<int64_t> distributionThreadSizes =
       getSwizzledDistributionShape(swizzle);

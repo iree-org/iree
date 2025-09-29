@@ -129,18 +129,18 @@ def IREEGPU_DataTiledMMAInterfaceAttr
   let methods = [
     InterfaceMethod<
       /*desc=*/[{
-        Return the TileSwizzle for the given operand index. This is the swizzle
+        Returns the TileSwizzle for the given operand index. This is the swizzle
         that defines the layout of the packed inner tiles for the data tiled
         operand. For data tiling materialization, this is the swizzle in the
         MaterializeEncodingInfo.
       }],
       /*retType=*/"::mlir::iree_compiler::IREE::Codegen::TileSwizzle",
       /*methodName=*/"getTileSwizzle",
-      /*args=*/(ins "unsigned":$operand_index)
+      /*args=*/(ins "unsigned":$operandIndex)
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Get the packed inner tile shapes for the data tiled layout. For data
+        Returns the packed inner tile shapes for the data tiled layout. For data
         tiling materialization, these correspond to the innerTileSizes in the
         MaterializeEncodingInfo.
       }],
@@ -150,8 +150,8 @@ def IREEGPU_DataTiledMMAInterfaceAttr
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Get the element types of the data tiled operation corresponding to the
-        DataTiledMMAInterfaceAttr.
+        Returns the element types of the data tiled operation corresponding to
+        the DataTiledMMAInterfaceAttr.
       }],
       /*retType=*/"void",
       /*methodName=*/"getElementTypes",
@@ -159,7 +159,7 @@ def IREEGPU_DataTiledMMAInterfaceAttr
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Get the subgroup size for distribution of the data tiled operation
+        Returns the subgroup size for distribution of the data tiled operation
         described by the DataTiledMMAInterfaceAttr.
       }],
       /*retType=*/"int64_t",
@@ -168,8 +168,8 @@ def IREEGPU_DataTiledMMAInterfaceAttr
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Get the flat workgroup size for distribution of the data tiled operation
-        described by the DataTiledMMAInterfaceAttr.
+        Returns the flat workgroup size for distribution of the data tiled
+        operation described by the DataTiledMMAInterfaceAttr.
       }],
       /*retType=*/"int64_t",
       /*methodName=*/"getFlatWorkgroupSize",
