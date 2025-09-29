@@ -233,6 +233,10 @@ LogicalResult CoalescedGatherDMAOp::verify() {
   bool hasTensor = isa<RankedTensorType>(initType);
   bool hasMemRef = isa<MemRefType>(initType);
 
+  if (!hasTensor && !hasMemRef) {
+    return emitOpError("input type must either be a tensor or a memref");
+  }
+
   if (hasTensor) {
     if (!isa<RankedTensorType>(getIndices().getType()) ||
         !isa<RankedTensorType>(getSource().getType())) {
@@ -243,8 +247,6 @@ LogicalResult CoalescedGatherDMAOp::verify() {
         !isa<MemRefType>(getSource().getType())) {
       return emitOpError("all operands must be memrefs when init is a memref");
     }
-  } else {
-    return emitOpError("input types must either be all tensors or memrefs");
   }
 
   return success();
