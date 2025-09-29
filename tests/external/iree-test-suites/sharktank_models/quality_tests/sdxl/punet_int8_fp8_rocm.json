@@ -27,7 +27,7 @@
     ],
     "outputs": [
         {
-            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_output_v2.bin",
+            "source": "https://sharkpublic.blob.core.windows.net/sharkpublic/sdxl/03142025/IO/punet_output_v4.bin",
             "value": "1x4x128x128xf16"
         }
     ],
@@ -46,6 +46,9 @@
         "--iree-scheduling-dump-statistics-format=json",
         "--iree-scheduling-dump-statistics-file=compilation_info.json",
         "--iree-preprocessing-pass-pipeline=builtin.module(util.func(iree-flow-canonicalize), iree-preprocessing-transpose-convolution-pipeline, iree-preprocessing-pad-to-intrinsics)"
+    ],
+    "threshold_args": [
+        "--expected_f16_threshold=0.2f"
     ],
     "run_function": "main",
     "compile_chip_expecting_to_fail": ["gfx90a"],

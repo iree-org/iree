@@ -3,6 +3,7 @@
 // RUN:   --iree-codegen-llvmgpu-use-unaligned-gemm-vector-distribution --iree-codegen-llvmgpu-use-igemm=false \
 // RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s
 
+
 // TODO: This test is still using the legacy LLVMGPU kernel config. This needs
 // to be migrated to the rocdl heuristics, but for now is just physically
 // located here.
@@ -53,7 +54,7 @@ func.func @expanded_matmul_transpose_b() {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-func.func @conv_nhwc() {
+func.func @conv_nhwc_1() {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x258x514x768xf16>>
@@ -68,7 +69,7 @@ func.func @conv_nhwc() {
   return
 }
 
-// CHECK-LABEL: func.func @conv_nhwc()
+// CHECK-LABEL: func.func @conv_nhwc_1()
 // CHECK: linalg.conv_2d_nhwc_hwcf {{.*}} lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME:                           mma_kind = #iree_gpu.virtual_mma_layout<VMFMA_F32_16x16x32_F16>
 // CHECK-SAME:                           reduction =  [0, 0, 0, 0, 1, 1, 64]
@@ -107,10 +108,9 @@ func.func @matmul_256x256x256() attributes {hal.executable.target = #executable_
 // Check that we do not use the distribute pipeline if there are no supported
 // intrinsics.
 //       CHECK-NOT: iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK-LABEL: func.func @matmul_256x256x256()
 
 // -----
-
-// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -132,14 +132,16 @@ func.func @mfma_matmul_1024x1024x1024() {
   return
 }
 
+// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
 // CHECK-LABEL: func.func @mfma_matmul_1024x1024x1024()
 // CHECK: linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME:                           mma_kind = #iree_gpu.virtual_mma_layout<VMFMA_F32_16x16x32_F16>
 // CHECK-SAME:                           reduction =  [0, 0, 128]
-// CHECK-SAME{LITERAL}:                   subgroup_basis = [[2, 2, 1], [0, 1, 2]]
+// CHECK-SAME{LITERAL}:                  subgroup_basis = [[2, 2, 1], [0, 1, 2]]
 // CHECK-SAME:                           workgroup =  [64, 128, 0]
 
 // -----
+
 
 // CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
 
@@ -154,7 +156,7 @@ func.func @mfma_matmul_1024x1024x1024() {
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d1, d5, d6, d7, d4, d8)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4)>
 #map3 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
-func.func @conv_nchwc() {
+func.func @conv_nchwc_2() {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x20x34x34x64xf16>>
@@ -182,7 +184,7 @@ func.func @conv_nchwc() {
   return
 }
 
-// CHECK-LABEL: func.func @conv_nchwc()
+// CHECK-LABEL: func.func @conv_nchwc_2()
 // CHECK: linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME:                           mma_kind = #iree_gpu.virtual_mma_layout<VMFMA_F32_16x16x32_F16>
 // CHECK-SAME:                           reduction =  [0, 0, 0, 0, 0, 1, 1, 1, 64]
@@ -464,3 +466,54 @@ func.func @attention_multi_m_dynamic(%4 : tensor<20x8x?x16x64xf16>, %5 : tensor<
 // CHECK-SAME:           #iree_gpu.lowering_config
 // CHECK-SAME:                           reduction =  [0, 0, 0, 0, 0, 64, 0]
 // CHECK-SAME:                           workgroup =  [1, 4, 1, 16, 0, 0, 64]
+
+// -----
+
+// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK-SAME: iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @attention_20x1x64x4096x64() {
+  %cst = arith.constant 1.250000e-01 : f16
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x1x64xf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf16>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf16>>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<20x1x64xf16>>
+  %4 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [20, 1, 64], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x1x64xf16>> -> tensor<20x1x64xf16>
+  %5 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf16>> -> tensor<20x4096x64xf16>
+  %6 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf16>> -> tensor<20x4096x64xf16>
+  %7 = tensor.empty() : tensor<20x1x64xf16>
+  %8 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+               affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+               affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+               affine_map<(d0, d1, d2, d3, d4) -> ()>,
+               affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+               ins(%4, %5, %6, %cst : tensor<20x1x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%7 : tensor<20x1x64xf16>) {
+                ^bb0(%score: f32):
+                  iree_linalg_ext.yield %score : f32
+               } -> tensor<20x1x64xf16>
+  iree_tensor_ext.dispatch.tensor.store %8, %3, offsets = [0, 0, 0], sizes = [20, 1, 64], strides = [1, 1, 1] : tensor<20x1x64xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<20x1x64xf16>>
+  return
+}
+
+// CHECK:      decomposition_config =
+// CHECK-SAME:  pv_attrs =
+// CHECK-SAME:    #iree_gpu.lowering_config
+// CHECK-SAME:      lane_basis = {{\[}}[1, 1, 1, 1, 64], [1, 0, 4, 3]{{\]}}
+// CHECK-SAME:      subgroup_basis = {{\[}}[1, 1, 1, 1, 8], [0, 1, 4, 3]{{\]}}
+// CHECK-SAME:      thread = [0, 0, 0, 8]
+// CHECK-SAME:  qk_attrs =
+// CHECK-SAME:    #iree_gpu.lowering_config
+// CHECK-SAME:      lane_basis = {{\[}}[1, 1, 1, 1, 64], [1, 0, 3, 4]{{\]}}
+// CHECK-SAME:      subgroup_basis = {{\[}}[1, 1, 1, 1, 8], [0, 1, 2, 4]{{\]}}
+// CHECK-SAME:      thread = [0, 0, 8, 0]
+// CHECK-SAME:  lowering_config =
+// CHECK-SAME:    #iree_gpu.lowering_config
+// CHECK-SAME:      partial_reduction = [0, 0, 0, 512, 0]
+// CHECK-SAME:      workgroup = [1, 1, 0, 0, 16]
