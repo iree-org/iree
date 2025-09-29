@@ -44,7 +44,7 @@ namespace {
 template <typename CastOpTy>
 struct BubbleUpAcrossCastOp
     : public OpRewritePattern<IREE::TensorExt::DispatchWorkloadOrdinalOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::TensorExt::DispatchWorkloadOrdinalOp ordinalOp,
                   PatternRewriter &rewriter) const override {

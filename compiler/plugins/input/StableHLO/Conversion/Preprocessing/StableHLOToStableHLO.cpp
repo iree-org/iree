@@ -56,7 +56,7 @@ Value getF32Const(ImplicitLocOpBuilder b, ArrayRef<int64_t> shapes,
 // dim.
 struct ReorderConvOpInputDimensions final
     : OpRewritePattern<mlir::stablehlo::ConvolutionOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ConvolutionOp op,
                                 PatternRewriter &rewriter) const override {
@@ -117,7 +117,7 @@ struct ReorderConvOpInputDimensions final
 
 struct ReorderConvOpKernelDimensions final
     : OpRewritePattern<mlir::stablehlo::ConvolutionOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(mlir::stablehlo::ConvolutionOp op,
                                 PatternRewriter &rewriter) const override {
     auto kernel = op.getRhs();
@@ -185,7 +185,7 @@ struct ReorderConvOpKernelDimensions final
 // dim.
 struct ReorderConvOpOutputDimensions final
     : OpRewritePattern<mlir::stablehlo::ConvolutionOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ConvolutionOp op,
                                 PatternRewriter &rewriter) const override {
@@ -270,7 +270,7 @@ bool isConsecutive(ArrayRef<int64_t> array) {
 /// generate a rank-3 dot_general op.
 struct TransposeReshapeGenericDotGeneral final
     : OpRewritePattern<mlir::stablehlo::DotGeneralOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   Value TransposeIfNonConsecutive(OpBuilder &b, Location loc, Value src,
                                   ArrayRef<int64_t> targetOrder) const {
@@ -449,7 +449,7 @@ struct TransposeReshapeGenericDotGeneral final
 
 struct ScatterInt64Indices final
     : OpRewritePattern<mlir::stablehlo::ScatterOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ScatterOp op,
                                 PatternRewriter &rewriter) const override {
@@ -493,7 +493,7 @@ struct ScatterInt64Indices final
 // an explicit dim.
 struct ScatterImplicitIndex final
     : OpRewritePattern<mlir::stablehlo::ScatterOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ScatterOp op,
                                 PatternRewriter &rewriter) const override {
@@ -537,7 +537,7 @@ struct ScatterImplicitIndex final
 
 struct ScatterImplicitBatch final
     : OpRewritePattern<mlir::stablehlo::ScatterOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   static Value addUnitBatchDim(Location loc, Value value,
                                PatternRewriter &rewriter) {
@@ -620,7 +620,7 @@ struct ScatterImplicitBatch final
 
 struct ScatterCollapseBatch final
     : OpRewritePattern<mlir::stablehlo::ScatterOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   static Value collapseBatchDims(Location loc, Value value, int64_t batchCount,
                                  PatternRewriter &rewriter) {
@@ -722,7 +722,7 @@ struct ScatterCollapseBatch final
 // Ensure the batch dimensions of both the indices and updates are the first
 // dimensions. If they are not, transpose them to the start.
 struct ScatterBatchFirst final : OpRewritePattern<mlir::stablehlo::ScatterOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ScatterOp op,
                                 PatternRewriter &rewriter) const override {
@@ -852,7 +852,7 @@ struct ScatterBatchFirst final : OpRewritePattern<mlir::stablehlo::ScatterOp> {
 //  return %0 : tensor<5x4x1xi32>
 struct ScatterMaterializeInsertedDim final
     : OpRewritePattern<mlir::stablehlo::ScatterOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ScatterOp op,
                                 PatternRewriter &rewriter) const override {
@@ -993,7 +993,7 @@ bool isFromBool(Value val) {
 // Mul of non-finite values (e.g. NaN, inf) and 0.0 produce 0.0 in StableHLO.
 // For linalg we need to convert these to select operations.
 struct MulCastOfBool final : OpRewritePattern<mlir::stablehlo::MulOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::MulOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1048,7 +1048,7 @@ struct MulCastOfBool final : OpRewritePattern<mlir::stablehlo::MulOp> {
 // Generates Gaussian noise with uniform random generator based on Box-Muller
 // transform.
 struct ExpandRngNormal final : OpRewritePattern<mlir::stablehlo::RngOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::RngOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1253,7 +1253,7 @@ struct FuseWidenOperands final : OpRewritePattern<Op> {
 };
 
 struct DotToMul final : OpRewritePattern<mlir::stablehlo::DotOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::DotOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1327,7 +1327,7 @@ struct DotToMul final : OpRewritePattern<mlir::stablehlo::DotOp> {
 // number of i32 outputs, then BitcastConvert to return f32.
 struct RngBitcastFloat final
     : OpRewritePattern<mlir::stablehlo::RngBitGeneratorOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::RngBitGeneratorOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1362,7 +1362,7 @@ struct RngBitcastFloat final
 };
 
 struct ZeroConcat final : OpRewritePattern<mlir::stablehlo::ConcatenateOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ConcatenateOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1396,7 +1396,7 @@ struct ZeroConcat final : OpRewritePattern<mlir::stablehlo::ConcatenateOp> {
 // can be represented using a mul operation. This includes possibly making
 // an implicit cast explicit prior the mul.
 struct DotGeneralIsMul final : OpRewritePattern<mlir::stablehlo::DotGeneralOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::DotGeneralOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1555,7 +1555,7 @@ struct DotGeneralIsMul final : OpRewritePattern<mlir::stablehlo::DotGeneralOp> {
 // TODO(suderman): Move this to solve code.
 struct CustomCallIsTopK final
     : OpRewritePattern<mlir::stablehlo::CustomCallOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::CustomCallOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1691,7 +1691,7 @@ bool isIotaOrIotaBroadcast(PatternRewriter &rewriter, Value input) {
 }
 
 struct IotaSortSliceIsTopK final : OpRewritePattern<mlir::stablehlo::SortOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::SortOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1775,7 +1775,7 @@ struct IotaSortSliceIsTopK final : OpRewritePattern<mlir::stablehlo::SortOp> {
 
 // TODO(suderman): Move this to solve code.
 struct ApproxTopK final : OpRewritePattern<mlir::stablehlo::CustomCallOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::CustomCallOp op,
                                 PatternRewriter &rewriter) const override {

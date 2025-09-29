@@ -130,7 +130,7 @@ namespace {
 
 struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
     : public OpRewritePattern<memref::ExtractStridedMetadataOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(memref::ExtractStridedMetadataOp op,
                                 PatternRewriter &rewriter) const override {
     auto binding =

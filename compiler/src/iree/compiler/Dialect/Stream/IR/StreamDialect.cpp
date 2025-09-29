@@ -65,7 +65,7 @@ struct StreamFolderInterface : public DialectFoldInterface {
 //        !stream.resource<transient>, index to !stream.resource<transient>
 struct StripResourceConversionCastPattern
     : public OpRewritePattern<UnrealizedConversionCastOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(UnrealizedConversionCastOp castOp,
                                 PatternRewriter &rewriter) const override {
     auto result = castOp.getResult(0);

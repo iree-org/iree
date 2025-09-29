@@ -78,7 +78,7 @@ namespace {
 /// ```
 struct VectorizePadWithConditions final
     : public OpRewritePattern<tensor::PadOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::PadOp padOp,
                                 PatternRewriter &rewriter) const override {

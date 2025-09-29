@@ -51,7 +51,7 @@ static Operation *isTriviallyProducedByReadOnlyViewLike(Value input) {
 namespace {
 struct BubbleResourceCastPattern
     : public OpRewritePattern<IREE::GPU::BufferResourceCastOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::GPU::BufferResourceCastOp castOp,
                                 PatternRewriter &rewriter) const override {

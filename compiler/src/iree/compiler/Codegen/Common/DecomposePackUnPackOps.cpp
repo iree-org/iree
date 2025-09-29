@@ -46,7 +46,7 @@ namespace {
 /// A wrapper pattern that calls linalg::lowerPack on linalg::PackOp. It lowers
 /// a linalg.pack op to tensor.pad + tensor.expand_shape + linalg.transpose ops.
 struct LowerPackPattern : public OpRewritePattern<linalg::PackOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   explicit LowerPackPattern(MLIRContext *context,
                             std::optional<PackUnPackControlFn> controlFn)
@@ -79,7 +79,7 @@ private:
 /// lowers a linalg.unpack op to tensor.empty + linalg.transpose +
 /// tensor.collapse_shape + tensor.extract_slice ops.
 struct LowerUnPackPattern : public OpRewritePattern<linalg::UnPackOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   explicit LowerUnPackPattern(MLIRContext *context,
                               std::optional<PackUnPackControlFn> controlFn)

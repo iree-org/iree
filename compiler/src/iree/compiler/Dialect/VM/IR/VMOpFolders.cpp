@@ -61,7 +61,7 @@ namespace {
 
 // Deletes empty vm.initializer ops.
 struct DropEmptyInitializerOp : public OpRewritePattern<InitializerOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(InitializerOp op,
                                 PatternRewriter &rewriter) const override {
     if (op.getBody().getBlocks().size() != 1)
@@ -79,7 +79,7 @@ struct DropEmptyInitializerOp : public OpRewritePattern<InitializerOp> {
 // This is not strictly required but can help our initialization code perform
 // more efficient initialization of large numbers of primitive values.
 struct InlineConstGlobalInitializer : public OpRewritePattern<InitializerOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(InitializerOp op,
                                 PatternRewriter &rewriter) const override {
@@ -2896,7 +2896,7 @@ namespace {
 
 /// Changes a cmp.eq.ref check against null to a cmp.nz.ref and inverted cond.
 struct NullCheckCmpEQRefToCmpNZRef : public OpRewritePattern<CmpEQRefOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(CmpEQRefOp op,
                                 PatternRewriter &rewriter) const override {
     Attribute rhs;
@@ -2931,7 +2931,7 @@ namespace {
 
 /// Changes a cmp.ne.ref check against null to a cmp.nz.ref.
 struct NullCheckCmpNERefToCmpNZRef : public OpRewritePattern<CmpNERefOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(CmpNERefOp op,
                                 PatternRewriter &rewriter) const override {
     Attribute rhs;
@@ -3026,7 +3026,7 @@ namespace {
 ///
 /// (same logic as for std.br)
 struct SimplifyBrToBlockWithSinglePred : public OpRewritePattern<BranchOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(BranchOp op,
                                 PatternRewriter &rewriter) const override {
     // Check that the successor block has a single predecessor.
@@ -3052,7 +3052,7 @@ struct SimplifyBrToBlockWithSinglePred : public OpRewritePattern<BranchOp> {
 ///
 /// (same logic as for std.br)
 struct SimplifyPassThroughBr : public OpRewritePattern<BranchOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(BranchOp op,
                                 PatternRewriter &rewriter) const override {
     Block *dest = op.getDest();
@@ -3084,7 +3084,7 @@ namespace {
 
 /// Simplifies a cond_br with a constant condition to an unconditional branch.
 struct SimplifyConstCondBranchPred : public OpRewritePattern<CondBranchOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(CondBranchOp op,
                                 PatternRewriter &rewriter) const override {
     if (matchPattern(op.getCondition(), m_NonZero())) {
@@ -3105,7 +3105,7 @@ struct SimplifyConstCondBranchPred : public OpRewritePattern<CondBranchOp> {
 /// Simplifies a cond_br with both targets (including operands) being equal to
 /// an unconditional branch.
 struct SimplifySameTargetCondBranchOp : public OpRewritePattern<CondBranchOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(CondBranchOp op,
                                 PatternRewriter &rewriter) const override {
     if (op.getTrueDest() != op.getFalseDest()) {
@@ -3128,7 +3128,7 @@ struct SimplifySameTargetCondBranchOp : public OpRewritePattern<CondBranchOp> {
 
 /// Swaps the cond_br true and false targets if the condition is inverted.
 struct SwapInvertedCondBranchOpTargets : public OpRewritePattern<CondBranchOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(CondBranchOp op,
                                 PatternRewriter &rewriter) const override {
     // TODO(benvanik): figure out something more reliable when the xor may be
@@ -3165,7 +3165,7 @@ namespace {
 
 /// Converts a vm.call.variadic to a non-variadic function to a normal vm.call.
 struct ConvertNonVariadicToCallOp : public OpRewritePattern<CallVariadicOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(CallVariadicOp op,
                                 PatternRewriter &rewriter) const override {
     // If any segment size is != -1 (which indicates variadic) we bail.
@@ -3192,7 +3192,7 @@ namespace {
 
 /// Rewrites a cond_fail op to a cond_branch to a fail op.
 struct RewriteCondFailToBranchFail : public OpRewritePattern<CondFailOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(CondFailOp op,
                                 PatternRewriter &rewriter) const override {
     auto *block = rewriter.getInsertionBlock();
@@ -3307,7 +3307,7 @@ namespace {
 
 // Folds vm.import.resolved ops referencing required imports.
 struct RequiredImportResolver : public OpRewritePattern<ImportResolvedOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(ImportResolvedOp op,
                                 PatternRewriter &rewriter) const override {
     auto importOp = SymbolTable::lookupNearestSymbolFrom<IREE::VM::ImportOp>(
@@ -3357,7 +3357,7 @@ struct RemoveDisabledDebugAsyncOp : public OpRewritePattern<T> {
 };
 
 struct SimplifyConstCondBreakPred : public OpRewritePattern<CondBreakOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(CondBreakOp op,
                                 PatternRewriter &rewriter) const override {
     IntegerAttr condValue;

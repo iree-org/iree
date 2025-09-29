@@ -20,7 +20,7 @@ namespace {
 
 struct VectorizeStaticMapScatterOpPattern final
     : OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
                                 PatternRewriter &rewriter) const override {
     if (mapScatterOp.isVectorized()) {

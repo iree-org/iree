@@ -97,7 +97,7 @@ struct PromoteContractOperands final
 /// upstream does not have a mechanism of registering canonicalization without
 /// adding dependencies like this, we manually add it where it is needed.
 struct FoldI1SelectToBroadcast final : OpRewritePattern<arith::SelectOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(arith::SelectOp selectOp,
                                 PatternRewriter &rewriter) const override {
@@ -147,7 +147,7 @@ struct FoldI1SelectToBroadcast final : OpRewritePattern<arith::SelectOp> {
 // Set FMF to fold arith.mulf + arith.addf -> math.fma and thus enable
 // optimizations w.r.t vector.multi_reduction(fma).
 struct SetMulAddFMF final : OpRewritePattern<vector::MultiDimReductionOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::MultiDimReductionOp redOp,
                                 PatternRewriter &rewriter) const override {

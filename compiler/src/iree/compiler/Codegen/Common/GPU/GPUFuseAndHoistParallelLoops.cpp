@@ -91,7 +91,7 @@ static bool forallTripCountMatchesWorkgroupSize(scf::ForallOp forallOp,
   return *maybeTripCount == flatWorkgroupSize;
 }
 struct FuseForalls final : OpRewritePattern<scf::ForallOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   FuseForalls(MLIRContext *ctx, int64_t flatWorkgroupSize, PatternBenefit b = 1)
       : OpRewritePattern<scf::ForallOp>(ctx, b),
         flatWorkgroupSize(flatWorkgroupSize) {}
@@ -136,7 +136,7 @@ private:
 };
 
 struct FuseNestedLaneAndWarpForalls final : OpRewritePattern<scf::ForallOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(scf::ForallOp warpForallOp,
                                 PatternRewriter &rewriter) const override {
@@ -157,7 +157,7 @@ struct FuseNestedLaneAndWarpForalls final : OpRewritePattern<scf::ForallOp> {
 };
 
 struct FuseTilableDestinationProducers final : OpRewritePattern<scf::ForallOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(scf::ForallOp forallOp,
                                 PatternRewriter &rewriter) const override {
     TilingInterface tileableProducer;
@@ -196,7 +196,7 @@ struct FuseTilableDestinationProducers final : OpRewritePattern<scf::ForallOp> {
 };
 
 struct FuseUnitLoopDestination final : OpRewritePattern<scf::ForallOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(scf::ForallOp forallOp,
                                 PatternRewriter &rewriter) const override {
     std::optional<int64_t> maybeTripCount = getStaticForallTripCount(forallOp);
@@ -259,7 +259,7 @@ struct FuseUnitLoopDestination final : OpRewritePattern<scf::ForallOp> {
 
 struct FuseTilableSliceProducers final
     : OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
     if (sliceOp->use_empty()) {
@@ -292,7 +292,7 @@ struct FuseTilableSliceProducers final
 
 struct FuseCollapseShapeConsumers final
     : OpRewritePattern<tensor::CollapseShapeOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(tensor::CollapseShapeOp collapseOp,
                                 PatternRewriter &rewriter) const override {
     auto forallOp = collapseOp.getSrc().getDefiningOp<scf::ForallOp>();
@@ -310,7 +310,7 @@ struct FuseCollapseShapeConsumers final
 
 struct FuseExtractSliceConsumers final
     : OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractSliceOp,
                                 PatternRewriter &rewriter) const override {
     // Find the scf::ForallOp producer, and get the corresponding

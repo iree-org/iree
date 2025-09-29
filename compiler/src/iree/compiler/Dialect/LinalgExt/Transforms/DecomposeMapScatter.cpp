@@ -28,7 +28,7 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 /// be collapsible, because the decomposition will work for collapsable memrefs,
 /// and there is no need to fold the subview.
 struct FoldSubViewIntoMapScatter final : OpRewritePattern<MapScatterOp> {
-  using OpRewritePattern<MapScatterOp>::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(MapScatterOp mapScatterOp,
                                 PatternRewriter &rewriter) const override {
     if (!mapScatterOp.isVectorized()) {

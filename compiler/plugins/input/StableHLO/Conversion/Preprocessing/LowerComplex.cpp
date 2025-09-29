@@ -22,7 +22,7 @@ namespace mlir::iree_compiler::stablehlo {
 namespace {
 
 struct ConvertComplexDot final : OpRewritePattern<mlir::stablehlo::DotOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   // Will decompose stablehlo::DotOp with complex parameters down to
   // four Dot operations in the following fashion:

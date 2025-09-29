@@ -100,7 +100,7 @@ void DetupleRegion(Region &srcRegion, Region &destRegion, ArrayRef<Type> types,
 }
 
 class DetupleYieldOp : public OpRewritePattern<scf::YieldOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::scf::YieldOp op,
                                 PatternRewriter &rewriter) const override {
@@ -123,7 +123,7 @@ class DetupleYieldOp : public OpRewritePattern<scf::YieldOp> {
 };
 
 class DetupleConditionOp : public OpRewritePattern<scf::ConditionOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::scf::ConditionOp op,
                                 PatternRewriter &rewriter) const override {
@@ -147,7 +147,7 @@ class DetupleConditionOp : public OpRewritePattern<scf::ConditionOp> {
 };
 
 class DetupleIfOp : public OpRewritePattern<scf::IfOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::scf::IfOp op,
                                 PatternRewriter &rewriter) const override {
@@ -190,7 +190,7 @@ class DetupleIfOp : public OpRewritePattern<scf::IfOp> {
 };
 
 class DetupleWhileOp : public OpRewritePattern<scf::WhileOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::scf::WhileOp op,
                                 PatternRewriter &rewriter) const override {

@@ -728,7 +728,7 @@ struct FoldAssumeAlignOp
 
 /// Removes memref.cast that turns static shapes into dynamic shapes.
 struct RemoveDynamicCastOp final : public OpRewritePattern<memref::CastOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(memref::CastOp castOp,
                                 PatternRewriter &rewriter) const override {

@@ -59,7 +59,7 @@ namespace {
 // operations as well.
 struct ReplaceGPUBarrierWithLDSBarrier
     : public OpRewritePattern<gpu::BarrierOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(gpu::BarrierOp op,
                                 PatternRewriter &rewriter) const override {
@@ -101,7 +101,7 @@ static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns,
 /// effort.
 constexpr StringLiteral kSwapName = "iree_gpu.swap_mfma";
 struct SwapSetPrioWithMFMA : public OpRewritePattern<ROCDL::SetPrioOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(ROCDL::SetPrioOp setPrio,
                                 PatternRewriter &rewriter) const override {
     if (!setPrio->hasAttr(kSwapName)) {

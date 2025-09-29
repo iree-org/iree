@@ -38,7 +38,7 @@ namespace {
 
 struct RemoveOptimizationBarrier final
     : public OpRewritePattern<IREE::Util::OptimizationBarrierOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::Util::OptimizationBarrierOp barrierOp,
                                 PatternRewriter &rewriter) const override {

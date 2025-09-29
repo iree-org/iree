@@ -139,7 +139,7 @@ namespace {
 
 struct FoldRelayoutOpIntoMapScatterPattern
     : public OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
                                 PatternRewriter &rewriter) const override {
@@ -160,7 +160,7 @@ struct FoldRelayoutOpIntoMapScatterPattern
 
 struct FoldPadOpIntoMapScatterPattern
     : public OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   FoldPadOpIntoMapScatterPattern(MLIRContext *context,
                                  PadDistributionConfigFn configFn,
                                  PatternBenefit benefit = 1)
@@ -353,7 +353,7 @@ namespace {
 
 struct SwapExpandShapeWithSlicePattern
     : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
@@ -698,7 +698,7 @@ namespace {
 
 struct SwapCollapseShapeWithSlicePattern
     : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {

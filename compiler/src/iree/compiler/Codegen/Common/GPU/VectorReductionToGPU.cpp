@@ -151,7 +151,7 @@ static void moveScalarAndBindingUniformCode(gpu::WarpExecuteOnLane0Op warpOp) {
 /// Pattern to convert single element vector.insert to broadcast, this is a
 /// workaround until MultiDimReduction distribution is supported.
 struct InsertToBroadcast final : OpRewritePattern<vector::InsertOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::InsertOp insertOp,
                                 PatternRewriter &rewriter) const override {
@@ -165,7 +165,7 @@ struct InsertToBroadcast final : OpRewritePattern<vector::InsertOp> {
 
 /// Pattern to sink `gpu.barrier` ops out of a `warp_execute_on_lane_0` op.
 struct WarpOpBarrier final : OpRewritePattern<gpu::WarpExecuteOnLane0Op> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(gpu::WarpExecuteOnLane0Op warpOp,
                                 PatternRewriter &rewriter) const override {

@@ -53,7 +53,7 @@ struct BubbleUpExpandShapesPass final
 // Because `extract_slice` ops and dequantize-like ops get cloned into regions
 // later, it's okay to bubble up through multi-use dequant ops.
 struct BubbleUpExtract : OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const final {
@@ -141,7 +141,7 @@ struct BubbleUpExtract : OpRewritePattern<tensor::ExtractSliceOp> {
 /// former can be folded away.
 struct SwapExtractSliceOfFill final
     : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractOp,
                                 PatternRewriter &rewriter) const override {
@@ -167,7 +167,7 @@ struct SwapExtractSliceOfFill final
 struct BubbleExpandThroughExtract final
     : public OpRewritePattern<tensor::ExpandShapeOp> {
 
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExpandShapeOp expandOp,
                                 PatternRewriter &rewriter) const override {
@@ -270,7 +270,7 @@ struct BubbleExpandThroughExtract final
 
 struct BubbleExpandThroughConcat final
     : public OpRewritePattern<tensor::ExpandShapeOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExpandShapeOp expandOp,
                                 PatternRewriter &rewriter) const override {

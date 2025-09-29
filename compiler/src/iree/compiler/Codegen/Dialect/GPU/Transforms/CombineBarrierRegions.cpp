@@ -98,7 +98,7 @@ combineBarrierRegionPair(RewriterBase &rewriter,
 
 struct CombineAdjacentBarrierRegions final
     : OpRewritePattern<IREE::GPU::BarrierRegionOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::GPU::BarrierRegionOp barrierOp,
                                 PatternRewriter &rewriter) const override {
     auto prevBarrier = llvm::dyn_cast_if_present<IREE::GPU::BarrierRegionOp>(

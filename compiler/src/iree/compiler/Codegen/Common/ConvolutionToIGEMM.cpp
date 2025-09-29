@@ -29,7 +29,7 @@ using iree_compiler::IREE::LinalgExt::IREELinalgExtDialect;
 /// to set the configuration.
 /// TODO(Max191): Use a funcOp walk instead of a pattern for this.
 struct SetIGEMMConfiguration final : OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   SetIGEMMConfiguration(MLIRContext *context, IGEMMConfigFn configFn)
       : OpRewritePattern(context), configFn(configFn) {}

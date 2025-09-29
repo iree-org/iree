@@ -205,7 +205,7 @@ dedupAndGetOldToNewPosMapping(ValueRange values) {
 
 struct ReplaceDispatchResultIfZeroElements
     : public OpRewritePattern<DispatchWorkgroupsOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(DispatchWorkgroupsOp op,
                                 PatternRewriter &rewriter) const override {
     // NOTE: we only look at used results; if unused then closure optimization
@@ -230,7 +230,7 @@ struct ReplaceDispatchResultIfZeroElements
 /// requires modifying the `count` region of the op to match the new workloads.
 struct ElideRedundantWorkloadValues
     : public OpRewritePattern<DispatchWorkgroupsOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(DispatchWorkgroupsOp op,
                                 PatternRewriter &rewriter) const override {
     ValueRange workload = op.getWorkload();
@@ -293,7 +293,7 @@ struct ElideRedundantWorkloadValues
 /// the operands in the `dispatch.workgroup_count_from_slice`.
 struct ElideRedundantOperandsOfWorkgroupCountFromSliceOp
     : OpRewritePattern<DispatchWorkgroupsOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(DispatchWorkgroupsOp op,
                                 PatternRewriter &rewriter) const override {
     Region &count = op.getWorkgroupCount();
@@ -387,7 +387,7 @@ namespace {
 
 struct DeduplicateDispatchEntryRefs final
     : public OpRewritePattern<DispatchOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(DispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
     auto originalAttr = dispatchOp.getEntryPointsAttr();
@@ -449,7 +449,7 @@ namespace {
 
 struct ExpandDynamicShapeConstant
     : public OpRewritePattern<TensorDynamicConstantOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TensorDynamicConstantOp op,
                                 PatternRewriter &rewriter) const override {
     auto constantOp = IREE::Flow::TensorConstantOp::create(
@@ -564,7 +564,7 @@ struct FlattenTensorCastLikeChain : public OpRewritePattern<CastOpTy> {
 };
 
 struct ResolveShapedRank : public OpRewritePattern<tensor::RankOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(tensor::RankOp op,
                                 PatternRewriter &rewriter) const override {
     auto shapedType = llvm::cast<ShapedType>(op.getTensor().getType());
@@ -575,7 +575,7 @@ struct ResolveShapedRank : public OpRewritePattern<tensor::RankOp> {
 };
 
 struct ResolveShapedDim : public OpRewritePattern<tensor::DimOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(tensor::DimOp op,
                                 PatternRewriter &rewriter) const override {
     if (!op.getConstantIndex().has_value()) {
@@ -675,7 +675,7 @@ namespace {
 // Replace `flow.tensor.splat`-`flow.tensor.load` op-pairs by the input
 // primitive value for the splat op.
 struct FoldSplatLoadIntoPrimitive : public OpRewritePattern<TensorLoadOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
     auto sourceOp =
@@ -748,7 +748,7 @@ void TensorEmptyOp::getCanonicalizationPatterns(RewritePatternSet &results,
 namespace {
 
 struct FoldSplatReshapeIntoSplat : public OpRewritePattern<TensorReshapeOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TensorReshapeOp reshapeOp,
                                 PatternRewriter &rewriter) const override {
     auto splatOp = dyn_cast_if_present<TensorSplatOp>(
@@ -872,7 +872,7 @@ namespace {
 // control flow edges or globals and is mostly for simplifying IR that may come
 // in with a transfer on every single tensor.
 struct ElideRedundantTransfer : public OpRewritePattern<TensorTransferOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TensorTransferOp op,
                                 PatternRewriter &rewriter) const override {
     auto baseValue =
@@ -892,7 +892,7 @@ struct ElideRedundantTransfer : public OpRewritePattern<TensorTransferOp> {
 // rewrite it as (A -> C). Writes it as A -> B and A -> C relying on dead code
 // elimination to remove the unused A -> B transfer.
 struct ElideIntermediateTransfer final : OpRewritePattern<TensorTransferOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TensorTransferOp targetTransferOp,
                                 PatternRewriter &rewriter) const override {
     auto sourceTransferOp = dyn_cast_if_present<IREE::Flow::TensorTransferOp>(
@@ -1066,7 +1066,7 @@ namespace {
 // When the target tensor is a result of a tensor.cast operation, the op needs
 // to be updated to use the source of the cast as the target tensor.
 struct FoldTensorUpdateOpWithCasts : public OpRewritePattern<TensorUpdateOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TensorUpdateOp updateOp,
                                 PatternRewriter &rewriter) const override {
     auto targetCastOp = updateOp.getTarget().getDefiningOp<tensor::CastOp>();
@@ -1094,7 +1094,7 @@ struct FoldTensorUpdateOpWithCasts : public OpRewritePattern<TensorUpdateOp> {
 
 struct ReplaceOpIfTensorUpdateOperandZeroElements
     : public OpRewritePattern<TensorUpdateOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TensorUpdateOp op,
                                 PatternRewriter &rewriter) const override {
     auto operand = op.getUpdate();

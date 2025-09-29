@@ -147,7 +147,7 @@ Value processDotArg(Value arg, Location loc, ArrayRef<int64_t> contractDimsAttr,
 
 struct GeneralDotRemoveBatch final
     : OpRewritePattern<mlir::stablehlo::DotGeneralOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::DotGeneralOp op,
                                 PatternRewriter &rewriter) const override {
@@ -211,7 +211,7 @@ struct GeneralDotRemoveBatch final
 
 struct GeneralDotConvert final
     : OpRewritePattern<mlir::stablehlo::DotGeneralOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   // Attempts to lower a General Dot operator to a standard Dot operator.
   // General dots include batching dimensions and can have collapsing
   // dimensions along any axis. Inserting correctly arrange transpose and
@@ -382,7 +382,7 @@ struct GeneralDotConvert final
 };
 
 struct DotVectorOptimization final : OpRewritePattern<mlir::stablehlo::DotOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(mlir::stablehlo::DotOp op,
                                 PatternRewriter &rewriter) const override {
     ImplicitLocOpBuilder b(op.getLoc(), rewriter);

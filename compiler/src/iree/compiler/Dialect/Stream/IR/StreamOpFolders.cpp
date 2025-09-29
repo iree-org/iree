@@ -515,7 +515,7 @@ namespace {
 // used after deallocations have been inserted but prior to that point this
 // pattern allows for more eager removal of unused allocations.
 struct ElideUnusedAllocaOp : public OpRewritePattern<ResourceAllocaOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(ResourceAllocaOp allocaOp,
                                 PatternRewriter &rewriter) const override {
     if (!allocaOp.getResult().use_empty()) {
@@ -540,7 +540,7 @@ struct ElideUnusedAllocaOp : public OpRewritePattern<ResourceAllocaOp> {
 //   %resource, %alloca_t = stream.resource.alloca
 //   %dealloca_t = stream.resource.dealloca await(%alloca_t) %resource
 struct ElideAllocaDeallocaOp : public OpRewritePattern<ResourceAllocaOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(ResourceAllocaOp allocaOp,
                                 PatternRewriter &rewriter) const override {
     if (!allocaOp.getResult().hasOneUse()) {
@@ -699,7 +699,7 @@ namespace {
 //  %c = select %cond, %a, %b : !stream.resource<*>
 //  %c_sz = select %cond, %a_sz, %b_sz : index
 struct SelectResourceSizeOp : public OpRewritePattern<ResourceSizeOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(ResourceSizeOp op,
                                 PatternRewriter &rewriter) const override {
     auto selectOp = op.getOperand().getDefiningOp<mlir::arith::SelectOp>();
@@ -748,7 +748,7 @@ namespace {
 //  %new_offset = arith.addi %offset, %subview_offset
 //  %1 = stream.resource.load %src[%new_offset]
 struct FoldSubviewIntoLoadOp : public OpRewritePattern<ResourceLoadOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(ResourceLoadOp op,
                                 PatternRewriter &rewriter) const override {
     auto subviewOp = ResourceSubviewOp::findSubviewOp(op.getSource());
@@ -793,7 +793,7 @@ namespace {
 //  %new_offset = arith.addi %offset, %subview_offset
 //  stream.resource.store %c123_i32, %dst[%new_offset]
 struct FoldSubviewIntoStoreOp : public OpRewritePattern<ResourceStoreOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(ResourceStoreOp op,
                                 PatternRewriter &rewriter) const override {
     auto subviewOp = ResourceSubviewOp::findSubviewOp(op.getTarget());
@@ -859,7 +859,7 @@ namespace {
 // no impact on the actual packing operation.
 struct PropagateResourcePackBaseOffset
     : public OpRewritePattern<ResourcePackOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(ResourcePackOp op,
                                 PatternRewriter &rewriter) const override {
     // Offset is optional.
@@ -907,7 +907,7 @@ struct PropagateResourcePackBaseOffset
 //  }) : index
 struct CanonicalizeResourcePackIntervals
     : public OpRewritePattern<ResourcePackOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(ResourcePackOp op,
                                 PatternRewriter &rewriter) const override {
     // Get the slices in a possibly unsorted order and sort.
@@ -980,7 +980,7 @@ namespace {
 // Folds subview -> subview to point at the original source resource with an
 // updated range.
 struct FoldResourceSubviewOps : public OpRewritePattern<ResourceSubviewOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(ResourceSubviewOp op,
                                 PatternRewriter &rewriter) const override {
     auto parentOp = ResourceSubviewOp::findSubviewOp(op.getSource());
@@ -1009,7 +1009,7 @@ struct FoldResourceSubviewOps : public OpRewritePattern<ResourceSubviewOp> {
 //  %subview = stream.resource.subview %src[%offset]
 struct SinkSubviewAcrossSelectOps
     : public OpRewritePattern<mlir::arith::SelectOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(mlir::arith::SelectOp op,
                                 PatternRewriter &rewriter) const override {
     if (!llvm::isa<IREE::Stream::ResourceType>(op.getType()))
@@ -1051,7 +1051,7 @@ namespace {
 
 struct FoldParameterLoadTargetSubviews
     : public OpRewritePattern<ParameterLoadOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(ParameterLoadOp op,
                                 PatternRewriter &rewriter) const override {
     auto ip = rewriter.saveInsertionPoint();
@@ -1116,7 +1116,7 @@ namespace {
 
 struct FoldParameterReadTargetSubview
     : public OpRewritePattern<ParameterReadOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(ParameterReadOp op,
                                 PatternRewriter &rewriter) const override {
     auto ip = rewriter.saveInsertionPoint();
@@ -1169,7 +1169,7 @@ namespace {
 
 struct FoldParameterWriteSourceSubview
     : public OpRewritePattern<ParameterWriteOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(ParameterWriteOp op,
                                 PatternRewriter &rewriter) const override {
     auto ip = rewriter.saveInsertionPoint();
@@ -1312,7 +1312,7 @@ void TensorExportOp::getCanonicalizationPatterns(RewritePatternSet &results,
 namespace {
 
 struct TensorConstantToEmpty : public OpRewritePattern<TensorConstantOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TensorConstantOp constantOp,
                                 PatternRewriter &rewriter) const override {
     auto shapedType =
@@ -1355,7 +1355,7 @@ struct TensorConstantToEmpty : public OpRewritePattern<TensorConstantOp> {
 };
 
 struct TensorConstantToSplat : public OpRewritePattern<TensorConstantOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TensorConstantOp constantOp,
                                 PatternRewriter &rewriter) const override {
     auto splatAttr = llvm::dyn_cast<SplatElementsAttr>(constantOp.getValue());
@@ -1431,7 +1431,7 @@ namespace {
 
 // Elides clones that don't do anything meaningful (like setting up a tie).
 struct ElideUnneededTensorClones : public OpRewritePattern<TensorCloneOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TensorCloneOp cloneOp,
                                 PatternRewriter &rewriter) const override {
     if (cloneOp.getType() == cloneOp.getSource().getType() &&
@@ -1561,7 +1561,7 @@ namespace {
 
 struct DeduplicateTensorDispatchEntryRefs final
     : public OpRewritePattern<TensorDispatchOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TensorDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
     auto originalAttr = dispatchOp.getEntryPointsAttr();
@@ -1670,7 +1670,7 @@ namespace {
 // Converts constants with splat values into splats.
 struct ConvertSplatConstantsIntoSplats
     : public OpRewritePattern<AsyncConstantOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(AsyncConstantOp constantOp,
                                 PatternRewriter &rewriter) const override {
     auto value = dyn_cast<ElementsAttr>(constantOp.getValue());
@@ -1753,7 +1753,7 @@ namespace {
 // ->
 //  %1 = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%c128}
 struct PropagateSplatsThroughSlices : public OpRewritePattern<AsyncSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(AsyncSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
     auto splatOp =
@@ -1793,7 +1793,7 @@ namespace {
 // ->
 //  %0 = stream.async.splat %cst : f32 -> !stream.resource<*>{%dstsz}
 struct FlattenFullFillToSplat : public OpRewritePattern<AsyncFillOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(AsyncFillOp fillOp,
                                 PatternRewriter &rewriter) const override {
     if (fillOp.getTargetLength() != fillOp.getTargetSize())
@@ -1823,7 +1823,7 @@ struct FlattenFullFillToSplat : public OpRewritePattern<AsyncFillOp> {
 //  %0 = stream.async.splat %c123
 //  %1 = stream.async.fill %c123, %0[...]
 struct ElideRedundantFill : public OpRewritePattern<AsyncFillOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(AsyncFillOp fillOp,
                                 PatternRewriter &rewriter) const override {
     auto splatOp = dyn_cast_or_null<IREE::Stream::AsyncSplatOp>(
@@ -1854,7 +1854,7 @@ struct ElideRedundantFill : public OpRewritePattern<AsyncFillOp> {
 // ->
 //  %0 = stream.async.fill %c123, %...[%a to %c for %l0plus1]
 struct CoalesceAdjacentFills : public OpRewritePattern<AsyncFillOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(AsyncFillOp fillOp,
                                 PatternRewriter &rewriter) const override {
     auto sourceOp = dyn_cast_or_null<IREE::Stream::AsyncFillOp>(
@@ -1982,7 +1982,7 @@ namespace {
 // ->
 //  %2 = stream.async.dispatch .... %0 -> %0
 struct ElideInPlaceUpdate : public OpRewritePattern<AsyncUpdateOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(AsyncUpdateOp updateOp,
                                 PatternRewriter &rewriter) const override {
     // Look for entire tensor replacement.
@@ -2070,7 +2070,7 @@ struct ElideInPlaceUpdate : public OpRewritePattern<AsyncUpdateOp> {
 // ->
 //  %1 = stream.async.fill %c123_i32, %dst[%c0 to %c128 for %c128]
 struct CombineSplatUpdateFromToFill : public OpRewritePattern<AsyncUpdateOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(AsyncUpdateOp updateOp,
                                 PatternRewriter &rewriter) const override {
     auto splatOp =
@@ -2104,7 +2104,7 @@ struct CombineSplatUpdateFromToFill : public OpRewritePattern<AsyncUpdateOp> {
 // want if it there are users of the source after this op such that we wouldn't
 // be the op keeping the entire unsliced source resource live.
 struct CombineSliceUpdateFromToCopy : public OpRewritePattern<AsyncUpdateOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(AsyncUpdateOp updateOp,
                                 PatternRewriter &rewriter) const override {
     auto sliceOp =
@@ -2154,7 +2154,7 @@ namespace {
 // ->
 //  %2 = stream.async.update %0, %1[%c0 to %sz1]
 struct AsyncCopyFullSourceToUpdate : public OpRewritePattern<AsyncCopyOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(AsyncCopyOp copyOp,
                                 PatternRewriter &rewriter) const override {
     if (copyOp.getSourceEnd() == copyOp.getSourceSize() &&
@@ -2213,7 +2213,7 @@ namespace {
 // Elides transfer operations that are a no-op (from/to the same affinity and
 // same resource type).
 struct RedundantTransferElision : public OpRewritePattern<AsyncTransferOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(AsyncTransferOp transferOp,
                                 PatternRewriter &rewriter) const override {
     if (transferOp.getSourceAffinityAttr() ==
@@ -2229,7 +2229,7 @@ struct RedundantTransferElision : public OpRewritePattern<AsyncTransferOp> {
 
 // Collapses chains of transfers that have no use.
 struct IntermediateTransferElision : public OpRewritePattern<AsyncTransferOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(AsyncTransferOp transferOp,
                                 PatternRewriter &rewriter) const override {
     // Walk up the transfer chain to the first non-transfer op.
@@ -2272,7 +2272,7 @@ namespace {
 // Folds subsequent bitcasts into the load op. The bit width will be the same
 // and it avoids additional conversion.
 struct FoldAsyncLoadBitcast : public OpRewritePattern<AsyncLoadOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(AsyncLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
     auto loadedValue = loadOp.getResult();
@@ -2310,7 +2310,7 @@ namespace {
 // Folds preceding bitcasts into the store op. The bit width will be the same
 // and it avoids additional conversion.
 struct FoldAsyncStoreBitcast : public OpRewritePattern<AsyncStoreOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(AsyncStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
     auto storedValue = storeOp.getValue();
@@ -2342,7 +2342,7 @@ namespace {
 
 struct DeduplicateAsyncDispatchEntryRefs final
     : public OpRewritePattern<AsyncDispatchOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(AsyncDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
     auto originalAttr = dispatchOp.getEntryPointsAttr();
@@ -2385,7 +2385,7 @@ namespace {
 // allows us to progressively fold the subviews into the ops consuming them.
 struct CloneCapturedAsyncExecuteSubviewOps
     : public OpRewritePattern<AsyncExecuteOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(AsyncExecuteOp op,
                                 PatternRewriter &rewriter) const override {
     struct SubviewCapture {
@@ -2442,7 +2442,7 @@ struct CloneCapturedAsyncExecuteSubviewOps
 //  %result = %capture
 //  %timepoint = stream.timepoint.immediate
 struct ElideNoOpAsyncExecuteOp : public OpRewritePattern<AsyncExecuteOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(AsyncExecuteOp op,
                                 PatternRewriter &rewriter) const override {
     auto &entryBlock = op.getBody().front();
@@ -2508,7 +2508,7 @@ namespace {
 //  %new_offset = arith.addi %offset, %subview_offset
 //  stream.cmd.flush %dst[%new_offset for %subview_length]
 struct FoldSubviewsIntoCmdFlushOp : public OpRewritePattern<CmdFlushOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(CmdFlushOp op,
                                 PatternRewriter &rewriter) const override {
     auto subviewOp = ResourceSubviewOp::findSubviewOp(op.getTarget());
@@ -2550,7 +2550,7 @@ namespace {
 //  stream.cmd.invalidate %dst[%new_offset for %subview_length]
 struct FoldSubviewsIntoCmdInvalidateOp
     : public OpRewritePattern<CmdInvalidateOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(CmdInvalidateOp op,
                                 PatternRewriter &rewriter) const override {
     auto subviewOp = ResourceSubviewOp::findSubviewOp(op.getTarget());
@@ -2591,7 +2591,7 @@ namespace {
 //  %new_offset = arith.addi %offset, %subview_offset
 //  stream.cmd.discard %dst[%new_offset for %subview_length]
 struct FoldSubviewsIntoCmdDiscardOp : public OpRewritePattern<CmdDiscardOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(CmdDiscardOp op,
                                 PatternRewriter &rewriter) const override {
     auto subviewOp = ResourceSubviewOp::findSubviewOp(op.getTarget());
@@ -2632,7 +2632,7 @@ namespace {
 //  %new_offset = arith.addi %offset, %subview_offset
 //  stream.cmd.fill %cst, %dst[%new_offset for %subview_length]
 struct FoldSubviewsIntoCmdFillOp : public OpRewritePattern<CmdFillOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(CmdFillOp op,
                                 PatternRewriter &rewriter) const override {
     auto subviewOp = ResourceSubviewOp::findSubviewOp(op.getTarget());
@@ -2674,7 +2674,7 @@ namespace {
 //  %new_offset = arith.addi %offset, %subview_offset
 //  stream.cmd.copy %src[%new_offset], %dst[%new_offset], %subview_length
 struct FoldSubviewsIntoCmdCopyOp : public OpRewritePattern<CmdCopyOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(CmdCopyOp op,
                                 PatternRewriter &rewriter) const override {
     auto sourceSubviewOp = ResourceSubviewOp::findSubviewOp(op.getSource());
@@ -2791,7 +2791,7 @@ namespace {
 
 struct DeduplicateCmdDispatchEntryRefs final
     : public OpRewritePattern<CmdDispatchOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(CmdDispatchOp dispatchOp,
                                 PatternRewriter &rewriter) const override {
     auto originalAttr = dispatchOp.getEntryPointsAttr();
@@ -2822,7 +2822,7 @@ namespace {
 // This duplicates FoldSubviewsIntoDispatchOp to handle the call op until the
 // interface can be written.
 struct FoldSubviewsIntoCmdCallOp : public OpRewritePattern<CmdCallOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(CmdCallOp op,
                                 PatternRewriter &rewriter) const override {
     // Original operand index + the subview.
@@ -2893,7 +2893,7 @@ namespace {
 //  }
 struct CloneCapturedCmdExecuteSubviewOps
     : public OpRewritePattern<CmdExecuteOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(CmdExecuteOp op,
                                 PatternRewriter &rewriter) const override {
     struct SubviewCapture {
@@ -2942,7 +2942,7 @@ struct CloneCapturedCmdExecuteSubviewOps
 // Elides stream.cmd.execute ops when they have no meaningful work.
 // The returned timepoint is replaced with an immediately resolved timepoint.
 struct ElideNoOpCmdExecuteOp : public OpRewritePattern<CmdExecuteOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(CmdExecuteOp op,
                                 PatternRewriter &rewriter) const override {
     auto &entryBlock = op.getBody().front();
@@ -3060,7 +3060,7 @@ namespace {
 //  %chained_fence = %arg_fence
 struct PassThroughChainExternal
     : public OpRewritePattern<TimepointChainExternalOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TimepointChainExternalOp op,
                                 PatternRewriter &rewriter) const override {
     // Try to get the original external values that we want to chain.
@@ -3136,7 +3136,7 @@ namespace {
 
 struct ElideImmediateTimepointJoinOperands
     : public OpRewritePattern<TimepointJoinOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TimepointJoinOp op,
                                 PatternRewriter &rewriter) const override {
     SmallVector<Value> newTimepoints;
@@ -3162,7 +3162,7 @@ struct ElideImmediateTimepointJoinOperands
 
 struct FoldDuplicateTimepointJoinOperands
     : public OpRewritePattern<TimepointJoinOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TimepointJoinOp op,
                                 PatternRewriter &rewriter) const override {
     SetVector<Value> newTimepoints;
@@ -3184,7 +3184,7 @@ struct FoldDuplicateTimepointJoinOperands
 // Which we want to fold and expand:
 //   %j1 = stream.timepoint.join max(%tp2, %tp0, %tp1, %tp3)
 struct ExpandTimepointJoinOperands : public OpRewritePattern<TimepointJoinOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TimepointJoinOp op,
                                 PatternRewriter &rewriter) const override {
     SetVector<Value> newTimepoints;
@@ -3250,7 +3250,7 @@ static bool isSourceImmediatelyResolved(Value resource) {
 //  %r0b = %r0a
 //  %r0ready = stream.timepoint.immediate
 struct ElideImmediateBarrier : public OpRewritePattern<TimepointBarrierOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TimepointBarrierOp barrierOp,
                                 PatternRewriter &rewriter) const override {
     if (!isSourceImmediatelyResolved(barrierOp.getResource())) {
@@ -3297,7 +3297,7 @@ findSourceAwaitOp(Value resource) {
 //  %r0b = %source
 //  %t1 = %t0
 struct ChainTimepoints : public OpRewritePattern<TimepointBarrierOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TimepointBarrierOp barrierOp,
                                 PatternRewriter &rewriter) const override {
     // Try to find an await op. This may traverse through any number of tied ops
@@ -3350,7 +3350,7 @@ LogicalResult TimepointAwaitOp::fold(FoldAdaptor operands,
 namespace {
 
 struct ElideImmediateHostAwaits : public OpRewritePattern<TimepointAwaitOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TimepointAwaitOp op,
                                 PatternRewriter &rewriter) const override {
     if (isa_and_nonnull<TimepointImmediateOp>(
@@ -3365,7 +3365,7 @@ struct ElideImmediateHostAwaits : public OpRewritePattern<TimepointAwaitOp> {
 // Sinks an await down to the first consumer of any resource. Note that there
 // may be multiple resources guarded by the await.
 struct SinkAwaitToFirstConsumer : public OpRewritePattern<TimepointAwaitOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TimepointAwaitOp op,
                                 PatternRewriter &rewriter) const override {
     // Don't move sync points as they may be implicitly guarding execution.
@@ -3426,7 +3426,7 @@ struct SinkAwaitToFirstConsumer : public OpRewritePattern<TimepointAwaitOp> {
 // This allows us to pass-through the subviews to consumers that can hopefully
 // fold the range.
 struct SinkSubviewsAcrossAwaits : public OpRewritePattern<TimepointAwaitOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TimepointAwaitOp op,
                                 PatternRewriter &rewriter) const override {
     rewriter.setInsertionPointAfter(op);
@@ -3493,7 +3493,7 @@ static bool areAllOperandsDefinedBy(Operation *op, Operation *insertionPoint,
 //  %7 = stream.tensor.export %6#0 ...
 //  %9 = stream.tensor.export %6#1 ...
 struct GroupAwaitsByTimepoint : public OpRewritePattern<TimepointAwaitOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TimepointAwaitOp op,
                                 PatternRewriter &rewriter) const override {
     DominanceInfo dominanceInfo(op->getParentOp());
@@ -3558,7 +3558,7 @@ struct GroupAwaitsByTimepoint : public OpRewritePattern<TimepointAwaitOp> {
 // ->
 //  %1:2 = stream.timepoint.await %tp => %1, %2
 struct FoldDuplicateAwaitResources : public OpRewritePattern<TimepointAwaitOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TimepointAwaitOp op,
                                 PatternRewriter &rewriter) const override {
     DenseMap<Value, unsigned> baseMap;
@@ -3600,7 +3600,7 @@ struct FoldDuplicateAwaitResources : public OpRewritePattern<TimepointAwaitOp> {
 };
 
 struct ElideUnusedTimepointAwait : public OpRewritePattern<TimepointAwaitOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(TimepointAwaitOp op,
                                 PatternRewriter &rewriter) const override {
     // If there are any uses the await is required to associate the timepoint.

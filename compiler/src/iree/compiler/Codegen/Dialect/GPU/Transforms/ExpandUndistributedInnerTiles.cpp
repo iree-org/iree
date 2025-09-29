@@ -101,7 +101,7 @@ static LogicalResult materializeOperandExpandedShape(
 
 namespace {
 struct ExpandInnerTileShapes final : OpRewritePattern<Codegen::InnerTiledOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   ExpandInnerTileShapes(MLIRContext *context, bool expandInputs,
                         bool expandOutputs)

@@ -23,7 +23,7 @@ namespace {
 
 struct FftRfftOpConversion
     : public OpRewritePattern<torch::Torch::AtenFftRfftOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(torch::Torch::AtenFftRfftOp op,
                                 PatternRewriter &rewriter) const override {
 

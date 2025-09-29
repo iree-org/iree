@@ -30,7 +30,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 struct DistributeLoop final : OpRewritePattern<scf::ForOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   DistributeLoop(MLIRContext *context, bool useBD, PatternBenefit benefit = 1)
       : OpRewritePattern(context, benefit), useBlockDims(useBD) {}

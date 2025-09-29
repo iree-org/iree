@@ -97,7 +97,7 @@ static bool transposeOpFilter(Operation *op) {
 /// ```
 struct SwapAllocTensorPattern final
     : OpRewritePattern<bufferization::AllocTensorOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(bufferization::AllocTensorOp allocOp,
                                 PatternRewriter &rewriter) const override {

@@ -323,7 +323,7 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
 //===----------------------------------------------------------------------===//
 
 struct RemoveBarriers : public OpRewritePattern<IREE::Stream::AsyncBarrierOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::AsyncBarrierOp op,
                                 PatternRewriter &rewriter) const override {
     rewriter.replaceOp(op, op.getOperand(0));
