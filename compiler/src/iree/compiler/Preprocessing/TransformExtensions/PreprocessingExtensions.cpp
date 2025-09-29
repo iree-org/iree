@@ -314,9 +314,29 @@ DiagnosedSilenceableFailure IREE::transform_dialect::MatchDimsEqualOp::apply(
       state.getParams(getDimensionSizes());
   ArrayAttr targetDimensionSizes = getExpectedValues();
 
-  if (!llvm::equal(currentDimSizes, targetDimensionSizes)) {
+  if (currentDimSizes.size() != targetDimensionSizes.size()) {
     return emitSilenceableError()
-           << "Dimension sizes do not match expected values";
+           << "dimension sizes and expected values have different lengths";
+  }
+
+  for (auto [currentDimSizeAttr, targetDimSizeAttr] :
+       llvm::zip_equal(currentDimSizes, targetDimensionSizes)) {
+    auto currentDimSizeIntegerAttr = dyn_cast<IntegerAttr>(currentDimSizeAttr);
+    auto targetDimSizeIntegerAttr = dyn_cast<IntegerAttr>(targetDimSizeAttr);
+    if (!currentDimSizeIntegerAttr || !targetDimSizeIntegerAttr) {
+      return emitSilenceableError() << "expected integer attributes";
+    }
+
+    int64_t currentDimSize = currentDimSizeIntegerAttr.getInt();
+    int64_t targetDimSize = targetDimSizeIntegerAttr.getInt();
+
+    if (targetDimSize == -1)
+      continue;
+
+    if (currentDimSize != targetDimSize) {
+      return emitSilenceableError() << "dimension value " << currentDimSize
+                                    << " does not match " << targetDimSize;
+    }
   }
 
   return DiagnosedSilenceableFailure::success();

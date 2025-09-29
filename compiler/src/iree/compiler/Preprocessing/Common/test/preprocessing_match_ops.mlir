@@ -644,3 +644,136 @@ module attributes {transform.with_named_sequence} {
     transform.yield
   }
 }
+
+// -----
+
+// CHECK-LABEL: func.func @op_broadcast_rhs_mmt_d0
+func.func @op_broadcast_rhs_mmt_d0(
+  %lhs: tensor<4x8x512xi8>,
+  %rhs: tensor<1024x512xi8>,
+  %out: tensor<4x8x1024xi32>)
+  -> tensor<4x8x1024xi32> {
+  // CHECK-NEXT: linalg.generic
+  // CHECK-SAME:   match_status = "matched"
+  %res = linalg.generic
+    { indexing_maps = [
+        affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+        affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
+        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+      ],
+      iterator_types = ["parallel", "parallel", "parallel", "reduction"], match_status = "unmatched"}
+    ins(%lhs, %rhs : tensor<4x8x512xi8>, tensor<1024x512xi8>)
+    outs(%out : tensor<4x8x1024xi32>) {
+  ^bb0(%in_l: i8, %in_r: i8, %acc: i32):
+    %l = arith.extsi %in_l : i8 to i32
+    %r = arith.extsi %in_r : i8 to i32
+    %m = arith.muli %l, %r : i32
+    %a = arith.addi %acc, %m : i32
+    linalg.yield %a : i32
+  } -> tensor<4x8x1024xi32>
+  return %res : tensor<4x8x1024xi32>
+}
+
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @match_broadcast_rhs_mmt_i8_i8_i32_d0(
+    %op: !transform.any_op {transform.readonly}) -> !transform.any_op {
+
+    %batch, %m, %n, %k = transform.iree.match.contraction %op,
+      lhs_type = i8, rhs_type = i8, output_type = i32
+      { indexing_maps = [
+          affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+          affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
+          affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+        ] } :
+      (!transform.any_op)
+      -> (!transform.param<i64>, !transform.param<i64>,
+          !transform.param<i64>, !transform.param<i64>)
+
+    transform.iree.match.dims_equal %batch, []      : !transform.param<i64>
+    transform.iree.match.dims_equal %m, [-1, 8]     : !transform.param<i64>
+    transform.iree.match.dims_equal %n, [1024]      : !transform.param<i64>
+    transform.iree.match.dims_equal %k, [512]       : !transform.param<i64>
+
+    transform.yield %op : !transform.any_op
+  }
+
+  transform.named_sequence @annotate(%op: !transform.any_op {transform.readonly}) {
+    %0 = transform.param.constant "matched" -> !transform.any_param
+    transform.annotate %op "match_status" = %0 : !transform.any_op, !transform.any_param
+    transform.yield
+  }
+
+  transform.named_sequence @__transform_main(%module: !transform.any_op) {
+    transform.foreach_match in %module
+        @match_broadcast_rhs_mmt_i8_i8_i32_d0 -> @annotate
+      : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
+  }
+}
+
+// -----
+
+// CHECK-LABEL: func.func @op_broadcast_lhs_mmt_d0
+func.func @op_broadcast_lhs_mmt_d0(
+  %lhs: tensor<1024x512xi8>,
+  %rhs: tensor<4x8x512xi8>,
+  %out: tensor<4x8x1024xi32>)
+  -> tensor<4x8x1024xi32> {
+  // CHECK-NEXT: linalg.generic
+  // CHECK-SAME:   match_status = "matched"
+  %res = linalg.generic
+    { indexing_maps = [
+        affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
+        affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+      ],
+      iterator_types = ["parallel", "parallel", "parallel", "reduction"],
+      match_status = "unmatched" }
+    ins(%lhs, %rhs : tensor<1024x512xi8>, tensor<4x8x512xi8>)
+    outs(%out : tensor<4x8x1024xi32>) {
+  ^bb0(%in_l: i8, %in_r: i8, %acc: i32):
+    %l = arith.extsi %in_l : i8 to i32
+    %r = arith.extsi %in_r : i8 to i32
+    %m = arith.muli %l, %r : i32
+    %a = arith.addi %acc, %m : i32
+    linalg.yield %a : i32
+  } -> tensor<4x8x1024xi32>
+  return %res : tensor<4x8x1024xi32>
+}
+
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @match_broadcast_lhs_mmt_i8_i8_i32_d0(
+    %op: !transform.any_op {transform.readonly}) -> !transform.any_op {
+
+    %batch, %m, %n, %k = transform.iree.match.contraction %op,
+      lhs_type = i8, rhs_type = i8, output_type = i32
+      { indexing_maps = [
+          affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
+          affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+          affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+        ] } :
+      (!transform.any_op)
+      -> (!transform.param<i64>, !transform.param<i64>,
+          !transform.param<i64>, !transform.param<i64>)
+
+    transform.iree.match.dims_equal %batch, []     : !transform.param<i64>
+    transform.iree.match.dims_equal %m, [1024]     : !transform.param<i64>
+    transform.iree.match.dims_equal %n, [-1, 8]    : !transform.param<i64>
+    transform.iree.match.dims_equal %k, [512]      : !transform.param<i64>
+
+    transform.yield %op : !transform.any_op
+  }
+
+  transform.named_sequence @annotate(%op: !transform.any_op {transform.readonly}) {
+    %0 = transform.param.constant "matched" -> !transform.any_param
+    transform.annotate %op "match_status" = %0 : !transform.any_op, !transform.any_param
+    transform.yield
+  }
+
+  transform.named_sequence @__transform_main(%module: !transform.any_op) {
+    transform.foreach_match in %module
+        @match_broadcast_lhs_mmt_i8_i8_i32_d0 -> @annotate
+      : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
+  }
+}
