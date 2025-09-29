@@ -200,10 +200,6 @@ def IREEGPU_DataTiledMMAInterfaceAttr
 
     OpFoldResult getDistributionWorkerCount(
         OpBuilder &builder, Location loc, Operation *opToDistribute);
-
-    // LogicalResult buildUnderlyingOperations(
-    //     OpBuilder &builder, Location loc, ValueRange inputs, ValueRange outputs,
-    //     llvm::SmallVectorImpl<Value>& results);
   }];
 }
 

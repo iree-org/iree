@@ -31,8 +31,8 @@ using ::mlir::iree_compiler::IREE::Codegen::TileSwizzle;
 // DataTiledMMAInterfaceAttr
 //===----------------------------------------------------------------------===//
 
-/// Returns the swizzled tile distribution shape, but with dim sizes overwritten
-/// with 1 if `predicate` returns false.
+/// Returns the swizzled tile distribution shape after applying the swizzle
+/// permutation.
 static SmallVector<int64_t>
 getSwizzledDistributionShape(const TileSwizzle &swizzle) {
   SmallVector<int64_t> shape;
@@ -52,7 +52,7 @@ void DataTiledMMAInterfaceAttr::getUndistributedTileTypes(
   for (auto [i, elementType] : llvm::enumerate(elementTypes)) {
     TileSwizzle swizzle = getTileSwizzle(i);
     SmallVector<int64_t> shape;
-    for (auto group : swizzle.expandShape) {
+    for (TileSwizzle::ExpandShapeDimVectorType group : swizzle.expandShape) {
       for (TileSwizzle::Dim d : group) {
         shape.push_back(d.size);
       }
@@ -156,7 +156,7 @@ Attribute DataTiledMMAInterfaceAttr::getDistributionMappingKind() {
 OpFoldResult DataTiledMMAInterfaceAttr::getDistributionWorkerCount(
     OpBuilder &builder, Location loc, Operation *opToDistribute) {
   if (auto func = opToDistribute->getParentOfType<FunctionOpInterface>()) {
-    if (auto wgSizes = getWorkgroupSize(func)) {
+    if (std::optional<SmallVector<int64_t>> wgSizes = getWorkgroupSize(func)) {
       return getAsIndexOpFoldResult(getContext(),
                                     ShapedType::getNumElements(*wgSizes));
     }
