@@ -267,6 +267,44 @@ a `.hsaco` with
 ld.lld -o [filename].hsaco -shared [filename].o
 ```
 
-You'll want to use the LLD shipped by ROCm (typically in `/opt/rocm/llvm/bin`)
-or built by IREE (typically in `[build-directory]/llvm-project/bin`) to
-ensure the linking operates correctly.
+In full, if you have a dispatch in `dispatch.mlir` and want to compile it
+manually, the process is as follows
+
+``` shell
+iree-compile dispatch.mlir \
+  --iree-hal-target-device=hip \
+  --iree-hip-target=<target> \
+  -o original.vmfb \
+  --iree-hal-dump-executable-files-to=original_trace
+# Extract the flags from original_trace/[...].linked.ll to a file, say opt-flags, and
+opt -o - $(cat opt-flags) <original_trace/[...].linked.ll >altered.opt.ll
+# To inspect the assembly
+llc [flags from original_trace/[...].rocmasm] altered.opt.ll -o altered.rocmasm
+# To produce an object file
+llc [flags from original_trace/[...].rocmasm] altered.opt.ll -o altered.o --filetype=obj
+# Linking to an HSACO
+ld.lld -o altered.hsaco -shared altered.o
+# Re-compile with substitution. [dispatch_name] is the name of the
+# `hal.executable` op symbol, not the variant within it.
+iree-compile dispatch.mlir \
+  --iree-hal-target-device=hip \
+  --iree-hip-target=<target> \
+  -o altered.vmfb \
+  --iree-hal-substitute-executable-object=[dispatch_name]=altered.hsaco
+```
+
+During each of these steps, you can change the flags or manually edit the `.ll`
+(or even `.rocmasm`) files to attempt to get potentially-different behavior.
+
+!!! tip
+
+    You'll want to use the binaries built by IREE, located in
+    `[build-directory]/llvm-project/bin`, to ensure you don't get spurious
+    successes or failures due to version mismatches.
+
+!!! note
+
+    The binary substution process could be used to replace a dispatch with a
+    completely foreign implementation, such as one written in C, so long as the
+    function names and argument handling schemes agree. If you do this, please
+    document the steps here.

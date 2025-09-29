@@ -55,7 +55,8 @@ use
 ninja opt llc
 ```
 
-to produce binaries in `[build-directory]/llvm-project/bin`.
+to produce binaries in `[build-directory]/llvm-project/bin`. You can similarly
+produce other utility binaries such as `llvm-reduce`, which aren't built by default.
 
 ## Reducing optimization levels in IREE
 
@@ -90,6 +91,14 @@ of compiler optimizations.
   needs a `-o -` to send its results to standard output. `llc` takes a
   `--filetype={asm,obj}` argument to control whether assembly or
   assembled objects are produced.
+
+## `llvm-diff`
+
+When adjusting an `opt` invocation to isolate misbehaving passes or when
+comparing LLVM IR from a working and a broken commit, you may be able to
+use the `llvm-diff` tool to compare two LLVM IR files without the noise that
+is induced by LLVM's IR numbering scheme. Note that the diff is generall output
+to standard error and should be redirected with a `2>&1`.
 
 ## `llvm-reduce`
 
