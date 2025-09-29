@@ -175,6 +175,21 @@ investigate by comparing with different paths and inputs:
     * [vendor-specific tools](../performance/profiling-gpu-vulkan.md) to
       understand kernel internal counters to identify the bottleneck.
 
+!!! tip "[correctness]"
+
+    Some targets support the `gpu.printf` operation for printing out vaules from
+    within GPU code, and many of the targets that don't _could_ support it with
+    some work in IREE or upstream MLIR.
+
+!!! tip "[correctness]"
+
+    If you suspect an issue in an LLVM backend, check
+    [the LLVM debugging playbook](./llvm.md) for general recommendations.
+
+    [:simple-amd:] An occasional source of failures has been disagreements about
+    code object version. Ensure that both `amdhsa_code_object_version` metadata
+    and `__oclc_ABI_version` are set and agree.
+
 ## Pinpointing runtime issues
 
 On the other side, if we suspect that it's a runtime issue, here are some
@@ -236,3 +251,22 @@ useful approachs and tips:
     * [:simple-vulkan:] Use `--vulkan_robust_buffer_access=true` to `iree-run-module`
       especially when seeing undeterministic/corrupted contents in buffers and
       suspecting there are buffer allocation/indexing issues.
+
+## Binary substiution for ROCm
+
+[:simple-amd:] The AMD ROCm target supports binary substitution on HSA code objects
+(`.hsaco` files).
+
+These files are, under the hood, ELF shared libraries containing kernel code.
+
+If you have manually produced a binary you want to test, such as by manually
+running `llc` with different optiumization flags, you can turn the `.o` into
+a `.hsaco` with
+
+``` shell
+ld.lld -o [filename].hsaco -shared [filename].o
+```
+
+You'll want to use the LLD shipped by ROCm (typically in `/opt/rocm/llvm/bin`)
+or built by IREE (typically in `[build-directory]/llvm-project/bin`) to
+ensure the linking operates correctly.
