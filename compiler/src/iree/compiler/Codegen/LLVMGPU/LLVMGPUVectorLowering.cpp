@@ -184,7 +184,7 @@ struct SetMulAddFMF final : OpRewritePattern<vector::MultiDimReductionOp> {
   }
 };
 
-struct UnrollElementwiseOps : public RewritePattern {
+struct UnrollElementwiseOps final : public RewritePattern {
   UnrollElementwiseOps(MLIRContext *context, PatternBenefit benefit = 1)
       : RewritePattern(MatchAnyOpTypeTag(), benefit, context) {}
 
