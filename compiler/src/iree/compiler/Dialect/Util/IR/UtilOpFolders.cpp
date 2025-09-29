@@ -12,6 +12,8 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Matchers.h"
@@ -819,6 +821,139 @@ OpFoldResult SwitchOp::fold(FoldAdaptor operands) {
 }
 
 //===----------------------------------------------------------------------===//
+// util.scf.unreachable
+//===----------------------------------------------------------------------===//
+
+// Returns true if |op| is directly nested within an SCF region.
+// These regions require an scf.yield terminator.
+static bool inSCFRegion(Operation *op) {
+  Block *block = op->getBlock();
+  Region *region = block->getParent();
+  Operation *parentOp = region ? region->getParentOp() : nullptr;
+  return parentOp && isa<scf::SCFDialect>(parentOp->getDialect());
+}
+
+// Returns true if |op| is directly nested within an SCF region with a single
+// block. These regions require an scf.yield terminator.
+static bool inSingleBlockSCFRegion(Operation *op) {
+  Block *block = op->getBlock();
+  Region *region = block->getParent();
+  Operation *parentOp = region ? region->getParentOp() : nullptr;
+  return parentOp && isa<scf::SCFDialect>(parentOp->getDialect()) &&
+         region->hasOneBlock();
+}
+
+// Converts util.scf.unreachable to util.unreachable when not in an SCF region.
+// This arises during SCF->CFG lowering and we don't control the pass so need
+// to clean up what it produces. It may also be introduced by SCF simplification
+// patterns that are always applied.
+struct ConvertSCFUnreachableToTerminatorOp
+    : public OpRewritePattern<SCFUnreachableOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(SCFUnreachableOp op,
+                                PatternRewriter &rewriter) const override {
+    // Only handle if the parent region is not an SCF operation.
+    // SCF operations (even multi-block ones like scf.execute_region) require
+    // scf.yield as their terminator and cannot use util.unreachable.
+    if (inSCFRegion(op)) {
+      return rewriter.notifyMatchFailure(op, "in scf region");
+    }
+
+    // Not in SCF region or in multi-block region: convert to terminator if at
+    // end of block.
+    Block *block = op->getBlock();
+    if (&block->back() == op.getOperation()) {
+      rewriter.replaceOpWithNewOp<IREE::Util::UnreachableOp>(
+          op, op.getMessageAttr());
+      return success();
+    }
+
+    // Since util.scf.unreachable marks unreachable code we can safely delete
+    // all operations after it even if they have side effects as the code is
+    // unreachable at runtime. If the op produces any results we need to replace
+    // them with poison values in case they escape the block.
+    SmallVector<Operation *> deadOps;
+    for (Operation *nextOp = op->getNextNode(); nextOp;
+         nextOp = nextOp->getNextNode()) {
+      deadOps.push_back(nextOp);
+      rewriter.replaceAllOpUsesWith(
+          nextOp, IREE::Util::SCFUnreachableOp::createPoisonValues(
+                      rewriter, nextOp->getLoc(), nextOp->getResultTypes()));
+    }
+    for (auto *opToErase : deadOps) {
+      rewriter.eraseOp(opToErase);
+    }
+
+    // Convert to terminator.
+    rewriter.replaceOpWithNewOp<IREE::Util::UnreachableOp>(op,
+                                                           op.getMessageAttr());
+    return success();
+  }
+};
+
+// Pattern to handle util.scf.unreachable inside single-block SCF regions by
+// erasing subsequent operations and creating poison values.
+struct SimplifySCFUnreachableInSCFRegionOp
+    : public OpRewritePattern<SCFUnreachableOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(SCFUnreachableOp op,
+                                PatternRewriter &rewriter) const override {
+    // Only handle if the parent region is in an SCF operation.
+    // Multi-block SCF regions (like scf.execute_region with CFG) still require
+    // scf.yield for any terminator that is return-like, so we can't use
+    // util.unreachable there.
+    if (!inSCFRegion(op)) {
+      return rewriter.notifyMatchFailure(op, "not in scf region");
+    }
+
+    // We replace each yielded value with a poison to break the use-def chain
+    // from the producers we are removing. This is only required if they aren't
+    // already poisons.
+    bool didChangeYield = false;
+    if (auto yieldOp = dyn_cast_if_present<scf::YieldOp>(
+            op->getBlock()->getTerminator())) {
+      if (!llvm::all_of(yieldOp->getOperands(), [&](Value operand) {
+            return isa_and_nonnull<ub::PoisonOp>(operand.getDefiningOp());
+          })) {
+        yieldOp->setOperands(IREE::Util::SCFUnreachableOp::createPoisonValues(
+            rewriter, op.getLoc(), yieldOp.getOperandTypes()));
+        didChangeYield = true;
+      }
+    }
+
+    // Find all operations after the unreachable op in the same block, if any.
+    // We need to remove them if they exist (except the terminator/poisons).
+    SmallVector<Operation *> deadOps;
+    for (Operation *nextOp = op->getNextNode();
+         nextOp && !nextOp->hasTrait<OpTrait::IsTerminator>();
+         nextOp = nextOp->getNextNode()) {
+      if (!isa<ub::PoisonOp>(nextOp)) {
+        deadOps.push_back(nextOp);
+      }
+    }
+    if (deadOps.empty()) {
+      return didChangeYield ? success() : failure();
+    }
+
+    // Replace any results with poison values and erase non-terminator
+    // operations.
+    SmallVector<Value> poisonValues;
+    for (auto *deadOp : llvm::reverse(deadOps)) {
+      assert(deadOp->use_empty() && "should have dropped uses");
+      rewriter.eraseOp(deadOp);
+    }
+
+    return success();
+  }
+};
+
+void SCFUnreachableOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                   MLIRContext *context) {
+  results.add<ConvertSCFUnreachableToTerminatorOp>(context);
+  results.add<SimplifySCFUnreachableInSCFRegionOp>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // Compiler hints
 //===----------------------------------------------------------------------===//
 
@@ -859,7 +994,9 @@ struct DropEmptyInitializerOp : public OpRewritePattern<InitializerOp> {
     if (op.getBody().getBlocks().size() != 1)
       return failure();
     auto &block = op.getBody().front();
-    if (block.empty() || isa<IREE::Util::ReturnOp>(block.front())) {
+    // Empty block or block with only a ReturnLike terminator.
+    if (block.empty() || (block.getOperations().size() == 1 &&
+                          block.front().hasTrait<OpTrait::ReturnLike>())) {
       rewriter.eraseOp(op);
       return success();
     }

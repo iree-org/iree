@@ -58,11 +58,13 @@ iree_cc_library(
     MLIRInferTypeOpInterface
     MLIRMemRefDialect
     MLIRParser
+    MLIRSCFDialect
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
     MLIRTransformUtils
     MLIRTransforms
+    MLIRUBDialect
     MLIRViewLikeInterface
   PUBLIC
 )
