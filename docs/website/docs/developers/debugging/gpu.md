@@ -260,7 +260,7 @@ useful approachs and tips:
 These files are, under the hood, ELF shared libraries containing kernel code.
 
 If you have manually produced a binary you want to test, such as by manually
-running `llc` with different optiumization flags, you can turn the `.o` into
+running `llc` with different optimization flags, you can turn the `.o` into
 a `.hsaco` with
 
 ``` shell
