@@ -4,12 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cstdint>
 #include "iree/compiler/Codegen/Common/TileAndFuseUtils.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -18,6 +21,7 @@
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Support/WalkResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -238,6 +242,100 @@ getLoopBounds(RewriterBase &rewriter, Location loc, ArrayRef<Range> loopRanges,
   return {lbs, ubs, steps};
 }
 
+static Value computeNbTiles(OpBuilder &b, Location loc, OpFoldResult size,
+                            OpFoldResult tileSize) {
+  Value sizeVal = getValueOrCreateConstantIntOp(b, loc, size);
+  Value tileSizeVal = getValueOrCreateConstantIntOp(b, loc, tileSize);
+  auto nbTiles =
+      b.create<mlir::arith::DivUIOp>(loc, sizeVal, tileSizeVal).getResult();
+  return getValueOrCreateConstantIntOp(b, loc, nbTiles);
+}
+
+/// Computes the total number of Tile loads per iteration for the pingpong
+/// matmul kernel.
+static Value computeNumTileLoads(OpBuilder &b, Location loc, OpFoldResult size,
+                                 OpFoldResult tileSize, Value nbXcds,
+                                 Value nbCus) {
+
+  Value nbTiles = computeNbTiles(b, loc, size, tileSize);
+  auto totalCus = b.create<mlir::arith::MulIOp>(loc, nbXcds, nbCus);
+  auto nbX = b.create<mlir::arith::MinUIOp>(loc, nbTiles, totalCus).getResult();
+
+  auto nbY = b.create<mlir::arith::CeilDivUIOp>(loc, totalCus, nbX);
+
+  return getValueOrCreateConstantIndexOp(
+      b, loc, b.create<mlir::arith::AddIOp>(loc, nbX, nbY).getResult());
+}
+
+static Value getCondition(OpBuilder &b, Location loc,
+                          ArrayRef<OpFoldResult> ubs,
+                          ArrayRef<OpFoldResult> steps, Value nbXcds,
+                          Value nbCus) {
+  assert(ubs.size() == 2 && steps.size() == 2 && "rank must be 2");
+  Value transposedOrder =
+      computeNumTileLoads(b, loc, ubs[0], steps[0], nbXcds, nbCus);
+  Value defaultOrder =
+      computeNumTileLoads(b, loc, ubs[1], steps[1], nbXcds, nbCus);
+
+  AffineExpr s0, s1, s2;
+  bindSymbols(b.getContext(), s0, s1, s2);
+  AffineExpr transposedOrderBumpExpr = (s0 * s1).floorDiv(s2);
+  Value c4 = b.create<arith::ConstantIntOp>(loc, 4, 32);
+  Value c5 = b.create<arith::ConstantIntOp>(loc, 5, 32);
+
+  Value defaultOrderTolerance = getValueOrCreateConstantIntOp(
+      b, loc,
+      affine::makeComposedFoldedAffineApply(b, loc, transposedOrderBumpExpr,
+                                            {defaultOrder, c4, c5}));
+
+  Value cond =
+      b.create<mlir::arith::CmpIOp>(loc, mlir::arith::CmpIPredicate::ult,
+                                    transposedOrder, defaultOrderTolerance);
+  return cond;
+}
+
+static void swapIf(OpBuilder &b, Location loc, OpFoldResult pred,
+                   SmallVector<OpFoldResult> &values,
+                   ArrayRef<size_t> ids = {0, 1}) {
+
+  assert(ids.size() == 2 && "Can only swap between 2 indices");
+
+  Value v0 = getValueOrCreateConstantIndexOp(b, loc, values[ids[0]]);
+  Value v1 = getValueOrCreateConstantIndexOp(b, loc, values[ids[1]]);
+  Value predVal = getValueOrCreateConstantIndexOp(b, loc, pred);
+  values[ids[0]] =
+      b.create<mlir::arith::SelectOp>(loc, predVal, v1, v0).getResult();
+  values[ids[1]] =
+      b.create<mlir::arith::SelectOp>(loc, predVal, v0, v1).getResult();
+}
+
+static std::tuple<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>,
+                  SmallVector<size_t>>
+computeOffsetAndSize(RewriterBase &rewriter, Location loc,
+                     ArrayRef<Range> loopRanges,
+                     ArrayRef<OpFoldResult> givenTileSizes,
+                     ArrayRef<Value> ivs) {
+  SmallVector<size_t> ids;
+  SmallVector<OpFoldResult> offsets, sizes;
+
+  offsets.reserve(loopRanges.size());
+  sizes.reserve(loopRanges.size());
+  const Value *ivIt = ivs.begin();
+
+  for (auto [loopRange, givenTileSize] :
+       llvm::zip_equal(loopRanges, givenTileSizes)) {
+    if (isZeroInteger(givenTileSize)) {
+      offsets.push_back(loopRange.offset);
+      sizes.push_back(loopRange.size);
+    } else {
+      offsets.push_back(*ivIt++);
+      sizes.push_back(givenTileSize);
+      ids.push_back(sizes.size() - 1);
+    }
+  }
+  return {offsets, sizes, ids};
+}
+
 void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   auto *context = &getContext();
@@ -293,45 +391,51 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
     llvm::outs() << "Test mode\n";
     // START
 
-    // loopRanges Range (0,8192,1).
-    // givenTileSizes 256,256,0
-    //   OpFoldResult oneOfr = rewriter.getIndexAttr(1);
-
     scf::SCFTilingOptions::GenerateLoopHeaderFn loopHeaderFn =
         [&](RewriterBase &rewriter, Location loc, ArrayRef<Range> loopRanges,
             ArrayRef<OpFoldResult> givenTileSizes,
             ValueRange outerDestinationTensors)
         -> FailureOr<scf::SCFTilingOptions::CustomLoopHeaderInfo> {
       scf::ForallOp forallOp;
+      // Get loop bounds
       SmallVector<OpFoldResult> lbs, ubs, steps;
       std::tie(lbs, ubs, steps) =
           getLoopBounds(rewriter, loc, loopRanges, givenTileSizes);
 
+      assert(lbs.size() == 2 && "only rank 2 is supported");
+
+      // Rewrite ourselve ?
       std::optional<ArrayAttr> mappingAttr;
       if (!tilingOptions.mappingVector.empty())
         mappingAttr = rewriter.getArrayAttr(tilingOptions.mappingVector);
 
+      const int NBCUS = 38;
+      const int NBXCDS = 8;
+
+      // Apply condition on loop bounds
+      Value nbCusVal = rewriter.create<arith::ConstantIndexOp>(loc, NBCUS);
+      Value nbXCDs = rewriter.create<arith::ConstantIndexOp>(loc, NBXCDS);
+      Value cond = getCondition(rewriter, loc, ubs, steps, nbXCDs, nbCusVal);
+
+      swapIf(rewriter, loc, cond, lbs);
+      swapIf(rewriter, loc, cond, ubs);
+      swapIf(rewriter, loc, cond, steps);
+
       forallOp = scf::ForallOp::create(rewriter, loc, lbs, ubs, steps,
                                        outerDestinationTensors, mappingAttr);
 
-      rewriter.setInsertionPoint(forallOp.getTerminator());
       SmallVector<Value> ivs = forallOp.getInductionVars();
 
-      ValueRange innerDestinationTensors = forallOp.getRegionOutArgs();
-
-      // Compute the `offsets` and `sizes` to use for tiling.
       SmallVector<OpFoldResult> offsets, sizes;
-      for (int i = 0; i < 2; i++) {
-        sizes.push_back(givenTileSizes[i]);
-      }
-      sizes.push_back(loopRanges[2].size);
+      SmallVector<size_t> ids;
+      std::tie(offsets, sizes, ids) =
+          computeOffsetAndSize(rewriter, loc, loopRanges, givenTileSizes, ivs);
 
-      offsets.reserve(sizes.size());
+      swapIf(rewriter, loc, cond, offsets, ids);
+      swapIf(rewriter, loc, cond, sizes, ids);
 
-      for (Value v : ivs) {
-        offsets.push_back(v);
-      }
-      offsets.push_back(rewriter.getIndexAttr(0));
+      ValueRange innerDestinationTensors = forallOp.getRegionOutArgs();
+      rewriter.setInsertionPoint(forallOp.getTerminator());
 
       return scf::SCFTilingOptions::CustomLoopHeaderInfo{
           {cast<LoopLikeOpInterface>(forallOp.getOperation())},
