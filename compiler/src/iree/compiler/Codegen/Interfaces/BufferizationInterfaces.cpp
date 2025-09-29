@@ -176,7 +176,8 @@ struct LoadFromBufferOpInterface
     // buffer, and check if the subspan is read only.
     auto loadFromBufferOp = cast<IREE::Codegen::LoadFromBufferOp>(op);
     std::optional<IREE::HAL::InterfaceBindingSubspanOp> subspanOp =
-        getSourceSubspanMemref(cast<MemrefValue>(loadFromBufferOp.getBuffer()));
+        getSourceSubspanMemref(
+            cast<TypedValue<MemRefType>>(loadFromBufferOp.getBuffer()));
     // Conservatively return false if the subspan is not found.
     if (!subspanOp)
       return false;

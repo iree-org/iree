@@ -1141,7 +1141,7 @@ int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp) {
 //===---------------------------------------------------------------------===//
 
 std::optional<IREE::HAL::InterfaceBindingSubspanOp>
-getSourceSubspanMemref(MemrefValue buffer) {
+getSourceSubspanMemref(TypedValue<MemRefType> buffer) {
   Operation *currentOp = buffer.getDefiningOp();
   while (currentOp) {
     if (auto subspanOp =

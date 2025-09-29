@@ -14,7 +14,6 @@
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
-#include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -61,7 +60,8 @@ static Operation *isTriviallyProducedByReadOnlyViewLike(
     return nullptr;
   }
   std::optional<IREE::HAL::InterfaceBindingSubspanOp> binding =
-      getSourceSubspanMemref(cast<MemrefValue>(loadFromBuffer.getBuffer()));
+      getSourceSubspanMemref(
+          cast<TypedValue<MemRefType>>(loadFromBuffer.getBuffer()));
   if (!binding) {
     return nullptr;
   }

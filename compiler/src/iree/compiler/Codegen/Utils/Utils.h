@@ -15,7 +15,6 @@
 #include "llvm/TargetParser/Triple.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
-#include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Vector/IR/ScalableValueBoundsConstraintSet.h"
@@ -221,7 +220,7 @@ int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp);
 /// Walks the memref producers and returns the source subspan memref for the
 /// given buffer, or std::nullopt if no subspan is found.
 std::optional<IREE::HAL::InterfaceBindingSubspanOp>
-getSourceSubspanMemref(MemrefValue buffer);
+getSourceSubspanMemref(TypedValue<MemRefType> buffer);
 
 /// Find the memref version of the given InterfaceBindingSubspanOp. If no such
 /// op exists in the same block (before the given op), create a new op.
