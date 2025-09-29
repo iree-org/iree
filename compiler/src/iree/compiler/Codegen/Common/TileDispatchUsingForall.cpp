@@ -221,6 +221,23 @@ static bool isUsedAsInit(Operation *producer, Operation *user) {
   });
 }
 
+static std::tuple<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>,
+                  SmallVector<OpFoldResult>>
+getLoopBounds(RewriterBase &rewriter, Location loc, ArrayRef<Range> loopRanges,
+              ArrayRef<OpFoldResult> givenTileSizes) {
+  SmallVector<OpFoldResult> lbs, ubs, steps;
+  for (auto [loopRange, givenTileSize] :
+       llvm::zip_equal(loopRanges, givenTileSizes)) {
+    // No loop if the tile size is 0.
+    if (isZeroInteger(givenTileSize))
+      continue;
+    lbs.push_back(loopRange.offset);
+    ubs.push_back(loopRange.size);
+    steps.push_back(givenTileSize);
+  }
+  return {lbs, ubs, steps};
+}
+
 void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   auto *context = &getContext();
@@ -256,17 +273,95 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
       yieldReplacementsFor.insert(op);
     }
   }
-  scf::SCFTilingOptions tilingOptions;
-  tilingOptions.setTileSizes(tilingInfo->tileSizes);
-  tilingOptions.setInterchange(tilingInfo->interchange);
-  tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
+
   SmallVector<Attribute> deviceMappingAttribute =
       getMapping(context, tilingInfo->tileSizes);
   if (failed(IREE::Codegen::WorkgroupMappingAttr::verifyAttrList(
           context, funcOp.getLoc(), deviceMappingAttribute))) {
     return signalPassFailure();
   }
+
+  scf::SCFTilingOptions tilingOptions;
+  tilingOptions.setTileSizes(tilingInfo->tileSizes);
+  tilingOptions.setInterchange(tilingInfo->interchange);
   tilingOptions.setMapping(deviceMappingAttribute);
+  const char *env_var = std::getenv("TEST");
+
+  if (!env_var) {
+    tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
+  } else {
+    llvm::outs() << "Test mode\n";
+    // START
+
+    // loopRanges Range (0,8192,1).
+    // givenTileSizes 256,256,0
+    //   OpFoldResult oneOfr = rewriter.getIndexAttr(1);
+
+    scf::SCFTilingOptions::GenerateLoopHeaderFn loopHeaderFn =
+        [&](RewriterBase &rewriter, Location loc, ArrayRef<Range> loopRanges,
+            ArrayRef<OpFoldResult> givenTileSizes,
+            ValueRange outerDestinationTensors)
+        -> FailureOr<scf::SCFTilingOptions::CustomLoopHeaderInfo> {
+      scf::ForallOp forallOp;
+      SmallVector<OpFoldResult> lbs, ubs, steps;
+      std::tie(lbs, ubs, steps) =
+          getLoopBounds(rewriter, loc, loopRanges, givenTileSizes);
+
+      std::optional<ArrayAttr> mappingAttr;
+      if (!tilingOptions.mappingVector.empty())
+        mappingAttr = rewriter.getArrayAttr(tilingOptions.mappingVector);
+
+      forallOp = scf::ForallOp::create(rewriter, loc, lbs, ubs, steps,
+                                       outerDestinationTensors, mappingAttr);
+
+      rewriter.setInsertionPoint(forallOp.getTerminator());
+      SmallVector<Value> ivs = forallOp.getInductionVars();
+
+      ValueRange innerDestinationTensors = forallOp.getRegionOutArgs();
+
+      // Compute the `offsets` and `sizes` to use for tiling.
+      SmallVector<OpFoldResult> offsets, sizes;
+      for (int i = 0; i < 2; i++) {
+        sizes.push_back(givenTileSizes[i]);
+      }
+      sizes.push_back(loopRanges[2].size);
+
+      offsets.reserve(sizes.size());
+
+      for (Value v : ivs) {
+        offsets.push_back(v);
+      }
+      offsets.push_back(rewriter.getIndexAttr(0));
+
+      return scf::SCFTilingOptions::CustomLoopHeaderInfo{
+          {cast<LoopLikeOpInterface>(forallOp.getOperation())},
+          offsets,
+          sizes,
+          innerDestinationTensors};
+    };
+
+    scf::SCFTilingOptions::GenerateLoopTerminatorFn terminatorFn =
+        [&](RewriterBase &rewriter, Location loc, ValueRange tiledResults,
+            ArrayRef<SmallVector<OpFoldResult>> resultOffsets,
+            ArrayRef<SmallVector<OpFoldResult>> resultSizes,
+            ValueRange destinationTensors) -> LogicalResult {
+      for (auto [tiledValue, destinationTensor, resultOffset, resultSize] :
+           llvm::zip_equal(tiledResults, destinationTensors, resultOffsets,
+                           resultSizes)) {
+        SmallVector<OpFoldResult> resultStride(resultOffset.size(),
+                                               rewriter.getIndexAttr(1));
+
+        tensor::ParallelInsertSliceOp::create(rewriter, loc, tiledValue,
+                                              destinationTensor, resultOffset,
+                                              resultSize, resultStride);
+      }
+      return success();
+    };
+    // END
+
+    tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::CustomOp);
+    tilingOptions.setCustomLoopGenerationFns(loopHeaderFn, terminatorFn);
+  }
 
   scf::SCFTileAndFuseOptions tileAndFuseOptions;
   tileAndFuseOptions.setTilingOptions(tilingOptions);
