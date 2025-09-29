@@ -535,11 +535,6 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       return failure();
     }
   }
-  // for (auto pll : parallelOpsToConfigure) {
-  //   if (pll.getIteratorTypesArray().size() != rootOpMaps.size()) {
-  //     return failure();
-  //   }
-  // }
 
   const IREE::GPU::TargetWgpAttr wgp = target.getWgp();
   const SmallVector<int64_t> bounds = root.getStaticLoopRanges();
@@ -594,20 +589,20 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // subgroup size must be revisited. It is currently required to unblock
   // a failing test. Moreover, if better performance is indeed obtained with
   // another strategy, then that logic should be separated out, i.e. we must
-  // decouple the decision of if a strategy is valid from how performant it is.
+  // decouple the decision of whether a strategy is valid from how performant it
+  // is.
   const int64_t subgroupSize = target.getPreferredSubgroupSize();
   if (!lastReductionDimDynamic && subgroupSize > lastReductionSize) {
     return failure();
   }
 
-  const unsigned largestLoadSizeInBits =
-      wgp.getMaxLoadInstructionBits().value_or(128);
-  const unsigned largestLoadSizeInElements = largestLoadSizeInBits / bitWidth;
-
   // We ensure that threads either load a full vector in each iteration, or
   // nothing, in the reduction dimension. This is to avoid masking, which would
   // cause serialized loads.
   const unsigned threadReductionElements = [&]() -> unsigned {
+    const unsigned largestLoadSizeInBits =
+        wgp.getMaxLoadInstructionBits().value_or(128);
+    const unsigned largestLoadSizeInElements = largestLoadSizeInBits / bitWidth;
     if (!reductionIsContiguous) {
       return 1;
     }
@@ -677,21 +672,17 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       return subgroupSize;
     }
 
-    const int64_t reductionElements =
-        std::max<int64_t>(threadReductionElements, 4);
-    const int64_t numThreadLoads = lastReductionSize / reductionElements;
+    // Each thread should load at least 4 elements.
+    const int64_t minLoads = 4;
+    const int64_t perThread =
+        std::max<int64_t>(threadReductionElements, minLoads);
+    const int64_t numLoads = lastReductionSize / perThread;
+
     int64_t numSubgroupsPerReduction =
-        numThreadLoads / subgroupSize + (numThreadLoads % subgroupSize != 0);
+        numLoads / subgroupSize + (numLoads % subgroupSize != 0);
     while (numSubgroupsPerReduction % workgroupParallelThreads != 0) {
       ++numSubgroupsPerReduction;
     }
-
-    //   llvm::errs() << " \nreduction elements is " << reductionElements
-    //                << " \nnumThreadLoads is " << numThreadLoads
-    //                << " \nnumSubgroupsPerReduction is " <<
-    //                numSubgroupsPerReduction
-    //                << "\n";
-
     return std::min(numSubgroupsPerReduction * subgroupSize, maxWorkgroupSize);
   }();
 
@@ -743,7 +734,6 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     threadTileSizes[lastReductionDim] = threadReductionElements;
 
     SmallVector<int64_t> partialReductionTileSizes = whereReduction;
-
     partialReductionTileSizes[lastReductionDim] = partialReduction;
 
     SmallVector<int64_t> laneBasis(numLoops, 1);
@@ -784,21 +774,19 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     Builder b(context);
 
     SmallVector<unsigned> parallelDims;
-    SmallVector<unsigned> reductionDims;
     op.getParallelDims(parallelDims);
-    op.getReductionDims(reductionDims);
 
     SmallVector<int64_t> bounds = op.getStaticLoopRanges();
 
-    SmallVector<int64_t> threadTileSizes(op.getNumLoops(), 0);
-    SmallVector<int64_t> threadCounts(op.getNumLoops(), 1);
-    SmallVector<int64_t> subGroupCounts(op.getNumLoops(), 1);
-    SmallVector<int64_t> mapping(op.getNumLoops());
-    std::iota(mapping.begin(), mapping.end(), 0);
-    SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 1);
+    const auto nLoops = op.getNumLoops();
+
+    SmallVector<int64_t> threadTileSizes(nLoops, 0);
+    SmallVector<int64_t> threadCounts(nLoops, 1);
+    SmallVector<int64_t> subGroupCounts(nLoops, 1);
+    SmallVector<int64_t> reductionTileSizes(nLoops, 1);
 
     SmallVector<int64_t> workgroupTileSizes = sharedWgpTiles;
-    workgroupTileSizes.resize(op.getNumLoops(), 0);
+    workgroupTileSizes.resize(nLoops, 0);
 
     int64_t reductionTileSize =
         llvm::APIntOps::GreatestCommonDivisor(
@@ -806,13 +794,19 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
             {64, static_cast<uint64_t>(partialReduction)})
             .getZExtValue();
 
+    int threadSize = threadReductionElements;
     int64_t threadBasis = subgroupSize;
-    while (reductionTileSize % (threadBasis * threadReductionElements) != 0) {
+
+    while (reductionTileSize % (threadBasis * threadSize) != 0 &&
+           threadSize > 1) {
+      threadSize >>= 1;
+    }
+    while (reductionTileSize % (threadBasis * threadSize) != 0) {
       threadBasis >>= 1;
     }
 
-    int64_t subgroupBasis = std::max<int64_t>(
-        reductionTileSize / (threadBasis * threadReductionElements), 1);
+    int64_t subgroupBasis =
+        std::max<int64_t>(reductionTileSize / (threadBasis * threadSize), 1);
 
     for (auto iter : llvm::enumerate(sharedWgpTiles)) {
       if (iter.value() > 0) {
@@ -821,8 +815,7 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       }
     }
 
-    int threadSize = threadReductionElements;
-    if (sharedWgpTiles.size() > op.getNumLoops()) {
+    if (sharedWgpTiles.size() > nLoops) {
       threadSize = 1;
       reductionTileSize = 1;
       threadBasis = 1;
@@ -833,6 +826,9 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     threadTileSizes[parallelDims.back()] = threadSize;
     threadCounts[parallelDims.back()] = threadBasis;
     subGroupCounts[parallelDims.back()] = subgroupBasis;
+
+    SmallVector<int64_t> mapping(nLoops);
+    std::iota(mapping.begin(), mapping.end(), 0);
 
     ArrayAttr subgroupBasisAttr = b.getArrayAttr(
         {b.getI64ArrayAttr(subGroupCounts), b.getI64ArrayAttr(mapping)});
