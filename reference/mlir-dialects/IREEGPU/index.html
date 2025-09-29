@@ -6093,31 +6093,40 @@ effort and has no verification or failure modes.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.coalesced_gather_dma` $indices `,` $source `into` $init attr-dict
               `:` type($indices) `,` type($source) `,` type($init) `-&gt;` type($result)
 </code></pre></div>
-<p>Performs a coalesced gather operation that reads elements from a source tensor
-based on indices and produces a result tensor with the gathered data. The operation is
-specifically designed for subgroup-level parallelism, where threads within a
-subgroup cooperatively gather data with coalesced memory accesses. It implements
-<code>ParallelCombiningOpInterface</code> and must live inside an op implementing
-<code>InParallelOpInterface</code>, such as <code>scf.forall.in_parallel</code>.</p>
+<p>Performs a coalesced gather operation.
+This operation can exist in two forms: a tensor-based (value-semantic) form
+and a buffer-based (memref-semantic) form.</p>
+<p>In both forms, it reads elements from a source operand based on indices.
+* When the source is a tensor, the operation produces a new result tensor
+  containing the gathered data.
+* When the source is a memref, the operation writes the gathered data into
+  a destination out memref operand.</p>
+<p>The operation is specifically designed for subgroup-level parallelism, where
+threads within a subgroup cooperatively gather data with coalesced memory
+accesses. It implements ParallelCombiningOpInterface and must live inside an
+op implementing <code>InParallelOpInterface</code>, such as <code>scf.forall.in_parallel</code>.</p>
 <h2 id="lowering-paths">Lowering Paths<a class="headerlink" href="#lowering-paths" title="Permanent link">link</a></h2>
 <p>Two lowering strategies are supported:
-1. Lowers to <code>amdgpu.gather_to_lds</code> operations when lowering requirements are met.
+1. Lowers to <code>amdgpu.gather_to_lds</code> operations when lowering requirements
+   are met.
 2. Default lowering using <code>vector.gather</code> operations.</p>
 <h2 id="operands-and-results">Operands and Results<a class="headerlink" href="#operands-and-results" title="Permanent link">link</a></h2>
 <ul>
-<li><code>$indices</code>: Tensor of index type specifying gather locations in the source tensor</li>
-<li><code>$source</code>: Source tensor containing the data to be gathered</li>
-<li><code>$init</code>: Destination tensor receiving the gathered data (destination-passing style)</li>
-<li><code>$result</code>: Output tensor with gathered data (same type as <code>$init</code>)</li>
+<li><code>$indices</code>: Tensor/memref of index type specifying gather locations in
+  the source tensor</li>
+<li><code>$source</code>: Source tensor/memref containing the data to be gathered</li>
+<li><code>$init</code>: Destination tensor/memref receiving the gathered data
+  (destination-passing style)</li>
+<li><code>$result</code>: Output tensor/memref with gathered data (same type as <code>$init</code>)</li>
 </ul>
 <h2 id="example">Example<a class="headerlink" href="#example" title="Permanent link">link</a></h2>
-<p>The following example shows how this op is designed to be used in a tiled scenario, which sets up
-lowering path for efficient gathering.</p>
+<p>The following example shows how this op is designed to be used in a tiled
+scenario, which sets up lowering path for efficient gathering.</p>
 <ol>
 <li>Outer <code>scf.forall</code> represents workgroup-level parallelism.</li>
 <li>Inner <code>scf.forall</code> represents subgroup-level parallelism.</li>
-<li>Each thread in the subgroup coalesces its memory accesses when gathering data and writes to
-   its lane-offset in the destination tensor.</li>
+<li>Each thread in the subgroup coalesces its memory accesses when
+   gathering data and writes to its lane-offset in the destination tensor.</li>
 </ol>
 <div class="highlight"><pre><span></span><code>%result = scf.forall (%wg_i, %wg_j) in (16, 1) shared_outs(%wg_out = %dest) -&gt; (tensor&lt;128x16xf32&gt;) {
   %indices_wg_slice = tensor.extract_slice ...
@@ -6146,15 +6155,15 @@ lowering path for efficient gathering.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>indices</code></td>
-<td>ranked tensor of index values</td>
+<td>ranked tensor of index values or memref of index values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
-<td>ranked tensor of any type values</td>
+<td>ranked tensor of any type values or memref of any type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>init</code></td>
-<td>ranked tensor of any type values</td>
+<td>ranked tensor of any type values or memref of any type values</td>
 </tr>
 </tbody>
 </table>
@@ -6169,7 +6178,7 @@ lowering path for efficient gathering.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>ranked tensor of any type values</td>
+<td>ranked tensor of any type values or memref of any type values</td>
 </tr>
 </tbody>
 </table>
