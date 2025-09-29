@@ -36,7 +36,7 @@ namespace {
 
 struct ConvertHalInterfaceBindingSubspan final
     : OpConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op, OpAdaptor adaptor,
@@ -331,7 +331,7 @@ static void nonAtomicRMW(OpBuilder &builder, Location loc,
 // NOTE: By default, all RMW sequences are atomic. Set `disableAtomicRMW` to
 // `false` to generate non-atomic RMW sequences.
 struct IREEConvertVectorStore final : OpConversionPattern<vector::StoreOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   IREEConvertVectorStore(MLIRContext *context, bool disableAtomicRMW,
                          PatternBenefit benefit)

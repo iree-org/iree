@@ -1706,7 +1706,7 @@ struct ElideYieldOpPattern
 // equivalent we have access to so that we could do it in a generic way.
 struct GlobalTimepointConversionPattern
     : public OpConversionPattern<IREE::Util::GlobalOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::GlobalOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {

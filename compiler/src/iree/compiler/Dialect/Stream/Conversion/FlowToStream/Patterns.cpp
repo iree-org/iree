@@ -538,7 +538,7 @@ struct ConvertChannelDefaultOp
 
 struct ConvertChannelSplitOp
     : public OpConversionPattern<IREE::Flow::ChannelSplitOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Flow::ChannelSplitOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -550,7 +550,7 @@ struct ConvertChannelSplitOp
 
 struct ConvertChannelRankOp
     : public OpConversionPattern<IREE::Flow::ChannelRankOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Flow::ChannelRankOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -562,7 +562,7 @@ struct ConvertChannelRankOp
 
 struct ConvertChannelCountOp
     : public OpConversionPattern<IREE::Flow::ChannelCountOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Flow::ChannelCountOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -885,7 +885,7 @@ struct ConvertDispatchOp
 };
 
 struct ConvertFuncOp : public OpConversionPattern<IREE::Flow::FuncOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Flow::FuncOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -1089,7 +1089,7 @@ struct ConvertDispatchWorkgroupInfoOp : public OpConversionPattern<FlowOpT> {
 
 struct ConvertExecutableOp
     : public OpConversionPattern<IREE::Flow::ExecutableOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Flow::ExecutableOp flowOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -1194,7 +1194,7 @@ struct ConvertExecutableOp
 };
 
 struct ConvertReturnOp : public OpConversionPattern<IREE::Flow::ReturnOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Flow::ReturnOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {

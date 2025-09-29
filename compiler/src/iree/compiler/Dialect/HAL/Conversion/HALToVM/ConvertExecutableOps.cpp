@@ -74,7 +74,7 @@ namespace {
 class RemoveExecutableOpConversion
     : public OpConversionPattern<IREE::HAL::ExecutableOp> {
 public:
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(IREE::HAL::ExecutableOp op, OpAdaptor adaptor,

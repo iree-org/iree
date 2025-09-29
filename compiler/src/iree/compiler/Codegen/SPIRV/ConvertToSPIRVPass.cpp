@@ -352,7 +352,7 @@ struct HALInterfaceLoadConstantConverter final
 /// to annotate push constants.
 struct UtilAssumeIntConverter final
     : OpConversionPattern<IREE::Util::AssumeIntOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(IREE::Util::AssumeIntOp assumeOp, OpAdaptor adaptor,
@@ -506,7 +506,7 @@ struct RemoveStaticDynamicCast final : OpRewritePattern<memref::CastOp> {
 /// lowering when possible.
 struct RemoveIdentityConversionCast final
     : OpConversionPattern<UnrealizedConversionCastOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(UnrealizedConversionCastOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {

@@ -712,7 +712,7 @@ getReassociationIndices(int outerDims,
 /// expand_shape + linalg.transpose to represent a tile swizzling op.
 struct SetEncodingOpLoweringConversion
     : public OpConversionPattern<IREE::Encoding::SetEncodingOp> {
-  using OpConversionPattern<IREE::Encoding::SetEncodingOp>::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp, OpAdaptor adaptor,
@@ -888,7 +888,7 @@ static bool isRankedTensorTypeWithEncoding(Type type) {
 
 struct MaterializeFuncReturnOp final
     : public OpConversionPattern<func::ReturnOp> {
-  using OpConversionPattern<func::ReturnOp>::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(func::ReturnOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {

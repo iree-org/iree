@@ -173,7 +173,7 @@ struct FlattenAlloc final : public OpConversionPattern<AllocOpTy> {
 
 /// Flattens memref global ops with more than 1 dimensions to 1 dimension.
 struct FlattenGlobal final : public OpConversionPattern<memref::GlobalOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   static Attribute flattenAttribute(Attribute value, ShapedType newType) {
     if (!value)
@@ -215,7 +215,7 @@ struct FlattenGlobal final : public OpConversionPattern<memref::GlobalOp> {
 /// Flattens memref global load ops with more than 1 dimensions to 1 dimension.
 struct FlattenGetGlobal final
     : public OpConversionPattern<memref::GetGlobalOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(memref::GetGlobalOp getOp, OpAdaptor adaptor,
@@ -242,7 +242,7 @@ struct FlattenGetGlobal final
 /// Flattens memref subspan ops with more than 1 dimensions to 1 dimension.
 struct FlattenBindingSubspan final
     : public OpConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
@@ -320,7 +320,7 @@ struct FlattenBindingSubspan final
 // necessary.
 struct FlattenReinterpretCast
     : public OpConversionPattern<memref::ReinterpretCastOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(memref::ReinterpretCastOp op, OpAdaptor adaptor,
@@ -432,7 +432,7 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
 
 /// Flattens memref subspan ops with more than 1 dimensions to 1 dimension.
 struct FlattenSubView final : public OpConversionPattern<memref::SubViewOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(memref::SubViewOp op, OpAdaptor adaptor,
@@ -463,7 +463,7 @@ struct FlattenSubView final : public OpConversionPattern<memref::SubViewOp> {
 
 /// Linearizes indices in memref.load ops.
 struct LinearizeLoadIndices final : public OpConversionPattern<memref::LoadOp> {
-  using OpConversionPattern<memref::LoadOp>::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(memref::LoadOp loadOp, OpAdaptor adaptor,
@@ -488,7 +488,7 @@ struct LinearizeLoadIndices final : public OpConversionPattern<memref::LoadOp> {
 /// Linearizes indices in gpu.subgroup_mma_load_matrix ops.
 struct LinearizeMMALoadIndices final
     : public OpConversionPattern<gpu::SubgroupMmaLoadMatrixOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(gpu::SubgroupMmaLoadMatrixOp loadOp, OpAdaptor adaptor,
@@ -514,7 +514,7 @@ struct LinearizeMMALoadIndices final
 /// Linearizes indices in memref.store ops.
 struct LinearizeStoreIndices final
     : public OpConversionPattern<memref::StoreOp> {
-  using OpConversionPattern<memref::StoreOp>::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(memref::StoreOp storeOp, OpAdaptor adaptor,
@@ -539,7 +539,7 @@ struct LinearizeStoreIndices final
 /// Linearizes indices in gpu.subgroup_mma_store_matrix ops.
 struct LinearizeMMAStoreIndices final
     : public OpConversionPattern<gpu::SubgroupMmaStoreMatrixOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(gpu::SubgroupMmaStoreMatrixOp storeOp, OpAdaptor adaptor,
@@ -566,7 +566,7 @@ struct LinearizeMMAStoreIndices final
 /// Linearizes indices in vector.transfer_read ops.
 struct LinearizeTransferReadIndices final
     : public OpConversionPattern<vector::TransferReadOp> {
-  using OpConversionPattern<vector::TransferReadOp>::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(vector::TransferReadOp transferReadOp, OpAdaptor adaptor,
@@ -599,7 +599,7 @@ struct LinearizeTransferReadIndices final
 /// Linearizes indices in vector.transfer_write ops.
 struct LinearizeTransferWriteIndices final
     : public OpConversionPattern<vector::TransferWriteOp> {
-  using OpConversionPattern<vector::TransferWriteOp>::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(vector::TransferWriteOp transferWriteOp, OpAdaptor adaptor,
@@ -630,7 +630,7 @@ struct LinearizeTransferWriteIndices final
 
 /// Updates deallocations to the flattened allocation.
 struct FlattenDealloc final : public OpConversionPattern<memref::DeallocOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(memref::DeallocOp deallocOp, OpAdaptor adaptor,
@@ -648,7 +648,7 @@ struct FlattenDealloc final : public OpConversionPattern<memref::DeallocOp> {
 /// Adjusts unrealized_conversion_cast ops' inputs to flattened memref values.
 struct AdjustConversionCast final
     : public OpConversionPattern<UnrealizedConversionCastOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(UnrealizedConversionCastOp castOp, OpAdaptor adaptor,
@@ -717,7 +717,7 @@ struct FoldMemRefReshape final : public OpConversionPattern<ReshapeOpTy> {
 /// Fold alignment hints.
 struct FoldAssumeAlignOp
     : public OpConversionPattern<memref::AssumeAlignmentOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(memref::AssumeAlignmentOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {

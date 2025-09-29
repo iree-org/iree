@@ -120,7 +120,7 @@ struct MaterializePadEncodingTypeConverter final
 /// materializing the encoding.
 struct MaterializeFlowDispatchTensorLoadOp final
     : OpConversionPattern<IREE::TensorExt::DispatchTensorLoadOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(IREE::TensorExt::DispatchTensorLoadOp loadOp,
@@ -165,7 +165,7 @@ struct MaterializeFlowDispatchTensorLoadOp final
 /// materializing the encoding.
 struct MaterializeFlowDispatchTensorStoreOp final
     : OpConversionPattern<IREE::TensorExt::DispatchTensorStoreOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp storeOp,
@@ -213,7 +213,7 @@ struct MaterializeFlowDispatchTensorStoreOp final
 /// TODO(#20160): Abstract new interface methods and collapse two patterns.
 struct MaterializeInterfaceBindingEncoding final
     : OpConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp subspanOp,

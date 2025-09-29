@@ -52,7 +52,7 @@ namespace {
 /// so we use this lowering instead with a higher pattern benefit.
 struct ConcatenateOpConversion final
     : OpConversionPattern<mlir::stablehlo::ConcatenateOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(mlir::stablehlo::ConcatenateOp op, OpAdaptor adaptor,
@@ -166,7 +166,7 @@ Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
 
 /// Converts stablehlo.fft operation to Linalg ops.
 struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(mlir::stablehlo::FftOp op, OpAdaptor adaptor,
@@ -211,7 +211,7 @@ struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
 
 struct OptimizationBarrierOpConversion final
     : OpConversionPattern<mlir::stablehlo::OptimizationBarrierOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(mlir::stablehlo::OptimizationBarrierOp op, OpAdaptor adaptor,
@@ -291,7 +291,7 @@ static void rewriteFuncAttrs(func::FuncOp funcOp) {
 
 // We need to convert func ops in order to convert types.
 struct BuiltinFuncOpPattern final : OpConversionPattern<func::FuncOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(func::FuncOp srcOp, OpAdaptor adaptor,
@@ -340,7 +340,7 @@ struct BuiltinFuncOpPattern final : OpConversionPattern<func::FuncOp> {
 };
 
 struct TensorEmptyPattern final : OpConversionPattern<tensor::EmptyOp> {
-  using OpConversionPattern<tensor::EmptyOp>::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(tensor::EmptyOp op, OpAdaptor adaptor,
@@ -362,7 +362,7 @@ struct TensorEmptyPattern final : OpConversionPattern<tensor::EmptyOp> {
 };
 
 struct GlobalOpPattern final : OpConversionPattern<ml_program::GlobalOp> {
-  using OpConversionPattern<ml_program::GlobalOp>::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(ml_program::GlobalOp globalOp, OpAdaptor adaptor,
