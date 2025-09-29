@@ -1933,15 +1933,19 @@ static LogicalResult setAttentionReductionConfig(
   decompositionConfig.emplace_back(IREE::LinalgExt::AttentionOp::getPVAttrStr(),
                                    pvAttrDict);
 
+  SmallVector<NamedAttribute, 1> pipelineAttrs;
+  setAttentionPipelineAttributes(target, pipelineAttrs);
+
   // Set attention decomposition control config.
   op.setDecompositionConfigAttr(b.getDictionaryAttr(decompositionConfig));
 
   auto configDict = b.getDictionaryAttr(attrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
+  auto pipelineConfig = DictionaryAttr::get(context, pipelineAttrs);
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, loweringConfig, CodeGenPipeline::LLVMGPUVectorDistribute,
-      workgroupSize, targetSubgroupSize);
+      workgroupSize, targetSubgroupSize, pipelineConfig);
 
   return success();
 }
