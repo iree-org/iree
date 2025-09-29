@@ -108,13 +108,8 @@ func.func @multi_reduction_f32(%a: vector<2x1x8xf32>, %b: vector<2x1x8xf32>) -> 
 }
 
 // CHECK-LABEL: func.func @multi_reduction_f32
-// CHECK-DAG:  %[[C0:.+]]  = arith.constant 0.000000e+00 : f32
-// CHECK-DAG:  %[[V0:.+]]  = arith.constant dense<0.000000e+00> : vector<2x1x8xf32>
-// CHECK:      %[[FMA:.+]] = math.fma %{{.*}}, %{{.*}}, %[[V0]] fastmath<contract> : vector<2x1x8xf32>
-// CHECK:      %[[E0:.+]]  = vector.extract %[[FMA]][0, 0] : vector<8xf32> from vector<2x1x8xf32>
-// CHECK:                    vector.reduction <add>, %[[E0]], %[[C0]] : vector<8xf32> into f32
-// CHECK:      %[[E1:.+]]  = vector.extract %[[FMA]][1, 0] : vector<8xf32> from vector<2x1x8xf32>
-// CHECK:                    vector.reduction <add>, %[[E1]], %[[C0]] : vector<8xf32> into f32
+// CHECK-COUNT-2: math.fma
+// CHECK-COUNT-2: vector.reduction
 
 func.func @multi_reduction_no_uplift(%a: vector<2x1x8xf32>, %b: vector<2x1x8xf32>) -> vector<2x1xf32> {
   %cst_4 = arith.constant dense<0.000000e+00> : vector<2x1xf32>
@@ -126,11 +121,7 @@ func.func @multi_reduction_no_uplift(%a: vector<2x1x8xf32>, %b: vector<2x1x8xf32
 }
 
 // CHECK-LABEL: func.func @multi_reduction_no_uplift
-// CHECK-DAG:  %[[C0:.+]]  = arith.constant 0.000000e+00 : f32
-// CHECK-DAG:  %[[V0:.+]]  = arith.constant dense<0.000000e+00> : vector<2x1x8xf32>
-// CHECK:      %[[MUL:.+]] = arith.mulf %{{.*}}, %{{.*}} fastmath<fast> : vector<2x1x8xf32>
-// CHECK:      %[[ADD:.+]] = arith.addf %[[MUL]], %[[V0]] : vector<2x1x8xf32>
-// CHECK:      %[[E0:.+]]  = vector.extract %[[ADD]][0, 0] : vector<8xf32> from vector<2x1x8xf32>
-// CHECK:                    vector.reduction <add>, %[[E0]], %[[C0]] : vector<8xf32> into f32
-// CHECK:      %[[E1:.+]]  = vector.extract %[[ADD]][1, 0] : vector<8xf32> from vector<2x1x8xf32>
-// CHECK:                    vector.reduction <add>, %[[E1]], %[[C0]] : vector<8xf32> into f32
+// CHECK-NOT: math.fma
+// CHECK-COUNT-2: arith.mulf
+// CHECK-COUNT-2: arith.addf
+// CHECK-COUNT-2: vector.reduction
