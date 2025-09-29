@@ -71,6 +71,7 @@ createHoistIntoGlobalsPass(const ExprHoistingOptions &options);
 #define GEN_PASS_DECL_STRIPDEBUGOPSPASS
 #define GEN_PASS_DECL_TESTCONVERSIONPASS
 #define GEN_PASS_DECL_TESTFLOATRANGEANALYSISPASS
+#define GEN_PASS_DECL_VERIFYSTRUCTUREDCONTROLFLOWPASS
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc" // IWYU pragma: keep
 
 void registerUtilPasses();
