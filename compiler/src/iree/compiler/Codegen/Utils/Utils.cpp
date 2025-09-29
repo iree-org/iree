@@ -1140,6 +1140,33 @@ int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp) {
 // Bufferization utility functions
 //===---------------------------------------------------------------------===//
 
+std::optional<IREE::HAL::InterfaceBindingSubspanOp>
+getSourceSubspanMemref(TypedValue<MemRefType> buffer) {
+  Operation *currentOp = buffer.getDefiningOp();
+  while (currentOp) {
+    if (auto subspanOp =
+            dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(currentOp)) {
+      return subspanOp;
+    }
+    // There is expected to be only a single memref source for a given memref
+    // OpResult, because producers of memref Values are expected to be
+    // view-like or cast-like operations. Bail if there are multiple memref
+    // operands, since we don't know which one to use as the source.
+    if (llvm::count_if(currentOp->getOperandTypes(),
+                       llvm::IsaPred<MemRefType>) != 1) {
+      return std::nullopt;
+    }
+    // Otherwise, follow the memref operand to find the source buffer.
+    for (Value operand : currentOp->getOperands()) {
+      if (isa<MemRefType>(operand.getType())) {
+        currentOp = operand.getDefiningOp();
+        break;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
 /// Get strides for row-major oredering of a tensor with the given `shape`.
 static SmallVector<int64_t> getStridesFromShape(ArrayRef<int64_t> shape) {
   if (shape.empty()) {

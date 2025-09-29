@@ -5,11 +5,15 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
+#include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -26,26 +30,69 @@ struct GPUBubbleResourceCastsPass final
 } // namespace
 
 /// Walk the producers of |input| and return the hal.interface.binding_subspan
-/// that produces it if the binding is readonly.
-static Operation *isTriviallyProducedByReadOnlyViewLike(Value input) {
+/// that produces it if the binding is readonly. If the binding is already
+/// bufferized, then check that there is at most one FatRawBufferCastOp in its
+/// use chain, and add it to |rawBufferCasts| if found.
+static Operation *isTriviallyProducedByReadOnlyViewLike(
+    Value input, SetVector<amdgpu::FatRawBufferCastOp> &rawBufferCasts) {
   Value next = input;
   while (auto slice = next.getDefiningOp<tensor::ExtractSliceOp>()) {
     next = slice.getSource();
   }
 
+  // Case 1: Subspan is not bufferized.
   auto tensorLoad = next.getDefiningOp<IREE::TensorExt::DispatchTensorLoadOp>();
-  if (!tensorLoad) {
-    return nullptr;
+  if (tensorLoad) {
+    IREE::HAL::InterfaceBindingSubspanOp binding =
+        tensorLoad.getSource()
+            .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+    if (!binding ||
+        cast<IREE::TensorExt::DispatchTensorType>(binding.getType())
+                .getAccess() != IREE::TensorExt::TensorAccess::ReadOnly) {
+      return nullptr;
+    }
+    return binding;
   }
 
-  auto binding = tensorLoad.getSource()
-                     .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
-  if (!binding ||
-      cast<IREE::TensorExt::DispatchTensorType>(binding.getType())
-              .getAccess() != IREE::TensorExt::TensorAccess::ReadOnly) {
+  // Case 2: Subspan is bufferized.
+  auto loadFromBuffer = next.getDefiningOp<IREE::Codegen::LoadFromBufferOp>();
+  if (!loadFromBuffer) {
     return nullptr;
   }
-  return binding;
+  std::optional<IREE::HAL::InterfaceBindingSubspanOp> binding =
+      getSourceSubspanMemref(
+          cast<TypedValue<MemRefType>>(loadFromBuffer.getBuffer()));
+  if (!binding) {
+    return nullptr;
+  }
+  std::optional<IREE::HAL::DescriptorFlags> descriptorFlags =
+      binding->getDescriptorFlags();
+  if (!descriptorFlags.has_value() ||
+      !bitEnumContainsAll(*descriptorFlags,
+                          IREE::HAL::DescriptorFlags::ReadOnly)) {
+    return nullptr;
+  }
+  // Check that the binding has at most one FatRawBufferCastOp in its use
+  // chain.
+  ForwardSliceOptions options;
+  options.filter = [&](Operation *op) {
+    // Only follow memref results.
+    if (llvm::none_of(op->getOpResults(), [](OpResult result) {
+          return isa<MemRefType>(result.getType());
+        })) {
+      return false;
+    }
+    if (isa<amdgpu::FatRawBufferCastOp>(op)) {
+      rawBufferCasts.insert(cast<amdgpu::FatRawBufferCastOp>(op));
+    }
+    return true;
+  };
+  SetVector<Operation *> slice;
+  getForwardSlice(binding->getOperation(), &slice, options);
+  if (rawBufferCasts.size() > 1) {
+    return nullptr;
+  }
+  return binding.value();
 }
 
 namespace {
@@ -171,14 +218,22 @@ void GPUBubbleResourceCastsPass::runOnOperation() {
   auto *ireeGpuDialect = context->getLoadedDialect<IREE::GPU::IREEGPUDialect>();
 
   SmallVector<IREE::GPU::BufferResourceCastOp> castsToDrop;
+  IRRewriter rewriter(op);
   op->walk([&](IREE::GPU::BufferResourceCastOp castOp) {
     // Skip ops without cache swizzle values set. There is no need to drop
     // these because we will try to bubble them up.
     if (!castOp.getCacheSwizzleStride()) {
       return;
     }
-    if (Operation *binding =
-            isTriviallyProducedByReadOnlyViewLike(castOp.getInput())) {
+    SetVector<amdgpu::FatRawBufferCastOp> rawBufferCasts;
+    if (Operation *binding = isTriviallyProducedByReadOnlyViewLike(
+            castOp.getInput(), rawBufferCasts)) {
+      for (amdgpu::FatRawBufferCastOp rawBufferCast : rawBufferCasts) {
+        replaceMemrefUsesAndPropagateType(rewriter, rawBufferCast.getLoc(),
+                                          rawBufferCast.getResult(),
+                                          rawBufferCast.getSource());
+        rewriter.eraseOp(rawBufferCast);
+      }
       if (ireeGpuDialect->getUseRocdlBufferInstructionsAttrHelper()
               .isAttrPresent(binding)) {
         // TODO: Support updating buffer structs so we don't have to replace
