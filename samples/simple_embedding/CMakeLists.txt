@@ -147,25 +147,6 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
-    simple_embedding_test_bytecode_module_cpu_arm_32
-  SRC
-    "simple_embedding_test.mlir"
-  C_IDENTIFIER
-    "iree_samples_simple_embedding_test_module_cpu_arm_32"
-  FLAGS
-    "--iree-hal-target-device=local"
-    "--iree-hal-local-target-device-backends=llvm-cpu"
-    "--iree-llvmcpu-target-triple=armv7a-pc-linux-elf"
-    "--iree-llvmcpu-target-cpu=generic"
-    "--iree-llvmcpu-target-float-abi=hard"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-vm-bytecode-module-strip-source-map=true"
-    "--iree-vm-emit-polyglot-zip=false"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME
     simple_embedding_test_bytecode_module_cpu_arm_64
   SRC
     "simple_embedding_test.mlir"
