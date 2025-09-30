@@ -74,7 +74,6 @@ iree_cc_binary(
     "device_embedded_sync.c"
     "simple_embedding.c"
   DEPS
-    ::simple_embedding_test_bytecode_module_cpu_arm_32_c
     ::simple_embedding_test_bytecode_module_cpu_arm_64_c
     ::simple_embedding_test_bytecode_module_cpu_riscv_32_c
     ::simple_embedding_test_bytecode_module_cpu_riscv_64_c
