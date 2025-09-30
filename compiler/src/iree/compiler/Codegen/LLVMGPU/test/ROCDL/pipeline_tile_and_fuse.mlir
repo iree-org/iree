@@ -1281,22 +1281,21 @@ hal.executable public @main {
   }
 }
 
-// CHECK-LABEL: func @unaligned_to_intrinsic_batched_matmul_nocpromo
-//   CHECK-NOT:   memref.alloc() {{.*}}xf32
-//   CHECK-DAG:   memref.alloc() : memref<1x4x66xf32, #gpu.address_space<workgroup>>
-//   CHECK-DAG:   memref.alloc() : memref<1x16x6xf32, #gpu.address_space<workgroup>>
-//   CHECK-DAG:   %[[B0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
-//   CHECK-DAG:   %[[B1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
-//   CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
-//       CHECK:   scf.forall ({{.*}}) in (12, 37, 10) {
-//       CHECK:     scf.for %[[IV:.+]] = %c0 to %c144 step %c1 {{.*}} -> (vector<1x1x1x4x1xf32>)
-//       CHECK:       gpu.barrier
-//   CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
-//   CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
+//   CHECK-LABEL: func @unaligned_to_intrinsic_batched_matmul_nocpromo
+//     CHECK-NOT:   memref.alloc() {{.*}}xf32
+//     CHECK-DAG:   memref.alloc() : memref<1x4x66xf32, #gpu.address_space<workgroup>>
+//     CHECK-DAG:   memref.alloc() : memref<1x16x6xf32, #gpu.address_space<workgroup>>
+//     CHECK-DAG:   %[[B0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+//     CHECK-DAG:   %[[B1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+//     CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
+//         CHECK:   scf.forall ({{.*}}) in (12, 37, 10) {
+//         CHECK:     scf.for %[[IV:.+]] = %c0 to %c144 step %c1 {{.*}} -> (vector<1x1x1x4x1xf32>)
+//         CHECK:       gpu.barrier
+//     CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
+//     CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
 // CHECK-COUNT-1:     amdgpu.mfma {{.*}}blocks = 1 : i32, k = 4 : i32, m = 16 : i32, n = 16 : i32
-//       CHECK:       scf.yield
-//   CHECK-NOT:     scf.for
-//       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+//         CHECK:     scf.yield
+//         CHECK: } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
 // -----
 
