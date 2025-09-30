@@ -7,9 +7,10 @@
 #include "iree/compiler/DispatchCreation/Passes.h"
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/Utils/Utils.h"
 
 #define DEBUG_TYPE "iree-dispatch-creation-set-split-reduction-sizes"
 
@@ -27,6 +28,30 @@ static SmallVector<int64_t> getStaticReductionDimSizes(linalg::LinalgOp op) {
     }
   }
   return dimSizes;
+}
+
+static std::optional<SmallVector<int64_t>> getReductionDimSizes(Operation *Op) {
+  SmallVector<int64_t> reductionDimSizes;
+  bool isSupportedOp = true;
+
+  mlir::TypeSwitch<Operation *, void>(Op)
+      .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
+        reductionDimSizes = getStaticReductionDimSizes(linalgOp);
+      })
+      .Case<IREE::LinalgExt::ArgCompareOp>(
+          [&](IREE::LinalgExt::ArgCompareOp argCmp) {
+            ShapedType inType = argCmp.getInputType();
+            int64_t dim = argCmp.getDimension();
+            reductionDimSizes.push_back(inType.getShape()[dim]);
+          })
+      .Default([&](Operation *) {
+        LDBG() << "skipping op; unsupported PartialReduction op kind";
+        isSupportedOp = false;
+      });
+
+  if (!isSupportedOp)
+    return std::nullopt;
+  return reductionDimSizes;
 }
 
 static std::optional<int64_t>
@@ -84,19 +109,19 @@ private:
   /// which reduce over outer dimensions of a tensor.
   std::optional<SmallVector<int64_t>>
   getOuterReductionSizes(PartialReductionOpInterface op) const {
-    auto linalgOp = dyn_cast<linalg::LinalgOp>(*op);
-    if (!linalgOp) {
-      LDBG() << "skipping op; not a linalg op";
-      return std::nullopt;
-    }
-    if (!linalg::isReductionIterator(
-            linalgOp.getIteratorTypesArray().front())) {
+    SmallVector<utils::IteratorType> iters = op.getLoopIteratorTypes();
+    if (iters.empty() || iters.front() != utils::IteratorType::reduction) {
       LDBG() << "skipping op; not outer-reduction";
       return std::nullopt;
     }
 
-    SmallVector<int64_t> opReductionSizes =
-        getStaticReductionDimSizes(linalgOp);
+    std::optional<SmallVector<int64_t>> maybeSizes =
+        getReductionDimSizes(op.getOperation());
+    if (!maybeSizes)
+      return std::nullopt;
+
+    SmallVector<int64_t> opReductionSizes = std::move(*maybeSizes);
+
     int64_t currentSplitReductionSize = 1;
     SmallVector<int64_t> tileSizes(opReductionSizes.size());
     // Tile dimensions until we reach or exceed the target. Tile sizes must
