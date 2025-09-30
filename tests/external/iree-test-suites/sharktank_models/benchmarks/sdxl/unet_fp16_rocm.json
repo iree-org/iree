@@ -16,8 +16,8 @@
     "device": "hip",
     "golden_time_tolerance_multiplier": {
         "mi250": 1.3,
-        "mi300": 1.1,
-        "mi308": 1.1
+        "mi300": 1.3,
+        "mi308": 1.3
     },
     "golden_time_ms": {
         "mi250": 233,

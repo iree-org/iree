@@ -40,7 +40,8 @@ func.func @max_sub_exp() {
 func.func @max_sub_exp_dynamic() {
   %cst = arith.constant -3.40282347E+38 : f32
   %cst_0 = arith.constant dense<1.000000e+00> : tensor<12x128x128xf32>
-  %cst_1 = flow.tensor.dynamic_constant dense<5.000000e+00> : tensor<12x128x128xf32> -> tensor<?x?x?xf32>
+  %dynamic_constant = flow.tensor.dynamic_constant dense<5.000000e+00> : tensor<12x128x128xf32> -> tensor<?x?x?xf32>
+  %cst_1 = util.optimization_barrier %dynamic_constant : tensor<?x?x?xf32>
   %c_0_index = arith.constant 0 : index
   %c_1_index = arith.constant 1 : index
   %c_2_index = arith.constant 2 : index
