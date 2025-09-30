@@ -4,13 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 
 #define DEBUG_TYPE "iree-dispatch-creation-set-split-reduction-sizes"
 
@@ -31,26 +31,35 @@ static SmallVector<int64_t> getStaticReductionDimSizes(linalg::LinalgOp op) {
 }
 
 static std::optional<SmallVector<int64_t>> getReductionDimSizes(Operation *Op) {
-  SmallVector<int64_t> reductionDimSizes;
-  bool isSupportedOp = true;
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(Op)) {
+    return getStaticReductionDimSizes(linalgOp);
+  }
 
-  mlir::TypeSwitch<Operation *, void>(Op)
-      .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
-        reductionDimSizes = getStaticReductionDimSizes(linalgOp);
-      })
-      .Case<IREE::LinalgExt::ArgCompareOp>(
-          [&](IREE::LinalgExt::ArgCompareOp argCmp) {
-            ShapedType inType = argCmp.getInputType();
-            int64_t dim = argCmp.getDimension();
-            reductionDimSizes.push_back(inType.getShape()[dim]);
-          })
-      .Default([&](Operation *) {
-        LDBG() << "skipping op; unsupported PartialReduction op kind";
-        isSupportedOp = false;
-      });
+  SmallVector<int64_t> loopRanges;
+  if (auto fusionOp = dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(Op)) {
+    loopRanges = fusionOp.getStaticLoopRanges();
+  }
 
-  if (!isSupportedOp)
+  if (loopRanges.empty()) {
+    LDBG() << "skipping op; no static loop ranges";
+    return std ::nullopt;
+  }
+
+  SmallVector<utils::IteratorType> iters;
+  if (auto tilingInterfaceOp = dyn_cast<TilingInterface>(Op)) {
+    iters = tilingInterfaceOp.getLoopIteratorTypes();
+  }
+
+  if (iters.size() != loopRanges.size()) {
+    LDBG() << "skipping op; iterator/loop range rank mismatch";
     return std::nullopt;
+  }
+
+  SmallVector<int64_t> reductionDimSizes;
+  for (auto [range, it] : llvm::zip_equal(loopRanges, iters)) {
+    if (it == utils::IteratorType::reduction)
+      reductionDimSizes.push_back(range);
+  }
   return reductionDimSizes;
 }
 
@@ -117,9 +126,9 @@ private:
 
     std::optional<SmallVector<int64_t>> maybeSizes =
         getReductionDimSizes(op.getOperation());
-    if (!maybeSizes)
+    if (!maybeSizes) {
       return std::nullopt;
-
+    }
     SmallVector<int64_t> opReductionSizes = std::move(*maybeSizes);
 
     int64_t currentSplitReductionSize = 1;
