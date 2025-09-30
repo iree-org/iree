@@ -72,27 +72,17 @@ static LogicalResult verifyWarpMapping(scf::ForallOp forallOp) {
 
 // Verifies that destination memref is contiguous and source/target memory
 // address spaces are compatible.
-static LogicalResult verifyMemoryLayout(IREE::GPU::CoalescedGatherDMAOp dmaOp) {
+static LogicalResult verifyMemoryLayout(IREE::GPU::CoalescedGatherDMAOp dmaOp,
+                                        PatternRewriter &rewriter) {
   // Check that destination memref is contiguous.
   auto destMemRefType = cast<MemRefType>(dmaOp.getInit().getType());
   LDBG() << "  - Destination type: " << destMemRefType;
 
-  if (!destMemRefType.getLayout().isIdentity()) {
-    LDBG() << "  - Layout is not identity, checking for strided layout";
-    // Check if it's a strided layout with contiguous innermost dimension.
-    auto stridedLayout =
-        dyn_cast<StridedLayoutAttr>(destMemRefType.getLayout());
-    if (!stridedLayout) {
-      LDBG() << "  - Layout is not strided";
-      return failure();
-    }
-    auto strides = stridedLayout.getStrides();
-    if (strides.empty() || strides.back() != 1) {
-      LDBG() << "  - Innermost stride is not 1";
-      return failure();
-    }
+  if (!destMemRefType.areTrailingDimsContiguous(1)) {
+    return rewriter.notifyMatchFailure(
+        dmaOp,
+        "destination memref does not have contiguous trailing dimension");
   }
-  LDBG() << "  - Destination memref is contiguous";
 
   // Check memory address spaces.
   auto sourceType = cast<MemRefType>(dmaOp.getSource().getType());
@@ -102,9 +92,8 @@ static LogicalResult verifyMemoryLayout(IREE::GPU::CoalescedGatherDMAOp dmaOp) {
   bool hasSharedTarget = hasSharedMemoryAddressSpace(targetType);
 
   if (!hasGlobalSource || !hasSharedTarget) {
-    LDBG() << "-- Op: " << *dmaOp;
-    LDBG() << "-- incompatible source or target memory address space.";
-    return failure();
+    return rewriter.notifyMatchFailure(
+        dmaOp, "incompatible source or target memory address space");
   }
 
   return success();
@@ -116,7 +105,8 @@ static LogicalResult verifyMemoryLayout(IREE::GPU::CoalescedGatherDMAOp dmaOp) {
 // * Destination memref must be contiguous
 // * Source must be in global memory and destination in shared memory
 static LogicalResult
-isEligibleForGlobalDMA(IREE::GPU::CoalescedGatherDMAOp dmaOp) {
+isEligibleForGlobalDMA(IREE::GPU::CoalescedGatherDMAOp dmaOp,
+                       PatternRewriter &rewriter) {
   scf::ForallOp forallOp = dmaOp->getParentOfType<scf::ForallOp>();
 
   // Verify that the forall has the required GPU warp mapping.
@@ -129,16 +119,15 @@ isEligibleForGlobalDMA(IREE::GPU::CoalescedGatherDMAOp dmaOp) {
   // For now, the coalesced dma op must be the only op in the forall body
   // (excluding the terminator).
   if (body.getOperations().size() != 2) {
-    LDBG() << "Forall body has " << body.getOperations().size()
-           << " operations, expected 2 (dma + terminator)";
-    return failure();
+    return rewriter.notifyMatchFailure(
+        dmaOp, "forall body must have exactly 2 operations (dma + terminator)");
   }
   if (!isa<IREE::GPU::CoalescedGatherDMAOp>(body.front())) {
-    LDBG() << "First operation is not a CoalescedGatherDMAOp";
-    return failure();
+    return rewriter.notifyMatchFailure(
+        dmaOp, "first operation in forall body is not a CoalescedGatherDMAOp");
   }
 
-  if (failed(verifyMemoryLayout(dmaOp))) {
+  if (failed(verifyMemoryLayout(dmaOp, rewriter))) {
     return failure();
   }
 
@@ -181,7 +170,6 @@ static int64_t getNumOfGlobalLoadsPerThread(MemRefType destType,
 //     %store_index = affine.delinearize_index(%lane_id, ...)
 //     amdgpu.gather_to_lds %source[%thread_index] into %dest[%store_index]
 //   }
-//   gpu.barrier
 struct LowerCoalescedGatherDMAPattern
     : public OpRewritePattern<IREE::GPU::CoalescedGatherDMAOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -201,8 +189,7 @@ struct LowerCoalescedGatherDMAPattern
     LDBG() << "=== matchAndRewrite called for: " << dmaOp;
 
     // Check if this DMA op is eligible for transformation.
-    if (failed(isEligibleForGlobalDMA(dmaOp))) {
-      LDBG() << "Op is not eligible for transformation";
+    if (failed(isEligibleForGlobalDMA(dmaOp, rewriter))) {
       return failure();
     }
 
@@ -298,7 +285,6 @@ struct LowerCoalescedGatherDMAPattern
     }
 
     rewriter.setInsertionPointAfter(forOp);
-    rewriter.create<gpu::BarrierOp>(loc);
 
     rewriter.replaceOp(dmaOp, dmaOp.getInit());
 
