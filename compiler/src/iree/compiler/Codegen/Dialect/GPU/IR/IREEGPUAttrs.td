@@ -30,7 +30,9 @@ def IREEGPU_LoweringConfigAttr :
         "hasTilingLevel",
         "hasWorkgroupTilingLevel",
         "getLoweringStrategy",
-      ]>
+        "getWorkgroupOrderingStrategy"
+
+    ]>
     ]> {
   let mnemonic = "lowering_config";
   let summary = [{Drive lowering of an operation for gpu compilation.}];
@@ -653,6 +655,37 @@ def IREEGPU_LaneIdAttr : AttrDef<IREEGPU_Dialect, "LaneId", [
   let description = [{
     An attribute for mapping scf.forall ops to subgroup lanes.
   }];
+}
+
+//===---------------------------------------------------------------------===//
+// Dynamic Transpose Workgroup Reordering
+//===---------------------------------------------------------------------===//
+
+def IREEGPU_DynamicTransposeAttr  :
+    AttrDef<IREEGPU_Dialect, "DynamicTranspose", [
+    DeclareAttrInterfaceMethods<IREECodegen_WorkgroupReorderingAttrInterface, [
+        "generateLoopHeaderFn",
+        "generateLoopTerminatorFn"
+
+      ]>
+    ]> {
+  let mnemonic = "dynamic_transpose";
+  let summary = [{Enable or disable transposed workgroup reordering based the workload.}];
+  let description = [{ This attribute controls conditional transposed workgroup reordering, determined by tile size, the number of XCDs, and the number of CUs. The reordering strategy is also influenced by the memory access pattern, and is specifically designed to optimize the ping-pong matmul specialization.
+  On gfx9 architectures, all CUs within a single XCD share an L2 cache. This attribute helps determine whether applying transposed workgroup reordering will improve the L2 cache hit rate.
+
+  Fields:
+    - nb_xcds: Number of XCDs.
+    - nb_CUs: Number of CUs per XCD.
+  }];
+  let parameters = (ins
+    AttrParameter<"int64_t", "">:$nbXcds,
+    AttrParameter<"int64_t", "">:$nbCus
+  );
+  let assemblyFormat = [{
+    `<` $nbXcds `,` $nbCus `>`
+  }];
+  let genVerifyDecl = 1;
 }
 
 //===----------------------------------------------------------------------===//

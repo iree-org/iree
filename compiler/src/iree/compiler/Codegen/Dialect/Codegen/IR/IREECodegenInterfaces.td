@@ -231,6 +231,42 @@ def IREECodegen_AnyInnerTileDescAttr : Attr<Or<[
   let convertFromStorage = "$_self";
 }
 
+def IREECodegen_WorkgroupReorderingAttrInterface :
+  AttrInterface<"WorkgroupReorderingAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
+  let description = [{
+    An interface that describes workgroup reordering patterns.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        TODO.
+      }],
+      /*retTy=*/"::mlir::FailureOr<::mlir::scf::SCFTilingOptions::CustomLoopHeaderInfo>",
+      /*methodName=*/"generateLoopHeaderFn",
+      /*args=*/(ins "::mlir::OpBuilder&":$b,
+                    "::mlir::Location":$loc,
+                    "::llvm::ArrayRef<::mlir::Range>":$loopRanges,
+                    "::llvm::ArrayRef<::mlir::OpFoldResult>":$tileSizes,
+                    "::mlir::ValueRange":$destinationTensors)
+    >,
+     InterfaceMethod<
+      /*desc=*/[{
+        TODO.
+      }],
+      /*retType=*/"::mlir::LogicalResult",
+      /*methodName=*/"generateLoopTerminatorFn",
+      /*args=*/(ins "::mlir::OpBuilder&":$b,
+                    "::mlir::Location":$loc,
+                    "::mlir::ValueRange":$tiledResults,
+                    "::llvm::ArrayRef<::llvm::SmallVector<::mlir::OpFoldResult>>":$resultOffsets,
+                    "::llvm::ArrayRef<::llvm::SmallVector<::mlir::OpFoldResult>>":$resultSizes,
+                    "::mlir::ValueRange":$destinationTensors)
+    >
+  ];
+}
+
 def IREECodegen_LoweringConfigAttrInterface :
   AttrInterface<"LoweringConfigAttrInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
@@ -415,7 +451,18 @@ def IREECodegen_LoweringConfigAttrInterface :
       /*defaultImplementation=*/[{
         return std::nullopt;
       }]
-    >
+    >,
+     InterfaceMethod<
+      /*desc=*/[{
+        TODO.
+      }],
+      /*retTy=*/"::mlir::iree_compiler::IREE::Codegen::WorkgroupReorderingAttrInterface",
+      /*methodName=*/"getWorkgroupOrderingStrategy",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return nullptr;
+      }]>
   ];
 }
 
