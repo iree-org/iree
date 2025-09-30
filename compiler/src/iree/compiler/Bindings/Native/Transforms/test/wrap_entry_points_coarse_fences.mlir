@@ -19,6 +19,7 @@
 //  CHECK-NEXT: }
 
 // CHECK-LABEL: util.func private @_asyncEntry(
+// CHECK-SAME: attributes {hal.abi.convention = #hal.abi.convention<coarse_fences>}
 util.func public @asyncEntry(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> (tensor<4xf32>, tensor<4xf32>) {
   %0 = arith.addf %arg0, %arg1 : tensor<4xf32>
   %1 = arith.addf %0, %arg0 : tensor<4xf32>
@@ -34,6 +35,7 @@ util.func public @asyncEntry(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> (ten
 //  CHECK-NEXT:   util.return
 
 // CHECK-LABEL: util.func private @_bareFunc(
+// CHECK-SAME: attributes {hal.abi.convention = #hal.abi.convention<coarse_fences>}
 util.func public @bareFunc() {
   util.return
 }
@@ -47,6 +49,7 @@ util.func public @bareFunc() {
 //  CHECK-NEXT:   util.return
 
 // CHECK-LABEL: util.func private @_primitiveArgOnly(
+// CHECK-SAME: attributes {hal.abi.convention = #hal.abi.convention<coarse_fences>}
 util.func public @primitiveArgOnly(%arg0: i32) {
   %0 = arith.addi %arg0, %arg0 : i32
   util.optimization_barrier %0 : i32
@@ -63,6 +66,7 @@ util.func public @primitiveArgOnly(%arg0: i32) {
 //  CHECK-NEXT:   util.return
 
 // CHECK-LABEL: util.func private @_tensorArgOnly(
+// CHECK-SAME: attributes {hal.abi.convention = #hal.abi.convention<coarse_fences>}
 util.func public @tensorArgOnly(%arg0: tensor<4xf32>) {
   %0 = arith.addf %arg0, %arg0 : tensor<4xf32>
   util.optimization_barrier %0 : tensor<4xf32>
@@ -78,6 +82,7 @@ util.func public @tensorArgOnly(%arg0: tensor<4xf32>) {
 //  CHECK-NEXT:   util.return %[[RESULT]]
 
 // CHECK-LABEL: util.func private @_primitiveResultOnly(
+// CHECK-SAME: attributes {hal.abi.convention = #hal.abi.convention<coarse_fences>}
 util.func public @primitiveResultOnly() -> i32 {
   %0 = arith.constant 8 : i32
   %1 = util.optimization_barrier %0 : i32
@@ -94,6 +99,7 @@ util.func public @primitiveResultOnly() -> i32 {
 //  CHECK-NEXT:   util.return %[[RESULT_VIEW]]
 
 // CHECK-LABEL: util.func private @_tensorResultOnly(
+// CHECK-SAME: attributes {hal.abi.convention = #hal.abi.convention<coarse_fences>}
 util.func public @tensorResultOnly() -> tensor<4xf32> {
   %0 = arith.constant dense<[0.0, 1.0, 2.0, 3.0]> : tensor<4xf32>
   %1 = util.optimization_barrier %0 : tensor<4xf32>
@@ -114,6 +120,7 @@ util.func public @tensorResultOnly() -> tensor<4xf32> {
 //  CHECK-NEXT: util.return %[[EXPORT0]], %[[EXPORT1]]
 
 // CHECK-LABEL: util.func private @_outputStorage(
+// CHECK-SAME: attributes {hal.abi.convention = #hal.abi.convention<coarse_fences>}
 util.func public @outputStorage(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>, %ret0: !hal.buffer {iree.abi.output = 0 : index}, %ret1: !hal.buffer {iree.abi.output = 1 : index}) -> (tensor<4xf32>, tensor<4xf32>) {
   %0 = arith.addf %arg0, %arg1 : tensor<4xf32>
   %1 = arith.addf %0, %arg0 : tensor<4xf32>
@@ -134,7 +141,9 @@ util.func private @import(tensor<?x2xi32>, tensor<?x3xi32>) -> (tensor<2x?xi32>,
   nosideeffects
 }
 
-// CHECK: util.func private @_import(%[[ARG0_TENSOR:.+]]: tensor<?x2xi32>, %[[ARG1_TENSOR:.+]]: tensor<?x3xi32>) -> (tensor<2x?xi32>, tensor<3x?xi32>) {
+// CHECK: util.func private @_import(%[[ARG0_TENSOR:.+]]: tensor<?x2xi32>, %[[ARG1_TENSOR:.+]]: tensor<?x3xi32>) -> (tensor<2x?xi32>, tensor<3x?xi32>)
+// CHECK-SAME: attributes {hal.abi.convention = #hal.abi.convention<coarse_fences>}
+// CHECK-SAME: {
 
 // Prepare fences and put a barrier on input arguments:
 // CHECK:   %[[DEVICE:.+]] = hal.devices.get %{{.+}}
@@ -184,7 +193,9 @@ util.func private @pinnedImport(tensor<2xi32> {iree.abi.affinity = #hal.device.a
   nosideeffects
 }
 
-// CHECK: util.func private @_pinnedImport(%[[ARG_TENSOR:.+]]: tensor<2xi32>) -> tensor<2xi32> {
+// CHECK: util.func private @_pinnedImport(%[[ARG_TENSOR:.+]]: tensor<2xi32>) -> tensor<2xi32>
+// CHECK-SAME: attributes {hal.abi.convention = #hal.abi.convention<coarse_fences>}
+// CHECK-SAME: {
 // CHECK-DAG:   %[[DEVICE_C:.+]] = hal.device.resolve on(#hal.device.affinity<@dev_c>) : !hal.device
 // CHECK-DAG:   %[[ARG_FENCE:.+]] = hal.fence.create device(%[[DEVICE_C]] : !hal.device) flags("None") : !hal.fence
 // CHECK-DAG:   %[[ARG_READY:.+]] = hal.tensor.barrier join(%[[ARG_TENSOR]] : tensor<2xi32>) => %[[ARG_FENCE]] : !hal.fence
@@ -213,7 +224,9 @@ util.func private @importI32(i32) -> i32 attributes {
 }
 
 // No fences required as the call has no side-effects and no async resources.
-// CHECK: util.func private @_importI32(%[[ARG0:.+]]: i32) -> i32 {
+// CHECK: util.func private @_importI32(%[[ARG0:.+]]: i32) -> i32
+// CHECK-SAME: attributes {hal.abi.convention = #hal.abi.convention<coarse_fences>}
+// CHECK-SAME: {
 // CHECK:   %[[WAIT_FENCE:.+]] = util.null : !hal.fence
 // CHECK:   %[[SIGNAL_FENCE:.+]] = util.null : !hal.fence
 // CHECK:   %[[RET0:.+]] = util.call @importI32(%[[ARG0]], %[[WAIT_FENCE]], %[[SIGNAL_FENCE]]) : (i32, !hal.fence, !hal.fence) -> i32
@@ -230,14 +243,18 @@ util.func private @callerI32(%arg0: i32) -> i32 {
 
 // -----
 
-// Tests a side-effecting import that requires a host-side wait.
+// Tests a side-effecting import that with coarse-fences does NOT require a
+// host-side wait. The caller is responsible for synchronizing on the returned
+// resources when using the async invocation model.
 
 // CHECK-LABEL: util.func private @importI32Effects(%arg0: !hal.buffer_view, %arg1: !hal.fence, %arg2: !hal.fence) -> i32
 util.func private @importI32Effects(tensor<4xf32>) -> i32 attributes {
   iree.abi.model = "coarse-fences"
 }
 
-// CHECK: util.func private @_importI32Effects(%[[ARG0_TENSOR:.+]]: tensor<4xf32>) -> i32 {
+// CHECK: util.func private @_importI32Effects(%[[ARG0_TENSOR:.+]]: tensor<4xf32>) -> i32
+// CHECK-SAME: attributes {hal.abi.convention = #hal.abi.convention<coarse_fences>}
+// CHECK-SAME: {
 
 // Wait for the inputs to be ready and create the signal fence to wait on.
 // CHECK:   %[[DEVICE:.+]] = hal.devices.get %{{.+}}
@@ -251,8 +268,8 @@ util.func private @importI32Effects(tensor<4xf32>) -> i32 attributes {
 // Make the import call:
 // CHECK:   %[[RET0:.+]] = util.call @importI32Effects(%[[ARG0_VIEW]], %[[WAIT_FENCE]], %[[SIGNAL_FENCE]]) : (!hal.buffer_view, !hal.fence, !hal.fence) -> i32
 
-// Perform host-side wait.
-// CHECK:   hal.fence.await until([%[[SIGNAL_FENCE]]])
+// No host-side wait for coarse-fences model - caller is responsible for synchronization.
+// CHECK-NOT:   hal.fence.await
 
 // CHECK:   util.return %[[RET0]] : i32
 // CHECK: }
@@ -263,4 +280,43 @@ util.func private @callerI32Effects(%arg0: tensor<4xf32>) -> i32 {
   %result = util.call @importI32Effects(%arg0) : (tensor<4xf32>) -> i32
   // CHECK-NEXT: util.return %[[RESULT]]
   util.return %result : i32
+}
+
+// -----
+
+// Tests a side-effecting import that returns tensors with coarse-fences.
+
+// CHECK-LABEL: util.func private @importTensorEffects(%arg0: !hal.buffer_view, %arg1: !hal.fence, %arg2: !hal.fence) -> !hal.buffer_view
+util.func private @importTensorEffects(tensor<4xf32>) -> tensor<4xf32> attributes {
+  iree.abi.model = "coarse-fences"
+}
+
+// CHECK: util.func private @_importTensorEffects(%[[ARG0_TENSOR:.+]]: tensor<4xf32>) -> tensor<4xf32>
+// CHECK-SAME: attributes {hal.abi.convention = #hal.abi.convention<coarse_fences>}
+// CHECK-SAME: {
+
+// Prepare fences and put a barrier on input arguments:
+// CHECK:   %[[DEVICE:.+]] = hal.devices.get %{{.+}}
+// CHECK:   %[[WAIT_FENCE:.+]] = hal.fence.create device(%[[DEVICE]]
+// CHECK:   %[[ARG_BARRIER:.+]] = hal.tensor.barrier join(%[[ARG0_TENSOR]] : tensor<4xf32>) => %[[WAIT_FENCE]] : !hal.fence
+// CHECK:   %[[SIGNAL_FENCE:.+]] = hal.fence.create device(%[[DEVICE]]
+
+// Export input argument to buffer view:
+// CHECK:   %[[ARG0_VIEW:.+]] = hal.tensor.export %[[ARG_BARRIER]] : tensor<4xf32> -> !hal.buffer_view
+
+// Call the import:
+// CHECK:   %[[RET_VIEW:.+]] = util.call @importTensorEffects(%[[ARG0_VIEW]], %[[WAIT_FENCE]], %[[SIGNAL_FENCE]]) : (!hal.buffer_view, !hal.fence, !hal.fence) -> !hal.buffer_view
+
+// Import the result tensor with fence synchronization but NO host-side wait:
+// CHECK:   %[[RET_TENSOR:.+]] = hal.tensor.import wait(%[[SIGNAL_FENCE]]) => %[[RET_VIEW]] : !hal.buffer_view -> tensor<4xf32>
+// CHECK-NOT:   hal.fence.await
+// CHECK:   util.return %[[RET_TENSOR]] : tensor<4xf32>
+// CHECK: }
+
+// CHECK: util.func private @callerTensorEffects(%[[ARG0_CALLER:.+]]: tensor<4xf32>)
+util.func private @callerTensorEffects(%arg0: tensor<4xf32>) -> tensor<4xf32> {
+  // CHECK: %[[RESULT:.+]] = util.call @_importTensorEffects(%[[ARG0_CALLER]]) : (tensor<4xf32>) -> tensor<4xf32>
+  %result = util.call @importTensorEffects(%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  // CHECK-NEXT: util.return %[[RESULT]]
+  util.return %result : tensor<4xf32>
 }

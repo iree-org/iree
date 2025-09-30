@@ -286,3 +286,105 @@ util.func public @scfIfConvergent(%cond: i1, %t0: !stream.timepoint, %t1: !strea
 }
 
 // TODO(benvanik): support scf.for
+
+// -----
+
+// Tests that timeline-aware ops propagate coverage.
+// The timepoint imported from the wait fence is covered by the result timepoint
+// from the signal fence.
+
+// CHECK-LABEL: util.func public @timelineAwareCallCoverage
+// CHECK-SAME: (%[[VIEW:.+]]: !hal.buffer_view, %[[SIGNAL_FENCE:.+]]: !stream.test.fence)
+util.func public @timelineAwareCallCoverage(%view: !hal.buffer_view, %signal_fence: !stream.test.fence) -> !hal.buffer_view {
+  // Create async work producing a timepoint.
+  // CHECK: %[[T0:.+]] = stream.cmd.execute
+  %t0 = stream.cmd.execute with() {} => !stream.timepoint
+
+  // Export timepoint as fence for the call.
+  %wait_fence = stream.timepoint.export %t0 => (!stream.test.fence)
+
+  // Timeline-aware call - timepoints built from fences.
+  // CHECK: stream.test.timeline_aware(%[[VIEW]]) waits(%{{.+}}) signals(%[[SIGNAL_FENCE]])
+  %result = stream.test.timeline_aware(%view) waits(%wait_fence) signals(%signal_fence) : (!hal.buffer_view) -> !hal.buffer_view
+
+  // Import signal fence as timepoint.
+  // CHECK: %[[T1:.+]] = stream.timepoint.import %[[SIGNAL_FENCE]] : (!stream.test.fence)
+  %t1 = stream.timepoint.import %signal_fence : (!stream.test.fence) => !stream.timepoint
+
+  // CHECK: %[[T0_IMM:.+]] = stream.timepoint.immediate
+  // CHECK: %[[JOIN:.+]] = stream.timepoint.join max(%[[T0_IMM]], %[[T1]])
+  %join = stream.timepoint.join max(%t0, %t1) => !stream.timepoint
+
+  // CHECK: util.return
+  util.return %result : !hal.buffer_view
+}
+
+// -----
+
+// Tests that timeline-aware calls in sequence propagate coverage correctly.
+// Each call's signal fence covers its wait fence.
+
+// CHECK-LABEL: util.func public @timelineAwareCallSequence
+// CHECK-SAME: (%[[VIEW:.+]]: !hal.buffer_view, %[[FENCE_A_SIGNAL:.+]]: !stream.test.fence, %[[FENCE_B_SIGNAL:.+]]: !stream.test.fence)
+util.func public @timelineAwareCallSequence(%view: !hal.buffer_view, %fence_a_signal: !stream.test.fence, %fence_b_signal: !stream.test.fence) -> !hal.buffer_view {
+  // First async work.
+  // CHECK: %[[T0:.+]] = stream.cmd.execute
+  %t0 = stream.cmd.execute with() {} => !stream.timepoint
+
+  // First timeline-aware call.
+  %fence_a_wait = stream.timepoint.export %t0 => (!stream.test.fence)
+  // CHECK: stream.test.timeline_aware(%[[VIEW]]) waits(%{{.+}}) signals(%[[FENCE_A_SIGNAL]])
+  %result_a = stream.test.timeline_aware(%view) waits(%fence_a_wait) signals(%fence_a_signal) : (!hal.buffer_view) -> !hal.buffer_view
+  // CHECK: %[[T1:.+]] = stream.timepoint.import %[[FENCE_A_SIGNAL]] : (!stream.test.fence)
+  %t1 = stream.timepoint.import %fence_a_signal : (!stream.test.fence) => !stream.timepoint
+
+  // Second async work awaiting first call.
+  // CHECK: %[[T2:.+]] = stream.cmd.execute await(%[[T1]])
+  %t2 = stream.cmd.execute await(%t1) => with() {} => !stream.timepoint
+
+  // Second timeline-aware call.
+  %fence_b_wait = stream.timepoint.export %t2 => (!stream.test.fence)
+  // CHECK: stream.test.timeline_aware(%{{.+}}) waits(%{{.+}}) signals(%[[FENCE_B_SIGNAL]])
+  %result_b = stream.test.timeline_aware(%result_a) waits(%fence_b_wait) signals(%fence_b_signal) : (!hal.buffer_view) -> !hal.buffer_view
+  // CHECK: %[[T3:.+]] = stream.timepoint.import %[[FENCE_B_SIGNAL]] : (!stream.test.fence)
+  %t3 = stream.timepoint.import %fence_b_signal : (!stream.test.fence) => !stream.timepoint
+
+  // All of %t0, %t1, and %t2 should be elided since they're covered by %t3.
+  // %t3 transitively covers: %t2 (direct), %t1 (via %t2's await), %t0 (via %t1).
+  // CHECK-DAG: %[[T0_IMM:.+]] = stream.timepoint.immediate
+  // CHECK-DAG: %[[T1_IMM:.+]] = stream.timepoint.immediate
+  // CHECK-DAG: %[[T2_IMM:.+]] = stream.timepoint.immediate
+  // CHECK: %[[JOIN:.+]] = stream.timepoint.join max(%[[T0_IMM]], %[[T1_IMM]], %[[T2_IMM]], %[[T3]])
+  %join = stream.timepoint.join max(%t0, %t1, %t2, %t3) => !stream.timepoint
+
+  // CHECK: util.return
+  util.return %result_b : !hal.buffer_view
+}
+
+// -----
+
+// Tests that non-timeline-aware calls (without fences) are not treated specially.
+
+util.func private @normal_func(!hal.buffer_view) -> !hal.buffer_view
+
+// CHECK-LABEL: util.func public @nonTimelineAwareCall
+util.func public @nonTimelineAwareCall(%view: !hal.buffer_view) -> !hal.buffer_view {
+  // CHECK: %[[T0:.+]] = stream.cmd.execute
+  %t0 = stream.cmd.execute with() {} => !stream.timepoint
+
+  // Normal call without fences - not timeline-aware.
+  // CHECK: util.call @normal_func
+  %result = util.call @normal_func(%view) : (!hal.buffer_view) -> !hal.buffer_view
+
+  // Create another timepoint after the call.
+  // CHECK: %[[T1:.+]] = stream.cmd.execute
+  %t1 = stream.cmd.execute with() {} => !stream.timepoint
+
+  // Both timepoints should remain since there's no coverage relationship.
+  // CHECK-NOT: stream.timepoint.immediate
+  // CHECK: %[[JOIN:.+]] = stream.timepoint.join max(%[[T0]], %[[T1]])
+  %join = stream.timepoint.join max(%t0, %t1) => !stream.timepoint
+
+  // CHECK: util.return
+  util.return %result : !hal.buffer_view
+}

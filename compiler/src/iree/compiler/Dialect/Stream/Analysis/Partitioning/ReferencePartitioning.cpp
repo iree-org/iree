@@ -155,8 +155,36 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
 
   auto asmState = getRootAsmState(block);
 
-  llvm::DenseMap<Operation *, llvm::SmallVector<Operation *>> syncOps;
+  // Build a map from values to operations that consume them in nested regions.
+  // This allows us to detect when an operation with nested regions (like
+  // scf.for) consumes values produced by other operations that may create
+  // hazards even though there's no direct use-def edge.
+  DenseMap<Value, SmallVector<Operation *>> nestedConsumers;
+  for (auto &op : *block) {
+    // Only check operations with regions that are not streamable.
+    // Streamable ops are handled normally but non-streamable ops with regions
+    // (like scf.for, scf.if, scf.while) need special handling.
+    if (op.getNumRegions() == 0 ||
+        isa<IREE::Stream::StreamableOpInterface>(op)) {
+      continue;
+    }
 
+    // Collect all values consumed by this operation (including in nested
+    // regions).
+    SetVector<Value> consumedValues;
+    collectConsumedValues(&op, consumedValues);
+
+    // For each consumed value record this op as a nested consumer.
+    for (auto value : consumedValues) {
+      // Only track values defined in the same block (not block arguments).
+      auto definingOp = value.getDefiningOp();
+      if (definingOp && definingOp->getBlock() == block) {
+        nestedConsumers[value].push_back(&op);
+      }
+    }
+  }
+
+  llvm::DenseMap<Operation *, llvm::SmallVector<Operation *>> syncOps;
   for (auto &op : llvm::reverse(*block)) {
 
     LLVM_DEBUG({
@@ -223,6 +251,8 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
     // We prune the set based on whether the users are part of a transitive
     // dependency chain down the use-def chain to a partition.
     llvm::BitVector consumers(builders.size(), /*t=*/false);
+
+    // Process direct users (common case).
     for (auto user : op.getUsers()) {
       auto userInfoIt = opInfos.find(user);
       if (userInfoIt == opInfos.end()) {
@@ -243,6 +273,38 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
       consumers |= userInfo.membership;
       opInfo.hazards |= userInfo.membership;
       opInfo.hazards |= userInfo.hazards;
+    }
+
+    // Process indirect users (operations that consume this op's results in
+    // their nested regions e.g. scf.for using a value in its body).
+    for (auto result : op.getResults()) {
+      auto nestedConsumersIt = nestedConsumers.find(result);
+      if (nestedConsumersIt != nestedConsumers.end()) {
+        for (auto *nestedUser : nestedConsumersIt->second) {
+          auto userInfoIt = opInfos.find(nestedUser);
+          if (userInfoIt == opInfos.end()) {
+            continue;
+          }
+          auto &userInfo = userInfoIt->second;
+          LLVM_DEBUG({
+            llvm::dbgs() << "Testing nested region user:\n";
+            nestedUser->print(llvm::dbgs(), *asmState);
+            llvm::dbgs() << "\n";
+            for (auto membershipOrdinal : userInfo.membership.set_bits()) {
+              llvm::dbgs() << "  member of partition " << membershipOrdinal
+                           << "\n";
+            }
+            for (auto hazardOrdinal : userInfo.hazards.set_bits()) {
+              llvm::dbgs() << "  hazard w/ partition " << hazardOrdinal << "\n";
+            }
+          });
+          // For nested consumers we only propagate hazards and not membership.
+          // The nested consumer itself is not streamable and won't be in a
+          // partition but it creates a dependency barrier.
+          opInfo.hazards |= userInfo.membership;
+          opInfo.hazards |= userInfo.hazards;
+        }
+      }
     }
 
     for (auto syncOp : syncOps[&op]) {
@@ -410,10 +472,17 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
     SetVector<Value> producedValues;
     SetVector<Value> escapingValues;
     for (auto *op : llvm::reverse(builder->ops)) {
+      // Collect direct operands only. Do NOT recursively collect values from
+      // nested regions of operations that define our operands - that would
+      // incorrectly add values consumed inside control flow ops (scf.for, etc)
+      // to partition inputs, creating spurious circular dependencies.
+      // The circular dependency check in Partition::verify() will correctly
+      // detect actual circular dependencies using collectConsumedValues.
       bool didCloneEscape = false;
       for (auto operand : op->getOperands()) {
         consumedValues.insert(operand);
       }
+
       for (auto result : op->getResults()) {
         producedValues.insert(result);
 

@@ -2227,6 +2227,45 @@ struct RedundantTransferElision : public OpRewritePattern<AsyncTransferOp> {
   }
 };
 
+// Converts same-affinity transfers to clones for clearer semantics.
+// Transfers are meant to represent cross-device or staging operations while
+// clones represent copy-on-write operations on the same device. When a transfer
+// has the same source and target affinity (or both are implicit), it's actually
+// a clone operation that may also change the lifetime.
+struct SameAffinityTransferToClone : public OpRewritePattern<AsyncTransferOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(AsyncTransferOp transferOp,
+                                PatternRewriter &rewriter) const override {
+    auto sourceAffinityAttr = transferOp.getSourceAffinityAttr();
+    auto resultAffinityAttr = transferOp.getResultAffinityAttr();
+
+    // Check if source and result affinities are the same.
+    // This includes the case where both are null (implicit same affinity).
+    if (sourceAffinityAttr != resultAffinityAttr) {
+      return failure();
+    }
+
+    // Don't convert if either source or result is staging.
+    // Clone doesn't support staging resources.
+    auto sourceType = llvm::cast<IREE::Stream::ResourceType>(
+        transferOp.getSource().getType());
+    auto resultType = llvm::cast<IREE::Stream::ResourceType>(
+        transferOp.getResult().getType());
+    if (sourceType.getLifetime() == IREE::Stream::Lifetime::Staging ||
+        resultType.getLifetime() == IREE::Stream::Lifetime::Staging) {
+      return failure();
+    }
+
+    // Replace with a clone operation using the common affinity.
+    // The clone preserves the lifetime change (e.g., transient -> external).
+    rewriter.replaceOpWithNewOp<AsyncCloneOp>(
+        transferOp, transferOp.getResult().getType(), transferOp.getSource(),
+        transferOp.getSourceSize(), transferOp.getResultSize(),
+        sourceAffinityAttr);
+    return success();
+  }
+};
+
 // Collapses chains of transfers that have no use.
 struct IntermediateTransferElision : public OpRewritePattern<AsyncTransferOp> {
   using Base::Base;
@@ -2258,7 +2297,7 @@ struct IntermediateTransferElision : public OpRewritePattern<AsyncTransferOp> {
 void AsyncTransferOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context) {
   // TODO(benvanik): staging propagation (fill of staging -> fill on device).
-  results.insert<RedundantTransferElision>(context);
+  results.insert<SameAffinityTransferToClone>(context);
   results.insert<IntermediateTransferElision>(context);
   results.insert<ElideUnusedOp<AsyncTransferOp>>(context);
 }

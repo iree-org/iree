@@ -39,6 +39,15 @@ namespace {
 
 // Maps a resource usage bitfield to a resource lifetime.
 static Lifetime convertUsageToLifetime(ResourceUsageBitfield usage) {
+  // Special case: if stored to global and constant, preserve Constant.
+  // This prevents External from overriding the global's type constraint.
+  // This is forward-compatible with the UsageAttr migration where this check
+  // becomes unnecessary (constant|global|external is expressible directly).
+  if (bitEnumContains(usage, ResourceUsageBitfield::Global) &&
+      bitEnumContains(usage, ResourceUsageBitfield::Constant)) {
+    return Lifetime::Constant;
+  }
+
   if (bitEnumContains(usage, ResourceUsageBitfield::Indirect) ||
       bitEnumContains(usage, ResourceUsageBitfield::External)) {
     return Lifetime::External;
@@ -429,12 +438,40 @@ struct ApplyStreamableOp : public UsageRefinementPattern<Op> {
   }
 };
 
+// Update usage of transferred values when they are unknown.
+struct ApplyAsyncTransferOp
+    : public UsageRefinementPattern<IREE::Stream::AsyncTransferOp> {
+  using UsageRefinementPattern<
+      IREE::Stream::AsyncTransferOp>::UsageRefinementPattern;
+  LogicalResult matchAndRewrite(IREE::Stream::AsyncTransferOp op,
+                                PatternRewriter &rewriter) const override {
+    // Only refine if the result is unknown.
+    auto resultType =
+        llvm::cast<IREE::Stream::ResourceType>(op.getResult().getType());
+    if (resultType.getLifetime() != IREE::Stream::Lifetime::Unknown) {
+      return failure();
+    }
+
+    // Get the refined lifetime from usage analysis.
+    auto newUsage = analysis.lookupResourceUsage(op.getResult());
+    auto newLifetime = convertUsageToLifetime(newUsage);
+    auto newType = rewriter.getType<IREE::Stream::ResourceType>(newLifetime);
+
+    // Directly update the result type without inserting transfers.
+    rewriter.startOpModification(op);
+    op.getResult().setType(newType);
+    rewriter.finalizeOpModification(op);
+
+    return success();
+  }
+};
+
 static void insertUsageRefinementPatterns(MLIRContext *context,
                                           ResourceUsageAnalysis &analysis,
                                           RewritePatternSet &patterns) {
   // NOTE: only ops that return values or contain regions need to be handled.
   patterns.insert<ApplyInitializerOp, ApplyFuncOp, ApplyScfForOp, ApplyScfIfOp,
-                  ApplyScfWhileOp>(context, analysis);
+                  ApplyScfWhileOp, ApplyAsyncTransferOp>(context, analysis);
   patterns.insert<ApplyGenericOp<IREE::Util::OptimizationBarrierOp>,
                   ApplyGenericOp<mlir::arith::SelectOp>,
                   ApplyGenericOp<IREE::Util::CallOp>,
@@ -442,29 +479,30 @@ static void insertUsageRefinementPatterns(MLIRContext *context,
                   ApplyGenericOp<mlir::scf::YieldOp>,
                   ApplyGenericOp<IREE::Stream::TimepointBarrierOp>>(context,
                                                                     analysis);
-  patterns.insert<ApplyStreamableOp<IREE::Stream::ResourceAllocOp>,
-                  ApplyStreamableOp<IREE::Stream::ResourceAllocaOp>,
-                  ApplyStreamableOp<IREE::Stream::TensorImportOp>,
-                  ApplyStreamableOp<IREE::Stream::TensorExportOp>,
-                  ApplyStreamableOp<IREE::Stream::AsyncAllocaOp>,
-                  ApplyStreamableOp<IREE::Stream::AsyncConstantOp>,
-                  ApplyStreamableOp<IREE::Stream::AsyncSplatOp>,
-                  ApplyStreamableOp<IREE::Stream::AsyncCloneOp>,
-                  ApplyStreamableOp<IREE::Stream::AsyncSliceOp>,
-                  ApplyStreamableOp<IREE::Stream::AsyncFillOp>,
-                  ApplyStreamableOp<IREE::Stream::AsyncUpdateOp>,
-                  ApplyStreamableOp<IREE::Stream::AsyncCopyOp>,
-                  ApplyStreamableOp<IREE::Stream::AsyncCollectiveOp>,
-                  ApplyStreamableOp<IREE::Stream::AsyncBarrierOp>,
-                  ApplyStreamableOp<IREE::Stream::AsyncTransferOp>,
-                  ApplyStreamableOp<IREE::Stream::AsyncLoadOp>,
-                  ApplyStreamableOp<IREE::Stream::AsyncStoreOp>,
-                  ApplyStreamableOp<IREE::Stream::AsyncDispatchOp>,
-                  ApplyStreamableOp<IREE::Stream::AsyncCallOp>,
-                  ApplyStreamableOp<IREE::Stream::AsyncExecuteOp>,
-                  ApplyStreamableOp<IREE::Stream::AsyncConcurrentOp>,
-                  ApplyStreamableOp<IREE::Stream::YieldOp>>(context, analysis);
-  IREE::Stream::AsyncTransferOp::getCanonicalizationPatterns(patterns, context);
+  patterns
+      .insert<ApplyStreamableOp<IREE::Stream::ResourceAllocOp>,
+              ApplyStreamableOp<IREE::Stream::ResourceAllocaOp>,
+              ApplyStreamableOp<IREE::Stream::TensorImportOp>,
+              ApplyStreamableOp<IREE::Stream::TensorExportOp>,
+              ApplyStreamableOp<IREE::Stream::AsyncAllocaOp>,
+              ApplyStreamableOp<IREE::Stream::AsyncConstantOp>,
+              ApplyStreamableOp<IREE::Stream::AsyncSplatOp>,
+              ApplyStreamableOp<IREE::Stream::AsyncCloneOp>,
+              ApplyStreamableOp<IREE::Stream::AsyncSliceOp>,
+              ApplyStreamableOp<IREE::Stream::AsyncFillOp>,
+              ApplyStreamableOp<IREE::Stream::AsyncUpdateOp>,
+              ApplyStreamableOp<IREE::Stream::AsyncCopyOp>,
+              ApplyStreamableOp<IREE::Stream::AsyncCollectiveOp>,
+              ApplyStreamableOp<IREE::Stream::AsyncBarrierOp>,
+              // Note: AsyncTransferOp excluded - transfers perform lifetime
+              // transitions and shouldn't have additional transfers inserted.
+              ApplyStreamableOp<IREE::Stream::AsyncLoadOp>,
+              ApplyStreamableOp<IREE::Stream::AsyncStoreOp>,
+              ApplyStreamableOp<IREE::Stream::AsyncDispatchOp>,
+              ApplyStreamableOp<IREE::Stream::AsyncCallOp>,
+              ApplyStreamableOp<IREE::Stream::AsyncExecuteOp>,
+              ApplyStreamableOp<IREE::Stream::AsyncConcurrentOp>,
+              ApplyStreamableOp<IREE::Stream::YieldOp>>(context, analysis);
 }
 
 //===----------------------------------------------------------------------===//

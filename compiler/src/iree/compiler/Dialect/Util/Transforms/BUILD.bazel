@@ -22,6 +22,7 @@ iree_compiler_cc_library(
     srcs = [
         "AnnotateOpOrdinals.cpp",
         "ApplyPatterns.cpp",
+        "AttributeCallGraph.cpp",
         "CombineInitializers.cpp",
         "DropCompilerHints.cpp",
         "DumpModule.cpp",

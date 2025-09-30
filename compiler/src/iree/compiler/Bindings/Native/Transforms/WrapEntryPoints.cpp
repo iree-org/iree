@@ -262,7 +262,11 @@ createImportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
   // If the call has side-effects then we need to wait on its signal fence on
   // the host. This is because they may have launched a thread of their own to
   // perform work that we can't track.
-  if (hasSideEffects && signalFence) {
+  // However, for async invocation models (coarse-fences), we should NOT block
+  // here as it defeats the purpose of async execution. The caller is
+  // responsible for synchronizing on the returned resources via the timeline.
+  if (hasSideEffects && signalFence &&
+      invocationModel != IREE::ABI::InvocationModel::CoarseFences) {
     auto timeoutMillis =
         arith::ConstantIntOp::create(entryBuilder, importOp.getLoc(), -1, 32);
     IREE::HAL::FenceAwaitOp::create(
@@ -298,6 +302,12 @@ createImportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
   IREE::Util::ReturnOp::create(entryBuilder, importOp.getLoc(), results);
 
   stripABIAttrs(importOp);
+
+  // Set the HAL ABI convention attribute on the import wrapper.
+  IREE::HAL::ABIConventionAttr::setExecutionModel(
+      wrapperOp, invocationModel == IREE::ABI::InvocationModel::CoarseFences
+                     ? IREE::HAL::ExecutionModel::CoarseFences
+                     : IREE::HAL::ExecutionModel::Synchronous);
 
   return wrapperOp;
 }
@@ -703,6 +713,12 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
   }
 
   stripABIAttrs(exportOp);
+
+  // Set the HAL ABI convention attribute on the export wrapper.
+  IREE::HAL::ABIConventionAttr::setExecutionModel(
+      exportOp, invocationModel == IREE::ABI::InvocationModel::CoarseFences
+                    ? IREE::HAL::ExecutionModel::CoarseFences
+                    : IREE::HAL::ExecutionModel::Synchronous);
 
   IREE::Util::ReturnOp::create(entryBuilder, exportOp.getLoc(), results);
   return wrapperOp;

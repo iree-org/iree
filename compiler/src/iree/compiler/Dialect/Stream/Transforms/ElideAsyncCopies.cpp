@@ -225,6 +225,18 @@ private:
       getState() ^= argumentSemantics.getState();
     }
 
+    // Check if the source is a tensor.import with consume attribute.
+    // This indicates transfer of ownership (by-value semantics).
+    if (auto importOp =
+            operand.get().getDefiningOp<IREE::Stream::TensorImportOp>()) {
+      if (importOp.getConsume()) {
+        // Consume attribute present - value is owned by importer (by-value).
+        // Already in BEST_STATE (NOT_MUTATED | NOT_BY_REFERENCE).
+        LLVM_DEBUG(llvm::dbgs() << "  tensor.import with consume attribute\n");
+        return;
+      }
+    }
+
     auto &lastUsers = solver.getElementFor<LastUsers>(
         *this, Position::forValue(operand.get()), DFX::Resolution::REQUIRED);
     bool isLastUser = lastUsers.isAssumedLastUser(operand.getOwner());
@@ -246,19 +258,56 @@ private:
     auto arg = llvm::cast<BlockArgument>(value);
     bool isEntryArg = arg.getParentBlock()->isEntryBlock();
     if (isEntryArg) {
-      // Call argument.
-      auto callableOp =
-          cast<mlir::CallableOpInterface>(arg.getParentBlock()->getParentOp());
-      traversalResult |= solver.getExplorer().walkIncomingCalls(
-          callableOp, [&](mlir::CallOpInterface callOp) -> WalkResult {
-            unsigned baseIdx = callOp.getArgOperands().getBeginOperandIndex();
-            auto &sourceOperand =
-                callOp->getOpOperand(baseIdx + arg.getArgNumber());
-            updateFromPredecessorUse(sourceOperand, solver);
-            return WalkResult::advance();
-          });
+      // Entry block argument - could be a callable function argument or
+      // an SCF/region operation argument (scf.for iter_args, scf.if, etc).
+      auto *parentOp = arg.getParentBlock()->getParentOp();
+      if (auto callableOp = dyn_cast<mlir::CallableOpInterface>(parentOp)) {
+        // Call argument.
+        traversalResult |= solver.getExplorer().walkIncomingCalls(
+            callableOp, [&](mlir::CallOpInterface callOp) -> WalkResult {
+              unsigned baseIdx = callOp.getArgOperands().getBeginOperandIndex();
+              auto &sourceOperand =
+                  callOp->getOpOperand(baseIdx + arg.getArgNumber());
+              updateFromPredecessorUse(sourceOperand, solver);
+              return WalkResult::advance();
+            });
+      } else {
+        // SCF or other region operation argument (scf.for iter_args, etc).
+        // Use walkIncomingBlockArgument to get the incoming values.
+        traversalResult |= solver.getExplorer().walkIncomingBlockArgument(
+            arg, [&](Block *sourceBlock, Value operand) -> WalkResult {
+              // The Explorer provides the value feeding this argument.
+              // We need to find the OpOperand that corresponds to this use.
+              // For scf.for, this could be from the ForOp (init args) or
+              // from the yield terminator (loop-back).
+
+              // Find which operation provides this operand.
+              Operation *sourceOp = arg.getParentBlock()->getParentOp();
+              if (sourceBlock == sourceOp->getBlock()) {
+                // Init args case: operand is from the region op itself.
+                for (unsigned i = 0; i < sourceOp->getNumOperands(); ++i) {
+                  if (sourceOp->getOperand(i) == operand) {
+                    updateFromPredecessorUse(sourceOp->getOpOperand(i), solver);
+                    return WalkResult::advance();
+                  }
+                }
+              } else {
+                // Loop-back case: operand is from a terminator in the region.
+                auto *terminator = sourceBlock->getTerminator();
+                for (unsigned i = 0; i < terminator->getNumOperands(); ++i) {
+                  if (terminator->getOperand(i) == operand) {
+                    updateFromPredecessorUse(terminator->getOpOperand(i),
+                                             solver);
+                    return WalkResult::advance();
+                  }
+                }
+              }
+              // Fallback: couldn't find the operand.
+              return WalkResult::advance();
+            });
+      }
     } else {
-      // Branch argument.
+      // Non-entry block branch argument.
       traversalResult |= solver.getExplorer().walkIncomingBranchOperands(
           arg.getParentBlock(),
           [&](Block *sourceBlock, OperandRange operands,
@@ -311,19 +360,21 @@ public:
   // Runs analysis and populates the state cache.
   // May fail if analysis cannot be completed due to unsupported or unknown IR.
   LogicalResult run() {
-    // Seed all block arguments throughout the program.
+    // Seed all block arguments throughout the program, including nested
+    // regions. This ensures SCF operations (scf.for, scf.if, scf.while) and
+    // other region-bearing ops have their block arguments analyzed.
     for (auto callableOp : getTopLevelOps()) {
       auto *region = callableOp.getCallableRegion();
       if (!region)
         continue;
-      for (auto &block : *region) {
-        for (auto arg : block.getArguments()) {
+      region->walk([&](Block *block) {
+        for (auto arg : block->getArguments()) {
           if (llvm::isa<IREE::Stream::ResourceType>(arg.getType())) {
             solver.getOrCreateElementFor<ArgumentSemantics>(
                 Position::forValue(arg));
           }
         }
-      }
+      });
     }
 
     // Run solver to completion.
@@ -390,26 +441,21 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
   });
 
   // If this clone is performing a type change we need to preserve it.
+  // Type changes encode important semantic information about resource lifetime
+  // and usage patterns (e.g., * -> variable for global stores, * -> external
+  // for exports). Eliding these clones can lead to type mismatches and
+  // verification failures.
   //
   // TODO(benvanik): remove this carveout - could make clone not change type
   // and transfer be needed instead.
-  //
-  // HACK: the constant check is to support initializers that have lifetime
-  // transfers to constants. This is clearly bad and can lead to additional
-  // weirdness later on in the program, but without it resource usage analysis
-  // will try to treat entire IR trees that result in a constant transfer as if
-  // they are unknown. The real fix is to the analysis by possibly marking
-  // values as "eventually constant" to allow us to promote to constant
-  // lifetime.
   auto sourceType =
       llvm::cast<IREE::Stream::ResourceType>(cloneOp.getSource().getType());
   auto targetType =
       llvm::cast<IREE::Stream::ResourceType>(cloneOp.getResult().getType());
-  if (sourceType != targetType &&
-      sourceType.getLifetime() == IREE::Stream::Lifetime::Constant) {
+  if (sourceType != targetType) {
     LLVM_DEBUG(llvm::dbgs()
-               << "  - clone is a resource lifetime cast (" << sourceType
-               << " to " << targetType << "); cannot elide\n");
+               << "  - clone is a resource type cast (" << sourceType << " to "
+               << targetType << "); cannot elide\n");
     return false;
   }
 
@@ -451,6 +497,193 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
 static void elideCloneOp(IREE::Stream::AsyncCloneOp cloneOp) {
   cloneOp.replaceAllUsesWith(cloneOp.getSource());
   cloneOp.erase();
+}
+
+//===----------------------------------------------------------------------===//
+// IREE::Stream::AsyncTransferOp elision
+//===----------------------------------------------------------------------===//
+
+// Returns true if |transferOp| performs no work or is safe to elide as a copy.
+//
+// This handles both:
+// 1. No-op transfers (same affinity + same type)
+// 2. Lifetime-changing copies (same affinity, different type)
+// 3. Transfer chain collapsing (A->B->C becomes A->C)
+// 4. Topology-based elision (unified memory between devices)
+//
+// The analysis must ensure we don't elide protective copies needed for:
+// - Tied operations (in-place mutations)
+// - Values with multiple users (fork semantics)
+// - Block arguments passed by-reference
+static bool isSafeToElideTransferOp(
+    IREE::Stream::AsyncTransferOp transferOp, ElisionAnalysis &analysis,
+    IREE::Stream::AffinityTopologyAttrInterface topologyAttr) {
+  LLVM_DEBUG({
+    llvm::dbgs() << "isSafeToElideTransferOp:\n";
+    llvm::dbgs() << "  ";
+    transferOp.print(llvm::dbgs(), analysis.getAsmState());
+    llvm::dbgs() << "\n";
+  });
+
+  auto source = transferOp.getSource();
+  auto result = transferOp.getResult();
+  auto sourceType = cast<IREE::Stream::ResourceType>(source.getType());
+  auto resultType = cast<IREE::Stream::ResourceType>(result.getType());
+
+  // Don't elide transfers that change lifetime (usage casts).
+  // These encode important semantic information about how the resource is used.
+  if (sourceType.getLifetime() != resultType.getLifetime()) {
+    LLVM_DEBUG(llvm::dbgs() << "  - transfer changes lifetime; cannot elide\n");
+    return false;
+  }
+
+  // Get source and result affinities for topology checks.
+  // If source affinity is not explicit, try to infer it from the producing op.
+  auto sourceAffinityAttr = transferOp.getSourceAffinityAttr();
+  if (!sourceAffinityAttr) {
+    if (auto definingOp = source.getDefiningOp()) {
+      if (auto affinityOp =
+              dyn_cast<IREE::Stream::AffinityOpInterface>(definingOp)) {
+        sourceAffinityAttr = affinityOp.getResultAffinityAttr();
+      }
+    }
+  }
+  auto resultAffinityAttr = transferOp.getResultAffinityAttr();
+
+  // Track whether topology analysis allows elision.
+  bool topologyAllowsElision = false;
+
+  // Case 1: Check if topology allows elision (unified memory, etc).
+  // This check happens first as it's the primary reason ElideAsyncTransfersPass
+  // existed - to remove transfers that the hardware topology doesn't require.
+  if (sourceAffinityAttr && resultAffinityAttr && topologyAttr) {
+    // Check if we can elide based on topology (unified memory, transparent
+    // access, etc).
+    if (topologyAttr.hasUnifiedMemory(sourceAffinityAttr, resultAffinityAttr) ||
+        topologyAttr.hasTransparentAccess(sourceAffinityAttr,
+                                          resultAffinityAttr)) {
+      LLVM_DEBUG(llvm::dbgs() << "  + topology allows elision (unified memory "
+                                 "or transparent access)\n");
+      topologyAllowsElision = true;
+      // Fall through to check if it's also safe from a usage perspective.
+      // Even with unified memory, we may need the transfer for other reasons
+      // (protective copy, etc).
+    } else {
+      // Topology requires an actual transfer - cannot elide.
+      LLVM_DEBUG(llvm::dbgs()
+                 << "  - topology requires transfer; cannot elide\n");
+      return false;
+    }
+  }
+
+  // Case 2: Different affinity without topology info = real transfer operation.
+  // These must be preserved as they represent data movement and we don't have
+  // topology information to determine if they're needed.
+  // Skip this check if topology already approved elision.
+  if (!topologyAllowsElision && transferOp.getSourceAffinityAttr() !=
+                                    transferOp.getResultAffinityAttr()) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "  - transfer changes affinity and no topology info; cannot "
+                  "elide\n");
+    return false;
+  }
+
+  // Case 3: Same affinity = either no-op (same type) or lifetime change.
+  // Only elide if this is truly a no-op or if we can prove it's safe.
+
+  // Check if this is a same-type transfer (true no-op).
+  bool isSameType = (sourceType.getLifetime() == resultType.getLifetime());
+
+  // If the immediate source is a block argument we have to look into the
+  // analysis cache to see if it's been classified as a last use/by-value move.
+  // However, same-type transfers are always safe to elide regardless of move
+  // semantics, since they're true no-ops.
+  if (auto arg = llvm::dyn_cast<BlockArgument>(transferOp.getSource())) {
+    if (!analysis.isArgMoved(arg) && !isSameType) {
+      LLVM_DEBUG(llvm::dbgs() << "  - transfer source is a by-ref arg and "
+                                 "changes type; cannot elide\n");
+      return false;
+    }
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "  ? transfer source is a by-value arg or same-type; may elide\n");
+  }
+
+  // If there's only one user of the source we know it's this transfer and can
+  // bypass all the more expensive liveness analysis. Single-use transfers can
+  // usually be elided (they compose with downstream transfers), BUT we need to
+  // check if the result type is constrained by the user (e.g., return type).
+  if (transferOp.getSource().hasOneUse()) {
+    // Check if this transfer is the only thing preventing a type mismatch.
+    // This happens when the source and result have different types and the
+    // result type is required by the context (return, call, etc).
+    if (!isSameType) {
+      // For type-changing transfers, we need to be conservative.
+      // Many operations have specific type requirements (e.g.,
+      // stream.async.load requires staging resources). Rather than try to
+      // enumerate all such cases, we conservatively preserve type-changing
+      // single-use transfers UNLESS:
+      // 1. The user is another transfer (chain collapsing is safe)
+      // 2. The user explicitly accepts * (unrefined) resources
+      for (auto &use : transferOp.getResult().getUses()) {
+        Operation *user = use.getOwner();
+        // Allow elision if the user is another transfer (chain collapsing).
+        if (isa<IREE::Stream::AsyncTransferOp>(user)) {
+          continue;
+        }
+        // Conservative: preserve type-changing transfers for other users.
+        LLVM_DEBUG(llvm::dbgs()
+                   << "  - type-changing transfer with non-transfer "
+                      "user; cannot elide\n");
+        return false;
+      }
+    }
+    LLVM_DEBUG(llvm::dbgs()
+               << "  + transfer source SSA value has one use; can elide\n");
+    return true;
+  }
+
+  // If this is the last user of the source SSA value then we can elide the
+  // transfer knowing that any mutations won't impact the source - BUT only
+  // for same-type transfers since type changes may encode required semantics.
+  if (analysis.isLastUser(transferOp.getSource(), transferOp) && isSameType) {
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "  + transfer source use is the last and same type; can elide\n");
+    return true;
+  }
+
+  // Special case: same-type transfers are always safe to elide regardless of
+  // multiple users, since they're true no-ops. The transfer result can be
+  // replaced with the source without any semantic changes.
+  if (isSameType) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "  + same-type transfer (true no-op); can always elide\n");
+    return true;
+  }
+
+  // Not the last user and type-changing - check if the result is used in a tied
+  // operation. If so, this transfer is providing a protective copy for in-place
+  // mutation.
+  for (auto &use : transferOp.getResult().getUses()) {
+    if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(use.getOwner())) {
+      if (tiedOp.isOperandTied(use.getOperandNumber())) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "  - transfer result used in tied op; cannot elide\n");
+        return false;
+      }
+    }
+  }
+
+  // Not safe.
+  LLVM_DEBUG(llvm::dbgs() << "  - transfer source cannot be elided\n");
+  return false;
+}
+
+// Elides a stream.async.transfer op by replacing all uses with the source.
+static void elideTransferOp(IREE::Stream::AsyncTransferOp transferOp) {
+  transferOp.replaceAllUsesWith(transferOp.getSource());
+  transferOp.erase();
 }
 
 //===----------------------------------------------------------------------===//
@@ -643,8 +876,9 @@ static void elideSliceOp(IREE::Stream::AsyncSliceOp sliceOp) {
 
 // Tries to elide copies nested within |region| when safe.
 // Returns true if any ops were elided.
-static bool tryElideAsyncCopiesInRegion(Region &region,
-                                        ElisionAnalysis &analysis) {
+static bool tryElideAsyncCopiesInRegion(
+    Region &region, ElisionAnalysis &analysis,
+    IREE::Stream::AffinityTopologyAttrInterface topologyAttr) {
   bool didChange = false;
   for (auto &block : region) {
     block.walk([&](Operation *op) {
@@ -652,6 +886,13 @@ static bool tryElideAsyncCopiesInRegion(Region &region,
           .Case<IREE::Stream::AsyncCloneOp>([&](auto cloneOp) {
             if (isSafeToElideCloneOp(cloneOp, analysis)) {
               elideCloneOp(cloneOp);
+              didChange = true;
+            }
+            return WalkResult::advance();
+          })
+          .Case<IREE::Stream::AsyncTransferOp>([&](auto transferOp) {
+            if (isSafeToElideTransferOp(transferOp, analysis, topologyAttr)) {
+              elideTransferOp(transferOp);
               didChange = true;
             }
             return WalkResult::advance();
@@ -693,6 +934,12 @@ struct ElideAsyncCopiesPass
       return;
     }
 
+    // Get the topology attribute from the module (if present).
+    // This enables topology-based transfer elision (unified memory, etc).
+    auto topologyAttr =
+        moduleOp->getAttrOfType<IREE::Stream::AffinityTopologyAttrInterface>(
+            "stream.topology");
+
     // Try analyzing the program and eliding the unneeded copies until we reach
     // a fixed point (no more copies can be elided).
     unsigned maxIterationCount = 30;
@@ -712,7 +959,8 @@ struct ElideAsyncCopiesPass
       for (auto callableOp : analysis.getTopLevelOps()) {
         if (auto *region = callableOp.getCallableRegion()) {
           didChange =
-              tryElideAsyncCopiesInRegion(*region, analysis) || didChange;
+              tryElideAsyncCopiesInRegion(*region, analysis, topologyAttr) ||
+              didChange;
         }
       }
       if (!didChange) {

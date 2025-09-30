@@ -113,6 +113,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // Start of Flow pipeline, verify input legality.
   passManager.addPass(IREE::Flow::createVerifyInputLegalityPass());
 
+  // Propagate attributes from callees to call sites for local analysis.
+  passManager.addPass(IREE::Util::createAttributeCallGraphPass());
+
   FunctionLikeNest(passManager)
       .addPass([&]() {
         return IREE::Flow::createInitializeEmptyTensorsPass(

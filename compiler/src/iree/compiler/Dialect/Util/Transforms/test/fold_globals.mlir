@@ -286,3 +286,23 @@ util.func @foo() -> (index, index, index, index) {
   // CHECK: return %[[VALUE0]], %[[VALUE1]], %[[VALUE2]], %[[VALUE3]]
   util.return %0, %1, %2, %3 : index, index, index, index
 }
+
+// -----
+
+// Tests that globals with the same initial value but different types are not
+// deduplicated.
+
+// CHECK: util.global private @untyped_list = #util.uninitialized : !util.list<?>
+util.global private @untyped_list = #util.uninitialized : !util.list<?>
+// CHECK: util.global private @typed_list = #util.uninitialized : !util.list<i32>
+util.global private @typed_list = #util.uninitialized : !util.list<i32>
+util.func @use_untyped() -> !util.list<?> {
+  // CHECK: util.global.load immutable @untyped_list : !util.list<?>
+  %0 = util.global.load @untyped_list : !util.list<?>
+  util.return %0 : !util.list<?>
+}
+util.func @use_typed() -> !util.list<i32> {
+  // CHECK: util.global.load immutable @typed_list : !util.list<i32>
+  %0 = util.global.load @typed_list : !util.list<i32>
+  util.return %0 : !util.list<i32>
+}
