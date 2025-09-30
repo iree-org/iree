@@ -1810,10 +1810,10 @@ constexpr StringLiteral kWorkgroupOrderingStrategyName =
 
 ::mlir::iree_compiler::IREE::Codegen::WorkgroupReorderingAttrInterface
 LoweringConfigAttr::getWorkgroupOrderingStrategy() const {
-  if (auto attr = getAttributes()
-                      .getAs<::mlir::iree_compiler::IREE::Codegen::
-                                 WorkgroupReorderingAttrInterface>(
-                          kWorkgroupOrderingStrategyName)) {
+  auto attrs = getAttributes();
+  if (auto attr = attrs.getAs<::mlir::iree_compiler::IREE::Codegen::
+                                  WorkgroupReorderingAttrInterface>(
+          kWorkgroupOrderingStrategyName)) {
     return attr;
   }
   return nullptr;
@@ -1977,7 +1977,6 @@ DynamicTransposeAttr::generateLoopHeaderFn(
       computeOffsetAndSize(loopRanges, givenTileSizes, ivs);
 
   swapIf(builder, loc, cond, offsets, ids);
-  swapIf(builder, loc, cond, sizes, ids);
 
   ValueRange innerDestinationTensors = forallOp.getRegionOutArgs();
   builder.setInsertionPoint(forallOp.getTerminator());

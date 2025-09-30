@@ -225,117 +225,6 @@ static bool isUsedAsInit(Operation *producer, Operation *user) {
   });
 }
 
-static std::tuple<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>,
-                  SmallVector<OpFoldResult>>
-getLoopBounds(RewriterBase &rewriter, Location loc, ArrayRef<Range> loopRanges,
-              ArrayRef<OpFoldResult> givenTileSizes) {
-  SmallVector<OpFoldResult> lbs, ubs, steps;
-  for (auto [loopRange, givenTileSize] :
-       llvm::zip_equal(loopRanges, givenTileSizes)) {
-    // No loop if the tile size is 0.
-    if (isZeroInteger(givenTileSize))
-      continue;
-    lbs.push_back(loopRange.offset);
-    ubs.push_back(loopRange.size);
-    steps.push_back(givenTileSize);
-  }
-  return {lbs, ubs, steps};
-}
-
-static Value computeNbTiles(OpBuilder &b, Location loc, OpFoldResult size,
-                            OpFoldResult tileSize) {
-  Value sizeVal = getValueOrCreateConstantIntOp(b, loc, size);
-  Value tileSizeVal = getValueOrCreateConstantIntOp(b, loc, tileSize);
-  auto nbTiles =
-      b.create<mlir::arith::DivUIOp>(loc, sizeVal, tileSizeVal).getResult();
-  return getValueOrCreateConstantIntOp(b, loc, nbTiles);
-}
-
-/// Computes the total number of Tile loads per iteration for the pingpong
-/// matmul kernel.
-static Value computeNumTileLoads(OpBuilder &b, Location loc, OpFoldResult size,
-                                 OpFoldResult tileSize, Value nbXcds,
-                                 Value nbCus) {
-
-  Value nbTiles = computeNbTiles(b, loc, size, tileSize);
-  auto totalCus = b.create<mlir::arith::MulIOp>(loc, nbXcds, nbCus);
-  auto nbX = b.create<mlir::arith::MinUIOp>(loc, nbTiles, totalCus).getResult();
-
-  auto nbY = b.create<mlir::arith::CeilDivUIOp>(loc, totalCus, nbX);
-
-  return getValueOrCreateConstantIndexOp(
-      b, loc, b.create<mlir::arith::AddIOp>(loc, nbX, nbY).getResult());
-}
-
-static Value getCondition(OpBuilder &b, Location loc,
-                          ArrayRef<OpFoldResult> ubs,
-                          ArrayRef<OpFoldResult> steps, Value nbXcds,
-                          Value nbCus) {
-  assert(ubs.size() == 2 && steps.size() == 2 && "rank must be 2");
-  Value transposedOrder =
-      computeNumTileLoads(b, loc, ubs[0], steps[0], nbXcds, nbCus);
-  Value defaultOrder =
-      computeNumTileLoads(b, loc, ubs[1], steps[1], nbXcds, nbCus);
-
-  AffineExpr s0, s1, s2;
-  bindSymbols(b.getContext(), s0, s1, s2);
-  AffineExpr transposedOrderBumpExpr = (s0 * s1).floorDiv(s2);
-  Value c4 = b.create<arith::ConstantIntOp>(loc, 4, 32);
-  Value c5 = b.create<arith::ConstantIntOp>(loc, 5, 32);
-
-  Value defaultOrderTolerance = getValueOrCreateConstantIntOp(
-      b, loc,
-      affine::makeComposedFoldedAffineApply(b, loc, transposedOrderBumpExpr,
-                                            {defaultOrder, c4, c5}));
-
-  Value cond =
-      b.create<mlir::arith::CmpIOp>(loc, mlir::arith::CmpIPredicate::ult,
-                                    transposedOrder, defaultOrderTolerance);
-  return cond;
-}
-
-static void swapIf(OpBuilder &b, Location loc, OpFoldResult pred,
-                   SmallVector<OpFoldResult> &values,
-                   ArrayRef<size_t> ids = {0, 1}) {
-
-  assert(ids.size() == 2 && "Can only swap between 2 indices");
-
-  Value v0 = getValueOrCreateConstantIndexOp(b, loc, values[ids[0]]);
-  Value v1 = getValueOrCreateConstantIndexOp(b, loc, values[ids[1]]);
-  Value predVal = getValueOrCreateConstantIndexOp(b, loc, pred);
-  values[ids[0]] =
-      b.create<mlir::arith::SelectOp>(loc, predVal, v1, v0).getResult();
-  values[ids[1]] =
-      b.create<mlir::arith::SelectOp>(loc, predVal, v0, v1).getResult();
-}
-
-static std::tuple<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>,
-                  SmallVector<size_t>>
-computeOffsetAndSize(RewriterBase &rewriter, Location loc,
-                     ArrayRef<Range> loopRanges,
-                     ArrayRef<OpFoldResult> givenTileSizes,
-                     ArrayRef<Value> ivs) {
-  SmallVector<size_t> ids;
-  SmallVector<OpFoldResult> offsets, sizes;
-
-  offsets.reserve(loopRanges.size());
-  sizes.reserve(loopRanges.size());
-  const Value *ivIt = ivs.begin();
-
-  for (auto [loopRange, givenTileSize] :
-       llvm::zip_equal(loopRanges, givenTileSizes)) {
-    if (isZeroInteger(givenTileSize)) {
-      offsets.push_back(loopRange.offset);
-      sizes.push_back(loopRange.size);
-    } else {
-      offsets.push_back(*ivIt++);
-      sizes.push_back(givenTileSize);
-      ids.push_back(sizes.size() - 1);
-    }
-  }
-  return {offsets, sizes, ids};
-}
-
 void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   auto *context = &getContext();
@@ -389,82 +278,34 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
     tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
   } else {
     llvm::outs() << "Test mode\n";
-    // START
 
-    scf::SCFTilingOptions::GenerateLoopHeaderFn loopHeaderFn =
-        [&](RewriterBase &rewriter, Location loc, ArrayRef<Range> loopRanges,
-            ArrayRef<OpFoldResult> givenTileSizes,
-            ValueRange outerDestinationTensors)
-        -> FailureOr<scf::SCFTilingOptions::CustomLoopHeaderInfo> {
-      scf::ForallOp forallOp;
-      // Get loop bounds
-      SmallVector<OpFoldResult> lbs, ubs, steps;
-      std::tie(lbs, ubs, steps) =
-          getLoopBounds(rewriter, loc, loopRanges, givenTileSizes);
+    auto dynamicTransposeAttr =
+        getLoweringConfig(tilingInfo->tilableOp).getWorkgroupOrderingStrategy();
+    if (dynamicTransposeAttr) {
 
-      assert(lbs.size() == 2 && "only rank 2 is supported");
+      scf::SCFTilingOptions::GenerateLoopHeaderFn loopHeaderFn =
+          [&dynamicTransposeAttr](RewriterBase &rewriter, Location loc,
+                                  ArrayRef<Range> loopRanges,
+                                  ArrayRef<OpFoldResult> givenTileSizes,
+                                  ValueRange outerDestinationTensors)
+          -> FailureOr<scf::SCFTilingOptions::CustomLoopHeaderInfo> {
+        return dynamicTransposeAttr.generateLoopHeaderFn(
+            rewriter, loc, loopRanges, givenTileSizes, outerDestinationTensors);
+      };
 
-      // Rewrite ourselve ?
-      std::optional<ArrayAttr> mappingAttr;
-      if (!tilingOptions.mappingVector.empty())
-        mappingAttr = rewriter.getArrayAttr(tilingOptions.mappingVector);
-
-      const int NBCUS = 38;
-      const int NBXCDS = 8;
-
-      // Apply condition on loop bounds
-      Value nbCusVal = rewriter.create<arith::ConstantIndexOp>(loc, NBCUS);
-      Value nbXCDs = rewriter.create<arith::ConstantIndexOp>(loc, NBXCDS);
-      Value cond = getCondition(rewriter, loc, ubs, steps, nbXCDs, nbCusVal);
-
-      swapIf(rewriter, loc, cond, lbs);
-      swapIf(rewriter, loc, cond, ubs);
-      swapIf(rewriter, loc, cond, steps);
-
-      forallOp = scf::ForallOp::create(rewriter, loc, lbs, ubs, steps,
-                                       outerDestinationTensors, mappingAttr);
-
-      SmallVector<Value> ivs = forallOp.getInductionVars();
-
-      SmallVector<OpFoldResult> offsets, sizes;
-      SmallVector<size_t> ids;
-      std::tie(offsets, sizes, ids) =
-          computeOffsetAndSize(rewriter, loc, loopRanges, givenTileSizes, ivs);
-
-      swapIf(rewriter, loc, cond, offsets, ids);
-      swapIf(rewriter, loc, cond, sizes, ids);
-
-      ValueRange innerDestinationTensors = forallOp.getRegionOutArgs();
-      rewriter.setInsertionPoint(forallOp.getTerminator());
-
-      return scf::SCFTilingOptions::CustomLoopHeaderInfo{
-          {cast<LoopLikeOpInterface>(forallOp.getOperation())},
-          offsets,
-          sizes,
-          innerDestinationTensors};
-    };
-
-    scf::SCFTilingOptions::GenerateLoopTerminatorFn terminatorFn =
-        [&](RewriterBase &rewriter, Location loc, ValueRange tiledResults,
-            ArrayRef<SmallVector<OpFoldResult>> resultOffsets,
-            ArrayRef<SmallVector<OpFoldResult>> resultSizes,
-            ValueRange destinationTensors) -> LogicalResult {
-      for (auto [tiledValue, destinationTensor, resultOffset, resultSize] :
-           llvm::zip_equal(tiledResults, destinationTensors, resultOffsets,
-                           resultSizes)) {
-        SmallVector<OpFoldResult> resultStride(resultOffset.size(),
-                                               rewriter.getIndexAttr(1));
-
-        tensor::ParallelInsertSliceOp::create(rewriter, loc, tiledValue,
-                                              destinationTensor, resultOffset,
-                                              resultSize, resultStride);
-      }
-      return success();
-    };
-    // END
-
-    tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::CustomOp);
-    tilingOptions.setCustomLoopGenerationFns(loopHeaderFn, terminatorFn);
+      scf::SCFTilingOptions::GenerateLoopTerminatorFn terminatorFn =
+          [&dynamicTransposeAttr](
+              RewriterBase &rewriter, Location loc, ValueRange tiledResults,
+              ArrayRef<SmallVector<OpFoldResult>> resultOffsets,
+              ArrayRef<SmallVector<OpFoldResult>> resultSizes,
+              ValueRange destinationTensors) -> LogicalResult {
+        return dynamicTransposeAttr.generateLoopTerminatorFn(
+            rewriter, loc, tiledResults, resultOffsets, resultSizes,
+            destinationTensors);
+      };
+      tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::CustomOp);
+      tilingOptions.setCustomLoopGenerationFns(loopHeaderFn, terminatorFn);
+    }
   }
 
   scf::SCFTileAndFuseOptions tileAndFuseOptions;
