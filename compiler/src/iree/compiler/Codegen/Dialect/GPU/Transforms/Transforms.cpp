@@ -1080,7 +1080,7 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertScaledContractionToInnerTiledMma(
   SmallVector<int64_t> rhsInnerPerm = getNormalizedPermutation(
       rhsMap.getMinorSubMap(3), {kExpr, kBExpr, nExpr});
   SmallVector<int64_t> sc2InnerPerm =
-      getNormalizedPermutation(sc2Map.getMinorSubMap(2), {nExpr, kExpr});
+      getNormalizedPermutation(sc2Map.getMinorSubMap(2), {kExpr, nExpr});
   SmallVector<int64_t> accInnerPerm =
       getNormalizedPermutation(accMap.getMinorSubMap(2), {mExpr, nExpr});
   if (lhsInnerPerm.empty() || sc1InnerPerm.empty() || rhsInnerPerm.empty() ||
