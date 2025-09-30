@@ -295,12 +295,13 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
 
       scf::SCFTilingOptions::GenerateLoopTerminatorFn terminatorFn =
           [&dynamicTransposeAttr](
-              RewriterBase &rewriter, Location loc, ValueRange tiledResults,
+              RewriterBase &rewriter, Location loc,
+              ArrayRef<LoopLikeOpInterface> loops, ValueRange tiledResults,
               ArrayRef<SmallVector<OpFoldResult>> resultOffsets,
               ArrayRef<SmallVector<OpFoldResult>> resultSizes,
               ValueRange destinationTensors) -> LogicalResult {
         return dynamicTransposeAttr.generateLoopTerminatorFn(
-            rewriter, loc, tiledResults, resultOffsets, resultSizes,
+            rewriter, loc, loops, tiledResults, resultOffsets, resultSizes,
             destinationTensors);
       };
       tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::CustomOp);

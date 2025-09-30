@@ -1989,10 +1989,16 @@ DynamicTransposeAttr::generateLoopHeaderFn(
 }
 
 LogicalResult DynamicTransposeAttr::generateLoopTerminatorFn(
-    OpBuilder &builder, Location loc, ValueRange tiledResults,
-    ArrayRef<SmallVector<OpFoldResult>> resultOffsets,
+    OpBuilder &builder, Location loc, ArrayRef<LoopLikeOpInterface> loops,
+    ValueRange tiledResults, ArrayRef<SmallVector<OpFoldResult>> resultOffsets,
     ArrayRef<SmallVector<OpFoldResult>> resultSizes,
     ValueRange destinationTensors) const {
+
+  auto forallOp = cast<scf::ForallOp>(loops.front());
+  if (!forallOp) {
+    return emitError(loc) << "Only scf.forall op are supported";
+  }
+  builder.setInsertionPointToEnd(forallOp.getTerminator().getBody());
 
   for (auto [tiledValue, destinationTensor, resultOffset, resultSize] :
        llvm::zip_equal(tiledResults, destinationTensors, resultOffsets,

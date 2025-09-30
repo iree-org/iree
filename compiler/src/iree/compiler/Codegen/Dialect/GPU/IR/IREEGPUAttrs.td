@@ -666,7 +666,6 @@ def IREEGPU_DynamicTransposeAttr  :
     DeclareAttrInterfaceMethods<IREECodegen_WorkgroupReorderingAttrInterface, [
         "generateLoopHeaderFn",
         "generateLoopTerminatorFn"
-
       ]>
     ]> {
   let mnemonic = "dynamic_transpose";

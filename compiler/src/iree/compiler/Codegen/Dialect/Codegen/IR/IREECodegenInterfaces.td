@@ -259,6 +259,7 @@ def IREECodegen_WorkgroupReorderingAttrInterface :
       /*methodName=*/"generateLoopTerminatorFn",
       /*args=*/(ins "::mlir::OpBuilder&":$b,
                     "::mlir::Location":$loc,
+                    "::mlir::ArrayRef<::mlir::LoopLikeOpInterface>":$loops,
                     "::mlir::ValueRange":$tiledResults,
                     "::llvm::ArrayRef<::llvm::SmallVector<::mlir::OpFoldResult>>":$resultOffsets,
                     "::llvm::ArrayRef<::llvm::SmallVector<::mlir::OpFoldResult>>":$resultSizes,
