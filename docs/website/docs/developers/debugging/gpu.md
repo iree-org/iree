@@ -278,11 +278,11 @@ iree-compile dispatch.mlir \
   --iree-hal-dump-executable-files-to=original_trace
 # Extract the flags from original_trace/[...].linked.ll to a file, say opt-flags, and
 opt -o - $(cat opt-flags) <original_trace/[...].linked.ll >altered.opt.ll
-# To inspect the assembly
+# To inspect the assembly.
 llc [flags from original_trace/[...].rocmasm] altered.opt.ll -o altered.rocmasm
-# To produce an object file
+# To produce an object file.
 llc [flags from original_trace/[...].rocmasm] altered.opt.ll -o altered.o --filetype=obj
-# Linking to an HSACO
+# Linking to an HSACO.
 ld.lld -o altered.hsaco -shared altered.o
 # Re-compile with substitution. [dispatch_name] is the name of the
 # `hal.executable` op symbol, not the variant within it.

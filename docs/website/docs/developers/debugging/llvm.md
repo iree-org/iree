@@ -2,6 +2,8 @@
 hide:
   - tags
 tags:
+  - CPU
+  - CUDA
   - GPU
   - ROCm
 icon: octicons/bug-16
@@ -76,7 +78,7 @@ of compiler optimizations.
 
 ## Useful flags
 
-- `-print-after-all` and `-print-before/after=[passname]` cane help
+- `-print-after-all` and `-print-before/after=[passname]` can help
   locate places were suspect IR is introduced or where crashes occur, just as their
   MLIR equivalents can be used in IREE.
 - `-print-module-scope` ensures IR dumps include attributes and metadata
@@ -116,7 +118,7 @@ These slides include other useful flags and tips.
 
 ## Creating reproducers
 
-If you're planning to file a bug anaist LLVM, it's helpful to create a small reproducer.
+If you're planning to file a bug against LLVM, it's helpful to create a small reproducer.
 
 In many cases, an input that demonstrates the behavior you've identified as a bug
 can be either created with `llvm-reduce` or by hand.
