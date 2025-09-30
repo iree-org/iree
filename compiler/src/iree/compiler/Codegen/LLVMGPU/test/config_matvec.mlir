@@ -357,7 +357,7 @@ func.func @skinny_mmt_lhs_is_vector() {
 // CHECK-SAME:       partial_reduction =       [0, 0, 512],
 // CHECK-SAME:       subgroup_basis =    {{\[}}[1, 1, 1], [0, 1, 2]],
 // CHECK-SAME:       thread =                  [0, 0, 8],
-// CHECK-SAME:       workgroup =               [1, 1, 0]}>}
+// CHECK-SAME:       workgroup =               [2, 1, 0]}>}
 
 // -----
 

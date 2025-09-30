@@ -430,7 +430,7 @@ getVectorDistributeReductionConfig(
     const int64_t maxParallelFactor = workgroupSize / 4;
     for (int64_t parallelFactor = 2; (parallelFactor < maxParallelFactor) &&
                                      (parallelBound % parallelFactor == 0) &&
-                                     (parallelBound > parallelFactor);
+                                     (parallelBound >= parallelFactor);
          parallelFactor *= 2) {
       numParallelReductions = parallelFactor;
     }
