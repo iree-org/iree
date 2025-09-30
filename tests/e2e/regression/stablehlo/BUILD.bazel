@@ -113,14 +113,13 @@ iree_lit_test_suite(
         include = ["*.mlir"],
         exclude = CPU_SPECIFIC_TESTS + CHECK_TESTS,
     ),
-    cfg = "//tools:lit.cfg.py",
+    cfg = "//tests:lit.cfg.py",
     tags = [
         "driver=local-task",
         "hostonly",
     ],
     tools = [
         "//tools:iree-run-mlir",
-        "@llvm-project//lld",
         "@llvm-project//llvm:FileCheck",
     ],
 )

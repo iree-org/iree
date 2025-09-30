@@ -128,7 +128,6 @@ iree_lit_test_suite(
   SRCS
     "globals_ml_program.mlir"
   TOOLS
-    ${IREE_LLD_TARGET}
     FileCheck
     iree-run-mlir
   LABELS
