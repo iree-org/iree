@@ -152,6 +152,7 @@ iree_bytecode_module(
     ],
 )
 
+# TODO:Fix https://github.com/iree-org/iree/issues/22161
 #iree_bytecode_module(
 #    name = "simple_embedding_test_bytecode_module_cpu_arm_32",
 #    src = "simple_embedding_test.mlir",
