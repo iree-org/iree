@@ -185,9 +185,6 @@ void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface op,
                      ArrayRef<int64_t> tileSizes,
                      ArrayRef<bool> tileScalableFlags);
 
-Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
-                              ArrayRef<NamedAttribute> attributes = {});
-
 /// Returns the option that distributes the ops using the flow workgroup
 /// ID/Count operations.
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
@@ -393,6 +390,22 @@ bool neverRunsSecondIteration(scf::ForOp op);
 ///  Here %4 is an external capture used via tensor.extract inside
 ///  linalg.generic hence the above `genericOp` has an external capture.
 bool hasExternalCapture(linalg::GenericOp genericOp);
+
+//===----------------------------------------------------------------------===//
+// Utility functions for copy operations
+//===----------------------------------------------------------------------===//
+
+/// Create a linalg::GenericOp version of an n-D copy that can further tile,
+/// lower to loops or vectorize, unlike the current implementation of
+/// memref::CopyOp.
+Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
+                              ArrayRef<NamedAttribute> attributes = {});
+
+/// Returns the tile sizes for tiling a `memref.copy` operation.
+SmallVector<OpFoldResult> getCopyTileSizes(OpBuilder &b, memref::CopyOp copy);
+
+/// Returns the tile sizes for tiling a `linalg.copy` operation.
+std::optional<SmallVector<int64_t>> getCopyTileSizes(linalg::CopyOp);
 
 } // namespace mlir::iree_compiler
 

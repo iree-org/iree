@@ -46,6 +46,8 @@ constexpr char kCpuFeaturesAttrName[] = "cpu_features";
 constexpr char kDataLayoutAttrName[] = "data_layout";
 constexpr char kTargetInfoAttrName[] = "iree_codegen.target_info";
 constexpr char kTargetTripleAttrName[] = "target_triple";
+// For optimal performance we always want to copy 128 bits
+constexpr int64_t kPreferredCopyNumBits = 128;
 
 namespace mlir::iree_compiler {
 
@@ -972,36 +974,6 @@ void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface op,
               });
         });
   }
-}
-
-/// Create a linalg::GenericOp version of an n-D copy that can further tile,
-/// lower to loops or vectorize, unlike the current implementation of
-/// memref::CopyOp.
-Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
-                              ArrayRef<NamedAttribute> attributes) {
-  auto memrefTypeFrom = llvm::dyn_cast<MemRefType>(from.getType());
-  auto memrefTypeTo = llvm::dyn_cast<MemRefType>(to.getType());
-  if (!memrefTypeFrom || !memrefTypeTo ||
-      memrefTypeFrom.getRank() != memrefTypeTo.getRank()) {
-    mlir::emitError(
-        loc, "unable to generate copy op within bufferization from type ")
-        << memrefTypeFrom << " to " << memrefTypeTo;
-    return nullptr;
-  }
-  AffineMap id =
-      AffineMap::getMultiDimIdentityMap(memrefTypeTo.getRank(), b.getContext());
-  SmallVector<utils::IteratorType> iteratorTypes(memrefTypeTo.getRank(),
-                                                 utils::IteratorType::parallel);
-  return linalg::GenericOp::create(
-      b, loc,
-      /*inputs=*/from,
-      /*outputs=*/to,
-      /*indexingMaps=*/llvm::ArrayRef({id, id}),
-      /*iteratorTypes=*/iteratorTypes,
-      [](OpBuilder &b, Location loc, ValueRange args) {
-        linalg::YieldOp::create(b, loc, args.front());
-      },
-      attributes);
 }
 
 template <typename OpTy>
@@ -2044,6 +2016,85 @@ bool hasExternalCapture(linalg::GenericOp genericOp) {
     }
   }
   return false; // All operands are locally defined or block arguments.
+}
+
+//===----------------------------------------------------------------------===//
+// Utility functions for copy operations
+//===----------------------------------------------------------------------===//
+
+Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
+                              ArrayRef<NamedAttribute> attributes) {
+  auto memrefTypeFrom = llvm::dyn_cast<MemRefType>(from.getType());
+  auto memrefTypeTo = llvm::dyn_cast<MemRefType>(to.getType());
+  if (!memrefTypeFrom || !memrefTypeTo ||
+      memrefTypeFrom.getRank() != memrefTypeTo.getRank()) {
+    mlir::emitError(
+        loc, "unable to generate copy op within bufferization from type ")
+        << memrefTypeFrom << " to " << memrefTypeTo;
+    return nullptr;
+  }
+  AffineMap id =
+      AffineMap::getMultiDimIdentityMap(memrefTypeTo.getRank(), b.getContext());
+  SmallVector<utils::IteratorType> iteratorTypes(memrefTypeTo.getRank(),
+                                                 utils::IteratorType::parallel);
+  return linalg::GenericOp::create(
+      b, loc,
+      /*inputs=*/from,
+      /*outputs=*/to,
+      /*indexingMaps=*/llvm::ArrayRef({id, id}),
+      /*iteratorTypes=*/iteratorTypes,
+      [](OpBuilder &b, Location loc, ValueRange args) {
+        linalg::YieldOp::create(b, loc, args.front());
+      },
+      attributes);
+}
+
+SmallVector<OpFoldResult> getCopyTileSizes(OpBuilder &b, memref::CopyOp copy) {
+  int64_t rank = copy.getTarget().getType().getRank();
+  if (rank == 0) {
+    return {};
+  }
+
+  SmallVector<OpFoldResult> tileSizes(rank - 1, b.getIndexAttr(1));
+  int64_t elementBitWidth = llvm::cast<MemRefType>(copy.getTarget().getType())
+                                .getElementTypeBitWidth();
+  tileSizes.push_back(b.getIndexAttr(kPreferredCopyNumBits / elementBitWidth));
+  return tileSizes;
+}
+
+std::optional<SmallVector<int64_t>> getCopyTileSizes(linalg::CopyOp copyOp) {
+  auto type =
+      llvm::dyn_cast<MemRefType>(copyOp.getDpsInputOperand(0)->get().getType());
+  if (!type) {
+    return std::nullopt;
+  }
+  SmallVector<int64_t> bounds = copyOp.getStaticLoopRanges();
+  int64_t elementBitWidth = type.getElementTypeBitWidth();
+  SmallVector<int64_t> tileSizes(bounds.size(), 1);
+  int64_t innerBound = bounds.back();
+  const int64_t preferredCopyNumElements =
+      kPreferredCopyNumBits / elementBitWidth;
+  if (ShapedType::isDynamic(innerBound) ||
+      innerBound >= preferredCopyNumElements) {
+    tileSizes[bounds.size() - 1] = preferredCopyNumElements;
+    return tileSizes;
+  }
+  // Distribute the preferred number of elements being copied across multiple
+  // dimensions if possible.
+  int64_t remPreferredCopyNumElementsDiv = preferredCopyNumElements;
+  for (auto [i, b] : llvm::enumerate(llvm::reverse(bounds))) {
+    size_t index = bounds.size() - i - 1;
+    if (remPreferredCopyNumElementsDiv < b) {
+      tileSizes[index] = remPreferredCopyNumElementsDiv;
+      break;
+    }
+    tileSizes[index] = b;
+    remPreferredCopyNumElementsDiv /= b;
+    if (remPreferredCopyNumElementsDiv == 0) {
+      break;
+    }
+  }
+  return tileSizes;
 }
 
 } // namespace mlir::iree_compiler
