@@ -77,9 +77,31 @@ struct ConvertGatherOpToCoalescedDMA
     auto initType = cast<RankedTensorType>(init.getType());
     int64_t rank = initType.getRank();
 
+    // Check that init has static dimension sizes.
+    if (!initType.hasStaticShape()) {
+      return rewriter.notifyMatchFailure(
+          gatherOp, "init tensor must have static dimensions");
+    }
+
     // Subgroup size should be equal to the gathering memref rank.
     if (rank != subgroupTileSizes.size()) {
       return failure();
+    }
+
+    // Verify that tile sizes divide the dimensions evenly.
+    for (int64_t i = 0; i < rank; ++i) {
+      OpFoldResult tileSize = subgroupTileSizes[i];
+      if (auto tileSizeAttr = llvm::dyn_cast_if_present<Attribute>(tileSize)) {
+        if (auto intAttr = llvm::dyn_cast<IntegerAttr>(tileSizeAttr)) {
+          int64_t tileSizeVal = intAttr.getInt();
+          int64_t dimSize = initType.getDimSize(i);
+          if (dimSize != ShapedType::kDynamic && tileSizeVal > 0 &&
+              dimSize % tileSizeVal != 0) {
+            return rewriter.notifyMatchFailure(
+                gatherOp, "tile size must divide dimension size evenly");
+          }
+        }
+      }
     }
 
     SmallVector<OpFoldResult> tileSizes;
