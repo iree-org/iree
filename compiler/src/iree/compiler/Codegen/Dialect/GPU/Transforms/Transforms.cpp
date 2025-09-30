@@ -28,7 +28,6 @@
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
@@ -1923,7 +1922,6 @@ struct LowerGlobalLoadDMAPattern
     return success();
   }
 };
-
 } // namespace
 
 void populateIREEGPULowerValueBarrierPatterns(RewritePatternSet &patterns) {
