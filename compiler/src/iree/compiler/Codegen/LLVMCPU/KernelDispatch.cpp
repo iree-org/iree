@@ -1099,7 +1099,7 @@ public:
   }
 
   /// Returns all global dimension indices associated with the given operation.
-  ArrayRef<int64_t> getGlobalDimIdx(Operation *op) const {
+  ArrayRef<int64_t> getAllGlobalDimIdx(Operation *op) const {
     auto it = operationToGlobalDimMaps.find(op);
     assert(it != operationToGlobalDimMaps.end() &&
            "Operation not found in DimTracker");
@@ -1109,9 +1109,7 @@ public:
   /// Returns the global dimension index corresponding to the given local loop
   /// dimension `pos` for the specified operation.
   int64_t getGlobalDimIdx(Operation *op, int64_t pos) const {
-    ArrayRef<int64_t> globalDims = getGlobalDimIdx(op);
-    assert(pos >= 0 && pos < static_cast<int64_t>(globalDims.size()) &&
-           "Dimension index out of range");
+    ArrayRef<int64_t> globalDims = getAllGlobalDimIdx(op);
     return globalDims[pos];
   }
 
@@ -2960,218 +2958,23 @@ public:
 
   /// Load the root op lowering config, and store its tiling info using global
   /// dimension indices.
-  void
-  loadRootLoweringConfig(IREE::CPU::LoweringConfigAttr rootLoweringConfig) {
-    const int64_t totalLoopNum = dimTracker.getTotalLoopNum();
-
-    auto loadTilingLevel = [&](TilingLevel level) {
-      SmallVector<int64_t> sizes;
-      SmallVector<bool> flags;
-      if (level == TilingLevel::DistributionTiles) {
-        assert(rootLoweringConfig.hasWorkgroupTilingLevel() &&
-               "Expected root lowering config to have workgroup tiling level.");
-        sizes = rootLoweringConfig.getWorkgroupTileSizes();
-        flags.resize(sizes.size(), false);
-      } else if (level == TilingLevel::VectorCommonParallelTiles) {
-        if (rootLoweringConfig.hasTilingLevel(level)) {
-          auto attr = llvm::cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-              rootLoweringConfig.getTilingLevelAttr(level));
-          sizes.assign(attr.getSizes().begin(), attr.getSizes().end());
-          // Only `VectorCommonParallel` has scalable flags.
-          flags.assign(attr.getScalableFlags().begin(),
-                       attr.getScalableFlags().end());
-        }
-      } else {
-        if (rootLoweringConfig.hasTilingLevel(level)) {
-          sizes = rootLoweringConfig.getStaticTilingLevelSizes(level,
-                                                               rootOperation);
-          flags.resize(sizes.size(), false);
-        }
-      }
-
-      // `MultiLoweringConfigGenerator` propagates tiling on the unpacked
-      // dimensions, while `rootLoweringConfig` defines tiling on the packed
-      // inner dimensions. Therefore, use inverse
-      // `scaleAndPermutateTilingForPackOp` to translate tiling information from
-      // the packed back to the unpacked dimensions.
-      if (auto packOp = dyn_cast<linalg::PackOp>(rootOperation);
-          packOp && !sizes.empty()) {
-        scaleAndPermutateTilingForPackOp(packOp, sizes, flags,
-                                         /*inverse=*/true);
-      }
-
-      // Map the tiling information from the op-level local dimension indices
-      // to dispatch-region global dimension indices.
-      globalTileSizes[level].assign(totalLoopNum, 0);
-      globalScalableTileFlags[level].assign(totalLoopNum, false);
-      for (auto [pos, pair] : llvm::enumerate(llvm::zip_equal(sizes, flags))) {
-        auto [size, flag] = pair;
-        int64_t globalDimIdx = dimTracker.getGlobalDimIdx(rootOperation, pos);
-        globalTileSizes[level][globalDimIdx] = size;
-        globalScalableTileFlags[level][globalDimIdx] = flag;
-      }
-    };
-
-    // Load all tiling levels.
-    loadTilingLevel(TilingLevel::CacheParallelTiles);
-    loadTilingLevel(TilingLevel::CacheReductionTiles);
-    loadTilingLevel(TilingLevel::DistributionTiles);
-    loadTilingLevel(TilingLevel::VectorCommonParallelTiles);
-    loadTilingLevel(TilingLevel::VectorReductionTiles);
-  }
+  void loadRootLoweringConfig(IREE::CPU::LoweringConfigAttr rootLoweringConfig);
 
   /// Get the vector tile sizes favoured by non-root operations.
-  void getVecTileSizesForNonRootOps(mlir::FunctionOpInterface entryPointFn) {
-    for (auto op : computeOps) {
-      // Tile sizes have been initialized from the root op, so skip it.
-      if (op == rootOperation) {
-        continue;
-      }
-      if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
-        nonRootOpVecTileSizes[op] =
-            getVecTileSizesForNonRootPackOp(entryPointFn, packOp);
-      } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
-        nonRootOpVecTileSizes[op] = getVecTileSizesForNonRootUnPackOp(unpackOp);
-      } else if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
-        nonRootOpVecTileSizes[op] =
-            getVecTileSizesForNonRootGenericOp(entryPointFn, genericOp);
-      }
-    }
-  }
+  void getVecTileSizesForNonRootOps(mlir::FunctionOpInterface entryPointFn);
 
   /// Adjust the root op tiling sizes based on non-root ops and root result
   /// type.
-  void adjustTileSizesForRootOp() {
-    ArrayRef<int64_t> rootOpGlobalDims =
-        dimTracker.getGlobalDimIdx(rootOperation);
-    auto adjust = [&](Operation *op, ArrayRef<int64_t> vecTileSize,
-                      TilingLevel level,
-                      llvm::function_ref<int64_t(int64_t, int64_t)> updater) {
-      for (auto [pos, size] : llvm::enumerate(vecTileSize)) {
-        int64_t globalDimIdx = dimTracker.getGlobalDimIdx(op, pos);
-        if (size <= 0 || !llvm::is_contained(rootOpGlobalDims, globalDimIdx)) {
-          continue;
-        }
-        globalTileSizes[level][globalDimIdx] =
-            updater(globalTileSizes[level][globalDimIdx], size);
-      }
-    };
-    auto align = [](int64_t oldSize, int64_t newSize) {
-      return llvm::alignTo(oldSize, newSize);
-    };
-    auto overwrite = [](int64_t oldSize, int64_t newSize) { return newSize; };
-    // Adjust root op tiling sizes with non-root op.
-    for (auto &[op, vecTileSize] : nonRootOpVecTileSizes) {
-      if (isa<linalg::PackOp>(op)) {
-        // For pack op, align the distribution tile size and overwrite the
-        // vector parallel tile size.
-        adjust(op, vecTileSize, TilingLevel::DistributionTiles, align);
-        adjust(op, vecTileSize, TilingLevel::VectorCommonParallelTiles,
-               overwrite);
-      } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
-        // For unpack op, just overwrite the vector parallel tile size.
-        // However, dimension tracking is expected be broken in the case of
-        // `generic -> unpack`, since only the unpacked dimensions are propated.
-        // To correct this, use the generic op result indexing map to update the
-        // tracking.
-        //
-        // Example: If the generic op result has an affine map
-        //          (d0, d1, d2, d3) -> (d0, d1, d2, d3),
-        //          we use `vecTileSize` to adjust (d2, d3) instead of (d0, d1).
-        auto linalgOp = unpackOp.getSource().getDefiningOp<linalg::LinalgOp>();
-        if (!linalgOp) {
-          continue;
-        }
-        AffineMap indexingMap = linalgOp.getIndexingMapMatchingResult(
-            cast<OpResult>(unpackOp.getSource()));
-        SmallVector<int64_t> adjustedTileSize(linalgOp.getNumLoops(), 0);
-        for (auto [expr, tileSize] : llvm::zip_equal(
-                 indexingMap.getResults().take_back(vecTileSize.size()),
-                 vecTileSize)) {
-          auto dimExpr = dyn_cast<AffineDimExpr>(expr);
-          if (!dimExpr) {
-            continue;
-          }
-          adjustedTileSize[dimExpr.getPosition()] = tileSize;
-        }
-        adjust(linalgOp.getOperation(), adjustedTileSize,
-               TilingLevel::VectorCommonParallelTiles, overwrite);
-      }
-    }
-
-    // Adjust root op tiling sizes with root result element type.
-    // Make sure the innermost tile size times element size is multiple
-    // of byte bits. This is required for now because we do not fully
-    // support sub-byte vector stores. Once vector stores are supported
-    // then this can be eliminated. Note that emulating sub-byte sized vector
-    // loads and stores will have a performance impact.
-    auto resultTypes = rootOperation->getResultTypes();
-    if (!resultTypes.empty()) {
-      Type elementType = cast<ShapedType>(resultTypes[0]).getElementType();
-      unsigned int elementTypeSize;
-      if (auto complexType = llvm::dyn_cast<ComplexType>(elementType)) {
-        elementTypeSize =
-            2 * complexType.getElementType().getIntOrFloatBitWidth();
-      } else {
-        elementTypeSize = elementType.getIntOrFloatBitWidth();
-      }
-      // For now just enable for i1.
-      if (elementTypeSize == 1) {
-        SmallVector<int64_t> vecTileSize(rootOpGlobalDims.size(), 0);
-        vecTileSize.back() = 8;
-        adjust(rootOperation, vecTileSize,
-               TilingLevel::VectorCommonParallelTiles, align);
-      }
-    }
-  }
+  void adjustTileSizesForRootOp();
 
   /// Fills the vector parallel tile sizes that haven't been set yet with values
   /// from non-root ops. Pack ops are prioritized for good performance.
-  void fillTileSizesWithNonRootOps() {
-    SmallVector<std::pair<Operation *, SmallVector<int64_t>>> opToVecTileSize(
-        nonRootOpVecTileSizes.begin(), nonRootOpVecTileSizes.end());
-    // Sort to prioritize pack ops.
-    llvm::sort(opToVecTileSize, [](auto &a, auto &b) {
-      return isa<linalg::PackOp>(a.first) > isa<linalg::PackOp>(b.first);
-    });
-    for (auto &[op, vecTileSize] : opToVecTileSize) {
-      for (auto [pos, size] : llvm::enumerate(vecTileSize)) {
-        int64_t globalDimIdx = dimTracker.getGlobalDimIdx(op, pos);
-        int64_t &tile = globalTileSizes[TilingLevel::VectorCommonParallelTiles]
-                                       [globalDimIdx];
-        // Only set the tile size if it hasn't been assigned yet.
-        if (tile == 0 && size > 0) {
-          tile = size;
-        }
-      }
-    }
-  }
+  void fillTileSizesWithNonRootOps();
 
   /// Fill `VectorReduction` on all reduction dimensions of non-root generic
   /// operations. At this stage, common/inner dimensions have not yet been
   /// split, so use values from `VectorCommonParallelTiles` to fill.
-  void getGenericReductionTileSizes() {
-    for (auto &[op, vecTileSize] : nonRootOpVecTileSizes) {
-      if (!isa<linalg::GenericOp>(op)) {
-        continue;
-      }
-      SmallVector<utils::IteratorType> iterTypes =
-          cast<TilingInterface>(op).getLoopIteratorTypes();
-      for (auto [pos, pair] :
-           llvm::enumerate(llvm::zip_equal(vecTileSize, iterTypes))) {
-        auto [size, iterType] = pair;
-        if (iterType == utils::IteratorType::parallel) {
-          continue;
-        }
-        int64_t globalDimIdx = dimTracker.getGlobalDimIdx(op, pos);
-        globalTileSizes[TilingLevel::VectorReductionTiles][globalDimIdx] = size;
-        globalScalableTileFlags
-            [TilingLevel::VectorReductionTiles][globalDimIdx] =
-                globalScalableTileFlags[TilingLevel::VectorCommonParallelTiles]
-                                       [globalDimIdx];
-      }
-    }
-  }
+  void getGenericReductionTileSizes();
 
   /// Split parallel vector tile sizes into common parts and op-specific
   /// parts. Note: the concept of `VectorCommonParallel` is currently abused to
@@ -3180,118 +2983,48 @@ public:
   ///     compute operations,
   /// (2) a parallel (non-reduction) loop dimension that appears in the
   ///     root operation (not necessary in all operations).
-  void splitCommonInnerVectorTiles() {
-    ArrayRef<int64_t> rootOpGlobalDims =
-        dimTracker.getGlobalDimIdx(rootOperation);
-    const int64_t totalLoopNum = dimTracker.getTotalLoopNum();
-
-    // Initialize inner parallel tiles.
-    globalTileSizes[TilingLevel::VectorInnerParallelTiles].assign(totalLoopNum,
-                                                                  0);
-    globalScalableTileFlags[TilingLevel::VectorInnerParallelTiles].assign(
-        totalLoopNum, false);
-
-    auto isReductionDim = [&](int64_t globalDimIdx) {
-      return globalTileSizes[TilingLevel::VectorReductionTiles][globalDimIdx] >
-             0;
-    };
-
-    SmallVector<int64_t> &commonSizes =
-        globalTileSizes[TilingLevel::VectorCommonParallelTiles];
-    SmallVector<bool> &commonFlags =
-        globalScalableTileFlags[TilingLevel::VectorCommonParallelTiles];
-    SmallVector<int64_t> &innerSizes =
-        globalTileSizes[TilingLevel::VectorInnerParallelTiles];
-    SmallVector<bool> &innerFlags =
-        globalScalableTileFlags[TilingLevel::VectorInnerParallelTiles];
-
-    for (auto [globalDimIdx, pair] :
-         llvm::enumerate(llvm::zip_equal(commonSizes, commonFlags))) {
-      auto [size, flag] = pair;
-      // "Common" means a parallel loop present either in all compute ops or in
-      // the root op.
-      if ((dimTracker.presentInAllOps(globalDimIdx) ||
-           llvm::is_contained(rootOpGlobalDims, globalDimIdx)) &&
-          !isReductionDim(globalDimIdx)) {
-        continue;
-      }
-      innerSizes[globalDimIdx] = size;
-      innerFlags[globalDimIdx] = flag;
-      commonSizes[globalDimIdx] = 0;
-      commonFlags[globalDimIdx] = false;
-    }
-  }
+  void splitCommonInnerVectorTiles();
 
   /// Sets new tiling configurations for all compute operations (including the
   /// root op).
-  void setNewTilingConfigs() {
-    SmallVector<TilingLevel> tilingLevels;
-    tilingLevels.reserve(globalTileSizes.size());
-    for (const auto &entry : globalTileSizes) {
-      tilingLevels.push_back(entry.first);
-    }
-
-    for (auto op : computeOps) {
-      SmallVector<utils::IteratorType> iterTypes =
-          cast<TilingInterface>(op).getLoopIteratorTypes();
-      int numLoops = iterTypes.size();
-      SmallVector<IREE::CPU::LoweringConfigLevelInfo> newTilingInfo;
-      for (TilingLevel level : tilingLevels) {
-        SmallVector<int64_t> tileSizes(numLoops, 0);
-        SmallVector<bool> scalableFlags(numLoops, false);
-        for (auto [pos, iterType] : llvm::enumerate(iterTypes)) {
-          int64_t globalDimIdx = dimTracker.getGlobalDimIdx(op, pos);
-          // Skip dimensions where the reduction iterator type and tiling level
-          // mismatch. The XOR(^) means:
-          //   - If the loop dimension is a reduction but the current tiling
-          //   level is not `VectorReductionTiles`, skip it.
-          //   - If the loop dimension is not a reduction but the current tiling
-          //   level is `VectorReductionTiles`, skip it.
-          if ((iterType == utils::IteratorType::reduction) ^
-              (level == TilingLevel::VectorReductionTiles)) {
-            continue;
-          }
-          tileSizes[pos] = globalTileSizes[level][globalDimIdx];
-          scalableFlags[pos] = globalScalableTileFlags[level][globalDimIdx];
-        }
-
-        if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
-          // `MultiLoweringConfigGenerator` propagates tiling on the
-          // unpacked dimensions, while for a pack operation, `LoweringConfig`
-          // defines tiling on the packed inner dimensions. Therefore, use
-          // `scaleAndPermutateTilingForPackOp` to translate the tiling
-          // information from the unpacked to the packed dimensions.
-          scaleAndPermutateTilingForPackOp(packOp, tileSizes, scalableFlags,
-                                           /*inverse=*/false);
-        }
-        updateOrAddTilingLevelInfo(newTilingInfo, level, tileSizes,
-                                   scalableFlags);
-
-        std::sort(newTilingInfo.begin(), newTilingInfo.end(),
-                  [](const IREE::CPU::LoweringConfigLevelInfo &lhs,
-                     const IREE::CPU::LoweringConfigLevelInfo &rhs) {
-                    return lhs.level < rhs.level;
-                  });
-        IREE::Codegen::LoweringConfigAttrInterface config =
-            getNewLoweringConfig(rootOperation->getContext(), newTilingInfo,
-                                 /*setDistributionConfig=*/op == rootOperation);
-        setLoweringConfig(op, config);
-      }
-    }
-  }
+  void setNewTilingConfigs();
 
 private:
+  /// The Pack op requires special vector tile sizes, which are determined using
+  /// getPackVectorTileSize to achieve optimal performance (e.g., a 16x16 tile
+  /// size on AVX512 to generate efficient transpose code for the Pack op).
+  ///
+  /// Example:
+  /// For a Matmul RHS Pack op with `outer_dims_perm = [1, 0]` and `inner_tiles
+  /// = [16, 1]`, `getPackVectorTileSize` initially returns `[1, 1]`. Since the
+  /// `MultiLoweringConfigGenerator` propagates tiling of the outer (unpacked)
+  /// dimensions, inversed `scaleAndPermutateTilingForPackOp` translates the
+  /// tile sizes from `[1, 1]` to `[1, 16]`.
+  ///
+  /// As a result, the Pack op expects its producer (potentially the root op) to
+  /// use tile sizes `[1, 16]` for those two dimensions, enabling tile-and-fuse
+  /// optimizations.
   SmallVector<int64_t>
   getVecTileSizesForNonRootPackOp(mlir::FunctionOpInterface entryPointFn,
                                   linalg::PackOp packOp);
 
+  /// Simply returns the inner tile sizes for a non-root `UnPackOp`, used to
+  /// help fusion. Dynamic sizes are replaced with 0 to indicate that tiling
+  /// size is unknown. Note: the method is designed for fusion cases in
+  /// data-tiling, like `matmul->generic->unpack`.
   SmallVector<int64_t>
   getVecTileSizesForNonRootUnPackOp(linalg::UnPackOp unpackOp);
 
+  /// Returns tile sizes for a non-root `GenericOp`.
+  /// The selection logic is the same as `setElementwiseGenericOpRootConfig`.
+  ///
+  /// TODO (zhewen): Merge this function to avoid duplication.
   SmallVector<int64_t>
   getVecTileSizesForNonRootGenericOp(mlir::FunctionOpInterface entryPointFn,
                                      linalg::GenericOp genericOp);
 
+  /// Updates the tile sizes and scalable flags in the `tilingInfo` with given
+  /// `level`, if it is present. Otherwise, adds a new item to the vector.
   void updateOrAddTilingLevelInfo(
       SmallVectorImpl<IREE::CPU::LoweringConfigLevelInfo> &tilingInfo,
       TilingLevel level, ArrayRef<int64_t> tileSizes,
@@ -3313,42 +3046,7 @@ private:
   void scaleAndPermutateTilingForPackOp(linalg::PackOp packOp,
                                         SmallVector<int64_t> &tileSizes,
                                         SmallVector<bool> &scalableFlags,
-                                        bool inverse) {
-    ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
-    ArrayRef<int64_t> innerDimPos = packOp.getInnerDimsPos();
-    ArrayRef<int64_t> outerDimsPerm = packOp.getOuterDimsPerm();
-    if (inverse) {
-      // First undo dimension permutation if present.
-      if (!outerDimsPerm.empty()) {
-        auto invertedPerm = invertPermutationVector(outerDimsPerm);
-        applyPermutationToVector(tileSizes, invertedPerm);
-        applyPermutationToVector(scalableFlags, invertedPerm);
-      }
-      // Then unscale tile sizes by multiplying the inner tile sizes.
-      for (auto &&[pos, size] : llvm::zip_equal(innerDimPos, innerTiles)) {
-        if (ShapedType::isDynamic(size)) {
-          continue;
-        }
-        tileSizes[pos] *= size;
-      }
-
-    } else {
-      // First scale tile sizes by dividing by the inner tile sizes.
-      for (auto &&[pos, size] : llvm::zip_equal(innerDimPos, innerTiles)) {
-        if (ShapedType::isDynamic(size)) {
-          continue;
-        }
-        tileSizes[pos] /= size;
-      }
-
-      // Then apply dimension permutation if present.
-      if (!outerDimsPerm.empty()) {
-        applyPermutationToVector(tileSizes, outerDimsPerm);
-        applyPermutationToVector(scalableFlags, outerDimsPerm);
-      }
-    }
-  }
-
+                                        bool inverse);
   Operation *rootOperation;
   SmallVector<Operation *> computeOps;
 
@@ -3363,20 +3061,304 @@ private:
   llvm::SmallDenseMap<Operation *, SmallVector<int64_t>> nonRootOpVecTileSizes;
 };
 
-/// The Pack op requires special vector tile sizes, which are determined using
-/// getPackVectorTileSize to achieve optimal performance (e.g., a 16x16 tile
-/// size on AVX512 to generate efficient transpose code for the Pack op).
-///
-/// Example:
-/// For a Matmul RHS Pack op with `outer_dims_perm = [1, 0]` and `inner_tiles =
-/// [16, 1]`, `getPackVectorTileSize` initially returns `[1, 1]`. Since the
-/// `MultiLoweringConfigGenerator` propagates tiling of the outer (unpacked)
-/// dimensions, inversed `scaleAndPermutateTilingForPackOp` translates the tile
-/// sizes from `[1, 1]` to `[1, 16]`.
-///
-/// As a result, the Pack op expects its producer (potentially the root op) to
-/// use tile sizes `[1, 16]` for those two dimensions, enabling tile-and-fuse
-/// optimizations.
+void MultiLoweringConfigGenerator::loadRootLoweringConfig(
+    IREE::CPU::LoweringConfigAttr rootLoweringConfig) {
+  const int64_t totalLoopNum = dimTracker.getTotalLoopNum();
+
+  auto loadTilingLevel = [&](TilingLevel level) {
+    SmallVector<int64_t> sizes;
+    SmallVector<bool> flags;
+    if (level == TilingLevel::DistributionTiles) {
+      assert(rootLoweringConfig.hasWorkgroupTilingLevel() &&
+             "Expected root lowering config to have workgroup tiling level.");
+      sizes = rootLoweringConfig.getWorkgroupTileSizes();
+      flags.resize(sizes.size(), false);
+    } else if (level == TilingLevel::VectorCommonParallelTiles) {
+      if (rootLoweringConfig.hasTilingLevel(level)) {
+        auto attr = llvm::cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
+            rootLoweringConfig.getTilingLevelAttr(level));
+        sizes.assign(attr.getSizes().begin(), attr.getSizes().end());
+        // Only `VectorCommonParallel` has scalable flags.
+        flags.assign(attr.getScalableFlags().begin(),
+                     attr.getScalableFlags().end());
+      }
+    } else {
+      if (rootLoweringConfig.hasTilingLevel(level)) {
+        sizes =
+            rootLoweringConfig.getStaticTilingLevelSizes(level, rootOperation);
+        flags.resize(sizes.size(), false);
+      }
+    }
+
+    // `MultiLoweringConfigGenerator` propagates tiling on the unpacked
+    // dimensions, while `rootLoweringConfig` defines tiling on the packed
+    // inner dimensions. Therefore, use inverse
+    // `scaleAndPermutateTilingForPackOp` to translate tiling information from
+    // the packed back to the unpacked dimensions.
+    if (auto packOp = dyn_cast<linalg::PackOp>(rootOperation);
+        packOp && !sizes.empty()) {
+      scaleAndPermutateTilingForPackOp(packOp, sizes, flags,
+                                       /*inverse=*/true);
+    }
+
+    // Map the tiling information from the op-level local dimension indices
+    // to dispatch-region global dimension indices.
+    globalTileSizes[level].assign(totalLoopNum, 0);
+    globalScalableTileFlags[level].assign(totalLoopNum, false);
+    for (auto [pos, size, flag] : llvm::enumerate(sizes, flags)) {
+      int64_t globalDimIdx = dimTracker.getGlobalDimIdx(rootOperation, pos);
+      globalTileSizes[level][globalDimIdx] = size;
+      globalScalableTileFlags[level][globalDimIdx] = flag;
+    }
+  };
+
+  // Load all tiling levels.
+  for (int i = 0, e = static_cast<int>(TilingLevel::MaxNumTileLevels); i < e;
+       ++i) {
+    loadTilingLevel(static_cast<TilingLevel>(i));
+  }
+}
+
+void MultiLoweringConfigGenerator::getVecTileSizesForNonRootOps(
+    mlir::FunctionOpInterface entryPointFn) {
+  for (auto op : computeOps) {
+    // Tile sizes have been initialized from the root op, so skip it.
+    if (op == rootOperation) {
+      continue;
+    }
+    if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
+      nonRootOpVecTileSizes[op] =
+          getVecTileSizesForNonRootPackOp(entryPointFn, packOp);
+    } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
+      nonRootOpVecTileSizes[op] = getVecTileSizesForNonRootUnPackOp(unpackOp);
+    } else if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+      nonRootOpVecTileSizes[op] =
+          getVecTileSizesForNonRootGenericOp(entryPointFn, genericOp);
+    }
+  }
+}
+
+void MultiLoweringConfigGenerator::adjustTileSizesForRootOp() {
+  ArrayRef<int64_t> rootOpGlobalDims =
+      dimTracker.getAllGlobalDimIdx(rootOperation);
+  auto adjust = [&](Operation *op, ArrayRef<int64_t> vecTileSize,
+                    TilingLevel level,
+                    llvm::function_ref<int64_t(int64_t, int64_t)> updater) {
+    for (auto [pos, size] : llvm::enumerate(vecTileSize)) {
+      int64_t globalDimIdx = dimTracker.getGlobalDimIdx(op, pos);
+      if (size <= 0 || !llvm::is_contained(rootOpGlobalDims, globalDimIdx)) {
+        continue;
+      }
+      globalTileSizes[level][globalDimIdx] =
+          updater(globalTileSizes[level][globalDimIdx], size);
+    }
+  };
+  auto align = [](int64_t oldSize, int64_t newSize) {
+    return llvm::alignTo(oldSize, newSize);
+  };
+  auto overwrite = [](int64_t oldSize, int64_t newSize) { return newSize; };
+  // Adjust root op tiling sizes with non-root op.
+  for (auto &[op, vecTileSize] : nonRootOpVecTileSizes) {
+    if (isa<linalg::PackOp>(op)) {
+      // For pack op, align the distribution tile size and overwrite the
+      // vector parallel tile size.
+      adjust(op, vecTileSize, TilingLevel::DistributionTiles, align);
+      adjust(op, vecTileSize, TilingLevel::VectorCommonParallelTiles,
+             overwrite);
+    } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
+      // For unpack op, just overwrite the vector parallel tile size.
+      // However, dimension tracking is expected be broken in the case of
+      // `generic -> unpack`, since only the unpacked dimensions are propated.
+      // To correct this, use the generic op result indexing map to update the
+      // tracking.
+      //
+      // Example: If the generic op result has an affine map
+      //          (d0, d1, d2, d3) -> (d0, d1, d2, d3),
+      //          we use `vecTileSize` to adjust (d2, d3) instead of (d0, d1).
+      auto linalgOp = unpackOp.getSource().getDefiningOp<linalg::LinalgOp>();
+      if (!linalgOp) {
+        continue;
+      }
+      AffineMap indexingMap = linalgOp.getIndexingMapMatchingResult(
+          cast<OpResult>(unpackOp.getSource()));
+      SmallVector<int64_t> adjustedTileSize(linalgOp.getNumLoops(), 0);
+      for (auto [expr, tileSize] : llvm::zip_equal(
+               indexingMap.getResults().take_back(vecTileSize.size()),
+               vecTileSize)) {
+        auto dimExpr = dyn_cast<AffineDimExpr>(expr);
+        if (!dimExpr) {
+          continue;
+        }
+        adjustedTileSize[dimExpr.getPosition()] = tileSize;
+      }
+      adjust(linalgOp.getOperation(), adjustedTileSize,
+             TilingLevel::VectorCommonParallelTiles, overwrite);
+    }
+  }
+
+  // Adjust root op tiling sizes with root result element type.
+  // Make sure the innermost tile size times element size is multiple
+  // of byte bits. This is required for now because we do not fully
+  // support sub-byte vector stores. Once vector stores are supported
+  // then this can be eliminated. Note that emulating sub-byte sized vector
+  // loads and stores will have a performance impact.
+  auto resultTypes = rootOperation->getResultTypes();
+  if (!resultTypes.empty()) {
+    Type elementType = cast<ShapedType>(resultTypes[0]).getElementType();
+    unsigned int elementTypeSize;
+    if (auto complexType = llvm::dyn_cast<ComplexType>(elementType)) {
+      elementTypeSize =
+          2 * complexType.getElementType().getIntOrFloatBitWidth();
+    } else {
+      elementTypeSize = elementType.getIntOrFloatBitWidth();
+    }
+    // For now just enable for i1.
+    if (elementTypeSize == 1) {
+      SmallVector<int64_t> vecTileSize(rootOpGlobalDims.size(), 0);
+      vecTileSize.back() = 8;
+      adjust(rootOperation, vecTileSize, TilingLevel::VectorCommonParallelTiles,
+             align);
+    }
+  }
+}
+
+void MultiLoweringConfigGenerator::fillTileSizesWithNonRootOps() {
+  SmallVector<std::pair<Operation *, SmallVector<int64_t>>> opToVecTileSize(
+      nonRootOpVecTileSizes.begin(), nonRootOpVecTileSizes.end());
+  // Sort to prioritize pack ops.
+  llvm::sort(opToVecTileSize, [](auto &a, auto &b) {
+    return isa<linalg::PackOp>(a.first) > isa<linalg::PackOp>(b.first);
+  });
+  for (auto &[op, vecTileSize] : opToVecTileSize) {
+    for (auto [pos, size] : llvm::enumerate(vecTileSize)) {
+      int64_t globalDimIdx = dimTracker.getGlobalDimIdx(op, pos);
+      int64_t &tile =
+          globalTileSizes[TilingLevel::VectorCommonParallelTiles][globalDimIdx];
+      // Only set the tile size if it hasn't been assigned yet.
+      if (tile == 0 && size > 0) {
+        tile = size;
+      }
+    }
+  }
+}
+
+void MultiLoweringConfigGenerator::getGenericReductionTileSizes() {
+  for (auto &[op, vecTileSize] : nonRootOpVecTileSizes) {
+    if (!isa<linalg::GenericOp>(op)) {
+      continue;
+    }
+    SmallVector<utils::IteratorType> iterTypes =
+        cast<TilingInterface>(op).getLoopIteratorTypes();
+    for (auto [pos, pair] :
+         llvm::enumerate(llvm::zip_equal(vecTileSize, iterTypes))) {
+      auto [size, iterType] = pair;
+      if (iterType == utils::IteratorType::parallel) {
+        continue;
+      }
+      int64_t globalDimIdx = dimTracker.getGlobalDimIdx(op, pos);
+      globalTileSizes[TilingLevel::VectorReductionTiles][globalDimIdx] = size;
+      globalScalableTileFlags[TilingLevel::VectorReductionTiles][globalDimIdx] =
+          globalScalableTileFlags[TilingLevel::VectorCommonParallelTiles]
+                                 [globalDimIdx];
+    }
+  }
+}
+
+void MultiLoweringConfigGenerator::splitCommonInnerVectorTiles() {
+  ArrayRef<int64_t> rootOpGlobalDims =
+      dimTracker.getAllGlobalDimIdx(rootOperation);
+  const int64_t totalLoopNum = dimTracker.getTotalLoopNum();
+
+  // Initialize inner parallel tiles.
+  globalTileSizes[TilingLevel::VectorInnerParallelTiles].assign(totalLoopNum,
+                                                                0);
+  globalScalableTileFlags[TilingLevel::VectorInnerParallelTiles].assign(
+      totalLoopNum, false);
+
+  auto isReductionDim = [&](int64_t globalDimIdx) {
+    return globalTileSizes[TilingLevel::VectorReductionTiles][globalDimIdx] > 0;
+  };
+
+  SmallVector<int64_t> &commonSizes =
+      globalTileSizes[TilingLevel::VectorCommonParallelTiles];
+  SmallVector<bool> &commonFlags =
+      globalScalableTileFlags[TilingLevel::VectorCommonParallelTiles];
+  SmallVector<int64_t> &innerSizes =
+      globalTileSizes[TilingLevel::VectorInnerParallelTiles];
+  SmallVector<bool> &innerFlags =
+      globalScalableTileFlags[TilingLevel::VectorInnerParallelTiles];
+  for (auto [globalDimIdx, size, flag] :
+       llvm::enumerate(commonSizes, commonFlags)) {
+    // "Common" means a parallel loop present either in all compute ops or in
+    // the root op.
+    if ((dimTracker.presentInAllOps(globalDimIdx) ||
+         llvm::is_contained(rootOpGlobalDims, globalDimIdx)) &&
+        !isReductionDim(globalDimIdx)) {
+      continue;
+    }
+    innerSizes[globalDimIdx] = size;
+    innerFlags[globalDimIdx] = flag;
+    commonSizes[globalDimIdx] = 0;
+    commonFlags[globalDimIdx] = false;
+  }
+}
+
+void MultiLoweringConfigGenerator::setNewTilingConfigs() {
+  SmallVector<TilingLevel> tilingLevels;
+  tilingLevels.reserve(globalTileSizes.size());
+  for (const auto &entry : globalTileSizes) {
+    tilingLevels.push_back(entry.first);
+  }
+
+  for (auto op : computeOps) {
+    SmallVector<utils::IteratorType> iterTypes =
+        cast<TilingInterface>(op).getLoopIteratorTypes();
+    int numLoops = iterTypes.size();
+    SmallVector<IREE::CPU::LoweringConfigLevelInfo> newTilingInfo;
+    for (TilingLevel level : tilingLevels) {
+      SmallVector<int64_t> tileSizes(numLoops, 0);
+      SmallVector<bool> scalableFlags(numLoops, false);
+      for (auto [pos, iterType] : llvm::enumerate(iterTypes)) {
+        int64_t globalDimIdx = dimTracker.getGlobalDimIdx(op, pos);
+        // Skip dimensions where the reduction iterator type and tiling level
+        // mismatch. The XOR(^) means:
+        //   - If the loop dimension is a reduction but the current tiling
+        //   level is not `VectorReductionTiles`, skip it.
+        //   - If the loop dimension is not a reduction but the current tiling
+        //   level is `VectorReductionTiles`, skip it.
+        if ((iterType == utils::IteratorType::reduction) ^
+            (level == TilingLevel::VectorReductionTiles)) {
+          continue;
+        }
+        tileSizes[pos] = globalTileSizes[level][globalDimIdx];
+        scalableFlags[pos] = globalScalableTileFlags[level][globalDimIdx];
+      }
+
+      if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
+        // `MultiLoweringConfigGenerator` propagates tiling on the
+        // unpacked dimensions, while for a pack operation, `LoweringConfig`
+        // defines tiling on the packed inner dimensions. Therefore, use
+        // `scaleAndPermutateTilingForPackOp` to translate the tiling
+        // information from the unpacked to the packed dimensions.
+        scaleAndPermutateTilingForPackOp(packOp, tileSizes, scalableFlags,
+                                         /*inverse=*/false);
+      }
+      updateOrAddTilingLevelInfo(newTilingInfo, level, tileSizes,
+                                 scalableFlags);
+
+      std::sort(newTilingInfo.begin(), newTilingInfo.end(),
+                [](const IREE::CPU::LoweringConfigLevelInfo &lhs,
+                   const IREE::CPU::LoweringConfigLevelInfo &rhs) {
+                  return lhs.level < rhs.level;
+                });
+      IREE::Codegen::LoweringConfigAttrInterface config =
+          getNewLoweringConfig(rootOperation->getContext(), newTilingInfo,
+                               /*setDistributionConfig=*/op == rootOperation);
+      setLoweringConfig(op, config);
+    }
+  }
+}
+
 SmallVector<int64_t>
 MultiLoweringConfigGenerator::getVecTileSizesForNonRootPackOp(
     mlir::FunctionOpInterface entryPointFn, linalg::PackOp packOp) {
@@ -3391,11 +3373,6 @@ MultiLoweringConfigGenerator::getVecTileSizesForNonRootPackOp(
   return vecTileSizes;
 }
 
-/// Simply returns the inner tile sizes for a non-root `UnPackOp`, used to help
-/// fusion. Dynamic sizes are replaced with 0 to indicate that tiling size is
-/// unknown.
-/// Note: the method is designed for fusion cases in data-tiling, like
-/// `matmul->generic->unpack`.
 SmallVector<int64_t>
 MultiLoweringConfigGenerator::getVecTileSizesForNonRootUnPackOp(
     linalg::UnPackOp unpackOp) {
@@ -3406,6 +3383,83 @@ MultiLoweringConfigGenerator::getVecTileSizesForNonRootUnPackOp(
     }
   }
   return vecTileSizes;
+}
+
+SmallVector<int64_t>
+MultiLoweringConfigGenerator::getVecTileSizesForNonRootGenericOp(
+    mlir::FunctionOpInterface entryPointFn, linalg::GenericOp genericOp) {
+  auto linalgOpInfo = LinalgOpInfo(genericOp);
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  auto targetMLTransInfo =
+      TargetMLTransformInfo::getTargetMLTransformInfo(targetAttr);
+  SmallVector<int64_t> vecTileSizes = getMinTilingSizesForEachDim(
+      entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
+
+  auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
+  int64_t vecSize = getNativeVectorSizeInBytes(entryPointFn) / 4;
+  for (auto &vecTileSize : vecTileSizes) {
+    vecTileSize =
+        roundUpToPow2(std::min(vecTileSize, vecSize),
+                      vecPreProcStrategy == VectorPreProcStrategy::Masking);
+  }
+  limitVectorTileSizes(genericOp, vecTileSizes);
+  return vecTileSizes;
+}
+
+void MultiLoweringConfigGenerator::updateOrAddTilingLevelInfo(
+    SmallVectorImpl<IREE::CPU::LoweringConfigLevelInfo> &tilingInfo,
+    TilingLevel level, ArrayRef<int64_t> tileSizes,
+    ArrayRef<bool> scalableFlags) {
+  for (IREE::CPU::LoweringConfigLevelInfo &info : tilingInfo) {
+    if (info.level == level) {
+      info.sizes.assign(tileSizes.begin(), tileSizes.end());
+      info.scalableFlags.assign(scalableFlags.begin(), scalableFlags.end());
+      return;
+    }
+  }
+  IREE::CPU::LoweringConfigLevelInfo newInfo;
+  newInfo.level = level;
+  newInfo.sizes.assign(tileSizes.begin(), tileSizes.end());
+  newInfo.scalableFlags.assign(scalableFlags.begin(), scalableFlags.end());
+  tilingInfo.push_back(newInfo);
+}
+
+void MultiLoweringConfigGenerator::scaleAndPermutateTilingForPackOp(
+    linalg::PackOp packOp, SmallVector<int64_t> &tileSizes,
+    SmallVector<bool> &scalableFlags, bool inverse) {
+  ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
+  ArrayRef<int64_t> innerDimPos = packOp.getInnerDimsPos();
+  ArrayRef<int64_t> outerDimsPerm = packOp.getOuterDimsPerm();
+  if (inverse) {
+    // First undo dimension permutation if present.
+    if (!outerDimsPerm.empty()) {
+      auto invertedPerm = invertPermutationVector(outerDimsPerm);
+      applyPermutationToVector(tileSizes, invertedPerm);
+      applyPermutationToVector(scalableFlags, invertedPerm);
+    }
+    // Then unscale tile sizes by multiplying the inner tile sizes.
+    for (auto &&[pos, size] : llvm::zip_equal(innerDimPos, innerTiles)) {
+      if (ShapedType::isDynamic(size)) {
+        continue;
+      }
+      tileSizes[pos] *= size;
+    }
+
+  } else {
+    // First scale tile sizes by dividing by the inner tile sizes.
+    for (auto &&[pos, size] : llvm::zip_equal(innerDimPos, innerTiles)) {
+      if (ShapedType::isDynamic(size)) {
+        continue;
+      }
+      tileSizes[pos] /= size;
+    }
+
+    // Then apply dimension permutation if present.
+    if (!outerDimsPerm.empty()) {
+      applyPermutationToVector(tileSizes, outerDimsPerm);
+      applyPermutationToVector(scalableFlags, outerDimsPerm);
+    }
+  }
 }
 
 /// Adjusts the tile sizes (carried by `rootOp`) to be aligned with
@@ -3499,51 +3553,6 @@ adjustTileSizesForRootUnPackOp(mlir::FunctionOpInterface entryPointFn,
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, rootOp, newLoweringConfig, pipeline, /*workgroupSize=*/{},
       /*subgroupSize=*/{}, pipelineConfig);
-}
-
-/// Returns tile sizes for a non-root `GenericOp`.
-/// The selection logic is the same as `setElementwiseGenericOpRootConfig`.
-///
-/// TODO (zhewen): Merge this function to avoid duplication
-SmallVector<int64_t>
-MultiLoweringConfigGenerator::getVecTileSizesForNonRootGenericOp(
-    mlir::FunctionOpInterface entryPointFn, linalg::GenericOp genericOp) {
-  auto linalgOpInfo = LinalgOpInfo(genericOp);
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-  auto targetMLTransInfo =
-      TargetMLTransformInfo::getTargetMLTransformInfo(targetAttr);
-  SmallVector<int64_t> vecTileSizes = getMinTilingSizesForEachDim(
-      entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
-
-  auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
-  int64_t vecSize = getNativeVectorSizeInBytes(entryPointFn) / 4;
-  for (auto &vecTileSize : vecTileSizes) {
-    vecTileSize =
-        roundUpToPow2(std::min(vecTileSize, vecSize),
-                      vecPreProcStrategy == VectorPreProcStrategy::Masking);
-  }
-  limitVectorTileSizes(genericOp, vecTileSizes);
-  return vecTileSizes;
-}
-
-/// Updates the tile sizes and scalable flags in the `tilingInfo` with given
-/// `level`, if it is present. Otherwise, adds a new item to the vector.
-void MultiLoweringConfigGenerator::updateOrAddTilingLevelInfo(
-    SmallVectorImpl<IREE::CPU::LoweringConfigLevelInfo> &tilingInfo,
-    TilingLevel level, ArrayRef<int64_t> tileSizes,
-    ArrayRef<bool> scalableFlags) {
-  for (IREE::CPU::LoweringConfigLevelInfo &info : tilingInfo) {
-    if (info.level == level) {
-      info.sizes.assign(tileSizes.begin(), tileSizes.end());
-      info.scalableFlags.assign(scalableFlags.begin(), scalableFlags.end());
-      return;
-    }
-  }
-  IREE::CPU::LoweringConfigLevelInfo newInfo;
-  newInfo.level = level;
-  newInfo.sizes.assign(tileSizes.begin(), tileSizes.end());
-  newInfo.scalableFlags.assign(scalableFlags.begin(), scalableFlags.end());
-  tilingInfo.push_back(newInfo);
 }
 
 /// Set the lowering configs for all the compute ops. The lowering config is
@@ -3671,7 +3680,7 @@ static bool shouldSetLoweringConfig(Operation *op) {
   }
 
   if (auto tilingOp = dyn_cast<TilingInterface>(op)) {
-    if (tilingOp.getLoopIteratorTypes().size() < 1) {
+    if (tilingOp.getLoopIteratorTypes().empty()) {
       return false;
     }
   }

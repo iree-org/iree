@@ -470,6 +470,7 @@ module {
   }
 }
 // CHECK-LABEL: func.func @mmt4d_bias_relu
+// CHECK-NOT:     memref.alloc
 // CHECK:         scf.forall
 // CHECK:           scf.for
 // CHECK:             vector.fma
