@@ -20,6 +20,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/WalkPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-convert-to-coalesced-dma"
 
@@ -48,7 +49,7 @@ namespace {
 //     }
 //   } {mapping = [#gpu.warp<linear_dim_0>]}
 //
-struct ConverGatherOpToCoalescedDMA
+struct ConvertGatherOpToCoalescedDMA
     : public OpRewritePattern<IREE::LinalgExt::GatherOp> {
   using OpRewritePattern<IREE::LinalgExt::GatherOp>::OpRewritePattern;
 
@@ -69,12 +70,17 @@ struct ConverGatherOpToCoalescedDMA
     }
 
     // Actual tiling to CoalescedDMA:
-    Value source = gatherOp.getInputs()[0];
-    Value indices = gatherOp.getInputs()[1];
-    Value init = gatherOp.getOutputs()[0];
+    Value source = gatherOp.getSource();
+    Value indices = gatherOp.getIndices();
+    Value init = gatherOp.getOutput();
 
     auto initType = cast<RankedTensorType>(init.getType());
     int64_t rank = initType.getRank();
+
+    // Subgroup size should be equal to the gathering memref rank.
+    if (rank != subgroupTileSizes.size()) {
+      return failure();
+    }
 
     SmallVector<OpFoldResult> tileSizes;
     SmallVector<OpFoldResult> lowerBounds;
@@ -145,21 +151,10 @@ struct GPUConvertToCoalescedDMAPass final
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
 
-    LLVM_DEBUG(llvm::dbgs()
-               << "Running GPUConvertToCoalescedDMAPass on function: "
-               << funcOp.getName() << "\n");
-
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-
-    patterns.add<ConverGatherOpToCoalescedDMA>(context);
-
-    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
-      LLVM_DEBUG(llvm::dbgs() << "Pattern application failed\n");
-      return signalPassFailure();
-    }
-
-    LLVM_DEBUG(llvm::dbgs() << "GPUConvertToCoalescedDMAPass completed\n");
+    patterns.add<ConvertGatherOpToCoalescedDMA>(context);
+    walkAndApplyPatterns(funcOp, std::move(patterns));
   }
 };
 
