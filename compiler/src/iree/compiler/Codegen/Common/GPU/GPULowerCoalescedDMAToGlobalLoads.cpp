@@ -42,19 +42,19 @@ static LogicalResult
 isEligibleForGlobalDMA(IREE::GPU::CoalescedGatherDMAOp dmaOp) {
   LLVM_DEBUG(llvm::dbgs() << "Checking eligibility for: " << dmaOp << "\n");
 
-  // check that the surrounding scf.forall:
-  // 1. loop bounds are (subgroup_size, 1)
-  // 2. mapping is [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
-  auto forallOp = dmaOp->getParentOfType<scf::ForallOp>();
+  // Check that the surrounding scf.forall:
+  // 1. Loop bounds are (subgroup_size, 1).
+  // 2. Mapping is [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>].
+  scf::ForallOp forallOp = dmaOp->getParentOfType<scf::ForallOp>();
   if (!forallOp) {
     LLVM_DEBUG(llvm::dbgs() << "  - Not in scf.forall\n");
-    // If not in scf.forall, don't transform
+    // If not in scf.forall, don't transform.
     return failure();
   }
   LLVM_DEBUG(llvm::dbgs() << "  - Found parent scf.forall\n");
 
-  // Verify that the forall has the required loop bounds (32, 1)
-  auto upperBounds = forallOp.getStaticUpperBound();
+  // Verify that the forall has the required loop bounds (32, 1).
+  ArrayRef<int64_t> upperBounds = forallOp.getStaticUpperBound();
   LLVM_DEBUG(llvm::dbgs() << "  - Loop bounds: ");
   LLVM_DEBUG({
     for (auto bound : upperBounds) {
@@ -67,8 +67,8 @@ isEligibleForGlobalDMA(IREE::GPU::CoalescedGatherDMAOp dmaOp) {
     return failure();
   }
 
-  // Verify that the forall has the required GPU thread mapping
-  auto mappingAttr = forallOp.getMapping();
+  // Verify that the forall has the required GPU thread mapping.
+  std::optional<ArrayAttr> mappingAttr = forallOp.getMapping();
   if (!mappingAttr) {
     LLVM_DEBUG(llvm::dbgs() << "  - No mapping attribute found\n");
     return failure();
@@ -80,45 +80,49 @@ isEligibleForGlobalDMA(IREE::GPU::CoalescedGatherDMAOp dmaOp) {
   }
 
   // Check that the mapping attributes match the expected pattern:
-  // [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
-  llvm::SmallString<64> mapping0Str, mapping1Str;
-  llvm::raw_svector_ostream os0(mapping0Str), os1(mapping1Str);
-  (*mappingAttr)[0].print(os0);
-  (*mappingAttr)[1].print(os1);
-
-  LLVM_DEBUG(llvm::dbgs() << "  - Mapping[0]: " << mapping0Str << "\n");
-  LLVM_DEBUG(llvm::dbgs() << "  - Mapping[1]: " << mapping1Str << "\n");
-
-  if (mapping0Str != "#gpu.thread<linear_dim_1>" ||
-      mapping1Str != "#gpu.thread<linear_dim_0>") {
+  // [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>].
+  auto thread0 = dyn_cast<gpu::GPUThreadMappingAttr>((*mappingAttr)[0]);
+  auto thread1 = dyn_cast<gpu::GPUThreadMappingAttr>((*mappingAttr)[1]);
+  if (!thread0 || !thread1) {
     LLVM_DEBUG(llvm::dbgs()
-               << "  - Mapping mismatch (expected #gpu.thread<linear_dim_1>, "
-                  "#gpu.thread<linear_dim_0>)\n");
+               << "  - Mapping attributes are not GPUThreadMappingAttr\n");
     return failure();
   }
 
-  // Check that the forall body contains a CoalescedGatherDMAOp
-  // scf.forall has an implicit terminator (scf.forall.in_parallel)
+  LLVM_DEBUG(llvm::dbgs() << "  - Mapping[0]: " << thread0 << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "  - Mapping[1]: " << thread1 << "\n");
+
+  if (thread0.getThread() != gpu::MappingId::LinearDim1 ||
+      thread1.getThread() != gpu::MappingId::LinearDim0) {
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "  - Mapping mismatch (expected linear_dim_1, linear_dim_0)\n");
+    return failure();
+  }
+
+  // Check that the forall body contains a CoalescedGatherDMAOp.
+  // scf.forall has an implicit terminator (scf.forall.in_parallel).
   Block &body = forallOp.getRegion().front();
   LLVM_DEBUG(llvm::dbgs() << "  - Forall body has "
                           << body.getOperations().size() << " operations\n");
 
-  // Print all operations for debugging
+  // Print all operations for debugging.
   LLVM_DEBUG({
     int opIdx = 0;
     for (auto &op : body.getOperations()) {
-      llvm::dbgs() << "    Op[" << opIdx++ << "]: " << op.getName() << "\n";
+      llvm::dbgs() << "    Op[" << opIdx << "]: " << op.getName() << "\n";
+      ++opIdx;
     }
   });
 
-  // The forall body should have exactly 2 ops: the DMA op and the terminator
+  // The forall body should have exactly 2 ops: the DMA op and the terminator.
   if (body.getOperations().size() != 2) {
     LLVM_DEBUG(llvm::dbgs() << "  - Expected exactly 2 operations in forall "
                                "body (DMA + terminator)\n");
     return failure();
   }
 
-  // Verify the first operation is a CoalescedGatherDMAOp
+  // Verify the first operation is a CoalescedGatherDMAOp.
   if (!isa<IREE::GPU::CoalescedGatherDMAOp>(body.front())) {
     LLVM_DEBUG(llvm::dbgs()
                << "  - First operation is not a CoalescedGatherDMAOp\n");
@@ -126,7 +130,7 @@ isEligibleForGlobalDMA(IREE::GPU::CoalescedGatherDMAOp dmaOp) {
   }
   LLVM_DEBUG(llvm::dbgs() << "  - Forall body check passed\n");
 
-  // Check that destination memref is contiguous
+  // Check that destination memref is contiguous.
   auto destMemRefType = llvm::dyn_cast<MemRefType>(dmaOp.getInit().getType());
   if (!destMemRefType) {
     LLVM_DEBUG(llvm::dbgs()
@@ -137,11 +141,11 @@ isEligibleForGlobalDMA(IREE::GPU::CoalescedGatherDMAOp dmaOp) {
                           << "\n");
 
   // For contiguity check, we need to ensure the innermost dimension has
-  // stride 1
+  // stride 1.
   if (!destMemRefType.getLayout().isIdentity()) {
     LLVM_DEBUG(llvm::dbgs()
                << "  - Layout is not identity, checking for strided layout\n");
-    // Check if it's a strided layout with contiguous innermost dimension
+    // Check if it's a strided layout with contiguous innermost dimension.
     auto stridedLayout =
         llvm::dyn_cast<StridedLayoutAttr>(destMemRefType.getLayout());
     if (!stridedLayout) {
@@ -156,7 +160,7 @@ isEligibleForGlobalDMA(IREE::GPU::CoalescedGatherDMAOp dmaOp) {
   }
   LLVM_DEBUG(llvm::dbgs() << "  - Destination memref is contiguous\n");
 
-  // Check memory address spaces
+  // Check memory address spaces.
   auto sourceType = llvm::dyn_cast<MemRefType>(dmaOp.getSource().getType());
   auto targetType = llvm::dyn_cast<MemRefType>(dmaOp.getInit().getType());
   if (!sourceType || !targetType) {
@@ -188,20 +192,21 @@ isEligibleForGlobalDMA(IREE::GPU::CoalescedGatherDMAOp dmaOp) {
 
 constexpr int64_t kNumBitsPerCopy = 128;
 
-// Here we assume each load is 128 bit, so
+// Compute the number of global loads per thread. We assume each load is 128
+// bits.
 static int64_t getNumOfGlobalLoadsPerThread(MemRefType destType,
                                             int64_t subgroupSize) {
-  // first, compute total number of bytes to load
+  // First, compute total number of bytes to load.
   int64_t elementSize = destType.getElementTypeBitWidth();
   int64_t totalBits = destType.getNumElements() * elementSize;
 
-  // Then, compute number of bytes each thread should load
+  // Then, compute number of bytes each thread should load.
   assert(totalBits % subgroupSize == 0 &&
-         "total bits must be divisible by subgroup size");
+         "Total bits must be divisible by subgroup size");
   int64_t bitsPerThread = totalBits / subgroupSize;
 
   assert(bitsPerThread % kNumBitsPerCopy == 0 &&
-         "bits per thread must be divisible by 128");
+         "Bits per thread must be divisible by 128");
   int64_t copiesPerThread = bitsPerThread / kNumBitsPerCopy;
   return copiesPerThread;
 }
@@ -218,7 +223,7 @@ struct LowerCoalescedGatherDMAPattern
 
   LogicalResult matchAndRewrite(IREE::GPU::CoalescedGatherDMAOp dmaOp,
                                 PatternRewriter &rewriter) const override {
-    auto loc = dmaOp.getLoc();
+    Location loc = dmaOp.getLoc();
 
     LLVM_DEBUG(llvm::dbgs()
                << "=== matchAndRewrite called for: " << dmaOp << "\n");
@@ -234,45 +239,47 @@ struct LowerCoalescedGatherDMAPattern
     }
     LLVM_DEBUG(llvm::dbgs() << "DMA op is eligible for transformation\n");
 
-    auto forallOp = dmaOp->getParentOfType<scf::ForallOp>();
+    scf::ForallOp forallOp = dmaOp->getParentOfType<scf::ForallOp>();
 
-    // Replace the entire scf.forall with the amdgpu.gather_to_lds operation
+    // Replace the entire scf.forall with the amdgpu.gather_to_lds operation.
     rewriter.setInsertionPoint(forallOp);
 
     auto destMemRefType = llvm::dyn_cast<MemRefType>(dmaOp.getInit().getType());
     int64_t numCopiesPerThread =
         getNumOfGlobalLoadsPerThread(destMemRefType, subgroupSize);
 
-    auto indices = dmaOp.getIndices();
+    Value indices = dmaOp.getIndices();
     auto indicesType = llvm::cast<MemRefType>(indices.getType());
 
-    auto dest = dmaOp.getInit();
+    Value dest = dmaOp.getInit();
     auto destType = llvm::cast<MemRefType>(dest.getType());
 
-    Value subgroupId = gpu::SubgroupIdOp::create(rewriter, loc, nullptr);
-    Value laneId = gpu::LaneIdOp::create(rewriter, loc, nullptr);
+    Value subgroupId = rewriter.create<gpu::SubgroupIdOp>(
+        loc, rewriter.getIndexType(), nullptr);
+    Value laneId =
+        rewriter.create<gpu::LaneIdOp>(loc, rewriter.getIndexType(), nullptr);
 
-    // Build a for loop skeleton:
-    auto lowerBound = arith::ConstantIndexOp::create(rewriter, loc, 0);
-    auto upperBound =
-        arith::ConstantIndexOp::create(rewriter, loc, numCopiesPerThread);
-    auto step = arith::ConstantIndexOp::create(rewriter, loc, 1);
+    // Build a for loop skeleton.
+    Value lowerBound = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    Value upperBound =
+        rewriter.create<arith::ConstantIndexOp>(loc, numCopiesPerThread);
+    Value step = rewriter.create<arith::ConstantIndexOp>(loc, 1);
     scf::ForOp forOp =
-        scf::ForOp::create(rewriter, loc, lowerBound, upperBound, step);
+        rewriter.create<scf::ForOp>(loc, lowerBound, upperBound, step);
 
-    // Now build the `scf.for` loop body:
+    // Now build the `scf.for` loop body.
     auto delinearizeIndex = [&](Value index, ArrayRef<int64_t> shape) {
-      return affine::AffineDelinearizeIndexOp::create(rewriter, loc, index,
-                                                      shape)
+      return rewriter
+          .create<affine::AffineDelinearizeIndexOp>(loc, index, shape)
           .getMultiIndex();
     };
 
     auto getLinearizedGatherIndex = [&](Value sgIdVal, Value lIdVal,
                                         Value indVar) -> Value {
       int64_t numSubgroups = workgroupSize[0] / subgroupSize;
-      auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
-      return affine::AffineLinearizeIndexOp::create(
-          rewriter, loc, ValueRange{sgIdVal, indVar, lIdVal, zero},
+      Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+      return rewriter.create<affine::AffineLinearizeIndexOp>(
+          loc, ValueRange{sgIdVal, indVar, lIdVal, zero},
           ArrayRef<int64_t>{numSubgroups, numCopiesPerThread, subgroupSize,
                             kNumBitsPerCopy /
                                 destType.getElementTypeBitWidth()},
@@ -280,32 +287,32 @@ struct LowerCoalescedGatherDMAPattern
     };
 
     auto getSubgroupStoreBaseIndex = [&](Value indVar) -> Value {
-      auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+      Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
       return getLinearizedGatherIndex(subgroupId, zero, indVar);
     };
 
     {
       OpBuilder::InsertionGuard guard(rewriter);
       rewriter.setInsertionPointToStart(forOp.getBody());
-      auto inductionVar = forOp.getInductionVar();
+      Value inductionVar = forOp.getInductionVar();
 
-      // Compute load address from `indices`:
+      // Compute load address from `indices`.
       Value linearizedGatherIndices =
           getLinearizedGatherIndex(subgroupId, laneId, inductionVar);
       ValueRange delinearizedGlobalIndices =
           delinearizeIndex(linearizedGatherIndices, indicesType.getShape());
 
-      // Load the actual thread gather index from `indices` memref:
+      // Load the actual thread gather index from `indices` memref.
       Value threadGatherIndex = rewriter.create<memref::LoadOp>(
           loc, indices, delinearizedGlobalIndices);
 
-      // Compute the base index in dest memref:
+      // Compute the base index in dest memref.
       Value linearizedBaseIndices = getSubgroupStoreBaseIndex(inductionVar);
       ValueRange delinearizedLocalIndices =
           delinearizeIndex(linearizedBaseIndices, destType.getShape());
 
       // Determine the transfer type based on the destination element type and
-      // the number of bits per copy (128 bits)
+      // the number of bits per copy (128 bits).
       int64_t elementBits = destType.getElementTypeBitWidth();
       int64_t elementsPerTransfer = kNumBitsPerCopy / elementBits;
 
@@ -317,20 +324,20 @@ struct LowerCoalescedGatherDMAPattern
             VectorType::get({elementsPerTransfer}, destType.getElementType());
       }
 
-      // Create the amdgpu.gather_to_lds operation
+      // Create the amdgpu.gather_to_lds operation.
       rewriter.create<amdgpu::GatherToLDSOp>(
           loc, dmaOp.getSource(), ValueRange{threadGatherIndex}, dest,
           delinearizedLocalIndices, TypeAttr::get(transferType));
     }
 
-    // Insert a barrier after the loop
+    // Insert a barrier after the loop.
     rewriter.setInsertionPointAfter(forOp);
     rewriter.create<gpu::BarrierOp>(loc);
 
-    // Replace the DMA op result with its init value (dest memref)
+    // Replace the DMA op result with its init value (dest memref).
     rewriter.replaceOp(dmaOp, dmaOp.getInit());
 
-    // Remove the scf.forall
+    // Remove the scf.forall.
     rewriter.eraseOp(forallOp);
     return success();
   }
@@ -347,16 +354,16 @@ struct GPULowerCoalescedDMAToGlobalLoadsPass final
   void runOnOperation() override {
     mlir::FunctionOpInterface funcOp = getOperation();
 
-    // Debug: Print that the pass is running
+    // Debug: Print that the pass is running.
     LLVM_DEBUG(llvm::dbgs()
                << "Running GPULowerCoalescedDMAToGlobalLoadsPass on "
                << funcOp.getName() << "\n");
 
-    // Walk the function to see if there are any CoalescedGatherDMAOp ops
+    // Walk the function to see if there are any CoalescedGatherDMAOp ops.
     int count = 0;
     funcOp.walk([&count](IREE::GPU::CoalescedGatherDMAOp op) {
       LLVM_DEBUG(llvm::dbgs() << "Found CoalescedGatherDMAOp: " << op << "\n");
-      count++;
+      ++count;
     });
     LLVM_DEBUG(llvm::dbgs()
                << "Total CoalescedGatherDMAOp found: " << count << "\n");
