@@ -31,6 +31,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/WalkPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-lower-coalesced-dma-to-global-loads"
 
@@ -352,9 +353,7 @@ struct GPULowerCoalescedDMAToGlobalLoadsPass final
     patterns.add<LowerCoalescedGatherDMAPattern>(context, *workgroupSize,
                                                  *subgroupSize, *maxLoadBits);
 
-    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
-      return signalPassFailure();
-    }
+    walkAndApplyPatterns(funcOp, std::move(patterns));
   }
 };
 } // namespace
