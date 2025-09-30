@@ -14,6 +14,13 @@ namespace mlir::iree_compiler {
 struct GlobalPipelineOptions {
   llvm::OptimizationLevel optLevel = llvm::OptimizationLevel::O0;
 
+  // Maximum byte size increase allowed for constant expr hoisting policy to
+  // allow hoisting. The threshold is 1MB by default.
+  int64_t constExprMaxSizeIncreaseThreshold = 1024 * 1024;
+
+  // Enables const-expr hoisting into globals.
+  bool constExprHoisting = true;
+
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<GlobalPipelineOptions>;
 };
@@ -91,9 +98,6 @@ struct PreprocessingOptions {
 // Options controlling high level optimizations.
 struct GlobalOptimizationOptions {
   llvm::OptimizationLevel optLevel = llvm::OptimizationLevel::O0;
-  // Maximum byte size increase allowed for constant expr hoisting policy to
-  // allow hoisting. The threshold is 1MB by default.
-  int64_t constExprMaxSizeIncreaseThreshold = 1024 * 1024;
 
   // File paths to archives to import parameters from with an optional
   // `scope=` prefix.
@@ -125,9 +129,6 @@ struct GlobalOptimizationOptions {
   // flags during the transition state. The other has to be off if this one is
   // enabled. Any feature built on top of this path will be deprecated.
   bool dataTiling = false;
-
-  // Enables const-expr hoisting into globals.
-  bool constExprHoisting = true;
 
   // Enables recursive evaluation of immutable globals using the compiler
   // and runtime.

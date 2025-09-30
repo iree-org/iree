@@ -48,6 +48,8 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
       llvm::cl::desc("Enable split reduction for dispatch creation pipeline"),
       llvm::cl::init(false),
   };
+  bool constExprHoisting = true;
+  int64_t constExprMaxSizeIncreaseThreshold = 1024 * 1024;
 };
 
 void buildDispatchCreationPassPipeline(

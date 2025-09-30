@@ -987,11 +987,12 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
     }
 
     buildIREEVMTransformPassPipeline(
-        session.targetRegistry, session.bindingOptions, session.inputOptions,
-        session.preprocessingOptions, session.highLevelOptimizationOptions,
-        session.dispatchCreationOptions, session.schedulingOptions,
-        session.halTargetOptions, session.vmTargetOptions, pipelineHooks,
-        *passManager, compileFrom, compileTo);
+        session.targetRegistry, session.pipelineOptions, session.bindingOptions,
+        session.inputOptions, session.preprocessingOptions,
+        session.highLevelOptimizationOptions, session.dispatchCreationOptions,
+        session.schedulingOptions, session.halTargetOptions,
+        session.vmTargetOptions, pipelineHooks, *passManager, compileFrom,
+        compileTo);
     break;
   }
   case IREE_COMPILER_PIPELINE_HAL_EXECUTABLE: {
@@ -1020,11 +1021,11 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
       return false;
     }
     buildIREEPrecompileTransformPassPipeline(
-        session.targetRegistry, session.bindingOptions, session.inputOptions,
-        session.preprocessingOptions, session.highLevelOptimizationOptions,
-        session.dispatchCreationOptions, session.schedulingOptions,
-        session.halTargetOptions, pipelineHooks, *passManager, compileFrom,
-        compileTo);
+        session.targetRegistry, session.pipelineOptions, session.bindingOptions,
+        session.inputOptions, session.preprocessingOptions,
+        session.highLevelOptimizationOptions, session.dispatchCreationOptions,
+        session.schedulingOptions, session.halTargetOptions, pipelineHooks,
+        *passManager, compileFrom, compileTo);
     break;
   }
   default:
