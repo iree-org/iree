@@ -47,6 +47,10 @@ bool hasPackedStorageAttr(RankedTensorType type);
 FailureOr<linalg::ContractionDimensions>
 getEncodingContractionDims(EncodingAttr encoding);
 
+/// Returns the matmul dimensions (batch, m, n, k) in a given encoding. Returns
+/// empty if failed.
+SmallVector<int64_t, 4> getMatmulDims(EncodingAttr encoding);
+
 /// Returns the narrow dim in a given `encoding`, ceiled to a power of two. This
 /// works by inspecting the `iteration_sizes` array attribute in the `encoding`.
 /// If the `iteration_sizes` of one dimension (M or N) is smaller than the
