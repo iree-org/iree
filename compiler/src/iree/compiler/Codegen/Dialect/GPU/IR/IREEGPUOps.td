@@ -275,6 +275,14 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     * When the source is a memref, the operation writes the gathered data into
       a destination out memref operand.
 
+    Each index in the indices operand specifies a location in the source to load,
+    and the load width can be 32, 64, or 128 bits, limited by the underlying hardware.
+    The load width is inferred from the size relationship between the indices
+    and result types. So the result tensor/memref should satisfy the following
+    restriction:
+    * `sizeof(result) == num_indices * load_width`, where load_width is in {4, 8, 16} bytes.
+    * if in memref form, the result memref should be contiguous.
+
     The operation is specifically designed for subgroup-level parallelism, where
     threads within a subgroup cooperatively gather data with coalesced memory
     accesses. It implements ParallelCombiningOpInterface and must live inside an
@@ -348,6 +356,11 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
         return memrefType.getRank();
       assert(false && "expected ranked tensor or memref type");
       return 0;
+    }
+
+    bool isLegalLoadWidthInBytes(int64_t width) const {
+      const llvm::SmallVector<int64_t> legalWidths = {4, 8, 16};
+      return llvm::find(legalWidths, width) != legalWidths.end();
     }
   }];
 }
