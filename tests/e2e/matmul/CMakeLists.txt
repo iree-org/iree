@@ -1726,7 +1726,74 @@ iree_generated_e2e_runner_test(
     "requires-gpu-cdna3"
 )
 
+elseif(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx95")
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cdna4_mxfp4
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f4E2M1FN"
+    "--acc_type=f32"
+    "--mx_scale_type=f8E8M0FNU"
+    "--mx_block_size=32"
+    "--shapes=easy_large_static"
+    "--transpose_rhs"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-cdna4"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cdna4_mxfp4_dt
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f4E2M1FN"
+    "--acc_type=f32"
+    "--mx_scale_type=f8E8M0FNU"
+    "--mx_block_size=32"
+    "--shapes=easy_large_static"
+    "--transpose_rhs"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
+    --iree-opt-data-tiling=false
+    --iree-dispatch-creation-data-tiling=true
+    --iree-hip-encoding-layout-resolver=data-tiling
+    --iree-llvmgpu-test-combine-layout-transformation=true
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-cdna4"
+)
+
 endif()
+
 
 elseif(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx11")
 
