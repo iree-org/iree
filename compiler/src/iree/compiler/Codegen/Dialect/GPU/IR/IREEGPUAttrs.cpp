@@ -32,6 +32,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/Interfaces/LoopLikeInterface.h"
 
 #define DEBUG_TYPE "iree-gpu-attrs"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
@@ -1863,7 +1864,8 @@ static Value computeNumTileLoads(OpBuilder &b, Location loc, OpFoldResult size,
       b, loc, b.create<mlir::arith::AddIOp>(loc, nbX, nbY).getResult());
 }
 
-/// Gets the condition of transposed ordering.
+/// Retrieves the condition for transposed ordering. Transposed order is enabled
+/// if the number of tile loads is at least 20% less than in regular order.
 static Value getCondition(OpBuilder &b, Location loc,
                           ArrayRef<OpFoldResult> ubs,
                           ArrayRef<OpFoldResult> steps, Value nbXcds,
@@ -1940,7 +1942,8 @@ ConditionalTransposeAttr::generateLoopHeaderFn(
   SmallVector<OpFoldResult> lbs, ubs, steps;
   std::tie(lbs, ubs, steps) = getLoopBounds(loopRanges, givenTileSizes);
 
-  assert(lbs.size() == 2 && "only rank 2 is supported");
+  if (lbs.size() != 2)
+    return emitError(loc) << "conditional_transpose only supports rank 2";
 
   SmallVector<Attribute> deviceMappingAttribute;
   deviceMappingAttribute.push_back(IREE::Codegen::WorkgroupMappingAttr::get(
@@ -1951,11 +1954,12 @@ ConditionalTransposeAttr::generateLoopHeaderFn(
   std::optional<ArrayAttr> mappingAttr =
       builder.getArrayAttr(deviceMappingAttribute);
 
-  // Apply condition on loop bounds
+  // Compute condition for transpose
   Value nbCusVal = builder.create<arith::ConstantIndexOp>(loc, getNbCus());
   Value nbXCDs = builder.create<arith::ConstantIndexOp>(loc, getNbXcds());
   Value cond = getCondition(builder, loc, ubs, steps, nbXCDs, nbCusVal);
 
+  // Apply condition on loop bounds
   swapIf(builder, loc, cond, lbs);
   swapIf(builder, loc, cond, ubs);
   swapIf(builder, loc, cond, steps);
@@ -1970,6 +1974,7 @@ ConditionalTransposeAttr::generateLoopHeaderFn(
   std::tie(offsets, sizes, ids) =
       computeOffsetAndSize(loopRanges, givenTileSizes, ivs);
 
+  // Apply condition on offsets
   swapIf(builder, loc, cond, offsets, ids);
 
   ValueRange innerDestinationTensors = forallOp.getRegionOutArgs();
@@ -1988,11 +1993,13 @@ LogicalResult ConditionalTransposeAttr::generateLoopTerminatorFn(
     ArrayRef<SmallVector<OpFoldResult>> resultSizes,
     ValueRange destinationTensors) const {
 
-  auto forallOp = cast<scf::ForallOp>(loops.front());
-  if (!forallOp) {
+  assert(loops.size() == 1 && "Expected loop count should be 1.");
+  LoopLikeOpInterface loop = loops.front();
+  scf::ForallOp *forallOp = dyn_cast<scf::ForallOp>(&loop);
+  if (!forallOp)
     return emitError(loc) << "Only scf.forall op are supported";
-  }
-  builder.setInsertionPointToEnd(forallOp.getTerminator().getBody());
+
+  builder.setInsertionPointToEnd(forallOp->getTerminator().getBody());
 
   for (auto [tiledValue, destinationTensor, resultOffset, resultSize] :
        llvm::zip_equal(tiledResults, destinationTensors, resultOffsets,
@@ -2011,7 +2018,8 @@ LogicalResult
 ConditionalTransposeAttr::verify(function_ref<InFlightDiagnostic()> emitError,
                                  int64_t nbXcds, int64_t nbCus) {
   if (nbXcds == 0 || nbCus == 0) {
-    return emitError() << "DynamicTransposeAttr must have non-zeros parameters";
+    return emitError()
+           << "conditional_transpose must have non-zeros parameters";
   }
   return success();
 }
