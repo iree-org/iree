@@ -1966,9 +1966,9 @@ ConditionalTransposeAttr::generateLoopHeaderFn(
 
   forallOp = scf::ForallOp::create(builder, loc, lbs, ubs, steps,
                                    destinationTensors, mappingAttr);
+  builder.setInsertionPoint(forallOp.getTerminator());
 
   SmallVector<Value> ivs = forallOp.getInductionVars();
-
   SmallVector<OpFoldResult> offsets, sizes;
   SmallVector<size_t> ids;
   std::tie(offsets, sizes, ids) =
@@ -1978,8 +1978,6 @@ ConditionalTransposeAttr::generateLoopHeaderFn(
   swapIf(builder, loc, cond, offsets, ids);
 
   ValueRange innerDestinationTensors = forallOp.getRegionOutArgs();
-  builder.setInsertionPoint(forallOp.getTerminator());
-
   return mlir::scf::SCFTilingOptions::CustomLoopHeaderInfo{
       {cast<LoopLikeOpInterface>(forallOp.getOperation())},
       offsets,
