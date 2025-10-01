@@ -251,7 +251,7 @@ def MatchDimsEqualOp : Op<Transform_Dialect, "iree.match.dims_equal",
 
   let arguments = (ins
     TransformParamTypeInterface:$dimension_sizes, // Array of dimension parameters.
-    ArrayAttr:$expected_values                    // Array of expected values.
+    DenseI64ArrayAttr:$expected_values                    // Array of expected i64 values.
   );
 
   let assemblyFormat = [{

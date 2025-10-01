@@ -312,32 +312,19 @@ DiagnosedSilenceableFailure IREE::transform_dialect::MatchDimsEqualOp::apply(
     transform::TransformResults &results, transform::TransformState &state) {
   ArrayRef<transform::Param> currentDimAttrs =
       state.getParams(getDimensionSizes());
-  ArrayAttr targetDimAttrs = getExpectedValues();
+  ArrayRef<int64_t> targetDims = getExpectedValues();
 
-  if (currentDimAttrs.size() != targetDimAttrs.size()) {
-    return emitSilenceableError()
-           << "dimension sizes and expected values have different lengths";
-  }
-
-  auto extractDims = [](const auto &range) {
-    return llvm::map_to_vector(
-        range, [](Attribute attr) -> std::optional<int64_t> {
-          if (auto intAttr = dyn_cast<IntegerAttr>(attr)) {
-            return intAttr.getInt();
-          }
-          return std::nullopt;
-        });
-  };
-
-  SmallVector<std::optional<int64_t>> currentDims =
-      extractDims(currentDimAttrs);
-  SmallVector<std::optional<int64_t>> targetDims =
-      extractDims(targetDimAttrs.getValue());
+  SmallVector<std::optional<int64_t>> currentDims = llvm::map_to_vector(
+      currentDimAttrs, [](Attribute attr) -> std::optional<int64_t> {
+        if (auto intAttr = dyn_cast<IntegerAttr>(attr)) {
+          return intAttr.getInt();
+        }
+        return std::nullopt;
+      });
 
   if (!llvm::equal(currentDims, targetDims,
-                   [](const std::optional<int64_t> &lhs,
-                      const std::optional<int64_t> &rhs) {
-                     return (rhs && *rhs == -1) || (lhs && rhs && *lhs == *rhs);
+                   [](const std::optional<int64_t> &lhs, int64_t rhs) {
+                     return (rhs == -1) || (lhs && *lhs == rhs);
                    })) {
     return emitSilenceableError() << "Dimension sizes do not match";
   }
