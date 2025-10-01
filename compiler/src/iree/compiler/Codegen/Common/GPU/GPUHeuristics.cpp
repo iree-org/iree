@@ -636,11 +636,9 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     int64_t subgroupSize, std::optional<int64_t> wgpCount, bool transposedLhs,
     bool transposedRhs, bool canUpcastAcc, bool mustBeAligned,
     bool doCPromotion) {
-
-  SmallVector<GPUIntrinsicType> sortedIntrinsics =
-      sortMMAIntrinsics(problem, intrinsics);
-
-  for (const GPUIntrinsicType &intrinsic : sortedIntrinsics) {
+  // TODO(#22160): sortMMAIntrinsics call is disabled for now since it causes
+  // performance regression. Re-enable once the issue is addressed.
+  for (const GPUIntrinsicType &intrinsic : intrinsics) {
     if (failed(canTargetIntrinsic(problem, intrinsic, subgroupSize,
                                   canUpcastAcc, mustBeAligned))) {
       continue;
