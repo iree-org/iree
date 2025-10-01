@@ -73,6 +73,42 @@ def IPOPass : Pass<"iree-util-ipo", "mlir::ModuleOp"> {
   ];
 }
 
+def LiftCFGToSCFPass : Pass<"iree-util-lift-cfg-to-scf", "mlir::ModuleOp"> {
+  let summary = "Lift unstructured control flow to SCF/Util dialect for callable ops.";
+  let description = [{
+    Transforms unstructured control flow (CFG) in `util.initializer`/`util.func`
+    ops to structured control flow (SCF) operations. All CFG terminator ops like
+    `cf.br` and `cf.cond_br` along with non-terminator ops like `cf.switch` are
+    converted to their structured equivalents like `scf.if`, `scf.while`, and
+    `scf.index_switch` ops.
+
+    Limitations:
+    * Irreducible control flow (loops with multiple entry points) will cause
+      the transformation to fail. This is rare in practice as most high-level
+      languages and ML frameworks generate reducible control flow.
+    * Operations with side-effecting branches are not supported.
+    * Operations that produce successor operands dynamically are not supported.
+    * Infinite loops require the insertion of `util.unreachable` terminators.
+
+    The algorithm handles:
+    * Simple if/else patterns -> `scf.if`
+    * Loops with single entry -> `scf.while`
+    * Switch statements -> `scf.index_switch`
+    * Multiple returns -> exit block combining
+    * Unreachable code -> `util.unreachable` insertion
+
+    Based on the algorithm from:
+    Bahmann et al. 2015. Perfect Reconstructability of Control Flow from
+    Demand Dependence Graphs. ACM TACO. https://dl.acm.org/doi/10.1145/2693261
+  }];
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::cf::ControlFlowDialect",
+    "::mlir::scf::SCFDialect",
+    "::mlir::ub::UBDialect",
+  ];
+}
+
 def OptimizeIntArithmeticPass : Pass<"iree-util-optimize-int-arithmetic", ""> {
   let summary = "Optimizes integer arithmetic using a variety of dataflow analysis and patterns.";
   let dependentDialects = [
