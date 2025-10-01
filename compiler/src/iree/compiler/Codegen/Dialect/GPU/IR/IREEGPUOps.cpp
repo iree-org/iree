@@ -240,10 +240,8 @@ LogicalResult CoalescedGatherDMAOp::verify() {
     return emitOpError("all operands must be consistently tensors or memrefs");
   }
 
-  // Verify memref result is contiguous (identity layout)
-  if (!hasTensor && !cast<MemRefType>(resultType).getLayout().isIdentity()) {
-    return emitOpError("result memref must be contiguous (identity layout)");
-  }
+  // Relax contiguity test here and enforce it in the lowering part because
+  // the need to accommodate subview memrefs.
 
   // Verify element types match
   if (resultShapedType.getElementType() != sourceType.getElementType()) {
