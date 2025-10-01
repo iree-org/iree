@@ -43,26 +43,15 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-llvmcpu-reassociate-fp-reductions=false"
     "--iree-llvmcpu-target-cpu=generic"
-  INPUT_TYPE
-    "stablehlo"
 )
 
 iree_check_single_backend_test_suite(
   NAME
     check_regression_llvm-cpu
   SRCS
-    "dynamic_abs.mlir"
-    "dynamic_add.mlir"
-    "dynamic_dot.mlir"
-    "dynamic_reduce_min.mlir"
-    "dynamic_torch_index_select_high_rank.mlir"
-    "dynamic_torch_index_select_negative.mlir"
-    "dynamic_torch_index_select_scalar.mlir"
-    "dynamic_torch_index_select_vector.mlir"
     "i1_inlined_constant.mlir"
     "layernorm.mlir"
     "linalg_ops.mlir"
-    "lowering_config.mlir"
     "pack_pad_transpose_1x9_into_2x1x8x4_issue_12546.mlir"
     "reduction_broadcast_elementwise.mlir"
     "scalar_computation.mlir"
@@ -76,8 +65,6 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-llvmcpu-target-cpu=generic"
-  INPUT_TYPE
-    "stablehlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -106,22 +93,12 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-llvmcpu-target-cpu=generic"
-  INPUT_TYPE
-    "tosa"
 )
 
 iree_check_single_backend_test_suite(
   NAME
     check_regression_vmvx
   SRCS
-    "dynamic_abs.mlir"
-    "dynamic_add.mlir"
-    "dynamic_dot.mlir"
-    "dynamic_reduce_min.mlir"
-    "dynamic_torch_index_select_high_rank.mlir"
-    "dynamic_torch_index_select_negative.mlir"
-    "dynamic_torch_index_select_scalar.mlir"
-    "dynamic_torch_index_select_vector.mlir"
     "i1_inlined_constant.mlir"
     "layernorm.mlir"
     "linalg_ops.mlir"
@@ -134,22 +111,12 @@ iree_check_single_backend_test_suite(
     "vmvx"
   DRIVER
     "local-task"
-  INPUT_TYPE
-    "stablehlo"
 )
 
 iree_check_single_backend_test_suite(
   NAME
     check_regression_vulkan-spirv
   SRCS
-    "dynamic_abs.mlir"
-    "dynamic_add.mlir"
-    "dynamic_dot.mlir"
-    "dynamic_reduce_min.mlir"
-    "dynamic_torch_index_select_high_rank.mlir"
-    "dynamic_torch_index_select_negative.mlir"
-    "dynamic_torch_index_select_scalar.mlir"
-    "dynamic_torch_index_select_vector.mlir"
     "i1_inlined_constant.mlir"
     "linalg_ops.mlir"
     "reduction_broadcast_elementwise.mlir"
@@ -161,22 +128,12 @@ iree_check_single_backend_test_suite(
     "vulkan-spirv"
   DRIVER
     "vulkan"
-  INPUT_TYPE
-    "stablehlo"
 )
 
 iree_check_single_backend_test_suite(
   NAME
     check_regression_cuda
   SRCS
-    "dynamic_abs.mlir"
-    "dynamic_add.mlir"
-    "dynamic_dot.mlir"
-    "dynamic_reduce_min.mlir"
-    "dynamic_torch_index_select_high_rank.mlir"
-    "dynamic_torch_index_select_negative.mlir"
-    "dynamic_torch_index_select_scalar.mlir"
-    "dynamic_torch_index_select_vector.mlir"
     "i1_inlined_constant.mlir"
     "large_reduction.mlir"
     "layernorm.mlir"
@@ -190,8 +147,6 @@ iree_check_single_backend_test_suite(
     "cuda"
   DRIVER
     "cuda"
-  INPUT_TYPE
-    "stablehlo"
   LABELS
     "noasan"
     "nomsan"
@@ -264,8 +219,6 @@ iree_check_single_backend_test_suite(
     "vmvx"
   COMPILER_FLAGS
     "--iree-vmvx-enable-microkernels"
-  INPUT_TYPE
-    "tosa"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
