@@ -441,3 +441,31 @@ func.func @batch_matvec_f16_f32() {
 //  CHECK-SAME:                 subgroup_basis = {{\[}}[1, 1, 1], [0, 1, 2]],
 //  CHECK-SAME:                 thread = [0, 0, 8],
 //  CHECK-SAME:                 workgroup = [4, 1, 0]
+
+
+// -----
+
+!TA = tensor<1152x384xf32>
+!TB = tensor<384xf32>
+!DTB = !iree_tensor_ext.dispatch.tensor<readwrite:tensor<384xf32>>
+//       CHECK: LLVMGPUVectorDistribute workgroup_size = [128, 1, 1] subgroup_size = 64
+// CHECK-LABEL: @non_contiguous_reduction_example
+//      CHECK:       iterator_types = ["parallel", "reduction"]}
+// CHECK-SAME: attrs =  {lowering_config = #iree_gpu.lowering_config<{
+// CHECK-SAME:           lane_basis = {{\[}}[16, 4], [1, 0]],
+// CHECK-SAME:    partial_reduction = [0, 32],
+// CHECK-SAME:       subgroup_basis = {{\[}}[1, 2], [0, 1]],
+// CHECK-SAME:               thread = [0, 1],
+// CHECK-SAME:            workgroup = [16, 0]}>
+#map = affine_map<(d0, d1) -> (d1, d0)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+func.func @non_contiguous_reduction_example(%arg0: !TA, %arg1: !TB, %arg2: !DTB) {
+  %0 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]}
+  ins(%arg0 : !TA) outs(%arg1 : !TB) {
+  ^bb0(%in: f32, %out: f32):
+    %1 = arith.addf %in, %out : f32
+    linalg.yield %1 : f32
+  } -> !TB
+  iree_tensor_ext.dispatch.tensor.store %0, %arg2, offsets = [0], sizes = [384], strides = [1] : !TB -> !DTB
+  return
+}
