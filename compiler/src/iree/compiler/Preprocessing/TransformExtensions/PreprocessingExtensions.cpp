@@ -310,13 +310,23 @@ IREE::transform_dialect::MatchContractionOp::matchOperation(
 DiagnosedSilenceableFailure IREE::transform_dialect::MatchDimsEqualOp::apply(
     transform::TransformRewriter &rewriter,
     transform::TransformResults &results, transform::TransformState &state) {
-  ArrayRef<transform::Param> currentDimSizes =
+  ArrayRef<transform::Param> actualDimAttrs =
       state.getParams(getDimensionSizes());
-  ArrayAttr targetDimensionSizes = getExpectedValues();
+  ArrayRef<int64_t> expectedDims = getExpectedValues();
 
-  if (!llvm::equal(currentDimSizes, targetDimensionSizes)) {
-    return emitSilenceableError()
-           << "Dimension sizes do not match expected values";
+  SmallVector<std::optional<int64_t>> actualDims = llvm::map_to_vector(
+      actualDimAttrs, [](Attribute attr) -> std::optional<int64_t> {
+        if (auto intAttr = dyn_cast<IntegerAttr>(attr)) {
+          return intAttr.getInt();
+        }
+        return std::nullopt;
+      });
+
+  if (!llvm::equal(actualDims, expectedDims,
+                   [](const std::optional<int64_t> &lhs, int64_t rhs) {
+                     return rhs == -1 || lhs == rhs;
+                   })) {
+    return emitSilenceableError() << "Dimension sizes do not match";
   }
 
   return DiagnosedSilenceableFailure::success();
