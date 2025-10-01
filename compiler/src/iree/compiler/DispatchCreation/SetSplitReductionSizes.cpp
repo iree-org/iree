@@ -30,10 +30,12 @@ static SmallVector<int64_t> getStaticReductionDimSizes(linalg::LinalgOp op) {
 }
 
 static std::optional<SmallVector<int64_t>> getReductionDimSizes(Operation *Op) {
-  SmallVector<int64_t> loopRanges;
-  if (auto fusionOp = dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(Op)) {
-    loopRanges = fusionOp.getStaticLoopRanges();
+  auto fusionOp = dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(Op);
+  if (!fusionOp) {
+    LDBG() << "skipping op; not a LinalgFusionOpInterface op";
+    return std::nullopt;
   }
+  SmallVector<int64_t> loopRanges = fusionOp.getStaticLoopRanges();
 
   auto tilingInterfaceOp = dyn_cast<TilingInterface>(Op);
   if (!tilingInterfaceOp) {
