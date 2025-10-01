@@ -307,54 +307,39 @@ IREE::transform_dialect::MatchContractionOp::matchOperation(
 // MatchDimsEqualOp
 //===----------------------------------------------------------------------===//
 
-template <typename Range, typename Mapper>
-static FailureOr<SmallVector<std::optional<int64_t>>>
-extractDimSizes(Range &&attrs, Mapper mapValueToOptional) {
-  SmallVector<std::optional<int64_t>> dimSizes;
-  dimSizes.reserve(std::distance(std::begin(attrs), std::end(attrs)));
-  for (Attribute attr : attrs) {
-    auto valAttr = dyn_cast<IntegerAttr>(attr);
-    if (!valAttr) {
-      return failure();
-    }
-    dimSizes.push_back(mapValueToOptional(valAttr.getInt()));
-  }
-  return dimSizes;
-}
-
 DiagnosedSilenceableFailure IREE::transform_dialect::MatchDimsEqualOp::apply(
     transform::TransformRewriter &rewriter,
     transform::TransformResults &results, transform::TransformState &state) {
-  ArrayRef<transform::Param> currentDimSizes =
+  ArrayRef<transform::Param> currentDimAttrs =
       state.getParams(getDimensionSizes());
-  ArrayAttr targetDimSizes = getExpectedValues();
+  ArrayAttr targetDimAttrs = getExpectedValues();
 
-  if (currentDimSizes.size() != targetDimSizes.size()) {
+  if (currentDimAttrs.size() != targetDimAttrs.size()) {
     return emitSilenceableError()
            << "dimension sizes and expected values have different lengths";
   }
 
-  FailureOr<SmallVector<std::optional<int64_t>>> currentDims = extractDimSizes(
-      currentDimSizes, [](int64_t v) { return std::optional<int64_t>(v); });
-  if (failed(currentDims)) {
-    return emitSilenceableError()
-           << "expected integer attributes for current sizes";
-  }
+  auto extractDims = [](const auto &range) {
+    return llvm::map_to_vector(
+        range, [](Attribute attr) -> std::optional<int64_t> {
+          if (auto intAttr = dyn_cast<IntegerAttr>(attr)) {
+            return intAttr.getInt();
+          }
+          return std::nullopt;
+        });
+  };
 
-  FailureOr<SmallVector<std::optional<int64_t>>> targetDims =
-      extractDimSizes(targetDimSizes.getValue(), [](int64_t v) {
-        return v == -1 ? std::nullopt : std::optional<int64_t>(v);
-      });
-  if (failed(targetDims)) {
-    return emitSilenceableError()
-           << "expected integer attributes for expected sizes";
-  }
+  SmallVector<std::optional<int64_t>> currentDims =
+      extractDims(currentDimAttrs);
+  SmallVector<std::optional<int64_t>> targetDims =
+      extractDims(targetDimAttrs.getValue());
 
-  for (auto [current, target] : llvm::zip_equal(*currentDims, *targetDims)) {
-    if (target && *current != *target) {
-      return emitSilenceableError()
-             << "dimension size " << *current << " does not match " << *target;
-    }
+  if (!llvm::equal(currentDims, targetDims,
+                   [](const std::optional<int64_t> &lhs,
+                      const std::optional<int64_t> &rhs) {
+                     return (rhs && *rhs == -1) || (lhs && rhs && *lhs == *rhs);
+                   })) {
+    return emitSilenceableError() << "Dimension sizes do not match";
   }
 
   return DiagnosedSilenceableFailure::success();
