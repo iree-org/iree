@@ -1820,7 +1820,7 @@ LoweringConfigAttr::getWorkgroupReOrderingStrategy() const {
 }
 
 //===----------------------------------------------------------------------===//
-// Dynamic Transpose Workgroup Reordering
+// Conditional Transpose Workgroup Reordering
 //===----------------------------------------------------------------------===//
 
 static std::tuple<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>,
@@ -1849,22 +1849,21 @@ static Value computeNbTiles(OpBuilder &b, Location loc, OpFoldResult size,
   return getValueOrCreateConstantIntOp(b, loc, nbTiles);
 }
 
-/// Computes the total number of Tile loads per iteration for the pingpong
-/// matmul kernel.
+/// Computes the total number of different Tile loads accross all XCDs per
+/// iteration for the pingpong matmul kernel. For each iteration, we distribute
+/// tile loads to invidiual CUs along the X axis of the RHS.
 static Value computeNumTileLoads(OpBuilder &b, Location loc, OpFoldResult size,
                                  OpFoldResult tileSize, Value nbXcds,
                                  Value nbCus) {
-
   Value nbTiles = computeNbTiles(b, loc, size, tileSize);
-  auto totalCus = b.create<mlir::arith::MulIOp>(loc, nbXcds, nbCus);
-  auto nbX = b.create<mlir::arith::MinUIOp>(loc, nbTiles, totalCus).getResult();
-
-  auto nbY = b.create<mlir::arith::CeilDivUIOp>(loc, totalCus, nbX);
-
+  auto totalCUs = b.create<mlir::arith::MulIOp>(loc, nbXcds, nbCus);
+  auto nbX = b.create<mlir::arith::MinUIOp>(loc, nbTiles, totalCUs).getResult();
+  auto nbY = b.create<mlir::arith::CeilDivUIOp>(loc, totalCUs, nbX);
   return getValueOrCreateConstantIndexOp(
       b, loc, b.create<mlir::arith::AddIOp>(loc, nbX, nbY).getResult());
 }
 
+/// Gets the condition of transposed ordering.
 static Value getCondition(OpBuilder &b, Location loc,
                           ArrayRef<OpFoldResult> ubs,
                           ArrayRef<OpFoldResult> steps, Value nbXcds,
@@ -1885,19 +1884,17 @@ static Value getCondition(OpBuilder &b, Location loc,
       b, loc,
       affine::makeComposedFoldedAffineApply(b, loc, transposedOrderBumpExpr,
                                             {defaultOrder, c4, c5}));
-
   Value cond =
       b.create<mlir::arith::CmpIOp>(loc, mlir::arith::CmpIPredicate::ult,
                                     transposedOrder, defaultOrderTolerance);
   return cond;
 }
-
+/// Swap values based on `pred`.
 static void swapIf(OpBuilder &b, Location loc, OpFoldResult pred,
                    SmallVector<OpFoldResult> &values,
                    ArrayRef<size_t> ids = {0, 1}) {
 
   assert(ids.size() == 2 && "Can only swap between 2 indices");
-
   Value v0 = getValueOrCreateConstantIndexOp(b, loc, values[ids[0]]);
   Value v1 = getValueOrCreateConstantIndexOp(b, loc, values[ids[1]]);
   Value predVal = getValueOrCreateConstantIndexOp(b, loc, pred);
@@ -1934,7 +1931,7 @@ computeOffsetAndSize(ArrayRef<Range> loopRanges,
 }
 
 FailureOr<mlir::scf::SCFTilingOptions::CustomLoopHeaderInfo>
-DynamicTransposeAttr::generateLoopHeaderFn(
+ConditionalTransposeAttr::generateLoopHeaderFn(
     OpBuilder &builder, Location loc, ArrayRef<Range> loopRanges,
     ArrayRef<OpFoldResult> givenTileSizes,
     ValueRange destinationTensors) const {
@@ -1954,12 +1951,9 @@ DynamicTransposeAttr::generateLoopHeaderFn(
   std::optional<ArrayAttr> mappingAttr =
       builder.getArrayAttr(deviceMappingAttribute);
 
-  const int NBCUS = 38;
-  const int NBXCDS = 8;
-
   // Apply condition on loop bounds
-  Value nbCusVal = builder.create<arith::ConstantIndexOp>(loc, NBCUS);
-  Value nbXCDs = builder.create<arith::ConstantIndexOp>(loc, NBXCDS);
+  Value nbCusVal = builder.create<arith::ConstantIndexOp>(loc, getNbCus());
+  Value nbXCDs = builder.create<arith::ConstantIndexOp>(loc, getNbXcds());
   Value cond = getCondition(builder, loc, ubs, steps, nbXCDs, nbCusVal);
 
   swapIf(builder, loc, cond, lbs);
@@ -1988,7 +1982,7 @@ DynamicTransposeAttr::generateLoopHeaderFn(
       innerDestinationTensors};
 }
 
-LogicalResult DynamicTransposeAttr::generateLoopTerminatorFn(
+LogicalResult ConditionalTransposeAttr::generateLoopTerminatorFn(
     OpBuilder &builder, Location loc, ArrayRef<LoopLikeOpInterface> loops,
     ValueRange tiledResults, ArrayRef<SmallVector<OpFoldResult>> resultOffsets,
     ArrayRef<SmallVector<OpFoldResult>> resultSizes,
@@ -2014,8 +2008,8 @@ LogicalResult DynamicTransposeAttr::generateLoopTerminatorFn(
 }
 
 LogicalResult
-DynamicTransposeAttr::verify(function_ref<InFlightDiagnostic()> emitError,
-                             int64_t nbXcds, int64_t nbCus) {
+ConditionalTransposeAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                                 int64_t nbXcds, int64_t nbCus) {
   if (nbXcds == 0 || nbCus == 0) {
     return emitError() << "DynamicTransposeAttr must have non-zeros parameters";
   }

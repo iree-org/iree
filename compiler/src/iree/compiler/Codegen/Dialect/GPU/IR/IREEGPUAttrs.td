@@ -657,18 +657,18 @@ def IREEGPU_LaneIdAttr : AttrDef<IREEGPU_Dialect, "LaneId", [
 }
 
 //===---------------------------------------------------------------------===//
-// Dynamic Transpose Workgroup Reordering
+// Conditional Transpose Workgroup Reordering
 //===---------------------------------------------------------------------===//
 
-def IREEGPU_DynamicTransposeAttr  :
-    AttrDef<IREEGPU_Dialect, "DynamicTranspose", [
+def IREEGPU_ConditionalTransposeAttr  :
+    AttrDef<IREEGPU_Dialect, "ConditionalTranspose", [
     DeclareAttrInterfaceMethods<IREECodegen_WorkgroupReorderingAttrInterface, [
         "generateLoopHeaderFn",
         "generateLoopTerminatorFn"
       ]>
     ]> {
-  let mnemonic = "dynamic_transpose";
-  let summary = [{Enable or disable transposed workgroup reordering based the workload.}];
+  let mnemonic = "conditional_transpose";
+  let summary = [{Enable or disable transposed workgroup reordering based on the workload.}];
   let description = [{ This attribute controls conditional transposed workgroup reordering, determined by tile size, the number of XCDs, and the number of CUs. The reordering strategy is also influenced by the memory access pattern, and is specifically designed to optimize the ping-pong matmul specialization.
   On gfx9 architectures, all CUs within a single XCD share an L2 cache. This attribute helps determine whether applying transposed workgroup reordering will improve the L2 cache hit rate.
 
