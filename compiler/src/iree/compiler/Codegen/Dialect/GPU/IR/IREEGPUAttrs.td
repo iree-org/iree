@@ -30,8 +30,7 @@ def IREEGPU_LoweringConfigAttr :
         "hasTilingLevel",
         "hasWorkgroupTilingLevel",
         "getLoweringStrategy",
-        "getWorkgroupOrderingStrategy"
-
+        "getWorkgroupReOrderingStrategy"
     ]>
     ]> {
   let mnemonic = "lowering_config";

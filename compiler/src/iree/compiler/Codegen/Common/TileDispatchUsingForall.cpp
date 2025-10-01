@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <cstdint>
 #include "iree/compiler/Codegen/Common/TileAndFuseUtils.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
@@ -272,41 +271,36 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   tilingOptions.setTileSizes(tilingInfo->tileSizes);
   tilingOptions.setInterchange(tilingInfo->interchange);
   tilingOptions.setMapping(deviceMappingAttribute);
-  const char *env_var = std::getenv("TEST");
 
-  if (!env_var) {
-    tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
+  auto workgroupReOrderingStrategy =
+      getLoweringConfig(tilingInfo->tilableOp).getWorkgroupReOrderingStrategy();
+  if (workgroupReOrderingStrategy) {
+
+    scf::SCFTilingOptions::GenerateLoopHeaderFn loopHeaderFn =
+        [&workgroupReOrderingStrategy](RewriterBase &rewriter, Location loc,
+                                       ArrayRef<Range> loopRanges,
+                                       ArrayRef<OpFoldResult> givenTileSizes,
+                                       ValueRange outerDestinationTensors)
+        -> FailureOr<scf::SCFTilingOptions::CustomLoopHeaderInfo> {
+      return workgroupReOrderingStrategy.generateLoopHeaderFn(
+          rewriter, loc, loopRanges, givenTileSizes, outerDestinationTensors);
+    };
+
+    scf::SCFTilingOptions::GenerateLoopTerminatorFn terminatorFn =
+        [&workgroupReOrderingStrategy](
+            RewriterBase &rewriter, Location loc,
+            ArrayRef<LoopLikeOpInterface> loops, ValueRange tiledResults,
+            ArrayRef<SmallVector<OpFoldResult>> resultOffsets,
+            ArrayRef<SmallVector<OpFoldResult>> resultSizes,
+            ValueRange destinationTensors) -> LogicalResult {
+      return workgroupReOrderingStrategy.generateLoopTerminatorFn(
+          rewriter, loc, loops, tiledResults, resultOffsets, resultSizes,
+          destinationTensors);
+    };
+    tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::CustomOp);
+    tilingOptions.setCustomLoopGenerationFns(loopHeaderFn, terminatorFn);
   } else {
-    llvm::outs() << "Test mode\n";
-
-    auto dynamicTransposeAttr =
-        getLoweringConfig(tilingInfo->tilableOp).getWorkgroupOrderingStrategy();
-    if (dynamicTransposeAttr) {
-
-      scf::SCFTilingOptions::GenerateLoopHeaderFn loopHeaderFn =
-          [&dynamicTransposeAttr](RewriterBase &rewriter, Location loc,
-                                  ArrayRef<Range> loopRanges,
-                                  ArrayRef<OpFoldResult> givenTileSizes,
-                                  ValueRange outerDestinationTensors)
-          -> FailureOr<scf::SCFTilingOptions::CustomLoopHeaderInfo> {
-        return dynamicTransposeAttr.generateLoopHeaderFn(
-            rewriter, loc, loopRanges, givenTileSizes, outerDestinationTensors);
-      };
-
-      scf::SCFTilingOptions::GenerateLoopTerminatorFn terminatorFn =
-          [&dynamicTransposeAttr](
-              RewriterBase &rewriter, Location loc,
-              ArrayRef<LoopLikeOpInterface> loops, ValueRange tiledResults,
-              ArrayRef<SmallVector<OpFoldResult>> resultOffsets,
-              ArrayRef<SmallVector<OpFoldResult>> resultSizes,
-              ValueRange destinationTensors) -> LogicalResult {
-        return dynamicTransposeAttr.generateLoopTerminatorFn(
-            rewriter, loc, loops, tiledResults, resultOffsets, resultSizes,
-            destinationTensors);
-      };
-      tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::CustomOp);
-      tilingOptions.setCustomLoopGenerationFns(loopHeaderFn, terminatorFn);
-    }
+    tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
   }
 
   scf::SCFTileAndFuseOptions tileAndFuseOptions;

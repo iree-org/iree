@@ -1806,10 +1806,10 @@ std::optional<StringRef> LoweringConfigAttr::getLoweringStrategy() const {
   return std::nullopt;
 }
 constexpr StringLiteral kWorkgroupOrderingStrategyName =
-    "workgroup_ordering_strategy";
+    "workgroup_reordering_strategy";
 
 ::mlir::iree_compiler::IREE::Codegen::WorkgroupReorderingAttrInterface
-LoweringConfigAttr::getWorkgroupOrderingStrategy() const {
+LoweringConfigAttr::getWorkgroupReOrderingStrategy() const {
   auto attrs = getAttributes();
   if (auto attr = attrs.getAs<::mlir::iree_compiler::IREE::Codegen::
                                   WorkgroupReorderingAttrInterface>(

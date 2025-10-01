@@ -241,7 +241,10 @@ def IREECodegen_WorkgroupReorderingAttrInterface :
   let methods = [
     InterfaceMethod<
       /*desc=*/[{
-        TODO.
+        Function that generates the workgroup loop headers.
+          - `loopRanges` : Values that represent the full size of the iteration space being tiled.
+          - `givenTileSizes` : The tile sizes that are to be used to tile the iteration space.
+          - `destinationTensors` : The tensors to use as destinations for the results of the tiled loop.
       }],
       /*retTy=*/"::mlir::FailureOr<::mlir::scf::SCFTilingOptions::CustomLoopHeaderInfo>",
       /*methodName=*/"generateLoopHeaderFn",
@@ -253,7 +256,13 @@ def IREECodegen_WorkgroupReorderingAttrInterface :
     >,
      InterfaceMethod<
       /*desc=*/[{
-        TODO.
+        Function that generates the workgroup loop terminator.
+          - `loops` : generated loops from the generateLoopHeaderFn callback above
+          - `tiledResults` : Tiles of the result computed for the iteration space tile.
+          - `resultOffsets` : For each of the `tiledResults`, the offset at which the result tile is
+          to be "inserted" back into the destination tensor.
+          - `resultSizes` : For each of the `tiledResults`, the size of the result tile that is to
+          be "inserted" back into the destination tensor.
       }],
       /*retType=*/"::mlir::LogicalResult",
       /*methodName=*/"generateLoopTerminatorFn",
@@ -455,10 +464,11 @@ def IREECodegen_LoweringConfigAttrInterface :
     >,
      InterfaceMethod<
       /*desc=*/[{
-        TODO.
+        Gets the workgroup reordering strategy to apply to the annotated
+        operation.
       }],
       /*retTy=*/"::mlir::iree_compiler::IREE::Codegen::WorkgroupReorderingAttrInterface",
-      /*methodName=*/"getWorkgroupOrderingStrategy",
+      /*methodName=*/"getWorkgroupReOrderingStrategy",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
