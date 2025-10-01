@@ -310,21 +310,21 @@ IREE::transform_dialect::MatchContractionOp::matchOperation(
 DiagnosedSilenceableFailure IREE::transform_dialect::MatchDimsEqualOp::apply(
     transform::TransformRewriter &rewriter,
     transform::TransformResults &results, transform::TransformState &state) {
-  ArrayRef<transform::Param> currentDimAttrs =
+  ArrayRef<transform::Param> actualDimAttrs =
       state.getParams(getDimensionSizes());
-  ArrayRef<int64_t> targetDims = getExpectedValues();
+  ArrayRef<int64_t> expectedDims = getExpectedValues();
 
-  SmallVector<std::optional<int64_t>> currentDims = llvm::map_to_vector(
-      currentDimAttrs, [](Attribute attr) -> std::optional<int64_t> {
+  SmallVector<std::optional<int64_t>> actualDims = llvm::map_to_vector(
+      actualDimAttrs, [](Attribute attr) -> std::optional<int64_t> {
         if (auto intAttr = dyn_cast<IntegerAttr>(attr)) {
           return intAttr.getInt();
         }
         return std::nullopt;
       });
 
-  if (!llvm::equal(currentDims, targetDims,
+  if (!llvm::equal(actualDims, expectedDims,
                    [](const std::optional<int64_t> &lhs, int64_t rhs) {
-                     return (rhs == -1) || (lhs && *lhs == rhs);
+                     return rhs == -1 || lhs == rhs;
                    })) {
     return emitSilenceableError() << "Dimension sizes do not match";
   }
