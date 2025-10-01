@@ -41,12 +41,13 @@ static std::optional<SmallVector<int64_t>> getReductionDimSizes(Operation *Op) {
     return std::nullopt;
   }
 
-  SmallVector<utils::IteratorType> iters;
-  iters = tilingInterfaceOp.getLoopIteratorTypes();
+  SmallVector<utils::IteratorType> iters =
+      tilingInterfaceOp.getLoopIteratorTypes();
   SmallVector<int64_t> reductionDimSizes;
   for (auto [range, it] : llvm::zip_equal(loopRanges, iters)) {
-    if (it == utils::IteratorType::reduction)
+    if (it == utils::IteratorType::reduction) {
       reductionDimSizes.push_back(range);
+    }
   }
   return reductionDimSizes;
 }

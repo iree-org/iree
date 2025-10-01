@@ -1223,8 +1223,7 @@ LogicalResult ArgCompareOp::reifyResultShapes(
 SmallVector<AffineMap>
 IREE::LinalgExt::ArgCompareOp::getIndexingMapsForOperands() {
   Builder b(getContext());
-  const int64_t rank = getInputRank();
-  return SmallVector<AffineMap>{b.getMultiDimIdentityMap(rank)};
+  return {b.getMultiDimIdentityMap(getInputRank())};
 }
 
 SmallVector<AffineMap>
@@ -1241,7 +1240,7 @@ IREE::LinalgExt::ArgCompareOp::getIndexingMapsForResults() {
   }
 
   AffineMap resultMap = AffineMap::get(rank, 0, proj, ctx);
-  return SmallVector<AffineMap>{resultMap, resultMap};
+  return {resultMap, resultMap};
 }
 
 SmallVector<int64_t> IREE::LinalgExt::ArgCompareOp::getStaticLoopRanges() {
