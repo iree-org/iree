@@ -259,14 +259,12 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
       yieldReplacementsFor.insert(op);
     }
   }
-
   SmallVector<Attribute> deviceMappingAttribute =
       getMapping(context, tilingInfo->tileSizes);
   if (failed(IREE::Codegen::WorkgroupMappingAttr::verifyAttrList(
           context, funcOp.getLoc(), deviceMappingAttribute))) {
     return signalPassFailure();
   }
-
   scf::SCFTilingOptions tilingOptions;
   tilingOptions.setTileSizes(tilingInfo->tileSizes);
   tilingOptions.setInterchange(tilingInfo->interchange);
