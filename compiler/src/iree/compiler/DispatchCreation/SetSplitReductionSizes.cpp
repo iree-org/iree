@@ -4,12 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/Utils/Utils.h"
 
 #define DEBUG_TYPE "iree-dispatch-creation-set-split-reduction-sizes"
 
@@ -27,6 +27,31 @@ static SmallVector<int64_t> getStaticReductionDimSizes(linalg::LinalgOp op) {
     }
   }
   return dimSizes;
+}
+
+static std::optional<SmallVector<int64_t>> getReductionDimSizes(Operation *Op) {
+  auto fusionOp = dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(Op);
+  if (!fusionOp) {
+    LDBG() << "skipping op; not a LinalgFusionOpInterface op";
+    return std::nullopt;
+  }
+  SmallVector<int64_t> loopRanges = fusionOp.getStaticLoopRanges();
+
+  auto tilingInterfaceOp = dyn_cast<TilingInterface>(Op);
+  if (!tilingInterfaceOp) {
+    LDBG() << "skipping op; not a TilingInterface op";
+    return std::nullopt;
+  }
+
+  SmallVector<utils::IteratorType> iters =
+      tilingInterfaceOp.getLoopIteratorTypes();
+  SmallVector<int64_t> reductionDimSizes;
+  for (auto [range, it] : llvm::zip_equal(loopRanges, iters)) {
+    if (it == utils::IteratorType::reduction) {
+      reductionDimSizes.push_back(range);
+    }
+  }
+  return reductionDimSizes;
 }
 
 static std::optional<int64_t>
@@ -84,19 +109,19 @@ private:
   /// which reduce over outer dimensions of a tensor.
   std::optional<SmallVector<int64_t>>
   getOuterReductionSizes(PartialReductionOpInterface op) const {
-    auto linalgOp = dyn_cast<linalg::LinalgOp>(*op);
-    if (!linalgOp) {
-      LDBG() << "skipping op; not a linalg op";
-      return std::nullopt;
-    }
-    if (!linalg::isReductionIterator(
-            linalgOp.getIteratorTypesArray().front())) {
+    SmallVector<utils::IteratorType> iters = op.getLoopIteratorTypes();
+    if (iters.empty() || iters.front() != utils::IteratorType::reduction) {
       LDBG() << "skipping op; not outer-reduction";
       return std::nullopt;
     }
 
-    SmallVector<int64_t> opReductionSizes =
-        getStaticReductionDimSizes(linalgOp);
+    std::optional<SmallVector<int64_t>> maybeSizes =
+        getReductionDimSizes(op.getOperation());
+    if (!maybeSizes) {
+      return std::nullopt;
+    }
+    SmallVector<int64_t> opReductionSizes = std::move(*maybeSizes);
+
     int64_t currentSplitReductionSize = 1;
     SmallVector<int64_t> tileSizes(opReductionSizes.size());
     // Tile dimensions until we reach or exceed the target. Tile sizes must

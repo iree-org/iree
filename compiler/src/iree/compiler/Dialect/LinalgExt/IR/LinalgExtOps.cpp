@@ -1121,7 +1121,7 @@ TopkOp::reifyResultShapes(OpBuilder &b,
 }
 
 //===----------------------------------------------------------------------===//
-// ArgmaxOp
+// ArgCompareOp
 //===----------------------------------------------------------------------===//
 
 LogicalResult ArgCompareOp::verify() {
@@ -1218,6 +1218,43 @@ LogicalResult ArgCompareOp::reifyResultShapes(
     OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   return cast<LinalgExtOp>(getOperation())
       .reifyResultShapes(b, reifiedReturnShapes);
+}
+
+SmallVector<AffineMap> IREE::LinalgExt::ArgCompareOp::getIndexingMapsArray() {
+  MLIRContext *ctx = getContext();
+
+  const int64_t rank = getInputRank();
+  const int64_t redDim = static_cast<int64_t>(getDimension());
+
+  Builder b(ctx);
+  AffineMap inputMap = b.getMultiDimIdentityMap(rank);
+
+  SmallVector<AffineExpr> proj;
+  for (int64_t i = 0; i < rank; ++i) {
+    if (i == redDim) {
+      continue;
+    }
+    proj.push_back(getAffineDimExpr(i, ctx));
+  }
+  AffineMap resultMap = AffineMap::get(rank, 0, proj, ctx);
+  return {inputMap, resultMap, resultMap};
+}
+
+SmallVector<AffineMap>
+IREE::LinalgExt::ArgCompareOp::getIndexingMapsForOperands() {
+  SmallVector<AffineMap> maps = getIndexingMapsArray();
+  maps.resize(getNumDpsInputs() + getNumDpsInits());
+  return maps;
+}
+
+SmallVector<AffineMap>
+IREE::LinalgExt::ArgCompareOp::getIndexingMapsForResults() {
+  return llvm::to_vector_of<AffineMap>(
+      llvm::drop_begin(getIndexingMapsArray(), getNumDpsInputs()));
+}
+
+SmallVector<int64_t> IREE::LinalgExt::ArgCompareOp::getStaticLoopRanges() {
+  return llvm::to_vector(getInputType().getShape());
 }
 
 //===----------------------------------------------------------------------===//

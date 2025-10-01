@@ -679,6 +679,9 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
 
 def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<LinalgFusionInterface,
+   ["getIndexingMapsForResults", "getIndexingMapsForOperands",
+    "getStaticLoopRanges"]>,
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
   ["generateScalarImplementation",
@@ -795,6 +798,8 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
     MutableOperandRange getDpsInitsMutable() {
       return getOutputsMutable();
     }
+
+    SmallVector<AffineMap> getIndexingMapsArray();
   }];
 }
 
