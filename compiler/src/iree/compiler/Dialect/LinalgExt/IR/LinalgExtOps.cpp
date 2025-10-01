@@ -156,9 +156,10 @@ verifyGatherScatter(OpTy op, int64_t sliceRank, ShapedType originalType,
 
   auto indicesType = op.getIndicesType();
   if (indicesType.getRank() < 1 ||
-      !isa<IntegerType>(indicesType.getElementType())) {
+      !(isa<IntegerType>(indicesType.getElementType()) ||
+        indicesType.getElementType().isIndex())) {
     return op->emitOpError("expected indices to be of rank 1 or greater and of "
-                           "integer element type");
+                           "integer or index element type");
   }
 
   ArrayRef<int64_t> dimMap = op.getDimensionMap();

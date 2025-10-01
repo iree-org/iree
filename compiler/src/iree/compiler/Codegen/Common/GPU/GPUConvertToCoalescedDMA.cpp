@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cstdint>
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
@@ -15,6 +16,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
@@ -59,14 +61,26 @@ struct ConvertGatherOpToCoalescedDMA
     auto loweringConfig =
         getLoweringConfig<IREE::GPU::LoweringConfigAttr>(gatherOp);
     if (!loweringConfig) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          gatherOp, "missing lowering config for gather op");
     }
 
     auto subgroupTileSizes = loweringConfig.getTilingLevelSizes(
         rewriter, llvm::to_underlying(IREE::GPU::TilingLevel::Subgroup),
         gatherOp);
     if (subgroupTileSizes.empty()) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          gatherOp, "missing subgroup tile sizes in lowering config");
+    }
+
+    SmallVector<int64_t> staticTileSizes;
+    for (OpFoldResult ofr : subgroupTileSizes) {
+      std::optional<int64_t> tileSize = getConstantIntValue(ofr);
+      if (!tileSize) {
+        return rewriter.notifyMatchFailure(
+            gatherOp, "subgroup tile sizes must be constant");
+      }
+      staticTileSizes.push_back(*tileSize);
     }
 
     // Actual tiling to CoalescedDMA:
@@ -84,23 +98,15 @@ struct ConvertGatherOpToCoalescedDMA
     }
 
     // Subgroup size should be equal to the gathering memref rank.
-    if (rank != subgroupTileSizes.size()) {
+    if (rank != staticTileSizes.size()) {
       return failure();
     }
 
     // Verify that tile sizes divide the dimensions evenly.
     for (int64_t i = 0; i < rank; ++i) {
-      OpFoldResult tileSize = subgroupTileSizes[i];
-      if (auto tileSizeAttr = llvm::dyn_cast_if_present<Attribute>(tileSize)) {
-        if (auto intAttr = llvm::dyn_cast<IntegerAttr>(tileSizeAttr)) {
-          int64_t tileSizeVal = intAttr.getInt();
-          int64_t dimSize = initType.getDimSize(i);
-          if (dimSize != ShapedType::kDynamic && tileSizeVal > 0 &&
-              dimSize % tileSizeVal != 0) {
-            return rewriter.notifyMatchFailure(
-                gatherOp, "tile size must divide dimension size evenly");
-          }
-        }
+      if (initType.getDimSize(i) % staticTileSizes[i] != 0) {
+        return rewriter.notifyMatchFailure(
+            gatherOp, "tile size must divide dimension size evenly");
       }
     }
 
@@ -138,20 +144,22 @@ struct ConvertGatherOpToCoalescedDMA
                            body->getArguments().begin() + rank);
     Value sharedOut = body->getArguments()[rank];
 
-    SmallVector<OpFoldResult> offsets;
-    for (Value iv : ivs) {
-      offsets.push_back(iv);
-    }
+    SmallVector<OpFoldResult> offsets(ivs.begin(), ivs.end());
     SmallVector<OpFoldResult> strides(rank, rewriter.getIndexAttr(1));
 
     auto extractedIndices = rewriter.create<tensor::ExtractSliceOp>(
         loc, indices, offsets, tileSizes, strides);
 
     auto indicesType = cast<RankedTensorType>(extractedIndices.getType());
-    auto indexIndicesType =
-        RankedTensorType::get(indicesType.getShape(), rewriter.getIndexType());
-    Value indexIndices = rewriter.create<arith::IndexCastOp>(
-        loc, indexIndicesType, extractedIndices.getResult());
+    Value indexIndices = extractedIndices.getResult();
+
+    // Cast to index type if needed
+    if (indicesType.getElementType() != rewriter.getIndexType()) {
+      auto indexIndicesType = RankedTensorType::get(indicesType.getShape(),
+                                                    rewriter.getIndexType());
+      indexIndices = rewriter.create<arith::IndexCastOp>(
+          loc, indexIndicesType, extractedIndices.getResult());
+    }
 
     auto inParallelOp = cast<scf::InParallelOp>(body->getTerminator());
 
