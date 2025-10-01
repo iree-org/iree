@@ -229,24 +229,49 @@ LogicalResult CoalescedGatherDMAOp::verify() {
     return emitOpError("init and result must have the same type and shape");
   }
 
-  // Ensure all operands are either all tensors or all memrefs
-  bool hasTensor = isa<RankedTensorType>(initType);
-  bool hasMemRef = isa<MemRefType>(initType);
+  auto indicesType = cast<ShapedType>(getIndices().getType());
+  auto sourceType = cast<ShapedType>(getSource().getType());
+  auto resultShapedType = cast<ShapedType>(resultType);
 
-  if (!hasTensor && !hasMemRef) {
-    return emitOpError("input type must either be a tensor or a memref");
+  // Verify all operands are either tensors or memrefs consistently
+  bool hasTensor = isa<RankedTensorType>(initType);
+  if (hasTensor != isa<RankedTensorType>(indicesType) ||
+      hasTensor != isa<RankedTensorType>(sourceType)) {
+    return emitOpError("all operands must be consistently tensors or memrefs");
   }
 
-  if (hasTensor) {
-    if (!isa<RankedTensorType>(getIndices().getType()) ||
-        !isa<RankedTensorType>(getSource().getType())) {
-      return emitOpError("all operands must be tensors when init is a tensor");
-    }
-  } else if (hasMemRef) {
-    if (!isa<MemRefType>(getIndices().getType()) ||
-        !isa<MemRefType>(getSource().getType())) {
-      return emitOpError("all operands must be memrefs when init is a memref");
-    }
+  // Verify memref result is contiguous (identity layout)
+  if (!hasTensor && !cast<MemRefType>(resultType).getLayout().isIdentity()) {
+    return emitOpError("result memref must be contiguous (identity layout)");
+  }
+
+  // Verify element types match
+  if (resultShapedType.getElementType() != sourceType.getElementType()) {
+    return emitOpError("result and source must have the same element type");
+  }
+
+  // Require static shapes for load width verification
+  if (!indicesType.hasStaticShape() || !resultShapedType.hasStaticShape()) {
+    return emitOpError(
+        "coalesced_gather_dma requires static shapes to verify load width "
+        "constraints");
+  }
+
+  // Verify load width constraint: sizeof(result) == num_indices * load_width
+  // where load_width must be 4, 8, or 16 bytes
+  int64_t resultBytes =
+      resultShapedType.getNumElements() *
+      resultShapedType.getElementType().getIntOrFloatBitWidth() / 8;
+  int64_t numIndices = indicesType.getNumElements();
+
+  if (resultBytes % numIndices != 0) {
+    return emitOpError(
+        "result size must be evenly divisible by number of indices");
+  }
+
+  size_t loadWidth = resultBytes / numIndices;
+  if (!isLegalLoadWidthInBytes(loadWidth)) {
+    return emitOpError("load width illegal: " + std::to_string(loadWidth));
   }
 
   return success();

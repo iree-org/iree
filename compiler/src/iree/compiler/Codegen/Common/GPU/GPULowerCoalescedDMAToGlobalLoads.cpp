@@ -186,30 +186,49 @@ struct LowerCoalescedGatherDMAPattern
                                 PatternRewriter &rewriter) const override {
     Location loc = dmaOp.getLoc();
 
-    LDBG() << "=== matchAndRewrite called for: " << dmaOp;
-
     // Check if this DMA op is eligible for transformation.
     if (failed(isEligibleForGlobalDMA(dmaOp, rewriter))) {
       return failure();
     }
 
-    scf::ForallOp forallOp = dmaOp->getParentOfType<scf::ForallOp>();
-
-    // Replace the entire scf.forall with amdgpu.gather_to_lds.
-    rewriter.setInsertionPoint(forallOp);
+    rewriter.setInsertionPoint(dmaOp);
 
     auto destMemRefType = dyn_cast<MemRefType>(dmaOp.getInit().getType());
     int64_t numCopiesPerThread = getNumOfGlobalLoadsPerThread(
         destMemRefType, subgroupSize, maxLoadInstructionBits);
 
     Value indices = dmaOp.getIndices();
-    auto indicesType = cast<MemRefType>(indices.getType());
-
     Value dest = dmaOp.getInit();
+    auto indicesType = cast<MemRefType>(indices.getType());
     auto destType = cast<MemRefType>(dest.getType());
 
-    Value subgroupId = rewriter.create<gpu::SubgroupIdOp>(
-        loc, rewriter.getIndexType(), nullptr);
+    int64_t numIndices = indicesType.getNumElements();
+
+    int64_t totalBytesOfCopy =
+        (destType.getNumElements() * destType.getElementTypeBitWidth()) / 8;
+    if (totalBytesOfCopy % numIndices != 0) {
+      return rewriter.notifyMatchFailure(
+          dmaOp, "total bytes to copy is not divisible by number of indices");
+    }
+    int64_t bytesPerIndexCopy = totalBytesOfCopy / numIndices;
+
+    // Each time a thread gathers an index:
+    // for copy_id in [0, num_copies_per_thread) {
+    // copy_vector = linearized_source[indices[copy_id * subgroup_size +
+    // lane_id]] linearized_dest[copy_id * subgroup_size + lane_id] =
+    // copy_vector
+    // }
+    // where sizeof(copy_vector) == max_load_instruction_bytes
+
+    numCopiesPerThread = numIndices / subgroupSize;
+
+    // TODO: change this to a better query.
+    if (!dmaOp.isLegalLoadWidthInBytes(bytesPerIndexCopy)) {
+      return rewriter.notifyMatchFailure(
+          dmaOp,
+          "bytes per index copy does not match max load instruction bits");
+    }
+
     Value laneId =
         rewriter.create<gpu::LaneIdOp>(loc, rewriter.getIndexType(), nullptr);
 
@@ -218,78 +237,62 @@ struct LowerCoalescedGatherDMAPattern
     Value upperBound =
         rewriter.create<arith::ConstantIndexOp>(loc, numCopiesPerThread);
     Value step = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+
     scf::ForOp forOp =
         rewriter.create<scf::ForOp>(loc, lowerBound, upperBound, step);
 
-    // Now build the `scf.for` loop body.
+    // helper functions
     auto delinearizeIndex = [&](Value index, ArrayRef<int64_t> shape) {
       return rewriter
           .create<affine::AffineDelinearizeIndexOp>(loc, index, shape)
           .getMultiIndex();
     };
 
-    auto getLinearizedGatherIndex = [&](Value sgIdVal, Value lIdVal,
-                                        Value indVar) -> Value {
-      int64_t numSubgroups = workgroupSize[0] / subgroupSize;
-      Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-      return rewriter.create<affine::AffineLinearizeIndexOp>(
-          loc, ValueRange{sgIdVal, indVar, lIdVal, zero},
-          ArrayRef<int64_t>{numSubgroups, numCopiesPerThread, subgroupSize,
-                            maxLoadInstructionBits /
-                                destType.getElementTypeBitWidth()},
-          /*disjoint=*/true);
+    auto getSubgroupStoreBaseIndex = [&](Value indVar) -> ValueRange {
+      Value subgroupSizeVal =
+          rewriter.create<arith::ConstantIndexOp>(loc, subgroupSize);
+      Value linearizedBaseIndex =
+          rewriter.create<arith::MulIOp>(loc, indVar, subgroupSizeVal);
+      return delinearizeIndex(linearizedBaseIndex, destType.getShape());
     };
 
-    auto getSubgroupStoreBaseIndex = [&](Value indVar) -> Value {
-      Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-      return getLinearizedGatherIndex(subgroupId, zero, indVar);
-    };
+    // Determine the transfer type based on the destination element type and
+    // the max load instruction size.
+    int64_t bytesPerElement = destType.getElementTypeBitWidth() / 8;
+    int64_t elementsPerTransfer = bytesPerIndexCopy / bytesPerElement;
+    Type transferType =
+        VectorType::get({elementsPerTransfer}, destType.getElementType());
 
+    // Build the loop body:
     {
       OpBuilder::InsertionGuard guard(rewriter);
       rewriter.setInsertionPointToStart(forOp.getBody());
       Value inductionVar = forOp.getInductionVar();
 
       // Compute load address from `indices`.
-      Value linearizedGatherIndices =
-          getLinearizedGatherIndex(subgroupId, laneId, inductionVar);
+      Value linearizedGatherIndex = rewriter.create<arith::AddIOp>(
+          loc, laneId,
+          rewriter.create<arith::MulIOp>(
+              loc, inductionVar,
+              rewriter.create<arith::ConstantIndexOp>(loc, subgroupSize)));
       ValueRange delinearizedGlobalIndices =
-          delinearizeIndex(linearizedGatherIndices, indicesType.getShape());
+          delinearizeIndex(linearizedGatherIndex, indicesType.getShape());
 
       // Load the actual thread gather index from `indices` memref.
       Value threadGatherIndex = rewriter.create<memref::LoadOp>(
           loc, indices, delinearizedGlobalIndices);
 
       // Compute the base index in dest memref.
-      Value linearizedBaseIndices = getSubgroupStoreBaseIndex(inductionVar);
-      ValueRange delinearizedLocalIndices =
-          delinearizeIndex(linearizedBaseIndices, destType.getShape());
-
-      // Determine the transfer type based on the destination element type and
-      // the max load instruction size.
-      int64_t elementBits = destType.getElementTypeBitWidth();
-      int64_t elementsPerTransfer = maxLoadInstructionBits / elementBits;
-
-      Type transferType;
-      if (elementsPerTransfer == 1) {
-        transferType = destType.getElementType();
-      } else {
-        transferType =
-            VectorType::get({elementsPerTransfer}, destType.getElementType());
-      }
+      ValueRange delinearizedBaseIndices =
+          getSubgroupStoreBaseIndex(inductionVar);
 
       // Create the amdgpu.gather_to_lds operation.
       rewriter.create<amdgpu::GatherToLDSOp>(
           loc, dmaOp.getSource(), ValueRange{threadGatherIndex}, dest,
-          delinearizedLocalIndices, TypeAttr::get(transferType));
+          delinearizedBaseIndices, TypeAttr::get(transferType));
     }
 
-    rewriter.setInsertionPointAfter(forOp);
-
-    rewriter.replaceOp(dmaOp, dmaOp.getInit());
-
-    // Remove the scf.forall.
-    rewriter.eraseOp(forallOp);
+    rewriter.eraseOp(dmaOp);
     return success();
   }
 
