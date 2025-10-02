@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/Support/Debug.h"
@@ -34,6 +35,54 @@ namespace {
 //===----------------------------------------------------------------------===//
 // Per-dispatchable export optimization
 //===----------------------------------------------------------------------===//
+
+// Returns the uniformly duplicated values across all indexing map entries of
+// duplicated values and a bit vector indicating the 'dead' values.
+//
+// Example:
+// Map of duplicated values per entry: [[0, 1, 0, 1], [0, 1, 0, 2]]
+// Returns:
+// - A map of uniformly duplicated values: [0, 1, 0, 2]
+// - A bit vector with dead values: b0010
+static std::pair<SmallVector<unsigned>, llvm::BitVector>
+getUniformDupeIndexingAndDeadValues(
+    const SmallVector<SmallVector<unsigned>> &dupeIndexMaps) {
+  if (dupeIndexMaps.size() == 0) {
+    return {};
+  }
+  unsigned numValues = dupeIndexMaps[0].size();
+  llvm::BitVector sameValues(numValues);
+  llvm::BitVector deadOperandsMap(numValues);
+  SmallVector<unsigned> uniformDupeIndexMap =
+      llvm::to_vector(llvm::seq(0u, numValues)); // old -> new
+  for (unsigned idx = 0; idx < numValues; ++idx) {
+    if (deadOperandsMap.test(idx))
+      continue;
+    // Each bit represents a value that duplicates the value at idx.
+    // We walk all the sites and AND their masks together to get the safe
+    // set of duplicate operands.
+    // Example for %0: (%a, %b, %a) -> b001
+    // Example for %1: (%a, %b, %a) -> b000
+    sameValues.set(); // note reused
+    for (ArrayRef<unsigned> dupeIndexMap : dupeIndexMaps) {
+      for (unsigned i = 0; i < numValues; ++i) {
+        if (i == idx || dupeIndexMap[i] != idx) {
+          sameValues.reset(i);
+        }
+      }
+    }
+    if (sameValues.none()) {
+      uniformDupeIndexMap[idx] = idx;
+      continue;
+    }
+    deadOperandsMap |= sameValues;
+    uniformDupeIndexMap[idx] = idx;
+    for (auto dupeIdx : sameValues.set_bits()) {
+      uniformDupeIndexMap[dupeIdx] = idx;
+    }
+  }
+  return std::make_pair(uniformDupeIndexMap, deadOperandsMap);
+}
 
 // Deduplicates operands that have the same value at all dispatch sites.
 // This will deduplicate dynamic values as well.
@@ -70,36 +119,8 @@ deduplicateOperands(mlir::FunctionOpInterface funcOp,
   }
 
   // Per-operand now find which are consistently duplicated.
-  llvm::BitVector sameValues(operandCount);
-  llvm::BitVector deadOperandsMap(operandCount);
-  auto uniformDupeIndexMap =
-      llvm::to_vector(llvm::seq(0u, operandCount)); // old -> new
-  for (unsigned idx = 0; idx < operandCount; ++idx) {
-    if (deadOperandsMap.test(idx))
-      continue;
-    // Each bit represents an operand that duplicates the operand at idx.
-    // We walk all the sites and AND their masks together to get the safe
-    // set of duplicate operands.
-    // Example for %0: (%a, %b, %a) -> b001
-    // Example for %1: (%a, %b, %a) -> b000
-    sameValues.set(); // note reused
-    for (auto &dupeIndexMap : dupeIndexMaps) {
-      for (unsigned i = 0; i < operandCount; ++i) {
-        if (i == idx || dupeIndexMap[i] != idx) {
-          sameValues.reset(i);
-        }
-      }
-    }
-    if (sameValues.none()) {
-      uniformDupeIndexMap[idx] = idx;
-      continue;
-    }
-    deadOperandsMap |= sameValues;
-    uniformDupeIndexMap[idx] = idx;
-    for (auto dupeIdx : sameValues.set_bits()) {
-      uniformDupeIndexMap[dupeIdx] = idx;
-    }
-  }
+  auto [uniformDupeIndexMap, deadOperandsMap] =
+      getUniformDupeIndexingAndDeadValues(dupeIndexMaps);
   if (deadOperandsMap.none()) {
     // No-op.
     return;
@@ -154,8 +175,7 @@ deduplicateOperands(mlir::FunctionOpInterface funcOp,
   // Update the function signature.
   // Lame we need two data structures to do this.
   funcOp.setType(funcOp.getTypeWithoutArgsAndResults(deadArgMap, {}));
-  entryBlock.eraseArguments(
-      [&](BlockArgument arg) { return deadArgMap.test(arg.getArgNumber()); });
+  entryBlock.eraseArguments(deadArgMap);
 }
 
 // Inlines constant values passed in at dispatch sites that are uniform across
@@ -248,8 +268,118 @@ inlineUniformConstants(mlir::FunctionOpInterface funcOp,
 
   // Fixup function signature.
   funcOp.setType(funcOp.getTypeWithoutArgsAndResults(deadArgMap, {}));
-  entryBlock.eraseArguments(
-      [&](BlockArgument arg) { return deadArgMap.test(arg.getArgNumber()); });
+  entryBlock.eraseArguments(deadArgMap);
+}
+
+// Deduplicates workloads that have the same value at all dispatch sites.
+//
+// Example:
+//   stream.cmd.dispatch @foo[%0, %0](...)
+//  ->
+//   stream.cmd.dispatch @foo[%0](...)
+// + deduped arguments in `stream.executable.export`
+// + deduped ordinals in `dispatch.workload.ordinal`
+static void
+deduplicateWorkloads(IREE::Stream::ExecutableExportOp exportOp,
+                     SmallVector<IREE::Stream::CmdDispatchOp> &dispatchOps) {
+  if (exportOp.getWorkgroupCount().empty()) {
+    return;
+  }
+  mlir::FunctionOpInterface funcOp = exportOp.lookupFunctionRef();
+  if (!funcOp) {
+    return;
+  }
+  IREE::Stream::CmdDispatchOp anyDispatchOp = dispatchOps.front();
+  unsigned workloadCount = anyDispatchOp.getWorkload().size();
+
+  // Build a map of workload indices to its base duplicate for each dispatch
+  // site. Base/non-duplicated values will be identity.
+  // Example: (%a, %b, %a, %b) -> (0, 1, 0, 1)
+  static const int kUnassigned = -1;
+  SmallVector<SmallVector<unsigned>> dupeIndexMaps(dispatchOps.size());
+  for (auto [i, dispatchOp] : llvm::enumerate(dispatchOps)) {
+    SmallVector<unsigned> &dupeIndexMap = dupeIndexMaps[i];
+    dupeIndexMap.resize(workloadCount, kUnassigned);
+    SmallVector<Value> workloads = dispatchOp.getWorkload();
+    for (unsigned i = 0; i < workloads.size(); ++i) {
+      for (unsigned j = 0; j < i; ++j) {
+        if (workloads[j] == workloads[i]) {
+          dupeIndexMap[i] = j;
+          break;
+        }
+      }
+    }
+  }
+
+  // Per-workload now find which are consistently duplicated.
+  auto [uniformDupeIndexMap, deadOperandsMap] =
+      getUniformDupeIndexingAndDeadValues(dupeIndexMaps);
+  if (deadOperandsMap.none()) {
+    // No-op.
+    return;
+  }
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "deduplicateWorkloads for " << exportOp.getName() << "\n";
+    llvm::dbgs() << "  dead workloads: ";
+    llvm::interleaveComma(deadOperandsMap.set_bits(), llvm::dbgs());
+    llvm::dbgs() << "\n";
+    for (auto [deadIdx, liveIdx] : llvm::enumerate(uniformDupeIndexMap)) {
+      if (deadIdx == liveIdx) {
+        continue;
+      }
+      llvm::dbgs() << "  %arg" << deadIdx << " -> %arg" << liveIdx << "\n";
+    }
+  });
+
+  // Update the ordinals in the workload ordinal ops.
+  unsigned ordinalCount = 0;
+  SmallVector<unsigned> newOrdinals(uniformDupeIndexMap.size());
+  for (auto [deadIdx, liveIdx] : llvm::enumerate(uniformDupeIndexMap)) {
+    if (deadIdx > liveIdx) {
+      continue;
+    }
+    newOrdinals[deadIdx] = ordinalCount++;
+  }
+  funcOp->walk([&](IREE::TensorExt::DispatchWorkloadOrdinalOp ordinalOp) {
+    uint64_t ordinal = ordinalOp.getOrdinal().getZExtValue();
+    assert(ordinal < newOrdinals.size() &&
+           "the ordinal shouldn't be larger than the number of workloads");
+    uint64_t newOrdinal = newOrdinals[ordinal];
+    if (newOrdinal == ordinal) {
+      return WalkResult::advance();
+    }
+    ordinalOp.setOrdinal(APInt(64, newOrdinal));
+    return WalkResult::advance();
+  });
+
+  // Update the workgroup region arguments.
+  Block &entryBlock = exportOp.getWorkgroupCount().front();
+  auto argReplacementMap = llvm::to_vector(
+      llvm::seq(0u, entryBlock.getNumArguments())); // old -> new
+  llvm::BitVector deadArgMap(entryBlock.getNumArguments());
+  for (auto [deadIdx, liveIdx] : llvm::enumerate(uniformDupeIndexMap)) {
+    if (deadIdx == liveIdx) {
+      continue;
+    }
+    deadArgMap.set(deadIdx);
+    entryBlock.getArgument(deadIdx).replaceAllUsesWith(
+        entryBlock.getArgument(liveIdx));
+  }
+
+  // Update each dispatch site to remove duplicates.
+  SmallVector<unsigned> deadOperands;
+  for (auto idx : deadOperandsMap.set_bits()) {
+    deadOperands.push_back(idx);
+  }
+  for (auto dispatchOp : dispatchOps) {
+    for (auto idx : llvm::reverse(deadOperands)) {
+      dispatchOp.getWorkloadMutable().erase(idx);
+    }
+  }
+
+  // Update the block arguments.
+  entryBlock.eraseArguments(deadArgMap);
 }
 
 //===----------------------------------------------------------------------===//
@@ -290,6 +420,9 @@ struct FoldUniformOperandsPass
         // We do this first so that we know all constants passed in are unique
         // per dispatch site.
         deduplicateOperands(funcOp, dispatchOps);
+
+        // Deduplicate workloads that are correlated at all dispatch sites.
+        deduplicateWorkloads(exportOp, dispatchOps);
 
         // Inline constants that have the same value at all sites.
         inlineUniformConstants(funcOp, dispatchOps);
