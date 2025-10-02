@@ -179,7 +179,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
                              getNSize(intrinsicMma.getIntrinsic()))
           : INT64_MAX;
   // Enumerate x (powers of two).
-  for (int x = 1; x <= m; x <<= 1) {
+  for (int x = 2; x <= m; x <<= 1) {
     // For this x, solve maximum feasible y.
     //
     // The register space taken is:
@@ -192,8 +192,8 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
     //     + x * y * sizeInBits(intrinsicC)
     //    <= wgp.getVgprSpaceBits()
     int y =
-        (*wgp.getVgprSpaceBits() - intrinsicsK * sizeInBits(intrinsicB) * x) /
-        (intrinsicsK * sizeInBits(intrinsicA) + sizeInBits(intrinsicC) * x);
+        (*wgp.getVgprSpaceBits() - intrinsicsK * sizeInBits(intrinsicA) * x) /
+        (intrinsicsK * sizeInBits(intrinsicB) + sizeInBits(intrinsicC) * x);
     if (y <= 0) {
       break;
     }
