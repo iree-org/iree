@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Utils/Permutation.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -466,20 +467,55 @@ struct DistributeTransferWrite final
           writeOp, "warp or thread tiles have overlapping strides");
     }
 
-    // If the write op is not distributed to threads, modify the op to be
-    // guarded by a conditional to avoid multiple threads writing the same
-    // address.
-    // NOTE[1]: This makes the assumption that before distributing the `write`
-    // op, none of the indices of the op are thread dependent.
-    // NOTE[2]: Currently this assumes that all the fields in the layout have
-    // the same rank. This is ensured by the verifier of the attribute, but if
-    // that changes, this needs to be updated.
-    // NOTE[3]: This assumes that the value to be written is held by thread 0.
-    if (vectorLayout.getThreadTile().empty()) {
-      auto cmpOp = arith::CmpIOp::create(
-          rewriter, writeOp.getLoc(), arith::CmpIPredicate::eq, threadId,
-          arith::ConstantIndexOp::create(rewriter, writeOp.getLoc(), 0));
-      auto ifOp = scf::IfOp::create(rewriter, writeOp.getLoc(), cmpOp);
+    // If the distribution results in threads writing to the same address,
+    // guard with scf.if to ensure only one thread writes per duplication group.
+    //
+    // The grid to which lanes (threads?) are mapped. If the size of this grid
+    // is less than the subgroup size, that means some lanes perform the same
+    // write.
+    ArrayRef<int64_t> threadTile = vectorLayout.getThreadTile();
+    int64_t threadTileSize = std::accumulate(
+        threadTile.begin(), threadTile.end(), 1, std::multiplies<int64_t>());
+    int64_t duplicationFactor = subgroupSize / threadTileSize;
+    bool isDuplication = subgroupSize > threadTileSize;
+
+    ArrayRef<int64_t> subgroupTile = vectorLayout.getSubgroupTile();
+
+    // TODO(newling) there could also be duplication if wgTileSize <
+    // workgroupsize/subgroupsize, but workgroupsize needs to pushed down into
+    // this pattern. Do we want to do that?
+
+    // If there are threads in a subgroup that write to the same address:
+    if (isDuplication) {
+
+      // Delinearize the thread id into
+      //   (*subgroup_tile, lane_overlap, *thread_tile)
+      SmallVector<int64_t> basis(2 * rank + 1);
+      basis[rank] = duplicationFactor;
+      for (unsigned i = 0; i < rank; ++i) {
+        basis[i] = subgroupTile[i];
+        basis[rank + 1 + i] = threadTile[i];
+      }
+
+      Location loc = writeOp.getLoc();
+      auto delinearizedOp = affine::AffineDelinearizeIndexOp::create(
+          rewriter, loc, threadId, basis, /* has outer-bound */ false);
+      auto delinearized = delinearizedOp.getResults();
+      assert(delinearized.size() == 2 * rank + 2 &&
+             "but has outer-bound is false");
+
+      OpResult subgroupGroupId = delinearized[0];
+      OpResult threadGroupId = delinearized[rank + 1];
+      auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+
+      auto subgroupZero = arith::CmpIOp::create(
+          rewriter, loc, arith::CmpIPredicate::eq, subgroupGroupId, zero);
+      auto threadZero = arith::CmpIOp::create(
+          rewriter, loc, arith::CmpIPredicate::eq, threadGroupId, zero);
+      auto isRepresentative =
+          arith::AndIOp::create(rewriter, loc, threadZero, subgroupZero);
+
+      auto ifOp = scf::IfOp::create(rewriter, loc, isRepresentative);
       rewriter.setInsertionPoint(ifOp.thenYield());
     }
 
