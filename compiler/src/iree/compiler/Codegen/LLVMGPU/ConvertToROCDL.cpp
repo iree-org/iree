@@ -346,8 +346,10 @@ struct ConvertToROCDLPass final
       populateVectorToLLVMConversionPatterns(converter, llvmPatterns);
       vector::populateVectorTransferLoweringPatterns(llvmPatterns,
                                                      /*maxTransferRank=*/1);
+      // We pass Runtime::HIP in order to enable gpu.printf for debugging.
+      // At time of writing, that flag has no other effect.
       populateGpuToROCDLConversionPatterns(
-          converter, llvmPatterns, gpu::amd::Runtime::Unknown, *maybeChipset);
+          converter, llvmPatterns, gpu::amd::Runtime::HIP, *maybeChipset);
       LLVMConversionTarget target(getContext());
       populateFuncToLLVMFuncOpConversionPattern(converter, llvmPatterns);
       configureGpuToROCDLConversionLegality(target);
