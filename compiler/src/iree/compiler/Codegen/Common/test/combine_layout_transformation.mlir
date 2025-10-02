@@ -64,6 +64,34 @@ func.func @fold_transpose_op(%source : tensor<2x4x16xf32>, %result : memref<4x16
 
 // -----
 
+func.func @fold_generic_transpose_op(%source : tensor<2x4x16xf32>, %result : memref<4x16x2xf32>) {
+  %init = tensor.empty() : tensor<4x16x2xf32>
+  %transposed = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2) -> (d2, d0, d1)>,
+                       affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel"]}
+      ins(%source : tensor<2x4x16xf32>)
+      outs(%init : tensor<4x16x2xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      linalg.yield %in : f32
+  } -> tensor<4x16x2xf32>
+  iree_codegen.store_to_buffer %transposed, %result : tensor<4x16x2xf32> into memref<4x16x2xf32>
+  return
+}
+// DISPATCH-SCOPE-LABEL: @fold_generic_transpose_op
+//  DISPATCH-SCOPE-SAME:   %[[SOURCE:[a-zA-Z0-9_]+]]
+//  DISPATCH-SCOPE-SAME:   %[[RESULT:[a-zA-Z0-9_]+]]
+//   DISPATCH-SCOPE-DAG:   %[[TRUE:.+]] = arith.constant true
+//       DISPATCH-SCOPE:   %[[MAP_SCATTER_DEST:.+]] = tensor.empty() : tensor<4x16x2xf32>
+//       DISPATCH-SCOPE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter
+//  DISPATCH-SCOPE-SAME:     %[[SOURCE]] into %[[MAP_SCATTER_DEST]] {
+//  DISPATCH-SCOPE-NEXT:   ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index):
+//       DISPATCH-SCOPE:     iree_linalg_ext.yield %[[IDX1]], %[[IDX2]], %[[IDX0]], %[[TRUE]]
+//       DISPATCH-SCOPE:   } : tensor<2x4x16xf32> into tensor<4x16x2xf32> -> tensor<4x16x2xf32>
+//       DISPATCH-SCOPE:   iree_codegen.store_to_buffer %[[MAP_SCATTER]], %[[RESULT]] : tensor<4x16x2xf32> into memref<4x16x2xf32>
+
+// -----
+
 func.func @fold_extract_slice_op(%source : tensor<64xf32>, %result : memref<63xf32>) {
   %slice = tensor.extract_slice %source[0] [63] [1] : tensor<64xf32> to tensor<63xf32>
   iree_codegen.store_to_buffer %slice, %result : tensor<63xf32> into memref<63xf32>
@@ -432,3 +460,28 @@ func.func @consumer_unfusable_due_to_init(%arg0: tensor<?xi32>, %arg1: tensor<?x
 //       DISPATCH-SCOPE:     scf.forall.in_parallel
 //       DISPATCH-SCOPE:       tensor.parallel_insert_slice
 //       DISPATCH-SCOPE:   linalg.generic
+
+// -----
+
+func.func @dont_decompose_unfolded_ops(%source : tensor<250x250xf32>, %result : memref<2x2x128x128xf32>) {
+  %cst = arith.constant 0.0 : f32
+  %dest = tensor.empty() : tensor<2x2x128x128xf32>
+  %pack = linalg.pack %source padding_value(%cst : f32)
+      outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [128, 128]
+      into %dest : tensor<250x250xf32> -> tensor<2x2x128x128xf32>
+  %barrier = util.optimization_barrier %pack : tensor<2x2x128x128xf32>
+  %transpose = linalg.transpose
+      ins(%barrier : tensor<2x2x128x128xf32>)
+      outs(%dest : tensor<2x2x128x128xf32>)
+      permutation = [1, 0, 2, 3]
+  iree_codegen.store_to_buffer %transpose, %result : tensor<2x2x128x128xf32> into memref<2x2x128x128xf32>
+  return
+}
+
+// Ensure that composite ops are not decomposed if they are
+// not able to be folded into a map_scatter op.
+
+// DISPATCH-SCOPE-LABEL: func @dont_decompose_unfolded_ops
+//       DISPATCH-SCOPE:   linalg.pack
+//       DISPATCH-SCOPE:   util.optimization_barrier
+//       DISPATCH-SCOPE:   iree_linalg_ext.map_scatter
