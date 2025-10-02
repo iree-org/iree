@@ -223,6 +223,8 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
   if (auto paddedLinalgOp =
           dyn_cast<linalg::LinalgOp>(paddedOp.getOperation())) {
     Block *block = paddedLinalgOp.getBlock();
+    SmallVector<int64_t> paddedLoopRanges =
+        paddedLinalgOp.getStaticLoopRanges();
 
     SmallVector<Operation *> reductions;
     for (auto [index, initOpOperand] :
@@ -247,8 +249,8 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
       assert(succeeded(reductionDimInfo) &&
              "obtained with confirmation earlier");
       for (auto &&dimInfo : reductionDimInfo.value()) {
-        Value redDimSize = tensor::DimOp::create(
-            rewriter, paddedOp.getLoc(), dimInfo.operand, dimInfo.operandDim);
+        Value redDimSize = rewriter.createOrFold<tensor::DimOp>(
+            paddedOp.getLoc(), dimInfo.operand, dimInfo.operandDim);
         reductionDimSizes.push_back({dimInfo.loopIndex, redDimSize});
       }
 
@@ -256,12 +258,23 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
       // loops is inside or outside the padded part of the iteration space.
       rewriter.setInsertionPoint(reduction);
       SmallVector<Value> conds;
-      for (auto &&[redDim, redDimSize] : reductionDimSizes) {
-        Value redDimIndex =
-            linalg::IndexOp::create(rewriter, paddedOp.getLoc(), redDim);
-        Value cond = arith::CmpIOp::create(rewriter, paddedOp.getLoc(),
-                                           arith::CmpIPredicate::ult,
-                                           redDimIndex, redDimSize);
+      for (auto &&[dimension, unpaddedSize] : reductionDimSizes) {
+        Value cond;
+
+        // First check if the condition 'index < unpaddedSize' is always true,
+        // and directly optimize for this case.
+        int64_t lhs = paddedLoopRanges[dimension];
+        std::optional<int64_t> rhs = getConstantIntValue(unpaddedSize);
+        if (lhs != ShapedType::kDynamic && rhs.has_value() && lhs <= rhs) {
+          cond = arith::ConstantOp::create(rewriter, paddedOp.getLoc(),
+                                           rewriter.getBoolAttr(true));
+        } else {
+          Value redDimIndex =
+              linalg::IndexOp::create(rewriter, paddedOp.getLoc(), dimension);
+          cond = arith::CmpIOp::create(rewriter, paddedOp.getLoc(),
+                                       arith::CmpIPredicate::ult, redDimIndex,
+                                       unpaddedSize);
+        }
         conds.push_back(cond);
       }
       Value reductionIdentityValue = arith::ConstantOp::create(
