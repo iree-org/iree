@@ -68,6 +68,13 @@ bool isIdentityLayout(const MaterializeEncodingInfo &info);
 SmallVector<int64_t>
 getExpandedTileShape(const TileSwizzle::ExpandShapeType &expandShape);
 
+struct TileMxNxKxKb {
+  int64_t M = 1;
+  int64_t N = 1;
+  int64_t K = 1;
+  int64_t KB = 1;
+};
+
 struct TileMxNxK {
   int64_t M = 1;
   int64_t N = 1;

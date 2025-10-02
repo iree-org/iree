@@ -24,6 +24,11 @@ SmallVector<int64_t> sliceSwizzledShape(
 Codegen::TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
                                 IREE::GPU::MMAFragment fragment);
 
+/// Returns the swizzle for the full data-tiled-scaled-mma tile, including all
+/// the relevant unrolling and expansion factors.
+Codegen::TileSwizzle getSwizzle(IREE::GPU::DataTiledScaledMMAAttr scaledMma,
+                                unsigned operandIdx);
+
 /// Returns the swizzle for the data-tiled-mma tile, based on the `fragment`
 /// and contraction dimensions required from the `encoding`.
 FailureOr<Codegen::TileSwizzle>
