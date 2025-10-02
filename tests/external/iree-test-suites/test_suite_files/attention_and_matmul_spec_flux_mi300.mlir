@@ -22,8 +22,7 @@ module attributes {transform.with_named_sequence} {
     lhs_type = bf16, rhs_type = bf16, output_type = f32
     {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
                       affine_map<(d0, d1, d2) -> (d1, d2)>,
-                      affine_map<(d0, d1, d2) -> (d0, d1)>]} :
-    (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+                      affine_map<(d0, d1, d2) -> (d0, d1)>]} : !transform.any_op -> !transform.param<i64>
     transform.iree.match.dims_equal %m, [4608] : !transform.param<i64>
     transform.iree.match.dims_equal %n, [21504] : !transform.param<i64>
     transform.iree.match.dims_equal %k, [3072] : !transform.param<i64>
@@ -38,8 +37,7 @@ module attributes {transform.with_named_sequence} {
       lhs_type = bf16, rhs_type = bf16, output_type = f32
       {indexing_maps = [affine_map<(d0, d1, d2) -> (d2, d0)>,
                         affine_map<(d0, d1, d2) -> (d1, d2)>,
-                        affine_map<(d0, d1, d2) -> (d0, d1)>]} :
-      (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+                        affine_map<(d0, d1, d2) -> (d0, d1)>]} : !transform.any_op -> !transform.param<i64>
     transform.iree.match.dims_equal %m, [4608] : !transform.param<i64>
     transform.iree.match.dims_equal %n, [3072] : !transform.param<i64>
     transform.iree.match.dims_equal %k, [15360] : !transform.param<i64>
@@ -54,9 +52,7 @@ module attributes {transform.with_named_sequence} {
       lhs_type = bf16, rhs_type = bf16, output_type = f32
       {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
                         affine_map<(d0, d1, d2) -> (d1, d2)>,
-                        affine_map<(d0, d1, d2) -> (d0, d1)>]} :
-      (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
-
+                        affine_map<(d0, d1, d2) -> (d0, d1)>]} : !transform.any_op -> !transform.param<i64>
     transform.iree.match.dims_equal %m, [4096] : !transform.param<i64>
     transform.iree.match.dims_equal %n, [12288] : !transform.param<i64>
     transform.iree.match.dims_equal %k, [3072] : !transform.param<i64>
@@ -71,8 +67,7 @@ module attributes {transform.with_named_sequence} {
       lhs_type = bf16, rhs_type = bf16, output_type = f32
       {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
                         affine_map<(d0, d1, d2) -> (d1, d2)>,
-                        affine_map<(d0, d1, d2) -> (d0, d1)>]} :
-      (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+                        affine_map<(d0, d1, d2) -> (d0, d1)>]} : !transform.any_op -> !transform.param<i64>
     transform.iree.match.dims_equal %m, [4096] : !transform.param<i64>
     transform.iree.match.dims_equal %n, [3072] : !transform.param<i64>
     transform.iree.match.dims_equal %k, [12288] : !transform.param<i64>
@@ -87,8 +82,7 @@ module attributes {transform.with_named_sequence} {
       lhs_type = bf16, rhs_type = bf16, output_type = f32
       {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d1, d3)>,
                         affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
-                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]} :
-      (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]} : !transform.any_op -> !transform.param<i64>
     transform.iree.match.dims_equal %batch, [72] : !transform.param<i64>
     transform.iree.match.dims_equal %m, [4096] : !transform.param<i64>
     transform.iree.match.dims_equal %n, [128] : !transform.param<i64>
@@ -104,8 +98,7 @@ module attributes {transform.with_named_sequence} {
       lhs_type = bf16, rhs_type = bf16, output_type = f32
       {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
                         affine_map<(d0, d1, d2) -> (d1, d2)>,
-                        affine_map<(d0, d1, d2) -> (d0, d1)>]} :
-      (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+                        affine_map<(d0, d1, d2) -> (d0, d1)>]} : !transform.any_op -> !transform.param<i64>
     transform.iree.match.dims_equal %m, [4096] : !transform.param<i64>
     transform.iree.match.dims_equal %n, [3072] : !transform.param<i64>
     transform.iree.match.dims_equal %k, [3072] : !transform.param<i64>
@@ -120,8 +113,7 @@ module attributes {transform.with_named_sequence} {
       lhs_type = bf16, rhs_type = bf16, output_type = f32
       {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
                         affine_map<(d0, d1, d2) -> (d1, d2)>,
-                        affine_map<(d0, d1, d2) -> (d0, d1)>]} :
-      (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+                        affine_map<(d0, d1, d2) -> (d0, d1)>]} : !transform.any_op -> !transform.param<i64>
     transform.iree.match.dims_equal %m, [512] : !transform.param<i64>
     transform.iree.match.dims_equal %n, [12288] : !transform.param<i64>
     transform.iree.match.dims_equal %k, [3072] : !transform.param<i64>
@@ -136,8 +128,7 @@ module attributes {transform.with_named_sequence} {
       lhs_type = bf16, rhs_type = bf16, output_type = f32
       {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
                         affine_map<(d0, d1, d2) -> (d1, d2)>,
-                        affine_map<(d0, d1, d2) -> (d0, d1)>]} :
-      (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+                        affine_map<(d0, d1, d2) -> (d0, d1)>]} : !transform.any_op -> !transform.param<i64>
     transform.iree.match.dims_equal %m, [512] : !transform.param<i64>
     transform.iree.match.dims_equal %n, [3072] : !transform.param<i64>
     transform.iree.match.dims_equal %k, [12288] : !transform.param<i64>
