@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-target-test-propagate-target-attrs)))' %s -o -
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-target-test-propagate-target-attrs)))' %s -o -
 
 hal.executable private @simple_dispatch_0 {
   hal.executable.variant public @embedded_elf_riscv_64 target(<"llvm-cpu", "embedded-elf-riscv_64", {cpu = "sifive-x390", cpu_features = "+m,+d,+zvl1024b,+v", data_layout = "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>, max_stack_allocation_size = 32768 : i64, native_vector_size = 256 : i64, target_triple = "riscv64-unknown-unknown-eabi-elf"}>) {
