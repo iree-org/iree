@@ -370,6 +370,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
 
 struct ConvToIgemmInfo {
   bool isInputChannelLast;
+  bool isSpatialDimLast;
   linalg::ConvolutionDimensions convDims;
   DenseMap<int64_t, AffineExpr> convToIgemmDimMap;
   DenseMap<int64_t, int64_t> inputChannelDimToSize;
@@ -383,6 +384,10 @@ getPaddingConvSizes(Builder &b, const SmallVector<int64_t> &bounds,
                     const SmallVector<int64_t> &reductionTileSizes,
                     std::optional<ConvToIgemmInfo> &convToIgemmInfo) {
   if (!convToIgemmInfo.has_value())
+    return std::nullopt;
+
+  // Skip padding convolution for NCHW layout.
+  if (convToIgemmInfo->isSpatialDimLast)
     return std::nullopt;
 
   DenseMap<int64_t, AffineExpr> convToIgemmMap =
@@ -808,6 +813,7 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
     ArrayRef<int64_t> inputShape = inputType.getShape();
     AffineMap inputMap = linalgOp.getIndexingMapsArray()[0];
     SmallVector<int64_t> inputChannelPos;
+    SmallVector<int64_t> inputImagePos;
     for (auto dim : igemmGenericConvDetails->convDims.inputChannel) {
       for (auto [idx, e] : llvm::enumerate(inputMap.getResults())) {
         if (e.isFunctionOfDim(dim)) {
@@ -816,9 +822,19 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
         }
       }
     }
+    for (auto dim : igemmGenericConvDetails->convDims.outputImage) {
+      for (auto [idx, e] : llvm::enumerate(inputMap.getResults())) {
+        if (e.isFunctionOfDim(dim)) {
+          inputImagePos.push_back(idx);
+        }
+      }
+    }
     llvm::sort(inputChannelPos);
+    llvm::sort(inputImagePos);
     convToIgemmInfo.isInputChannelLast =
         inputChannelPos.back() == inputShape.size() - 1;
+    convToIgemmInfo.isSpatialDimLast =
+        inputImagePos.back() == inputShape.size() - 1;
     convToIgemmInfo.convDims = igemmGenericConvDetails->convDims;
     convToIgemmInfo.convToIgemmDimMap =
         igemmGenericConvDetails->convToIgemmDimMap;
