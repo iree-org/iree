@@ -1790,10 +1790,8 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-    --iree-opt-data-tiling=false
     --iree-dispatch-creation-data-tiling=true
     --iree-hip-encoding-layout-resolver=data-tiling
-    --iree-llvmgpu-test-combine-layout-transformation=true
   LABELS
     "noasan"
     "nomsan"
