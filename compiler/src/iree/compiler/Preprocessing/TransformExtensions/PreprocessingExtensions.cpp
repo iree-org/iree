@@ -304,6 +304,108 @@ IREE::transform_dialect::MatchContractionOp::matchOperation(
 }
 
 //===----------------------------------------------------------------------===//
+// MatchConvolutionOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+IREE::transform_dialect::MatchConvolutionOp::matchOperation(
+    Operation *current, transform::TransformResults &results,
+    transform::TransformState &state) {
+  Location loc = current->getLoc();
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(current);
+  if (!linalgOp) {
+    return emitSilenceableFailure(loc)
+           << "Operation " << *current << " is not a LinalgOp.";
+  }
+
+  if (!linalg::isaConvolutionOpInterface(linalgOp)) {
+    return emitSilenceableFailure(loc)
+           << "Operation " << *current << " is not a convolution operation.";
+  }
+
+  Type targetLhsType = getLhsType();
+  Type currentLhsType = getElementTypeOrSelf(linalgOp.getDpsInputs()[0]);
+  if (currentLhsType != targetLhsType) {
+    return emitSilenceableFailure(loc)
+           << "LHS type doesn't match: expected " << targetLhsType << ", got "
+           << currentLhsType;
+  }
+
+  Type targetRhsType = getRhsType();
+  Type currentRhsType = getElementTypeOrSelf(linalgOp.getDpsInputs()[1]);
+  if (currentRhsType != targetRhsType) {
+    return emitSilenceableFailure(loc)
+           << "RHS type doesn't match: expected " << targetRhsType << ", got "
+           << currentRhsType;
+  }
+
+  Type targetOutputType = getOutputType();
+  Type currentOutputType =
+      getElementTypeOrSelf(linalgOp.getDpsInits()[0].getType());
+  if (currentOutputType != targetOutputType) {
+    return emitSilenceableFailure(loc)
+           << "output type doesn't match: expected " << targetOutputType
+           << ", got " << currentOutputType;
+  }
+
+  ArrayAttr currentIndexingMaps = linalgOp.getIndexingMaps();
+  if (std::optional<ArrayAttr> targetIndexingMaps = getIndexingMaps()) {
+    if (currentIndexingMaps != *targetIndexingMaps) {
+      return emitSilenceableFailure(loc) << "indexing maps don't match";
+    }
+  }
+
+  FailureOr<linalg::ConvolutionDimensions> maybeConvDims =
+      linalg::inferConvolutionDims(linalgOp);
+  if (failed(maybeConvDims)) {
+    return emitSilenceableFailure(loc)
+           << "Failed to infer convolution dimensions.";
+  }
+  linalg::ConvolutionDimensions convDims = *maybeConvDims;
+  SmallVector<int64_t> iterationDomain = linalgOp.getStaticLoopRanges();
+  MLIRContext *ctx = getContext();
+  Builder builder(ctx);
+
+  auto buildI64Attrs = [&](auto values, auto transform) {
+    return llvm::map_to_vector(values, [&](auto val) -> Attribute {
+      return builder.getI64IntegerAttr(transform(val));
+    });
+  };
+
+  results.setParams(cast<OpResult>(getBatchDims()),
+                    buildI64Attrs(convDims.batch, [&](unsigned idx) {
+                      return iterationDomain[idx];
+                    }));
+  results.setParams(cast<OpResult>(getOutputImageDims()),
+                    buildI64Attrs(convDims.outputImage, [&](unsigned idx) {
+                      return iterationDomain[idx];
+                    }));
+  results.setParams(cast<OpResult>(getOutputChannelDims()),
+                    buildI64Attrs(convDims.outputChannel, [&](unsigned idx) {
+                      return iterationDomain[idx];
+                    }));
+  results.setParams(cast<OpResult>(getFilterDims()),
+                    buildI64Attrs(convDims.filterLoop, [&](unsigned idx) {
+                      return iterationDomain[idx];
+                    }));
+  results.setParams(cast<OpResult>(getInputChannelDims()),
+                    buildI64Attrs(convDims.inputChannel, [&](unsigned idx) {
+                      return iterationDomain[idx];
+                    }));
+  results.setParams(cast<OpResult>(getDepthDims()),
+                    buildI64Attrs(convDims.depth, [&](unsigned idx) {
+                      return iterationDomain[idx];
+                    }));
+  results.setParams(
+      cast<OpResult>(getStrides()),
+      buildI64Attrs(convDims.strides, [](int64_t val) { return val; }));
+  results.setParams(
+      cast<OpResult>(getDilations()),
+      buildI64Attrs(convDims.dilations, [](int64_t val) { return val; }));
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===----------------------------------------------------------------------===//
 // MatchDimsEqualOp
 //===----------------------------------------------------------------------===//
 

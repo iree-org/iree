@@ -225,6 +225,68 @@ def MatchContractionOp : Op<Transform_Dialect, "iree.match.contraction",
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
+def MatchConvolutionOp : Op<Transform_Dialect, "iree.match.convolution",
+    [MatchOpInterface,
+     SingleOpMatcher,
+     MemoryEffectsOpInterface]> {
+  let summary = [{Check whether the op is a convolution operation.}];
+  let description = [{
+    Matches operations that implement the ConvolutionOpInterface.
+    This includes operations like linalg.conv_2d_nhwc_hwcf,
+    linalg.conv_2d_nchw_fchw, linalg.depthwise_conv_2d_nhwc_hwc, etc.
+
+    Optionally matches specific indexing maps patterns.
+
+    #### Return modes
+
+    Succeeds if the operation is a convolution operation, and
+    produces a silenceable failure otherwise.
+
+    #### Results
+
+    Returns arrays of dimension sizes for each convolution dimension:
+    - batch_dims: Array of batch dimension sizes.
+    - output_image_dims: Array of output spatial dimension sizes.
+    - output_channel_dims: Array of output channel dimension sizes.
+    - filter_dims: Array of filter spatial dimension sizes.
+    - input_channel_dims: Array of input channel dimension sizes.
+    - depth_dims: Array of depth dimension sizes (for depthwise convolutions).
+    - strides: Array of stride values.
+    - dilations: Array of dilation values.
+  }];
+
+  let arguments = (ins
+    TransformHandleTypeInterface:$operand_handle,
+    TypeAttr:$lhs_type,
+    TypeAttr:$rhs_type,
+    TypeAttr:$output_type,
+    OptionalAttr<AffineMapArrayAttr>:$indexing_maps
+  );
+
+  let results = (outs
+    TransformParamTypeInterface:$batch_dims,
+    TransformParamTypeInterface:$output_image_dims,
+    TransformParamTypeInterface:$output_channel_dims,
+    TransformParamTypeInterface:$filter_dims,
+    TransformParamTypeInterface:$input_channel_dims,
+    TransformParamTypeInterface:$depth_dims,
+    TransformParamTypeInterface:$strides,
+    TransformParamTypeInterface:$dilations
+  );
+
+  let assemblyFormat = [{
+    $operand_handle
+    `,` `lhs_type` `=` $lhs_type
+    `,` `rhs_type` `=` $rhs_type
+    `,` `output_type` `=` $output_type
+    (`indexing_maps` $indexing_maps^)?
+    attr-dict `:` functional-type(operands, results)
+  }];
+  let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+}
+
 def MatchDimsEqualOp : Op<Transform_Dialect, "iree.match.dims_equal",
     [DeclareOpInterfaceMethods<TransformOpInterface>,
      MatchOpInterface,
