@@ -228,7 +228,11 @@ def MatchContractionOp : Op<Transform_Dialect, "iree.match.contraction",
 def MatchConvolutionOp : Op<Transform_Dialect, "iree.match.convolution",
     [MatchOpInterface,
      SingleOpMatcher,
-     MemoryEffectsOpInterface]> {
+     MemoryEffectsOpInterface,
+     AllTypesMatch<["batch_dims", "output_image_dims", "output_channel_dims",
+                    "filter_dims", "input_channel_dims", "depth_dims",
+                    "strides", "dilations"]>
+     ]> {
   let summary = [{Check whether the op is a convolution operation.}];
   let description = [{
     Matches operations that implement the ConvolutionOpInterface.
@@ -280,7 +284,7 @@ def MatchConvolutionOp : Op<Transform_Dialect, "iree.match.convolution",
     `,` `rhs_type` `=` $rhs_type
     `,` `output_type` `=` $output_type
     (`indexing_maps` $indexing_maps^)?
-    attr-dict `:` functional-type(operands, results)
+    attr-dict `:` type($operand_handle) `->` type($batch_dims)
   }];
   let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
 

@@ -779,7 +779,6 @@ func.func @conv_ops(
         ins(%input_nchw, %filter_nchw : tensor<4x32x112x112xf16>, tensor<64x32x7x7xf16>)
         outs(%output_nchw : tensor<4x64x106x106xf16>) {match_status = "unmatched"} -> tensor<4x64x106x106xf16>
 
-  // Non-convolution operation should not match.
   // CHECK: linalg.matmul
   // CHECK-SAME:   match_status = "unmatched"
   %res3 = linalg.matmul
@@ -795,11 +794,7 @@ module attributes {transform.with_named_sequence} {
       transform.iree.match.convolution %op,
         lhs_type = f32, rhs_type = f32, output_type = f32
         {indexing_maps = [#map_nhwc_hwcf_input, #map_nhwc_hwcf_filter, #map_nhwc_hwcf_output]} :
-        (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>,
-                                 !transform.param<i64>, !transform.param<i64>, !transform.param<i64>,
-                                 !transform.param<i64>, !transform.param<i64>)
-    %c2 = transform.param.constant 2 : i64 -> !transform.param<i64>
-    transform.match.param.cmpi eq %batch, %c2 : !transform.param<i64>
+        !transform.any_op -> !transform.param<i64>
     transform.yield %op : !transform.any_op
   }
 
@@ -808,9 +803,7 @@ module attributes {transform.with_named_sequence} {
       transform.iree.match.convolution %op,
         lhs_type = f16, rhs_type = f16, output_type = f16
         {indexing_maps = [#map_nchw_fchw_input, #map_nchw_fchw_filter, #map_nchw_fchw_output]} :
-        (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>,
-                                 !transform.param<i64>, !transform.param<i64>, !transform.param<i64>,
-                                 !transform.param<i64>, !transform.param<i64>)
+        !transform.any_op -> !transform.param<i64>
     %c4 = transform.param.constant 4 : i64 -> !transform.param<i64>
     transform.match.param.cmpi eq %batch, %c4 : !transform.param<i64>
     transform.yield %op : !transform.any_op
@@ -848,8 +841,9 @@ func.func @conv_constraints(
     %out1: tensor<1x112x112x64xf32>) -> tensor<1x112x112x64xf32> {
 
   // CHECK: linalg.conv_2d_nhwc_hwcf
+  // CHECK-SAME:   lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1]}>
   // CHECK-SAME:   match_status = "matched"
-  %res = linalg.conv_2d_nhwc_hwcf
+  %res = linalg.conv_2d_nhwc_hwcf {lowering_config = #lowering_config}
         ins(%in1, %filt1 : tensor<1x224x224x3xf16>, tensor<7x7x3x64xf16>)
         outs(%out1 : tensor<1x112x112x64xf32>) {match_status = "unmatched"} -> tensor<1x112x112x64xf32>
 
@@ -862,9 +856,7 @@ module attributes {transform.with_named_sequence} {
       transform.iree.match.convolution %op,
         lhs_type = f16, rhs_type = f16, output_type = f32
         {indexing_maps = [#map_nhwc_hwcf_input, #map_nhwc_hwcf_filter, #map_nhwc_hwcf_output]} :
-        (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>,
-                                 !transform.param<i64>, !transform.param<i64>, !transform.param<i64>,
-                                 !transform.param<i64>, !transform.param<i64>)
+        !transform.any_op -> !transform.param<i64>
 
     transform.iree.match.dims_equal %batch, [1] : !transform.param<i64>
     transform.iree.match.dims_equal %out_img, [112, 112] : !transform.param<i64>
@@ -896,7 +888,6 @@ module attributes {transform.with_named_sequence} {
 // Verify indexing maps mismatching for the convolution op.
 
 #map_nhwc_hwcf_input = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
-#map_nhwc_hwcf_filter = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
 #map_nhwc_hwcf_output = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
 
 // Wrong filter map with transposed channels: (d4, d5, d3, d6) instead of (d4, d5, d6, d3).
@@ -923,9 +914,7 @@ module attributes {transform.with_named_sequence} {
       transform.iree.match.convolution %op,
         lhs_type = f32, rhs_type = f32, output_type = f32
         {indexing_maps = [#map_nhwc_hwcf_input, #map_wrong_filter, #map_nhwc_hwcf_output]} :
-        (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>,
-                                 !transform.param<i64>, !transform.param<i64>, !transform.param<i64>,
-                                 !transform.param<i64>, !transform.param<i64>)
+        !transform.any_op -> !transform.param<i64>
     transform.yield %op : !transform.any_op
   }
 

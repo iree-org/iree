@@ -233,15 +233,16 @@ IREE::transform_dialect::MatchContractionOp::matchOperation(
     Operation *current, transform::TransformResults &results,
     transform::TransformState &state) {
   Location loc = current->getLoc();
+  StringRef opName = current->getName().getStringRef();
   auto linalgOp = dyn_cast<linalg::LinalgOp>(current);
   if (!linalgOp) {
     return emitSilenceableFailure(loc)
-           << "Operation " << *current << " is not a LinalgOp.";
+           << "Operation " << opName << " is not a LinalgOp.";
   }
 
   if (!linalg::isaContractionOpInterface(linalgOp)) {
     return emitSilenceableFailure(loc)
-           << "Operation " << *current << " is not a contraction operation.";
+           << "Operation " << opName << " is not a contraction operation.";
   }
 
   Type targetLhsType = getLhsType();
@@ -312,15 +313,16 @@ IREE::transform_dialect::MatchConvolutionOp::matchOperation(
     Operation *current, transform::TransformResults &results,
     transform::TransformState &state) {
   Location loc = current->getLoc();
+  StringRef opName = current->getName().getStringRef();
   auto linalgOp = dyn_cast<linalg::LinalgOp>(current);
   if (!linalgOp) {
     return emitSilenceableFailure(loc)
-           << "Operation " << *current << " is not a LinalgOp.";
+           << "Operation " << opName << " is not a LinalgOp.";
   }
 
   if (!linalg::isaConvolutionOpInterface(linalgOp)) {
     return emitSilenceableFailure(loc)
-           << "Operation " << *current << " is not a convolution operation.";
+           << "Operation " << opName << " is not a convolution operation.";
   }
 
   Type targetLhsType = getLhsType();
