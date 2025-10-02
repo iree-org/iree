@@ -571,17 +571,6 @@ static bool compareIntrinsics(const GPUMatmulShapeType &problem,
          ShapedType::getNumElements(rhs.kSizes);
 }
 
-static SmallVector<GPUIntrinsicType>
-sortMMAIntrinsics(GPUMatmulShapeType problem,
-                  ArrayRef<GPUIntrinsicType> intrinsics) {
-  SmallVector<GPUIntrinsicType> sortedIntrinsics(intrinsics);
-  llvm::stable_sort(sortedIntrinsics, [&](const GPUMatmulShapeType &lhs,
-                                          const GPUMatmulShapeType &rhs) {
-    return compareIntrinsics(problem, lhs, rhs);
-  });
-  return sortedIntrinsics;
-}
-
 static int64_t adjustSeedsForWgpCount(const GPUMatmulShapeType &problem,
                                       const GPUIntrinsicType &intrinsic,
                                       std::optional<int64_t> wgpCount,
