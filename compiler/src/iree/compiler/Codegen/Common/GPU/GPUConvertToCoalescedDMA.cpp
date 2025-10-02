@@ -183,8 +183,9 @@ struct ConvertGatherOpToCoalescedDMA
       outerUpperBounds.push_back(rewriter.getIndexAttr(dimSize));
     }
 
-    auto outerMapping = createGPUMappingAttrs(rewriter.getContext(), rank,
-                                              /*useWarpMapping=*/true);
+    SmallVector<Attribute> outerMapping =
+        createGPUMappingAttrs(rewriter.getContext(), rank,
+                              /*useWarpMapping=*/true);
     auto outerForallOp = rewriter.create<scf::ForallOp>(
         loc, outerLowerBounds, outerUpperBounds, subgroupTileSizes, init,
         rewriter.getArrayAttr(outerMapping));
@@ -215,8 +216,9 @@ struct ConvertGatherOpToCoalescedDMA
     SmallVector<OpFoldResult> innerLowerBounds(rank, rewriter.getIndexAttr(0));
     SmallVector<OpFoldResult> innerUpperBounds = subgroupTileSizes;
 
-    auto innerMapping = createGPUMappingAttrs(rewriter.getContext(), rank,
-                                              /*useWarpMapping=*/false);
+    SmallVector<Attribute> innerMapping =
+        createGPUMappingAttrs(rewriter.getContext(), rank,
+                              /*useWarpMapping=*/false);
     auto innerForallOp = rewriter.create<scf::ForallOp>(
         loc, innerLowerBounds, innerUpperBounds, threadTileSizes,
         destWgSlice.getResult(), rewriter.getArrayAttr(innerMapping));
@@ -234,7 +236,7 @@ struct ConvertGatherOpToCoalescedDMA
     rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
         loc, innerSharedOut.getType(), indexIndices, source, innerSharedOut);
 
-    // Insert the result of inner forall back into outer forall's output
+    // Insert the result of inner forall back into outer forall's output.
     rewriter.setInsertionPointAfter(innerForallOp);
     auto outerInParallelOp =
         cast<scf::InParallelOp>(outerBody->getTerminator());
