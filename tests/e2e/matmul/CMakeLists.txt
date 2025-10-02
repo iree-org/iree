@@ -1783,7 +1783,6 @@ iree_generated_e2e_runner_test(
     --iree-opt-data-tiling=false
     --iree-dispatch-creation-data-tiling=true
     --iree-hip-encoding-layout-resolver=data-tiling
-    --iree-llvmgpu-test-combine-layout-transformation=true
   LABELS
     "noasan"
     "nomsan"
