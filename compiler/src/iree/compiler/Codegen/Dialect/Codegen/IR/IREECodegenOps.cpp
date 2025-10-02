@@ -228,20 +228,8 @@ LogicalResult InnerTiledOp::verify() {
   int64_t expectedNumOuts = getKind().getExpectedNumOutputs();
   if (expectedNumOuts != getNumOutputs()) {
     return emitOpError("number of outputs (" + Twine(getNumOutputs()) +
-                       ")doesn't match expected number from kind (" +
+                       ") doesn't match expected number from kind (" +
                        Twine(expectedNumOuts) + ")");
-  }
-
-  if (getNumResults() != expectedNumOuts) {
-    return emitOpError("number of results (" + Twine(getNumResults()) +
-                       ") does't match expected number from kind (" +
-                       Twine(expectedNumOuts) + ")");
-  }
-
-  if (!llvm::equal(getResultTypes(), getOutputs().getTypes())) {
-    return emitOpError("output types '")
-           << getOutputs().getTypes() << "' do not match result type '"
-           << getResultTypes() << "'";
   }
 
   SmallVector<ShapedType> opTypes = llvm::map_to_vector(
@@ -268,15 +256,15 @@ LogicalResult InnerTiledOp::verify() {
     // This also correctly accounts for (..) -> () for rank-0 results.
     if (map.getNumDims() != numIterators) {
       return emitOpError("expected indexing map ")
-             << index << " to have " << numIterators << " number of inputs";
+             << index << " to have " << numIterators << " input dims";
     }
     if (map.getNumResults() >= rank) {
       return emitOpError("expected indexing map ")
-             << index << " to have fewer than " << rank << " number of outputs";
+             << index << " to have fewer than " << rank << " results";
     }
     if (!map.isProjectedPermutation()) {
       return emitOpError("expected indexing map ")
-             << index << " to be a projected permutation of its inputs";
+             << index << " to be a projected permutation";
     }
 
     for (int64_t size :
@@ -303,8 +291,7 @@ LogicalResult InnerTiledOp::verify() {
         return emitOpError("shape does not match iteration bounds");
       }
     }
-    return success();
-  };
+  }
 
   SmallVector<VectorType> preThreadTypes;
   getKind().getUndistributedTileTypes(preThreadTypes);
