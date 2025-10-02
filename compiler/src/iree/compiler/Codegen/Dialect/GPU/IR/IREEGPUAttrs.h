@@ -63,9 +63,24 @@ struct MMASingleSubgroupLayout {
   SmallVector<int64_t, 2> element;
 };
 
+/// Helpers to return the M, N, K, and Kb sizes for the given scaled MMA
+/// intrinsic. These sizes correspond to computation performed by a single
+/// subgroup.
+int64_t getMSize(ScaledMMAIntrinsic intrinsic);
+int64_t getNSize(ScaledMMAIntrinsic intrinsic);
+int64_t getKSize(ScaledMMAIntrinsic intrinsic);
+int64_t getKbSize(ScaledMMAIntrinsic intrinsic);
+
+/// Returns the subgroup size used by the given scaled MMA intrinsic.
+int64_t getIntrinsicSubgroupSize(ScaledMMAIntrinsic intrinsic);
+
+/// Helpers to return the M, N, and K sizes for the given MMA intrinsic.
+/// These sizes correspond to computation performed by a single subgroup.
 int64_t getMSize(MMAIntrinsic intrinsic);
 int64_t getNSize(MMAIntrinsic intrinsic);
 int64_t getKSize(MMAIntrinsic intrinsic);
+
+/// Returns the subgroup size used by the given MMA intrinsic.
 int64_t getIntrinsicSubgroupSize(MMAIntrinsic intrinsic);
 
 MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
@@ -85,6 +100,9 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
 MMASingleSubgroupLayout
 getSingleSubgroupLayout(IREE::Codegen::InnerTileDescAttrInterface mmaKind,
                         MMAFragment fragment);
+
+MMASingleSubgroupLayout getSingleSubgroupLayout(ScaledMMAIntrinsic intrinsic,
+                                                int64_t operandIndex);
 
 /// Returns the name of the tilling `level`, as used in the `lowering_config`
 /// attribute.
