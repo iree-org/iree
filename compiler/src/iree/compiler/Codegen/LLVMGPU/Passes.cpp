@@ -794,6 +794,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createCSEPass());
     // Post tiling, the tensor.pad multiples can be simplified to static
     // sizes, run dim simplification to infer and propagate these sizes.
+    funcPassManager.addPass(memref::createResolveShapedTypeResultDimsPass());
     funcPassManager.addPass(affine::createSimplifyAffineMinMaxPass());
     funcPassManager.addPass(memref::createReifyResultShapesPass());
     funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
