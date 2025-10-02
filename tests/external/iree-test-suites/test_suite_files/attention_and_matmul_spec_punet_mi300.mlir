@@ -256,10 +256,10 @@ transform.named_sequence @match_mmt_8192x640x2560 (%matmul: !transform.any_op {t
                         affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
                         affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]} :
       (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
-    %lhs = transform.get_operand %generic[0] : (!transform.any_op) -> !transform.any_value
-    %rhs = transform.get_operand %generic[1] : (!transform.any_op) -> !transform.any_value
-    transform.iree.match.cast_compatible_type %lhs = tensor<?x1024x1280xi8> : !transform.any_value
-    transform.iree.match.cast_compatible_type %rhs = tensor<10240x1280xi8> : !transform.any_value
+    transform.iree.match.dims_equal %batch, [] : !transform.param<i64>
+    transform.iree.match.dims_equal %m, [-1, 1024] : !transform.param<i64>
+    transform.iree.match.dims_equal %n, [10240] : !transform.param<i64>
+    transform.iree.match.dims_equal %k, [1280] : !transform.param<i64>
     %config = transform.param.constant #iree_codegen.compilation_info<
       lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
                                                    mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8>,
@@ -282,10 +282,10 @@ transform.named_sequence @match_mmt_8192x640x2560 (%matmul: !transform.any_op {t
                         affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
                         affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]} :
       (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
-    %lhs = transform.get_operand %generic[0] : (!transform.any_op) -> !transform.any_value
-    %rhs = transform.get_operand %generic[1] : (!transform.any_op) -> !transform.any_value
-    transform.iree.match.cast_compatible_type %lhs = tensor<?x1024x1280xi8> : !transform.any_value
-    transform.iree.match.cast_compatible_type %rhs = tensor<1280x1280xi8> : !transform.any_value
+    transform.iree.match.dims_equal %batch, [] : !transform.param<i64>
+    transform.iree.match.dims_equal %m, [-1, 1024] : !transform.param<i64>
+    transform.iree.match.dims_equal %n, [1280] : !transform.param<i64>
+    transform.iree.match.dims_equal %k, [1280] : !transform.param<i64>
     %config = transform.param.constant #iree_codegen.compilation_info<
       lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
                                                    mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8>,
@@ -309,10 +309,10 @@ transform.named_sequence @match_mmt_8192x640x2560 (%matmul: !transform.any_op {t
                         affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
                         affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]} :
       (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
-    %lhs = transform.get_operand %generic[0] : (!transform.any_op) -> !transform.any_value
-    %rhs = transform.get_operand %generic[1] : (!transform.any_op) -> !transform.any_value
-    transform.iree.match.cast_compatible_type %lhs = tensor<?x64x2480xi8> : !transform.any_value
-    transform.iree.match.cast_compatible_type %rhs = tensor<1280x2480xi8> : !transform.any_value
+    transform.iree.match.dims_equal %batch, [] : !transform.param<i64>
+    transform.iree.match.dims_equal %m, [-1, 64] : !transform.param<i64>
+    transform.iree.match.dims_equal %n, [1280] : !transform.param<i64>
+    transform.iree.match.dims_equal %k, [2480] : !transform.param<i64>
     %config = transform.param.constant #iree_codegen.compilation_info<
       lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
                                                    mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8>,
@@ -337,10 +337,10 @@ transform.named_sequence @match_mmt_8192x640x2560 (%matmul: !transform.any_op {t
                         affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
                         affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]} :
       (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
-    %lhs = transform.get_operand %generic[0] : (!transform.any_op) -> !transform.any_value
-    %rhs = transform.get_operand %generic[1] : (!transform.any_op) -> !transform.any_value
-    transform.iree.match.cast_compatible_type %lhs = tensor<?x4960x640xi8> : !transform.any_value
-    transform.iree.match.cast_compatible_type %rhs = tensor<640x640xi8> : !transform.any_value
+    transform.iree.match.dims_equal %batch, [] : !transform.param<i64>
+    transform.iree.match.dims_equal %m, [-1, 4960] : !transform.param<i64>
+    transform.iree.match.dims_equal %n, [640] : !transform.param<i64>
+    transform.iree.match.dims_equal %k, [640] : !transform.param<i64>
     %config = transform.param.constant #iree_codegen.compilation_info<
       lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
                                                    mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8>,
@@ -363,10 +363,10 @@ transform.named_sequence @match_mmt_8192x640x2560 (%matmul: !transform.any_op {t
                         affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
                         affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]} :
       (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
-    %lhs = transform.get_operand %generic[0] : (!transform.any_op) -> !transform.any_value
-    %rhs = transform.get_operand %generic[1] : (!transform.any_op) -> !transform.any_value
-    transform.iree.match.cast_compatible_type %lhs = tensor<?x64x2480xi8> : !transform.any_value
-    transform.iree.match.cast_compatible_type %rhs = tensor<640x2480xi8> : !transform.any_value
+    transform.iree.match.dims_equal %batch, [] : !transform.param<i64>
+    transform.iree.match.dims_equal %m, [-1, 64] : !transform.param<i64>
+    transform.iree.match.dims_equal %n, [640] : !transform.param<i64>
+    transform.iree.match.dims_equal %k, [2480] : !transform.param<i64>
     %config = transform.param.constant #iree_codegen.compilation_info<
       lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
                                                    mma_kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8>,
@@ -389,10 +389,10 @@ transform.named_sequence @match_mmt_8192x640x2560 (%matmul: !transform.any_op {t
                         affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
                         affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]} :
       (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
-    %lhs = transform.get_operand %generic[0] : (!transform.any_op) -> !transform.any_value
-    %rhs = transform.get_operand %generic[1] : (!transform.any_op) -> !transform.any_value
-    transform.iree.match.cast_compatible_type %lhs = tensor<?x4096x640xi8> : !transform.any_value
-    transform.iree.match.cast_compatible_type %rhs = tensor<5120x640xi8> : !transform.any_value
+    transform.iree.match.dims_equal %batch, [] : !transform.param<i64>
+    transform.iree.match.dims_equal %m, [-1, 4096] : !transform.param<i64>
+    transform.iree.match.dims_equal %n, [5120] : !transform.param<i64>
+    transform.iree.match.dims_equal %k, [640] : !transform.param<i64>
     %config = transform.param.constant #iree_codegen.compilation_info<
       lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1],
                                                    mma_kind = #iree_gpu.mma_layout<MFMA_I32_32x32x16_I8>,
