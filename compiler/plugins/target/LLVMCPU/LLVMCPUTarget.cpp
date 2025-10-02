@@ -14,6 +14,7 @@
 #include "compiler/plugins/target/LLVMCPU/LLVMTargetOptions.h"
 #include "compiler/plugins/target/LLVMCPU/LibraryBuilder.h"
 #include "compiler/plugins/target/LLVMCPU/LinkerTool.h"
+#include "compiler/plugins/target/LLVMCPU/Passes.h"
 #include "compiler/plugins/target/LLVMCPU/StaticLibraryGenerator.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
@@ -863,6 +864,7 @@ private:
 struct LLVMCPUSession
     : public PluginSession<LLVMCPUSession, LLVMCPUTargetCLOptions,
                            PluginActivationPolicy::DefaultActivated> {
+  static void registerPasses() { registerLLVMCPUTargetPasses(); }
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
     // #hal.executable.target<"llvm-cpu", ...
     targets.add("llvm-cpu", [=]() {

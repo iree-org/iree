@@ -17,19 +17,56 @@ iree_compiler_register_plugin(
     target = ":LLVMCPU",
 )
 
+iree_gentbl_cc_library(
+    name = "PassesIncGen",
+    tbl_outs = [
+        (
+            ["--gen-pass-decls"],
+            "Passes.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    deps = [
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
+)
+
+iree_tablegen_doc(
+    name = "LLVMCPUTargetPassesDocGen",
+    category = "Passes",
+    tbl_outs = [
+        (
+            [
+                "--gen-pass-doc",
+            ],
+            "LLVMCPUTargetPasses.md",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    deps = [
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
+)
+
 iree_compiler_cc_library(
     name = "LLVMCPU",
     srcs = [
         "LLVMCPUTarget.cpp",
         "LibraryBuilder.cpp",
+        "Passes.cpp",
+        "TestPropagateTargetAttrs.cpp"
     ],
     hdrs = [
         "LibraryBuilder.h",
+        "Passes.h"
     ],
     deps = [
         ":LLVMIRPasses",
         ":LLVMTargetOptions",
         ":LinkerTool",
+        ":PassesIncGen",
         ":StaticLibraryGenerator",
         "//compiler/plugins/target/LLVMCPU/Builtins",
         "//compiler/src/iree/compiler/Codegen/Common",

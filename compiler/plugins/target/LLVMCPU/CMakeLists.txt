@@ -17,18 +17,42 @@ iree_compiler_register_plugin(
     ::LLVMCPU
 )
 
+iree_tablegen_library(
+  NAME
+    PassesIncGen
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-decls Passes.h.inc
+)
+
+iree_tablegen_doc(
+  NAME
+    LLVMCPUTargetPassesDocGen
+  CATEGORY
+    "Passes"
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-doc LLVMCPUTargetPasses.md
+)
+
 iree_cc_library(
   NAME
     LLVMCPU
   HDRS
     "LibraryBuilder.h"
+    "Passes.h"
   SRCS
     "LLVMCPUTarget.cpp"
     "LibraryBuilder.cpp"
+    "Passes.cpp"
+    "TestPropagateTargetAttrs.cpp"
   DEPS
     ::LLVMIRPasses
     ::LLVMTargetOptions
     ::LinkerTool
+    ::PassesIncGen
     ::StaticLibraryGenerator
     IREELLVMCPUTargetDeps
     IREELinalgTransformDialect
