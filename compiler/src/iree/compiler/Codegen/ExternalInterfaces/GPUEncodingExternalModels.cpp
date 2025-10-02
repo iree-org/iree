@@ -223,7 +223,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   // or N dimension. TODO(#18851): revisit that.
   int subgroupsM = 1;
   int subgroupsN = *wgp.getSimdsPerWgp();
-  if (totalUnrollM > totalUnrollN) {
+  if (m > n) {
     std::swap(subgroupsM, subgroupsN);
   }
   totalUnrollM = std::max(totalUnrollM, subgroupsM);

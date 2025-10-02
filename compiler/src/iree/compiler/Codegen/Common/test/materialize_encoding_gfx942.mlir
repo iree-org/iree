@@ -251,11 +251,11 @@ func.func @set_encoding_ACC_dynamic_M_MFMA_F32_16x16x4_F32(%arg0 : tensor<?x513x
 // CHECK-SAME:      inner_tiles = [128, 128]
 // CHECK-SAME:      : tensor<?x513xf32> -> tensor<?x5x128x128xf32>
 // CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME       : tensor<?x5x128x128xf32> into tensor<?x5x4x8x4x4x16x2xf32>
+// CHECK-SAME       : tensor<?x5x128x128xf32> into tensor<?x5x4x4x2x4x16x8xf32>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPAND]] : tensor<?x5x4x8x4x4x16x2xf32>)
-// CHECK-SAME:       outs({{.*}} : tensor<?x5x4x8x2x4x16x4xf32>)
-// CHECK-SAME:       permutation = [0, 1, 5, 3, 7, 2, 6, 4]
+// CHECK-SAME:       ins(%[[EXPAND]] : tensor<?x5x4x4x2x4x16x8xf32>)
+// CHECK-SAME:       outs({{.*}} : tensor<?x5x4x2x8x4x16x4xf32>)
+// CHECK-SAME:       permutation = [0, 1, 2, 4, 7, 3, 6, 5]
 // CHECK:         return %[[TRANSPOSE]]
 
 // -----
