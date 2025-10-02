@@ -145,17 +145,17 @@ module {
 #map3 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 #map4 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
 module {
-  func.func @scaled_mfma_32x32x64(%a: tensor<?x?x?xf8E8M0FNU>, %b: tensor<?x?x?xf8E8M0FNU>, %a_scales: tensor<?x?xf32>, %b_scales: tensor<?x?xf32>, %c: tensor<?x?xf32>) -> tensor<?x?xf32> {
+  func.func @scaled_mfma_32x32x64(%a: tensor<?x?x?xf8E8M0FNU>, %b: tensor<?x?x?xf8E8M0FNU>, %a_scales: tensor<?x?xf8E8M0FNU>, %b_scales: tensor<?x?xf8E8M0FNU>, %c: tensor<?x?xf32>) -> tensor<?x?xf32> {
     %mm = linalg.generic {
       indexing_maps = [#map, #map1, #map2, #map3, #map4],
       iterator_types = ["parallel", "parallel", "reduction", "reduction"]
-    } ins(%a, %b, %a_scales, %b_scales : tensor<?x?x?xf8E8M0FNU>, tensor<?x?x?xf8E8M0FNU>, tensor<?x?xf32>, tensor<?x?xf32>)
+    } ins(%a, %b, %a_scales, %b_scales : tensor<?x?x?xf8E8M0FNU>, tensor<?x?x?xf8E8M0FNU>, tensor<?x?xf8E8M0FNU>, tensor<?x?xf8E8M0FNU>)
     outs(%c : tensor<?x?xf32>) attrs =  {
       lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_32x32x64_B32, lhs_elem_type = f8E8M0FNU, rhs_elem_type = f8E8M0FNU, acc_elem_type = f32>}>
     } {
-    ^bb0(%in: f8E8M0FNU, %in_4: f8E8M0FNU, %in_5: f32, %in_6: f32, %out: f32):
-      %17 = arith.scaling_extf %in, %in_5 : f8E8M0FNU, f32 to f32
-      %18 = arith.scaling_extf %in_4, %in_6 : f8E8M0FNU, f32 to f32
+    ^bb0(%in: f8E8M0FNU, %in_4: f8E8M0FNU, %in_5: f8E8M0FNU, %in_6: f8E8M0FNU, %out: f32):
+      %17 = arith.scaling_extf %in, %in_5 : f8E8M0FNU, f8E8M0FNU to f32
+      %18 = arith.scaling_extf %in_4, %in_6 : f8E8M0FNU, f8E8M0FNU to f32
       %19 = arith.mulf %17, %18 : f32
       %20 = arith.addf %out, %19 : f32
       linalg.yield %20 : f32
@@ -174,7 +174,7 @@ module {
 //  CHECK-SAME:       affine_map<(d0, d1, d2, d3) -> (d0, d1)>
 //  CHECK-SAME:     lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_32x32x64_B32, lhs_elem_type = f8E8M0FNU, rhs_elem_type = f8E8M0FNU, acc_elem_type = f32>}>
 // CHECK-SAME:      permutations = [array<i64: 0, 1, 2>, array<i64: 0, 1>, array<i64: 2, 0, 1>, array<i64: 1, 0>, array<i64: 0, 1>]
-//  CHECK-SAME:     : tensor<?x?x?x32x2x32xf8E8M0FNU>, tensor<?x?x32x2xf32>, tensor<?x?x?x32x2x32xf8E8M0FNU>, tensor<?x?x32x2xf32> into tensor<?x?x32x32xf32>
+//  CHECK-SAME:     : tensor<?x?x?x32x2x32xf8E8M0FNU>, tensor<?x?x32x2xf8E8M0FNU>, tensor<?x?x?x32x2x32xf8E8M0FNU>, tensor<?x?x32x2xf8E8M0FNU> into tensor<?x?x32x32xf32>
 
 // -----
 
