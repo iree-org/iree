@@ -121,8 +121,7 @@ transform.named_sequence
     lhs_type = f16, rhs_type = f16, output_type = f32
     {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
                       affine_map<(d0, d1, d2) -> (d1, d2)>,
-                      affine_map<(d0, d1, d2) -> (d0, d1)>]} :
-    (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+                      affine_map<(d0, d1, d2) -> (d0, d1)>]} : !transform.any_op -> !transform.param<i64>
   transform.iree.match.dims_equal %m, [2048] : !transform.param<i64>
   transform.iree.match.dims_equal %n, [1280] : !transform.param<i64>
   transform.iree.match.dims_equal %k, [5120] : !transform.param<i64>

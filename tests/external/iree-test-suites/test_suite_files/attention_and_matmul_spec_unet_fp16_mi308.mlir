@@ -58,8 +58,7 @@ transform.named_sequence @match_mmt_1920x10240x1280(%matmul: !transform.any_op {
     lhs_type = f16, rhs_type = f16, output_type = f32
     {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
                       affine_map<(d0, d1, d2) -> (d1, d2)>,
-                      affine_map<(d0, d1, d2) -> (d0, d1)>]} :
-    (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+                      affine_map<(d0, d1, d2) -> (d0, d1)>]} : !transform.any_op -> !transform.param<i64>
   transform.iree.match.dims_equal %m, [1920] : !transform.param<i64>
   transform.iree.match.dims_equal %n, [10240] : !transform.param<i64>
   transform.iree.match.dims_equal %k, [1280] : !transform.param<i64>
@@ -84,8 +83,7 @@ transform.named_sequence @match_mmt_1920x1280x1280(%matmul: !transform.any_op {t
     lhs_type = f16, rhs_type = f16, output_type = f32
     {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
                       affine_map<(d0, d1, d2) -> (d1, d2)>,
-                      affine_map<(d0, d1, d2) -> (d0, d1)>]} :
-    (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+                      affine_map<(d0, d1, d2) -> (d0, d1)>]} : !transform.any_op -> !transform.param<i64>
   transform.iree.match.dims_equal %m, [1920] : !transform.param<i64>
   transform.iree.match.dims_equal %n, [10240] : !transform.param<i64>
   transform.iree.match.dims_equal %k, [1280] : !transform.param<i64>
@@ -110,8 +108,7 @@ transform.named_sequence @match_mmt_1920x1280x5120(%matmul: !transform.any_op {t
     lhs_type = f16, rhs_type = f16, output_type = f32
     {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
                       affine_map<(d0, d1, d2) -> (d1, d2)>,
-                      affine_map<(d0, d1, d2) -> (d0, d1)>]} :
-    (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+                      affine_map<(d0, d1, d2) -> (d0, d1)>]} : !transform.any_op -> !transform.param<i64>
   transform.iree.match.dims_equal %m, [1920] : !transform.param<i64>
   transform.iree.match.dims_equal %n, [1280] : !transform.param<i64>
   transform.iree.match.dims_equal %k, [1280] : !transform.param<i64>
@@ -136,8 +133,7 @@ transform.named_sequence @match_mmt_7680x5120x640(%matmul: !transform.any_op {tr
     lhs_type = f16, rhs_type = f16, output_type = f32
     {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
                       affine_map<(d0, d1, d2) -> (d1, d2)>,
-                      affine_map<(d0, d1, d2) -> (d0, d1)>]} :
-    (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+                      affine_map<(d0, d1, d2) -> (d0, d1)>]} : !transform.any_op -> !transform.param<i64>
   transform.iree.match.dims_equal %m, [7680] : !transform.param<i64>
   transform.iree.match.dims_equal %n, [5120] : !transform.param<i64>
   transform.iree.match.dims_equal %k, [640] : !transform.param<i64>
@@ -162,8 +158,7 @@ transform.named_sequence @match_mmt_128x1280x2048(%matmul: !transform.any_op {tr
     lhs_type = f16, rhs_type = f16, output_type = f32
     {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
                       affine_map<(d0, d1, d2) -> (d1, d2)>,
-                      affine_map<(d0, d1, d2) -> (d0, d1)>]} :
-    (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+                      affine_map<(d0, d1, d2) -> (d0, d1)>]} : !transform.any_op -> !transform.param<i64>
   transform.iree.match.dims_equal %m, [128] : !transform.param<i64>
   transform.iree.match.dims_equal %n, [1280] : !transform.param<i64>
   transform.iree.match.dims_equal %k, [2048] : !transform.param<i64>
@@ -188,8 +183,7 @@ transform.named_sequence @match_mmt_7680x640x640(%matmul: !transform.any_op {tra
     lhs_type = f16, rhs_type = f16, output_type = f32
     {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
                       affine_map<(d0, d1, d2) -> (d1, d2)>,
-                      affine_map<(d0, d1, d2) -> (d0, d1)>]} :
-    (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+                      affine_map<(d0, d1, d2) -> (d0, d1)>]} : !transform.any_op -> !transform.param<i64>
   transform.iree.match.dims_equal %m, [7680] : !transform.param<i64>
   transform.iree.match.dims_equal %n, [640] : !transform.param<i64>
   transform.iree.match.dims_equal %k, [640] : !transform.param<i64>
@@ -214,8 +208,7 @@ transform.named_sequence @match_mmt_7680x640x2560(%matmul: !transform.any_op {tr
     lhs_type = f16, rhs_type = f16, output_type = f32
     {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
                       affine_map<(d0, d1, d2) -> (d1, d2)>,
-                      affine_map<(d0, d1, d2) -> (d0, d1)>]} :
-    (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+                      affine_map<(d0, d1, d2) -> (d0, d1)>]} : !transform.any_op -> !transform.param<i64>
   transform.iree.match.dims_equal %m, [7680] : !transform.param<i64>
   transform.iree.match.dims_equal %n, [640] : !transform.param<i64>
   transform.iree.match.dims_equal %k, [2560] : !transform.param<i64>
