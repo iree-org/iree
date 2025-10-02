@@ -273,3 +273,47 @@ func.func @minmax_reduction(%arg0: tensor<1x?xf32>, %arg1: tensor<1xf32>, %arg2 
    } -> (tensor<1xf32>, tensor<1xf32>)
   return %0#0, %0#1: tensor<1xf32>, tensor<1xf32>
 }
+
+
+// -----
+
+// The reduction dimension is perfectly tiled by the partial reduction (1024 % 128 == 0).
+// We confirm that we directly optimize this case, where the arith.select condition is always true.
+
+// CHECK-LABEL: reduction_static_complete_tile
+//   CHECK-NOT: arith.select
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+func.func @reduction_static_complete_tile(%arg0: tensor<1x1024xf32>, %arg1: tensor<1xf32>) -> tensor<1xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1],
+                       iterator_types = ["parallel", "reduction"]}
+                       ins(%arg0 : tensor<1x1024xf32>) outs(%arg1 : tensor<1xf32>)
+   attrs =  {lowering_config = #iree_gpu.lowering_config<{partial_reduction = [0, 128]}>}
+   {
+   ^bb0(%in: f32, %out: f32):
+     %1 = arith.maxnumf %in, %out : f32
+     linalg.yield %1 : f32
+   } -> tensor<1xf32>
+  return %0 : tensor<1xf32>
+}
+
+// -----
+
+// The reduction dimension is not perfectly tiled by the partial reduction (1024 % 100 != 0).
+
+// CHECK-LABEL: reduction_static_incomplete_tile
+//       CHECK: arith.select
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+func.func @reduction_static_incomplete_tile(%arg0: tensor<1x1024xf32>, %arg1: tensor<1xf32>) -> tensor<1xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1],
+                       iterator_types = ["parallel", "reduction"]}
+                       ins(%arg0 : tensor<1x1024xf32>) outs(%arg1 : tensor<1xf32>)
+   attrs =  {lowering_config = #iree_gpu.lowering_config<{partial_reduction = [0, 100]}>}
+   {
+   ^bb0(%in: f32, %out: f32):
+     %1 = arith.maxnumf %in, %out : f32
+     linalg.yield %1 : f32
+   } -> tensor<1xf32>
+  return %0 : tensor<1xf32>
+}
