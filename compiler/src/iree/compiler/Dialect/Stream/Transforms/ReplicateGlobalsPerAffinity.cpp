@@ -426,6 +426,10 @@ void ReplicateGlobalsPerAffinityPass::runOnOperation() {
         .Default([&](Operation *) {});
   }
 
+  // We have to update the operands in topological order, because they may
+  // depend on each other. It can lead to ambigious affinity if an op queries
+  // the affinity from unresolved operations. In this context, it can return
+  // multiple affinities and fail to replicate the global for its uses.
   SetVector<Operation *> sortedAffinityOps(opToGlobalUseMap.keys().begin(),
                                            opToGlobalUseMap.keys().end());
   sortedAffinityOps = mlir::topologicalSort(sortedAffinityOps);
