@@ -12,6 +12,10 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 
+namespace mlir::iree_compiler::IREE::LinalgExt {
+class ScaledContractionDimensions;
+} // namespace mlir::iree_compiler::IREE::LinalgExt
+
 namespace mlir::iree_compiler::IREE::Encoding {
 
 constexpr char kDataTilingHint[] = "iree.opt.data_tiling";
@@ -46,6 +50,10 @@ bool hasPackedStorageAttr(RankedTensorType type);
 /// Returns the ContractionDimensions for the encoding user_indexing_maps.
 FailureOr<linalg::ContractionDimensions>
 getEncodingContractionDims(EncodingAttr encoding);
+
+/// Returns the ScaledContractionDimensions for the encoding user_indexing_maps.
+FailureOr<IREE::LinalgExt::ScaledContractionDimensions>
+getEncodingScaledContractionDims(EncodingAttr encoding);
 
 /// Returns the narrow dim in a given `encoding`, ceiled to a power of two. This
 /// works by inspecting the `iteration_sizes` array attribute in the `encoding`.

@@ -34,7 +34,7 @@ Codegen::TileSwizzle getSwizzle(IREE::GPU::DataTiledScaledMMAAttr scaledMma,
 FailureOr<Codegen::TileSwizzle>
 getEncodingSwizzle(IREE::Encoding::EncodingAttr encoding,
                    IREE::GPU::DataTiledMMAInterfaceAttr mma,
-                   IREE::GPU::MMAFragment fragment);
+                   unsigned operandIndex);
 
 } // namespace mlir::iree_compiler::IREE::GPU
 

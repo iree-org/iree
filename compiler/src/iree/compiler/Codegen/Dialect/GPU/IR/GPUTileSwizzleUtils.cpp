@@ -564,59 +564,45 @@ static void remove(TileSwizzle &swizzle, size_t idx) {
 FailureOr<TileSwizzle>
 getEncodingSwizzle(IREE::Encoding::EncodingAttr encoding,
                    IREE::GPU::DataTiledMMAInterfaceAttr mma,
-                   IREE::GPU::MMAFragment fragment) {
-  FailureOr<linalg::ContractionDimensions> cDims =
-      Encoding::getEncodingContractionDims(encoding);
-  if (failed(cDims)) {
+                   unsigned operandIndex) {
+  FailureOr<Codegen::EncodingContractionLikeDimInfo> dims =
+      Codegen::getEncodingContractionLikeDims(encoding);
+  if (failed(dims)) {
     return failure();
   }
-  int64_t operandIndex = static_cast<int64_t>(fragment);
   TileSwizzle swizzle = mma.getTileSwizzle(operandIndex);
-  // The following expects M, N, K, and Batch sizes of at most 1 for now.
-  // TODO: Extend this to multiple M/N/K/Batch dims.
-  assert(cDims->m.size() <= 1 && cDims->n.size() <= 1 && cDims->k.size() == 1 &&
-         cDims->batch.size() <= 1 &&
-         "Expected at most one M, N, K, and Batch dimension");
-  std::optional<unsigned> mDim =
-      cDims->m.empty() ? std::nullopt
-                       : encoding.mapDimToOperandIndex(cDims->m[0]);
-  std::optional<unsigned> nDim =
-      cDims->n.empty() ? std::nullopt
-                       : encoding.mapDimToOperandIndex(cDims->n[0]);
-  std::optional<unsigned> kDim = encoding.mapDimToOperandIndex(cDims->k[0]);
-  switch (fragment) {
-  case IREE::GPU::MMAFragment::Lhs:
-    // A-matrix (LHS). Source dimensions are M (index 0) and K (index 1).
-    // Dimensions are removed from last to first to ensure correctness.
-    if (!kDim.has_value()) {
-      remove(swizzle, 1);
-    }
-    if (!cDims->m.empty() && !mDim.has_value()) {
+  // Some dimensions may be missing from the encoding due to broadcasting.
+  // Remove any dimensions that are supposed to be present for the given
+  // operand, but are not present for the encoding.
+  // The swizzle.expandShape is an expansion of the packed inner tiles.
+  // The order of dimensions in the inner tiles follow the following priorities:
+  //  - LHS: [M, K, Kb]
+  //  - RHS: [N, K, Kb]
+  //  - LHS Scales: [M, Kb]
+  //  - RHS Scales: [N, Kb]
+  //  - ACC: [M, N]
+  // The order of dimensions for all operands is therefore: [M, N, K, Kb].
+  // Remove dimensions from outermost to innermost, so we can always just remove
+  // the outer dimension regardless of the operand.
+  if (dims->mDim.shouldHaveDim) {
+    if (!dims->mDim.operandIdx.has_value()) {
       remove(swizzle, 0);
     }
-    break;
-  case IREE::GPU::MMAFragment::Rhs:
-    // B-matrix (RHS). Since the pack ops already took care of transposing B,
-    // source dimensions are N (index 0) and K (index 1).
-    // Dimensions are removed from last to first to ensure correctness.
-    if (!kDim.has_value()) {
-      remove(swizzle, 1);
-    }
-    if (!cDims->n.empty() && !nDim.has_value()) {
+  }
+  if (dims->nDim.shouldHaveDim) {
+    if (!dims->nDim.operandIdx.has_value()) {
       remove(swizzle, 0);
     }
-    break;
-  case IREE::GPU::MMAFragment::Acc:
-    // C-matrix (accumulator). Source dimensions are M (index 0) and N (index
-    // 1).
-    // Dimensions are removed from last to first to ensure correctness.
-    if (!cDims->n.empty() && !nDim.has_value()) {
-      remove(swizzle, 1);
-    }
-    if (!cDims->m.empty() && !mDim.has_value()) {
+  }
+  if (dims->kDim.shouldHaveDim) {
+    if (!dims->kDim.operandIdx.has_value()) {
       remove(swizzle, 0);
     }
-    break;
+  }
+  if (dims->kBDim.shouldHaveDim) {
+    if (!dims->kBDim.operandIdx.has_value()) {
+      remove(swizzle, 0);
+    }
   }
   return swizzle;
 }
