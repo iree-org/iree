@@ -14,6 +14,7 @@
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -127,19 +128,23 @@ getReductionInfo(linalg::LinalgOp linalgOp) {
 static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
                                        TilingInterface tilingInterfaceOp,
                                        IREE::GPU::TilingLevel tilingLevel) {
-  // 1.a. Get padding values. The default should be poison, instead of 0.
+
+  // 1.a. Get padding values.
   //
-  // TODO(newling) pad with poison. Requires
+  // The default padding value for linalg.generic should be poison, instead of
+  // 0. Still required: https://github.com/iree-org/iree/issues/21575
   //
-  // https://github.com/iree-org/iree/pull/21573
-  // https://github.com/llvm/llvm-project/pull/152003
-  // https://github.com/iree-org/iree/issues/21575
+  // TODO(newling) pad linalg.generic with poison.
   //
-  // The linalg operations can be padded with any value because we rewrite the
-  // basic block to select the reduction identity for the yielded value if the
-  // index corresponds to the padded part of the tensor.
+  // The linalg generic operations can be padded with any value because we
+  // rewrite the basic block to select the reduction identity for the yielded
+  // value where the index corresponds to the padded part of a tensor.
   //
-  // Non-linalg operations require special handling.
+  // On the other hand, operations that are not linalg.generic require special
+  // case-by-case handling. We currently assume that all named linalg ops should
+  // be padded with zero (expect numerical errors where this assumption is
+  // invalid..). Only the OnlineAttentionOp has special handling implemented.
+  //
   // TODO: Extract the special handling into an upstream PaddingOpInterface.
 
   SmallVector<Attribute> paddingValues;
@@ -200,9 +205,9 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
   // parts of tensors are never read. This is useful to avoid inferring what
   // padding values should be for non-trivial basic blocks.
   FailureOr<SmallVector<ReductionDimInfo>> reductionDimInfo;
-  if (auto linalgOp =
-          dyn_cast<linalg::LinalgOp>(tilingInterfaceOp.getOperation())) {
-    reductionDimInfo = getReductionInfo(linalgOp);
+  if (linalg::GenericOp genericOp =
+          dyn_cast<linalg::GenericOp>(tilingInterfaceOp.getOperation())) {
+    reductionDimInfo = getReductionInfo(genericOp);
     if (failed(reductionDimInfo)) {
       tilingInterfaceOp.emitWarning("failed to map reduction dimensions");
       return failure();
@@ -221,7 +226,8 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
   TilingInterface paddedOp = *maybePaddedOp;
 
   if (auto paddedLinalgOp =
-          dyn_cast<linalg::LinalgOp>(paddedOp.getOperation())) {
+          dyn_cast<linalg::GenericOp>(paddedOp.getOperation())) {
+
     Block *block = paddedLinalgOp.getBlock();
 
     SmallVector<Operation *> reductions;
