@@ -74,7 +74,7 @@ func.func @fused_contraction_1(%arg0: tensor<2x4096x640xf16>,
 //  CHECK-SAME:         subgroup_size = 64
 //       CHECK:   %[[GENERIC:.+]]:3 = linalg.generic
 //  CHECK-SAME:       lowering_config = #iree_gpu.lowering_config
-// GFX942-SAME:      mma_kind = #iree_gpu.virtual_mma_layout<VMFMA_F32_16x16x32_F16
+// GFX942-SAME:      mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16
 // GFX950-SAME:      mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16
 //  CHECK-SAME:       promote_operands = [0, 1, 2, 3]
 //  CHECK-SAME:       reduction = [0, 0, 0, 0, 128]
@@ -276,7 +276,7 @@ func.func @fused_contraction_4(%arg0: tensor<2x4096x640xf16>,
 //  CHECK-SAME:         subgroup_size = 64
 //       CHECK:   %[[GENERIC:.+]]:3 = linalg.generic
 //  CHECK-SAME:       lowering_config = #iree_gpu.lowering_config
-// GFX942-SAME:       mma_kind = #iree_gpu.virtual_mma_layout<VMFMA_F32_16x16x32_F16
+// GFX942-SAME:       mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16
 // GFX950-SAME:       mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x32_F16
 //  CHECK-SAME:       promote_operands = [0, 1, 2, 3]
 //  CHECK-SAME:       reduction = [0, 0, 0, 0, 128]

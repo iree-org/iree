@@ -978,13 +978,8 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     if (mma.getSubgroupSize() != targetSubgroupSize)
       continue;
     storeMmaInfo(mma, intrinsics);
-    // Store info on virtual intrinsics based on current mma if any
-    for (IREE::GPU::VirtualMMAIntrinsic virtualIntrinsic :
-         mma.getVirtualIntrinsics()) {
-      auto virtualMma =
-          IREE::GPU::VirtualMMAAttr::get(context, virtualIntrinsic);
-      storeMmaInfo(virtualMma, intrinsics);
-    }
+    // Skip adding any virtual intrinsics since they are not tested for
+    // convolutions.
   }
 
   if (intrinsics.empty())
@@ -1209,13 +1204,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
     if (mma.getSubgroupSize() != targetSubgroupSize)
       continue;
     storeMmaInfo(mma, intrinsics);
-    // Store info on virtual intrinsics based on current mma if any
-    for (IREE::GPU::VirtualMMAIntrinsic virtualIntrinsic :
-         mma.getVirtualIntrinsics()) {
-      auto virtualMma =
-          IREE::GPU::VirtualMMAAttr::get(context, virtualIntrinsic);
-      storeMmaInfo(virtualMma, intrinsics);
-    }
+    // Skip adding any virtual intrinsics since they are not tested for matmuls.
   }
 
   if (intrinsics.empty())
