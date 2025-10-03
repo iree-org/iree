@@ -24,11 +24,11 @@ func.func @matmul_f8_gfx942(%arg0: tensor<1x128x4096xf8E4M3FNUZ>, %arg1: tensor<
 // GFX942:         linalg.generic
 // GFX942-SAME:      compilation_info = #iree_codegen.compilation_info
 // GFX942-SAME:      lowering_config =
+// GFX942-SAME:      workgroup_reordering_strategy = #iree_gpu.conditional_transpose<8, 38>
 // GFX942-SAME:      translation_info =
 // GFX942-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
 // GFX950-LABEL: @matmul_f8_gfx942
 // GFX950:         linalg.generic
-// GFX950-NOT:      compilation_info = #iree_codegen.compilation_info
 // GFX950-NOT:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
 // -----
 
@@ -110,6 +110,7 @@ func.func @matmul_f8_dynamic_gfx942(%arg0: index) -> tensor<1x128x1024xf32> {
 // GFX942:         linalg.generic
 // GFX942-SAME:      compilation_info = #iree_codegen.compilation_info
 // GFX942-SAME:      lowering_config =
+// GFX942-SAME:      workgroup_reordering_strategy = #iree_gpu.conditional_transpose<8, 38>
 // GFX942-SAME:      translation_info =
 // GFX942-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FNUZ_expanded", tensor>
 // GFX950-LABEL: @matmul_f8_dynamic_gfx942
@@ -226,6 +227,7 @@ func.func @matmul_f8_gfx950(%arg0: tensor<1x128x4096xf8E4M3FN>, %arg1: tensor<10
 // GFX950:         linalg.generic
 // GFX950-SAME:      compilation_info = #iree_codegen.compilation_info
 // GFX950-SAME:      lowering_config =
+// GFX950-SAME:      workgroup_reordering_strategy = #iree_gpu.conditional_transpose<8, 32>
 // GFX950-SAME:      translation_info =
 // GFX950-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FN_expanded", tensor>
 // GFX942-LABEL: @matmul_f8_gfx950
@@ -311,6 +313,7 @@ func.func @matmul_f8_dynamic_gfx950(%arg0: index) -> tensor<1x128x1024xf32> {
 // GFX950:         linalg.generic
 // GFX950-SAME:      compilation_info = #iree_codegen.compilation_info
 // GFX950-SAME:      lowering_config =
+// GFX950-SAME:      workgroup_reordering_strategy = #iree_gpu.conditional_transpose<8, 32>
 // GFX950-SAME:      translation_info =
 // GFX950-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_medium_f8E4M3FN_expanded", tensor>
 // GFX942-LABEL: @matmul_f8_dynamic_gfx950
