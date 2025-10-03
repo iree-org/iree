@@ -10,6 +10,7 @@
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/MLIRContext.h"
@@ -228,7 +229,22 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
     rewriter.inlineRegionBefore(linalgOp->getRegion(0), genericOp.getRegion(),
                                 genericOp.getRegion().begin());
 
-    rewriter.replaceOp(linalgOp, genericOp->getResults());
+    // Reorder the indexing dimensions so that the input channel loops appears
+    // after the filter loops.
+    unsigned numParallelLoop = genericOp.getNumParallelLoops();
+    SmallVector<unsigned> interchange =
+        llvm::to_vector(llvm::seq<unsigned>(0, numParallelLoop));
+    interchange.append(convolutionDims->filterLoop.begin(),
+                       convolutionDims->filterLoop.end());
+    interchange.append(convolutionDims->inputChannel.begin(),
+                       convolutionDims->inputChannel.end());
+
+    FailureOr<linalg::GenericOp> reorderOp =
+        linalg::interchangeGenericOp(rewriter, genericOp, interchange);
+    if (failed(reorderOp))
+      return failure();
+
+    rewriter.replaceOp(linalgOp, reorderOp->getResults());
     return success();
   }
 };
