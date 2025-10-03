@@ -363,7 +363,11 @@ struct GPUEncodingPackedLayoutMaterializerAttr
 
     // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
     // based on its operand index in the matmul.
-    TileMxNxK innerTile = mma.getTileMNK();
+    Codegen::TileMxNxKxKb innerTileScaled = mma.getTileMNKKb();
+    TileMxNxK innerTile;
+    innerTile.M = innerTileScaled.M;
+    innerTile.N = innerTileScaled.N;
+    innerTile.K = innerTileScaled.K;
     FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
         getEncodingInfoForMatmul(encoding, innerTile);
     if (failed(maybeEncodingInfo)) {
