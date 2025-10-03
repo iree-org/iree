@@ -1280,6 +1280,37 @@ func.func @matmul_transposed_reordering_static_on() attributes {translation_info
 //       CHECK:     tensor.parallel_insert_slice %[[RES]] into %[[OUT0]][%[[J]], %[[I]]]
 //   CHECK: {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
+func.func @matmul_transposed_reordering_static_no_reordering() attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = true, reorder_workgroups_strategy = <Transpose>>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") {iree_gpu.use_rocdl_buffer_instructions} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8192x4096xf16>>
+  %1 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") {iree_gpu.use_rocdl_buffer_instructions} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128256x4096xf16>>
+  %2 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8192x128256xf32>>
+  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [8192, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8192x4096xf16>> -> tensor<8192x4096xf16>
+  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [128256, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128256x4096xf16>> -> tensor<128256x4096xf16>
+  %5 = tensor.empty() : tensor<8192x128256xf32>
+  %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<8192x128256xf32>) -> tensor<8192x128256xf32>
+  %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%3, %4 : tensor<8192x4096xf16>, tensor<128256x4096xf16>) outs(%6 : tensor<8192x128256xf32>) attrs =  {iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_large_f16", tensor>, lowering_config = #iree_gpu.lowering_config<{workgroup = [256, 256, 0]}>} {
+  ^bb0(%in: f16, %in_0: f16, %out: f32):
+    %8 = arith.extf %in : f16 to f32
+    %9 = arith.extf %in_0 : f16 to f32
+    %10 = arith.mulf %8, %9 : f32
+    %11 = arith.addf %out, %10 : f32
+    linalg.yield %11 : f32
+  } -> tensor<8192x128256xf32>
+  iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [8192, 128256], strides = [1, 1] : tensor<8192x128256xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8192x128256xf32>>
+  return
+}
+// CHECK-LABEL: @matmul_transposed_reordering_static_no_reordering
+//       CHECK: scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (8192, 128256) step (256, 256) shared_outs(%[[OUT0:.+]] = %{{.+}})
+//       CHECK:   tensor.extract_slice %{{.+}}[%[[I]], 0]
+//       CHECK:   tensor.extract_slice %{{.+}}[%[[J]], 0]
+//       CHECK:   tensor.extract_slice %[[OUT0]][%[[I]], %[[J]]]
+//       CHECK:   %[[RES:.+]] = linalg.generic
+//       CHECK:   scf.forall.in_parallel
+//       CHECK:     tensor.parallel_insert_slice %[[RES]] into %[[OUT0]][%[[I]], %[[J]]]
+//   CHECK: {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+
 func.func @matmul_transposed_reordering_static_off() attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
