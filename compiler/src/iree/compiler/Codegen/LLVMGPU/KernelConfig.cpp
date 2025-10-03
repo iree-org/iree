@@ -2891,8 +2891,8 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     computeOp->print(llvm::dbgs(), OpPrintingFlags().skipRegions());
     llvm::dbgs() << "\n";
   });
-  if (succeeded(setDataTiledMultiMmaLoweringConfig(target, entryPointFn,
-                                                   computeOp, ukernelConfig))) {
+  if (succeeded(setDataTiledMmaInnerTiledLoweringConfig(
+          target, entryPointFn, computeOp, ukernelConfig))) {
     LDBG() << "Tile and fuse data tiled MMA inner_tiled config";
     return success();
   }

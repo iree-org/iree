@@ -231,8 +231,83 @@ def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// DataTiled MMA Attributes
+//===----------------------------------------------------------------------===//
+
+/// Helper class to define common interface method implementations for the
+/// InnerTileDescAttrInterface based on the DataTiledMMAInterfaceAttr.
+class IREEGPU_DataTiledMMAInnerTileDescAttr<string mnemonic, list<Trait> traits = []> :
+    AttrDef<IREEGPU_Dialect, mnemonic, !listconcat(traits, [
+      DeclareAttrInterfaceMethods<IREECodegen_InnerTileDescAttrInterface, [
+        "getUndistributedTileTypes",
+        "getDistributedTileTypes",
+        "getUndistributedTileDimExpansion",
+        "populateOperandOffsetsSizesStrides",
+        "getDistributionMappingKind",
+        "getDistributionWorkerCount",
+      ]>,
+      DeclareAttrInterfaceMethods<IREEGPU_DataTiledMMAInterfaceAttr, [
+        "getTileSwizzle",
+        "getTileMNK",
+        "getElementTypes",
+        "getSubgroupSize",
+        "getFlatWorkgroupSize",
+      ]>
+  ])> {
+
+  let extraClassDefinition = [{
+    //========================================================================//
+    // Define interface methods for InnerTileDescAttrInterface with shared
+    // implementation among DataTiledMMAInterfaceAttr. The implementations
+    // are defined in IREEGPUInterfaces.cpp.
+    //========================================================================//
+
+    void $cppClass::getUndistributedTileTypes(
+        SmallVectorImpl<VectorType>& result) const {
+      return cast<DataTiledMMAInterfaceAttr>(*this)
+          .getUndistributedTileTypes(result);
+    }
+
+    void $cppClass::getDistributedTileTypes(
+        SmallVectorImpl<VectorType>& result) const {
+      return cast<DataTiledMMAInterfaceAttr>(*this)
+          .getDistributedTileTypes(result);
+    }
+
+    std::optional<::mlir::SmallVector<int64_t, 2>>
+    $cppClass::getUndistributedTileDimExpansion(int64_t operandIndex,
+                                                int64_t logicalDim) const {
+      return cast<DataTiledMMAInterfaceAttr>(*this)
+          .getUndistributedTileDimExpansion(operandIndex, logicalDim);
+    }
+
+    LogicalResult $cppClass::populateOperandOffsetsSizesStrides(
+        OpBuilder &builder, Location loc, uint32_t operandIndex, Value laneId,
+        ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
+        SmallVectorImpl<OpFoldResult> &sizes,
+        SmallVectorImpl<OpFoldResult> &strides) const {
+      return cast<DataTiledMMAInterfaceAttr>(*this)
+          .populateOperandOffsetsSizesStrides(builder, loc, operandIndex,
+                                              laneId, permutation, offsets,
+                                              sizes, strides);
+    }
+
+    Attribute $cppClass::getDistributionMappingKind() const {
+      return cast<DataTiledMMAInterfaceAttr>(*this)
+          .getDistributionMappingKind();
+    }
+
+    OpFoldResult $cppClass::getDistributionWorkerCount(
+        OpBuilder &builder, Location loc, Operation *opToDistribute) const {
+      return cast<DataTiledMMAInterfaceAttr>(*this)
+          .getDistributionWorkerCount(builder, loc, opToDistribute);
+    }
+  }];
+}
+
 def IREEGPU_DataTiledMMAAttr :
-    AttrDef<IREEGPU_Dialect, "DataTiledMMA", [
+    IREEGPU_DataTiledMMAInnerTileDescAttr<"DataTiledMMA", [
   DeclareAttrInterfaceMethods<IREEGPU_MmaInterfaceAttr, [
     "getSubgroupSize",
   ]>,
@@ -240,11 +315,6 @@ def IREEGPU_DataTiledMMAAttr :
     "getExpectedNumInputs",
     "getExpectedNumOutputs",
     "verifyIndexingMaps",
-    "getUndistributedTileTypes",
-    "getDistributedTileTypes",
-    "populateOperandOffsetsSizesStrides",
-    "getDistributionMappingKind",
-    "getDistributionWorkerCount",
     "buildUnderlyingOperations",
   ]>
 ]> {

@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -19,6 +20,19 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 using ::mlir::iree_compiler::IREE::Codegen::TileSwizzle;
 using Kind = TileSwizzle::Dim::Kind;
+
+SmallVector<int64_t>
+sliceSwizzledShape(const TileSwizzle &swizzle,
+                   const std::function<bool(TileSwizzle::Dim)> &predicate) {
+  SmallVector<int64_t> shape;
+  for (TileSwizzle::ExpandShapeDimVectorType e : swizzle.expandShape) {
+    for (TileSwizzle::Dim d : e) {
+      shape.push_back(predicate(d) ? d.size : 1);
+    }
+  }
+  applyPermutationToVector(shape, swizzle.permutation);
+  return shape;
+}
 
 // Returns the index of the first destination dimension corresponding to the
 // given source dimension `srcIdx`.
@@ -113,9 +127,28 @@ static TileSwizzle getIntrinsicSwizzleBeforeMovingCrossThreadOutermost(
     }
   }
   // Next come `layout.thread` dims.
-  for (auto [i, t] : llvm::enumerate(layout.thread)) {
-    if (t != 1) {
-      expand(swizzle, i, {Kind::CrossThread, t});
+  int64_t subgroupSize = getIntrinsicSubgroupSize(intrinsic);
+  int64_t numThreadsInLayout =
+      std::reduce(layout.thread.begin(), layout.thread.end(), 1LL,
+                  std::multiplies<int64_t>());
+  assert(subgroupSize % numThreadsInLayout == 0 &&
+         "expected subgroupSize to be divisible by numThreadsInLayout");
+  assert(subgroupSize >= numThreadsInLayout &&
+         "expected at most subgroupSize threads in the layout");
+  int64_t extraDistributionFactor = subgroupSize / numThreadsInLayout;
+  // Based on the MMA layouts, there is expected to be at most one dim with a
+  // tstride of 0.
+  assert(llvm::count(layout.tstrides, 0) <= 1 &&
+         "expected at most one dim with a tstride of 0");
+  for (auto [i, t, s] : llvm::enumerate(layout.thread, layout.tstrides)) {
+    // If the thread has a stride of 0, then we need a dimension for it in the
+    // swizzle so we can distribute by more than a factor of 1 along the dim.
+    if (t != 1 || s == 0) {
+      TileSwizzle::Dim tDim(Kind::CrossThread, t);
+      if (s == 0) {
+        tDim.distributionSize *= extraDistributionFactor;
+      }
+      expand(swizzle, i, tDim);
     }
   }
   // `layout.thread` dims are special in that they come with `layout.tstrides`
@@ -241,10 +274,17 @@ static TileSwizzle moveCrossThreadOutermost(TileSwizzle swizzle,
              "expected to find reassociation");
       TileSwizzle::ExpandShapeDimVectorType expandedGroup;
       for (auto [i, reassociation] : llvm::enumerate(*groupReassociation)) {
+        int64_t residualDistributionSize = group[i].distributionSize;
         for (int64_t reInd : reassociation) {
+          residualDistributionSize =
+              llvm::divideCeil(residualDistributionSize, accGroup[reInd].size);
           expandedGroup.push_back(
               TileSwizzle::Dim(group[i].kind, accGroup[reInd].size));
         }
+        // Place the residual distribution factor on the last dimension, because
+        // the semantics of the distribution size are to distribute more threads
+        // along the inner side of the dimension.
+        expandedGroup.back().distributionSize *= residualDistributionSize;
         int expandedPermIdx;
         for (auto [permIdx, permDim] : llvm::enumerate(swizzle.permutation)) {
           if (permDim > i) {
@@ -337,7 +377,13 @@ getSwizzleBeforeMovingCrossThreadOutermost(IREE::GPU::DataTiledMMAAttr mma,
       expand(swizzle, 0, {Kind::CrossIntrinsic, mma.getIntrinsicsM()});
     }
     if (mma.getSubgroupsM() > 1) {
-      expand(swizzle, 0, {Kind::CrossThread, mma.getSubgroupsM()});
+      // Although subGroupsN is not part of the LHS swizzle, we must still
+      // delinearize over the combined subGroupsM × subGroupsN space. By
+      // contrast, RHS does *not* need special handling, since subGroupsM can be
+      // treated as an implicit leading dimension and omitted anyway.
+      TileSwizzle::Dim dim(Kind::CrossThread, mma.getSubgroupsM(),
+                           mma.getSubgroupsM() * mma.getSubgroupsN());
+      expand(swizzle, 0, dim);
     }
     break;
   case IREE::GPU::MMAFragment::Rhs:
@@ -423,15 +469,17 @@ static void remove(TileSwizzle &swizzle, size_t idx) {
   swizzle.permutation = newPermutation;
 }
 
-FailureOr<TileSwizzle> getEncodingSwizzle(IREE::Encoding::EncodingAttr encoding,
-                                          IREE::GPU::DataTiledMMAAttr mma,
-                                          IREE::GPU::MMAFragment fragment) {
-  TileSwizzle swizzle = getSwizzle(mma, fragment);
+FailureOr<TileSwizzle>
+getEncodingSwizzle(IREE::Encoding::EncodingAttr encoding,
+                   IREE::GPU::DataTiledMMAInterfaceAttr mma,
+                   IREE::GPU::MMAFragment fragment) {
   FailureOr<linalg::ContractionDimensions> cDims =
       Encoding::getEncodingContractionDims(encoding);
   if (failed(cDims)) {
     return failure();
   }
+  int64_t operandIndex = static_cast<int64_t>(fragment);
+  TileSwizzle swizzle = mma.getTileSwizzle(operandIndex);
   // The following expects M, N, K, and Batch sizes of at most 1 for now.
   // TODO: Extend this to multiple M/N/K/Batch dims.
   assert(cDims->m.size() <= 1 && cDims->n.size() <= 1 && cDims->k.size() == 1 &&
@@ -479,28 +527,6 @@ FailureOr<TileSwizzle> getEncodingSwizzle(IREE::Encoding::EncodingAttr encoding,
     break;
   }
   return swizzle;
-}
-
-TileSwizzle getIntrinsicSwizzle(IREE::GPU::MMAIntrinsic intrinsic,
-                                IREE::GPU::MMAFragment fragment) {
-  auto swizzle =
-      getIntrinsicSwizzleBeforeMovingCrossThreadOutermost(intrinsic, fragment);
-  TileSwizzle accSwizzle = swizzle;
-  if (fragment != IREE::GPU::MMAFragment::Acc) {
-    accSwizzle = getIntrinsicSwizzleBeforeMovingCrossThreadOutermost(
-        intrinsic, IREE::GPU::MMAFragment::Acc);
-  }
-  LLVM_DEBUG(
-      llvm::dbgs() << fragment
-                   << " intrinsic swizzle before moving CrossThread dims: "
-                   << swizzle << "\n");
-  TileSwizzle crossThreadOuterSwizzle =
-      moveCrossThreadOutermost(swizzle, accSwizzle, fragment);
-  LLVM_DEBUG(
-      llvm::dbgs() << fragment
-                   << " intrinsic swizzle after moving CrossThread dims: "
-                   << crossThreadOuterSwizzle << "\n\n");
-  return crossThreadOuterSwizzle;
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU
