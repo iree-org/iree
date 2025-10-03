@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/SmallVectorExtras.h"
@@ -878,6 +879,43 @@ public:
   }
 };
 
+/// Pattern to convert scaled contraction operations.
+class MaterializeScaledContractionOp
+    : public OpInterfaceConversionPattern<linalg::LinalgOp> {
+public:
+  MaterializeScaledContractionOp(
+      const MaterializeEncodingTypeConverter &typeConverter,
+      MLIRContext *context, PatternBenefit benefit = 1)
+      : OpInterfaceConversionPattern<linalg::LinalgOp>(typeConverter, context,
+                                                       benefit) {}
+
+  LogicalResult
+  matchAndRewrite(linalg::LinalgOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (!IREE::LinalgExt::isaScaledContractionOpInterface(op)) {
+      return rewriter.notifyMatchFailure(
+          op, "does not implement ScaledContractionOpInterface");
+    }
+
+    auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
+        this->getTypeConverter());
+
+    IREE::Encoding::LayoutMaterializerAttr layoutAttr =
+        converter->getLayoutAttr();
+    SmallVector<Type> convertedResTypes;
+    for (Value init : op.getDpsInits()) {
+      convertedResTypes.push_back(converter->convertType(init.getType()));
+    }
+    Operation *newOp =
+        layoutAttr.lowerOp(rewriter, op, convertedResTypes, operands);
+    if (!newOp) {
+      return failure();
+    }
+    rewriter.replaceOp(op, newOp->getResults());
+    return success();
+  }
+};
+
 static bool isRankedTensorTypeWithEncoding(Type type) {
   auto rankedTensorType = dyn_cast<RankedTensorType>(type);
   if (!rankedTensorType) {
@@ -937,15 +975,15 @@ void populateMaterializeEncodingPatterns(
                          isRankedTensorTypeWithEncoding);
   });
 
-  patterns.insert<MaterializeContractionOp, SetEncodingOpLoweringConversion,
-                  UnsetEncodingOpLoweringConversion,
-                  MaterializeDPSOperation<linalg::FillOp>,
-                  MaterializeDPSOperation<linalg::GenericOp>,
-                  MaterializeOperation<tensor::EmptyOp>,
-                  MaterializeOptimizationBarrierOp,
-                  MaterializeTensorExtDispatchTensorLoadOp,
-                  MaterializeTensorExtDispatchTensorStoreOp,
-                  MaterializeInterfaceBindingEncoding, MaterializeFuncReturnOp>(
+  patterns.insert<
+      MaterializeContractionOp, MaterializeScaledContractionOp,
+      SetEncodingOpLoweringConversion, UnsetEncodingOpLoweringConversion,
+      MaterializeDPSOperation<linalg::FillOp>,
+      MaterializeDPSOperation<linalg::GenericOp>,
+      MaterializeOperation<tensor::EmptyOp>, MaterializeOptimizationBarrierOp,
+      MaterializeTensorExtDispatchTensorLoadOp,
+      MaterializeTensorExtDispatchTensorStoreOp,
+      MaterializeInterfaceBindingEncoding, MaterializeFuncReturnOp>(
       typeConverter, context);
 };
 

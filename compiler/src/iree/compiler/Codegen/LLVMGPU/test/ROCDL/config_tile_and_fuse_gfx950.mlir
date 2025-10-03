@@ -131,3 +131,30 @@ func.func @small_scaled_matmul(
 //  CHECK-SAME:     reduction = [0, 0, 1, 1]
 //  CHECK-SAME:     subgroup = [1, 1, 0, 0]
 //  CHECK-SAME:     workgroup = [16, 16, 0, 0]
+
+// -----
+
+module {
+  func.func @data_tiled_scaled_mma_inner_tiled(
+      %lhs: tensor<1x1x1x2x4x4x16x32xf4E2M1FN>, %rhs: tensor<1x1x1x2x4x4x16x32xf4E2M1FN>,
+      %lhs_scales: tensor<1x1x2x4x16x4xf8E8M0FNU>, %rhs_scales: tensor<1x1x2x4x16x4xf8E8M0FNU>,
+      %acc: tensor<1x1x2x2x4x16x4xf32>) -> tensor<1x1x2x2x4x16x4xf32> {
+    %0 = iree_codegen.inner_tiled ins(%lhs, %rhs, %lhs_scales, %rhs_scales) outs(%acc) {
+      indexing_maps = [affine_map<(m, n, k, kb) -> (m, k, kb)>,
+                       affine_map<(m, n, k, kb) -> (n, k, kb)>,
+                       affine_map<(m, n, k, kb) -> (m, k)>,
+                       affine_map<(m, n, k, kb) -> (n, k)>,
+                       affine_map<(m, n, k, kb) -> (m, n)>],
+      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>],
+      kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, subgroups_m = 2, subgroups_n = 2, intrinsics_k = 4>}
+      : tensor<1x1x1x2x4x4x16x32xf4E2M1FN>, tensor<1x1x1x2x4x4x16x32xf4E2M1FN>, tensor<1x1x2x4x16x4xf8E8M0FNU>, tensor<1x1x2x4x16x4xf8E8M0FNU> into tensor<1x1x2x2x4x16x4xf32>
+      return %0 : tensor<1x1x2x2x4x16x4xf32>
+  }
+}
+
+// CHECK-LABEL: func.func @data_tiled_scaled_mma_inner_tiled
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}
+//       CHECK:   iree_codegen.inner_tiled {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     reduction = [0, 0, 1, 1]
+//  CHECK-SAME:     workgroup = [1, 1, 0, 0]

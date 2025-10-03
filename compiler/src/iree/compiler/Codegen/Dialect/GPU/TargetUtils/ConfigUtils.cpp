@@ -68,16 +68,17 @@ LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
   // Set all workgroup and reduction tile sizes to 1, since the data tiled
   // kernel has the scope of an entire workgroup, and the reduction tiling is
   // already baked into the "opaque" data tiled inner layout of the inner_tiled.
-  SmallVector<AffineMap> indexingMaps = multiMmaOp.getIndexingMapsArray();
-  mlir::linalg::ContractionDimensions contractionDims =
-      mlir::linalg::inferContractionDims(indexingMaps).value();
-
-  int64_t iterationRank = indexingMaps.front().getNumDims();
+  SmallVector<utils::IteratorType> iteratorTypes =
+      multiMmaOp.getIteratorTypesArray();
+  int64_t iterationRank = iteratorTypes.size();
   SmallVector<int64_t> workgroupTileSizes(iterationRank, 1);
   SmallVector<int64_t> reductionTileSizes(iterationRank, 0);
-  for (int64_t kDim : contractionDims.k) {
-    workgroupTileSizes[kDim] = 0;
-    reductionTileSizes[kDim] = ukernelConfig ? 0 : 1;
+  for (auto [idx, iteratorType] : llvm::enumerate(iteratorTypes)) {
+    if (iteratorType == utils::IteratorType::parallel) {
+      continue;
+    }
+    workgroupTileSizes[idx] = 0;
+    reductionTileSizes[idx] = ukernelConfig ? 0 : 1;
   }
 
   // Set tile sizes.
