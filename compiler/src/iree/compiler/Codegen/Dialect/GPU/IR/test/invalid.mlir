@@ -1,15 +1,5 @@
 // RUN: iree-opt --split-input-file --verify-diagnostics %s
 
-
-// func.func @mma_inner_tiled_valid(%lhs: tensor<?x?x4xf16>, %rhs: tensor<?x?x4xf16>, %acc: tensor<?x?x4xf32>) -> tensor<?x?x4xf32> {
-//   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
-//     indexing_maps = [affine_map<(i, j, k) -> (i, k)>, affine_map<(i, j, k) -> (k, j)>, affine_map<(i, j, k) -> (i, j)>],
-//     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-//     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
-//   } : tensor<?x?x4xf16>, tensor<?x?x4xf16> into tensor<?x?x4xf32>
-//   return %0 : tensor<?x?x4xf32>
-// }
-
 func.func @mma_inner_tiled_invalid_num_inputs(%lhs: tensor<?x?x4xf16>, %acc: tensor<?x?x4xf32>) -> tensor<?x?x4xf32> {
   // expected-error @+1 {{number of inputs (1) doesn't match expected number from kind (2)}}
   %0 = iree_codegen.inner_tiled ins(%lhs) outs(%acc) {
