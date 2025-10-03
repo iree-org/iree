@@ -235,13 +235,12 @@ IREE::transform_dialect::MatchContractionOp::matchOperation(
   Location loc = current->getLoc();
   auto linalgOp = dyn_cast<linalg::LinalgOp>(current);
   if (!linalgOp) {
-    return emitSilenceableFailure(loc)
-           << "Operation " << *current << " is not a LinalgOp.";
+    return emitSilenceableFailure(loc) << "Operation is not a LinalgOp.";
   }
 
   if (!linalg::isaContractionOpInterface(linalgOp)) {
     return emitSilenceableFailure(loc)
-           << "Operation " << *current << " is not a contraction operation.";
+           << "Operation is not a contraction operation.";
   }
 
   Type targetLhsType = getLhsType();

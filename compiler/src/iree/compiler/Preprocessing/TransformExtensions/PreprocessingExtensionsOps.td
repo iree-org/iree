@@ -175,7 +175,9 @@ def MatchRegionsOp : Op<Transform_Dialect, "iree.match.regions",
 def MatchContractionOp : Op<Transform_Dialect, "iree.match.contraction",
     [MatchOpInterface,
      SingleOpMatcher,
-     MemoryEffectsOpInterface]> {
+     MemoryEffectsOpInterface,
+     AllTypesMatch<["batch_dims", "m_dims", "n_dims", "k_dims"]>
+     ]> {
   let summary = [{Check whether the op is a contraction operation.}];
   let description = [{
     Matches operations that implement the ContractionOpInterface.
@@ -218,7 +220,7 @@ def MatchContractionOp : Op<Transform_Dialect, "iree.match.contraction",
     `,` `rhs_type` `=` $rhs_type
     `,` `output_type` `=` $output_type
     (`indexing_maps` $indexing_maps^)?
-    attr-dict `:` functional-type(operands, results)
+    attr-dict `:` type($operand_handle) `->` type($batch_dims)
   }];
   let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
 
