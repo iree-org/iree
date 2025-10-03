@@ -1,0 +1,100 @@
+# Copyright 2025 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: PkgCI Torch Tests
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact_run_id:
+        type: string
+        default: ""
+
+jobs:
+  tests:
+    name: "torch_models tests :: ${{ matrix.name }}"
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # CPU
+          - name: cpu_task
+            markers: "cpu"
+            cache-dir: /home/nod/iree_tests_cache
+            runs-on:
+              - self-hosted # must come first
+              - persistent-cache
+              - Linux
+              - X64
+          # MI325
+          - name: amdgpu_mi325_gfx942
+            markers: "hip or gfx942 or mi325"
+            cache-dir: /shark-cache/data/iree-regression-cache
+            runs-on: linux-mi325-1gpu-ossci-iree-org
+    env:
+      VENV_DIR: ${{ github.workspace }}/.venv
+      PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
+    steps:
+      - name: Checking out IREE repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          submodules: false
+
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v5.4.0
+        with:
+          # Must match the subset of versions built in pkgci_build_packages.
+          python-version: "3.11"
+
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        if: ${{ inputs.artifact_run_id == '' }}
+        with:
+          name: linux_x86_64_release_packages
+          path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
+
+      - name: Checkout test suites repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          repository: iree-org/iree-test-suites
+          ref: 42cd1763634c1a1a63d71ebbfd9edaebd64ebd49
+          path: iree-test-suites
+          # Don't need lfs for torch models yet.
+          lfs: false
+
+      - name: Setup Python virtual environment
+        run: |
+          ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
+            --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
+            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+          source ${VENV_DIR}/bin/activate
+          pip install -r ${{ github.workspace }}/iree-test-suites/torch_models/requirements.txt
+
+      - name: Run Torch Model tests
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest \
+            iree-test-suites/torch_models \
+            -rpFe \
+            --log-cli-level=info \
+            -o log_cli=True \
+            --durations=0 \
+            --timeout=1200 \
+            --capture=no \
+            --test-file-directory=${{ github.workspace }}/tests/external/iree-test-suites/torch_models \
+            --external-file-directory=${{ github.workspace }}/tests/external/iree-test-suites/test_suite_files \
+            --module-directory=${{ github.workspace }}/tests/external/iree-test-suites/torch_models \
+            --artifact-directory=${{ matrix.cache-dir }}/torch_models/artifacts \
+            --job-summary-path=${{ github.workspace }}/iree-test-suites \
+            --force-recompile \
+            -m "${{ matrix.markers }}"
+
+      - name: Upload Torch Model Job Summary
+        if: always()
+        run: |
+          cat ${{ github.workspace }}/iree-test-suites/job_summary.md >> $GITHUB_STEP_SUMMARY
