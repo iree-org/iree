@@ -1247,3 +1247,132 @@ func.func @multi_fusable_users(%arg0: tensor<?x65536x32xf16>, %arg1: index, %arg
   return %8, %6 : tensor<?x65536xi8>, tensor<?x65536x32xf4E2M1FN>
 }
 //
+
+// -----
+func.func @matmul_transposed_reordering_static_on() attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = true, reorder_workgroups_strategy = <Transpose>>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") {iree_gpu.use_rocdl_buffer_instructions} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8192x4096xf16>>
+  %1 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") {iree_gpu.use_rocdl_buffer_instructions} : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128256x4096xf16>>
+  %2 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8192x128256xf32>>
+  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [8192, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8192x4096xf16>> -> tensor<8192x4096xf16>
+  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [128256, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<128256x4096xf16>> -> tensor<128256x4096xf16>
+  %5 = tensor.empty() : tensor<8192x128256xf32>
+  %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<8192x128256xf32>) -> tensor<8192x128256xf32>
+  %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%3, %4 : tensor<8192x4096xf16>, tensor<128256x4096xf16>) outs(%6 : tensor<8192x128256xf32>) attrs =  {iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_large_f16", tensor>, lowering_config = #iree_gpu.lowering_config<{workgroup = [256, 256, 0], workgroup_reordering_strategy = #iree_gpu.conditional_transpose<8,38>}>} {
+  ^bb0(%in: f16, %in_0: f16, %out: f32):
+    %8 = arith.extf %in : f16 to f32
+    %9 = arith.extf %in_0 : f16 to f32
+    %10 = arith.mulf %8, %9 : f32
+    %11 = arith.addf %out, %10 : f32
+    linalg.yield %11 : f32
+  } -> tensor<8192x128256xf32>
+  iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [8192, 128256], strides = [1, 1] : tensor<8192x128256xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8192x128256xf32>>
+  return
+}
+// CHECK-LABEL: @matmul_transposed_reordering_static_on
+//       CHECK: scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (128256, 8192) step (256, 256) shared_outs(%[[OUT0:.+]] = %{{.+}})
+//       CHECK:   tensor.extract_slice %{{.+}}[%[[J]], 0]
+//       CHECK:   tensor.extract_slice %{{.+}}[%[[I]], 0]
+//       CHECK:   tensor.extract_slice %[[OUT0]][%[[J]], %[[I]]]
+//       CHECK:   %[[RES:.+]] = linalg.generic
+//       CHECK:   scf.forall.in_parallel
+//       CHECK:     tensor.parallel_insert_slice %[[RES]] into %[[OUT0]][%[[J]], %[[I]]]
+//   CHECK: {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+
+func.func @matmul_transposed_reordering_static_off() attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : memref<128256x4096xf16, #hal.descriptor_type<storage_buffer>>
+  %1 = amdgpu.fat_raw_buffer_cast %0 resetOffset : memref<128256x4096xf16, #hal.descriptor_type<storage_buffer>> to memref<128256x4096xf16, #amdgpu.address_space<fat_raw_buffer>>
+  %2 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : memref<8192x4096xf16, #hal.descriptor_type<storage_buffer>>
+  %3 = amdgpu.fat_raw_buffer_cast %2 resetOffset : memref<8192x4096xf16, #hal.descriptor_type<storage_buffer>> to memref<8192x4096xf16, #amdgpu.address_space<fat_raw_buffer>>
+  %4 = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c0) flags(Indirect) : memref<128256x8192xf32, #hal.descriptor_type<storage_buffer>>
+  %5 = iree_codegen.load_from_buffer %1 : memref<128256x4096xf16, #amdgpu.address_space<fat_raw_buffer>> -> tensor<128256x4096xf16>
+  %6 = iree_codegen.load_from_buffer %3 : memref<8192x4096xf16, #amdgpu.address_space<fat_raw_buffer>> -> tensor<8192x4096xf16>
+  %7 = tensor.empty() : tensor<128256x8192xf32>
+  %8 = linalg.fill ins(%cst : f32) outs(%7 : tensor<128256x8192xf32>) -> tensor<128256x8192xf32>
+  %9 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%5, %6 : tensor<128256x4096xf16>, tensor<8192x4096xf16>) outs(%8 : tensor<128256x8192xf32>) attrs =  {iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_large_f16", tensor>, lowering_config = #iree_gpu.lowering_config<{workgroup = [256, 256, 0], workgroup_reordering_strategy = #iree_gpu.conditional_transpose<8, 38>}>} {
+  ^bb0(%in: f16, %in_0: f16, %out: f32):
+    %10 = arith.extf %in : f16 to f32
+    %11 = arith.extf %in_0 : f16 to f32
+    %12 = arith.mulf %10, %11 : f32
+    %13 = arith.addf %out, %12 : f32
+    linalg.yield %13 : f32
+  } -> tensor<128256x8192xf32>
+  iree_codegen.store_to_buffer %9, %4 : tensor<128256x8192xf32> into memref<128256x8192xf32, #hal.descriptor_type<storage_buffer>>
+  return
+}
+// CHECK-LABEL: @matmul_transposed_reordering_static_off
+//       CHECK: scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (128256, 8192) step (256, 256) shared_outs(%[[OUT0:.+]] = %{{.+}})
+//       CHECK:   tensor.extract_slice %{{.+}}[%[[I]], 0]
+//       CHECK:   tensor.extract_slice %{{.+}}[%[[J]], 0]
+//       CHECK:   tensor.extract_slice %[[OUT0]][%[[I]], %[[J]]]
+//       CHECK:   %[[RES:.+]] = linalg.generic
+//       CHECK:   scf.forall.in_parallel
+//       CHECK:     tensor.parallel_insert_slice %[[RES]] into %[[OUT0]][%[[I]], %[[J]]]
+//   CHECK: {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+
+
+func.func @matmul_transposed_reordering_dynamic() attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = false, no_reduce_shared_memory_bank_conflicts = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>} {
+  %c32_i64 = arith.constant 32 : i64
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(0) : i32
+  %1 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(1) : i32
+  %2 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(2) : i32
+  %3 = hal.interface.constant.load layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) ordinal(3) : i32
+  %4 = arith.extui %0 : i32 to i64
+  %5 = arith.extui %1 : i32 to i64
+  %6 = arith.shli %5, %c32_i64 : i64
+  %7 = arith.ori %4, %6 : i64
+  %8 = arith.index_castui %7 : i64 to index
+  %9 = arith.extui %2 : i32 to i64
+  %10 = arith.extui %3 : i32 to i64
+  %11 = arith.shli %10, %c32_i64 : i64
+  %12 = arith.ori %9, %11 : i64
+  %13 = arith.index_castui %12 : i64 to index
+  %14:2 = util.assume.int
+      %8<umin = 0, umax = 9007199254740736, udiv = 256>,
+      %13<umin = 0, umax = 9007199254740991>
+    : index, index
+  %15 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : memref<8192x4096xf16, #hal.descriptor_type<storage_buffer>>
+  %16 = amdgpu.fat_raw_buffer_cast %15 resetOffset : memref<8192x4096xf16, #hal.descriptor_type<storage_buffer>> to memref<8192x4096xf16, #amdgpu.address_space<fat_raw_buffer>>
+  %17 = iree_tensor_ext.dispatch.workload.ordinal %14#0, 0 : index
+  %18 = iree_tensor_ext.dispatch.workload.ordinal %14#1, 1 : index
+  %19 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : memref<?x4096xf16, #hal.descriptor_type<storage_buffer>>{%18}
+  %20 = hal.interface.binding.subspan layout(<constants = 4, bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>) binding(2) alignment(64) offset(%c0) flags(Indirect) : memref<?x8192xf32, #hal.descriptor_type<storage_buffer>>{%17}
+  %21 = iree_codegen.load_from_buffer %16 : memref<8192x4096xf16, #amdgpu.address_space<fat_raw_buffer>> -> tensor<8192x4096xf16>
+  %22 = affine.apply affine_map<()[s0] -> (s0 floordiv 256)>()[%17]
+  %23 = tensor.empty(%22) : tensor<?x256x8192xf32>
+  %24 = linalg.fill ins(%cst : f32) outs(%23 : tensor<?x256x8192xf32>) -> tensor<?x256x8192xf32>
+  %25 = affine.apply affine_map<()[s0] -> (s0 floordiv 256)>()[%18]
+  %expand_shape = memref.expand_shape %20 [[0, 1], [2]] output_shape [%25, 256, 8192] : memref<?x8192xf32, #hal.descriptor_type<storage_buffer>> into memref<?x256x8192xf32, #hal.descriptor_type<storage_buffer>>
+  %expand_shape_0 = memref.expand_shape %19 [[0, 1], [2]] output_shape [%25, 256, 4096] : memref<?x4096xf16, #hal.descriptor_type<storage_buffer>> into memref<?x256x4096xf16, #hal.descriptor_type<storage_buffer>>
+  %26 = iree_codegen.load_from_buffer %expand_shape_0 : memref<?x256x4096xf16, #hal.descriptor_type<storage_buffer>> -> tensor<?x256x4096xf16>
+  %27 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%26, %21 : tensor<?x256x4096xf16>, tensor<8192x4096xf16>) outs(%24 : tensor<?x256x8192xf32>) attrs =  {iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"pingpong_large_f16_expanded", tensor>, lowering_config = #iree_gpu.lowering_config<{workgroup = [1, 256, 256, 0], workgroup_reordering_strategy = #iree_gpu.conditional_transpose<8, 38>}>} {
+  ^bb0(%in: f16, %in_1: f16, %out: f32):
+    %28 = arith.extf %in : f16 to f32
+    %29 = arith.extf %in_1 : f16 to f32
+    %30 = arith.mulf %28, %29 : f32
+    %31 = arith.addf %out, %30 : f32
+    linalg.yield %31 : f32
+  } -> tensor<?x256x8192xf32>
+  iree_codegen.store_to_buffer %27, %expand_shape : tensor<?x256x8192xf32> into memref<?x256x8192xf32, #hal.descriptor_type<storage_buffer>>
+  return
+}
+// CHECK-LABEL: @matmul_transposed_reordering_dynamic
+//       CHECK:   %[[COND:.+]] = arith.cmpi ult, %{{.+}}, %{{.+}} : index
+//       CHECK:   %[[BOUND0:.+]] = arith.select %[[COND]], %c8192, %{{.+}} : index
+//       CHECK:   %[[BOUND1:.+]] = arith.select %[[COND]], %{{.+}}, %c8192 : index
+//       CHECK:   %[[STEP0:.+]] = arith.select %[[COND]], %c256, %c1 : index
+//       CHECK:   %[[STEP1:.+]] = arith.select %[[COND]], %c1, %c256 : index
+//       CHECK: scf.forall (%[[I:.+]], %[[J:.+]]) = (0, 0) to (%[[BOUND0]], %[[BOUND1]]) step (%[[STEP0]], %[[STEP1]]) shared_outs(%[[OUT0:.+]] = %{{.+}})
+//       CHECK:   %[[OFFSET0:.+]] = arith.select %[[COND]], %[[J]], %[[I]] : index
+//       CHECK:   %[[OFFSET1:.+]] = arith.select %[[COND]], %[[I]], %[[J]] : index
+//       CHECK:   tensor.extract_slice %{{.+}}[%[[OFFSET0]], 0, 0]
+//       CHECK:   tensor.extract_slice %{{.+}}[%[[OFFSET1]], 0]
+//       CHECK:   %[[RES:.+]] = linalg.generic
+//       CHECK:   scf.forall.in_parallel
+//       CHECK:     tensor.parallel_insert_slice %[[RES]] into %[[OUT0]][%[[OFFSET0]], 0, %[[OFFSET1]]]
+//   CHECK: {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
