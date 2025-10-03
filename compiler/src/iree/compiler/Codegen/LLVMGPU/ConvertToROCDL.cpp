@@ -69,13 +69,8 @@ struct ReplaceGPUBarrierWithLDSBarrier
   }
 };
 
-static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns,
-                                               const amdgpu::Chipset &chipset) {
-  // TODO(kdrewnia): This if statement is an emergency fix for an incorrect
-  // lowering of amdgpu.lds_barrier.
-  if (chipset.majorVersion != 12) {
-    patterns.add<ReplaceGPUBarrierWithLDSBarrier>(patterns.getContext());
-  }
+static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns) {
+  patterns.add<ReplaceGPUBarrierWithLDSBarrier>(patterns.getContext());
 }
 
 /// Hacky pattern to swap `s_setprio` operations with `amdgpu.mfma` ops.
@@ -255,7 +250,7 @@ struct ConvertToROCDLPass final
           /*chipset=*/*maybeChipset);
       arith::populateCeilFloorDivExpandOpsPatterns(patterns);
       populateSwapSetPrioWithMFMAPatterns(patterns);
-      populateConvertGPUToAMDGPUPatterns(patterns, *maybeChipset);
+      populateConvertGPUToAMDGPUPatterns(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
       populateDropSharedMemoryDeallocOpPatterns(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
