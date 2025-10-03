@@ -175,30 +175,7 @@ void buildIREEPrecompileTransformPassPipeline(
                                                   halAssignmentOptions);
 
   GlobalOptimization::TransformOptions globalTransformOptions;
-  globalTransformOptions.parameterImportPaths =
-      globalOptimizationOptions.parameterImportPaths;
-  globalTransformOptions.parameterImportKeys =
-      globalOptimizationOptions.parameterImportKeys;
-  globalTransformOptions.parameterImportMaximumSize =
-      globalOptimizationOptions.parameterImportMaximumSize;
-  globalTransformOptions.parameterExportPath =
-      globalOptimizationOptions.parameterExportPath;
-  globalTransformOptions.parameterExportMinimumSize =
-      globalOptimizationOptions.parameterExportMinimumSize;
-  globalTransformOptions.parameterSplatExportFile =
-      globalOptimizationOptions.parameterSplatExportFile;
-  globalTransformOptions.aggressiveTransposePropagation =
-      globalOptimizationOptions.aggressiveTransposePropagation;
-  globalTransformOptions.outerDimConcat =
-      globalOptimizationOptions.outerDimConcat;
-  globalTransformOptions.dataTiling = globalOptimizationOptions.dataTiling;
-  globalTransformOptions.constEval = globalOptimizationOptions.constEval;
-  globalTransformOptions.numericPrecisionReduction =
-      globalOptimizationOptions.numericPrecisionReduction;
-  globalTransformOptions.stripAssertions =
-      globalOptimizationOptions.stripAssertions;
-  globalTransformOptions.generalizeMatmul =
-      globalOptimizationOptions.generalizeMatmul;
+  globalTransformOptions.options = globalOptimizationOptions;
   globalTransformOptions.constExprHoisting = pipelineOptions.constExprHoisting;
   globalTransformOptions.constExprMaxSizeIncreaseThreshold =
       pipelineOptions.constExprMaxSizeIncreaseThreshold;
