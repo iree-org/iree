@@ -314,7 +314,7 @@ public:
         LLVM::LLVMDialect::getTargetTripleAttrName(),
         executableBuilder.getStringAttr(targetTriple.str()));
 
-    auto variantModOp = variantOp.getInnerModule();
+    ModuleOp variantModOp = variantOp.getInnerModule();
     // Propagate target features and cpu to function ops.
     populateLLVMFuncTargetAttrs(variantModOp, *targetMachine);
 

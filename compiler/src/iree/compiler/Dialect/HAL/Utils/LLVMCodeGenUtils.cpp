@@ -24,8 +24,7 @@ void populateLLVMFuncTargetAttrs(ModuleOp moduleOp,
       enabledFeatures, [](llvm::SubtargetFeatureKV feature) {
         return std::string("+") + feature.Key;
       });
-  auto plussedFeaturesRefs = llvm::map_to_vector(
-      plussedFeatures, [](const std::string &str) -> StringRef { return str; });
+  auto plussedFeaturesRefs = llvm::to_vector_of<StringRef>(plussedFeatures);
   auto fullTargetFeaturesAttr =
       LLVM::TargetFeaturesAttr::get(context, plussedFeaturesRefs);
 

@@ -26,7 +26,7 @@ struct TestPropagateTargetAttrsPass final
 
 static std::optional<LLVMTarget>
 getVariantTarget(IREE::HAL::ExecutableVariantOp variantOp) {
-  auto configAttr = variantOp.getTarget().getConfiguration();
+  DictionaryAttr configAttr = variantOp.getTarget().getConfiguration();
   LLVMTargetOptions emptyOptions = LLVMCPUTargetCLOptions().getTargetOptions();
   return LLVMTarget::loadFromConfigAttr(variantOp.getLoc(), configAttr,
                                         emptyOptions.target);
@@ -35,11 +35,13 @@ getVariantTarget(IREE::HAL::ExecutableVariantOp variantOp) {
 void TestPropagateTargetAttrsPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
   auto maybeTarget = getVariantTarget(variantOp);
-  if (!maybeTarget)
+  if (!maybeTarget) {
     return signalPassFailure();
+  }
   const LLVMTarget &target = *maybeTarget;
 
-  auto targetMachine = createTargetMachine(target);
+  std::unique_ptr<llvm::TargetMachine> targetMachine =
+      createTargetMachine(target);
   if (!targetMachine) {
     mlir::emitError(variantOp.getLoc())
         << "failed to create target machine for target triple '"
@@ -47,7 +49,7 @@ void TestPropagateTargetAttrsPass::runOnOperation() {
     return signalPassFailure();
   }
 
-  auto variantModOp = variantOp.getInnerModule();
+  ModuleOp variantModOp = variantOp.getInnerModule();
   // Propagate target features and cpu to function ops.
   populateLLVMFuncTargetAttrs(variantModOp, *targetMachine);
 }
