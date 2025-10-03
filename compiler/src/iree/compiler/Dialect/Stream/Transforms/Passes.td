@@ -13,6 +13,21 @@ include "mlir/Pass/PassBase.td"
 // Tensor lowering and resource management
 //===----------------------------------------------------------------------===//
 
+def ReplicateGlobalsPerAffinityPass :
+    Pass<"iree-stream-replicate-globals-per-affinity", "mlir::ModuleOp"> {
+  let summary = "Replicates globals for each unique affinity and rewires their uses.";
+  let description = [{
+    Replicates IREE::Util::GlobalOps that are used on multiple affinities
+    and rewires their uses to the associated global. This allows for
+    specialization of globals for each affinity instead of having unspecialized
+    and a copy each use.
+  }];
+  let dependentDialects = [
+    "IREE::Flow::FlowDialect",
+    "IREE::Util::UtilDialect",
+  ];
+}
+
 def ConvertToStreamPass :
     Pass<"iree-stream-conversion", "mlir::ModuleOp"> {
   let summary = "Converts from flow and other input dialects into the stream dialect.";
