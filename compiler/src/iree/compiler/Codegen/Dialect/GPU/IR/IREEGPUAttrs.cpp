@@ -23,6 +23,8 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -30,6 +32,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/Interfaces/LoopLikeInterface.h"
 
 #define DEBUG_TYPE "iree-gpu-attrs"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
@@ -1649,6 +1652,221 @@ std::optional<StringRef> LoweringConfigAttr::getLoweringStrategy() const {
     return name.strref();
   }
   return std::nullopt;
+}
+constexpr StringLiteral kWorkgroupReOrderingStrategyName =
+    "workgroup_reordering_strategy";
+
+::mlir::iree_compiler::IREE::Codegen::WorkgroupReorderingAttrInterface
+LoweringConfigAttr::getWorkgroupReOrderingStrategy() const {
+  auto attrs = getAttributes();
+  if (auto attr = attrs.getAs<::mlir::iree_compiler::IREE::Codegen::
+                                  WorkgroupReorderingAttrInterface>(
+          kWorkgroupReOrderingStrategyName)) {
+    return attr;
+  }
+  return nullptr;
+}
+
+//===----------------------------------------------------------------------===//
+// Conditional Transpose Workgroup Reordering
+//===----------------------------------------------------------------------===//
+
+static std::tuple<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>,
+                  SmallVector<OpFoldResult>>
+getLoopBounds(ArrayRef<Range> loopRanges,
+              ArrayRef<OpFoldResult> givenTileSizes) {
+  SmallVector<OpFoldResult> lbs, ubs, steps;
+  for (auto [loopRange, givenTileSize] :
+       llvm::zip_equal(loopRanges, givenTileSizes)) {
+    // No loop if the tile size is 0.
+    if (isZeroInteger(givenTileSize))
+      continue;
+    lbs.push_back(loopRange.offset);
+    ubs.push_back(loopRange.size);
+    steps.push_back(givenTileSize);
+  }
+  return {lbs, ubs, steps};
+}
+
+static Value computeNbTiles(OpBuilder &b, Location loc, OpFoldResult size,
+                            OpFoldResult tileSize) {
+  Value sizeVal = getValueOrCreateConstantIntOp(b, loc, size);
+  Value tileSizeVal = getValueOrCreateConstantIntOp(b, loc, tileSize);
+  auto nbTiles =
+      b.create<mlir::arith::DivUIOp>(loc, sizeVal, tileSizeVal).getResult();
+  return getValueOrCreateConstantIntOp(b, loc, nbTiles);
+}
+
+/// Computes the total number of different Tile loads accross all XCDs per
+/// iteration for the pingpong matmul kernel. For each iteration, we distribute
+/// tile loads to invidiual CUs along the X axis of the RHS.
+static Value computeNumTileLoads(OpBuilder &b, Location loc, OpFoldResult size,
+                                 OpFoldResult tileSize, Value nbXcds,
+                                 Value nbCus) {
+  Value nbTiles = computeNbTiles(b, loc, size, tileSize);
+  auto totalCUs = b.create<mlir::arith::MulIOp>(loc, nbXcds, nbCus);
+  auto nbX = b.create<mlir::arith::MinUIOp>(loc, nbTiles, totalCUs).getResult();
+  auto nbY = b.create<mlir::arith::CeilDivUIOp>(loc, totalCUs, nbX);
+  return getValueOrCreateConstantIndexOp(
+      b, loc, b.create<mlir::arith::AddIOp>(loc, nbX, nbY).getResult());
+}
+
+/// Retrieves the condition for transposed ordering. Transposed order is enabled
+/// if the number of tile loads is at least 20% less than in regular order.
+static Value getCondition(OpBuilder &b, Location loc,
+                          ArrayRef<OpFoldResult> ubs,
+                          ArrayRef<OpFoldResult> steps, Value nbXcds,
+                          Value nbCus) {
+  assert(ubs.size() == 2 && steps.size() == 2 && "rank must be 2");
+  Value transposedOrder =
+      computeNumTileLoads(b, loc, ubs[0], steps[0], nbXcds, nbCus);
+  Value defaultOrder =
+      computeNumTileLoads(b, loc, ubs[1], steps[1], nbXcds, nbCus);
+
+  AffineExpr s0, s1, s2;
+  bindSymbols(b.getContext(), s0, s1, s2);
+  AffineExpr transposedOrderBumpExpr = (s0 * s1).floorDiv(s2);
+  Value c4 = b.create<arith::ConstantIntOp>(loc, 4, 32);
+  Value c5 = b.create<arith::ConstantIntOp>(loc, 5, 32);
+
+  Value defaultOrderTolerance = getValueOrCreateConstantIntOp(
+      b, loc,
+      affine::makeComposedFoldedAffineApply(b, loc, transposedOrderBumpExpr,
+                                            {defaultOrder, c4, c5}));
+  Value cond =
+      b.create<mlir::arith::CmpIOp>(loc, mlir::arith::CmpIPredicate::ult,
+                                    transposedOrder, defaultOrderTolerance);
+  return cond;
+}
+/// Swap values based on `pred`.
+static void swapIf(OpBuilder &b, Location loc, OpFoldResult pred,
+                   SmallVector<OpFoldResult> &values,
+                   ArrayRef<size_t> ids = {0, 1}) {
+
+  assert(ids.size() == 2 && "Can only swap between 2 indices");
+  Value v0 = getValueOrCreateConstantIndexOp(b, loc, values[ids[0]]);
+  Value v1 = getValueOrCreateConstantIndexOp(b, loc, values[ids[1]]);
+  Value predVal = getValueOrCreateConstantIndexOp(b, loc, pred);
+  values[ids[0]] =
+      b.create<mlir::arith::SelectOp>(loc, predVal, v1, v0).getResult();
+  values[ids[1]] =
+      b.create<mlir::arith::SelectOp>(loc, predVal, v0, v1).getResult();
+}
+
+static std::tuple<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>,
+                  SmallVector<size_t>>
+computeOffsetAndSize(ArrayRef<Range> loopRanges,
+                     ArrayRef<OpFoldResult> givenTileSizes,
+                     ArrayRef<Value> ivs) {
+  SmallVector<size_t> ids;
+  SmallVector<OpFoldResult> offsets, sizes;
+
+  offsets.reserve(loopRanges.size());
+  sizes.reserve(loopRanges.size());
+  const Value *ivIt = ivs.begin();
+
+  for (auto [loopRange, givenTileSize] :
+       llvm::zip_equal(loopRanges, givenTileSizes)) {
+    if (isZeroInteger(givenTileSize)) {
+      offsets.push_back(loopRange.offset);
+      sizes.push_back(loopRange.size);
+    } else {
+      offsets.push_back(*ivIt++);
+      sizes.push_back(givenTileSize);
+      ids.push_back(sizes.size() - 1);
+    }
+  }
+  return {offsets, sizes, ids};
+}
+
+FailureOr<mlir::scf::SCFTilingOptions::CustomLoopHeaderInfo>
+ConditionalTransposeAttr::generateLoopHeaderFn(
+    OpBuilder &builder, Location loc, ArrayRef<Range> loopRanges,
+    ArrayRef<OpFoldResult> givenTileSizes,
+    ValueRange destinationTensors) const {
+  scf::ForallOp forallOp;
+  // Get loop bounds
+  SmallVector<OpFoldResult> lbs, ubs, steps;
+  std::tie(lbs, ubs, steps) = getLoopBounds(loopRanges, givenTileSizes);
+
+  if (lbs.size() != 2)
+    return emitError(loc) << "conditional_transpose only supports rank 2";
+
+  SmallVector<Attribute> deviceMappingAttribute;
+  deviceMappingAttribute.push_back(IREE::Codegen::WorkgroupMappingAttr::get(
+      builder.getContext(), IREE::Codegen::symbolizeWorkgroupId(1).value()));
+  deviceMappingAttribute.push_back(IREE::Codegen::WorkgroupMappingAttr::get(
+      builder.getContext(), IREE::Codegen::symbolizeWorkgroupId(0).value()));
+
+  std::optional<ArrayAttr> mappingAttr =
+      builder.getArrayAttr(deviceMappingAttribute);
+
+  // Compute condition for transpose
+  Value nbCusVal = builder.create<arith::ConstantIndexOp>(loc, getNbCus());
+  Value nbXCDs = builder.create<arith::ConstantIndexOp>(loc, getNbXcds());
+  Value cond = getCondition(builder, loc, ubs, steps, nbXCDs, nbCusVal);
+
+  // Apply condition on loop bounds
+  swapIf(builder, loc, cond, lbs);
+  swapIf(builder, loc, cond, ubs);
+  swapIf(builder, loc, cond, steps);
+
+  forallOp = scf::ForallOp::create(builder, loc, lbs, ubs, steps,
+                                   destinationTensors, mappingAttr);
+  builder.setInsertionPoint(forallOp.getTerminator());
+
+  SmallVector<Value> ivs = forallOp.getInductionVars();
+  SmallVector<OpFoldResult> offsets, sizes;
+  SmallVector<size_t> ids;
+  std::tie(offsets, sizes, ids) =
+      computeOffsetAndSize(loopRanges, givenTileSizes, ivs);
+
+  // Apply condition on offsets
+  swapIf(builder, loc, cond, offsets, ids);
+
+  ValueRange innerDestinationTensors = forallOp.getRegionOutArgs();
+  return mlir::scf::SCFTilingOptions::CustomLoopHeaderInfo{
+      {cast<LoopLikeOpInterface>(forallOp.getOperation())},
+      offsets,
+      sizes,
+      innerDestinationTensors};
+}
+
+LogicalResult ConditionalTransposeAttr::generateLoopTerminatorFn(
+    OpBuilder &builder, Location loc, ArrayRef<LoopLikeOpInterface> loops,
+    ValueRange tiledResults, ArrayRef<SmallVector<OpFoldResult>> resultOffsets,
+    ArrayRef<SmallVector<OpFoldResult>> resultSizes,
+    ValueRange destinationTensors) const {
+
+  assert(loops.size() == 1 && "Expected loop count should be 1.");
+  LoopLikeOpInterface loop = loops.front();
+  scf::ForallOp *forallOp = dyn_cast<scf::ForallOp>(&loop);
+  if (!forallOp)
+    return emitError(loc) << "Only scf.forall op are supported";
+
+  builder.setInsertionPointToEnd(forallOp->getTerminator().getBody());
+
+  for (auto [tiledValue, destinationTensor, resultOffset, resultSize] :
+       llvm::zip_equal(tiledResults, destinationTensors, resultOffsets,
+                       resultSizes)) {
+    SmallVector<OpFoldResult> resultStride(resultOffset.size(),
+                                           builder.getIndexAttr(1));
+
+    tensor::ParallelInsertSliceOp::create(builder, loc, tiledValue,
+                                          destinationTensor, resultOffset,
+                                          resultSize, resultStride);
+  }
+  return success();
+}
+
+LogicalResult
+ConditionalTransposeAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                                 int64_t nbXcds, int64_t nbCus) {
+  if (nbXcds == 0 || nbCus == 0) {
+    return emitError()
+           << "conditional_transpose must have non-zeros parameters";
+  }
+  return success();
 }
 
 //===----------------------------------------------------------------------===//

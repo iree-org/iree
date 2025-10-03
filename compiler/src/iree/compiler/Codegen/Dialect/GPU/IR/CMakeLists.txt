@@ -58,9 +58,11 @@ iree_cc_library(
     MLIRGPUDialect
     MLIRIR
     MLIRLinalgDialect
+    MLIRLoopLikeInterface
     MLIRParallelCombiningOpInterface
     MLIRParser
     MLIRSCFDialect
+    MLIRSCFTransforms
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
