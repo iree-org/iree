@@ -185,6 +185,23 @@ def MatchContractionOp : Op<Transform_Dialect, "iree.match.contraction",
 
     Optionally matches specific indexing maps patterns.
 
+    ### Example
+
+    ```mlir
+    #map_lhs = affine_map<(d0, d1, d2) -> (d0, d2)>
+    #map_rhs = affine_map<(d0, d1, d2) -> (d1, d2)>
+    #map_output = affine_map<(d0, d1, d2) -> (d0, d1)>
+
+    %batch_dims, %m_dims, %n_dims, %k_dims =
+      transform.iree.match.contraction %matmul_op,
+        lhs_type = f32, rhs_type = f32, output_type = f32
+        {indexing_maps = [#map_lhs, #map_rhs, #map_output]} :
+        !transform.any_op -> !transform.param<i64>
+    ```
+
+    This succeeds when `%matmul_op` is a contraction operation with f32 input
+    types and f32 output type, and matches the specified indexing maps pattern.
+
     #### Return modes
 
     Succeeds if the operation is a contraction operation, and
@@ -304,6 +321,86 @@ def MatchConvolutionOp : Op<Transform_Dialect, "iree.match.convolution",
     `,` `rhs_type` `=` $rhs_type
     `,` `output_type` `=` $output_type
     (`indexing_maps` $indexing_maps^)?
+    attr-dict `:` type($operand_handle) `->` type($batch_dims)
+  }];
+  let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+}
+
+def MatchAttentionOp : Op<Transform_Dialect, "iree.match.attention",
+    [MatchOpInterface,
+     SingleOpMatcher,
+     MemoryEffectsOpInterface,
+     AllTypesMatch<["batch_dims", "m_dims", "n_dims",
+                    "k1_dims", "k2_dims"]>
+     ]> {
+  let summary = [{Check whether the op is an attention operation.}];
+  let description = [{
+    Matches operations from the IREELinalgExt dialect that implement
+    attention: iree_linalg_ext.attention.
+
+    ### Example
+
+    ```mlir
+    #map_query = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
+    #map_key = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>
+    #map_value = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d5)>
+    #map_scale = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
+    #map_output = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+
+    %batch_dims, %m_dims, %n_dims, %k1_dims, %k2_dims =
+      transform.iree.match.attention %attn_op,
+        query_type = f32, key_type = f32, value_type = f32, output_type = f32,
+        indexing_maps = [#map_query, #map_key, #map_value, #map_scale, #map_output] :
+        !transform.any_op -> !transform.param<i64>
+    ```
+
+    This succeeds when `%attn_op` is an attention operation with f32 element
+    types for query, key, value, and output tensors, and matches the specified
+    indexing maps pattern.
+
+    #### Return modes
+
+    Succeeds if the operation is an attention operation, and
+    produces a silenceable failure otherwise.
+
+    #### Results
+
+    Returns arrays of dimension sizes extracted from the iteration domain:
+    - batch_dims: Array of batch dimension sizes.
+    - m_dims: Array of query sequence length dimension sizes.
+    - n_dims: Array of number of heads dimension sizes.
+    - k1_dims: Array of key/value sequence length dimension sizes.
+    - k2_dims: Array of key embedding dimension sizes.
+
+    The exact interpretation depends on the indexing maps of the attention op.
+  }];
+
+  let arguments = (ins
+    TransformHandleTypeInterface:$operand_handle,
+    TypeAttr:$query_type,
+    TypeAttr:$key_type,
+    TypeAttr:$value_type,
+    TypeAttr:$output_type,
+    AffineMapArrayAttr:$indexing_maps
+  );
+
+  let results = (outs
+    TransformParamTypeInterface:$batch_dims,
+    TransformParamTypeInterface:$m_dims,
+    TransformParamTypeInterface:$n_dims,
+    TransformParamTypeInterface:$k1_dims,
+    TransformParamTypeInterface:$k2_dims
+  );
+
+  let assemblyFormat = [{
+    $operand_handle
+    `,` `query_type` `=` $query_type
+    `,` `key_type` `=` $key_type
+    `,` `value_type` `=` $value_type
+    `,` `output_type` `=` $output_type
+    `,` `indexing_maps` `=` $indexing_maps
     attr-dict `:` type($operand_handle) `->` type($batch_dims)
   }];
   let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
