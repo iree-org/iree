@@ -27,6 +27,19 @@ void GlobalPipelineOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc("Global optimization level to apply to the entire "
                      "compilation flow."),
       llvm::cl::cat(category));
+
+  binder.opt<bool>(
+      "iree-opt-const-expr-hoisting", constExprHoisting,
+      llvm::cl::desc(
+          "Hoists the results of latent constant expressions into immutable "
+          "global initializers for evaluation at program load."),
+      llvm::cl::cat(category));
+  binder.opt<int64_t>(
+      "iree-opt-const-expr-max-size-increase-threshold",
+      constExprMaxSizeIncreaseThreshold,
+      llvm::cl::desc("Maximum byte size increase allowed for constant expr "
+                     "hoisting policy to allow hoisting."),
+      llvm::cl::cat(category));
 }
 
 void BindingOptions::bindOptions(OptionsBinder &binder) {
@@ -167,18 +180,6 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
       "iree-opt-const-eval", constEval,
       llvm::cl::desc("Enables eager evaluation of constants using the full "
                      "compiler and runtime (on by default)."),
-      llvm::cl::cat(category));
-  binder.opt<bool>(
-      "iree-opt-const-expr-hoisting", constExprHoisting,
-      llvm::cl::desc(
-          "Hoists the results of latent constant expressions into immutable "
-          "global initializers for evaluation at program load."),
-      llvm::cl::cat(category));
-  binder.opt<int64_t>(
-      "iree-opt-const-expr-max-size-increase-threshold",
-      constExprMaxSizeIncreaseThreshold,
-      llvm::cl::desc("Maximum byte size increase allowed for constant expr "
-                     "hoisting policy to allow hoisting."),
       llvm::cl::cat(category));
   binder.opt<bool>(
       "iree-opt-numeric-precision-reduction", numericPrecisionReduction,

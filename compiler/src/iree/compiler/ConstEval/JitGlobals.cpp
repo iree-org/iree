@@ -69,6 +69,7 @@ emitDebugWarning(Location loc,
 // shared.
 // TODO: See if we can make them copyable?
 struct CompileOptions {
+  GlobalPipelineOptions pipelineOptions;
   BindingOptions bindingOptions;
   InputDialectOptions inputOptions;
   PreprocessingOptions preprocessingOptions;
@@ -624,12 +625,13 @@ public:
     // Disable constant evaluation for our Jit compilation pipeline.
     // It would make no sense to recursively do constant evaluation, and since
     // we omit the necessary hooks, it is unsupported anyway.
-    compileOptions->globalOptimizationOptions.constExprHoisting = false;
+    compileOptions->pipelineOptions.constExprHoisting = false;
     compileOptions->globalOptimizationOptions.constEval = false;
 
     buildIREEVMTransformPassPipeline(
-        *targetRegistry.value, compileOptions->bindingOptions,
-        compileOptions->inputOptions, compileOptions->preprocessingOptions,
+        *targetRegistry.value, compileOptions->pipelineOptions,
+        compileOptions->bindingOptions, compileOptions->inputOptions,
+        compileOptions->preprocessingOptions,
         compileOptions->globalOptimizationOptions,
         compileOptions->dispatchCreationOptions,
         compileOptions->schedulingOptions, compileOptions->executableOptions,

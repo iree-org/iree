@@ -72,7 +72,7 @@ void buildGlobalOptExprHoistingPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions) {
   IREE::Util::ExprHoistingOptions options;
   options.maxSizeIncreaseThreshold =
-      transformOptions.options.constExprMaxSizeIncreaseThreshold;
+      transformOptions.constExprMaxSizeIncreaseThreshold;
   options.registerDependentDialectsFn = [](DialectRegistry &registry) {
     registry.insert<IREE::TensorExt::IREETensorExtDialect>();
   };
@@ -219,7 +219,7 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(createCSEPass);
 
-  if (transformOptions.options.constExprHoisting) {
+  if (transformOptions.constExprHoisting) {
     buildGlobalOptExprHoistingPassPipeline(mainPassManager, transformOptions);
   }
 
