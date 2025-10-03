@@ -1050,6 +1050,161 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
 
   let hasCanonicalizer = 1;
 }
+
+//===----------------------------------------------------------------------===//
+// ExpReduction
+//===----------------------------------------------------------------------===//
+
+def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction"> {
+  let summary = [{
+    A linalg.generic extension with support for exponential reduction.
+  }];
+
+  let description = [{
+    This operation is a restricted form of a linalg.generic operation,
+    representing a reduction over `e^{x}` where `x` is an input, and it is known
+    that the function's result is independent of translation over x,
+      i.e. f(x) = f(x + c).
+
+    Since `e{x}` grows exponentially for `x > 0`, if the values of `x` are
+    unbounded, the intermediate computation for `e^{x}` in `f(x)`, may not fit
+    in the floating point range, even if the result does. To prevent such
+    numerical inaccuracies, we can instead compute `f(max(x) - x)`, which will
+    ensure that `e{max(x) - x}` always fits in the range (0, 1], because
+    0 < e{negative} <= 1.
+
+    These properties allow us to compute an online normalization of this
+    function, in which we don't have to compute the `max(x)` as a seperate
+    reduction, but as a running max.
+
+    Generally, these properties are hard to infer from a linalg.generic, because
+    two back-to-back reduction combiners in a linalg.generic can have hard to
+    infer properties. This restricted form ensures we don't have to do
+    complicated analysis to infer these properties.
+
+    The first input and output operands are intrinsically linked.
+    - The first output operand is always the maximum of the first input operand,
+      henceforth 'nmax'.
+    - The first input operand in the basic block is always `2^{nmax-x}`, where
+      `x` is the value
+
+    `norm` is calculated by `2^{nmax - pmax}`, where
+    - `pmax` is the value from the previous iteration.
+    - `nmax` is the new maximum, read from the current element from the input
+      tensor
+
+    The operands listed in `exp_reduced_operands` will be multiplied by `norm`
+    before executing the basic block.
+
+    For example,
+
+    ```mlir
+    // compute the exponentials and the sum
+    %M, %O = iree_linalg_ext.exp_reduction {
+      indexing_maps = [
+        affine_map<(i) -> (i)>,
+        affine_map<(i) -> ()>,
+        affine_map<(i) -> ()>
+      ],
+      iterator_types = [
+        #iree_linalg_ext.iterator_type<reduction>
+      ],
+      exp_reduced_operands = [ 1 ]
+    } ins(%V: tensor<256xf32>)
+      outs(%M_init, %S: tensor<f32>, tensor<f32>) {
+      ^bb0(%exp_v: f32, %m: f32, %s: f32):
+        // take note of the operand names when comparing with the subsequent
+        // code snippets
+        %add = arith.addf %exp_v, %s : f32
+        linalg.yield %m, %add        : f32, f32
+    } -> tensor<f32>, tensor<f32>
+  ```
+
+  Encodes the following computation
+
+  ```
+  %M, %O = linalg.generic {
+    indexing_maps = [
+      affine_map<(i) -> (i)>,
+      affine_map<(i) -> ()>,
+      affine_map<(i) -> ()>
+    ],
+    iterator_types = [
+      "reduction"
+    ],
+  } ins(%V: tensor<256xf32>)
+    outs(%M_init, %S: tensor<f32>, tensor<f32>) {
+    ^bb0(%v: f32, %m: f32, %s: f32):
+      %exp_v = math.exp2 %v       : f32
+      %add = arith.addf %norm, %s : f32
+      linalg.yield %m, %add       : f32, f32
+  } -> tensor<256xf32>, tensor<f32>
+  ```
+
+  And transforms it into operations equivalent to the following:
+
+  ```
+  %M, %O = linalg.generic {
+    indexing_maps = [
+      affine_map<(i) -> (i)>,
+      affine_map<(i) -> ()>,
+      affine_map<(i) -> ()>
+    ],
+    iterator_types = [
+      "reduction"
+    ],
+  } ins(%V: tensor<256xf32>)
+    outs(%M_init, %S: tensor<f32>, tensor<f32>) {
+    ^bb0(%v: f32, %prev_m: f32, %prev_s: f32):
+      %m      = arith.maximumf %v, %prev_m : f32
+      %m_diff = arith.subf %m, %prev_m     : f32
+      %norm   = math.exp2 %m_diff          : f32
+
+      %exp_v  = math.exp2 %v               : f32  // raise v to the exponent
+      %s      = arith.mulf %prev_s, %norm  : f32  // multiply s by the norm
+      %add    = arith.addf %exp_v, %s      : f32
+      linalg.yield %m, %add                : f32, f32
+  } -> tensor<256xf32>, tensor<f32>
+  ```
+  }];
+
+  let arguments = (ins
+    Variadic<AnyRankedTensor>:$inputs,
+    Variadic<AnyRankedTensor>:$outputs,
+    AffineMapArrayAttr:$indexing_maps,
+    IREELinalgExt_IteratorTypeArrayAttr:$iterator_types,
+    DenseI64ArrayAttr:$exp_reduced_operands);
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let regions = (region SizedRegion<1>:$region);
+
+  let hasVerifier = 1;
+
+  let assemblyFormat = [{
+    `{`
+      `indexing_maps` `=` $indexing_maps `,`
+      `iterator_types` `=` $iterator_types `,`
+      `exp_reduced_operands` `=` $exp_reduced_operands
+    `}`
+    attr-dict
+    `ins` `(` $inputs `:` type($inputs) `)`
+    `outs` `(` $outputs `:` type($outputs) `)`
+    $region (`->` type($results)^)?
+  }];
+
+
+  let extraClassDeclaration = [{
+    static std::function<void(ImplicitLocOpBuilder &, Block &, ArrayRef<NamedAttribute>, llvm::function_ref<mlir::InFlightDiagnostic()>)>
+    getRegionBuilder() {
+      return nullptr;
+    }
+
+    // DestinationStyleOpInterface methods.
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
+    }
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // Im2col
 //===----------------------------------------------------------------------===//

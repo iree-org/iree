@@ -1029,6 +1029,62 @@ func.func @unpack_mismatch_inner_tile_size_and_output_shape(
 
 // -----
 
+func.func @exp_reduction(%S: tensor<2x3xf32>) -> tensor<2xf32> {
+  %M = tensor.empty() : tensor<2xf32>
+  %out = tensor.empty() : tensor<2xf32>
+
+  // expected-error@+1 {{operand index in exp_reduced_operands cannot be the 0th operand, it always contains the maximum value}}
+  %max, %sum = iree_linalg_ext.exp_reduction {
+    indexing_maps = [
+      affine_map<(M,N)->(M,N)>,
+      affine_map<(M,N)->(M)>,
+      affine_map<(M,N)->(M)>
+    ],
+    iterator_types = [
+      #iree_linalg_ext.iterator_type<parallel>,
+      #iree_linalg_ext.iterator_type<reduction>
+    ],
+    exp_reduced_operands = [0]
+  } ins(%S: tensor<2x3xf32>)
+    outs(%M, %out: tensor<2xf32>, tensor<2xf32>)
+  {
+  ^bb0(%s: f32, %m: f32, %o: f32):
+    %add = arith.addf %s, %o: f32
+    linalg.yield %m, %add: f32, f32
+  } -> tensor<2xf32>, tensor<2xf32>
+  return %sum : tensor<2xf32>
+}
+
+// -----
+
+func.func @exp_reduction(%S: tensor<2x3xf32>) -> tensor<2xf32> {
+  %M = tensor.empty() : tensor<2xf32>
+  %out = tensor.empty() : tensor<2xf32>
+
+  // expected-error@+1 {{operand index in exp_reduced_operands must index the outs operands (outs has 2 operands)}}
+  %max, %sum = iree_linalg_ext.exp_reduction {
+    indexing_maps = [
+      affine_map<(M,N)->(M,N)>,
+      affine_map<(M,N)->(M)>,
+      affine_map<(M,N)->(M)>
+    ],
+    iterator_types = [
+      #iree_linalg_ext.iterator_type<parallel>,
+      #iree_linalg_ext.iterator_type<reduction>
+    ],
+    exp_reduced_operands = [2]
+  } ins(%S: tensor<2x3xf32>)
+    outs(%M, %out: tensor<2xf32>, tensor<2xf32>)
+  {
+  ^bb0(%s: f32, %m: f32, %o: f32):
+    %add = arith.addf %s, %o: f32
+    linalg.yield %m, %add: f32, f32
+  } -> tensor<2xf32>, tensor<2xf32>
+  return %sum : tensor<2xf32>
+}
+
+// -----
+
 func.func @illegal_im2col_strides(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   // expected-error @+1 {{expected strides rank to be equal to the kernel rank}}
