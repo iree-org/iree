@@ -233,16 +233,15 @@ IREE::transform_dialect::MatchContractionOp::matchOperation(
     Operation *current, transform::TransformResults &results,
     transform::TransformState &state) {
   Location loc = current->getLoc();
-  StringRef opName = current->getName().getStringRef();
   auto linalgOp = dyn_cast<linalg::LinalgOp>(current);
   if (!linalgOp) {
     return emitSilenceableFailure(loc)
-           << "Operation " << opName << " is not a LinalgOp.";
+           << "Operation " << *current << " is not a LinalgOp.";
   }
 
   if (!linalg::isaContractionOpInterface(linalgOp)) {
     return emitSilenceableFailure(loc)
-           << "Operation " << opName << " is not a contraction operation.";
+           << "Operation " << *current << " is not a contraction operation.";
   }
 
   Type targetLhsType = getLhsType();
@@ -313,16 +312,14 @@ IREE::transform_dialect::MatchConvolutionOp::matchOperation(
     Operation *current, transform::TransformResults &results,
     transform::TransformState &state) {
   Location loc = current->getLoc();
-  StringRef opName = current->getName().getStringRef();
   auto linalgOp = dyn_cast<linalg::LinalgOp>(current);
   if (!linalgOp) {
-    return emitSilenceableFailure(loc)
-           << "Operation " << opName << " is not a LinalgOp.";
+    return emitSilenceableFailure(loc) << "Operation is not a LinalgOp.";
   }
 
   if (!linalg::isaConvolutionOpInterface(linalgOp)) {
     return emitSilenceableFailure(loc)
-           << "Operation " << opName << " is not a convolution operation.";
+           << "Operation is not a convolution operation.";
   }
 
   Type targetLhsType = getLhsType();
@@ -368,7 +365,7 @@ IREE::transform_dialect::MatchConvolutionOp::matchOperation(
   MLIRContext *ctx = getContext();
   Builder builder(ctx);
 
-  auto buildI64Attrs = [&](auto values, auto transform) {
+  auto buildI64Attrs = [&builder](const auto &values, const auto &transform) {
     return llvm::map_to_vector(values, [&](auto val) -> Attribute {
       return builder.getI64IntegerAttr(transform(val));
     });
