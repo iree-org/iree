@@ -241,6 +241,24 @@ def MatchConvolutionOp : Op<Transform_Dialect, "iree.match.convolution",
 
     Optionally matches specific indexing maps patterns.
 
+    ### Example
+
+    ```mlir
+    #map_input = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
+    #map_filter = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
+    #map_output = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+
+    %batch_dims, %output_image_dims, %output_channel_dims, %filter_dims,
+    %input_channel_dims, %depth_dims, %strides, %dilations =
+      transform.iree.match.convolution %conv_op,
+        lhs_type = f32, rhs_type = f32, output_type = f32
+        {indexing_maps = [#map_input, #map_filter, #map_output]} :
+        !transform.any_op -> !transform.param<i64>
+    ```
+
+    This succeeds when `%conv_op` is a convolution operation with f32 element
+    types for input, filter, and output tensors.
+
     #### Return modes
 
     Succeeds if the operation is a convolution operation, and
@@ -317,7 +335,7 @@ def MatchDimsEqualOp : Op<Transform_Dialect, "iree.match.dims_equal",
 
   let arguments = (ins
     TransformParamTypeInterface:$dimension_sizes, // Array of dimension parameters.
-    DenseI64ArrayAttr:$expected_values                    // Array of expected i64 values.
+    DenseI64ArrayAttr:$expected_values            // Array of expected i64 values.
   );
 
   let assemblyFormat = [{
