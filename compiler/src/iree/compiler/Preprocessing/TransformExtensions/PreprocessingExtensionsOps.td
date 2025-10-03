@@ -227,6 +227,90 @@ def MatchContractionOp : Op<Transform_Dialect, "iree.match.contraction",
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
+def MatchConvolutionOp : Op<Transform_Dialect, "iree.match.convolution",
+    [MatchOpInterface,
+     SingleOpMatcher,
+     MemoryEffectsOpInterface,
+     AllTypesMatch<["batch_dims", "output_image_dims", "output_channel_dims",
+                    "filter_dims", "input_channel_dims", "depth_dims",
+                    "strides", "dilations"]>
+     ]> {
+  let summary = [{Check whether the op is a convolution operation.}];
+  let description = [{
+    Matches operations that implement the ConvolutionOpInterface.
+    This includes operations like linalg.conv_2d_nhwc_hwcf,
+    linalg.conv_2d_nchw_fchw, linalg.depthwise_conv_2d_nhwc_hwc, etc.
+
+    Optionally matches specific indexing maps patterns.
+
+    ### Example
+
+    ```mlir
+    #map_input = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
+    #map_filter = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
+    #map_output = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+
+    %batch_dims, %output_image_dims, %output_channel_dims, %filter_dims,
+    %input_channel_dims, %depth_dims, %strides, %dilations =
+      transform.iree.match.convolution %conv_op,
+        lhs_type = f32, rhs_type = f32, output_type = f32
+        {indexing_maps = [#map_input, #map_filter, #map_output]} :
+        !transform.any_op -> !transform.param<i64>
+    ```
+
+    This succeeds when `%conv_op` is a convolution operation with f32 element
+    types for input, filter, and output tensors.
+
+    #### Return modes
+
+    Succeeds if the operation is a convolution operation, and
+    produces a silenceable failure otherwise.
+
+    #### Results
+
+    Returns arrays of dimension sizes for each convolution dimension:
+    - batch_dims: Array of batch dimension sizes.
+    - output_image_dims: Array of output spatial dimension sizes.
+    - output_channel_dims: Array of output channel dimension sizes.
+    - filter_dims: Array of filter spatial dimension sizes.
+    - input_channel_dims: Array of input channel dimension sizes.
+    - depth_dims: Array of depth dimension sizes (for depthwise convolutions).
+    - strides: Array of stride values.
+    - dilations: Array of dilation values.
+  }];
+
+  let arguments = (ins
+    TransformHandleTypeInterface:$operand_handle,
+    TypeAttr:$lhs_type,
+    TypeAttr:$rhs_type,
+    TypeAttr:$output_type,
+    OptionalAttr<AffineMapArrayAttr>:$indexing_maps
+  );
+
+  let results = (outs
+    TransformParamTypeInterface:$batch_dims,
+    TransformParamTypeInterface:$output_image_dims,
+    TransformParamTypeInterface:$output_channel_dims,
+    TransformParamTypeInterface:$filter_dims,
+    TransformParamTypeInterface:$input_channel_dims,
+    TransformParamTypeInterface:$depth_dims,
+    TransformParamTypeInterface:$strides,
+    TransformParamTypeInterface:$dilations
+  );
+
+  let assemblyFormat = [{
+    $operand_handle
+    `,` `lhs_type` `=` $lhs_type
+    `,` `rhs_type` `=` $rhs_type
+    `,` `output_type` `=` $output_type
+    (`indexing_maps` $indexing_maps^)?
+    attr-dict `:` type($operand_handle) `->` type($batch_dims)
+  }];
+  let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+}
+
 def MatchDimsEqualOp : Op<Transform_Dialect, "iree.match.dims_equal",
     [DeclareOpInterfaceMethods<TransformOpInterface>,
      MatchOpInterface,
@@ -253,7 +337,7 @@ def MatchDimsEqualOp : Op<Transform_Dialect, "iree.match.dims_equal",
 
   let arguments = (ins
     TransformParamTypeInterface:$dimension_sizes, // Array of dimension parameters.
-    DenseI64ArrayAttr:$expected_values                    // Array of expected i64 values.
+    DenseI64ArrayAttr:$expected_values            // Array of expected i64 values.
   );
 
   let assemblyFormat = [{
