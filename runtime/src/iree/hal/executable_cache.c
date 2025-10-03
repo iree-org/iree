@@ -42,6 +42,28 @@ IREE_API_EXPORT iree_status_t iree_hal_executable_cache_create(
   return status;
 }
 
+IREE_API_EXPORT iree_status_t iree_hal_executable_cache_infer_format(
+    iree_hal_executable_cache_t* executable_cache,
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_const_byte_span_t executable_data,
+    iree_host_size_t executable_format_capacity, char* executable_format,
+    iree_host_size_t* out_inferred_size) {
+  IREE_ASSERT_ARGUMENT(executable_cache);
+  IREE_ASSERT_ARGUMENT(executable_format);
+  IREE_ASSERT_ARGUMENT(out_inferred_size);
+  *out_inferred_size = 0;
+  if (executable_format_capacity == 0) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "executable_format_capacity must be > 0");
+  }
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = _VTABLE_DISPATCH(executable_cache, infer_format)(
+      executable_cache, caching_mode, executable_data,
+      executable_format_capacity, executable_format, out_inferred_size);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 IREE_API_EXPORT bool iree_hal_executable_cache_can_prepare_format(
     iree_hal_executable_cache_t* executable_cache,
     iree_hal_executable_caching_mode_t caching_mode,

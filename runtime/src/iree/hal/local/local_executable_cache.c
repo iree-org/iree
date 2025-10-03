@@ -81,6 +81,40 @@ static void iree_hal_local_executable_cache_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
+static iree_status_t iree_hal_local_executable_cache_infer_format(
+    iree_hal_executable_cache_t* base_executable_cache,
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_const_byte_span_t executable_data,
+    iree_host_size_t executable_format_capacity, char* executable_format,
+    iree_host_size_t* out_inferred_size) {
+  iree_hal_local_executable_cache_t* executable_cache =
+      iree_hal_local_executable_cache_cast(base_executable_cache);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0; i < executable_cache->loader_count; ++i) {
+    iree_status_t infer_status = iree_hal_executable_loader_infer_format(
+        executable_cache->loaders[i], caching_mode, executable_data,
+        executable_format_capacity, executable_format, out_inferred_size);
+    if (iree_status_is_ok(status)) {
+      // Successfully inferred.
+      status = iree_ok_status();
+      break;
+    } else if (iree_status_is_incompatible(infer_status)) {
+      // Skip this loader and try another.
+      iree_status_ignore(infer_status);
+      status = iree_status_from_code(IREE_STATUS_INCOMPATIBLE);
+      continue;
+    } else {
+      status = infer_status;
+      break;
+    }
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 static bool iree_hal_local_executable_cache_can_prepare_format(
     iree_hal_executable_cache_t* base_executable_cache,
     iree_hal_executable_caching_mode_t caching_mode,
@@ -138,6 +172,7 @@ static iree_status_t iree_hal_local_executable_cache_prepare_executable(
 static const iree_hal_executable_cache_vtable_t
     iree_hal_local_executable_cache_vtable = {
         .destroy = iree_hal_local_executable_cache_destroy,
+        .infer_format = iree_hal_local_executable_cache_infer_format,
         .can_prepare_format =
             iree_hal_local_executable_cache_can_prepare_format,
         .prepare_executable =

@@ -25,11 +25,13 @@ namespace mlir::iree_compiler {
 // does not support storage uniquing then we can directly allocate and copy
 // the pages into the buffer without the extra copy.
 static SmallVector<uint8_t, 32>
-cloneBufferIntoContiguousBytes(FlatbufferBuilder &fbb) {
+cloneBufferIntoContiguousBytes(ArrayRef<uint8_t> prefix,
+                               FlatbufferBuilder &fbb) {
   size_t packedSize = flatcc_builder_get_buffer_size(fbb);
-  SmallVector<uint8_t, 32> packedData(packedSize);
-  void *result =
-      flatcc_builder_copy_buffer(fbb, packedData.data(), packedData.size());
+  SmallVector<uint8_t, 32> packedData(prefix.size() + packedSize);
+  memcpy(packedData.data(), prefix.data(), prefix.size());
+  void *result = flatcc_builder_copy_buffer(
+      fbb, packedData.data() + prefix.size(), packedData.size());
   assert(result && "flatcc_emitter_t impl failed (non-default?)");
   (void)result;
   return packedData;
@@ -54,10 +56,26 @@ FlatbufferBuilder::streamUint8Vec(std::function<bool(raw_ostream &stream)> fn,
 DenseIntElementsAttr FlatbufferBuilder::getBufferAttr(MLIRContext *context) {
   // We require direct access to the FlatBuffer bytes so we can pass them to
   // the attribute constructor (which needs to inspect them all for uniquing).
-  auto bufferData = cloneBufferIntoContiguousBytes(*this);
+  auto bufferData = cloneBufferIntoContiguousBytes({}, *this);
 
   // NOTE: ew. OpaqueAttr may be better? It does equality checks but won't try
   // to unique and would let us get a mutable buffer out.
+  return DenseIntElementsAttr::get(
+      VectorType::get({static_cast<int64_t>(bufferData.size())},
+                      IntegerType::get(context, 8)),
+      std::move(bufferData));
+}
+
+DenseIntElementsAttr FlatbufferBuilder::getHeaderPrefixedBufferAttr(
+    MLIRContext *context, uint32_t magic, uint32_t version) {
+  iree_flatbuffer_file_header_t header = {0};
+  header.magic = magic;
+  header.version = version;
+  header.content_size = flatcc_builder_get_buffer_size(*this);
+  auto bufferData = cloneBufferIntoContiguousBytes(
+      ArrayRef<uint8_t>(reinterpret_cast<const uint8_t *>(&header),
+                        sizeof(header)),
+      *this);
   return DenseIntElementsAttr::get(
       VectorType::get({static_cast<int64_t>(bufferData.size())},
                       IntegerType::get(context, 8)),
@@ -93,7 +111,7 @@ LogicalResult FlatbufferBuilder::printJsonToStream(bool pretty,
                                                    print_json_fn_t printJsonFn,
                                                    llvm::raw_ostream &output) {
   // The printer requires direct access to the FlatBuffer bytes so clone here.
-  auto bufferData = cloneBufferIntoContiguousBytes(*this);
+  auto bufferData = cloneBufferIntoContiguousBytes({}, *this);
   auto moduleData = ArrayRef<uint8_t>(bufferData.data(), bufferData.size())
                         .drop_front(sizeof(flatbuffers_uoffset_t));
 
