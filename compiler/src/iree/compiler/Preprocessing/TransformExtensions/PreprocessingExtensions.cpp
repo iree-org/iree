@@ -362,39 +362,27 @@ IREE::transform_dialect::MatchConvolutionOp::matchOperation(
   }
   linalg::ConvolutionDimensions convDims = *maybeConvDims;
   SmallVector<int64_t> iterationDomain = linalgOp.getStaticLoopRanges();
-  MLIRContext *ctx = getContext();
-  Builder builder(ctx);
 
+  Builder builder(getContext());
   auto buildI64Attrs = [&builder](const auto &values, const auto &transform) {
     return llvm::map_to_vector(values, [&](auto val) -> Attribute {
       return builder.getI64IntegerAttr(transform(val));
     });
   };
+  auto getIterationSize = [&](unsigned idx) { return iterationDomain[idx]; };
 
   results.setParams(cast<OpResult>(getBatchDims()),
-                    buildI64Attrs(convDims.batch, [&](unsigned idx) {
-                      return iterationDomain[idx];
-                    }));
+                    buildI64Attrs(convDims.batch, getIterationSize));
   results.setParams(cast<OpResult>(getOutputImageDims()),
-                    buildI64Attrs(convDims.outputImage, [&](unsigned idx) {
-                      return iterationDomain[idx];
-                    }));
+                    buildI64Attrs(convDims.outputImage, getIterationSize));
   results.setParams(cast<OpResult>(getOutputChannelDims()),
-                    buildI64Attrs(convDims.outputChannel, [&](unsigned idx) {
-                      return iterationDomain[idx];
-                    }));
+                    buildI64Attrs(convDims.outputChannel, getIterationSize));
   results.setParams(cast<OpResult>(getFilterDims()),
-                    buildI64Attrs(convDims.filterLoop, [&](unsigned idx) {
-                      return iterationDomain[idx];
-                    }));
+                    buildI64Attrs(convDims.filterLoop, getIterationSize));
   results.setParams(cast<OpResult>(getInputChannelDims()),
-                    buildI64Attrs(convDims.inputChannel, [&](unsigned idx) {
-                      return iterationDomain[idx];
-                    }));
+                    buildI64Attrs(convDims.inputChannel, getIterationSize));
   results.setParams(cast<OpResult>(getDepthDims()),
-                    buildI64Attrs(convDims.depth, [&](unsigned idx) {
-                      return iterationDomain[idx];
-                    }));
+                    buildI64Attrs(convDims.depth, getIterationSize));
   results.setParams(
       cast<OpResult>(getStrides()),
       buildI64Attrs(convDims.strides, [](int64_t val) { return val; }));
