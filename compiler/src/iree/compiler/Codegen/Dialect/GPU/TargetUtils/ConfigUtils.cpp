@@ -1053,14 +1053,15 @@ static FailureOr<DistributionInfo> collectOpDistributionInfo(Operation *op) {
   }
 
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  if (!linalgOp) {
+  // Bail out on multi result cases as consumer fusion currently does not
+  // support multi result ops.
+  if (!linalgOp || linalgOp.getNumDpsInits() != 1) {
     return failure();
   }
 
   // This pipeline requires tensor semantics. Also fail for gather semantics
   // for now to simplify tile + fuse.
-  if (!linalgOp.hasPureTensorSemantics() ||
-      LinalgExt::isGatherlikeOp(linalgOp)) {
+  if (!linalgOp.hasPureTensorSemantics() || linalgOp.hasIndexSemantics()) {
     return failure();
   }
 
