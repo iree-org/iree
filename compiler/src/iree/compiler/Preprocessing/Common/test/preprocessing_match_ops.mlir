@@ -316,8 +316,7 @@ func.func @op_fill(%dest: tensor<32x64xf32>, %value: f32) -> tensor<32x64xf32> {
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_matmul(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
     %batch_dims, %m_dims, %n_dims, %k_dims = transform.iree.match.contraction %op,
-      lhs_type = i8, rhs_type = i8, output_type = i32 :
-      (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+      lhs_type = i8, rhs_type = i8, output_type = i32 : !transform.any_op -> !transform.param<i64>
     %c32 = transform.param.constant 32 : i64 -> !transform.param<i64>
     transform.match.param.cmpi eq %m_dims, %c32 : !transform.param<i64>
     transform.match.param.cmpi eq %n_dims, %c32 : !transform.param<i64>
@@ -326,8 +325,7 @@ module attributes {transform.with_named_sequence} {
 
   transform.named_sequence @match_batch_matmul(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
     %batch_dims, %m_dims, %n_dims, %k_dims = transform.iree.match.contraction %op,
-      lhs_type = i8, rhs_type = i8, output_type = i32 :
-      (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+      lhs_type = i8, rhs_type = i8, output_type = i32 : !transform.any_op -> !transform.param<i64>
     %c2 = transform.param.constant 2 : i64 -> !transform.param<i64>
     %c32 = transform.param.constant 32 : i64 -> !transform.param<i64>
     transform.match.param.cmpi eq %batch_dims, %c2 : !transform.param<i64>
@@ -385,8 +383,7 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_correct_maps(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
    %batch, %m, %n, %k = transform.iree.match.contraction %op,
     lhs_type = i8, rhs_type = i8, output_type = i32 {indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2]} :
-    (!transform.any_op) ->
-    (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+    !transform.any_op -> !transform.param<i64>
     transform.yield %op : !transform.any_op
   }
 
@@ -427,7 +424,7 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_different_count(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
     %batch, %m, %n, %k = transform.iree.match.contraction %op,
       lhs_type = i8, rhs_type = i8, output_type = i32 {indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2, #map_matmul0]} :
-      (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+      !transform.any_op -> !transform.param<i64>
     transform.yield %op : !transform.any_op
   }
 
@@ -478,8 +475,7 @@ func.func @test_mma_layout_config(%a: tensor<64x64xf32>, %b: tensor<64x64xf32>, 
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_matmul(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
     %batch_dims, %m_dims, %n_dims, %k_dims = transform.iree.match.contraction %op,
-      lhs_type = f32, rhs_type = f32, output_type = f32 :
-      (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+      lhs_type = f32, rhs_type = f32, output_type = f32 : !transform.any_op -> !transform.param<i64>
     transform.yield %op : !transform.any_op
   }
 
@@ -524,8 +520,7 @@ func.func @op_matmul_1024x512x2048(%input0: tensor<1024x2048xf16>, %input1: tens
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_contraction_and_size(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
     %batch, %m, %n, %k = transform.iree.match.contraction %op,
-      lhs_type = f16, rhs_type = f16, output_type = f32 :
-      (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+      lhs_type = f16, rhs_type = f16, output_type = f32 : !transform.any_op -> !transform.param<i64>
 
     transform.iree.match.dims_equal %m, [4096] : !transform.param<i64>
     transform.iree.match.dims_equal %n, [2048] : !transform.param<i64>
@@ -581,8 +576,7 @@ func.func @op_contract_mismatch_dims(%input0: tensor<3x5x16x128xf16>, %input1: t
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_multi_dimensions(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
     %batch_dims, %m_dims, %n_dims, %k_dims = transform.iree.match.contraction %op,
-      lhs_type = f16, rhs_type = f16, output_type = f32 :
-      (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+      lhs_type = f16, rhs_type = f16, output_type = f32 : !transform.any_op -> !transform.param<i64>
     // Test multiple dimensions.
     // %batch_dims = [2, 4] - check if first batch dim is 2 and second is 4.
     transform.iree.match.dims_equal %batch_dims, [2, 4] : !transform.param<i64>
@@ -624,8 +618,7 @@ func.func @op_matmul_size_mismatch(%input0: tensor<512x1024xf16>, %input1: tenso
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_size_mismatch(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
     %batch, %m, %n, %k = transform.iree.match.contraction %op,
-      lhs_type = f16, rhs_type = f16, output_type = f32 :
-      (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+      lhs_type = f16, rhs_type = f16, output_type = f32 : !transform.any_op -> !transform.param<i64>
     // This should fail because %m contains [512] but we expect [512, 256] (different array lengths).
     transform.iree.match.dims_equal %m, [512, 256] : !transform.param<i64>
     transform.yield %op : !transform.any_op
@@ -703,8 +696,7 @@ module attributes {transform.with_named_sequence} {
           affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
           affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
           affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-        ] } :
-      (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+        ] } : !transform.any_op -> !transform.param<i64>
     transform.iree.match.dims_equal %batch, [] : !transform.param<i64>
     transform.iree.match.dims_equal %m, [-1, 8] : !transform.param<i64>
     transform.iree.match.dims_equal %n, [1024] : !transform.param<i64>
@@ -719,8 +711,7 @@ module attributes {transform.with_named_sequence} {
           affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
           affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
           affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-        ] } :
-      (!transform.any_op) -> (!transform.param<i64>, !transform.param<i64>, !transform.param<i64>, !transform.param<i64>)
+        ] } : !transform.any_op -> !transform.param<i64>
     transform.iree.match.dims_equal %batch, [] : !transform.param<i64>
     transform.iree.match.dims_equal %m, [1024] : !transform.param<i64>
     transform.iree.match.dims_equal %n, [-1, 8] : !transform.param<i64>
