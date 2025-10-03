@@ -39,7 +39,7 @@ getEncodingContractionDims(EncodingAttr encoding) {
   return linalg::inferContractionDims(indexingMaps);
 }
 
-MatmulNarrowDim getPo2MatmulNarrowDim(EncodingAttr encoding) {
+SmallVector<int64_t, 4> getMatmulDims(EncodingAttr encoding) {
   if (encoding.getOpType().getValue() != EncodingOpType::matmul) {
     return {};
   }
@@ -58,10 +58,24 @@ MatmulNarrowDim getPo2MatmulNarrowDim(EncodingAttr encoding) {
   assert(cDims.m.size() <= 1 && cDims.n.size() <= 1 && cDims.k.size() == 1 &&
          cDims.batch.size() <= 1 &&
          "Expected at most one M, N, K, and Batch dimension");
+  const int64_t k = iterationSizes[cDims.k[0]];
   // M or N can be empty instead of having an explicit dim size of 1 for matvec
   // and vecmat, so set to 1 if empty.
   const int64_t m = cDims.m.empty() ? 1 : iterationSizes[cDims.m[0]];
   const int64_t n = cDims.n.empty() ? 1 : iterationSizes[cDims.n[0]];
+  // Batch can also be empty, which defaults to 1.
+  const int64_t batch =
+      cDims.batch.empty() ? 1 : iterationSizes[cDims.batch[0]];
+  return {batch, m, n, k};
+}
+
+MatmulNarrowDim getPo2MatmulNarrowDim(EncodingAttr encoding) {
+  SmallVector<int64_t, 4> matmulDims = getMatmulDims(encoding);
+  if (matmulDims.size() != 4) {
+    return {};
+  }
+  const int64_t m = matmulDims[1];
+  const int64_t n = matmulDims[2];
 
   // If both dimensions are dynamic, return empty.
   if (ShapedType::isDynamic(m) && ShapedType::isDynamic(n)) {
