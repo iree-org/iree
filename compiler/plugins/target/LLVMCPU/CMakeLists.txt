@@ -85,6 +85,7 @@ iree_cc_library(
     iree::compiler::Codegen::LLVMCPU
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Encoding::IR
+    iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Target::Devices
