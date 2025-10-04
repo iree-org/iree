@@ -51,12 +51,32 @@ iree_bitcode_library(
     "-march=rv64gcv"
 )
 
+iree_bitcode_library(
+  NAME
+    ukernel_bitcode_arch_riscv_64_zvfhmin
+  ARCH
+    riscv_64
+  INTERNAL_HDRS
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "common_riscv_64.h"
+    "mmt4d_riscv_64_internal.h"
+    "mmt4d_riscv_64_tiles.inl"
+    "pack_riscv_64_internal.h"
+    "unpack_riscv_64_internal.h"
+  SRCS
+    "mmt4d_riscv_64_zvfhmin.c"
+  COPTS
+    "-march=rv64gc_zvfhmin"
+)
+
 iree_link_bitcode(
   NAME
     ukernel_bitcode_arch_riscv_64
   SRCS
     "ukernel_bitcode_arch_riscv_64_entry_points.bc"
     "ukernel_bitcode_arch_riscv_64_v.bc"
+    "ukernel_bitcode_arch_riscv_64_zvfhmin.bc"
 
 )
 
@@ -75,8 +95,13 @@ iree_select_compiler_opts(IREE_UK_COPTS_RISCV_64_V
     "-march=rv64gv"
 )
 
-check_cxx_compiler_flag("${IREE_UK_COPTS_RISCV_64_V}" IREE_UK_BUILD_RISCV_64_V)
+iree_select_compiler_opts(IREE_UK_COPTS_RISCV_64_ZVFHMIN
+  CLANG_OR_GCC
+    "-march=rv64gc_zvfhmin"
+)
 
+check_cxx_compiler_flag("${IREE_UK_COPTS_RISCV_64_V}" IREE_UK_BUILD_RISCV_64_V)
+check_cxx_compiler_flag("${IREE_UK_COPTS_RISCV_64_ZVFHMIN}" IREE_UK_BUILD_RISCV_64_ZVFHMIN)
 
 configure_file("config_riscv_64.h.in" "config_riscv_64.h")
 
@@ -104,6 +129,20 @@ iree_cc_library(
 )
 list(APPEND IREE_UK_RISCV_64_DEPS "::riscv_64_v")
 endif()  # IREE_UK_BUILD_RISCV_64_V
+
+if(IREE_UK_BUILD_RISCV_64_ZVFHMIN)
+iree_cc_library(
+  NAME
+    riscv_64_zvfhmin
+  SRCS
+    "mmt4d_riscv_64_zvfhmin.c"
+  COPTS
+    "${IREE_UK_COPTS_RISCV_64_ZVFHMIN}"
+  DEPS
+    iree::builtins::ukernel::internal_headers
+)
+list(APPEND IREE_UK_RISCV_64_DEPS "::riscv_64_zvfhmin")
+endif()  # IREE_UK_BUILD_RISCV_64_ZVFHMIN
 
 iree_cc_library(
   NAME
