@@ -75,6 +75,7 @@ iree_cc_library(
     MLIRLLVMToLLVMIRTranslation
     MLIRPDLDialect
     MLIRPDLInterpDialect
+    MLIRPass
     MLIRSupport
     MLIRTargetLLVMIRExport
     MLIRTransformDialect
