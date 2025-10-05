@@ -250,7 +250,6 @@ func.func @multi_dim_reduction(%arg0 : tensor<?x?xf16>, %arg1 : tensor<?x?xf16>,
 
 // -----
 
-
 // Multiple reductions in parallel in a linalg.generic op.
 
 // CHECK-LABEL: minmax_reduction
@@ -272,4 +271,24 @@ func.func @minmax_reduction(%arg0: tensor<1x?xf32>, %arg1: tensor<1xf32>, %arg2 
      linalg.yield %1, %2 : f32, f32
    } -> (tensor<1xf32>, tensor<1xf32>)
   return %0#0, %0#1: tensor<1xf32>, tensor<1xf32>
+}
+
+// -----
+
+// Padding linalg.matmul should be done with zeros. In this case, there is no rewriting of the
+// linalg op's block, as linalg.matmul is not a linalg.generic that we can modify without completely
+// generalizing it to a linalg.generic.
+
+// CHECK-LABEL: named_matmul
+//  CHECK-SAME: (%[[ARG0:[0-9a-zA-Z]+]]: tensor<1x?xf32>, %[[ARG1:[0-9a-zA-Z]+]]: tensor<?x1xf32>
+//   CHECK-DAG: %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+//       CHECK: tensor.pad %[[ARG0]]
+//       CHECK: tensor.yield %[[CST]] : f32
+//       CHECK: tensor.pad %[[ARG1]]
+//       CHECK: tensor.yield %[[CST]] : f32
+//       CHECK: linalg.matmul
+func.func @named_matmul(%arg0 : tensor<1x?xf32>, %arg1 : tensor<?x1xf32>, %arg2 : tensor<1x1xf32>) -> tensor<1x1xf32> {
+  %0 =  linalg.matmul {lowering_config = #iree_gpu.lowering_config<{partial_reduction = [0, 0, 32]}>}
+  ins(%arg0, %arg1 : tensor<1x?xf32>, tensor<?x1xf32>) outs(%arg2 : tensor<1x1xf32>) -> tensor<1x1xf32>
+  return %0 : tensor<1x1xf32>
 }
