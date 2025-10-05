@@ -262,6 +262,54 @@ func.func @set_encoding_ACC_dynamic_M_MFMA_F32_16x16x4_F32(%arg0 : tensor<?x513x
 
 #encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32],
                                     user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
+                                    iteration_sizes = [4, 513, ?]>
+func.func @set_encoding_ACC_static_narrow_M_MFMA_F32_16x16x4_F32(%arg0 : tensor<4x513xf32>) -> tensor<4x513xf32, #encoding> {
+  %0 = iree_encoding.set_encoding %arg0 : tensor<4x513xf32> -> tensor<4x513xf32, #encoding>
+  return %0 : tensor<4x513xf32, #encoding>
+}
+
+// CHECK-LABEL: func.func @set_encoding_ACC_static_narrow_M_MFMA_F32_16x16x4_F32
+// CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f32)
+// CHECK-SAME:      outer_dims_perm = [0, 1]
+// CHECK-SAME:      inner_dims_pos = [0, 1]
+// CHECK-SAME:      inner_tiles = [16, 512]
+// CHECK-SAME:      : tensor<4x513xf32> -> tensor<1x2x16x512xf32>
+// CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
+// CHECK-SAME       : tensor<1x2x16x512xf32> into tensor<1x2x4x4x4x16x8xf32>
+// CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
+// CHECK-SAME:       ins(%[[EXPAND]] : tensor<1x2x4x4x4x16x8xf32>)
+// CHECK-SAME:       outs({{.*}} : tensor<1x2x4x8x4x16x4xf32>)
+// CHECK-SAME:       permutation = [0, 1, 4, 6, 2, 5, 3]
+// CHECK:         return %[[TRANSPOSE]]
+
+// -----
+
+#encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32],
+                                    user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
+                                    iteration_sizes = [513, 4, ?]>
+func.func @set_encoding_ACC_static_narrow_N_MFMA_F32_16x16x4_F32(%arg0 : tensor<513x4xf32>) -> tensor<513x4xf32, #encoding> {
+  %0 = iree_encoding.set_encoding %arg0 : tensor<513x4xf32> -> tensor<513x4xf32, #encoding>
+  return %0 : tensor<513x4xf32, #encoding>
+}
+
+// CHECK-LABEL: func.func @set_encoding_ACC_static_narrow_N_MFMA_F32_16x16x4_F32
+// CHECK:         %[[PACK:.*]] = linalg.pack %{{.+}} padding_value(%{{.+}} : f32)
+// CHECK-SAME:      outer_dims_perm = [0, 1]
+// CHECK-SAME:      inner_dims_pos = [0, 1]
+// CHECK-SAME:      inner_tiles = [512, 16]
+// CHECK-SAME:      : tensor<513x4xf32> -> tensor<2x1x512x16xf32>
+// CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
+// CHECK-SAME       : tensor<2x1x512x16xf32> into tensor<2x1x4x4x8x4x16xf32>
+// CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
+// CHECK-SAME:       ins(%[[EXPAND]] : tensor<2x1x4x4x8x4x16xf32>)
+// CHECK-SAME:       outs({{.*}} : tensor<2x1x4x8x4x16x4xf32>)
+// CHECK-SAME:       permutation = [0, 1, 2, 4, 3, 6, 5]
+// CHECK:         return %[[TRANSPOSE]]
+
+// -----
+
+#encoding = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32],
+                                    user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
                                     iteration_sizes = [255, ?, ?]>
 func.func @set_encoding_ACC_dynamic_N_MFMA_F32_16x16x4_F32(%arg0 : tensor<255x?xf32>) -> tensor<255x?xf32, #encoding> {
   %0 = iree_encoding.set_encoding %arg0 : tensor<255x?xf32> -> tensor<255x?xf32, #encoding>
