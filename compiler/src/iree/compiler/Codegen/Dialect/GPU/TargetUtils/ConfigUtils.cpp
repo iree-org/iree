@@ -1025,6 +1025,47 @@ struct DistributionInfo {
   bool vectorizable = false;
 };
 
+// Generally parallel loops are pationable, however if the dims for it
+// are not present in a producer of the compute op within the dispatch
+// then that dim is not partioned as codegen for this is unsupported.
+static SmallVector<unsigned int>
+getSupportedPartionableLoops(linalg::LinalgOp linalgOp) {
+  SmallVector<unsigned int> partitionableLoops;
+  linalgOp.getParallelDims(partitionableLoops);
+  SmallVector<OpOperand *> ProducerOperands;
+  for (auto operand : linalgOp.getDpsInputOperands()) {
+    auto producerOp = operand->get().getDefiningOp<linalg::LinalgOp>();
+    if (producerOp) {
+      ProducerOperands.push_back(operand);
+    }
+  }
+  if (ProducerOperands.empty()) {
+    return partitionableLoops;
+  }
+  // If we have producer operands then we need to confirm that all of them
+  // also have the the partionableLoop dims if not we skip that dim.
+  SmallVector<unsigned int> finalPartitionableLoops;
+  for (auto dim : partitionableLoops) {
+    bool dimFound = false;
+    for (auto operand : ProducerOperands) {
+      AffineMap IndexingMap = linalgOp.getMatchingIndexingMap(operand);
+      if (llvm::any_of(IndexingMap.getResults(), [&](AffineExpr expr) {
+            auto dimExpr = dyn_cast<AffineDimExpr>(expr);
+            return dimExpr && dimExpr.getPosition() == dim;
+          })) {
+        dimFound = true;
+      } else {
+        dimFound = false;
+        break;
+      }
+    }
+    if (dimFound) {
+      finalPartitionableLoops.push_back(dim);
+    }
+  }
+  return finalPartitionableLoops;
+}
+
 static FailureOr<DistributionInfo> collectOpDistributionInfo(Operation *op) {
   DistributionInfo distInfo;
   // MapScatterOp doesn't fit the LinalgOp interface, so use special case logic
@@ -1064,8 +1105,7 @@ static FailureOr<DistributionInfo> collectOpDistributionInfo(Operation *op) {
       LinalgExt::isGatherlikeOp(linalgOp)) {
     return failure();
   }
-
-  linalgOp.getParallelDims(distInfo.partitionableLoops);
+  distInfo.partitionableLoops = getSupportedPartionableLoops(linalgOp);
 
   // Bail out if op is not tilable.
   if (distInfo.partitionableLoops.empty()) {
