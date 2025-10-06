@@ -135,7 +135,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   //
   // Step 1: select a MMAIntrinsic and compute the LHS and RHS vector sizes.
   //
-  auto sizeInBits = [](VectorType type) -> int {
+  auto sizeInBits = [](VectorType type) -> int64_t {
     return type.getElementTypeBitWidth() * type.getNumElements();
   };
   int64_t intrinsicSizeBitsLHS = 0;
