@@ -86,14 +86,15 @@ util.func public @conv_2d_nhwc_chwf(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<
   util.return %0 : tensor<1x14x14x16xf32>
 }
 
-// CHECK-FHWC: #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d3, d5, d6, d4)>
+// CHECK-FHWC: #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
+// CHECK-FHWC: #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d3, d4, d5, d6)>
 
 // CHECK-FHWC-LABEL:  @conv_2d_nhwc_chwf
 // CHECK-FHWC:        %[[EMPTY:.*]] = tensor.empty() : tensor<16x3x3x4xf32>
 // CHECK-FHWC:        %[[TRANSPOSE:.*]] = linalg.transpose ins({{.*}} : tensor<4x3x3x16xf32>) outs(%[[EMPTY]] : tensor<16x3x3x4xf32>)
 // CHECK-FHWC-SAME:   permutation = [3, 1, 2, 0]
 // CHECK-FHWC:        %[[GENERIC:.*]] = linalg.generic
-// CHECK-FHWC-SAME:   indexing_maps = [#map, #[[$MAP1]], #map2],
+// CHECK-FHWC-SAME:   indexing_maps = [#[[$MAP0]], #[[$MAP1]], #map2],
 // CHECK-FHWC-SAME:   ins({{.*}}, %[[TRANSPOSE]] : tensor<1x16x16x4xf32>, tensor<16x3x3x4xf32>)
 
 // -----
@@ -111,6 +112,7 @@ util.func public @conv_2d_nhwgc_gchwf(%arg0: tensor<2x10x10x7x4xf32>, %arg1: ten
   util.return %0 : tensor<2x8x8x7x16xf32>
 }
 
+// CHECK-FHWC: #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1 + d5, d2 + d6, d3, d7)>
 // CHECK-FHWC: #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d3, d4, d5, d6, d7)>
 
 // CHECK-FHWC-LABEL:  @conv_2d_nhwgc_gchwf
@@ -118,7 +120,7 @@ util.func public @conv_2d_nhwgc_gchwf(%arg0: tensor<2x10x10x7x4xf32>, %arg1: ten
 // CHECK-FHWC:        %[[TRANSPOSE:.*]] = linalg.transpose ins({{.*}} : tensor<7x4x3x3x16xf32>) outs(%[[EMPTY]] : tensor<7x16x3x3x4xf32>)
 // CHECK-FHWC-SAME:   permutation = [0, 4, 2, 3, 1]
 // CHECK-FHWC:        %[[GENERIC:.*]] = linalg.generic
-// CHECK-FHWC-SAME:   indexing_maps = [#map, #[[$MAP1]], #map2],
+// CHECK-FHWC-SAME:   indexing_maps = [#[[$MAP0]], #[[$MAP1]], #map2],
 // CHECK-FHWC-SAME:   ins({{.*}}, %[[TRANSPOSE]] : tensor<2x10x10x7x4xf32>, tensor<7x16x3x3x4xf32>)
 
 // -----
