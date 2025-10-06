@@ -2,7 +2,7 @@
     "type": "benchmark",
     "markers": [
         "hip",
-        "gfx942"
+        "mi325"
     ],
     "modules": [
         "sdxl/modules/clip_gfx942"
