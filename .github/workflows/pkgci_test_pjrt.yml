@@ -62,6 +62,8 @@ jobs:
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: ccache
         uses: hendrikmuhs/ccache-action@bfa03e1de4d7f7c3e80ad9109feedd05c4f5a716 # v1.2.19
         with:

@@ -65,6 +65,8 @@ jobs:
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Install build dependencies
         run: sudo apt update && sudo apt install -y ninja-build
 
