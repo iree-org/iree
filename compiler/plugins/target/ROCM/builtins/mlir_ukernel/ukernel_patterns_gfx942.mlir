@@ -69,10 +69,9 @@ pdl.pattern @annotate_matmul_like_f8E4M3FNUZ_medium_expanded : benefit(1) {
       }>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
-        // This strategy uses the maximum amount of possible shared memory on
-        // all gfx942 architectures so shared memory padding to reduce bank
-        // conflicts must be disabled. Also prefetching is done manually in the
-        // above and is disabled here as well.
+        // This strategy manually prefetches and eliminates bank conflicts on LDS
+        // by using swizzling (rotate_rows). Therefore, we disable prefetch_shared_memory
+        // and enable no_reduce_shared_memory_bank_conflicts.
         {gpu_pipeline_options =
           #iree_gpu.pipeline_options<
             prefetch_shared_memory = false,
@@ -162,10 +161,9 @@ pdl.pattern @annotate_matmul_like_f8E4M3FNUZ_large_expanded : benefit(2) {
       }>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
-        // This strategy uses the maximum amount of possible shared memory on
-        // all gfx942 architectures so shared memory padding to reduce bank
-        // conflicts must be disabled. Also prefetching is done manually in the
-        // above and is disabled here as well.
+        // This strategy manually prefetches and eliminates bank conflicts on LDS
+        // by using swizzling (rotate_rows). Therefore, we disable prefetch_shared_memory
+        // and enable no_reduce_shared_memory_bank_conflicts.
         {gpu_pipeline_options =
           #iree_gpu.pipeline_options<
             prefetch_shared_memory = false,
@@ -248,10 +246,9 @@ pdl.pattern @annotate_matmul_like_f16_large : benefit(1) {
                                                    workgroup_reordering_strategy = #iree_gpu.conditional_transpose<8,38>}>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
-        // This strategy uses the maximum amount of possible shared memory on
-        // all gfx9 architectures so shared memory padding to reduce bank
-        // conflicts must be disabled. Also prefetching is done manually in the
-        // above and is disabled here as well.
+        // This strategy manually prefetches and eliminates bank conflicts on LDS
+        // by using swizzling (rotate_rows). Therefore, we disable prefetch_shared_memory
+        // and enable no_reduce_shared_memory_bank_conflicts.
         {gpu_pipeline_options =
           #iree_gpu.pipeline_options<
             prefetch_shared_memory = false,
@@ -340,10 +337,9 @@ pdl.pattern @annotate_matmul_like_f16_medium_expanded : benefit(1) {
         }>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
-        // This strategy uses the maximum amount of possible shared memory on
-        // all gfx9 architectures so shared memory padding to reduce bank
-        // conflicts must be disabled. Also prefetching is done manually in the
-        // above and is disabled here as well.
+        // This strategy manually prefetches and eliminates bank conflicts on LDS
+        // by using swizzling (rotate_rows). Therefore, we disable prefetch_shared_memory
+        // and enable no_reduce_shared_memory_bank_conflicts.
         {gpu_pipeline_options =
           #iree_gpu.pipeline_options<
             prefetch_shared_memory = false,
@@ -430,10 +426,9 @@ pdl.pattern @annotate_matmul_like_f16_large_expanded : benefit(2) {
                                                    workgroup_reordering_strategy = #iree_gpu.conditional_transpose<8,38>}>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
-        // This strategy uses the maximum amount of possible shared memory on
-        // all gfx9 architectures so shared memory padding to reduce bank
-        // conflicts must be disabled. Also prefetching is done manually in the
-        // above and is disabled here as well.
+        // This strategy manually prefetches and eliminates bank conflicts on LDS
+        // by using swizzling (rotate_rows). Therefore, we disable prefetch_shared_memory
+        // and enable no_reduce_shared_memory_bank_conflicts.
         {gpu_pipeline_options =
           #iree_gpu.pipeline_options<
             prefetch_shared_memory = false,
@@ -516,10 +511,9 @@ pdl.pattern @annotate_matmul_like_bf16_large : benefit(1) {
                                                    workgroup_reordering_strategy = #iree_gpu.conditional_transpose<8,38>}>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
-        // This strategy uses the maximum amount of possible shared memory on
-        // all gfx9 architectures so shared memory padding to reduce bank
-        // conflicts must be disabled. Also prefetching is done manually in the
-        // above and is disabled here as well.
+        // This strategy manually prefetches and eliminates bank conflicts on LDS
+        // by using swizzling (rotate_rows). Therefore, we disable prefetch_shared_memory
+        // and enable no_reduce_shared_memory_bank_conflicts.
         {gpu_pipeline_options =
           #iree_gpu.pipeline_options<
             prefetch_shared_memory = false,
@@ -610,10 +604,9 @@ pdl.pattern @annotate_matmul_like_bf16_medium_expanded : benefit(1) {
         }>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
-        // This strategy uses the maximum amount of possible shared memory on
-        // all gfx9 architectures so shared memory padding to reduce bank
-        // conflicts must be disabled. Also prefetching is done manually in the
-        // above and is disabled here as well.
+        // This strategy manually prefetches and eliminates bank conflicts on LDS
+        // by using swizzling (rotate_rows). Therefore, we disable prefetch_shared_memory
+        // and enable no_reduce_shared_memory_bank_conflicts.
         {gpu_pipeline_options =
           #iree_gpu.pipeline_options<
             prefetch_shared_memory = false,
@@ -694,10 +687,9 @@ pdl.pattern @annotate_matmul_like_bf16_large_expanded : benefit(2) {
                                                    workgroup_reordering_strategy = #iree_gpu.conditional_transpose<8,38>}>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
-        // This strategy uses the maximum amount of possible shared memory on
-        // all gfx9 architectures so shared memory padding to reduce bank
-        // conflicts must be disabled. Also prefetching is done manually in the
-        // above and is disabled here as well.
+        // This strategy manually prefetches and eliminates bank conflicts on LDS
+        // by using swizzling (rotate_rows). Therefore, we disable prefetch_shared_memory
+        // and enable no_reduce_shared_memory_bank_conflicts.
         {gpu_pipeline_options =
           #iree_gpu.pipeline_options<
             prefetch_shared_memory = false,
@@ -752,10 +744,9 @@ pdl.pattern @annotate_inner_tiled_f8E4M3FNUZ_medium : benefit(1) {
       }>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
-        // This strategy uses the maximum amount of possible shared memory on
-        // all gfx942 architectures so shared memory padding to reduce bank
-        // conflicts must be disabled. Also prefetching is done manually in the
-        // above and is disabled here as well.
+        // This strategy manually prefetches and eliminates bank conflicts on LDS
+        // by using swizzling (rotate_rows). Therefore, we disable prefetch_shared_memory
+        // and enable no_reduce_shared_memory_bank_conflicts.
         {gpu_pipeline_options =
           #iree_gpu.pipeline_options<
             prefetch_shared_memory = false,
@@ -810,10 +801,9 @@ pdl.pattern @annotate_inner_tiled_f8E4M3FNUZ_large : benefit(2) {
       }>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
-        // This strategy uses the maximum amount of possible shared memory on
-        // all gfx942 architectures so shared memory padding to reduce bank
-        // conflicts must be disabled. Also prefetching is done manually in the
-        // above and is disabled here as well.
+        // This strategy manually prefetches and eliminates bank conflicts on LDS
+        // by using swizzling (rotate_rows). Therefore, we disable prefetch_shared_memory
+        // and enable no_reduce_shared_memory_bank_conflicts.
         {gpu_pipeline_options =
           #iree_gpu.pipeline_options<
             prefetch_shared_memory = false,
@@ -868,10 +858,9 @@ pdl.pattern @annotate_inner_tiled_f16_large : benefit(1) {
       }>,
       translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
         workgroup_size = [512, 1, 1] subgroup_size = 64,
-        // This strategy uses the maximum amount of possible shared memory on
-        // all gfx942 architectures so shared memory padding to reduce bank
-        // conflicts must be disabled. Also prefetching is done manually in the
-        // above and is disabled here as well.
+        // This strategy manually prefetches and eliminates bank conflicts on LDS
+        // by using swizzling (rotate_rows). Therefore, we disable prefetch_shared_memory
+        // and enable no_reduce_shared_memory_bank_conflicts.
         {gpu_pipeline_options =
           #iree_gpu.pipeline_options<
             prefetch_shared_memory = false,
