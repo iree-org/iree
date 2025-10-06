@@ -24,7 +24,30 @@
  affine_map<(i, j, k) -> (i, j)>
 ]
 
-util.func @pingpong_dt_large_f8E4M3FNUZ(%lhs_base: !lhs_base_ty, %rhs_base: !rhs_base_ty, %unused_acc: !acc_base_ty) -> !acc_base_ty {
+util.func @pingpong_dt_large_f8E4M3FNUZ(%lhs_base: !lhs_base_ty, %rhs_base: !rhs_base_ty, %unused_acc: !acc_base_ty) -> !acc_base_ty attributes {
+  ukernel_info = #rocm.ukernel_info<
+    match = {
+      types = [f8E4M3FNUZ, f8E4M3FNUZ, f32],
+      iteration_sizes_constraints = [
+        #rocm.ukernel_interation_size_constraint<
+          index = 1,
+          size_min = 2048,
+          size_max = 8192
+        >
+      ]
+    },
+    // Benefit larger than the default 0 means we prefer this "large" kernel when it matches.
+    benefit = 1,
+    mma = #iree_gpu.data_tiled_mma_layout<
+      intrinsic = MFMA_F32_16x16x32_F8E4M3FNUZ,
+      intrinsics_m = 8,
+      subgroups_m = 2,
+      intrinsics_n = 4,
+      subgroups_n = 4,
+      intrinsics_k = 1
+    >
+  >
+} {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
@@ -264,7 +287,21 @@ util.func @pingpong_dt_large_f8E4M3FNUZ(%lhs_base: !lhs_base_ty, %rhs_base: !rhs
   util.return %1 : !acc_base_ty
 }
 
-util.func private @pingpong_dt_medium_f8E4M3FNUZ(%lhs_base: !m_lhs_base_ty, %rhs_base: !m_rhs_base_ty, %unused_acc: !m_acc_base_ty) -> !m_acc_base_ty {
+util.func private @pingpong_dt_medium_f8E4M3FNUZ(%lhs_base: !m_lhs_base_ty, %rhs_base: !m_rhs_base_ty, %unused_acc: !m_acc_base_ty) -> !m_acc_base_ty attributes {
+  ukernel_info = #rocm.ukernel_info<
+    match = {
+      types = [f8E4M3FNUZ, f8E4M3FNUZ, f32]
+    },
+    mma = #iree_gpu.data_tiled_mma_layout<
+      intrinsic = MFMA_F32_16x16x32_F8E4M3FNUZ,
+      intrinsics_m = 8,
+      subgroups_m = 1,
+      intrinsics_n = 2,
+      subgroups_n = 8,
+      intrinsics_k = 2
+    >
+  >
+} {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
