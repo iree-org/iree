@@ -24,7 +24,7 @@ iree_uk_mmt4d_tile_f16f16fXX_1xXXx1_to_6xXXx1_riscv_64_zvfhmin(
   vfloat32m4_t acc0, acc1, acc2, acc3, acc4, acc5;
   int N0 = params->N0;
   size_t vl = N0;
-  
+
   if (M0 == 1) {
     if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
       if (acc_type == IREE_UK_TYPE_FLOAT_32) {
@@ -32,7 +32,8 @@ iree_uk_mmt4d_tile_f16f16fXX_1xXXx1_to_6xXXx1_riscv_64_zvfhmin(
         acc0 = __riscv_vle32_v_f32m4(out_ptr, vl);
       } else {
         _Float16* IREE_UK_RESTRICT out_ptr = out_tile;
-        acc0 = __riscv_vfwcvt_f_f_v_f32m4(__riscv_vle16_v_f16m2(out_ptr, vl), vl);
+        acc0 =
+            __riscv_vfwcvt_f_f_v_f32m4(__riscv_vle16_v_f16m2(out_ptr, vl), vl);
       }
     } else {
       acc0 = __riscv_vfmv_v_f_f32m4(0.0, vl);
@@ -59,8 +60,10 @@ iree_uk_mmt4d_tile_f16f16fXX_1xXXx1_to_6xXXx1_riscv_64_zvfhmin(
         acc1 = __riscv_vle32_v_f32m4(out_ptr + N0, vl);
       } else {
         _Float16* IREE_UK_RESTRICT out_ptr = out_tile;
-        acc0 = __riscv_vfwcvt_f_f_v_f32m4(__riscv_vle16_v_f16m2(out_ptr, vl), vl);
-        acc1 = __riscv_vfwcvt_f_f_v_f32m4(__riscv_vle16_v_f16m2(out_ptr + N0, vl), vl);
+        acc0 =
+            __riscv_vfwcvt_f_f_v_f32m4(__riscv_vle16_v_f16m2(out_ptr, vl), vl);
+        acc1 = __riscv_vfwcvt_f_f_v_f32m4(
+            __riscv_vle16_v_f16m2(out_ptr + N0, vl), vl);
       }
     } else {
       acc0 = __riscv_vfmv_v_f_f32m4(0.0, vl);
@@ -83,7 +86,8 @@ iree_uk_mmt4d_tile_f16f16fXX_1xXXx1_to_6xXXx1_riscv_64_zvfhmin(
     } else {
       _Float16* IREE_UK_RESTRICT out_ptr = out_tile;
       __riscv_vse16_v_f16m2(out_ptr, __riscv_vfncvt_f_f_w_f16m2(acc0, vl), vl);
-      __riscv_vse16_v_f16m2(out_ptr + N0, __riscv_vfncvt_f_f_w_f16m2(acc1, vl), vl);
+      __riscv_vse16_v_f16m2(out_ptr + N0, __riscv_vfncvt_f_f_w_f16m2(acc1, vl),
+                            vl);
     }
   } else if (M0 == 4) {
     if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
@@ -95,10 +99,14 @@ iree_uk_mmt4d_tile_f16f16fXX_1xXXx1_to_6xXXx1_riscv_64_zvfhmin(
         acc3 = __riscv_vle32_v_f32m4(out_ptr + N0 * 3, vl);
       } else {
         _Float16* IREE_UK_RESTRICT out_ptr = out_tile;
-        acc0 = __riscv_vfwcvt_f_f_v_f32m4(__riscv_vle16_v_f16m2(out_ptr, vl), vl);
-        acc1 = __riscv_vfwcvt_f_f_v_f32m4(__riscv_vle16_v_f16m2(out_ptr + N0, vl), vl);
-        acc2 = __riscv_vfwcvt_f_f_v_f32m4(__riscv_vle16_v_f16m2(out_ptr + N0 * 2, vl), vl);
-        acc3 = __riscv_vfwcvt_f_f_v_f32m4(__riscv_vle16_v_f16m2(out_ptr + N0 * 3, vl), vl);
+        acc0 =
+            __riscv_vfwcvt_f_f_v_f32m4(__riscv_vle16_v_f16m2(out_ptr, vl), vl);
+        acc1 = __riscv_vfwcvt_f_f_v_f32m4(
+            __riscv_vle16_v_f16m2(out_ptr + N0, vl), vl);
+        acc2 = __riscv_vfwcvt_f_f_v_f32m4(
+            __riscv_vle16_v_f16m2(out_ptr + N0 * 2, vl), vl);
+        acc3 = __riscv_vfwcvt_f_f_v_f32m4(
+            __riscv_vle16_v_f16m2(out_ptr + N0 * 3, vl), vl);
       }
     } else {
       acc0 = __riscv_vfmv_v_f_f32m4(0.0, vl);
@@ -129,9 +137,12 @@ iree_uk_mmt4d_tile_f16f16fXX_1xXXx1_to_6xXXx1_riscv_64_zvfhmin(
     } else {
       _Float16* IREE_UK_RESTRICT out_ptr = out_tile;
       __riscv_vse16_v_f16m2(out_ptr, __riscv_vfncvt_f_f_w_f16m2(acc0, vl), vl);
-      __riscv_vse16_v_f16m2(out_ptr + N0, __riscv_vfncvt_f_f_w_f16m2(acc1, vl), vl);
-      __riscv_vse16_v_f16m2(out_ptr + N0 * 2, __riscv_vfncvt_f_f_w_f16m2(acc2, vl), vl);
-      __riscv_vse16_v_f16m2(out_ptr + N0 * 3, __riscv_vfncvt_f_f_w_f16m2(acc3, vl), vl);
+      __riscv_vse16_v_f16m2(out_ptr + N0, __riscv_vfncvt_f_f_w_f16m2(acc1, vl),
+                            vl);
+      __riscv_vse16_v_f16m2(out_ptr + N0 * 2,
+                            __riscv_vfncvt_f_f_w_f16m2(acc2, vl), vl);
+      __riscv_vse16_v_f16m2(out_ptr + N0 * 3,
+                            __riscv_vfncvt_f_f_w_f16m2(acc3, vl), vl);
     }
   } else if (M0 == 6) {
     if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
@@ -145,12 +156,18 @@ iree_uk_mmt4d_tile_f16f16fXX_1xXXx1_to_6xXXx1_riscv_64_zvfhmin(
         acc5 = __riscv_vle32_v_f32m4(out_ptr + N0 * 5, vl);
       } else {
         _Float16* IREE_UK_RESTRICT out_ptr = out_tile;
-        acc0 = __riscv_vfwcvt_f_f_v_f32m4(__riscv_vle16_v_f16m2(out_ptr, vl), vl);
-        acc1 = __riscv_vfwcvt_f_f_v_f32m4(__riscv_vle16_v_f16m2(out_ptr + N0, vl), vl);
-        acc2 = __riscv_vfwcvt_f_f_v_f32m4(__riscv_vle16_v_f16m2(out_ptr + N0 * 2, vl), vl);
-        acc3 = __riscv_vfwcvt_f_f_v_f32m4(__riscv_vle16_v_f16m2(out_ptr + N0 * 3, vl), vl);
-        acc4 = __riscv_vfwcvt_f_f_v_f32m4(__riscv_vle16_v_f16m2(out_ptr + N0 * 4, vl), vl);
-        acc5 = __riscv_vfwcvt_f_f_v_f32m4(__riscv_vle16_v_f16m2(out_ptr + N0 * 5, vl), vl);
+        acc0 =
+            __riscv_vfwcvt_f_f_v_f32m4(__riscv_vle16_v_f16m2(out_ptr, vl), vl);
+        acc1 = __riscv_vfwcvt_f_f_v_f32m4(
+            __riscv_vle16_v_f16m2(out_ptr + N0, vl), vl);
+        acc2 = __riscv_vfwcvt_f_f_v_f32m4(
+            __riscv_vle16_v_f16m2(out_ptr + N0 * 2, vl), vl);
+        acc3 = __riscv_vfwcvt_f_f_v_f32m4(
+            __riscv_vle16_v_f16m2(out_ptr + N0 * 3, vl), vl);
+        acc4 = __riscv_vfwcvt_f_f_v_f32m4(
+            __riscv_vle16_v_f16m2(out_ptr + N0 * 4, vl), vl);
+        acc5 = __riscv_vfwcvt_f_f_v_f32m4(
+            __riscv_vle16_v_f16m2(out_ptr + N0 * 5, vl), vl);
       }
     } else {
       acc0 = __riscv_vfmv_v_f_f32m4(0.0, vl);
@@ -189,11 +206,16 @@ iree_uk_mmt4d_tile_f16f16fXX_1xXXx1_to_6xXXx1_riscv_64_zvfhmin(
     } else {
       _Float16* IREE_UK_RESTRICT out_ptr = out_tile;
       __riscv_vse16_v_f16m2(out_ptr, __riscv_vfncvt_f_f_w_f16m2(acc0, vl), vl);
-      __riscv_vse16_v_f16m2(out_ptr + N0, __riscv_vfncvt_f_f_w_f16m2(acc1, vl), vl);
-      __riscv_vse16_v_f16m2(out_ptr + N0 * 2, __riscv_vfncvt_f_f_w_f16m2(acc2, vl), vl);
-      __riscv_vse16_v_f16m2(out_ptr + N0 * 3, __riscv_vfncvt_f_f_w_f16m2(acc3, vl), vl);
-      __riscv_vse16_v_f16m2(out_ptr + N0 * 4, __riscv_vfncvt_f_f_w_f16m2(acc4, vl), vl);
-      __riscv_vse16_v_f16m2(out_ptr + N0 * 5, __riscv_vfncvt_f_f_w_f16m2(acc5, vl), vl);
+      __riscv_vse16_v_f16m2(out_ptr + N0, __riscv_vfncvt_f_f_w_f16m2(acc1, vl),
+                            vl);
+      __riscv_vse16_v_f16m2(out_ptr + N0 * 2,
+                            __riscv_vfncvt_f_f_w_f16m2(acc2, vl), vl);
+      __riscv_vse16_v_f16m2(out_ptr + N0 * 3,
+                            __riscv_vfncvt_f_f_w_f16m2(acc3, vl), vl);
+      __riscv_vse16_v_f16m2(out_ptr + N0 * 4,
+                            __riscv_vfncvt_f_f_w_f16m2(acc4, vl), vl);
+      __riscv_vse16_v_f16m2(out_ptr + N0 * 5,
+                            __riscv_vfncvt_f_f_w_f16m2(acc5, vl), vl);
     }
   }
 }
@@ -240,4 +262,4 @@ IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_f16f16f16_4xXXx1_riscv_64_zvfhmin, 4)
 IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_f16f16f16_1xXXx1_to_6xXXx1_riscv_64_zvfhmin,
-    iree_uk_mmt4d_tile_f16f16f16_6xXXx1_riscv_64_zvfhmin, 6) 
+    iree_uk_mmt4d_tile_f16f16f16_6xXXx1_riscv_64_zvfhmin, 6)

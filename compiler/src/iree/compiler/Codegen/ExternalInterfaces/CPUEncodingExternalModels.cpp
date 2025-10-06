@@ -440,10 +440,9 @@ enumerateMatmulTileRiscv64(TypeRange elementTypes, DictionaryAttr config) {
     int N0 = vlen / 8;
     if (hasFeature(config, "+zvfhmin")) {
       return {
-          TileMxNxK{6, N0, 1},
-          TileMxNxK{4, N0, 1}, // Truncation of the above.
-          TileMxNxK{2, N0, 1}, // Truncation of the above.
-          TileMxNxK{1, N0, 1}, // Truncation of the above.
+          TileMxNxK{6, N0, 1}, TileMxNxK{4, N0, 1}, // Truncation of the above.
+          TileMxNxK{2, N0, 1},                      // Truncation of the above.
+          TileMxNxK{1, N0, 1},                      // Truncation of the above.
       };
     }
   }
@@ -451,10 +450,9 @@ enumerateMatmulTileRiscv64(TypeRange elementTypes, DictionaryAttr config) {
     int N0 = vlen / 8;
     if (hasFeature(config, "+zvfhmin")) {
       return {
-          TileMxNxK{6, N0, 1},
-          TileMxNxK{4, N0, 1}, // Truncation of the above.
-          TileMxNxK{2, N0, 1}, // Truncation of the above.
-          TileMxNxK{1, N0, 1}, // Truncation of the above.
+          TileMxNxK{6, N0, 1}, TileMxNxK{4, N0, 1}, // Truncation of the above.
+          TileMxNxK{2, N0, 1},                      // Truncation of the above.
+          TileMxNxK{1, N0, 1},                      // Truncation of the above.
       };
     }
   }

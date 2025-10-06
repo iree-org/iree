@@ -28,7 +28,8 @@ static inline bool iree_uk_cpu_riscv_64_v(const iree_uk_uint64_t* cpu_data) {
   return iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_RISCV_64_V);
 }
 
-static inline bool iree_uk_cpu_riscv_64_zvfhmin(const iree_uk_uint64_t* cpu_data) {
+static inline bool iree_uk_cpu_riscv_64_zvfhmin(
+    const iree_uk_uint64_t* cpu_data) {
   return iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_RISCV_64_ZVFHMIN);
 }
 

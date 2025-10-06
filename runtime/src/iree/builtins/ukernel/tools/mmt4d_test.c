@@ -606,8 +606,8 @@ int main(int argc, char** argv) {
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 7, 16, 1, "v");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 6, 16, 1, "zvfhmin");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS |
-                        IREE_UK_FLAG_MMT4D_TYPE_F16F16F16,
-                    6, 16, 1, "zvfhmin");
+                         IREE_UK_FLAG_MMT4D_TYPE_F16F16F16,
+                     6, 16, 1, "zvfhmin");
 
 #endif  // defined(IREE_ARCH_ARM_64)
 
