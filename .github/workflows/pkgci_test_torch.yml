@@ -10,6 +10,11 @@ permissions:
   contents: read
 
 on:
+  workflow_call:
+    inputs:
+      artifact_run_id:
+        type: string
+        default: ""
   workflow_dispatch:
     inputs:
       artifact_run_id:
