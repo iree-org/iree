@@ -36,9 +36,10 @@ jobs:
       matrix:
         include:
           # CPU
-          - name: cpu_llvm_sync_O0
+          - name: cpu_task
+            markers: "cpu"
+            cache-dir: /home/nod/iree_tests_cache
             config-file: torch_ops_cpu_llvm_sync_O0.json
-            numprocesses: auto
             runs-on:
               - self-hosted # must come first
               - persistent-cache
