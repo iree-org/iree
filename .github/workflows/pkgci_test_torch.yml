@@ -35,7 +35,7 @@ jobs:
               - X64
           # MI325
           - name: amdgpu_mi325_gfx942
-            markers: "hip or gfx942 or mi325"
+            markers: "gfx942 or mi325"
             cache-dir: /shark-cache/data/iree-regression-cache
             runs-on: linux-mi325-1gpu-ossci-iree-org
     env:
