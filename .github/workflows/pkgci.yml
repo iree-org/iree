@@ -97,6 +97,12 @@ jobs:
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_onnx')
     uses: ./.github/workflows/pkgci_test_onnx.yml
 
+  test_torch:
+    name: Test Torch
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_torch')
+    uses: ./.github/workflows/pkgci_test_torch.yml
+
   test_sharktank:
     name: Test Sharktank
     needs: [setup, build_packages]
@@ -139,6 +145,7 @@ jobs:
       - test_android
       - test_riscv64
       - test_onnx
+      - test_torch
       - test_sharktank
       - test_tensorflow
       - test_pjrt
