@@ -83,16 +83,16 @@ void buildGlobalOptimizationPassPipeline(
     OpPassManager &mainPassManager, const TransformOptions &transformOptions) {
   // Import parameters before any global optimization passes so that the inlined
   // parameters are available for folding.
-  if (!transformOptions.options.parameterImportPaths.empty()) {
+  if (!transformOptions.parameterImportPaths.empty()) {
     IREE::IO::Parameters::ImportParametersPassOptions importParametersOptions;
     importParametersOptions.scopePaths.assign(
-        transformOptions.options.parameterImportPaths.begin(),
-        transformOptions.options.parameterImportPaths.end());
+        transformOptions.parameterImportPaths.begin(),
+        transformOptions.parameterImportPaths.end());
     importParametersOptions.keys.assign(
-        transformOptions.options.parameterImportKeys.begin(),
-        transformOptions.options.parameterImportKeys.end());
+        transformOptions.parameterImportKeys.begin(),
+        transformOptions.parameterImportKeys.end());
     importParametersOptions.maximumSize =
-        transformOptions.options.parameterImportMaximumSize;
+        transformOptions.parameterImportMaximumSize;
     mainPassManager.addPass(IREE::IO::Parameters::createImportParametersPass(
         importParametersOptions));
   }
@@ -104,7 +104,7 @@ void buildGlobalOptimizationPassPipeline(
 
   // Preprocessing passes to get the program into a canonical state.
   FunctionLikeNest(mainPassManager)
-      .addPredicatedPass(transformOptions.options.stripAssertions,
+      .addPredicatedPass(transformOptions.stripAssertions,
                          IREE::Util::createStripDebugOpsPass)
       .addPass(IREE::Util::createOptimizeIntArithmeticPass)
       .addPass(createLinalgQuantizedConvToConvPass)
@@ -133,8 +133,7 @@ void buildGlobalOptimizationPassPipeline(
       // unit extent dims because this allows decoupling unit dims in the
       // concatenation from the transposes that are introduced.
       .addPass([&]() {
-        return createDecomposeConcatPass(
-            transformOptions.options.outerDimConcat);
+        return createDecomposeConcatPass(transformOptions.outerDimConcat);
       })
       // We generalize certain named ops immediately before folding unit extent
       // dims as the unit dim folding pass updates indexing maps and is better
@@ -142,7 +141,7 @@ void buildGlobalOptimizationPassPipeline(
       // specialized raising and the op names are no longer useful.
       .addPass([&]() {
         GeneralizeLinalgNamedOpsPassOptions opt;
-        opt.enableGeneralizeMatmul = transformOptions.options.generalizeMatmul;
+        opt.enableGeneralizeMatmul = transformOptions.generalizeMatmul;
         return createGeneralizeLinalgNamedOpsPass(opt);
       });
 
@@ -164,20 +163,20 @@ void buildGlobalOptimizationPassPipeline(
       // decisions as SetEncoding is expected to pick the ideal layout for
       // that operation anyway, and this way we only need to make such a
       // decision once.
-      .addPredicatedPass(
-          clEnableTransposePropagation,
-          [&]() {
-            PropagateLinalgTransposePassOptions options;
-            options.enableAggressivePropagation =
-                transformOptions.options.aggressiveTransposePropagation;
-            options.enableAttentionVTranspose = clEnableAttentionVTranspose;
-            return createPropagateLinalgTransposePass(options);
-          })
+      .addPredicatedPass(clEnableTransposePropagation,
+                         [&]() {
+                           PropagateLinalgTransposePassOptions options;
+                           options.enableAggressivePropagation =
+                               transformOptions.aggressiveTransposePropagation;
+                           options.enableAttentionVTranspose =
+                               clEnableAttentionVTranspose;
+                           return createPropagateLinalgTransposePass(options);
+                         })
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass);
 
   // Enable data tiling after they are in a canonical form.
-  if (transformOptions.options.dataTiling) {
+  if (transformOptions.dataTiling) {
     FunctionLikeNest(mainPassManager)
         .addPass(DispatchCreation::createAnnotateDataTilingHintsPass)
         .addPass([&]() {
@@ -227,7 +226,7 @@ void buildGlobalOptimizationPassPipeline(
     transformOptions.buildConstEvalPassPipeline(mainPassManager);
   }
 
-  if (transformOptions.options.numericPrecisionReduction) {
+  if (transformOptions.numericPrecisionReduction) {
     mainPassManager.addPass(createInferNumericNarrowingPass());
     mainPassManager.addPass(createOptimizeNumericsPass());
     mainPassManager.addPass(createCleanupNumericNarrowingPass());
@@ -247,21 +246,19 @@ void buildGlobalOptimizationPassPipeline(
   // constants that aren't exported and skip it for larger parameters, but this
   // is a sensible place for the common case of wanting const-eval in the final
   // artifact + archive.
-  if (!transformOptions.options.parameterExportPath.empty()) {
+  if (!transformOptions.parameterExportPath.empty()) {
     IREE::IO::Parameters::ExportParametersPassOptions exportParametersOptions;
-    exportParametersOptions.scopePath =
-        transformOptions.options.parameterExportPath;
+    exportParametersOptions.scopePath = transformOptions.parameterExportPath;
     exportParametersOptions.minimumSize =
-        transformOptions.options.parameterExportMinimumSize;
+        transformOptions.parameterExportMinimumSize;
     mainPassManager.addPass(IREE::IO::Parameters::createExportParametersPass(
         exportParametersOptions));
   }
 
-  if (!transformOptions.options.parameterSplatExportFile.empty()) {
+  if (!transformOptions.parameterSplatExportFile.empty()) {
     IREE::IO::Parameters::GenerateSplatParameterArchivePassOptions
         generateSplatOptions;
-    generateSplatOptions.filePath =
-        transformOptions.options.parameterSplatExportFile;
+    generateSplatOptions.filePath = transformOptions.parameterSplatExportFile;
     mainPassManager.addPass(
         IREE::IO::Parameters::createGenerateSplatParameterArchivePass(
             generateSplatOptions));
