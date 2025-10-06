@@ -52,7 +52,7 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
       *this,
       "const-expr-hoisting",
       llvm::cl::desc("Enables hoisting of constant expressions."),
-      llvm::cl::init(false),
+      llvm::cl::init(true),
   };
   Option<int64_t> constExprMaxSizeIncreaseThreshold{
       *this,
