@@ -270,28 +270,26 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   tilingOptions.setInterchange(tilingInfo->interchange);
   tilingOptions.setMapping(deviceMappingAttribute);
 
-  auto workgroupReOrderingStrategy =
-      getLoweringConfig(tilingInfo->tilableOp).getWorkgroupReOrderingStrategy();
-  if (workgroupReOrderingStrategy) {
-
+  auto workgroupReorderingStrategy =
+      getLoweringConfig(tilingInfo->tilableOp).getWorkgroupReorderingStrategy();
+  if (workgroupReorderingStrategy) {
     scf::SCFTilingOptions::GenerateLoopHeaderFn loopHeaderFn =
-        [&workgroupReOrderingStrategy](RewriterBase &rewriter, Location loc,
+        [&workgroupReorderingStrategy](RewriterBase &rewriter, Location loc,
                                        ArrayRef<Range> loopRanges,
                                        ArrayRef<OpFoldResult> givenTileSizes,
                                        ValueRange outerDestinationTensors)
         -> FailureOr<scf::SCFTilingOptions::CustomLoopHeaderInfo> {
-      return workgroupReOrderingStrategy.generateLoopHeaderFn(
+      return workgroupReorderingStrategy.generateLoopHeaderFn(
           rewriter, loc, loopRanges, givenTileSizes, outerDestinationTensors);
     };
-
     scf::SCFTilingOptions::GenerateLoopTerminatorFn terminatorFn =
-        [&workgroupReOrderingStrategy](
+        [&workgroupReorderingStrategy](
             RewriterBase &rewriter, Location loc,
             ArrayRef<LoopLikeOpInterface> loops, ValueRange tiledResults,
             ArrayRef<SmallVector<OpFoldResult>> resultOffsets,
             ArrayRef<SmallVector<OpFoldResult>> resultSizes,
             ValueRange destinationTensors) -> LogicalResult {
-      return workgroupReOrderingStrategy.generateLoopTerminatorFn(
+      return workgroupReorderingStrategy.generateLoopTerminatorFn(
           rewriter, loc, loops, tiledResults, resultOffsets, resultSizes,
           destinationTensors);
     };

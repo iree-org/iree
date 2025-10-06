@@ -30,7 +30,7 @@ def IREEGPU_LoweringConfigAttr :
         "hasTilingLevel",
         "hasWorkgroupTilingLevel",
         "getLoweringStrategy",
-        "getWorkgroupReOrderingStrategy"
+        "getWorkgroupReorderingStrategy"
     ]>
     ]> {
   let mnemonic = "lowering_config";
@@ -670,23 +670,39 @@ def IREEGPU_ConditionalTransposeAttr  :
   let mnemonic = "conditional_transpose";
   let summary = [{Enable or disable transposed workgroup reordering based on the workload.}];
   let description = [{
-    This attribute controls conditional transposed workgroup reordering, determined by tile size,
-    the number of XCDs, and the number of CUs. The reordering strategy is also influenced by
-    the memory access pattern, and is specifically designed to optimize the ping-pong matmul
-    specialization. On gfx9 architectures, all CUs within a single XCD share an L2 cache.
-    This attribute helps determine whether applying transposed workgroup reordering will
-    improve the L2 cache hit rate.
+    This attribute controls conditional transposed workgroup reordering, determined by tile size and
+    the number of CUs. This strategy is specifically designed to optimize the ping-pong matmul specialization.
+    At each iteration over the K dimension, `X` distinct tiles for RHS and 'Y' distinct tiles for LHS are loaded.
+    The strategy compares the sum of X and Y for the default ordering versus the transposed ordering, and selects
+    the configuration with the minimum value.
+    Calculation breakdown:
+     - LHS shape: (M,K)
+     - RHS shape: (N,K)
+     - Tile dimension : (TileM, TileN)
+     - numTileLoadsDefault = min(numCUS,ceil(N,tileN)) + ceil(numCUS,min(numCUS,ceil(N,tileN)))
+     - numTileLoadsTransposed = min(numCUS,ceil(M,tileM)) + ceil(numCUS,min(numCUS,ceil(M,tileM)))
 
-  Fields:
-    - nb_xcds: Number of XCDs.
-    - nb_CUs: Number of CUs per XCD.
+     Examples for gfx942:
+     - (M=8192, N=128256, K=4096)
+      - numTileLoadsDefault = 304 + ceil(304, 304) = 305
+      - numTileLoadsTransposed = 32 + ceil(304, 32) = 42
+      => numTileLoadsTransposed < numTileLoadsDefault => enable transpose
+
+     - (M=8192, N=128256, K=4096)
+      - numTileLoadsDefault = 32 + ceil(304, 32) = 42
+      - numTileLoadsTransposed = 64 + ceil(304, 64) = 69
+      numTileLoadsTransposed > numTileLoadsDefault => disable transpose
+
+      Fields:
+        - numXCDs: Number of XCDs.
+        - numCUs: Number of CUs per XCD.
   }];
   let parameters = (ins
-    AttrParameter<"int64_t", "">:$nbXcds,
-    AttrParameter<"int64_t", "">:$nbCus
+    AttrParameter<"int64_t", "">:$numXCDs,
+    AttrParameter<"int64_t", "">:$numCUs
   );
   let assemblyFormat = [{
-    `<` $nbXcds `,` $nbCus `>`
+    `<` $numXCDs `,` $numCUs `>`
   }];
   let genVerifyDecl = 1;
 }

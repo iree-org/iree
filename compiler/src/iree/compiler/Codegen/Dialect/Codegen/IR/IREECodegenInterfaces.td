@@ -468,7 +468,7 @@ def IREECodegen_LoweringConfigAttrInterface :
         operation.
       }],
       /*retTy=*/"::mlir::iree_compiler::IREE::Codegen::WorkgroupReorderingAttrInterface",
-      /*methodName=*/"getWorkgroupReOrderingStrategy",
+      /*methodName=*/"getWorkgroupReorderingStrategy",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
