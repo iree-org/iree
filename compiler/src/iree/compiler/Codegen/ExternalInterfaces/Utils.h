@@ -22,6 +22,14 @@ namespace mlir::iree_compiler::IREE {
 
 static const char kEncodingInfoAttrName[] = "encoding_info";
 
+// Adjusts tile sizes when the tensor was bitcast from a different element type.
+// The encoding's `original_element_type` field records the element type before
+// bitcast packing. Tile sizes are computed for the original (semantic) element
+// count, so we scale them by the bit width ratio to match the storage shape.
+// This also adjusts the swizzle's expandShape innermost dimension if present.
+void adjustTileSizesForBitcast(RankedTensorType type,
+                               IREE::Codegen::MaterializeEncodingInfo &info);
+
 // This class is the base class for the external model of different packed
 // encoding layout attributes. It provides a public method, `getEncodingInfo` to
 // reduce the duplicated implementations before. To inherit it, it requires the
@@ -47,7 +55,10 @@ public:
         return info.value();
       }
     }
-    return impl->getEncodingInfoImpl(attr, type);
+    IREE::Codegen::MaterializeEncodingInfo info =
+        impl->getEncodingInfoImpl(attr, type);
+    adjustTileSizesForBitcast(type, info);
+    return info;
   }
 
   LogicalResult verifyPackedLayoutWithType(

@@ -117,6 +117,15 @@ struct PropagationResult {
   SmallVector<Value> replacements;
 };
 
+/// Information returned by convertForBitcast interface method.
+/// Contains the new shape and encoding after bitcasting to a new element type.
+struct BitcastEncodingInfo {
+  /// The new shape after bitcasting.
+  SmallVector<int64_t> newShape;
+  /// The new encoding attribute after bitcasting.
+  Attribute encoding;
+};
+
 } // namespace mlir::iree_compiler::IREE::Encoding
 
 // clang-format off

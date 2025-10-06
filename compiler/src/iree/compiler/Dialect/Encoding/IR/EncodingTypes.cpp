@@ -89,10 +89,10 @@ SerializableAttr::getEncodingProperties(Operation *op) {
   SmallVector<Value> dynamicDims = getDynamicLoopDims(builder, linalgOp);
 
   auto addEncoding = [&](int64_t operandIndex) {
-    return EncodingProperties{EncodingAttr::get(ctx, operandIndex, opType,
-                                                elemTypes, maps,
-                                                iterationSizes),
-                              dynamicDims};
+    return EncodingProperties{
+        EncodingAttr::get(ctx, operandIndex, opType, elemTypes,
+                          /*originalElementType=*/{}, maps, iterationSizes),
+        dynamicDims};
   };
 
   // Return encoding properties for contraction operations.
