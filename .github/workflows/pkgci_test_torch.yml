@@ -20,6 +20,12 @@ on:
       artifact_run_id:
         type: string
         default: ""
+  workflow_call:
+    inputs:
+      artifact_run_id:
+        type: string
+        default: ""
+
 
 jobs:
   test_torch_ops:
@@ -33,6 +39,11 @@ jobs:
           - name: cpu_llvm_sync_O0
             config-file: torch_ops_cpu_llvm_sync_O0.json
             numprocesses: auto
+            runs-on:
+              - self-hosted # must come first
+              - persistent-cache
+              - Linux
+              - X64
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       CONFIG_FILE_PATH: tests/external/iree-test-suites/pytorch_ops/${{ matrix.config-file }}

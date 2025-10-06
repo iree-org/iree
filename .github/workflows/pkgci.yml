@@ -146,6 +146,7 @@ jobs:
       - test_riscv64
       - test_onnx
       - test_torch
+      - test_torch_ops
       - test_sharktank
       - test_tensorflow
       - test_pjrt
