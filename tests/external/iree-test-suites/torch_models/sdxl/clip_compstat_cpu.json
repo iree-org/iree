@@ -2,6 +2,6 @@
   "type": "compstat",
   "markers": ["cpu"],
   "module": "sdxl/modules/clip_cpu",
-  "golden_dispatch_count": 12,
-  "golden_binary_size": 12345678
+  "golden_dispatch_count": 2089,
+  "golden_binary_size": 650000
 }
