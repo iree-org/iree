@@ -1667,9 +1667,9 @@ LogicalResult DataTiledScaledMMAAttr::buildUnderlyingOperations(
   auto intrinCType = cast<VectorType>(intrinsicsAcc.front().getType());
 
   // Loop over the 3 unroll_{m,n,k} dimensions to create the intrinsics.
-  for (int mu = 0; mu < getIntrinsicsM(); ++mu) {
-    for (int nu = 0; nu < getIntrinsicsN(); ++nu) {
-      for (int ku = 0; ku < getIntrinsicsK(); ++ku) {
+  for (int64_t mu = 0; mu < getIntrinsicsM(); ++mu) {
+    for (int64_t nu = 0; nu < getIntrinsicsN(); ++nu) {
+      for (int64_t ku = 0; ku < getIntrinsicsK(); ++ku) {
         Value lhs = intrinsicsLhs[mu * getIntrinsicsK() + ku];
         Value rhs = intrinsicsRhs[nu * getIntrinsicsK() + ku];
         Value lhsScales = intrinsicsLhsScales[mu * getIntrinsicsK() + ku];
@@ -1694,7 +1694,7 @@ LogicalResult DataTiledScaledMMAAttr::buildUnderlyingOperations(
   LDBG() << "accCrossIntrinsicShape: "
          << llvm::interleaved(accCrossIntrinsicShape);
   LDBG() << "accInternalShape: " << llvm::interleaved(accInternalShape);
-  int dstRank = accCrossIntrinsicShape.size();
+  size_t dstRank = accCrossIntrinsicShape.size();
   SmallVector<int64_t> strides(dstRank, 1);
   SmallVector<int64_t> indices(dstRank, 0);
   Value acc = outputs[0];

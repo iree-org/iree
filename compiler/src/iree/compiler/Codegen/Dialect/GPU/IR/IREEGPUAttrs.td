@@ -331,6 +331,11 @@ def IREEGPU_DataTiledMMAAttr :
     wider "kernels" consisting of multiple intrinsics, with the data layout
     already swizzled into a tile layout that allows each intrinsic to access
     data at an offset that's as simple as possible a mapping from the thread ID.
+
+    For intrinsics_k, the extra unrolling dimension is interleaved along the
+    innermost non-internal dimension of the swizzled shape. This means the
+    unrolled K dimension will be the innermost non-internal dimension of the
+    swizzled shape.
   }];
 
   let assemblyFormat = "`<` struct(params) `>`";
@@ -372,6 +377,11 @@ def IREEGPU_DataTiledScaledMMAAttr :
     consisting of multiple intrinsic instructions, with the data layout already
     swizzled into a tile layout that allows each intrinsic to access data at an
     offset that's as simple as possible a mapping from the thread ID.
+
+    For intrinsics_k, the extra unrolling dimension is interleaved along the
+    innermost dimension for the scales operands, meaning this dimension will
+    become the innermost dimension of the swizzled shape. For non-scales
+    operands, the intrinsics_k dimension is not interleaved at all.
   }];
 
   let assemblyFormat = "`<` struct(params) `>`";

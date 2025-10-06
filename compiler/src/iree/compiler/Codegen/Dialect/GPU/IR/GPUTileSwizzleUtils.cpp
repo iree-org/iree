@@ -36,10 +36,10 @@ sliceSwizzledShape(const TileSwizzle &swizzle,
 
 // Returns the index of the first destination dimension corresponding to the
 // given source dimension `srcIdx`.
-static int64_t expandedDimIdx(const TileSwizzle::ExpandShapeType &expandShape,
-                              int srcIdx) {
-  int dstIdx = 0;
-  for (int i = 0; i < srcIdx; ++i) {
+static size_t expandedDimIdx(const TileSwizzle::ExpandShapeType &expandShape,
+                             size_t srcIdx) {
+  size_t dstIdx = 0;
+  for (size_t i = 0; i < srcIdx; ++i) {
     dstIdx += expandShape[i].size();
   }
   return dstIdx;
@@ -58,8 +58,8 @@ static int64_t expandedDimIdx(const TileSwizzle::ExpandShapeType &expandShape,
 //    Input dim.size = 4
 // -> Output swizzle = { expandShape = [[16], [4, 4]], permutation = [1, 2, 0] }
 //
-static void expand(TileSwizzle &swizzle, int srcIdx, TileSwizzle::Dim dim) {
-  int dstIdx = expandedDimIdx(swizzle.expandShape, srcIdx);
+static void expand(TileSwizzle &swizzle, size_t srcIdx, TileSwizzle::Dim dim) {
+  int64_t dstIdx = expandedDimIdx(swizzle.expandShape, srcIdx);
   // The new unrolling dimension is inserted at the start of the expandShape
   // dimensions group corresponding to srcIdx.
   swizzle.expandShape[srcIdx].insert(swizzle.expandShape[srcIdx].begin(), dim);
@@ -83,18 +83,18 @@ static void expand(TileSwizzle &swizzle, int srcIdx, TileSwizzle::Dim dim) {
 //    Input expandedIdx = 1
 // -> Output swizzle = { expandShape = [[16], [4, 4]], permutation = [2, 0, 1] }
 //
-static void interleave(TileSwizzle &swizzle, int srcIdx, int expandedIdx) {
-  int dstIdx = expandedDimIdx(swizzle.expandShape, srcIdx) + expandedIdx;
+static void interleave(TileSwizzle &swizzle, size_t srcIdx, int expandedIdx) {
+  size_t dstIdx = expandedDimIdx(swizzle.expandShape, srcIdx) + expandedIdx;
   SmallVector<int64_t> outPermutation(swizzle.permutation.size());
   // The leading dimension, permutation[0], gets moved inwards to the
   // position that we just computed, dstIdx.
   outPermutation[dstIdx] = swizzle.permutation[0];
   // Outer dimensions get shifted outwards to fill the gap.
-  for (int i = 0; i < dstIdx; ++i) {
+  for (size_t i = 0; i < dstIdx; ++i) {
     outPermutation[i] = swizzle.permutation[i + 1];
   }
   // Inner dimensions don't change.
-  for (int i = dstIdx + 1; i < outPermutation.size(); ++i) {
+  for (size_t i = dstIdx + 1; i < outPermutation.size(); ++i) {
     outPermutation[i] = swizzle.permutation[i];
   }
   swizzle.permutation = outPermutation;
@@ -140,7 +140,7 @@ static TileSwizzle getIntrinsicSwizzle(MMAIntrinsicTy intrinsic,
   // MMASingleSubgroupLayout has non-transposed RHS and RHS scales, but
   // TileSwizzle has transposed RHS and RHS scales, so reorder the `layout`
   // to match the TileSwizzle.
-  auto swapRHSKAndN = [](SmallVectorImpl<int64_t> &v) {
+  auto swapRHSKAndN = [](MutableArrayRef<int64_t> v) {
     // The RHS layout is [K, N], and the RHS scales layout is [K, Kb, N], so
     // rotate right by 1 element to swap [K, Kb] and N.
     std::rotate(v.begin(), v.end() - 1, v.end());
@@ -158,7 +158,8 @@ static TileSwizzle getIntrinsicSwizzle(MMAIntrinsicTy intrinsic,
   // dimensions. These correspond to the arrays in `layout` all having a
   // matching size. Let's just guard that assumption with one assert here.
   const unsigned numSrcDims = isScaled && isLHSorRHS ? 3 : 2;
-  assert(layout.thread.size() == numSrcDims);
+  assert(layout.thread.size() == numSrcDims &&
+         "expected layout rank to match the number of source dims");
   swizzle.expandShape.resize(numSrcDims);
   // Expand the shape from inner-most to outer-most dimension, so that we can
   // simply use the `expand` helper function, which creates new outer dims.
@@ -167,7 +168,7 @@ static TileSwizzle getIntrinsicSwizzle(MMAIntrinsicTy intrinsic,
   // dimension to be innermost.
   for (auto [i, e] : llvm::enumerate(llvm::reverse(layout.element))) {
     if (e != 1) {
-      int srcIdx = layout.element.size() - 1 - i;
+      size_t srcIdx = layout.element.size() - 1 - i;
       expand(swizzle, srcIdx, {Kind::Internal, e});
     }
   }
@@ -221,9 +222,9 @@ static TileSwizzle getIntrinsicSwizzle(MMAIntrinsicTy intrinsic,
   return swizzle;
 }
 
-static int getInnermostNonInternalDimIdx(
+static size_t getInnermostNonInternalDimIdx(
     const TileSwizzle::ExpandShapeDimVectorType &shape) {
-  for (int idx = shape.size() - 1; idx >= 0; --idx) {
+  for (size_t idx = shape.size() - 1; idx >= 0; --idx) {
     if (shape[idx].kind != Kind::Internal) {
       return idx;
     }
@@ -412,7 +413,7 @@ static TileSwizzle moveCrossThreadOutermost(TileSwizzle swizzle,
 template <typename MMAAttrTy>
 static TileSwizzle
 getSwizzleBeforeMovingCrossThreadOutermost(MMAAttrTy mma, unsigned operandIdx) {
-  auto swizzle = getIntrinsicSwizzle(mma.getIntrinsic(), operandIdx);
+  TileSwizzle swizzle = getIntrinsicSwizzle(mma.getIntrinsic(), operandIdx);
   const bool isScaled =
       std::is_same<MMAAttrTy, IREE::GPU::DataTiledScaledMMAAttr>::value;
   const unsigned lhsIdx = 0;
@@ -427,7 +428,7 @@ getSwizzleBeforeMovingCrossThreadOutermost(MMAAttrTy mma, unsigned operandIdx) {
     // Unroll on K with interleaving, then on M.
     if (mma.getIntrinsicsK() > 1) {
       expand(swizzle, 1, {Kind::CrossIntrinsic, mma.getIntrinsicsK()});
-      int interleavingIdx =
+      size_t interleavingIdx =
           getInnermostNonInternalDimIdx(swizzle.expandShape[1]);
       // For scaled matmuls, interleaving happens because we want to load all
       // the unrolled scales with each vector load, so we need to interleave at
@@ -458,7 +459,7 @@ getSwizzleBeforeMovingCrossThreadOutermost(MMAAttrTy mma, unsigned operandIdx) {
     // Unroll on K with interleaving, then on N.
     if (mma.getIntrinsicsK() > 1) {
       expand(swizzle, 1, {Kind::CrossIntrinsic, mma.getIntrinsicsK()});
-      int interleavingIdx =
+      size_t interleavingIdx =
           getInnermostNonInternalDimIdx(swizzle.expandShape[1]);
       // Like with the LHS above, we want to interleave such that we load all
       // the unrolled scales with each vector load.
