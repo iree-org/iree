@@ -765,9 +765,8 @@ iree_check_single_backend_test_suite(
     "while.mlir"
   TARGET_BACKEND
     "rocm"
-  # Only test compilation for now, the ROCm driver is experimental.
-  # DRIVER
-  #   "rocm"
+  DRIVER
+    "hip"
   COMPILER_FLAGS
     "--iree-input-type=stablehlo"
 )
