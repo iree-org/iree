@@ -331,12 +331,66 @@ def IREEGPU_DataTiledMMAAttr :
     wider "kernels" consisting of multiple intrinsics, with the data layout
     already swizzled into a tile layout that allows each intrinsic to access
     data at an offset that's as simple as possible a mapping from the thread ID.
+
+    For intrinsics_k, the extra unrolling dimension is interleaved along the
+    innermost non-internal dimension of the swizzled shape. This means the
+    unrolled K dimension will be the innermost non-internal dimension of the
+    swizzled shape.
   }];
 
   let assemblyFormat = "`<` struct(params) `>`";
 
   let parameters = (ins
     EnumParameter<IREEGPU_MMAIntrinsic>:$intrinsic,
+    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the M dimension.">:$intrinsics_m,
+    DefaultValuedParameter<"int64_t", "1", "Subgroup count along the M dimension.">:$subgroups_m,
+    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the N dimension.">:$intrinsics_n,
+    DefaultValuedParameter<"int64_t", "1", "Subgroup count along the N dimension.">:$subgroups_n,
+    DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the K dimension, with interleaved layout.">:$intrinsics_k
+  );
+}
+
+def IREEGPU_DataTiledScaledMMAAttr :
+    IREEGPU_DataTiledMMAInnerTileDescAttr<"DataTiledScaledMMA", [
+  DeclareAttrInterfaceMethods<IREECodegen_InnerTileDescAttrInterface, [
+    "getExpectedNumInputs",
+    "getExpectedNumOutputs",
+    "verifyIndexingMaps",
+    "buildUnderlyingOperations"
+  ]>
+]> {
+  let mnemonic = "data_tiled_scaled_mma_layout";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let description = [{
+    This mma variant represents scaled MMA ops with data-tiling details. The
+    |intrinsic| field specifies which particular scaled MMA intrinsic is
+    targeted by the data-tiling.
+
+    The |lhs_elem_type|, |rhs_elem_type|, and |acc_elem_type| fields specify the
+    element types of the LHS, RHS, and ACC operands respectively. The element
+    types for the scales operands are always Float8E8M0FNUType, so they are not
+    specified on the attribute.
+
+    The other fields default to one, and that default results in a single
+    intrinsic, while values greater than one result in wider "kernels"
+    consisting of multiple intrinsic instructions, with the data layout already
+    swizzled into a tile layout that allows each intrinsic to access data at an
+    offset that's as simple as possible a mapping from the thread ID.
+
+    For intrinsics_k, the extra unrolling dimension is interleaved along the
+    innermost dimension for the scales operands, meaning this dimension will
+    become the innermost dimension of the swizzled shape. For non-scales
+    operands, the intrinsics_k dimension is not interleaved at all.
+  }];
+
+  let assemblyFormat = "`<` struct(params) `>`";
+
+  let parameters = (ins
+    EnumParameter<IREEGPU_ScaledMMAIntrinsic>:$intrinsic,
+    "::mlir::Type":$lhs_elem_type,
+    "::mlir::Type":$rhs_elem_type,
+    "::mlir::Type":$acc_elem_type,
     DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the M dimension.">:$intrinsics_m,
     DefaultValuedParameter<"int64_t", "1", "Subgroup count along the M dimension.">:$subgroups_m,
     DefaultValuedParameter<"int64_t", "1", "Intrinsic count along the N dimension.">:$intrinsics_n,
@@ -460,6 +514,13 @@ def IREEGPU_ScaledMMAAttr :
     // Return all supported element types for inputs
     static SmallVector<Type> getSupportedInputTypes(MLIRContext *ctx);
     static SmallVector<Type> getSupportedOutputTypes(MLIRContext *ctx);
+
+    /// For scaled MFMA intrinsics, the scales are packed into a 32 bit register.
+    /// Since scales are 8 bits, the intrinsic takes a vector of 4 scales, along
+    /// with a selector to indicate which scale is used.
+    int64_t getScalesVectorSize() const {
+      return 4;
+    }
 
     // Return the number of elements per shared scale.
     int64_t getBlockSize() const;

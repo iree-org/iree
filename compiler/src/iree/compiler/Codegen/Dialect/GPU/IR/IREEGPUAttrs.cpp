@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Utils/Indexing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/STLForwardCompat.h"
@@ -69,6 +70,17 @@ static bool is_AMD_WMMA(MMAIntrinsic intrinsic) {
 
 static bool is_AMD(MMAIntrinsic intrinsic) {
   return is_AMD_MFMA(intrinsic) || is_AMD_WMMA(intrinsic);
+}
+
+int64_t getIntrinsicSubgroupSize(ScaledMMAIntrinsic intrinsic) {
+  switch (intrinsic) {
+  case ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32:
+  case ScaledMMAIntrinsic::MFMA_SCALE_F32_32x32x64_B32:
+    return 64;
+  }
+  assert(false &&
+         "all cases should've been handled in ScaledMMA::getBlockSize()");
+  return 0;
 }
 
 int64_t getIntrinsicSubgroupSize(MMAIntrinsic intrinsic) {
@@ -941,8 +953,8 @@ TileSwizzle DataTiledMMAAttr::getTileSwizzle(unsigned operandIndex) const {
   return getSwizzle(*this, fragment);
 }
 
-IREE::Codegen::TileMxNxK DataTiledMMAAttr::getTileMNK() const {
-  IREE::Codegen::TileMxNxK innerTile;
+IREE::Codegen::TileMxNxKxKb DataTiledMMAAttr::getTileMNKKb() const {
+  IREE::Codegen::TileMxNxKxKb innerTile;
   std::tie(innerTile.M, innerTile.N, innerTile.K) =
       getMNKShapeFromIntrinsic(getIntrinsic());
   innerTile.M *= getIntrinsicsM() * getSubgroupsM();
@@ -1317,14 +1329,7 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(ScaledMMAIntrinsic intrinsic,
 }
 
 int64_t ScaledMMAAttr::getSubgroupSize() const {
-  switch (getIntrinsic()) {
-  case ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32:
-  case ScaledMMAIntrinsic::MFMA_SCALE_F32_32x32x64_B32:
-    return 64;
-  }
-  assert(false &&
-         "all cases should'vee been handled in ScaledMMA::getBlockSize()");
-  return 0;
+  return getIntrinsicSubgroupSize(getIntrinsic());
 }
 
 SmallVector<Type> ScaledMMAAttr::getSupportedInputTypes(MLIRContext *ctx) {
@@ -1483,7 +1488,7 @@ LogicalResult ScaledMMAAttr::buildUnderlyingOperations(
   Value zeroScales = arith::ConstantOp::create(
       builder, loc,
       SplatElementsAttr::get(
-          VectorType::get({4}, f8E8M0),
+          VectorType::get({getScalesVectorSize()}, f8E8M0),
           llvm::APFloat::getSmallest(f8E8M0.getFloatSemantics())));
   auto padScales = [&](Value scales) {
     Value scale = vector::ExtractOp::create(builder, loc, scales, 0);
@@ -1519,6 +1524,210 @@ LogicalResult ScaledMMAAttr::buildUnderlyingOperations(
                                    /*scalesIdxB=*/0);
   results.push_back(result);
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// DataTiledScaledMMA Attributes
+//===----------------------------------------------------------------------===//
+
+TileSwizzle
+DataTiledScaledMMAAttr::getTileSwizzle(unsigned operandIndex) const {
+  return getSwizzle(*this, operandIndex);
+}
+
+static std::tuple<int64_t, int64_t, int64_t, int64_t>
+getMNKKbShapeFromScaledIntrinsic(ScaledMMAIntrinsic intrinsic) {
+  MMASingleSubgroupLayout lhs = getSingleSubgroupLayout(intrinsic, 0);
+  MMASingleSubgroupLayout rhs = getSingleSubgroupLayout(intrinsic, 2);
+  int64_t m = lhs.outer[0] * lhs.thread[0] * lhs.element[0];
+  int64_t n = rhs.outer[2] * rhs.thread[2] * rhs.element[2];
+  int64_t k = lhs.outer[1] * lhs.thread[1] * lhs.element[1];
+  int64_t kB = lhs.outer[2] * lhs.thread[2] * lhs.element[2];
+  return {m, n, k, kB};
+}
+
+int64_t getMSize(ScaledMMAIntrinsic intrinsic) {
+  return std::get<0>(getMNKKbShapeFromScaledIntrinsic(intrinsic));
+}
+int64_t getNSize(ScaledMMAIntrinsic intrinsic) {
+  return std::get<1>(getMNKKbShapeFromScaledIntrinsic(intrinsic));
+}
+int64_t getKSize(ScaledMMAIntrinsic intrinsic) {
+  return std::get<2>(getMNKKbShapeFromScaledIntrinsic(intrinsic));
+}
+int64_t getKbSize(ScaledMMAIntrinsic intrinsic) {
+  return std::get<3>(getMNKKbShapeFromScaledIntrinsic(intrinsic));
+}
+
+IREE::Codegen::TileMxNxKxKb DataTiledScaledMMAAttr::getTileMNKKb() const {
+  IREE::Codegen::TileMxNxKxKb innerTile;
+  std::tie(innerTile.M, innerTile.N, innerTile.K, innerTile.KB) =
+      getMNKKbShapeFromScaledIntrinsic(getIntrinsic());
+  innerTile.M *= getIntrinsicsM() * getSubgroupsM();
+  innerTile.N *= getIntrinsicsN() * getSubgroupsN();
+  innerTile.K *= getIntrinsicsK();
+  return innerTile;
+}
+
+void DataTiledScaledMMAAttr::getElementTypes(
+    SmallVectorImpl<Type> &result) const {
+  result.push_back(getLhsElemType());
+  result.push_back(getRhsElemType());
+  result.push_back(Float8E8M0FNUType::get(getContext()));
+  result.push_back(Float8E8M0FNUType::get(getContext()));
+  result.push_back(getAccElemType());
+  return;
+}
+
+static Value createScaledMmaOp(OpBuilder &builder, Location loc,
+                               ScaledMMAIntrinsic intrinsic, Type resultType,
+                               Value lhs, Value rhs, Value lhsScales,
+                               Value rhsScales, Value acc) {
+  FloatType f8E8M0 = builder.getF8E8M0Type();
+  Value zeroScales = arith::ConstantOp::create(
+      builder, loc,
+      SplatElementsAttr::get(
+          VectorType::get({4}, f8E8M0),
+          llvm::APFloat::getSmallest(f8E8M0.getFloatSemantics())));
+  auto padScales = [&](Value scales) {
+    Value scale = vector::ExtractOp::create(builder, loc, scales, 0);
+    Value padded = vector::InsertOp::create(builder, loc, scale, zeroScales, 0);
+    return padded;
+  };
+
+  lhsScales = padScales(lhsScales);
+  rhsScales = padScales(rhsScales);
+
+  int64_t m = getMSize(intrinsic);
+  // We use m x [k / kPerBlock] x blockSize as the LHS pre-distribution shape
+  // since this makes the higher-level tiling clearer.
+  int64_t k = getKSize(intrinsic) * getKbSize(intrinsic);
+  int64_t n = getNSize(intrinsic);
+
+  return amdgpu::ScaledMFMAOp::create(builder, loc, m, n, k, lhs, rhs, acc,
+                                      lhsScales, rhsScales, /*scalesIdxA=*/0,
+                                      /*scalesIdxB=*/0);
+}
+
+LogicalResult DataTiledScaledMMAAttr::buildUnderlyingOperations(
+    OpBuilder &builder, Location loc, ValueRange inputs, ValueRange outputs,
+    SmallVectorImpl<Value> &results) const {
+  // Validation. Similar to MMAAttr::buildMmaOperation.
+  if (inputs.size() != 4) {
+    return failure();
+  }
+  if (outputs.size() != 1) {
+    return failure();
+  }
+  SmallVector<VectorType> regTypes;
+  getDistributedTileTypes(regTypes);
+  if (!llvm::equal(regTypes,
+                   llvm::concat<Type>(inputs.getTypes(), outputs.getTypes()))) {
+    return failure();
+  }
+
+  // Prepare Lhs/Rhs/Acc operand slices to feed the intrinsic.
+  const unsigned lhsIdx = 0;
+  const unsigned rhsIdx = 1;
+  const unsigned lhsScalesIdx = 2;
+  const unsigned rhsScalesIdx = 3;
+  const unsigned accIdx = 4;
+  TileSwizzle lhsSwizzle = getSwizzle(*this, lhsIdx);
+  LDBG() << "DataTiledScaledMMAAttr::buildMmaOperation";
+  LDBG() << "    lhsSwizzle: " << lhsSwizzle;
+  SmallVector<Value> intrinsicsLhs =
+      distributeMmaFragmentToIntrinsics(builder, loc, inputs[0], lhsSwizzle);
+
+  TileSwizzle rhsSwizzle = getSwizzle(*this, rhsIdx);
+  LDBG() << "DataTiledScaledMMAAttr::buildMmaOperation";
+  LDBG() << "    rhsSwizzle: " << rhsSwizzle;
+  SmallVector<Value> intrinsicsRhs =
+      distributeMmaFragmentToIntrinsics(builder, loc, inputs[1], rhsSwizzle);
+
+  TileSwizzle lhsScalesSwizzle = getSwizzle(*this, lhsScalesIdx);
+  LDBG() << "DataTiledScaledMMAAttr::buildMmaOperation";
+  LDBG() << "    lhsScalesSwizzle: " << lhsScalesSwizzle;
+  SmallVector<Value> intrinsicsLhsScales = distributeMmaFragmentToIntrinsics(
+      builder, loc, inputs[2], lhsScalesSwizzle);
+
+  TileSwizzle rhsScalesSwizzle = getSwizzle(*this, rhsScalesIdx);
+  LDBG() << "DataTiledScaledMMAAttr::buildMmaOperation";
+  LDBG() << "    rhsScalesSwizzle: " << rhsScalesSwizzle;
+  SmallVector<Value> intrinsicsRhsScales = distributeMmaFragmentToIntrinsics(
+      builder, loc, inputs[3], rhsScalesSwizzle);
+
+  TileSwizzle accSwizzle = getSwizzle(*this, accIdx);
+  LDBG() << "DataTiledScaledMMAAttr::buildMmaOperation";
+  LDBG() << "    accSwizzle: " << accSwizzle;
+
+  SmallVector<Value> intrinsicsAcc =
+      distributeMmaFragmentToIntrinsics(builder, loc, outputs[0], accSwizzle);
+
+  ScaledMMAIntrinsic intrinsic = getIntrinsic();
+  auto intrinCType = cast<VectorType>(intrinsicsAcc.front().getType());
+
+  // Loop over the 3 unroll_{m,n,k} dimensions to create the intrinsics.
+  for (int64_t mu = 0; mu < getIntrinsicsM(); ++mu) {
+    for (int64_t nu = 0; nu < getIntrinsicsN(); ++nu) {
+      for (int64_t ku = 0; ku < getIntrinsicsK(); ++ku) {
+        Value lhs = intrinsicsLhs[mu * getIntrinsicsK() + ku];
+        Value rhs = intrinsicsRhs[nu * getIntrinsicsK() + ku];
+        Value lhsScales = intrinsicsLhsScales[mu * getIntrinsicsK() + ku];
+        Value rhsScales = intrinsicsRhsScales[nu * getIntrinsicsK() + ku];
+        Value &acc = intrinsicsAcc[mu * getIntrinsicsN() + nu];
+        acc = createScaledMmaOp(builder, loc, intrinsic, intrinCType, lhs, rhs,
+                                lhsScales, rhsScales, acc);
+      }
+    }
+  }
+
+  // Insert the results into the destination accumulator.
+  SmallVector<int64_t> accCrossIntrinsicShape =
+      sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
+        return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
+      });
+  SmallVector<int64_t> accInternalShape =
+      sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
+        return dim.kind == TileSwizzle::Dim::Kind::Internal;
+      });
+
+  LDBG() << "accCrossIntrinsicShape: "
+         << llvm::interleaved(accCrossIntrinsicShape);
+  LDBG() << "accInternalShape: " << llvm::interleaved(accInternalShape);
+  size_t dstRank = accCrossIntrinsicShape.size();
+  SmallVector<int64_t> strides(dstRank, 1);
+  SmallVector<int64_t> indices(dstRank, 0);
+  Value acc = outputs[0];
+  for (Value intrAcc : intrinsicsAcc) {
+    auto expandedAcc = vector::ShapeCastOp::create(
+        builder, loc,
+        VectorType::get(
+            accInternalShape,
+            cast<VectorType>(outputs[0].getType()).getElementType()),
+        intrAcc);
+    acc = vector::InsertStridedSliceOp::create(builder, loc, expandedAcc, acc,
+                                               indices, strides);
+    incrementIndices(indices, accCrossIntrinsicShape);
+  }
+  results.push_back(acc);
+  return success();
+}
+
+int64_t DataTiledScaledMMAAttr::getExpectedNumInputs() const { return 4; }
+
+int64_t DataTiledScaledMMAAttr::getExpectedNumOutputs() const { return 1; }
+
+int64_t DataTiledScaledMMAAttr::getSubgroupSize() const {
+  return getIntrinsicSubgroupSize(getIntrinsic());
+}
+
+int64_t DataTiledScaledMMAAttr::getFlatWorkgroupSize() const {
+  return getSubgroupSize() * getSubgroupsM() * getSubgroupsN();
+}
+
+LogicalResult
+DataTiledScaledMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
+  return IREE::LinalgExt::inferScaledContractionDims(maps);
 }
 
 //===----------------------------------------------------------------------===//

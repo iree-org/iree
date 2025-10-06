@@ -144,8 +144,8 @@ def IREEGPU_DataTiledMMAInterfaceAttr
         tiling materialization, these correspond to the innerTileSizes in the
         MaterializeEncodingInfo.
       }],
-      /*retType=*/"::mlir::iree_compiler::IREE::Codegen::TileMxNxK",
-      /*methodName=*/"getTileMNK",
+      /*retType=*/"::mlir::iree_compiler::IREE::Codegen::TileMxNxKxKb",
+      /*methodName=*/"getTileMNKKb",
       /*args=*/(ins)
     >,
     InterfaceMethod<
