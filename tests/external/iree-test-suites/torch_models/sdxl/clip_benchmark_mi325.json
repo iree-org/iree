@@ -35,5 +35,5 @@
         "value": "1x64xi64"
       }
     ],
-    "golden_time": 7.65
+    "golden_time_ms": 7.65
 }
