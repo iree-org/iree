@@ -22,6 +22,14 @@ namespace mlir::iree_compiler::IREE {
 
 static const char kEncodingInfoAttrName[] = "encoding_info";
 
+// Adjusts tile sizes when the tensor was bitcast from a different element type.
+// The encoding's `original_element_type` field records the element type before
+// bitcast packing. Tile sizes are computed for the original (semantic) element
+// count, so we scale them by the bit width ratio to match the storage shape.
+// This also adjusts the swizzle's expandShape innermost dimension if present.
+void adjustTileSizesForBitcast(RankedTensorType type,
+                               IREE::Codegen::MaterializeEncodingInfo &info);
+
 // This class is the base class for the external model of different packed
 // encoding layout attributes. It provides a public method, `getEncodingInfo` to
 // reduce the duplicated implementations before. To inherit it, it requires the
@@ -37,17 +45,21 @@ public:
   getEncodingInfo(Attribute attr, RankedTensorType type) const {
     const EncodingPackedLayoutMaterializerAttr *impl =
         static_cast<const EncodingPackedLayoutMaterializerAttr *>(this);
+    IREE::Codegen::MaterializeEncodingInfo info;
     // If the layout is already resolved, use it directly.
     if (auto config = impl->getConfiguration(attr)) {
       if (auto namedAttr = config.getNamed(kEncodingInfoAttrName)) {
-        std::optional<IREE::Codegen::MaterializeEncodingInfo> info =
+        std::optional<IREE::Codegen::MaterializeEncodingInfo> maybeInfo =
             IREE::Codegen::deserializeEncodingInfo(
                 cast<DictionaryAttr>(namedAttr->getValue()));
-        assert(info && "encoding_info is invalid");
-        return info.value();
+        assert(maybeInfo && "encoding_info is invalid");
+        info = maybeInfo.value();
+        return info;
       }
     }
-    return impl->getEncodingInfoImpl(attr, type);
+    info = impl->getEncodingInfoImpl(attr, type);
+    adjustTileSizesForBitcast(type, info);
+    return info;
   }
 
   LogicalResult verifyPackedLayoutWithType(

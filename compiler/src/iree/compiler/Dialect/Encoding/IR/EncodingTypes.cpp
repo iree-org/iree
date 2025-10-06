@@ -66,10 +66,10 @@ SerializableAttr::getEncodingProperties(Operation *op) {
   EncodingOpType opType;
 
   auto addEncoding = [&](int64_t operandIndex) {
-    return EncodingProperties{EncodingAttr::get(ctx, operandIndex, opType,
-                                                elemTypes, maps,
-                                                iterationSizes),
-                              /*dynamicValues=*/{}};
+    return EncodingProperties{
+        EncodingAttr::get(ctx, operandIndex, opType, elemTypes,
+                          /*originalElementType=*/{}, maps, iterationSizes),
+        /*dynamicValues=*/{}};
   };
 
   // Return encoding properties for contraction operations.

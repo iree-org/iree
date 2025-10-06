@@ -35,6 +35,8 @@ iree_compiler_cc_library(
         "HoistableTypeInterface.h",
     ],
     deps = [
+        "//compiler/src/iree/compiler/Dialect/Encoding/IR",
+        "//compiler/src/iree/compiler/Dialect/Encoding/Utils",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/TensorExt/IR",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
