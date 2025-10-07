@@ -65,6 +65,7 @@ def DecomposeMapScatterPass :
   let summary =
       "Decomposes vectorized map_scatter ops into vector ops";
   let dependentDialects = [
+    "::mlir::scf::SCFDialect",
     "::mlir::tensor::TensorDialect",
     "::mlir::vector::VectorDialect",
     "::mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect"
