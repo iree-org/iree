@@ -206,9 +206,9 @@ static TileSwizzle getIntrinsicSwizzle(MMAIntrinsicTy intrinsic,
   // The `thread` size for the `Kb` dimension is always 1 with a tstride of 1,
   // so there can only be 2 layout.thread dims to check here, and we can do a
   // simple swap instead of a rotate.
-  assert(layout.thread.size() == 2 ||
-         (layout.thread.size() == 3 && layout.thread[2] == 1) &&
-             "expected inner thread dim to be 1 for blocked LHS or RHS");
+  assert((layout.thread.size() == 2 ||
+          (layout.thread.size() == 3 && layout.thread[2] == 1)) &&
+         "expected inner thread dim to be 1 for blocked LHS or RHS");
   if (layout.thread[0] != 1 && layout.thread[1] != 1 &&
       layout.tstrides[0] > layout.tstrides[1]) {
     std::swap(swizzle.permutation[0], swizzle.permutation[1]);
