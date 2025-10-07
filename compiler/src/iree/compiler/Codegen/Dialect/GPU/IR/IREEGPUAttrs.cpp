@@ -1916,10 +1916,9 @@ static Value getCondition(OpBuilder &b, Location loc,
       b, loc,
       affine::makeComposedFoldedAffineApply(b, loc, transposedOrderBumpExpr,
                                             {defaultOrder, c4, c5}));
-  Value cond =
+  return
       mlir::arith::CmpIOp::create(b, loc, mlir::arith::CmpIPredicate::ult,
                                   transposedOrder, defaultOrderTolerance);
-  return cond;
 }
 /// Swap values based on `pred`.
 static void swapIf(OpBuilder &b, Location loc, OpFoldResult pred,
