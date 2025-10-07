@@ -2626,6 +2626,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-util-lift-cfg-to-scf" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-util-lift-cfg-to-scf
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-util-optimize-int-arithmetic" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-util-optimize-int-arithmetic
@@ -4999,6 +5008,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-util-lift-cfg-to-scf" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-util-lift-cfg-to-scf
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-util-optimize-int-arithmetic" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-util-optimize-int-arithmetic
@@ -5169,6 +5187,29 @@ is done at the source (frontend), but this pass is provided to aid
 transition and testing by doing a manual conversion with iree-opt.</p>
 <h3 id="-iree-util-ipo"><code>-iree-util-ipo</code><a class="headerlink" href="#-iree-util-ipo" title="Permanent link">link</a></h3>
 <p><em>Performs basic inter-procedural optimization.</em></p>
+<h3 id="-iree-util-lift-cfg-to-scf"><code>-iree-util-lift-cfg-to-scf</code><a class="headerlink" href="#-iree-util-lift-cfg-to-scf" title="Permanent link">link</a></h3>
+<p><em>Lift unstructured control flow to SCF/Util dialect for callable ops.</em></p>
+<p>Transforms unstructured control flow (CFG) in <code>util.initializer</code>/<code>util.func</code>
+ops to structured control flow (SCF) operations. All CFG terminator ops like
+<code>cf.br</code> and <code>cf.cond_br</code> along with non-terminator ops like <code>cf.switch</code> are
+converted to their structured equivalents like <code>scf.if</code>, <code>scf.while</code>, and
+<code>scf.index_switch</code> ops.</p>
+<p>Limitations:
+* Irreducible control flow (loops with multiple entry points) will cause
+  the transformation to fail. This is rare in practice as most high-level
+  languages and ML frameworks generate reducible control flow.
+* Operations with side-effecting branches are not supported.
+* Operations that produce successor operands dynamically are not supported.
+* Infinite loops require the insertion of <code>util.unreachable</code> terminators.</p>
+<p>The algorithm handles:
+* Simple if/else patterns -&gt; <code>scf.if</code>
+* Loops with single entry -&gt; <code>scf.while</code>
+* Switch statements -&gt; <code>scf.index_switch</code>
+* Multiple returns -&gt; exit block combining
+* Unreachable code -&gt; <code>util.unreachable</code> insertion</p>
+<p>Based on the algorithm from:
+Bahmann et al. 2015. Perfect Reconstructability of Control Flow from
+Demand Dependence Graphs. ACM TACO. <a href="https://dl.acm.org/doi/10.1145/2693261">https://dl.acm.org/doi/10.1145/2693261</a></p>
 <h3 id="-iree-util-optimize-int-arithmetic"><code>-iree-util-optimize-int-arithmetic</code><a class="headerlink" href="#-iree-util-optimize-int-arithmetic" title="Permanent link">link</a></h3>
 <p><em>Optimizes integer arithmetic using a variety of dataflow analysis and patterns.</em></p>
 <h4 id="options_3">Options<a class="headerlink" href="#options_3" title="Permanent link">link</a></h4>
