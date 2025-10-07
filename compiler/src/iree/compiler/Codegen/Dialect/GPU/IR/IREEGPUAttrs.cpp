@@ -1843,11 +1843,24 @@ getLoopBounds(ArrayRef<Range> loopRanges,
 
 static Value computeNumTiles(OpBuilder &b, Location loc, OpFoldResult size,
                              OpFoldResult tileSize) {
-  Value sizeVal = getValueOrCreateConstantIntOp(b, loc, size);
-  Value tileSizeVal = getValueOrCreateConstantIntOp(b, loc, tileSize);
-  auto numTiles =
-      b.create<mlir::arith::DivUIOp>(loc, sizeVal, tileSizeVal).getResult();
+  AffineExpr s0, s1;
+  bindSymbols(b.getContext(), s0, s1);
+  AffineExpr ceilDivExpr = s0.ceilDiv(s1);
+  OpFoldResult numTiles = affine::makeComposedFoldedAffineApply(
+      b, loc, ceilDivExpr, {size, tileSize});
   return getValueOrCreateConstantIntOp(b, loc, numTiles);
+}
+
+static AffineExpr getMulExpr(OpBuilder &b) {
+  AffineExpr s0, s1;
+  bindSymbols(b.getContext(), s0, s1);
+  return s0 * s1;
+}
+
+static AffineExpr getSubExpr(OpBuilder &b) {
+  AffineExpr s0, s1;
+  bindSymbols(b.getContext(), s0, s1);
+  return s0 - s1;
 }
 
 /// Computes the total number of different Tile loads accross all XCDs per
@@ -1857,39 +1870,55 @@ static Value computeNumTileLoads(OpBuilder &b, Location loc, OpFoldResult size,
                                  OpFoldResult tileSize, Value numXCDs,
                                  Value numCUs) {
   Value numTiles = computeNumTiles(b, loc, size, tileSize);
-  auto totalCUs = b.create<mlir::arith::MulIOp>(loc, numXCDs, numCUs);
-  auto numX =
-      b.create<mlir::arith::MinUIOp>(loc, numTiles, totalCUs).getResult();
-  auto numY = b.create<mlir::arith::CeilDivUIOp>(loc, totalCUs, numX);
-  return getValueOrCreateConstantIndexOp(
-      b, loc, b.create<mlir::arith::AddIOp>(loc, numX, numY).getResult());
+  AffineExpr mulExpr = getMulExpr(b);
+  Value totalCUs =
+      getValueOrCreateConstantIntOp(b, loc,
+                                    affine::makeComposedFoldedAffineApply(
+                                        b, loc, mulExpr, {numXCDs, numCUs}));
+  auto numX = arith::MinUIOp::create(b, loc, numTiles, totalCUs)->getResult(0);
+
+  AffineExpr s0, s1;
+  bindSymbols(b.getContext(), s0, s1);
+  AffineExpr numTilesExpr =
+      s0.ceilDiv(s1) + s1; // totalCUs.ceildiv(numX) + numX
+  OpFoldResult numTileLoads = affine::makeComposedFoldedAffineApply(
+      b, loc, numTilesExpr, {totalCUs, numX});
+  return getValueOrCreateConstantIndexOp(b, loc, numTileLoads);
 }
 
 /// Retrieves the condition for transposed ordering. Transposed order is enabled
 /// if the number of tile loads is at least 20% less than in regular order.
 static Value getCondition(OpBuilder &b, Location loc,
+                          ArrayRef<OpFoldResult> lbs,
                           ArrayRef<OpFoldResult> ubs,
                           ArrayRef<OpFoldResult> steps, Value numXCDs,
                           Value numCUs) {
   assert(ubs.size() == 2 && steps.size() == 2 && "rank must be 2");
+
+  AffineExpr subExpr = getSubExpr(b);
+  OpFoldResult size0 =
+      affine::makeComposedFoldedAffineApply(b, loc, subExpr, {ubs[0], lbs[0]});
+  OpFoldResult size1 =
+      affine::makeComposedFoldedAffineApply(b, loc, subExpr, {ubs[1], lbs[1]});
+
   Value transposedOrder =
-      computeNumTileLoads(b, loc, ubs[0], steps[0], numXCDs, numCUs);
+      computeNumTileLoads(b, loc, size0, steps[0], numXCDs, numCUs);
   Value defaultOrder =
-      computeNumTileLoads(b, loc, ubs[1], steps[1], numXCDs, numCUs);
+      computeNumTileLoads(b, loc, size1, steps[1], numXCDs, numCUs);
 
   AffineExpr s0, s1, s2;
   bindSymbols(b.getContext(), s0, s1, s2);
   AffineExpr transposedOrderBumpExpr = (s0 * s1).floorDiv(s2);
-  Value c4 = b.create<arith::ConstantIntOp>(loc, 4, 32);
-  Value c5 = b.create<arith::ConstantIntOp>(loc, 5, 32);
+  Value c4 = arith::ConstantIntOp::create(b, loc, 4, 32);
+  Value c5 = arith::ConstantIntOp::create(b, loc, 5, 32);
 
   Value defaultOrderTolerance = getValueOrCreateConstantIntOp(
       b, loc,
       affine::makeComposedFoldedAffineApply(b, loc, transposedOrderBumpExpr,
                                             {defaultOrder, c4, c5}));
   Value cond =
-      b.create<mlir::arith::CmpIOp>(loc, mlir::arith::CmpIPredicate::ult,
-                                    transposedOrder, defaultOrderTolerance);
+      mlir::arith::CmpIOp::create(b, loc, mlir::arith::CmpIPredicate::ult,
+                                  transposedOrder, defaultOrderTolerance);
   return cond;
 }
 /// Swap values based on `pred`.
@@ -1902,9 +1931,9 @@ static void swapIf(OpBuilder &b, Location loc, OpFoldResult pred,
   Value v1 = getValueOrCreateConstantIndexOp(b, loc, values[ids[1]]);
   Value predVal = getValueOrCreateConstantIndexOp(b, loc, pred);
   values[ids[0]] =
-      b.create<mlir::arith::SelectOp>(loc, predVal, v1, v0).getResult();
+      mlir::arith::SelectOp::create(b, loc, predVal, v1, v0).getResult();
   values[ids[1]] =
-      b.create<mlir::arith::SelectOp>(loc, predVal, v0, v1).getResult();
+      mlir::arith::SelectOp::create(b, loc, predVal, v0, v1).getResult();
 }
 
 static std::tuple<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>,
@@ -1957,9 +1986,9 @@ ConditionalTransposeAttr::generateLoopHeaderFn(
       builder.getArrayAttr(deviceMappingAttribute);
 
   // Compute condition for transpose.
-  Value numCUsVal = builder.create<arith::ConstantIndexOp>(loc, getNumCUs());
-  Value numXCDs = builder.create<arith::ConstantIndexOp>(loc, getNumXCDs());
-  Value cond = getCondition(builder, loc, ubs, steps, numXCDs, numCUsVal);
+  Value numCUsVal = arith::ConstantIndexOp::create(builder, loc, getNumCUs());
+  Value numXCDs = arith::ConstantIndexOp::create(builder, loc, getNumXCDs());
+  Value cond = getCondition(builder, loc, lbs, ubs, steps, numXCDs, numCUsVal);
 
   // Apply condition on loop bounds.
   swapIf(builder, loc, cond, lbs);
