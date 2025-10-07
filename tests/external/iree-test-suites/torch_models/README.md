@@ -38,4 +38,4 @@ on these markers.
 
 ## Misc
 
-Information on accepted test schema : https://github.com/iree-org/iree-test-suites/blob/main/torch_models/README.md
+Information on accepted test schema: https://github.com/iree-org/iree-test-suites/blob/main/torch_models/README.md
