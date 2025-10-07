@@ -679,18 +679,18 @@ def IREEGPU_ConditionalTransposeAttr  :
      - LHS shape: (M, K)
      - RHS shape: (N, K)
      - Tile dimension: (TileM, TileN)
-     - numTileLoadsDefault = min(numCUS,ceil(N,tileN)) + ceil(numCUS,min(numCUS,ceil(N,tileN)))
-     - numTileLoadsTransposed = min(numCUS,ceil(M,tileM)) + ceil(numCUS,min(numCUS,ceil(M,tileM)))
+     - numTileLoadsDefault = min(numCUS, ceildiv(N, tileN)) + ceildiv(numCUS, min(numCUS, ceildiv(N,tileN)))
+     - numTileLoadsTransposed = min(numCUS, ceildiv(M, tileM)) + ceildiv(numCUS, min(numCUS, ceildiv(M,tileM)))
 
      Examples for gfx942:
      - (M=8192, N=128256, K=4096)
-      - numTileLoadsDefault = 304 + ceil(304, 304) = 305
-      - numTileLoadsTransposed = 32 + ceil(304, 32) = 42
+      - numTileLoadsDefault = 304 + ceildiv(304, 304) = 305
+      - numTileLoadsTransposed = 32 + ceildiv(304, 32) = 42
       => numTileLoadsTransposed < numTileLoadsDefault => enable transpose
 
      - (M=8192, N=128256, K=4096)
-      - numTileLoadsDefault = 32 + ceil(304, 32) = 42
-      - numTileLoadsTransposed = 64 + ceil(304, 64) = 69
+      - numTileLoadsDefault = 32 + ceildiv(304, 32) = 42
+      - numTileLoadsTransposed = 64 + ceildiv(304, 64) = 69
       numTileLoadsTransposed > numTileLoadsDefault => disable transpose
 
       Fields:
