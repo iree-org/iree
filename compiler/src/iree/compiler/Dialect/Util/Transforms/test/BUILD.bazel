@@ -26,6 +26,7 @@ iree_lit_test_suite(
             "import_resources.mlir",
             "integer_divisibility.mlir",
             "ipo.mlir",
+            "lift_cfg_to_scf.mlir",
             "optimize_int_arithmetic.mlir",
             "optimize_int_arithmetic_narrowing.mlir",
             "patterns.mlir",
