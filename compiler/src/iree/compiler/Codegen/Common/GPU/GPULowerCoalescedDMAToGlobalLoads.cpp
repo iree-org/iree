@@ -30,7 +30,6 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Support/LLVM.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/WalkPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-lower-coalesced-dma-to-global-loads"
