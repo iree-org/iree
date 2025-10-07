@@ -1921,6 +1921,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#utilunreachable-utilunreachableop" class="md-nav__link">
+    <span class="md-ellipsis">
+      util.unreachable (Util::UnreachableOp)
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2200,24 +2209,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#utilscfunreachable-utilscfunreachableop" class="md-nav__link">
-    <span class="md-ellipsis">
-      util.scf.unreachable (Util::SCFUnreachableOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#utilunreachable-utilunreachableop" class="md-nav__link">
-    <span class="md-ellipsis">
-      util.unreachable (Util::UnreachableOp)
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -2304,7 +2295,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_18" class="md-nav__link">
+  <a href="#attributes_17" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -5582,6 +5573,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#utilunreachable-utilunreachableop" class="md-nav__link">
+    <span class="md-ellipsis">
+      util.unreachable (Util::UnreachableOp)
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5861,24 +5861,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#utilscfunreachable-utilscfunreachableop" class="md-nav__link">
-    <span class="md-ellipsis">
-      util.scf.unreachable (Util::SCFUnreachableOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#utilunreachable-utilunreachableop" class="md-nav__link">
-    <span class="md-ellipsis">
-      util.unreachable (Util::UnreachableOp)
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -5965,7 +5947,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_18" class="md-nav__link">
+  <a href="#attributes_17" class="md-nav__link">
     <span class="md-ellipsis">
       Attributes
     </span>
@@ -6203,6 +6185,7 @@
 <li><a href="#utilassumeint-utilassumeintop">util.assume.int (Util::AssumeIntOp)</a></li>
 <li><a href="#utiloptimization_barrier-utiloptimizationbarrierop">util.optimization_barrier (Util::OptimizationBarrierOp)</a></li>
 <li><a href="#utilunfoldable_constant-utilunfoldableconstantop">util.unfoldable_constant (Util::UnfoldableConstantOp)</a></li>
+<li><a href="#utilunreachable-utilunreachableop">util.unreachable (Util::UnreachableOp)</a></li>
 </ul>
 </li>
 <li><a href="#data-type-conversion-ops">Data type conversion ops</a><ul>
@@ -6242,8 +6225,6 @@
 <li><a href="#utilfunc-utilfuncop">util.func (Util::FuncOp)</a></li>
 <li><a href="#utilinitializer-utilinitializerop">util.initializer (Util::InitializerOp)</a></li>
 <li><a href="#utilreturn-utilreturnop">util.return (Util::ReturnOp)</a></li>
-<li><a href="#utilscfunreachable-utilscfunreachableop">util.scf.unreachable (Util::SCFUnreachableOp)</a></li>
-<li><a href="#utilunreachable-utilunreachableop">util.unreachable (Util::UnreachableOp)</a></li>
 </ul>
 </li>
 <li><a href="#type-manipulation-ops">Type manipulation ops</a><ul>
@@ -6259,7 +6240,7 @@
 </li>
 </ul>
 </li>
-<li><a href="#attributes_18">Attributes</a><ul>
+<li><a href="#attributes_17">Attributes</a><ul>
 <li><a href="#bytepatternattr">BytePatternAttr</a></li>
 <li><a href="#byterangeattr">ByteRangeAttr</a></li>
 <li><a href="#compositeattr">CompositeAttr</a></li>
@@ -7125,6 +7106,32 @@ std.constant wrapped in an util.optimization_barrier.</p>
 </tr>
 </tbody>
 </table>
+<h4 id="utilunreachable-utilunreachableop"><code>util.unreachable</code> (Util::UnreachableOp)<a class="headerlink" href="#utilunreachable-utilunreachableop" title="Permanent link">link</a></h4>
+<p><em>Unreachable assertion op.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `util.unreachable` $message attr-dict
+</code></pre></div>
+<p>Signals to the compiler that the parent block should not be reachable.
+This may be converted into a runtime assertion, though ideally they are
+stripped during translation.</p>
+<div class="highlight"><pre><span></span><code>^bb0:
+  %true = arith.constant true
+  cond_br %true, ^bb2, ^bb1
+^bb1:
+  // Indicates that this branch should never be taken.
+  util.unreachable &quot;shouldn&#39;t be here&quot;
+^bb2:
+  ...
+</code></pre></div>
+<p>Traits: <code>ReturnLike</code>, <code>Terminator</code></p>
+<p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RegionBranchTerminatorOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>message</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
+</table>
+
 <h3 id="data-type-conversion-ops">Data type conversion ops<a class="headerlink" href="#data-type-conversion-ops" title="Permanent link">link</a></h3>
 <h4 id="utilnumericoptional_narrow-utilnumericoptionalnarrowop"><code>util.numeric.optional_narrow</code> (Util::NumericOptionalNarrowOp)<a class="headerlink" href="#utilnumericoptional_narrow-utilnumericoptionalnarrowop" title="Permanent link">link</a></h4>
 <p><em>Memorializes an optional numeric narrowing that is valid.</em></p>
@@ -7150,7 +7157,7 @@ types) are tracked if known.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultType</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>
+<h5 id="attributes_7">Attributes:<a class="headerlink" href="#attributes_7" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>semantic_type</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
@@ -7200,7 +7207,7 @@ global load and store indirect ops.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>SymbolUserOpInterface</code>, <code>Util_GlobalAddressOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_7">Attributes:<a class="headerlink" href="#attributes_7" title="Permanent link">link</a></h5>
+<h5 id="attributes_8">Attributes:<a class="headerlink" href="#attributes_8" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>::mlir::FlatSymbolRefAttr</td><td>flat symbol reference attribute</td></tr>
@@ -7230,7 +7237,7 @@ global load and store indirect ops.</p>
 </code></pre></div>
 <p>Returns a copy of the global variable value.</p>
 <p>Interfaces: <code>Util_GlobalLoadIndirectOpInterface</code></p>
-<h5 id="attributes_8">Attributes:<a class="headerlink" href="#attributes_8" title="Permanent link">link</a></h5>
+<h5 id="attributes_9">Attributes:<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>is_immutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
@@ -7276,7 +7283,7 @@ global load and store indirect ops.</p>
 mutability of the loaded global to minimize the need to traverse symbol
 tables.</p>
 <p>Interfaces: <code>MemoryEffectOpInterface</code>, <code>OpAsmOpInterface</code>, <code>SymbolUserOpInterface</code>, <code>Util_GlobalLoadOpInterface</code></p>
-<h5 id="attributes_9">Attributes:<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h5>
+<h5 id="attributes_10">Attributes:<a class="headerlink" href="#attributes_10" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>::mlir::FlatSymbolRefAttr</td><td>flat symbol reference attribute</td></tr>
@@ -7311,7 +7318,7 @@ tables.</p>
 The value is tied to the execution context of the module and different
 contexts will have different variable storage.</p>
 <p>Interfaces: <code>Symbol</code>, <code>Util_GlobalOpInterface</code></p>
-<h5 id="attributes_10">Attributes:<a class="headerlink" href="#attributes_10" title="Permanent link">link</a></h5>
+<h5 id="attributes_11">Attributes:<a class="headerlink" href="#attributes_11" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>sym_visibility</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
@@ -7355,7 +7362,7 @@ contexts will have different variable storage.</p>
 </code></pre></div>
 <p>Stores a copy of the value into a global variable.</p>
 <p>Interfaces: <code>SymbolUserOpInterface</code>, <code>Util_GlobalStoreOpInterface</code></p>
-<h5 id="attributes_11">Attributes:<a class="headerlink" href="#attributes_11" title="Permanent link">link</a></h5>
+<h5 id="attributes_12">Attributes:<a class="headerlink" href="#attributes_12" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>::mlir::FlatSymbolRefAttr</td><td>flat symbol reference attribute</td></tr>
@@ -7748,7 +7755,7 @@ or synchronous invocation results.</p>
 have a latency between when they are emitted and when the application can
 observe the failure. It's also possible that other work that is in-flight
 or pending when the failure occurs will complete.</p>
-<h5 id="attributes_12">Attributes:<a class="headerlink" href="#attributes_12" title="Permanent link">link</a></h5>
+<h5 id="attributes_13">Attributes:<a class="headerlink" href="#attributes_13" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>message</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
@@ -7794,7 +7801,7 @@ a cast is performed within the callee.</p>
 %0 = util.call @fn(%0, %1) : (i32, tensor&lt;f32&gt;) -&gt; (f32, %1 as tensor&lt;i32&gt;)
 </code></pre></div></p>
 <p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallOpInterface</code>, <code>SymbolUserOpInterface</code>, <code>Util_TiedOpInterface</code></p>
-<h5 id="attributes_13">Attributes:<a class="headerlink" href="#attributes_13" title="Permanent link">link</a></h5>
+<h5 id="attributes_14">Attributes:<a class="headerlink" href="#attributes_14" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>callee</code></td><td>::mlir::FlatSymbolRefAttr</td><td>flat symbol reference attribute</td></tr>
@@ -7840,7 +7847,7 @@ a cast is performed within the callee.</p>
 in some other module) has no body.</p>
 <p>Traits: <code>AffineScope</code>, <code>AutomaticAllocationScope</code>, <code>IsolatedFromAbove</code></p>
 <p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>OpAsmOpInterface</code>, <code>Symbol</code></p>
-<h5 id="attributes_14">Attributes:<a class="headerlink" href="#attributes_14" title="Permanent link">link</a></h5>
+<h5 id="attributes_15">Attributes:<a class="headerlink" href="#attributes_15" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>sym_name</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
@@ -7859,7 +7866,7 @@ Must not load any globals that are defined or initialized after it in the
 module.</p>
 <p>Traits: <code>IsolatedFromAbove</code></p>
 <p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code>, <code>Util_InitializerOpInterface</code></p>
-<h5 id="attributes_15">Attributes:<a class="headerlink" href="#attributes_15" title="Permanent link">link</a></h5>
+<h5 id="attributes_16">Attributes:<a class="headerlink" href="#attributes_16" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>function_type</code></td><td>::mlir::TypeAttr</td><td>type attribute of function type</td></tr>
@@ -7892,65 +7899,6 @@ module.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="utilscfunreachable-utilscfunreachableop"><code>util.scf.unreachable</code> (Util::SCFUnreachableOp)<a class="headerlink" href="#utilscfunreachable-utilscfunreachableop" title="Permanent link">link</a></h4>
-<p><em>Non-terminator unreachable for use in SCF regions.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `util.scf.unreachable` ($message^)? attr-dict
-</code></pre></div>
-<p>Marks a point as unreachable within SCF regions. Unlike <code>util.unreachable</code>
-this is not a terminator and must be followed by appropriate region
-terminators (e.g. <code>scf.yield</code>).</p>
-<p>When not in an SCF region (e.g. <code>util.func</code>) this op canonicalizes to an
-<code>util.unreachable</code> terminator that preserves the intended behavior.</p>
-<p>Note that this op has side effects to prevent code motion: reaching this op
-at runtime is observable indirectly (by way of what ops <em>don't</em> execute). At
-minimum presence of the op indicates all following ops in the same region
-are unreachable and depending on the parent op may indicate the entire
-parent op is unreachable. The behavior is roughly equivalent to having
-lowered SCF to CFG and used <code>util.unreachable</code>.</p>
-<p>Example:
-<div class="highlight"><pre><span></span><code>scf.while (...) {
-  ...
-  scf.condition(%true) ...
-} do {
-  ...
-  util.scf.unreachable &quot;infinite loop body&quot;
-  scf.yield  // Required terminator with poison values
-}
-</code></pre></div></p>
-<p>Traits: <code>Util_UnreachableLike</code></p>
-<h5 id="attributes_16">Attributes:<a class="headerlink" href="#attributes_16" title="Permanent link">link</a></h5>
-<table>
-<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>message</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-</table>
-
-<h4 id="utilunreachable-utilunreachableop"><code>util.unreachable</code> (Util::UnreachableOp)<a class="headerlink" href="#utilunreachable-utilunreachableop" title="Permanent link">link</a></h4>
-<p><em>Unreachable assertion op.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `util.unreachable` ($message^)? attr-dict
-</code></pre></div>
-<p>Signals to the compiler that the parent block should not be reachable.
-This may be converted into a runtime assertion, though ideally they are
-stripped during translation.</p>
-<div class="highlight"><pre><span></span><code>^bb0:
-  %true = arith.constant true
-  cond_br %true, ^bb2, ^bb1
-^bb1:
-  // Indicates that this branch should never be taken.
-  util.unreachable &quot;shouldn&#39;t be here&quot;
-^bb2:
-  ...
-</code></pre></div>
-<p>Traits: <code>ReturnLike</code>, <code>Terminator</code>, <code>Util_UnreachableLike</code></p>
-<p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RegionBranchTerminatorOpInterface</code></p>
-<p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_17">Attributes:<a class="headerlink" href="#attributes_17" title="Permanent link">link</a></h5>
-<table>
-<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>message</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-</table>
-
 <h3 id="type-manipulation-ops">Type manipulation ops<a class="headerlink" href="#type-manipulation-ops" title="Permanent link">link</a></h3>
 <h4 id="utilcast-utilcastop"><code>util.cast</code> (Util::CastOp)<a class="headerlink" href="#utilcast-utilcastop" title="Permanent link">link</a></h4>
 <p><em>Casts one util type to another ala static_cast/dynamic_cast.</em></p>
@@ -8162,7 +8110,7 @@ the index is out of bounds.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="attributes_18">Attributes<a class="headerlink" href="#attributes_18" title="Permanent link">link</a></h2>
+<h2 id="attributes_17">Attributes<a class="headerlink" href="#attributes_17" title="Permanent link">link</a></h2>
 <h3 id="bytepatternattr">BytePatternAttr<a class="headerlink" href="#bytepatternattr" title="Permanent link">link</a></h3>
 <p><em>An attribute containing a filled byte pattern.</em></p>
 <p>Syntax:</p>
