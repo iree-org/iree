@@ -65,11 +65,8 @@ static Operation *isTriviallyProducedByReadOnlyViewLike(
   if (!binding) {
     return nullptr;
   }
-  std::optional<IREE::HAL::DescriptorFlags> descriptorFlags =
-      binding->getDescriptorFlags();
-  if (!descriptorFlags.has_value() ||
-      !bitEnumContainsAll(*descriptorFlags,
-                          IREE::HAL::DescriptorFlags::ReadOnly)) {
+  if (!binding->getMemoryAccess() ||
+      !binding->getMemoryAccessAttr().hasRead()) {
     return nullptr;
   }
   // Check that the binding has at most one FatRawBufferCastOp in its use

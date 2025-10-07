@@ -2228,22 +2228,6 @@ LogicalResult InterfaceConstantLoadOp::verify() {
 // hal.interface.binding.subspan
 //===----------------------------------------------------------------------===//
 
-void InterfaceBindingSubspanOp::build(OpBuilder &builder,
-                                      OperationState &result, Type resultType,
-                                      IREE::HAL::PipelineLayoutAttr layout,
-                                      APInt binding, Value byte_offset,
-                                      ValueRange dynamic_dims,
-                                      IntegerAttr alignment,
-                                      std::optional<DescriptorFlags> flags) {
-  IREE::HAL::DescriptorFlagsAttr descriptorAttr;
-  if (flags.has_value()) {
-    descriptorAttr = IREE::HAL::DescriptorFlagsAttr::get(builder.getContext(),
-                                                         flags.value());
-  }
-  build(builder, result, resultType, layout, binding, byte_offset, dynamic_dims,
-        alignment, descriptorAttr);
-}
-
 LogicalResult InterfaceBindingSubspanOp::verify() {
   InterfaceBindingSubspanOp op = *this;
   if (ShapedType shapedType = llvm::dyn_cast<ShapedType>(op.getType())) {
@@ -2265,11 +2249,6 @@ LogicalResult InterfaceBindingSubspanOp::verify() {
 IREE::HAL::PipelineBindingAttr
 InterfaceBindingSubspanOp::getPipelineBindingAttr() {
   return getLayout().getBinding(getBinding());
-}
-
-IREE::HAL::DescriptorType InterfaceBindingSubspanOp::getDescriptorType() {
-  auto bindingAttr = getPipelineBindingAttr();
-  return bindingAttr.getType();
 }
 
 llvm::MaybeAlign InterfaceBindingSubspanOp::getBaseAlignment() {

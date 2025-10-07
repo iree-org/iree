@@ -233,9 +233,11 @@ analyzeSubspans(llvm::SetVector<IREE::HAL::InterfaceBindingSubspanOp> &subspans,
   for (auto subspan : subspans) {
     int64_t binding = subspan.getBinding().getSExtValue();
     result[binding].unused = false;
-    result[binding].readonly &= IREE::HAL::bitEnumContainsAny(
-        subspan.getDescriptorFlags().value_or(IREE::HAL::DescriptorFlags::None),
-        IREE::HAL::DescriptorFlags::ReadOnly);
+    if (IREE::HAL::MemoryAccessAttr memoryAccessAttr =
+            subspan.getMemoryAccessAttr()) {
+      result[binding].readonly &=
+          memoryAccessAttr.hasRead() && !memoryAccessAttr.hasWrite();
+    }
     unsigned bindingAddrSpace = 0;
     auto bindingType = dyn_cast<BaseMemRefType>(subspan.getType());
     if (bindingType) {

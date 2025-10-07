@@ -292,7 +292,7 @@ struct FlattenBindingSubspan final
     auto newOp = IREE::HAL::InterfaceBindingSubspanOp::create(
         rewriter, subspanOp.getLoc(), newType, subspanOp.getLayout(),
         subspanOp.getBinding(), newOffset, dynamicShape,
-        subspanOp.getAlignmentAttr(), subspanOp.getDescriptorFlagsAttr());
+        subspanOp.getAlignmentAttr(), subspanOp.getMemoryAccessAttr());
 
     Value replacement = newOp;
     if (!isZeroInteger(elementOffset)) {

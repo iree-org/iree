@@ -3513,7 +3513,7 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
     Optional<HAL_DeviceSize>:$byte_offset,
     HAL_ShapeDynamicDims:$dynamic_dims,
     OptionalAttr<IndexAttr>:$alignment,
-    OptionalAttr<HAL_DescriptorFlagsAttr>:$descriptor_flags
+    OptionalAttr<HAL_MemoryAccessAttr>:$memory_access
   );
   let results = (outs
     AnyType:$result
@@ -3524,21 +3524,9 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
     `binding` `(` $binding `)`
     (`alignment` `(` $alignment^ `)`)?
     (`offset` `(` $byte_offset^ `)`)?
-    (`flags` `(` $descriptor_flags^ `)`)?
+    (`memory_access` `(` $memory_access^ `)`)?
     attr-dict `:` type($result) (`{` $dynamic_dims^ `}`)?
   }];
-
-  let builders = [
-    OpBuilder<(ins
-      "Type":$resultType,
-      "IREE::HAL::PipelineLayoutAttr":$layout,
-      "APInt":$binding,
-      "Value":$byte_offset,
-      "ValueRange":$dynamic_dims,
-      "IntegerAttr":$alignment,
-      CArg<"std::optional<DescriptorFlags>", "std::nullopt">:$flags
-    )>,
-  ];
 
   let hasVerifier = 1;
 
@@ -3548,9 +3536,6 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
 
     // Returns the descriptor set binding metadata for the given set/binding.
     IREE::HAL::PipelineBindingAttr getPipelineBindingAttr();
-
-    // Returns the type of the descriptor this binding references.
-    IREE::HAL::DescriptorType getDescriptorType();
 
     // Returns the alignment of the base buffer pointer (before offset).
     llvm::MaybeAlign getBaseAlignment();

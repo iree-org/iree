@@ -84,9 +84,9 @@ static bool isUniformLoad(Operation *op) {
       cast<MemRefType>(subspan.getResult().getType()).getMemorySpace());
   if (descTypeAttr && descTypeAttr.getValue() == DescriptorType::UniformBuffer)
     return true;
-  if (auto flags = subspan.getDescriptorFlags()) {
-    if (bitEnumContainsAll(*flags, IREE::HAL::DescriptorFlags::ReadOnly))
-      return true;
+  if (subspan.getMemoryAccess().has_value() &&
+      subspan.getMemoryAccessAttr().hasRead()) {
+    return true;
   }
   return false;
 }

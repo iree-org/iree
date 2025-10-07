@@ -283,6 +283,43 @@ def HAL_MemoryAccessBitfieldAttr :
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
+def HAL_MemoryAccessAttr : AttrDef<HAL_Dialect, "MemoryAccess"> {
+  let mnemonic = "memory_access";
+  let summary = [{Memory access bitfield attribute.}];
+  let description = [{
+    Specifies memory access patterns as a bitfield combination.
+  }];
+  
+  let parameters = (ins
+    AttrParameter<"MemoryAccessBitfield", "bitfield value">:$value
+  );
+  
+  let hasCustomAssemblyFormat = 1;
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+  
+  let extraClassDeclaration = [{
+    // Convenience accessors that work with the underlying enum
+    bool hasRead() const { 
+      return bitEnumContainsAny(getValue(), MemoryAccessBitfield::Read);
+    }
+    bool hasWrite() const { 
+      return bitEnumContainsAny(getValue(), MemoryAccessBitfield::Write);
+    }
+    bool hasDiscard() const { 
+      return bitEnumContainsAny(getValue(), MemoryAccessBitfield::Discard);
+    }
+    bool hasMayAlias() const { 
+      return bitEnumContainsAny(getValue(), MemoryAccessBitfield::MayAlias);
+    }
+    bool hasUnaligned() const { 
+      return bitEnumContainsAny(getValue(), MemoryAccessBitfield::Unaligned);
+    }
+    bool hasAny() const { 
+      return bitEnumContainsAny(getValue(), MemoryAccessBitfield::Any);
+    }
+  }];
+}
+
 def HAL_MemoryModel_Unified : I32EnumAttrCase<"Unified", 0>;
 def HAL_MemoryModel_Discrete : I32EnumAttrCase<"Discrete", 1>;
 def HAL_MemoryModelAttr :
