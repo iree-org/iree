@@ -35,7 +35,7 @@ jobs:
           # CPU
           - name: cpu_task
             markers: "cpu"
-            config-file: torch_ops_cpu_llvm_sync_O0.json
+            config-file: pytorch_ops_cpu_llvm_sync.json
             numprocesses: auto
             runs-on: ubuntu-24.04
     env:
