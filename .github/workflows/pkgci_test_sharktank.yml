@@ -67,6 +67,7 @@ jobs:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       TEST_OUTPUT_ARTIFACTS: ${{ github.workspace }}/model_output_artifacts
       IREE_TEST_FILES: ${{ matrix.iree_test_files }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     steps:
       - name: Checking out IREE repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -99,6 +100,21 @@ jobs:
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
           source ${VENV_DIR}/bin/activate
           pip install -e ${{ github.workspace }}/iree-test-suites/sharktank_models
+          pip install torch --index-url https://download.pytorch.org/whl/cpu "torch>=2.5,<2.7"
+          pip install -f https://github.com/iree-org/wave/releases/expanded_assets/dev-wheels wave-lang --no-index
+          pip install -U "huggingface_hub[cli]"
+          pip install "huggingface_hub[hf_transfer]"
+          pip install sharktank -f https://github.com/nod-ai/shark-ai/releases/expanded_assets/dev-wheels --pre
+          python -c "from sharktank import ops; print('Sanity check passed')"
+
+      - name: Download models from Hugging face
+        run: |
+          source ${VENV_DIR}/bin/activate
+          HF_HUB_ENABLE_HF_TRANSFER=1 hf download meta-llama/Meta-Llama-3.1-8B-Instruct --local-dir Meta-Llama-3.1-8B-Instruct --exclude original/* --token ${{ secrets.HF_TOKEN }}
+          HF_HUB_ENABLE_HF_TRANSFER=1 hf download amd/Llama-3.1-8B-Instruct-FP8-KV --local-dir Meta-Llama-3.1-8B-FP8 --exclude original/* --token ${{ secrets.HF_TOKEN }}
+
+          ls -R Meta-Llama-3.1-8B-Instruct
+          ls -R Meta-Llama-3.1-8B-FP8
 
       - name: Run sharktank model tests
         run: |
