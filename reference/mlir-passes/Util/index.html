@@ -2727,6 +2727,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#-iree-util-verify-structured-control-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-util-verify-structured-control-flow
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5109,6 +5118,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#-iree-util-verify-structured-control-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-util-verify-structured-control-flow
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5233,6 +5251,10 @@ Demand Dependence Graphs. ACM TACO. <a href="https://dl.acm.org/doi/10.1145/2693
 <p><em>Tests floating point range analysis.</em></p>
 <p>Tests floating point range analysis by evaluating any
 'iree_unregistered.test_fprange' op and setting the results on an attribute.</p>
+<h3 id="-iree-util-verify-structured-control-flow"><code>-iree-util-verify-structured-control-flow</code><a class="headerlink" href="#-iree-util-verify-structured-control-flow" title="Permanent link">link</a></h3>
+<p><em>Verifies that functions contain only structured control flow.</em></p>
+<p>Verifies that functions contain only structured control flow (no ops
+implementing <code>BranchOpInterface</code> like <code>cf.br</code> or <code>cf.cond_br</code>).</p>
 
 
 
