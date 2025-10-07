@@ -679,8 +679,8 @@ def IREEGPU_ConditionalTransposeAttr  :
      - LHS shape: (M, K)
      - RHS shape: (N, K)
      - Tile dimension: (TileM, TileN)
-     - numTileLoadsDefault = min(numCUS, ceildiv(N, tileN)) + ceildiv(numCUS, min(numCUS, ceildiv(N,tileN)))
-     - numTileLoadsTransposed = min(numCUS, ceildiv(M, tileM)) + ceildiv(numCUS, min(numCUS, ceildiv(M,tileM)))
+     - numTileLoadsDefault = min(numCUS, ceildiv(N, tileN)) + ceildiv(numCUS, min(numCUS, ceildiv(N, tileN)))
+     - numTileLoadsTransposed = min(numCUS, ceildiv(M, tileM)) + ceildiv(numCUS, min(numCUS, ceildiv(M, tileM)))
 
      Examples for gfx942:
      - (M=8192, N=128256, K=4096)
