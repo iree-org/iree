@@ -44,6 +44,7 @@ iree_lit_test_suite(
     "llvmgpu_bufferize.mlir"
     "nvvm_pipeline_test.mlir"
     "pack_shared_memory_alloc.mlir"
+    "playtime.mlir"
     "prefetch_shared_memory.mlir"
     "reduction_pipeline_cuda.mlir"
     "reduction_pipeline_rocm.mlir"
