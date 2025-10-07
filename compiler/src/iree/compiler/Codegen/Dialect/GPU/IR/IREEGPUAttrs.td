@@ -676,8 +676,8 @@ def IREEGPU_ConditionalTransposeAttr  :
     The strategy compares the sum of X and Y for the default ordering versus the transposed ordering, and selects
     the configuration with the minimum value.
     Calculation breakdown:
-     - LHS shape: (M,K)
-     - RHS shape: (N,K)
+     - LHS shape: (M, K)
+     - RHS shape: (N, K)
      - Tile dimension: (TileM, TileN)
      - numTileLoadsDefault = min(numCUS,ceil(N,tileN)) + ceil(numCUS,min(numCUS,ceil(N,tileN)))
      - numTileLoadsTransposed = min(numCUS,ceil(M,tileM)) + ceil(numCUS,min(numCUS,ceil(M,tileM)))
