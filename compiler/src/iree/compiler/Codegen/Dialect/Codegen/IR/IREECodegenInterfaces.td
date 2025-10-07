@@ -242,9 +242,9 @@ def IREECodegen_WorkgroupReorderingAttrInterface :
     InterfaceMethod<
       /*desc=*/[{
         Function that generates the workgroup loop headers.
-          - `loopRanges` : Values that represent the full size of the iteration space being tiled.
-          - `givenTileSizes` : The tile sizes that are to be used to tile the iteration space.
-          - `destinationTensors` : The tensors to use as destinations for the results of the tiled loop.
+          - `loopRanges`: Values that represent the full size of the iteration space being tiled.
+          - `givenTileSizes`: The tile sizes that are to be used to tile the iteration space.
+          - `destinationTensors`: The tensors to use as destinations for the results of the tiled loop.
       }],
       /*retTy=*/"::mlir::FailureOr<::mlir::scf::SCFTilingOptions::CustomLoopHeaderInfo>",
       /*methodName=*/"generateLoopHeaderFn",
