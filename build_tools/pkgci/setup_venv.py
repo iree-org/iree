@@ -66,6 +66,9 @@ There are several modes in which to use this script:
   ```
 
   (Note that these two modes are often combined to allow for workflow testing)
+
+You must have a GitHub token with `repo` scope available as the `GH_TOKEN`
+environment variable if you will be fetching artifacts.
 """
 
 from glob import glob
