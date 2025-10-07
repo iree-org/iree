@@ -144,6 +144,15 @@ def StripDebugOpsPass : Pass<"iree-util-strip-debug-ops", ""> {
   let summary = "Strips debug ops, like assertions.";
 }
 
+def VerifyStructuredControlFlowPass :
+    InterfacePass<"iree-util-verify-structured-control-flow", "mlir::FunctionOpInterface"> {
+  let summary = "Verifies that functions contain only structured control flow.";
+  let description = [{
+    Verifies that functions contain only structured control flow (no ops
+    implementing `BranchOpInterface` like `cf.br` or `cf.cond_br`).
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // Globals
 //===----------------------------------------------------------------------===//

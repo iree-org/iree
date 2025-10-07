@@ -39,6 +39,7 @@ iree_cc_library(
     "StripDebugOps.cpp"
     "TestConversion.cpp"
     "TestFloatRangeAnalysis.cpp"
+    "VerifyStructuredControlFlow.cpp"
   DEPS
     ::PassesIncGen
     LLVMSupport
@@ -50,6 +51,7 @@ iree_cc_library(
     MLIRArithTransforms
     MLIRBytecodeWriter
     MLIRControlFlowDialect
+    MLIRControlFlowInterfaces
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
