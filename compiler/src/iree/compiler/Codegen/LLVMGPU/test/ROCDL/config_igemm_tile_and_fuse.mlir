@@ -149,7 +149,7 @@ func.func @nchw_conv_unaligned_mfma() {
 // MI300X-SAME:     subgroup = [1, 1, 1, 1, 0]
 // MI300X-SAME:     workgroup = [1, 32, 2, 32, 0]
 
-// PAD-CONV-GFX942:     padding_conv = [1, 64, 4, 32, 0, 0, 0]
+// PAD-CONV-GFX942-NOT:     padding_conv
 
 // -----
 

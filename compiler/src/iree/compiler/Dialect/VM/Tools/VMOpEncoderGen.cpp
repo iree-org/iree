@@ -43,7 +43,7 @@ bool emitEncodeFnDefs(const llvm::RecordKeeper &recordKeeper, raw_ostream &os) {
       continue;
 
     Operator op(def);
-    tblgen::NamespaceEmitter emitter(os, op.getDialect());
+    tblgen::DialectNamespaceEmitter emitter(os, op.getDialect());
     os << formatv(
         "LogicalResult {0}::encode(SymbolTable &syms, VMFuncEncoder &e) {{\n",
         op.getCppClassName());

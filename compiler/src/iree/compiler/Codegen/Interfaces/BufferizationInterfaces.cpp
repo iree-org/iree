@@ -172,36 +172,20 @@ struct LoadFromBufferOpInterface
           LoadFromBufferOpInterface, IREE::Codegen::LoadFromBufferOp> {
   bool isWritable(Operation *op, Value value,
                   const AnalysisState &state) const {
-    // Walk memref Value producers until a hal.interface.binding.subspan op is
-    // found, and check if the subspan is read only.
-    Operation *currentOp = op;
-    while (currentOp) {
-      if (auto subspanOp =
-              dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(currentOp)) {
-        std::optional<IREE::HAL::DescriptorFlags> descriptorFlags =
-            subspanOp.getDescriptorFlags();
-        return !descriptorFlags.has_value() ||
-               descriptorFlags.value() != IREE::HAL::DescriptorFlags::ReadOnly;
-      }
-      // There is expected to be only a single memref source for a given memref
-      // OpResult, because producers of memref Values are expected to be
-      // view-like or cast-like operations. If multiple operands have a memref
-      // type, then conservatively return not writable.
-      if (llvm::count_if(currentOp->getOperandTypes(),
-                         llvm::IsaPred<MemRefType>) != 1) {
-        return false;
-      }
-      // Otherwise, follow the memref operand to find the source buffer.
-      for (Value operand : currentOp->getOperands()) {
-        if (isa<MemRefType>(operand.getType())) {
-          currentOp = operand.getDefiningOp();
-          break;
-        }
-      }
-    }
-    // Conservatively default to not writable if the source of the buffer is
-    // not found.
-    return false;
+    // Search for a hal.interface.binding.subspan op that is the source of the
+    // buffer, and check if the subspan is read only.
+    auto loadFromBufferOp = cast<IREE::Codegen::LoadFromBufferOp>(op);
+    std::optional<IREE::HAL::InterfaceBindingSubspanOp> subspanOp =
+        getSourceSubspanMemref(
+            cast<TypedValue<MemRefType>>(loadFromBufferOp.getBuffer()));
+    // Conservatively return false if the subspan is not found.
+    if (!subspanOp)
+      return false;
+    std::optional<IREE::HAL::DescriptorFlags> descriptorFlags =
+        subspanOp->getDescriptorFlags();
+    return !descriptorFlags.has_value() ||
+           !bitEnumContainsAll(*descriptorFlags,
+                               IREE::HAL::DescriptorFlags::ReadOnly);
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,

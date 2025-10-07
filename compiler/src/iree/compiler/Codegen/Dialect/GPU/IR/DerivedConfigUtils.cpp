@@ -47,7 +47,7 @@ static SmallVector<int64_t> getVectorSizeTileSizes(int64_t rank,
 /// to collapse the vector.transfer_read that results from this choice of tile
 /// size.
 static SmallVector<int64_t> getVectorTileSizesFromLoopRanges(
-    SmallVector<int64_t> loopRanges, int64_t numThreads, int64_t vectorSize,
+    ArrayRef<int64_t> loopRanges, int64_t numThreads, int64_t vectorSize,
     bool allowMultiDimCollapse = true, bool vectorizeOutermost = false) {
   int64_t rank = loopRanges.size();
   int64_t targetDim = vectorizeOutermost ? 0 : rank - 1;
@@ -175,6 +175,17 @@ SmallVector<int64_t> deriveThreadTileSizes(Operation *op) {
         return getVectorTileSizesFromLoopRanges(loopBounds, numThreads,
                                                 vectorSize);
       })
+      .Case(
+          [&](IREE::LinalgExt::MapScatterOp scatterOp) -> SmallVector<int64_t> {
+            ShapedType inputType = scatterOp.getInputType();
+            if (!inputType.hasStaticShape())
+              return {};
+            ArrayRef<int64_t> loopBounds = inputType.getShape();
+            int64_t elemBits = inputType.getElementTypeBitWidth();
+            int64_t vectorSize = kPreferredCopyNumBits / elemBits;
+            return getVectorTileSizesFromLoopRanges(loopBounds, numThreads,
+                                                    vectorSize);
+          })
       .Default([&](Operation *op) -> SmallVector<int64_t> { return {}; });
 }
 

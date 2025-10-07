@@ -8,6 +8,7 @@
 
 import enum
 import dataclasses
+import re
 import typing
 
 
@@ -17,6 +18,7 @@ import typing
 @enum.unique
 class MatrixElemTypeId(enum.Enum):
     NONE = ""
+    UI8 = "ui8"
     I8 = "i8"
     I32 = "i32"
     F64 = "f64"
@@ -27,6 +29,14 @@ class MatrixElemTypeId(enum.Enum):
     F8E4M3FN = "f8E4M3FN"
     F8E5M2FNUZ = "f8E5M2FNUZ"
     F8E4M3FNUZ = "f8E4M3FNUZ"
+    F8E8M0FNU = "f8E8M0FNU"
+    F6E3M2FN = "f6E3M2FN"
+    F6E2M3FN = "f6E2M3FN"
+    F4E2M1FN = "f4E2M1FN"
+
+
+def get_size_in_bits(type_id: MatrixElemTypeId):
+    return int(re.search(r"\d+", str(type_id)).group())
 
 
 # Enumerates of the collections of shapes that we can generate tests for.
@@ -133,3 +143,78 @@ def int_or_question_mark(s: DimSize):
 # util.func @somefunction_DYNxDYNxf32, where we can't use "?" characters.
 def int_or_DYN(s: DimSize):
     return s.value or "DYN"
+
+
+# Describes the fully resolved shape dimensions of all 3 input matrices,
+# LHS, RHS, and Accumulator, in a testcase.
+# Each value is a string, which may either represent a positive integer such as "123",
+# or a "?" string, meaning a dynamic dimension as in MLIR.
+# These string values are used to generate MLIR function names and tensor shapes.
+@dataclasses.dataclass
+class TestInputMatricesShapes:
+    lhs_rows: DimSize
+    lhs_cols: DimSize
+    rhs_rows: DimSize
+    rhs_cols: DimSize
+    acc_rows: DimSize
+    acc_cols: DimSize
+
+
+# Represents a generated test function.
+@dataclasses.dataclass
+class MLIRFunction:
+    name: str
+    signature: str
+    import_declaration: str
+    definition: str
+
+
+# Represents a call to a generated test function.
+@dataclasses.dataclass
+class TestCall:
+    function: MLIRFunction
+    op: str
+
+
+# Helper for generate_function. Generates TestInputMatricesShapes, i.e.
+# converts from the runtime shape dimensions in TestShape and given dynamicity to
+# the set of shapes to be used in a test function's input tensors.
+def generate_shapes(shape: TestShape, transpose_rhs: bool, dynamicity: Dynamicity):
+    lhs_rows = shape_dim(shape.m, dynamicity)
+    lhs_cols = shape_dim(shape.k, dynamicity)
+    acc_rows = shape_dim(shape.m, dynamicity)
+    acc_cols = shape_dim(shape.n, dynamicity)
+    if transpose_rhs:
+        rhs_rows = shape_dim(shape.n, dynamicity)
+        rhs_cols = shape_dim(shape.k, dynamicity)
+    else:
+        rhs_rows = shape_dim(shape.k, dynamicity)
+        rhs_cols = shape_dim(shape.n, dynamicity)
+    shapes = TestInputMatricesShapes(
+        lhs_rows=lhs_rows,
+        lhs_cols=lhs_cols,
+        rhs_rows=rhs_rows,
+        rhs_cols=rhs_cols,
+        acc_rows=acc_rows,
+        acc_cols=acc_cols,
+    )
+    return shapes
+
+
+random_matrix_seed = 0
+
+
+# Generate a matrix function argument of the given size as `%name`.
+def generate_random_matrix(
+    name: str, matrix_shape: list, element_type: MatrixElemTypeId, increment_seed=True
+):
+    global random_matrix_seed
+    if increment_seed:
+        random_matrix_seed += 1
+    return (
+        f"  %{name}_dim0 = arith.constant {matrix_shape[0]} : i64\n"
+        f"  %{name}_dim1 = arith.constant {matrix_shape[1]} : i64\n"
+        f"  %{name}_element_type = hal.element_type<{element_type.value}> : i32\n"
+        f"  %{name}_seed = arith.constant {random_matrix_seed} : i32\n"
+        f"  %{name} = util.call @matmul_test.generate_random_matrix(%device, %{name}_dim0, %{name}_dim1, %{name}_element_type, %{name}_seed) : (!hal.device, i64, i64, i32, i32) -> !hal.buffer_view\n"
+    )

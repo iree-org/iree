@@ -430,7 +430,7 @@ getVectorDistributeReductionConfig(
     const int64_t maxParallelFactor = workgroupSize / 4;
     for (int64_t parallelFactor = 2; (parallelFactor < maxParallelFactor) &&
                                      (parallelBound % parallelFactor == 0) &&
-                                     (parallelBound > parallelFactor);
+                                     (parallelBound >= parallelFactor);
          parallelFactor *= 2) {
       numParallelReductions = parallelFactor;
     }
@@ -978,13 +978,8 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     if (mma.getSubgroupSize() != targetSubgroupSize)
       continue;
     storeMmaInfo(mma, intrinsics);
-    // Store info on virtual intrinsics based on current mma if any
-    for (IREE::GPU::VirtualMMAIntrinsic virtualIntrinsic :
-         mma.getVirtualIntrinsics()) {
-      auto virtualMma =
-          IREE::GPU::VirtualMMAAttr::get(context, virtualIntrinsic);
-      storeMmaInfo(virtualMma, intrinsics);
-    }
+    // Skip adding any virtual intrinsics since they are not tested for
+    // convolutions.
   }
 
   if (intrinsics.empty())
@@ -1209,13 +1204,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
     if (mma.getSubgroupSize() != targetSubgroupSize)
       continue;
     storeMmaInfo(mma, intrinsics);
-    // Store info on virtual intrinsics based on current mma if any
-    for (IREE::GPU::VirtualMMAIntrinsic virtualIntrinsic :
-         mma.getVirtualIntrinsics()) {
-      auto virtualMma =
-          IREE::GPU::VirtualMMAAttr::get(context, virtualIntrinsic);
-      storeMmaInfo(virtualMma, intrinsics);
-    }
+    // Skip adding any virtual intrinsics since they are not tested for matmuls.
   }
 
   if (intrinsics.empty())
@@ -2891,8 +2880,8 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     computeOp->print(llvm::dbgs(), OpPrintingFlags().skipRegions());
     llvm::dbgs() << "\n";
   });
-  if (succeeded(setDataTiledMultiMmaLoweringConfig(target, entryPointFn,
-                                                   computeOp, ukernelConfig))) {
+  if (succeeded(setDataTiledMmaInnerTiledLoweringConfig(
+          target, entryPointFn, computeOp, ukernelConfig))) {
     LDBG() << "Tile and fuse data tiled MMA inner_tiled config";
     return success();
   }

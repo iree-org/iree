@@ -13,31 +13,14 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-py_library(
-    name = "common",
-    srcs = [
-        "common.py",
-    ],
-)
-
-py_library(
-    name = "compilation_info",
-    srcs = [
-        "compilation_info.py",
-    ],
-    deps = [
-        ":common",
-    ],
-)
-
 py_binary(
     name = "generate_e2e_matmul_tests",
     srcs = [
+        "common.py",
+        "compilation_info.py",
+        "generate_code.py",
+        "generate_code_mx.py",
         "generate_e2e_matmul_tests.py",
-    ],
-    deps = [
-        ":common",
-        ":compilation_info",
     ],
 )
 

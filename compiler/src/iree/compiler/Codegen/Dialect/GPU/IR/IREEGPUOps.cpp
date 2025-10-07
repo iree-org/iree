@@ -194,27 +194,59 @@ MutableOperandRange CoalescedGatherDMAOp::getDpsInitsMutable() {
 
 // ParallelCombiningOpInterface implementation
 MutableOperandRange CoalescedGatherDMAOp::getUpdatedDestinations() {
+  // Only relevant for tensor operands
+  if (!isa<RankedTensorType>(getInit().getType())) {
+    return MutableOperandRange(getOperation(), /*start=*/0, /*length=*/0);
+  }
   // Return the init operand as the destination being updated
   return getInitMutable();
 }
 
 Operation *CoalescedGatherDMAOp::getIteratingParent() {
+  // Only relevant for tensor operands
+  if (!isa<RankedTensorType>(getInit().getType())) {
+    return nullptr;
+  }
   // Return the parent scf.forall operation
   return getOperation()->getParentOfType<scf::ForallOp>();
 }
 
 LogicalResult CoalescedGatherDMAOp::verify() {
-  auto initType = cast<RankedTensorType>(getInit().getType());
-  auto resultType = cast<RankedTensorType>(getResult().getType());
+  auto initType = getInit().getType();
+  auto resultType = getResult().getType();
 
   // Verify that this op is nested within an InParallelOpInterface op
-  if (!isa_and_nonnull<InParallelOpInterface>(getOperation()->getParentOp())) {
-    return emitOpError("must be nested within an operation implementing "
-                       "InParallelOpInterface");
+  // Note: This constraint only applies when working with tensors
+  if (isa<RankedTensorType>(initType)) {
+    if (!isa_and_nonnull<InParallelOpInterface>(
+            getOperation()->getParentOp())) {
+      return emitOpError("must be nested within an operation implementing "
+                         "InParallelOpInterface when using tensor operands");
+    }
   }
 
   if (initType != resultType) {
     return emitOpError("init and result must have the same type and shape");
+  }
+
+  // Ensure all operands are either all tensors or all memrefs
+  bool hasTensor = isa<RankedTensorType>(initType);
+  bool hasMemRef = isa<MemRefType>(initType);
+
+  if (!hasTensor && !hasMemRef) {
+    return emitOpError("input type must either be a tensor or a memref");
+  }
+
+  if (hasTensor) {
+    if (!isa<RankedTensorType>(getIndices().getType()) ||
+        !isa<RankedTensorType>(getSource().getType())) {
+      return emitOpError("all operands must be tensors when init is a tensor");
+    }
+  } else if (hasMemRef) {
+    if (!isa<MemRefType>(getIndices().getType()) ||
+        !isa<MemRefType>(getSource().getType())) {
+      return emitOpError("all operands must be memrefs when init is a memref");
+    }
   }
 
   return success();

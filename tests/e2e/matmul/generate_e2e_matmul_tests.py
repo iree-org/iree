@@ -13,6 +13,7 @@ import typing
 
 from tests.e2e.matmul.common import *
 from tests.e2e.matmul.compilation_info import *
+from tests.e2e.matmul.generate_code import *
 
 
 # Returns the list of TestShape's to use for the collection of shapes
@@ -99,266 +100,12 @@ def get_test_shapes(shapes_id: ShapesId):
     raise ValueError(shapes_id)
 
 
-# Describes the fully resolved shape dimensions of all 3 input matrices,
-# LHS, RHS, and Accumulator, in a testcase.
-# Each value is a string, which may either represent a positive integer such as "123",
-# or a "?" string, meaning a dynamic dimension as in MLIR.
-# These string values are used to generate MLIR function names and tensor shapes.
-@dataclasses.dataclass
-class TestInputMatricesShapes:
-    lhs_rows: DimSize
-    lhs_cols: DimSize
-    rhs_rows: DimSize
-    rhs_cols: DimSize
-    acc_rows: DimSize
-    acc_cols: DimSize
-
-
-# Helper for generate_function. Generates TestInputMatricesShapes, i.e.
-# converts from the runtime shape dimensions in TestShape and given dynamicity to
-# the set of shapes to be used in a test function's input tensors.
-def generate_shapes(shape: TestShape, transpose_rhs: bool, dynamicity: Dynamicity):
-    lhs_rows = shape_dim(shape.m, dynamicity)
-    lhs_cols = shape_dim(shape.k, dynamicity)
-    acc_rows = shape_dim(shape.m, dynamicity)
-    acc_cols = shape_dim(shape.n, dynamicity)
-    if transpose_rhs:
-        rhs_rows = shape_dim(shape.n, dynamicity)
-        rhs_cols = shape_dim(shape.k, dynamicity)
-    else:
-        rhs_rows = shape_dim(shape.k, dynamicity)
-        rhs_cols = shape_dim(shape.n, dynamicity)
-    shapes = TestInputMatricesShapes(
-        lhs_rows=lhs_rows,
-        lhs_cols=lhs_cols,
-        rhs_rows=rhs_rows,
-        rhs_cols=rhs_cols,
-        acc_rows=acc_rows,
-        acc_cols=acc_cols,
-    )
-    return shapes
-
-
-# Helper for generate_function.
-# Generates a name for a test function in the generated MLIR code.
-def generate_function_name(
-    lhs_rhs_type: MatrixElemTypeId,
-    acc_type: MatrixElemTypeId,
-    shapes: TestInputMatricesShapes,
-    accumulate: bool,
-    compilation_info: typing.Optional[CompilationInfo] = None,
-):
-    input_t = lhs_rhs_type.value
-    acc_t = acc_type.value
-    lhs_r = int_or_DYN(shapes.lhs_rows)
-    lhs_c = int_or_DYN(shapes.lhs_cols)
-    rhs_r = int_or_DYN(shapes.rhs_rows)
-    rhs_c = int_or_DYN(shapes.rhs_cols)
-    acc_r = int_or_DYN(shapes.acc_rows)
-    acc_c = int_or_DYN(shapes.acc_cols)
-
-    info = ""
-    if compilation_info:
-        info = f"_for_{compilation_info.dispatch_lowering_pass_pipeline}"
-
-    matmul_kind = "matmul_accumulate" if accumulate else "matmul"
-    return (
-        f"{matmul_kind}_{lhs_r}x{lhs_c}x{input_t}_times_"
-        + f"{rhs_r}x{rhs_c}x{input_t}_into_{acc_r}x{acc_c}x{acc_t}{info}"
-    )
-
-
-# Represents a generated test function.
-@dataclasses.dataclass
-class MLIRFunction:
-    name: str
-    signature: str
-    import_declaration: str
-    definition: str
-
-
-# Generates a test function in the generated MLIR code.
-# The generated function will take the same arguments as linalg.matmul variants
-# and will just call linalg.matmul variants with them, returning its result.
-def generate_function(
-    lhs_rhs_type: MatrixElemTypeId,
-    acc_type: MatrixElemTypeId,
-    shape: TestShape,
-    transpose_rhs: bool,
-    dynamicity: Dynamicity,
-    compilation_info: Optional[CompilationInfo] = None,
-):
-    shapes = generate_shapes(shape, transpose_rhs, dynamicity)
-    func_name = generate_function_name(
-        lhs_rhs_type, acc_type, shapes, shape.accumulate, compilation_info
-    )
-    lhs_r = int_or_question_mark(shapes.lhs_rows)
-    lhs_c = int_or_question_mark(shapes.lhs_cols)
-    rhs_r = int_or_question_mark(shapes.rhs_rows)
-    rhs_c = int_or_question_mark(shapes.rhs_cols)
-    acc_r = int_or_question_mark(shapes.acc_rows)
-    acc_c = int_or_question_mark(shapes.acc_cols)
-
-    lhs_tensor_type = f"tensor<{lhs_r}x{lhs_c}x{lhs_rhs_type.value}>"
-    rhs_tensor_type = f"tensor<{rhs_r}x{rhs_c}x{lhs_rhs_type.value}>"
-    acc_tensor_type = f"tensor<{acc_r}x{acc_c}x{acc_type.value}>"
-
-    (
-        compilation_info_string,
-        compilation_info_attr,
-    ) = generate_compilation_info_string_and_attr(compilation_info)
-
-    args = [("%lhs", lhs_tensor_type), ("%rhs", rhs_tensor_type)]
-    if shape.accumulate:
-        args += [("%acc", acc_tensor_type)]
-
-    func_definition = compilation_info_string + (
-        f"util.func @{func_name}("
-        + ", ".join([name + ": " + ty for name, ty in args])
-        + f") -> {acc_tensor_type} {{\n"
-    )
-
-    if not shape.accumulate:
-        literal_zero_for_acc_type = "0.0" if "f" in acc_type.value else "0"
-        if acc_r == "?":
-            func_definition += (
-                f"  %c0 = arith.constant 0 : index\n"
-                f"  %c1 = arith.constant 1 : index\n"
-                f"  %acc_dim0 = tensor.dim %lhs, %c0 : {lhs_tensor_type}\n"
-                f"  %acc_dim1 = tensor.dim %rhs, %c1 : {rhs_tensor_type}\n"
-                f"  %init_acc = tensor.empty(%acc_dim0, %acc_dim1) : {acc_tensor_type}\n"
-            )
-        else:
-            func_definition += f"  %init_acc = tensor.empty() : {acc_tensor_type}\n"
-        func_definition += (
-            f"  %c0_acc_type = arith.constant {literal_zero_for_acc_type}: {acc_type.value}\n"
-            f"  %acc = linalg.fill ins(%c0_acc_type : {acc_type.value}) outs(%init_acc : {acc_tensor_type}) -> {acc_tensor_type}\n"
-        )
-
-    indexing_maps_attr = ""
-
-    if transpose_rhs:
-        indexing_maps_attr = "indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>]"
-
-    func_definition += (
-        f"  %result = linalg.matmul {indexing_maps_attr} {compilation_info_attr} ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
-        f"  util.return %result: {acc_tensor_type}\n"
-        f"}}\n"
-    )
-
-    signature = ", ".join([ty for name, ty in args]) + " -> {acc_tensor_type}"
-    import_declaration = (
-        f"util.func private @module.{func_name}("
-        + ", ".join([name + ": !hal.buffer_view" for name, ty in args])
-        + ") -> !hal.buffer_view"
-    )
-    return MLIRFunction(
-        name=func_name,
-        signature=signature,
-        import_declaration=import_declaration,
-        definition=func_definition,
-    )
-
-
-# Represents a call to a generated test function.
-@dataclasses.dataclass
-class TestCall:
-    function: MLIRFunction
-    op: str
-
-
-random_matrix_index = 0
-
-
-# Generate a matrix function argument of the given size as `%name`.
-def generate_random_matrix(
-    name: str,
-    matrix_shape: list,
-    element_type: MatrixElemTypeId,
-):
-    global random_matrix_index
-    random_matrix_index += 1
-    return (
-        f"  %{name}_dim0 = arith.constant {matrix_shape[0]} : i64\n"
-        f"  %{name}_dim1 = arith.constant {matrix_shape[1]} : i64\n"
-        f"  %{name}_element_type = hal.element_type<{element_type.value}> : i32\n"
-        f"  %{name}_seed = arith.constant {random_matrix_index} : i32\n"
-        f"  %{name} = util.call @matmul_test.generate_random_matrix(%device, %{name}_dim0, %{name}_dim1, %{name}_element_type, %{name}_seed) : (!hal.device, i64, i64, i32, i32) -> !hal.buffer_view\n"
-    )
-
-
-call_id = 0
-
-
-# Generates the output trace for a testcase i.e. a single test function call,
-# as a dictionary to be passed to yaml.dump.
-def generate_call(
-    function: MLIRFunction,
-    lhs_rhs_type: MatrixElemTypeId,
-    acc_type: MatrixElemTypeId,
-    shape: TestShape,
-    transpose_rhs: bool,
-):
-    global call_id
-    func_name = f"{function.name}_{shape.m}_{shape.k}_{shape.n}"
-    if shape.accumulate:
-        func_name = f"{func_name}_acc"
-    func_name = f"{func_name}_{call_id}"
-    call_id = call_id + 1
-
-    description = f"Matmul shape (MxKxN): {shape.m}x{shape.k}x{shape.n}"
-    op = (
-        f"util.func @{func_name}() attributes {{\n"
-        f'  iree.reflection = {{description = "{description}"}}\n'
-        "} {\n"
-        "  %device_index = arith.constant 0 : index\n"
-        "  %device = hal.devices.get %device_index : !hal.device\n"
-    )
-
-    lhs_shape = [shape.m, shape.k]
-    if transpose_rhs:
-        rhs_shape = [shape.n, shape.k]
-        transpose_rhs = 1
-    else:
-        rhs_shape = [shape.k, shape.n]
-        transpose_rhs = 0
-
-    op = op + generate_random_matrix("lhs", lhs_shape, lhs_rhs_type)
-    op = op + generate_random_matrix("rhs", rhs_shape, lhs_rhs_type)
-    if shape.accumulate:
-        op = op + generate_random_matrix("acc", [shape.m, shape.n], acc_type)
-        # TODO(#16168): there's a bug with in-place input->output aliasing and
-        # we work around it here by passing in a unique copy.
-        global random_matrix_index
-        random_matrix_index -= 1
-        op = op + generate_random_matrix("acc_copy", [shape.m, shape.n], acc_type)
-        op = op + (
-            f"  %result = util.call @module.{function.name}(%lhs, %rhs, %acc_copy) : (!hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view\n"
-        )
-    else:
-        op = op + (
-            f"  %acc = util.null : !hal.buffer_view\n"
-            f"  %result = util.call @module.{function.name}(%lhs, %rhs) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view\n"
-        )
-
-    op = op + (
-        f"  %m = arith.constant {shape.m} : i64\n"
-        f"  %k = arith.constant {shape.k} : i64\n"
-        f"  %n = arith.constant {shape.n} : i64\n"
-        f"  %transpose_rhs = arith.constant {transpose_rhs} : i32\n"
-        f"  util.call @matmul_test.check_matmul_results(%device, %m, %k, %n, %transpose_rhs, %lhs, %rhs, %acc, %result) : (!hal.device, i64, i64, i64, i32, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
-    )
-
-    op = op + "  util.return\n"
-    op = op + "}\n"
-
-    return TestCall(function=function, op=op)
-
-
 # Generates all output files' contents as strings.
 def generate(
     lhs_rhs_type: MatrixElemTypeId,
     acc_type: MatrixElemTypeId,
+    mx_scale_type: MatrixElemTypeId,
+    mx_block_size: int,
     shapes_id: ShapesId,
     transpose_rhs: bool,
     compilation_info_id: CompilationInfoId,
@@ -372,12 +119,14 @@ def generate(
         for shape in get_test_shapes(shapes_id):
             for dynamicity in get_dynamicities(shapes_id):
                 function = generate_function(
-                    lhs_rhs_type,
-                    acc_type,
-                    shape,
-                    transpose_rhs,
-                    dynamicity,
-                    compilation_info,
+                    lhs_rhs_type=lhs_rhs_type,
+                    acc_type=acc_type,
+                    mx_scale_type=mx_scale_type,
+                    mx_block_size=mx_block_size,
+                    shape=shape,
+                    transpose_rhs=transpose_rhs,
+                    dynamicity=dynamicity,
+                    compilation_info=compilation_info,
                 )
                 # Different testcases may differ only by runtime parameters but
                 # share the same code. For example, dynamic-shapes testcases
@@ -388,7 +137,13 @@ def generate(
                     functions[function.name] = function
                 calls.append(
                     generate_call(
-                        function, lhs_rhs_type, acc_type, shape, transpose_rhs
+                        function=function,
+                        lhs_rhs_type=lhs_rhs_type,
+                        acc_type=acc_type,
+                        mx_scale_type=mx_scale_type,
+                        mx_block_size=mx_block_size,
+                        shape=shape,
+                        transpose_rhs=transpose_rhs,
                     )
                 )
 
@@ -423,6 +178,9 @@ def parse_arguments():
             "f8E4M3FN",
             "f8E5M2FNUZ",
             "f8E4M3FNUZ",
+            "f6E3M2FN",
+            "f6E2M3FN",
+            "f4E2M1FN",
         ],
         help="Numeric type of input LHS and RHS matrices",
         required=True,
@@ -433,6 +191,24 @@ def parse_arguments():
         choices=["i32", "f64", "f32", "f16", "bf16"],
         help="Numeric type of the accumulator and result matrices",
         required=True,
+    )
+    parser.add_argument(
+        "--mx_scale_type",
+        type=str,
+        choices=[
+            "f8E8M0FNU",
+        ],
+        help="Numeric type of input microscaling scales matrices",
+        required=False,
+    )
+    parser.add_argument(
+        "--mx_block_size",
+        type=int,
+        choices=[
+            32,
+        ],
+        help="Numeric type of input microscaling scales matrices",
+        required=False,
     )
     parser.add_argument(
         "--shapes",
@@ -516,16 +292,18 @@ def write_calls_file(functions, calls, filename, requirements):
 
 
 def main(args):
-    lhs_rhs_type = MatrixElemTypeId(args.lhs_rhs_type)
-    acc_type = MatrixElemTypeId(args.acc_type)
-    shapes_id = ShapesId(args.shapes)
-    compilation_info_id = CompilationInfoId(args.compilation_info)
-
     # Parse custom MNK values if provided
+    shapes_id = ShapesId(args.shapes)
     ShapesId.set_custom_mnk(shapes_id, args.mnk)
 
     (functions, calls) = generate(
-        lhs_rhs_type, acc_type, shapes_id, args.transpose_rhs, compilation_info_id
+        lhs_rhs_type=MatrixElemTypeId(args.lhs_rhs_type),
+        acc_type=MatrixElemTypeId(args.acc_type),
+        mx_scale_type=args.mx_scale_type,
+        mx_block_size=args.mx_block_size,
+        shapes_id=shapes_id,
+        transpose_rhs=args.transpose_rhs,
+        compilation_info_id=CompilationInfoId(args.compilation_info),
     )
 
     write_code_file(functions, args.output_matmul_mlir)

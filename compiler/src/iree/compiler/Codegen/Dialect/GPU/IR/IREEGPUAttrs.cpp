@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Utils/Indexing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/STLForwardCompat.h"
@@ -71,7 +72,18 @@ static bool is_AMD(MMAIntrinsic intrinsic) {
   return is_AMD_MFMA(intrinsic) || is_AMD_WMMA(intrinsic);
 }
 
-static int64_t getIntrinsicSubgroupSize(MMAIntrinsic intrinsic) {
+int64_t getIntrinsicSubgroupSize(ScaledMMAIntrinsic intrinsic) {
+  switch (intrinsic) {
+  case ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32:
+  case ScaledMMAIntrinsic::MFMA_SCALE_F32_32x32x64_B32:
+    return 64;
+  }
+  assert(false &&
+         "all cases should've been handled in ScaledMMA::getBlockSize()");
+  return 0;
+}
+
+int64_t getIntrinsicSubgroupSize(MMAIntrinsic intrinsic) {
   // Not using Wave64 at all at the moment, so the only place where the
   // subgroup size is 64 is on CDNA* architectures.
   return is_AMD_MFMA(intrinsic) ? 64 : 32;
@@ -780,21 +792,6 @@ LogicalResult MMAAttr::populateOperandOffsetsSizesStrides(
 // DataTiledMMA Attributes
 //===----------------------------------------------------------------------===//
 
-/// Returns the swizzled tile shape, but with dim sizes overwritten with 1 if
-/// `predicate` returns false.
-static SmallVector<int64_t>
-sliceSwizzledShape(const TileSwizzle &swizzle,
-                   std::function<bool(TileSwizzle::Dim)> predicate) {
-  SmallVector<int64_t> shape;
-  for (TileSwizzle::ExpandShapeDimVectorType e : swizzle.expandShape) {
-    for (TileSwizzle::Dim d : e) {
-      shape.push_back(predicate(d) ? d.size : 1);
-    }
-  }
-  applyPermutationToVector(shape, swizzle.permutation);
-  return shape;
-}
-
 int64_t DataTiledMMAAttr::getExpectedNumInputs() const { return 2; }
 
 int64_t DataTiledMMAAttr::getExpectedNumOutputs() const { return 1; }
@@ -804,170 +801,12 @@ DataTiledMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
   return verifyMmaIndexingMaps(maps);
 }
 
-void DataTiledMMAAttr::getUndistributedTileTypes(
-    SmallVectorImpl<VectorType> &result) const {
-  MLIRContext *ctx = getContext();
-  OpaqueMmaLayout o = getOpaqueMMALayout(ctx, getIntrinsic());
-  int64_t m = o.mSize * getIntrinsicsM() * getSubgroupsM();
-  int64_t n = o.nSize * getIntrinsicsN() * getSubgroupsN();
-  int64_t k = o.kSize * getIntrinsicsK();
-  result.push_back(VectorType::get({m, k}, o.aType));
-  result.push_back(VectorType::get({k, n}, o.bType));
-  result.push_back(VectorType::get({m, n}, o.cType));
-}
-
-void DataTiledMMAAttr::getDistributedTileTypes(
-    SmallVectorImpl<VectorType> &result) const {
-  auto [A, B, C] = getABCElementTypes();
-  auto getShape = [=](MMAFragment fragment) {
-    return sliceSwizzledShape(
-        getSwizzle(*this, fragment), [](TileSwizzle::Dim d) {
-          return d.kind != TileSwizzle::Dim::Kind::CrossThread;
-        });
-  };
-  result.assign({VectorType::get(getShape(MMAFragment::Lhs), A),
-                 VectorType::get(getShape(MMAFragment::Rhs), B),
-                 VectorType::get(getShape(MMAFragment::Acc), C)});
-}
-
 int64_t DataTiledMMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());
 }
 
-Attribute DataTiledMMAAttr::getDistributionMappingKind() const {
-  return gpu::GPUThreadMappingAttr::get(getContext(),
-                                        gpu::MappingId::LinearDim0);
-}
-
-OpFoldResult
-DataTiledMMAAttr::getDistributionWorkerCount(OpBuilder &, Location,
-                                             Operation *opToDistribute) const {
-  if (auto func = opToDistribute->getParentOfType<FunctionOpInterface>()) {
-    if (auto wgSizes = getWorkgroupSize(func)) {
-      return getAsIndexOpFoldResult(getContext(),
-                                    ShapedType::getNumElements(*wgSizes));
-    }
-  }
-  return OpFoldResult();
-}
-
-LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
-    OpBuilder &builder, Location loc, uint32_t operandIndex, Value threadId,
-    ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
-    SmallVectorImpl<OpFoldResult> &sizes,
-    SmallVectorImpl<OpFoldResult> &strides) const {
-  assert(operandIndex <= 2 && "Must index valid MMA operand");
-  auto fragment = static_cast<IREE::GPU::MMAFragment>(operandIndex);
-  TileSwizzle swizzle = getSwizzle(*this, fragment);
-
-  LLVM_DEBUG({
-    DBGS() << "DataTiledMMAAttr::populateOperandOffsetsSizesStrides\n";
-    DBGS() << "    fragment: " << llvm::to_underlying(fragment) << "\n";
-    DBGS() << "    swizzle: " << swizzle << "\n";
-  });
-
-  MLIRContext *ctx = builder.getContext();
-  SmallVector<OpFoldResult> tileSizes = getAsIndexOpFoldResult(
-      ctx, sliceSwizzledShape(swizzle, [](TileSwizzle::Dim d) {
-        return d.kind != TileSwizzle::Dim::Kind::CrossThread;
-      }));
-
-  // Most of the rest of this function is the computation of the offsets.
-  // The basic idea is to delinearize the threadId over the basis of
-  // cross-thread dimensions. These cross-thread dimensions may be either
-  // the intrinsic's own, or they may come from expansion to multiple subgroups.
-  // Normally, that distinction is irrelevant here: we just delinearize the
-  // thread-id over all cross-thread dimensions.
-  //
-  // There are, however, two special cases that require inserting dummy
-  // dimensions into the delinearization index list, which are later
-  // removed when constructing tile offsets:
-  //
-  // 1. On RDNA3 only: some intrinsics use multiple threads (currently 2)
-  //    to read the same data. This redundancy is not represented in the
-  //    TileSwizzle structures we rely on. In these cases, the thread grid
-  //    encoded by TileSwizzle is *smaller* than the subgroup size, and an
-  //    implicit "distribution-only" dimension exists where multiple threads
-  //    map to identical data. To handle this, we distinguish between
-  //    layoutThreadSizes and distributionThreadSizes.
-  //
-  // 2. LHS delinearization when both subGroupsM and subGroupsN > 1.
-  //    Although subGroupsN is not part of the LHS swizzle, we must still
-  //    delinearize over the combined subGroupsM × subGroupsN space. By
-  //    contrast, RHS does *not* need special handling, since subGroupsM can be
-  //    treated as an implicit leading dimension and omitted anyway.
-
-  // Handle the RDNA3 special case.
-  SmallVector<int64_t> layoutThreadSizes =
-      sliceSwizzledShape(swizzle, [](TileSwizzle::Dim d) {
-        return d.kind == TileSwizzle::Dim::Kind::CrossThread;
-      });
-  // In layoutThreadSizes, intrinsic level dimensions are mixed with expansion
-  // to multiple subgroups, so in order to tell if there are additional
-  // distribution-only thread dimensions, we need to get back to the intrinsic.
-  TileSwizzle intrinsicSwizzle = getIntrinsicSwizzle(getIntrinsic(), fragment);
-
-  SmallVector<int64_t> intrinsicLayoutThreadSizes =
-      sliceSwizzledShape(intrinsicSwizzle, [](TileSwizzle::Dim d) {
-        return d.kind == TileSwizzle::Dim::Kind::CrossThread;
-      });
-  int64_t intrinsicLayoutThreadBound =
-      ShapedType::getNumElements(intrinsicLayoutThreadSizes);
-  SmallVector<int64_t> distributionThreadSizes = layoutThreadSizes;
-  int distributionOnlyDimIdx =
-      distributionThreadSizes.size() - intrinsicLayoutThreadSizes.size();
-  // Now we are able to tell if there is an extra distribution-only dimension.
-  bool hasDistributionOnlyDim = intrinsicLayoutThreadBound < getSubgroupSize();
-  if (hasDistributionOnlyDim) {
-    // Insert the extra distribution-only dimension. This will need to be paired
-    // below with erasing the corresponding dim out of the delinearized indices.
-    distributionThreadSizes.insert(
-        distributionThreadSizes.begin() + distributionOnlyDimIdx,
-        getSubgroupSize() / intrinsicLayoutThreadBound);
-  }
-
-  // Handle the subgroupsM/N special case.
-  int64_t subgroupsM = getSubgroupsM();
-  int64_t subgroupsN = getSubgroupsN();
-  bool needsLhsSubgroupNDim = (fragment == IREE::GPU::MMAFragment::Lhs) &&
-                              subgroupsM > 1 && subgroupsN > 1;
-  const int lhsSubgroupNDimIdx = 1;
-  if (needsLhsSubgroupNDim) {
-    distributionThreadSizes.insert(
-        distributionThreadSizes.begin() + lhsSubgroupNDimIdx, subgroupsN);
-  }
-
-  // Obtain the offsets from delinearization along the distributionThreadSizes.
-  // Use a delinearize without outer bound and throw away its initial result
-  // to get clamping behavior.
-  SmallVector<OpFoldResult> tileOffsets =
-      affine::AffineDelinearizeIndexOp::create(
-          builder, loc, getValueOrCreateConstantIndexOp(builder, loc, threadId),
-          distributionThreadSizes, /*hasOuterBound=*/false)
-          ->getResults()
-          .drop_front();
-
-  // Erase the delinearized index that corresponds to the dummy
-  // dimension that we had inserted above. This is what causes multiple
-  // threads (which only differed in the index being discarded here) to read
-  // exactly the same data.
-  if (hasDistributionOnlyDim) {
-    tileOffsets.erase(tileOffsets.begin() + distributionOnlyDimIdx);
-  }
-  if (needsLhsSubgroupNDim) {
-    tileOffsets.erase(tileOffsets.begin() + lhsSubgroupNDimIdx);
-  }
-
-  // Strides are trivial: each slice is contiguous along the *expanded* dims
-  // even if it may not be contiguous in the flattened layout.
-  SmallVector<OpFoldResult> tileStrides(tileSizes.size(),
-                                        builder.getIndexAttr(1));
-
-  offsets.append(tileOffsets);
-  sizes.append(tileSizes);
-  strides.append(tileStrides);
-
-  return success();
+int64_t DataTiledMMAAttr::getFlatWorkgroupSize() const {
+  return getSubgroupSize() * getSubgroupsM() * getSubgroupsN();
 }
 
 /// Increment the mutable vector `indices` to traverse the index space below
@@ -1107,6 +946,26 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
   }
   results.push_back(acc);
   return success();
+}
+
+TileSwizzle DataTiledMMAAttr::getTileSwizzle(unsigned operandIndex) const {
+  auto fragment = static_cast<IREE::GPU::MMAFragment>(operandIndex);
+  return getSwizzle(*this, fragment);
+}
+
+IREE::Codegen::TileMxNxKxKb DataTiledMMAAttr::getTileMNKKb() const {
+  IREE::Codegen::TileMxNxKxKb innerTile;
+  std::tie(innerTile.M, innerTile.N, innerTile.K) =
+      getMNKShapeFromIntrinsic(getIntrinsic());
+  innerTile.M *= getIntrinsicsM() * getSubgroupsM();
+  innerTile.N *= getIntrinsicsN() * getSubgroupsN();
+  innerTile.K *= getIntrinsicsK();
+  return innerTile;
+}
+
+void DataTiledMMAAttr::getElementTypes(SmallVectorImpl<Type> &result) const {
+  auto [a, b, c] = IREE::GPU::getABCElementTypes(getContext(), getIntrinsic());
+  result.assign({a, b, c});
 }
 
 //===----------------------------------------------------------------------===//
@@ -1470,14 +1329,7 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(ScaledMMAIntrinsic intrinsic,
 }
 
 int64_t ScaledMMAAttr::getSubgroupSize() const {
-  switch (getIntrinsic()) {
-  case ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32:
-  case ScaledMMAIntrinsic::MFMA_SCALE_F32_32x32x64_B32:
-    return 64;
-  }
-  assert(false &&
-         "all cases should'vee been handled in ScaledMMA::getBlockSize()");
-  return 0;
+  return getIntrinsicSubgroupSize(getIntrinsic());
 }
 
 SmallVector<Type> ScaledMMAAttr::getSupportedInputTypes(MLIRContext *ctx) {
@@ -1636,7 +1488,7 @@ LogicalResult ScaledMMAAttr::buildUnderlyingOperations(
   Value zeroScales = arith::ConstantOp::create(
       builder, loc,
       SplatElementsAttr::get(
-          VectorType::get({4}, f8E8M0),
+          VectorType::get({getScalesVectorSize()}, f8E8M0),
           llvm::APFloat::getSmallest(f8E8M0.getFloatSemantics())));
   auto padScales = [&](Value scales) {
     Value scale = vector::ExtractOp::create(builder, loc, scales, 0);
@@ -1672,6 +1524,210 @@ LogicalResult ScaledMMAAttr::buildUnderlyingOperations(
                                    /*scalesIdxB=*/0);
   results.push_back(result);
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// DataTiledScaledMMA Attributes
+//===----------------------------------------------------------------------===//
+
+TileSwizzle
+DataTiledScaledMMAAttr::getTileSwizzle(unsigned operandIndex) const {
+  return getSwizzle(*this, operandIndex);
+}
+
+static std::tuple<int64_t, int64_t, int64_t, int64_t>
+getMNKKbShapeFromScaledIntrinsic(ScaledMMAIntrinsic intrinsic) {
+  MMASingleSubgroupLayout lhs = getSingleSubgroupLayout(intrinsic, 0);
+  MMASingleSubgroupLayout rhs = getSingleSubgroupLayout(intrinsic, 2);
+  int64_t m = lhs.outer[0] * lhs.thread[0] * lhs.element[0];
+  int64_t n = rhs.outer[2] * rhs.thread[2] * rhs.element[2];
+  int64_t k = lhs.outer[1] * lhs.thread[1] * lhs.element[1];
+  int64_t kB = lhs.outer[2] * lhs.thread[2] * lhs.element[2];
+  return {m, n, k, kB};
+}
+
+int64_t getMSize(ScaledMMAIntrinsic intrinsic) {
+  return std::get<0>(getMNKKbShapeFromScaledIntrinsic(intrinsic));
+}
+int64_t getNSize(ScaledMMAIntrinsic intrinsic) {
+  return std::get<1>(getMNKKbShapeFromScaledIntrinsic(intrinsic));
+}
+int64_t getKSize(ScaledMMAIntrinsic intrinsic) {
+  return std::get<2>(getMNKKbShapeFromScaledIntrinsic(intrinsic));
+}
+int64_t getKbSize(ScaledMMAIntrinsic intrinsic) {
+  return std::get<3>(getMNKKbShapeFromScaledIntrinsic(intrinsic));
+}
+
+IREE::Codegen::TileMxNxKxKb DataTiledScaledMMAAttr::getTileMNKKb() const {
+  IREE::Codegen::TileMxNxKxKb innerTile;
+  std::tie(innerTile.M, innerTile.N, innerTile.K, innerTile.KB) =
+      getMNKKbShapeFromScaledIntrinsic(getIntrinsic());
+  innerTile.M *= getIntrinsicsM() * getSubgroupsM();
+  innerTile.N *= getIntrinsicsN() * getSubgroupsN();
+  innerTile.K *= getIntrinsicsK();
+  return innerTile;
+}
+
+void DataTiledScaledMMAAttr::getElementTypes(
+    SmallVectorImpl<Type> &result) const {
+  result.push_back(getLhsElemType());
+  result.push_back(getRhsElemType());
+  result.push_back(Float8E8M0FNUType::get(getContext()));
+  result.push_back(Float8E8M0FNUType::get(getContext()));
+  result.push_back(getAccElemType());
+  return;
+}
+
+static Value createScaledMmaOp(OpBuilder &builder, Location loc,
+                               ScaledMMAIntrinsic intrinsic, Type resultType,
+                               Value lhs, Value rhs, Value lhsScales,
+                               Value rhsScales, Value acc) {
+  FloatType f8E8M0 = builder.getF8E8M0Type();
+  Value zeroScales = arith::ConstantOp::create(
+      builder, loc,
+      SplatElementsAttr::get(
+          VectorType::get({4}, f8E8M0),
+          llvm::APFloat::getSmallest(f8E8M0.getFloatSemantics())));
+  auto padScales = [&](Value scales) {
+    Value scale = vector::ExtractOp::create(builder, loc, scales, 0);
+    Value padded = vector::InsertOp::create(builder, loc, scale, zeroScales, 0);
+    return padded;
+  };
+
+  lhsScales = padScales(lhsScales);
+  rhsScales = padScales(rhsScales);
+
+  int64_t m = getMSize(intrinsic);
+  // We use m x [k / kPerBlock] x blockSize as the LHS pre-distribution shape
+  // since this makes the higher-level tiling clearer.
+  int64_t k = getKSize(intrinsic) * getKbSize(intrinsic);
+  int64_t n = getNSize(intrinsic);
+
+  return amdgpu::ScaledMFMAOp::create(builder, loc, m, n, k, lhs, rhs, acc,
+                                      lhsScales, rhsScales, /*scalesIdxA=*/0,
+                                      /*scalesIdxB=*/0);
+}
+
+LogicalResult DataTiledScaledMMAAttr::buildUnderlyingOperations(
+    OpBuilder &builder, Location loc, ValueRange inputs, ValueRange outputs,
+    SmallVectorImpl<Value> &results) const {
+  // Validation. Similar to MMAAttr::buildMmaOperation.
+  if (inputs.size() != 4) {
+    return failure();
+  }
+  if (outputs.size() != 1) {
+    return failure();
+  }
+  SmallVector<VectorType> regTypes;
+  getDistributedTileTypes(regTypes);
+  if (!llvm::equal(regTypes,
+                   llvm::concat<Type>(inputs.getTypes(), outputs.getTypes()))) {
+    return failure();
+  }
+
+  // Prepare Lhs/Rhs/Acc operand slices to feed the intrinsic.
+  const unsigned lhsIdx = 0;
+  const unsigned rhsIdx = 1;
+  const unsigned lhsScalesIdx = 2;
+  const unsigned rhsScalesIdx = 3;
+  const unsigned accIdx = 4;
+  TileSwizzle lhsSwizzle = getSwizzle(*this, lhsIdx);
+  LDBG() << "DataTiledScaledMMAAttr::buildMmaOperation";
+  LDBG() << "    lhsSwizzle: " << lhsSwizzle;
+  SmallVector<Value> intrinsicsLhs =
+      distributeMmaFragmentToIntrinsics(builder, loc, inputs[0], lhsSwizzle);
+
+  TileSwizzle rhsSwizzle = getSwizzle(*this, rhsIdx);
+  LDBG() << "DataTiledScaledMMAAttr::buildMmaOperation";
+  LDBG() << "    rhsSwizzle: " << rhsSwizzle;
+  SmallVector<Value> intrinsicsRhs =
+      distributeMmaFragmentToIntrinsics(builder, loc, inputs[1], rhsSwizzle);
+
+  TileSwizzle lhsScalesSwizzle = getSwizzle(*this, lhsScalesIdx);
+  LDBG() << "DataTiledScaledMMAAttr::buildMmaOperation";
+  LDBG() << "    lhsScalesSwizzle: " << lhsScalesSwizzle;
+  SmallVector<Value> intrinsicsLhsScales = distributeMmaFragmentToIntrinsics(
+      builder, loc, inputs[2], lhsScalesSwizzle);
+
+  TileSwizzle rhsScalesSwizzle = getSwizzle(*this, rhsScalesIdx);
+  LDBG() << "DataTiledScaledMMAAttr::buildMmaOperation";
+  LDBG() << "    rhsScalesSwizzle: " << rhsScalesSwizzle;
+  SmallVector<Value> intrinsicsRhsScales = distributeMmaFragmentToIntrinsics(
+      builder, loc, inputs[3], rhsScalesSwizzle);
+
+  TileSwizzle accSwizzle = getSwizzle(*this, accIdx);
+  LDBG() << "DataTiledScaledMMAAttr::buildMmaOperation";
+  LDBG() << "    accSwizzle: " << accSwizzle;
+
+  SmallVector<Value> intrinsicsAcc =
+      distributeMmaFragmentToIntrinsics(builder, loc, outputs[0], accSwizzle);
+
+  ScaledMMAIntrinsic intrinsic = getIntrinsic();
+  auto intrinCType = cast<VectorType>(intrinsicsAcc.front().getType());
+
+  // Loop over the 3 unroll_{m,n,k} dimensions to create the intrinsics.
+  for (int64_t mu = 0; mu < getIntrinsicsM(); ++mu) {
+    for (int64_t nu = 0; nu < getIntrinsicsN(); ++nu) {
+      for (int64_t ku = 0; ku < getIntrinsicsK(); ++ku) {
+        Value lhs = intrinsicsLhs[mu * getIntrinsicsK() + ku];
+        Value rhs = intrinsicsRhs[nu * getIntrinsicsK() + ku];
+        Value lhsScales = intrinsicsLhsScales[mu * getIntrinsicsK() + ku];
+        Value rhsScales = intrinsicsRhsScales[nu * getIntrinsicsK() + ku];
+        Value &acc = intrinsicsAcc[mu * getIntrinsicsN() + nu];
+        acc = createScaledMmaOp(builder, loc, intrinsic, intrinCType, lhs, rhs,
+                                lhsScales, rhsScales, acc);
+      }
+    }
+  }
+
+  // Insert the results into the destination accumulator.
+  SmallVector<int64_t> accCrossIntrinsicShape =
+      sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
+        return dim.kind == TileSwizzle::Dim::Kind::CrossIntrinsic;
+      });
+  SmallVector<int64_t> accInternalShape =
+      sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
+        return dim.kind == TileSwizzle::Dim::Kind::Internal;
+      });
+
+  LDBG() << "accCrossIntrinsicShape: "
+         << llvm::interleaved(accCrossIntrinsicShape);
+  LDBG() << "accInternalShape: " << llvm::interleaved(accInternalShape);
+  size_t dstRank = accCrossIntrinsicShape.size();
+  SmallVector<int64_t> strides(dstRank, 1);
+  SmallVector<int64_t> indices(dstRank, 0);
+  Value acc = outputs[0];
+  for (Value intrAcc : intrinsicsAcc) {
+    auto expandedAcc = vector::ShapeCastOp::create(
+        builder, loc,
+        VectorType::get(
+            accInternalShape,
+            cast<VectorType>(outputs[0].getType()).getElementType()),
+        intrAcc);
+    acc = vector::InsertStridedSliceOp::create(builder, loc, expandedAcc, acc,
+                                               indices, strides);
+    incrementIndices(indices, accCrossIntrinsicShape);
+  }
+  results.push_back(acc);
+  return success();
+}
+
+int64_t DataTiledScaledMMAAttr::getExpectedNumInputs() const { return 4; }
+
+int64_t DataTiledScaledMMAAttr::getExpectedNumOutputs() const { return 1; }
+
+int64_t DataTiledScaledMMAAttr::getSubgroupSize() const {
+  return getIntrinsicSubgroupSize(getIntrinsic());
+}
+
+int64_t DataTiledScaledMMAAttr::getFlatWorkgroupSize() const {
+  return getSubgroupSize() * getSubgroupsM() * getSubgroupsN();
+}
+
+LogicalResult
+DataTiledScaledMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
+  return IREE::LinalgExt::inferScaledContractionDims(maps);
 }
 
 //===----------------------------------------------------------------------===//

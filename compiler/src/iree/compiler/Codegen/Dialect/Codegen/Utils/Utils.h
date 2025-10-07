@@ -68,6 +68,47 @@ bool isIdentityLayout(const MaterializeEncodingInfo &info);
 SmallVector<int64_t>
 getExpandedTileShape(const TileSwizzle::ExpandShapeType &expandShape);
 
+/// The dimensions needed for materializing an encoding for either a contraction
+/// or a scaled contraction.
+struct EncodingContractionLikeDimInfo {
+  /// Info for each dimension. `shouldHaveDim` indicates whether or not the dim
+  /// is present on the root operation's operand, and `operandIdx` is the index
+  /// of the encoded tensor that belongs to the Dim. For example, the LHS
+  /// operand's encoding would have `mDim = {true, 0}` for a plain matmul, while
+  /// the RHS operand's encoding would have `mDim = {false, std::nullopt}`.
+  /// If `shouldHaveDim` is true, and `operandIdx` is std::nullopt, this
+  /// indicates that the encoded Value may be the source of a broadcast, and the
+  /// Dim is not present on the Value, but it is present on the corresponding
+  /// operand of the encoding root operation.
+  struct DimInfo {
+    bool shouldHaveDim = false;
+    std::optional<unsigned> operandIdx;
+  };
+  DimInfo batchDim;
+  DimInfo mDim;
+  DimInfo nDim;
+  DimInfo kDim;
+  DimInfo kBDim;
+};
+
+/// Returns the dimension info needed for materializing an encoding for either a
+/// contraction or a scaled contraction. This function expects at most one each
+/// of M, N, K, Kb, and Batch dimensions, since multiple contraction dimensions
+/// are currently not supported in data tiling.
+FailureOr<EncodingContractionLikeDimInfo>
+getEncodingContractionLikeDims(Encoding::EncodingAttr encoding);
+
+struct TileMxNxKxKb {
+  int64_t M = 1;
+  int64_t N = 1;
+  int64_t K = 1;
+  int64_t KB = 1;
+};
+
+FailureOr<MaterializeEncodingInfo>
+getEncodingInfoForMatmul(Encoding::EncodingAttr encoding,
+                         TileMxNxKxKb tileMxNxKxKb);
+
 struct TileMxNxK {
   int64_t M = 1;
   int64_t N = 1;

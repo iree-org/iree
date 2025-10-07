@@ -346,6 +346,8 @@ void populateGenericStructuralConversionPatterns(
       });
   addGenericLegalOp<IREE::Util::CallOp>(conversionTarget, typeConverter);
   addGenericLegalOp<IREE::Util::ReturnOp>(conversionTarget, typeConverter);
+  conversionTarget
+      .addLegalOp<IREE::Util::UnreachableOp, IREE::Util::SCFUnreachableOp>();
   patterns.insert<ConvertInitializerOp, ConvertFuncOp, ConvertCallOp,
                   ConvertReturnOp>(typeConverter, context);
 

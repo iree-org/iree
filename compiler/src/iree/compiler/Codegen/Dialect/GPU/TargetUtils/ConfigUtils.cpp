@@ -42,43 +42,43 @@ constexpr int64_t kPreferredCopyNumBits = 128;
 // Lowering Config Selection
 //===----------------------------------------------------------------------===//
 
-LogicalResult setDataTiledMultiMmaLoweringConfig(
+LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
     Operation *op, IREE::Codegen::UKernelDescriptorAttr ukernelConfig) {
   auto multiMmaOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op);
   if (!multiMmaOp) {
     return failure();
   }
-  auto dataTiledMmaAttr = dyn_cast<DataTiledMMAAttr>(multiMmaOp.getKind());
+  auto dataTiledMmaAttr =
+      dyn_cast<DataTiledMMAInterfaceAttr>(multiMmaOp.getKind());
   if (!dataTiledMmaAttr) {
     return failure();
   }
 
-  LDBG() << "MultiMMA TileAndFuse Config";
+  LDBG() << "Data Tiled MMA InnerTiled TileAndFuse Config";
 
   // Compute workgroup size, which is given by the subgroup size times the
   // number of subgroups. The number of subgroups is found by the product of
   // subgroup unrolling factors, since the non-unrolled inner kernel takes a
   // single subgroup.
   const int64_t targetSubgroupSize = dataTiledMmaAttr.getSubgroupSize();
-  int64_t flatWorkgroupSize = targetSubgroupSize *
-                              dataTiledMmaAttr.getSubgroupsM() *
-                              dataTiledMmaAttr.getSubgroupsN();
+  int64_t flatWorkgroupSize = dataTiledMmaAttr.getFlatWorkgroupSize();
   std::array<int64_t, 3> workgroupSize{flatWorkgroupSize, 1, 1};
 
   // Set all workgroup and reduction tile sizes to 1, since the data tiled
   // kernel has the scope of an entire workgroup, and the reduction tiling is
   // already baked into the "opaque" data tiled inner layout of the inner_tiled.
-  SmallVector<AffineMap> indexingMaps = multiMmaOp.getIndexingMapsArray();
-  mlir::linalg::ContractionDimensions contractionDims =
-      mlir::linalg::inferContractionDims(indexingMaps).value();
-
-  int64_t iterationRank = indexingMaps.front().getNumDims();
+  SmallVector<utils::IteratorType> iteratorTypes =
+      multiMmaOp.getIteratorTypesArray();
+  int64_t iterationRank = iteratorTypes.size();
   SmallVector<int64_t> workgroupTileSizes(iterationRank, 1);
   SmallVector<int64_t> reductionTileSizes(iterationRank, 0);
-  for (int64_t kDim : contractionDims.k) {
-    workgroupTileSizes[kDim] = 0;
-    reductionTileSizes[kDim] = ukernelConfig ? 0 : 1;
+  for (auto [idx, iteratorType] : llvm::enumerate(iteratorTypes)) {
+    if (iteratorType == utils::IteratorType::parallel) {
+      continue;
+    }
+    workgroupTileSizes[idx] = 0;
+    reductionTileSizes[idx] = ukernelConfig ? 0 : 1;
   }
 
   // Set tile sizes.
@@ -370,6 +370,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
 
 struct ConvToIgemmInfo {
   bool isInputChannelLast;
+  bool isSpatialDimLast;
   linalg::ConvolutionDimensions convDims;
   DenseMap<int64_t, AffineExpr> convToIgemmDimMap;
   DenseMap<int64_t, int64_t> inputChannelDimToSize;
@@ -383,6 +384,10 @@ getPaddingConvSizes(Builder &b, const SmallVector<int64_t> &bounds,
                     const SmallVector<int64_t> &reductionTileSizes,
                     std::optional<ConvToIgemmInfo> &convToIgemmInfo) {
   if (!convToIgemmInfo.has_value())
+    return std::nullopt;
+
+  // Skip padding convolution for NCHW layout.
+  if (convToIgemmInfo->isSpatialDimLast)
     return std::nullopt;
 
   DenseMap<int64_t, AffineExpr> convToIgemmMap =
@@ -808,6 +813,7 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
     ArrayRef<int64_t> inputShape = inputType.getShape();
     AffineMap inputMap = linalgOp.getIndexingMapsArray()[0];
     SmallVector<int64_t> inputChannelPos;
+    SmallVector<int64_t> inputImagePos;
     for (auto dim : igemmGenericConvDetails->convDims.inputChannel) {
       for (auto [idx, e] : llvm::enumerate(inputMap.getResults())) {
         if (e.isFunctionOfDim(dim)) {
@@ -816,9 +822,19 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
         }
       }
     }
+    for (auto dim : igemmGenericConvDetails->convDims.outputImage) {
+      for (auto [idx, e] : llvm::enumerate(inputMap.getResults())) {
+        if (e.isFunctionOfDim(dim)) {
+          inputImagePos.push_back(idx);
+        }
+      }
+    }
     llvm::sort(inputChannelPos);
+    llvm::sort(inputImagePos);
     convToIgemmInfo.isInputChannelLast =
         inputChannelPos.back() == inputShape.size() - 1;
+    convToIgemmInfo.isSpatialDimLast =
+        inputImagePos.back() == inputShape.size() - 1;
     convToIgemmInfo.convDims = igemmGenericConvDetails->convDims;
     convToIgemmInfo.convToIgemmDimMap =
         igemmGenericConvDetails->convToIgemmDimMap;

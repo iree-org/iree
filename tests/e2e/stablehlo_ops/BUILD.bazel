@@ -89,7 +89,6 @@ iree_check_single_backend_test_suite(
         "--iree-llvmcpu-target-cpu=generic",
     ],
     driver = "local-task",
-    input_type = "stablehlo",
     tags = [
         # round_nearest_afz/fmodf fail with a wasm target, just disable all tests there for now
         #   undefined symbol: round_nearest_afz/fmodf
@@ -107,7 +106,6 @@ iree_check_single_backend_test_suite(
         "--iree-llvmcpu-target-cpu=host",
     ],
     driver = "local-task",
-    input_type = "stablehlo",
     # Building and testing must be on the same architecture, which doesn't work
     # with remote execution in general.
     tags = [
@@ -193,7 +191,6 @@ iree_check_single_backend_test_suite(
         "--iree-input-demote-f64-to-f32",
     ],
     driver = "local-task",
-    input_type = "stablehlo",
     target_backend = "vmvx",
 )
 
@@ -273,7 +270,6 @@ iree_check_single_backend_test_suite(
         "--iree-input-demote-f64-to-f32",
     ],
     driver = "vulkan",
-    input_type = "stablehlo",
     target_backend = "vulkan-spirv",
 )
 
@@ -286,7 +282,6 @@ iree_check_single_backend_test_suite(
         "--iree-stream-emulate-memset",
     ],
     driver = "cuda",
-    input_type = "stablehlo",
     runner_args = ["--cuda_use_streams=false"],
     tags = [
         # CUDA cuInit fails with sanitizer on.
@@ -306,7 +301,6 @@ iree_check_single_backend_test_suite(
         "--iree-input-demote-f64-to-f32",
     ],
     driver = "cuda",
-    input_type = "stablehlo",
     runner_args = ["--cuda_use_streams=true"],
     tags = [
         # CUDA cuInit fails with sanitizer on.
@@ -323,7 +317,6 @@ iree_check_single_backend_test_suite(
     name = "check_rocm_hip_stream",
     srcs = ALL_SRCS,
     driver = "hip",
-    input_type = "stablehlo",
     runner_args = [
         "--hip_use_streams=true",
     ],
@@ -403,6 +396,5 @@ iree_check_single_backend_test_suite(
         ],
     ),
     driver = "metal",
-    input_type = "stablehlo",
     target_backend = "metal-spirv",
 )

@@ -17,14 +17,6 @@ package(
 )
 
 BACKEND_TESTS = [
-    "dynamic_abs.mlir",
-    "dynamic_add.mlir",
-    "dynamic_dot.mlir",
-    "dynamic_reduce_min.mlir",
-    "dynamic_torch_index_select_high_rank.mlir",
-    "dynamic_torch_index_select_negative.mlir",
-    "dynamic_torch_index_select_scalar.mlir",
-    "dynamic_torch_index_select_vector.mlir",
     "i1_inlined_constant.mlir",
     "linalg_ops.mlir",
     "reduction_broadcast_elementwise.mlir",
@@ -68,7 +60,6 @@ iree_check_single_backend_test_suite(
         "--iree-llvmcpu-target-cpu=generic",
     ],
     driver = "local-task",
-    input_type = "stablehlo",
     target_backend = "llvm-cpu",
 )
 
@@ -76,13 +67,11 @@ iree_check_single_backend_test_suite(
     name = "check_regression_llvm-cpu",
     srcs = [
         "layernorm.mlir",
-        "lowering_config.mlir",
         "pack_pad_transpose_1x9_into_2x1x8x4_issue_12546.mlir",
         "split_reduction_using_tiling.mlir",
     ] + BACKEND_TESTS,
     compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
     driver = "local-task",
-    input_type = "stablehlo",
     target_backend = "llvm-cpu",
 )
 
@@ -110,7 +99,6 @@ iree_check_single_backend_test_suite(
     ],
     compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
     driver = "local-task",
-    input_type = "tosa",
     target_backend = "llvm-cpu",
 )
 
@@ -120,7 +108,6 @@ iree_check_single_backend_test_suite(
         "layernorm.mlir",
     ] + BACKEND_TESTS,
     driver = "local-task",
-    input_type = "stablehlo",
     target_backend = "vmvx",
 )
 
@@ -129,7 +116,6 @@ iree_check_single_backend_test_suite(
     # TODO(#10024): Fix layernorm.mlir on Pixel 6 and put in BACKEND_TESTS.
     srcs = BACKEND_TESTS,
     driver = "vulkan",
-    input_type = "stablehlo",
     target_backend = "vulkan-spirv",
 )
 
@@ -140,7 +126,6 @@ iree_check_single_backend_test_suite(
         "layernorm.mlir",
     ] + BACKEND_TESTS,
     driver = "cuda",
-    input_type = "stablehlo",
     tags = [
         # CUDA cuInit fails with sanitizer on.
         "noasan",
@@ -220,6 +205,5 @@ iree_check_single_backend_test_suite(
     compiler_flags = [
         "--iree-vmvx-enable-microkernels",
     ],
-    input_type = "tosa",
     target_backend = "vmvx",
 )

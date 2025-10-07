@@ -101,6 +101,12 @@ getCInnermostStaticCrossIntrinsicDim(IREE::Codegen::InnerTiledOp op) {
     }
     return outputIdx;
   }
+  // Handle the case where there are no `CrossIntrinsic` dims present in
+  // `accSwizzle`, as `intrinsicsM` and `intrinsicsN` are both set as 1. In this
+  // case, we can assume `swizzleIdx` = 0 and just return the rank difference.
+  if (swizzleDims.size() > 0) {
+    return rankDiff;
+  }
   return std::nullopt;
 }
 
