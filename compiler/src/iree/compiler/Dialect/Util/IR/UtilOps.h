@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_UTIL_IR_UTILOPS_H_
 #define IREE_COMPILER_DIALECT_UTIL_IR_UTILOPS_H_
 
+#include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -24,6 +25,10 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
 #include "mlir/Transforms/DialectConversion.h"
+
+namespace mlir::scf {
+class YieldOp;
+} // namespace mlir::scf
 
 namespace mlir::iree_compiler {
 

@@ -172,7 +172,10 @@ struct UtilToSCFInterface : public mlir::CFGToSCFInterface {
     return ub::PoisonOp::create(builder, loc, type, nullptr);
   }
 
-  // Creates util.unreachable for infinite loops.
+  // Creates appropriate terminator for infinite loops.
+  // We insert util.scf.unreachable to mark the unreachable code then
+  // create a return with poison values (like upstream) to allow full CFG->SCF
+  // transformation.
   FailureOr<Operation *> createUnreachableTerminator(Location loc,
                                                      OpBuilder &builder,
                                                      Region &region) override {
@@ -181,8 +184,17 @@ struct UtilToSCFInterface : public mlir::CFGToSCFInterface {
       return emitError(loc) << "expected callable op (e.g. util.func or "
                                "util.initializer) as parent of region";
     }
-    return IREE::Util::UnreachableOp::create(
-               builder, loc, builder.getStringAttr("unreachable code"))
+
+    // Insert util.scf.unreachable to mark that this is an infinite loop.
+    IREE::Util::SCFUnreachableOp::create(builder, loc, "infinite loop");
+
+    // Return poisoned values. We don't use util.unreachable as that breaks the
+    // lifting and instead we let canonicalizers fix things after we are fully
+    // converted.
+    return IREE::Util::ReturnOp::create(
+               builder, loc,
+               IREE::Util::SCFUnreachableOp::createPoisonValues(
+                   builder, loc, callableOp.getResultTypes()))
         .getOperation();
   }
 };

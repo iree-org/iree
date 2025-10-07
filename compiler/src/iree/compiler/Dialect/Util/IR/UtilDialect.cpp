@@ -13,7 +13,9 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/MLIRContext.h"
@@ -84,22 +86,29 @@ struct UtilInlinerInterface : public DialectInlinerInterface {
   }
 
   void handleTerminator(Operation *op, Block *newDest) const final {
-    auto returnOp = dyn_cast<IREE::Util::ReturnOp>(op);
-    if (!returnOp)
+    if (!op->hasTrait<OpTrait::ReturnLike>())
       return;
+
     OpBuilder builder(op);
-    mlir::cf::BranchOp::create(builder, op->getLoc(), newDest,
-                               returnOp.getOperands());
+    if (auto returnOp = dyn_cast<IREE::Util::ReturnOp>(op)) {
+      mlir::cf::BranchOp::create(builder, op->getLoc(), newDest,
+                                 returnOp.getOperands());
+    } else if (op->hasTrait<OpTrait::IREE::Util::UnreachableLike>()) {
+      mlir::cf::BranchOp::create(builder, op->getLoc(), newDest, ValueRange{});
+    }
     op->erase();
   }
 
   void handleTerminator(Operation *op, ValueRange valuesToReplace) const final {
-    auto returnOp = dyn_cast<IREE::Util::ReturnOp>(op);
-    if (!returnOp)
-      return;
-    assert(returnOp.getNumOperands() == valuesToReplace.size());
-    for (const auto &it : llvm::enumerate(returnOp.getOperands())) {
-      valuesToReplace[it.index()].replaceAllUsesWith(it.value());
+    if (auto returnOp = dyn_cast<IREE::Util::ReturnOp>(op)) {
+      // Replace return operands with their new values.
+      assert(returnOp.getNumOperands() == valuesToReplace.size());
+      for (const auto &it : llvm::enumerate(returnOp.getOperands())) {
+        valuesToReplace[it.index()].replaceAllUsesWith(it.value());
+      }
+    } else if (op->hasTrait<OpTrait::IREE::Util::UnreachableLike>()) {
+      // Unreachable ops have no operands to replace.
+      assert(valuesToReplace.empty());
     }
   }
 
@@ -113,6 +122,8 @@ struct UtilInlinerInterface : public DialectInlinerInterface {
 UtilDialect::UtilDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<UtilDialect>()) {
   context->loadDialect<arith::ArithDialect>();
+  context->loadDialect<scf::SCFDialect>();
+  context->loadDialect<ub::UBDialect>();
 
   addInterfaces<UtilOpAsmInterface, UtilInlinerInterface>();
 
