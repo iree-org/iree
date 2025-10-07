@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 
-#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/IR/AffineMap.h"

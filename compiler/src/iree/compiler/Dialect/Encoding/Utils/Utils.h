@@ -8,13 +8,10 @@
 #define IREE_COMPILER_DIALECT_ENCODING_UTILS_UTILS_H_
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
-
-namespace mlir::iree_compiler::IREE::LinalgExt {
-class ScaledContractionDimensions;
-} // namespace mlir::iree_compiler::IREE::LinalgExt
 
 namespace mlir::iree_compiler::IREE::Encoding {
 
