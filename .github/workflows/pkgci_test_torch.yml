@@ -20,11 +20,6 @@ on:
       artifact_run_id:
         type: string
         default: ""
-  workflow_call:
-    inputs:
-      artifact_run_id:
-        type: string
-        default: ""
 
 jobs:
   test_torch_ops:
