@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Preprocessing/TransformExtensions/PreprocessingExtensions.h"
 
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Utils/EquivalenceUtils.h"
 #include "iree/compiler/Utils/ShapeUtils.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
@@ -298,6 +300,90 @@ IREE::transform_dialect::MatchContractionOp::matchOperation(
                     iterationSizes(contractionDims.n));
   results.setParams(cast<OpResult>(getKDims()),
                     iterationSizes(contractionDims.k));
+
+  return DiagnosedSilenceableFailure::success();
+}
+
+DiagnosedSilenceableFailure
+IREE::transform_dialect::MatchAttentionOp::matchOperation(
+    Operation *current, transform::TransformResults &results,
+    transform::TransformState &state) {
+  Location loc = current->getLoc();
+  auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(current);
+  if (!attentionOp) {
+    return emitSilenceableFailure(loc)
+           << "Operation is not an attention operation.";
+  }
+
+  Type targetQueryType = getQueryType();
+  Type currentQueryType =
+      getElementTypeOrSelf(attentionOp.getQuery().getType());
+  if (currentQueryType != targetQueryType) {
+    return emitSilenceableFailure(loc)
+           << "Query type doesn't match: expected " << targetQueryType
+           << ", got " << currentQueryType;
+  }
+
+  Type targetKeyType = getKeyType();
+  Type currentKeyType = getElementTypeOrSelf(attentionOp.getKey().getType());
+  if (currentKeyType != targetKeyType) {
+    return emitSilenceableFailure(loc)
+           << "Key type doesn't match: expected " << targetKeyType << ", got "
+           << currentKeyType;
+  }
+
+  Type targetValueType = getValueType();
+  Type currentValueType =
+      getElementTypeOrSelf(attentionOp.getValue().getType());
+  if (currentValueType != targetValueType) {
+    return emitSilenceableFailure(loc)
+           << "Value type doesn't match: expected " << targetValueType
+           << ", got " << currentValueType;
+  }
+
+  Type targetOutputType = getOutputType();
+  Type currentOutputType =
+      getElementTypeOrSelf(attentionOp.getOutput().getType());
+  if (currentOutputType != targetOutputType) {
+    return emitSilenceableFailure(loc)
+           << "Output type doesn't match: expected " << targetOutputType
+           << ", got " << currentOutputType;
+  }
+
+  ArrayAttr currentIndexingMaps = attentionOp.getIndexingMaps();
+  ArrayAttr targetIndexingMaps = getIndexingMaps();
+  if (currentIndexingMaps != targetIndexingMaps) {
+    return emitSilenceableFailure(loc) << "indexing maps don't match";
+  }
+
+  FailureOr<IREE::LinalgExt::AttentionOpDetail> maybeOpInfo =
+      IREE::LinalgExt::AttentionOpDetail::get(
+          attentionOp.getQueryMap(), attentionOp.getKeyMap(),
+          attentionOp.getValueMap(), attentionOp.getOutputMap());
+  if (failed(maybeOpInfo)) {
+    return emitSilenceableFailure(loc)
+           << "Failed to infer attention dimensions";
+  }
+  IREE::LinalgExt::AttentionOpDetail opInfo = *maybeOpInfo;
+  SmallVector<int64_t> iterationDomain = attentionOp.getStaticLoopRanges();
+
+  Builder builder(getContext());
+  auto iterationSizes = [&](ArrayRef<int64_t> dimIndices) {
+    return llvm::map_to_vector(dimIndices, [&](int64_t dimIdx) -> Attribute {
+      return builder.getI64IntegerAttr(iterationDomain[dimIdx]);
+    });
+  };
+
+  results.setParams(cast<OpResult>(getBatchDims()),
+                    iterationSizes(opInfo.getBatchDims()));
+  results.setParams(cast<OpResult>(getMDims()),
+                    iterationSizes(opInfo.getMDims()));
+  results.setParams(cast<OpResult>(getNDims()),
+                    iterationSizes(opInfo.getNDims()));
+  results.setParams(cast<OpResult>(getK1Dims()),
+                    iterationSizes(opInfo.getK1Dims()));
+  results.setParams(cast<OpResult>(getK2Dims()),
+                    iterationSizes(opInfo.getK2Dims()));
 
   return DiagnosedSilenceableFailure::success();
 }
