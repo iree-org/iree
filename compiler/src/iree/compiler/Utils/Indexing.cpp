@@ -148,7 +148,7 @@ std::optional<int64_t> getCoefficient(Value a, Value b) {
   if (a == b) {
     return 1;
   }
-  auto applyOp = dyn_cast<affine::AffineApplyOp>(a.getDefiningOp());
+  auto applyOp = dyn_cast_if_present<affine::AffineApplyOp>(a.getDefiningOp());
   if (!applyOp) {
     return std::nullopt;
   }
