@@ -678,7 +678,7 @@ def IREEGPU_ConditionalTransposeAttr  :
     Calculation breakdown:
      - LHS shape: (M,K)
      - RHS shape: (N,K)
-     - Tile dimension : (TileM, TileN)
+     - Tile dimension: (TileM, TileN)
      - numTileLoadsDefault = min(numCUS,ceil(N,tileN)) + ceil(numCUS,min(numCUS,ceil(N,tileN)))
      - numTileLoadsTransposed = min(numCUS,ceil(M,tileM)) + ceil(numCUS,min(numCUS,ceil(M,tileM)))
 
