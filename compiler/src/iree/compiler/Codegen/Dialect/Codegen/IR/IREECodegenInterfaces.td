@@ -257,11 +257,11 @@ def IREECodegen_WorkgroupReorderingAttrInterface :
      InterfaceMethod<
       /*desc=*/[{
         Function that generates the workgroup loop terminator.
-          - `loops` : generated loops from the generateLoopHeaderFn callback above
-          - `tiledResults` : Tiles of the result computed for the iteration space tile.
-          - `resultOffsets` : For each of the `tiledResults`, the offset at which the result tile is
+          - `loops`: generated loops from the generateLoopHeaderFn callback above
+          - `tiledResults`: Tiles of the result computed for the iteration space tile.
+          - `resultOffsets`: For each of the `tiledResults`, the offset at which the result tile is
           to be "inserted" back into the destination tensor.
-          - `resultSizes` : For each of the `tiledResults`, the size of the result tile that is to
+          - `resultSizes`: For each of the `tiledResults`, the size of the result tile that is to
           be "inserted" back into the destination tensor.
       }],
       /*retType=*/"::mlir::LogicalResult",
