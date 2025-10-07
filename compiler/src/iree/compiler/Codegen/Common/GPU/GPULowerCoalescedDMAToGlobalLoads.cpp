@@ -84,17 +84,16 @@ static LogicalResult verifyMemoryLayout(IREE::GPU::CoalescedGatherDMAOp dmaOp,
   }
 
   // Check memory address spaces.
-  // TEMPORARY: Disable address space check for testing
-  // auto sourceType = cast<MemRefType>(dmaOp.getSource().getType());
-  // auto targetType = cast<MemRefType>(dmaOp.getInit().getType());
+  auto sourceType = cast<MemRefType>(dmaOp.getSource().getType());
+  auto targetType = cast<MemRefType>(dmaOp.getInit().getType());
 
-  // bool hasGlobalSource = hasGlobalMemoryAddressSpace(sourceType);
-  // bool hasSharedTarget = hasSharedMemoryAddressSpace(targetType);
+  bool hasGlobalSource = hasGlobalMemoryAddressSpace(sourceType);
+  bool hasSharedTarget = hasSharedMemoryAddressSpace(targetType);
 
-  // if (!hasGlobalSource || !hasSharedTarget) {
-  //   return rewriter.notifyMatchFailure(
-  //       dmaOp, "incompatible source or target memory address space");
-  // }
+  if (!hasGlobalSource || !hasSharedTarget) {
+    return rewriter.notifyMatchFailure(
+        dmaOp, "incompatible source or target memory address space");
+  }
 
   return success();
 }
@@ -263,8 +262,12 @@ struct LowerCoalescedGatherDMAPattern : public OpRewritePattern<scf::ForallOp> {
 
     Value laneId =
         rewriter.create<gpu::LaneIdOp>(loc, rewriter.getIndexType(), nullptr);
-    Value subgroupSize = rewriter.create<gpu::SubgroupSizeOp>(
-        loc, rewriter.getIndexType(), rewriter.getI32IntegerAttr(32));
+
+    // Create subgroup size op with the subgroup size from the config.
+    // The upper_bound attribute must be an IndexAttr, not an IntegerAttr.
+    Value subgroupSizeValue = rewriter.create<gpu::SubgroupSizeOp>(
+        loc, rewriter.getIndexType(),
+        rewriter.getIndexAttr(this->subgroupSize));
 
     // Build a for loop skeleton.
     Value lowerBound = rewriter.create<arith::ConstantIndexOp>(loc, 0);
@@ -296,7 +299,7 @@ struct LowerCoalescedGatherDMAPattern : public OpRewritePattern<scf::ForallOp> {
       Value inductionVar = forOp.getInductionVar();
 
       Value linearizedBaseIndex =
-          rewriter.create<arith::MulIOp>(loc, inductionVar, subgroupSize);
+          rewriter.create<arith::MulIOp>(loc, inductionVar, subgroupSizeValue);
 
       // Compute the base index in dest memref.
       ValueRange delinearizedBaseIndices =

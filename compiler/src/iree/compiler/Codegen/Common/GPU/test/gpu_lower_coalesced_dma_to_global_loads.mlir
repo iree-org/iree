@@ -33,22 +33,17 @@ func.func @lower_coalesced_gather_dma_basic(
     translation_info = #translation_info} {
   // CHECK-NOT: iree_gpu.coalesced_gather_dma
   // CHECK: %[[LANE_ID:.+]] = gpu.lane_id
+  // CHECK: %[[SUBGROUP_SIZE:.+]] = gpu.subgroup_size upper_bound 32
   // CHECK: %[[C0:.+]] = arith.constant 0 : index
   // CHECK: %[[C1:.+]] = arith.constant 1 : index
   // CHECK: %[[C1_STEP:.+]] = arith.constant 1 : index
   // CHECK: scf.for %[[IV:.+]] = %[[C0]] to %[[C1]] step %[[C1_STEP]]
-  // CHECK:   %[[C32:.+]] = arith.constant 32 : index
-  // CHECK:   %[[IDX_OFFSET:.+]] = arith.muli %[[IV]], %[[C32]]
+  // CHECK:   %[[IDX_OFFSET:.+]] = arith.muli %[[IV]], %[[SUBGROUP_SIZE]]
+  // CHECK:   %[[DELINEAR_DEST:.+]] = affine.delinearize_index %[[IDX_OFFSET]] into (128)
   // CHECK:   %[[IDX_POS:.+]] = arith.addi %[[LANE_ID]], %[[IDX_OFFSET]]
-  // CHECK:   %[[DELINEAR_IDX:.+]] =
-  // CHECK-SAME: affine.delinearize_index %[[IDX_POS]] into (32)
+  // CHECK:   %[[DELINEAR_IDX:.+]] = affine.delinearize_index %[[IDX_POS]] into (32)
   // CHECK:   %[[LOADED_IDX:.+]] = memref.load %arg0[%[[DELINEAR_IDX]]]
-  // CHECK:   %[[C32_1:.+]] = arith.constant 32 : index
-  // CHECK:   %[[DEST_OFFSET_MUL:.+]] = arith.muli %[[IV]], %[[C32_1]]
-  // CHECK:   %[[DELINEAR_DEST:.+]] =
-  // CHECK-SAME: affine.delinearize_index %[[DEST_OFFSET_MUL]] into (128)
-  // CHECK:   amdgpu.gather_to_lds %arg1[%[[LOADED_IDX]]],
-  // CHECK-SAME: %arg2[%[[DELINEAR_DEST]]] : vector<4xf32>
+  // CHECK:   amdgpu.gather_to_lds %arg1[%[[LOADED_IDX]]], %arg2[%[[DELINEAR_DEST]]] : vector<4xf32>
   scf.forall (%arg5, %arg6) in (32, 1) {
     %1 = iree_gpu.coalesced_gather_dma %indices, %source into %dest :
       memref<32xindex>,
@@ -96,22 +91,17 @@ func.func @lower_coalesced_gather_dma_multiple(
     translation_info = #translation_info} {
   // CHECK-NOT: iree_gpu.coalesced_gather_dma
   // CHECK: %[[LANE_ID:.+]] = gpu.lane_id
+  // CHECK: %[[SUBGROUP_SIZE:.+]] = gpu.subgroup_size upper_bound 32
   // CHECK: %[[C0:.+]] = arith.constant 0 : index
   // CHECK: %[[C4:.+]] = arith.constant 4 : index
   // CHECK: %[[C1:.+]] = arith.constant 1 : index
   // CHECK: scf.for %[[IV:.+]] = %[[C0]] to %[[C4]] step %[[C1]]
-  // CHECK:   %[[C32:.+]] = arith.constant 32 : index
-  // CHECK:   %[[IDX_OFFSET:.+]] = arith.muli %[[IV]], %[[C32]]
+  // CHECK:   %[[IDX_OFFSET:.+]] = arith.muli %[[IV]], %[[SUBGROUP_SIZE]]
+  // CHECK:   %[[DELINEAR_DEST:.+]] = affine.delinearize_index %[[IDX_OFFSET]] into (512)
   // CHECK:   %[[IDX_POS:.+]] = arith.addi %[[LANE_ID]], %[[IDX_OFFSET]]
-  // CHECK:   %[[DELINEAR_IDX:.+]] =
-  // CHECK-SAME: affine.delinearize_index %[[IDX_POS]] into (128)
+  // CHECK:   %[[DELINEAR_IDX:.+]] = affine.delinearize_index %[[IDX_POS]] into (128)
   // CHECK:   %[[LOADED_IDX:.+]] = memref.load %arg0[%[[DELINEAR_IDX]]]
-  // CHECK:   %[[C32_0:.+]] = arith.constant 32 : index
-  // CHECK:   %[[DEST_OFFSET_MUL:.+]] = arith.muli %[[IV]], %[[C32_0]]
-  // CHECK:   %[[DELINEAR_DEST:.+]] =
-  // CHECK-SAME: affine.delinearize_index %[[DEST_OFFSET_MUL]] into (512)
-  // CHECK:   amdgpu.gather_to_lds %arg1[%[[LOADED_IDX]]],
-  // CHECK-SAME: %arg2[%[[DELINEAR_DEST]]] : vector<4xf32>
+  // CHECK:   amdgpu.gather_to_lds %arg1[%[[LOADED_IDX]]], %arg2[%[[DELINEAR_DEST]]] : vector<4xf32>
   scf.forall (%arg5, %arg6) in (32, 1) {
     %1 = iree_gpu.coalesced_gather_dma %indices, %source into %dest :
       memref<128xindex>,
@@ -159,19 +149,17 @@ func.func @lower_loop_nest(%arg0: memref<1024xf32, #amdgpu.address_space<fat_raw
   // CHECK-SAME:   memref<32x32xf32, #gpu.address_space<workgroup>> to memref<1x32xf32, strided<[32, 1], offset: ?>, #gpu.address_space<workgroup>>
   // CHECK-NOT: iree_gpu.coalesced_gather_dma
   // CHECK:   %[[LANE_ID:.+]] = gpu.lane_id
+  // CHECK:   %[[SUBGROUP_SIZE:.+]] = gpu.subgroup_size upper_bound 32
   // CHECK:   %[[C0:.+]] = arith.constant 0 : index
   // CHECK:   %[[C1:.+]] = arith.constant 1 : index
   // CHECK:   %[[C1_STEP:.+]] = arith.constant 1 : index
   // CHECK:   scf.for %[[IV:.+]] = %[[C0]] to %[[C1]] step %[[C1_STEP]]
-  // CHECK:     %[[C32:.+]] = arith.constant 32 : index
-  // CHECK:     %[[IDX_OFFSET:.+]] = arith.muli %[[IV]], %[[C32]]
+  // CHECK:     %[[IDX_OFFSET:.+]] = arith.muli %[[IV]], %[[SUBGROUP_SIZE]]
+  // CHECK:     %[[DELINEAR_DEST:.+]]:2 = affine.delinearize_index %[[IDX_OFFSET]] into (1, 32)
   // CHECK:     %[[IDX_POS:.+]] = arith.addi %[[LANE_ID]], %[[IDX_OFFSET]]
   // CHECK:     %[[DELINEAR_IDX:.+]]:2 = affine.delinearize_index %[[IDX_POS]] into (1, 32)
   // CHECK:     %[[LOADED_IDX:.+]] = memref.load %[[INDICES_SLICE]][%[[DELINEAR_IDX]]#0, %[[DELINEAR_IDX]]#1]
-  // CHECK:     %[[C32_1:.+]] = arith.constant 32 : index
-  // CHECK:     %[[DEST_OFFSET_MUL:.+]] = arith.muli %[[IV]], %[[C32_1]]
-  // CHECK:     %[[DELINEAR_DEST:.+]]:2 = affine.delinearize_index %[[DEST_OFFSET_MUL]] into (1, 32)
-  // CHECK:     amdgpu.gather_to_lds %arg0[%[[LOADED_IDX]]], %[[DEST_SLICE]][%[[DELINEAR_DEST]]#0, %[[DELINEAR_DEST]]#1]
+  // CHECK:     amdgpu.gather_to_lds %arg0[%[[LOADED_IDX]]], %[[DEST_SLICE]][%[[DELINEAR_DEST]]#0, %[[DELINEAR_DEST]]#1] : vector<1xf32>
   // CHECK:     }
   // CHECK: } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
   scf.forall (%arg3, %arg4) = (0, 0) to (32, 32) step (1, 32) {
