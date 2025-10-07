@@ -40,7 +40,6 @@ jobs:
             runs-on: ubuntu-24.04
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
-      CONFIG_FILE_PATH: tests/external/iree-test-suites/pytorch_ops/configs/${{ matrix.config-file }}
       NUMPROCESSES: ${{ matrix.numprocesses }}
       LOG_FILE_PATH: /tmp/test_torch_ops_${{ matrix.name }}_logs.json
       VENV_DIR: ${{ github.workspace }}/venv
@@ -83,7 +82,6 @@ jobs:
               --numprocesses ${NUMPROCESSES} \
               --timeout=30 \
               --durations=20 \
-              --config-files=${CONFIG_FILE_PATH} \
               --report-log=${LOG_FILE_PATH}
 
   tests:
