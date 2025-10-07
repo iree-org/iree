@@ -1361,7 +1361,7 @@ attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPU
   return %27 : tensor<?x256x8192xf32>
 }
 // CHECK-LABEL: @matmul_transposed_reordering_dynamic
-//       CHECK:   %[[COND:.+]] = arith.cmpi ult, %{{.+}}, %{{.+}} : index
+//       CHECK:   %[[COND:.+]] = arith.cmpi ult, %{{.+}}, %c33 : index
 //       CHECK:   %[[BOUND0:.+]] = arith.select %[[COND]], %c8192, %{{.+}} : index
 //       CHECK:   %[[BOUND1:.+]] = arith.select %[[COND]], %{{.+}}, %c8192 : index
 //       CHECK:   %[[STEP0:.+]] = arith.select %[[COND]], %c256, %c1 : index

@@ -270,7 +270,7 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   tilingOptions.setInterchange(tilingInfo->interchange);
   tilingOptions.setMapping(deviceMappingAttribute);
 
-  auto workgroupReorderingStrategy =
+  IREE::Codegen::WorkgroupReorderingAttrInterface workgroupReorderingStrategy =
       getLoweringConfig(tilingInfo->tilableOp).getWorkgroupReorderingStrategy();
   if (workgroupReorderingStrategy) {
     scf::SCFTilingOptions::GenerateLoopHeaderFn loopHeaderFn =
