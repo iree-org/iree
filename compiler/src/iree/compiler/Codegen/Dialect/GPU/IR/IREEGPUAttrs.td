@@ -682,8 +682,8 @@ def IREEGPU_ConditionalTransposeAttr  :
      - numTileLoadsDefault = min(numCUS, ceildiv(N, tileN)) + ceildiv(numCUS, min(numCUS, ceildiv(N, tileN)))
      - numTileLoadsTransposed = min(numCUS, ceildiv(M, tileM)) + ceildiv(numCUS, min(numCUS, ceildiv(M, tileM)))
 
-     Examples for gfx942:
-     - (M=8192, N=128256, K=4096)
+     Examples for gfx942 (304 CUs):
+     - (M=8192, N=128256, K=4096) (tileM=256, tileN=256)
       - numTileLoadsDefault = 304 + ceildiv(304, 304) = 305
       - numTileLoadsTransposed = 32 + ceildiv(304, 32) = 42
       => numTileLoadsTransposed < numTileLoadsDefault => enable transpose
@@ -693,7 +693,7 @@ def IREEGPU_ConditionalTransposeAttr  :
       - numTileLoadsTransposed = 64 + ceildiv(304, 64) = 69
       numTileLoadsTransposed > numTileLoadsDefault => disable transpose
 
-      Fields:
+      Parameters:
         - numXCDs: Number of XCDs.
         - numCUs: Number of CUs per XCD.
   }];
