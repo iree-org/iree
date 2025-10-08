@@ -283,9 +283,9 @@ def HAL_MemoryAccessBitfieldAttr :
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_MemoryAccessAttr : AttrDef<HAL_Dialect, "MemoryAccess"> {
-  let mnemonic = "memory_access";
-  let summary = [{Memory access bitfield attribute.}];
+def HAL_SubspanAccessAttr : AttrDef<HAL_Dialect, "SubspanAccess"> {
+  let mnemonic = "subspan_access";
+  let summary = [{Subspan Access bitfield attribute.}];
   let description = [{
     Specifies memory access patterns as a bitfield combination.
   }];

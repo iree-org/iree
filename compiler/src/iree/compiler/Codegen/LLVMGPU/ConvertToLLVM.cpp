@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
@@ -233,10 +234,10 @@ analyzeSubspans(llvm::SetVector<IREE::HAL::InterfaceBindingSubspanOp> &subspans,
   for (auto subspan : subspans) {
     int64_t binding = subspan.getBinding().getSExtValue();
     result[binding].unused = false;
-    if (IREE::HAL::MemoryAccessAttr memoryAccessAttr =
-            subspan.getMemoryAccessAttr()) {
+    if (IREE::HAL::SubspanAccessAttr subspanAccessAttr =
+            subspan.getSubspanAccessAttr()) {
       result[binding].readonly &=
-          memoryAccessAttr.hasRead() && !memoryAccessAttr.hasWrite();
+          subspanAccessAttr.hasRead() && !subspanAccessAttr.hasWrite();
     }
     unsigned bindingAddrSpace = 0;
     auto bindingType = dyn_cast<BaseMemRefType>(subspan.getType());

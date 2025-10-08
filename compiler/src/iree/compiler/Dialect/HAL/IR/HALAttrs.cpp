@@ -100,7 +100,7 @@ PipelineBindingAttr PipelineLayoutAttr::getBinding(int64_t ordinal) const {
 //===----------------------------------------------------------------------===//
 
 // static
-Attribute MemoryAccessAttr::parse(AsmParser &p, Type type) {
+Attribute SubspanAccessAttr::parse(AsmParser &p, Type type) {
   if (p.parseLParen())
     return {};
 
@@ -140,7 +140,7 @@ Attribute MemoryAccessAttr::parse(AsmParser &p, Type type) {
   return get(p.getContext(), value);
 }
 
-void MemoryAccessAttr::print(AsmPrinter &p) const {
+void SubspanAccessAttr::print(AsmPrinter &p) const {
   SmallVector<StringRef> parts;
 
   auto value = getValue();

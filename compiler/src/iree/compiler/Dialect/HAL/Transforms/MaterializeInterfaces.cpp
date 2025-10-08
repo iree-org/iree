@@ -322,10 +322,10 @@ convertBindingUsage(mlir::FunctionOpInterface sourceFuncOp, BlockArgument arg,
     auto alignmentAttr = sourceFuncOp.getArgAttrOfType<IntegerAttr>(
         arg.getArgNumber(), "stream.alignment");
 
-    IREE::HAL::MemoryAccessAttr memoryAccessAttr;
+    IREE::HAL::SubspanAccessAttr subspanAccessAttr;
     if (auto dispatchTensorType =
             dyn_cast<IREE::TensorExt::DispatchTensorType>(oldOp.getType())) {
-      memoryAccessAttr = IREE::HAL::MemoryAccessAttr::get(
+      subspanAccessAttr = IREE::HAL::SubspanAccessAttr::get(
           builder.getContext(),
           getBitfieldAccessFromDispatch(dispatchTensorType));
     }
@@ -333,7 +333,7 @@ convertBindingUsage(mlir::FunctionOpInterface sourceFuncOp, BlockArgument arg,
     auto newOp = IREE::HAL::InterfaceBindingSubspanOp::create(
         builder, oldOp.getLoc(), oldOp.getType(), pipelineLayoutAttr,
         APInt(64, bindingOrdinal), oldOp.getByteOffset(),
-        oldOp.getDynamicDims(), alignmentAttr, memoryAccessAttr);
+        oldOp.getDynamicDims(), alignmentAttr, subspanAccessAttr);
     oldOp.replaceAllUsesWith(newOp.getResult());
     oldOp.erase();
   }

@@ -662,7 +662,7 @@ public:
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
         subspanOp, *vecMemRef, subspanOp.getLayout(), subspanOp.getBinding(),
         subspanOp.getByteOffset(), subspanOp.getDynamicDims(),
-        subspanOp.getAlignmentAttr(), subspanOp.getMemoryAccessAttr());
+        subspanOp.getAlignmentAttr(), subspanOp.getSubspanAccessAttr());
     return success();
   }
 };

@@ -181,8 +181,8 @@ struct LoadFromBufferOpInterface
     // Conservatively return false if the subspan is not found.
     if (!subspanOp)
       return false;
-    return subspanOp->getMemoryAccess().has_value() &&
-           !subspanOp->getMemoryAccessAttr().hasRead();
+    return subspanOp->getSubspanAccess().has_value() &&
+           !subspanOp->getSubspanAccessAttr().hasRead();
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,

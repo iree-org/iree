@@ -65,8 +65,8 @@ static Operation *isTriviallyProducedByReadOnlyViewLike(
   if (!binding) {
     return nullptr;
   }
-  if (!binding->getMemoryAccess() ||
-      !binding->getMemoryAccessAttr().hasRead()) {
+  if (!binding->getSubspanAccess() ||
+      !binding->getSubspanAccessAttr().hasRead()) {
     return nullptr;
   }
   // Check that the binding has at most one FatRawBufferCastOp in its use

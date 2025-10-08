@@ -3513,7 +3513,7 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
     Optional<HAL_DeviceSize>:$byte_offset,
     HAL_ShapeDynamicDims:$dynamic_dims,
     OptionalAttr<IndexAttr>:$alignment,
-    OptionalAttr<HAL_MemoryAccessAttr>:$memory_access
+    OptionalAttr<HAL_SubspanAccessAttr>:$subspan_access
   );
   let results = (outs
     AnyType:$result
@@ -3524,7 +3524,7 @@ def HAL_InterfaceBindingSubspanOp : HAL_PureOp<"interface.binding.subspan", [
     `binding` `(` $binding `)`
     (`alignment` `(` $alignment^ `)`)?
     (`offset` `(` $byte_offset^ `)`)?
-    (`memory_access` `(` $memory_access^ `)`)?
+    (`subspan_access` `(` $subspan_access^ `)`)?
     attr-dict `:` type($result) (`{` $dynamic_dims^ `}`)?
   }];
 

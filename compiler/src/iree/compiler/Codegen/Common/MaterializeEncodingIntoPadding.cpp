@@ -231,7 +231,7 @@ struct MaterializeInterfaceBindingEncoding final
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
         subspanOp, newResultType, subspanOp.getLayout(), subspanOp.getBinding(),
         subspanOp.getByteOffset(), newDynamicDims, subspanOp.getAlignmentAttr(),
-        subspanOp.getMemoryAccessAttr());
+        subspanOp.getSubspanAccessAttr());
     return success();
   }
 };

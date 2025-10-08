@@ -84,8 +84,8 @@ static bool isUniformLoad(Operation *op) {
       cast<MemRefType>(subspan.getResult().getType()).getMemorySpace());
   if (descTypeAttr && descTypeAttr.getValue() == DescriptorType::UniformBuffer)
     return true;
-  if (subspan.getMemoryAccess().has_value() &&
-      subspan.getMemoryAccessAttr().hasRead()) {
+  if (subspan.getSubspanAccess().has_value() &&
+      subspan.getSubspanAccessAttr().hasRead()) {
     return true;
   }
   return false;
