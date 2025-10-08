@@ -99,6 +99,8 @@ jobs:
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
           source ${VENV_DIR}/bin/activate
           pip install -e ${{ github.workspace }}/iree-test-suites/sharktank_models
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run sharktank model tests
         run: |
@@ -206,6 +208,8 @@ jobs:
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
           source ${VENV_DIR}/bin/activate
           pip install -e ${{ github.workspace }}/iree-test-suites/sharktank_models
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run sharktank model tests
         run: |
