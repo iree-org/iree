@@ -21,6 +21,7 @@
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
+#include "iree/compiler/Dialect/TensorExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Analysis/TestPasses.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
@@ -62,6 +63,7 @@ inline void registerAllIreePasses() {
   IREE::IO::Parameters::registerParametersPasses();
   IREE::LinalgExt::registerPasses();
   IREE::Stream::registerStreamPasses();
+  IREE::TensorExt::registerPasses();
   IREE::Util::registerUtilPasses();
   IREE::VM::registerVMPasses();
   IREE::VM::registerVMAnalysisTestPasses();

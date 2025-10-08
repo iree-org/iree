@@ -148,3 +148,13 @@ util.func public @dynamicAvgRaggedColumnLengths(%source : tensor<?x?x?xf32>,
   util.return %0 : tensor<?x3x?x?xf32, #iree_tensor_ext.ragged_tensor<1>>
 }
 // CHECK-LABEL: @dynamicAvgRaggedColumnLengths
+
+// -----
+
+// Round trip test for SparseIterationDimsAttr
+func.func @sparseIterationDimsAttr() {
+  scf.forall (%i, %j) = (0, 0) to (10, 20) step (1, 1) {
+  } {iree_tensor_ext.sparse_iteration_dims = #iree_tensor_ext.sparse_iteration_dims<[0, 1]>}
+  return
+}
+// CHECK-LABEL: func @sparseIterationDimsAttr()

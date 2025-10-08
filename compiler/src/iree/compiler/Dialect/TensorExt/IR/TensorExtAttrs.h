@@ -15,4 +15,11 @@
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtAttrs.h.inc" // IWYU pragma: keep
 // clang-format on
 
+namespace mlir::iree_compiler::IREE::TensorExt {
+
+// Get the attribute that specifies sparse iteration dimensions on operations.
+SparseIterationDimsAttr getSparseIterationDimsAttr(Operation *op);
+
+} // namespace mlir::iree_compiler::IREE::TensorExt
+
 #endif // IREE_COMPILER_DIALECT_TENSOREXT_IR_TENSOREXTATTRS_H_
