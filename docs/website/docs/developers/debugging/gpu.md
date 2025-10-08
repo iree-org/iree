@@ -177,7 +177,7 @@ investigate by comparing with different paths and inputs:
 
 !!! tip "[correctness]"
 
-    Some targets support the `gpu.printf` operation for printing out vaules from
+    Some targets support the `gpu.printf` operation for printing out values from
     within GPU code, and many of the targets that don't _could_ support it with
     some work in IREE or upstream MLIR.
 
@@ -267,25 +267,32 @@ a `.hsaco` with
 ld.lld -o [filename].hsaco -shared [filename].o
 ```
 
-In full, if you have a dispatch in `dispatch.mlir` and want to compile it
-manually, the process is as follows
+In full, if you have a dispatch in `dispatch.mlir` and want to recompile it with
+while potentially making modifications, the process is
 
 ``` shell
+# A PATH edit is not strictly required. It is used here to point out that the
+# LLVM binaries used should me built from the same LLVM sources IREE uses.
+export PATH="[build-directory]/llvm-project/bin:[build-directory]/tools/bin:$PATH"
+
 iree-compile dispatch.mlir \
   --iree-hal-target-device=hip \
   --iree-hip-target=<target> \
   -o original.vmfb \
-  --iree-hal-dump-executable-files-to=original_trace
-# Extract the flags from original_trace/[...].linked.ll to a file, say opt-flags, and
-opt -o - $(cat opt-flags) <original_trace/[...].linked.ll >altered.opt.ll
-# To inspect the assembly.
-llc [flags from original_trace/[...].rocmasm] altered.opt.ll -o altered.rocmasm
+  --iree-hal-dump-executable-files-to=odump
+# Opt flags are in dump/[...].optimized.ll to a file.
+opt -o - [opt flags] <dump/[...].linked.ll >altered.opt.ll
+# llc flags are in dump/[...].rocmsasm.
+# To produce an assembly file.
+llc [llc flags] altered.opt.ll -o altered.rocmasm
 # To produce an object file.
-llc [flags from original_trace/[...].rocmasm] altered.opt.ll -o altered.o --filetype=obj
+llc [llc flags] altered.opt.ll -o altered.o --filetype=obj
 # Linking to an HSACO.
 ld.lld -o altered.hsaco -shared altered.o
 # Re-compile with substitution. [dispatch_name] is the name of the
-# `hal.executable` op symbol, not the variant within it.
+# `hal.executable` op symbol, not the variant within it. This can
+# be found by looking at the relevant configured_*.mlir file in dump/, for
+# example.
 iree-compile dispatch.mlir \
   --iree-hal-target-device=hip \
   --iree-hip-target=<target> \
@@ -293,18 +300,18 @@ iree-compile dispatch.mlir \
   --iree-hal-substitute-executable-object=[dispatch_name]=altered.hsaco
 ```
 
+If successful, `iree-complie` will print a message stating
+
+``` shell
+NOTE: hal.executable `[executable name]` substituted with object file at`altered.hsaco`
+```
+
 During each of these steps, you can change the flags or manually edit the `.ll`
 (or even `.rocmasm`) files to attempt to get potentially-different behavior.
 
-!!! tip
-
-    You'll want to use the binaries built by IREE, located in
-    `[build-directory]/llvm-project/bin`, to ensure you don't get spurious
-    successes or failures due to version mismatches.
-
 !!! note
 
-    The binary substution process could be used to replace a dispatch with a
+    The binary substitution process could be used to replace a dispatch with a
     completely foreign implementation, such as one written in C, so long as the
     function names and argument handling schemes agree. If you do this, please
     document the steps here.
