@@ -262,6 +262,7 @@ nav:
           - "developers/usage-best-practices.md"
           - "developers/update-sdxl-golden-outputs.md"
           - "developers/vulkan-environment-setup.md"
+          - "developers/lowering-config.md"
   - "Community":
       - "community/index.md"
       - "Blog":
