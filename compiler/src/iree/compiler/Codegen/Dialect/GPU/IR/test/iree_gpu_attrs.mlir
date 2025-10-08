@@ -118,6 +118,15 @@ module {
 //  CHECK-SAME:   lowering_config = #iree_gpu.lowering_config<{thread = [0, 4], workgroup = [16, 16]}>
 
 module {
+  func.func @test_lowering_config_reordering() attributes {
+      lowering_config = #iree_gpu.lowering_config<{workgroup = [256, 256], workgroup_reordering_strategy = #iree_gpu.conditional_transpose<8, 38>}>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_lowering_config_reordering
+//  CHECK-SAME:   lowering_config = #iree_gpu.lowering_config<{workgroup = [256, 256], workgroup_reordering_strategy = #iree_gpu.conditional_transpose<8, 38>}>
+
+module {
   func.func @test_cache_swizzle_promotion() attributes {
       promotion_types = [#iree_gpu.promote_with_cache_swizzle<#iree_gpu.derived_thread_config>]} {
     return

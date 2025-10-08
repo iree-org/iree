@@ -231,6 +231,52 @@ def IREECodegen_AnyInnerTileDescAttr : Attr<Or<[
   let convertFromStorage = "$_self";
 }
 
+def IREECodegen_WorkgroupReorderingAttrInterface :
+  AttrInterface<"WorkgroupReorderingAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
+  let description = [{
+    An interface that describes workgroup reordering patterns.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Function that generates the workgroup loop headers.
+          - `loopRanges`: Values that represent the full size of the iteration space being tiled.
+          - `givenTileSizes`: The tile sizes that are to be used to tile the iteration space.
+          - `destinationTensors`: The tensors to use as destinations for the results of the tiled loop.
+      }],
+      /*retTy=*/"::mlir::FailureOr<::mlir::scf::SCFTilingOptions::CustomLoopHeaderInfo>",
+      /*methodName=*/"generateLoopHeaderFn",
+      /*args=*/(ins "::mlir::OpBuilder&":$b,
+                    "::mlir::Location":$loc,
+                    "::llvm::ArrayRef<::mlir::Range>":$loopRanges,
+                    "::llvm::ArrayRef<::mlir::OpFoldResult>":$tileSizes,
+                    "::mlir::ValueRange":$destinationTensors)
+    >,
+     InterfaceMethod<
+      /*desc=*/[{
+        Function that generates the workgroup loop terminator.
+          - `loops`: generated loops from the generateLoopHeaderFn callback above
+          - `tiledResults`: Tiles of the result computed for the iteration space tile.
+          - `resultOffsets`: For each of the `tiledResults`, the offset at which the result tile is
+          to be "inserted" back into the destination tensor.
+          - `resultSizes`: For each of the `tiledResults`, the size of the result tile that is to
+          be "inserted" back into the destination tensor.
+      }],
+      /*retType=*/"::mlir::LogicalResult",
+      /*methodName=*/"generateLoopTerminatorFn",
+      /*args=*/(ins "::mlir::OpBuilder&":$b,
+                    "::mlir::Location":$loc,
+                    "::mlir::ArrayRef<::mlir::LoopLikeOpInterface>":$loops,
+                    "::mlir::ValueRange":$tiledResults,
+                    "::llvm::ArrayRef<::llvm::SmallVector<::mlir::OpFoldResult>>":$resultOffsets,
+                    "::llvm::ArrayRef<::llvm::SmallVector<::mlir::OpFoldResult>>":$resultSizes,
+                    "::mlir::ValueRange":$destinationTensors)
+    >
+  ];
+}
+
 def IREECodegen_LoweringConfigAttrInterface :
   AttrInterface<"LoweringConfigAttrInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
@@ -415,7 +461,19 @@ def IREECodegen_LoweringConfigAttrInterface :
       /*defaultImplementation=*/[{
         return std::nullopt;
       }]
-    >
+    >,
+     InterfaceMethod<
+      /*desc=*/[{
+        Gets the workgroup reordering strategy to apply to the annotated
+        operation.
+      }],
+      /*retTy=*/"::mlir::iree_compiler::IREE::Codegen::WorkgroupReorderingAttrInterface",
+      /*methodName=*/"getWorkgroupReorderingStrategy",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return nullptr;
+      }]>
   ];
 }
 

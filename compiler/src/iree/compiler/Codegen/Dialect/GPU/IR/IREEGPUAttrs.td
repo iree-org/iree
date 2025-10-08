@@ -30,7 +30,8 @@ def IREEGPU_LoweringConfigAttr :
         "hasTilingLevel",
         "hasWorkgroupTilingLevel",
         "getLoweringStrategy",
-      ]>
+        "getWorkgroupReorderingStrategy"
+    ]>
     ]> {
   let mnemonic = "lowering_config";
   let summary = [{Drive lowering of an operation for gpu compilation.}];
@@ -784,6 +785,57 @@ def IREEGPU_LaneIdAttr : AttrDef<IREEGPU_Dialect, "LaneId", [
   let description = [{
     An attribute for mapping scf.forall ops to subgroup lanes.
   }];
+}
+
+//===---------------------------------------------------------------------===//
+// Conditional Transpose Workgroup Reordering
+//===---------------------------------------------------------------------===//
+
+def IREEGPU_ConditionalTransposeAttr  :
+    AttrDef<IREEGPU_Dialect, "ConditionalTranspose", [
+    DeclareAttrInterfaceMethods<IREECodegen_WorkgroupReorderingAttrInterface, [
+        "generateLoopHeaderFn",
+        "generateLoopTerminatorFn"
+      ]>
+    ]> {
+  let mnemonic = "conditional_transpose";
+  let summary = [{Enable or disable transposed workgroup reordering based on the workload.}];
+  let description = [{
+    This attribute controls conditional transposed workgroup reordering, determined by tile size and
+    the number of CUs. This strategy is specifically designed to optimize the ping-pong matmul specialization.
+    At each iteration over the K dimension, `X` distinct tiles for RHS and 'Y' distinct tiles for LHS are loaded.
+    The strategy compares the sum of X and Y for the default ordering versus the transposed ordering, and selects
+    the configuration with the minimum value.
+    Calculation breakdown:
+     - LHS shape: (M, K)
+     - RHS shape: (N, K)
+     - Tile dimension: (tileM, tileN)
+     - numTileLoadsDefault = min(numCUS, ceildiv(N, tileN)) + ceildiv(numCUS, min(numCUS, ceildiv(N, tileN)))
+     - numTileLoadsTransposed = min(numCUS, ceildiv(M, tileM)) + ceildiv(numCUS, min(numCUS, ceildiv(M, tileM)))
+
+     Examples for gfx942 (304 CUs):
+     - (M=8192, N=128256, K=4096) (tileM=256, tileN=256)
+      - numTileLoadsDefault = 304 + ceildiv(304, 304) = 305
+      - numTileLoadsTransposed = 32 + ceildiv(304, 32) = 42
+      => numTileLoadsTransposed < numTileLoadsDefault => enable transpose
+
+     - (M=8192, N=128256, K=4096)
+      - numTileLoadsDefault = 32 + ceildiv(304, 32) = 42
+      - numTileLoadsTransposed = 64 + ceildiv(304, 64) = 69
+      numTileLoadsTransposed > numTileLoadsDefault => disable transpose
+
+      Parameters:
+        - numXCDs: Number of XCDs.
+        - numCUs: Number of CUs per XCD.
+  }];
+  let parameters = (ins
+    AttrParameter<"int64_t", "">:$numXCDs,
+    AttrParameter<"int64_t", "">:$numCUs
+  );
+  let assemblyFormat = [{
+    `<` $numXCDs `,` $numCUs `>`
+  }];
+  let genVerifyDecl = 1;
 }
 
 //===----------------------------------------------------------------------===//
