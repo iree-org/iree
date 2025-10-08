@@ -376,7 +376,7 @@ static void optimizeModule(llvm::Module &module,
 
 class CUDATargetDevice final : public TargetDevice {
 public:
-  CUDATargetDevice(const CUDAOptions &options) : options(options) {}
+  CUDATargetDevice(const CUDAOptions & /*options*/) {}
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
@@ -395,9 +395,6 @@ public:
                                             deviceConfigAttr,
                                             executableTargetAttrs);
   }
-
-private:
-  const CUDAOptions &options;
 };
 
 class CUDATargetBackend final : public TargetBackend {

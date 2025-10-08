@@ -57,24 +57,24 @@ static iree_status_t iree_hal_cuda_query_limits(
 
   IREE_CUDA_RETURN_IF_ERROR(
       symbols,
-      cuDeviceGetAttribute(&out_limits->max_block_dims[0],
+      cuDeviceGetAttribute((int32_t*)&out_limits->max_block_dims[0],
                            CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_X, device),
       "cuDeviceGetAttribute");
   IREE_CUDA_RETURN_IF_ERROR(
       symbols,
-      cuDeviceGetAttribute(&out_limits->max_block_dims[1],
+      cuDeviceGetAttribute((int32_t*)&out_limits->max_block_dims[1],
                            CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_Y, device),
       "cuDeviceGetAttribute");
   IREE_CUDA_RETURN_IF_ERROR(
       symbols,
-      cuDeviceGetAttribute(&out_limits->max_block_dims[2],
+      cuDeviceGetAttribute((int32_t*)&out_limits->max_block_dims[2],
                            CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_Z, device),
       "cuDeviceGetAttribute");
 
   IREE_CUDA_RETURN_IF_ERROR(
       symbols,
       cuDeviceGetAttribute(
-          &out_limits->max_block_shared_memory_size,
+          (int32_t*)&out_limits->max_block_shared_memory_size,
           CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK_OPTIN, device),
       "cuDeviceGetAttribute");
 

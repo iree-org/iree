@@ -1050,7 +1050,7 @@ private:
 
 class AMDGPUTargetDevice final : public TargetDevice {
 public:
-  AMDGPUTargetDevice(const ROCMOptions &options) : options(options) {}
+  AMDGPUTargetDevice(const ROCMOptions & /*options*/) {}
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
@@ -1069,14 +1069,11 @@ public:
                                             deviceConfigAttr,
                                             executableTargetAttrs);
   }
-
-private:
-  const ROCMOptions &options;
 };
 
 class HIPTargetDevice final : public TargetDevice {
 public:
-  HIPTargetDevice(const ROCMOptions &options) : options(options) {}
+  HIPTargetDevice(const ROCMOptions & /*options*/) {}
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
@@ -1095,9 +1092,6 @@ public:
                                             deviceConfigAttr,
                                             executableTargetAttrs);
   }
-
-private:
-  const ROCMOptions &options;
 };
 
 namespace {
