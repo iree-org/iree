@@ -6384,7 +6384,7 @@ Calculation breakdown:
   - numTileLoadsTransposed = 32 + ceildiv(304, 32) = 42
   =&gt; numTileLoadsTransposed &lt; numTileLoadsDefault =&gt; enable transpose</p>
 <ul>
-<li>(M=8192, N=128256, K=4096)</li>
+<li>(M=16384, N=8192, K=4096) (tileM=256, tileN=256)</li>
 <li>numTileLoadsDefault = 32 + ceildiv(304, 32) = 42</li>
 <li>numTileLoadsTransposed = 64 + ceildiv(304, 64) = 69
   numTileLoadsTransposed &gt; numTileLoadsDefault =&gt; disable transpose</li>
