@@ -819,7 +819,7 @@ def IREEGPU_ConditionalTransposeAttr  :
       - numTileLoadsTransposed = 32 + ceildiv(304, 32) = 42
       => numTileLoadsTransposed < numTileLoadsDefault => enable transpose
 
-     - (M=8192, N=128256, K=4096)
+     - (M=16384, N=8192, K=4096) (tileM=256, tileN=256)
       - numTileLoadsDefault = 32 + ceildiv(304, 32) = 42
       - numTileLoadsTransposed = 64 + ceildiv(304, 64) = 69
       numTileLoadsTransposed > numTileLoadsDefault => disable transpose
