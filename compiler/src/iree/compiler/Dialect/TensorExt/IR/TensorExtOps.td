@@ -8,6 +8,7 @@
 #define IREE_DIALECT_TENSOR_EXT_OPS
 
 include "iree/compiler/Dialect/TensorExt/IR/TensorExtBase.td"
+include "iree/compiler/Dialect/TensorExt/IR/TensorExtInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "mlir/Interfaces/InferIntRangeInterface.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
@@ -524,6 +525,92 @@ def IREETensorExt_ComputeBarrierEndOp : IREETensorExt_PureOp<"compute_barrier.en
   }];
 
   let hasFolder = 1;
+  let hasVerifier = 1;
+}
+
+//===---------------------------------------------------------------------===//
+// Sparse Tensor Operations
+//===---------------------------------------------------------------------===//
+
+def IREETensorExt_CastToRaggedShapeOp :
+    IREETensorExt_PureOp<"cast_to_ragged_shape", [
+      AttrSizedOperandSegments,
+      DeclareOpInterfaceMethods<IREETensorExt_SparseCastOpInterface>
+    ]> {
+  let summary = [{
+    Create a shaped type with ragged rows.
+  }];
+
+  let description = [{
+    The op takes a shaped type and reinterprets its contents as a ragged shaped type. The
+    dimensions specified by `ragged_dim` in the source is interpreted as two
+    dimensions at `ragged_dim` and `ragged_dim + 1` in the result shaped type. The
+    result shaped type has a rank of one more than that of the `source`. The result
+    type also has the encoding set to an attribute of type `RaggedShapeAttr`
+    with the specified `ragged_dim` used to specify the `raggedRow` in the
+    encoding attribute. (See description of `RaggedShapeAttr`). The number of
+    ragged rows is specified using `num_ragged_rows` argument. The size of each
+    row is specified using `column_lengths` argument, which is a single rank
+    shaped type of size `num_rows + 1` and where size of the `i`-th row of the result
+    is computed using
+
+    ```
+    column_lengths[i+1] - column_lengths[i]
+    ```
+
+    In other words, `column_lengths` is same as the `ROW_INDEX` in CSR
+    representation (https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format)).
+    An optional argument `max_ragged_column_length` allows specifying the dynamic
+    upper bound for the number of columns (for static upper bounds the shape of the
+    dimension in the result shaped type encodes this value)
+
+    Contraints are
+    1. `ragged_dim` < rank(`source`)
+    2. rank(`columnLengths`) == 1.
+    3. dim(`columnLengths`, 0) == `num_rows` + 1.
+    4. dim(`result`, `raggedRowDim` + 1) >=
+        (`columnLengths`[k+1] - `columnLengths`[k])
+        for all 0 <= k < dim(`result`, `raggedRowDim`)
+  }];
+
+  let arguments = (ins
+    AnyTypeOf<[AnyRankedTensor, AnyMemRef]>:$source,
+    IndexAttr:$raggedDim,
+    AnyTypeOf<[AnyRankedTensor, AnyMemRef]>:$columnLengths,
+    Optional<Index>:$numRaggedRows,
+    Optional<Index>:$avgRaggedColumnLength,
+    Variadic<Index>:$sourceDynamicDims
+  );
+  let results = (outs AnyTypeOf<[AnyRankedTensor, AnyMemRef]>:$result);
+
+  let assemblyFormat = [{
+    $source `ragged_dim` `(` $raggedDim `)`
+    `column_lengths` `(` $columnLengths `)`
+    (`num_ragged_rows` `(` $numRaggedRows^ `)`)?
+    (`avg_ragged_column_length` `(` $avgRaggedColumnLength^ `)`)?
+    attr-dict `:`
+    `(` type($source) (`{` $sourceDynamicDims^ `}`)? `,` type($columnLengths) `)`
+    `->` type($result)
+  }];
+
+  let extraClassDeclaration = [{
+    ShapedType getSourceType() {
+      return cast<ShapedType>(getSource().getType());
+    }
+    ShapedType getResultType() {
+      return cast<ShapedType>(getResult().getType());
+    }
+    RaggedShapeAttr getResultSparseEncoding() {
+      if (auto tensorType = dyn_cast<RankedTensorType>(getResultType())) {
+        return dyn_cast_or_null<RaggedShapeAttr>(tensorType.getEncoding());
+      } else if (auto memrefType = dyn_cast<MemRefType>(getResultType())) {
+        return dyn_cast_or_null<RaggedShapeAttr>(memrefType.getLayout());
+      }
+      return RaggedShapeAttr();
+    }
+    OpFoldResult getNumRaggedRowsAsOfr();
+  }];
+
   let hasVerifier = 1;
 }
 
