@@ -39,7 +39,8 @@ lookupDevicesAndQueueAffintiesFor(Operation *op, OpBuilder &builder) {
   auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
   SmallVector<Value> devices;
   SmallVector<Value> queueAffinities;
-  if (auto optimalAttr = dyn_cast<IREE::HAL::DeviceOptimalAttr>(affinityAttr)) {
+  if (auto optimalAttr =
+          dyn_cast_if_present<IREE::HAL::DeviceOptimalAttr>(affinityAttr)) {
     for (auto affinity : optimalAttr.getAffinities()) {
       auto [device, queueAffinity] =
           lookupDeviceAndQueueAffinityFor(op->getLoc(), affinity, builder);
