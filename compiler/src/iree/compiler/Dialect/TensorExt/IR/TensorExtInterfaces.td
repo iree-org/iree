@@ -45,6 +45,38 @@ def IREETensorExt_SparseOpInterface :
     given logical shape with tensor encoding which implements the
     `SparseTensorAttrInterface`.
   }];
+
+  let methods = [
+    InterfaceMethod<
+      /*description =*/[{Generate to a loop structure that iterates over the exact sparse
+      iteration space.
+
+      Given a range, expected to be "bigger" (or a hull) of the actual sparse iteration,
+      generate a loop structure that iterates over the exact sparse iteration space. The
+      methods returns the induction variables of the generated loops.
+      }],
+      /*retTy =*/"::llvm::FailureOr<::llvm::SmallVector<::mlir::Value>>",
+      /*methodName =*/"lowerLoopRange",
+      /*arguments =*/(ins
+          "::mlir::RewriterBase &":$rewriter,
+          "::llvm::ArrayRef<int64_t>":$sparseDims,
+          "::llvm::ArrayRef<::mlir::Range>":$givenRanges)
+    >,
+    InterfaceMethod<
+      /*description =*/[{Return an estimate of the range account for the sparsity.
+
+      Typically, the actual sparse iteration space is such that the bounds of one dimension
+      depends on the position of the other dimensions. This methods is meant to get an
+      estimate of such that the bounds dont depend on position of the other dimensions.
+      }],
+      /*retTy =*/"::llvm::FailureOr<::llvm::SmallVector<::mlir::Range>>",
+      /*methodName =*/"getEstimatedLoopRange",
+      /*arguments =*/(ins
+          "::mlir::RewriterBase &":$rewriter,
+          "::llvm::ArrayRef<int64_t>":$sparseDims,
+          "::llvm::ArrayRef<::mlir::Range>":$givenRanges)
+    >
+  ];
 }
 
 #endif // IREE_DIALECT_TENSOR_EXT_INTERFACES
