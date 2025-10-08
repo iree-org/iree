@@ -1,5 +1,5 @@
 {
-  "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/iree-test-suites/torch-models/llama_8b_fp16/bs4.mlir",
+  "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/iree-test-suites/torch-models/llama_8b_fp8/bs4.mlir",
   "compiler_flags": [
       "--iree-hal-target-device=hip",
       "--iree-hip-target=gfx942",
