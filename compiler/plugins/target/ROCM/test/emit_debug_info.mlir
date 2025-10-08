@@ -1,7 +1,7 @@
-// RUN: iree-opt --iree-hip-emit-debug-info --mlir-print-debuginfo %s | FileCheck %s
+// RUN: iree-opt --mlir-print-debuginfo %s --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline{preserve-debug-info})))" | FileCheck %s
 
 // Test that LLVM debug info attributes pass through without being stripped when
-// the `--iree-hip-emit-debug-info` flag is used
+// the pipeline `preserve-debug-info` option is used
 
 #di_file = #llvm.di_file<"test.mlir" in "/work">
 #di_compile_unit = #llvm.di_compile_unit<

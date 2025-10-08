@@ -1250,6 +1250,13 @@ void registerCodegenLLVMGPUPasses() {
   // Generated.
   common::registerPasses();
 
+  struct LLVMGPUPipelineOptions
+      : public PassPipelineOptions<LLVMGPUPipelineOptions> {
+    Option<bool> preserveDebugInfo{
+        *this, "preserve-debug-info",
+        llvm::cl::desc("Preserve debug information (do not strip)")};
+  };
+
   static PassPipelineRegistration<> LLVMGPUConfigPipeline(
       "iree-codegen-llvmgpu-configuration-pipeline",
       "Runs the translation strategy configuration pipeline on Linalg for GPU "
@@ -1258,20 +1265,20 @@ void registerCodegenLLVMGPUPasses() {
         buildLLVMGPUCodegenConfigurationPassPipelineImpl(modulePassManager);
       });
 
-  static PassPipelineRegistration<> LinalgNVVMPipeline(
+  static PassPipelineRegistration<LLVMGPUPipelineOptions> LinalgNVVMPipeline(
       "iree-codegen-linalg-to-nvvm-pipeline",
       "Runs the progressive lowering pipeline from Linalg to NVVM",
-      [](OpPassManager &passManager) {
+      [](OpPassManager &passManager, const LLVMGPUPipelineOptions &options) {
         buildLLVMGPUCodegenPassPipeline(passManager, false,
-                                        /*preserveDebugInfo=*/false);
+                                        options.preserveDebugInfo);
       });
 
-  static PassPipelineRegistration<> LinalgROCDLPipeline(
+  static PassPipelineRegistration<LLVMGPUPipelineOptions> LinalgROCDLPipeline(
       "iree-codegen-linalg-to-rocdl-pipeline",
       "Runs the progressive lowering pipeline from Linalg to ROCDL",
-      [](OpPassManager &passManager) {
+      [](OpPassManager &passManager, const LLVMGPUPipelineOptions &options) {
         buildLLVMGPUCodegenPassPipeline(passManager, true,
-                                        /*preserveDebugInfo=*/false);
+                                        options.preserveDebugInfo);
       });
 
   static PassPipelineRegistration<> LLVMGPULinkingPipeline(
@@ -1295,11 +1302,18 @@ void registerCodegenROCDLPasses() {
   // Generated.
   rocdl::registerPasses();
 
-  static PassPipelineRegistration<> LinalgROCDLPipeline(
+  struct ROCDLPipelineOptions
+      : public PassPipelineOptions<ROCDLPipelineOptions> {
+    Option<bool> preserveDebugInfo{
+        *this, "preserve-debug-info",
+        llvm::cl::desc("Preserve debug information (do not strip)")};
+  };
+
+  static PassPipelineRegistration<ROCDLPipelineOptions> LinalgROCDLPipeline(
       "iree-codegen-linalg-to-rocdl-pipeline2",
       "Runs pass pipeline to progressively lower Linalg to ROCDL",
-      [](OpPassManager &passManager) {
-        buildROCDLCodegenPassPipeline(passManager, /*preserveDebugInfo=*/false);
+      [](OpPassManager &passManager, const ROCDLPipelineOptions &options) {
+        buildROCDLCodegenPassPipeline(passManager, options.preserveDebugInfo);
       });
 
   static PassPipelineRegistration<> LLVMGPUBufferizePipeline(
