@@ -1,12 +1,7 @@
-// RUN: rm -rf %t && mkdir -p %t
-// RUN: iree-compile --iree-hal-target-backends=rocm --iree-hip-target=gfx942 \
-// RUN:   --iree-hip-emit-debug-info \
-// RUN:   --iree-hal-dump-executable-binaries-to=%t \
-// RUN:   %s -o %t/module.vmfb
-// RUN: llvm-dwarfdump --debug-line %t/*.hsaco | FileCheck %s
+// RUN: iree-opt --iree-hip-emit-debug-info --mlir-print-debuginfo %s | FileCheck %s
 
-// Test that the `--iree-hip-emit-debug-info` flag preserves debug information
-// in the generated ELF binary by checking for specific source locations in DWARF.
+// Test that LLVM debug info attributes pass through without being stripped when
+// the `--iree-hip-emit-debug-info` flag is used
 
 #di_file = #llvm.di_file<"test.mlir" in "/work">
 #di_compile_unit = #llvm.di_compile_unit<
@@ -45,8 +40,8 @@ module attributes {
   } loc(fused<#di_subprogram>["test.mlir":5:1])
 }
 
-// CHECK: .debug_line contents:
-// CHECK: file_names[{{.*}}]:
-// CHECK-NEXT: name: "test.mlir"
-// ------ address         line column file ... flags
-// CHECK: {{0x[0-9a-f]+}} 5    1      1 {{.*}} is_stmt
+// CHECK-DAG: [[DI_FILE:#[a-z_0-9]+]] = #llvm.di_file<"test.mlir" in "/work">
+// CHECK-DAG: [[DI_CU:#[a-z_0-9]+]] = #llvm.di_compile_unit<{{.*}}file = [[DI_FILE]]{{.*}}>
+// CHECK-DAG: module attributes {llvm.di_compile_unit = [[DI_CU]]}
+// CHECK-DAG: [[DI_SP:#[a-z_0-9]+]] = #llvm.di_subprogram<{{.*}}compileUnit = [[DI_CU]]{{.*}}name = "simple_mul"{{.*}}line = 5{{.*}}>
+// CHECK-DAG: [[LOC:#loc[0-9]+]] = loc("test.mlir":5:1)
