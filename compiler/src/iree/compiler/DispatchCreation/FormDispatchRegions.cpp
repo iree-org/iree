@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/DispatchCreation/FusionUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/ADT/STLExtras.h"
@@ -562,6 +563,10 @@ isFusableWithConsumer(OpOperand &fusedOperand,
   // into their consumers.
   if (IREE::LinalgExt::isBitExtendOp(consumer)) {
     return false;
+  }
+
+  if (isa<IREE::TensorExt::LinearizeRaggedDimsOp>(consumer)) {
+    return true;
   }
 
   // Fuse unset_encoding operations with `tensor.extract_slice` and elementwise

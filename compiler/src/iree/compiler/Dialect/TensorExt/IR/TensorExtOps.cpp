@@ -767,6 +767,21 @@ CastToRaggedShapeOp::lowerLoopRange(RewriterBase &rewriter,
   return SmallVector<Value>{outerIv, innerIv};
 }
 
+//===----------------------------------------------------------------------===//
+// iree_tensor_ext.linearize_ragged_shapes
+//===----------------------------------------------------------------------===//
+
+LogicalResult LinearizeRaggedDimsOp::reifyResultShapes(
+    OpBuilder &builder, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  ArrayRef<int64_t> resultShape =
+      cast<ShapedType>(getResult().getType()).getShape();
+  ValueRange dynamicDims = getResultDynamicDims();
+  SmallVector<OpFoldResult> mixedResultShapes =
+      getMixedValues(resultShape, dynamicDims, builder);
+  reifiedReturnShapes.emplace_back(std::move(mixedResultShapes));
+  return success();
+}
+
 } // namespace mlir::iree_compiler::IREE::TensorExt
 
 //===----------------------------------------------------------------------===//

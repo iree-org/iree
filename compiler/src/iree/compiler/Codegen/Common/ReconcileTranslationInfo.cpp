@@ -20,6 +20,7 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/Analysis/CallGraph.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -41,6 +42,17 @@ public:
   void runOnOperation() override;
 };
 } // namespace
+
+struct LoopBounds {
+  SmallVector<OpFoldResult> mixedLowerBounds;
+  SmallVector<OpFoldResult> mixedUpperBounds;
+  SmallVector<OpFoldResult> mixedSteps;
+  size_t size() const { return mixedLowerBounds.size(); }
+  SmallVector<OpFoldResult> getRange(int index) const {
+    return {mixedLowerBounds[index], mixedUpperBounds[index],
+            mixedSteps[index]};
+  }
+};
 
 //===---------------------------------------------------------------------===//
 // Resolve `scf.forall` operations
@@ -105,6 +117,82 @@ getInvertedMappingPermutation(ArrayRef<MappingAttrType> mapping) {
       getMappingPermutation<MappingAttrType>(mapping));
 }
 
+/// Find which loops are sparse. TODO: Dont fidn it, rather try to use an
+/// annotation to get this information on loop creation.
+static SmallVector<int64_t> findSparseLoops(scf::ForallOp forallOp) {
+  auto sparseLoopInfo = forallOp->getAttrOfType<ArrayAttr>("sparse_loops");
+  if (!sparseLoopInfo) {
+    return {};
+  }
+  auto sparseLoops =
+      llvm::map_to_vector(sparseLoopInfo, [](Attribute attr) -> int64_t {
+        return cast<IntegerAttr>(attr).getInt();
+      });
+  return sparseLoops;
+}
+
+/// Information needed to resolve a single sparse loop.
+struct SparseLoopResolver {
+  IREE::TensorExt::SparseOpInterface sparseOp;
+  int64_t resultDim;
+};
+/// Information needed to resolve all the sparse loops.
+using SparseLoopsResolvers = SmallVector<SparseLoopResolver>;
+
+/// Find operations that resolve the sparse iteration dimensions.
+static FailureOr<SparseLoopsResolvers>
+getSparseIterationDimResolvers(scf::ForallOp forallOp,
+                               ArrayRef<int64_t> sparseLoops) {
+  if (sparseLoops.empty()) {
+    return SparseLoopsResolvers{};
+  }
+
+  SmallVector<OpFoldResult> mixedUpperBounds = forallOp.getMixedUpperBound();
+
+  // For now just check that the upperbounds are defined by `memref.dim` of
+  // result of an operation that implements the sparse op interface.
+  SparseLoopsResolvers resolvers;
+  for (auto sparseLoop : sparseLoops) {
+    Value ub = dyn_cast<Value>(mixedUpperBounds[sparseLoop]);
+    if (!ub) {
+      return forallOp->emitOpError("unable to adjust bounds for sparse loop");
+    }
+    Value ubSource;
+    IntegerAttr dim;
+    if (!matchPattern(ub, m_Op<memref::DimOp>(matchers::m_Any(&ubSource),
+                                              m_Constant(&dim)))) {
+      return forallOp->emitOpError("unable to adjust bounds for sparse loop");
+    }
+    auto currSparseOp =
+        ubSource.getDefiningOp<IREE::TensorExt::SparseOpInterface>();
+    if (!currSparseOp) {
+      return forallOp->emitOpError("unable to adjust bounds for sparse loop");
+    }
+    int64_t dimValue = dim.getInt();
+    resolvers.emplace_back(SparseLoopResolver{currSparseOp, dimValue});
+  }
+  return resolvers;
+}
+
+/// Inverse of the SparseLoopResolver
+using ResolverToLoopInfo = llvm::MapVector<int64_t, int64_t>;
+static llvm::MapVector<IREE::TensorExt::SparseOpInterface, ResolverToLoopInfo>
+invertSparseLoopResolverInfo(SparseLoopsResolvers const &resolvers,
+                             ArrayRef<int64_t> sparseLoops) {
+  llvm::MapVector<IREE::TensorExt::SparseOpInterface, ResolverToLoopInfo>
+      allResolversToLoopsInfo;
+  for (auto [sparseLoopId, resolver] :
+       llvm::zip_equal(sparseLoops, resolvers)) {
+    ResolverToLoopInfo &resolverToLoopInfo =
+        allResolversToLoopsInfo[resolver.sparseOp];
+    resolverToLoopInfo[resolver.resultDim] = sparseLoopId;
+  }
+  for (auto [sparseOp, loopInfo] : allResolversToLoopsInfo) {
+    llvm::sort(loopInfo);
+  }
+  return allResolversToLoopsInfo;
+}
+
 /// Resolve the `forallOp` by mapping the loop induction variables to
 /// processor IDs. Expected `procIds` and `nProcs` to match the number
 /// of induction variables of the loop.
@@ -115,7 +203,6 @@ static LogicalResult resolveForAll(RewriterBase &rewriter,
                                    ArrayRef<bool> generateLoopNest) {
   assert(generateLoopNest.size() == forallOp.getRank());
 
-  SmallVector<Value> loopNestIvs;
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(forallOp);
 
@@ -124,16 +211,73 @@ static LogicalResult resolveForAll(RewriterBase &rewriter,
   SmallVector<OpFoldResult> mixedSteps = forallOp.getMixedStep();
   assert(mixedLbs.size() == procIds.size());
   assert(mixedLbs.size() == nProcs.size());
+
+  SmallVector<int64_t> sparseLoops = findSparseLoops(forallOp);
+  SetVector<int64_t> sparseLoopsSet;
+  sparseLoopsSet.insert(sparseLoops.begin(), sparseLoops.end());
+
+  FailureOr<SparseLoopsResolvers> sparseLoopsResolvers =
+      getSparseIterationDimResolvers(forallOp, sparseLoops);
+  if (failed(sparseLoopsResolvers)) {
+    return failure();
+  }
+  llvm::MapVector<IREE::TensorExt::SparseOpInterface, ResolverToLoopInfo>
+      resolverToLoopsInfo = invertSparseLoopResolverInfo(
+          sparseLoopsResolvers.value(), sparseLoops);
+
   Location loc = forallOp.getLoc();
   Operation *bodyInsertionPoint = forallOp;
-  for (auto [index, lb] : llvm::enumerate(mixedLbs)) {
-    OpFoldResult ub = mixedUbs[index], step = mixedSteps[index],
-                 numProc = nProcs[index], procId = procIds[index];
+  DenseMap<int64_t, Value> loopNestIvs;
+  for (auto loopId : llvm::seq<int64_t>(0, forallOp.getRank())) {
+    if (loopNestIvs.contains(loopId)) {
+      continue;
+    }
+
+    if (sparseLoopsSet.contains(loopId)) {
+      const SparseLoopResolver &resolver = sparseLoopsResolvers.value()[loopId];
+      IREE::TensorExt::SparseOpInterface resolverOp = resolver.sparseOp;
+      const ResolverToLoopInfo &loopInfo = resolverToLoopsInfo[resolverOp];
+      SmallVector<int64_t> resolverDims =
+          llvm::map_to_vector(loopInfo, [](auto it) { return it.first; });
+      SmallVector<int64_t> currResolvedLoops =
+          llvm::map_to_vector(loopInfo, [](auto it) { return it.second; });
+      auto givenRanges =
+          llvm::map_to_vector(currResolvedLoops, [&](auto loopId) {
+            OpFoldResult currStep = mixedSteps[loopId];
+            OpFoldResult lb = getValueOrCreateConstantIndexOp(
+                rewriter, loc,
+                IREE::LinalgExt::mulAddOfrs(rewriter, loc, procIds[loopId],
+                                            currStep, mixedLbs[loopId]));
+            OpFoldResult step = getValueOrCreateConstantIndexOp(
+                rewriter, loc,
+                IREE::LinalgExt::mulOfrs(rewriter, loc, nProcs[loopId],
+                                         currStep));
+            return Range{lb, mixedUbs[loopId], step};
+          });
+      FailureOr<SmallVector<Value>> resolvedLoopIvs =
+          resolverOp.lowerLoopRange(rewriter, resolverDims, givenRanges);
+      if (failed(resolvedLoopIvs)) {
+        return failure();
+      }
+      if (resolvedLoopIvs->size() != resolverDims.size()) {
+        return forallOp.emitOpError("expected as many induction variables as "
+                                    "the number of resolved sparse loops");
+      }
+      for (auto [index, resolvedLoopId] : llvm::enumerate(currResolvedLoops)) {
+        loopNestIvs[resolvedLoopId] = resolvedLoopIvs.value()[index];
+      }
+      bodyInsertionPoint = &(*(rewriter.getInsertionPoint()));
+      continue;
+    }
+
+    OpFoldResult lb = mixedLbs[loopId], ub = mixedUbs[loopId],
+                 step = mixedSteps[loopId], numProc = nProcs[loopId],
+                 procId = procIds[loopId];
     Value forLb = getValueOrCreateConstantIndexOp(
         rewriter, loc,
         IREE::LinalgExt::mulAddOfrs(rewriter, loc, procId, step, lb));
-    if (!generateLoopNest[index]) {
-      loopNestIvs.push_back(forLb);
+    if (!generateLoopNest[loopId]) {
+      loopNestIvs[loopId] = forLb;
       continue;
     }
 
@@ -141,13 +285,20 @@ static LogicalResult resolveForAll(RewriterBase &rewriter,
     Value forStep = getValueOrCreateConstantIndexOp(
         rewriter, loc, IREE::LinalgExt::mulOfrs(rewriter, loc, numProc, step));
     auto loop = scf::ForOp::create(rewriter, loc, forLb, forUb, forStep);
-    loopNestIvs.push_back(loop.getInductionVar());
+    loopNestIvs[loopId] = loop.getInductionVar();
     bodyInsertionPoint = loop.getBody()->getTerminator();
     rewriter.setInsertionPointToStart(loop.getBody());
   }
   Block *forAllBody = forallOp.getBody();
   rewriter.eraseOp(forAllBody->getTerminator());
-  rewriter.inlineBlockBefore(forAllBody, bodyInsertionPoint, loopNestIvs);
+  SmallVector<Value> ivs(forallOp.getRank());
+  for (auto [loopId, iv] : loopNestIvs) {
+    ivs[loopId] = iv;
+  }
+  if (llvm::any_of(ivs, [](Value v) { return !v; })) {
+    return forallOp.emitOpError("unable to resolve all dimensions of the loop");
+  }
+  rewriter.inlineBlockBefore(forAllBody, bodyInsertionPoint, ivs);
   rewriter.eraseOp(forallOp);
   return success();
 }
@@ -159,6 +310,10 @@ static LogicalResult resolveForAll(RewriterBase &rewriter,
 scf::ForallOp
 collapseForAllOpDimensions(RewriterBase &rewriter, scf::ForallOp forallOp,
                            IREE::Codegen::WorkgroupId delinearizeFrom) {
+  // For now dont collapse for sparse loops.
+  if (!findSparseLoops(forallOp).empty()) {
+    return forallOp;
+  }
   SmallVector<OpFoldResult> mixedLbs = forallOp.getMixedLowerBound();
   SmallVector<OpFoldResult> mixedUbs = forallOp.getMixedUpperBound();
   SmallVector<OpFoldResult> mixedSteps = forallOp.getMixedStep();
@@ -270,6 +425,69 @@ collapseForAllOpDimensions(RewriterBase &rewriter, scf::ForallOp forallOp,
   return newForOp;
 }
 
+static LogicalResult getEstimatedBounds(RewriterBase &rewriter,
+                                        scf::ForallOp forallOp,
+                                        SmallVector<OpFoldResult> &mixedLbs,
+                                        SmallVector<OpFoldResult> &mixedUbs,
+                                        SmallVector<OpFoldResult> &mixedSteps) {
+  mixedLbs = forallOp.getMixedLowerBound();
+  mixedUbs = forallOp.getMixedUpperBound();
+  mixedSteps = forallOp.getMixedStep();
+  SmallVector<int64_t> sparseLoops = findSparseLoops(forallOp);
+  if (sparseLoops.empty()) {
+    return success();
+  }
+
+  SetVector<int64_t> sparseLoopsSet;
+  sparseLoopsSet.insert(sparseLoops.begin(), sparseLoops.end());
+
+  FailureOr<SparseLoopsResolvers> sparseLoopsResolvers =
+      getSparseIterationDimResolvers(forallOp, sparseLoops);
+  if (failed(sparseLoopsResolvers)) {
+    return failure();
+  }
+  llvm::MapVector<IREE::TensorExt::SparseOpInterface, ResolverToLoopInfo>
+      resolverToLoopsInfo = invertSparseLoopResolverInfo(
+          sparseLoopsResolvers.value(), sparseLoops);
+
+  llvm::SmallDenseSet<int64_t> adjustedLoops;
+  for (auto loopId : llvm::seq<int64_t>(0, forallOp.getRank())) {
+    if (adjustedLoops.contains(loopId)) {
+      continue;
+    }
+
+    if (!sparseLoopsSet.contains(loopId)) {
+      continue;
+    }
+    const SparseLoopResolver &resolver = sparseLoopsResolvers.value()[loopId];
+    IREE::TensorExt::SparseOpInterface resolverOp = resolver.sparseOp;
+    const ResolverToLoopInfo &loopInfo = resolverToLoopsInfo[resolverOp];
+    SmallVector<int64_t> resolverDims =
+        llvm::map_to_vector(loopInfo, [](auto it) { return it.first; });
+    SmallVector<int64_t> currResolvedLoops =
+        llvm::map_to_vector(loopInfo, [](auto it) { return it.second; });
+    auto givenRanges = llvm::map_to_vector(currResolvedLoops, [&](auto loopId) {
+      adjustedLoops.insert(loopId);
+      return Range{mixedLbs[loopId], mixedUbs[loopId], mixedSteps[loopId]};
+    });
+    FailureOr<SmallVector<Range>> estimatedRanges =
+        resolverOp.getEstimatedLoopRange(rewriter, resolverDims, givenRanges);
+    if (failed(estimatedRanges)) {
+      return failure();
+    }
+    if (estimatedRanges->size() != resolverDims.size()) {
+      return forallOp.emitOpError("expected as many induction variables as "
+                                  "the number of resolved sparse loops");
+    }
+    for (auto [index, resolvedLoopId] : llvm::enumerate(currResolvedLoops)) {
+      mixedLbs[resolvedLoopId] = (*estimatedRanges)[index].offset;
+      mixedUbs[resolvedLoopId] = (*estimatedRanges)[index].size;
+      mixedSteps[resolvedLoopId] = (*estimatedRanges)[index].stride;
+    }
+  }
+  return success();
+}
+
 /// Resolve scf.forall operation by using the workgroup ID and counts.
 static FailureOr<SmallVector<OpFoldResult>>
 resolveWorkgroupForAll(RewriterBase &rewriter, scf::ForallOp forallOp,
@@ -283,9 +501,13 @@ resolveWorkgroupForAll(RewriterBase &rewriter, scf::ForallOp forallOp,
     forallOp = collapseForAllOpDimensions(rewriter, forallOp, delinearizeFrom);
   }
   assert(forallOp.getRank() <= llvm::to_underlying(delinearizeFrom) + 1);
-  SmallVector<OpFoldResult> mixedLowerBound = forallOp.getMixedLowerBound();
-  SmallVector<OpFoldResult> mixedUpperBound = forallOp.getMixedUpperBound();
-  SmallVector<OpFoldResult> mixedStep = forallOp.getMixedStep();
+
+  SmallVector<OpFoldResult> mixedLowerBound, mixedUpperBound, mixedStep;
+  if (failed(getEstimatedBounds(rewriter, forallOp, mixedLowerBound,
+                                mixedUpperBound, mixedStep))) {
+    return failure();
+  }
+
   FailureOr<SmallVector<IREE::Codegen::WorkgroupMappingAttr>> workgroupMapping =
       verifyWorkgroupMappingAttrArray(forallOp);
   if (failed(workgroupMapping)) {
