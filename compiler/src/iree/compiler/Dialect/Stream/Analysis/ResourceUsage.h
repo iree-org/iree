@@ -21,7 +21,7 @@ namespace mlir::iree_compiler::IREE::Stream {
 enum class ResourceUsageBitfield : uint32_t {
   Indirect = 1u << 0,
   External = 1u << 1,
-  Mutated = 1u << 2, // beyond definition
+  Mutated = 1u << 2,
   Constant = 1u << 3,
   TransferRead = 1u << 4,
   TransferWrite = 1u << 5,
@@ -31,10 +31,12 @@ enum class ResourceUsageBitfield : uint32_t {
   DispatchWrite = 1u << 9,
   GlobalRead = 1u << 10,
   GlobalWrite = 1u << 11,
+  // Value is global storage or references global storage.
+  GlobalStorage = 1u << 12,
 
   Unknown = Indirect | External | Mutated | Constant | TransferRead |
             TransferWrite | StagingRead | StagingWrite | DispatchRead |
-            DispatchWrite | GlobalRead | GlobalWrite,
+            DispatchWrite | GlobalRead | GlobalWrite | GlobalStorage,
 };
 
 inline ResourceUsageBitfield operator|(ResourceUsageBitfield lhs,
