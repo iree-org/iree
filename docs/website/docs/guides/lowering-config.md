@@ -5,14 +5,17 @@ icon: octicons/file-symlink-file-16
 
 ## Overview
 
-The lowering config is an attribute that guides IREE in the process of
-efficiently lowering from the tensor level down to the vector level. They are
-determined by:
+The lowering config is an attribute that is used to correctly and optimally
+lower operations within a dispatch from the tensor level down to the vector
+level. They are determined by:
 
 1. The type of computation being performed (e.g., matmul, reduction,
    convolution)
 2. Hardware attributes (e.g., subgroup size, memory bandwidth, compute units)
 3. Optional tuner refinements for performance optimization
+
+IREE provides multiple variants of lowering configs depending on the desired
+backend and type of computation.
 
 ---
 
@@ -20,8 +23,10 @@ determined by:
 
 ### Reduction
 
-This pipeline is used when a dispatch contains at least one reduction operation
-and targets efficient reduction strategies.
+#### Partial Reduction
+
+This configuration is set when an operation contains at least one reduction
+dimension and targets efficient reduction strategies.
 
 #### Relevant lowering config attributes
 
@@ -34,6 +39,8 @@ and targets efficient reduction strategies.
 ---
 
 #### `workgroup` Tile Sizes
+
+**Applies to:** Parallel dimensions.
 
 **Definition:** The output tile that each workgroup computes.
 
@@ -55,6 +62,8 @@ Dimension 0 (parallel): Each workgroup produces 16 output elements in d0.
 ---
 
 #### `thread` Tile Sizes
+
+**Applies to:** Reduction dimensions.
 
 **Definition:** The number of elements each thread processes per load per
 iteration along reduction dimensions.
@@ -79,12 +88,12 @@ along d1.
 
 #### `partial_reduction` Tile Sizes
 
-**Applies to:** Reduction dimensions only.
+**Applies to:** Reduction dimensions.
 
 **Tiling strategy:** We use `PartialReductionOuterReduction` at the partial
 reduction level. This tiles the reduction dimension as `r -> r_outer, r_partial`,
 where we create a serial loop over `r_outer` with step size equal to
-`partial_reduction[d]`. Within each iteration, threads maintain `r_partial`
+`r_partial`. Within each iteration, threads maintain `r_partial`
 partial accumulators across the reduction dimension. At the end, partial results
 are merged.
 
@@ -158,8 +167,7 @@ For a subgroup of 64 threads:
 **Why 1 is the default, not 0:**
 
 * Counts are multiplicative (used in a product).
-* `count = 1` means “no distribution along this dimension” (multiplicative
-  identity).
+* `count = 1` means “no distribution along this dimension”
 * `count = 0` would make the product zero, which is invalid.
 
 ##### The `mapping` Array
@@ -326,7 +334,7 @@ dimension).
 
 **Partial reduction `[0, 0, 512]`:** We tile dimension 2 (reduction) into
 chunks of 512 elements, creating `16384 / 512 = 32` loop iterations. In each
-iteration the subgroup processes 512 elements of partial accumulators along
+iteration the workgroup processes 512 elements of partial accumulators along
 `d2`.
 
 **Thread `[0, 0, 8]`:** Each thread loads 8 elements per iteration in `d2`. With
@@ -362,14 +370,13 @@ dimension 1 (reduction) and 4 threads (`c₂`) map to iteration dimension 0
 (parallel).
 
 **Partial reduction `[0, 32]`:** We tile dimension 1 (reduction) into chunks of
-32 elements, creating `1152 / 32 = 36` loop iterations. Each iteration processes
-32 elements of partial accumulators along `d1`.
+32 elements, creating `1152 / 32 = 36` loop iterations. Each workgroup processes
+32 elements of partial accumulators along `d1` per iteration.
 
 **Thread `[0, 1]`:** Each thread loads 1 element per iteration along reduction
 dimension `d1`.
 
-**Workgroup `[16, 0]`:** The workgroup produces 16 output elements (one per
-parallel element).
+**Workgroup `[16, 0]`:** The workgroup produces a 16 element tile on `d0`.
 
 **Subgroup basis `[[1, 2], [0, 1]]`:** With product `1 × 2 = 2`, there are two
 subgroups per workgroup, yielding a workgroup size of `64 × 2 = 128` threads.
@@ -401,14 +408,14 @@ workgroup = [8, 0, 0]
 **Partial reduction `[0, 1, 128]`:** Dimension 1 has tile size 1 (iterated
 serially without chunking). Dimension 2 has tile size 128, producing chunks of
 128 elements. Since `d2` has extent 128, the loop is elided (processed once).
-Each iteration therefore processes 128 elements of partial accumulators along
-the reduction dimension per workgroup.
+Each iteration erefore has step size 1 and processes 128 elements
+of partial accumulators along the `d2` per workgroup.
 
 **Thread `[0, 1, 2]`:** Each thread loads 1 element in `d1` and 2 elements in
 `d2` per iteration, for 2 elements per thread per iteration. With 64 threads,
 that yields `64 × 2 = 128` elements total.
 
-**Workgroup `[8, 0, 0]`:** The workgroup produces 8 output elements.
+**Workgroup `[8, 0, 0]`:** The workgroup produces an 8 element tile along `d0`.
 
 **Subgroup basis `[[1, 1, 1], [0, 1, 2]]`:** With product `1 × 1 × 1 = 1`,
 there is a single subgroup per workgroup.
