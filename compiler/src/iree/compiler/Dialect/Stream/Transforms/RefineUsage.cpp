@@ -38,7 +38,38 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 // Maps a resource usage bitfield to a resource lifetime.
+//
+// The GlobalStorage bit acts as a "storage identity" marker indicating the
+// value is or directly references global storage (not just accessed from it).
+// This enables copy-on-write optimizations by preserving Constant lifetime
+// even when used with External/Staging/Indirect operations.
+//
+// Usage bit semantics:
+// - GlobalRead: Value was loaded from a global (access semantics)
+// - GlobalWrite: Value was stored to a global (access semantics)
+// - GlobalStorage: Value IS/references global storage (identity semantics)
+//
+// Priority order (first match wins):
+// 1. GlobalStorage + Constant -> Constant (preserves constant globals)
+// 2. Indirect | External -> External
+// 3. StagingRead | StagingWrite -> Staging
+// 4. Constant -> Constant
+// 5. GlobalRead | GlobalWrite -> Variable if mutated, else Constant
+// 6. Default -> Transient
+//
+// TODO(benvanik): explode the concept of lifetime so we can just specify these
+// bits directly and avoid needing the mapping - doing this the way we are
+// today is a lossy operation that makes subsequent analysis more difficult.
 static Lifetime convertUsageToLifetime(ResourceUsageBitfield usage) {
+  // Special case: if stored to global and constant, preserve Constant.
+  // This prevents External from overriding the global's type constraint.
+  // This is forward-compatible with the UsageAttr migration where this check
+  // becomes unnecessary (constant|global|external is expressible directly).
+  if (bitEnumContains(usage, ResourceUsageBitfield::GlobalStorage) &&
+      bitEnumContains(usage, ResourceUsageBitfield::Constant)) {
+    return Lifetime::Constant;
+  }
+
   if (bitEnumContains(usage, ResourceUsageBitfield::Indirect) ||
       bitEnumContains(usage, ResourceUsageBitfield::External)) {
     return Lifetime::External;
@@ -429,12 +460,40 @@ struct ApplyStreamableOp : public UsageRefinementPattern<Op> {
   }
 };
 
+// Update usage of transferred values when they are unknown.
+struct ApplyAsyncTransferOp
+    : public UsageRefinementPattern<IREE::Stream::AsyncTransferOp> {
+  using UsageRefinementPattern<
+      IREE::Stream::AsyncTransferOp>::UsageRefinementPattern;
+  LogicalResult matchAndRewrite(IREE::Stream::AsyncTransferOp op,
+                                PatternRewriter &rewriter) const override {
+    // Only refine if the result is unknown.
+    auto resultType =
+        llvm::cast<IREE::Stream::ResourceType>(op.getResult().getType());
+    if (resultType.getLifetime() != IREE::Stream::Lifetime::Unknown) {
+      return failure();
+    }
+
+    // Get the refined lifetime from usage analysis.
+    auto newUsage = analysis.lookupResourceUsage(op.getResult());
+    auto newLifetime = convertUsageToLifetime(newUsage);
+    auto newType = rewriter.getType<IREE::Stream::ResourceType>(newLifetime);
+
+    // Directly update the result type without inserting transfers.
+    rewriter.startOpModification(op);
+    op.getResult().setType(newType);
+    rewriter.finalizeOpModification(op);
+
+    return success();
+  }
+};
+
 static void insertUsageRefinementPatterns(MLIRContext *context,
                                           ResourceUsageAnalysis &analysis,
                                           RewritePatternSet &patterns) {
   // NOTE: only ops that return values or contain regions need to be handled.
   patterns.insert<ApplyInitializerOp, ApplyFuncOp, ApplyScfForOp, ApplyScfIfOp,
-                  ApplyScfWhileOp>(context, analysis);
+                  ApplyScfWhileOp, ApplyAsyncTransferOp>(context, analysis);
   patterns.insert<ApplyGenericOp<IREE::Util::OptimizationBarrierOp>,
                   ApplyGenericOp<mlir::arith::SelectOp>,
                   ApplyGenericOp<IREE::Util::CallOp>,
@@ -456,7 +515,6 @@ static void insertUsageRefinementPatterns(MLIRContext *context,
                   ApplyStreamableOp<IREE::Stream::AsyncCopyOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncCollectiveOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncBarrierOp>,
-                  ApplyStreamableOp<IREE::Stream::AsyncTransferOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncLoadOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncStoreOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncDispatchOp>,
@@ -464,7 +522,6 @@ static void insertUsageRefinementPatterns(MLIRContext *context,
                   ApplyStreamableOp<IREE::Stream::AsyncExecuteOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncConcurrentOp>,
                   ApplyStreamableOp<IREE::Stream::YieldOp>>(context, analysis);
-  IREE::Stream::AsyncTransferOp::getCanonicalizationPatterns(patterns, context);
 }
 
 //===----------------------------------------------------------------------===//
