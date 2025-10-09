@@ -69,7 +69,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           repository: iree-org/iree-test-suites
-          ref: 8b9aa50637de4d05a5e75709a684f8e8bd4bab52
+          ref: 1027aa9ad8290bc7c8cdcf5395888f313fa414c4
           path: iree-test-suites
           # Don't need lfs for torch models yet.
           lfs: false
@@ -100,7 +100,6 @@ jobs:
             --module-directory=${{ github.workspace }}/tests/external/iree-test-suites/torch_models \
             --artifact-directory=${{ matrix.cache-dir }}/torch_models/artifacts \
             --job-summary-path=${{ github.workspace }}/iree-test-suites \
-            --force-recompile \
             -m "${{ matrix.markers }}"
 
       - name: Upload Torch Model Job Summary
