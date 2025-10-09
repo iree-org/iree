@@ -217,6 +217,14 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // change and it makes the IR cleaner.
   passManager.addPass(IREE::Stream::createRefineUsagePass());
 
+  // Cleanup junk inserted by usage refinement (mostly lifetime transfers).
+  FunctionLikeNest(passManager).addPass(mlir::createCanonicalizerPass);
+
+  // Elide copies again after refinement resolves unknown lifetimes. Some of the
+  // lifetime transfers inserted during usage refinement are only possible to
+  // detect with full analysis (vs. our simple canonicalizer patterns).
+  passManager.addPass(IREE::Stream::createElideAsyncCopiesPass());
+
   buildStreamCleanupPassPipeline(passManager, transformOptions);
 
   // Verify all stream.async.* op access ranges that we can by taking advantage

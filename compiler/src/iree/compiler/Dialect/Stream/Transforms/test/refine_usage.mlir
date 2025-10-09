@@ -31,19 +31,21 @@ util.func public @propagateFuncCaller(%size: index) -> !stream.resource<*> {
 // -----
 
 // Tests that if a tied op (in this case export) is traversed during analysis
-// and the type changes we don't explode.
+// and the type changes we don't explode. The transfer from * to external is
+// preserved by RefineUsagePass and will be elided by ElideAsyncCopiesPass since
+// it's a same-type transfer (external->external after refinement).
 
 // CHECK-LABEL: @transitionTypesAcrossTies
-util.func public @transitionTypesAcrossTies() -> !hal.buffer_view {
+util.func public @transitionTypesAcrossTies() -> !util.buffer {
   %c4 = arith.constant 4 : index
   %c255_i32 = arith.constant 255 : i32
   // CHECK: %[[SPLAT:.+]] = stream.async.splat {{.+}} -> !stream.resource<external>
   %0 = stream.async.splat %c255_i32 : i32 -> !stream.resource<*>{%c4}
   // CHECK: %[[TRANSFER:.+]] = stream.async.transfer %[[SPLAT]] : !stream.resource<external>{%c4} -> !stream.resource<external>{%c4}
   %1 = stream.async.transfer %0 : !stream.resource<*>{%c4} -> !stream.resource<external>{%c4}
-  // CHECK: stream.tensor.export %[[TRANSFER]] : tensor<f32> in !stream.resource<external>{%c4} -> !hal.buffer_view
-  %2 = stream.tensor.export %1 : tensor<f32> in !stream.resource<external>{%c4} -> !hal.buffer_view
-  util.return %2 : !hal.buffer_view
+  // CHECK: stream.tensor.export %[[TRANSFER]] : tensor<f32> in !stream.resource<external>{%c4} -> !util.buffer
+  %2 = stream.tensor.export %1 : tensor<f32> in !stream.resource<external>{%c4} -> !util.buffer
+  util.return %2 : !util.buffer
 }
 
 // -----
@@ -135,7 +137,10 @@ util.func public @transferResolution(%arg0: !stream.resource<constant>, %size: i
 
 // -----
 
-// Tests that multiple transfers are elided during transfer materialization.
+// Tests that transfer chains are preserved during refinement. The chain
+// constant->*->external becomes constant->transient->external after refinement.
+// Note: A redundant external->external transfer may appear but will be
+// eliminated by ElideAsyncCopiesPass.
 
 // CHECK-LABEL: @transferElision
 // CHECK-SAME: (%[[SIZE:.+]]: index) -> !stream.resource<external>
@@ -146,6 +151,7 @@ util.func public @transferElision(%size: index) -> !stream.resource<external> {
   %transfer_any = stream.async.transfer %alloca : !stream.resource<constant>{%size} -> !stream.resource<*>{%size}
   // CHECK: %[[TRANSFER_EXTERNAL:.+]] = stream.async.transfer %[[TRANSFER_TRANSIENT]] : !stream.resource<transient>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]}
   %transfer_external = stream.async.transfer %transfer_any : !stream.resource<*>{%size} -> !stream.resource<external>{%size}
+  // A redundant transfer may be inserted here but will be eliminated later.
   // CHECK: %[[TRANSFER_REDUNDANT:.+]] = stream.async.transfer %[[TRANSFER_EXTERNAL]] : !stream.resource<external>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]}
   // CHECK: util.return %[[TRANSFER_REDUNDANT]] : !stream.resource<external>
   util.return %transfer_external : !stream.resource<external>
@@ -153,7 +159,9 @@ util.func public @transferElision(%size: index) -> !stream.resource<external> {
 
 // -----
 
-// Tests that global usage propagates through loads/stores.
+// Tests that global usage propagates through loads/stores. Same-type transfers
+// (variable->variable) are preserved during refinement and will be elided by
+// ElideAsyncCopiesPass.
 
 util.global private mutable @variable : !stream.resource<variable>
 util.global private mutable @variable__size : index
@@ -183,90 +191,98 @@ util.func private @globalStore(%value: !stream.resource<*>, %size: index) {
 
 // -----
 
-// Tests that explicit resource allocations are refined.
+// Tests that explicit resource allocations are refined. Same-type transfer
+// (external->external) is preserved during refinement.
 
 // CHECK-LABEL: @explicitAlloc
-util.func public @explicitAlloc() -> !hal.buffer_view {
+util.func public @explicitAlloc() -> !util.buffer {
   %c0 = arith.constant 0 : index
   // CHECK: %[[ALLOC:.+]] = stream.resource.alloc : !stream.resource<external>{%c0}
   %0 = stream.resource.alloc : !stream.resource<*>{%c0}
   // CHECK: %[[TRANSFER:.+]] = stream.async.transfer %[[ALLOC]] : !stream.resource<external>{%c0} -> !stream.resource<external>{%c0}
   %1 = stream.async.transfer %0 : !stream.resource<*>{%c0} -> !stream.resource<external>{%c0}
-  // CHECK: stream.tensor.export %[[TRANSFER]] : tensor<f32> in !stream.resource<external>{%c0} -> !hal.buffer_view
-  %2 = stream.tensor.export %1 : tensor<f32> in !stream.resource<external>{%c0} -> !hal.buffer_view
-  util.return %2 : !hal.buffer_view
+  // CHECK: stream.tensor.export %[[TRANSFER]] : tensor<f32> in !stream.resource<external>{%c0} -> !util.buffer
+  %2 = stream.tensor.export %1 : tensor<f32> in !stream.resource<external>{%c0} -> !util.buffer
+  util.return %2 : !util.buffer
 }
 
 // -----
 
 // Tests that async allocations that escape are turned into non-transient allocs.
+// Same-type transfer (external->external) is preserved during refinement.
 
 // CHECK-LABEL: @escapingAlloca
-util.func public @escapingAlloca() -> !hal.buffer_view {
+util.func public @escapingAlloca() -> !util.buffer {
   %c123 = arith.constant 123 : index
   // CHECK: %[[ALLOCA:.+]] = stream.async.alloca : !stream.resource<external>{%c123}
   %0 = stream.async.alloca : !stream.resource<*>{%c123}
   // CHECK: %[[TRANSFER:.+]] = stream.async.transfer %[[ALLOCA]] : !stream.resource<external>{%c123} -> !stream.resource<external>{%c123}
   %1 = stream.async.transfer %0 : !stream.resource<*>{%c123} -> !stream.resource<external>{%c123}
-  // CHECK: stream.tensor.export %[[TRANSFER]] : tensor<f32> in !stream.resource<external>{%c123} -> !hal.buffer_view
-  %2 = stream.tensor.export %1 : tensor<f32> in !stream.resource<external>{%c123} -> !hal.buffer_view
-  util.return %2 : !hal.buffer_view
+  // CHECK: stream.tensor.export %[[TRANSFER]] : tensor<f32> in !stream.resource<external>{%c123} -> !util.buffer
+  %2 = stream.tensor.export %1 : tensor<f32> in !stream.resource<external>{%c123} -> !util.buffer
+  util.return %2 : !util.buffer
 }
 
 // -----
 
+// Tests scf.if with resources. Both branches must yield the same type, and
+// function arguments are refined based on usage in both branches.
+
 // CHECK-LABEL: @testIf
+// CHECK-SAME: (%[[COND:.+]]: i1, %[[ARG1:.+]]: !stream.resource<external>, %[[ARG2:.+]]: !stream.resource<external>)
+// CHECK-SAME: -> !stream.resource<external>
 util.func public @testIf(%arg0: i1, %arg1: !stream.resource<*>, %arg2: !stream.resource<*>) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c4 = arith.constant 4 : index
-  // CHECK: %[[IF:.+]] = scf.if
-  // CHECK-SAME: !stream.resource<external>
+  // CHECK: %[[IF:.+]] = scf.if %[[COND]] -> (!stream.resource<external>)
   %if = scf.if %arg0 -> (!stream.resource<*>) {
-    // CHECK: %[[DISPATCH:.+]] = stream.async.dispatch
-    // CHECK-SAME: !stream.resource<external>
-    // CHECK-SAME: !stream.resource<external>
-    // CHECK-SAME: -> !stream.resource<external>
+    // CHECK: %[[DISPATCH:.+]] = stream.async.dispatch @disp(%[[ARG1]][%c0 to %c4 for %c4], %[[ARG2]][%c0 to %c4 for %c4]) : (!stream.resource<external>{%c4}, !stream.resource<external>{%c4}) -> !stream.resource<external>{%c4}
     %disp = stream.async.dispatch @disp(%arg1[%c0 to %c4 for %c4], %arg2[%c0 to %c4 for %c4]) : (!stream.resource<*>{%c4}, !stream.resource<*>{%c4}) -> !stream.resource<*>{%c4}
-    // CHECK: scf.yield
-    // CHECK-SAME: !stream.resource<external>
+    // CHECK: scf.yield %[[DISPATCH]] : !stream.resource<external>
     scf.yield %disp : !stream.resource<*>
   } else {
-    // CHECK: scf.yield
-    // CHECK-SAME: !stream.resource<external>
+    // CHECK: scf.yield %[[ARG1]] : !stream.resource<external>
     scf.yield %arg1 : !stream.resource<*>
   }
+  // CHECK: util.return %[[IF]] : !stream.resource<external>
   util.return %if : !stream.resource<*>
 }
 
 // -----
 
-// CHECK: @testWhile
+// Tests scf.while with resources. Loop arguments are refined based on usage
+// across both before and after regions.
+
+// CHECK-LABEL: @testWhile
+// CHECK-SAME: (%[[ARG0:.+]]: i32, %[[ARG1:.+]]: !stream.resource<external>)
+// CHECK-SAME: -> (i32, !stream.resource<external>)
 util.func public @testWhile(%arg0: i32, %arg1: !stream.resource<*>) -> (i32, !stream.resource<*>) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : i32
   %c4 = arith.constant 4 : index
   %c10 = arith.constant 10 : i32
-  // CHECK: scf.while
-  // CHECK-SAME: (i32, !stream.resource<external>)
-  // CHECK-SAME: (i32, !stream.resource<external>)
+  // CHECK: %[[WHILE:.+]]:2 = scf.while (%[[ARG2:.+]] = %[[ARG0]], %[[ARG3:.+]] = %[[ARG1]]) : (i32, !stream.resource<external>) -> (i32, !stream.resource<external>)
   %while:2 = scf.while (%arg2 = %arg0, %arg3 = %arg1) : (i32, !stream.resource<*>) -> (i32, !stream.resource<*>) {
     %cmp = arith.cmpi slt, %arg2, %c10 : i32
-    // CHECK: scf.condition
-    // CHECK-SAME: !stream.resource<external>
+    // CHECK: scf.condition(%{{.+}}) %[[ARG2]], %[[ARG3]] : i32, !stream.resource<external>
     scf.condition(%cmp) %arg2, %arg3 : i32, !stream.resource<*>
   } do {
   ^bb0(%arg2: i32, %arg3: !stream.resource<*>):
     %add = arith.addi %arg2, %c1 : i32
+    // CHECK: %[[DISPATCH:.+]] = stream.async.dispatch @disp(%[[ARG3]][%c0 to %c4 for %c4], %[[ARG1]][%c0 to %c4 for %c4]) : (!stream.resource<external>{%c4}, !stream.resource<external>{%c4}) -> !stream.resource<external>{%c4}
     %disp = stream.async.dispatch @disp(%arg3[%c0 to %c4 for %c4], %arg1[%c0 to %c4 for %c4]) : (!stream.resource<*>{%c4}, !stream.resource<*>{%c4}) -> !stream.resource<*>{%c4}
-    // CHECK: scf.yield
-    // CHECK-SAME: !stream.resource<external>
+    // CHECK: scf.yield %{{.+}}, %[[DISPATCH]] : i32, !stream.resource<external>
     scf.yield %add, %disp : i32, !stream.resource<*>
   }
-  // CHECK: util.return %[[IF]]#0, %[[IF]]#1 : i32, !stream.resource<external>
+  // CHECK: util.return %[[WHILE]]#0, %[[WHILE]]#1 : i32, !stream.resource<external>
   util.return %while#0, %while#1 : i32, !stream.resource<*>
 }
 
 // -----
+
+// Tests scf.while with type-changing dispatch in condition region. The dispatch
+// produces transient which must transfer to staging for stream.async.load.
+// Same-type transfer at end (external->external) is preserved.
 
 // CHECK-LABEL: @testWhileRecurse
 // CHECK-SAME: %[[ARG0:.+]]: !stream.resource<external>
@@ -313,9 +329,14 @@ util.func public @testWhileRecurse(%arg0 : !stream.resource<*>) -> !stream.resou
 
 // -----
 
+// Tests scf.for with iter_args. The loop body uses transient resources for
+// intermediate computation, with external input and output. Same-type transfer
+// at end (external->external) is preserved.
+
 // CHECK-LABEL: @testForOp
 // CHECK-SAME: %[[ARG0:.+]]: index
 // CHECK-SAME: %[[ARG1:.+]]: !stream.resource<external>
+// CHECK-SAME: -> !stream.resource<external>
 util.func public @testForOp(%arg0 : index, %arg1 : !stream.resource<*>) -> !stream.resource<external> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -324,7 +345,7 @@ util.func public @testForOp(%arg0 : index, %arg1 : !stream.resource<*>) -> !stre
   // CHECK: %[[C0:.+]] = arith.constant 0 : index
   // CHECK: %[[C1:.+]] = arith.constant 1 : index
   // CHECK: %[[C4:.+]] = arith.constant 4 : index
-  // CHECK: %[[DISP0:.+]] = stream.async.dispatch @dispatch0(%arg1[%[[C0]] to %[[ARG0]] for %[[ARG0]]]) : (!stream.resource<external>{%[[C4]]}) -> !stream.resource<transient>{%[[C4]]}
+  // CHECK: %[[DISP0:.+]] = stream.async.dispatch @dispatch0(%[[ARG1]][%[[C0]] to %[[ARG0]] for %[[ARG0]]]) : (!stream.resource<external>{%[[C4]]}) -> !stream.resource<transient>{%[[C4]]}
   %dispatch6 = stream.async.dispatch @dispatch0(%arg1[%c0 to %arg0 for %arg0]) : (!stream.resource<*>{%c4}) -> !stream.resource<*>{%c4}
 
   // CHECK: %[[FOR:.+]] = scf.for %[[ARG2:.+]] = %[[C0]] to %[[ARG0]] step %[[C1]] iter_args(%[[ARG3:.+]] = %[[DISP0]]) -> (!stream.resource<transient>) {
@@ -350,22 +371,23 @@ util.func public @testForOp(%arg0 : index, %arg1 : !stream.resource<*>) -> !stre
 
 // -----
 
-// Tests that constant resources with external usage become external.
+// Tests that constant resources stored to globals preserve their constant
+// lifetime even when they have external usage (e.g., being returned).
 
 util.global private mutable @constant_global : !stream.resource<constant>
 
 // CHECK-LABEL: @constant_global_with_external_use
-// CHECK-SAME: -> !stream.resource<external>
 util.func public @constant_global_with_external_use() -> !stream.resource<*> {
   %c4 = arith.constant 4 : index
-  // CHECK: %[[CST:.+]] = stream.async.constant : !stream.resource<external>{%[[C4:.+]]}
-  %const = stream.async.constant : !stream.resource<*>{%c4} = dense<1.0> : tensor<f32>
-  // CHECK: %[[TRANSFER:.+]] = stream.async.transfer %[[CST]] : !stream.resource<external>{%[[C4]]} -> !stream.resource<constant>{%[[C4]]}
-  %0 = stream.async.transfer %const : !stream.resource<*>{%c4} -> !stream.resource<constant>{%c4}
+  // CHECK: %[[CONSTANT:.+]] = stream.async.constant : !stream.resource<constant>{%[[C4:.+]]}
+  %constant = stream.async.constant : !stream.resource<*>{%c4} = dense<1.0> : tensor<f32>
+  // Transfer to ensure the value can be used as both constant (for store) and external (for return).
+  // CHECK: %[[TRANSFER:.+]] = stream.async.transfer %[[CONSTANT]] : !stream.resource<constant>{%[[C4]]} -> !stream.resource<constant>{%[[C4]]}
+  %0 = stream.async.transfer %constant : !stream.resource<*>{%c4} -> !stream.resource<constant>{%c4}
   // CHECK: util.global.store %[[TRANSFER]], @constant_global : !stream.resource<constant>
   util.global.store %0, @constant_global : !stream.resource<constant>
-  // CHECK: util.return %[[CST]] : !stream.resource<external>
-  util.return %const : !stream.resource<*>
+  // CHECK: util.return %[[CONSTANT]] : !stream.resource<constant>
+  util.return %constant : !stream.resource<*>
 }
 
 // -----
