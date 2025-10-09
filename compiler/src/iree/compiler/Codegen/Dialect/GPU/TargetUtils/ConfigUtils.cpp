@@ -1062,7 +1062,7 @@ static FailureOr<DistributionInfo> collectOpDistributionInfo(Operation *op) {
 
   // This pipeline requires tensor semantics. Also fail for gather semantics
   // for now to simplify tile + fuse.
-  if (!linalgOp.hasPureTensorSemantics() || linalgOp.hasIndexSemantics()) {
+  if (!linalgOp.hasPureTensorSemantics()) {
     return failure();
   }
 
