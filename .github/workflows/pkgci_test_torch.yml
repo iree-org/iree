@@ -84,6 +84,14 @@ jobs:
 
       - name: Run Torch Model tests
         run: |
+          # Only make tests run on GPU0 to have consistency across multiple
+          # runs. If we eventually have multi-GPU tests, we should run them
+          # separately from single GPU tests.
+          #
+          # This needs to be set for each runner separately.
+          if [ "${{ matrix.name }}" == "amdgpu_mi325_gfx942" ]; then
+            export ROCR_VISIBLE_DEVICES="0"
+          fi
           source ${VENV_DIR}/bin/activate
           pytest \
             iree-test-suites/torch_models \
