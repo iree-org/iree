@@ -316,6 +316,13 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
                                    PipelinePhase compileFrom,
                                    PipelinePhase compileTo) {
   //----------------------------------------------------------------------------
+  // Precondition verification and IR normalization
+  //----------------------------------------------------------------------------
+
+  // Propagate attributes from callees to call sites for local analysis.
+  passManager.addPass(IREE::Util::createAttributeCallGraphPass());
+
+  //----------------------------------------------------------------------------
   // Device assignment and interface materialization
   //----------------------------------------------------------------------------
 
