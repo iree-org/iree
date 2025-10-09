@@ -31,40 +31,21 @@ transform.named_sequence @apply_attn_op_config(%attention: !transform.any_op {tr
   transform.yield
 }
 
-transform.named_sequence @match_attention_f16(%root: !transform.any_op {transform.readonly})
-  -> !transform.any_op {
-  transform.match.operation_name %root ["iree_linalg_ext.attention"] : !transform.any_op
-  %ins, %outs = transform.iree.match.cast_compatible_dag_from_root %root {
-    ^bb0(%query: tensor<?x?x?x?xf16>,
-         %key: tensor<?x?x?x?xf16>,
-         %value: tensor<?x?x?x?xf16>,
-         %softmax_scale: f16,
-         %out: tensor<?x?x?x?xf16>):
-
-      %attn = iree_linalg_ext.attention {indexing_maps = [
-                                          affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, M, K1)>,
-                                          affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, K2, K1)>,
-                                          affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, N, K2)>,
-                                          affine_map<(B0, B1, M, N, K1, K2) -> ()>,
-                                          affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, M, N)>]}
-        ins(%query, %key, %value, %softmax_scale :
-            tensor<?x?x?x?xf16>, tensor<?x?x?x?xf16>, tensor<?x?x?x?xf16>, f16)
-        outs(%out : tensor<?x?x?x?xf16>){
-          ^bb0(%arg0: f32):
-            iree_linalg_ext.yield %arg0 : f32
-        } -> tensor<?x?x?x?xf16>
-  } : (!transform.any_op) -> (!transform.any_value, !transform.any_value)
-
-  transform.yield %root : !transform.any_op
-}
-
 transform.named_sequence
 @match_attention_2x10x4096x64x64x64_f16(%attention: !transform.any_op {transform.readonly})
   -> (!transform.any_op, !transform.any_param, !transform.any_param) {
   transform.iree.match.has_no_lowering_config %attention : !transform.any_op
 
-  %matched = transform.include @match_attention_f16 failures(propagate) (%attention)
-    : (!transform.any_op) -> !transform.any_op
+  %batch, %m, %k1, %k2, %n =
+    transform.iree.match.attention %attention,
+      query_type = f16, key_type = f16, value_type = f16, output_type = f16,
+      indexing_maps = [
+        affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, M, K1)>,
+        affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, K2, K1)>,
+        affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, N, K2)>,
+        affine_map<(B0, B1, M, N, K1, K2) -> ()>,
+        affine_map<(B0, B1, M, N, K1, K2) -> (B0, B1, M, N)>
+      ] : !transform.any_op -> !transform.param<i64>
 
   %query = transform.get_operand %attention[0] : (!transform.any_op) -> !transform.any_value
   %key = transform.get_operand %attention[1] : (!transform.any_op) -> !transform.any_value
