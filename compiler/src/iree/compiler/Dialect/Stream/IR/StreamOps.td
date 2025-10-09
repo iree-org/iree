@@ -671,6 +671,7 @@ def Stream_ResourceConstantsOp : Stream_PureOp<"resource.constants", [
     Value getOperandSize(unsigned idx) { return {}; }
     Value getResultSize(unsigned idx) { return getResultSizes()[idx]; }
     SmallVector<Value> getAwaitTimepoints() { return {}; }
+    void setAwaitTimepoint(Value timepoint) {}
   }];
 }
 
@@ -3864,6 +3865,7 @@ def Stream_TimepointImmediateOp : Stream_PureOp<"timepoint.immediate", [
 
   let extraClassDeclaration = [{
     SmallVector<Value> getAwaitTimepoints() { return {}; }
+    void setAwaitTimepoint(Value timepoint) {}
   }];
 
   let hasFolder = 1;
@@ -3957,7 +3959,10 @@ def Stream_TimepointChainExternalOp :
 }
 
 def Stream_TimepointJoinOp : Stream_PureOp<"timepoint.join", [
-  Stream_TimelineOp,
+  DeclareOpInterfaceMethods<Stream_TimelineOp, [
+    "setAwaitTimepoint",
+    "setAwaitTimepoints",
+  ]>,
 ]> {
   let summary = [{Joins one or more timepoints into the max of all of them.}];
   let description = [{
@@ -4040,6 +4045,7 @@ def Stream_TimepointBarrierOp : Stream_PureOp<"timepoint.barrier", [
     Value getOperandSize(unsigned idx) { return getResourceSize(); }
     Value getResultSize(unsigned idx) { return getResourceSize(); }
     SmallVector<Value> getAwaitTimepoints() { return {}; }
+    void setAwaitTimepoint(Value timepoint) {}
   }];
 
   let hasVerifier = 1;
@@ -4049,7 +4055,11 @@ def Stream_TimepointBarrierOp : Stream_PureOp<"timepoint.barrier", [
 
 def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
   AttrSizedOperandSegments,
-  Stream_TimelineOp,
+  DeclareOpInterfaceMethods<Stream_TimelineOp, [
+    "getAwaitTimepoints",
+    "setAwaitTimepoint",
+    "getResultTimepoint",
+  ]>,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedResultOperandIndex",
@@ -4106,10 +4116,6 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
     Value getResultSize(unsigned idx) {
       return getResourceOperandSizes()[idx];
     }
-    SmallVector<Value> getAwaitTimepoints() {
-      if (getAwaitTimepoint()) return {getAwaitTimepoint()}; else return {};
-    }
-    Value getResultTimepoint() { return {}; }
   }];
 
   let hasVerifier = 1;
