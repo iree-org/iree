@@ -36,6 +36,9 @@ struct VerifyInputLegalityPass
                                                           target))) {
       return signalPassFailure();
     }
+
+    // Preserve all analyses since this is a read-only verification pass.
+    markAllAnalysesPreserved();
   }
 };
 } // namespace
