@@ -332,7 +332,7 @@ there is a single 64-thread subgroup per workgroup.
 
 ### Example 2
 
-**Iteration space:** `[d0 = parallel(1152), d1 = reduction(384)]`
+**Iteration space:** `[d0 = parallel(384), d1 = reduction(1152)]`
 
 **Configuration:**
 
@@ -346,10 +346,11 @@ workgroup = [16, 0]
 
 **Analysis:**
 
-**Lane basis `[[16, 4], [1, 0]]`:** The 64 threads form a 16×4 grid in basis
-space. Mapping `[1, 0]` swaps coordinates: 16 threads (`c₁`) map to iteration
-dimension 1 (reduction) and 4 threads (`c₂`) map to iteration dimension 0
-(parallel).
+**Lane basis `[[16, 4], [1, 0]]`:**
+Lanes form a 16×4 grid in basis space.
+mapping = [1, 0] places the 16-wide digit on iteration dim 1 (reduction)
+and the 4-wide digit on iteration dim 0 (parallel). So within a subgroup,
+lanes cover 16 reduction positions × 4 parallel positions per iteration.
 
 **Partial reduction `[0, 32]`:** We tile dimension 1 (reduction) into chunks of
 32 elements, creating `1152 / 32 = 36` loop iterations. Each workgroup processes
