@@ -42,6 +42,13 @@ namespace mlir::iree_compiler::GlobalOptimization {
 // Transpose permutation helpers
 //===----------------------------------------------------------------------===//
 
+static bool hasGatherSemantics(linalg::GenericOp genericOp) {
+  for (Operation &op : genericOp.getBody()->getOperations())
+    if (isa<tensor::ExtractOp, linalg::IndexOp>(op))
+      return true;
+  return false;
+}
+
 static bool isIdentityPermutation(ArrayRef<int64_t> perm) {
   for (auto [index, dim] : llvm::enumerate(perm)) {
     if (index != dim) {
@@ -761,6 +768,11 @@ public:
       return rewriter.notifyMatchFailure(genericOp, "non-elementwise generic");
     }
 
+    if (hasGatherSemantics(genericOp)) {
+      return rewriter.notifyMatchFailure(genericOp,
+                                         "unimplemented: gather like op");
+    }
+
     if (genericOp.getNumDpsInits() != 1) {
       return rewriter.notifyMatchFailure(genericOp,
                                          "unimplemented: multiple results");
@@ -865,6 +877,11 @@ public:
       return rewriter.notifyMatchFailure(transposeOp, "not elementwise");
     }
 
+    if (hasGatherSemantics(genericOp)) {
+      return rewriter.notifyMatchFailure(genericOp,
+                                         "unimplemented: gather like op");
+    }
+
     if (!genericOp->hasOneUse()) {
       return rewriter.notifyMatchFailure(transposeOp, "not single user");
     }
@@ -898,9 +915,9 @@ public:
     SmallVector<AffineMap> indexingMaps = getTransposedIndexingMaps(
         genericOp, inputOperand->getOperandNumber(), transposeMap);
 
-    // We do not need to update indexing maps because this is a unary
-    // elementwise op where the input and output maps are the same. Just
-    // replace the operands with transposed variants.
+    // We do not need to update indexing maps because this is an elementwise
+    // op where the input and output maps are the same.
+    // Just replace the operands with transposed variants.
     auto newGenericOp =
         mlir::clone(rewriter, genericOp, newInit.getType(), newOperands);
     newGenericOp.setIndexingMapsAttr(
