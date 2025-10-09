@@ -378,32 +378,38 @@ static void iree_cpu_initialize_from_platform_x86_64(uint64_t* out_fields) {
 // expose the features that we need, we can just rely on the HWPROBE way.
 // See:
 // https://github.com/torvalds/linux/blob/master/Documentation/arch/riscv/hwprobe.rst
+#include <asm/hwprobe.h>
 #include <sched.h>
-#include <sys/hwprobe.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 
 static struct riscv_hwprobe kv_pairs[] = {{RISCV_HWPROBE_KEY_IMA_EXT_0, 0}};
 
+long riscv_hwprobe(struct riscv_hwprobe* pairs, size_t pair_count,
+                   size_t cpusetsize, cpu_set_t* cpus, unsigned int flags) {
+  return syscall(__NR_riscv_hwprobe, pairs, pair_count, cpusetsize, cpus,
+                 flags);
+}
+
 // NOTE: not all kernel versions have all of the cap bits we need defined so as
 // a practice we always define the feature bits we need locally.
-#define RISCV_HWPROBE_IMA_V (1 << 2)
-#define RISCV_HWPROBE_EXT_ZVFH (1 << 30)
-#define RISCV_HWPROBE_EXT_ZVFHMIN (1ULL << 31)
+#define IREE_RISCV_HWPROBE_IMA_V (1 << 2)
+#define IREE_RISCV_HWPROBE_EXT_ZVFH (1 << 30)
+#define IREE_RISCV_HWPROBE_EXT_ZVFHMIN (1ULL << 31)
 
 static void iree_cpu_initialize_from_platform_riscv_64(uint64_t* out_fields) {
-  long rc = __riscv_hwprobe(&kv_pairs[0], 1, 0, NULL, 0);
+  long rc = riscv_hwprobe(&kv_pairs[0], 1, 0, NULL, 0);
   if (rc != 0) {
     fprintf(stderr, "riscv_hwprobe syscall failed");
     exit(1);
   }
   unsigned long long hwprobe = kv_pairs[0].value;
   IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_RISCV_64_V, hwprobe,
-                 RISCV_HWPROBE_IMA_V);
+                 IREE_RISCV_HWPROBE_IMA_V);
   IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_RISCV_64_ZVFHMIN, hwprobe,
-                 RISCV_HWPROBE_EXT_ZVFHMIN);
+                 IREE_RISCV_HWPROBE_EXT_ZVFHMIN);
   IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_RISCV_64_ZVFH, hwprobe,
-                 RISCV_HWPROBE_EXT_ZVFH);
+                 IREE_RISCV_HWPROBE_EXT_ZVFH);
 }
 
 #else
