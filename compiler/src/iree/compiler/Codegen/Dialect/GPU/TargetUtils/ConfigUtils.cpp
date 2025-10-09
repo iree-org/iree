@@ -1109,8 +1109,7 @@ static FailureOr<DistributionInfo> collectOpDistributionInfo(Operation *op) {
 
   // This pipeline requires tensor semantics. Also fail for gather semantics
   // for now to simplify tile + fuse.
-  if (!linalgOp.hasPureTensorSemantics() ||
-      LinalgExt::isGatherlikeOp(linalgOp)) {
+  if (!linalgOp.hasPureTensorSemantics()) {
     return failure();
   }
   distInfo.partitionableLoops = getSupportedPartitionableLoops(linalgOp);
