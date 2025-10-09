@@ -134,6 +134,190 @@ util.func private @callee(%arg0: !util.buffer, %arg1: !util.buffer) -> (!util.bu
 
 // -----
 
+// Tests that scf.if operations propagate subranges through both branches.
+
+// CHECK-LABEL: @scfIfWithResults
+// CHECK-SAME: (%[[COND:.+]]: i1, %[[ARG:.+]]: !util.buffer, %[[ARG_SIZE:.+]]: index, %[[ARG_OFFSET:.+]]: index, %[[ARG_LENGTH:.+]]: index)
+// CHECK-SAME: -> (!util.buffer, index, index, index)
+util.func private @scfIfWithResults(%cond: i1, %arg: !util.buffer) -> !util.buffer {
+  // Function args expanded, create subrange from expanded args.
+  // CHECK: %[[ARG_SUBRANGE:.+]] = util.buffer.subspan %[[ARG]][%[[ARG_OFFSET]]] : !util.buffer{%[[ARG_SIZE]]} -> !util.buffer{%[[ARG_LENGTH]]}
+
+  // scf.if result types expanded to 4 values.
+  // CHECK: %[[IF_RESULT:.+]]:4 = scf.if %[[COND]] -> (!util.buffer, index, index, index) {
+  %0 = scf.if %cond -> !util.buffer {
+    // THEN branch: compute size/offset/length, create nested subspan.
+    // CHECK-NEXT: %[[THEN_SIZE:.+]] = util.buffer.size %[[ARG_SUBRANGE]]
+    %then_size = util.buffer.size %arg : !util.buffer
+    // CHECK-NEXT: %[[THEN_OFFSET:.+]] = arith.constant 10
+    %then_offset = arith.constant 10 : index
+    // CHECK-NEXT: %[[THEN_LENGTH:.+]] = arith.constant 20
+    %then_length = arith.constant 20 : index
+    // CHECK-NEXT: %[[THEN_SUBSPAN:.+]] = util.buffer.subspan %[[ARG_SUBRANGE]][%[[THEN_OFFSET]]] : !util.buffer{%[[THEN_SIZE]]} -> !util.buffer{%[[THEN_LENGTH]]}
+    %then_subspan = util.buffer.subspan %arg[%then_offset] : !util.buffer{%then_size} -> !util.buffer{%then_length}
+    // Adjusted offset computed but not used in yield (updateSubrangeOp tracking).
+    // CHECK-NEXT: %[[ADJUSTED:.+]] = arith.addi %[[ARG_OFFSET]], %[[THEN_OFFSET]]
+    // Yields: parent subrange, size, LOCAL offset, LOCAL length (not adjusted offset!).
+    // CHECK-NEXT: scf.yield %[[ARG_SUBRANGE]], %[[THEN_SIZE]], %[[THEN_OFFSET]], %[[THEN_LENGTH]] : !util.buffer, index, index, index
+    scf.yield %then_subspan : !util.buffer
+  } else {
+    // ELSE branch: yields original expanded args unchanged.
+    // CHECK: scf.yield %[[ARG]], %[[ARG_SIZE]], %[[ARG_OFFSET]], %[[ARG_LENGTH]] : !util.buffer, index, index, index
+    scf.yield %arg : !util.buffer
+  }
+  // After if: create subrange from if results (for compatibility).
+  // CHECK: %[[RESULT_SUBRANGE:.+]] = util.buffer.subspan %[[IF_RESULT]]#0[%[[IF_RESULT]]#2] : !util.buffer{%[[IF_RESULT]]#1} -> !util.buffer{%[[IF_RESULT]]#3}
+  // Return the 4-tuple directly (function signature already expanded).
+  // CHECK: util.return %[[IF_RESULT]]#0, %[[IF_RESULT]]#1, %[[IF_RESULT]]#2, %[[IF_RESULT]]#3 : !util.buffer, index, index, index
+  util.return %0 : !util.buffer
+}
+
+// -----
+
+// Tests that scf.for operations propagate subranges through iter_args.
+
+// CHECK-LABEL: @scfForWithIterArgs
+// CHECK-SAME: (%[[ARG:.+]]: !util.buffer, %[[ARG_SIZE:.+]]: index, %[[ARG_OFFSET:.+]]: index, %[[ARG_LENGTH:.+]]: index)
+util.func private @scfForWithIterArgs(%arg: !util.buffer) -> !util.buffer {
+  %c0 = arith.constant 0 : index
+  %c10 = arith.constant 10 : index
+  %c1 = arith.constant 1 : index
+
+  // CHECK-DAG: %[[ARG_SUBRANGE:.+]] = util.buffer.subspan %[[ARG]][%[[ARG_OFFSET]]] : !util.buffer{%[[ARG_SIZE]]} -> !util.buffer{%[[ARG_LENGTH]]}
+  // CHECK-DAG: %[[C0:.+]] = arith.constant 0
+  // CHECK-DAG: %[[C0_0:.+]] = arith.constant 0
+  // CHECK-DAG: %[[C10:.+]] = arith.constant 10
+  // CHECK-DAG: %[[C1:.+]] = arith.constant 1
+
+  // CHECK: %[[FOR_RESULT:.+]]:4 = scf.for %[[IV:.+]] = %[[C0_0]] to %[[C10]] step %[[C1]]
+  // CHECK-SAME: iter_args(%[[ITER:.+]] = %[[ARG]], %[[ITER_SIZE:.+]] = %[[ARG_SIZE]], %[[ITER_OFFSET:.+]] = %[[ARG_OFFSET]], %[[ITER_LENGTH:.+]] = %[[ARG_LENGTH]])
+  // CHECK-SAME: -> (!util.buffer, index, index, index)
+  %0 = scf.for %i = %c0 to %c10 step %c1 iter_args(%iter = %arg) -> !util.buffer {
+    // CHECK: %[[NEXT_SIZE:.+]] = util.buffer.size %[[ITER]]
+    %next_size = util.buffer.size %iter : !util.buffer
+    // CHECK: %[[C0_2:.+]] = arith.constant 0
+    %next_offset = arith.constant 0 : index
+    // CHECK: scf.yield %[[ITER]], %[[NEXT_SIZE]], %[[C0]], %[[NEXT_SIZE]]
+    scf.yield %iter : !util.buffer
+  }
+  // CHECK: %[[RESULT_SUBRANGE:.+]] = util.buffer.subspan %[[FOR_RESULT]]#0[%[[FOR_RESULT]]#2] : !util.buffer{%[[FOR_RESULT]]#1} -> !util.buffer{%[[FOR_RESULT]]#3}
+  // CHECK: util.return %[[FOR_RESULT]]#0, %[[FOR_RESULT]]#1, %[[FOR_RESULT]]#2, %[[FOR_RESULT]]#3
+  util.return %0 : !util.buffer
+}
+
+// -----
+
+// Tests that scf.while operations propagate subranges through before and after regions.
+
+// CHECK-LABEL: @scfWhileWithResources
+// CHECK-SAME: (%[[ARG:.+]]: !util.buffer, %[[ARG_SIZE:.+]]: index, %[[ARG_OFFSET:.+]]: index, %[[ARG_LENGTH:.+]]: index)
+util.func private @scfWhileWithResources(%arg: !util.buffer) -> !util.buffer {
+  %true = arith.constant true
+  %false = arith.constant false
+
+  // CHECK-DAG: %[[ARG_SUBRANGE:.+]] = util.buffer.subspan %[[ARG]][%[[ARG_OFFSET]]] : !util.buffer{%[[ARG_SIZE]]} -> !util.buffer{%[[ARG_LENGTH]]}
+  // CHECK-DAG: %[[C0:.+]] = arith.constant 0
+  // CHECK-DAG: %[[TRUE:.+]] = arith.constant true
+  // CHECK-DAG: %[[FALSE:.+]] = arith.constant false
+
+  // CHECK: %[[WHILE_RESULT:.+]]:4 = scf.while
+  // CHECK-SAME: (%[[BEFORE_ARG:.+]] = %[[ARG]], %[[BEFORE_SIZE:.+]] = %[[ARG_SIZE]], %[[BEFORE_OFFSET:.+]] = %[[ARG_OFFSET]], %[[BEFORE_LENGTH:.+]] = %[[ARG_LENGTH]])
+  // CHECK-SAME: : (!util.buffer, index, index, index) -> (!util.buffer, index, index, index)
+  %0 = scf.while (%arg0 = %arg) : (!util.buffer) -> !util.buffer {
+    // CHECK: %[[BEFORE_NEXT_SIZE:.+]] = util.buffer.size %[[BEFORE_ARG]]
+    // CHECK: scf.condition(%[[TRUE]]) %[[BEFORE_ARG]], %[[BEFORE_NEXT_SIZE]], %[[C0]], %[[BEFORE_NEXT_SIZE]]
+    scf.condition(%true) %arg0 : !util.buffer
+  } do {
+  ^bb0(%arg1: !util.buffer):
+    // CHECK: ^bb0(%[[AFTER_ARG:.+]]: !util.buffer, %[[AFTER_SIZE:.+]]: index, %[[AFTER_OFFSET:.+]]: index, %[[AFTER_LENGTH:.+]]: index):
+    // CHECK: %[[AFTER_NEXT_SIZE:.+]] = util.buffer.size %[[AFTER_ARG]]
+    %next_size = util.buffer.size %arg1 : !util.buffer
+    // CHECK: %[[C0_1:.+]] = arith.constant 0
+    %next_offset = arith.constant 0 : index
+    // CHECK: scf.yield %[[AFTER_ARG]], %[[AFTER_NEXT_SIZE]], %[[C0]], %[[AFTER_NEXT_SIZE]]
+    scf.yield %arg1 : !util.buffer
+  }
+  // CHECK: %[[RESULT_SUBRANGE:.+]] = util.buffer.subspan %[[WHILE_RESULT]]#0[%[[WHILE_RESULT]]#2] : !util.buffer{%[[WHILE_RESULT]]#1} -> !util.buffer{%[[WHILE_RESULT]]#3}
+  // CHECK: util.return %[[WHILE_RESULT]]#0, %[[WHILE_RESULT]]#1, %[[WHILE_RESULT]]#2, %[[WHILE_RESULT]]#3
+  util.return %0 : !util.buffer
+}
+
+// -----
+
+// Tests that scf.index_switch operations propagate subranges through all cases.
+
+// CHECK-LABEL: @scfIndexSwitchWithResources
+// CHECK-SAME: (%[[IDX:.+]]: index, %[[ARG:.+]]: !util.buffer, %[[ARG_SIZE:.+]]: index, %[[ARG_OFFSET:.+]]: index, %[[ARG_LENGTH:.+]]: index)
+util.func private @scfIndexSwitchWithResources(%idx: index, %arg: !util.buffer) -> !util.buffer {
+  // CHECK: %[[ARG_SUBRANGE:.+]] = util.buffer.subspan %[[ARG]][%[[ARG_OFFSET]]] : !util.buffer{%[[ARG_SIZE]]} -> !util.buffer{%[[ARG_LENGTH]]}
+
+  // CHECK: %[[SWITCH_RESULT:.+]]:4 = scf.index_switch %[[IDX]] -> !util.buffer, index, index, index
+  %0 = scf.index_switch %idx -> !util.buffer
+  case 0 {
+    // CHECK: %[[CASE0_SIZE:.+]] = util.buffer.size %[[ARG_SUBRANGE]]
+    %case0_size = util.buffer.size %arg : !util.buffer
+    // CHECK: %[[CASE0_OFFSET:.+]] = arith.constant 5
+    %case0_offset = arith.constant 5 : index
+    // CHECK: %[[CASE0_LENGTH:.+]] = arith.constant 10
+    %case0_length = arith.constant 10 : index
+    // CHECK: %[[CASE0_SUBSPAN:.+]] = util.buffer.subspan %[[ARG_SUBRANGE]][%[[CASE0_OFFSET]]] : !util.buffer{%[[CASE0_SIZE]]} -> !util.buffer{%[[CASE0_LENGTH]]}
+    %case0_subspan = util.buffer.subspan %arg[%case0_offset] : !util.buffer{%case0_size} -> !util.buffer{%case0_length}
+    // CHECK: scf.yield %[[ARG_SUBRANGE]], %[[CASE0_SIZE]], %[[CASE0_OFFSET]], %[[CASE0_LENGTH]]
+    scf.yield %case0_subspan : !util.buffer
+  }
+  case 1 {
+    // CHECK: scf.yield %[[ARG]], %[[ARG_SIZE]], %[[ARG_OFFSET]], %[[ARG_LENGTH]]
+    scf.yield %arg : !util.buffer
+  }
+  default {
+    // CHECK: scf.yield %[[ARG]], %[[ARG_SIZE]], %[[ARG_OFFSET]], %[[ARG_LENGTH]]
+    scf.yield %arg : !util.buffer
+  }
+  // CHECK: %[[RESULT_SUBRANGE:.+]] = util.buffer.subspan %[[SWITCH_RESULT]]#0[%[[SWITCH_RESULT]]#2] : !util.buffer{%[[SWITCH_RESULT]]#1} -> !util.buffer{%[[SWITCH_RESULT]]#3}
+  // CHECK: util.return %[[SWITCH_RESULT]]#0, %[[SWITCH_RESULT]]#1, %[[SWITCH_RESULT]]#2, %[[SWITCH_RESULT]]#3
+  util.return %0 : !util.buffer
+}
+
+// -----
+
+// Tests that nested SCF operations propagate subranges correctly.
+
+// CHECK-LABEL: @nestedScfOps
+// CHECK-SAME: (%[[COND:.+]]: i1, %[[ARG:.+]]: !util.buffer, %[[ARG_SIZE:.+]]: index, %[[ARG_OFFSET:.+]]: index, %[[ARG_LENGTH:.+]]: index)
+util.func private @nestedScfOps(%cond: i1, %arg: !util.buffer) -> !util.buffer {
+  %c0 = arith.constant 0 : index
+  %c5 = arith.constant 5 : index
+  %c1 = arith.constant 1 : index
+
+  // CHECK-DAG: %[[ARG_SUBRANGE:.+]] = util.buffer.subspan %[[ARG]][%[[ARG_OFFSET]]] : !util.buffer{%[[ARG_SIZE]]} -> !util.buffer{%[[ARG_LENGTH]]}
+  // CHECK-DAG: %[[C0:.+]] = arith.constant 0
+  // CHECK-DAG: %[[C0_0:.+]] = arith.constant 0
+  // CHECK-DAG: %[[C5:.+]] = arith.constant 5
+  // CHECK-DAG: %[[C1:.+]] = arith.constant 1
+
+  // CHECK: %[[IF_RESULT:.+]]:4 = scf.if %[[COND]] -> (!util.buffer, index, index, index) {
+  %0 = scf.if %cond -> !util.buffer {
+    // CHECK: %[[FOR_RESULT:.+]]:4 = scf.for %{{.+}} = %[[C0_0]] to %[[C5]] step %[[C1]]
+    // CHECK-SAME: iter_args(%[[ITER:.+]] = %[[ARG]], %[[ITER_SIZE:.+]] = %[[ARG_SIZE]], %[[ITER_OFFSET:.+]] = %[[ARG_OFFSET]], %[[ITER_LENGTH:.+]] = %[[ARG_LENGTH]])
+    %1 = scf.for %i = %c0 to %c5 step %c1 iter_args(%iter = %arg) -> !util.buffer {
+      // CHECK: %[[ITER_NEXT_SIZE:.+]] = util.buffer.size %[[ITER]]
+      // CHECK: scf.yield %[[ITER]], %[[ITER_NEXT_SIZE]], %[[C0]], %[[ITER_NEXT_SIZE]]
+      scf.yield %iter : !util.buffer
+    }
+    // CHECK: %[[FOR_SUBRANGE:.+]] = util.buffer.subspan %[[FOR_RESULT]]#0[%[[FOR_RESULT]]#2] : !util.buffer{%[[FOR_RESULT]]#1} -> !util.buffer{%[[FOR_RESULT]]#3}
+    // CHECK: scf.yield %[[FOR_RESULT]]#0, %[[FOR_RESULT]]#1, %[[FOR_RESULT]]#2, %[[FOR_RESULT]]#3
+    scf.yield %1 : !util.buffer
+  } else {
+    // CHECK: scf.yield %[[ARG]], %[[ARG_SIZE]], %[[ARG_OFFSET]], %[[ARG_LENGTH]]
+    scf.yield %arg : !util.buffer
+  }
+  // CHECK: %[[RESULT_SUBRANGE:.+]] = util.buffer.subspan %[[IF_RESULT]]#0[%[[IF_RESULT]]#2] : !util.buffer{%[[IF_RESULT]]#1} -> !util.buffer{%[[IF_RESULT]]#3}
+  // CHECK: util.return %[[IF_RESULT]]#0, %[[IF_RESULT]]#1, %[[IF_RESULT]]#2, %[[IF_RESULT]]#3
+  util.return %0 : !util.buffer
+}
+
+// -----
+
 // Tests that function calls within scf ops get expanded as expected.
 // This would also indicate that other constructs (global loads/etc) also get
 // expanded within the SCF regions.

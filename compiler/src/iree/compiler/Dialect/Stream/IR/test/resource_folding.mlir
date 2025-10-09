@@ -30,6 +30,31 @@ util.func private @SelectResourceSizeOp(%arg0: !stream.resource<staging>, %arg1:
 
 // -----
 
+// Tests stream.resource.size on loop-carried resource with tied operations.
+
+// CHECK-LABEL: @FoldResourceSizeOpAcrossWhile
+util.func private @FoldResourceSizeOpAcrossWhile(%arg0: !stream.resource<*>, %arg1: index, %cond: i1) -> index {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  // Loop with tied async.update operation
+  %result:2 = scf.while (%iter = %arg0, %size = %arg1) : (!stream.resource<*>, index) -> (!stream.resource<*>, index) {
+    %updated = stream.async.update %iter, %iter[%c0 to %c4] :
+        !stream.resource<*>{%size} ->
+        %iter as !stream.resource<*>{%size}
+    scf.condition(%cond) %updated, %size : !stream.resource<*>, index
+  } do {
+  ^bb0(%iter_body: !stream.resource<*>, %size_body: index):
+    scf.yield %iter_body, %size_body : !stream.resource<*>, index
+  }
+  // Query size - this traverses tied operands, would cycle if possible
+  // CHECK: = stream.resource.size %arg0
+  %result_size = stream.resource.size %result#0 : !stream.resource<*>
+  // CHECK: util.return
+  util.return %result_size : index
+}
+
+// -----
+
 // Erases allocation ops that have no users of their allocated resource.
 
 // CHECK-LABEL: @ElideUnusedAllocaOp
