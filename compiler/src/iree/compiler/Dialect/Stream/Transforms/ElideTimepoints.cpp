@@ -27,6 +27,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -307,6 +308,116 @@ ChangeStatus IsGlobalImmediate::updateOperation(IREE::Util::GlobalOp globalOp,
   return DFX::clampStateAndIndicateChange(getState(), newState);
 }
 
+// Tracks which timepoints are covered by a fence from timeline-aware ops.
+// This is used to bridge HAL fence values to stream timepoints for operations
+// like util.call with async fence arguments.
+class FenceCoverage : public DFX::StateWrapper<DFX::PotentialValuesState<Value>,
+                                               DFX::ValueElement> {
+public:
+  using BaseType =
+      DFX::StateWrapper<DFX::PotentialValuesState<Value>, DFX::ValueElement>;
+
+  static FenceCoverage &createForPosition(const Position &pos,
+                                          DFX::Solver &solver) {
+    return *(new (solver.getAllocator()) FenceCoverage(pos));
+  }
+
+  const std::string getName() const override { return "FenceCoverage"; }
+  const void *getID() const override { return &ID; }
+  static bool classof(const DFX::AbstractElement *element) {
+    return (element->getID() == &ID);
+  }
+  static const char ID;
+
+  const std::string getAsStr(AsmState &asmState) const override {
+    std::string str;
+    llvm::raw_string_ostream sstream(str);
+    sstream << "fence_covered: ";
+    if (isValidState()) {
+      sstream << "[";
+      llvm::interleaveComma(getAssumedSet(), sstream, [&](Value value) {
+        value.printAsOperand(sstream, asmState);
+      });
+      sstream << "]";
+    } else {
+      sstream << "(invalid)";
+    }
+    sstream.flush();
+    return str;
+  }
+
+private:
+  explicit FenceCoverage(const Position &pos) : BaseType(pos) {}
+
+  void initializeValue(Value fence, DFX::Solver &solver) override {
+    // Find timeline-aware ops that use this fence directly.
+    // Transitive coverage is handled in updateValue() through FenceCoverage
+    // dependencies to avoid the O(F × U × A) nested walk complexity.
+    auto processTimelineAwareOp =
+        [&](IREE::Stream::TimelineAwareOpInterface awareOp) {
+          if (!awareOp.participatesInTimeline() ||
+              awareOp.getSignalFence() != fence) {
+            return;
+          }
+          // Found a timeline-aware op signaling this fence.
+          // Record its await fences for processing in updateValue().
+          for (Value awaitFence : awareOp.getAwaitFences()) {
+            // We'll process this await fence's coverage in updateValue().
+            // For now, just record it by walking to find direct exports.
+            solver.getExplorer().walkDefiningOps(
+                awaitFence, [&](OpResult awaitResult) {
+                  if (auto exportOp = dyn_cast<IREE::Stream::TimepointExportOp>(
+                          awaitResult.getOwner())) {
+                    // Check if this export result is the await fence.
+                    for (auto result : exportOp.getResults()) {
+                      if (result == awaitResult) {
+                        unionAssumed(exportOp.getAwaitTimepoint());
+                        LLVM_DEBUG({
+                          llvm::dbgs() << "[ElideTimepoints] fence ";
+                          fence.printAsOperand(llvm::dbgs(),
+                                               solver.getAsmState());
+                          llvm::dbgs() << " directly covers timepoint ";
+                          exportOp.getAwaitTimepoint().printAsOperand(
+                              llvm::dbgs(), solver.getAsmState());
+                          llvm::dbgs() << "\n";
+                        });
+                        break;
+                      }
+                    }
+                  }
+                  return WalkResult::advance();
+                });
+          }
+        };
+
+    // Check if any users are timeline-aware ops (for fence operands).
+    for (auto *user : fence.getUsers()) {
+      if (auto awareOp =
+              dyn_cast<IREE::Stream::TimelineAwareOpInterface>(user)) {
+        processTimelineAwareOp(awareOp);
+      }
+    }
+
+    // Walk defining ops to find timeline-aware producers (for fence results).
+    solver.getExplorer().walkDefiningOps(fence, [&](OpResult valueResult) {
+      auto *definingOp = valueResult.getOwner();
+      if (auto awareOp =
+              dyn_cast<IREE::Stream::TimelineAwareOpInterface>(definingOp)) {
+        if (awareOp.getSignalFence() == valueResult) {
+          processTimelineAwareOp(awareOp);
+        }
+      }
+      return WalkResult::advance();
+    });
+  }
+
+  // Defined after TimepointCoverage since it uses TimepointCoverage methods.
+  ChangeStatus updateValue(Value fence, DFX::Solver &solver) override;
+
+  friend class DFX::Solver;
+};
+const char FenceCoverage::ID = 0;
+
 class TimepointCoverage
     : public DFX::StateWrapper<DFX::PotentialValuesState<Value>,
                                DFX::ValueElement> {
@@ -463,6 +574,7 @@ private:
           // Timepoints cover themselves; this is redundant but simplifies the
           // set logic later on.
           if (auto resultTimepoint = timelineOp.getResultTimepoint()) {
+            newState.unionAssumed(resultTimepoint);
             LLVM_DEBUG({
               llvm::dbgs() << "[ElideTimepoints] produced timeline result ";
               resultTimepoint.printAsOperand(llvm::dbgs(),
@@ -471,9 +583,38 @@ private:
             });
           }
         })
+        .Case([&](IREE::Stream::TimepointImportOp importOp) {
+          // Special handling for stream.timepoint.import: check if the imported
+          // value comes from a timeline-aware op and query FenceCoverage for
+          // each imported fence to find covered timepoints.
+          for (Value importedValue : importOp.getOperands()) {
+            auto &fenceCoverage = solver.getElementFor<FenceCoverage>(
+                *this, Position::forValue(importedValue),
+                DFX::Resolution::REQUIRED);
+            if (fenceCoverage.isValidState()) {
+              // Add all timepoints covered by this fence.
+              for (Value coveredTimepoint : fenceCoverage.getAssumedSet()) {
+                newState.unionAssumed(coveredTimepoint);
+                auto coverage = solver.getElementFor<TimepointCoverage>(
+                    *this, Position::forValue(coveredTimepoint),
+                    DFX::Resolution::REQUIRED);
+                newState &= coverage;
+                LLVM_DEBUG({
+                  llvm::dbgs() << "[ElideTimepoints] imported fence ";
+                  importedValue.printAsOperand(llvm::dbgs(),
+                                               solver.getAsmState());
+                  llvm::dbgs() << " covers exported timepoint ";
+                  coveredTimepoint.printAsOperand(llvm::dbgs(),
+                                                  solver.getAsmState());
+                  llvm::dbgs() << "\n";
+                });
+              }
+            }
+          }
+        })
         .Case([&](mlir::CallOpInterface callOp) {
-          // Step into callees and get a coverage intersection of all return
-          // sites.
+          // Step into called functions and get a coverage intersection of all
+          // return sites.
           auto callableOp = callOp.resolveCallableInTable(
               &solver.getExplorer().getSymbolTables());
           unsigned resultIndex = cast<OpResult>(value).getResultNumber();
@@ -510,16 +651,85 @@ private:
 };
 const char TimepointCoverage::ID = 0;
 
+// Define FenceCoverage::updateValue() after TimepointCoverage is fully defined.
+ChangeStatus FenceCoverage::updateValue(Value fence, DFX::Solver &solver) {
+  StateType newState = getState();
+
+  // Gather transitive coverage from await fences.
+  // We need to query FenceCoverage for await fences to get their transitive
+  // coverage, and TimepointCoverage for the timepoints we directly cover.
+  auto processTimelineAwareOp =
+      [&](IREE::Stream::TimelineAwareOpInterface awareOp) {
+        if (!awareOp.participatesInTimeline() ||
+            awareOp.getSignalFence() != fence) {
+          return;
+        }
+        // For each await fence, get its transitive coverage.
+        for (Value awaitFence : awareOp.getAwaitFences()) {
+          // Query FenceCoverage for this await fence to get transitive
+          // coverage. This lets the DFX solver handle fixpoint iteration.
+          auto &awaitFenceCoverage = solver.getElementFor<FenceCoverage>(
+              *this, Position::forValue(awaitFence), DFX::Resolution::REQUIRED);
+          if (awaitFenceCoverage.isValidState()) {
+            LLVM_DEBUG({
+              llvm::dbgs() << "[ElideTimepoints] fence ";
+              fence.printAsOperand(llvm::dbgs(), solver.getAsmState());
+              llvm::dbgs() << " transitively covers via await fence ";
+              awaitFence.printAsOperand(llvm::dbgs(), solver.getAsmState());
+              llvm::dbgs() << ": ";
+              awaitFenceCoverage.print(llvm::dbgs(), solver.getAsmState());
+              llvm::dbgs() << "\n";
+            });
+            newState &= awaitFenceCoverage;
+          }
+        }
+      };
+
+  // Check users for timeline-aware ops.
+  for (auto *user : fence.getUsers()) {
+    if (auto awareOp = dyn_cast<IREE::Stream::TimelineAwareOpInterface>(user)) {
+      processTimelineAwareOp(awareOp);
+    }
+  }
+
+  // Walk defining ops to find timeline-aware producers.
+  solver.getExplorer().walkDefiningOps(fence, [&](OpResult valueResult) {
+    auto *definingOp = valueResult.getOwner();
+    if (auto awareOp =
+            dyn_cast<IREE::Stream::TimelineAwareOpInterface>(definingOp)) {
+      if (awareOp.getSignalFence() == valueResult) {
+        processTimelineAwareOp(awareOp);
+      }
+    }
+    return WalkResult::advance();
+  });
+
+  // Also propagate coverage from the timepoints we directly cover.
+  for (Value timepoint : getAssumedSet()) {
+    auto &timepointCoverage = solver.getElementFor<TimepointCoverage>(
+        *this, Position::forValue(timepoint), DFX::Resolution::REQUIRED);
+    if (timepointCoverage.isValidState()) {
+      LLVM_DEBUG({
+        llvm::dbgs() << "[ElideTimepoints] fence ";
+        fence.printAsOperand(llvm::dbgs(), solver.getAsmState());
+        llvm::dbgs() << " covers timepoint ";
+        timepoint.printAsOperand(llvm::dbgs(), solver.getAsmState());
+        llvm::dbgs() << " which covers: ";
+        timepointCoverage.print(llvm::dbgs(), solver.getAsmState());
+        llvm::dbgs() << "\n";
+      });
+      newState &= timepointCoverage;
+    }
+  }
+
+  return DFX::clampStateAndIndicateChange(getState(), newState);
+}
+
 class TimepointCoverageAnalysis {
 public:
   explicit TimepointCoverageAnalysis(Operation *rootOp)
-      : explorer(rootOp, TraversalAction::SHALLOW),
+      : explorer(rootOp, TraversalAction::RECURSE),
         solver(explorer, allocator) {
-    explorer.setOpInterfaceAction<mlir::FunctionOpInterface>(
-        TraversalAction::RECURSE);
-    explorer.setOpAction<mlir::scf::IfOp>(TraversalAction::RECURSE);
-    explorer.setDialectAction<IREE::Stream::StreamDialect>(
-        TraversalAction::RECURSE);
     // Ignore the contents of executables (linalg goo, etc) and execution
     // regions (they don't impact timepoints).
     explorer.setOpAction<IREE::Stream::ExecutableOp>(TraversalAction::IGNORE);
@@ -573,6 +783,29 @@ public:
           }
         }
 
+        // Seed FenceCoverage for fence values that might be relevant.
+        // This includes fences from timeline-aware ops and imported fences.
+        for (auto op : block.getOps<IREE::Stream::TimelineAwareOpInterface>()) {
+          if (!op.participatesInTimeline())
+            continue;
+          if (Value signalFence = op.getSignalFence()) {
+            solver.getOrCreateElementFor<FenceCoverage>(
+                Position::forValue(signalFence));
+          }
+          for (Value awaitFence : op.getAwaitFences()) {
+            solver.getOrCreateElementFor<FenceCoverage>(
+                Position::forValue(awaitFence));
+          }
+        }
+
+        // Also seed for fences being imported by TimepointImportOp.
+        for (auto importOp : block.getOps<IREE::Stream::TimepointImportOp>()) {
+          for (Value importedValue : importOp.getOperands()) {
+            solver.getOrCreateElementFor<FenceCoverage>(
+                Position::forValue(importedValue));
+          }
+        }
+
         // Seed all terminator operands.
         if (auto *terminatorOp = block.getTerminator()) {
           for (auto operand : terminatorOp->getOperands()) {
@@ -620,7 +853,31 @@ public:
     return isImmediate.isValidState() && isImmediate.isKnown();
   }
 
-  // Union all transitively reached timepoints by the time |value| is reached.
+  // Returns true if the given |consumerTimepoints| are covered by the
+  // |producerTimepoint|.
+  bool covers(Value producerTimepoint, ValueRange consumerTimepoints) {
+    // Empty await list covers nothing - need proactive folding.
+    if (consumerTimepoints.empty()) {
+      return false;
+    }
+    for (Value consumerTimepoint : consumerTimepoints) {
+      auto coverage = solver.getOrCreateElementFor<TimepointCoverage>(
+          Position::forValue(producerTimepoint));
+      if (!coverage.isValidState() || !coverage.covers(consumerTimepoint)) {
+        return false;
+      }
+      LLVM_DEBUG({
+        llvm::dbgs() << "[ElideTimepoints] producer timepoint ";
+        producerTimepoint.printAsOperand(llvm::dbgs(), getAsmState());
+        llvm::dbgs() << " already covered by ";
+        consumerTimepoint.printAsOperand(llvm::dbgs(), getAsmState());
+        llvm::dbgs() << "\n";
+      });
+    }
+    return true;
+  }
+
+  // Unions all transitively reached timepoints by the time |value| is reached.
   bool unionTransitivelyReachedTimepoints(Value value, SetVector<Value> &set) {
     auto coverage = solver.getOrCreateElementFor<TimepointCoverage>(
         Position::forValue(value));
@@ -686,10 +943,575 @@ buildRequiredCoverageSet(SmallVector<Value> possibleTimepoints,
   return requiredTimepoints;
 }
 
+//===----------------------------------------------------------------------===//
+// Await hoisting/sinking for control flow
+//===----------------------------------------------------------------------===//
+
+// Returns true if |value| is used directly (not captured by stream ops) in
+// |region|. Stream ops with await() clauses don't count as direct usage since
+// the value is captured for async execution.
+static bool isValueUsedDirectlyInRegion(Value value, Region &region) {
+  for (Block &block : region) {
+    for (Operation &op : block) {
+      // Check if op uses value as operand (but not in stream op await clause).
+      for (OpOperand &operand : op.getOpOperands()) {
+        if (operand.get() == value) {
+          // Check if value is in await list.
+          if (auto timelineOp =
+                  dyn_cast<IREE::Stream::TimelineOpInterface>(&op)) {
+            bool isInAwaitList = false;
+            for (Value awaitTimepoint : timelineOp.getAwaitTimepoints()) {
+              if (awaitTimepoint == value) {
+                isInAwaitList = true;
+                break;
+              }
+            }
+            if (isInAwaitList) {
+              // Not a direct use, captured by await().
+              continue;
+            }
+          }
+          // Direct use found.
+          return true;
+        }
+      }
+
+      // Recursively check nested regions.
+      for (Region &nestedRegion : op.getRegions()) {
+        if (isValueUsedDirectlyInRegion(value, nestedRegion)) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+// Identifies which regions of |controlFlowOp| use |value| directly.
+static void getRegionsThatUseValue(Value value, Operation *controlFlowOp,
+                                   SmallVectorImpl<Region *> &regions) {
+  for (Region &region : controlFlowOp->getRegions()) {
+    if (isValueUsedDirectlyInRegion(value, region)) {
+      regions.push_back(&region);
+    }
+  }
+}
+
+// Sinks awaits into specific branches of control flow.
+// Conservative: only optimizes ops with mutually exclusive execution paths.
+static bool trySinkAwaitIntoBranch(IREE::Stream::TimepointAwaitOp awaitOp,
+                                   Operation *controlFlowOp) {
+  // Generic analysis: which regions use the awaited values?
+  // We need at least one region to use it for sinking to make sense.
+  SmallVector<Region *> regionsWithDirectUse;
+  for (Value awaitedValue : awaitOp.getResults()) {
+    getRegionsThatUseValue(awaitedValue, controlFlowOp, regionsWithDirectUse);
+  }
+  if (regionsWithDirectUse.empty()) {
+    return false;
+  }
+
+  // Conservative: only handle ops with mutually exclusive branches.
+  // TODO(benvanik): maybe peel an scf.if from an scf.for/while and make the
+  //     wait conditional? That may mess up other analysis so we'd only want
+  //     to do that if all other analysis failed. Better would be to try to
+  //     rotate it into the loop.
+  auto sinkIntoRegion = [&](Region *targetRegion) {
+    // Clone await into target region.
+    OpBuilder builder(&targetRegion->front(), targetRegion->front().begin());
+    auto *newAwaitOp = builder.clone(*awaitOp);
+
+    // Replace uses in target region with new await.
+    for (auto [oldResult, newResult] :
+         llvm::zip(awaitOp.getResults(), newAwaitOp->getResults())) {
+      oldResult.replaceUsesWithIf(newResult, [&](OpOperand &use) {
+        return targetRegion->isAncestor(use.getOwner()->getParentRegion());
+      });
+    }
+  };
+  return TypeSwitch<Operation *, bool>(controlFlowOp)
+      .Case<scf::IfOp>([&](auto ifOp) {
+        // scf.if has mutually exclusive branches - sink into all that need it.
+        LLVM_DEBUG({
+          llvm::dbgs() << "[ElideTimepoints] sinking await into scf.if ";
+          bool first = true;
+          for (Region *region : regionsWithDirectUse) {
+            if (!first)
+              llvm::dbgs() << " and ";
+            if (region == &ifOp.getThenRegion()) {
+              llvm::dbgs() << "then";
+            } else {
+              llvm::dbgs() << "else";
+            }
+            first = false;
+          }
+          llvm::dbgs() << " branch(es)\n";
+        });
+        for (Region *region : regionsWithDirectUse) {
+          sinkIntoRegion(region);
+        }
+        // If no uses remain outside then erase the original op we're sinking.
+        if (llvm::all_of(awaitOp.getResults(),
+                         [](Value v) { return v.use_empty(); })) {
+          awaitOp.erase();
+        }
+        return true;
+      })
+      .Case<scf::IndexSwitchOp>([&](auto switchOp) {
+        // scf.index_switch has mutually exclusive case regions - sink into all
+        // that need it.
+        LLVM_DEBUG({
+          llvm::dbgs()
+              << "[ElideTimepoints] sinking await into scf.index_switch ";
+          bool first = true;
+          auto caseRegions = switchOp.getCaseRegions();
+          for (Region *region : regionsWithDirectUse) {
+            if (!first)
+              llvm::dbgs() << ", ";
+            // Find which case this is.
+            bool foundCase = false;
+            for (auto [idx, caseRegion] : llvm::enumerate(caseRegions)) {
+              if (&caseRegion == region) {
+                llvm::dbgs() << "case " << idx;
+                foundCase = true;
+                break;
+              }
+            }
+            if (!foundCase && region == &switchOp.getDefaultRegion()) {
+              llvm::dbgs() << "default";
+            }
+            first = false;
+          }
+          llvm::dbgs() << " region(s)\n";
+        });
+        for (Region *region : regionsWithDirectUse) {
+          sinkIntoRegion(region);
+        }
+        // If no uses remain outside then erase the original op we're sinking.
+        if (llvm::all_of(awaitOp.getResults(),
+                         [](Value v) { return v.use_empty(); })) {
+          awaitOp.erase();
+        }
+        return true;
+      })
+      .Default([](auto) { return false; });
+}
+
+// Hoists await past control flow when the value only used after.
+// Safe for any control flow if no regions use the value as our timepoints are
+// immutable and cannot be impacted by side-effects. I hope.
+static bool tryHoistAwaitPastControlFlow(IREE::Stream::TimepointAwaitOp awaitOp,
+                                         Operation *controlFlowOp) {
+  // Check if awaited values used in any region of control flow.
+  for (Value awaitedValue : awaitOp.getResults()) {
+    for (Region &region : controlFlowOp->getRegions()) {
+      if (isValueUsedDirectlyInRegion(awaitedValue, region)) {
+        // Used in region, can't hoist.
+        return false;
+      }
+    }
+
+    // Also check if used by control flow op itself (condition, bounds, etc).
+    for (OpOperand &operand : controlFlowOp->getOpOperands()) {
+      if (operand.get() == awaitedValue) {
+        return false;
+      }
+    }
+  }
+
+  // All uses are after control flow - safe to move.
+  awaitOp->moveAfter(controlFlowOp);
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "[ElideTimepoints] hoisted await past ";
+    llvm::dbgs() << controlFlowOp->getName() << "\n";
+  });
+
+  return true;
+}
+
+// Folds await with timeline ops that consume the awaited values.
+// Handles both proactive absorption and reactive cleanup:
+// - Proactive: if timeline op doesn't cover the await timepoint absorb it by
+//   adding to the timeline op's await list.
+// - Reactive: if timeline op already covers the await timepoint just eliminate
+//   the redundant await.
+// Returns true if any folding occurred.
+static bool tryFoldAwaitWithTimelineOps(IREE::Stream::TimepointAwaitOp awaitOp,
+                                        TimepointCoverageAnalysis &analysis,
+                                        DominanceInfo &domInfo) {
+  // Walk all uses (which may be across CFG or call graph edges).
+  // Note that we don't care if we can't find all of them - this is an
+  // optimization and there will always be cases we miss.
+  bool didChange = false;
+  Value awaitTimepoint = awaitOp.getAwaitTimepoint();
+
+  // Validate the await timepoint before using it.
+  if (!awaitTimepoint) {
+    LLVM_DEBUG({
+      llvm::dbgs() << "[ElideTimepoints] skipping fold: null await timepoint\n";
+    });
+    return false;
+  }
+
+  // Collect modifications to apply after walking (don't modify IR during walk).
+  // We store enough information to reconstruct what to do without holding
+  // OpOperand* pointers which can become invalid.
+  struct Modification {
+    IREE::Stream::TimelineOpInterface timelineOp;
+    Value oldValue;                // value to replace
+    Value newValue;                // replacement value
+    bool needsTimepointAbsorption; // true if we need to add awaitTimepoint
+  };
+  SmallVector<Modification> modifications;
+
+  // Validate resource operands before accessing.
+  auto resourceOperands = awaitOp.getResourceOperands();
+  if (resourceOperands.size() != awaitOp->getNumResults()) {
+    LLVM_DEBUG({
+      llvm::dbgs() << "[ElideTimepoints] skipping fold: resource operands "
+                      "mismatch with results\n";
+    });
+    return false;
+  }
+
+  for (auto result : awaitOp->getResults()) {
+    Value asyncValue = resourceOperands[result.getResultNumber()];
+
+    // Validate the async value before using it.
+    if (!asyncValue) {
+      LLVM_DEBUG({
+        llvm::dbgs() << "[ElideTimepoints] skipping fold: null async value\n";
+      });
+      continue;
+    }
+
+    analysis.getExplorer().walkTransitiveUses(
+        result,
+        [&](OpOperand &operand) {
+          if (auto timelineOp = dyn_cast<IREE::Stream::TimelineOpInterface>(
+                  operand.getOwner())) {
+            // Await result value is being consumed by a timeline op.
+
+            // Only fold if the async value dominates the timeline op.
+            // This prevents dominance violations when the async value is
+            // defined inside a nested region (e.g., scf.if branch).
+            if (!domInfo.properlyDominates(asyncValue, timelineOp)) {
+              LLVM_DEBUG({
+                llvm::dbgs() << "[ElideTimepoints] skipping fold: async value ";
+                asyncValue.printAsOperand(llvm::dbgs(), analysis.getAsmState());
+                llvm::dbgs() << " does not dominate timeline op\n";
+              });
+              return WalkResult::advance();
+            }
+
+            // Check if timeline op's awaits cover this await timepoint.
+            bool isCovered = analysis.covers(awaitTimepoint,
+                                             timelineOp.getAwaitTimepoints());
+
+            if (!isCovered) {
+              // PROACTIVE: Timeline op DOESN'T cover the await timepoint.
+              // We'll absorb the await into the timeline op after the walk
+              // completes.
+              LLVM_DEBUG({
+                llvm::dbgs()
+                    << "[ElideTimepoints] will absorb await into timeline op "
+                    << "adding timepoint ";
+                awaitTimepoint.printAsOperand(llvm::dbgs(),
+                                              analysis.getAsmState());
+                llvm::dbgs() << "\n";
+              });
+              modifications.push_back(
+                  {timelineOp, operand.get(), asyncValue, true});
+              didChange = true;
+            } else {
+              // REACTIVE: Timeline op DOES cover the await timepoint.
+              // The timeline op already awaits this timepoint (or something
+              // that covers it), so we can just eliminate the redundant await.
+              LLVM_DEBUG({
+                llvm::dbgs() << "[ElideTimepoints] timeline op consumed sync "
+                                "operand already covered by timepoint ";
+                awaitTimepoint.printAsOperand(llvm::dbgs(),
+                                              analysis.getAsmState());
+                llvm::dbgs() << "\n";
+              });
+              modifications.push_back(
+                  {timelineOp, operand.get(), asyncValue, false});
+              didChange = true;
+            }
+          }
+          return WalkResult::advance();
+        },
+        TraversalBehavior::DONT_WALK_TIED_VALUES);
+  }
+
+  // Phase 1: Update all timeline ops that need timepoint absorption.
+  // Group by timeline op to avoid adding the same timepoint multiple times.
+  llvm::DenseMap<Operation *, SmallVector<Value>> timelineAbsorptions;
+  for (auto &mod : modifications) {
+    if (mod.needsTimepointAbsorption) {
+      timelineAbsorptions[mod.timelineOp].push_back(awaitTimepoint);
+    }
+  }
+
+  // Apply timepoint absorptions.
+  for (auto &[timelineOpPtr, timepoints] : timelineAbsorptions) {
+    auto timelineOp = cast<IREE::Stream::TimelineOpInterface>(timelineOpPtr);
+    OpBuilder builder(timelineOp);
+    SmallVector<Value> newAwaitTimepoints(timelineOp.getAwaitTimepoints());
+
+    // Add unique timepoints (avoid duplicates).
+    for (Value timepoint : timepoints) {
+      if (!llvm::is_contained(newAwaitTimepoints, timepoint)) {
+        newAwaitTimepoints.push_back(timepoint);
+      }
+    }
+
+    timelineOp.setAwaitTimepoints(newAwaitTimepoints, builder);
+    LLVM_DEBUG({
+      llvm::dbgs() << "[ElideTimepoints] absorbed await into timeline op ";
+      timelineOp.print(llvm::dbgs(), analysis.getAsmState());
+      llvm::dbgs() << "\n";
+    });
+  }
+
+  // Phase 2: Replace all operand values with async values.
+  // Use replaceUsesWithIf to safely update only the uses within the timeline
+  // ops we're modifying.
+  for (auto &mod : modifications) {
+    mod.oldValue.replaceUsesWithIf(mod.newValue, [&](OpOperand &use) {
+      if (use.getOwner() != mod.timelineOp.getOperation()) {
+        return false;
+      }
+      // Verify that mod.newValue dominates mod.oldValue.
+      // For block arguments, check if the block containing mod.newValue
+      // dominates the block argument's owner block.
+      // For regular values, check if mod.newValue dominates the defining op.
+      if (auto blockArg = dyn_cast<BlockArgument>(mod.oldValue)) {
+        // mod.oldValue is a block argument.
+        Block *argBlock = blockArg.getOwner();
+
+        // Check if this is a CF loop header (block has a back-edge to itself).
+        // A back-edge exists if any predecessor is dominated by this block.
+        // This indicates the block is part of a loop where the same block
+        // argument receives different values on different iterations. Skip this
+        // check for blocks inside SCF regions (they use
+        // RegionBranchOpInterface).
+        bool isInSCFRegion = false;
+        Operation *parentOp = argBlock->getParentOp();
+        while (parentOp) {
+          if (isa<mlir::RegionBranchOpInterface>(parentOp)) {
+            isInSCFRegion = true;
+            break;
+          }
+          if (parentOp->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
+            break; // Stop at function/module boundary.
+          }
+          parentOp = parentOp->getParentOp();
+        }
+
+        if (!isInSCFRegion) {
+          for (Block *pred : argBlock->getPredecessors()) {
+            if (pred == argBlock || domInfo.dominates(argBlock, pred)) {
+              // Back-edge detected: either self-loop or pred is dominated by
+              // argBlock. Block argument could receive different values on
+              // different paths.
+              return false;
+            }
+          }
+        }
+
+        // Get the block containing mod.newValue and check if it dominates.
+        Operation *defOp = mod.newValue.getDefiningOp();
+        if (!defOp) {
+          // mod.newValue is itself a block argument, check block dominance.
+          auto newBlockArg = cast<BlockArgument>(mod.newValue);
+          return domInfo.properlyDominates(newBlockArg.getOwner(), argBlock);
+        }
+        // Check if the block containing the defining op dominates the block
+        // argument's owner block.
+        return domInfo.properlyDominates(defOp->getBlock(), argBlock);
+      } else {
+        // mod.oldValue is a regular SSA value. Check if mod.newValue dominates
+        // its defining operation.
+        return domInfo.properlyDominates(mod.newValue,
+                                         mod.oldValue.getDefiningOp());
+      }
+    });
+  }
+
+  // Phase 3: Erase the await op if all its results are now unused.
+  // This is safe now that all modifications are complete and we're not in a
+  // walk anymore.
+  if (didChange && llvm::all_of(awaitOp->getResults(), [](Value result) {
+        return result.use_empty();
+      })) {
+    LLVM_DEBUG({
+      llvm::dbgs() << "[ElideTimepoints] erasing completely folded await op\n";
+    });
+    awaitOp.erase();
+  }
+
+  return didChange;
+}
+
+// Tries to eliminate redundant awaits before region branch terminators when
+// both the awaited resource and a covering timepoint are passed to the
+// successor region. Uses RegionBranchOpInterface to handle all region branch
+// ops generically (scf.if, scf.for, scf.while, etc.).
+//
+// Pattern: %r = await %tp => %res; <region terminator> %r, %tp
+// Transform: <region terminator> %res, %tp (eliminates await)
+//
+// This is safe because:
+// 1. The timepoint is passed to the successor, so consumers will wait on it
+// 2. Coverage analysis confirms the timepoint covers the await
+// 3. Dominance analysis ensures the original resource is available
+//
+// Returns true if any awaits were eliminated.
+static bool
+tryEliminateAwaitBeforeRegionBranchYield(IREE::Stream::TimepointAwaitOp awaitOp,
+                                         TimepointCoverageAnalysis &analysis,
+                                         DominanceInfo &domInfo) {
+  bool didChange = false;
+
+  // Collect await's timepoint and resources for checking.
+  Value awaitTimepoint = awaitOp.getAwaitTimepoint();
+  if (!awaitTimepoint) {
+    return false;
+  }
+  auto awaitResources = awaitOp.getResourceOperands();
+  if (awaitResources.empty()) {
+    return false;
+  }
+
+  // Walk all transitive uses of the await results to find region branch
+  // terminators. This handles indirect flows through arith.select, phi nodes,
+  // etc., which getDefiningOp would miss.
+  for (auto awaitResult : awaitOp->getResults()) {
+    unsigned resultIdx = cast<OpResult>(awaitResult).getResultNumber();
+    Value originalResource = awaitResources[resultIdx];
+
+    // Track modifications to apply after walking (don't modify during walk).
+    struct Modification {
+      Operation *terminator;
+      unsigned operandIdx;
+      Value newValue;
+    };
+    SmallVector<Modification> modifications;
+    analysis.getExplorer().walkTransitiveUses(
+        awaitResult,
+        [&](OpOperand &use) {
+          Operation *user = use.getOwner();
+
+          // Check if user is a terminator in a region branch op.
+          if (!user->hasTrait<OpTrait::IsTerminator>()) {
+            return WalkResult::advance();
+          }
+          auto parentOp =
+              dyn_cast<RegionBranchOpInterface>(user->getParentOp());
+          if (!parentOp) {
+            return WalkResult::advance();
+          }
+
+          // Query where this terminator's operands flow.
+          // We need to cast the terminator to RegionBranchTerminatorOpInterface
+          // to construct a proper RegionBranchPoint.
+          auto terminatorInterface =
+              dyn_cast<RegionBranchTerminatorOpInterface>(user);
+          if (!terminatorInterface) {
+            // Terminator doesn't implement the interface, skip it.
+            return WalkResult::advance();
+          }
+
+          SmallVector<RegionSuccessor> successors;
+          parentOp.getSuccessorRegions(RegionBranchPoint(terminatorInterface),
+                                       successors);
+          for (auto successor : successors) {
+            // Only handle yields to parent (region -> parent op results).
+            // Yields to other regions would require different analysis.
+            if (!successor.isParent()) {
+              continue;
+            }
+
+            // Get operands passed to this successor.
+            // For scf.condition, exclude the condition boolean from operands.
+            OperandRange successorOperands = user->getOperands();
+            if (auto condOp = dyn_cast<scf::ConditionOp>(user)) {
+              successorOperands = condOp.getArgs();
+            }
+
+            // Collect all timepoint operands passed to the successor.
+            SmallVector<Value> yieldedTimepoints;
+            for (Value operand : successorOperands) {
+              if (isa<IREE::Stream::TimepointType>(operand.getType())) {
+                yieldedTimepoints.push_back(operand);
+              }
+            }
+            if (yieldedTimepoints.empty()) {
+              // No timepoints yielded - can't eliminate await.
+              continue;
+            }
+
+            // Check if the yielded timepoints cover the awaited timepoint.
+            // This handles both exact matches and transitive coverage
+            // (e.g., yielding a joined timepoint that covers this one).
+            if (!analysis.covers(awaitTimepoint, yieldedTimepoints)) {
+              LLVM_DEBUG({
+                llvm::dbgs()
+                    << "[ElideTimepoints] cannot eliminate await "
+                       "before region branch yield: yielded timepoints "
+                       "don't cover awaited timepoint\n";
+              });
+              continue;
+            }
+
+            // Verify the original resource dominates the terminator.
+            // This ensures it's safe to use the original instead of awaited.
+            if (!domInfo.properlyDominates(originalResource, user)) {
+              LLVM_DEBUG({
+                llvm::dbgs() << "[ElideTimepoints] cannot eliminate await "
+                                "before region branch yield: original resource "
+                                "doesn't dominate terminator\n";
+              });
+              continue;
+            }
+
+            // Safe to eliminate - record the modification.
+            LLVM_DEBUG({
+              llvm::dbgs() << "[ElideTimepoints] eliminating redundant await "
+                              "before region branch yield - timepoint ";
+              awaitTimepoint.printAsOperand(llvm::dbgs(),
+                                            analysis.getAsmState());
+              llvm::dbgs() << " is covered by yielded timepoints\n";
+            });
+
+            modifications.push_back({
+                user,
+                use.getOperandNumber(),
+                originalResource,
+            });
+            didChange = true;
+          }
+
+          return WalkResult::advance();
+        },
+        TraversalBehavior::DONT_WALK_TIED_VALUES);
+
+    // Apply modifications.
+    for (auto &mod : modifications) {
+      mod.terminator->setOperand(mod.operandIdx, mod.newValue);
+    }
+  }
+
+  return didChange;
+}
+
 // Tries to elide timepoints nested within |region| when safe.
 // Returns true if any ops were elided.
 static bool tryElideTimepointsInRegion(Region &region,
-                                       TimepointCoverageAnalysis &analysis) {
+                                       TimepointCoverageAnalysis &analysis,
+                                       DominanceInfo &domInfo) {
   bool didChange = false;
 
   // We batch up all results we're going to change to prevent SSA value
@@ -866,10 +1688,60 @@ static bool tryElideTimepointsInRegion(Region &region,
           elideTimepointOperands(op);
           elideTimepointResults(op);
         })
-        .Case<cf::BranchOp, cf::CondBranchOp>(
-            [&](Operation *op) { elideTimepointOperands(op); })
-        .Case<IREE::Util::ReturnOp, scf::YieldOp>(
+        .Case<cf::BranchOp, cf::CondBranchOp, IREE::Util::ReturnOp>(
             [&](Operation *op) { elideTimepointOperands(op); });
+  });
+
+  // Apply await movement optimizations around control flow.
+  // Iterate until no more structural changes occur (sinking/hoisting).
+  // Folding is not iterated because it doesn't change await placement.
+  bool awaitMovementChanged = false;
+  do {
+    awaitMovementChanged = false;
+    // Walk awaits and try to optimize their placement.
+    region.walk([&](IREE::Stream::TimepointAwaitOp awaitOp) {
+      // Try moving await around control flow.
+      Operation *nextOp = awaitOp->getNextNode();
+      if (!nextOp || nextOp->getNumRegions() == 0) {
+        // Try folding if no control flow after.
+        if (tryFoldAwaitWithTimelineOps(awaitOp, analysis, domInfo)) {
+          didChange = true;
+        }
+        return WalkResult::advance();
+      }
+
+      // Try sinking into specific branch.
+      if (trySinkAwaitIntoBranch(awaitOp, nextOp)) {
+        didChange = true;
+        awaitMovementChanged = true;
+        return WalkResult::skip();
+      }
+
+      // Try hoisting past control flow.
+      if (tryHoistAwaitPastControlFlow(awaitOp, nextOp)) {
+        didChange = true;
+        awaitMovementChanged = true;
+      }
+
+      return WalkResult::advance();
+    });
+  } while (awaitMovementChanged);
+
+  // After all structural movement is complete, do a final folding pass.
+  // This catches awaits that may now be adjacent to timeline ops after sinking.
+  region.walk([&](IREE::Stream::TimepointAwaitOp awaitOp) {
+    if (tryFoldAwaitWithTimelineOps(awaitOp, analysis, domInfo)) {
+      didChange = true;
+    }
+  });
+
+  // Eliminate redundant awaits before region branch yields.
+  // This uses coverage analysis to determine if yielded timepoints cover the
+  // awaits, handling all RegionBranchOpInterface ops generically.
+  region.walk([&](IREE::Stream::TimepointAwaitOp awaitOp) {
+    if (tryEliminateAwaitBeforeRegionBranchYield(awaitOp, analysis, domInfo)) {
+      didChange = true;
+    }
   });
 
   // Process elided results; we do this afterward to keep the debug output
@@ -907,9 +1779,18 @@ struct ElideTimepointsPass
     // fixed-point iteration continues.
     for (auto callableOp : analysis.getTopLevelOps()) {
       auto *region = callableOp.getCallableRegion();
-      if (!region || region->empty())
+      if (!region || region->empty()) {
         continue;
-      didChange = tryElideTimepointsInRegion(*region, analysis) || didChange;
+      }
+
+      // Compute dominance info once for the entire function and reuse across
+      // all await folding within. This is safe because we never modify the CFG
+      // structure (blocks/branches), only operation operands, uses, and
+      // non-CFG operations.
+      DominanceInfo domInfo(callableOp);
+
+      didChange =
+          tryElideTimepointsInRegion(*region, analysis, domInfo) || didChange;
     }
 
     if (didChange)

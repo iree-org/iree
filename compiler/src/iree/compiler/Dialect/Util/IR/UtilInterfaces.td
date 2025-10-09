@@ -1646,7 +1646,6 @@ def Util_SerializableAttrInterface :
 //===----------------------------------------------------------------------===//
 
 def Util_StoredModuleAttrInterface : Util_AttrInterface<"StoredModuleAttrInterface"> {
-
   let description = [{
     Interface allowing attributes to store a reference to an underlying readonly
     module. Thread safety of accesses to the module are managed by the
@@ -1673,6 +1672,151 @@ def Util_StoredModuleAttrInterface : Util_AttrInterface<"StoredModuleAttrInterfa
       ),
       /*methodBody=*/[{}]
     >,
+  ];
+}
+
+//===----------------------------------------------------------------------===//
+// IREE::Util::MutableRegionBranchOpInterface
+//===----------------------------------------------------------------------===//
+
+def Util_MutableRegionBranchOpInterface : Util_OpInterface<"MutableRegionBranchOpInterface"> {
+  let description = [{
+    Interface for RegionBranchOpInterface operations that support mutation
+    for type expansion passes (e.g., PropagateTimepoints, PropagateSubviews).
+
+    This interface enables generic SROA-like passes to handle control flow ops
+    like scf.for, scf.if, scf.while without hardcoding each op type.
+
+    The interface separates concerns:
+    - Type expansion policy (provided by the pass via TypeExpander callback)
+    - Op-specific mutation mechanics (provided by this interface)
+    - Metadata tracking (provided by the pass via MetadataMap callback)
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Rebuild this operation with expanded types for operands and results.
+
+        This is the core mutation method that:
+        1. Expands operands using expandOperandFn
+        2. Expands result types using expandTypeFn
+        3. Creates a new op with expanded signature
+        4. Populates block arguments with expansion metadata
+        5. Calls wrapExpandedBlockArgFn to create reconstruction ops
+        6. Recursively processes nested regions
+
+        The pass provides:
+        - expandTypeFn: Type -> SmallVector<Type> (e.g., resource -> [resource, timepoint])
+        - expandOperandFn: Value -> SmallVector<Value> (e.g., lookup+consume timepoint)
+        - wrapExpandedBlockArgFn: Optional callback invoked after block arg expansion.
+          Receives the original block arg, the expanded values (1:N), and a builder.
+          Returns the replacement value to use for all uses of the original arg.
+          If std::nullopt, no wrapping is performed.
+        - expandRegionFn: Region -> void (recursively expand ops in region)
+        - builder: Where to insert the new op
+
+        Returns the new operation that replaces this one, or nullptr if the
+        operation cannot be rebuilt.
+      }],
+      /*retTy=*/"::mlir::Operation *",
+      /*methodName=*/"rebuildWithExpandedTypes",
+      /*args=*/(ins
+        "::llvm::function_ref<void(::mlir::Type, ::llvm::SmallVectorImpl<::mlir::Type> &)>":$expandTypeFn,
+        "::llvm::function_ref<void(::mlir::Value, ::llvm::SmallVectorImpl<::mlir::Value> &, ::mlir::OpBuilder &)>":$expandOperandFn,
+        "::std::optional<::llvm::function_ref<::mlir::Value(::mlir::Location, ::mlir::Value, ::mlir::ValueRange, ::mlir::OpBuilder &)>>":$wrapExpandedBlockArgFn,
+        "::llvm::function_ref<void(::mlir::Region &, bool /*canModifyEntryBlock*/)>":$expandRegionFn,
+        "::mlir::OpBuilder &":$builder
+      )
+    >,
+
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns which block arguments should NOT be expanded.
+
+        For scf.for: the induction variable (first arg of body)
+        For scf.while: typically none
+        For scf.if: none (no block args)
+
+        Returns a BitVector with bits set for args that should be preserved.
+        An empty BitVector means all arguments can be expanded.
+      }],
+      /*retTy=*/"::llvm::BitVector",
+      /*methodName=*/"getPreservedBlockArguments",
+      /*args=*/(ins "unsigned":$regionIndex),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        // By default, all block arguments can be expanded.
+        if (regionIndex >= $_op->getNumRegions()) {
+          return ::llvm::BitVector();
+        }
+        auto &region = $_op->getRegion(regionIndex);
+        if (region.empty()) {
+          return ::llvm::BitVector();
+        }
+        return ::llvm::BitVector(region.front().getNumArguments());
+      }]
+    >,
+
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the operands that correspond to region entry block arguments.
+
+        For scf.for: iter_args (not lb, ub, step)
+        For scf.if: {} (no operands map to block args)
+        For scf.while: before/after operands
+
+        This enables the interface to map expanded operands to expanded block args.
+      }],
+      /*retTy=*/"::mlir::OperandRange",
+      /*methodName=*/"getRegionEntryOperands",
+      /*args=*/(ins "unsigned":$regionIndex),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        // By default, assume all operands map to entry block args.
+        return $_op->getOperands();
+      }]
+    >,
+
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the results that correspond to region exit values.
+
+        For scf.for: all results correspond to yielded values
+        For scf.if: all results correspond to yielded values
+        For scf.while: results correspond to 'after' region yields
+
+        Used to map expanded yields to expanded results.
+      }],
+      /*retTy=*/"::mlir::ResultRange",
+      /*methodName=*/"getRegionExitResults",
+      /*args=*/(ins "unsigned":$regionIndex),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        // By default, assume all results correspond to region exit values.
+        return $_op->getResults();
+      }]
+    >,
+
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the terminator operands that should be expanded.
+
+        For scf.yield in scf.for: all operands
+        For scf.yield in scf.if: all operands
+        For scf.condition: all operands except the condition i1
+
+        This is needed because not all terminator operands are iteration values.
+      }],
+      /*retTy=*/"::mlir::OperandRange",
+      /*methodName=*/"getExpandableTerminatorOperands",
+      /*args=*/(ins "::mlir::Operation *":$terminator, "unsigned":$regionIndex),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        // By default, all terminator operands are expandable.
+        return terminator->getOperands();
+      }]
+    >
   ];
 }
 

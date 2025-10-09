@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Patterns.h"
 #include "iree/compiler/Utils/IntegerSet.h"
@@ -228,11 +229,20 @@ static void expandRegion(Region &region, bool canModifyEntryBlock,
   for (auto &block : region.getBlocks()) {
     if (!llvm::any_of(block.getArgumentTypes(), isResourceType))
       continue;
-    if (block.isEntryBlock() && !canModifyEntryBlock)
-      continue;
 
-    // Insert and build a list of expanded (resource, size, offset) tuples.
+    // Entry blocks that we can't modify are fully handled by
+    // MutableRegionBranchOpInterface (via wrapExpandedBlockArgFn callback).
+    // Skip them entirely - block args already expanded and subrange ops
+    // already inserted.
+    if (block.isEntryBlock() && !canModifyEntryBlock) {
+      continue;
+    }
+
+    // Insert and build a list of expanded (resource, size, offset, length)
+    // tuples.
     SmallVector<Subrange> expansions;
+
+    // Insert new arguments for each resource argument.
     for (int i = block.getNumArguments() - 1; i >= 0; --i) {
       auto arg = block.getArgument(i);
       if (!isResourceType(arg.getType()))
@@ -575,6 +585,98 @@ static void expandSwitchOp(mlir::cf::SwitchOp op, IndexSet &indexSet,
   op.erase();
 }
 
+// Expands a region branch operation using MutableRegionBranchOpInterface.
+// This handles SCF operations like scf.if, scf.for, scf.while,
+// scf.index_switch.
+static void
+expandRegionBranchOp(IREE::Util::MutableRegionBranchOpInterface mutableOp,
+                     SymbolTable &symbolTable, ExpandedGlobalMap &globalMap,
+                     IndexSet &indexSet, SubrangeMap &subrangeMap) {
+  Operation *op = mutableOp.getOperation();
+  if (!usesResources(op)) {
+    // No resources used, but still need to process nested regions.
+    expandRegions(op, /*canModifyEntryBlock=*/false, symbolTable, globalMap,
+                  indexSet, subrangeMap);
+    return;
+  }
+
+  OpBuilder builder(op);
+  builder.setInsertionPoint(op);
+
+  auto expandTypeFn = [](Type type, SmallVectorImpl<Type> &newTypes) {
+    expandType(type, newTypes);
+  };
+
+  auto expandOperandFn = [&](Value operand, SmallVectorImpl<Value> &newOperands,
+                             OpBuilder &builder) {
+    expandOperand(op->getLoc(), operand, newOperands, subrangeMap, indexSet,
+                  builder);
+  };
+
+  // SROA-style callback: receives expanded block arg values and creates
+  // subrange reconstruction op, returning the replacement value.
+  auto wrapExpandedBlockArgFn = [&](Location loc, Value originalArg,
+                                    ValueRange expandedArgs,
+                                    OpBuilder &builder) -> Value {
+    // expandedArgs = [resource, size, offset, length].
+    assert(expandedArgs.size() == 4 &&
+           "expected resource expansion to produce 4 values");
+    Subrange subrange;
+    subrange.resource = expandedArgs[0];
+    subrange.resourceSize = expandedArgs[1];
+    subrange.subrangeOffset = expandedArgs[2];
+    subrange.subrangeLength = expandedArgs[3];
+    subrangeMap[subrange.resource] = subrange;
+
+    // Create subrange reconstruction op.
+    auto resourceType =
+        cast<IREE::Util::SubrangeTypeInterface>(subrange.resource.getType());
+    Value newSubrange = resourceType.createSubrangeOp(
+        loc, subrange.resource, subrange.resourceSize, subrange.subrangeOffset,
+        subrange.subrangeLength, builder);
+    return newSubrange;
+  };
+
+  auto expandRegionFn = [&](Region &region, bool canModifyEntryBlock) {
+    expandRegion(region, canModifyEntryBlock, symbolTable, globalMap, indexSet,
+                 subrangeMap);
+  };
+
+  Operation *newOp = mutableOp.rebuildWithExpandedTypes(
+      expandTypeFn, expandOperandFn, wrapExpandedBlockArgFn, expandRegionFn,
+      builder);
+  if (!newOp) {
+    return;
+  }
+
+  // Map old results to new results and insert subrange ops.
+  builder.setInsertionPointAfter(newOp);
+  unsigned newIdx = 0;
+  for (unsigned oldIdx = 0; oldIdx < op->getNumResults(); ++oldIdx) {
+    Value oldResult = op->getResult(oldIdx);
+    if (!isResourceType(oldResult.getType())) {
+      auto newResult = newOp->getResult(newIdx++);
+      oldResult.replaceAllUsesWith(newResult);
+      continue;
+    }
+    // Collect expanded 4-tuple: resource, size, offset, length.
+    Subrange subrange;
+    subrange.resource = newOp->getResult(newIdx++);
+    subrange.resourceSize = newOp->getResult(newIdx++);
+    subrange.subrangeOffset = newOp->getResult(newIdx++);
+    subrange.subrangeLength = newOp->getResult(newIdx++);
+    subrangeMap[subrange.resource] = subrange;
+
+    // Insert subrange op to tie them together.
+    auto newSubrange = subrange.getResourceType().createSubrangeOp(
+        op->getLoc(), subrange.resource, subrange.resourceSize,
+        subrange.subrangeOffset, subrange.subrangeLength, builder);
+    oldResult.replaceAllUsesWith(newSubrange);
+  }
+
+  op->erase();
+}
+
 // Recursively expands resources into (resource, size, offset, length) in |op|.
 // TODO(benvanik): make this a type switch.
 static void expandSubranges(Operation *op, SymbolTable &symbolTable,
@@ -603,24 +705,11 @@ static void expandSubranges(Operation *op, SymbolTable &symbolTable,
     return expandCondBranchOp(condBranchOp, indexSet, subrangeMap);
   } else if (auto switchOp = dyn_cast<mlir::cf::SwitchOp>(op)) {
     return expandSwitchOp(switchOp, indexSet, subrangeMap);
+  } else if (auto mutableOp =
+                 dyn_cast<IREE::Util::MutableRegionBranchOpInterface>(op)) {
+    return expandRegionBranchOp(mutableOp, symbolTable, globalMap, indexSet,
+                                subrangeMap);
   }
-
-  // We could have a more generic thing here with RegionBranchOpInterface but
-  // not all ops can contain subrange ops and some are isolated from above.
-  // We could add an interface to ops we want to do this to, though, to at least
-  // allow dialects to plug in. For now we just need SCF so this is hardcoded.
-  if (auto ifOp = dyn_cast<mlir::scf::IfOp>(op)) {
-    return expandRegions(ifOp, /*canModifyEntryBlock=*/false, symbolTable,
-                         globalMap, indexSet, subrangeMap);
-  } else if (auto forOp = dyn_cast<mlir::scf::ForOp>(op)) {
-    return expandRegions(forOp, /*canModifyEntryBlock=*/false, symbolTable,
-                         globalMap, indexSet, subrangeMap);
-  } else if (auto whileOp = dyn_cast<mlir::scf::WhileOp>(op)) {
-    return expandRegions(whileOp, /*canModifyEntryBlock=*/false, symbolTable,
-                         globalMap, indexSet, subrangeMap);
-  }
-  // TODO(benvanik): also handle scf.yield: today we don't propagate across
-  // return values.
 }
 
 //===----------------------------------------------------------------------===//
