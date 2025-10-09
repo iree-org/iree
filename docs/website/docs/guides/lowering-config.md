@@ -157,18 +157,12 @@ the iteration space.
 ```mlir
 lane_basis = [[16, 4], [1, 0]]
 counts = [16, 4]
-```
 
 For a subgroup of 64 threads:
 
 * 16 × 4 = 64
 * This forms a conceptual 16×4 grid of threads in basis space.
-
-**Why 1 is the default, not 0:**
-
-* Counts are multiplicative (used in a product).
-* `count = 1` means “no distribution along this dimension”
-* `count = 0` would make the product zero, which is invalid.
+```
 
 ##### The `mapping` Array
 
@@ -178,7 +172,7 @@ dimensions.
 **Semantics:**
 
 ```text
-mapping[j] = i  means:  iteration_dim[i] ← basis_coordinate[j+1]
+mapping[j] = i  means:  iteration_dim[i] ← basis_digit d_j
 ```
 
 **Example:**
@@ -190,41 +184,30 @@ mapping = [1, 0]
 ```text
 This swaps/transposes the coordinates:
 
-- Basis coordinate c₁ maps to iteration dimension 1.
-- Basis coordinate c₂ maps to iteration dimension 0.
+- Basis digit d₀ maps to iteration dimension 1.
+- Basis digit d₁ maps to iteration dimension 0.
 ```
 
 ##### Computing Thread Position (Step by Step)
 
-Given a thread ID `x`, compute its position in the iteration space:
+Given a thread ID `x`, compute its position in the iteration space.
 
-**Step 1: Delinearize** the thread ID using `counts` to get basis coordinates.
+**Step 1: Delinearize** `x` into mixed-radix digits using `counts`.
 
-**Formula** (for basis `[B₀, B₁, ..., Bₙ₋₁]` producing `n+1` results
-`(c₀, c₁, ..., cₙ)`):
+Let the counts be `B₀, B₁, …, Bₙ₋₁`, and let `N = Π Bᵢ`.
 
-Let `P_i` be the product of basis elements from position `i` onward:
+P<sub>i</sub> = ∏<sub>k=i</sub><sup>n−1</sup> B<sub>k</sub>
 
-```text
-P_n     = 1
-P_{n-1} = B_{n-1}
-P_{n-2} = B_{n-2} × B_{n-1}
-...
-P_0     = B_0 × B_1 × ... × B_{n-1}
-```
-
-Then:
+The basis digits (coordinates) are:
 
 ```text
-c₀ = x ÷ P_0                    (outer bound, typically ignored)
-c_i = (x mod P_{i-1}) ÷ P_i     for i = 1, 2, ..., n
+dᵢ = ⌊ (x mod Pᵢ) / Pᵢ₊₁ ⌋     for i = 0..n-1 where each digit ranges 0 <= dᵢ < bᵢ
 ```
 
 **Step 2: Apply the mapping** to get iteration-space coordinates.
 
 ```text
-For each basis coordinate c_j (j = 1, 2, ..., n):
-  iteration_dim[mapping[j-1]] = c_j
+iteration_dim[mapping[i]] = dᵢ   for i = 0..n-1
 ```
 
 ##### Concrete Example: Thread 42 with `[[16, 4], [1, 0]]`
@@ -232,31 +215,30 @@ For each basis coordinate c_j (j = 1, 2, ..., n):
 **Step 1: Delinearize(42, [16, 4])**
 
 ```text
-Basis: [16, 4]
+Basis counts: [16, 4]
 
 Products:
-  P_2 = 1
-  P_1 = 4
-  P_0 = 64
+  P₂ = 1
+  P₁ = 4
+  P₀ = 64
 
-Apply:
-  c₀ = 42 ÷ 64 = 0       (outer bound, typically ignored)
-  c₁ = (42 mod 64) ÷ 4 = 10
-  c₂ = (42 mod 4) ÷ 1 = 2
+Digits:
+  d₀ = ⌊(42 mod 64) / 4⌋ = ⌊42 / 4⌋ = 10
+  d₁ = ⌊(42 mod 4)  / 1⌋ = ⌊2  / 1⌋ = 2
 
-Basis coordinates: [c₁, c₂] = [10, 2]
+Basis digits: [d₀, d₁] = [10, 2]
 ```
 
 **Step 2: Apply mapping [1, 0]**
 
 ```text
-mapping[0] = 1  →  iteration_dim[1] = c₁ = 10
-mapping[1] = 0  →  iteration_dim[0] = c₂ = 2
+mapping[0] = 1  →  iteration_dim[1] = d₀ = 10
+mapping[1] = 0  →  iteration_dim[0] = d₁ = 2
 
 Iteration coordinates: [dim0 = 2, dim1 = 10]
 ```
 
-**Result:** Thread 42 works at position `[parallel = 2, reduction = 10]` in the
+**Result:** Thread 42 works at position `[d0 = 10, d1 = 2]` in the
 iteration space.
 
 **Visual interpretation:**
@@ -408,8 +390,8 @@ workgroup = [8, 0, 0]
 **Partial reduction `[0, 1, 128]`:** Dimension 1 has tile size 1 (iterated
 serially without chunking). Dimension 2 has tile size 128, producing chunks of
 128 elements. Since `d2` has extent 128, the loop is elided (processed once).
-Each iteration erefore has step size 1 and processes 128 elements
-of partial accumulators along the `d2` per workgroup.
+Each iteration therefore has step size 1 and processes 128 elements
+of partial accumulators along `d2` per workgroup.
 
 **Thread `[0, 1, 2]`:** Each thread loads 1 element in `d1` and 2 elements in
 `d2` per iteration, for 2 elements per thread per iteration. With 64 threads,
