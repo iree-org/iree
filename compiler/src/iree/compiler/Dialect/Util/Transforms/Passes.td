@@ -17,6 +17,19 @@ def ApplyPatternsPass : Pass<"iree-util-apply-patterns", ""> {
   let summary = "Applies some risky/IREE-specific canonicalization patterns.";
 }
 
+def AttributeCallGraphPass : Pass<"iree-util-attribute-call-graph", "mlir::ModuleOp"> {
+  let summary = "Propagates attributes from callees to call sites.";
+  let description = [{
+    Walks all call operations and propagates relevant attributes from the
+    called functions to the call sites. This includes:
+    * Attributes implementing CallAnnotationAttrInterface
+    * nosideeffects (for side-effect analysis)
+
+    This allows subsequent passes to check attributes directly on call sites
+    without expensive symbol table lookups during analysis.
+  }];
+}
+
 def CombineInitializersPass : Pass<"iree-util-combine-initializers", "mlir::ModuleOp"> {
   let summary = "Combines global initializers into one.";
   let dependentDialects = [
