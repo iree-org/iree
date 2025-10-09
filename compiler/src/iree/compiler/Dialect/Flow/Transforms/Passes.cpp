@@ -118,6 +118,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // this is our gate).
   passManager.addPass(IREE::Util::createVerifyInitializationOrderPass());
 
+  // Propagate attributes from callees to call sites for local analysis.
+  passManager.addPass(IREE::Util::createAttributeCallGraphPass());
+
   FunctionLikeNest(passManager)
       .addPass([&]() {
         return IREE::Flow::createInitializeEmptyTensorsPass(
