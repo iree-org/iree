@@ -10,6 +10,8 @@
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -18,6 +20,7 @@
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Support/WalkResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -256,17 +259,45 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
       yieldReplacementsFor.insert(op);
     }
   }
-  scf::SCFTilingOptions tilingOptions;
-  tilingOptions.setTileSizes(tilingInfo->tileSizes);
-  tilingOptions.setInterchange(tilingInfo->interchange);
-  tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
   SmallVector<Attribute> deviceMappingAttribute =
       getMapping(context, tilingInfo->tileSizes);
   if (failed(IREE::Codegen::WorkgroupMappingAttr::verifyAttrList(
           context, funcOp.getLoc(), deviceMappingAttribute))) {
     return signalPassFailure();
   }
+  scf::SCFTilingOptions tilingOptions;
+  tilingOptions.setTileSizes(tilingInfo->tileSizes);
+  tilingOptions.setInterchange(tilingInfo->interchange);
   tilingOptions.setMapping(deviceMappingAttribute);
+
+  IREE::Codegen::WorkgroupReorderingAttrInterface workgroupReorderingStrategy =
+      getLoweringConfig(tilingInfo->tilableOp).getWorkgroupReorderingStrategy();
+  if (workgroupReorderingStrategy) {
+    scf::SCFTilingOptions::GenerateLoopHeaderFn loopHeaderFn =
+        [&workgroupReorderingStrategy](RewriterBase &rewriter, Location loc,
+                                       ArrayRef<Range> loopRanges,
+                                       ArrayRef<OpFoldResult> givenTileSizes,
+                                       ValueRange outerDestinationTensors)
+        -> FailureOr<scf::SCFTilingOptions::CustomLoopHeaderInfo> {
+      return workgroupReorderingStrategy.generateLoopHeaderFn(
+          rewriter, loc, loopRanges, givenTileSizes, outerDestinationTensors);
+    };
+    scf::SCFTilingOptions::GenerateLoopTerminatorFn terminatorFn =
+        [&workgroupReorderingStrategy](
+            RewriterBase &rewriter, Location loc,
+            ArrayRef<LoopLikeOpInterface> loops, ValueRange tiledResults,
+            ArrayRef<SmallVector<OpFoldResult>> resultOffsets,
+            ArrayRef<SmallVector<OpFoldResult>> resultSizes,
+            ValueRange destinationTensors) -> LogicalResult {
+      return workgroupReorderingStrategy.generateLoopTerminatorFn(
+          rewriter, loc, loops, tiledResults, resultOffsets, resultSizes,
+          destinationTensors);
+    };
+    tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::CustomOp);
+    tilingOptions.setCustomLoopGenerationFns(loopHeaderFn, terminatorFn);
+  } else {
+    tilingOptions.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
+  }
 
   scf::SCFTileAndFuseOptions tileAndFuseOptions;
   tileAndFuseOptions.setTilingOptions(tilingOptions);
