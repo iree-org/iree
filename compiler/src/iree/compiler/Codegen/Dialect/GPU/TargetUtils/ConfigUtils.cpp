@@ -1107,8 +1107,7 @@ static FailureOr<DistributionInfo> collectOpDistributionInfo(Operation *op) {
     return failure();
   }
 
-  // This pipeline requires tensor semantics. Also fail for gather semantics
-  // for now to simplify tile + fuse.
+  // This pipeline requires tensor semantics.
   if (!linalgOp.hasPureTensorSemantics()) {
     return failure();
   }
