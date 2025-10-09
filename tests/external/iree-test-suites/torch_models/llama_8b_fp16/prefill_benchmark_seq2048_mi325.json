@@ -9,8 +9,10 @@
     ],
     "weights": [
         {
-            "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/halo-models/llm-dev/llama3_8b_random/real_weights.irpa",
-            "scope": "model"
+            "type": "random",
+            "scope": "model",
+            "module": "llama_8b_fp16/modules/llama_gfx942",
+            "seed": 42
         }
     ],
     "run_args": [

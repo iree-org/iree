@@ -9,6 +9,7 @@
     ],
     "weights": [
         {
+            "type": "url",
             "url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-prompt-encoder/real_weights.irpa",
             "scope": "model"
         }
@@ -35,5 +36,5 @@
         "value": "1x64xi64"
       }
     ],
-    "golden_time_ms": 7.65
+    "golden_time_ms": 7.8
 }
