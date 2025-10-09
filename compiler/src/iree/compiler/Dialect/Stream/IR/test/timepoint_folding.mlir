@@ -173,7 +173,7 @@ util.func private @SinkAwaitToFirstConsumer(
   cf.cond_br %arg1, ^bb2, ^bb3
 // CHECK: ^bb2:
 ^bb2:
-  // CHECK: = stream.async.transfer %[[READY]]#0
+  // CHECK: = stream.async.clone %[[READY]]#0
   %1 = stream.async.transfer %0#0 : !stream.resource<constant>{%c100} -> !stream.resource<external>{%c100}
   cf.br ^bb4(%1 : !stream.resource<external>)
 // CHECK: ^bb3:
@@ -208,7 +208,7 @@ util.func private @SinkAwaitToFirstConsumerRegion(
   %3 = "fake.region"() ({
     // CHECK: "fake.region"
     %4 = "fake.region"() ({
-      // CHECK: stream.async.transfer
+      // CHECK: stream.async.clone
       %5 = stream.async.transfer %0#0 : !stream.resource<constant>{%c100} -> !stream.resource<external>{%c100}
       // CHECK: "fake.yield"
       "fake.yield"(%5) : (!stream.resource<external>) -> ()
