@@ -687,8 +687,13 @@ OpFoldResult ResourceSizeOp::fold(FoldAdaptor operands) {
   auto sizeAwareType =
       cast<IREE::Util::SizeAwareTypeInterface>(getOperand().getType());
   Operation *op = this->getOperation();
-  return sizeAwareType.findSizeValue(getOperand(), op->getBlock(),
-                                     Block::iterator(op));
+  Value sizeValue = sizeAwareType.findSizeValue(getOperand(), op->getBlock(),
+                                                Block::iterator(op));
+  // Do not fold if we found ourselves (would cause infinite fold loop).
+  if (sizeValue != getResult()) {
+    return sizeValue;
+  }
+  return {};
 }
 
 namespace {
