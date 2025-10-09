@@ -121,7 +121,7 @@ For example, the interestingness script used to reduce the crash in
 [issue #22001](https://github.com/iree-org/iree/issues/22001) was
 
 ``` shell
-#!/bin/bash
+#!/usr/bin/env bash
 
 [llvm-bin]/not --crash [llvm-bin]/opt -passes='amdgpu-lower-buffer-fat-pointers' -disable-output "$@" 2>/dev/null
 ```
