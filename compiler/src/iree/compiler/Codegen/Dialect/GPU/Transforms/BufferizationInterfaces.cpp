@@ -327,6 +327,22 @@ struct CoalescedGatherDMAOpBufferizationInterface
     return alist;
   }
 
+  FailureOr<BaseMemRefType>
+  getBufferType(Operation *op, Value value, const BufferizationOptions &options,
+                const bufferization::BufferizationState &state,
+                SmallVector<Value> &invocationStack) const {
+    auto gatherOp = cast<IREE::GPU::CoalescedGatherDMAOp>(op);
+    assert(value == gatherOp.getResult() && "invalid value");
+
+    // Get the buffer type for the init operand
+    auto initMemrefType = bufferization::getBufferType(
+        gatherOp.getInit(), options, state, invocationStack);
+    if (failed(initMemrefType))
+      return failure();
+
+    return cast<BaseMemRefType>(*initMemrefType);
+  }
+
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                           const BufferizationOptions &options,
                           bufferization::BufferizationState &state) const {

@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
@@ -250,6 +251,40 @@ LogicalResult CoalescedGatherDMAOp::verify() {
   }
 
   return success();
+}
+
+void CoalescedGatherDMAOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results.add(+[](CoalescedGatherDMAOp op, PatternRewriter &rewriter) {
+    bool changed = false;
+    Value indices = op.getIndices();
+    Value source = op.getSource();
+    Value init = op.getInit();
+
+    if (auto castOp = source.getDefiningOp<memref::CastOp>()) {
+      source = castOp.getSource();
+      changed = true;
+    }
+
+    if (auto castOp = indices.getDefiningOp<memref::CastOp>()) {
+      indices = castOp.getSource();
+      changed = true;
+    }
+
+    if (auto castOp = init.getDefiningOp<memref::CastOp>()) {
+      init = castOp.getSource();
+      changed = true;
+    }
+
+    if (!changed)
+      return failure();
+
+    // Create a new op with the folded operands
+    auto newOp = rewriter.create<CoalescedGatherDMAOp>(
+        op.getLoc(), init.getType(), indices, source, init);
+    rewriter.replaceOp(op, newOp.getResult());
+    return success();
+  });
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU
