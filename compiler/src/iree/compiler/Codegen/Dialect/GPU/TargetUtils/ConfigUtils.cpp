@@ -1030,10 +1030,10 @@ struct DistributionInfo {
 // results of that producer op are also returned from the dispatch
 // then that dim is not partitioned as codegen for this is unsupported.
 static SmallVector<unsigned int>
-getSupportedPartionableLoops(linalg::LinalgOp linalgOp) {
+getSupportedPartitionableLoops(linalg::LinalgOp linalgOp) {
   SmallVector<unsigned int> partitionableLoops;
   linalgOp.getParallelDims(partitionableLoops);
-  SmallVector<OpOperand *> ProducerOperands;
+  SmallVector<OpOperand *> producerOperands;
   for (auto operand : linalgOp.getDpsInputOperands()) {
     auto producerOp = operand->get().getDefiningOp<linalg::LinalgOp>();
     if (!producerOp) {
@@ -1042,12 +1042,12 @@ getSupportedPartionableLoops(linalg::LinalgOp linalgOp) {
 
     for (Operation *user : producerOp->getUsers()) {
       if (isa<IREE::Codegen::StoreToBufferOp>(user)) {
-        ProducerOperands.push_back(operand);
+        producerOperands.push_back(operand);
         break;
       }
     }
   }
-  if (ProducerOperands.empty()) {
+  if (producerOperands.empty()) {
     return partitionableLoops;
   }
   // If we have producer operands then we need to confirm that all of them
@@ -1055,7 +1055,7 @@ getSupportedPartionableLoops(linalg::LinalgOp linalgOp) {
   SmallVector<unsigned int> finalPartitionableLoops;
   for (auto dim : partitionableLoops) {
     bool dimFound = false;
-    for (auto operand : ProducerOperands) {
+    for (auto operand : producerOperands) {
       AffineMap IndexingMap = linalgOp.getMatchingIndexingMap(operand);
       if (llvm::any_of(IndexingMap.getResults(), [&](AffineExpr expr) {
             auto dimExpr = dyn_cast<AffineDimExpr>(expr);
@@ -1113,7 +1113,7 @@ static FailureOr<DistributionInfo> collectOpDistributionInfo(Operation *op) {
       LinalgExt::isGatherlikeOp(linalgOp)) {
     return failure();
   }
-  distInfo.partitionableLoops = getSupportedPartionableLoops(linalgOp);
+  distInfo.partitionableLoops = getSupportedPartitionableLoops(linalgOp);
 
   // Bail out if op is not tilable.
   if (distInfo.partitionableLoops.empty()) {
