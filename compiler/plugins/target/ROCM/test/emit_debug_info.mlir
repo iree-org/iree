@@ -1,47 +1,37 @@
-// RUN: iree-opt --mlir-print-debuginfo %s --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline{preserve-debug-info})))" | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --mlir-print-debuginfo --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline{preserve-debug-info})))" %s | FileCheck %s --check-prefix=WITH-DEBUG
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --mlir-print-debuginfo --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" %s | FileCheck %s --check-prefix=WITHOUT-DEBUG
 
-// Test that LLVM debug info attributes pass through without being stripped when
-// the pipeline `preserve-debug-info` option is used
+// Test that debug location information is preserved when the pipeline
+// `preserve-debug-info` option is used, and stripped otherwise.
 
-#di_file = #llvm.di_file<"test.mlir" in "/work">
-#di_compile_unit = #llvm.di_compile_unit<
-  id = distinct[0]<>,
-  sourceLanguage = DW_LANG_C,
-  file = #di_file,
-  producer = "test",
-  isOptimized = false,
-  emissionKind = LineTablesOnly
->
-#di_subprogram = #llvm.di_subprogram<
-  id = distinct[1]<>,
-  compileUnit = #di_compile_unit,
-  scope = #di_file,
-  name = "simple_mul",
-  file = #di_file,
-  line = 5,
-  scopeLine = 5,
-  subprogramFlags = Definition
->
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
 
-module attributes {
-  llvm.di_compile_unit = #di_compile_unit
-} {
-  func.func @simple_mul(%arg0: tensor<16xf32>) -> tensor<16xf32> {
-    %0 = tensor.empty() : tensor<16xf32>
-    %1 = linalg.generic {
-      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
-      iterator_types = ["parallel"]
-    } ins(%arg0 : tensor<16xf32>) outs(%0 : tensor<16xf32>) {
-    ^bb0(%in: f32, %out: f32):
-      %2 = arith.mulf %in, %in : f32
-      linalg.yield %2 : f32
-    } -> tensor<16xf32>
-    return %1 : tensor<16xf32>
-  } loc(fused<#di_subprogram>["test.mlir":5:1])
+hal.executable @debug_test {
+  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @debug_test layout(#pipeline_layout)
+    builtin.module {
+      func.func @debug_test() {
+        %c0 = arith.constant 0 : index loc("test.mlir":1:1)
+        %c2 = arith.constant 2.0 : f32 loc("test.mlir":2:1)
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xf32>> loc("test.mlir":3:1)
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xf32>> loc("test.mlir":4:1)
+        %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets=[0], sizes=[4], strides=[1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xf32>> -> tensor<4xf32> loc("test.mlir":5:1)
+        %3 = tensor.empty() : tensor<4xf32> loc("test.mlir":6:1)
+        %4 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]}
+             ins(%2 : tensor<4xf32>) outs(%3 : tensor<4xf32>) {
+        ^bb0(%in: f32 loc("test.mlir":8:1), %out: f32 loc("test.mlir":8:2)):
+          %5 = arith.mulf %in, %c2 : f32 loc("test.mlir":9:1)
+          linalg.yield %5 : f32 loc("test.mlir":10:1)
+        } -> tensor<4xf32> loc("test.mlir":7:1)
+        iree_tensor_ext.dispatch.tensor.store %4, %1, offsets=[0], sizes=[4], strides=[1] : tensor<4xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xf32>> loc("test.mlir":11:1)
+        return loc("test.mlir":12:1)
+      }
+    }
+  }
 }
 
-// CHECK-DAG: [[DI_FILE:#[a-z_0-9]+]] = #llvm.di_file<"test.mlir" in "/work">
-// CHECK-DAG: [[DI_CU:#[a-z_0-9]+]] = #llvm.di_compile_unit<{{.*}}file = [[DI_FILE]]{{.*}}>
-// CHECK-DAG: module attributes {llvm.di_compile_unit = [[DI_CU]]}
-// CHECK-DAG: [[DI_SP:#[a-z_0-9]+]] = #llvm.di_subprogram<{{.*}}compileUnit = [[DI_CU]]{{.*}}name = "simple_mul"{{.*}}line = 5{{.*}}>
-// CHECK-DAG: [[LOC:#loc[0-9]+]] = loc("test.mlir":5:1)
+// WITH-DEBUG: loc("test.mlir":9:1
+// WITHOUT-DEBUG-NOT: loc("test.mlir":
