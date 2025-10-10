@@ -1250,8 +1250,8 @@ void registerCodegenLLVMGPUPasses() {
   // Generated.
   common::registerPasses();
 
-  struct LLVMGPUPipelineOptions
-      : public PassPipelineOptions<LLVMGPUPipelineOptions> {
+  struct LLVMGPUPipelineOptions final
+      :  PassPipelineOptions<LLVMGPUPipelineOptions> {
     Option<bool> preserveDebugInfo{
         *this, "preserve-debug-info",
         llvm::cl::desc("Preserve debug information (do not strip)")};
@@ -1302,8 +1302,8 @@ void registerCodegenROCDLPasses() {
   // Generated.
   rocdl::registerPasses();
 
-  struct ROCDLPipelineOptions
-      : public PassPipelineOptions<ROCDLPipelineOptions> {
+  struct ROCDLPipelineOptions final
+      : PassPipelineOptions<ROCDLPipelineOptions> {
     Option<bool> preserveDebugInfo{
         *this, "preserve-debug-info",
         llvm::cl::desc("Preserve debug information (do not strip)")};
