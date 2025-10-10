@@ -54,7 +54,7 @@ builtin.module {
         strided<[4096, 64, 1], offset: ?>>
   %2 = vector.load %0[%c0, %c0, %c0] : memref<32x64x64xf32, strided<[4096, 64, 1], offset: ?>>, vector<2xf32>
   %3 = vector.reduction <maximumf>, %2 : vector<2xf32> into f32
-  %4 = vector.splat %3 : vector<2xf32>
+  %4 = vector.broadcast %3 : f32 to vector<2xf32>
   vector.store %4, %1[%c0, %c0, %c0] : memref<32x64x64xf32, strided<[4096, 64, 1], offset: ?>>, vector<2xf32>
   return
   }
