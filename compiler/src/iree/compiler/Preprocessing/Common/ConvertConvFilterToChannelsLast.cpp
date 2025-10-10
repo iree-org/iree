@@ -192,9 +192,9 @@ struct ConvertGenericChwfToFhwc : public OpRewritePattern<linalg::GenericOp> {
     mPos.append(batchPos.begin(), batchPos.end());
 
     auto getProduct = [](ArrayRef<int64_t> shape, ArrayRef<int64_t> pos) {
-      return std::accumulate(
-          pos.begin(), pos.end(), int64_t{1},
-          [&](int64_t a, int64_t idx) { return a * shape[idx]; });
+      return llvm::accumulate(pos, int64_t{1}, [&](int64_t a, int64_t idx) {
+        return a * shape[idx];
+      });
     };
 
     int64_t mSize = getProduct(outputShape, mPos);
