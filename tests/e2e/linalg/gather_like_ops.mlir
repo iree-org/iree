@@ -1,4 +1,4 @@
-#map = affine_map<(d0, d1) -> (d0)>
+#map = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 func.func @gather_like_op() {
   // Input :-
