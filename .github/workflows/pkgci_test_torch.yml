@@ -48,7 +48,7 @@ jobs:
           # MI355
           - name: amdgpu_mi355_gfx950
             markers: "gfx950 or mi355"
-            cache-dir: /shark-cache/data/iree-regression-cache
+            cache-dir: /shark-cache/iree-regression-cache
             summary-file: torch_models_amdgpu_mi355_summary.json
             runs-on: linux-mi35x-1gpu-ossci-iree-org
     env:
