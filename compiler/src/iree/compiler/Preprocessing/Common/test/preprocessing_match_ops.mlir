@@ -382,7 +382,7 @@ func.func @op_matmul(%input0: tensor<32x64xi8>, %input1: tensor<32x64xi8>, %inpu
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_correct_maps(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
    %batch, %m, %n, %k = transform.iree.match.contraction %op,
-    lhs_type = i8, rhs_type = i8, output_type = i32 {indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2]} :
+    lhs_type = i8, rhs_type = i8, output_type = i32, indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2] :
     !transform.any_op -> !transform.param<i64>
     transform.yield %op : !transform.any_op
   }
@@ -423,7 +423,7 @@ func.func @op_matmul(%input0: tensor<32x64xi8>, %input1: tensor<32x64xi8>, %dest
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_different_count(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
     %batch, %m, %n, %k = transform.iree.match.contraction %op,
-      lhs_type = i8, rhs_type = i8, output_type = i32 {indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2, #map_matmul0]} :
+      lhs_type = i8, rhs_type = i8, output_type = i32, indexing_maps = [#map_matmul0, #map_matmul1, #map_matmul2, #map_matmul0] :
       !transform.any_op -> !transform.param<i64>
     transform.yield %op : !transform.any_op
   }
@@ -691,12 +691,12 @@ func.func @broadcast_mmt_cases(
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_broadcast_rhs(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
     %batch, %m, %n, %k = transform.iree.match.contraction %op,
-      lhs_type = i8, rhs_type = i8, output_type = i32
-      { indexing_maps = [
+      lhs_type = i8, rhs_type = i8, output_type = i32,
+      indexing_maps = [
           affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
           affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
           affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-        ] } : !transform.any_op -> !transform.param<i64>
+      ] : !transform.any_op -> !transform.param<i64>
     transform.iree.match.dims_equal %batch, [] : !transform.param<i64>
     transform.iree.match.dims_equal %m, [-1, 8] : !transform.param<i64>
     transform.iree.match.dims_equal %n, [1024] : !transform.param<i64>
@@ -706,12 +706,12 @@ module attributes {transform.with_named_sequence} {
 
   transform.named_sequence @match_broadcast_lhs(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
     %batch, %m, %n, %k = transform.iree.match.contraction %op,
-      lhs_type = i8, rhs_type = i8, output_type = i32
-      { indexing_maps = [
+      lhs_type = i8, rhs_type = i8, output_type = i32,
+      indexing_maps = [
           affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
           affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
           affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-        ] } : !transform.any_op -> !transform.param<i64>
+      ] : !transform.any_op -> !transform.param<i64>
     transform.iree.match.dims_equal %batch, [] : !transform.param<i64>
     transform.iree.match.dims_equal %m, [1024] : !transform.param<i64>
     transform.iree.match.dims_equal %n, [-1, 8] : !transform.param<i64>
@@ -783,8 +783,8 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_conv_nhwc_hwcf(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
     %batch, %out_img, %out_ch, %filt, %in_ch, %depth, %strides, %dilations =
       transform.iree.match.convolution %op,
-        lhs_type = f32, rhs_type = f32, output_type = f32
-        {indexing_maps = [#map_nhwc_hwcf_input, #map_nhwc_hwcf_filter, #map_nhwc_hwcf_output]} :
+        lhs_type = f32, rhs_type = f32, output_type = f32,
+        indexing_maps = [#map_nhwc_hwcf_input, #map_nhwc_hwcf_filter, #map_nhwc_hwcf_output] :
         !transform.any_op -> !transform.param<i64>
     transform.yield %op : !transform.any_op
   }
@@ -792,8 +792,8 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_conv_nchw_fchw(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
     %batch, %out_img, %out_ch, %filt, %in_ch, %depth, %strides, %dilations =
       transform.iree.match.convolution %op,
-        lhs_type = f16, rhs_type = f16, output_type = f16
-        {indexing_maps = [#map_nchw_fchw_input, #map_nchw_fchw_filter, #map_nchw_fchw_output]} :
+        lhs_type = f16, rhs_type = f16, output_type = f16,
+        indexing_maps = [#map_nchw_fchw_input, #map_nchw_fchw_filter, #map_nchw_fchw_output] :
         !transform.any_op -> !transform.param<i64>
     %c4 = transform.param.constant 4 : i64 -> !transform.param<i64>
     transform.match.param.cmpi eq %batch, %c4 : !transform.param<i64>
@@ -845,8 +845,8 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_conv_all_dims(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
     %batch, %out_img, %out_ch, %filt, %in_ch, %depth, %strides, %dilations =
       transform.iree.match.convolution %op,
-        lhs_type = f16, rhs_type = f16, output_type = f32
-        {indexing_maps = [#map_nhwc_hwcf_input, #map_nhwc_hwcf_filter, #map_nhwc_hwcf_output]} :
+        lhs_type = f16, rhs_type = f16, output_type = f32,
+        indexing_maps = [#map_nhwc_hwcf_input, #map_nhwc_hwcf_filter, #map_nhwc_hwcf_output] :
         !transform.any_op -> !transform.param<i64>
 
     transform.iree.match.dims_equal %batch, [1] : !transform.param<i64>
@@ -903,8 +903,8 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @match_with_wrong_maps(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
     %batch, %out_img, %out_ch, %filt, %in_ch, %depth, %strides, %dilations =
       transform.iree.match.convolution %op,
-        lhs_type = f32, rhs_type = f32, output_type = f32
-        {indexing_maps = [#map_nhwc_hwcf_input, #map_wrong_filter, #map_nhwc_hwcf_output]} :
+        lhs_type = f32, rhs_type = f32, output_type = f32,
+        indexing_maps = [#map_nhwc_hwcf_input, #map_wrong_filter, #map_nhwc_hwcf_output] :
         !transform.any_op -> !transform.param<i64>
     transform.yield %op : !transform.any_op
   }
