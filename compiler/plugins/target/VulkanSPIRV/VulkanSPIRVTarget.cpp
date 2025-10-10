@@ -154,8 +154,7 @@ createPipelineLayoutDefs(ArrayRef<IREE::HAL::ExecutableExportOp> exportOps,
 // TODO: VulkanOptions for choosing the Vulkan version and extensions/features.
 class VulkanTargetDevice : public TargetDevice {
 public:
-  VulkanTargetDevice(const VulkanSPIRVTargetOptions &options)
-      : options_(options) {}
+  VulkanTargetDevice(const VulkanSPIRVTargetOptions & /*options*/) {}
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
@@ -173,9 +172,6 @@ public:
                                             deviceConfigAttr,
                                             executableTargetAttrs);
   }
-
-private:
-  const VulkanSPIRVTargetOptions &options_;
 };
 
 class VulkanSPIRVTargetBackend : public TargetBackend {
