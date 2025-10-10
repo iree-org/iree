@@ -1025,6 +1025,55 @@ struct DistributionInfo {
   bool vectorizable = false;
 };
 
+// Generally parallel loops are partitionable, however if the dims for it
+// are not present in a producer of the compute op within the dispatch and the
+// results of that producer op are also returned from the dispatch
+// then that dim is not partitioned as codegen for this is unsupported.
+static SmallVector<unsigned int>
+getSupportedPartitionableLoops(linalg::LinalgOp linalgOp) {
+  SmallVector<unsigned int> partitionableLoops;
+  linalgOp.getParallelDims(partitionableLoops);
+  SmallVector<OpOperand *> producerOperands;
+  for (auto operand : linalgOp.getDpsInputOperands()) {
+    auto producerOp = operand->get().getDefiningOp<linalg::LinalgOp>();
+    if (!producerOp) {
+      continue;
+    }
+
+    for (Operation *user : producerOp->getUsers()) {
+      if (isa<IREE::Codegen::StoreToBufferOp>(user)) {
+        producerOperands.push_back(operand);
+        break;
+      }
+    }
+  }
+  if (producerOperands.empty()) {
+    return partitionableLoops;
+  }
+  // If we have producer operands then we need to confirm that all of them
+  // also have the the partitionableLoop dims if not we skip that dim.
+  SmallVector<unsigned int> finalPartitionableLoops;
+  for (auto dim : partitionableLoops) {
+    bool dimFound = false;
+    for (auto operand : producerOperands) {
+      AffineMap IndexingMap = linalgOp.getMatchingIndexingMap(operand);
+      if (llvm::any_of(IndexingMap.getResults(), [&](AffineExpr expr) {
+            auto dimExpr = dyn_cast<AffineDimExpr>(expr);
+            return dimExpr && dimExpr.getPosition() == dim;
+          })) {
+        dimFound = true;
+      } else {
+        dimFound = false;
+        break;
+      }
+    }
+    if (dimFound) {
+      finalPartitionableLoops.push_back(dim);
+    }
+  }
+  return finalPartitionableLoops;
+}
+
 static FailureOr<DistributionInfo> collectOpDistributionInfo(Operation *op) {
   DistributionInfo distInfo;
   // MapScatterOp doesn't fit the LinalgOp interface, so use special case logic
@@ -1054,19 +1103,17 @@ static FailureOr<DistributionInfo> collectOpDistributionInfo(Operation *op) {
   }
 
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  // Bail out on multi result cases as consumer fusion currently does not
-  // support multi result ops.
-  if (!linalgOp || linalgOp.getNumDpsInits() != 1) {
+  if (!linalgOp) {
     return failure();
   }
 
   // This pipeline requires tensor semantics. Also fail for gather semantics
   // for now to simplify tile + fuse.
-  if (!linalgOp.hasPureTensorSemantics() || linalgOp.hasIndexSemantics()) {
+  if (!linalgOp.hasPureTensorSemantics() ||
+      LinalgExt::isGatherlikeOp(linalgOp)) {
     return failure();
   }
-
-  linalgOp.getParallelDims(distInfo.partitionableLoops);
+  distInfo.partitionableLoops = getSupportedPartitionableLoops(linalgOp);
 
   // Bail out if op is not tilable.
   if (distInfo.partitionableLoops.empty()) {
