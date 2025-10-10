@@ -1050,6 +1050,7 @@ def Util_GlobalLoadOp : Util_Op<"global.load", [
   DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
   SymbolUserOpInterface,
   Util_GlobalLoadOpInterface,
+  DeclareOpInterfaceMethods<Util_HoistableOpInterface, ["getResultLayout"]>,
 ]> {
   let summary = [{Loads a value from a global variable.}];
   let description = [{

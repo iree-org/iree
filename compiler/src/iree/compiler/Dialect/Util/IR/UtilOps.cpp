@@ -2066,6 +2066,13 @@ LogicalResult GlobalStoreIndirectOp::verify() {
   return success();
 }
 
+std::optional<LayoutInfo> GlobalLoadOp::getResultLayout(unsigned resultNum) {
+  if (resultNum != 0) {
+    return std::nullopt;
+  }
+  return LayoutInfo{getResult().getType()};
+}
+
 //===----------------------------------------------------------------------===//
 // !util.list<T>
 //===----------------------------------------------------------------------===//

@@ -405,7 +405,42 @@ static inline int64_t getRoundedPhysicalStorageSize(ShapedType type) {
                                        type.getElementType());
 }
 
+// Struct providing layout information for a value.
+// For now it is assumed that the type is enough to provide the
+// layout information.
+struct LayoutInfo {
+  ::mlir::Type type;
+};
+inline bool operator==(const LayoutInfo &lhs, const LayoutInfo &rhs) {
+  return lhs.type == rhs.type;
+}
+inline bool operator!=(const LayoutInfo &lhs, const LayoutInfo &rhs) {
+  return !(lhs == rhs);
+}
 } // namespace mlir::iree_compiler::IREE::Util
+
+namespace llvm {
+template <>
+struct DenseMapInfo<mlir::iree_compiler::IREE::Util::LayoutInfo> {
+  static inline mlir::iree_compiler::IREE::Util::LayoutInfo getEmptyKey() {
+    ::mlir::Type emptyType = llvm::DenseMapInfo<::mlir::Type>::getEmptyKey();
+    return mlir::iree_compiler::IREE::Util::LayoutInfo{emptyType};
+  }
+  static inline mlir::iree_compiler::IREE::Util::LayoutInfo getTombstoneKey() {
+    ::mlir::Type tombstoneType =
+        llvm::DenseMapInfo<::mlir::Type>::getTombstoneKey();
+    return mlir::iree_compiler::IREE::Util::LayoutInfo{tombstoneType};
+  }
+  static unsigned
+  getHashValue(mlir::iree_compiler::IREE::Util::LayoutInfo layout) {
+    return llvm::DenseMapInfo<::mlir::Type>::getHashValue(layout.type);
+  }
+  static bool isEqual(mlir::iree_compiler::IREE::Util::LayoutInfo lhs,
+                      mlir::iree_compiler::IREE::Util::LayoutInfo rhs) {
+    return lhs == rhs;
+  }
+};
+} // namespace llvm
 
 #include "iree/compiler/Dialect/Util/IR/UtilAttrInterfaces.h.inc" // IWYU pragma: export
 #include "iree/compiler/Dialect/Util/IR/UtilOpInterfaces.h.inc" // IWYU pragma: export

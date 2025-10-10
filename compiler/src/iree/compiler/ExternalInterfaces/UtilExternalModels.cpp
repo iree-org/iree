@@ -324,6 +324,21 @@ struct AlwaysHoistableOpInterface
     : public IREE::Util::HoistableOpInterface::ExternalModel<
           AlwaysHoistableOpInterface<OpTy>, OpTy> {};
 
+// Interface for ops that are hoistable but layout considerations
+// are needed to avoid duplicating globals.
+template <typename OpTy>
+struct HoistableLayoutChangingOpInterface
+    : public IREE::Util::HoistableOpInterface::ExternalModel<
+          HoistableLayoutChangingOpInterface<OpTy>, OpTy> {
+  std::optional<IREE::Util::LayoutInfo>
+  getResultLayout(Operation *op, unsigned resultNum) const {
+    if (op->getNumResults() != 1 || resultNum != 0) {
+      return std::nullopt;
+    }
+    return IREE::Util::LayoutInfo{op->getResult(0).getType()};
+  }
+};
+
 template <typename OpTy>
 struct HoistableLinalgOpInterface
     : public IREE::Util::HoistableOpInterface::ExternalModel<
@@ -387,6 +402,15 @@ template <typename... Ops>
 struct AlwaysHoistableOpInterfaceHelper {
   static void registerOpInterface(MLIRContext *context) {
     (Ops::template attachInterface<AlwaysHoistableOpInterface<Ops>>(*context),
+     ...);
+  }
+};
+
+template <typename... Ops>
+struct HoistableLayoutChangingOpInterfaceHelper {
+  static void registerOpInterface(MLIRContext *context) {
+    (Ops::template attachInterface<HoistableLayoutChangingOpInterface<Ops>>(
+         *context),
      ...);
   }
 };
@@ -490,7 +514,7 @@ void registerUtilExternalModels(DialectRegistry &registry) {
         UnhoistableOpInterfaceHelper<
             IREE::Flow::DispatchWorkgroupCountOp>::registerOpInterface(context);
 
-        AlwaysHoistableOpInterfaceHelper<
+        HoistableLayoutChangingOpInterfaceHelper<
             IREE::Flow::TensorEncodeOp>::registerOpInterface(context);
       });
 

@@ -1317,6 +1317,26 @@ def Util_HoistableOpInterface : OpInterface<"HoistableOpInterface"> {
         return true;
       }]
     >,
+    InterfaceMethod<      
+      /*desc=*/[{
+        Get the layout of the result if available.
+
+        If the op provides layout information this can be used
+        to determine if a sequence of ops rooted at a constant
+        has different layouts at all the leaves in the const expr
+        tree for a given root. This can be used to check if
+        const expr needs to be dropped due to increase in memory
+        usage. If a leaf result provides no layout information, then
+        that result is ignored.
+      }],
+      /*retTy=*/"std::optional<::mlir::iree_compiler::IREE::Util::LayoutInfo>",
+      /*methodName=*/"getResultLayout",
+      /*args=*/(ins "unsigned":$resultNum),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return std::nullopt;
+      }]
+    >
   ];
 }
 
