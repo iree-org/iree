@@ -1025,9 +1025,10 @@ struct DistributionInfo {
   bool vectorizable = false;
 };
 
-// Generally parallel loops are pationable, however if the dims for it
-// are not present in a producer of the compute op within the dispatch
-// then that dim is not partioned as codegen for this is unsupported.
+// Generally parallel loops are partitionable, however if the dims for it
+// are not present in a producer of the compute op within the dispatch and the
+// results of that producer op are also returned from the dispatch
+// then that dim is not partitioned as codegen for this is unsupported.
 static SmallVector<unsigned int>
 getSupportedPartionableLoops(linalg::LinalgOp linalgOp) {
   SmallVector<unsigned int> partitionableLoops;
@@ -1035,15 +1036,22 @@ getSupportedPartionableLoops(linalg::LinalgOp linalgOp) {
   SmallVector<OpOperand *> ProducerOperands;
   for (auto operand : linalgOp.getDpsInputOperands()) {
     auto producerOp = operand->get().getDefiningOp<linalg::LinalgOp>();
-    if (producerOp) {
-      ProducerOperands.push_back(operand);
+    if (!producerOp) {
+      continue;
+    }
+
+    for (Operation *user : producerOp->getUsers()) {
+      if (isa<IREE::Codegen::StoreToBufferOp>(user)) {
+        ProducerOperands.push_back(operand);
+        break;
+      }
     }
   }
   if (ProducerOperands.empty()) {
     return partitionableLoops;
   }
   // If we have producer operands then we need to confirm that all of them
-  // also have the the partionableLoop dims if not we skip that dim.
+  // also have the the partitionableLoop dims if not we skip that dim.
   SmallVector<unsigned int> finalPartitionableLoops;
   for (auto dim : partitionableLoops) {
     bool dimFound = false;

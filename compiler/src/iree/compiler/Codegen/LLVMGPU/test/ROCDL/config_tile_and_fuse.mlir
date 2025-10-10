@@ -907,7 +907,7 @@ func.func @multi_result_index_generic_with_scatterfusion(%arg0: tensor<4x?x32x8x
 //  CHECK-SAME:     workgroup = [1, 1, 32, 8]
 
 // -----
-func.func @producer_broadcasted(%arg0: tensor<4xi64>, %arg1: tensor<4xi64>) -> (tensor<4xi64>, tensor<4x8xi64>) {
+func.func @producer_broadcasted(%arg0: tensor<4xi64>, %arg1: tensor<4xi64>) -> tensor<4x8xi64> {
   %c59_i64 = arith.constant 59 : i64
   %c2_i64 = arith.constant 2 : i64
   %c8_i64 = arith.constant 8 : i64
@@ -937,7 +937,48 @@ func.func @producer_broadcasted(%arg0: tensor<4xi64>, %arg1: tensor<4xi64>) -> (
     %9 = arith.addi %8, %in_0 : i64
     linalg.yield %9 : i64
   } -> tensor<4x8xi64>
-  return %2, %3 : tensor<4xi64>, tensor<4x8xi64>
+  return %3 : tensor<4x8xi64>
+}
+
+// CHECK-LABEL: func.func @producer_broadcasted
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//       CHECK:     thread = [1, 1]
+//  CHECK-SAME:     workgroup = [4, 16]
+
+// -----
+func.func @producer_broadcasted_and_stored_to_buffer(%arg0: tensor<4xi64>, %arg1: tensor<4xi64>, %arg2 : memref<4xi64>) -> tensor<4x8xi64> {
+  %c59_i64 = arith.constant 59 : i64
+  %c2_i64 = arith.constant 2 : i64
+  %c8_i64 = arith.constant 8 : i64
+  %c32_i64 = arith.constant 32 : i64
+  %0 = tensor.empty() : tensor<4x8xi64>
+  %1 = tensor.empty() : tensor<4xi64>
+  %2 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>,
+                                        affine_map<(d0) -> (d0)>],
+                       iterator_types = ["parallel"]}
+      ins(%arg0 : tensor<4xi64>) outs(%1 : tensor<4xi64>) {
+  ^bb0(%in: i64, %out: i64):
+    %4 = arith.addi %in, %c59_i64 : i64
+    %5 = arith.muli %4, %c2_i64 : i64
+    linalg.yield %5 : i64
+  } -> tensor<4xi64>
+  %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0)>,
+                                        affine_map<(d0, d1) -> (d0)>,
+                                        affine_map<(d0, d1) -> (d0, d1)>],
+                      iterator_types = ["parallel", "parallel"]}
+  ins(%2, %arg1 : tensor<4xi64>, tensor<4xi64>) outs(%0 : tensor<4x8xi64>) {
+  ^bb0(%in: i64, %in_0: i64, %out: i64):
+    %4 = linalg.index 1 : index
+    %5 = arith.index_cast %4 : index to i64
+    %6 = arith.muli %in, %c8_i64 : i64
+    %7 = arith.addi %6, %5 : i64
+    %8 = arith.muli %7, %c32_i64 : i64
+    %9 = arith.addi %8, %in_0 : i64
+    linalg.yield %9 : i64
+  } -> tensor<4x8xi64>
+  iree_codegen.store_to_buffer %2, %arg2 : tensor<4xi64> into memref<4xi64>
+  return %3 : tensor<4x8xi64>
 }
 
 // CHECK-LABEL: func.func @producer_broadcasted
