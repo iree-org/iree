@@ -591,6 +591,40 @@ def Util_InitializerOp : Util_Op<"initializer", [
     A function that is called in definition order upon module initialization.
     Must not load any globals that are defined or initialized after it in the
     module.
+
+    Module initialization follows a strict execution order to ensure
+    correctness:
+    * Initialization points: two types of operations define initialization:
+      - `util.initializer` ops: explicit initialization functions
+      - `util.global` ops with initial values: implicit initialization via
+        attributes
+    * Execution order: initialization proceeds in exact module definition order:
+      - Operations execute sequentially from top to bottom
+      - Each `util.global` with an initial value conceptually materializes its
+        value and stores it before the next initialization point
+      - Each `util.initializer` executes its entire body before proceeding
+    * Dependency rules:
+      - Initializers may only access globals defined before them in module order
+      - Globals with initial values are considered "initialized" at their
+        definition point, not when first accessed
+      - Function calls within initializers observe the current initialization
+        state when the call is made
+    * Transformation guarantees:
+      - Combining passes preserve exact initialization order
+      - Globals with initial values may be converted to explicit initialization
+        while maintaining their position in the initialization sequence
+      - The final initialization state must be identical to sequential execution
+
+    Example execution:
+    ```mlir
+    util.global @A = 1 : i32           // A = 1
+    util.initializer { ... }           // Executes with A = 1
+    util.global @B = 2 : i32           // B = 2
+    util.initializer {
+      %a = util.global.load @A : i32   // Loads 1
+      %b = util.global.load @B : i32   // Loads 2
+    }
+    ```
   }];
 
   let arguments = (ins
@@ -968,6 +1002,57 @@ def Util_GlobalOp : Util_Op<"global", [
     Declares a global variable that maintains its value across invocations.
     The value is tied to the execution context of the module and different
     contexts will have different variable storage.
+
+    Globals can be initialized with an `initial_value` attribute that specifies
+    their value at module initialization time. This initial value is evaluated
+    in module definition order: a global with an initial value is considered
+    initialized at its definition point in the module, not when first accessed.
+
+    During module initialization:
+    * Globals with `initial_value` attributes conceptually have their value
+      materialized and stored before any subsequent initialization points
+    * Initialization order follows module definition order exactly
+    * Globals are visible to initializers but only after their definition point
+
+    Example:
+    ```mlir
+    // A is initialized to 1 at this point in module initialization.
+    util.global @A = 1 : i32
+
+    // This initializer can read A (it's defined above).
+    util.initializer {
+      %a = util.global.load @A : i32  // Loads 1
+    }
+
+    // B is initialized to 2 here, after the above initializer runs.
+    util.global @B = 2 : i32
+    ```
+
+    Globals marked as mutable can be modified by stores anywhere in the program.
+    Immutable globals have strict initialization rules:
+    * Can only be initialized once - either by `initial_value` or by stores
+      in initializers, never both.
+    * Stores to immutable globals are only allowed in:
+      - `util.initializer` ops directly
+      - Functions that are only called from initializers (initializer-only)
+    * Stores from externally-reachable functions are forbidden.
+    * Initialization must respect module order - initializers can only
+      access globals defined before them.
+
+    Stores to immutable globals inside control flow regions (scf.if, scf.for,
+    scf.while, etc) in initializer-only functions will generate warnings as
+    they may indicate complex initialization patterns that could be fragile:
+    ```mlir
+    util.func private @init_func() {
+      scf.if %cond {
+        // Warning: conditional store in initializer-only function
+        util.global.store %val, @immutable_global : i32
+      }
+    }
+    ```
+    While such patterns are allowed they should be used with caution as the
+    initialization behavior depends on runtime control flow and the compiler
+    may disable optimizations on those globals.
   }];
 
   let arguments = (ins

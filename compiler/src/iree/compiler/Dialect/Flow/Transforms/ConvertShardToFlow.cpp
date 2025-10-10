@@ -219,10 +219,12 @@ static void buildGlobalChannelCreation(shard::GridOp grid,
   builder.setInsertionPointToStart(&module.getBodyRegion().getBlocks().front());
 
   auto channelName = getGridChannelName(grid, gridAxes);
-  IREE::Util::GlobalOp::create(
+  auto globalOp = IREE::Util::GlobalOp::create(
       builder, builder.getStringAttr("private"), channelName,
       builder.getType<IREE::Flow::ChannelType>(), false, TypedAttr(),
       builder.getAttr<IREE::Util::InlineNeverAttr>());
+  // Ensure initializer comes after the global.
+  builder.setInsertionPointAfter(globalOp);
   buildChannelInitializer(grid, gridAxes, useNamedDefaultChannels, builder);
 }
 
