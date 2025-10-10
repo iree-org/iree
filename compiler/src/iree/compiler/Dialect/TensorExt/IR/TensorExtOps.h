@@ -7,6 +7,8 @@
 #ifndef IREE_COMPILER_DIALECT_TENSOREXT_IR_TENSOREXTOPS_H_
 #define IREE_COMPILER_DIALECT_TENSOREXT_IR_TENSOREXTOPS_H_
 
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtAttrs.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOpInterfaces.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/IR/Attributes.h"
