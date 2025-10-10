@@ -641,6 +641,8 @@ def IREEGPU_TargetWgpAttr : AttrDef<IREEGPU_Dialect, "TargetWgp"> {
     OptionalParameter<"std::optional<int32_t>">:$simds_per_wgp,
     // VGPR register space size in bits. TODO(#18849): populate on all GPUs.
     OptionalParameter<"std::optional<int32_t>">:$vgpr_space_bits,
+    // Available bit-widths for direct load from global to LDS memory.
+    OptionalParameter<"DenseI64ArrayAttr">:$dma_sizes,
 
     // An optional extra dict
     // This field allows to inject more features/limits not supported in the
