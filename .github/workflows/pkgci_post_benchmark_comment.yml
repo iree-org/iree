@@ -29,12 +29,12 @@ jobs:
       - name: Generate Benchmark Comment
         run: |
           python3 ./build_tools/pkgci/compare-benchmarks.py \
-            --workflow-run-id ${github.run_id} \
-            --output-file-path ${github.workspace}/job_summary.md
+            --workflow-run-id ${{ github.run_id }} \
+            --output-file-path ${{ github.workspace }}/job_summary.md
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Post / Update Benchmark Comment
         uses: marocchino/sticky-pull-request-comment@v2.9.4
         with:
-          path: ${github.workspace}/job_summary.md
+          path: ${{ github.workspace }}/job_summary.md
