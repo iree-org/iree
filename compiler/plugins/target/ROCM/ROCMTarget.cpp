@@ -91,6 +91,7 @@ struct ROCMOptions {
   IREE::Codegen::DenormalFpMath denormalFpMathF32 =
       IREE::Codegen::DenormalFpMath::None;
   bool enableRegSpillWarning = false;
+  bool debugSymbols = false;
 
   void bindOptions(OptionsBinder &binder) {
     using namespace llvm;
@@ -178,6 +179,9 @@ struct ROCMOptions {
     binder.opt<bool>("iree-hip-enable-register-spill-warning",
                      enableRegSpillWarning, cl::cat(category),
                      cl::desc("Report register spilling for AMD GPUs"));
+    binder.opt<bool>(
+        "iree-hip-emit-debug-info", debugSymbols, cl::cat(category),
+        cl::desc("Generate and embed debug information (DWARF) for HIP."));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
@@ -448,7 +452,7 @@ public:
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) override {
-    buildLLVMGPUCodegenPassPipeline(passManager, true);
+    buildLLVMGPUCodegenPassPipeline(passManager, true, options.debugSymbols);
   }
 
   void buildLinkingPassPipeline(OpPassManager &passManager) override {
@@ -694,6 +698,7 @@ public:
       // CI or users may not be prepared for.
       llvmModule->addModuleFlag(llvm::Module::Error,
                                 "amdhsa_code_object_version", abiVersion);
+
       for (llvm::Function &f : llvmModule->functions())
         f.addFnAttr(llvm::Attribute::AlwaysInline);
 
