@@ -160,6 +160,7 @@ nav:
           - GPU - Metal: "guides/deployment-configurations/gpu-metal.md"
       - "General topics":
           - "guides/parameters.md"
+          - "guides/lowering-config.md"
   - "Reference":
       - "reference/index.md"
       - "General topics":
