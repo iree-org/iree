@@ -290,6 +290,10 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   int subgroupsN = *wgp.getSimdsPerWgp();
   int intrinsicsM = totalUnrollM / subgroupsM;
   int intrinsicsN = totalUnrollN / subgroupsN;
+  // We currently never generate subgroupsK != 1, as subgroupsK requires
+  // specific partial-accumulator-reduction in the kernel, currently only done
+  // in some microkernels that would provide their own DataTiledMMAAttr.
+  int subgroupsK = 1;
 
   //
   // Step 3: Adjust the unrolling factors when there is a narrow dimension.
@@ -312,14 +316,14 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   if (auto intrinsicMma = dyn_cast<MMAAttr>(intrinsicAttr)) {
     return DataTiledMMAAttr::get(ctx, intrinsicMma.getIntrinsic(), intrinsicsM,
                                  subgroupsM, intrinsicsN, subgroupsN,
-                                 intrinsicsK);
+                                 intrinsicsK, subgroupsK);
   }
   auto intrinsicScaledMma = cast<ScaledMMAAttr>(intrinsicAttr);
   return DataTiledScaledMMAAttr::get(
       ctx, intrinsicScaledMma.getIntrinsic(),
       intrinsicScaledMma.getLhsElemType(), intrinsicScaledMma.getRhsElemType(),
       intrinsicScaledMma.getAccElemType(), intrinsicsM, subgroupsM, intrinsicsN,
-      subgroupsN, intrinsicsK);
+      subgroupsN, intrinsicsK, subgroupsK);
 }
 
 static Operation *lowerContractionOrScaledContractionOpToInnerTiledOp(

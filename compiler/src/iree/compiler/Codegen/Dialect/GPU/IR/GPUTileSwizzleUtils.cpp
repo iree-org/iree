@@ -7,10 +7,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
-#include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
-#include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 
 #define DEBUG_TYPE "gpu-tile-swizzle-utils"
 
@@ -235,11 +232,14 @@ static TileSwizzle getSwizzleImpl(MMAAttrTy mma, unsigned operandIdx) {
     if (mma.getIntrinsicsM() > 1) {
       expand(swizzle, 0, {Kind::CrossIntrinsic, mma.getIntrinsicsM()});
     }
+    if (mma.getSubgroupsK() > 1) {
+      expand(swizzle, 1, {Kind::CrossThread, mma.getSubgroupsK()});
+    }
     if (mma.getSubgroupsM() > 1) {
-      // Although subGroupsN is not part of the LHS swizzle, we must still
-      // delinearize over the combined subGroupsM × subGroupsN space. By
-      // contrast, RHS does *not* need special handling, since subGroupsM can be
-      // treated as an implicit leading dimension and omitted anyway.
+      // The distribution size here is multiplied by subgroupsN because the
+      // subgroupsN dimension, which does not occur in the LHS swizzle, is more
+      // inner than the subgroupsM dimension.
+      // TODO(#22072): split subgroupsN into a separate "null" dimension.
       TileSwizzle::Dim dim(Kind::CrossThread, mma.getSubgroupsM(),
                            mma.getSubgroupsM() * mma.getSubgroupsN());
       expand(swizzle, 0, dim);
@@ -264,6 +264,9 @@ static TileSwizzle getSwizzleImpl(MMAAttrTy mma, unsigned operandIdx) {
     if (mma.getIntrinsicsN() > 1) {
       expand(swizzle, 0, {Kind::CrossIntrinsic, mma.getIntrinsicsN()});
     }
+    if (mma.getSubgroupsK() > 1) {
+      expand(swizzle, 1, {Kind::CrossThread, mma.getSubgroupsK()});
+    }
     if (mma.getSubgroupsN() > 1) {
       expand(swizzle, 0, {Kind::CrossThread, mma.getSubgroupsN()});
     }
@@ -276,11 +279,29 @@ static TileSwizzle getSwizzleImpl(MMAAttrTy mma, unsigned operandIdx) {
     if (mma.getIntrinsicsM() > 1) {
       expand(swizzle, 0, {Kind::CrossIntrinsic, mma.getIntrinsicsM()});
     }
+    // TODO(#22072): split subgroupsK into a separate "null" dimension.
+    // The current logic with alreadyAccountedForSubgroupsK is exactly the kind
+    // of complication that shows why we need #22072.
+    bool alreadyAccountedForSubgroupsK = false;
     if (mma.getSubgroupsN() > 1) {
-      expand(swizzle, 1, {Kind::CrossThread, mma.getSubgroupsN()});
+      int64_t distributionSize = mma.getSubgroupsN();
+      if (!alreadyAccountedForSubgroupsK) {
+        distributionSize *= mma.getSubgroupsK();
+        alreadyAccountedForSubgroupsK = true;
+      }
+      TileSwizzle::Dim dim(Kind::CrossThread, mma.getSubgroupsN(),
+                           distributionSize);
+      expand(swizzle, 1, dim);
     }
     if (mma.getSubgroupsM() > 1) {
-      expand(swizzle, 0, {Kind::CrossThread, mma.getSubgroupsM()});
+      int64_t distributionSize = mma.getSubgroupsM();
+      if (!alreadyAccountedForSubgroupsK) {
+        distributionSize *= mma.getSubgroupsK();
+        alreadyAccountedForSubgroupsK = true;
+      }
+      TileSwizzle::Dim dim(Kind::CrossThread, mma.getSubgroupsM(),
+                           distributionSize);
+      expand(swizzle, 0, dim);
     }
   }
   return swizzle;
