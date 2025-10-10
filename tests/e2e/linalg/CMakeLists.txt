@@ -153,6 +153,7 @@ iree_check_single_backend_test_suite(
     check_rocm_hip
   SRCS
     "argmax.mlir"
+    "gather_like_ops.mlir"
     "pack_i8.mlir"
     "softmax.mlir"
     "unpack.mlir"
