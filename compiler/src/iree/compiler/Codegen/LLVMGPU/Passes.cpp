@@ -1251,7 +1251,7 @@ void registerCodegenLLVMGPUPasses() {
   common::registerPasses();
 
   struct LLVMGPUPipelineOptions final
-      :  PassPipelineOptions<LLVMGPUPipelineOptions> {
+      : PassPipelineOptions<LLVMGPUPipelineOptions> {
     Option<bool> preserveDebugInfo{
         *this, "preserve-debug-info",
         llvm::cl::desc("Preserve debug information (do not strip)")};
