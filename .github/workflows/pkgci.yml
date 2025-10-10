@@ -25,6 +25,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
   cancel-in-progress: true
 
+permissions:
+  pull-requests: write
+  contents: read
+
 jobs:
   setup:
     uses: ./.github/workflows/setup.yml
