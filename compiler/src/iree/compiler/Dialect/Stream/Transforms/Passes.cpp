@@ -75,6 +75,9 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   // Verify we support the program.
   passManager.addPass(IREE::Stream::createVerifyInputPass());
 
+  // Propagate attributes from callees to call sites for timeline analysis.
+  passManager.addPass(IREE::Util::createAttributeCallGraphPass());
+
   // Cleanup the program prior to outlining constants in case there is
   // propagation or fusion that needs to happen first.
   buildStreamCleanupPassPipeline(passManager, transformOptions);
@@ -192,22 +195,20 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // lifetime assigned.
   passManager.addPass(IREE::Stream::createVerifyLoweringToAsyncResourcesPass());
 
-  // Elide transfers we can provably detect are not required due to the target
-  // topology. We do this prior to copy-on-write so that we are only providing
-  // real transfers to the analysis.
-  passManager.addPass(IREE::Stream::createElideAsyncTransfersPass());
-
   // Materialize copy-on-write behavior with explicit stream.async.* ops.
-  // This will insert a lot of copies, so follow it up with a pass that elides
-  // ones that aren't needed. This is easier to verify than if there was one
-  // pass attempting to do both. Note that copy-on-write materialization is
-  // required for correct execution while copy elision is for performance only
-  // (though it's critical enough that it is not optional).
+  // This will insert a lot of copies and transfers as it is fairly conservative
+  // so we follow it up with a pass that elides ones that aren't needed. This is
+  // easier to verify than if there was one pass attempting to do both copy
+  // insertion for preserving correctness and copy elision to avoid expensive
+  // copies (which is critical enough that it is not optional).
   FunctionLikeNest(passManager)
       .addPass(IREE::Stream::createMaterializeCopyOnWritePass)
       .addPass(mlir::createCanonicalizerPass);
+  // ElideAsyncCopiesPass handles both copy and transfer elision, including
+  // topology-based transfer elision for unified memory systems.
   passManager.addPass(IREE::Stream::createElideAsyncCopiesPass());
   FunctionLikeNest(passManager)
+      .addPass(mlir::createCSEPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(IREE::Stream::createEmplaceAllocationsPass);
 
@@ -405,6 +406,13 @@ void buildStreamOptimizationPassPipeline(
 
 void buildStreamTransformPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions) {
+  //----------------------------------------------------------------------------
+  // Precondition verification and IR normalization
+  //----------------------------------------------------------------------------
+
+  // Propagate attributes from callees to call sites for local analysis.
+  passManager.addPass(IREE::Util::createAttributeCallGraphPass());
+
   //----------------------------------------------------------------------------
   // Primary pipeline stages (required)
   //----------------------------------------------------------------------------

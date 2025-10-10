@@ -205,17 +205,21 @@ def ElideAsyncCopiesPass :
   }];
 }
 
-def ElideAsyncTransfersPass :
-    Pass<"iree-stream-elide-async-transfers", "mlir::ModuleOp"> {
-  let summary = "Elides transfer ops when they the topology allows";
-  let description = [{
-    Elides all transfer ops that are between device links that do not
-    require tansfers and do not change the lifetime of the resource.
-  }];
-  let dependentDialects = [
-    "IREE::Stream::StreamDialect",
-  ];
-}
+// ElideAsyncTransfersPass has been merged into ElideAsyncCopiesPass to provide
+// comprehensive copy and transfer elision with topology awareness in a single
+// analysis pass. The functionality is still available via ElideAsyncCopiesPass.
+//
+// def ElideAsyncTransfersPass :
+//     Pass<"iree-stream-elide-async-transfers", "mlir::ModuleOp"> {
+//   let summary = "Elides transfer ops when they the topology allows";
+//   let description = [{
+//     Elides all transfer ops that are between device links that do not
+//     require tansfers and do not change the lifetime of the resource.
+//   }];
+//   let dependentDialects = [
+//     "IREE::Stream::StreamDialect",
+//   ];
+// }
 
 def EmplaceAllocationsPass :
     Pass<"iree-stream-emplace-allocations", ""> {

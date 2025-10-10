@@ -259,6 +259,9 @@ struct VerifyInputPass
     if (failed(verifier.run(getOperation()))) {
       return signalPassFailure();
     }
+
+    // Preserve all analyses since this is a read-only verification pass.
+    markAllAnalysesPreserved();
   }
 };
 
@@ -294,6 +297,9 @@ struct VerifyLoweringToTensorsPass
     if (failed(verifier.run(getOperation()))) {
       return signalPassFailure();
     }
+
+    // Preserve all analyses since this is a read-only verification pass.
+    markAllAnalysesPreserved();
   }
 };
 
@@ -315,6 +321,9 @@ struct VerifyLoweringToAsyncResourcesPass
     if (failed(verifier.run(getOperation()))) {
       return signalPassFailure();
     }
+
+    // Preserve all analyses since this is a read-only verification pass.
+    markAllAnalysesPreserved();
   }
 };
 
@@ -366,6 +375,9 @@ struct VerifyLoweringToAsyncPass
     if (failed(verifier.run(getOperation()))) {
       return signalPassFailure();
     }
+
+    // Preserve all analyses since this is a read-only verification pass.
+    markAllAnalysesPreserved();
   }
 };
 
@@ -394,6 +406,9 @@ struct VerifyLoweringToCmdPass
     if (failed(verifier.run(getOperation()))) {
       return signalPassFailure();
     }
+
+    // Preserve all analyses since this is a read-only verification pass.
+    markAllAnalysesPreserved();
   }
 };
 

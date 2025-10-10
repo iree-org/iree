@@ -196,27 +196,7 @@ def Util_InlineAlwaysAttr : AttrDef<Util_Dialect, "InlineAlways", [
 }
 
 //===----------------------------------------------------------------------===//
-// #util.null
-//===----------------------------------------------------------------------===//
-
-def Util_NullAttr : AttrDef<Util_Dialect, "Null", [
-  TypedAttrInterface,
-]> {
-  let mnemonic = "null";
-  let summary = [{An attribute specifying a null reference.}];
-  let description = [{
-    A null reference value.
-  }];
-
-  let parameters = (ins
-    AttributeSelfTypeParameter<"">:$type
-  );
-
-  let assemblyFormat = [{}];
-}
-
-//===----------------------------------------------------------------------===//
-// #util.uninitialized
+// #util.preprocessing_pipeline
 //===----------------------------------------------------------------------===//
 
 def Util_PreprocessingPipelineAttr : AttrDef<Util_Dialect,
@@ -240,6 +220,26 @@ def Util_PreprocessingPipelineAttr : AttrDef<Util_Dialect,
   let assemblyFormat = [{
     `<` $pipelineString `>`
   }];
+}
+
+//===----------------------------------------------------------------------===//
+// #util.null
+//===----------------------------------------------------------------------===//
+
+def Util_NullAttr : AttrDef<Util_Dialect, "Null", [
+  TypedAttrInterface,
+]> {
+  let mnemonic = "null";
+  let summary = [{An attribute specifying a null reference.}];
+  let description = [{
+    A null reference value.
+  }];
+
+  let parameters = (ins
+    AttributeSelfTypeParameter<"">:$type
+  );
+
+  let assemblyFormat = [{}];
 }
 
 //===----------------------------------------------------------------------===//
