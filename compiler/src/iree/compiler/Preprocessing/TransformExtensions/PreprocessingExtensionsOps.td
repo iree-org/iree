@@ -194,8 +194,8 @@ def MatchContractionOp : Op<Transform_Dialect, "iree.match.contraction",
 
     %batch_dims, %m_dims, %n_dims, %k_dims =
       transform.iree.match.contraction %matmul_op,
-        lhs_type = f32, rhs_type = f32, output_type = f32
-        {indexing_maps = [#map_lhs, #map_rhs, #map_output]} :
+        lhs_type = f32, rhs_type = f32, output_type = f32,
+        indexing_maps = [#map_lhs, #map_rhs, #map_output] :
         !transform.any_op -> !transform.param<i64>
     ```
 
@@ -236,7 +236,7 @@ def MatchContractionOp : Op<Transform_Dialect, "iree.match.contraction",
     `,` `lhs_type` `=` $lhs_type
     `,` `rhs_type` `=` $rhs_type
     `,` `output_type` `=` $output_type
-    (`indexing_maps` $indexing_maps^)?
+    (`,` `indexing_maps` `=` $indexing_maps^)?
     attr-dict `:` type($operand_handle) `->` type($batch_dims)
   }];
   let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
@@ -270,8 +270,8 @@ def MatchConvolutionOp : Op<Transform_Dialect, "iree.match.convolution",
     %batch_dims, %output_image_dims, %output_channel_dims, %filter_dims,
     %input_channel_dims, %depth_dims, %strides, %dilations =
       transform.iree.match.convolution %conv_op,
-        lhs_type = f32, rhs_type = f32, output_type = f32
-        {indexing_maps = [#map_input, #map_filter, #map_output]} :
+        lhs_type = f32, rhs_type = f32, output_type = f32,
+        indexing_maps = [#map_input, #map_filter, #map_output] :
         !transform.any_op -> !transform.param<i64>
     ```
 
@@ -320,7 +320,7 @@ def MatchConvolutionOp : Op<Transform_Dialect, "iree.match.convolution",
     `,` `lhs_type` `=` $lhs_type
     `,` `rhs_type` `=` $rhs_type
     `,` `output_type` `=` $output_type
-    (`indexing_maps` $indexing_maps^)?
+    (`,` `indexing_maps` `=` $indexing_maps^)?
     attr-dict `:` type($operand_handle) `->` type($batch_dims)
   }];
   let extraClassDeclaration = SingleOpMatcher.extraDeclaration;
