@@ -123,6 +123,12 @@ jobs:
     with:
       write-caches: ${{ needs.setup.outputs.write-caches }}
 
+  post_benchmark_comment:
+    name: Post Benchmark Comment
+    needs: [setup, test_torch]
+    if: github.event_name == 'pull_request' && contains(fromJson(needs.setup.outputs.enabled-jobs), 'post_benchmark_comment')
+    uses: ./.github/workflows/pkgci_post_benchmark_comment.yml
+
   ##############################################################################
 
   # Aggregate job status and alerting on failures.

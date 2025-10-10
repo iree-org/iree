@@ -1,0 +1,40 @@
+# Copyright 2025 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: Workflow Summary
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  summary:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checking out IREE repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          submodules: false
+
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v5.4.0
+        with:
+          python-version: "3.11"
+
+      - name: Generate Benchmark Comment
+        run: |
+          python3 ./build_tools/pkgci/compare-benchmarks.py \
+            --workflow-run-id ${github.run_id} \
+            --output-file-path ${github.workspace}/job_summary.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Post / Update Benchmark Comment
+        uses: marocchino/sticky-pull-request-comment@v2.9.4
+        with:
+          path: ${github.workspace}/job_summary.md
