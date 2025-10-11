@@ -20,4 +20,10 @@
 #undef GET_ATTRDEF_CLASSES
 // clang-format on
 
+// Some keys used in the DictionaryAttr rocm.ukernel_info.match
+static constexpr char ukernelInfoName[] = "ukernel_info";
+static constexpr char typesName[] = "types";
+static constexpr char iterationSizesConstraintsName[] =
+    "iteration_sizes_constraints";
+
 #endif // IREE_PLUGINS_TARGET_ROCM_DIALECT_ROCM_ROCMATTRS_H_

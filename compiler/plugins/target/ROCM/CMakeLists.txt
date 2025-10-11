@@ -65,6 +65,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Utils::ExecutableDebugInfoUtils
     iree::compiler::Dialect::HAL::Utils::LLVMLinkerUtils
+    iree::compiler::Dialect::Util::IR
     iree::compiler::PluginAPI
     iree::compiler::Utils
     iree::compiler::plugins::target::ROCM::Dialect::ROCM::IR::ROCMDialect

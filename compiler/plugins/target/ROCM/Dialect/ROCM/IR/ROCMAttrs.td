@@ -72,4 +72,49 @@ def ROCM_TensorUKernelProviderAttr  :
   let assemblyFormat = [{}];
 }
 
+//===---------------------------------------------------------------------===//
+// rocm.ukernel_info
+//===---------------------------------------------------------------------===//
+
+def ROCM_UKernelInfoAttr : AttrDef<ROCM_Dialect, "UKernelInfo", []> {
+  let mnemonic = "ukernel_info";
+  let summary = [{
+    An attribute that provides metadata around a ukernel, e.g. for matching.
+  }];
+  let parameters =
+      (ins AttrParameter<
+           "DictionaryAttr",
+           "Parameters controlling matching this ukernel, in addition to ISA "
+           "requirements from the mma attribute.">:$match,
+          DefaultValuedParameter<"int64_t", "0",
+                                 "Determines which ukernel is selected when "
+                                 "multiple ones are applicable.">:$benefit,
+          OptionalParameter<"Attribute",
+                            "MMAAttr-like attribute if applicable, dictates "
+                            "layout and/or ISA requirements">:$mma);
+  let assemblyFormat = "`<` struct(params) `>`";
+}
+
+//===---------------------------------------------------------------------===//
+// rocm.ukernel_interation_size_constraint
+//===---------------------------------------------------------------------===//
+
+def ROCM_UKernelIterationSizeConstraint
+    : AttrDef<ROCM_Dialect, "UKernelIterationSizeConstraint", []> {
+  let mnemonic = "ukernel_interation_size_constraint";
+  let summary = [{
+    An attribute that provides a matching constraint on an iteration size.
+  }];
+  let parameters = (ins OptionalParameter<
+                        "IntegerAttr",
+                        "Index of iteration dimension to match">:$index,
+      OptionalParameter<"IntegerAttr",
+                        "Minimum iteration dimension size to match">:$size_min,
+      OptionalParameter<"IntegerAttr",
+                        "Maximum iteration dimension size to match">:$size_max,
+      OptionalParameter<"IntegerAttr", "Divisor of iteration dimension size to "
+                                       "match">:$size_div);
+  let assemblyFormat = "`<` struct(params) `>`";
+}
+
 #endif // IREE_PLUGINS_TARGET_ROCM_DIALECT_ROCMATTRS

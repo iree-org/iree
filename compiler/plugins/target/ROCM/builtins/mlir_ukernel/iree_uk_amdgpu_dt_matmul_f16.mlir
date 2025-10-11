@@ -14,7 +14,20 @@
  affine_map<(i, j, k) -> (i, j)>
 ]
 
-util.func @pingpong_dt_large_f16(%lhs_base: !lhs_base_ty, %rhs_base: !rhs_base_ty, %unused_acc: !acc_base_ty) -> !acc_base_ty {
+util.func @pingpong_dt_large_f16(%lhs_base: !lhs_base_ty, %rhs_base: !rhs_base_ty, %unused_acc: !acc_base_ty) -> !acc_base_ty attributes {
+  ukernel_info = #rocm.ukernel_info<
+    match = {
+      types = [f16, f16, f32]
+    },
+    mma = #iree_gpu.data_tiled_mma_layout<
+      intrinsic = MFMA_F32_16x16x16_F16,
+      intrinsics_m = 8,
+      subgroups_m = 2,
+      intrinsics_n = 4,
+      subgroups_n = 4
+    >
+  >
+} {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
