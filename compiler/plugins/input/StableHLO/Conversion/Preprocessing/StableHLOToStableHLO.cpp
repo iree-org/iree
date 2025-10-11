@@ -297,8 +297,7 @@ struct TransposeReshapeGenericDotGeneral final
 
     int64_t resultShape[] = {
         llvm::product_of(shape.take_front(dimsBorder0)),
-        llvm::product_of(shape.drop_front(dimsBorder0)
-                             .take_front(dimsBorder1 - dimsBorder0)),
+        llvm::product_of(shape.slice(dimsBorder0, dimsBorder1 - dimsBorder0)),
         llvm::product_of(shape.drop_front(dimsBorder1))};
     return mlir::stablehlo::ReshapeOp::create(
         b, loc, RankedTensorType::get(resultShape, type.getElementType()), src);
