@@ -945,9 +945,7 @@ static ElementsAttr tensorSlice(ElementsAttr tensor, uint64_t dim,
   llvm::SmallVector<Attribute> newContents;
   newContents.reserve(outputType.getNumElements());
   auto valuesBegin = tensor.getValues<Attribute>().begin();
-  int64_t step =
-      std::accumulate(shape.rbegin(), shape.rbegin() + shape.size() - dim,
-                      /*init=*/1, /*op=*/std::multiplies<int64_t>());
+  int64_t step = llvm::product_of(llvm::drop_begin(shape, dim));
   int64_t num = length * step / shape[dim];
   for (int64_t offset = step / shape[dim] * start,
                numElements = tensorType.getNumElements();

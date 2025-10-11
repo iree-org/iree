@@ -194,11 +194,6 @@ InnerTiledOp::inferReturnTypes(MLIRContext *, std::optional<Location>,
   return success();
 }
 
-static int64_t multiplyAcc(ArrayRef<int64_t> shape) {
-  return std::accumulate(shape.begin(), shape.end(), 1,
-                         std::multiplies<int64_t>());
-}
-
 static bool countsMatchTileTypes(ArrayRef<int64_t> innerElemCounts,
                                  ArrayRef<VectorType> tileTypes) {
   return llvm::all_of_zip(
@@ -213,7 +208,7 @@ static SmallVector<int64_t> getInnerElemCounts(InnerTiledOp tiledOp) {
            tiledOp.getOperandTypes(),
            tiledOp.getIndexingMapsAttr().getAsValueRange<AffineMapAttr>())) {
     ArrayRef<int64_t> shape = cast<ShapedType>(opType).getShape();
-    result.push_back(multiplyAcc(shape.drop_front(map.getNumResults())));
+    result.push_back(llvm::product_of(shape.drop_front(map.getNumResults())));
   }
   return result;
 }

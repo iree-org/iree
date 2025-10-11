@@ -338,9 +338,7 @@ void GPUFuseAndHoistParallelLoopsPass::runOnOperation() {
   std::optional<int64_t> maybeFlatWorkgroupSize = std::nullopt;
   if (std::optional<SmallVector<int64_t>> workgroupSize =
           getWorkgroupSize(funcOp)) {
-    maybeFlatWorkgroupSize =
-        std::accumulate(workgroupSize->begin(), workgroupSize->end(), 1,
-                        std::multiplies<int64_t>());
+    maybeFlatWorkgroupSize = llvm::product_of(*workgroupSize);
   }
 
   // First run the hoisting and fusion patterns.

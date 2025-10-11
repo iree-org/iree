@@ -457,9 +457,7 @@ static void reduceDistributionWorkgroups(
   }
 
   int64_t numWorkgroupsLimit = 2 * clNumberOfRuntimeThreads;
-  int64_t numWorkgroups =
-      std::accumulate(numWorkgroupsPerDim.begin(), numWorkgroupsPerDim.end(),
-                      1LL, std::multiplies<int64_t>{});
+  int64_t numWorkgroups = llvm::product_of(numWorkgroupsPerDim);
   unsigned currDim = workload.size();
   while (numWorkgroups > numWorkgroupsLimit && currDim > 0) {
     unsigned index = currDim - 1;

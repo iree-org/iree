@@ -295,17 +295,12 @@ struct TransposeReshapeGenericDotGeneral final
         shape.size() - dimsBorder1 <= 1)
       return src;
 
-    SmallVector<int64_t> result_shape = {
-        std::accumulate(shape.begin(), shape.begin() + dimsBorder0, 1,
-                        std::multiplies<int64_t>()),
-        std::accumulate(shape.begin() + dimsBorder0,
-                        shape.begin() + dimsBorder1, 1,
-                        std::multiplies<int64_t>()),
-        std::accumulate(shape.begin() + dimsBorder1, shape.end(), 1,
-                        std::multiplies<int64_t>())};
+    int64_t resultShape[] = {
+        llvm::product_of(shape.take_front(dimsBorder0)),
+        llvm::product_of(shape.slice(dimsBorder0, dimsBorder1 - dimsBorder0)),
+        llvm::product_of(shape.drop_front(dimsBorder1))};
     return mlir::stablehlo::ReshapeOp::create(
-        b, loc, RankedTensorType::get(result_shape, type.getElementType()),
-        src);
+        b, loc, RankedTensorType::get(resultShape, type.getElementType()), src);
   }
 
   LogicalResult matchAndRewrite(mlir::stablehlo::DotGeneralOp op,
