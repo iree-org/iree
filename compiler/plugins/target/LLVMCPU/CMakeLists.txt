@@ -17,18 +17,42 @@ iree_compiler_register_plugin(
     ::LLVMCPU
 )
 
+iree_tablegen_library(
+  NAME
+    PassesIncGen
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-decls Passes.h.inc
+)
+
+iree_tablegen_doc(
+  NAME
+    LLVMCPUTargetPassesDocGen
+  CATEGORY
+    "Passes"
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-doc LLVMCPUTargetPasses.md
+)
+
 iree_cc_library(
   NAME
     LLVMCPU
   HDRS
     "LibraryBuilder.h"
+    "Passes.h"
   SRCS
     "LLVMCPUTarget.cpp"
     "LibraryBuilder.cpp"
+    "Passes.cpp"
+    "TestPropagateTargetAttrs.cpp"
   DEPS
     ::LLVMIRPasses
     ::LLVMTargetOptions
     ::LinkerTool
+    ::PassesIncGen
     ::StaticLibraryGenerator
     IREELLVMCPUTargetDeps
     IREELinalgTransformDialect
@@ -38,6 +62,7 @@ iree_cc_library(
     LLVMCore
     LLVMLinker
     LLVMSupport
+    LLVMTarget
     LLVMTargetParser
     MLIRArmNeonDialect
     MLIRArmSMEDialect
@@ -50,6 +75,7 @@ iree_cc_library(
     MLIRLLVMToLLVMIRTranslation
     MLIRPDLDialect
     MLIRPDLInterpDialect
+    MLIRPass
     MLIRSupport
     MLIRTargetLLVMIRExport
     MLIRTransformDialect
@@ -60,8 +86,11 @@ iree_cc_library(
     iree::compiler::Codegen::LLVMCPU
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Encoding::IR
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Target::Devices
+    iree::compiler::Dialect::HAL::Utils::LLVMCodeGenUtils
     iree::compiler::Dialect::HAL::Utils::LLVMLinkerUtils
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::Util::IR
