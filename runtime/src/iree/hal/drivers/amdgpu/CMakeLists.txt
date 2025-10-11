@@ -66,6 +66,7 @@ iree_cc_library(
     iree::hal::drivers::amdgpu::util::libhsa
     iree::hal::drivers::amdgpu::util::topology
     iree::hal::utils::executable_debug_info
+    iree::hal::utils::executable_header
     iree::hal::utils::file_transfer
     iree::hal::utils::files
     iree::hal::utils::resource_set
