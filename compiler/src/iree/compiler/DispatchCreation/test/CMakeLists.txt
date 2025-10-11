@@ -52,6 +52,7 @@ iree_lit_test_suite(
     "set_encoding_padding.mlir"
     "set_encoding_pipeline.mlir"
     "set_split_reduction_sizes.mlir"
+    "set_split_reduction_sizes_conv.mlir"
     "sink_reshapes.mlir"
     "split_reduction.mlir"
     "tensor_pad_to_tensor_insert_slice.mlir"

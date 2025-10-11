@@ -4,10 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
-
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 
@@ -94,12 +93,17 @@ struct SetSplitReductionSizesPass final
         return;
       }
 
-      std::optional<SmallVector<int64_t>> tileSizes =
-          getOuterReductionSizes(tilingOp);
-      if (!tileSizes) {
+      // --- Case 1: Outer reduction ---
+      if (auto tileSizes = getOuterReductionSizes(tilingOp)) {
+        IREE::LinalgExt::setSplitReductionAttribute(tilingOp, *tileSizes);
         return;
       }
-      IREE::LinalgExt::setSplitReductionAttribute(tilingOp, tileSizes.value());
+
+      // --- Case 2: Generic weight backward convolution ---
+      if (auto tileSizes = getWeightBackwardReductionSizes(tilingOp)) {
+        IREE::LinalgExt::setSplitReductionAttribute(tilingOp, *tileSizes);
+        return;
+      }
     });
   }
 
@@ -141,6 +145,126 @@ private:
       tileSizes[i] = tileSize;
       currentSplitReductionSize *= tileSize;
     }
+    return tileSizes;
+  }
+
+  /// Determines split reduction sizes for weight backward convolutions.
+  /// These convolutions have a special CHWN layout, where the filter sizes
+  /// (corresponding to output image sizes in forward convolutions) are
+  /// typically large, while the output spatial dimensions are small. This makes
+  /// the split reduction strategy particularly effective. Currently, splitting
+  /// is only applied along the input channel dimension.
+  std::optional<SmallVector<int64_t>>
+  getWeightBackwardReductionSizes(PartialReductionOpInterface op) const {
+    // First check if the input op is a convolution with CHWN layout.
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(op.getOperation());
+    if (!linalgOp || !linalg::isaConvolutionOpInterface(linalgOp)) {
+      LDBG() << "skipping op; not convolution";
+      return std::nullopt;
+    }
+
+    FailureOr<mlir::linalg::ConvolutionDimensions> convDims =
+        mlir::linalg::inferConvolutionDims(linalgOp);
+    if (failed(convDims)) {
+      LDBG() << "skipping op; failed to infer convolution dims";
+      return std::nullopt;
+    }
+
+    if (convDims->inputChannel.empty()) {
+      LDBG() << "skipping op; has no input channel dimension";
+      return std::nullopt;
+    }
+
+    OpOperand *input = linalgOp.getDpsInputOperand(0);
+    OpOperand *filter = linalgOp.getDpsInputOperand(1);
+    OpOperand *output = linalgOp.getDpsInitOperand(0);
+
+    Value inputVal = input->get();
+    Value filterVal = filter->get();
+    Value outputVal = output->get();
+
+    ArrayRef<int64_t> inputShape =
+        llvm::cast<ShapedType>(inputVal.getType()).getShape();
+    ArrayRef<int64_t> filterShape =
+        llvm::cast<ShapedType>(filterVal.getType()).getShape();
+    ArrayRef<int64_t> outputShape =
+        llvm::cast<ShapedType>(outputVal.getType()).getShape();
+
+    if (ShapedType::isDynamicShape(inputShape) ||
+        ShapedType::isDynamicShape(filterShape) ||
+        ShapedType::isDynamicShape(outputShape)) {
+      LDBG() << "skipping op; has dynamic shape";
+      return std::nullopt;
+    }
+
+    AffineMap inputMap = linalgOp.getMatchingIndexingMap(input);
+    AffineMap filterMap = linalgOp.getMatchingIndexingMap(filter);
+    AffineMap outputMap = linalgOp.getMatchingIndexingMap(output);
+
+    std::optional<int64_t> batchLastDim = outputMap.getResultPosition(
+        getAffineDimExpr(convDims->batch.back(), outputMap.getContext()));
+    if (!batchLastDim || batchLastDim.value() != outputShape.size() - 1) {
+      LDBG() << "skipping op; not batch last layout";
+      return std::nullopt;
+    }
+
+    std::optional<int64_t> inputChannelDim = filterMap.getResultPosition(
+        getAffineDimExpr(convDims->inputChannel[0], filterMap.getContext()));
+    std::optional<int64_t> filterDim = filterMap.getResultPosition(
+        getAffineDimExpr(convDims->filterLoop[0], filterMap.getContext()));
+    if (!inputChannelDim || !filterDim ||
+        inputChannelDim.value() > filterDim.value()) {
+      LDBG() << "skipping op; not channel first layout";
+      return std::nullopt;
+    }
+
+    std::optional<int64_t> outputChannelDim = outputMap.getResultPosition(
+        getAffineDimExpr(convDims->outputChannel[0], outputMap.getContext()));
+    if (!outputChannelDim) {
+      LDBG() << "skipping op; has no output channel dim";
+      return std::nullopt;
+    }
+
+    std::optional<SmallVector<int64_t>> maybeSizes =
+        getReductionDimSizes(op.getOperation());
+    if (!maybeSizes) {
+      LDBG() << "skipping op; failed to get reduction sizes";
+      return std::nullopt;
+    }
+
+    // The constants below are determined based on empirical data.
+    const int64_t largeDimSize = 512;
+    const int64_t mediumDimSize = 128;
+    const int64_t smallDimSize = 32;
+
+    // When the batch and output channel sizes are large, the workload tends
+    // to distributed across many workgroups, making split reduction little to
+    // no effect.
+    int64_t outputChannelSize = outputShape[outputChannelDim.value()];
+    int64_t batchSize = outputShape[batchLastDim.value()];
+    if (outputChannelSize >= largeDimSize && batchSize >= largeDimSize) {
+      LDBG() << "skipping op; large output channel or batch size";
+      return std::nullopt;
+    }
+
+    // When the input spatial sizes are small while the batch and output channel
+    // sizes are relatively larger, split reduction often has no effect or even
+    // degrades performance.
+    for (auto dim : convDims->filterLoop) {
+      for (auto [idx, e] : llvm::enumerate(inputMap.getResults())) {
+        if (e.isFunctionOfDim(dim) && inputShape[idx] < smallDimSize &&
+            outputChannelSize > mediumDimSize && batchSize > mediumDimSize) {
+          LDBG() << "skipping op; small input spatial size";
+          return std::nullopt;
+        }
+      }
+    }
+
+    // Only split along the input channel dimension.
+    // TODO(vivian): split more reduction dimensions if needed.
+    int64_t cDim = inputChannelDim.value();
+    SmallVector<int64_t> tileSizes = std::move(*maybeSizes);
+    tileSizes[cDim] = std::ceil(float(tileSizes[cDim]) / largeDimSize);
     return tileSizes;
   }
 };
