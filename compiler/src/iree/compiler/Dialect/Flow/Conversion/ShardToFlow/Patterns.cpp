@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Flow/Conversion/ShardToFlow/Patterns.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <functional>
 #include <numeric>
 
@@ -135,9 +136,7 @@ static SmallVector<int64_t> collapseAxesN(ArrayRef<int64_t> shape,
   assert(firstAxis + n <= shape.size());
   assert(n > 1);
   auto res = llvm::to_vector_of<int64_t>(shape.take_front(firstAxis));
-  size_t collapsedAxisSize = std::accumulate(
-      shape.begin() + firstAxis + 1, shape.begin() + firstAxis + n,
-      shape[firstAxis], std::multiplies<>{});
+  int64_t collapsedAxisSize = llvm::product_of(shape.slice(firstAxis, n));
   res.push_back(collapsedAxisSize);
   llvm::append_range(res, shape.drop_front(firstAxis + n));
   return res;
