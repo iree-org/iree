@@ -213,23 +213,8 @@ Operation *CoalescedGatherDMAOp::getIteratingParent() {
 
 LogicalResult CoalescedGatherDMAOp::verify() {
   auto initType = getInit().getType();
-  auto resultType = getResult().getType();
+  Value result = getResult();
 
-  // Verify that this op is nested within an InParallelOpInterface op
-  // Note: This constraint only applies when working with tensors
-  if (isa<RankedTensorType>(initType)) {
-    if (!isa_and_nonnull<InParallelOpInterface>(
-            getOperation()->getParentOp())) {
-      return emitOpError("must be nested within an operation implementing "
-                         "InParallelOpInterface when using tensor operands");
-    }
-  }
-
-  if (initType != resultType) {
-    return emitOpError("init and result must have the same type and shape");
-  }
-
-  // Ensure all operands are either all tensors or all memrefs
   bool hasTensor = isa<RankedTensorType>(initType);
   bool hasMemRef = isa<MemRefType>(initType);
 
@@ -238,14 +223,66 @@ LogicalResult CoalescedGatherDMAOp::verify() {
   }
 
   if (hasTensor) {
-    if (!isa<RankedTensorType>(getIndices().getType()) ||
-        !isa<RankedTensorType>(getSource().getType())) {
-      return emitOpError("all operands must be tensors when init is a tensor");
+    if (!result) {
+      return emitOpError("tensor semantics requires a result");
     }
-  } else if (hasMemRef) {
-    if (!isa<MemRefType>(getIndices().getType()) ||
-        !isa<MemRefType>(getSource().getType())) {
-      return emitOpError("all operands must be memrefs when init is a memref");
+    if (initType != result.getType()) {
+      return emitOpError("init and result must have the same type and shape");
+    }
+  }
+
+  if (hasMemRef && result) {
+    return emitOpError("memref semantics should not have a result");
+  }
+
+  auto initShape = cast<ShapedType>(initType).getShape();
+  auto sourceType = cast<ShapedType>(getSource().getType());
+
+  auto checkSourceType = [&]() -> LogicalResult {
+    if (hasTensor && !isa<RankedTensorType>(sourceType)) {
+      return emitOpError("source must be tensor when init is tensor");
+    }
+    if (hasMemRef && !isa<MemRefType>(sourceType)) {
+      return emitOpError("source must be memref when init is memref");
+    }
+    return success();
+  };
+
+  if (!getIndices().empty()) {
+    // Gather mode:
+    auto indicesValues = getIndices();
+
+    for (auto [idx, indicesValue] : llvm::enumerate(indicesValues)) {
+      auto shapedType = dyn_cast<ShapedType>(indicesValue.getType());
+      if (!shapedType || !shapedType.getElementType().isIndex() ||
+          shapedType.getRank() != 1) {
+        return emitOpError("indices[")
+               << idx << "] must be a 1D vector or tensor of index type";
+      }
+    }
+
+    if (failed(checkSourceType()))
+      return failure();
+
+    size_t numIndices = indicesValues.size();
+    if (numIndices > initShape.size()) {
+      return emitOpError(
+          "number of indices must not exceed the result/init rank");
+    }
+
+    if (numIndices > sourceType.getRank()) {
+      return emitOpError("number of indices (")
+             << numIndices << ") must not exceed the source rank ("
+             << sourceType.getRank() << ")";
+    }
+  } else {
+    // Copy mode:
+    if (failed(checkSourceType()))
+      return failure();
+
+    if (sourceType.getShape().size() != initShape.size()) {
+      return emitOpError("source and init must have the same rank when indices "
+                         "are not present");
     }
   }
 
