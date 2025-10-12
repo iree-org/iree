@@ -322,15 +322,16 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
 
     ## Example of a single subgroup using coalesced_gather_dma in copy mode
        for transferring tensor<4x128xf32>, with an intended DMA width of 128 bits
-       (4 x f32):
+       (4 x f32), with subgroup size 32:
     ```mlir
-    scf.forall (%arg5, %arg6) in (1, 32) ... {
+    scf.forall (%arg6) in (32) ... {
         %2 = %arg6 * 4
-        %thread_slice = tensor.extract_slice %source_slice[0, %2] [4, 4] [1, 1] : tensor<4x128xf32> to tensor<4x4xf32>
+        %thread_slice = ... : tensor<4x128xf32>
+        %dest_slice = ... : tensor<4x128xf32>
         scf.forall.in_parallel {
           iree_gpu.coalesced_gather_dma %thread_slice into %dest_slice lane(%arg6) :  ...
         }
-      } {mapping = [#gpu.lane_id<linear_dim_1>, #gpu.lane_id<linear_dim_0>]}
+      } {mapping = [#gpu.lane_id<linear_dim_0>]}
     ```
   }];
 

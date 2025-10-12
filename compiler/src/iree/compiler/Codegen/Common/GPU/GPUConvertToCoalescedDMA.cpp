@@ -271,7 +271,12 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
 
   // Extract source and indices based on op type.
   if constexpr (std::is_same_v<OpTy, linalg::CopyOp>) {
-    source = innerOp.getInputs()[0];
+    Value input = innerOp.getInputs()[0];
+    if (auto extractSlice = input.getDefiningOp<tensor::ExtractSliceOp>()) {
+      source = extractSlice.getSource();
+    } else {
+      llvm_unreachable("unreachable");
+    }
   } else if constexpr (std::is_same_v<OpTy, IREE::LinalgExt::GatherOp>) {
     source = innerOp.getSource();
     indices = innerOp.getIndices();
@@ -303,8 +308,8 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
 
   // When used in forall.in_parallel, the op doesn't return a result
   // as it performs an in-place update to the shared_outs tensor
-  rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
-      loc, Type(), source, indicesVec, sharedOut, laneId);
+  IREE::GPU::CoalescedGatherDMAOp::create(rewriter, loc, Type(), source,
+                                          indicesVec, sharedOut, laneId);
 
   // Erase the parallel_insert_slice ops and inner operation.
   for (auto insertOp : toErase) {

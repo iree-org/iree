@@ -226,7 +226,6 @@ LogicalResult CoalescedGatherDMAOp::verify() {
   }
 
   auto indices = getIndices();
-  auto sourceShape = sourceType.getShape();
 
   for (auto [dim, size] : llvm::enumerate(initShape)) {
     if (dim < indices.size()) {
@@ -235,7 +234,10 @@ LogicalResult CoalescedGatherDMAOp::verify() {
         return emitOpError("expected index ")
                << dim << " to be a 1-D tensor of " << size << " elements";
       }
-      if (sourceShape[dim] != size) {
+    } else {
+      auto sourceShape = sourceType.getShape();
+      // For unindexed dimensions, source and init must have the same size
+      if (dim < sourceShape.size() && sourceShape[dim] != size) {
         return emitOpError("expected unindexed dimension ")
                << dim << " to have same length in source and destination";
       }
