@@ -18,12 +18,14 @@ func.func @gather_tile_to_subgroup(%source: tensor<1024xf32>, %indices: tensor<3
   // CHECK: %[[DEST_WG_SLICE:.*]] = tensor.extract_slice %[[WG_OUT]][%[[WG_I]], %[[WG_J]]] [1, 32] [1, 1]
   // CHECK-SAME: tensor<32x32xf32> to tensor<1x32xf32>
 
+  // CHECK: %[[VECTOR_INDICES:.*]] = vector.transfer_read %[[INDICES_WG_SLICE]]
+
   // CHECK: %[[INNER:.*]] = scf.forall (%[[TH_I:.*]], %[[TH_J:.*]]) in (1, 32)
   // CHECK-SAME: shared_outs(%[[TH_OUT:.*]] = %[[DEST_WG_SLICE]]) -> (tensor<1x32xf32>)
 
   // CHECK: scf.forall.in_parallel {
-  // CHECK:   iree_gpu.coalesced_gather_dma %[[INDICES_WG_SLICE]], %{{.*}} into %[[TH_OUT]]
-  // CHECK-SAME: tensor<1x32xindex>, tensor<1024xf32>, tensor<1x32xf32> -> tensor<1x32xf32>
+  // CHECK:   iree_gpu.coalesced_gather_dma %{{.*}}[%[[VECTOR_INDICES]]] into %[[TH_OUT]] lane
+  // CHECK-SAME: tensor<1024xf32>, vector<32xindex>, tensor<1x32xf32>, index -> tensor<1x32xf32>
   // CHECK: }
   // CHECK: } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
 

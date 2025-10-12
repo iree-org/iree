@@ -12,11 +12,13 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
@@ -94,7 +96,7 @@ static Value castIndicesToIndexType(OpBuilder &rewriter, Location loc,
 //     %inner_result = scf.forall (%sg_i, %sg_j) in (8, 16) step (32, 1)
 //         shared_outs(%sg_out = %dest_wg_slice) -> (tensor<8x16xf32>) {
 //       scf.forall.in_parallel {
-//         iree_gpu.coalesced_gather_dma %indices_wg_slice, %source into %sg_out
+//         iree_gpu.coalesced_gather_dma %source[%indices_wg_slice] into %sg_out
 //       }
 //     } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
 //
@@ -210,8 +212,21 @@ struct ConvertGatherOpToCoalescedDMA
         rewriter, loc, outerSharedOut, outerOffsets, subgroupTileSizes,
         strides);
 
-    // Cast indices to index type if needed
+    // Ensure indices are of index type for vector operations.
     Value indexIndices = castIndicesToIndexType(rewriter, loc, indicesWgSlice);
+
+    auto indicesTensorType = cast<RankedTensorType>(indexIndices.getType());
+    int64_t totalElements = indicesTensorType.getNumElements();
+    VectorType vec1DType =
+        VectorType::get({totalElements}, rewriter.getIndexType());
+    Value zeroIdx = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    SmallVector<Value> readIndices(indicesTensorType.getRank(), zeroIdx);
+
+    Value flattenedIndices = vector::TransferReadOp::create(
+        rewriter, loc, vec1DType, indexIndices, readIndices,
+        /*padding=*/std::nullopt);
+
+    SmallVector<Value> vectorIndices = {flattenedIndices};
 
     // Create inner forall with thread mapping
     SmallVector<OpFoldResult> innerLowerBounds(rank, rewriter.getIndexAttr(0));
@@ -228,6 +243,12 @@ struct ConvertGatherOpToCoalescedDMA
     Block *innerBody = innerForallOp.getBody();
     rewriter.setInsertionPointToStart(innerBody);
 
+    // Compute the lane ID by linearizing the thread IVs
+    SmallVector<Value> threadIVs(innerBody->getArguments().begin(),
+                                 innerBody->getArguments().begin() + rank);
+    Value laneId = affine::AffineLinearizeIndexOp::create(
+        rewriter, loc, threadIVs, *staticThreadTileSizes);
+
     Value innerSharedOut = innerBody->getArguments()[rank];
     auto innerInParallelOp =
         cast<scf::InParallelOp>(innerBody->getTerminator());
@@ -235,8 +256,8 @@ struct ConvertGatherOpToCoalescedDMA
     rewriter.setInsertionPointToStart(&innerInParallelBlock);
 
     IREE::GPU::CoalescedGatherDMAOp::create(
-        rewriter, loc, innerSharedOut.getType(), indexIndices, source,
-        innerSharedOut);
+        rewriter, loc, innerSharedOut.getType(), source,
+        ValueRange(vectorIndices), innerSharedOut, laneId);
 
     // Insert the result of inner forall back into outer forall's output.
     rewriter.setInsertionPointAfter(innerForallOp);
