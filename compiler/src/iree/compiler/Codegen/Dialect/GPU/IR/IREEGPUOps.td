@@ -268,11 +268,18 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     This operation can exist in two forms: a tensor-based (value-semantic) form
     and a buffer-based (memref-semantic) form.
 
-    In both forms, it reads elements from a source operand based on indices.
+    In both forms, it reads elements from a source operand based on the optional `indices` operand.
     * When the source is a tensor, the operation produces a new result tensor
       containing the gathered data.
     * When the source is a memref, the operation writes the gathered data into
       a destination out memref operand.
+
+    The `indices` operand is optional. When `indices` is not present (copy mode),
+    each thread in the subgroup loads a contiguous slice of data from `source` and
+    writes it to its lane-offset in `result`/`init`. The `source` represents the
+    data loaded by this thread, while `result`/`init` is the collective output for
+    all threads in the subgroup. Therefore, `source` and `result`/`init` may have
+    different shapes (typically source is smaller, representing one thread's portion).
 
     The operation is specifically designed for subgroup-level parallelism, where
     threads within a subgroup cooperatively gather data with coalesced memory
@@ -288,65 +295,84 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
 
     ## Operands and Results
 
-    * `$indices`: Tensor/memref of index type specifying gather locations in
-      the source tensor
-    * `$source`: Source tensor/memref containing the data to be gathered
+    * `$indices`: The variadic `indices` operand is an optional tensor or vector of indices
+      to gather from `source`. If the indices are present, their shape must be a prefix of
+      the `init`/`result` type. Each `index` must be a 1D tensor or vector whose length matches
+      the length of the corresponding dimension of `source`.
+
+      The values in `indices` form indices into the memref starting at
+      `source` from which a given thread will gather data, and each tensor/vector component in `indices`
+      corresponds to one index dimension in `source`.
+      Any component that is not specified is implicitly assumed to be `[0, 1, ..., len - 1]`
+      where `len` is the length of the corresponding dimension of source. That is, gather all the
+      elements along that dimension.
+
+      This operation will gather data into its result as by setting:
+      ```
+      forall (i0, i1, ... iN) in (dim(source, 0), dim(source, 1), ... dim(source, N)):
+        result[i0, i1, ... iN-1, iN + lane_id * dim(source, N)] =
+            source[indices[0][i0], indices[1][i1], ..., indices[N][iN]]
+      ```
+      where `lane_id` is the ID of the thread within its subgroup.
+
+      Note that, in order to enable efficient gathers, the trailing dimension of `source`
+      must have unspecified indices and the dim's size must be a supported
+      DMA width for your target.
+
+    * `$source`: Source tensor/memref containing the data to be gathered.
     * `$init`: Destination tensor/memref receiving the gathered data
-      (destination-passing style)
-    * `$result`: Output tensor/memref with gathered data (same type as `$init`)
+      (destination-passing style).
+    * `$result`: Output tensor with gathered data (same type as `$init`). Only
+      present for tensor semantics; memref form does not have a result.
+    * `lane`: The lane that specifies the coalescing store's offset within the
+      workgroup/shared memory.
 
-    ## Example
-
-    The following example shows how this op is designed to be used in a tiled
-    scenario, which sets up lowering path for efficient gathering.
-
-    1. Outer `scf.forall` represents workgroup-level parallelism.
-    2. Inner `scf.forall` represents subgroup-level parallelism.
-    3. Each thread in the subgroup coalesces its memory accesses when
-       gathering data and writes to its lane-offset in the destination tensor.
-
+    ## Example of a single subgroup using coalesced_gather_dma in copy mode
+       for transferring tensor<4x128xf32>, with an intended DMA width of 128 bits
+       (4 x f32):
     ```mlir
-    %result = scf.forall (%wg_i, %wg_j) in (16, 1) shared_outs(%wg_out = %dest) -> (tensor<128x16xf32>) {
-      %indices_wg_slice = tensor.extract_slice ...
-      %dest_wg_slice = tensor.extract_slice ...
-
-      %inner_result = scf.forall (%sg_i, %sg_j) in (32, 1) shared_outs(%sg_out = %dest_wg_slice) -> (tensor<8x16xf32>) {
+    %result = scf.forall (%arg5, %arg6) in (1, 32) ... -> (tensor<4x128xf32>) {
+        %2 = %arg6 * 4
+        %thread_slice = tensor.extract_slice %source_slice[0, %2] [4, 4] [1, 1] : tensor<4x128xf32> to tensor<4x4xf32>
         scf.forall.in_parallel {
-          iree_gpu.coalesced_gather_dma %indices_wg_slice, %source into %sg_out : ...
+          %3 = iree_gpu.coalesced_gather_dma %thread_slice into %dest_slice lane(%arg6)
+            : tensor<4x4xf32>, tensor<4x128xf32>, index -> tensor<4x128xf32>
         }
       } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
-
-      scf.forall.in_parallel {
-        tensor.parallel_insert_slice %inner_result into %wg_out[...] : ...
-      }
-    } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
     ```
   }];
 
   let arguments = (ins
-    AnyTypeOf<[RankedTensorOf<[Index]>, MemRefOf<[Index]>]>:$indices,
     AnyRankedTensorOrMemRef:$source,
-    AnyRankedTensorOrMemRef:$init
+    Variadic<AnyTypeOf<[RankedTensorOf<[Index]>, VectorOfAnyRankOf<[Index]>]>>:$indices,
+    AnyRankedTensorOrMemRef:$init,
+    Index:$lane
   );
 
-  let results = (outs AnyRankedTensorOrMemRef:$result);
+  let results = (outs Optional<AnyRankedTensor>:$result);
 
   let assemblyFormat = [{
-    $indices `,` $source `into` $init attr-dict
-    `:` type($indices) `,` type($source) `,` type($init) `->` type($result)
+    $source (`[` $indices^ `]`)? `into` $init `lane` `(` $lane `)` attr-dict
+    `:` type(operands) (`->` type($result)^)?
   }];
 
   let hasVerifier = 1;
 
   let extraClassDeclaration = [{
-    // Get the rank of the result tensor/memref
+    // Get the rank of the init/result tensor/memref
     unsigned getResultRank() {
-      if (auto tensorType = ::llvm::dyn_cast<RankedTensorType>(getResult().getType()))
+      // For tensor semantics, use result; for memref semantics, use init
+      Type type = getResult() ? getResult().getType() : getInit().getType();
+      if (auto tensorType = ::llvm::dyn_cast<RankedTensorType>(type))
         return tensorType.getRank();
-      if (auto memrefType = ::llvm::dyn_cast<MemRefType>(getResult().getType()))
+      if (auto memrefType = ::llvm::dyn_cast<MemRefType>(type))
         return memrefType.getRank();
       assert(false && "expected ranked tensor or memref type");
       return 0;
+    }
+
+    bool hasTensorSemantics() {
+      return getResult() != nullptr;
     }
   }];
 }
