@@ -17,6 +17,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
@@ -94,7 +95,7 @@ static Value castIndicesToIndexType(OpBuilder &rewriter, Location loc,
 //     %inner_result = scf.forall (%sg_i, %sg_j) in (8, 16) step (32, 1)
 //         shared_outs(%sg_out = %dest_wg_slice) -> (tensor<8x16xf32>) {
 //       scf.forall.in_parallel {
-//         iree_gpu.coalesced_gather_dma %indices_wg_slice, %source into %sg_out
+//         iree_gpu.coalesced_gather_dma %source[%indices_wg_slice] into %sg_out
 //       }
 //     } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
 //
@@ -212,6 +213,15 @@ struct ConvertGatherOpToCoalescedDMA
     // Cast indices to index type if needed
     Value indexIndices = castIndicesToIndexType(rewriter, loc, indicesWgSlice);
 
+    auto indicesTensorType = cast<RankedTensorType>(indexIndices.getType());
+    VectorType vectorType = VectorType::get(indicesTensorType.getShape(),
+                                            indicesTensorType.getElementType());
+    Value zeroIdx = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    SmallVector<Value> transferIndices(indicesTensorType.getRank(), zeroIdx);
+    Value vectorIndices = rewriter.create<vector::TransferReadOp>(
+        loc, vectorType, indexIndices, transferIndices,
+        /*padding=*/std::nullopt);
+
     // Create inner forall with thread mapping
     SmallVector<OpFoldResult> innerLowerBounds(rank, rewriter.getIndexAttr(0));
     SmallVector<OpFoldResult> innerUpperBounds = subgroupTileSizes;
@@ -234,7 +244,7 @@ struct ConvertGatherOpToCoalescedDMA
     rewriter.setInsertionPointToStart(&innerInParallelBlock);
 
     rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
-        loc, innerSharedOut.getType(), indexIndices, source, innerSharedOut);
+        loc, innerSharedOut.getType(), source, vectorIndices, innerSharedOut);
 
     // Insert the result of inner forall back into outer forall's output.
     rewriter.setInsertionPointAfter(innerForallOp);
