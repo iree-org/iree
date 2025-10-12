@@ -325,7 +325,7 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
   }];
 
   let arguments = (ins
-    AnyTypeOf<[RankedTensorOf<[Index]>, MemRefOf<[Index]>]>:$indices,
+    Optional<AnyTypeOf<[RankedTensorOf<[Index]>, MemRefOf<[Index]>]>>:$indices,
     AnyRankedTensorOrMemRef:$source,
     AnyRankedTensorOrMemRef:$init
   );
@@ -333,8 +333,8 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
   let results = (outs AnyRankedTensorOrMemRef:$result);
 
   let assemblyFormat = [{
-    $indices `,` $source `into` $init attr-dict
-    `:` type($indices) `,` type($source) `,` type($init) `->` type($result)
+    (`[` $indices^ `]` `,`)? $source `into` $init attr-dict
+    `:` type(operands) `->` type($result)
   }];
 
   let hasVerifier = 1;

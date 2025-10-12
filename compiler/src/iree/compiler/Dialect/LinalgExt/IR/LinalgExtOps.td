@@ -240,6 +240,10 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
     Takes two inputs (`source` and `indices`) and outputs value (`output`).
     The operation returns the value at the slices specified by `indices`.
 
+    If the size of inputs is only 1 (i.e. only `source` is provided), then
+    this operation behaves like a copy operation. In such case, `source` and
+    `output` must have the same shape.
+
     The size of the `dimension_map` attribute is used to determine how many
     indices are used to index into `source`, i.e. `index_depth`. The
     `dimension_map` attribute describes which index value maps to which dimension
@@ -293,7 +297,14 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
       return cast<ShapedType>(getSource().getType());
     }
 
+    bool hasIndices() {
+      return getInputs().size() > 1;
+    }
+
     Value getIndices(){
+      if (!hasIndices()) {
+        return {};
+      }
       return getOperand(kIndicesOpNum);
     }
 
@@ -301,8 +312,15 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
       return cast<ShapedType>(getIndices().getType());
     }
 
+    /// Returns true if this gather is in copy mode (single input, no indices)
+    bool isCopyMode() {
+      return getInputs().size() == 1;
+    }
+
     Value getOutput(){
-      return getOperand(kResultOpNum);
+      // In copy mode, output is at position 1, otherwise at position 2
+      unsigned outputPos = isCopyMode() ? 1 : kResultOpNum;
+      return getOperand(outputPos);
     }
 
     ShapedType getOutputType(){

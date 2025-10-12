@@ -238,15 +238,34 @@ LogicalResult CoalescedGatherDMAOp::verify() {
     return emitOpError("input type must either be a tensor or a memref");
   }
 
-  if (hasTensor) {
-    if (!isa<RankedTensorType>(getIndices().getType()) ||
-        !isa<RankedTensorType>(getSource().getType())) {
-      return emitOpError("all operands must be tensors when init is a tensor");
+  // Check indices if present
+  if (Value indices = getIndices()) {
+    if (hasTensor) {
+      if (!isa<RankedTensorType>(indices.getType())) {
+        return emitOpError("indices must be a tensor when init is a tensor");
+      }
+      if (!isa<RankedTensorType>(getSource().getType())) {
+        return emitOpError("source must be a tensor when init is a tensor");
+      }
+    } else if (hasMemRef) {
+      if (!isa<MemRefType>(indices.getType())) {
+        return emitOpError("indices must be a memref when init is a memref");
+      }
+      if (!isa<MemRefType>(getSource().getType())) {
+        return emitOpError("source must be a memref when init is a memref");
+      }
     }
-  } else if (hasMemRef) {
-    if (!isa<MemRefType>(getIndices().getType()) ||
-        !isa<MemRefType>(getSource().getType())) {
-      return emitOpError("all operands must be memrefs when init is a memref");
+  } else {
+    // Copy mode (no indices) - just verify source and init match tensor/memref
+    // type
+    if (hasTensor) {
+      if (!isa<RankedTensorType>(getSource().getType())) {
+        return emitOpError("source must be a tensor when init is a tensor");
+      }
+    } else if (hasMemRef) {
+      if (!isa<MemRefType>(getSource().getType())) {
+        return emitOpError("source must be a memref when init is a memref");
+      }
     }
   }
 
@@ -266,9 +285,12 @@ void CoalescedGatherDMAOp::getCanonicalizationPatterns(
       changed = true;
     }
 
-    if (auto castOp = indices.getDefiningOp<memref::CastOp>()) {
-      indices = castOp.getSource();
-      changed = true;
+    // Only fold indices if present
+    if (indices) {
+      if (auto castOp = indices.getDefiningOp<memref::CastOp>()) {
+        indices = castOp.getSource();
+        changed = true;
+      }
     }
 
     if (auto castOp = init.getDefiningOp<memref::CastOp>()) {

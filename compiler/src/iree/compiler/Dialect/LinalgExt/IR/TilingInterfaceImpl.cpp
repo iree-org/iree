@@ -314,6 +314,60 @@ GatherOp::getTiledImplementation(OpBuilder &builder,
       getSlice(builder, loc, getOutput(), offsets, sizes, resultStrides);
   Value tiledResult = resultSlice->getResult(0);
 
+  // Handle copy mode (single input, no indices)
+  // In copy mode, the gather is a simple copy from source to output
+  if (isCopyMode()) {
+    // Slice the source with the same offsets and sizes as the result
+    auto sourceRank = getSourceType().getRank();
+    SmallVector<OpFoldResult> sourceStrides(sourceRank, oneAttr);
+    Operation *sourceSlice =
+        getSlice(builder, loc, getSource(), offsets, sizes, sourceStrides);
+    Value tiledSource = sourceSlice->getResult(0);
+
+    slices.push_back(sourceSlice);
+    slices.push_back(resultSlice);
+
+    SmallVector<Type> resultTypes;
+    if (getNumResults()) {
+      resultTypes.push_back(tiledResult.getType());
+    }
+
+    // Create tiled gather operation with proper operand segments
+    SmallVector<Value> allOperands = {tiledSource, tiledResult};
+
+    // Use a NamedAttrList to build the attributes
+    NamedAttrList attrs;
+    attrs.append("dimension_map",
+                 builder.getDenseI64ArrayAttr(getDimensionMap()));
+
+    // Copy other attributes from the original operation
+    for (auto namedAttr : getOperation()->getAttrs()) {
+      StringRef attrName = namedAttr.getName();
+      if (attrName != "dimension_map") {
+        attrs.append(namedAttr);
+      }
+    }
+
+    //  Create the operation with opaque properties
+    OperationState state(loc, GatherOp::getOperationName());
+    state.addOperands(allOperands);
+    state.addTypes(resultTypes);
+    state.addAttributes(attrs);
+
+    // Set properties for operand segment sizes
+    auto &props = state.getOrAddProperties<GatherOp::Properties>();
+    props.operandSegmentSizes[0] = 1; // 1 input
+    props.operandSegmentSizes[1] = 1; // 1 output
+    props.dimension_map = builder.getDenseI64ArrayAttr(getDimensionMap());
+
+    Operation *tiledGatherOp = builder.create(state);
+
+    return TilingResult{{tiledGatherOp},
+                        SmallVector<Value>(tiledGatherOp->getResults()),
+                        slices};
+  }
+
+  // Normal gather mode with indices
   // Slice of indices.
   auto indicesRank = getIndicesType().getRank();
   SmallVector<OpFoldResult> indicesOffsets(offsets.take_front(getBatchRank()));
@@ -380,6 +434,14 @@ GatherOp::generateResultTileValue(OpBuilder &builder, unsigned resultNumber,
 
 LogicalResult GatherOp::generateScalarImplementation(OpBuilder &b, Location loc,
                                                      ValueRange ivs) {
+  // Handle copy mode (single input, no indices) - simple copy
+  if (isCopyMode()) {
+    Value loaded = memref::LoadOp::create(b, loc, getSource(), ivs);
+    memref::StoreOp::create(b, loc, loaded, getOutput(), ivs);
+    return success();
+  }
+
+  // Normal gather mode with indices
   auto indexDepth = getIndexDepth();
   SmallVector<Value> loadIndices(ivs.take_front(getBatchRank()));
 

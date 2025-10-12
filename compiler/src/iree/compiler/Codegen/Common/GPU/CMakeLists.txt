@@ -70,6 +70,7 @@ iree_cc_library(
     "GPUGeneralizeNamedOps.cpp"
     "GPUGreedilyDistributeToThreads.cpp"
     "GPUInferMemorySpace.cpp"
+    "GPULowerCopyToCoalescedGather.cpp"
     "GPULowerToGlobalLoads.cpp"
     "GPUMultiBuffering.cpp"
     "GPUNestedLayoutDistributionPatterns.cpp"

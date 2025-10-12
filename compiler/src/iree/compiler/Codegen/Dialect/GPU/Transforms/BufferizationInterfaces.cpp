@@ -349,14 +349,21 @@ struct CoalescedGatherDMAOpBufferizationInterface
     auto gatherOp = cast<IREE::GPU::CoalescedGatherDMAOp>(op);
 
     // Get the bufferized operands.
-    FailureOr<Value> indicesBuffer =
-        getBuffer(rewriter, gatherOp.getIndices(), options, state);
+    // Indices is optional for copy-mode operations
+    FailureOr<Value> indicesBuffer = success(Value());
+    if (Value indices = gatherOp.getIndices()) {
+      indicesBuffer = getBuffer(rewriter, indices, options, state);
+      if (failed(indicesBuffer)) {
+        return failure();
+      }
+    }
+
     FailureOr<Value> sourceBuffer =
         getBuffer(rewriter, gatherOp.getSource(), options, state);
     FailureOr<Value> initBuffer =
         getBuffer(rewriter, gatherOp.getInit(), options, state);
 
-    if (failed(indicesBuffer) || failed(sourceBuffer) || failed(initBuffer)) {
+    if (failed(sourceBuffer) || failed(initBuffer)) {
       return failure();
     }
 

@@ -147,11 +147,35 @@ verifyGatherScatter(OpTy op, int64_t sliceRank, ShapedType originalType,
                     StringRef updateName) {
   static_assert(llvm::is_one_of<OpTy, GatherOp, ScatterOp>::value,
                 "applies to only gather or scatter operations");
-  if (op.getInputs().size() != 2) {
-    return op.emitOpError("expected two input operands");
+
+  // For GatherOp, allow 1 input (copy mode) or 2 inputs (normal gather mode)
+  if constexpr (std::is_same_v<OpTy, GatherOp>) {
+    if (op.getInputs().size() != 1 && op.getInputs().size() != 2) {
+      return op.emitOpError("expected one or two input operands");
+    }
+    // If only one input (copy mode), verify source and output have same shape
+    if (op.getInputs().size() == 1) {
+      if (originalType.getShape() != updateType.getShape()) {
+        return op.emitOpError("in copy mode (single input), source and output "
+                              "must have the same shape");
+      }
+      return success();
+    }
+  } else {
+    if (op.getInputs().size() != 2) {
+      return op.emitOpError("expected two input operands");
+    }
   }
+
   if (op.getOutputs().size() != 1) {
     return op.emitOpError("expected one output operand");
+  }
+
+  // For GatherOp in copy mode, early return after basic checks
+  if constexpr (std::is_same_v<OpTy, GatherOp>) {
+    if (op.isCopyMode()) {
+      return success();
+    }
   }
 
   auto indicesType = op.getIndicesType();

@@ -90,6 +90,15 @@ def GPUConvertToCoalescedDMAPass :
   ];
 }
 
+def GPULowerCopyToCoalescedGatherPass :
+    InterfacePass<"iree-codegen-gpu-lower-copy-to-coalesced-gather", "mlir::FunctionOpInterface"> {
+  let summary = "Lower linalg.copy operations to coalesced gather DMA operations.";
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
+    "::mlir::linalg::LinalgDialect"
+  ];
+}
+
 def GPUDistributeForallPass :
     InterfacePass<"iree-codegen-gpu-distribute-forall", "mlir::FunctionOpInterface"> {
   let summary = "Pass to distribute scf.forall ops.";
