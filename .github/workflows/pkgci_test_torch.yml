@@ -33,6 +33,7 @@ jobs:
           - name: cpu_task
             markers: "cpu"
             cache-dir: /home/nod/iree_tests_cache
+            summary-file: torch_models_cpu_task_summary.json
             runs-on:
               - self-hosted # must come first
               - persistent-cache
@@ -42,6 +43,7 @@ jobs:
           - name: amdgpu_mi325_gfx942
             markers: "gfx942 or mi325"
             cache-dir: /shark-cache/data/iree-regression-cache
+            summary-file: torch_models_amdgpu_mi325_summary.json
             runs-on: linux-mi325-1gpu-ossci-iree-org
     env:
       VENV_DIR: ${{ github.workspace }}/.venv
@@ -67,7 +69,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           repository: iree-org/iree-test-suites
-          ref: 8b9aa50637de4d05a5e75709a684f8e8bd4bab52
+          ref: 6407d0c7573c4f76ce0aaea3c6a642475713c68a
           path: iree-test-suites
           # Don't need lfs for torch models yet.
           lfs: false
@@ -98,10 +100,16 @@ jobs:
             --module-directory=${{ github.workspace }}/tests/external/iree-test-suites/torch_models \
             --artifact-directory=${{ matrix.cache-dir }}/torch_models/artifacts \
             --job-summary-path=${{ github.workspace }}/iree-test-suites \
-            --force-recompile \
             -m "${{ matrix.markers }}"
 
       - name: Upload Torch Model Job Summary
         if: always()
         run: |
           cat ${{ github.workspace }}/iree-test-suites/job_summary.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Torch Models JSON Summary
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ matrix.summary-file }}
+          path: ${{ github.workspace }}/iree-test-suites/job_summary.json

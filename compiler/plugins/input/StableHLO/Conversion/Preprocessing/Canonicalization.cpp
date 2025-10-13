@@ -551,8 +551,7 @@ struct ConcatenateOpCanon final
 
     uint64_t axis = op.getDimension();
     ArrayRef<int64_t> shape = type.getShape();
-    int64_t topSize = std::accumulate(shape.begin(), shape.begin() + axis,
-                                      int64_t{1}, std::multiplies<>{});
+    int64_t topSize = llvm::product_of(shape.take_front(axis));
 
     SmallVector<Attribute> newElems;
     newElems.reserve(numElems);

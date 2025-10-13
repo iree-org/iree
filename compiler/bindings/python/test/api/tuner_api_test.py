@@ -145,7 +145,6 @@ def test_isa_attention_op():
     """
     input_module = ir.Module.parse(module_str)
     assert input_module is not None, "Failed to parse input MLIR module"
-    print(input_module)
     root_op_list = iree_codegen.get_tuner_root_ops(input_module)
     assert len(root_op_list) == 1
     assert root_op_list[0].name == "iree_linalg_ext.attention"

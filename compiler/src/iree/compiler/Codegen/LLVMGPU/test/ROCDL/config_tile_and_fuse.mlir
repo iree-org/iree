@@ -870,3 +870,120 @@ func.func @dyn_parallel_reduction(%arg0: tensor<?x32xf32>) -> tensor<?xf32> {
 //  CHECK-SAME:     reduction = [0, 4]
 //  CHECK-SAME:     thread = [1, 0]
 //  CHECK-SAME:     workgroup = [64, 0]
+
+// -----
+func.func @multi_result_index_generic_with_scatterfusion(%arg0: tensor<4x?x32x8xf16>, %arg1: tensor<4x?xi64>) -> (tensor<?x8x32xf8E4M3FNUZ>, tensor<4x?x32x8xf8E4M3FNUZ>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %dim = tensor.dim %arg0, %c1 : tensor<4x?x32x8xf16>
+  %0 = tensor.empty(%dim) : tensor<4x?x32x8xf8E4M3FNUZ>
+  %1 = tensor.empty(%dim) : tensor<4x?x8x32xf8E4M3FNUZ>
+  %2 = tensor.empty(%dim) : tensor<?x8x32xf8E4M3FNUZ>
+  %3:2 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+      affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+      affine_map<(d0, d1, d2, d3) -> (d0, d1, d3, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%arg0 : tensor<4x?x32x8xf16>)
+      outs(%0, %1 : tensor<4x?x32x8xf8E4M3FNUZ>, tensor<4x?x8x32xf8E4M3FNUZ>) {
+  ^bb0(%in: f16, %out: f8E4M3FNUZ, %out_0: f8E4M3FNUZ):
+    %5 = linalg.index 1 : index
+    %6 = arith.mulf %in, %in : f16
+    %7 = arith.cmpi eq, %5, %c0 : index
+    %8 = arith.select %7, %6, %in : f16
+    %9 = arith.truncf %8 : f16 to f8E4M3FNUZ
+    linalg.yield %9, %9 : f8E4M3FNUZ, f8E4M3FNUZ
+  } -> (tensor<4x?x32x8xf8E4M3FNUZ>, tensor<4x?x8x32xf8E4M3FNUZ>)
+  %4 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true) ins(%3#1, %arg1 : tensor<4x?x8x32xf8E4M3FNUZ>, tensor<4x?xi64>) outs(%2 : tensor<?x8x32xf8E4M3FNUZ>) {
+  ^bb0(%arg2: f8E4M3FNUZ, %arg3: f8E4M3FNUZ):
+    iree_linalg_ext.yield %arg2 : f8E4M3FNUZ
+  } -> tensor<?x8x32xf8E4M3FNUZ>
+  return %4, %3#0 : tensor<?x8x32xf8E4M3FNUZ>, tensor<4x?x32x8xf8E4M3FNUZ>
+}
+
+// CHECK-LABEL: func.func @multi_result_index_generic_with_scatterfusion
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     thread = [1, 1, 1, 4]
+//  CHECK-SAME:     workgroup = [1, 1, 32, 8]
+
+// -----
+func.func @producer_broadcasted(%arg0: tensor<4xi64>, %arg1: tensor<4xi64>) -> tensor<4x8xi64> {
+  %c59_i64 = arith.constant 59 : i64
+  %c2_i64 = arith.constant 2 : i64
+  %c8_i64 = arith.constant 8 : i64
+  %c32_i64 = arith.constant 32 : i64
+  %0 = tensor.empty() : tensor<4x8xi64>
+  %1 = tensor.empty() : tensor<4xi64>
+  %2 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>,
+                                        affine_map<(d0) -> (d0)>],
+                       iterator_types = ["parallel"]}
+      ins(%arg0 : tensor<4xi64>) outs(%1 : tensor<4xi64>) {
+  ^bb0(%in: i64, %out: i64):
+    %4 = arith.addi %in, %c59_i64 : i64
+    %5 = arith.muli %4, %c2_i64 : i64
+    linalg.yield %5 : i64
+  } -> tensor<4xi64>
+  %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0)>,
+                                        affine_map<(d0, d1) -> (d0)>,
+                                        affine_map<(d0, d1) -> (d0, d1)>],
+                      iterator_types = ["parallel", "parallel"]}
+  ins(%2, %arg1 : tensor<4xi64>, tensor<4xi64>) outs(%0 : tensor<4x8xi64>) {
+  ^bb0(%in: i64, %in_0: i64, %out: i64):
+    %4 = linalg.index 1 : index
+    %5 = arith.index_cast %4 : index to i64
+    %6 = arith.muli %in, %c8_i64 : i64
+    %7 = arith.addi %6, %5 : i64
+    %8 = arith.muli %7, %c32_i64 : i64
+    %9 = arith.addi %8, %in_0 : i64
+    linalg.yield %9 : i64
+  } -> tensor<4x8xi64>
+  return %3 : tensor<4x8xi64>
+}
+
+// CHECK-LABEL: func.func @producer_broadcasted
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//       CHECK:     thread = [1, 1]
+//  CHECK-SAME:     workgroup = [4, 16]
+
+// -----
+func.func @producer_broadcasted_and_stored_to_buffer(%arg0: tensor<4xi64>, %arg1: tensor<4xi64>, %arg2 : memref<4xi64>) -> tensor<4x8xi64> {
+  %c59_i64 = arith.constant 59 : i64
+  %c2_i64 = arith.constant 2 : i64
+  %c8_i64 = arith.constant 8 : i64
+  %c32_i64 = arith.constant 32 : i64
+  %0 = tensor.empty() : tensor<4x8xi64>
+  %1 = tensor.empty() : tensor<4xi64>
+  %2 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>,
+                                        affine_map<(d0) -> (d0)>],
+                       iterator_types = ["parallel"]}
+      ins(%arg0 : tensor<4xi64>) outs(%1 : tensor<4xi64>) {
+  ^bb0(%in: i64, %out: i64):
+    %4 = arith.addi %in, %c59_i64 : i64
+    %5 = arith.muli %4, %c2_i64 : i64
+    linalg.yield %5 : i64
+  } -> tensor<4xi64>
+  %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0)>,
+                                        affine_map<(d0, d1) -> (d0)>,
+                                        affine_map<(d0, d1) -> (d0, d1)>],
+                      iterator_types = ["parallel", "parallel"]}
+  ins(%2, %arg1 : tensor<4xi64>, tensor<4xi64>) outs(%0 : tensor<4x8xi64>) {
+  ^bb0(%in: i64, %in_0: i64, %out: i64):
+    %4 = linalg.index 1 : index
+    %5 = arith.index_cast %4 : index to i64
+    %6 = arith.muli %in, %c8_i64 : i64
+    %7 = arith.addi %6, %5 : i64
+    %8 = arith.muli %7, %c32_i64 : i64
+    %9 = arith.addi %8, %in_0 : i64
+    linalg.yield %9 : i64
+  } -> tensor<4x8xi64>
+  iree_codegen.store_to_buffer %2, %arg2 : tensor<4xi64> into memref<4xi64>
+  return %3 : tensor<4x8xi64>
+}
+
+// CHECK-LABEL: func.func @producer_broadcasted
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//       CHECK:     reduction = [0, 4]
+//  CHECK-SAME:     thread = [1, 0]
+//  CHECK-SAME:     workgroup = [64, 0]
