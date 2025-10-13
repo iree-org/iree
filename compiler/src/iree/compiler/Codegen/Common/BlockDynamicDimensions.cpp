@@ -36,17 +36,6 @@ using TensorDivisibilityInfo =
 
 namespace {
 
-struct RemoveOptimizationBarrier final
-    : public OpRewritePattern<IREE::Util::OptimizationBarrierOp> {
-  using Base::Base;
-
-  LogicalResult matchAndRewrite(IREE::Util::OptimizationBarrierOp barrierOp,
-                                PatternRewriter &rewriter) const override {
-    rewriter.replaceOp(barrierOp, barrierOp.getOperands());
-    return success();
-  }
-};
-
 /// This pass is used to materialize information about dynamic dimensions of
 /// `tensor` operands of an operation in the IR. If a dynamic dimension is
 /// known to be a multiple of a compile-time constant value, this pass
@@ -110,70 +99,16 @@ getTensorDivisibilityInfo(const TensorDynamicDimAnalysis &dynamicDimAnalysis,
 /// inverses of each other. The `util.optimization.barrier` avoid these from
 /// getting folded away during reshape propagation. Return the result of the
 /// `tensor.collapse_shape generated.
-struct ReshapeOps {
-  tensor::ExpandShapeOp expandShapeOp;
-  tensor::CollapseShapeOp collapseShapeOp;
-};
 static std::optional<ReshapeOps>
 blockDynamicDimensionsOfValue(RewriterBase &rewriter,
                               const TensorDivisibilityInfo &divisibilityInfo,
                               Value v) {
-  auto tensorType = dyn_cast<RankedTensorType>(v.getType());
-  if (!tensorType) {
-    return std::nullopt;
+  // Convert divisibility info to expansion map (int64_t factors)
+  llvm::SmallDenseMap<unsigned, int64_t> expansionMap;
+  for (auto [index, divisibility] : divisibilityInfo) {
+    expansionMap[index] = static_cast<int64_t>(divisibility.sdiv());
   }
-
-  // Check if we know that the operands have a divisibility information.
-  SmallVector<OpFoldResult> outputShape;
-  SmallVector<ReassociationIndices> reassociation;
-  Location loc = v.getLoc();
-  SmallVector<OpFoldResult> origShape = tensor::getMixedSizes(rewriter, loc, v);
-
-  for (auto [index, dim] : llvm::enumerate(origShape)) {
-    reassociation.emplace_back(ReassociationIndices{});
-
-    // Check if this needs division.
-    if (!tensorType.isDynamicDim(index) || !divisibilityInfo.contains(index)) {
-      reassociation.back().push_back(outputShape.size());
-      outputShape.push_back(dim);
-      continue;
-    }
-
-    // Split the dynamic based on the divisibility info.
-    IREE::Util::ConstantIntDivisibility currDivisibility =
-        divisibilityInfo.lookup(index);
-    uint64_t factor = currDivisibility.sdiv();
-    AffineExpr s0 = rewriter.getAffineSymbolExpr(0);
-    AffineExpr divExpr = s0.floorDiv(factor);
-    OpFoldResult newDynamicDim = affine::makeComposedFoldedAffineApply(
-        rewriter, loc, divExpr, ArrayRef<OpFoldResult>{dim});
-    OpFoldResult newStaticDim = rewriter.getIndexAttr(factor);
-
-    reassociation.back().push_back(outputShape.size());
-    reassociation.back().push_back(outputShape.size() + 1);
-
-    outputShape.push_back(newDynamicDim);
-    outputShape.push_back(newStaticDim);
-  }
-
-  auto staticOutputShape =
-      llvm::map_to_vector(outputShape, [](OpFoldResult ofr) {
-        if (auto staticShapeAttr = dyn_cast<Attribute>(ofr)) {
-          return cast<IntegerAttr>(staticShapeAttr).getInt();
-        }
-        return ShapedType::kDynamic;
-      });
-  auto outputType = RankedTensorType::get(
-      staticOutputShape, tensorType.getElementType(), tensorType.getEncoding());
-
-  auto expandShapeOp = tensor::ExpandShapeOp::create(
-      rewriter, loc, outputType, v, reassociation, outputShape);
-  Value barrier = IREE::Util::OptimizationBarrierOp::create(
-                      rewriter, loc, expandShapeOp.getResult())
-                      .getResult(0);
-  auto collapseShapeOp = tensor::CollapseShapeOp::create(
-      rewriter, loc, tensorType, barrier, reassociation);
-  return ReshapeOps{expandShapeOp, collapseShapeOp};
+  return createDimensionExpansionOps(rewriter, expansionMap, v);
 }
 
 //===---------------------------------------------------------------------===//
@@ -413,7 +348,7 @@ void BlockDynamicDimensionsPass::runOnOperation() {
   // Delete the optimization barrier and run some further cleanup.
   {
     RewritePatternSet removeBarrierOpsPatterns(context);
-    removeBarrierOpsPatterns.insert<RemoveOptimizationBarrier>(context);
+    populateRemoveOptimizationBarrierPatterns(removeBarrierOpsPatterns);
     tensor::ExpandShapeOp::getCanonicalizationPatterns(removeBarrierOpsPatterns,
                                                        context);
     tensor::CollapseShapeOp::getCanonicalizationPatterns(
