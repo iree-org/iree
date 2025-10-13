@@ -191,7 +191,11 @@ void buildIREEPrecompileTransformPassPipeline(
       globalOptimizationOptions.aggressiveTransposePropagation;
   globalTransformOptions.outerDimConcat =
       globalOptimizationOptions.outerDimConcat;
+  // The pipeline option has higher priority.
   globalTransformOptions.dataTiling = globalOptimizationOptions.dataTiling;
+  if (pipelineOptions.dataTiling) {
+    globalTransformOptions.dataTiling = true;
+  }
   globalTransformOptions.constEval = globalOptimizationOptions.constEval;
   globalTransformOptions.numericPrecisionReduction =
       globalOptimizationOptions.numericPrecisionReduction;
@@ -308,7 +312,15 @@ void buildIREEVMTransformPassPipeline(
         dispatchCreationOptions.enableAggressiveFusion;
     dispatchTransformOptions.enableFuseMultiUse =
         dispatchCreationOptions.enableFuseMultiUse;
+    // The pipeline option has higher priority.
     dispatchTransformOptions.dataTiling = dispatchCreationOptions.dataTiling;
+    if (pipelineOptions.dataTiling) {
+      dispatchTransformOptions.dataTiling = false;
+    }
+    if (dispatchTransformOptions.dataTiling) {
+      assert(!globalOptimizationOptions.dataTiling &&
+             "expect only one data-tiling option to be enabled");
+    }
     dispatchTransformOptions.enableSplitReduction =
         dispatchCreationOptions.enableSplitReduction;
     dispatchTransformOptions.constExprMaxSizeIncreaseThreshold =

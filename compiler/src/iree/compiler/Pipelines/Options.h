@@ -21,6 +21,16 @@ struct GlobalPipelineOptions {
   // Enables const-expr hoisting into globals.
   bool constExprHoisting = true;
 
+  // Enables data tiling.
+  // There are two data-tiling paths. One starts from GlobalOptimization phase
+  // and the other starts from DispatchCreation phase. They are mutually
+  // exclusive. Only one of them can be enabled at a time. The default is using
+  // the GlobalOptimization data-tiling path, since the other path is still
+  // being developed. The main differnce is that the DispatchCreation
+  // data-tiling path enables more fusion opportunities. Any feature built on
+  // top of GlobalOptimization path will be deprecated eventually.
+  bool dataTiling = false;
+
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<GlobalPipelineOptions>;
 };
@@ -125,9 +135,7 @@ struct GlobalOptimizationOptions {
   // Enables transposing all concatenations to the outer most dimension.
   bool outerDimConcat = false;
 
-  // Enables data tiling in global optimization phase. There are two data-tiling
-  // flags during the transition state. The other has to be off if this one is
-  // enabled. Any feature built on top of this path will be deprecated.
+  // Enables data tiling in global optimization phase.
   bool dataTiling = false;
 
   // Enables recursive evaluation of immutable globals using the compiler
@@ -224,10 +232,7 @@ struct DispatchCreationOptions {
   bool enableFuseMultiUse = true;
   bool enableSplitReduction = false;
 
-  // Enables data tiling in dispatch creation phase. There are two data-tiling
-  // flags during the transition state. The other has to be off if this one is
-  // enabled. The main difference is that this path enables the fusion for
-  // data-tiled ops.
+  // Enables data tiling in dispatch creation phase.
   bool dataTiling = false;
 
   void bindOptions(OptionsBinder &binder);
