@@ -56,6 +56,7 @@ struct WgpDetails {
   std::optional<int32_t> maxLoadInstructionBits;
   std::optional<int32_t> simdsPerWgp;
   std::optional<int32_t> vgprSpaceBits;
+  std::optional<ArrayRef<int64_t>> dmaSizes;
 };
 
 // Chip level feature/limit details
@@ -131,6 +132,11 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
     subgroupSizes.push_back(wgp->subgroupSizeChoices.back());
   }
 
+  DenseI64ArrayAttr dmaSizesAttr;
+  if (wgp->dmaSizes.has_value()) {
+    dmaSizesAttr = DenseI64ArrayAttr::get(context, *wgp->dmaSizes);
+  }
+
   auto targetWgp = TargetWgpAttr::get(
       context, ComputeBitwidthsAttr::get(context, details.wgp->compute),
       StorageBitwidthsAttr::get(context, wgp->storage),
@@ -143,7 +149,7 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
       wgp->maxThreadSize, wgp->maxWorkgroupMemoryBytes,
       DenseI32ArrayAttr::get(context, wgp->maxWorkgroupCounts),
       wgp->maxLoadInstructionBits, wgp->simdsPerWgp, wgp->vgprSpaceBits,
-      DictionaryAttr{});
+      dmaSizesAttr, DictionaryAttr{});
 
   TargetChipAttr targetChip;
   if (details.chip) {
@@ -226,23 +232,26 @@ const WgpDetails *getCDNA4WgpDetails() {
       ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32,
       ScaledMMAIntrinsic::MFMA_SCALE_F32_32x32x64_B32,
   };
-  static const WgpDetails cdna4Wgp = {allComputeBits,
-                                      allStorageBits,
-                                      allSubgroupOps,
-                                      allDotProductOps,
-                                      std::size(cdna4MMAOps),
-                                      cdna4MMAOps,
-                                      std::size(cdna4ScaledMMAOps),
-                                      cdna4ScaledMMAOps,
-                                      {64, 64},
-                                      {1024, 1024, 1024},
-                                      1024,
-                                      // Note: upgraded from CDNA3
-                                      160 * 1024,
-                                      {0x7fffffff, 0x7fffffff, 0x7fffffff},
-                                      /*maxLoadInstructionBits=*/128,
-                                      /*simdsPerWgp=*/4,
-                                      /*vgprSpaceBits=*/512 * 32};
+  static const int64_t cdna4DMASizes[] = {32, 128};
+  static const WgpDetails cdna4Wgp = {
+      allComputeBits,
+      allStorageBits,
+      allSubgroupOps,
+      allDotProductOps,
+      std::size(cdna4MMAOps),
+      cdna4MMAOps,
+      std::size(cdna4ScaledMMAOps),
+      cdna4ScaledMMAOps,
+      {64, 64},
+      {1024, 1024, 1024},
+      1024,
+      // Note: upgraded from CDNA3
+      160 * 1024,
+      {0x7fffffff, 0x7fffffff, 0x7fffffff},
+      /*maxLoadInstructionBits=*/128,
+      /*simdsPerWgp=*/4,
+      /*vgprSpaceBits=*/512 * 32,
+      /*dmaSizes=*/ArrayRef<int64_t>(cdna4DMASizes)};
   return &cdna4Wgp;
 }
 
@@ -269,22 +278,25 @@ const WgpDetails *getCDNA3WgpDetails() {
       MMAIntrinsic::MFMA_F32_16x16x16_F16,
       MMAIntrinsic::MFMA_F32_32x32x8_F16,
   };
-  static const WgpDetails cdna3Wgp = {allComputeBits,
-                                      allStorageBits,
-                                      allSubgroupOps,
-                                      allDotProductOps,
-                                      std::size(cdna3MMAOps),
-                                      cdna3MMAOps,
-                                      0,
-                                      nullptr,
-                                      {64, 64},
-                                      {1024, 1024, 1024},
-                                      1024,
-                                      64 * 1024,
-                                      {0x7fffffff, 0x7fffffff, 0x7fffffff},
-                                      /*maxLoadInstructionBits=*/128,
-                                      /*simdsPerWgp=*/4,
-                                      /*vgprSpaceBits=*/512 * 32};
+  static const int64_t cdna3DMASizes[] = {32};
+  static const WgpDetails cdna3Wgp = {
+      allComputeBits,
+      allStorageBits,
+      allSubgroupOps,
+      allDotProductOps,
+      std::size(cdna3MMAOps),
+      cdna3MMAOps,
+      0,
+      nullptr,
+      {64, 64},
+      {1024, 1024, 1024},
+      1024,
+      64 * 1024,
+      {0x7fffffff, 0x7fffffff, 0x7fffffff},
+      /*maxLoadInstructionBits=*/128,
+      /*simdsPerWgp=*/4,
+      /*vgprSpaceBits=*/512 * 32,
+      /*dmaSizes=*/ArrayRef<int64_t>(cdna3DMASizes)};
   return &cdna3Wgp;
 }
 
