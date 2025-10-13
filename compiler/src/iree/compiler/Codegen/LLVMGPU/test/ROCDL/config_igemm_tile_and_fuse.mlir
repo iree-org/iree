@@ -305,7 +305,7 @@ module {
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d1 + d5 * 2, d2 + d6 * 2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d0)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
-func.func @conv_chwn_chwf_no_pad_conv(%arg0: tensor<2x192x128x40xbf16>, %arg1: tensor<2x95x63x40xbf16>, %arg2: tensor<40x3x3x40xf32>) -> tensor<40x3x3x40xf32> {
+func.func @conv_chwn_chwf_small_channel_size(%arg0: tensor<2x192x128x40xbf16>, %arg1: tensor<2x95x63x40xbf16>, %arg2: tensor<40x3x3x40xf32>) -> tensor<40x3x3x40xf32> {
   %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<2x192x128x40xbf16>, tensor<2x95x63x40xbf16>) outs(%arg2 : tensor<40x3x3x40xf32>) {
   ^bb0(%in: bf16, %in_0: bf16, %out: f32):
     %1 = arith.extf %in : bf16 to f32
@@ -317,16 +317,16 @@ func.func @conv_chwn_chwf_no_pad_conv(%arg0: tensor<2x192x128x40xbf16>, %arg1: t
   return %0 : tensor<40x3x3x40xf32>
 }
 
-//         CHECK-LABEL:  func.func @conv_chwn_chwf_no_pad_conv
-//     PAD-CONV-GFX942:     padding = [16, 1, 1, 16, 16]
-// PAD-CONV-GFX942-NOT:     padding_conv
+//     CHECK-LABEL:  func.func @conv_chwn_chwf_small_channel_size
+// PAD-CONV-GFX942:     padding = [16, 1, 1, 16, 16]
+// PAD-CONV-GFX942:     padding_conv = [16, 1, 1, 16, 0, 0, 0]
 
 // -----
 
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d3, d4, d5, d6)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
-func.func @conv_nhwc_small_channel_no_pad_conv(%arg0: tensor<16x26x19x3xf16>, %arg1: tensor<287x3x3x3xf16>, %arg2: tensor<16x24x17x287xf32>) -> tensor<16x24x17x287xf32> {
+func.func @conv_nhwc_small_channel_size(%arg0: tensor<16x26x19x3xf16>, %arg1: tensor<287x3x3x3xf16>, %arg2: tensor<16x24x17x287xf32>) -> tensor<16x24x17x287xf32> {
   %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<16x26x19x3xf16>, tensor<287x3x3x3xf16>) outs(%arg2 : tensor<16x24x17x287xf32>) {
   ^bb0(%in: f16, %in_0: f16, %out: f32):
     %1 = arith.extf %in : f16 to f32
@@ -338,6 +338,6 @@ func.func @conv_nhwc_small_channel_no_pad_conv(%arg0: tensor<16x26x19x3xf16>, %a
   return %0 : tensor<16x24x17x287xf32>
 }
 
-//         CHECK-LABEL:  func.func @conv_nhwc_small_channel_no_pad_conv
-//     PAD-CONV-GFX942:     padding = [1, 4, 32, 64, 32]
-// PAD-CONV-GFX942-NOT:     padding_conv
+//     CHECK-LABEL:  func.func @conv_nhwc_small_channel_size
+// PAD-CONV-GFX942:     padding = [1, 4, 32, 64, 32]
+// PAD-CONV-GFX942:     padding_conv = [1, 4, 32, 64, 0, 0, 0]
