@@ -56,15 +56,15 @@ util.func public @multiUseTiedOperand(%size: index) -> (!stream.resource<*>, !st
 // Since the caller passes in the last live reference the callee is allowed to
 // mutate the memory in-place.
 
-// CHECK-LABEL: @argMoveCallee
-// CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<*>
+// CHECK-LABEL: util.func private @argMoveCallee
+// CHECK-SAME: (%[[ARG:.+]]: !stream.resource<*>, %{{.+}}: index)
 util.func private @argMoveCallee(%arg: !stream.resource<*>, %size: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c123_i32 = arith.constant 123 : i32
   // CHECK-NOT: stream.async.clone
   %clone = stream.async.clone %arg : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
-  // CHECK: %[[FILL:.+]] = stream.async.fill %c123_i32, %[[ARG0]]
+  // CHECK: %[[FILL:.+]] = stream.async.fill %c123_i32, %[[ARG]]
   %fill = stream.async.fill %c123_i32, %clone[%c0 to %c128 for %c128] : i32 -> %0 as !stream.resource<*>{%size}
   // CHECK: util.return %[[FILL]]
   util.return %fill : !stream.resource<*>
@@ -83,7 +83,7 @@ util.func public @argMoveCaller(%size: index) -> !stream.resource<*> {
 // Tests a copy we cannot elide because the function argument is used after the
 // call and passed by const-reference.
 
-// CHECK-LABEL: @argCopyCallee
+// CHECK-LABEL: util.func private @argCopyCallee
 util.func private @argCopyCallee(%arg: !stream.resource<*>, %size: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
@@ -112,8 +112,8 @@ util.func public @argCopyCaller(%size: index) -> (!stream.resource<*>, !stream.r
 // is conditionally chosen to be the initial splat or the new value and as such
 // needs to preserve the copy so the original splat is not mutated.
 
-// CHECK-LABEL: @blockArgMove
-// CHECK-SAME: (%[[COND:.+]]: i1
+// CHECK-LABEL: util.func private @blockArgMove
+// CHECK-SAME: (%[[COND:.+]]: i1, %{{.+}}: index)
 util.func private @blockArgMove(%cond: i1, %size: index) -> (!stream.resource<*>, !stream.resource<*>) {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
@@ -123,7 +123,7 @@ util.func private @blockArgMove(%cond: i1, %size: index) -> (!stream.resource<*>
   %splat0 = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
   // CHECK: %[[SPLAT1:.+]] = stream.async.splat %c456
   %splat1 = stream.async.splat %c456_i32 : i32 -> !stream.resource<*>{%size}
-  // CHECK: cf.br ^bb1(%[[SPLAT0]], %[[SPLAT1]]
+  // CHECK: cf.br ^bb1(%[[SPLAT0]], %[[SPLAT1]] : !stream.resource<*>, !stream.resource<*>)
   cf.br ^bb1(%splat0, %splat1 : !stream.resource<*>, !stream.resource<*>)
 // CHECK: ^bb1(%[[BB1_ARG0:.+]]: !stream.resource<*>, %[[BB1_ARG1:.+]]: !stream.resource<*>)
 ^bb1(%bb1_0: !stream.resource<*>, %bb1_1: !stream.resource<*>):
@@ -135,10 +135,10 @@ util.func private @blockArgMove(%cond: i1, %size: index) -> (!stream.resource<*>
   %clone1 = stream.async.clone %bb1_1 : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
   // CHECK: %[[FILL1:.+]] = stream.async.fill %c456_i32, %[[CLONE1]]
   %fill1 = stream.async.fill %c456_i32, %clone1[%c0 to %c128 for %c128] : i32 -> !stream.resource<*>{%size}
-  // CHECK: %[[SELECT:.+]] = arith.select %[[COND]], %[[SPLAT1]], %[[FILL1]]
+  // CHECK: %[[BB1_1_NEW:.+]] = arith.select %[[COND]], %[[SPLAT1]], %[[FILL1]]
   %bb1_1_new = arith.select %cond, %splat1, %fill1 : !stream.resource<*>
-  // CHECK: cf.cond_br %[[COND]], ^bb1(%[[FILL0]], %[[SELECT]]
-  // CHECK-SAME:               ^bb2(%[[FILL0]], %[[SELECT]]
+  // CHECK: cf.cond_br %[[COND]], ^bb1(%[[FILL0]], %[[BB1_1_NEW]] : !stream.resource<*>, !stream.resource<*>),
+  // CHECK-SAME:               ^bb2(%[[FILL0]], %[[BB1_1_NEW]] : !stream.resource<*>, !stream.resource<*>)
   cf.cond_br %cond, ^bb1(%fill0, %bb1_1_new : !stream.resource<*>, !stream.resource<*>),
                  ^bb2(%fill0, %bb1_1_new : !stream.resource<*>, !stream.resource<*>)
 ^bb2(%bb2_0: !stream.resource<*>, %bb2_1: !stream.resource<*>):
@@ -244,10 +244,10 @@ util.func private @slice_overlap_readonly(%producer: !stream.resource<*>) -> (!s
   %c101 = arith.constant 101 : index
   %c200 = arith.constant 200 : index
   %c300 = arith.constant 300 : index
-  // CHECK-NOT: stream.async.slice
   %slice = stream.async.slice %producer[%c100 to %c200] : !stream.resource<*>{%c300} -> !stream.resource<*>{%c100}
   %consumer_storage_0 = stream.async.alloca : !stream.resource<*>{%c100}
   // CHECK: stream.async.copy %[[PRODUCER]][%c100 to %c200]
+  // CHECK-NOT: stream.async.slice
   %consumer_0 = stream.async.copy %slice[%c0 to %c100], %consumer_storage_0[%c0 to %c100], %c300 : !stream.resource<*>{%c100} -> %consumer_storage as !stream.resource<*>{%c100}
   %consumer_storage_1 = stream.async.alloca : !stream.resource<*>{%c100}
   // CHECK: stream.async.copy %[[PRODUCER]][%c101 to %c201]
@@ -259,6 +259,14 @@ util.func private @slice_overlap_readonly(%producer: !stream.resource<*>) -> (!s
 
 stream.executable private @ex {
   stream.executable.export public @dispatch workgroups() -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+  stream.executable.export public @dispatch1 workgroups() -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+  stream.executable.export public @dispatch2 workgroups() -> (index, index, index) {
     %c1 = arith.constant 1 : index
     stream.return %c1, %c1, %c1 : index, index, index
   }
@@ -275,10 +283,11 @@ util.func private @slice_dispatch_fold(%producer: !stream.resource<*>) -> !strea
   %c200 = arith.constant 200 : index
   %c300 = arith.constant 300 : index
   %c123_i32 = arith.constant 123 : i32
-  // CHECK-NOT: stream.async.slice
   %slice = stream.async.slice %producer[%c100 to %c200] : !stream.resource<*>{%c300} -> !stream.resource<*>{%c100}
   // CHECK: stream.async.dispatch @ex::@dispatch(%c123_i32, %[[PRODUCER]][%c110 to %c130 for %c20]) : (i32, !stream.resource<*>{%c300}) -> !stream.resource<*>{%c100}
   %consumer = stream.async.dispatch @ex::@dispatch(%c123_i32, %slice[%c10 to %c30 for %c20]) : (i32, !stream.resource<*>{%c100}) -> !stream.resource<*>{%c100}
+  // CHECK-NOT: stream.async.slice
+  // CHECK: util.return
   util.return %consumer : !stream.resource<*>
 }
 
@@ -337,6 +346,7 @@ util.func public @cloneToExternal() -> !stream.resource<external> {
   // CHECK-SAME: !stream.resource<*>{%c4} -> !stream.resource<external>{%c4}
   %clone = stream.async.clone %splat : !stream.resource<*>{%c4} -> !stream.resource<external>{%c4}
 
+  // CHECK: util.return %[[CLONE]]
   util.return %clone : !stream.resource<external>
 }
 
@@ -388,7 +398,7 @@ util.func public @constantCloneMultiUse(%size: index) -> (!stream.resource<const
 
   // Both dispatches read from the same constant (no mutation).
   // CSE will deduplicate these identical dispatches into one.
-  // CHECK: %[[RESULT:.+]] = stream.async.dispatch @constantDispatch::@entry
+  // CHECK: %[[RESULT0:.+]] = stream.async.dispatch @constantDispatch::@entry
   // CHECK-SAME: %[[CONST]]
   %result0 = stream.async.dispatch @constantDispatch::@entry(%clone0[%c0 to %size for %size]) :
       (!stream.resource<constant>{%size}) -> !stream.resource<constant>{%size}
@@ -396,7 +406,7 @@ util.func public @constantCloneMultiUse(%size: index) -> (!stream.resource<const
   %result1 = stream.async.dispatch @constantDispatch::@entry(%clone1[%c0 to %size for %size]) :
       (!stream.resource<constant>{%size}) -> !stream.resource<constant>{%size}
 
-  // CHECK: util.return %[[RESULT]], %[[RESULT]]
+  // CHECK: util.return %[[RESULT0]], %[[RESULT0]]
   util.return %result0, %result1 : !stream.resource<constant>, !stream.resource<constant>
 }
 
@@ -452,4 +462,376 @@ util.func public @constantCloneTiedMutation(%size: index) -> !stream.resource<co
 
   // CHECK: util.return %[[FILLED]]
   util.return %filled : !stream.resource<constant>
+}
+
+// -----
+
+// Tests aliasing pattern where user provides output storage.
+// The dispatch reuses the input buffer as output (tied operand) - clone should be elided.
+
+stream.executable private @ex0 {
+  stream.executable.export public @dispatch workgroups(%arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+}
+
+// CHECK-LABEL: util.func private @aliasing_user_provided_output_callee
+// CHECK-SAME: (%[[RESOURCE:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index)
+util.func private @aliasing_user_provided_output_callee(%resource: !stream.resource<*>, %size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  // Defensive clone as inserted by MaterializeCopyOnWritePass.
+  // CHECK-NOT: stream.async.clone
+  %clone = stream.async.clone %resource : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  // Dispatch reuses input as output (tied operand pattern).
+  // CHECK: %[[RESULT:.+]] = stream.async.dispatch @ex0::@dispatch[%c1, %c1, %c1](%[[RESOURCE]][%c0 to %[[SIZE]] for %[[SIZE]]], %[[RESOURCE]][%c0 to %[[SIZE]] for %[[SIZE]]]) : (!stream.resource<*>{%[[SIZE]]}, !stream.resource<*>{%[[SIZE]]}) -> %[[RESOURCE]]{%[[SIZE]]}
+  %result = stream.async.dispatch @ex0::@dispatch[%c1, %c1, %c1](%clone[%c0 to %size for %size], %clone[%c0 to %size for %size]) : (!stream.resource<*>{%size}, !stream.resource<*>{%size}) -> %clone{%size}
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : !stream.resource<*>
+}
+
+// CHECK-LABEL: @aliasing_user_provided_output_caller
+util.func public @aliasing_user_provided_output_caller(%size: index) -> !stream.resource<*> {
+  %c123_i32 = arith.constant 123 : i32
+  %initial = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  %result = util.call @aliasing_user_provided_output_callee(%initial, %size) : (!stream.resource<*>, index) -> !stream.resource<*>
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
+// Tests dispatch taking same SSA value multiple times (aliasing inputs).
+// Clone should be elided since all uses are read-only.
+
+stream.executable private @ex1 {
+  stream.executable.export public @dispatch_same_input_twice workgroups(%arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+}
+
+// CHECK-LABEL: util.func private @dispatch_same_value_twice_callee
+// CHECK-SAME: (%[[RESOURCE:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index)
+util.func private @dispatch_same_value_twice_callee(%resource: !stream.resource<*>, %size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  // Defensive clone as inserted by MaterializeCopyOnWritePass.
+  // CHECK-NOT: stream.async.clone
+  %clone = stream.async.clone %resource : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  // Dispatch reads the same value twice - both are read-only.
+  // CHECK: %[[RESULT:.+]] = stream.async.dispatch @ex1::@dispatch_same_input_twice[%c1, %c1, %c1](%[[RESOURCE]][%c0 to %[[SIZE]] for %[[SIZE]]], %[[RESOURCE]][%c0 to %[[SIZE]] for %[[SIZE]]]) : (!stream.resource<*>{%[[SIZE]]}, !stream.resource<*>{%[[SIZE]]}) -> !stream.resource<*>{%[[SIZE]]}
+  %result = stream.async.dispatch @ex1::@dispatch_same_input_twice[%c1, %c1, %c1](%clone[%c0 to %size for %size], %clone[%c0 to %size for %size]) : (!stream.resource<*>{%size}, !stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : !stream.resource<*>
+}
+
+// CHECK-LABEL: @dispatch_same_value_twice_caller
+util.func public @dispatch_same_value_twice_caller(%size: index) -> !stream.resource<*> {
+  %c123_i32 = arith.constant 123 : i32
+  %initial = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  %result = util.call @dispatch_same_value_twice_callee(%initial, %size) : (!stream.resource<*>, index) -> !stream.resource<*>
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
+// Tests splat followed by in-place dispatch (common zero-copy pattern).
+// Splat creates buffer, dispatch mutates it in-place without clone.
+
+stream.executable private @ex2 {
+  stream.executable.export public @dispatch_inplace workgroups(%arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+}
+
+// CHECK-LABEL: util.func private @splat_then_inplace_dispatch_callee
+util.func private @splat_then_inplace_dispatch_callee(%size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: %[[SPLAT:.+]] = stream.async.splat %c123_i32
+  %splat = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // Defensive clone as inserted by MaterializeCopyOnWritePass.
+  // CHECK-NOT: stream.async.clone
+  %clone = stream.async.clone %splat : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  // Dispatch mutates splat buffer in-place (tied operand).
+  // CHECK: %[[RESULT:.+]] = stream.async.dispatch @ex2::@dispatch_inplace[%c1, %c1, %c1](%[[SPLAT]][%c0 to %[[SIZE:.+]] for %[[SIZE]]]) : (!stream.resource<*>{%[[SIZE]]}) -> %[[SPLAT]]{%[[SIZE]]}
+  %result = stream.async.dispatch @ex2::@dispatch_inplace[%c1, %c1, %c1](%clone[%c0 to %size for %size]) : (!stream.resource<*>{%size}) -> %clone{%size}
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : !stream.resource<*>
+}
+
+// CHECK-LABEL: @splat_then_inplace_dispatch_caller
+util.func public @splat_then_inplace_dispatch_caller(%size: index) -> !stream.resource<*> {
+  %result = util.call @splat_then_inplace_dispatch_callee(%size) : (index) -> !stream.resource<*>
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
+// Tests splat followed by non-in-place dispatch (creates new output).
+// Clone should be elided since splat is last use before dispatch.
+
+stream.executable private @ex3 {
+  stream.executable.export public @dispatch_new_output workgroups(%arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+}
+
+// CHECK-LABEL: util.func private @splat_then_new_output_dispatch_callee
+util.func private @splat_then_new_output_dispatch_callee(%size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: %[[SPLAT:.+]] = stream.async.splat %c123_i32
+  %splat = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // Defensive clone as inserted by MaterializeCopyOnWritePass.
+  // CHECK-NOT: stream.async.clone
+  %clone = stream.async.clone %splat : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  // Dispatch reads splat and produces new output (not tied).
+  // CHECK: %[[RESULT:.+]] = stream.async.dispatch @ex3::@dispatch_new_output[%c1, %c1, %c1](%[[SPLAT]][%c0 to %[[SIZE:.+]] for %[[SIZE]]]) : (!stream.resource<*>{%[[SIZE]]}) -> !stream.resource<*>{%[[SIZE]]}
+  %result = stream.async.dispatch @ex3::@dispatch_new_output[%c1, %c1, %c1](%clone[%c0 to %size for %size]) : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : !stream.resource<*>
+}
+
+// CHECK-LABEL: @splat_then_new_output_dispatch_caller
+util.func public @splat_then_new_output_dispatch_caller(%size: index) -> !stream.resource<*> {
+  %result = util.call @splat_then_new_output_dispatch_callee(%size) : (index) -> !stream.resource<*>
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
+// Tests chained dispatches with user-provided storage (common pattern).
+// First dispatch in-place, second dispatch reuses same buffer.
+
+stream.executable private @ex4 {
+  stream.executable.export public @dispatch_first workgroups(%arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+}
+
+stream.executable private @ex5 {
+  stream.executable.export public @dispatch_second workgroups(%arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+}
+
+// CHECK-LABEL: util.func private @chained_inplace_dispatches_callee
+// CHECK-SAME: (%[[RESOURCE:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index)
+util.func private @chained_inplace_dispatches_callee(%resource: !stream.resource<*>, %size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  // First defensive clone.
+  // CHECK-NOT: stream.async.clone
+  %clone1 = stream.async.clone %resource : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  // First dispatch mutates in-place.
+  // CHECK: %[[DISPATCH1:.+]] = stream.async.dispatch @ex4::@dispatch_first[%c1, %c1, %c1](%[[RESOURCE]][%c0 to %[[SIZE]] for %[[SIZE]]]) : (!stream.resource<*>{%[[SIZE]]}) -> %[[RESOURCE]]{%[[SIZE]]}
+  %dispatch1 = stream.async.dispatch @ex4::@dispatch_first[%c1, %c1, %c1](%clone1[%c0 to %size for %size]) : (!stream.resource<*>{%size}) -> %clone1{%size}
+  // Second defensive clone.
+  // CHECK-NOT: stream.async.clone
+  %clone2 = stream.async.clone %dispatch1 : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  // Second dispatch also mutates in-place.
+  // CHECK: %[[DISPATCH2:.+]] = stream.async.dispatch @ex5::@dispatch_second[%c1, %c1, %c1](%[[DISPATCH1]][%c0 to %[[SIZE]] for %[[SIZE]]]) : (!stream.resource<*>{%[[SIZE]]}) -> %[[DISPATCH1]]{%[[SIZE]]}
+  %dispatch2 = stream.async.dispatch @ex5::@dispatch_second[%c1, %c1, %c1](%clone2[%c0 to %size for %size]) : (!stream.resource<*>{%size}) -> %clone2{%size}
+  // CHECK: util.return %[[DISPATCH2]]
+  util.return %dispatch2 : !stream.resource<*>
+}
+
+// CHECK-LABEL: @chained_inplace_dispatches_caller
+util.func public @chained_inplace_dispatches_caller(%size: index) -> !stream.resource<*> {
+  %c123_i32 = arith.constant 123 : i32
+  %initial = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  %result = util.call @chained_inplace_dispatches_callee(%initial, %size) : (!stream.resource<*>, index) -> !stream.resource<*>
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
+//===----------------------------------------------------------------------===//
+// Inter-procedural by-val/by-ref argument semantics
+//===----------------------------------------------------------------------===//
+
+// Tests that a callee called with mixed semantics (both by-val and by-ref)
+// must preserve defensive copies since it can't assume semantics.
+
+stream.executable private @ex {
+  stream.executable.export public @dispatch workgroups() -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+}
+
+// CHECK-LABEL: util.func private @mixedSemanticsSameCallee
+// CHECK-SAME: (%[[ARG:[^:]+]]: !stream.resource<external>)
+util.func private @mixedSemanticsSameCallee(%arg: !stream.resource<external>) {
+  %c0 = arith.constant 0 : index
+  %c100 = arith.constant 100 : index
+  %c123_i32 = arith.constant 123 : i32
+  // Clone must be preserved because callee is called with both semantics.
+  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[ARG]]
+  %clone = stream.async.clone %arg : !stream.resource<external>{%c100} -> !stream.resource<external>{%c100}
+  // CHECK: stream.async.fill %c123_i32, %[[CLONE]]
+  %filled = stream.async.fill %c123_i32, %clone[%c0 to %c100 for %c100] : i32 -> %clone as !stream.resource<external>{%c100}
+  util.return
+}
+
+// CHECK-LABEL: @mixedSemanticsByvalCaller
+util.func public @mixedSemanticsByvalCaller() {
+  %c0_i32 = arith.constant 0 : i32
+  %c100 = arith.constant 100 : index
+  %resource = stream.async.splat %c0_i32 : i32 -> !stream.resource<external>{%c100}
+  // Last use - by-value semantics.
+  util.call @mixedSemanticsSameCallee(%resource) : (!stream.resource<external>) -> ()
+  util.return
+}
+
+// CHECK-LABEL: @mixedSemanticsByrefCaller
+util.func public @mixedSemanticsByrefCaller() {
+  %c0 = arith.constant 0 : index
+  %c0_i32 = arith.constant 0 : i32
+  %c100 = arith.constant 100 : index
+  %resource = stream.async.splat %c0_i32 : i32 -> !stream.resource<external>{%c100}
+  // Not last use - by-ref semantics.
+  util.call @mixedSemanticsSameCallee(%resource) : (!stream.resource<external>) -> ()
+  // Additional use after call.
+  %dispatch = stream.async.dispatch @ex::@dispatch(%resource[%c0 to %c100 for %c100]) : (!stream.resource<external>{%c100}) -> !stream.resource<external>{%c100}
+  util.return
+}
+
+// -----
+
+//===----------------------------------------------------------------------===//
+// Same-type transfer elision
+//===----------------------------------------------------------------------===//
+
+// Tests that same-type transfers (external->external) are always elided
+// because they're no-ops regardless of by-val/by-ref semantics.
+
+// CHECK-LABEL: @transferSameTypeFromArg
+// CHECK-SAME: (%[[ARG:[^:]+]]: !stream.resource<external>)
+util.func public @transferSameTypeFromArg(%arg: !stream.resource<external>) -> !stream.resource<external> {
+  %c100 = arith.constant 100 : index
+  // Same-type transfer is always a no-op and can be elided.
+  // CHECK-NOT: stream.async.transfer
+  %transfer = stream.async.transfer %arg : !stream.resource<external>{%c100} -> !stream.resource<external>{%c100}
+  // CHECK: util.return %[[ARG]]
+  util.return %transfer : !stream.resource<external>
+}
+
+// -----
+
+// Tests that type-changing transfers (transient->external) are preserved
+// because they change mutability semantics.
+
+// CHECK-LABEL: @transferTypeChangingFromArg
+// CHECK-SAME: (%[[ARG:[^:]+]]: !stream.resource<transient>)
+util.func public @transferTypeChangingFromArg(%arg: !stream.resource<transient>) -> !stream.resource<external> {
+  %c100 = arith.constant 100 : index
+  // Type-changing transfer must be preserved.
+  // CHECK: %[[TRANSFER:.+]] = stream.async.transfer %[[ARG]]
+  %transfer = stream.async.transfer %arg : !stream.resource<transient>{%c100} -> !stream.resource<external>{%c100}
+  // CHECK: util.return %[[TRANSFER]]
+  util.return %transfer : !stream.resource<external>
+}
+
+// -----
+
+// Tests that transfer chains with type changes are preserved.
+// Since the source is a by-ref argument and transfers change types,
+// both transfers must be preserved.
+
+// CHECK-LABEL: @transferChainFromArg
+// CHECK-SAME: (%[[ARG:[^:]+]]: !stream.resource<constant>)
+util.func public @transferChainFromArg(%arg: !stream.resource<constant>) -> !stream.resource<external> {
+  %c100 = arith.constant 100 : index
+  // CHECK: %[[T1:.+]] = stream.async.transfer %[[ARG]] : !stream.resource<constant>{{.+}} -> !stream.resource<transient>
+  %t1 = stream.async.transfer %arg : !stream.resource<constant>{%c100} -> !stream.resource<transient>{%c100}
+  // CHECK: %[[T2:.+]] = stream.async.transfer %[[T1]] : !stream.resource<transient>{{.+}} -> !stream.resource<external>
+  %t2 = stream.async.transfer %t1 : !stream.resource<transient>{%c100} -> !stream.resource<external>{%c100}
+  // CHECK: util.return %[[T2]]
+  util.return %t2 : !stream.resource<external>
+}
+
+// -----
+
+// Tests that same-type transfers with multiple uses of the source are elided.
+// Since same-type transfer is a no-op, both dispatches use the original arg.
+
+stream.executable private @ex {
+  stream.executable.export public @dispatch1 workgroups() -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+  stream.executable.export public @dispatch2 workgroups() -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+}
+
+// CHECK-LABEL: @transferSameTypeMultiUse
+// CHECK-SAME: (%[[ARG:[^:]+]]: !stream.resource<external>)
+util.func public @transferSameTypeMultiUse(%arg: !stream.resource<external>) -> (!stream.resource<external>, !stream.resource<external>) {
+  %c0 = arith.constant 0 : index
+  %c100 = arith.constant 100 : index
+  // CHECK-NOT: stream.async.transfer
+  %transfer = stream.async.transfer %arg : !stream.resource<external>{%c100} -> !stream.resource<external>{%c100}
+  // Both original and transfer result used - transfer still elided.
+  // CHECK: %[[D1:.+]] = stream.async.dispatch @ex::@dispatch1(%[[ARG]][%c0 to %c100 for %c100])
+  %dispatch1 = stream.async.dispatch @ex::@dispatch1(%arg[%c0 to %c100 for %c100]) : (!stream.resource<external>{%c100}) -> !stream.resource<external>{%c100}
+  // CHECK: %[[D2:.+]] = stream.async.dispatch @ex::@dispatch2(%[[ARG]][%c0 to %c100 for %c100])
+  %dispatch2 = stream.async.dispatch @ex::@dispatch2(%transfer[%c0 to %c100 for %c100]) : (!stream.resource<external>{%c100}) -> !stream.resource<external>{%c100}
+  // CHECK: util.return %[[D1]], %[[D2]]
+  util.return %dispatch1, %dispatch2 : !stream.resource<external>, !stream.resource<external>
+}
+
+// -----
+
+//===----------------------------------------------------------------------===//
+// Clone from by-ref argument to tied operation
+//===----------------------------------------------------------------------===//
+
+// Tests that a clone from a by-ref argument feeding a tied operation must be
+// preserved to prevent mutation of the caller's value.
+
+stream.executable private @ex {
+  stream.executable.export public @dispatch workgroups() -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+}
+
+// CHECK-LABEL: util.func public @cloneByrefToTied
+// CHECK-SAME: (%[[ARG:[^:]+]]: !stream.resource<external>)
+util.func public @cloneByrefToTied(%arg: !stream.resource<external>) -> !stream.resource<external> {
+  %c0 = arith.constant 0 : index
+  %c100 = arith.constant 100 : index
+  %c123_i32 = arith.constant 123 : i32
+  // Clone must be preserved - arg is used again after call (by-ref semantics).
+  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[ARG]]
+  %clone = stream.async.clone %arg : !stream.resource<external>{%c100} -> !stream.resource<external>{%c100}
+  // Tied op will mutate - must not mutate the original arg.
+  // CHECK: %[[FILLED:.+]] = stream.async.fill %c123_i32, %[[CLONE]]
+  %filled = stream.async.fill %c123_i32, %clone[%c0 to %c100 for %c100] : i32 -> %clone as !stream.resource<external>{%c100}
+  // CHECK: util.return %[[FILLED]]
+  util.return %filled : !stream.resource<external>
+}
+
+// CHECK-LABEL: @cloneByrefToTiedCaller
+util.func public @cloneByrefToTiedCaller() {
+  %c0 = arith.constant 0 : index
+  %c0_i32 = arith.constant 0 : i32
+  %c100 = arith.constant 100 : index
+  %resource = stream.async.splat %c0_i32 : i32 -> !stream.resource<external>{%c100}
+  // Not last use - by-ref.
+  %result = util.call @cloneByrefToTied(%resource) : (!stream.resource<external>) -> !stream.resource<external>
+  // Original resource used again.
+  %dispatch = stream.async.dispatch @ex::@dispatch(%resource[%c0 to %c100 for %c100]) : (!stream.resource<external>{%c100}) -> !stream.resource<external>{%c100}
+  util.return
 }

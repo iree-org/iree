@@ -21,12 +21,9 @@ namespace mlir::iree_compiler::IREE::HAL {
 //===----------------------------------------------------------------------===//
 
 DeviceAnalysis::DeviceAnalysis(Operation *rootOp)
-    : explorer(rootOp, TraversalAction::SHALLOW), solver(explorer, allocator) {
+    : explorer(rootOp, TraversalAction::RECURSE), solver(explorer, allocator) {
   explorer.setOpInterfaceAction<mlir::FunctionOpInterface>(
       TraversalAction::RECURSE);
-  explorer.setOpAction<mlir::scf::ForOp>(TraversalAction::RECURSE);
-  explorer.setOpAction<mlir::scf::IfOp>(TraversalAction::RECURSE);
-  explorer.setOpAction<mlir::scf::WhileOp>(TraversalAction::RECURSE);
   // Ignore the contents of executables (linalg goo, etc).
   explorer.setOpAction<IREE::HAL::ExecutableOp>(TraversalAction::IGNORE);
   explorer.initialize();
