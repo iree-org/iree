@@ -487,7 +487,8 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
       buffer_type = IREE_HAL_HIP_BUFFER_TYPE_DEVICE;
       status = IREE_HIP_CALL_TO_STATUS(
           allocator->symbols,
-          hipMallocManaged(&device_ptr, allocation_size, hipMemAttachGlobal));
+          hipMallocManaged(&device_ptr, allocation_size + 64,
+                           hipMemAttachGlobal));
       if (iree_status_is_ok(status) &&
           allocator->supports_concurrent_managed_access) {
         // Prefetch the buffer on the GPU device.
@@ -503,8 +504,8 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
     } else {
       // Device only.
       buffer_type = IREE_HAL_HIP_BUFFER_TYPE_DEVICE;
-      status = IREE_HIP_CALL_TO_STATUS(allocator->symbols,
-                                       hipMalloc(&device_ptr, allocation_size));
+      status = IREE_HIP_CALL_TO_STATUS(
+          allocator->symbols, hipMalloc(&device_ptr, allocation_size + 64));
     }
   } else {
     // Host local case.
@@ -855,7 +856,7 @@ iree_status_t iree_hal_hip_allocator_alloc_async(
       // patterns of the host program, so instead we simply hipMalloc/hipFree.
       status = IREE_HIP_CALL_TO_STATUS(
           allocator->symbols,
-          hipMalloc(&ptr, (size_t)iree_hal_buffer_allocation_size(buffer)),
+          hipMalloc(&ptr, (size_t)iree_hal_buffer_allocation_size(buffer) + 64),
           "hipMalloc");
 
       status = iree_status_join(

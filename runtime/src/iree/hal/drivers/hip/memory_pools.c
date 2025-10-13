@@ -230,8 +230,8 @@ iree_status_t iree_hal_hip_memory_pools_allocate_pointer(
   hipDeviceptr_t device_ptr = NULL;
   IREE_RETURN_IF_ERROR(IREE_HIP_CALL_TO_STATUS(
       pools->hip_symbols,
-      hipMallocFromPoolAsync(&device_ptr, (size_t)allocation_size, memory_pool,
-                             stream),
+      hipMallocFromPoolAsync(&device_ptr, (size_t)allocation_size + 64,
+                             memory_pool, stream),
       "hipMallocFromPoolAsync"));
 
   iree_hal_hip_buffer_set_device_pointer(buffer, device_ptr);

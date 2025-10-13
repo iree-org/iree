@@ -369,6 +369,17 @@ struct ConvertToROCDLPass final
     // TODO(qedawkins): Set this much earlier when we introduce the allocations.
     setSharedMemoryAlignment(m, 16);
 
+    IRRewriter rw(m.getContext());
+    m.walk([&](ROCDL::MakeBufferRsrcOp rsrcOp) {
+      rw.setInsertionPoint(rsrcOp);
+      Location loc = rsrcOp.getLoc();
+      Value numRecords = rsrcOp.getNumRecords();
+      Value four = LLVM::ConstantOp::create(
+          rw, loc, rw.getIntegerAttr(numRecords.getType(), 4));
+      Value withGuardWord = LLVM::AddOp::create(rw, loc, numRecords, four);
+      rsrcOp.getNumRecordsMutable().assign(withGuardWord);
+    });
+
     LDBG() << "After updating shared memory alignments\n" << m;
   }
 };
