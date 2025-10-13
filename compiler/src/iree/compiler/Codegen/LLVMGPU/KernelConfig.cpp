@@ -24,6 +24,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/ADT/STLExtras.h"
@@ -758,8 +759,25 @@ setReductionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   SmallVector<int64_t> bounds = op.getStaticLoopRanges();
   IREE::GPU::TargetWgpAttr wgp = target.getWgp();
+  // First consider the inner reduction dimension. If this is a multiple of a
+  // subgroup size choice, use this as the reduction dimension, and choose
+  // subgroup, thread loads etc based on it. Otherwise, consider the entire
+  // reduction dimension.  This happens for example in case of multiple
+  // reductions in scaled matmul with the last dimension being the block size
+  // (32 for gfx950).
   int64_t reductionSize = bounds[reductionDims.back()];
-
+  if (!ShapedType::isDynamic(reductionSize) &&
+      reductionSize % target.getPreferredSubgroupSize() != 0) {
+    // Consider the entire reduction dimension.
+    reductionSize = 1;
+    for (unsigned dim : reductionDims) {
+      if (ShapedType::isDynamic(bounds[dim])) {
+        reductionSize = ShapedType::kDynamic;
+        break;
+      }
+      reductionSize *= bounds[dim];
+    }
+  }
   if (ShapedType::isDynamic(reductionSize)) {
     reductionSize = kVectorDistributeReductionSizeToTargetIfDynamic;
   }

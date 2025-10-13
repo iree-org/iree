@@ -263,15 +263,20 @@ static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
   // established after we sweep the different tile sizes for a problem config.
   // Once a precise threshold is established, replace 4 with the threshold and
   // remove this todo.
-  if (llvm::all_equal({problem.mSizes.size(), problem.nSizes.size(),
-                       problem.kSizes.size(), size_t{1}}) &&
-      problem.batchSizes.empty()) {
-    int64_t mSize = problem.mSizes.back();
-    int64_t nSize = problem.nSizes.back();
-    if ((mSize <= kVerySkinnyDimThreshold && (nSize > preferredSubgroupSize)) ||
-        (nSize <= kVerySkinnyDimThreshold && (mSize > preferredSubgroupSize))) {
-      return failure();
-    }
+  const int64_t mSize =
+      std::accumulate(problem.mSizes.begin(), problem.mSizes.end(), 1,
+                      std::multiplies<int64_t>());
+  const int64_t nSize =
+      std::accumulate(problem.nSizes.begin(), problem.nSizes.end(), 1,
+                      std::multiplies<int64_t>());
+  // TODO(jornt): Remove this check as batch size doesn't make a computation
+  // more compute bound, so it shouldn't be considered.
+  if (!problem.batchSizes.empty()) {
+    return success();
+  }
+  if ((mSize <= kVerySkinnyDimThreshold && (nSize > preferredSubgroupSize)) ||
+      (nSize <= kVerySkinnyDimThreshold && (mSize > preferredSubgroupSize))) {
+    return failure();
   }
   return success();
 }
