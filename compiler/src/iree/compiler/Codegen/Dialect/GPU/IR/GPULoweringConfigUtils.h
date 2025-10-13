@@ -7,7 +7,6 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_GPU_IR_GPULOWERINGCONFIGUTILS_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_GPU_IR_GPULOWERINGCONFIGUTILS_H_
 
-#include <cstdint>
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 
 namespace mlir::iree_compiler::IREE::GPU {
