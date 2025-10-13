@@ -36,9 +36,11 @@ namespace mlir::iree_compiler {
 namespace {
 
 /// Get subgroup tile sizes from the lowering config.
+/// If no lowering config exists, returns an empty vector.
 static SmallVector<OpFoldResult> getSubgroupTileSizes(OpBuilder &builder,
                                                       Operation *op) {
-  auto loweringConfig = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
+  auto loweringConfig =
+      getLoweringConfig<IREE::Codegen::LoweringConfigAttrInterface>(op);
   if (!loweringConfig) {
     return {};
   }
@@ -59,27 +61,53 @@ static SmallVector<Attribute> getWarpMapping(MLIRContext *ctx, int64_t rank) {
   return mapping;
 }
 
-/// Create GPU thread mapping attributes for the given rank.
-static SmallVector<Attribute> getThreadMapping(MLIRContext *ctx, int64_t rank) {
+/// Create GPU thread mapping attribute for 1D thread tiling.
+/// Returns a single mapping to LinearDim0 for the innermost dimension.
+static SmallVector<Attribute> getThreadMapping(MLIRContext *ctx) {
   SmallVector<Attribute> mapping;
-  for (int64_t i = 0; i < rank; ++i) {
-    auto mappingId = static_cast<gpu::MappingId>(
-        static_cast<int>(gpu::MappingId::LinearDim0) + (rank - 1 - i));
-    mapping.push_back(gpu::GPUThreadMappingAttr::get(ctx, mappingId));
-  }
+  // 1D thread tiling: single mapping to LinearDim0
+  mapping.push_back(
+      gpu::GPUThreadMappingAttr::get(ctx, gpu::MappingId::LinearDim0));
   return mapping;
 }
 
-/// Get thread tile sizes from the lowering config.
-static SmallVector<OpFoldResult> getThreadTileSizes(OpBuilder &builder,
-                                                    Operation *op) {
-  auto loweringConfig = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
-  if (!loweringConfig) {
+/// Get thread tile sizes: tiles only the innermost dimension to subgroupSize.
+/// Uses subgroup size from the function's translation info.
+/// Other dimensions are set to 0 (no tiling).
+static SmallVector<OpFoldResult>
+getThreadTileSizes(OpBuilder &builder, Operation *op,
+                   FunctionOpInterface funcOp) {
+  // Get subgroup size from translation info
+  std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
+  if (!subgroupSize) {
     return {};
   }
 
-  SmallVector<OpFoldResult> tileSizes = loweringConfig.getTilingLevelSizes(
-      builder, llvm::to_underlying(IREE::GPU::TilingLevel::Thread), op);
+  // Get the rank from the gather operation
+  auto gatherOp = dyn_cast<IREE::LinalgExt::GatherOp>(op);
+  if (!gatherOp) {
+    return {};
+  }
+
+  auto initType = cast<RankedTensorType>(gatherOp.getOutput().getType());
+  int64_t rank = initType.getRank();
+
+  // Create tile sizes: tile only innermost dimension with subgroupSize
+  // Set other dimensions to 0 (no tiling)
+  SmallVector<OpFoldResult> tileSizes;
+  IntegerAttr zeroAttr = builder.getIndexAttr(0);
+  IntegerAttr subgroupAttr = builder.getIndexAttr(*subgroupSize);
+
+  for (int64_t i = 0; i < rank; ++i) {
+    if (i == rank - 1) {
+      // Innermost dimension: tile with subgroup size
+      tileSizes.push_back(subgroupAttr);
+    } else {
+      // Other dimensions: no tiling (0 means no tiling)
+      tileSizes.push_back(zeroAttr);
+    }
+  }
+
   return tileSizes;
 }
 
@@ -112,6 +140,14 @@ struct GPUConvertToCoalescedDMAPass final
     MLIRContext *context = &getContext();
     IRRewriter rewriter(context);
 
+    // Check that function has translation info
+    IREE::Codegen::TranslationInfoAttr translationInfo =
+        getTranslationInfo(funcOp);
+    if (!translationInfo) {
+      // No translation info means this pass should not run
+      return;
+    }
+
     // Tile linalg_ext.gather operations to subgroup level only
     SmallVector<IREE::LinalgExt::GatherOp> gatherOps;
     funcOp->walk([&](IREE::LinalgExt::GatherOp gatherOp) {
@@ -136,24 +172,21 @@ struct GPUConvertToCoalescedDMAPass final
 
     // Second pass: Tile inner gather ops to thread level using tiling framework
     funcOp->walk([&](IREE::LinalgExt::GatherOp gatherOp) {
-      // Get thread tile sizes
+      // Get thread tile sizes from subgroup size in translation info
       SmallVector<OpFoldResult> threadTileSizes =
-          getThreadTileSizes(rewriter, gatherOp);
+          getThreadTileSizes(rewriter, gatherOp, funcOp);
       if (threadTileSizes.empty()) {
         return WalkResult::advance();
       }
 
-      auto initType = cast<RankedTensorType>(gatherOp.getOutput().getType());
-      int64_t rank = initType.getRank();
-
-      // Create thread-level tiling options
+      // Create thread-level tiling options with 1D thread mapping
       scf::SCFTilingOptions threadOptions;
       threadOptions.setTileSizeComputationFunction(
           [threadTileSizes](OpBuilder &b, Operation *op) {
             return threadTileSizes;
           });
       threadOptions.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
-      threadOptions.setMapping(getThreadMapping(context, rank));
+      threadOptions.setMapping(getThreadMapping(context));
 
       rewriter.setInsertionPoint(gatherOp);
       FailureOr<scf::SCFTilingResult> threadTilingResult = scf::tileUsingSCF(
@@ -185,8 +218,9 @@ struct GPUConvertToCoalescedDMAPass final
 
       if (innerGather) {
         // Get the shared_outs block argument
+        // With 1D tiling, there's 1 induction variable + 1 shared_outs arg
         Block *forallBody = forallOp.getBody();
-        Value sharedOut = forallBody->getArguments()[rank];
+        Value sharedOut = forallBody->getArguments()[1];
 
         // Find and remove any existing parallel_insert_slice in the in_parallel
         // region
