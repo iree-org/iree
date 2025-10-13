@@ -136,13 +136,13 @@ func.func @coalesced_gather_dma_f16(%idx0: vector<128xindex>, %source: tensor<81
 
 func.func @coalesced_gather_dma_1d(%indices: vector<1024xindex>, %source: tensor<2048xf32>, %dest: tensor<1024xf32>, %lane: index) -> tensor<1024xf32> {
   %c32 = arith.constant 32 : index
-  %result = scf.forall (%i) in (%c32) shared_outs(%out = %dest) -> (tensor<1024xf32>) {
+  %result = scf.forall (%i) in (%c32) shared_outs(%out = %dest) -> (tensor<128xf32>) {
     scf.forall.in_parallel {
       iree_gpu.coalesced_gather_dma %source[%indices] into %out lane(%lane)
         : tensor<2048xf32>, vector<1024xindex>, tensor<1024xf32>, index -> tensor<1024xf32>
     }
   }
-  return %result : tensor<1024xf32>
+  return %result : tensor<128xf32>
 }
 
 // CHECK-LABEL: func @coalesced_gather_dma_1d
