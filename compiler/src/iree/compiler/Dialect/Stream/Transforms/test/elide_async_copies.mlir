@@ -352,3 +352,191 @@ util.func public @cloneSameLifetimePreserved() -> !stream.resource<*> {
 
   util.return %fill : !stream.resource<*>
 }
+
+// -----
+
+// Tests aliasing pattern where user provides output storage.
+// The dispatch reuses the input buffer as output (tied operand) - clone should be elided.
+
+stream.executable private @ex0 {
+  stream.executable.export public @dispatch workgroups(%arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+}
+
+// CHECK-LABEL: @aliasing_user_provided_output_callee
+// CHECK-SAME: (%[[RESOURCE:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index)
+util.func private @aliasing_user_provided_output_callee(%resource: !stream.resource<*>, %size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  // Defensive clone as inserted by MaterializeCopyOnWritePass.
+  // CHECK-NOT: stream.async.clone
+  %clone = stream.async.clone %resource : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  // Dispatch reuses input as output (tied operand pattern).
+  // CHECK: %[[RESULT:.+]] = stream.async.dispatch @ex0::@dispatch[%c1, %c1, %c1](%[[RESOURCE]][%c0 to %[[SIZE]] for %[[SIZE]]], %[[RESOURCE]][%c0 to %[[SIZE]] for %[[SIZE]]]) : (!stream.resource<*>{%[[SIZE]]}, !stream.resource<*>{%[[SIZE]]}) -> %[[RESOURCE]]{%[[SIZE]]}
+  %result = stream.async.dispatch @ex0::@dispatch[%c1, %c1, %c1](%clone[%c0 to %size for %size], %clone[%c0 to %size for %size]) : (!stream.resource<*>{%size}, !stream.resource<*>{%size}) -> %clone{%size}
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : !stream.resource<*>
+}
+
+// CHECK-LABEL: @aliasing_user_provided_output_caller
+util.func public @aliasing_user_provided_output_caller(%size: index) -> !stream.resource<*> {
+  %c123_i32 = arith.constant 123 : i32
+  %initial = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  %result = util.call @aliasing_user_provided_output_callee(%initial, %size) : (!stream.resource<*>, index) -> !stream.resource<*>
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
+// Tests dispatch taking same SSA value multiple times (aliasing inputs).
+// Clone should be elided since all uses are read-only.
+
+stream.executable private @ex1 {
+  stream.executable.export public @dispatch_same_input_twice workgroups(%arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+}
+
+// CHECK-LABEL: @dispatch_same_value_twice_callee
+// CHECK-SAME: (%[[RESOURCE:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index)
+util.func private @dispatch_same_value_twice_callee(%resource: !stream.resource<*>, %size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  // Defensive clone as inserted by MaterializeCopyOnWritePass.
+  // CHECK-NOT: stream.async.clone
+  %clone = stream.async.clone %resource : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  // Dispatch reads the same value twice - both are read-only.
+  // CHECK: %[[RESULT:.+]] = stream.async.dispatch @ex1::@dispatch_same_input_twice[%c1, %c1, %c1](%[[RESOURCE]][%c0 to %[[SIZE]] for %[[SIZE]]], %[[RESOURCE]][%c0 to %[[SIZE]] for %[[SIZE]]]) : (!stream.resource<*>{%[[SIZE]]}, !stream.resource<*>{%[[SIZE]]}) -> !stream.resource<*>{%[[SIZE]]}
+  %result = stream.async.dispatch @ex1::@dispatch_same_input_twice[%c1, %c1, %c1](%clone[%c0 to %size for %size], %clone[%c0 to %size for %size]) : (!stream.resource<*>{%size}, !stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : !stream.resource<*>
+}
+
+// CHECK-LABEL: @dispatch_same_value_twice_caller
+util.func public @dispatch_same_value_twice_caller(%size: index) -> !stream.resource<*> {
+  %c123_i32 = arith.constant 123 : i32
+  %initial = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  %result = util.call @dispatch_same_value_twice_callee(%initial, %size) : (!stream.resource<*>, index) -> !stream.resource<*>
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
+// Tests splat followed by in-place dispatch (common zero-copy pattern).
+// Splat creates buffer, dispatch mutates it in-place without clone.
+
+stream.executable private @ex2 {
+  stream.executable.export public @dispatch_inplace workgroups(%arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+}
+
+// CHECK-LABEL: @splat_then_inplace_dispatch_callee
+util.func private @splat_then_inplace_dispatch_callee(%size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: %[[SPLAT:.+]] = stream.async.splat %c123_i32
+  %splat = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // Defensive clone as inserted by MaterializeCopyOnWritePass.
+  // CHECK-NOT: stream.async.clone
+  %clone = stream.async.clone %splat : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  // Dispatch mutates splat buffer in-place (tied operand).
+  // CHECK: %[[RESULT:.+]] = stream.async.dispatch @ex2::@dispatch_inplace[%c1, %c1, %c1](%[[SPLAT]][%c0 to %[[SIZE:.+]] for %[[SIZE]]]) : (!stream.resource<*>{%[[SIZE]]}) -> %[[SPLAT]]{%[[SIZE]]}
+  %result = stream.async.dispatch @ex2::@dispatch_inplace[%c1, %c1, %c1](%clone[%c0 to %size for %size]) : (!stream.resource<*>{%size}) -> %clone{%size}
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : !stream.resource<*>
+}
+
+// CHECK-LABEL: @splat_then_inplace_dispatch_caller
+util.func public @splat_then_inplace_dispatch_caller(%size: index) -> !stream.resource<*> {
+  %result = util.call @splat_then_inplace_dispatch_callee(%size) : (index) -> !stream.resource<*>
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
+// Tests splat followed by non-in-place dispatch (creates new output).
+// Clone should be elided since splat is last use before dispatch.
+
+stream.executable private @ex3 {
+  stream.executable.export public @dispatch_new_output workgroups(%arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+}
+
+// CHECK-LABEL: @splat_then_new_output_dispatch_callee
+util.func private @splat_then_new_output_dispatch_callee(%size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: %[[SPLAT:.+]] = stream.async.splat %c123_i32
+  %splat = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // Defensive clone as inserted by MaterializeCopyOnWritePass.
+  // CHECK-NOT: stream.async.clone
+  %clone = stream.async.clone %splat : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  // Dispatch reads splat and produces new output (not tied).
+  // CHECK: %[[RESULT:.+]] = stream.async.dispatch @ex3::@dispatch_new_output[%c1, %c1, %c1](%[[SPLAT]][%c0 to %[[SIZE:.+]] for %[[SIZE]]]) : (!stream.resource<*>{%[[SIZE]]}) -> !stream.resource<*>{%[[SIZE]]}
+  %result = stream.async.dispatch @ex3::@dispatch_new_output[%c1, %c1, %c1](%clone[%c0 to %size for %size]) : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : !stream.resource<*>
+}
+
+// CHECK-LABEL: @splat_then_new_output_dispatch_caller
+util.func public @splat_then_new_output_dispatch_caller(%size: index) -> !stream.resource<*> {
+  %result = util.call @splat_then_new_output_dispatch_callee(%size) : (index) -> !stream.resource<*>
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
+// Tests chained dispatches with user-provided storage (common pattern).
+// First dispatch in-place, second dispatch reuses same buffer.
+
+stream.executable private @ex4 {
+  stream.executable.export public @dispatch_first workgroups(%arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+}
+
+stream.executable private @ex5 {
+  stream.executable.export public @dispatch_second workgroups(%arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+}
+
+// CHECK-LABEL: @chained_inplace_dispatches_callee
+// CHECK-SAME: (%[[RESOURCE:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index)
+util.func private @chained_inplace_dispatches_callee(%resource: !stream.resource<*>, %size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  // First defensive clone.
+  // CHECK-NOT: stream.async.clone
+  %clone1 = stream.async.clone %resource : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  // First dispatch mutates in-place.
+  // CHECK: %[[DISPATCH1:.+]] = stream.async.dispatch @ex4::@dispatch_first[%c1, %c1, %c1](%[[RESOURCE]][%c0 to %[[SIZE]] for %[[SIZE]]]) : (!stream.resource<*>{%[[SIZE]]}) -> %[[RESOURCE]]{%[[SIZE]]}
+  %dispatch1 = stream.async.dispatch @ex4::@dispatch_first[%c1, %c1, %c1](%clone1[%c0 to %size for %size]) : (!stream.resource<*>{%size}) -> %clone1{%size}
+  // Second defensive clone.
+  // CHECK-NOT: stream.async.clone
+  %clone2 = stream.async.clone %dispatch1 : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
+  // Second dispatch also mutates in-place.
+  // CHECK: %[[DISPATCH2:.+]] = stream.async.dispatch @ex5::@dispatch_second[%c1, %c1, %c1](%[[DISPATCH1]][%c0 to %[[SIZE]] for %[[SIZE]]]) : (!stream.resource<*>{%[[SIZE]]}) -> %[[DISPATCH1]]{%[[SIZE]]}
+  %dispatch2 = stream.async.dispatch @ex5::@dispatch_second[%c1, %c1, %c1](%clone2[%c0 to %size for %size]) : (!stream.resource<*>{%size}) -> %clone2{%size}
+  // CHECK: util.return %[[DISPATCH2]]
+  util.return %dispatch2 : !stream.resource<*>
+}
+
+// CHECK-LABEL: @chained_inplace_dispatches_caller
+util.func public @chained_inplace_dispatches_caller(%size: index) -> !stream.resource<*> {
+  %c123_i32 = arith.constant 123 : i32
+  %initial = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  %result = util.call @chained_inplace_dispatches_callee(%initial, %size) : (!stream.resource<*>, index) -> !stream.resource<*>
+  util.return %result : !stream.resource<*>
+}
