@@ -40,38 +40,57 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
 // Verifies that the mapping attributes match the expected pattern:
-// [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>].
+// Either [#gpu.thread<linear_dim_0>] for 1D mapping
+// or [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>] for 2D mapping.
 static LogicalResult verifyThreadMapping(scf::ForallOp forallOp) {
   std::optional<ArrayAttr> mappingAttr = forallOp.getMapping();
   if (!mappingAttr) {
     LDBG() << "No mapping attribute found";
     return failure();
   }
-  if (mappingAttr->size() != 2) {
-    LDBG() << "Mapping attribute size is " << mappingAttr->size()
-           << ", expected 2";
+
+  size_t mappingSize = mappingAttr->size();
+
+  // Support both 1D and 2D thread mapping
+  if (mappingSize == 1) {
+    // 1D mapping: [#gpu.thread<linear_dim_0>]
+    LDBG() << "  - Mapping[0]: " << (*mappingAttr)[0];
+    auto thread0 = dyn_cast<gpu::GPUThreadMappingAttr>((*mappingAttr)[0]);
+    if (!thread0) {
+      LDBG() << "  - Mapping attribute is not GPUThreadMappingAttr";
+      return failure();
+    }
+    if (thread0.getThread() != gpu::MappingId::LinearDim0) {
+      LDBG() << "  - Mapping mismatch (expected linear_dim_0)";
+      LDBG() << "    thread0: " << thread0.getThread();
+      return failure();
+    }
+    LDBG() << "  - 1D thread mapping verified successfully";
+    return success();
+  } else if (mappingSize == 2) {
+    // 2D mapping: [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
+    LDBG() << "  - Mapping[0]: " << (*mappingAttr)[0];
+    LDBG() << "  - Mapping[1]: " << (*mappingAttr)[1];
+    auto thread0 = dyn_cast<gpu::GPUThreadMappingAttr>((*mappingAttr)[0]);
+    auto thread1 = dyn_cast<gpu::GPUThreadMappingAttr>((*mappingAttr)[1]);
+    if (!thread0 || !thread1) {
+      LDBG() << "  - Mapping attributes are not GPUThreadMappingAttr";
+      return failure();
+    }
+    if (thread0.getThread() != gpu::MappingId::LinearDim1 ||
+        thread1.getThread() != gpu::MappingId::LinearDim0) {
+      LDBG() << "  - Mapping mismatch (expected linear_dim_1, linear_dim_0)";
+      LDBG() << "    thread0: " << thread0.getThread()
+             << " thread1: " << thread1.getThread();
+      return failure();
+    }
+    LDBG() << "  - 2D thread mapping verified successfully";
+    return success();
+  } else {
+    LDBG() << "Mapping attribute size is " << mappingSize
+           << ", expected 1 or 2";
     return failure();
   }
-
-  LDBG() << "  - Mapping[0]: " << (*mappingAttr)[0];
-  LDBG() << "  - Mapping[1]: " << (*mappingAttr)[1];
-  auto thread0 = dyn_cast<gpu::GPUThreadMappingAttr>((*mappingAttr)[0]);
-  auto thread1 = dyn_cast<gpu::GPUThreadMappingAttr>((*mappingAttr)[1]);
-  if (!thread0 || !thread1) {
-    LDBG() << "  - Mapping attributes are not GPUThreadMappingAttr";
-    return failure();
-  }
-
-  if (thread0.getThread() != gpu::MappingId::LinearDim1 ||
-      thread1.getThread() != gpu::MappingId::LinearDim0) {
-    LDBG() << "  - Mapping mismatch (expected linear_dim_1, linear_dim_0)";
-    LDBG() << "    thread0: " << thread0.getThread()
-           << " thread1: " << thread1.getThread();
-    return failure();
-  }
-
-  LDBG() << "  - Thread mapping verified successfully";
-  return success();
 }
 
 // Verifies that destination memref is contiguous and source/target memory
@@ -104,7 +123,7 @@ static LogicalResult verifyMemoryLayout(IREE::GPU::CoalescedGatherDMAOp dmaOp,
 }
 
 // Checks if a CoalescedGatherDMAOp is eligible for lowering to global loads:
-// * the surrounding scf.forall must with 2D GPU thread mapping
+// * the surrounding scf.forall must have 1D or 2D GPU thread mapping
 // * The DMA op must be the only operation in the forall body
 // * Destination memref must be contiguous
 // * Source must be in global memory and destination in shared memory
@@ -231,6 +250,12 @@ struct LowerCoalescedGatherDMAPattern
     Value indices = dmaOp.getIndices();
     Value dest = dmaOp.getInit();
     Value source = dmaOp.getSource();
+
+    if (!indices) {
+      // we are in copying mode, so assert here.
+      assert(false && "copying mode not supported");
+    }
+
     auto indicesType = cast<MemRefType>(indices.getType());
     auto destType = cast<MemRefType>(dest.getType());
 

@@ -21,7 +21,8 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
 struct LowerCopyToGatherPattern : public OpRewritePattern<linalg::CopyOp> {
-  using OpRewritePattern<linalg::CopyOp>::OpRewritePattern;
+  LowerCopyToGatherPattern(MLIRContext *context, FunctionOpInterface funcOp)
+      : OpRewritePattern<linalg::CopyOp>(context), funcOp(funcOp) {}
 
   LogicalResult matchAndRewrite(linalg::CopyOp copy,
                                 PatternRewriter &rewriter) const override {
@@ -56,12 +57,43 @@ struct LowerCopyToGatherPattern : public OpRewritePattern<linalg::CopyOp> {
         copy.getLoc(), dest.getType(), /*inputs=*/ValueRange{source},
         /*outputs=*/ValueRange{dest}, dimensionMapAttr);
 
-    // Transfer the lowering_config from copy to gather
-    setLoweringConfig(gatherOp, loweringConfig);
+    // Create a proper lowering config with tile sizes from translation info
+    // Get subgroup size from translation info
+    std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
+    if (!subgroupSize) {
+      // Fall back to just transferring the existing config
+      setLoweringConfig(gatherOp, loweringConfig);
+    } else {
+      // Build tile sizes based on the tensor rank and subgroup size
+      int64_t rank = sourceType.getRank();
+
+      // Subgroup level: tile innermost dimension with subgroup size
+      SmallVector<int64_t> subgroupTiles(rank, 1);
+      subgroupTiles[rank - 1] = *subgroupSize;
+
+      // Thread level: tile innermost dimension with 1 (each thread handles 1
+      // element)
+      SmallVector<int64_t> threadTiles(rank, 1);
+
+      // Create the lowering config with subgroup and thread tile sizes
+      SmallVector<NamedAttribute> fields;
+      fields.push_back(rewriter.getNamedAttr(
+          "subgroup", rewriter.getI64ArrayAttr(subgroupTiles)));
+      fields.push_back(rewriter.getNamedAttr(
+          "thread", rewriter.getI64ArrayAttr(threadTiles)));
+
+      auto dictAttr = rewriter.getDictionaryAttr(fields);
+      auto newConfig =
+          IREE::GPU::LoweringConfigAttr::get(rewriter.getContext(), dictAttr);
+      setLoweringConfig(gatherOp, newConfig);
+    }
 
     rewriter.replaceOp(copy, gatherOp.getResults());
     return success();
   }
+
+private:
+  FunctionOpInterface funcOp;
 };
 
 namespace {
@@ -74,7 +106,7 @@ struct GPULowerCopyToCoalescedGatherPass final
     mlir::FunctionOpInterface funcOp = getOperation();
 
     RewritePatternSet patterns(context);
-    patterns.add<LowerCopyToGatherPattern>(context);
+    patterns.add<LowerCopyToGatherPattern>(context, funcOp);
     (void)applyPatternsGreedily(funcOp, std::move(patterns));
   }
 };
