@@ -670,13 +670,8 @@ const char TimepointCoverage::ID = 0;
 class TimepointCoverageAnalysis {
 public:
   explicit TimepointCoverageAnalysis(Operation *rootOp)
-      : explorer(rootOp, TraversalAction::SHALLOW),
+      : explorer(rootOp, TraversalAction::RECURSE),
         solver(explorer, allocator) {
-    explorer.setOpInterfaceAction<mlir::FunctionOpInterface>(
-        TraversalAction::RECURSE);
-    explorer.setOpAction<mlir::scf::IfOp>(TraversalAction::RECURSE);
-    explorer.setDialectAction<IREE::Stream::StreamDialect>(
-        TraversalAction::RECURSE);
     // Ignore the contents of executables (linalg goo, etc) and execution
     // regions (they don't impact timepoints).
     explorer.setOpAction<IREE::Stream::ExecutableOp>(TraversalAction::IGNORE);
