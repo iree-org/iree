@@ -49,10 +49,7 @@ struct GPUExpandDimensionsPass final
 };
 } // namespace
 
-/// Structure to hold expansion information for a dimension.
-/// For a dimension that should be expanded by factor N:
-/// - The original dimension of size D becomes two dimensions: D/N (dynamic) and
-/// N (static)
+// dim -> expand factor
 using DimensionExpansionInfo = llvm::SmallDenseMap<unsigned, int64_t>;
 
 /// Parse the expand_dims and thread tiling level to compute expansion
@@ -279,21 +276,21 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
 
 static LogicalResult expandIterationSpace(RewriterBase &rewriter,
                                           Operation *operation) {
-  return TypeSwitch<Operation *, LogicalResult>(operation)
-      .Case<linalg::GenericOp>([&](auto genericOp) {
-        return expandIterationSpace(rewriter, genericOp);
-      })
-      .Default([&](Operation *op) { return success(); });
+  if (auto genericOp = dyn_cast<linalg::GenericOp>(operation))
+    return expandIterationSpace(rewriter, genericOp);
+  return success();
 }
 
 void GPUExpandDimensionsPass::runOnOperation() {
   Operation *operation = getOperation();
   MLIRContext *context = &getContext();
   IRRewriter rewriter(context);
+
   auto walkResult = operation->walk([&](Operation *op) -> WalkResult {
     rewriter.setInsertionPoint(op);
     return expandIterationSpace(rewriter, op);
   });
+
   if (walkResult.wasInterrupted()) {
     return signalPassFailure();
   }
@@ -304,13 +301,9 @@ void GPUExpandDimensionsPass::runOnOperation() {
     llvm::dbgs() << "\n";
   });
 
-  llvm::DenseMap<mlir::Location, IREE::Codegen::LoweringConfigAttrInterface>
-      savedConfigsByLoc;
-  operation->walk([&](linalg::GenericOp op) {
-    if (auto config = getLoweringConfig(op)) {
-      savedConfigsByLoc[op->getLoc()] = config;
-    }
-  });
+  ConfigTrackingListener listener;
+  GreedyRewriteConfig config;
+  config.setListener(&listener);
 
   // Apply reshape propagation patterns (same as BlockDimensions)
   {
@@ -332,28 +325,13 @@ void GPUExpandDimensionsPass::runOnOperation() {
                                                 context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(
         bubbleExpandShapePatterns);
-    if (failed(applyPatternsGreedily(operation,
-                                     std::move(bubbleExpandShapePatterns)))) {
+    if (failed(applyPatternsGreedily(
+            operation, std::move(bubbleExpandShapePatterns), config))) {
       operation->emitOpError(
           "failed in application of bubble up expand shape patterns");
       return signalPassFailure();
     }
   }
-
-  operation->walk([&](linalg::GenericOp op) {
-    // If this op has no config, check if we have one saved for its location.
-    if (!getLoweringConfig(op)) {
-      auto it = savedConfigsByLoc.find(op->getLoc());
-      if (it != savedConfigsByLoc.end()) {
-        setLoweringConfig(op, it->second);
-        LLVM_DEBUG({
-          llvm::dbgs() << "Restored lowering config via location to:\n";
-          op->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-          llvm::dbgs() << "\n";
-        });
-      }
-    }
-  });
 
   LLVM_DEBUG({
     llvm::dbgs() << "After reshape propagation:\n";
