@@ -220,18 +220,6 @@ def ElideAsyncCopiesPass :
   }];
 }
 
-def ElideAsyncTransfersPass :
-    Pass<"iree-stream-elide-async-transfers", "mlir::ModuleOp"> {
-  let summary = "Elides transfer ops when they the topology allows";
-  let description = [{
-    Elides all transfer ops that are between device links that do not
-    require tansfers and do not change the lifetime of the resource.
-  }];
-  let dependentDialects = [
-    "IREE::Stream::StreamDialect",
-  ];
-}
-
 def EmplaceAllocationsPass :
     Pass<"iree-stream-emplace-allocations", ""> {
   let summary = "Emplaces transient tensor allocations to remove copies.";
