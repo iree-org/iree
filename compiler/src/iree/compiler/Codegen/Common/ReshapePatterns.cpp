@@ -30,10 +30,9 @@ namespace {
 //===---------------------------------------------------------------------===//
 
 static int64_t getProductExcludingDynamic(ArrayRef<int64_t> sizes) {
-  return std::accumulate(
-      sizes.begin(), sizes.end(), 1, [](int64_t res, int64_t size) {
-        return ShapedType::isDynamic(size) ? res : res * size;
-      });
+  return llvm::accumulate(sizes, int64_t(1), [](int64_t res, int64_t size) {
+    return ShapedType::isDynamic(size) ? res : res * size;
+  });
 }
 
 //===---------------------------------------------------------------------===//

@@ -41,8 +41,7 @@ static int64_t getTotalSizeInBytes(Type elemType, ArrayRef<int64_t> shape) {
   if (elemType.isIntOrFloat()) {
     elemBitWidth = elemType.getIntOrFloatBitWidth();
   }
-  int64_t size = std::accumulate(shape.begin(), shape.end(), elemBitWidth,
-                                 std::multiplies<int64_t>{});
+  int64_t size = llvm::product_of(shape, elemBitWidth);
   constexpr int64_t kBitsInByte = 8;
   size = llvm::divideCeil(size, kBitsInByte);
   return size;
