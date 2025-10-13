@@ -138,16 +138,18 @@ builtin.module attributes { transform.with_named_sequence } {
   thread_strides = [1]
 >
 
+// The lowered reduction works as follows:
 // Step 1: each thread reduces 4 elements to 1 element, then there's a subgroup reduce.
-// Step 2: threads write to their subgroup specific locations in LDS.
+// Step 2: threads write to their **subgroup** specific locations in LDS.
 // Step 3: each subgroup loads the 8 values from LDS, reduces and writes the final result.
 
-// There are 2 places threads write the same values to memory:
+// There are 2 places threads write the same values to memory,
 // - at step 2, there are duplicated writes to LDS.
 // - at step 3, there are duplicated writes to global memory.
 
 // CHECK-LABEL: @reduction
 func.func @reduction(%in: memref<2048xf32>, %out: memref<f32>) {
+
   // CHECK-DAG: %[[ZERO:.*]] = arith.constant 0 : index
   // CHECK-DAG: %[[THREADIDX:.*]] = gpu.thread_id x
   %cst = arith.constant dense<0.000000e+00> : vector<2048xf32>
@@ -164,23 +166,23 @@ func.func @reduction(%in: memref<2048xf32>, %out: memref<f32>) {
   %8 = arith.addf %6, %7 : vector<2048xf32>
   %9 = iree_vector_ext.to_layout %8 to layout(#layout) : vector<2048xf32>
 
-  // Guards on duplicated writes to LDS
-  // CHECK: %[[DELIN:.*]]:4 = affine.delinearize_index %[[THREADIDX]] into (8, 64, 1)
-  // CHECK: %[[WGCOND:.*]] = arith.cmpi eq, %[[DELIN]]#0, %[[ZERO]] : index
-  // CHECK: %[[LANECOND:.*]] = arith.cmpi eq, %[[DELIN]]#2, %[[ZERO]] : index
-  // CHECK: %[[COND:.*]] = arith.andi %[[LANECOND]], %[[WGCOND]] : i1
-  // CHECK-NEXT: scf.if %[[COND]] {
+  // Guards on duplicated writes to LDS.
+  // Only lane 0 within each subgroup writes.
+  //      CHECK: %[[DELIN:.*]]:4 = affine.delinearize_index %[[THREADIDX]] into (8, 64, 1)
+  //  CHECK-DAG: %[[LANECOND:.*]] = arith.cmpi eq, %[[DELIN]]#2, %[[ZERO]] : index
+  // CHECK-NEXT: scf.if %[[LANECOND]] {
   // CHECK-NEXT: linearize_index
   // CHECK-NEXT: vector.transfer_write {{.*}} #gpu.address_space<workgroup>>
   // CHECK-NEXT: }
   %10 = vector.multi_reduction <add>, %9, %cst_0 [0] : vector<2048xf32> to f32
   %11 = vector.broadcast %10 : f32 to vector<f32>
 
-  // Guards on duplicated writes to global memory
-  // CHECK: %[[DELIN2:.*]]:2 = affine.delinearize_index %[[THREADIDX]] into (64)
-  // CHECK: %[[WGCOND2:.*]] = arith.cmpi eq, %[[DELIN2]]#0, %[[ZERO]] : index
-  // CHECK: %[[LANECOND2:.*]] = arith.cmpi eq, %[[DELIN2]]#1, %[[ZERO]] : index
-  // CHECK: %[[COND2:.*]] = arith.andi %[[LANECOND2]], %[[WGCOND2]] : i1
+  // Guards on duplicated writes to global memory.
+  // Only thread 0 (lane 0 of subgroup 0) writes.
+  //      CHECK: %[[DELIN2:.*]]:2 = affine.delinearize_index %[[THREADIDX]] into (64)
+  //  CHECK-DAG: %[[WGCOND2:.*]] = arith.cmpi eq, %[[DELIN2]]#0, %[[ZERO]] : index
+  //  CHECK-DAG: %[[LANECOND2:.*]] = arith.cmpi eq, %[[DELIN2]]#1, %[[ZERO]] : index
+  //      CHECK: %[[COND2:.*]] = arith.andi %[[WGCOND2]], %[[LANECOND2]] : i1
   // CHECK-NEXT: scf.if %[[COND2]] {
   // CHECK-NEXT: vector.broadcast
   // CHECK-NEXT: vector.transfer_write {{.*}} #amdgpu.address_space<fat_raw_buffer>>
@@ -192,7 +194,8 @@ func.func @reduction(%in: memref<2048xf32>, %out: memref<f32>) {
 builtin.module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func  {workgroup_size = array<i64: 512, 1, 1>}
+    : !transform.any_op
     transform.yield
   }
 }
