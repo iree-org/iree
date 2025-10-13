@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
@@ -49,13 +48,12 @@ struct GPUExpandDimensionsPass final
 };
 } // namespace
 
-// dim -> expand factor
+// Map from tensor dimension index to thread level tile size.
 using DimensionExpansionInfo = llvm::SmallDenseMap<unsigned, int64_t>;
 
 /// Parse the expand_dims and thread tiling level to compute expansion
 /// information. expand_dims format: [[0], [1], [2,3]] means dim 0→0, dim 1→1,
-/// dim 2→[2,3] thread format: [0, 0, 0, 8] where positive values indicate
-/// expansion factor
+/// dim 2→[2,3].
 static DimensionExpansionInfo
 getExpansionInfo(IREE::GPU::LoweringConfigAttr config) {
   // Get expand_dims structure
@@ -117,7 +115,6 @@ expandIterationSpaceOfValue(RewriterBase &rewriter,
     return std::nullopt;
   }
 
-  // Build the new shape and reassociation
   SmallVector<OpFoldResult> outputShape;
   SmallVector<ReassociationIndices> reassociation;
   Location loc = v.getLoc();
@@ -126,7 +123,6 @@ expandIterationSpaceOfValue(RewriterBase &rewriter,
   for (auto [index, dim] : llvm::enumerate(origShape)) {
     reassociation.emplace_back(ReassociationIndices{});
 
-    // Check if this dimension needs expansion
     if (!expansionInfo.contains(index)) {
       reassociation.back().push_back(outputShape.size());
       outputShape.push_back(dim);
@@ -136,18 +132,17 @@ expandIterationSpaceOfValue(RewriterBase &rewriter,
     int64_t factor = expansionInfo.lookup(index);
     AffineExpr s0 = rewriter.getAffineSymbolExpr(0);
     AffineExpr divExpr = s0.floorDiv(factor);
-    OpFoldResult newDynamicDim = affine::makeComposedFoldedAffineApply(
+    OpFoldResult newOuterDim = affine::makeComposedFoldedAffineApply(
         rewriter, loc, divExpr, ArrayRef<OpFoldResult>{dim});
-    OpFoldResult newStaticDim = rewriter.getIndexAttr(factor);
+    OpFoldResult newInnerDim = rewriter.getIndexAttr(factor);
 
     reassociation.back().push_back(outputShape.size());
     reassociation.back().push_back(outputShape.size() + 1);
 
-    outputShape.push_back(newDynamicDim);
-    outputShape.push_back(newStaticDim);
+    outputShape.push_back(newOuterDim);
+    outputShape.push_back(newInnerDim);
   }
 
-  // Create output type
   auto staticOutputShape =
       llvm::map_to_vector(outputShape, [](OpFoldResult ofr) {
         if (auto staticShapeAttr = dyn_cast<Attribute>(ofr)) {
@@ -158,7 +153,6 @@ expandIterationSpaceOfValue(RewriterBase &rewriter,
   auto outputType = RankedTensorType::get(
       staticOutputShape, tensorType.getElementType(), tensorType.getEncoding());
 
-  // Create expand_shape, barrier, collapse_shape
   auto expandShapeOp = tensor::ExpandShapeOp::create(
       rewriter, loc, outputType, v, reassociation, outputShape);
   Value barrier = IREE::Util::OptimizationBarrierOp::create(
@@ -226,7 +220,7 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
     }
   }
 
-  // Expand results
+  // Expand results.
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointAfter(genericOp);
 
@@ -254,8 +248,8 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
         expandIterationSpaceOfValue(rewriter, tensorExpansionInfo, result);
     if (reshapes) {
       // Replace uses of the result with the collapse_shape, but exclude:
-      // - The expand_shape operation itself (it uses the result as input)
-      // - tensor.dim operations (they query the original dimensions)
+      // - The expand_shape operation itself (it uses the result as input).
+      // - tensor.dim operations (they query the original dimensions).
       auto replaceIf = [&](OpOperand &use) {
         Operation *user = use.getOwner();
         if (user == reshapes->expandShapeOp) {
@@ -305,7 +299,6 @@ void GPUExpandDimensionsPass::runOnOperation() {
   GreedyRewriteConfig config;
   config.setListener(&listener);
 
-  // Apply reshape propagation patterns (same as BlockDimensions)
   {
     RewritePatternSet bubbleExpandShapePatterns(context);
     linalg::ControlFusionFn controlFn = [](OpOperand *opOperand) {
@@ -339,7 +332,6 @@ void GPUExpandDimensionsPass::runOnOperation() {
     llvm::dbgs() << "\n";
   });
 
-  // Delete the optimization barrier and run some further cleanup.
   {
     RewritePatternSet removeBarrierOpsPatterns(context);
     removeBarrierOpsPatterns.insert<RemoveOptimizationBarrier>(context);
