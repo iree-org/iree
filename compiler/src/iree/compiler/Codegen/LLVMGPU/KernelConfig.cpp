@@ -1408,14 +1408,13 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   };
 
   SmallVector<int64_t> mBounds = getDimBounds(opInfo.getMDims());
-  int64_t mSize = std::accumulate(mBounds.begin(), mBounds.end(), (int64_t)1,
-                                  [](int64_t a, int64_t b) -> int64_t {
-                                    if (ShapedType::isDynamic(a) ||
-                                        ShapedType::isDynamic(b)) {
-                                      return ShapedType::kDynamic;
-                                    }
-                                    return a * b;
-                                  });
+  int64_t mSize = llvm::accumulate(
+      mBounds, int64_t(1), [](int64_t a, int64_t b) -> int64_t {
+        if (ShapedType::isDynamic(a) || ShapedType::isDynamic(b)) {
+          return ShapedType::kDynamic;
+        }
+        return a * b;
+      });
   // Bail out on skinny M dimension. This will be handled by the warp reduction
   // pipeline.
   if (!ShapedType::isDynamic(mSize) && mSize <= kVerySkinnyDimThreshold) {

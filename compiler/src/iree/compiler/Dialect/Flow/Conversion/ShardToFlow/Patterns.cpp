@@ -7,11 +7,14 @@
 #include "iree/compiler/Dialect/Flow/Conversion/ShardToFlow/Patterns.h"
 
 #include <algorithm>
+#include <cstdint>
+#include <functional>
 #include <numeric>
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Utils/Permutation.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Shard/IR/ShardOps.h"
@@ -132,14 +135,10 @@ static SmallVector<int64_t> collapseAxesN(ArrayRef<int64_t> shape,
                                           size_t firstAxis, size_t n) {
   assert(firstAxis + n <= shape.size());
   assert(n > 1);
-  SmallVector<int64_t> res;
-  std::copy(shape.begin(), shape.begin() + firstAxis, std::back_inserter(res));
-  size_t collapsedAxisSize = std::accumulate(
-      shape.begin() + firstAxis + 1, shape.begin() + firstAxis + n,
-      shape[firstAxis], [](size_t a, size_t b) { return a * b; });
+  auto res = llvm::to_vector_of<int64_t>(shape.take_front(firstAxis));
+  int64_t collapsedAxisSize = llvm::product_of(shape.slice(firstAxis, n));
   res.push_back(collapsedAxisSize);
-  std::copy(shape.begin() + firstAxis + n, shape.end(),
-            std::back_inserter(res));
+  llvm::append_range(res, shape.drop_front(firstAxis + n));
   return res;
 }
 
