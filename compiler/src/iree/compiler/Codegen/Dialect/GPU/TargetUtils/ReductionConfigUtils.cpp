@@ -293,11 +293,41 @@ getVectorDistributeReductionConfig(
   }
   int subgroup = partialReductionSize / subgroupStride;
   int64_t subgroupBasis = (subgroup == 0) ? 1 : subgroup;
+  SmallVector<Attribute> expandDimFactors = llvm::to_vector(llvm::map_range(
+      llvm::seq<int64_t>(0, op.getNumLoops()), [&](int64_t i) -> Attribute {
+        return b.getI64ArrayAttr({i + (i > lastReductionDim)});
+      }));
 
-  partialReductionTileSizes[lastReductionDim] = partialReductionSize;
-  threadTileSizes[lastReductionDim] = threadLoads;
-  threadCounts[lastReductionDim] = threadBasis;
-  subGroupCounts[lastReductionDim] = subgroupBasis;
+  if (threadLoads > 1) {
+    auto insAt = [&](auto &v, auto val) {
+      v.insert(v.begin() + lastReductionDim + 1, val);
+    };
+
+    insAt(workgroupTileSizes, int64_t{0});
+    insAt(partialReductionTileSizes, int64_t{0});
+    insAt(threadTileSizes, int64_t{0});
+    insAt(threadCounts, int64_t{1});
+    insAt(subGroupCounts, int64_t{1});
+    mapping.resize(mapping.size() + 1);
+    std::iota(mapping.begin(), mapping.end(), 0);
+
+    expandDimFactors[lastReductionDim] =
+        b.getI64ArrayAttr({lastReductionDim, lastReductionDim + 1});
+
+    int64_t outer = lastReductionDim;
+    int64_t inner = lastReductionDim + 1;
+
+    partialReductionTileSizes[outer] = partialReductionSize / threadLoads;
+    threadTileSizes[inner] = threadLoads;
+    threadCounts[outer] = threadBasis;
+    subGroupCounts[outer] = subgroupBasis;
+
+  } else {
+    partialReductionTileSizes[lastReductionDim] = partialReductionSize;
+    threadTileSizes[lastReductionDim] = threadLoads;
+    threadCounts[lastReductionDim] = threadBasis;
+    subGroupCounts[lastReductionDim] = subgroupBasis;
+  }
 
   ArrayAttr subgroupBasisAttr = b.getArrayAttr(
       {b.getI64ArrayAttr(subGroupCounts), b.getI64ArrayAttr(mapping)});
@@ -311,7 +341,8 @@ getVectorDistributeReductionConfig(
                      b.getI64ArrayAttr(partialReductionTileSizes)),
       NamedAttribute("thread", b.getI64ArrayAttr(threadTileSizes)),
       NamedAttribute("lane_basis", threadBasisAttr),
-      NamedAttribute("subgroup_basis", subgroupBasisAttr)};
+      NamedAttribute("subgroup_basis", subgroupBasisAttr),
+      NamedAttribute("expand_dims", b.getArrayAttr(expandDimFactors))};
 
   auto configDict = b.getDictionaryAttr(configAttrs);
   auto loweringConfig = IREE::GPU::LoweringConfigAttr::get(context, configDict);
