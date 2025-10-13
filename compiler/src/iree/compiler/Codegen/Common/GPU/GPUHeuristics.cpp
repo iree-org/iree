@@ -260,11 +260,6 @@ static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
   // remove this todo.
   const int64_t mSize = llvm::product_of(problem.mSizes);
   const int64_t nSize = llvm::product_of(problem.nSizes);
-  // TODO(jornt): Remove this check as batch size doesn't make a computation
-  // more compute bound, so it shouldn't be considered.
-  if (!problem.batchSizes.empty()) {
-    return success();
-  }
   if ((mSize <= kVerySkinnyDimThreshold && (nSize > preferredSubgroupSize)) ||
       (nSize <= kVerySkinnyDimThreshold && (mSize > preferredSubgroupSize))) {
     return failure();
