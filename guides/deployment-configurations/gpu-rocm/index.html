@@ -5148,7 +5148,7 @@ iree-import-onnx<span class="w"> </span>mobilenetv2-10.onnx<span class="w"> </sp
 <div class="highlight"><pre><span></span><code><span class="c1"># You need to specify a HIP target for your GPU. For this example we extract</span>
 <span class="c1"># the architecture name for the first device using rocm_agent_enumerator.</span>
 <span class="c1"># See the section below for more context and alternatives.</span>
-<span class="nv">IREE_HIP_TARGET</span><span class="o">=</span><span class="k">$(</span>rocm_agent_enumerator<span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span>-n<span class="w"> </span><span class="s1">&#39;2 p&#39;</span><span class="k">)</span><span class="w">  </span><span class="c1"># e.g. gfx1100</span>
+<span class="nv">IREE_HIP_TARGET</span><span class="o">=</span><span class="k">$(</span>rocm_agent_enumerator<span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span>-n<span class="w"> </span><span class="s1">&#39;1 p&#39;</span><span class="k">)</span><span class="w">  </span><span class="c1"># e.g. gfx1100</span>
 
 iree-compile<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">    </span>--iree-hal-target-device<span class="o">=</span>hip<span class="w"> </span><span class="se">\</span>
@@ -5351,8 +5351,7 @@ information can be queried in several ways:</p>
   <a href="https://rocm.docs.amd.com/projects/rocminfo/en/latest/how-to/use-rocm-agent-enumerator.html"><code>rocm_agent_enumerator</code></a>
   program on Linux:</p>
 <div class="highlight"><pre><span></span><code>rocm_agent_enumerator
-
-<span class="c1"># gfx000</span>
+<span class="c1"># gfx1100</span>
 <span class="c1"># gfx1100</span>
 <span class="c1"># gfx1100</span>
 </code></pre></div>
