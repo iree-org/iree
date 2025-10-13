@@ -39,8 +39,7 @@ static bool isMatmulLike(linalg::LinalgOp linalgOp) {
 };
 
 static bool hasReductionIterator(linalg::LinalgOp op) {
-  return !linalg::isaConvolutionOpInterface(op) &&
-         llvm::any_of(op.getIteratorTypesArray(), linalg::isReductionIterator);
+  return llvm::any_of(op.getIteratorTypesArray(), linalg::isReductionIterator);
 }
 
 struct TensorSizeEstimate {
@@ -467,6 +466,12 @@ checkDispatchForVectorDistribution(Operation *parentOp) {
     if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
       if (isa<linalg::FillOp>(op)) {
         continue;
+      }
+      // Pooling operations are currently not supported properly. The pipeline
+      // can support them, it's just not tested properly.
+      // TODO: Check if we can support pooling operations.
+      if (linalg::isaConvolutionOpInterface(linalgOp)) {
+        return failure();
       }
       if (hasReductionIterator(linalgOp) &&
           failed(checkSingleCombiner(linalgOp))) {
