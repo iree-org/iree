@@ -30,6 +30,32 @@ void setMmaKind(MLIRContext *context, SmallVectorImpl<NamedAttribute> &attrs,
   attrs.emplace_back(kMmaKindName, kind);
 }
 
+// can build with b.getArrayAttr({b.getI64ArrayAttr(...),
+// b.getI64ArrayAttr(...)}) support nested
+const StringLiteral kExpandDimsName = "expand_dims";
+
+FailureOr<DimensionExpansionFactor>
+getDimensionExpansion(IREE::GPU::LoweringConfigAttr config) {
+  auto expandDimsAttr =
+      dyn_cast_or_null<ArrayAttr>(config.getAttributes().get(kExpandDimsName));
+  if (!expandDimsAttr) {
+    return failure();
+  }
+
+  SmallVector<std::optional<SmallVector<int64_t>>> maybeDimExpandFactor =
+      llvm::to_vector(llvm::map_range(expandDimsAttr, [](Attribute attr) {
+        return getIntegerVector(dyn_cast_or_null<ArrayAttr>(attr));
+      }));
+
+  if (llvm::any_of(maybeDimExpandFactor,
+                   [](auto dimFactor) { return !dimFactor.has_value(); })) {
+    return failure();
+  }
+
+  return DimensionExpansionFactor{llvm::to_vector(llvm::map_range(
+      maybeDimExpandFactor, [](auto dimFactor) { return dimFactor.value(); }))};
+}
+
 const StringLiteral kSubgroupBasisName = "subgroup_basis";
 const StringLiteral kLaneBasisName = "lane_basis";
 

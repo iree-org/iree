@@ -311,6 +311,7 @@ def IREECodegen_LoweringConfigAttr :
         "getTilingLevelSizes",
         "hasTilingLevel",
         "hasWorkgroupTilingLevel",
+        "hasDimensionExpansion",
       ]>
     ]> {
   let mnemonic = "lowering_config";

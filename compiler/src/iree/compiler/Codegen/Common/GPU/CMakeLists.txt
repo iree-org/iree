@@ -54,6 +54,7 @@ iree_cc_library(
     "GPUAllocPrivateMemoryForDPSOps.cpp"
     "GPUApplyPaddingLevel.cpp"
     "GPUApplyTilingLevel.cpp"
+    "GPUExpandDimensions.cpp"
     "GPUBubbleResourceCasts.cpp"
     "GPUCheckResourceUsage.cpp"
     "GPUCombineLayoutTransformation.cpp"

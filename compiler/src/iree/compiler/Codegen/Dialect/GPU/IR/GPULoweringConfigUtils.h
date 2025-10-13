@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_GPU_IR_GPULOWERINGCONFIGUTILS_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_GPU_IR_GPULOWERINGCONFIGUTILS_H_
 
+#include <cstdint>
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 
 namespace mlir::iree_compiler::IREE::GPU {
@@ -30,6 +31,10 @@ struct Basis {
   SmallVector<int64_t> counts;
   SmallVector<int64_t> mapping;
 };
+
+using DimensionExpansionFactor = SmallVector<SmallVector<int64_t>>;
+FailureOr<DimensionExpansionFactor>
+getDimensionExpansion(IREE::GPU::LoweringConfigAttr config);
 
 // Helper to retrieve/set distribution basis.
 FailureOr<Basis> getBasis(IREE::GPU::LoweringConfigAttr config,

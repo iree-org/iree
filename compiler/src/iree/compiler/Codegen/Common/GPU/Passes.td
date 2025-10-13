@@ -375,6 +375,11 @@ def GPUApplyPaddingLevelPass :
   ];
 }
 
+def GPUExpandDimensionsPass :
+    InterfacePass<"iree-codegen-gpu-expand-dimensions", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to expand dimensions of tensor ops based on iteration space expansion lowering_configs";
+}
+
 def GPUTensorTileToSerialLoopsPass :
     InterfacePass<"iree-codegen-gpu-tensor-tile-to-serial-loops", "mlir::FunctionOpInterface"> {
   let summary = "Pass to tile reduction dimensions for certain GPU ops";
