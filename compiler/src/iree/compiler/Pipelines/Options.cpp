@@ -29,6 +29,18 @@ void GlobalPipelineOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::cat(category));
 
   binder.opt<bool>(
+      "iree-opt-data-tiling", dataTiling,
+      llvm::cl::desc(
+          "Enables data tiling optimization. There are two data-tiling "
+          "paths; it is the global flag that enables data-tiling with the"
+          "suggested path. You can choose one of them to enable explicitly, if "
+          "you have a preference. See `iree-global-opt-data-tiling` and "
+          "`iree-dispatch-creation-data-tiling` for details. Note that this "
+          "flag will override the other two flags, because it has a higher "
+          "priority."),
+      llvm::cl::cat(category));
+
+  binder.opt<bool>(
       "iree-opt-const-expr-hoisting", constExprHoisting,
       llvm::cl::desc(
           "Hoists the results of latent constant expressions into immutable "
@@ -172,7 +184,7 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
                                   "along the outer most dimension."),
                    llvm::cl::cat(category));
   binder.opt<bool>(
-      "iree-opt-data-tiling", dataTiling,
+      "iree-global-opt-data-tiling", dataTiling,
       llvm::cl::desc(
           "Enables data tiling path starting from GlobalOptimization phase."),
       llvm::cl::cat(category));
