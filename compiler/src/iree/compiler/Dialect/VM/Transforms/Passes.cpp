@@ -84,6 +84,11 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(mlir::createInlinerPass());
   passManager.addPass(mlir::createSymbolDCEPass());
 
+  // Verify module initialization order - subsequent passes rely on it being
+  // correct (and we maintain it as correct from this point on, so this is our
+  // gate).
+  passManager.addPass(IREE::Util::createVerifyInitializationOrderPass());
+
   // Combine the initializers for all globals to allow us to optimize them
   // together.
   passManager.addPass(IREE::Util::createCombineInitializersPass());

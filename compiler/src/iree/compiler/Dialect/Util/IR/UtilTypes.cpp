@@ -236,6 +236,23 @@ bool tryMoveProducerBefore(Value value, Operation *consumerOp) {
   return false;
 }
 
+Operation *materializeConstant(OpBuilder &builder, Location loc,
+                               TypedAttr attr) {
+  // Try arith::ConstantOp for compatible types (mostly builtins like index,
+  // i32, etc) and fall back to asking the dialects.
+  Type type = attr.getType();
+  if (arith::ConstantOp::isBuildableWith(attr, type)) {
+    return arith::ConstantOp::create(builder, loc, type, attr);
+  } else if (auto *op = attr.getDialect().materializeConstant(builder, attr,
+                                                              type, loc)) {
+    return op;
+  } else if (auto *op = type.getDialect().materializeConstant(builder, attr,
+                                                              type, loc)) {
+    return op;
+  }
+  return nullptr;
+}
+
 bool isPublicOrExternal(CallableOpInterface callableOp) {
   if (auto symbolOp = dyn_cast<SymbolOpInterface>(callableOp.getOperation())) {
     if (symbolOp.isPublic())
@@ -346,14 +363,6 @@ LogicalResult detail::verifyGlobalStoreOp(GlobalStoreOpInterface storeOp,
            << "global type mismatch; global " << globalOp.getGlobalName()
            << " is " << globalOp.getGlobalType() << " but store is "
            << storeType;
-  }
-  if (!globalOp.isGlobalMutable()) {
-    // Allow stores to immutable globals in initializers.
-    if (!storeOp->getParentOfType<IREE::Util::InitializerOpInterface>()) {
-      return storeOp->emitOpError()
-             << "global " << globalOp.getGlobalName()
-             << " is not mutable and cannot be stored to";
-    }
   }
   return success();
 }

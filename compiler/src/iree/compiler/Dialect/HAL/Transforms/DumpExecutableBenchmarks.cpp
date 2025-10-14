@@ -189,6 +189,8 @@ static IREE::Util::GlobalOp appendGlobalBuffer(
   }
 
   // Build an initializer to allocate the buffer.
+  // Ensure the initializer comes after the global by advancing insertion point.
+  moduleBuilder.setInsertionPointAfter(globalOp);
   auto initOp = IREE::Util::InitializerOp::create(moduleBuilder, loc);
   auto initBuilder = OpBuilder::atBlockBegin(initOp.addEntryBlock());
   IndexSet indexSet(loc, initBuilder);
