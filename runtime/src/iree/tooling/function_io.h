@@ -46,7 +46,7 @@ extern "C" {
 //    `&4xf32=1,2,3,4` (tensor<4xf32> storage with an initial value)
 iree_status_t iree_tooling_parse_variants(
     iree_string_view_t cconv, iree_string_view_list_t specs,
-    iree_hal_device_t* device, iree_hal_allocator_t* device_allocator,
+    iree_hal_device_list_t* device_list, iree_hal_allocator_t* device_allocator,
     iree_allocator_t host_allocator, iree_vm_list_t** out_list);
 
 //===----------------------------------------------------------------------===//
