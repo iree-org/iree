@@ -7,9 +7,9 @@
 name: CI - Update IR For Tests
 
 on:
-  pull_request:
-    branches:
-        main
+  schedule:
+    - cron: "10 5 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: write
