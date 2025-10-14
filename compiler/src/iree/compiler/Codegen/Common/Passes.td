@@ -123,6 +123,14 @@ def ConvertToDestinationPassingStylePass :
   ];
 }
 
+def ConvertWorkgroupForallToPCFPass
+    : Pass<"iree-codegen-convert-workgroup-forall-to-pcf"> {
+  let summary = "Converts workgroup mapped scf.forall ops to pcf.loop";
+  let dependentDialects = [
+    "iree_compiler::IREE::PCF::PCFDialect"
+  ];
+}
+
 def CombineLayoutTransformationPass :
     InterfacePass<"iree-codegen-combine-layout-transformation", "mlir::FunctionOpInterface"> {
   let summary =
@@ -150,6 +158,25 @@ def CombineLayoutTransformationPass :
   ];
   let dependentDialects = [
     "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
+    "scf::SCFDialect",
+    "tensor::TensorDialect"
+  ];
+}
+
+def CombineSplitKWorkgroupLoopPass
+    : Pass<"iree-codegen-combine-splitk-workgroup-loop"> {
+  let summary = "Combines split-k reduction scf.forall with nested pcf.loop into pcf.generic";
+  let description = [{
+    Transforms split-k reduction patterns by combining an scf.forall with
+    split_reduction_mapping containing a pcf.loop into a single pcf.generic
+    operation. The nested loops are converted to sequential scf.for loops
+    with proper delinearization for load balancing.
+  }];
+  let dependentDialects = [
+    "affine::AffineDialect",
+    "arith::ArithDialect",
+    "iree_compiler::IREE::LinalgExt::IREELinalgExtDialect",
+    "iree_compiler::IREE::PCF::PCFDialect",
     "scf::SCFDialect",
     "tensor::TensorDialect"
   ];
@@ -419,6 +446,21 @@ def FoldTensorExtractOpPass :
     folded to use a load of the created memref object that holds the constant
     values.
   }];
+}
+
+def FuseTensorToBufferConvertersPass :
+  Pass<"iree-codegen-fuse-tensor-to-buffer-converters", ""> {
+  let summary = "Fuse tensor to buffer converter ops into PCF ops";
+  let description = [{
+    Fuses iree_codegen.store_to_buffer and iree_tensor_ext.dispatch.tensor.store
+    operations into producer pcf.loop and pcf.generic ops by moving the writes
+    directly into the PCF region.
+  }];
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect",
+    "::mlir::vector::VectorDialect",
+    "::mlir::memref::MemRefDialect"
+  ];
 }
 
 def ForallToForPass :

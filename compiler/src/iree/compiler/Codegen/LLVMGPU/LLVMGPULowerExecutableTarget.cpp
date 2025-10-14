@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
+#include "iree/compiler/Codegen/Dialect/PCF/IR/PCF.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
@@ -50,6 +51,7 @@ public:
         .insert<IREE::HAL::HALDialect,
                 IREE::GPU::IREEGPUDialect,
                 IREE::LinalgExt::IREELinalgExtDialect,
+                IREE::PCF::PCFDialect,
                 IREE::VectorExt::IREEVectorExtDialect,
                 linalg::LinalgDialect,
                 gpu::GPUDialect,

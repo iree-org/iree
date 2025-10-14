@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Interfaces/Interfaces.h"
 
 #include "iree/compiler/Codegen/Dialect/GPU/TransformExtensions/IREEGPUExtensions.h"
+#include "iree/compiler/Codegen/Dialect/PCF/ExternalInterfaces/Interfaces.h"
 #include "iree/compiler/Codegen/ExternalInterfaces/Interfaces.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
@@ -47,6 +48,7 @@ namespace mlir::iree_compiler {
 void registerCodegenInterfaces(DialectRegistry &registry) {
   registerProcessorOpInterfaceExternalModels(registry);
   registerCodegenExternalInterfaces(registry);
+  registerPCFExternalInterfaces(registry);
   registerBufferizationInterfaces(registry);
   registerTensorMaskingOpInterface(registry);
   // TODO: Remove this dependency once the transform dialect extensions

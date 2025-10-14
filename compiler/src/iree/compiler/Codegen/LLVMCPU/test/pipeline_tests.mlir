@@ -275,8 +275,8 @@ func.func @ukernel_dispatch() attributes {hal.executable.target = #executable_ta
   return
 }
 // CHECK-LABEL: func @ukernel_dispatch()
-// Checks scf.for for distribution loops.
-//       CHECK:   scf.forall
+// Checks pcf.loop for distribution loops.
+//       CHECK:   pcf.loop
 // Checks scf.for for outer and inner parallel loops.
 //       CHECK:       scf.for
 //       CHECK:         scf.for
@@ -471,7 +471,7 @@ module {
 }
 // CHECK-LABEL: func.func @mmt4d_bias_relu
 // CHECK-NOT:     memref.alloc
-// CHECK:         scf.forall
+// CHECK:         pcf.loop
 // CHECK:           scf.for
 // CHECK:             vector.fma
 // CHECK:             vector.fma
@@ -549,9 +549,8 @@ func.func @pooling_nchw_max_pack_without_padding_issue_20723() attributes {hal.e
   return
 }
 // CHECK-LABEL: func.func @pooling_nchw_max_pack_without_padding_issue_20723(
-// CHECK:         scf.forall
+// CHECK:         pcf.loop scope(#iree_codegen.workgroup<linearize>)
 // CHECK:           iree_linalg_ext.map_scatter
-// CHECK:         } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
 // -----
 
@@ -577,10 +576,8 @@ func.func @pooling_nchw_max_pack_with_padding_issue_20723() attributes {hal.exec
   return
 }
 // CHECK-LABEL: func.func @pooling_nchw_max_pack_with_padding_issue_20723(
-// CHECK:         scf.forall
+// CHECK:         pcf.loop scope(#iree_codegen.workgroup<linearize>)
 // CHECK:           iree_linalg_ext.map_scatter
-// CHECK:         } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
-// CHECK:         scf.forall
 
 // -----
 

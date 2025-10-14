@@ -61,8 +61,8 @@ hal.executable public @main {
 //   CHECK-DAG:   %[[BUF2:.+]] = amdgpu.fat_raw_buffer_cast %[[ASSUMED_B2]]
 //   CHECK-DAG:   memref.alloc() : memref<64x8xf16, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x8xf16, #gpu.address_space<workgroup>>
-//       CHECK:   scf.forall ({{.*}}) in (32, 160) {
-//       CHECK:     %[[LOOP:.+]] = scf.for {{.*}} = %c0 to %c1280 step %c4 {{.*}} -> (vector<8x4xf32>)
+//       CHECK:   pcf.loop scope(#iree_codegen.workgroup<linearize>)
+//       CHECK:     %[[LOOP:.+]] = scf.for %[[IV:.+]] = %c0 to %c1280 step %c4 {{.*}} -> (vector<8x4xf32>)
 //       CHECK:       gpu.barrier
 //   CHECK-DAG:       %[[LHS_RD:.+]] = vector.transfer_read %[[BUF0]]{{.*}} vector<2xf16>
 //   CHECK-DAG:       vector.transfer_write %[[LHS_RD]], %[[LHS_ALLOC:[A-Za-z0-9]+]]
@@ -74,7 +74,7 @@ hal.executable public @main {
 //       CHECK:       %[[MM:.+]] = vector.contract {{.*}} %[[LHS_MM]], %[[RHS_MM]]
 //       CHECK:       scf.yield %[[MM]]
 //       CHECK:     vector.transfer_write %[[LOOP]], %[[BUF2]]
-//       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+//       CHECK:     pcf.return
 
 // -----
 
@@ -136,8 +136,8 @@ hal.executable public @main {
 //   CHECK-DAG:   %[[BUF2:.+]] = amdgpu.fat_raw_buffer_cast %[[ASSUMED_B2]]
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
-//       CHECK:   scf.forall ({{.*}}) in (32, 160) {
-//       CHECK:     %[[LOOP:.+]] = scf.for {{.*}} = %c0 to %c80 step %c2 {{.*}} -> (vector<2x2x4x1xf32>)
+//       CHECK:   pcf.loop scope(#iree_codegen.workgroup<linearize>)
+//       CHECK:     %[[LOOP:.+]] = scf.for %[[IV:.+]] = %c0 to %c80 step %c2 {{.*}} -> (vector<2x2x4x1xf32>)
 //       CHECK:       gpu.barrier
 //   CHECK-DAG:       %[[LHS_RD:.+]] = vector.transfer_read %[[BUF0]]{{.*}} vector<8xf16>
 //   CHECK-DAG:       vector.transfer_write %[[LHS_RD]]
@@ -152,7 +152,7 @@ hal.executable public @main {
 //       CHECK:       scf.yield
 //       CHECK:     %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 2, 1, 3] : vector<2x2x4x1xf32> to vector<2x4x2x1xf32>
 //       CHECK:     vector.transfer_write %[[LOOP_T]], %[[BUF2]]
-//       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+//       CHECK:     pcf.return
 
 // -----
 
@@ -214,8 +214,8 @@ hal.executable public @main {
 //   CHECK-DAG:   %[[BUF2:.+]] = amdgpu.fat_raw_buffer_cast %[[ASSUMED_B2]]
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
-//       CHECK:   scf.forall ({{.*}}) in (32, 160) {
-//       CHECK:     %[[LOOP:.+]] = scf.for {{.*}} = %c0 to %c80 step %c2 {{.*}} -> (vector<2x2x8x1x1xf32>)
+//       CHECK:   pcf.loop scope(#iree_codegen.workgroup<linearize>)
+//       CHECK:     %[[LOOP:.+]] = scf.for %[[IV:.+]] = %c0 to %c80 step %c2 {{.*}} -> (vector<2x2x8x1x1xf32>)
 //       CHECK:       gpu.barrier
 //   CHECK-DAG:       vector.transfer_read %[[BUF0]]{{.*}} vector<8xf16>
 //   CHECK-DAG:       vector.transfer_read %[[BUF0]]{{.*}} vector<8xf16>
@@ -230,7 +230,7 @@ hal.executable public @main {
 //       CHECK:       scf.yield
 //       CHECK:     %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 2, 3, 1, 4] : vector<2x2x8x1x1xf32> to vector<2x8x1x2x1xf32>
 //       CHECK:     vector.transfer_write %[[LOOP_T]], %[[BUF2]]
-//       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+//       CHECK:     pcf.return
 
 // -----
 
@@ -287,11 +287,11 @@ hal.executable public @main {
 // CHECK-LABEL: func @matmul_transpose_b_mfma_16x16x4
 //   CHECK-DAG:   memref.alloc() : memref<64x10xf32, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x10xf32, #gpu.address_space<workgroup>>
-//       CHECK:   scf.forall ({{.*}}) in (32, 160) {
+//       CHECK:   pcf.loop scope(#iree_codegen.workgroup<linearize>)
 //       CHECK:     scf.for %{{.*}} = %c0 to %c320 step %c2 {{.*}} -> (vector<2x2x4x1xf32>)
 // CHECK-COUNT-8:     amdgpu.mfma 16x16x4
 //       CHECK:       scf.yield
-//       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+//       CHECK:     pcf.return
 
 // -----
 
@@ -348,11 +348,11 @@ hal.executable public @main {
 // CHECK-LABEL: func @matmul_transpose_b_mfma_16x16x32_f8
 //   CHECK-DAG:   memref.alloc() : memref<64x72xf8E4M3FNUZ, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x72xf8E4M3FNUZ, #gpu.address_space<workgroup>>
-//       CHECK:   scf.forall ({{.*}}) in (32, 160) {
+//       CHECK:   pcf.loop scope(#iree_codegen.workgroup<linearize>)
 //       CHECK:     scf.for %{{.*}} = %c0 to %c40 step %c2 {{.*}} -> (vector<2x2x4x1xf32>)
 // CHECK-COUNT-8:     amdgpu.mfma 16x16x32
 //       CHECK:       scf.yield
-//       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+//       CHECK:     pcf.return
 
 // -----
 
@@ -409,11 +409,11 @@ hal.executable public @main {
 // CHECK-LABEL: func @matmul_transpose_b_mfma_32x32x16_i8
 //   CHECK-DAG:   memref.alloc() : memref<64x40xi8, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x40xi8, #gpu.address_space<workgroup>>
-//       CHECK:   scf.forall ({{.*}}) in (32, 160) {
+//       CHECK:   pcf.loop scope(#iree_codegen.workgroup<linearize>)
 //       CHECK:     scf.for %{{.*}} = %c0 to %c80 step %c2 {{.*}} -> (vector<1x1x4x4x1xi32>)
 // CHECK-COUNT-2:     amdgpu.mfma 32x32x16
 //       CHECK:       scf.yield
-//       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+//       CHECK:     pcf.return
 
 // -----
 
@@ -470,11 +470,11 @@ hal.executable public @main {
 // CHECK-LABEL: func @matmul_transpose_b_wmmar3_f16_16x16x16_f16
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
-//       CHECK:   scf.forall ({{.*}}) in (32, 160) {
+//       CHECK:   pcf.loop scope(#iree_codegen.workgroup<linearize>)
 //       CHECK:     scf.for %{{.*}} = %c0 to %c80 step %c2 {{.*}} -> (vector<2x2x16x1x1xf16>)
 // CHECK-COUNT-8:     amdgpu.wmma {{.*}} : vector<16xf16>, vector<16xf16>, vector<16xf16>
 //       CHECK:       scf.yield
-//       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+//       CHECK:     pcf.return
 
 // -----
 
@@ -529,14 +529,14 @@ hal.executable public @main {
 // the producer's (convolution's) distributed scf.forall loop.
 // CHECK-LABEL: func @conv_nchw_fused
 //       CHECK:   %[[ALLOCA:.+]] = memref.alloca() : memref<1x1x1x1xf32, #gpu.address_space<private>>
-//       CHECK:   scf.forall ({{.*}}) in (64, 14, 7) {
+//       CHECK:   pcf.loop scope(#iree_codegen.workgroup<linearize>)
 //       CHECK:     scf.for %{{.*}} = %c0 to %c64 step %c1
 //       CHECK:       linalg.conv_2d_nchw_fchw
 //  CHECK-SAME:         outs(%[[ALLOCA]] : memref<1x1x1x1xf32, #gpu.address_space<private>>)
 //       CHECK:     arith.addf
 //       CHECK:     arith.cmpf
 //       CHECK:     arith.select
-//       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+//       CHECK:     pcf.return
 
 // -----
 
@@ -601,14 +601,14 @@ hal.executable public @main {
 
 //   CHECK-DAG:   %[[IDX:.+]] = gpu.thread_id  x
 //   CHECK-DAG:   %[[IDY:.+]] = gpu.thread_id  y
-//       CHECK:   %[[LINID1:.+]] = affine.apply #[[$MAP0]]()[%[[IDY]], %[[IDX]]]
-//       CHECK:   scf.forall ({{.*}}) in (32, 98) {
+//       CHECK:   pcf.loop scope(#iree_codegen.workgroup<linearize>)
+//       CHECK:     %[[LINID1:.+]] = affine.apply #[[$MAP0]]()[%[[IDY]], %[[IDX]]]
 //       CHECK:     scf.for %{{.*}} = %c0 to %c256 step %c4 {{.*}} -> (vector<1x4xf32>)
 //       CHECK:       scf.for %{{.*}} = %[[LINID1]] to %c4 step %c32
 //       CHECK:         %[[READ:.+]] = vector.transfer_read {{.*}} : memref<128x256xf32, {{.*}}#amdgpu.address_space<fat_raw_buffer>>, vector<4xf32>
 //       CHECK:         vector.transfer_write %[[READ]], %{{.*}} : vector<4xf32>, memref<4x6xf32, #gpu.address_space<workgroup>>
 //       CHECK:       vector.contract
-//       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+//       CHECK:     pcf.return
 
 // -----
 
@@ -970,8 +970,8 @@ hal.executable public @main {
 //       CHECK:       vector.transfer_write %{{.*}}, %[[BUF2]]{{.*}} memref<10x1xf32, #amdgpu.address_space<fat_raw_buffer>>
 //  CHECK-NEXT:     }
 //  CHECK-NEXT:   gpu.barrier
-//  CHECK-NEXT:   } {mapping = [#iree_codegen.workgroup_mapping<x>]}
-//  CHECK-NEXT:   return
+//  CHECK-NEXT:   pcf.return
+//       CHECK:   return
 
 // -----
 
@@ -1138,7 +1138,7 @@ hal.executable public @main {
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x66xf32, #gpu.address_space<workgroup>>
-//       CHECK:   scf.forall ({{.*}}) in (32, 160) {
+//       CHECK:   pcf.loop scope(#iree_codegen.workgroup<linearize>)
 //       CHECK:     %[[LOOP:.+]] = scf.for %[[IV:.+]] = %c0 to %c80 step %c2 {{.*}} -> (vector<2x2x4x1xf32>)
 //       CHECK:       gpu.barrier
 //   CHECK-DAG:       %[[LHS_RD:.+]] = vector.transfer_read %[[BUF0]]{{.*}} vector<8xf16>
@@ -1153,12 +1153,13 @@ hal.executable public @main {
 // CHECK-COUNT-4:     amdgpu.mfma 16x16x16
 //       CHECK:       scf.yield
 //       CHECK:     %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 2, 1, 3] : vector<2x2x4x1xf32> to vector<2x4x2x1xf32>
-//       CHECK:     vector.transfer_write %[[LOOP_T]]
+//       CHECK:     %[[LOOP_SC:.+]] = vector.shape_cast %[[LOOP_T]]
+//       CHECK:     vector.transfer_write %[[LOOP_SC]]
 //       CHECK:     scf.for {{.*}} {
 //       CHECK:       %[[SHARED_READ:.+]] = vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<4xf32>
 //       CHECK:       vector.transfer_write %[[SHARED_READ]], %[[BUF2]]
 //       CHECK:    }
-//       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+//       CHECK:     pcf.return
 
 // -----
 
@@ -1218,7 +1219,7 @@ hal.executable public @main {
 //   CHECK-DAG:   memref.alloc() : memref<1x4x66xf32, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<1x16x6xf32, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<1x16x66xf32, #gpu.address_space<workgroup>>
-//       CHECK:   scf.forall ({{.*}}) in (12, 37, 10) {
+//       CHECK:   pcf.loop scope(#iree_codegen.workgroup<linearize>)
 //       CHECK:     scf.for %[[IV:.+]] = %c0 to %c144 step %c1 {{.*}} -> (vector<1x1x1x4x1xf32>)
 //       CHECK:       gpu.barrier
 //   CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
@@ -1228,8 +1229,8 @@ hal.executable public @main {
 //       CHECK:     vector.transfer_write {{.*}} #gpu.address_space<workgroup>>
 //       CHECK:     scf.for {{.*}} {
 //       CHECK:       memref.copy {{.*}}#gpu.address_space<workgroup>> to {{.*}}#amdgpu.address_space<fat_raw_buffer>
-//       CHECK:    }
-//       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+//       CHECK:     }
+//       CHECK:     pcf.return
 
 // -----
 
@@ -1289,14 +1290,14 @@ hal.executable public @main {
 //     CHECK-DAG:   %[[B0:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
 //     CHECK-DAG:   %[[B1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //     CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
-//         CHECK:   scf.forall ({{.*}}) in (12, 37, 10) {
+//         CHECK:   pcf.loop scope(#iree_codegen.workgroup<linearize>)
 //         CHECK:     scf.for %[[IV:.+]] = %c0 to %c144 step %c1 {{.*}} -> (vector<1x1x1x4x1xf32>)
 //         CHECK:       gpu.barrier
 //     CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
 //     CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
-// CHECK-COUNT-1:     amdgpu.mfma 16x16x4
-//         CHECK:     scf.yield
-//         CHECK: } {mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+// CHECK-COUNT-1:       amdgpu.mfma 16x16x4
+//         CHECK:       scf.yield
+//         CHECK:     pcf.return
 
 // -----
 
@@ -1336,8 +1337,8 @@ hal.executable public @main {
 // CHECK-LABEL: func @single_pack
 // CHECK-DAG:     %[[ALLOCA:.+]] = memref.alloca() : memref<4x1xi32, #gpu.address_space<private>>
 // CHECK-DAG:     %[[C42:.+]] = arith.constant 42 : i32
-// CHECK-DAG:     %[[ALLOCA_SUBVIEW:.+]] = memref.subview %[[ALLOCA]]{{.*}} : memref<4x1xi32, #gpu.address_space<private>> to memref<4xi32, strided<[1]>, #gpu.address_space<private>>
-// CHECK:         scf.forall {{.*}} in (16, 4) {
+// CHECK:         pcf.loop scope(#iree_codegen.workgroup<linearize>)
+// CHECK:           %[[ALLOCA_SUBVIEW:.+]] = memref.subview %[[ALLOCA]]{{.*}} : memref<4x1xi32, #gpu.address_space<private>> to memref<4xi32, strided<[1]>, #gpu.address_space<private>>
 // CHECK:           scf.for
 // CHECK:             %[[MASK:.+]] = vector.create_mask
 // CHECK:             %[[READ0:.+]] = vector.transfer_read{{.*}} %[[MASK]]
@@ -1387,16 +1388,16 @@ hal.executable public @main {
 
 // CHECK-LABEL: func @map_scatter
 // CHECK-NOT:     memref.alloca
-// CHECK:         scf.forall {{.*}} in (2048, 8) {
+// CHECK:         pcf.loop scope(#iree_codegen.workgroup<linearize>)
 // CHECK:           %[[READ:.+]] = vector.transfer_read{{.*}}: memref<2048x2048xf32, #amdgpu.address_space<fat_raw_buffer>>, vector<4xf32>
-// CHECK:           vector.scatter {{.*}} %[[READ]] : memref<4194304xf32, #amdgpu.address_space<fat_raw_buffer>>, vector<4xindex>, vector<4xi1>, vector<4xf32>
+// CHECK:           vector.scatter {{.*}} %[[READ]] : memref<4194304xf32{{.*}}#amdgpu.address_space<fat_raw_buffer>>, vector<4xindex>, vector<4xi1>, vector<4xf32>
 
 
 // -----
 #translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
 #lowering_config = #iree_gpu.lowering_config<{thread = [1, 1, 1, 4], workgroup = [1, 1, 32, 8]}>
 
-#pipeline_layout = #hal.pipeline.layout<bindings =
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings =
             [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
             #hal.pipeline.binding<storage_buffer, ReadOnly>,
             #hal.pipeline.binding<storage_buffer, Indirect>,
@@ -1405,8 +1406,8 @@ hal.executable public @main {
 
 hal.executable public @multi_result_index_generic_with_scatter_fusion {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
-    hal.executable.export public @multi_result_index_generic_with_scatter_fusion ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2, %arg3)
+    hal.executable.export public @multi_result_index_generic_with_scatter_fusion ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1)
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1414,15 +1415,16 @@ hal.executable public @multi_result_index_generic_with_scatter_fusion {
         %c32_i64 = arith.constant 32 : i64
         %c0 = arith.constant 0 : index
         %c1 = arith.constant 1 : index
-        %24 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c1) flags("ReadOnly|Indirect") : memref<4x?x32x8xf16, #hal.descriptor_type<storage_buffer>>{%c1}
-        %25 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c1) flags("ReadOnly|Indirect") : memref<4x?xi64, #hal.descriptor_type<storage_buffer>>{%c1}
-        %26 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(Indirect) : memref<?x8x32xf8E4M3FNUZ, #hal.descriptor_type<storage_buffer>>{%c1}
-        %27 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c1) flags(Indirect) : memref<4x?x32x8xf8E4M3FNUZ, strided<[?, 256, 8, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>{%c1}
+        %dyn_size = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+        %24 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c1) flags("ReadOnly|Indirect") : memref<4x?x32x8xf16, #hal.descriptor_type<storage_buffer>>{%dyn_size}
+        %25 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c1) flags("ReadOnly|Indirect") : memref<4x?xi64, #hal.descriptor_type<storage_buffer>>{%dyn_size}
+        %26 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(Indirect) : memref<?x8x32xf8E4M3FNUZ, #hal.descriptor_type<storage_buffer>>{%dyn_size}
+        %27 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c1) flags(Indirect) : memref<4x?x32x8xf8E4M3FNUZ, strided<[?, 256, 8, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>{%dyn_size}
         %28 = iree_codegen.load_from_buffer %24 : memref<4x?x32x8xf16, #hal.descriptor_type<storage_buffer>> -> tensor<4x?x32x8xf16>
         %29 = iree_codegen.load_from_buffer %25 : memref<4x?xi64, #hal.descriptor_type<storage_buffer>> -> tensor<4x?xi64>
-        %30 = tensor.empty(%c1) : tensor<?x8x32xf8E4M3FNUZ>
-        %31 = tensor.empty(%c1) : tensor<4x?x8x32xf8E4M3FNUZ>
-        %32 = tensor.empty(%c1) : tensor<4x?x32x8xf8E4M3FNUZ>
+        %30 = tensor.empty(%dyn_size) : tensor<?x8x32xf8E4M3FNUZ>
+        %31 = tensor.empty(%dyn_size) : tensor<4x?x8x32xf8E4M3FNUZ>
+        %32 = tensor.empty(%dyn_size) : tensor<4x?x32x8xf8E4M3FNUZ>
         %33:2 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d3, d2)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%28 : tensor<4x?x32x8xf16>) outs(%32, %31 : tensor<4x?x32x8xf8E4M3FNUZ>, tensor<4x?x8x32xf8E4M3FNUZ>) attrs =  {lowering_config = #lowering_config} {
         ^bb0(%in: f16, %out: f8E4M3FNUZ, %out_0: f8E4M3FNUZ):
           %35 = linalg.index 1 : index
@@ -1444,7 +1446,7 @@ hal.executable public @multi_result_index_generic_with_scatter_fusion {
   }
 }
 // CHECK-LABEL: func @multi_result_index_generic_with_scatter_fusion
-// CHECK:         scf.forall (%arg0, %arg1) in (4, 1) {
+// CHECK:         pcf.loop scope(#iree_codegen.workgroup<linearize>)
 // CHECK:           vector.transfer_read
 // CHECK:           arith.mulf {{.*}} vector<4xf16>
 // CHECK:           arith.truncf {{.*}} vector<4xf16> to vector<4xf8E4M3FNUZ>
