@@ -210,12 +210,12 @@ func.func @test_dyn_reduction(%arg0: !iree_tensor_ext.dispatch.tensor<readwrite:
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:      attrs =  {lowering_config = #iree_gpu.lowering_config<{
-//  CHECK-SAME:               expand_dims = {{\[}}[0], [1], [2], [3, 4]{{\]}},
-//  CHECK-SAME:               lane_basis = {{\[}}[1, 1, 1, 2, 1], [0, 1, 2, 3, 4]{{\]}},
-//  CHECK-SAME:               partial_reduction = [0, 0, 1, 2, 0],
-//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1, 1, 1], [0, 1, 2, 3, 4]{{\]}},
-//  CHECK-SAME:               thread = [0, 0, 1, 1, 16],
-//  CHECK-SAME:               workgroup = [1, 1, 0, 0, 0]
+//  CHECK-SAME:               expand_dims = {{\[}}[0], [1], [2], [3]{{\]}},
+//  CHECK-SAME:               lane_basis = {{\[}}[1, 1, 1, 2], [0, 1, 2, 3]{{\]}},
+//  CHECK-SAME:               partial_reduction = [0, 0, 1, 32],
+//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1, 1], [0, 1, 2, 3]{{\]}},
+//  CHECK-SAME:               thread = [0, 0, 1, 16],
+//  CHECK-SAME:               workgroup = [1, 1, 0, 0]
 
 // -----
 
@@ -390,12 +390,12 @@ func.func @test_store_to_buffer(%arg0: index, %arg1: index) {
 //   CHECK-NOT:      attrs =  {lowering_config = #iree_gpu.lowering_config<{
 //       CHECK:   linalg.generic
 //  CHECK-SAME:      attrs =  {lowering_config = #iree_gpu.lowering_config<{
-//  CHECK-SAME:               expand_dims = {{\[}}[0], [1], [2, 3]{{\]}},
-//  CHECK-SAME:               lane_basis = {{\[}}[1, 1, 64, 1], [0, 1, 2, 3]{{\]}},
-//  CHECK-SAME:               partial_reduction = [0, 0, 512, 0],
-//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 8, 1], [0, 1, 2, 3]{{\]}},
-//  CHECK-SAME:               thread = [0, 0, 1, 8],
-//  CHECK-SAME:               workgroup = [1, 1, 0, 0]
+//  CHECK-SAME:               expand_dims = {{\[}}[0], [1], [2]{{\]}},
+//  CHECK-SAME:               lane_basis = {{\[}}[1, 1, 64], [0, 1, 2]{{\]}},
+//  CHECK-SAME:               partial_reduction = [0, 0, 4096],
+//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 8], [0, 1, 2]{{\]}},
+//  CHECK-SAME:               thread = [0, 0, 8],
+//  CHECK-SAME:               workgroup = [1, 1, 0]
 
 
 // -----

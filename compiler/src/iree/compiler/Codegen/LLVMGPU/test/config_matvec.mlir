@@ -74,12 +74,12 @@ func.func @dynamic_batch_generic_matvec() {
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:    attrs =  {lowering_config = #iree_gpu.lowering_config<{
-//  CHECK-SAME:               expand_dims = {{\[}}[0], [1], [2], [3, 4]{{\]}},
-//  CHECK-SAME:               lane_basis = {{\[}}[1, 1, 1, 64, 1], [0, 1, 2, 3, 4]{{\]}},
-//  CHECK-SAME:               partial_reduction = [0, 0, 0, 64, 0],
-//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1, 1, 1], [0, 1, 2, 3, 4]{{\]}},
-//  CHECK-SAME:               thread = [0, 0, 0, 1, 8],
-//  CHECK-SAME:               workgroup = [1, 1, 1, 0, 0]
+//  CHECK-SAME:               expand_dims = {{\[}}[0], [1], [2], [3]{{\]}},
+//  CHECK-SAME:               lane_basis = {{\[}}[1, 1, 1, 64], [0, 1, 2, 3]{{\]}},
+//  CHECK-SAME:               partial_reduction = [0, 0, 0, 512],
+//  CHECK-SAME:               subgroup_basis = {{\[}}[1, 1, 1, 1], [0, 1, 2, 3]{{\]}},
+//  CHECK-SAME:               thread = [0, 0, 0, 8],
+//  CHECK-SAME:               workgroup = [1, 1, 1, 0]
 
 // CDNA3: LLVMGPUVectorDistribute
 
