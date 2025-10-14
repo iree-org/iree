@@ -50,14 +50,16 @@ static iree_status_t iree_hal_streaming_buffer_wrap(
     wrapper->device_ptr =
         (iree_hal_streaming_deviceptr_t)device_ptr.handle.device_allocation.ptr;
   }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_allocator_export_buffer(
-        context->device_allocator, buffer,
-        IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION,
-        IREE_HAL_EXTERNAL_BUFFER_FLAG_NONE, &device_ptr);
-  }
-  if (iree_status_is_ok(status)) {
-    wrapper->host_ptr = (void*)device_ptr.handle.host_allocation.ptr;
+  if (memory_type & IREE_HAL_MEMORY_TYPE_HOST_VISIBLE) {
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_allocator_export_buffer(
+          context->device_allocator, buffer,
+          IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION,
+          IREE_HAL_EXTERNAL_BUFFER_FLAG_NONE, &device_ptr);
+    }
+    if (iree_status_is_ok(status)) {
+      wrapper->host_ptr = (void*)device_ptr.handle.host_allocation.ptr;
+    }
   }
 
   if (iree_status_is_ok(status)) {

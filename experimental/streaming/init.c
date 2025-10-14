@@ -9,7 +9,7 @@
 #include <string.h>  // for memset
 
 #include "experimental/streaming/internal.h"
-
+#include "iree/hal/drivers/hip/registration/driver_module.h"
 //===----------------------------------------------------------------------===//
 // Global state
 //===----------------------------------------------------------------------===//
@@ -489,7 +489,10 @@ iree_status_t iree_hal_streaming_init_global(
     // status = iree_hal_register_all_available_drivers(
     //     device_registry->driver_registry);
     const char* driver_name = getenv("IREE_HAL_DRIVER");
-    if (driver_name && strcmp(driver_name, "local-sync") == 0) {
+    if (driver_name && strcmp(driver_name, "hip") == 0) {
+      status =
+          iree_hal_hip_driver_module_register(device_registry->driver_registry);
+    } else if (driver_name && strcmp(driver_name, "local-sync") == 0) {
       status = iree_hal_local_sync_driver_module_register(
           device_registry->driver_registry);
     } else if (!driver_name ||
