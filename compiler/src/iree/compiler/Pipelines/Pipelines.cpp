@@ -317,9 +317,14 @@ void buildIREEVMTransformPassPipeline(
     if (pipelineOptions.dataTiling) {
       dispatchTransformOptions.dataTiling = false;
     }
-    if (dispatchTransformOptions.dataTiling) {
-      assert(!globalOptimizationOptions.dataTiling &&
-             "expect only one data-tiling option to be enabled");
+    if (dispatchTransformOptions.dataTiling &&
+        globalOptimizationOptions.dataTiling) {
+#ifndef NDEBUG
+      llvm::reportFatalUsageError(
+          "Invalid configuration: data-tiling cannot be enabled in both "
+          "global optimization phase and dispatch creation phase.");
+#endif
+      dispatchTransformOptions.dataTiling = false;
     }
     dispatchTransformOptions.enableSplitReduction =
         dispatchCreationOptions.enableSplitReduction;
