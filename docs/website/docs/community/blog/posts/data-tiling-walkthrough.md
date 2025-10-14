@@ -53,10 +53,7 @@ Compilation command, that targets gfx942 AMDGPU:
 iree-compile matmul.mlir -o /tmp/matmul.mlir \
   --iree-hal-target-device=hip \
   --iree-hip-target=gfx942 \
-  --iree-opt-data-tiling=false \
-  --iree-dispatch-creation-data-tiling \
-  --iree-hip-encoding-layout-resolver=data-tiling \
-  --iree-llvmgpu-test-combine-layout-transformation=true
+  --iree-dispatch-creation-data-tiling
 ```
 
 Test source program, matmul.mlir:
@@ -88,7 +85,6 @@ iree-compile matmul.mlir -o /tmp/matmul.mlir \
   --iree-hal-target-device=local \
   --iree-hal-local-target-device-backends=llvm-cpu \
   --iree-llvmcpu-target-cpu-features=host \
-  --iree-opt-data-tiling=false \
   --iree-dispatch-creation-data-tiling
 ```
 

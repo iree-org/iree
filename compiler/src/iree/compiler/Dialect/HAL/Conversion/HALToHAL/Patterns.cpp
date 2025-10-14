@@ -17,7 +17,7 @@ namespace {
 
 struct ConvertDeviceResolveAnyOp
     : public OpConversionPattern<IREE::HAL::DeviceResolveOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::DeviceResolveOp resolveOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -57,7 +57,7 @@ struct ConvertDeviceResolveAnyOp
 
 struct ConvertDeviceResolveAffinityOp
     : public OpConversionPattern<IREE::HAL::DeviceResolveOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::DeviceResolveOp resolveOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -103,7 +103,7 @@ struct ConvertDeviceResolveAffinityOp
 
 struct ConvertExecutableCalculateWorkgroupsOp
     : public OpConversionPattern<IREE::HAL::ExecutableCalculateWorkgroupsOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::ExecutableCalculateWorkgroupsOp calculateOp,
                   OpAdaptor adaptor,

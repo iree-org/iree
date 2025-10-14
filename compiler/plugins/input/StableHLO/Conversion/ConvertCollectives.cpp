@@ -437,7 +437,7 @@ struct PartitionIdOpConversion
 /// Converts stablehlo.replica_id to floor_div(flow.channel.rank, numPartitions)
 struct ReplicaIdOpConversion
     : public OpConversionPattern<mlir::stablehlo::ReplicaIdOp> {
-  using OpConversionPattern<mlir::stablehlo::ReplicaIdOp>::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(mlir::stablehlo::ReplicaIdOp op, OpAdaptor adaptor,
@@ -471,7 +471,7 @@ struct ReplicaIdOpConversion
 
 struct AllGatherOpConversion final
     : OpConversionPattern<mlir::stablehlo::AllGatherOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(mlir::stablehlo::AllGatherOp op, OpAdaptor adaptor,
@@ -530,7 +530,7 @@ struct AllGatherOpConversion final
 
 struct AllReduceOpConversion final
     : OpConversionPattern<mlir::stablehlo::AllReduceOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(mlir::stablehlo::AllReduceOp op, OpAdaptor adaptor,
@@ -662,7 +662,7 @@ Value splitAndConcatForAllToAll(ConversionPatternRewriter &rewriter,
 
 struct AllToAllOpConversion final
     : OpConversionPattern<mlir::stablehlo::AllToAllOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(mlir::stablehlo::AllToAllOp op, OpAdaptor adaptor,
@@ -727,7 +727,7 @@ struct AllToAllOpConversion final
 
 struct ReduceScatterOpConversion final
     : OpConversionPattern<mlir::stablehlo::ReduceScatterOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(mlir::stablehlo::ReduceScatterOp op, OpAdaptor adaptor,

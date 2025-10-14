@@ -59,17 +59,14 @@ static bool isFusableWithSetEncoding(Operation *target) {
   return true;
 }
 
-struct FuseEncodingOpsIntoDispatchRegionsPass
-    : public DispatchCreation::impl::FuseEncodingOpsIntoDispatchRegionsPassBase<
+struct FuseEncodingOpsIntoDispatchRegionsPass final
+    : impl::FuseEncodingOpsIntoDispatchRegionsPassBase<
           FuseEncodingOpsIntoDispatchRegionsPass> {
+  using Base::Base;
   void runOnOperation() override {
     mlir::FunctionOpInterface funcOp = getOperation();
     MLIRContext *context = &getContext();
     IRRewriter rewriter(context);
-
-    // Run CSE to eliminate common encoding ops.
-    DominanceInfo domInfo;
-    mlir::eliminateCommonSubExpressions(rewriter, domInfo, funcOp);
 
     SmallVector<IREE::Encoding::SetEncodingOp> encodingOps;
     funcOp->walk([&](IREE::Encoding::SetEncodingOp encodingOp) {

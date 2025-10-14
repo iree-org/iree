@@ -56,7 +56,7 @@ namespace {
 ///
 struct FoldAttentionAndTranspose
     : public OpRewritePattern<IREE::LinalgExt::AttentionOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::LinalgExt::AttentionOp attentionOp,
                                 PatternRewriter &rewriter) const override {

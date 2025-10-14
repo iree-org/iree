@@ -112,7 +112,7 @@ struct FoldWinogradOpUnitDims : public OpRewritePattern<TransformOp> {
 /// ````
 struct DecomposeWinogradFilterTransform
     : public OpRewritePattern<WinogradFilterTransformOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(WinogradFilterTransformOp transformOp,
                                 PatternRewriter &rewriter) const override {
@@ -194,7 +194,7 @@ struct DecomposeWinogradFilterTransform
 /// ````
 struct DecomposeWinogradInputTransform
     : public OpRewritePattern<WinogradInputTransformOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(WinogradInputTransformOp transformOp,
                                 PatternRewriter &rewriter) const override {
@@ -277,7 +277,7 @@ struct DecomposeWinogradInputTransform
 /// ````
 struct DecomposeWinogradOutputTransform
     : public OpRewritePattern<WinogradOutputTransformOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(WinogradOutputTransformOp transformOp,
                                 PatternRewriter &rewriter) const override {

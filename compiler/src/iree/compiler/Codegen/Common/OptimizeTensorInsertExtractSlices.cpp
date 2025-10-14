@@ -242,7 +242,7 @@ void moveLoopInvariantCodeFromGenericOps(Operation *op) {
 namespace {
 struct CastLikeExtractSliceOpFolder final
     : OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
@@ -257,7 +257,7 @@ struct CastLikeExtractSliceOpFolder final
 
 struct CastLikeInsertSliceOpFolder final
     : OpRewritePattern<tensor::InsertSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::InsertSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
@@ -282,7 +282,7 @@ struct CastLikeInsertSliceOpFolder final
 /// write to memory.
 // TODO: Consider upstreaming
 struct FoldMaskedTransferRAW : OpRewritePattern<vector::TransferReadOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::TransferReadOp op,
                                 PatternRewriter &rewriter) const override {

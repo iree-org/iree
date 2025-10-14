@@ -79,6 +79,17 @@ def GPULowerToGlobalLoadsPass :
   ];
 }
 
+def GPUConvertToCoalescedDMAPass :
+    InterfacePass<"iree-codegen-gpu-convert-to-coalesced-dma", "mlir::FunctionOpInterface"> {
+  let summary = "Convert operations to coalesced DMA operations.";
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+    "::mlir::gpu::GPUDialect",
+    "::mlir::scf::SCFDialect",
+    "::mlir::tensor::TensorDialect"
+  ];
+}
+
 def GPUDistributeForallPass :
     InterfacePass<"iree-codegen-gpu-distribute-forall", "mlir::FunctionOpInterface"> {
   let summary = "Pass to distribute scf.forall ops.";

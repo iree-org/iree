@@ -36,6 +36,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
+#include "llvm/Frontend/Offloading/Utility.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
@@ -81,13 +82,16 @@ struct ROCMOptions {
   std::string bitcodeDirectory = getDefaultBitcodeDirectory();
   int wavesPerEu = 0;
   std::string enableROCMUkernels = "none";
-  std::string encodingLayoutResolver = GPU::kNoEncodingLayoutResolverName;
+  std::string encodingLayoutResolver =
+      GPU::kDataTilingEncodingLayoutResolverName;
   bool slpVectorization = true;
   bool globalISel = false;
   bool specializeDispatches = false;
   bool enableTensorUKernels = false;
   IREE::Codegen::DenormalFpMath denormalFpMathF32 =
       IREE::Codegen::DenormalFpMath::None;
+  bool enableRegSpillWarning = false;
+  bool debugSymbols = false;
 
   void bindOptions(OptionsBinder &binder) {
     using namespace llvm;
@@ -171,6 +175,13 @@ struct ROCMOptions {
                        "Convert denormals to zero while preserving sign"),
             clEnumValN(IREE::Codegen::DenormalFpMath::PositiveZero,
                        "positive-zero", "Convert denormals to positive zero")));
+
+    binder.opt<bool>("iree-hip-enable-register-spill-warning",
+                     enableRegSpillWarning, cl::cat(category),
+                     cl::desc("Report register spilling for AMD GPUs"));
+    binder.opt<bool>(
+        "iree-hip-emit-debug-info", debugSymbols, cl::cat(category),
+        cl::desc("Generate and embed debug information (DWARF) for HIP."));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
@@ -259,6 +270,24 @@ static std::string translateModuleToISA(llvm::Module &module,
     codegenPasses.run(module);
   }
   return targetISA;
+}
+
+static void checkRegisterSpilling(IREE::HAL::ExecutableVariantOp &variantOp,
+                                  StringRef obj) {
+  uint16_t abiVersion;
+  llvm::StringMap<llvm::offloading::amdgpu::AMDGPUKernelMetaData> infoMap;
+
+  if (!llvm::offloading::amdgpu::getAMDGPUMetaDataFromImage(
+          llvm::MemoryBufferRef(obj, ""), infoMap, abiVersion)) {
+    for (const auto &[_, metaData] : infoMap) {
+      if (metaData.SGPRSpillCount > 0 || metaData.VGPRSpillCount > 0) {
+        emitWarning(variantOp.getLoc())
+            << "Register spill: " << "VGPRSpillCount: "
+            << metaData.VGPRSpillCount
+            << " / SGPRSpillCount: " << metaData.SGPRSpillCount;
+      }
+    }
+  }
 }
 
 } // namespace
@@ -423,7 +452,7 @@ public:
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) override {
-    buildLLVMGPUCodegenPassPipeline(passManager, true);
+    buildLLVMGPUCodegenPassPipeline(passManager, true, options.debugSymbols);
   }
 
   void buildLinkingPassPipeline(OpPassManager &passManager) override {
@@ -669,6 +698,7 @@ public:
       // CI or users may not be prepared for.
       llvmModule->addModuleFlag(llvm::Module::Error,
                                 "amdhsa_code_object_version", abiVersion);
+
       for (llvm::Function &f : llvmModule->functions())
         f.addFnAttr(llvm::Attribute::AlwaysInline);
 
@@ -783,6 +813,10 @@ public:
       targetHSACO = createHsaco(variantOp.getLoc(), targetObj, libraryName);
       if (targetHSACO.empty())
         return failure();
+
+      if (options.enableRegSpillWarning) {
+        checkRegisterSpilling(variantOp, targetObj);
+      }
     }
 
     if (!serializationOptions.dumpBinariesPath.empty()) {
@@ -1021,7 +1055,7 @@ private:
 
 class AMDGPUTargetDevice final : public TargetDevice {
 public:
-  AMDGPUTargetDevice(const ROCMOptions &options) : options(options) {}
+  AMDGPUTargetDevice(const ROCMOptions & /*options*/) {}
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
@@ -1040,14 +1074,11 @@ public:
                                             deviceConfigAttr,
                                             executableTargetAttrs);
   }
-
-private:
-  const ROCMOptions &options;
 };
 
 class HIPTargetDevice final : public TargetDevice {
 public:
-  HIPTargetDevice(const ROCMOptions &options) : options(options) {}
+  HIPTargetDevice(const ROCMOptions & /*options*/) {}
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
@@ -1066,9 +1097,6 @@ public:
                                             deviceConfigAttr,
                                             executableTargetAttrs);
   }
-
-private:
-  const ROCMOptions &options;
 };
 
 namespace {

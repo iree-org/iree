@@ -42,43 +42,43 @@ constexpr int64_t kPreferredCopyNumBits = 128;
 // Lowering Config Selection
 //===----------------------------------------------------------------------===//
 
-LogicalResult setDataTiledMultiMmaLoweringConfig(
+LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
     Operation *op, IREE::Codegen::UKernelDescriptorAttr ukernelConfig) {
   auto multiMmaOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op);
   if (!multiMmaOp) {
     return failure();
   }
-  auto dataTiledMmaAttr = dyn_cast<DataTiledMMAAttr>(multiMmaOp.getKind());
+  auto dataTiledMmaAttr =
+      dyn_cast<DataTiledMMAInterfaceAttr>(multiMmaOp.getKind());
   if (!dataTiledMmaAttr) {
     return failure();
   }
 
-  LDBG() << "MultiMMA TileAndFuse Config";
+  LDBG() << "Data Tiled MMA InnerTiled TileAndFuse Config";
 
   // Compute workgroup size, which is given by the subgroup size times the
   // number of subgroups. The number of subgroups is found by the product of
   // subgroup unrolling factors, since the non-unrolled inner kernel takes a
   // single subgroup.
   const int64_t targetSubgroupSize = dataTiledMmaAttr.getSubgroupSize();
-  int64_t flatWorkgroupSize = targetSubgroupSize *
-                              dataTiledMmaAttr.getSubgroupsM() *
-                              dataTiledMmaAttr.getSubgroupsN();
+  int64_t flatWorkgroupSize = dataTiledMmaAttr.getFlatWorkgroupSize();
   std::array<int64_t, 3> workgroupSize{flatWorkgroupSize, 1, 1};
 
   // Set all workgroup and reduction tile sizes to 1, since the data tiled
   // kernel has the scope of an entire workgroup, and the reduction tiling is
   // already baked into the "opaque" data tiled inner layout of the inner_tiled.
-  SmallVector<AffineMap> indexingMaps = multiMmaOp.getIndexingMapsArray();
-  mlir::linalg::ContractionDimensions contractionDims =
-      mlir::linalg::inferContractionDims(indexingMaps).value();
-
-  int64_t iterationRank = indexingMaps.front().getNumDims();
+  SmallVector<utils::IteratorType> iteratorTypes =
+      multiMmaOp.getIteratorTypesArray();
+  int64_t iterationRank = iteratorTypes.size();
   SmallVector<int64_t> workgroupTileSizes(iterationRank, 1);
   SmallVector<int64_t> reductionTileSizes(iterationRank, 0);
-  for (int64_t kDim : contractionDims.k) {
-    workgroupTileSizes[kDim] = 0;
-    reductionTileSizes[kDim] = ukernelConfig ? 0 : 1;
+  for (auto [idx, iteratorType] : llvm::enumerate(iteratorTypes)) {
+    if (iteratorType == utils::IteratorType::parallel) {
+      continue;
+    }
+    workgroupTileSizes[idx] = 0;
+    reductionTileSizes[idx] = ukernelConfig ? 0 : 1;
   }
 
   // Set tile sizes.
@@ -370,6 +370,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
 
 struct ConvToIgemmInfo {
   bool isInputChannelLast;
+  bool isSpatialDimLast;
   linalg::ConvolutionDimensions convDims;
   DenseMap<int64_t, AffineExpr> convToIgemmDimMap;
   DenseMap<int64_t, int64_t> inputChannelDimToSize;
@@ -383,6 +384,10 @@ getPaddingConvSizes(Builder &b, const SmallVector<int64_t> &bounds,
                     const SmallVector<int64_t> &reductionTileSizes,
                     std::optional<ConvToIgemmInfo> &convToIgemmInfo) {
   if (!convToIgemmInfo.has_value())
+    return std::nullopt;
+
+  // Skip padding convolution for NCHW layout.
+  if (convToIgemmInfo->isSpatialDimLast)
     return std::nullopt;
 
   DenseMap<int64_t, AffineExpr> convToIgemmMap =
@@ -733,7 +738,10 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   SmallVector<Attribute> promotionArray = {useGlobalDma, useGlobalDma};
   SmallVector<int64_t> promotionList = {0, 1};
   if (scaled) {
-    promotionArray.append({useGlobalDma, useGlobalDma});
+    // TODO(#22119): We don't use global load DMA for scaled matmuls, because
+    // compilation doesn't support it. Once this is fixed, we should use global
+    // load DMA here when possible.
+    promotionArray = {};
     promotionList.append({2, 3});
   }
   ArrayRef<Attribute> promotionTypes = useDirectLoad
@@ -805,6 +813,7 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
     ArrayRef<int64_t> inputShape = inputType.getShape();
     AffineMap inputMap = linalgOp.getIndexingMapsArray()[0];
     SmallVector<int64_t> inputChannelPos;
+    SmallVector<int64_t> inputImagePos;
     for (auto dim : igemmGenericConvDetails->convDims.inputChannel) {
       for (auto [idx, e] : llvm::enumerate(inputMap.getResults())) {
         if (e.isFunctionOfDim(dim)) {
@@ -813,9 +822,19 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
         }
       }
     }
+    for (auto dim : igemmGenericConvDetails->convDims.outputImage) {
+      for (auto [idx, e] : llvm::enumerate(inputMap.getResults())) {
+        if (e.isFunctionOfDim(dim)) {
+          inputImagePos.push_back(idx);
+        }
+      }
+    }
     llvm::sort(inputChannelPos);
+    llvm::sort(inputImagePos);
     convToIgemmInfo.isInputChannelLast =
         inputChannelPos.back() == inputShape.size() - 1;
+    convToIgemmInfo.isSpatialDimLast =
+        inputImagePos.back() == inputShape.size() - 1;
     convToIgemmInfo.convDims = igemmGenericConvDetails->convDims;
     convToIgemmInfo.convToIgemmDimMap =
         igemmGenericConvDetails->convToIgemmDimMap;
@@ -1006,6 +1025,56 @@ struct DistributionInfo {
   bool vectorizable = false;
 };
 
+// Generally parallel loops are partitionable, however if the dims for it
+// are not present in a producer of the compute op within the dispatch and the
+// results of that producer op are also returned from the dispatch
+// then that dim is not partitioned as codegen for this is unsupported.
+static SmallVector<unsigned int>
+getSupportedPartitionableLoops(linalg::LinalgOp linalgOp) {
+  SmallVector<unsigned int> partitionableLoops;
+  linalgOp.getParallelDims(partitionableLoops);
+  SmallVector<OpOperand *> producerOperands;
+  for (auto operand : linalgOp.getDpsInputOperands()) {
+    auto producerOp = operand->get().getDefiningOp<linalg::LinalgOp>();
+    if (!producerOp) {
+      continue;
+    }
+
+    for (Operation *user : producerOp->getUsers()) {
+      if (isa<IREE::Codegen::StoreToBufferOp,
+              IREE::TensorExt::DispatchTensorStoreOp>(user)) {
+        producerOperands.push_back(operand);
+        break;
+      }
+    }
+  }
+  if (producerOperands.empty()) {
+    return partitionableLoops;
+  }
+  // If we have producer operands then we need to confirm that all of them
+  // also have the the partitionableLoop dims if not we skip that dim.
+  SmallVector<unsigned int> finalPartitionableLoops;
+  for (auto dim : partitionableLoops) {
+    bool dimFound = false;
+    for (auto operand : producerOperands) {
+      AffineMap IndexingMap = linalgOp.getMatchingIndexingMap(operand);
+      if (llvm::any_of(IndexingMap.getResults(), [&](AffineExpr expr) {
+            auto dimExpr = dyn_cast<AffineDimExpr>(expr);
+            return dimExpr && dimExpr.getPosition() == dim;
+          })) {
+        dimFound = true;
+      } else {
+        dimFound = false;
+        break;
+      }
+    }
+    if (dimFound) {
+      finalPartitionableLoops.push_back(dim);
+    }
+  }
+  return finalPartitionableLoops;
+}
+
 static FailureOr<DistributionInfo> collectOpDistributionInfo(Operation *op) {
   DistributionInfo distInfo;
   // MapScatterOp doesn't fit the LinalgOp interface, so use special case logic
@@ -1035,19 +1104,17 @@ static FailureOr<DistributionInfo> collectOpDistributionInfo(Operation *op) {
   }
 
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  // Bail out on multi result cases as consumer fusion currently does not
-  // support multi result ops.
-  if (!linalgOp || linalgOp.getNumDpsInits() != 1) {
+  if (!linalgOp) {
     return failure();
   }
 
   // This pipeline requires tensor semantics. Also fail for gather semantics
   // for now to simplify tile + fuse.
-  if (!linalgOp.hasPureTensorSemantics() || linalgOp.hasIndexSemantics()) {
+  if (!linalgOp.hasPureTensorSemantics() ||
+      LinalgExt::isGatherlikeOp(linalgOp)) {
     return failure();
   }
-
-  linalgOp.getParallelDims(distInfo.partitionableLoops);
+  distInfo.partitionableLoops = getSupportedPartitionableLoops(linalgOp);
 
   // Bail out if op is not tilable.
   if (distInfo.partitionableLoops.empty()) {

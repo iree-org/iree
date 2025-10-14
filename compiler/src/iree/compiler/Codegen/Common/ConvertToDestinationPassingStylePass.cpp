@@ -564,7 +564,7 @@ struct RemoveCstOutsDependency
 /// This is a workaround for #11273 while a proper fix lands.
 struct SwitchStoreOfIfResultValue
     : public OpRewritePattern<IREE::TensorExt::DispatchTensorStoreOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {

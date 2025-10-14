@@ -219,10 +219,13 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
   }
 
   TilingInterface paddedOp = *maybePaddedOp;
+  Location loc = paddedOp.getLoc();
 
   if (auto paddedLinalgOp =
           dyn_cast<linalg::LinalgOp>(paddedOp.getOperation())) {
     Block *block = paddedLinalgOp.getBlock();
+    SmallVector<int64_t> paddedLoopRanges =
+        paddedLinalgOp.getStaticLoopRanges();
 
     SmallVector<Operation *> reductions;
     for (auto [index, initOpOperand] :
@@ -247,8 +250,8 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
       assert(succeeded(reductionDimInfo) &&
              "obtained with confirmation earlier");
       for (auto &&dimInfo : reductionDimInfo.value()) {
-        Value redDimSize = tensor::DimOp::create(
-            rewriter, paddedOp.getLoc(), dimInfo.operand, dimInfo.operandDim);
+        Value redDimSize = rewriter.createOrFold<tensor::DimOp>(
+            loc, dimInfo.operand, dimInfo.operandDim);
         reductionDimSizes.push_back({dimInfo.loopIndex, redDimSize});
       }
 
@@ -256,21 +259,29 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
       // loops is inside or outside the padded part of the iteration space.
       rewriter.setInsertionPoint(reduction);
       SmallVector<Value> conds;
-      for (auto &&[redDim, redDimSize] : reductionDimSizes) {
-        Value redDimIndex =
-            linalg::IndexOp::create(rewriter, paddedOp.getLoc(), redDim);
-        Value cond = arith::CmpIOp::create(rewriter, paddedOp.getLoc(),
-                                           arith::CmpIPredicate::ult,
-                                           redDimIndex, redDimSize);
+      for (auto &&[dimension, unpaddedSize] : reductionDimSizes) {
+        Value cond;
+
+        // First check if the condition 'index < unpaddedSize' is always true,
+        // and directly optimize for this case.
+        int64_t lhs = paddedLoopRanges[dimension];
+        std::optional<int64_t> rhs = getConstantIntValue(unpaddedSize);
+        if (lhs != ShapedType::kDynamic && lhs <= rhs) {
+          cond = arith::ConstantOp::create(rewriter, loc,
+                                           rewriter.getBoolAttr(true));
+        } else {
+          Value redDimIndex = linalg::IndexOp::create(rewriter, loc, dimension);
+          cond = arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::ult,
+                                       redDimIndex, unpaddedSize);
+        }
         conds.push_back(cond);
       }
-      Value reductionIdentityValue = arith::ConstantOp::create(
-          rewriter, paddedOp.getLoc(), reductionIdentity.value());
+      Value reductionIdentityValue =
+          arith::ConstantOp::create(rewriter, loc, reductionIdentity.value());
       assert(conds.size() > 0);
       Value cond = conds[0];
       for (Value nxtCond : llvm::drop_begin(conds, 1)) {
-        cond =
-            arith::AndIOp::create(rewriter, paddedOp.getLoc(), cond, nxtCond);
+        cond = arith::AndIOp::create(rewriter, loc, cond, nxtCond);
       }
 
       // Find the reduction op operand that is reduced with the carried output.
@@ -283,8 +294,8 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
       Value uncarried = reduction->getOperand(uncarryIndex);
 
       // Select the reduction identity value if in the padding region.
-      Value selected = arith::SelectOp::create(
-          rewriter, paddedOp.getLoc(), cond, uncarried, reductionIdentityValue);
+      Value selected = arith::SelectOp::create(rewriter, loc, cond, uncarried,
+                                               reductionIdentityValue);
       IRMapping mapping;
       mapping.map(reduction->getOperand(uncarryIndex), selected);
       Operation *redClone = rewriter.clone(*reduction, mapping);
@@ -305,16 +316,15 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
     int64_t rank = tensorTy.getRank();
     SmallVector<OpFoldResult> sizes(rank, OpFoldResult());
     for (int64_t i = 0; i < rank; ++i) {
-      sizes[i] = rewriter.createOrFold<tensor::DimOp>(paddedOp->getLoc(),
-                                                      padOp.getResult(), i);
+      sizes[i] =
+          rewriter.createOrFold<tensor::DimOp>(loc, padOp.getResult(), i);
       if (auto v = dyn_cast<Value>(sizes[i]))
         sizes[i] = getAsOpFoldResult(v);
     }
 
-    Value out = tensor::EmptyOp::create(rewriter, paddedOp.getLoc(), sizes,
+    Value out = tensor::EmptyOp::create(rewriter, loc, sizes,
                                         getElementTypeOrSelf(tensorTy));
-    auto copied = linalg::CopyOp::create(rewriter, paddedOp.getLoc(),
-                                         padOp.getResult(), out);
+    auto copied = linalg::CopyOp::create(rewriter, loc, padOp.getResult(), out);
     rewriter.replaceUsesWithIf(padOp.getResult(), copied.getResult(0),
                                [&](OpOperand &opOperand) {
                                  return users.contains(opOperand.getOwner());

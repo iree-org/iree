@@ -35,7 +35,7 @@ static Value castToIndex(Value value, OpBuilder &builder) {
 
 class ListCreateOpConversion
     : public OpConversionPattern<IREE::Util::ListCreateOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::ListCreateOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -55,7 +55,7 @@ class ListCreateOpConversion
 
 class ListConstructOpConversion
     : public OpConversionPattern<IREE::Util::ListConstructOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::ListConstructOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -104,7 +104,7 @@ class ListConstructOpConversion
 
 class ListSizeOpConversion
     : public OpConversionPattern<IREE::Util::ListSizeOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::ListSizeOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -117,7 +117,7 @@ class ListSizeOpConversion
 
 class ListResizeOpConversion
     : public OpConversionPattern<IREE::Util::ListResizeOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::ListResizeOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -128,7 +128,7 @@ class ListResizeOpConversion
 };
 
 class ListGetOpConversion : public OpConversionPattern<IREE::Util::ListGetOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::ListGetOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -157,7 +157,7 @@ class ListGetOpConversion : public OpConversionPattern<IREE::Util::ListGetOp> {
 };
 
 class ListSetOpConversion : public OpConversionPattern<IREE::Util::ListSetOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::ListSetOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {

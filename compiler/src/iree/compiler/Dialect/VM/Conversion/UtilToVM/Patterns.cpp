@@ -55,7 +55,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 struct NullOpConversion : public OpConversionPattern<IREE::Util::NullOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::NullOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -70,7 +70,7 @@ struct NullOpConversion : public OpConversionPattern<IREE::Util::NullOp> {
 //===----------------------------------------------------------------------===//
 
 struct CmpEQOpConversion : public OpConversionPattern<IREE::Util::CmpEQOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::CmpEQOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -89,7 +89,7 @@ struct CmpEQOpConversion : public OpConversionPattern<IREE::Util::CmpEQOp> {
 //===----------------------------------------------------------------------===//
 
 struct CmpNEOpConversion : public OpConversionPattern<IREE::Util::CmpNEOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::CmpNEOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -103,26 +103,6 @@ struct CmpNEOpConversion : public OpConversionPattern<IREE::Util::CmpNEOp> {
   }
 };
 
-//===----------------------------------------------------------------------===//
-// Compiler hints
-//===----------------------------------------------------------------------===//
-
-struct UnreachableOpConversion
-    : public OpConversionPattern<IREE::Util::UnreachableOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult
-  matchAndRewrite(IREE::Util::UnreachableOp srcOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<IREE::VM::FailOp>(
-        srcOp,
-        rewriter.createOrFold<IREE::VM::ConstI32Op>(
-            srcOp.getLoc(),
-            static_cast<int32_t>(IREE::Util::StatusCode::Unknown)),
-        srcOp.getMessage());
-    return success();
-  }
-};
-
 } // namespace
 
 void populateUtilToVMPatterns(MLIRContext *context,
@@ -133,7 +113,6 @@ void populateUtilToVMPatterns(MLIRContext *context,
   patterns.insert<NullOpConversion>(typeConverter, context);
   patterns.insert<CmpEQOpConversion>(typeConverter, context);
   patterns.insert<CmpNEOpConversion>(typeConverter, context);
-  patterns.insert<UnreachableOpConversion>(typeConverter, context);
 
   populateUtilAlignmentToVMPatterns(context, conversionTarget, typeConverter,
                                     patterns);

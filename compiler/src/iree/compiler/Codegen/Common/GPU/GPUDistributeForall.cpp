@@ -188,9 +188,7 @@ void GPUDistributeForallPass::runOnOperation() {
     return signalPassFailure();
   }
 
-  int64_t flatWorkgroupSize =
-      std::accumulate(workgroupSize.begin(), workgroupSize.end(), 1,
-                      std::multiplies<int64_t>());
+  int64_t flatWorkgroupSize = llvm::product_of(workgroupSize);
   int64_t subgroupSize = *maybeSubgroupSize;
 
   if (flatWorkgroupSize % subgroupSize != 0 &&

@@ -46,6 +46,8 @@ jobs:
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
           source ${VENV_DIR}/bin/activate
           pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Validate runtime wheel
         run: |
           source ${VENV_DIR}/bin/activate

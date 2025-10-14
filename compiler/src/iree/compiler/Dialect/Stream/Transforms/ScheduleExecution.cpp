@@ -154,8 +154,8 @@ struct ExecutePartitionBuilder {
       if (transferOp.getSourceAffinityAttr() == partition->affinity) {
         transferOp.setSourceAffinityAttr(nullptr);
       }
-      if (transferOp.getResultAffinityAttr() == partition->affinity) {
-        transferOp.setResultAffinityAttr(nullptr);
+      if (transferOp.getTargetAffinityAttr() == partition->affinity) {
+        transferOp.setTargetAffinityAttr(nullptr);
       }
     } else if (auto affinityOp =
                    dyn_cast<IREE::Stream::AffinityOpInterface>(clonedOp)) {
@@ -323,7 +323,7 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
 //===----------------------------------------------------------------------===//
 
 struct RemoveBarriers : public OpRewritePattern<IREE::Stream::AsyncBarrierOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::AsyncBarrierOp op,
                                 PatternRewriter &rewriter) const override {
     rewriter.replaceOp(op, op.getOperand(0));

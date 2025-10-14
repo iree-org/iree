@@ -29,6 +29,7 @@ iree_lit_test_suite(
     "conv_pipeline_test_cuda.mlir"
     "convert_to_nvvm.mlir"
     "convert_to_rocdl.mlir"
+    "convert_to_rocdl_gfx950.mlir"
     "create_async_groups.mlir"
     "create_tile_sizes.mlir"
     "distribute_to_thread.mlir"

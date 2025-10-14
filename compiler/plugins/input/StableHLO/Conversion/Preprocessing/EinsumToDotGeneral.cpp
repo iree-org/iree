@@ -21,7 +21,7 @@ namespace {
 
 struct EinsumToDotGeneralPattern final
     : OpRewritePattern<mlir::stablehlo::EinsumOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::EinsumOp einsum,
                                 PatternRewriter &rewriter) const override {

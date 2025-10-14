@@ -798,7 +798,7 @@ static Value predicateMaybeMaskedScalarTransfer(
 /// if any of the memory access is not vector.
 struct ScalarizeVectorTransferRead final
     : public OpRewritePattern<vector::TransferReadOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::TransferReadOp readOp,
                                 PatternRewriter &rewriter) const override {
@@ -878,7 +878,7 @@ struct ScalarizeVectorTransferRead final
 };
 
 struct ScalarizeVectorLoad final : public OpRewritePattern<vector::LoadOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::LoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
@@ -923,7 +923,7 @@ struct ScalarizeVectorLoad final : public OpRewritePattern<vector::LoadOp> {
 
 struct ScalarizeVectorTransferWrite final
     : public OpRewritePattern<vector::TransferWriteOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::TransferWriteOp writeOp,
                                 PatternRewriter &rewriter) const override {
@@ -1007,7 +1007,7 @@ struct ScalarizeVectorTransferWrite final
 /// operations.
 struct ReifyExtractOfCreateMask final
     : public OpRewritePattern<vector::ExtractOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::ExtractOp extractOp,
                                 PatternRewriter &rewriter) const override {

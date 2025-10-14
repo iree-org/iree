@@ -47,7 +47,7 @@ static SmallVector<int64_t> getVectorSizeTileSizes(int64_t rank,
 /// to collapse the vector.transfer_read that results from this choice of tile
 /// size.
 static SmallVector<int64_t> getVectorTileSizesFromLoopRanges(
-    SmallVector<int64_t> loopRanges, int64_t numThreads, int64_t vectorSize,
+    ArrayRef<int64_t> loopRanges, int64_t numThreads, int64_t vectorSize,
     bool allowMultiDimCollapse = true, bool vectorizeOutermost = false) {
   int64_t rank = loopRanges.size();
   int64_t targetDim = vectorizeOutermost ? 0 : rank - 1;
@@ -62,8 +62,7 @@ static SmallVector<int64_t> getVectorTileSizesFromLoopRanges(
   // If the number of loop trips are indivisible by the number of threads then
   // also default to just the vector size (e.g., [1, ..., 1, vector_size] when
   // `targetDim` is the innermost).
-  int64_t flatNumTrips = std::accumulate(loopRanges.begin(), loopRanges.end(),
-                                         1, std::multiplies<int64_t>());
+  int64_t flatNumTrips = llvm::product_of(loopRanges);
   if (flatNumTrips % numThreads != 0) {
     return getVectorSizeTileSizes(rank, targetDim, targetRange, vectorSize);
   }
@@ -158,9 +157,7 @@ SmallVector<int64_t> deriveThreadTileSizes(Operation *op) {
   if (!workgroupSize) {
     return {};
   }
-  int64_t numThreads =
-      std::accumulate(workgroupSize->begin(), workgroupSize->end(), 1,
-                      std::multiplies<int64_t>());
+  int64_t numThreads = llvm::product_of(*workgroupSize);
   return TypeSwitch<Operation *, SmallVector<int64_t>>(op)
       .Case([&](linalg::LinalgOp linalgOp) -> SmallVector<int64_t> {
         return deriveLinalgOpThreadTileSizes(linalgOp, numThreads);
@@ -175,6 +172,17 @@ SmallVector<int64_t> deriveThreadTileSizes(Operation *op) {
         return getVectorTileSizesFromLoopRanges(loopBounds, numThreads,
                                                 vectorSize);
       })
+      .Case(
+          [&](IREE::LinalgExt::MapScatterOp scatterOp) -> SmallVector<int64_t> {
+            ShapedType inputType = scatterOp.getInputType();
+            if (!inputType.hasStaticShape())
+              return {};
+            ArrayRef<int64_t> loopBounds = inputType.getShape();
+            int64_t elemBits = inputType.getElementTypeBitWidth();
+            int64_t vectorSize = kPreferredCopyNumBits / elemBits;
+            return getVectorTileSizesFromLoopRanges(loopBounds, numThreads,
+                                                    vectorSize);
+          })
       .Default([&](Operation *op) -> SmallVector<int64_t> { return {}; });
 }
 
@@ -199,9 +207,7 @@ SmallVector<int64_t> globalLoadDMATileSizes(Operation *op) {
       (kDefaultGlobalLoadBitSizePerThread * targetSubgroupSize) /
       getElementTypeOrSelf(linalgOp->getResultTypes()[0])
           .getIntOrFloatBitWidth();
-  int64_t numThreads =
-      std::accumulate(workgroupSize->begin(), workgroupSize->end(), 1,
-                      std::multiplies<int64_t>());
+  int64_t numThreads = llvm::product_of(*workgroupSize);
   SmallVector<int64_t> tileSizes = getVectorTileSizesFromLoopRanges(
       loopRanges, numThreads, subgroupLoadSize);
   return tileSizes;

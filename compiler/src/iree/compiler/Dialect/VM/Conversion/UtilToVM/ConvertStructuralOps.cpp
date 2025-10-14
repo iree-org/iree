@@ -17,8 +17,7 @@ namespace {
 
 struct InitializerOpConversion
     : public OpConversionPattern<IREE::Util::InitializerOp> {
-  using OpConversionPattern::OpConversionPattern;
-
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::InitializerOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -85,7 +84,7 @@ static void copyFuncAttrs(IREE::Util::FuncOp srcOp, Operation *dstOp) {
 }
 
 class FuncOpConversion : public OpConversionPattern<IREE::Util::FuncOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::FuncOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -161,7 +160,7 @@ static void copyImportAttrs(IREE::Util::FuncOp srcOp,
 
 class ExternalFuncOpConversion
     : public OpConversionPattern<IREE::Util::FuncOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::FuncOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -367,12 +366,26 @@ struct CallOpConversion : public OpConversionPattern<IREE::Util::CallOp> {
 };
 
 struct ReturnOpConversion : public OpConversionPattern<IREE::Util::ReturnOp> {
-  using OpConversionPattern::OpConversionPattern;
-
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::ReturnOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::ReturnOp>(op, adaptor.getOperands());
+    return success();
+  }
+};
+
+struct UnreachableOpConversion
+    : public OpConversionPattern<IREE::Util::UnreachableOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Util::UnreachableOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Create INTERNAL status code (13) for unreachable code.
+    auto status = rewriter.create<IREE::VM::ConstI32Op>(
+        op.getLoc(), rewriter.getI32IntegerAttr(13));
+    rewriter.replaceOpWithNewOp<IREE::VM::FailOp>(op, status.getResult(),
+                                                  op.getMessageAttr());
     return success();
   }
 };
@@ -387,8 +400,8 @@ void populateUtilStructuralToVMPatterns(MLIRContext *context,
   conversionTarget.addIllegalOp<IREE::Util::InitializerOp, IREE::Util::FuncOp,
                                 IREE::Util::CallOp, IREE::Util::ReturnOp>();
   patterns.insert<InitializerOpConversion, FuncOpConversion,
-                  ExternalFuncOpConversion, ReturnOpConversion>(typeConverter,
-                                                                context);
+                  ExternalFuncOpConversion, ReturnOpConversion,
+                  UnreachableOpConversion>(typeConverter, context);
   patterns.insert<CallOpConversion>(typeConverter, context, importTable);
 }
 

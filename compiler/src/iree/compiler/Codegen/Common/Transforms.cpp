@@ -139,7 +139,7 @@ namespace {
 
 struct FoldRelayoutOpIntoMapScatterPattern
     : public OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
                                 PatternRewriter &rewriter) const override {
@@ -160,7 +160,7 @@ struct FoldRelayoutOpIntoMapScatterPattern
 
 struct FoldPadOpIntoMapScatterPattern
     : public OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   FoldPadOpIntoMapScatterPattern(MLIRContext *context,
                                  PadDistributionConfigFn configFn,
                                  PatternBenefit benefit = 1)
@@ -353,7 +353,7 @@ namespace {
 
 struct SwapExpandShapeWithSlicePattern
     : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
@@ -497,11 +497,14 @@ swapCollapseShapeWithSlice(RewriterBase &rewriter,
   for (auto [collapsedSize, collapsedOffset, reassocIndices] :
        llvm::zip_equal(collapsedSizes, collapsedOffsets,
                        collapseShapeOp.getReassociationIndices())) {
-    // CASE #1 - size and/or offset are dynamic.
-    // TODO(vivian): For some special case, running this pattern with dynamic
-    // `collapsedSize` may cause a dynamic allocation in workgroup which blocks
-    // `GPUReduceBankConflictsPass`.
-    if (isa<Value>(collapsedSize) || isa<Value>(collapsedOffset)) {
+    // Do not support cases where both the collapsed size and offset are
+    // dynamic, as this may cause failures when padding the operands.
+    if (isa<Value>(collapsedSize) && isa<Value>(collapsedOffset)) {
+      return rewriter.notifyMatchFailure(
+          sliceOp, "collapsed size and offset cannot be both dynamic");
+    }
+    // CASE #1 - size or offset is dynamic.
+    else if (isa<Value>(collapsedSize) || isa<Value>(collapsedOffset)) {
       // Special case especially for collapse shape of convolution filter in
       // IGEMM, while the offset is dynamic and the size is static.
       if (isa<Attribute>(collapsedSize) && isa<Value>(collapsedOffset)) {
@@ -698,7 +701,7 @@ namespace {
 
 struct SwapCollapseShapeWithSlicePattern
     : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {

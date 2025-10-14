@@ -46,7 +46,7 @@ struct WebGPUSPIRVOptions {
 // TODO: WebGPUOptions for choosing the version/extensions/etc.
 class WebGPUTargetDevice : public TargetDevice {
 public:
-  WebGPUTargetDevice(const WebGPUSPIRVOptions &options) : options(options) {}
+  WebGPUTargetDevice(const WebGPUSPIRVOptions & /*options*/) {}
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
@@ -64,9 +64,6 @@ public:
     return IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("webgpu"),
                                             configAttr, executableTargetAttrs);
   }
-
-private:
-  const WebGPUSPIRVOptions &options;
 };
 
 class WebGPUSPIRVTargetBackend : public TargetBackend {

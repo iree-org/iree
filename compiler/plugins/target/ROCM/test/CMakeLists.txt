@@ -44,6 +44,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "emit_debug_info.mlir"
     "external_function_validation.mlir"
     "smoketest.mlir"
     "smoketest_hsaco.mlir"

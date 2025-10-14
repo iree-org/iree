@@ -176,7 +176,7 @@ struct HoistEncodingOpsPass
 /// of a dispatch.
 struct BubbleUpSetEncodingOp
     : public OpRewritePattern<IREE::Encoding::SetEncodingOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp,
                                 PatternRewriter &rewriter) const override {
@@ -202,7 +202,7 @@ struct BubbleUpSetEncodingOp
 /// Pattern to sink UnsetEncoding ops down through consumers.
 struct SinkUnsetEncodingOp
     : public OpRewritePattern<IREE::Encoding::UnsetEncodingOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::Encoding::UnsetEncodingOp encodingOp,
                                 PatternRewriter &rewriter) const override {

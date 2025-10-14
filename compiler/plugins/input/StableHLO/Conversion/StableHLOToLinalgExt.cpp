@@ -148,7 +148,7 @@ struct LinalgExtRegionHLOOpConversion final : OpConversionPattern<OpTy> {
 
 struct LinalgExtRegionReturnOpConversion final
     : OpConversionPattern<mlir::stablehlo::ReturnOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(mlir::stablehlo::ReturnOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -165,7 +165,7 @@ struct LinalgExtRegionReturnOpConversion final
 //===----------------------------------------------------------------------===//
 
 struct SortOpConversion final : OpConversionPattern<mlir::stablehlo::SortOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(mlir::stablehlo::SortOp op, OpAdaptor adaptor,
@@ -204,7 +204,7 @@ struct SortOpConversion final : OpConversionPattern<mlir::stablehlo::SortOp> {
 
 struct ScatterOpConversion final
     : OpConversionPattern<mlir::stablehlo::ScatterOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   /// Returns true if the `dimensionNumbers` from the stablehlo.scatter op
   /// follows a canonical form:
@@ -295,7 +295,7 @@ struct ScatterOpConversion final
 //===----------------------------------------------------------------------===//
 
 struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(mlir::stablehlo::FftOp op, OpAdaptor adaptor,
@@ -330,7 +330,7 @@ struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
 
 struct ReverseOpConversion final
     : OpConversionPattern<mlir::stablehlo::ReverseOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(mlir::stablehlo::ReverseOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -397,7 +397,7 @@ static bool checkUnary(const ArrayRef<int64_t> &values) {
 
 struct ScanOpConversion final
     : OpConversionPattern<mlir::stablehlo::ReduceWindowOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(mlir::stablehlo::ReduceWindowOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -546,7 +546,7 @@ struct ScanOpConversion final
 //===----------------------------------------------------------------------===//
 
 struct TopkOpConversion final : OpConversionPattern<chlo::TopKOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(chlo::TopKOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {

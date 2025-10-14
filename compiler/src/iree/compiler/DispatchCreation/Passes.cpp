@@ -184,17 +184,21 @@ static void addDispatchRegionCreationPreprocessingPasses(
       //     c. Transpose generic ops to
       //        - help with dispatch region formation.
       //        - move reduction iterators to be innermost.
-      .addPass(DispatchCreation::createTransposeGenericOpsPass);
+      .addPass(DispatchCreation::createTransposeGenericOpsPass)
+      .addPass(DispatchCreation::createPropagateEncodingsPass);
 
   // Run constant expression hoisting just before dispatch creation in case
   // there are any new hoisting opportunities (e.g. transpose generics or
   // horizontal fusion).
-  IREE::Util::ExprHoistingOptions options;
-  options.maxSizeIncreaseThreshold = 0;
-  options.registerDependentDialectsFn = [](DialectRegistry &registry) {
-    registry.insert<IREE::TensorExt::IREETensorExtDialect>();
-  };
-  passManager.addPass(IREE::Util::createHoistIntoGlobalsPass(options));
+  if (dispatchOptions.constExprHoisting) {
+    IREE::Util::ExprHoistingOptions options;
+    options.maxSizeIncreaseThreshold =
+        dispatchOptions.constExprMaxSizeIncreaseThreshold;
+    options.registerDependentDialectsFn = [](DialectRegistry &registry) {
+      registry.insert<IREE::TensorExt::IREETensorExtDialect>();
+    };
+    passManager.addPass(IREE::Util::createHoistIntoGlobalsPass(options));
+  }
   FunctionLikeNest(passManager)
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass);
@@ -276,19 +280,22 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
     // SetEncodingOps through special operations like bit-extending ops and
     // broadcasting ops.
     passManager.addPass(DispatchCreation::createHoistEncodingOpsPass());
-    FunctionLikeNest(passManager)
-        .addPass(
-            DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass);
   }
   FunctionLikeNest(passManager)
+      .addPass(DispatchCreation::createFuseEncodingOpsIntoDispatchRegionsPass)
       .addPass(DispatchCreation::createConvertEncodingToFlowPass);
   // Hoist encoding operations into initializers when possible.
-  IREE::Util::ExprHoistingOptions hoistingOptions;
-  hoistingOptions.maxSizeIncreaseThreshold = 0;
-  hoistingOptions.registerDependentDialectsFn = [](DialectRegistry &registry) {
-    registry.insert<IREE::TensorExt::IREETensorExtDialect>();
-  };
-  passManager.addPass(IREE::Util::createHoistIntoGlobalsPass(hoistingOptions));
+  if (options.constExprHoisting) {
+    IREE::Util::ExprHoistingOptions hoistingOptions;
+    hoistingOptions.maxSizeIncreaseThreshold =
+        options.constExprMaxSizeIncreaseThreshold;
+    hoistingOptions.registerDependentDialectsFn =
+        [](DialectRegistry &registry) {
+          registry.insert<IREE::TensorExt::IREETensorExtDialect>();
+        };
+    passManager.addPass(
+        IREE::Util::createHoistIntoGlobalsPass(hoistingOptions));
+  }
 }
 
 // Apply preprocessing and form dispatch regions

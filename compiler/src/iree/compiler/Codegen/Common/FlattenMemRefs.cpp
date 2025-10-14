@@ -296,7 +296,7 @@ struct FlattenVectorTransferWrite
 };
 
 struct FlattenSubview : public OpRewritePattern<memref::SubViewOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(memref::SubViewOp op,
                                 PatternRewriter &rewriter) const override {

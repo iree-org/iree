@@ -15,7 +15,13 @@ package(
 
 py_binary(
     name = "generate_e2e_matmul_tests",
-    srcs = ["generate_e2e_matmul_tests.py"],
+    srcs = [
+        "common.py",
+        "compilation_info.py",
+        "generate_code.py",
+        "generate_code_mx.py",
+        "generate_e2e_matmul_tests.py",
+    ],
 )
 
 ###########################################################################

@@ -202,7 +202,7 @@ static Value canonicalizeFillPattern(Value pattern, OpBuilder &builder) {
 
 struct EncodeTensorImportOp
     : public OpRewritePattern<IREE::Stream::TensorImportOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorImportOp op,
                                 PatternRewriter &rewriter) const override {
     auto resultType = llvm::cast<RankedTensorType>(op.getResultEncoding());
@@ -225,7 +225,7 @@ struct EncodeTensorImportOp
 
 struct EncodeTensorExportOp
     : public OpRewritePattern<IREE::Stream::TensorExportOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorExportOp op,
                                 PatternRewriter &rewriter) const override {
     auto sourceType = llvm::cast<RankedTensorType>(op.getSourceEncoding());
@@ -248,7 +248,7 @@ struct EncodeTensorExportOp
 
 struct EncodeTensorSizeOfOp
     : public OpRewritePattern<IREE::Stream::TensorSizeOfOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorSizeOfOp op,
                                 PatternRewriter &rewriter) const override {
     auto encodingType = llvm::cast<RankedTensorType>(op.getEncoding());
@@ -276,7 +276,7 @@ struct EncodeTensorSizeOfOp
 
 struct EncodeTensorEmptyOp
     : public OpRewritePattern<IREE::Stream::TensorEmptyOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorEmptyOp op,
                                 PatternRewriter &rewriter) const override {
     auto resultType = llvm::cast<RankedTensorType>(op.getResultEncoding());
@@ -299,7 +299,7 @@ struct EncodeTensorEmptyOp
 
 struct EncodeTensorConstantOp
     : public OpRewritePattern<IREE::Stream::TensorConstantOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorConstantOp op,
                                 PatternRewriter &rewriter) const override {
     auto resultType = llvm::cast<RankedTensorType>(op.getResultEncoding());
@@ -360,7 +360,7 @@ struct EncodeTensorConstantOp
 
 struct EncodeTensorSplatOp
     : public OpRewritePattern<IREE::Stream::TensorSplatOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorSplatOp op,
                                 PatternRewriter &rewriter) const override {
     auto resultType = llvm::cast<RankedTensorType>(op.getResultEncoding());
@@ -393,7 +393,7 @@ struct EncodeTensorSplatOp
 
 struct EncodeTensorCloneOp
     : public OpRewritePattern<IREE::Stream::TensorCloneOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorCloneOp op,
                                 PatternRewriter &rewriter) const override {
     auto sourceType = llvm::cast<RankedTensorType>(op.getSourceEncoding());
@@ -422,7 +422,7 @@ struct EncodeTensorCloneOp
 
 struct EncodeTensorSliceOp
     : public OpRewritePattern<IREE::Stream::TensorSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorSliceOp op,
                                 PatternRewriter &rewriter) const override {
     auto sourceType = llvm::cast<RankedTensorType>(op.getSourceEncoding());
@@ -455,7 +455,7 @@ struct EncodeTensorSliceOp
 
 struct EncodeTensorFillOp
     : public OpRewritePattern<IREE::Stream::TensorFillOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorFillOp op,
                                 PatternRewriter &rewriter) const override {
     auto targetType = llvm::cast<RankedTensorType>(op.getTargetEncoding());
@@ -494,7 +494,7 @@ struct EncodeTensorFillOp
 
 struct EncodeTensorUpdateOp
     : public OpRewritePattern<IREE::Stream::TensorUpdateOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorUpdateOp op,
                                 PatternRewriter &rewriter) const override {
     auto updateType = llvm::cast<RankedTensorType>(op.getUpdateEncoding());
@@ -528,7 +528,7 @@ struct EncodeTensorUpdateOp
 
 struct EncodeTensorLoadOp
     : public OpRewritePattern<IREE::Stream::TensorLoadOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorLoadOp op,
                                 PatternRewriter &rewriter) const override {
     auto sourceType = llvm::cast<RankedTensorType>(op.getSourceEncoding());
@@ -571,7 +571,7 @@ struct EncodeTensorLoadOp
 
 struct EncodeTensorStoreOp
     : public OpRewritePattern<IREE::Stream::TensorStoreOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorStoreOp op,
                                 PatternRewriter &rewriter) const override {
     auto targetType = llvm::cast<RankedTensorType>(op.getTargetEncoding());
@@ -601,7 +601,7 @@ struct EncodeTensorStoreOp
 
 struct EncodeTensorDispatchOp
     : public OpRewritePattern<IREE::Stream::TensorDispatchOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorDispatchOp op,
                                 PatternRewriter &rewriter) const override {
     // Strip off the tensor encoding information - it's not used at all here. If
@@ -677,7 +677,7 @@ alignDispatchTensorType(IREE::TensorExt::DispatchTensorType originalType) {
 // a resource.
 struct EncodeBindingSubspanOp
     : public OpRewritePattern<IREE::Stream::BindingSubspanOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::BindingSubspanOp op,
                                 PatternRewriter &rewriter) const override {
     auto originalType = llvm::dyn_cast<IREE::TensorExt::DispatchTensorType>(
@@ -707,7 +707,7 @@ struct EncodeBindingSubspanOp
 
 struct EncodeDispatchTensorLoadOp
     : public OpRewritePattern<IREE::TensorExt::DispatchTensorLoadOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::TensorExt::DispatchTensorLoadOp op,
                                 PatternRewriter &rewriter) const override {
     auto targetType = llvm::cast<RankedTensorType>(op.getResult().getType());
@@ -741,7 +741,7 @@ struct EncodeDispatchTensorLoadOp
 
 struct EncodeDispatchTensorStoreOp
     : public OpRewritePattern<IREE::TensorExt::DispatchTensorStoreOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp op,
                                 PatternRewriter &rewriter) const override {
     auto sourceType = llvm::cast<RankedTensorType>(op.getValue().getType());

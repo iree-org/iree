@@ -46,7 +46,6 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-dispatch-creation-data-tiling"
     "--iree-llvmcpu-target-cpu=generic"
-    "--iree-opt-data-tiling=false"
   LABELS
     "nowasm"
 )

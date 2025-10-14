@@ -19,7 +19,7 @@ namespace {
 
 struct DropToLayoutUnitDims final
     : OpRewritePattern<IREE::VectorExt::ToLayoutOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::VectorExt::ToLayoutOp toLayoutOp,
                                 PatternRewriter &rewriter) const override {

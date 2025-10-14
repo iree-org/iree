@@ -8,6 +8,7 @@
 #define IREE_COMPILER_DIALECT_ENCODING_UTILS_UTILS_H_
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -46,6 +47,10 @@ bool hasPackedStorageAttr(RankedTensorType type);
 /// Returns the ContractionDimensions for the encoding user_indexing_maps.
 FailureOr<linalg::ContractionDimensions>
 getEncodingContractionDims(EncodingAttr encoding);
+
+/// Returns the ScaledContractionDimensions for the encoding user_indexing_maps.
+FailureOr<IREE::LinalgExt::ScaledContractionDimensions>
+getEncodingScaledContractionDims(EncodingAttr encoding);
 
 /// Returns the narrow dim in a given `encoding`, ceiled to a power of two. This
 /// works by inspecting the `iteration_sizes` array attribute in the `encoding`.

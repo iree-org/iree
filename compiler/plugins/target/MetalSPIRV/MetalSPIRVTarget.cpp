@@ -56,7 +56,7 @@ struct MetalSPIRVOptions {
 // TODO: MetalOptions for choosing the Metal version.
 class MetalTargetDevice : public TargetDevice {
 public:
-  MetalTargetDevice(const MetalSPIRVOptions &options) : options(options) {}
+  MetalTargetDevice(const MetalSPIRVOptions & /*options*/) {}
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
@@ -74,9 +74,6 @@ public:
     return IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("metal"),
                                             configAttr, executableTargetAttrs);
   }
-
-private:
-  const MetalSPIRVOptions &options;
 };
 
 class MetalSPIRVTargetBackend : public TargetBackend {

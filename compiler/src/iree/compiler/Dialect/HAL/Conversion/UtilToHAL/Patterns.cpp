@@ -19,7 +19,7 @@ namespace {
 
 struct GlobalConversionPattern
     : public OpConversionPattern<IREE::Util::GlobalOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::GlobalOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {

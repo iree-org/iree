@@ -25,7 +25,7 @@ namespace {
 class BitCastViewDtype
     : public OpRewritePattern<torch::Torch::AtenViewDtypeOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(torch::Torch::AtenViewDtypeOp op,
                                 PatternRewriter &rewriter) const override {
 
@@ -119,7 +119,7 @@ public:
 
 class BitCastMatmul : public OpRewritePattern<torch::Torch::OperatorOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(torch::Torch::OperatorOp op,
                                 PatternRewriter &rewriter) const override {
     // Check for group quantized matrix multiplications.

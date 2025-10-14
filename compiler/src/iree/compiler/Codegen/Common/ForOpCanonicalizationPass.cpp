@@ -23,7 +23,7 @@ namespace {
 
 struct CanonicalizeForOpInductionVarShape final
     : public OpRewritePattern<scf::ForOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   // Return true if it might be possible to yield the operand of `op` instead of
   // its result.
@@ -200,7 +200,7 @@ struct CanonicalizeForOpInductionVarShape final
 /// pattern allows packing i4/i8/f16 values into i32 variables tightly so that
 /// we can generate shader conformant SPIR-V.
 struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(scf::ForOp forOp,
                                 PatternRewriter &rewriter) const override {

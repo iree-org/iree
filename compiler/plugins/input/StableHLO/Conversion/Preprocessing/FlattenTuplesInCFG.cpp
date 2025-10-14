@@ -123,7 +123,7 @@ LogicalResult untupleAndLookupValues(T values,
 }
 
 class DetupleReturnOp : public OpRewritePattern<func::ReturnOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(func::ReturnOp op,
                                 PatternRewriter &builder) const override {
@@ -143,7 +143,7 @@ class DetupleReturnOp : public OpRewritePattern<func::ReturnOp> {
 };
 
 class DetupleCallOp : public OpRewritePattern<func::CallOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(func::CallOp oldOp,
                                 PatternRewriter &builder) const override {
@@ -176,7 +176,7 @@ class DetupleCallOp : public OpRewritePattern<func::CallOp> {
 };
 
 class DetupleIndirectCallOp : public OpRewritePattern<func::CallIndirectOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(func::CallIndirectOp oldOp,
                                 PatternRewriter &builder) const override {
@@ -198,7 +198,7 @@ class DetupleIndirectCallOp : public OpRewritePattern<func::CallIndirectOp> {
 };
 
 class DetupleBranchOp : public OpRewritePattern<cf::BranchOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(cf::BranchOp oldOp,
                                 PatternRewriter &builder) const override {
@@ -221,7 +221,7 @@ class DetupleBranchOp : public OpRewritePattern<cf::BranchOp> {
 };
 
 class DetupleConditionOp : public OpRewritePattern<cf::CondBranchOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(cf::CondBranchOp oldOp,
                                 PatternRewriter &builder) const override {

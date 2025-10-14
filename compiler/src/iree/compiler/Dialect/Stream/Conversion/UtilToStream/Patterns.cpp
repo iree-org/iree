@@ -33,7 +33,7 @@ static SmallVector<Value> flattenValues(ArrayRef<ValueRange> values) {
 
 struct FuncOpSignatureConversion
     : public OpConversionPattern<IREE::Util::FuncOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::FuncOp funcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -453,6 +453,8 @@ void populateUtilToStreamConversionPatterns(
       });
   addGenericLegalOp<IREE::Util::CallOp>(conversionTarget, typeConverter);
   addGenericLegalOp<IREE::Util::ReturnOp>(conversionTarget, typeConverter);
+  conversionTarget
+      .addLegalOp<IREE::Util::UnreachableOp, IREE::Util::SCFUnreachableOp>();
 
   conversionTarget.addDynamicallyLegalOp<IREE::Util::GlobalOp>(
       [&](IREE::Util::GlobalOp op) {

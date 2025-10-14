@@ -41,7 +41,7 @@ static Value createTranspose(OpBuilder &builder, Value source,
 // becoming a sequence of copies. The hope then is that the transposes on the
 // inputs and output is then fusable with surrounding operations.
 struct TransposeInnerConcatenation : public OpRewritePattern<tensor::ConcatOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ConcatOp concatOp,
                                 PatternRewriter &rewriter) const override {
@@ -90,7 +90,7 @@ struct TransposeInnerConcatenation : public OpRewritePattern<tensor::ConcatOp> {
 /// `flow.tensor.update` on conversion to Flow and then they get modified to be
 /// in-place.
 struct DecomposeNonOuterDimConcats : public OpRewritePattern<tensor::ConcatOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ConcatOp concatOp,
                                 PatternRewriter &rewriter) const override {

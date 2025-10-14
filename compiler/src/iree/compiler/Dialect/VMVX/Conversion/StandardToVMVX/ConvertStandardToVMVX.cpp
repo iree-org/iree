@@ -43,7 +43,7 @@ struct FoldAsNoOp final : public OpConversionPattern<OpTy> {
 /// lowering when possible.
 struct RemoveIdentityConversionCast final
     : public OpConversionPattern<UnrealizedConversionCastOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(UnrealizedConversionCastOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {

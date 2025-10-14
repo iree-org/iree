@@ -47,8 +47,6 @@ iree_static_linker_test(
     "predict"
   FUNCTION_INPUTS
     "1x28x28x1xf32"
-  COMPILER_FLAGS
-    "--iree-input-type=stablehlo"
 )
 
 iree_static_linker_test(
@@ -63,7 +61,6 @@ iree_static_linker_test(
   FUNCTION_INPUTS
     "1x28x28x1xf32"
   COMPILER_FLAGS
-    "--iree-input-type=stablehlo"
     "--iree-vm-target-index-bits=32"
   EMITC
 )

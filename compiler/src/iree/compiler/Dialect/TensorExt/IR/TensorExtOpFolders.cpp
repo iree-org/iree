@@ -17,7 +17,7 @@ namespace mlir::iree_compiler::IREE::TensorExt {
 
 namespace {
 struct ReplaceBitCastIfTensorOperandEmpty final : OpRewritePattern<BitCastOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(BitCastOp op,
                                 PatternRewriter &rewriter) const override {
     auto emptyOp =
@@ -31,7 +31,7 @@ struct ReplaceBitCastIfTensorOperandEmpty final : OpRewritePattern<BitCastOp> {
 };
 
 struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(BitCastOp bitcastOp,
                                 PatternRewriter &rewriter) const final {
@@ -153,7 +153,7 @@ static bool updateTensorOpDims(RewriterBase &rewriter, Operation *op,
 
 struct ReuseDispatchTensorLoadShapeDims
     : public OpRewritePattern<DispatchTensorLoadOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(DispatchTensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
     return success(updateTensorOpDims(rewriter, loadOp, loadOp.getSource(),
@@ -174,7 +174,7 @@ struct ReuseDispatchTensorLoadShapeDims
 // subtensor %v[..] [..] [..]
 struct ConvertDispatchInputLoadOfTensorToSubTensor
     : public OpRewritePattern<DispatchTensorLoadOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(DispatchTensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
     if (!llvm::isa<RankedTensorType>(loadOp.getSource().getType())) {
@@ -249,7 +249,7 @@ canonicalizeSubViewParts(OpTy op, RankedTensorType sliceType,
 /// Pattern to rewrite a subview op with constant arguments.
 struct DispatchTensorLoadOpWithOffsetSizesAndStridesConstantArgumentFolder final
     : public OpRewritePattern<DispatchTensorLoadOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(DispatchTensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
     SmallVector<OpFoldResult> mixedOffsets, mixedSizes, mixedStrides;
@@ -306,7 +306,7 @@ namespace {
 
 struct ReuseDispatchTensorStoreShapeDims
     : public OpRewritePattern<DispatchTensorStoreOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
     return success(updateTensorOpDims(rewriter, storeOp, storeOp.getTarget(),
@@ -316,7 +316,7 @@ struct ReuseDispatchTensorStoreShapeDims
 
 struct FoldCastOpIntoDispatchStoreOp
     : public OpRewritePattern<DispatchTensorStoreOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
     auto parentOp = storeOp.getValue().getDefiningOp<tensor::CastOp>();
@@ -349,7 +349,7 @@ struct FoldCastOpIntoDispatchStoreOp
 
 struct DispatchTensorStoreOpWithOffsetSizesAndStridesConstantArgumentFolder
     final : public OpRewritePattern<DispatchTensorStoreOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
     SmallVector<OpFoldResult> mixedOffsets, mixedSizes, mixedStrides;
@@ -390,7 +390,7 @@ namespace {
 
 // Bubble up the ordinal ops so that all uses go through this operation.
 struct BubbleUpOrdinalOp : public OpRewritePattern<DispatchWorkloadOrdinalOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(DispatchWorkloadOrdinalOp ordinalOp,
                                 PatternRewriter &rewriter) const override {
     auto blockArg = dyn_cast<BlockArgument>(ordinalOp.getOperand());

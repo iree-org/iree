@@ -24,6 +24,7 @@ iree_cc_library(
     MLIRGPUDialect
     MLIRIR
     MLIRMemRefDialect
+    MLIRSCFDialect
     MLIRSupport
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Dialect::HAL::IR

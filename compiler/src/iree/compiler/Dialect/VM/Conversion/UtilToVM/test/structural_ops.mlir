@@ -176,3 +176,31 @@ util.func @my_fn() -> !some.type<foo> {
   // CHECK: vm.return %[[RET]]
   util.return %0 : !some.type<foo>
 }
+
+// -----
+
+// CHECK-LABEL: vm.func private @unreachable_fn
+util.func @unreachable_fn(%arg0: i1) {
+  cf.cond_br %arg0, ^bb1, ^bb2
+^bb1:
+  // CHECK: vm.return
+  util.return
+^bb2:
+  // CHECK: %[[STATUS:.+]] = vm.const.i32 13
+  // CHECK: vm.fail %[[STATUS]], "unreachable code detected"
+  util.unreachable "unreachable code detected"
+}
+
+// -----
+
+// CHECK-LABEL: vm.func private @unreachable_no_message
+util.func @unreachable_no_message(%arg0: i1) {
+  cf.cond_br %arg0, ^bb1, ^bb2
+^bb1:
+  // CHECK: vm.return
+  util.return
+^bb2:
+  // CHECK: %[[STATUS:.+]] = vm.const.i32 13
+  // CHECK: vm.fail %[[STATUS]]{{$}}
+  util.unreachable
+}

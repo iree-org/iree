@@ -18,7 +18,7 @@ namespace mlir::iree_compiler {
 namespace {
 
 struct ConvertLinalgCopyToMemrefCopy final : OpRewritePattern<linalg::CopyOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(linalg::CopyOp copyOp,
                                 PatternRewriter &rewriter) const override {
     if (copyOp.hasPureTensorSemantics()) {

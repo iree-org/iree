@@ -22,7 +22,7 @@ namespace {
 class ConvertStridedContractionToContraction
     : public OpRewritePattern<linalg::GenericOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(linalg::GenericOp op,
                                 PatternRewriter &rewriter) const override {
     // Check if the generic op satisfies all other conditions for being a

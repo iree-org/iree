@@ -150,7 +150,7 @@ static Value computeHouseholderSlice(Value matrix, Value tau, Value k,
 
 struct HouseholderReflectorRewriter final
     : OpRewritePattern<mlir::stablehlo::CustomCallOp> {
-  using OpRewritePattern<mlir::stablehlo::CustomCallOp>::OpRewritePattern;
+  using Base::Base;
   using OpAdaptor = mlir::stablehlo::CustomCallOp::Adaptor;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::CustomCallOp op,
@@ -225,7 +225,7 @@ struct HouseholderReflectorRewriter final
 
 struct ShapeAssertionDrop final
     : OpRewritePattern<mlir::stablehlo::CustomCallOp> {
-  using OpRewritePattern<mlir::stablehlo::CustomCallOp>::OpRewritePattern;
+  using Base::Base;
   using OpAdaptor = mlir::stablehlo::CustomCallOp::Adaptor;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::CustomCallOp op,

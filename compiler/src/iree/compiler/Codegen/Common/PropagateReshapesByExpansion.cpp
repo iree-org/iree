@@ -129,7 +129,9 @@ expandVerifiedUsers(PatternRewriter &rewriter, Location loc, MLIRContext *ctx,
       for (size_t i = 1, e = reIndices[index].size(); i < e; ++i) {
         expandedOffsets.push_back(getAsIndexOpFoldResult(ctx, 0));
       }
-      rewriter.setInsertionPointToStart(forallOp.getBody());
+      Value offsetVal = getValueOrCreateConstantIndexOp(rewriter, loc, offset);
+      // Make sure we insert after offset.
+      rewriter.setInsertionPointAfterValue(offsetVal);
       // Compute the outer dimension expression.
       AffineExpr s0, s1;
       bindSymbols(rewriter.getContext(), s0, s1);
@@ -139,8 +141,7 @@ expandVerifiedUsers(PatternRewriter &rewriter, Location loc, MLIRContext *ctx,
           expandedOffsets.begin() + expandedOffsetsIdx,
           affine::makeComposedFoldedAffineApply(
               rewriter, loc, outerDimExpr,
-              {getValueOrCreateConstantIndexOp(rewriter, loc, offset),
-               rewriter.getIndexAttr(totalInnerSizes[index])}));
+              {offsetVal, rewriter.getIndexAttr(totalInnerSizes[index])}));
 
       expandedOffsetsIdx = expandedOffsets.size();
     }
@@ -177,7 +178,7 @@ expandVerifiedUsers(PatternRewriter &rewriter, Location loc, MLIRContext *ctx,
 /// hoisting out collapse_shape op consumed by its parallel.insert_slice op.
 struct ExpandDestinationForallOp final
     : OpRewritePattern<tensor::ParallelInsertSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(tensor::ParallelInsertSliceOp parallelInsertOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = parallelInsertOp.getLoc();
@@ -312,7 +313,7 @@ struct ExpandDestinationForallOp final
 /// should be applied later.
 struct SwapInnerBitcastWithExtractSlice
     : OpRewritePattern<IREE::TensorExt::BitCastOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::TensorExt::BitCastOp bitcastOp,
                                 PatternRewriter &rewriter) const override {

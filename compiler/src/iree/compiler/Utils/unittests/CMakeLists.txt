@@ -24,4 +24,19 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
+iree_cc_test(
+  NAME
+    IndexingTest
+  SRCS
+    "IndexingTest.cpp"
+  DEPS
+    LLVMPasses
+    LLVMSupport
+    MLIRIR
+    gmock
+    gtest
+    iree::compiler::Utils
+    iree::testing::gtest_main
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

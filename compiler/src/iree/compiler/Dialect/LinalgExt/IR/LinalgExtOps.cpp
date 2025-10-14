@@ -156,9 +156,10 @@ verifyGatherScatter(OpTy op, int64_t sliceRank, ShapedType originalType,
 
   auto indicesType = op.getIndicesType();
   if (indicesType.getRank() < 1 ||
-      !isa<IntegerType>(indicesType.getElementType())) {
+      !(isa<IntegerType>(indicesType.getElementType()) ||
+        indicesType.getElementType().isIndex())) {
     return op->emitOpError("expected indices to be of rank 1 or greater and of "
-                           "integer element type");
+                           "integer or index element type");
   }
 
   ArrayRef<int64_t> dimMap = op.getDimensionMap();
@@ -498,7 +499,7 @@ SmallVector<AffineMap> GatherOp::getIndexingMapsForResults() {
 namespace {
 struct ConvertGatherToExtract
     : public OpRewritePattern<IREE::LinalgExt::GatherOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::LinalgExt::GatherOp gatherOp,
                                 PatternRewriter &rewriter) const override {
     // TODO: support memref case.
@@ -740,7 +741,7 @@ bool MapScatterOp::isIdentity() {
 namespace {
 struct ConvertIdentityMapScatterToCopy
     : public OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
                                 PatternRewriter &rewriter) const override {
     if (!mapScatterOp.isIdentity()) {
@@ -862,7 +863,7 @@ namespace {
 /// functionality.
 struct RemoveUnusedSortOpResults
     : public OpRewritePattern<IREE::LinalgExt::SortOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::LinalgExt::SortOp sortOp,
                                 PatternRewriter &rewriter) const override {
     // To avoid problems in dispatches associated with unused results, prune
@@ -1121,7 +1122,7 @@ TopkOp::reifyResultShapes(OpBuilder &b,
 }
 
 //===----------------------------------------------------------------------===//
-// ArgmaxOp
+// ArgCompareOp
 //===----------------------------------------------------------------------===//
 
 LogicalResult ArgCompareOp::verify() {
@@ -1218,6 +1219,43 @@ LogicalResult ArgCompareOp::reifyResultShapes(
     OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   return cast<LinalgExtOp>(getOperation())
       .reifyResultShapes(b, reifiedReturnShapes);
+}
+
+SmallVector<AffineMap> IREE::LinalgExt::ArgCompareOp::getIndexingMapsArray() {
+  MLIRContext *ctx = getContext();
+
+  const int64_t rank = getInputRank();
+  const int64_t redDim = static_cast<int64_t>(getDimension());
+
+  Builder b(ctx);
+  AffineMap inputMap = b.getMultiDimIdentityMap(rank);
+
+  SmallVector<AffineExpr> proj;
+  for (int64_t i = 0; i < rank; ++i) {
+    if (i == redDim) {
+      continue;
+    }
+    proj.push_back(getAffineDimExpr(i, ctx));
+  }
+  AffineMap resultMap = AffineMap::get(rank, 0, proj, ctx);
+  return {inputMap, resultMap, resultMap};
+}
+
+SmallVector<AffineMap>
+IREE::LinalgExt::ArgCompareOp::getIndexingMapsForOperands() {
+  SmallVector<AffineMap> maps = getIndexingMapsArray();
+  maps.resize(getNumDpsInputs() + getNumDpsInits());
+  return maps;
+}
+
+SmallVector<AffineMap>
+IREE::LinalgExt::ArgCompareOp::getIndexingMapsForResults() {
+  return llvm::to_vector_of<AffineMap>(
+      llvm::drop_begin(getIndexingMapsArray(), getNumDpsInputs()));
+}
+
+SmallVector<int64_t> IREE::LinalgExt::ArgCompareOp::getStaticLoopRanges() {
+  return llvm::to_vector(getInputType().getShape());
 }
 
 //===----------------------------------------------------------------------===//
@@ -2224,6 +2262,30 @@ void OnlineAttentionOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
 }
 
 //===----------------------------------------------------------------------===//
+// ExpReductionOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult ExpReductionOp::verify() {
+  Operation *op = getOperation();
+
+  for (int64_t reducedOperand : getExpReducedOperands()) {
+    if (reducedOperand == 0) {
+      return op->emitOpError(
+          "operand index in exp_reduced_operands cannot be the 0th operand, it "
+          "always contains the maximum value");
+    }
+    if (reducedOperand >= getNumDpsInits()) {
+      return op->emitOpError("operand index in exp_reduced_operands must index "
+                             "the outs operands ("
+                             "outs has ")
+             << getNumDpsInits() << " operands)";
+    }
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // Im2colOp
 //===----------------------------------------------------------------------===//
 
@@ -2678,6 +2740,7 @@ DEFINE_OP_GET_EFFECTS(WinogradFilterTransformOp)
 DEFINE_OP_GET_EFFECTS(WinogradOutputTransformOp)
 DEFINE_OP_GET_EFFECTS(AttentionOp)
 DEFINE_OP_GET_EFFECTS(OnlineAttentionOp)
+DEFINE_OP_GET_EFFECTS(ExpReductionOp)
 DEFINE_OP_GET_EFFECTS(Im2colOp)
 DEFINE_OP_GET_EFFECTS(CustomOp)
 

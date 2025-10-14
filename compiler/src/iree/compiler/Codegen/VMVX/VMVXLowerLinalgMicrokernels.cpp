@@ -524,7 +524,7 @@ struct CopyEmitter {
 /// as a vmvx op.
 struct LinalgBinaryGenericConversion
     : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(linalg::GenericOp op,
                                 PatternRewriter &rewriter) const override {
     auto &children = op.getBlock()->getOperations();
@@ -704,7 +704,7 @@ struct LinalgBinaryGenericConversion
 /// as a vmvx op.
 struct LinalgUnaryGenericConversion
     : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(linalg::GenericOp op,
                                 PatternRewriter &rewriter) const override {
     auto &children = op.getBlock()->getOperations();
@@ -827,7 +827,7 @@ struct LinalgUnaryGenericConversion
 /// operation(s).
 struct LinalgTrivialGenericConversion
     : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(linalg::GenericOp op,
                                 PatternRewriter &rewriter) const override {
     auto &children = op.getBlock()->getOperations();
@@ -866,7 +866,7 @@ struct LinalgTrivialGenericConversion
 };
 
 struct LinalgFillConversion : public OpRewritePattern<linalg::FillOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   struct OpInfo {
     linalg::FillOp op;
     Value scalar;

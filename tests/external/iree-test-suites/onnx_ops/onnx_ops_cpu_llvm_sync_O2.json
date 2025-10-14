@@ -4,7 +4,8 @@
     "--iree-hal-target-device=local",
     "--iree-hal-local-target-device-backends=llvm-cpu",
     "--iree-input-demote-f64-to-f32=false",
-    "--iree-opt-level=O2"
+    "--iree-opt-level=O2",
+    "--iree-opt-data-tiling"
   ],
   "iree_run_module_flags": [
     "--device=local-sync"

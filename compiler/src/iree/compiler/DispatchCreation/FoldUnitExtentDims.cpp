@@ -60,7 +60,7 @@ namespace {
 /// ```
 struct DropUnitDimsFromCollapseOfExpand
     : OpRewritePattern<tensor::CollapseShapeOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::CollapseShapeOp collapseOp,
                                 PatternRewriter &rewriter) const override {

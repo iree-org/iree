@@ -24,7 +24,7 @@ namespace {
 
 struct ParameterLoadOpPattern
     : public OpConversionPattern<IREE::Stream::ParameterLoadOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::ParameterLoadOp loadOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -68,7 +68,7 @@ struct ParameterLoadOpPattern
 
 struct ParameterReadOpPattern
     : public OpConversionPattern<IREE::Stream::ParameterReadOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::ParameterReadOp readOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -98,7 +98,7 @@ struct ParameterReadOpPattern
 
 struct ParameterWriteOpPattern
     : public OpConversionPattern<IREE::Stream::ParameterWriteOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::ParameterWriteOp writeOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -127,7 +127,7 @@ struct ParameterWriteOpPattern
 
 struct ParameterGatherOpPattern
     : public OpConversionPattern<IREE::Stream::ParameterGatherOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::ParameterGatherOp gatherOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -155,7 +155,7 @@ struct ParameterGatherOpPattern
 
 struct ParameterScatterOpPattern
     : public OpConversionPattern<IREE::Stream::ParameterScatterOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Stream::ParameterScatterOp scatterOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {

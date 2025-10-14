@@ -915,9 +915,9 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch(
   }
 
   // Copy push constants to the end of the current segment for later access.
-  segment->dispatch.constant_count = constants.data_length / sizeof(uint32_t);
+  segment->dispatch.constant_count = constants.data_length / sizeof(int32_t);
   uint8_t* constant_ptr = storage_base + sizeof(*segment) + descriptor_length;
-  segment->dispatch.constants = (uint32_t*)constant_ptr;
+  segment->dispatch.constants = (int32_t*)constant_ptr;
   memcpy(constant_ptr, constants.data, constants.data_length);
 
   if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
