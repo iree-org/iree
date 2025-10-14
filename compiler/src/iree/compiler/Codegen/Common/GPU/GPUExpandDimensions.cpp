@@ -41,12 +41,12 @@ using DimensionExpansionInfo = llvm::SmallDenseMap<unsigned, int64_t>;
 /// information. expand_dims format: [[0], [1], [2,3]] means dim 0→0, dim 1→1,
 /// dim 2→[2,3].
 static DimensionExpansionInfo
-getExpansionInfo(IREE::GPU::LoweringConfigAttr config, linalg::LinalgOp op) {
+getExpansionInfo(IREE::GPU::LoweringConfigAttr config) {
   // Get expand_dims structure
   SmallVector<SmallVector<int64_t>> expansionFactors =
       IREE::GPU::getDimensionExpansion(config).value();
   SmallVector<int64_t> threadSizes = config.getStaticTilingLevelSizes(
-      llvm::to_underlying(IREE::GPU::TilingLevel::Thread), op);
+      llvm::to_underlying(IREE::GPU::TilingLevel::Thread), nullptr);
 
   DimensionExpansionInfo expansionInfo;
 
@@ -83,7 +83,7 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
     return success();
   }
 
-  DimensionExpansionInfo expansionInfo = getExpansionInfo(loweringConfig, op);
+  DimensionExpansionInfo expansionInfo = getExpansionInfo(loweringConfig);
   if (expansionInfo.empty()) {
     return success();
   }
