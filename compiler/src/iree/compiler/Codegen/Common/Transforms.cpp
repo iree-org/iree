@@ -750,10 +750,9 @@ struct RemoveOptimizationBarrier final
 
 } // namespace
 
-std::optional<ReshapeOps>
-createDimensionExpansionOps(RewriterBase &rewriter,
-                            const llvm::SmallDenseMap<unsigned, int64_t> &expansionMap,
-                            Value v) {
+std::optional<ReshapeOps> createDimensionExpansionOps(
+    RewriterBase &rewriter,
+    const llvm::SmallDenseMap<unsigned, int64_t> &expansionMap, Value v) {
   auto tensorType = dyn_cast<RankedTensorType>(v.getType());
   if (!tensorType) {
     return std::nullopt;
@@ -811,9 +810,8 @@ void populateRemoveOptimizationBarrierPatterns(RewritePatternSet &patterns) {
   patterns.insert<RemoveOptimizationBarrier>(patterns.getContext());
 }
 
-void populateReshapePropagationPatterns(
-    RewritePatternSet &patterns,
-    linalg::ControlFusionFn controlFn) {
+void populateReshapePropagationPatterns(RewritePatternSet &patterns,
+                                        linalg::ControlFusionFn controlFn) {
   if (!controlFn) {
     controlFn = [](OpOperand *opOperand) {
       return !isa_and_nonnull<linalg::FillOp, tensor::EmptyOp>(
@@ -822,7 +820,7 @@ void populateReshapePropagationPatterns(
   }
   linalg::populateFoldReshapeOpsByExpansionPatterns(patterns, controlFn);
   IREE::LinalgExt::populateFoldReshapeOpsByExpansionPatterns(patterns,
-                                                              controlFn);
+                                                             controlFn);
   populateReshapeToInterfaceTensorPatterns(patterns);
   populateCombineRelayoutOpPatterns(patterns);
   populateFoldTensorReshapeIntoBufferPatterns(patterns);

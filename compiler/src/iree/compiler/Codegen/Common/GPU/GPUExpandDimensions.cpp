@@ -134,8 +134,7 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
     if (!isa<RankedTensorType>(result.getType()))
       continue;
 
-    unsigned resultMapIndex =
-        op.getNumDpsInputs() + result.getResultNumber();
+    unsigned resultMapIndex = op.getNumDpsInputs() + result.getResultNumber();
     AffineMap indexingMap = indexingMaps[resultMapIndex];
     DimensionExpansionInfo tensorExpansionInfo;
 

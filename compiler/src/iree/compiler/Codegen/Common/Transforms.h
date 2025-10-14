@@ -161,19 +161,17 @@ struct ReshapeOps {
 /// inverses of each other. The `util.optimization.barrier` avoid these from
 /// getting folded away during reshape propagation. Return the result of the
 /// `tensor.collapse_shape generated.
-std::optional<ReshapeOps>
-createDimensionExpansionOps(RewriterBase &rewriter,
-                            const llvm::SmallDenseMap<unsigned, int64_t> &expansionMap,
-                            Value v);
+std::optional<ReshapeOps> createDimensionExpansionOps(
+    RewriterBase &rewriter,
+    const llvm::SmallDenseMap<unsigned, int64_t> &expansionMap, Value v);
 
 /// Populate patterns to remove optimization barriers.
 void populateRemoveOptimizationBarrierPatterns(RewritePatternSet &patterns);
 
 /// Populate common patterns for reshape propagation used in dimension
-/// expansion passes. 
+/// expansion passes.
 void populateReshapePropagationPatterns(
-    RewritePatternSet &patterns,
-    linalg::ControlFusionFn controlFn = nullptr);
+    RewritePatternSet &patterns, linalg::ControlFusionFn controlFn = nullptr);
 
 } // namespace mlir::iree_compiler
 
