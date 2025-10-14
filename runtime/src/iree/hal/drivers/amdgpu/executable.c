@@ -10,6 +10,7 @@
 #include "iree/hal/drivers/amdgpu/util/topology.h"
 #include "iree/hal/drivers/amdgpu/util/vmem.h"
 #include "iree/hal/utils/executable_debug_info.h"
+#include "iree/hal/utils/executable_header.h"
 
 // flatcc schemas:
 #include "iree/base/internal/flatcc/parsing.h"
@@ -212,6 +213,48 @@ static iree_status_t iree_hal_amdgpu_query_device_limits(
   return iree_ok_status();
 }
 
+iree_status_t iree_hal_amdgpu_executable_infer_format(
+    iree_const_byte_span_t executable_data,
+    iree_host_size_t executable_format_capacity, char* executable_format,
+    iree_host_size_t* out_inferred_size) {
+  // Read the header prefix (with unsafe inference if size is unknown).
+  const bool unsafe_infer_size = (executable_data.data_length == 0);
+  iree_const_byte_span_t flatbuffer_data = iree_const_byte_span_empty();
+  IREE_RETURN_IF_ERROR(iree_hal_read_executable_flatbuffer_header(
+      executable_data, unsafe_infer_size,
+      iree_hal_amdgpu_ExecutableDef_file_identifier, &flatbuffer_data));
+
+  // Verify the flatbuffer structure.
+  if (!iree_hal_amdgpu_ExecutableDef_verify_as_root(
+          flatbuffer_data.data, flatbuffer_data.data_length)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "failed to verify executable flatbuffer structure");
+  }
+
+  // Get the ISA name from the flatbuffer.
+  iree_hal_amdgpu_ExecutableDef_table_t executable_def =
+      iree_hal_amdgpu_ExecutableDef_as_root(flatbuffer_data.data);
+  flatbuffers_string_t isa =
+      iree_hal_amdgpu_ExecutableDef_isa_get(executable_def);
+  if (!isa) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "executable missing target_arch");
+  }
+
+  // Write the format string (ISA name).
+  const iree_host_size_t isa_length = flatbuffers_string_len(isa);
+  if (isa_length >= executable_format_capacity) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "executable format buffer too small");
+  }
+  memcpy(executable_format, isa, isa_length + /*NUL*/ 1);
+
+  // Return the total size (header + flatbuffer).
+  *out_inferred_size =
+      sizeof(iree_flatbuffer_file_header_t) + flatbuffer_data.data_length;
+  return iree_ok_status();
+}
+
 // Verifies the structure of the flatbuffer.
 //
 // There are still some conditions we must be aware of (such as omitted names on
@@ -220,10 +263,7 @@ static iree_status_t iree_hal_amdgpu_query_device_limits(
 static iree_status_t iree_hal_amdgpu_executable_flatbuffer_verify(
     iree_const_byte_span_t flatbuffer_data,
     const iree_hal_amdgpu_device_limits_t* limits) {
-  if (!flatbuffer_data.data) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "flatbuffer data is not present");
-  }
+  IREE_ASSERT(flatbuffer_data.data && flatbuffer_data.data_length >= 16);
 
   // Run flatcc generated verification. This ensures all pointers are in-bounds
   // and that we can safely walk the file, but not that the actual contents of
@@ -742,14 +782,22 @@ iree_status_t iree_hal_amdgpu_executable_create(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_amdgpu_query_device_limits(libhsa, any_device_agent, isa,
                                               &limits));
+
+  // Read and strip the flatbuffer header prefix.
+  iree_const_byte_span_t executable_flatbuffer = iree_const_byte_span_empty();
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_amdgpu_executable_flatbuffer_verify(
-              executable_params->executable_data, &limits));
+      z0, iree_hal_read_executable_flatbuffer_header(
+              executable_params->executable_data, /*unsafe_infer_size=*/false,
+              iree_hal_amdgpu_ExecutableDef_file_identifier,
+              &executable_flatbuffer));
+
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_amdgpu_executable_flatbuffer_verify(executable_flatbuffer,
+                                                       &limits));
 
   // Dereference the flatbuffer.
   iree_hal_amdgpu_ExecutableDef_table_t executable_def =
-      iree_hal_amdgpu_ExecutableDef_as_root(
-          executable_params->executable_data.data);
+      iree_hal_amdgpu_ExecutableDef_as_root(executable_flatbuffer.data);
   iree_hal_amdgpu_ExportDef_vec_t export_defs =
       iree_hal_amdgpu_ExecutableDef_exports_get(executable_def);
   const iree_host_size_t export_count =

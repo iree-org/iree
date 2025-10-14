@@ -27,6 +27,14 @@ typedef struct iree_hal_webgpu_entry_point_t {
   iree_hal_pipeline_layout_t* layout;
 } iree_hal_webgpu_entry_point_t;
 
+// Infers the format of the executable and calculates its total size.
+// If executable_data.data_length is 0 attempts to infer size from the data.
+// Returns the canonical format string and total size of the executable data.
+iree_status_t iree_hal_webgpu_executable_infer_format(
+    iree_const_byte_span_t executable_data,
+    iree_host_size_t executable_format_capacity, char* executable_format,
+    iree_host_size_t* out_inferred_size);
+
 iree_status_t iree_hal_webgpu_executable_create(
     WGPUDevice device, const iree_hal_executable_params_t* executable_params,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable);
