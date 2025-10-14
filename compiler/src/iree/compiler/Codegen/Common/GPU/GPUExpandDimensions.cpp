@@ -63,7 +63,8 @@ getExpansionInfo(IREE::GPU::LoweringConfigAttr config) {
     }
   }
 
-  LLVM_DEBUG(for (auto [dim, factor] : expansionInfo) {
+  LLVM_DEBUG(for (auto [dim, factor]
+                  : expansionInfo) {
     llvm::dbgs() << "Dimension " << dim << " will be expanded by factor "
                  << factor << "\n";
   });
