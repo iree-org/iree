@@ -1,21 +1,21 @@
 // RUN: iree-opt --split-input-file %s --verify-diagnostics | FileCheck %s
 
 // CHECK-LABEL: @tensorImport
-util.func private @tensorImport(%arg0: !hal.buffer_view, %arg1: index) -> !stream.resource<external> {
+util.func private @tensorImport(%arg0: !util.buffer, %arg1: index) -> !stream.resource<external> {
   %c20 = arith.constant 20 : index
-  // CHECK: = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
-  %0 = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  // CHECK: = stream.tensor.import %arg0 : !util.buffer -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  %0 = stream.tensor.import %arg0 : !util.buffer -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
   util.return %0 : !stream.resource<external>
 }
 
 // -----
 
 // CHECK-LABEL: @tensorExport
-util.func private @tensorExport(%arg0: !stream.resource<external>, %arg1: index) -> !hal.buffer_view {
+util.func private @tensorExport(%arg0: !stream.resource<external>, %arg1: index) -> !util.buffer {
   %c200 = arith.constant 200 : index
-  // CHECK: = stream.tensor.export %arg0 : tensor<?x1x10xf32>{%arg1} in !stream.resource<external>{%c200} -> !hal.buffer_view
-  %0 = stream.tensor.export %arg0 : tensor<?x1x10xf32>{%arg1} in !stream.resource<external>{%c200} -> !hal.buffer_view
-  util.return %0 : !hal.buffer_view
+  // CHECK: = stream.tensor.export %arg0 : tensor<?x1x10xf32>{%arg1} in !stream.resource<external>{%c200} -> !util.buffer
+  %0 = stream.tensor.export %arg0 : tensor<?x1x10xf32>{%arg1} in !stream.resource<external>{%c200} -> !util.buffer
+  util.return %0 : !util.buffer
 }
 
 // -----

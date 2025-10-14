@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Stream/Analysis/Partitioning.h"
-#include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
@@ -15,7 +14,6 @@
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -224,6 +222,39 @@ static SmallVector<Block *, 8> sortBlocksInDominanceOrder(Region &region) {
   return orderedBlocks;
 }
 
+// Tries to find a timeline-aware consumer of |value| that can provide a
+// timepoint for synchronization. This looks through stream.tensor.export ops
+// since timeline-aware ops (like util.call with fences) typically work with
+// HAL types rather than stream resources.
+// Returns the timepoint if found, otherwise returns null.
+static Value tryGetConsumerTimepoint(Value value) {
+  SmallVector<Operation *> usersToCheck;
+  usersToCheck.append(value.getUsers().begin(), value.getUsers().end());
+
+  // Look through tensor exports to find timeline-aware ops.
+  for (auto *user : value.getUsers()) {
+    if (auto exportOp = dyn_cast<IREE::Stream::TensorExportOp>(user)) {
+      usersToCheck.append(exportOp.getResult().getUsers().begin(),
+                          exportOp.getResult().getUsers().end());
+    }
+  }
+
+  for (auto *user : usersToCheck) {
+    if (auto awareOp = dyn_cast<IREE::Stream::TimelineAwareOpInterface>(user)) {
+      if (awareOp.participatesInTimeline()) {
+        // Let the timeline-aware op build its result timepoint.
+        OpBuilder awareBuilder(user);
+        awareBuilder.setInsertionPointAfter(user);
+        if (auto timepoint = awareOp.buildResultTimepoint(awareBuilder)) {
+          return timepoint;
+        }
+      }
+    }
+  }
+
+  return nullptr;
+}
+
 LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
                             const PartitioningConfigAttr &configAttr) {
   for (auto *block : sortBlocksInDominanceOrder(region)) {
@@ -275,19 +306,28 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
       for (auto [oldResult, newResult, newResultSize] : llvm::zip_equal(
                partitionBuilder.partition->outs, executeOp.getResults(),
                executeOp.getResultSizes())) {
-        // Insert one await per result. We could batch them all but that would
-        // prematurely tie their lifetimes together. By having unique awaits
-        // we allow propagation to move the waits further to where the values
-        // are used (including right into other execution regions).
-        auto awaitOp = IREE::Stream::TimepointAwaitOp::create(
-            builder, executeOp.getLoc(), newResult, newResultSize,
-            executeOp.getResultTimepoint());
-
-        // Explicitly copy the Value since it is marked as const.
-        Value toBeDeleted = oldResult;
-
-        toBeDeleted.replaceAllUsesWith(awaitOp.getResults().front());
-        deadOps.insert(oldResult.getDefiningOp());
+        // Check if any consumer is timeline-aware and can provide its own
+        // timepoint - if so we reuse that to guarantee we don't ever wait.
+        Value deferredTimepoint = tryGetConsumerTimepoint(oldResult);
+        if (deferredTimepoint) {
+          // Timeline-aware op provided a timepoint - use it.
+          auto awaitOp = IREE::Stream::TimepointAwaitOp::create(
+              builder, executeOp.getLoc(), newResult, newResultSize,
+              deferredTimepoint);
+          deadOps.insert(oldResult.getDefiningOp());
+          // Copy to non-const value for replacement.
+          Value toReplace = oldResult;
+          toReplace.replaceAllUsesWith(awaitOp.getResults().front());
+        } else {
+          // Normal case - immediate await on the execute's timepoint.
+          auto awaitOp = IREE::Stream::TimepointAwaitOp::create(
+              builder, executeOp.getLoc(), newResult, newResultSize,
+              executeOp.getResultTimepoint());
+          deadOps.insert(oldResult.getDefiningOp());
+          // Copy to non-const value for replacement.
+          Value toReplace = oldResult;
+          toReplace.replaceAllUsesWith(awaitOp.getResults().front());
+        }
       }
     }
     for (auto *deadOp : llvm::reverse(deadOps)) {
@@ -304,9 +344,22 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
     });
   }
 
+  // Recursively process regions in operations that have them.
+  // This handles structured control flow (SCF), closures, and any other
+  // operations with nested regions that may contain streamable ops.
+  // We skip partition container ops (like stream.async.execute) since those
+  // are created by partitioning and their regions are already partitioned.
   for (auto *block : sortBlocksInDominanceOrder(region)) {
     for (auto &op : *block) {
-      if (isa<scf::SCFDialect>(op.getDialect())) {
+      // Skip partition container operations - these are created by partitioning
+      // and their regions are already processed.
+      //
+      // TODO(benvanik): make an interface for these so we can have an
+      // AsyncPipelineOp that contains AsyncPipelineStageOps we ignore.
+      if (isa<IREE::Stream::AsyncExecuteOp>(op)) {
+        continue;
+      }
+      if (!op.getRegions().empty()) {
         for (auto &subregion : op.getRegions()) {
           if (failed(processRegion(loc, context, subregion, configAttr)))
             return failure();

@@ -13,6 +13,7 @@ class DialectRegistry;
 
 namespace mlir::iree_compiler {
 
+// Registers external models for HAL-specific timeline integration.
 void registerHALExternalModels(DialectRegistry &registry);
 
 } // namespace mlir::iree_compiler
