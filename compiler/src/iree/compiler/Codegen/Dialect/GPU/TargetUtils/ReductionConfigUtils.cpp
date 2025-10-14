@@ -298,7 +298,7 @@ getVectorDistributeReductionConfig(
         return b.getI64ArrayAttr({i + (i > lastReductionDim)});
       }));
 
-  if (threadLoads > 1) {
+  if (ShapedType::isStaticShape(bounds) && threadLoads > 1) {
     auto insAt = [&](auto &v, auto val) {
       v.insert(v.begin() + lastReductionDim + 1, val);
     };
