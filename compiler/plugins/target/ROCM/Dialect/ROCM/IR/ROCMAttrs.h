@@ -20,10 +20,14 @@
 #undef GET_ATTRDEF_CLASSES
 // clang-format on
 
+namespace mlir::iree_compiler::IREE::ROCM {
+
 // Some keys used in the DictionaryAttr rocm.ukernel_info.match
-static constexpr char ukernelInfoName[] = "ukernel_info";
-static constexpr char typesName[] = "types";
-static constexpr char iterationSizesConstraintsName[] =
+constexpr char kUKernelInfoName[] = "ukernel_info";
+constexpr char kUKernelInfoTypesName[] = "types";
+constexpr char kUKernelInfoIterationSizesConstraintsName[] =
     "iteration_sizes_constraints";
+
+} // namespace mlir::iree_compiler::IREE::ROCM
 
 #endif // IREE_PLUGINS_TARGET_ROCM_DIALECT_ROCM_ROCMATTRS_H_

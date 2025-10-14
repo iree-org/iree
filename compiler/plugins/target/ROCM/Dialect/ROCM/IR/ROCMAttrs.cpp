@@ -132,13 +132,17 @@ Attribute TensorUKernelProviderAttr::getDataLayoutForUKernel(
     // Require MLIR ukernels to have a ukernel_info attribute, otherwise we
     // won't be able to know how to data-tile for them.
     auto info =
-        dyn_cast_if_present<UKernelInfoAttr>(funcOp->getAttr(ukernelInfoName));
+        dyn_cast_if_present<UKernelInfoAttr>(funcOp->getAttr(kUKernelInfoName));
     if (!info) {
       continue;
     }
+    // If a previously selected mma has a larger or equal benefit, skip.
+    if (selectedMma && selectedMmaBenefit >= info.getBenefit()) {
+      continue;
+    }
     // Match the element types.
-    auto matchTypes =
-        dyn_cast_if_present<ArrayAttr>(info.getMatch().get(typesName));
+    auto matchTypes = dyn_cast_if_present<ArrayAttr>(
+        info.getMatch().get(kUKernelInfoTypesName));
     auto actualTypes =
         ArrayAttr::get(matchTypes.getContext(),
                        llvm::map_to_vector(types, [](Type v) -> Attribute {
@@ -149,13 +153,13 @@ Attribute TensorUKernelProviderAttr::getDataLayoutForUKernel(
     }
     // Match any constraints on iteration sizes.
     if (auto iterationSizeConstraints = dyn_cast_if_present<ArrayAttr>(
-            info.getMatch().get(iterationSizesConstraintsName))) {
+            info.getMatch().get(kUKernelInfoIterationSizesConstraintsName))) {
       if (!checkIterationSizeConstraints(iterationSizes,
                                          iterationSizeConstraints)) {
         continue;
       }
     }
-    // Read the data-tiled-layout attribute
+    // Read the data-tiled-layout attribute.
     Attribute mma = info.getMma();
     if (!mma) {
       continue;
@@ -182,10 +186,6 @@ Attribute TensorUKernelProviderAttr::getDataLayoutForUKernel(
       }
     } else {
       // Unhandled type of data-tiled-layout attr.
-      continue;
-    }
-    // If a previously selected mma has a larger or equal benefit, skip.
-    if (selectedMma && selectedMmaBenefit >= info.getBenefit()) {
       continue;
     }
     // Selected!
