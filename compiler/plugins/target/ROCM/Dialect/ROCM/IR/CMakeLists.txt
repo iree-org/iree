@@ -42,6 +42,7 @@ iree_cc_library(
     MLIRLinalgDialect
     MLIRLinalgInterfacesIncGenLib
     MLIRParser
+    MLIRROCDLDialect
     MLIRSupport
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::Codegen::Utils

@@ -26,6 +26,7 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Utils/ExecutableDebugInfoUtils.h"
 #include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/EmbeddedDataDirectory.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
@@ -399,6 +400,8 @@ public:
     registry.insert<IREE::VectorExt::IREEVectorExtDialect>();
     registry.insert<IREE::GPU::IREEGPUDialect>();
     registry.insert<IREE::ROCM::ROCMDialect>();
+    registry.insert<IREE::Util::UtilDialect>();
+    registry.insert<mlir::gpu::GPUDialect>();
     // Configuration may load and manipulate transform dialect libraries.
     registerTransformDialectTranslationDependentDialects(registry);
   }
