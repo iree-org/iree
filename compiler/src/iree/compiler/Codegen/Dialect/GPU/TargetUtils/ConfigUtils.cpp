@@ -1041,7 +1041,8 @@ getSupportedPartitionableLoops(linalg::LinalgOp linalgOp) {
     }
 
     for (Operation *user : producerOp->getUsers()) {
-      if (isa<IREE::Codegen::StoreToBufferOp>(user)) {
+      if (isa<IREE::Codegen::StoreToBufferOp,
+              IREE::TensorExt::DispatchTensorStoreOp>(user)) {
         producerOperands.push_back(operand);
         break;
       }
