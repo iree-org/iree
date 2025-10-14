@@ -421,10 +421,6 @@
          <lastmod>2025-10-14</lastmod>
     </url>
     <url>
-         <loc>https://iree.dev/reference/mlir-passes/LLVMCPUTarget/</loc>
-         <lastmod>2025-10-14</lastmod>
-    </url>
-    <url>
          <loc>https://iree.dev/reference/mlir-passes/Preprocessing/</loc>
          <lastmod>2025-10-14</lastmod>
     </url>
