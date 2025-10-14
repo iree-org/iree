@@ -299,17 +299,12 @@ getVectorDistributeReductionConfig(
       }));
 
   if (ShapedType::isStaticShape(bounds) && threadLoads > 1) {
-    auto addDim = [&](SmallVector<int64_t> &v, int64_t val) {
-      v.insert(v.begin() + lastReductionDim + 1, val);
-    };
-
-    addDim(workgroupTileSizes, 0);
-    addDim(partialReductionTileSizes, 0);
-    addDim(threadTileSizes, 0);
-    addDim(threadCounts, 1);
-    addDim(subGroupCounts, 1);
-    mapping.resize(mapping.size() + 1);
-    std::iota(mapping.begin(), mapping.end(), 0);
+    workgroupTileSizes.push_back(0);
+    partialReductionTileSizes.push_back(0);
+    threadTileSizes.push_back(0);
+    threadCounts.push_back(1);
+    subGroupCounts.push_back(1);
+    mapping.push_back(mapping.size());
 
     expandDimFactors[lastReductionDim] =
         b.getI64ArrayAttr({lastReductionDim, lastReductionDim + 1});
