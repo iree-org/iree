@@ -299,15 +299,15 @@ getVectorDistributeReductionConfig(
       }));
 
   if (ShapedType::isStaticShape(bounds) && threadLoads > 1) {
-    auto insAt = [&](auto &v, auto val) {
+    auto insAt = [&](SmallVector<int64_t> v, int64_t val) {
       v.insert(v.begin() + lastReductionDim + 1, val);
     };
 
-    insAt(workgroupTileSizes, int64_t{0});
-    insAt(partialReductionTileSizes, int64_t{0});
-    insAt(threadTileSizes, int64_t{0});
-    insAt(threadCounts, int64_t{1});
-    insAt(subGroupCounts, int64_t{1});
+    insAt(workgroupTileSizes, 0);
+    insAt(partialReductionTileSizes, 0);
+    insAt(threadTileSizes, 0);
+    insAt(threadCounts, 1);
+    insAt(subGroupCounts, 1);
     mapping.resize(mapping.size() + 1);
     std::iota(mapping.begin(), mapping.end(), 0);
 

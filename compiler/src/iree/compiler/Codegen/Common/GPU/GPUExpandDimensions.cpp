@@ -41,12 +41,12 @@ using DimensionExpansionInfo = llvm::SmallDenseMap<unsigned, int64_t>;
 /// information. expand_dims format: [[0], [1], [2,3]] means dim 0→0, dim 1→1,
 /// dim 2→[2,3].
 static DimensionExpansionInfo
-getExpansionInfo(IREE::GPU::LoweringConfigAttr config) {
+getExpansionInfo(IREE::GPU::LoweringConfigAttr config, linalg::LinalgOp op) {
   // Get expand_dims structure
   SmallVector<SmallVector<int64_t>> expansionFactors =
       IREE::GPU::getDimensionExpansion(config).value();
   SmallVector<int64_t> threadSizes = config.getStaticTilingLevelSizes(
-      llvm::to_underlying(IREE::GPU::TilingLevel::Thread), /*opIdx=*/0);
+      llvm::to_underlying(IREE::GPU::TilingLevel::Thread), op);
 
   DimensionExpansionInfo expansionInfo;
 
@@ -74,20 +74,19 @@ getExpansionInfo(IREE::GPU::LoweringConfigAttr config) {
 
 static LogicalResult expandIterationSpace(RewriterBase &rewriter,
                                           linalg::LinalgOp op) {
-  auto loweringConfig = getLoweringConfig(op);
-  if (!loweringConfig)
+  auto loweringConfig = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
+  if (!loweringConfig) {
     return success();
+  }
 
-  auto gpuConfig = dyn_cast<IREE::GPU::LoweringConfigAttr>(loweringConfig);
-  if (!gpuConfig)
+  if (failed(IREE::GPU::getDimensionExpansion(loweringConfig))) {
     return success();
+  }
 
-  if (failed(IREE::GPU::getDimensionExpansion(gpuConfig)))
+  DimensionExpansionInfo expansionInfo = getExpansionInfo(loweringConfig, op);
+  if (expansionInfo.empty()) {
     return success();
-
-  DimensionExpansionInfo expansionInfo = getExpansionInfo(gpuConfig);
-  if (expansionInfo.empty())
-    return success();
+  }
 
   LLVM_DEBUG({
     llvm::dbgs() << "Expanding dimensions for op:\n";
@@ -115,8 +114,9 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
       }
     }
 
-    if (tensorExpansionInfo.empty())
+    if (tensorExpansionInfo.empty()) {
       continue;
+    }
 
     std::optional<ReshapeOps> reshapes = createDimensionExpansionOps(
         rewriter, tensorExpansionInfo, operand.get());
@@ -130,8 +130,9 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
   rewriter.setInsertionPointAfter(op);
 
   for (OpResult result : op->getResults()) {
-    if (!isa<RankedTensorType>(result.getType()))
+    if (!isa<RankedTensorType>(result.getType())) {
       continue;
+    }
 
     unsigned resultMapIndex = op.getNumDpsInputs() + result.getResultNumber();
     AffineMap indexingMap = indexingMaps[resultMapIndex];
@@ -145,8 +146,9 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
       }
     }
 
-    if (tensorExpansionInfo.empty())
+    if (tensorExpansionInfo.empty()) {
       continue;
+    }
 
     std::optional<ReshapeOps> reshapes =
         createDimensionExpansionOps(rewriter, tensorExpansionInfo, result);
@@ -171,8 +173,9 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
 
 static LogicalResult expandIterationSpace(RewriterBase &rewriter,
                                           Operation *operation) {
-  if (auto op = dyn_cast<linalg::LinalgOp>(operation))
+  if (auto op = dyn_cast<linalg::LinalgOp>(operation)) {
     return expandIterationSpace(rewriter, op);
+  }
   return success();
 }
 
