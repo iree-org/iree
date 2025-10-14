@@ -306,17 +306,14 @@ getVectorDistributeReductionConfig(
     subGroupCounts.push_back(1);
     mapping.push_back(mapping.size());
 
-    expandDimFactors[lastReductionDim] =
-        b.getI64ArrayAttr({lastReductionDim, lastReductionDim + 1});
-
     int64_t outer = lastReductionDim;
     int64_t inner = lastReductionDim + 1;
 
+    expandDimFactors[lastReductionDim] = b.getI64ArrayAttr({outer, inner});
     partialReductionTileSizes[outer] = partialReductionSize / threadLoads;
     threadTileSizes[inner] = threadLoads;
     threadCounts[outer] = threadBasis;
     subGroupCounts[outer] = subgroupBasis;
-
   } else {
     partialReductionTileSizes[lastReductionDim] = partialReductionSize;
     threadTileSizes[lastReductionDim] = threadLoads;
