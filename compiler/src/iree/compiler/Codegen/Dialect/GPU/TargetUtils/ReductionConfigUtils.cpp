@@ -299,7 +299,7 @@ getVectorDistributeReductionConfig(
       }));
 
   if (ShapedType::isStaticShape(bounds) && threadLoads > 1) {
-    auto addDim = [&](SmallVector<int64_t>& v, int64_t val) {
+    auto addDim = [&](SmallVector<int64_t> &v, int64_t val) {
       v.insert(v.begin() + lastReductionDim + 1, val);
     };
 
