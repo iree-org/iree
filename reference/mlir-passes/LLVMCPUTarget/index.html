@@ -8,13 +8,9 @@
       
       
       
-        <link rel="canonical" href="https://iree.dev/reference/mlir-dialects/IREEGPU/">
+        <link rel="canonical" href="https://iree.dev/reference/mlir-passes/LLVMCPUTarget/">
       
       
-        <link rel="prev" href="../IREECodegen/">
-      
-      
-        <link rel="next" href="../IREEVectorExt/">
       
       
       <link rel="icon" href="../../../assets/images/IREE_Logo_Icon_Color.svg">
@@ -22,7 +18,7 @@
     
     
       
-        <title>IREEGPU - IREE</title>
+        <title>LLVMCPUTarget - IREE</title>
       
     
     
@@ -78,7 +74,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#iree_gpu-dialect" class="md-skip">
+        <a href="#-iree-llvmcpu-target-test-propagate-target-attrs" class="md-skip">
           Skip to content
         </a>
       
@@ -113,7 +109,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              IREEGPU
+              LLVMCPUTarget
             
           </span>
         </div>
@@ -269,12 +265,10 @@
         
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
+      <li class="md-tabs__item">
         <a href="../../" class="md-tabs__link">
           
   
@@ -1122,8 +1116,6 @@
       
   
   
-    
-  
   
   
     
@@ -1144,19 +1136,18 @@
     
     
       
-        
-        
-      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
         
           
           
@@ -1172,13 +1163,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             Reference
@@ -1209,13 +1200,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -1224,7 +1212,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_2" >
         
           
-          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="">
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
             
   
   <span class="md-ellipsis">
@@ -1372,13 +1360,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -1400,7 +1385,7 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4_3" id="__nav_4_3_label" tabindex="">
+              <label class="md-nav__link " for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
@@ -1473,8 +1458,6 @@
                 
   
   
-    
-  
   
   
     
@@ -1497,22 +1480,21 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4" >
         
           
           
           <div class="md-nav__link md-nav__container">
-            <a href="../" class="md-nav__link ">
+            <a href="../../mlir-dialects/" class="md-nav__link ">
               
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m20.83 2.978-.086.095a16 16 0 0 0-1.19 1.487 6 6 0 0 0-.446.719 3 3 0 0 0-.249.596.5.5 0 0 0-.033.177v.004a.3.3 0 0 0-.21.29.3.3 0 0 0 .187.284c.038.371.08 1.142.07 2.2l-.004.142a8 8 0 0 1-.434 2.327q-.024-.015-.04-.013c-.03.003-.11.12-.19.251-.058.09-.119.195-.154.291a.4.4 0 0 0-.03.14.3.3 0 0 0 .01.088c.01.037.022.058.022.058l-.003.007a.14.14 0 0 0-.028.067l-.012.029a7 7 0 0 1-.257.527l-.077.142-.07.115-.022-.014a.16.16 0 0 0-.113.024c-.047.035-.151.194-.498.368a1.4 1.4 0 0 1-.32.114 14 14 0 0 0 .248-2.07 5 5 0 0 0-.064-1.057q.004-.016.003-.017l-.005.01a4 4 0 0 0-.104-.458 3.55 3.55 0 0 0-.724-1.385c-.631-.754-1.496-1.14-2.256-1.165l-.125-.002q0-.012.002-.022c.02-.098.024-.127-.087-.032l-.057.054-.146.007a1 1 0 0 1-.003-.108c.004-.076.024-.127-.087-.032a.6.6 0 0 0-.142.167c-.05.008-.08.015-.08.015l.045-.002-.047.008c-.016-.042-.053-.105-.048-.16.01-.118.043-.14-.037-.065-.098.09-.202.226-.22.3l-.096.03c-.018-.019-.074-.07-.086-.179-.013-.11-.012-.166-.08-.05a1.1 1.1 0 0 0-.13.348q-.048.022-.093.046a.27.27 0 0 1-.057-.173c-.005-.144.04-.26-.067-.068a1.6 1.6 0 0 0-.146.406 2 2 0 0 0-.105.08 3 3 0 0 1-.008-.17c-.002-.143.021-.296-.067-.026a2 2 0 0 0-.07.321c-.404.385-.65.917-.644 1.572v.007a3 3 0 0 0 .014.33q.031.356.107.605c-.095.13-.103.689-.01.818.073.104.496.35.586.399a.4.4 0 0 1 .094.093c.115.188.115.567.027.762-.107.238.107.285.285.32s.415-.023.463-.118c.047-.095-.154-.31-.237-.748-.084-.439.13-.474.13-.474s.095.024.237.249c.11.175.227.313.336.413a.7.7 0 0 1-.201.172c.12.005.24-.051.304-.087a1 1 0 0 0 .07.045l-.05.05a.5.5 0 0 0 .109-.022.3.3 0 0 0 .084.022c.155.012.57-.368.57-.439q-.002-.028-.038-.063c-.042-.045-.12-.1-.207-.177a1 1 0 0 1-.11-.116.7.7 0 0 1-.141-.374v-.01l-.003-.031s.007-.007.016-.02v.004l.004-.01c.052-.08.15-.379-.47-1.078a3.05 3.05 0 0 0-.924-.706c-.042-.472.15-.913.626-1.13l-.005.005.008-.006c.227-.102.517-.155.877-.136.69.036 1.22.36 1.59.845.514.712.738 1.78.575 2.856-.068.065-.055.075-.013.077a5 5 0 0 1-.055.273l-.027.015c-.123.074-.071.073 0 .092l-.006.02a4 4 0 0 1-.066.193 1 1 0 0 0-.087.03c-.135.053-.08.06-.012.09l.044.023a6 6 0 0 1-.101.237 1 1 0 0 0-.08.017c-.142.036-.088.05-.024.09l.04.027a7 7 0 0 1-.107.214 1 1 0 0 0-.153.025c-.14.036-.087.05-.023.09q.05.03.08.059l-.094.165-.023.036a.6.6 0 0 0-.206.024c-.142.036-.088.05-.024.09a.7.7 0 0 1 .104.079l-.126.18a.5.5 0 0 0-.23-.005c-.144.02-.092.04-.033.086.068.053.1.099.118.118l-.062.084c-.044-.058-.15-.124-.246-.193a.9.9 0 0 0-.29-.13c-.048 0-.2.268-1.017.197-.819-.071-.87-.15-.942-.15a1 1 0 0 0-.228.059l-.034-.02a11 11 0 0 1-.972-.674c-.464-.37-.72-.647-.72-.647s.137-.125-.047-.284a3 3 0 0 0-.338-.277 2 2 0 0 0-.242-.166l-.088-.127a12 12 0 0 1-.363-.628 11 11 0 0 1-.25-.527c-.16-.36-.27-.682-.346-.964a5.6 5.6 0 0 1-.148-.923 2 2 0 0 1 .004-.242.41.41 0 0 0 .158-.323.41.41 0 0 0-.358-.407c-.204-.427-.982-1.477-3.881-3.68l-.127-.097.005.004-.036-.027C7.067 6.599 7.644 7.587 7.795 8l-.027.033-.018-.013c.018 0 .025-.005.025-.005s-.672-.546-1.787-1.23c-1.118-.687-1.748-.849-1.88-.877l-.026-.006s.206.19.174.285c-.01.032-.168.022-.421.028a4 4 0 0 0-.725.07 4.1 4.1 0 0 0-1.567.63C.238 7.785 0 8.401 0 8.401s.55-.768 1.58-1.305c-.014.337-.047 1.97.445 4.12.53 2.32 1.53 4.487 1.614 4.665.004.178.016.272.016.272s.148-1.79.756-3.647c.175.283.758 1.117 2.075 2.096 1.628 1.21 2.37 1.536 2.4 1.548.001.157.005.24.005.24s.005-.1.018-.263a4.7 4.7 0 0 1 .552-.67 3.6 3.6 0 0 1 .54-.435q.048.166.093.276-.029-.145-.052-.282c.107.01.538.066 1.206.393.343.168.609.395.798.595l-.014.006s.123.112.269.403a2.4 2.4 0 0 0-.73.084 3 3 0 0 0-.098-.19.5.5 0 0 0-.039-.134c-.027-.061-.095-.1-.164-.14a.4.4 0 0 0-.104-.073.2.2 0 0 1-.055-.073c-.084-.184-.798.012-.942.18-.175.204-.209.464-.14.608.021.045.07.082.138.11.002.22.137.75.404 1.133a5 5 0 0 1-.108-.666c-.009-.16 0-.274.015-.35.047.328.174.684.577 1.124-.248-.54-.22-.861-.195-1.143l.01-.044.005-.001c.036.263.142.534.482.963l-.014-.028.014.021a1.63 1.63 0 0 1-.167-1.03l.008-.002q.07.044.134.126c.128.172.188.349.212.47a.53.53 0 0 0 .067.383 18 18 0 0 1-.72.501c-.23.15-.49.313-.757.47q-.21.121-.414.23l-.135-.077h.002l-.008-.004c-.97-.559-1.69-.932-2.518-1.082-.93-.166-1.786.283-1.982 1.082a1.28 1.28 0 0 0 .552 1.38l.012.008q.02.014.04.026l.06.036h.002a2.1 2.1 0 0 0 .69.237l.028.005h.006a4 4 0 0 0 .412.044c.975.047 2.156-.408 3.323-.982q.15.08.306.166c2.547 1.403 4.098 1.585 6.154.728-.502.151-1.208.356-2.094.344a.1.1 0 0 0-.02-.006v.006a6 6 0 0 1-.647-.05l-.03-.004v-.003l-.001.002a6.3 6.3 0 0 1-1.556-.436 8 8 0 0 1-.745-.362 57 57 0 0 1-1.006-.569c.348-.178.692-.363 1.026-.545.355-.189.672-.362.918-.5l.009-.004h.007s.083-.019.16-.043c.17-.052.41-.149.695-.283.028.117.095.215.195.253.235.091.407.027.522-.102l.018-.01.047-.037c.05-.03.107-.067.156-.09l.053-.022q.06-.016.116-.037l.033-.01c-.145.297-.091.581-.091.581.043-.37.22-.608.392-.715q.096-.041.2-.067c.064 0 .116.023.144.07.07.12.217.194.364.226.024.15-.045.404-.4.866l.09-.062.004-.003.072-.053q.213-.162.334-.305a1 1 0 0 0 .19-.305c.013.2-.042.507-.31 1.036 0 0 .317-.276.514-.63.006.191-.01.443-.063.785.345-.673.325-1.085.239-1.326l-.01-.036a.4.4 0 0 0-.01-.065l.042-.057c.118-.166-.048-.344-.154-.414-.06-.04-.2-.154-.454-.157-.225-.27-.51-.15-.958.145a1.3 1.3 0 0 1-.166.092 1 1 0 0 0-.055-.116q.241-.145.494-.308c.317-.207.553-.416.728-.615.51-.517.69-1.02 1.21-1.446h-.013l.06-.031c.854-.458 1.306-.547 1.338-.553l-.003.128.018-.125a1.8 1.8 0 0 1 .481.344 2.1 2.1 0 0 1 .362.487l.044.3s0-.116-.01-.33c.153-.151 1.02-1.043 1.724-2.466.694-1.404.944-2.523 1.017-2.924a18 18 0 0 1 .665 2.466s-.002-.133-.03-.374c.096-.336.515-1.872.626-3.756.1-1.68-.065-2.78-.14-3.173.648.536.995 1.306.995 1.306s-.04-.163-.188-.437l.02.027s-.236-.455-.644-.904a7 7 0 0 0-.157-.172c-.432-.46-.854-.617-1.17-.672a1.6 1.6 0 0 0-.308-.03h-.019c-.125-.003-.2.002-.207-.026-.02-.095.11-.285.11-.285s-.177.046-.554.33c-.23.167-.52.41-.853.76a14 14 0 0 0-.89.994l-.075.095-.023-.017c.076-.33.362-1.117 1.788-3.111zM11.92 14.09l.012.006zm-.263 2.606q.133.064.303.194h-.005a.5.5 0 0 0-.155.07 1 1 0 0 1-.126-.224zm-4.855 1.57q.198-.002.432.047l.02.005.017.004q.165.041.337.102l.057.021q.287.11.611.248c.32.14.62.277.838.375l.183.088c-.22.106-.424.196-.577.261-1.014.416-1.83.536-2.338.391-.944-.269-.76-1.536.42-1.542"/></svg>
@@ -1525,13 +1507,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4_4" id="__nav_4_4_label" tabindex="">
+              <label class="md-nav__link " for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4_4">
             <span class="md-nav__icon md-icon"></span>
             MLIR dialects
@@ -1591,6 +1573,764 @@
           <label class="md-nav__title" for="__nav_4_4_2">
             <span class="md-nav__icon md-icon"></span>
             Core
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/Flow/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Flow
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/HAL/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    HAL
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/Stream/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Stream
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/Util/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Util
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/VM/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    VM
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4_3" id="__nav_4_4_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    MLIR extensions
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_4_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4_3">
+            <span class="md-nav__icon md-icon"></span>
+            MLIR extensions
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/Encoding/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Encoding
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/LinalgExt/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    LinalgExt
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/TensorExt/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    TensorExt
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4_4" id="__nav_4_4_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Codegen/target-specific
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_4_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4_4">
+            <span class="md-nav__icon md-icon"></span>
+            Codegen/target-specific
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/IREECodegen/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    IREECodegen
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/IREEGPU/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    IREEGPU
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/IREEVectorExt/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    IREEVectorExt
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/VMVX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    VMVX
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4_5" id="__nav_4_4_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Optional modules
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4_5">
+            <span class="md-nav__icon md-icon"></span>
+            Optional modules
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/Check/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Check
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4_5_2" id="__nav_4_4_5_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    HAL
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_4_4_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            HAL
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/HALInline/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Inline
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/HALLoader/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Loader
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4_5_3" id="__nav_4_4_5_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    IO
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_4_4_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            IO
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../mlir-dialects/IOParameters/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Parameters
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_5" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m20.83 2.978-.086.095a16 16 0 0 0-1.19 1.487 6 6 0 0 0-.446.719 3 3 0 0 0-.249.596.5.5 0 0 0-.033.177v.004a.3.3 0 0 0-.21.29.3.3 0 0 0 .187.284c.038.371.08 1.142.07 2.2l-.004.142a8 8 0 0 1-.434 2.327q-.024-.015-.04-.013c-.03.003-.11.12-.19.251-.058.09-.119.195-.154.291a.4.4 0 0 0-.03.14.3.3 0 0 0 .01.088c.01.037.022.058.022.058l-.003.007a.14.14 0 0 0-.028.067l-.012.029a7 7 0 0 1-.257.527l-.077.142-.07.115-.022-.014a.16.16 0 0 0-.113.024c-.047.035-.151.194-.498.368a1.4 1.4 0 0 1-.32.114 14 14 0 0 0 .248-2.07 5 5 0 0 0-.064-1.057q.004-.016.003-.017l-.005.01a4 4 0 0 0-.104-.458 3.55 3.55 0 0 0-.724-1.385c-.631-.754-1.496-1.14-2.256-1.165l-.125-.002q0-.012.002-.022c.02-.098.024-.127-.087-.032l-.057.054-.146.007a1 1 0 0 1-.003-.108c.004-.076.024-.127-.087-.032a.6.6 0 0 0-.142.167c-.05.008-.08.015-.08.015l.045-.002-.047.008c-.016-.042-.053-.105-.048-.16.01-.118.043-.14-.037-.065-.098.09-.202.226-.22.3l-.096.03c-.018-.019-.074-.07-.086-.179-.013-.11-.012-.166-.08-.05a1.1 1.1 0 0 0-.13.348q-.048.022-.093.046a.27.27 0 0 1-.057-.173c-.005-.144.04-.26-.067-.068a1.6 1.6 0 0 0-.146.406 2 2 0 0 0-.105.08 3 3 0 0 1-.008-.17c-.002-.143.021-.296-.067-.026a2 2 0 0 0-.07.321c-.404.385-.65.917-.644 1.572v.007a3 3 0 0 0 .014.33q.031.356.107.605c-.095.13-.103.689-.01.818.073.104.496.35.586.399a.4.4 0 0 1 .094.093c.115.188.115.567.027.762-.107.238.107.285.285.32s.415-.023.463-.118c.047-.095-.154-.31-.237-.748-.084-.439.13-.474.13-.474s.095.024.237.249c.11.175.227.313.336.413a.7.7 0 0 1-.201.172c.12.005.24-.051.304-.087a1 1 0 0 0 .07.045l-.05.05a.5.5 0 0 0 .109-.022.3.3 0 0 0 .084.022c.155.012.57-.368.57-.439q-.002-.028-.038-.063c-.042-.045-.12-.1-.207-.177a1 1 0 0 1-.11-.116.7.7 0 0 1-.141-.374v-.01l-.003-.031s.007-.007.016-.02v.004l.004-.01c.052-.08.15-.379-.47-1.078a3.05 3.05 0 0 0-.924-.706c-.042-.472.15-.913.626-1.13l-.005.005.008-.006c.227-.102.517-.155.877-.136.69.036 1.22.36 1.59.845.514.712.738 1.78.575 2.856-.068.065-.055.075-.013.077a5 5 0 0 1-.055.273l-.027.015c-.123.074-.071.073 0 .092l-.006.02a4 4 0 0 1-.066.193 1 1 0 0 0-.087.03c-.135.053-.08.06-.012.09l.044.023a6 6 0 0 1-.101.237 1 1 0 0 0-.08.017c-.142.036-.088.05-.024.09l.04.027a7 7 0 0 1-.107.214 1 1 0 0 0-.153.025c-.14.036-.087.05-.023.09q.05.03.08.059l-.094.165-.023.036a.6.6 0 0 0-.206.024c-.142.036-.088.05-.024.09a.7.7 0 0 1 .104.079l-.126.18a.5.5 0 0 0-.23-.005c-.144.02-.092.04-.033.086.068.053.1.099.118.118l-.062.084c-.044-.058-.15-.124-.246-.193a.9.9 0 0 0-.29-.13c-.048 0-.2.268-1.017.197-.819-.071-.87-.15-.942-.15a1 1 0 0 0-.228.059l-.034-.02a11 11 0 0 1-.972-.674c-.464-.37-.72-.647-.72-.647s.137-.125-.047-.284a3 3 0 0 0-.338-.277 2 2 0 0 0-.242-.166l-.088-.127a12 12 0 0 1-.363-.628 11 11 0 0 1-.25-.527c-.16-.36-.27-.682-.346-.964a5.6 5.6 0 0 1-.148-.923 2 2 0 0 1 .004-.242.41.41 0 0 0 .158-.323.41.41 0 0 0-.358-.407c-.204-.427-.982-1.477-3.881-3.68l-.127-.097.005.004-.036-.027C7.067 6.599 7.644 7.587 7.795 8l-.027.033-.018-.013c.018 0 .025-.005.025-.005s-.672-.546-1.787-1.23c-1.118-.687-1.748-.849-1.88-.877l-.026-.006s.206.19.174.285c-.01.032-.168.022-.421.028a4 4 0 0 0-.725.07 4.1 4.1 0 0 0-1.567.63C.238 7.785 0 8.401 0 8.401s.55-.768 1.58-1.305c-.014.337-.047 1.97.445 4.12.53 2.32 1.53 4.487 1.614 4.665.004.178.016.272.016.272s.148-1.79.756-3.647c.175.283.758 1.117 2.075 2.096 1.628 1.21 2.37 1.536 2.4 1.548.001.157.005.24.005.24s.005-.1.018-.263a4.7 4.7 0 0 1 .552-.67 3.6 3.6 0 0 1 .54-.435q.048.166.093.276-.029-.145-.052-.282c.107.01.538.066 1.206.393.343.168.609.395.798.595l-.014.006s.123.112.269.403a2.4 2.4 0 0 0-.73.084 3 3 0 0 0-.098-.19.5.5 0 0 0-.039-.134c-.027-.061-.095-.1-.164-.14a.4.4 0 0 0-.104-.073.2.2 0 0 1-.055-.073c-.084-.184-.798.012-.942.18-.175.204-.209.464-.14.608.021.045.07.082.138.11.002.22.137.75.404 1.133a5 5 0 0 1-.108-.666c-.009-.16 0-.274.015-.35.047.328.174.684.577 1.124-.248-.54-.22-.861-.195-1.143l.01-.044.005-.001c.036.263.142.534.482.963l-.014-.028.014.021a1.63 1.63 0 0 1-.167-1.03l.008-.002q.07.044.134.126c.128.172.188.349.212.47a.53.53 0 0 0 .067.383 18 18 0 0 1-.72.501c-.23.15-.49.313-.757.47q-.21.121-.414.23l-.135-.077h.002l-.008-.004c-.97-.559-1.69-.932-2.518-1.082-.93-.166-1.786.283-1.982 1.082a1.28 1.28 0 0 0 .552 1.38l.012.008q.02.014.04.026l.06.036h.002a2.1 2.1 0 0 0 .69.237l.028.005h.006a4 4 0 0 0 .412.044c.975.047 2.156-.408 3.323-.982q.15.08.306.166c2.547 1.403 4.098 1.585 6.154.728-.502.151-1.208.356-2.094.344a.1.1 0 0 0-.02-.006v.006a6 6 0 0 1-.647-.05l-.03-.004v-.003l-.001.002a6.3 6.3 0 0 1-1.556-.436 8 8 0 0 1-.745-.362 57 57 0 0 1-1.006-.569c.348-.178.692-.363 1.026-.545.355-.189.672-.362.918-.5l.009-.004h.007s.083-.019.16-.043c.17-.052.41-.149.695-.283.028.117.095.215.195.253.235.091.407.027.522-.102l.018-.01.047-.037c.05-.03.107-.067.156-.09l.053-.022q.06-.016.116-.037l.033-.01c-.145.297-.091.581-.091.581.043-.37.22-.608.392-.715q.096-.041.2-.067c.064 0 .116.023.144.07.07.12.217.194.364.226.024.15-.045.404-.4.866l.09-.062.004-.003.072-.053q.213-.162.334-.305a1 1 0 0 0 .19-.305c.013.2-.042.507-.31 1.036 0 0 .317-.276.514-.63.006.191-.01.443-.063.785.345-.673.325-1.085.239-1.326l-.01-.036a.4.4 0 0 0-.01-.065l.042-.057c.118-.166-.048-.344-.154-.414-.06-.04-.2-.154-.454-.157-.225-.27-.51-.15-.958.145a1.3 1.3 0 0 1-.166.092 1 1 0 0 0-.055-.116q.241-.145.494-.308c.317-.207.553-.416.728-.615.51-.517.69-1.02 1.21-1.446h-.013l.06-.031c.854-.458 1.306-.547 1.338-.553l-.003.128.018-.125a1.8 1.8 0 0 1 .481.344 2.1 2.1 0 0 1 .362.487l.044.3s0-.116-.01-.33c.153-.151 1.02-1.043 1.724-2.466.694-1.404.944-2.523 1.017-2.924a18 18 0 0 1 .665 2.466s-.002-.133-.03-.374c.096-.336.515-1.872.626-3.756.1-1.68-.065-2.78-.14-3.173.648.536.995 1.306.995 1.306s-.04-.163-.188-.437l.02.027s-.236-.455-.644-.904a7 7 0 0 0-.157-.172c-.432-.46-.854-.617-1.17-.672a1.6 1.6 0 0 0-.308-.03h-.019c-.125-.003-.2.002-.207-.026-.02-.095.11-.285.11-.285s-.177.046-.554.33c-.23.167-.52.41-.853.76a14 14 0 0 0-.89.994l-.075.095-.023-.017c.076-.33.362-1.117 1.788-3.111zM11.92 14.09l.012.006zm-.263 2.606q.133.064.303.194h-.005a.5.5 0 0 0-.155.07 1 1 0 0 1-.126-.224zm-4.855 1.57q.198-.002.432.047l.02.005.017.004q.165.041.337.102l.057.021q.287.11.611.248c.32.14.62.277.838.375l.183.088c-.22.106-.424.196-.577.261-1.014.416-1.83.536-2.338.391-.944-.269-.76-1.536.42-1.542"/></svg>
+  
+  <span class="md-ellipsis">
+    MLIR passes
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5">
+            <span class="md-nav__icon md-icon"></span>
+            MLIR passes
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_5_2" id="__nav_4_5_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Core dialects
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            Core dialects
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -1722,1437 +2462,6 @@
       
         
       
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4_3" >
-        
-          
-          <label class="md-nav__link" for="__nav_4_4_3" id="__nav_4_4_3_label" tabindex="0">
-            
-  
-  <span class="md-ellipsis">
-    MLIR extensions
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_4_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_4_3">
-            <span class="md-nav__icon md-icon"></span>
-            MLIR extensions
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../Encoding/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Encoding
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../LinalgExt/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    LinalgExt
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../TensorExt/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    TensorExt
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-    
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4_4" checked>
-        
-          
-          <label class="md-nav__link" for="__nav_4_4_4" id="__nav_4_4_4_label" tabindex="0">
-            
-  
-  <span class="md-ellipsis">
-    Codegen/target-specific
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_4_4_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_4_4_4">
-            <span class="md-nav__icon md-icon"></span>
-            Codegen/target-specific
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../IREECodegen/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    IREECodegen
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-    
-  
-  
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    IREEGPU
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
-        
-  
-  <span class="md-ellipsis">
-    IREEGPU
-  </span>
-  
-
-      </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#operations" class="md-nav__link">
-    <span class="md-ellipsis">
-      Operations
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Operations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#iree_gpubarrier_region-gpubarrierregionop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_gpu.barrier_region (GPU::BarrierRegionOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_gpubuffer_resource_cast-gpubufferresourcecastop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_gpu.buffer_resource_cast (GPU::BufferResourceCastOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_gpucoalesced_gather_dma-gpucoalescedgatherdmaop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_gpu.coalesced_gather_dma (GPU::CoalescedGatherDMAOp)
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#lowering-paths" class="md-nav__link">
-    <span class="md-ellipsis">
-      Lowering Paths
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#operands-and-results" class="md-nav__link">
-    <span class="md-ellipsis">
-      Operands and Results
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#example" class="md-nav__link">
-    <span class="md-ellipsis">
-      Example
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Example">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#iree_gpuglobal_load_dma-gpugloballoaddmaop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_gpu.global_load_dma (GPU::GlobalLoadDMAOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_gpuvalue_barrier-gpuvaluebarrierop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_gpu.value_barrier (GPU::ValueBarrierOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_gpuyield-gpuyieldop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_gpu.yield (GPU::YieldOp)
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#attributes" class="md-nav__link">
-    <span class="md-ellipsis">
-      Attributes
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Attributes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#computebitwidthsattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      ComputeBitwidthsAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#conditionaltransposeattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      ConditionalTransposeAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#datatiledmmaattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      DataTiledMMAAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#datatiledscaledmmaattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      DataTiledScaledMMAAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#derivedthreadconfigattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      DerivedThreadConfigAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#dotproductopsattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      DotProductOpsAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gpuencodingresolverattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      GPUEncodingResolverAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gpupaddingresolverattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      GPUPaddingResolverAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gpupipelineoptionsattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      GPUPipelineOptionsAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#laneidattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      LaneIdAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#loweringconfigattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      LoweringConfigAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mmaattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      MMAAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mmaintrinsicattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      MMAIntrinsicAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mmaopsarrayattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      MMAOpsArrayAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#promotewithcacheswizzleattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      PromoteWithCacheSwizzleAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#reorderworkgroupsstrategyattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      ReorderWorkgroupsStrategyAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#scaledmmaattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      ScaledMMAAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#scaledmmaopsarrayattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      ScaledMMAOpsArrayAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#storagebitwidthsattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      StorageBitwidthsAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#subgroupopsattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      SubgroupOpsAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#targetattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      TargetAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#targetchipattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      TargetChipAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#targetwgpattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      TargetWgpAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#usegloballoaddmaattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      UseGlobalLoadDMAAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#virtualmmaattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      VirtualMMAAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#virtualmmaintrinsicattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      VirtualMMAIntrinsicAttr
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#enums" class="md-nav__link">
-    <span class="md-ellipsis">
-      Enums
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Enums">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#computebitwidths" class="md-nav__link">
-    <span class="md-ellipsis">
-      ComputeBitwidths
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="ComputeBitwidths">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#dotproductops" class="md-nav__link">
-    <span class="md-ellipsis">
-      DotProductOps
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="DotProductOps">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mmafragment" class="md-nav__link">
-    <span class="md-ellipsis">
-      MMAFragment
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="MMAFragment">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_2" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mmaintrinsic" class="md-nav__link">
-    <span class="md-ellipsis">
-      MMAIntrinsic
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="MMAIntrinsic">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_3" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#reorderworkgroupsstrategy" class="md-nav__link">
-    <span class="md-ellipsis">
-      ReorderWorkgroupsStrategy
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="ReorderWorkgroupsStrategy">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_4" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#scaledmmaintrinsic" class="md-nav__link">
-    <span class="md-ellipsis">
-      ScaledMMAIntrinsic
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="ScaledMMAIntrinsic">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_5" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#storagebitwidths" class="md-nav__link">
-    <span class="md-ellipsis">
-      StorageBitwidths
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="StorageBitwidths">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_6" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#subgroupops" class="md-nav__link">
-    <span class="md-ellipsis">
-      SubgroupOps
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="SubgroupOps">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_7" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#tilinglevel" class="md-nav__link">
-    <span class="md-ellipsis">
-      TilingLevel
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="TilingLevel">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_8" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#virtualmmaintrinsic" class="md-nav__link">
-    <span class="md-ellipsis">
-      VirtualMMAIntrinsic
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="VirtualMMAIntrinsic">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_9" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iteratortype" class="md-nav__link">
-    <span class="md-ellipsis">
-      IteratorType
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="IteratorType">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_10" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../IREEVectorExt/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    IREEVectorExt
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../VMVX/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    VMVX
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4_5" >
-        
-          
-          <label class="md-nav__link" for="__nav_4_4_5" id="__nav_4_4_5_label" tabindex="0">
-            
-  
-  <span class="md-ellipsis">
-    Optional modules
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_4_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_4_5">
-            <span class="md-nav__icon md-icon"></span>
-            Optional modules
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../Check/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Check
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4_5_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_4_4_5_2" id="__nav_4_4_5_2_label" tabindex="0">
-            
-  
-  <span class="md-ellipsis">
-    HAL
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_4_4_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_4_5_2">
-            <span class="md-nav__icon md-icon"></span>
-            HAL
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../HALInline/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Inline
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../HALLoader/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Loader
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
-      
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4_5_3" >
-        
-          
-          <label class="md-nav__link" for="__nav_4_4_5_3" id="__nav_4_4_5_3_label" tabindex="0">
-            
-  
-  <span class="md-ellipsis">
-    IO
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_4_4_5_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_4_5_3">
-            <span class="md-nav__icon md-icon"></span>
-            IO
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../IOParameters/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Parameters
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
-          
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-      
-      
-        
-          
-          
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_5" >
-        
-          
-          
-          <div class="md-nav__link md-nav__container">
-            <a href="../../mlir-passes/" class="md-nav__link ">
-              
-  
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m20.83 2.978-.086.095a16 16 0 0 0-1.19 1.487 6 6 0 0 0-.446.719 3 3 0 0 0-.249.596.5.5 0 0 0-.033.177v.004a.3.3 0 0 0-.21.29.3.3 0 0 0 .187.284c.038.371.08 1.142.07 2.2l-.004.142a8 8 0 0 1-.434 2.327q-.024-.015-.04-.013c-.03.003-.11.12-.19.251-.058.09-.119.195-.154.291a.4.4 0 0 0-.03.14.3.3 0 0 0 .01.088c.01.037.022.058.022.058l-.003.007a.14.14 0 0 0-.028.067l-.012.029a7 7 0 0 1-.257.527l-.077.142-.07.115-.022-.014a.16.16 0 0 0-.113.024c-.047.035-.151.194-.498.368a1.4 1.4 0 0 1-.32.114 14 14 0 0 0 .248-2.07 5 5 0 0 0-.064-1.057q.004-.016.003-.017l-.005.01a4 4 0 0 0-.104-.458 3.55 3.55 0 0 0-.724-1.385c-.631-.754-1.496-1.14-2.256-1.165l-.125-.002q0-.012.002-.022c.02-.098.024-.127-.087-.032l-.057.054-.146.007a1 1 0 0 1-.003-.108c.004-.076.024-.127-.087-.032a.6.6 0 0 0-.142.167c-.05.008-.08.015-.08.015l.045-.002-.047.008c-.016-.042-.053-.105-.048-.16.01-.118.043-.14-.037-.065-.098.09-.202.226-.22.3l-.096.03c-.018-.019-.074-.07-.086-.179-.013-.11-.012-.166-.08-.05a1.1 1.1 0 0 0-.13.348q-.048.022-.093.046a.27.27 0 0 1-.057-.173c-.005-.144.04-.26-.067-.068a1.6 1.6 0 0 0-.146.406 2 2 0 0 0-.105.08 3 3 0 0 1-.008-.17c-.002-.143.021-.296-.067-.026a2 2 0 0 0-.07.321c-.404.385-.65.917-.644 1.572v.007a3 3 0 0 0 .014.33q.031.356.107.605c-.095.13-.103.689-.01.818.073.104.496.35.586.399a.4.4 0 0 1 .094.093c.115.188.115.567.027.762-.107.238.107.285.285.32s.415-.023.463-.118c.047-.095-.154-.31-.237-.748-.084-.439.13-.474.13-.474s.095.024.237.249c.11.175.227.313.336.413a.7.7 0 0 1-.201.172c.12.005.24-.051.304-.087a1 1 0 0 0 .07.045l-.05.05a.5.5 0 0 0 .109-.022.3.3 0 0 0 .084.022c.155.012.57-.368.57-.439q-.002-.028-.038-.063c-.042-.045-.12-.1-.207-.177a1 1 0 0 1-.11-.116.7.7 0 0 1-.141-.374v-.01l-.003-.031s.007-.007.016-.02v.004l.004-.01c.052-.08.15-.379-.47-1.078a3.05 3.05 0 0 0-.924-.706c-.042-.472.15-.913.626-1.13l-.005.005.008-.006c.227-.102.517-.155.877-.136.69.036 1.22.36 1.59.845.514.712.738 1.78.575 2.856-.068.065-.055.075-.013.077a5 5 0 0 1-.055.273l-.027.015c-.123.074-.071.073 0 .092l-.006.02a4 4 0 0 1-.066.193 1 1 0 0 0-.087.03c-.135.053-.08.06-.012.09l.044.023a6 6 0 0 1-.101.237 1 1 0 0 0-.08.017c-.142.036-.088.05-.024.09l.04.027a7 7 0 0 1-.107.214 1 1 0 0 0-.153.025c-.14.036-.087.05-.023.09q.05.03.08.059l-.094.165-.023.036a.6.6 0 0 0-.206.024c-.142.036-.088.05-.024.09a.7.7 0 0 1 .104.079l-.126.18a.5.5 0 0 0-.23-.005c-.144.02-.092.04-.033.086.068.053.1.099.118.118l-.062.084c-.044-.058-.15-.124-.246-.193a.9.9 0 0 0-.29-.13c-.048 0-.2.268-1.017.197-.819-.071-.87-.15-.942-.15a1 1 0 0 0-.228.059l-.034-.02a11 11 0 0 1-.972-.674c-.464-.37-.72-.647-.72-.647s.137-.125-.047-.284a3 3 0 0 0-.338-.277 2 2 0 0 0-.242-.166l-.088-.127a12 12 0 0 1-.363-.628 11 11 0 0 1-.25-.527c-.16-.36-.27-.682-.346-.964a5.6 5.6 0 0 1-.148-.923 2 2 0 0 1 .004-.242.41.41 0 0 0 .158-.323.41.41 0 0 0-.358-.407c-.204-.427-.982-1.477-3.881-3.68l-.127-.097.005.004-.036-.027C7.067 6.599 7.644 7.587 7.795 8l-.027.033-.018-.013c.018 0 .025-.005.025-.005s-.672-.546-1.787-1.23c-1.118-.687-1.748-.849-1.88-.877l-.026-.006s.206.19.174.285c-.01.032-.168.022-.421.028a4 4 0 0 0-.725.07 4.1 4.1 0 0 0-1.567.63C.238 7.785 0 8.401 0 8.401s.55-.768 1.58-1.305c-.014.337-.047 1.97.445 4.12.53 2.32 1.53 4.487 1.614 4.665.004.178.016.272.016.272s.148-1.79.756-3.647c.175.283.758 1.117 2.075 2.096 1.628 1.21 2.37 1.536 2.4 1.548.001.157.005.24.005.24s.005-.1.018-.263a4.7 4.7 0 0 1 .552-.67 3.6 3.6 0 0 1 .54-.435q.048.166.093.276-.029-.145-.052-.282c.107.01.538.066 1.206.393.343.168.609.395.798.595l-.014.006s.123.112.269.403a2.4 2.4 0 0 0-.73.084 3 3 0 0 0-.098-.19.5.5 0 0 0-.039-.134c-.027-.061-.095-.1-.164-.14a.4.4 0 0 0-.104-.073.2.2 0 0 1-.055-.073c-.084-.184-.798.012-.942.18-.175.204-.209.464-.14.608.021.045.07.082.138.11.002.22.137.75.404 1.133a5 5 0 0 1-.108-.666c-.009-.16 0-.274.015-.35.047.328.174.684.577 1.124-.248-.54-.22-.861-.195-1.143l.01-.044.005-.001c.036.263.142.534.482.963l-.014-.028.014.021a1.63 1.63 0 0 1-.167-1.03l.008-.002q.07.044.134.126c.128.172.188.349.212.47a.53.53 0 0 0 .067.383 18 18 0 0 1-.72.501c-.23.15-.49.313-.757.47q-.21.121-.414.23l-.135-.077h.002l-.008-.004c-.97-.559-1.69-.932-2.518-1.082-.93-.166-1.786.283-1.982 1.082a1.28 1.28 0 0 0 .552 1.38l.012.008q.02.014.04.026l.06.036h.002a2.1 2.1 0 0 0 .69.237l.028.005h.006a4 4 0 0 0 .412.044c.975.047 2.156-.408 3.323-.982q.15.08.306.166c2.547 1.403 4.098 1.585 6.154.728-.502.151-1.208.356-2.094.344a.1.1 0 0 0-.02-.006v.006a6 6 0 0 1-.647-.05l-.03-.004v-.003l-.001.002a6.3 6.3 0 0 1-1.556-.436 8 8 0 0 1-.745-.362 57 57 0 0 1-1.006-.569c.348-.178.692-.363 1.026-.545.355-.189.672-.362.918-.5l.009-.004h.007s.083-.019.16-.043c.17-.052.41-.149.695-.283.028.117.095.215.195.253.235.091.407.027.522-.102l.018-.01.047-.037c.05-.03.107-.067.156-.09l.053-.022q.06-.016.116-.037l.033-.01c-.145.297-.091.581-.091.581.043-.37.22-.608.392-.715q.096-.041.2-.067c.064 0 .116.023.144.07.07.12.217.194.364.226.024.15-.045.404-.4.866l.09-.062.004-.003.072-.053q.213-.162.334-.305a1 1 0 0 0 .19-.305c.013.2-.042.507-.31 1.036 0 0 .317-.276.514-.63.006.191-.01.443-.063.785.345-.673.325-1.085.239-1.326l-.01-.036a.4.4 0 0 0-.01-.065l.042-.057c.118-.166-.048-.344-.154-.414-.06-.04-.2-.154-.454-.157-.225-.27-.51-.15-.958.145a1.3 1.3 0 0 1-.166.092 1 1 0 0 0-.055-.116q.241-.145.494-.308c.317-.207.553-.416.728-.615.51-.517.69-1.02 1.21-1.446h-.013l.06-.031c.854-.458 1.306-.547 1.338-.553l-.003.128.018-.125a1.8 1.8 0 0 1 .481.344 2.1 2.1 0 0 1 .362.487l.044.3s0-.116-.01-.33c.153-.151 1.02-1.043 1.724-2.466.694-1.404.944-2.523 1.017-2.924a18 18 0 0 1 .665 2.466s-.002-.133-.03-.374c.096-.336.515-1.872.626-3.756.1-1.68-.065-2.78-.14-3.173.648.536.995 1.306.995 1.306s-.04-.163-.188-.437l.02.027s-.236-.455-.644-.904a7 7 0 0 0-.157-.172c-.432-.46-.854-.617-1.17-.672a1.6 1.6 0 0 0-.308-.03h-.019c-.125-.003-.2.002-.207-.026-.02-.095.11-.285.11-.285s-.177.046-.554.33c-.23.167-.52.41-.853.76a14 14 0 0 0-.89.994l-.075.095-.023-.017c.076-.33.362-1.117 1.788-3.111zM11.92 14.09l.012.006zm-.263 2.606q.133.064.303.194h-.005a.5.5 0 0 0-.155.07 1 1 0 0 1-.126-.224zm-4.855 1.57q.198-.002.432.047l.02.005.017.004q.165.041.337.102l.057.021q.287.11.611.248c.32.14.62.277.838.375l.183.088c-.22.106-.424.196-.577.261-1.014.416-1.83.536-2.338.391-.944-.269-.76-1.536.42-1.542"/></svg>
-  
-  <span class="md-ellipsis">
-    MLIR passes
-  </span>
-  
-
-            </a>
-            
-              
-              <label class="md-nav__link " for="__nav_4_5" id="__nav_4_5_label" tabindex="">
-                <span class="md-nav__icon md-icon"></span>
-              </label>
-            
-          </div>
-        
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_5">
-            <span class="md-nav__icon md-icon"></span>
-            MLIR passes
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_5_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_4_5_2" id="__nav_4_5_2_label" tabindex="0">
-            
-  
-  <span class="md-ellipsis">
-    Core dialects
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_5_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_5_2">
-            <span class="md-nav__icon md-icon"></span>
-            Core dialects
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../mlir-passes/Flow/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Flow
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../mlir-passes/HAL/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    HAL
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../mlir-passes/Stream/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Stream
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../mlir-passes/Util/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Util
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../mlir-passes/VM/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    VM
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    
-    
-      
-        
-      
-        
-      
-        
-      
         
       
         
@@ -3199,7 +2508,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/ConstEval/" class="md-nav__link">
+      <a href="../ConstEval/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3220,7 +2529,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/DispatchCreation/" class="md-nav__link">
+      <a href="../DispatchCreation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3241,7 +2550,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/GlobalOptimization/" class="md-nav__link">
+      <a href="../GlobalOptimization/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3262,7 +2571,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/InputConversion/" class="md-nav__link">
+      <a href="../InputConversion/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3283,7 +2592,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/Preprocessing/" class="md-nav__link">
+      <a href="../Preprocessing/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3374,7 +2683,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/CodegenCommon/" class="md-nav__link">
+      <a href="../CodegenCommon/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3395,7 +2704,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/CodegenCommonCPU/" class="md-nav__link">
+      <a href="../CodegenCommonCPU/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3416,7 +2725,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/CodegenCommonGPU/" class="md-nav__link">
+      <a href="../CodegenCommonGPU/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3437,7 +2746,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/CodegenDialectGPU/" class="md-nav__link">
+      <a href="../CodegenDialectGPU/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3458,7 +2767,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/CodegenDialectVectorExt/" class="md-nav__link">
+      <a href="../CodegenDialectVectorExt/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3479,7 +2788,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/CodegenLLVMCPU/" class="md-nav__link">
+      <a href="../CodegenLLVMCPU/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3500,7 +2809,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/CodegenLLVMGPU/" class="md-nav__link">
+      <a href="../CodegenLLVMGPU/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3521,7 +2830,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/CodegenSPIRV/" class="md-nav__link">
+      <a href="../CodegenSPIRV/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3542,7 +2851,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-passes/CodegenVMVX/" class="md-nav__link">
+      <a href="../CodegenVMVX/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -5239,8 +4548,6 @@
   
   
   
-    
-  
   
     <label class="md-nav__title" for="__toc">
       <span class="md-nav__icon md-icon"></span>
@@ -5249,632 +4556,11 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#operations" class="md-nav__link">
+  <a href="#-iree-llvmcpu-target-test-propagate-target-attrs" class="md-nav__link">
     <span class="md-ellipsis">
-      Operations
+      -iree-llvmcpu-target-test-propagate-target-attrs
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Operations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#iree_gpubarrier_region-gpubarrierregionop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_gpu.barrier_region (GPU::BarrierRegionOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_gpubuffer_resource_cast-gpubufferresourcecastop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_gpu.buffer_resource_cast (GPU::BufferResourceCastOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_gpucoalesced_gather_dma-gpucoalescedgatherdmaop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_gpu.coalesced_gather_dma (GPU::CoalescedGatherDMAOp)
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#lowering-paths" class="md-nav__link">
-    <span class="md-ellipsis">
-      Lowering Paths
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#operands-and-results" class="md-nav__link">
-    <span class="md-ellipsis">
-      Operands and Results
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#example" class="md-nav__link">
-    <span class="md-ellipsis">
-      Example
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Example">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#iree_gpuglobal_load_dma-gpugloballoaddmaop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_gpu.global_load_dma (GPU::GlobalLoadDMAOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_gpuvalue_barrier-gpuvaluebarrierop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_gpu.value_barrier (GPU::ValueBarrierOp)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_gpuyield-gpuyieldop" class="md-nav__link">
-    <span class="md-ellipsis">
-      iree_gpu.yield (GPU::YieldOp)
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#attributes" class="md-nav__link">
-    <span class="md-ellipsis">
-      Attributes
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Attributes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#computebitwidthsattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      ComputeBitwidthsAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#conditionaltransposeattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      ConditionalTransposeAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#datatiledmmaattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      DataTiledMMAAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#datatiledscaledmmaattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      DataTiledScaledMMAAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#derivedthreadconfigattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      DerivedThreadConfigAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#dotproductopsattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      DotProductOpsAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gpuencodingresolverattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      GPUEncodingResolverAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gpupaddingresolverattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      GPUPaddingResolverAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gpupipelineoptionsattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      GPUPipelineOptionsAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#laneidattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      LaneIdAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#loweringconfigattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      LoweringConfigAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mmaattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      MMAAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mmaintrinsicattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      MMAIntrinsicAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mmaopsarrayattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      MMAOpsArrayAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#promotewithcacheswizzleattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      PromoteWithCacheSwizzleAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#reorderworkgroupsstrategyattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      ReorderWorkgroupsStrategyAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#scaledmmaattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      ScaledMMAAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#scaledmmaopsarrayattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      ScaledMMAOpsArrayAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#storagebitwidthsattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      StorageBitwidthsAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#subgroupopsattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      SubgroupOpsAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#targetattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      TargetAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#targetchipattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      TargetChipAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#targetwgpattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      TargetWgpAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#usegloballoaddmaattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      UseGlobalLoadDMAAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#virtualmmaattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      VirtualMMAAttr
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#virtualmmaintrinsicattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      VirtualMMAIntrinsicAttr
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#enums" class="md-nav__link">
-    <span class="md-ellipsis">
-      Enums
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Enums">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#computebitwidths" class="md-nav__link">
-    <span class="md-ellipsis">
-      ComputeBitwidths
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="ComputeBitwidths">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#dotproductops" class="md-nav__link">
-    <span class="md-ellipsis">
-      DotProductOps
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="DotProductOps">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mmafragment" class="md-nav__link">
-    <span class="md-ellipsis">
-      MMAFragment
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="MMAFragment">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_2" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mmaintrinsic" class="md-nav__link">
-    <span class="md-ellipsis">
-      MMAIntrinsic
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="MMAIntrinsic">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_3" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#reorderworkgroupsstrategy" class="md-nav__link">
-    <span class="md-ellipsis">
-      ReorderWorkgroupsStrategy
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="ReorderWorkgroupsStrategy">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_4" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#scaledmmaintrinsic" class="md-nav__link">
-    <span class="md-ellipsis">
-      ScaledMMAIntrinsic
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="ScaledMMAIntrinsic">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_5" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#storagebitwidths" class="md-nav__link">
-    <span class="md-ellipsis">
-      StorageBitwidths
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="StorageBitwidths">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_6" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#subgroupops" class="md-nav__link">
-    <span class="md-ellipsis">
-      SubgroupOps
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="SubgroupOps">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_7" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#tilinglevel" class="md-nav__link">
-    <span class="md-ellipsis">
-      TilingLevel
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="TilingLevel">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_8" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#virtualmmaintrinsic" class="md-nav__link">
-    <span class="md-ellipsis">
-      VirtualMMAIntrinsic
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="VirtualMMAIntrinsic">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_9" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iteratortype" class="md-nav__link">
-    <span class="md-ellipsis">
-      IteratorType
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="IteratorType">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_10" class="md-nav__link">
-    <span class="md-ellipsis">
-      Cases:
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -5893,7 +4579,7 @@
                   
 
   
-    <a href="https://github.com/iree-org/iree/tree/main/compiler/src/iree/compiler/Codegen/Dialect/GPU/IR" title="Edit this page" class="md-content__button md-icon">
+    <a href="https://github.com/iree-org/iree/blob/main/docs/website/docs/reference/mlir-passes/LLVMCPUTarget.md" title="Edit this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 18c.56 0 1 .44 1 1s-.44 1-1 1-1-.44-1-1 .44-1 1-1m0-3c-2.73 0-5.06 1.66-6 4 .94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 6.5a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5M9.27 20H6V4h7v5h5v4.07c.7.08 1.36.25 2 .49V8l-6-6H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4.5a8.2 8.2 0 0 1-1.23-2"/></svg>
     </a>
@@ -5901,2103 +4587,18 @@
   
 
 
+  <h1>LLVMCPUTarget</h1>
+
 <!-- Autogenerated by mlir-tblgen; don't manually edit -->
 
-<h1 id="iree_gpu-dialect">'iree_gpu' Dialect<a class="headerlink" href="#iree_gpu-dialect" title="Permanent link">link</a></h1>
-<p><em>A dialect for common functionality used by GPU focused IREE code generation.</em></p>
-<p>This dialect provides operations and attributes to aid in code generation
-for GPU targets. The functionality in this dialect can be hardware specific,
-but is intended to be independent of the lowering target. Late lowerings to
-SPIR-V/LLVM are handled separately.</p>
-<div class="toc">
-<ul>
-<li><a href="#iree_gpu-dialect">'iree_gpu' Dialect</a><ul>
-<li><a href="#operations">Operations</a><ul>
-<li><a href="#iree_gpubarrier_region-gpubarrierregionop">iree_gpu.barrier_region (GPU::BarrierRegionOp)</a></li>
-<li><a href="#iree_gpubuffer_resource_cast-gpubufferresourcecastop">iree_gpu.buffer_resource_cast (GPU::BufferResourceCastOp)</a></li>
-<li><a href="#iree_gpucoalesced_gather_dma-gpucoalescedgatherdmaop">iree_gpu.coalesced_gather_dma (GPU::CoalescedGatherDMAOp)</a></li>
-</ul>
-</li>
-<li><a href="#lowering-paths">Lowering Paths</a></li>
-<li><a href="#operands-and-results">Operands and Results</a></li>
-<li><a href="#example">Example</a><ul>
-<li><a href="#iree_gpuglobal_load_dma-gpugloballoaddmaop">iree_gpu.global_load_dma (GPU::GlobalLoadDMAOp)</a></li>
-<li><a href="#iree_gpuvalue_barrier-gpuvaluebarrierop">iree_gpu.value_barrier (GPU::ValueBarrierOp)</a></li>
-<li><a href="#iree_gpuyield-gpuyieldop">iree_gpu.yield (GPU::YieldOp)</a></li>
-</ul>
-</li>
-<li><a href="#attributes">Attributes</a><ul>
-<li><a href="#computebitwidthsattr">ComputeBitwidthsAttr</a></li>
-<li><a href="#conditionaltransposeattr">ConditionalTransposeAttr</a></li>
-<li><a href="#datatiledmmaattr">DataTiledMMAAttr</a></li>
-<li><a href="#datatiledscaledmmaattr">DataTiledScaledMMAAttr</a></li>
-<li><a href="#derivedthreadconfigattr">DerivedThreadConfigAttr</a></li>
-<li><a href="#dotproductopsattr">DotProductOpsAttr</a></li>
-<li><a href="#gpuencodingresolverattr">GPUEncodingResolverAttr</a></li>
-<li><a href="#gpupaddingresolverattr">GPUPaddingResolverAttr</a></li>
-<li><a href="#gpupipelineoptionsattr">GPUPipelineOptionsAttr</a></li>
-<li><a href="#laneidattr">LaneIdAttr</a></li>
-<li><a href="#loweringconfigattr">LoweringConfigAttr</a></li>
-<li><a href="#mmaattr">MMAAttr</a></li>
-<li><a href="#mmaintrinsicattr">MMAIntrinsicAttr</a></li>
-<li><a href="#mmaopsarrayattr">MMAOpsArrayAttr</a></li>
-<li><a href="#promotewithcacheswizzleattr">PromoteWithCacheSwizzleAttr</a></li>
-<li><a href="#reorderworkgroupsstrategyattr">ReorderWorkgroupsStrategyAttr</a></li>
-<li><a href="#scaledmmaattr">ScaledMMAAttr</a></li>
-<li><a href="#scaledmmaopsarrayattr">ScaledMMAOpsArrayAttr</a></li>
-<li><a href="#storagebitwidthsattr">StorageBitwidthsAttr</a></li>
-<li><a href="#subgroupopsattr">SubgroupOpsAttr</a></li>
-<li><a href="#targetattr">TargetAttr</a></li>
-<li><a href="#targetchipattr">TargetChipAttr</a></li>
-<li><a href="#targetwgpattr">TargetWgpAttr</a></li>
-<li><a href="#usegloballoaddmaattr">UseGlobalLoadDMAAttr</a></li>
-<li><a href="#virtualmmaattr">VirtualMMAAttr</a></li>
-<li><a href="#virtualmmaintrinsicattr">VirtualMMAIntrinsicAttr</a></li>
-</ul>
-</li>
-<li><a href="#enums">Enums</a><ul>
-<li><a href="#computebitwidths">ComputeBitwidths</a><ul>
-<li><a href="#cases">Cases:</a></li>
-</ul>
-</li>
-<li><a href="#dotproductops">DotProductOps</a><ul>
-<li><a href="#cases_1">Cases:</a></li>
-</ul>
-</li>
-<li><a href="#mmafragment">MMAFragment</a><ul>
-<li><a href="#cases_2">Cases:</a></li>
-</ul>
-</li>
-<li><a href="#mmaintrinsic">MMAIntrinsic</a><ul>
-<li><a href="#cases_3">Cases:</a></li>
-</ul>
-</li>
-<li><a href="#reorderworkgroupsstrategy">ReorderWorkgroupsStrategy</a><ul>
-<li><a href="#cases_4">Cases:</a></li>
-</ul>
-</li>
-<li><a href="#scaledmmaintrinsic">ScaledMMAIntrinsic</a><ul>
-<li><a href="#cases_5">Cases:</a></li>
-</ul>
-</li>
-<li><a href="#storagebitwidths">StorageBitwidths</a><ul>
-<li><a href="#cases_6">Cases:</a></li>
-</ul>
-</li>
-<li><a href="#subgroupops">SubgroupOps</a><ul>
-<li><a href="#cases_7">Cases:</a></li>
-</ul>
-</li>
-<li><a href="#tilinglevel">TilingLevel</a><ul>
-<li><a href="#cases_8">Cases:</a></li>
-</ul>
-</li>
-<li><a href="#virtualmmaintrinsic">VirtualMMAIntrinsic</a><ul>
-<li><a href="#cases_9">Cases:</a></li>
-</ul>
-</li>
-<li><a href="#iteratortype">IteratorType</a><ul>
-<li><a href="#cases_10">Cases:</a></li>
-</ul>
-</li>
-</ul>
-</li>
-</ul>
-</li>
-</ul>
-</div>
-<h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">link</a></h2>
-<h3 id="iree_gpubarrier_region-gpubarrierregionop"><code>iree_gpu.barrier_region</code> (GPU::BarrierRegionOp)<a class="headerlink" href="#iree_gpubarrier_region-gpubarrierregionop" title="Permanent link">link</a></h3>
-<p><em>Synchronizes workers on a region of shared code.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.barrier_region` (`ins` `(` $inputs^ `:` type($inputs) `)` )?
-              $region attr-dict `:` type($results)
-</code></pre></div>
-<p>This op is designed to represent synchronization of workers on the operands
-and results of the given region. This operation naturally arises when combining
-the regions of producer-consumer <code>scf.forall</code> operations that share a
-mapping type.</p>
-<p>For example, consider the following pair of parallel loops.
-<div class="highlight"><pre><span></span><code>  %0 = scf.forall (%idy, %idx) in (2, 32) shared_outs(%init = %empty) -&gt; (tensor&lt;4x128xf32&gt;) {
-    %in = ...
-    %2 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 2)&gt; (%idy)
-    %3 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 4)&gt; (%idx)
-    scf.forall.in_parallel {
-      tensor.parallel_insert_slice %in into %init[%2, %3] [2, 4] [1, 1]
-        : tensor&lt;2x4xf32&gt; into tensor&lt;4x128xf32&gt;
-    }
-  } {mapping = [#gpu.thread&lt;y&gt;, #gpu.thread&lt;x&gt;]}
-  %1 = scf.forall (%idy, %idx) in (8, 8) -&gt; (tensor&lt;128x128xf32&gt;) {
-    %4 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 16)&gt; (%idx)
-    %extracted_slice = tensor.extract_slice %0[0, %4] [4, 16] [1, 1]
-      : tensor&lt;4x128xf32&gt; to tensor&lt;4x16xf32&gt;
-    ...
-  } {mapping = [#gpu.thread&lt;y&gt;, #gpu.thread&lt;x&gt;]}
-</code></pre></div></p>
-<p>Because these loops share the same worker type and total count, the bodies
-of these two loops can be merged with a barrier an insert_slice and a
-shuffle where the boundary of the loops currently is.</p>
-<div class="highlight"><pre><span></span><code>  %0 = scf.forall (%idy, %idx) in (8, 8) -&gt; (tensor&lt;4x128xf32&gt;) {
-    %alloc = bufferization.alloc_tensor {memory_space = #gpu.address_space&lt;workgroup&gt;}
-      : tensor&lt;4x128xf32&gt;
-    %barrier = iree_gpu.barrier_region %alloc {
-    ^bb0(%shared: tensor&lt;4x128xf32&gt;):
-      %ids = affine.delinearize_index %idy * 8 + %idx to (2, 32) : index
-      %in = ...
-      %2 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 2)&gt; (%ids#0)
-      %3 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 4)&gt; (%ids#1)
-      %inserted_slice = tensor.insert_slice %in into %shared[%2, %3] [2, 4] [1, 1]
-        : tensor&lt;2x4xf32&gt; to tensor&lt;4x128xf32&gt;
-      iree_gpu.yield %slice : tensor&lt;4x16xf32&gt;
-    } : tensor&lt;4x128xf32&gt; -&gt; tensor&lt;4x16xf32&gt;
-    %4 = affine.apply #affine_map&lt;(d0) -&gt; (d0 * 16)&gt; (%idx)
-    %slice = tensor.extract_slice %barrier[0, %4] [4, 16] [1, 1] : tensor&lt;4x128xf32&gt; to tensor&lt;4x16xf32&gt;
-    ...
-  } {mapping = [#gpu.thread&lt;y&gt;, #gpu.thread&lt;x&gt;]}
-</code></pre></div>
-<p>A barrier_region can be lowered to two barriers, one on the input operands
-and a second one on the results.</p>
-<p>Movtivation and Intended Use Cases:</p>
-<p>The primary way this op is generated is when fusing parallel loops with
-tensor results. This operation helps to make lowerings more progressive
-and flexible.
-  - Lowering directly to an alloc + reads and writes breaks the dependency
-    chain making transformations like barrier placement and pipelining
-    potentially more difficult.
-  - Allows the option of non-vector based lowering paths.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SingleBlockImplicitTerminator&lt;mlir::iree_compiler::IREE::GPU::YieldOp&gt;</code>, <code>SingleBlock</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
-<p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>inputs</code></td>
-<td>variadic of any type</td>
-</tr>
-</tbody>
-</table>
-<h5 id="results">Results:<a class="headerlink" href="#results" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>results</code></td>
-<td>variadic of any type</td>
-</tr>
-</tbody>
-</table>
-<h3 id="iree_gpubuffer_resource_cast-gpubufferresourcecastop"><code>iree_gpu.buffer_resource_cast</code> (GPU::BufferResourceCastOp)<a class="headerlink" href="#iree_gpubuffer_resource_cast-gpubufferresourcecastop" title="Permanent link">link</a></h3>
-<p><em>Represents a cast to addr_space&lt;7&gt; (buffer resource) before bufferization.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.buffer_resource_cast` $input oilist (`cacheSwizzleStride` `(` $cache_swizzle_stride `)` )
-              attr-dict `:` type($result)
-</code></pre></div>
-<p>Nominal cast of a tensor to AMDGPU buffer resource memory space before
-bufferization. This op takes the parameters with which to perform the cast
-if |input| bufferizes to <code>storage_buffer</code> memory space. If |input| resolves
-to any other memory space this op is silently dropped and has no effect.</p>
-<p>If |cache_swizzle_stride| is present, there is verification before
-bufferization that all producers of |input| are view-like and single source
-and user (i.e. trivially no alias). In all other cases this op is best
-effort and has no verification or failure modes.</p>
-<p>// TODO: Add other parameters for casting as needed.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
-<p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>input</code></td>
-<td>ranked tensor of any type values</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>cache_swizzle_stride</code></td>
-<td>index</td>
-</tr>
-</tbody>
-</table>
-<h5 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>result</code></td>
-<td>ranked tensor of any type values</td>
-</tr>
-</tbody>
-</table>
-<h3 id="iree_gpucoalesced_gather_dma-gpucoalescedgatherdmaop"><code>iree_gpu.coalesced_gather_dma</code> (GPU::CoalescedGatherDMAOp)<a class="headerlink" href="#iree_gpucoalesced_gather_dma-gpucoalescedgatherdmaop" title="Permanent link">link</a></h3>
-<p><em>Coalesced gather DMA operation for efficient GPU memory access</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.coalesced_gather_dma` $indices `,` $source `into` $init attr-dict
-              `:` type($indices) `,` type($source) `,` type($init) `-&gt;` type($result)
-</code></pre></div>
-<p>Performs a coalesced gather operation.
-This operation can exist in two forms: a tensor-based (value-semantic) form
-and a buffer-based (memref-semantic) form.</p>
-<p>In both forms, it reads elements from a source operand based on indices.
-* When the source is a tensor, the operation produces a new result tensor
-  containing the gathered data.
-* When the source is a memref, the operation writes the gathered data into
-  a destination out memref operand.</p>
-<p>The operation is specifically designed for subgroup-level parallelism, where
-threads within a subgroup cooperatively gather data with coalesced memory
-accesses. It implements ParallelCombiningOpInterface and must live inside an
-op implementing <code>InParallelOpInterface</code>, such as <code>scf.forall.in_parallel</code>.</p>
-<h2 id="lowering-paths">Lowering Paths<a class="headerlink" href="#lowering-paths" title="Permanent link">link</a></h2>
-<p>Two lowering strategies are supported:
-1. Lowers to <code>amdgpu.gather_to_lds</code> operations when lowering requirements
-   are met.
-2. Default lowering using <code>vector.gather</code> operations.</p>
-<h2 id="operands-and-results">Operands and Results<a class="headerlink" href="#operands-and-results" title="Permanent link">link</a></h2>
-<ul>
-<li><code>$indices</code>: Tensor/memref of index type specifying gather locations in
-  the source tensor</li>
-<li><code>$source</code>: Source tensor/memref containing the data to be gathered</li>
-<li><code>$init</code>: Destination tensor/memref receiving the gathered data
-  (destination-passing style)</li>
-<li><code>$result</code>: Output tensor/memref with gathered data (same type as <code>$init</code>)</li>
-</ul>
-<h2 id="example">Example<a class="headerlink" href="#example" title="Permanent link">link</a></h2>
-<p>The following example shows how this op is designed to be used in a tiled
-scenario, which sets up lowering path for efficient gathering.</p>
-<ol>
-<li>Outer <code>scf.forall</code> represents workgroup-level parallelism.</li>
-<li>Inner <code>scf.forall</code> represents subgroup-level parallelism.</li>
-<li>Each thread in the subgroup coalesces its memory accesses when
-   gathering data and writes to its lane-offset in the destination tensor.</li>
-</ol>
-<div class="highlight"><pre><span></span><code>%result = scf.forall (%wg_i, %wg_j) in (16, 1) shared_outs(%wg_out = %dest) -&gt; (tensor&lt;128x16xf32&gt;) {
-  %indices_wg_slice = tensor.extract_slice ...
-  %dest_wg_slice = tensor.extract_slice ...
-
-  %inner_result = scf.forall (%sg_i, %sg_j) in (32, 1) shared_outs(%sg_out = %dest_wg_slice) -&gt; (tensor&lt;8x16xf32&gt;) {
-    scf.forall.in_parallel {
-      iree_gpu.coalesced_gather_dma %indices_wg_slice, %source into %sg_out : ...
-    }
-  } {mapping = [#gpu.thread&lt;linear_dim_1&gt;, #gpu.thread&lt;linear_dim_0&gt;]}
-
-  scf.forall.in_parallel {
-    tensor.parallel_insert_slice %inner_result into %wg_out[...] : ...
-  }
-} {mapping = [#gpu.warp&lt;linear_dim_1&gt;, #gpu.warp&lt;linear_dim_0&gt;]}
-</code></pre></div>
-<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>ParallelCombiningOpInterface</code></p>
-<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>indices</code></td>
-<td>ranked tensor of index values or memref of index values</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>source</code></td>
-<td>ranked tensor of any type values or memref of any type values</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>init</code></td>
-<td>ranked tensor of any type values or memref of any type values</td>
-</tr>
-</tbody>
-</table>
-<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>result</code></td>
-<td>ranked tensor of any type values or memref of any type values</td>
-</tr>
-</tbody>
-</table>
-<h3 id="iree_gpuglobal_load_dma-gpugloballoaddmaop"><code>iree_gpu.global_load_dma</code> (GPU::GlobalLoadDMAOp)<a class="headerlink" href="#iree_gpuglobal_load_dma-gpugloballoaddmaop" title="Permanent link">link</a></h3>
-<p><em>Does a global load DMA operation</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.global_load_dma` $source`[` $sourceIndices `]` `-&gt;` $target `[` $targetIndices `]` attr-dict
-              `:` type($source) `-&gt;` type($target)
-</code></pre></div>
-<p>This operation represents a subgroup-level global load DMA operation.
-It is used to represent a direct gathering operation from global memory to workgroup.
-To be specific, the thread gathers data from the global memoryspace at the designated
-indices, and stores it to the thread's lane-offset of the workgroup memref at the
-designated indices.</p>
-<p>Specifically, if the thread's subgroup lane id is <code>lane_id</code>, the thread will load the data
-from <code>$source[sourceIndices]</code> and store it to <code>$target[targetIndices] + lane_id</code>.
-Collectively, all threads in the subgroup orchestrate the load DMA operation.</p>
-<p>Note: each gather has a load width is 32bit.</p>
-<p>Traits: <code>SameVariadicOperandSize</code></p>
-<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>source</code></td>
-<td>memref of any type values</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>sourceIndices</code></td>
-<td>variadic of index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>target</code></td>
-<td>memref of any type values</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>targetIndices</code></td>
-<td>variadic of index</td>
-</tr>
-</tbody>
-</table>
-<h3 id="iree_gpuvalue_barrier-gpuvaluebarrierop"><code>iree_gpu.value_barrier</code> (GPU::ValueBarrierOp)<a class="headerlink" href="#iree_gpuvalue_barrier-gpuvaluebarrierop" title="Permanent link">link</a></h3>
-<p><em>Synchronizes workers on a value semantic tensor or vector.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.value_barrier` $inputs attr-dict `:` type($inputs)
-</code></pre></div>
-<p>This operation acts as a barrier on a value semantic SSA values (tensor or
-vector). It takes multiple operands and produces a value equivalent to each
-input. This does not have copy and/or data movement semantics and simply
-represents a barrier on all writes in the tensor case, and a barrier until
-all threads acquire the input vector in the vector case.</p>
-<p>The inputs must be either all tensors, or all vectors.</p>
-<p>This operation is a no-op when not present in a parallel context. This
-operation is pure as it only requires synchronization for the value it
-produces.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
-<p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>inputs</code></td>
-<td>variadic of ranked tensor or vector of any type values</td>
-</tr>
-</tbody>
-</table>
-<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>results</code></td>
-<td>variadic of ranked tensor or vector of any type values</td>
-</tr>
-</tbody>
-</table>
-<h3 id="iree_gpuyield-gpuyieldop"><code>iree_gpu.yield</code> (GPU::YieldOp)<a class="headerlink" href="#iree_gpuyield-gpuyieldop" title="Permanent link">link</a></h3>
-<p><em>Yield values from a iree_gpu region.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_gpu.yield` attr-dict ($values^ `:` type($values))?
-</code></pre></div>
-<p>This operation is used to yield values from a within a region.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;::mlir::iree_compiler::IREE::GPU::BarrierRegionOp&gt;</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RegionBranchTerminatorOpInterface</code></p>
-<p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>values</code></td>
-<td>variadic of any type</td>
-</tr>
-</tbody>
-</table>
-<h2 id="attributes">Attributes<a class="headerlink" href="#attributes" title="Permanent link">link</a></h2>
-<h3 id="computebitwidthsattr">ComputeBitwidthsAttr<a class="headerlink" href="#computebitwidthsattr" title="Permanent link">link</a></h3>
-<p><em>Supported bitwidths for compute</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.compute_bitwidths&lt;
-  ::mlir::iree_compiler::IREE::GPU::ComputeBitwidths   # value
-&gt;
-</code></pre></div>
-<h5 id="parameters">Parameters:<a class="headerlink" href="#parameters" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">value</td>
-<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::ComputeBitwidths</code></td>
-<td>an enum of type ComputeBitwidths</td>
-</tr>
-</tbody>
-</table>
-<h3 id="conditionaltransposeattr">ConditionalTransposeAttr<a class="headerlink" href="#conditionaltransposeattr" title="Permanent link">link</a></h3>
-<p><em>Enable or disable transposed workgroup reordering based on the workload.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.conditional_transpose&lt;
-  int64_t,   # numXCDs
-  int64_t   # numCUs
-&gt;
-</code></pre></div>
-<p>This attribute controls conditional transposed workgroup reordering, determined by tile size and
-the number of CUs. This strategy is specifically designed to optimize the ping-pong matmul specialization.
-At each iteration over the K dimension, <code>X</code> distinct tiles for RHS and 'Y' distinct tiles for LHS are loaded.
-The strategy compares the sum of X and Y for the default ordering versus the transposed ordering, and selects
-the configuration with the minimum value.
-Calculation breakdown:
- - LHS shape: (M, K)
- - RHS shape: (N, K)
- - Tile dimension: (tileM, tileN)
- - numTileLoadsDefault = min(numCUS, ceildiv(N, tileN)) + ceildiv(numCUS, min(numCUS, ceildiv(N, tileN)))
- - numTileLoadsTransposed = min(numCUS, ceildiv(M, tileM)) + ceildiv(numCUS, min(numCUS, ceildiv(M, tileM)))</p>
-<p>Examples for gfx942 (304 CUs):
- - (M=8192, N=128256, K=4096) (tileM=256, tileN=256)
-  - numTileLoadsDefault = 304 + ceildiv(304, 304) = 305
-  - numTileLoadsTransposed = 32 + ceildiv(304, 32) = 42
-  =&gt; numTileLoadsTransposed &lt; numTileLoadsDefault =&gt; enable transpose</p>
-<ul>
-<li>(M=16384, N=8192, K=4096) (tileM=256, tileN=256)</li>
-<li>numTileLoadsDefault = 32 + ceildiv(304, 32) = 42</li>
-<li>numTileLoadsTransposed = 64 + ceildiv(304, 64) = 69
-  numTileLoadsTransposed &gt; numTileLoadsDefault =&gt; disable transpose</li>
-</ul>
-<p>Parameters:
-    - numXCDs: Number of XCDs.
-    - numCUs: Number of CUs per XCD.</p>
-<h5 id="parameters_1">Parameters:<a class="headerlink" href="#parameters_1" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">numXCDs</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">numCUs</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<h3 id="datatiledmmaattr">DataTiledMMAAttr<a class="headerlink" href="#datatiledmmaattr" title="Permanent link">link</a></h3>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.data_tiled_mma_layout&lt;
-  ::mlir::iree_compiler::IREE::GPU::MMAIntrinsic,   # intrinsic
-  int64_t,   # intrinsics_m
-  int64_t,   # subgroups_m
-  int64_t,   # intrinsics_n
-  int64_t,   # subgroups_n
-  int64_t   # intrinsics_k
-&gt;
-</code></pre></div>
-<p>This mma variant represents MMA ops with data-tiling details. The
-|intrinsic| field specifies which particular MMA intrinsic is targeted by
-the data-tiling.</p>
-<p>The other fields default to one, and that default results in a single
-intrinsic equivalent to MMAAttr, while values greater than one result in
-wider "kernels" consisting of multiple intrinsics, with the data layout
-already swizzled into a tile layout that allows each intrinsic to access
-data at an offset that's as simple as possible a mapping from the thread ID.</p>
-<p>For intrinsics_k, the extra unrolling dimension is interleaved along the
-innermost non-internal dimension of the swizzled shape. This means the
-unrolled K dimension will be the innermost non-internal dimension of the
-swizzled shape.</p>
-<h5 id="parameters_2">Parameters:<a class="headerlink" href="#parameters_2" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">intrinsic</td>
-<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::MMAIntrinsic</code></td>
-<td>an enum of type MMAIntrinsic</td>
-</tr>
-<tr>
-<td style="text-align: center;">intrinsics_m</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td>Intrinsic count along the M dimension.</td>
-</tr>
-<tr>
-<td style="text-align: center;">subgroups_m</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td>Subgroup count along the M dimension.</td>
-</tr>
-<tr>
-<td style="text-align: center;">intrinsics_n</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td>Intrinsic count along the N dimension.</td>
-</tr>
-<tr>
-<td style="text-align: center;">subgroups_n</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td>Subgroup count along the N dimension.</td>
-</tr>
-<tr>
-<td style="text-align: center;">intrinsics_k</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td>Intrinsic count along the K dimension, with interleaved layout.</td>
-</tr>
-</tbody>
-</table>
-<h3 id="datatiledscaledmmaattr">DataTiledScaledMMAAttr<a class="headerlink" href="#datatiledscaledmmaattr" title="Permanent link">link</a></h3>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.data_tiled_scaled_mma_layout&lt;
-  ::mlir::iree_compiler::IREE::GPU::ScaledMMAIntrinsic,   # intrinsic
-  ::mlir::Type,   # lhs_elem_type
-  ::mlir::Type,   # rhs_elem_type
-  ::mlir::Type,   # acc_elem_type
-  int64_t,   # intrinsics_m
-  int64_t,   # subgroups_m
-  int64_t,   # intrinsics_n
-  int64_t,   # subgroups_n
-  int64_t   # intrinsics_k
-&gt;
-</code></pre></div>
-<p>This mma variant represents scaled MMA ops with data-tiling details. The
-|intrinsic| field specifies which particular scaled MMA intrinsic is
-targeted by the data-tiling.</p>
-<p>The |lhs_elem_type|, |rhs_elem_type|, and |acc_elem_type| fields specify the
-element types of the LHS, RHS, and ACC operands respectively. The element
-types for the scales operands are always Float8E8M0FNUType, so they are not
-specified on the attribute.</p>
-<p>The other fields default to one, and that default results in a single
-intrinsic, while values greater than one result in wider "kernels"
-consisting of multiple intrinsic instructions, with the data layout already
-swizzled into a tile layout that allows each intrinsic to access data at an
-offset that's as simple as possible a mapping from the thread ID.</p>
-<p>For intrinsics_k, the extra unrolling dimension is interleaved along the
-innermost dimension for the scales operands, meaning this dimension will
-become the innermost dimension of the swizzled shape. For non-scales
-operands, the intrinsics_k dimension is not interleaved at all.</p>
-<h5 id="parameters_3">Parameters:<a class="headerlink" href="#parameters_3" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">intrinsic</td>
-<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::ScaledMMAIntrinsic</code></td>
-<td>an enum of type ScaledMMAIntrinsic</td>
-</tr>
-<tr>
-<td style="text-align: center;">lhs_elem_type</td>
-<td style="text-align: center;"><code>::mlir::Type</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">rhs_elem_type</td>
-<td style="text-align: center;"><code>::mlir::Type</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">acc_elem_type</td>
-<td style="text-align: center;"><code>::mlir::Type</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">intrinsics_m</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td>Intrinsic count along the M dimension.</td>
-</tr>
-<tr>
-<td style="text-align: center;">subgroups_m</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td>Subgroup count along the M dimension.</td>
-</tr>
-<tr>
-<td style="text-align: center;">intrinsics_n</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td>Intrinsic count along the N dimension.</td>
-</tr>
-<tr>
-<td style="text-align: center;">subgroups_n</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td>Subgroup count along the N dimension.</td>
-</tr>
-<tr>
-<td style="text-align: center;">intrinsics_k</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td>Intrinsic count along the K dimension, with interleaved layout.</td>
-</tr>
-</tbody>
-</table>
-<h3 id="derivedthreadconfigattr">DerivedThreadConfigAttr<a class="headerlink" href="#derivedthreadconfigattr" title="Permanent link">link</a></h3>
-<p><em>Drive lowering of an operation by deriving thread distribution when needed.</em></p>
-<p>Syntax: <code>#iree_gpu.derived_thread_config</code></p>
-<p>Lowering config for a single thread tiling level that is inferred after
-previous (often reduction) levels of tile + fuse. This is intended for
-fused operations where it is much easier to compute the tile sizes to use
-after previous levels of tile + fuse, rather than trying to pre-propagate
-tiling configs.</p>
-<h3 id="dotproductopsattr">DotProductOpsAttr<a class="headerlink" href="#dotproductopsattr" title="Permanent link">link</a></h3>
-<p><em>Supported dot product ops</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.dotproduct_ops&lt;
-  ::mlir::iree_compiler::IREE::GPU::DotProductOps   # value
-&gt;
-</code></pre></div>
-<h5 id="parameters_4">Parameters:<a class="headerlink" href="#parameters_4" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">value</td>
-<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::DotProductOps</code></td>
-<td>an enum of type DotProductOps</td>
-</tr>
-</tbody>
-</table>
-<h3 id="gpuencodingresolverattr">GPUEncodingResolverAttr<a class="headerlink" href="#gpuencodingresolverattr" title="Permanent link">link</a></h3>
-<p><em>The encoding layout attribute for GPU backend.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.gpu_encoding_resolver&lt;
-  DictionaryAttr   # configuration
-&gt;
-</code></pre></div>
-<p>This attribute can implement any layout interface methods for encoding
-serialization and or materialization, e.g., Encoding::LayoutMaterializerAttr,
-Codegen::PackedLayoutMaterializerAttr, etc. They should be implemented through external
-model mechanism because we do not want to relocate domain-specific logic to
-the dialect implementation, and we can have better code structure. See the
-implementation in compiler/Codegen/ExternalInterfaces/*.</p>
-<h5 id="parameters_5">Parameters:<a class="headerlink" href="#parameters_5" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">configuration</td>
-<td style="text-align: center;"><code>DictionaryAttr</code></td>
-<td>Executable target configuration. It is expected to be used in a pass scope, but not the final IR output.</td>
-</tr>
-</tbody>
-</table>
-<h3 id="gpupaddingresolverattr">GPUPaddingResolverAttr<a class="headerlink" href="#gpupaddingresolverattr" title="Permanent link">link</a></h3>
-<p><em>The padded encoding layout attribute for GPU targets.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.gpu_padding_resolver&lt;
-  std::optional&lt;uint32_t&gt;,   # cache_line_bytes
-  std::optional&lt;uint32_t&gt;   # cache_sets
-&gt;
-</code></pre></div>
-<p>Describes padding preferences for a given GPU target.
-This attribute can implement any encoding interface for data-tiling,
-e.g., Encoding::LayoutResolverAttr, etc. They should be implemented through
-external model mechanism because we do not want to relocate domain-specific
-logic to the dialect implementation, and we can have better code structure.
-See the implementation in compiler/Codegen/ExternalInterfaces/*.</p>
-<h5 id="parameters_6">Parameters:<a class="headerlink" href="#parameters_6" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">cache_line_bytes</td>
-<td style="text-align: center;"><code>std::optional&lt;uint32_t&gt;</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">cache_sets</td>
-<td style="text-align: center;"><code>std::optional&lt;uint32_t&gt;</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<h3 id="gpupipelineoptionsattr">GPUPipelineOptionsAttr<a class="headerlink" href="#gpupipelineoptionsattr" title="Permanent link">link</a></h3>
-<p><em>Options attribute for linalg + tensors -&gt; vector + memref GPU pipelines.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.pipeline_options&lt;
-  BoolAttr,   # prefetch_shared_memory
-  BoolAttr,   # no_reduce_shared_memory_bank_conflicts
-  BoolAttr,   # use_igemm_convolution
-  ReorderWorkgroupsStrategyAttr   # reorder_workgroups_strategy
-&gt;
-</code></pre></div>
-<p>This attributes describes lowering pipeline specific configuration options:
-* prefetch_shared_memory: Boolean option indicating whether or not to run
-  the loop prefetching pass in the lowering pipeline.
-* no_reduce_shared_memory_bank_conflicts: Boolean option indicating whether
-  or not to skip the bank conflict reduction pass in the lowering pipeline.
-* reorder_workgroups_strategy: Enum attribute indicating which strategy to
-  choose for the workgroup reordering pass. Options are <code>None</code>, <code>Swizzle</code>,
-  and <code>Transpose</code>.</p>
-<h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">prefetch_shared_memory</td>
-<td style="text-align: center;"><code>BoolAttr</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">no_reduce_shared_memory_bank_conflicts</td>
-<td style="text-align: center;"><code>BoolAttr</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">use_igemm_convolution</td>
-<td style="text-align: center;"><code>BoolAttr</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">reorder_workgroups_strategy</td>
-<td style="text-align: center;"><code>ReorderWorkgroupsStrategyAttr</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<h3 id="laneidattr">LaneIdAttr<a class="headerlink" href="#laneidattr" title="Permanent link">link</a></h3>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.lane_id&lt;
-  int64_t   # dim
-&gt;
-</code></pre></div>
-<p>An attribute for mapping scf.forall ops to subgroup lanes.</p>
-<h5 id="parameters_8">Parameters:<a class="headerlink" href="#parameters_8" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">dim</td>
-<td style="text-align: center;"><code>int64_t</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<h3 id="loweringconfigattr">LoweringConfigAttr<a class="headerlink" href="#loweringconfigattr" title="Permanent link">link</a></h3>
-<p><em>Drive lowering of an operation for gpu compilation.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.lowering_config&lt;
-  DictionaryAttr   # attributes
-&gt;
-</code></pre></div>
-<p>GPU specific implementation of a lowering config. This carries just a
-dictionary attribute to store any relevant fields. This is the simplest
-form of a lowering config, offering flexibility at the cost of structure.</p>
-<h5 id="parameters_9">Parameters:<a class="headerlink" href="#parameters_9" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">attributes</td>
-<td style="text-align: center;"><code>DictionaryAttr</code></td>
-<td>The configured fields, including tiling levels</td>
-</tr>
-</tbody>
-</table>
-<h3 id="mmaattr">MMAAttr<a class="headerlink" href="#mmaattr" title="Permanent link">link</a></h3>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.mma_layout&lt;
-  ::mlir::iree_compiler::IREE::GPU::MMAIntrinsic,   # intrinsic
-  bool   # col_major
-&gt;
-</code></pre></div>
-<p>Attribute describing a particular shape of matrix-multiply and accumulate
-instruction. Abstractly, all attributes of this type represent the following
-unit of arithmetic for matrices A, B, and C.</p>
-<div class="highlight"><pre><span></span><code>  C += A x B
-</code></pre></div>
-<p>The |intrinsic| field specifies which particular MMA intrinsic this refers
-to, with each intrinsic implicating a specific MNK shape and operand types.
-See IREEGPUEnums.td for the definition of the intrinsics.</p>
-<p>If set to true, |col_major| indicates that the result should be produced
-column major. This is equivalent to instead computing:</p>
-<div class="highlight"><pre><span></span><code>  C^T += B^T x A^T
-</code></pre></div>
-<h5 id="parameters_10">Parameters:<a class="headerlink" href="#parameters_10" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">intrinsic</td>
-<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::MMAIntrinsic</code></td>
-<td>an enum of type MMAIntrinsic</td>
-</tr>
-<tr>
-<td style="text-align: center;">col_major</td>
-<td style="text-align: center;"><code>bool</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<h3 id="mmaintrinsicattr">MMAIntrinsicAttr<a class="headerlink" href="#mmaintrinsicattr" title="Permanent link">link</a></h3>
-<p><em>Descriptor for different MMA intrinsics</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.mma_intrinsic&lt;
-  ::mlir::iree_compiler::IREE::GPU::MMAIntrinsic   # value
-&gt;
-</code></pre></div>
-<h5 id="parameters_11">Parameters:<a class="headerlink" href="#parameters_11" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">value</td>
-<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::MMAIntrinsic</code></td>
-<td>an enum of type MMAIntrinsic</td>
-</tr>
-</tbody>
-</table>
-<h3 id="mmaopsarrayattr">MMAOpsArrayAttr<a class="headerlink" href="#mmaopsarrayattr" title="Permanent link">link</a></h3>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.mma_ops&lt;
-  ::llvm::ArrayRef&lt;MMAAttr&gt;   # value
-&gt;
-</code></pre></div>
-<h5 id="parameters_12">Parameters:<a class="headerlink" href="#parameters_12" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">value</td>
-<td style="text-align: center;"><code>::llvm::ArrayRef&lt;MMAAttr&gt;</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<h3 id="promotewithcacheswizzleattr">PromoteWithCacheSwizzleAttr<a class="headerlink" href="#promotewithcacheswizzleattr" title="Permanent link">link</a></h3>
-<p><em>Indicate promotion of an operand with setting a cache swizzle value.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.promote_with_cache_swizzle&lt;
-  Attribute   # copy_config
-&gt;
-</code></pre></div>
-<p>When promoting, this will create a <code>linalg.copy</code> on the input operand,
-and then the primary producing dispatch input has a buffer cast with cache
-swizzle inserted if possible. For example,</p>
-<div class="highlight"><pre><span></span><code>%0 = tensor_ext.dispatch.tensor.load : tensor&lt;?x8192&gt;
-%1 = linalg.matmul ins(%0, ...)
-</code></pre></div>
-<p>Becomes with <code>#iree_gpu.promote_with_cache_swizzle&lt;#iree_gpu.derived_thread_config&gt;</code></p>
-<div class="highlight"><pre><span></span><code>%0 = tensor_ext.dispatch.tensor.load : tensor&lt;?x8192&gt;
-%1 = iree_gpu.buffer_resource_cast cache_swizzle(8192)
-%2 = linalg.copy lowering_config = #iree_gpu.derived_thread_config
-%3 = linalg.matmul ins(%2, ...)
-</code></pre></div>
-<h5 id="parameters_13">Parameters:<a class="headerlink" href="#parameters_13" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">copy_config</td>
-<td style="text-align: center;"><code>Attribute</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<h3 id="reorderworkgroupsstrategyattr">ReorderWorkgroupsStrategyAttr<a class="headerlink" href="#reorderworkgroupsstrategyattr" title="Permanent link">link</a></h3>
-<p><em>Strategy for workgroup reordering</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.reorder_workgroups_strategy&lt;
-  ::mlir::iree_compiler::IREE::GPU::ReorderWorkgroupsStrategy   # value
-&gt;
-</code></pre></div>
-<h5 id="parameters_14">Parameters:<a class="headerlink" href="#parameters_14" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">value</td>
-<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::ReorderWorkgroupsStrategy</code></td>
-<td>an enum of type ReorderWorkgroupsStrategy</td>
-</tr>
-</tbody>
-</table>
-<h3 id="scaledmmaattr">ScaledMMAAttr<a class="headerlink" href="#scaledmmaattr" title="Permanent link">link</a></h3>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.scaled_mma_layout&lt;
-  ::mlir::iree_compiler::IREE::GPU::ScaledMMAIntrinsic,   # intrinsic
-  ::mlir::Type,   # lhs_elem_type
-  ::mlir::Type,   # rhs_elem_type
-  ::mlir::Type,   # acc_elem_type
-  bool   # col_major
-&gt;
-</code></pre></div>
-<p>This attribute represents MMAs that operate on low-precision floating point
-types (like fp4 or fp8) and apply <em>block scales</em> to their inputs,
-where each |blockSize| elements share a scale (which is currently
-always a f32 exponent / f8E8M0).</p>
-<p>The intrinsic is a ScaledMMAIntrinsic, and the element types are given
-on the attribute, not in the intrinsic enum, since these scaled
-operations allow arbitrary combinations of fp4/fp6/fp8 inputs.</p>
-<p>This intrinsic takes its four parameters as (lhs, lhs_scale, rhs, rhs_scale).</p>
-<h5 id="parameters_15">Parameters:<a class="headerlink" href="#parameters_15" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">intrinsic</td>
-<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::ScaledMMAIntrinsic</code></td>
-<td>an enum of type ScaledMMAIntrinsic</td>
-</tr>
-<tr>
-<td style="text-align: center;">lhs_elem_type</td>
-<td style="text-align: center;"><code>::mlir::Type</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">rhs_elem_type</td>
-<td style="text-align: center;"><code>::mlir::Type</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">acc_elem_type</td>
-<td style="text-align: center;"><code>::mlir::Type</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">col_major</td>
-<td style="text-align: center;"><code>bool</code></td>
-<td>if this is a column-major scaled MFMA</td>
-</tr>
-</tbody>
-</table>
-<h3 id="scaledmmaopsarrayattr">ScaledMMAOpsArrayAttr<a class="headerlink" href="#scaledmmaopsarrayattr" title="Permanent link">link</a></h3>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.scaled_mma_ops&lt;
-  ::llvm::ArrayRef&lt;ScaledMMAAttr&gt;   # value
-&gt;
-</code></pre></div>
-<h5 id="parameters_16">Parameters:<a class="headerlink" href="#parameters_16" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">value</td>
-<td style="text-align: center;"><code>::llvm::ArrayRef&lt;ScaledMMAAttr&gt;</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<h3 id="storagebitwidthsattr">StorageBitwidthsAttr<a class="headerlink" href="#storagebitwidthsattr" title="Permanent link">link</a></h3>
-<p><em>Supported bitwidths for storage</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.storage_bitwidths&lt;
-  ::mlir::iree_compiler::IREE::GPU::StorageBitwidths   # value
-&gt;
-</code></pre></div>
-<h5 id="parameters_17">Parameters:<a class="headerlink" href="#parameters_17" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">value</td>
-<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::StorageBitwidths</code></td>
-<td>an enum of type StorageBitwidths</td>
-</tr>
-</tbody>
-</table>
-<h3 id="subgroupopsattr">SubgroupOpsAttr<a class="headerlink" href="#subgroupopsattr" title="Permanent link">link</a></h3>
-<p><em>Supported subgroup ops</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.subgroup_ops&lt;
-  ::mlir::iree_compiler::IREE::GPU::SubgroupOps   # value
-&gt;
-</code></pre></div>
-<h5 id="parameters_18">Parameters:<a class="headerlink" href="#parameters_18" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">value</td>
-<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::SubgroupOps</code></td>
-<td>an enum of type SubgroupOps</td>
-</tr>
-</tbody>
-</table>
-<h3 id="targetattr">TargetAttr<a class="headerlink" href="#targetattr" title="Permanent link">link</a></h3>
-<p><em>Full GPU target attribute.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.target&lt;
-  ::llvm::StringRef,   # arch
-  ::llvm::StringRef,   # features
-  TargetWgpAttr,   # wgp
-  TargetChipAttr   # chip
-&gt;
-</code></pre></div>
-<p>This attributes describes a full GPU target. It contains a few fields:
-* The canonical target architecture for compilation, e.g., sm_80 for
-  cuda, gfx942 for hip
-* A TargetWgpAttr describing the GPU features and limits in a single
-  GPU workgroup processor (WGP), that is, AMD compute unit or NVIDIA
-  streaming multiprocessor
-* An optional TargetChipAttr describing GPU features for the final chip
-  or product, e.g., wgp count</p>
-<h5 id="parameters_19">Parameters:<a class="headerlink" href="#parameters_19" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">arch</td>
-<td style="text-align: center;"><code>::llvm::StringRef</code></td>
-<td>target architecture</td>
-</tr>
-<tr>
-<td style="text-align: center;">features</td>
-<td style="text-align: center;"><code>::llvm::StringRef</code></td>
-<td>target features</td>
-</tr>
-<tr>
-<td style="text-align: center;">wgp</td>
-<td style="text-align: center;"><code>TargetWgpAttr</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">chip</td>
-<td style="text-align: center;"><code>TargetChipAttr</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<h3 id="targetchipattr">TargetChipAttr<a class="headerlink" href="#targetchipattr" title="Permanent link">link</a></h3>
-<p><em>Chip level target description.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.target_chip&lt;
-  uint32_t,   # wgp_count
-  StringAttr,   # sku
-  FloatAttr,   # memory_bandwidth_tbps
-  DictionaryAttr,   # perf_tflops
-  DictionaryAttr   # extra
-&gt;
-</code></pre></div>
-<p>This attribute contains hardware features/limits at a single GPU chip level.
-Here a GPU chip means the hardware functionality scope where the whole
-software compute grid is scheduled onto. A chip typically contains many
-AMD compute units or NVIDIA streaming multiprocessors; it's the final SKU.</p>
-<h5 id="parameters_20">Parameters:<a class="headerlink" href="#parameters_20" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">wgp_count</td>
-<td style="text-align: center;"><code>uint32_t</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">sku</td>
-<td style="text-align: center;"><code>StringAttr</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">memory_bandwidth_tbps</td>
-<td style="text-align: center;"><code>FloatAttr</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">perf_tflops</td>
-<td style="text-align: center;"><code>DictionaryAttr</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">extra</td>
-<td style="text-align: center;"><code>DictionaryAttr</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<h3 id="targetwgpattr">TargetWgpAttr<a class="headerlink" href="#targetwgpattr" title="Permanent link">link</a></h3>
-<p><em>Workgroup processor level target description.</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.target_wgp&lt;
-  ComputeBitwidthsAttr,   # compute
-  StorageBitwidthsAttr,   # storage
-  SubgroupOpsAttr,   # subgroup
-  DotProductOpsAttr,   # dot
-  MMAOpsArrayAttr,   # mma
-  ScaledMMAOpsArrayAttr,   # scaled_mma
-  DenseI32ArrayAttr,   # subgroup_size_choices
-  DenseI32ArrayAttr,   # max_workgroup_sizes
-  int32_t,   # max_thread_count_per_workgroup
-  int32_t,   # max_workgroup_memory_bytes
-  DenseI32ArrayAttr,   # max_workgroup_counts
-  std::optional&lt;int32_t&gt;,   # max_load_instruction_bits
-  std::optional&lt;int32_t&gt;,   # simds_per_wgp
-  std::optional&lt;int32_t&gt;,   # vgpr_space_bits
-  DenseI64ArrayAttr,   # dma_sizes
-  DictionaryAttr   # extra
-&gt;
-</code></pre></div>
-<p>This attribute contains hardware features/limits at a single GPU workgroup
-processor (WGP) level. Here a GPU workgroup processor means the basic
-hardware functionality unit where a software workgroup is scheduled onto;
-that is, a compute unit for AMD GPUs or a streaming multiprocessor for
-NVIDIA GPUs.</p>
-<h5 id="parameters_21">Parameters:<a class="headerlink" href="#parameters_21" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">compute</td>
-<td style="text-align: center;"><code>ComputeBitwidthsAttr</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">storage</td>
-<td style="text-align: center;"><code>StorageBitwidthsAttr</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">subgroup</td>
-<td style="text-align: center;"><code>SubgroupOpsAttr</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">dot</td>
-<td style="text-align: center;"><code>DotProductOpsAttr</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">mma</td>
-<td style="text-align: center;"><code>MMAOpsArrayAttr</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">scaled_mma</td>
-<td style="text-align: center;"><code>ScaledMMAOpsArrayAttr</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">subgroup_size_choices</td>
-<td style="text-align: center;"><code>DenseI32ArrayAttr</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">max_workgroup_sizes</td>
-<td style="text-align: center;"><code>DenseI32ArrayAttr</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">max_thread_count_per_workgroup</td>
-<td style="text-align: center;"><code>int32_t</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">max_workgroup_memory_bytes</td>
-<td style="text-align: center;"><code>int32_t</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">max_workgroup_counts</td>
-<td style="text-align: center;"><code>DenseI32ArrayAttr</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">max_load_instruction_bits</td>
-<td style="text-align: center;"><code>std::optional&lt;int32_t&gt;</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">simds_per_wgp</td>
-<td style="text-align: center;"><code>std::optional&lt;int32_t&gt;</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">vgpr_space_bits</td>
-<td style="text-align: center;"><code>std::optional&lt;int32_t&gt;</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">dma_sizes</td>
-<td style="text-align: center;"><code>DenseI64ArrayAttr</code></td>
-<td></td>
-</tr>
-<tr>
-<td style="text-align: center;">extra</td>
-<td style="text-align: center;"><code>DictionaryAttr</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<h3 id="usegloballoaddmaattr">UseGlobalLoadDMAAttr<a class="headerlink" href="#usegloballoaddmaattr" title="Permanent link">link</a></h3>
-<p><em>Drive lowering of an operation by using global load DMA.</em></p>
-<p>Syntax: <code>#iree_gpu.use_global_load_dma</code></p>
-<p>Lowering config for when using global load DMA is needed. This is intended for
-tagging operations that are known to be able to use global load DMA, which might
-also have its own cofiguration.</p>
-<h3 id="virtualmmaattr">VirtualMMAAttr<a class="headerlink" href="#virtualmmaattr" title="Permanent link">link</a></h3>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.virtual_mma_layout&lt;
-  ::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic,   # intrinsic
-  bool   # col_major
-&gt;
-</code></pre></div>
-<p>This mma variant represents "virtual" MMA ops that has modification to
-its native layouts by intrinsicsK and/or interleave reads. The |intrinsic|
-field represents different kinds of "Virtual" MMA Ops we found helpful.</p>
-<p>These interleaving and/or unrolling changes in the layout is especially
-useful to coalesce reads from shared memory to register or align layouts
-in a chained-matmul operation.</p>
-<p>If set to true (similar to MMAAttr), |col_major| indicates the computation
-is perfomed as below:</p>
-<div class="highlight"><pre><span></span><code>  C^T += B^T x A^T
-</code></pre></div>
-<h5 id="parameters_22">Parameters:<a class="headerlink" href="#parameters_22" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">intrinsic</td>
-<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic</code></td>
-<td>an enum of type VirtualMMAIntrinsic</td>
-</tr>
-<tr>
-<td style="text-align: center;">col_major</td>
-<td style="text-align: center;"><code>bool</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<h3 id="virtualmmaintrinsicattr">VirtualMMAIntrinsicAttr<a class="headerlink" href="#virtualmmaintrinsicattr" title="Permanent link">link</a></h3>
-<p><em>Descriptor for different Virtual MMA intrinsics</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_gpu.virtual_mma_intrinsic&lt;
-  ::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic   # value
-&gt;
-</code></pre></div>
-<h5 id="parameters_23">Parameters:<a class="headerlink" href="#parameters_23" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">value</td>
-<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::GPU::VirtualMMAIntrinsic</code></td>
-<td>an enum of type VirtualMMAIntrinsic</td>
-</tr>
-</tbody>
-</table>
-<h2 id="enums">Enums<a class="headerlink" href="#enums" title="Permanent link">link</a></h2>
-<h3 id="computebitwidths">ComputeBitwidths<a class="headerlink" href="#computebitwidths" title="Permanent link">link</a></h3>
-<p><em>Supported bitwidths for compute</em></p>
-<h4 id="cases">Cases:<a class="headerlink" href="#cases" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">FP64</td>
-<td style="text-align: center;"><code>1</code></td>
-<td>fp64</td>
-</tr>
-<tr>
-<td style="text-align: center;">FP32</td>
-<td style="text-align: center;"><code>2</code></td>
-<td>fp32</td>
-</tr>
-<tr>
-<td style="text-align: center;">FP16</td>
-<td style="text-align: center;"><code>4</code></td>
-<td>fp16</td>
-</tr>
-<tr>
-<td style="text-align: center;">Int64</td>
-<td style="text-align: center;"><code>8</code></td>
-<td>int64</td>
-</tr>
-<tr>
-<td style="text-align: center;">Int32</td>
-<td style="text-align: center;"><code>16</code></td>
-<td>int32</td>
-</tr>
-<tr>
-<td style="text-align: center;">Int16</td>
-<td style="text-align: center;"><code>32</code></td>
-<td>int16</td>
-</tr>
-<tr>
-<td style="text-align: center;">Int8</td>
-<td style="text-align: center;"><code>64</code></td>
-<td>int8</td>
-</tr>
-<tr>
-<td style="text-align: center;">FP8</td>
-<td style="text-align: center;"><code>128</code></td>
-<td>fp8</td>
-</tr>
-<tr>
-<td style="text-align: center;">FP6</td>
-<td style="text-align: center;"><code>256</code></td>
-<td>fp6</td>
-</tr>
-<tr>
-<td style="text-align: center;">FP4</td>
-<td style="text-align: center;"><code>512</code></td>
-<td>fp4</td>
-</tr>
-</tbody>
-</table>
-<h3 id="dotproductops">DotProductOps<a class="headerlink" href="#dotproductops" title="Permanent link">link</a></h3>
-<p><em>Supported dot product ops</em></p>
-<h4 id="cases_1">Cases:<a class="headerlink" href="#cases_1" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">None</td>
-<td style="text-align: center;"><code>0</code></td>
-<td>none</td>
-</tr>
-<tr>
-<td style="text-align: center;">DP4xI8ToI32</td>
-<td style="text-align: center;"><code>1</code></td>
-<td>dp4xi8toi32</td>
-</tr>
-</tbody>
-</table>
-<h3 id="mmafragment">MMAFragment<a class="headerlink" href="#mmafragment" title="Permanent link">link</a></h3>
-<p><em>Descriptor for a particular fragment of an MMA operation</em></p>
-<h4 id="cases_2">Cases:<a class="headerlink" href="#cases_2" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">Lhs</td>
-<td style="text-align: center;"><code>0</code></td>
-<td>Lhs</td>
-</tr>
-<tr>
-<td style="text-align: center;">Rhs</td>
-<td style="text-align: center;"><code>1</code></td>
-<td>Rhs</td>
-</tr>
-<tr>
-<td style="text-align: center;">Acc</td>
-<td style="text-align: center;"><code>2</code></td>
-<td>Acc</td>
-</tr>
-</tbody>
-</table>
-<h3 id="mmaintrinsic">MMAIntrinsic<a class="headerlink" href="#mmaintrinsic" title="Permanent link">link</a></h3>
-<p><em>Descriptor for different MMA intrinsics</em></p>
-<h4 id="cases_3">Cases:<a class="headerlink" href="#cases_3" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">MFMA_F32_16x16x4_F32</td>
-<td style="text-align: center;"><code>4112</code></td>
-<td>MFMA_F32_16x16x4_F32</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_16x16x16_F16</td>
-<td style="text-align: center;"><code>4128</code></td>
-<td>MFMA_F32_16x16x16_F16</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_32x32x8_F16</td>
-<td style="text-align: center;"><code>4129</code></td>
-<td>MFMA_F32_32x32x8_F16</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_I32_16x16x16_I8</td>
-<td style="text-align: center;"><code>4288</code></td>
-<td>MFMA_I32_16x16x16_I8</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_I32_32x32x8_I8</td>
-<td style="text-align: center;"><code>4289</code></td>
-<td>MFMA_I32_32x32x8_I8</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_16x16x8_BF16</td>
-<td style="text-align: center;"><code>4384</code></td>
-<td>MFMA_F32_16x16x8_BF16</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_32x32x4_BF16</td>
-<td style="text-align: center;"><code>4385</code></td>
-<td>MFMA_F32_32x32x4_BF16</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F64_16x16x4_F64</td>
-<td style="text-align: center;"><code>4352</code></td>
-<td>MFMA_F64_16x16x4_F64</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_16x16x16_BF16</td>
-<td style="text-align: center;"><code>4640</code></td>
-<td>MFMA_F32_16x16x16_BF16</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_32x32x8_BF16</td>
-<td style="text-align: center;"><code>4641</code></td>
-<td>MFMA_F32_32x32x8_BF16</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_16x16x32_F8E5M2FNUZ</td>
-<td style="text-align: center;"><code>4656</code></td>
-<td>MFMA_F32_16x16x32_F8E5M2FNUZ</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_16x16x32_F8E5M2FNUZ_F8E4M3FNUZ</td>
-<td style="text-align: center;"><code>4657</code></td>
-<td>MFMA_F32_16x16x32_F8E5M2FNUZ_F8E4M3FNUZ</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_16x16x32_F8E4M3FNUZ</td>
-<td style="text-align: center;"><code>4658</code></td>
-<td>MFMA_F32_16x16x32_F8E4M3FNUZ</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_16x16x32_F8E4M3FNUZ_F8E5M2FNUZ</td>
-<td style="text-align: center;"><code>4659</code></td>
-<td>MFMA_F32_16x16x32_F8E4M3FNUZ_F8E5M2FNUZ</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_32x32x16_F8E5M2FNUZ</td>
-<td style="text-align: center;"><code>4660</code></td>
-<td>MFMA_F32_32x32x16_F8E5M2FNUZ</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_32x32x16_F8E5M2FNUZ_F8E4M3FNUZ</td>
-<td style="text-align: center;"><code>4661</code></td>
-<td>MFMA_F32_32x32x16_F8E5M2FNUZ_F8E4M3FNUZ</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_32x32x16_F8E4M3FNUZ</td>
-<td style="text-align: center;"><code>4662</code></td>
-<td>MFMA_F32_32x32x16_F8E4M3FNUZ</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ</td>
-<td style="text-align: center;"><code>4663</code></td>
-<td>MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_I32_16x16x32_I8</td>
-<td style="text-align: center;"><code>4800</code></td>
-<td>MFMA_I32_16x16x32_I8</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_I32_32x32x16_I8</td>
-<td style="text-align: center;"><code>4801</code></td>
-<td>MFMA_I32_32x32x16_I8</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_16x16x32_F16</td>
-<td style="text-align: center;"><code>4896</code></td>
-<td>MFMA_F32_16x16x32_F16</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_32x32x16_F16</td>
-<td style="text-align: center;"><code>4897</code></td>
-<td>MFMA_F32_32x32x16_F16</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_16x16x32_BF16</td>
-<td style="text-align: center;"><code>4898</code></td>
-<td>MFMA_F32_16x16x32_BF16</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_32x32x16_BF16</td>
-<td style="text-align: center;"><code>4899</code></td>
-<td>MFMA_F32_32x32x16_BF16</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_16x16x32_F8E5M2</td>
-<td style="text-align: center;"><code>4912</code></td>
-<td>MFMA_F32_16x16x32_F8E5M2</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_16x16x32_F8E5M2_F8E4M3FN</td>
-<td style="text-align: center;"><code>4913</code></td>
-<td>MFMA_F32_16x16x32_F8E5M2_F8E4M3FN</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_16x16x32_F8E4M3FN</td>
-<td style="text-align: center;"><code>4914</code></td>
-<td>MFMA_F32_16x16x32_F8E4M3FN</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_16x16x32_F8E4M3FN_F8E5M2</td>
-<td style="text-align: center;"><code>4915</code></td>
-<td>MFMA_F32_16x16x32_F8E4M3FN_F8E5M2</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_32x32x16_F8E5M2</td>
-<td style="text-align: center;"><code>4916</code></td>
-<td>MFMA_F32_32x32x16_F8E5M2</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_32x32x16_F8E5M2_F8E4M3FN</td>
-<td style="text-align: center;"><code>4917</code></td>
-<td>MFMA_F32_32x32x16_F8E5M2_F8E4M3FN</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_32x32x16_F8E4M3FN</td>
-<td style="text-align: center;"><code>4918</code></td>
-<td>MFMA_F32_32x32x16_F8E4M3FN</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_32x32x16_F8E4M3FN_F8E5M2</td>
-<td style="text-align: center;"><code>4919</code></td>
-<td>MFMA_F32_32x32x16_F8E4M3FN_F8E5M2</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_16x16x128_F8E5M2</td>
-<td style="text-align: center;"><code>4920</code></td>
-<td>MFMA_F32_16x16x128_F8E5M2</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_16x16x128_F8E5M2_F8E4M3FN</td>
-<td style="text-align: center;"><code>4921</code></td>
-<td>MFMA_F32_16x16x128_F8E5M2_F8E4M3FN</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_16x16x128_F8E4M3FN</td>
-<td style="text-align: center;"><code>4922</code></td>
-<td>MFMA_F32_16x16x128_F8E4M3FN</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_16x16x128_F8E4M3FN_F8E5M2</td>
-<td style="text-align: center;"><code>4923</code></td>
-<td>MFMA_F32_16x16x128_F8E4M3FN_F8E5M2</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_32x32x64_F8E5M2</td>
-<td style="text-align: center;"><code>4924</code></td>
-<td>MFMA_F32_32x32x64_F8E5M2</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_32x32x64_F8E5M2_F8E4M3FN</td>
-<td style="text-align: center;"><code>4925</code></td>
-<td>MFMA_F32_32x32x64_F8E5M2_F8E4M3FN</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_32x32x64_F8E4M3FN</td>
-<td style="text-align: center;"><code>4926</code></td>
-<td>MFMA_F32_32x32x64_F8E4M3FN</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_F32_32x32x64_F8E4M3FN_F8E5M2</td>
-<td style="text-align: center;"><code>4927</code></td>
-<td>MFMA_F32_32x32x64_F8E4M3FN_F8E5M2</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_I32_16x16x64_I8</td>
-<td style="text-align: center;"><code>5056</code></td>
-<td>MFMA_I32_16x16x64_I8</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_I32_32x32x32_I8</td>
-<td style="text-align: center;"><code>5057</code></td>
-<td>MFMA_I32_32x32x32_I8</td>
-</tr>
-<tr>
-<td style="text-align: center;">WMMAR3_F32_16x16x16_F16</td>
-<td style="text-align: center;"><code>6176</code></td>
-<td>WMMAR3_F32_16x16x16_F16</td>
-</tr>
-<tr>
-<td style="text-align: center;">WMMAR3_F16_16x16x16_F16</td>
-<td style="text-align: center;"><code>6177</code></td>
-<td>WMMAR3_F16_16x16x16_F16</td>
-</tr>
-<tr>
-<td style="text-align: center;">WMMAR3_F32_16x16x16_BF16</td>
-<td style="text-align: center;"><code>6178</code></td>
-<td>WMMAR3_F32_16x16x16_BF16</td>
-</tr>
-<tr>
-<td style="text-align: center;">WMMAR3_BF16_16x16x16_BF16</td>
-<td style="text-align: center;"><code>6179</code></td>
-<td>WMMAR3_BF16_16x16x16_BF16</td>
-</tr>
-<tr>
-<td style="text-align: center;">WMMAR3_I32_16x16x16_I8</td>
-<td style="text-align: center;"><code>6336</code></td>
-<td>WMMAR3_I32_16x16x16_I8</td>
-</tr>
-<tr>
-<td style="text-align: center;">WMMAR4_F32_16x16x16_F16</td>
-<td style="text-align: center;"><code>6432</code></td>
-<td>WMMAR4_F32_16x16x16_F16</td>
-</tr>
-<tr>
-<td style="text-align: center;">WMMAR4_F16_16x16x16_F16</td>
-<td style="text-align: center;"><code>6433</code></td>
-<td>WMMAR4_F16_16x16x16_F16</td>
-</tr>
-<tr>
-<td style="text-align: center;">WMMAR4_F32_16x16x16_BF16</td>
-<td style="text-align: center;"><code>6434</code></td>
-<td>WMMAR4_F32_16x16x16_BF16</td>
-</tr>
-<tr>
-<td style="text-align: center;">WMMAR4_BF16_16x16x16_BF16</td>
-<td style="text-align: center;"><code>6435</code></td>
-<td>WMMAR4_BF16_16x16x16_BF16</td>
-</tr>
-<tr>
-<td style="text-align: center;">WMMAR4_F32_16x16x16_F8E5M2</td>
-<td style="text-align: center;"><code>6448</code></td>
-<td>WMMAR4_F32_16x16x16_F8E5M2</td>
-</tr>
-<tr>
-<td style="text-align: center;">WMMAR4_F32_16x16x16_F8E5M2_F8E4M3FN</td>
-<td style="text-align: center;"><code>6449</code></td>
-<td>WMMAR4_F32_16x16x16_F8E5M2_F8E4M3FN</td>
-</tr>
-<tr>
-<td style="text-align: center;">WMMAR4_F32_16x16x16_F8E4M3FN</td>
-<td style="text-align: center;"><code>6450</code></td>
-<td>WMMAR4_F32_16x16x16_F8E4M3FN</td>
-</tr>
-<tr>
-<td style="text-align: center;">WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2</td>
-<td style="text-align: center;"><code>6451</code></td>
-<td>WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2</td>
-</tr>
-<tr>
-<td style="text-align: center;">WMMAR4_I32_16x16x16_I8</td>
-<td style="text-align: center;"><code>6592</code></td>
-<td>WMMAR4_I32_16x16x16_I8</td>
-</tr>
-<tr>
-<td style="text-align: center;">NV_WMMA_F32_16x16x16_F16</td>
-<td style="text-align: center;"><code>8224</code></td>
-<td>NV_WMMA_F32_16x16x16_F16</td>
-</tr>
-<tr>
-<td style="text-align: center;">NV_WMMA_F16_16x16x16_F16</td>
-<td style="text-align: center;"><code>8225</code></td>
-<td>NV_WMMA_F16_16x16x16_F16</td>
-</tr>
-</tbody>
-</table>
-<h3 id="reorderworkgroupsstrategy">ReorderWorkgroupsStrategy<a class="headerlink" href="#reorderworkgroupsstrategy" title="Permanent link">link</a></h3>
-<p><em>Strategy for workgroup reordering</em></p>
-<h4 id="cases_4">Cases:<a class="headerlink" href="#cases_4" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">None</td>
-<td style="text-align: center;"><code>0</code></td>
-<td>None</td>
-</tr>
-<tr>
-<td style="text-align: center;">Transpose</td>
-<td style="text-align: center;"><code>1</code></td>
-<td>Transpose</td>
-</tr>
-</tbody>
-</table>
-<h3 id="scaledmmaintrinsic">ScaledMMAIntrinsic<a class="headerlink" href="#scaledmmaintrinsic" title="Permanent link">link</a></h3>
-<p><em>Descriptor for different scaled MMA intrinsics</em></p>
-<h4 id="cases_5">Cases:<a class="headerlink" href="#cases_5" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">MFMA_SCALE_F32_16x16x128_B32</td>
-<td style="text-align: center;"><code>4096</code></td>
-<td>MFMA_SCALE_F32_16x16x128_B32</td>
-</tr>
-<tr>
-<td style="text-align: center;">MFMA_SCALE_F32_32x32x64_B32</td>
-<td style="text-align: center;"><code>4097</code></td>
-<td>MFMA_SCALE_F32_32x32x64_B32</td>
-</tr>
-</tbody>
-</table>
-<h3 id="storagebitwidths">StorageBitwidths<a class="headerlink" href="#storagebitwidths" title="Permanent link">link</a></h3>
-<p><em>Supported bitwidths for storage</em></p>
-<h4 id="cases_6">Cases:<a class="headerlink" href="#cases_6" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">B64</td>
-<td style="text-align: center;"><code>1</code></td>
-<td>b64</td>
-</tr>
-<tr>
-<td style="text-align: center;">B32</td>
-<td style="text-align: center;"><code>2</code></td>
-<td>b32</td>
-</tr>
-<tr>
-<td style="text-align: center;">B16</td>
-<td style="text-align: center;"><code>4</code></td>
-<td>b16</td>
-</tr>
-<tr>
-<td style="text-align: center;">B8</td>
-<td style="text-align: center;"><code>8</code></td>
-<td>b8</td>
-</tr>
-</tbody>
-</table>
-<h3 id="subgroupops">SubgroupOps<a class="headerlink" href="#subgroupops" title="Permanent link">link</a></h3>
-<p><em>Supported subgroup ops</em></p>
-<h4 id="cases_7">Cases:<a class="headerlink" href="#cases_7" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">None</td>
-<td style="text-align: center;"><code>0</code></td>
-<td>none</td>
-</tr>
-<tr>
-<td style="text-align: center;">Shuffle</td>
-<td style="text-align: center;"><code>1</code></td>
-<td>shuffle</td>
-</tr>
-<tr>
-<td style="text-align: center;">Arithmetic</td>
-<td style="text-align: center;"><code>2</code></td>
-<td>arithmetic</td>
-</tr>
-</tbody>
-</table>
-<h3 id="tilinglevel">TilingLevel<a class="headerlink" href="#tilinglevel" title="Permanent link">link</a></h3>
-<p><em>Descriptor for tiling levels for GPU lowering configs</em></p>
-<h4 id="cases_8">Cases:<a class="headerlink" href="#cases_8" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">Workgroup</td>
-<td style="text-align: center;"><code>0</code></td>
-<td>Workgroup</td>
-</tr>
-<tr>
-<td style="text-align: center;">Reduction</td>
-<td style="text-align: center;"><code>1</code></td>
-<td>Reduction</td>
-</tr>
-<tr>
-<td style="text-align: center;">PartialReduction</td>
-<td style="text-align: center;"><code>2</code></td>
-<td>PartialReduction</td>
-</tr>
-<tr>
-<td style="text-align: center;">Thread</td>
-<td style="text-align: center;"><code>3</code></td>
-<td>Thread</td>
-</tr>
-<tr>
-<td style="text-align: center;">Subgroup</td>
-<td style="text-align: center;"><code>4</code></td>
-<td>Subgroup</td>
-</tr>
-<tr>
-<td style="text-align: center;">Lane</td>
-<td style="text-align: center;"><code>5</code></td>
-<td>Lane</td>
-</tr>
-</tbody>
-</table>
-<h3 id="virtualmmaintrinsic">VirtualMMAIntrinsic<a class="headerlink" href="#virtualmmaintrinsic" title="Permanent link">link</a></h3>
-<p><em>Descriptor for different Virtual MMA intrinsics</em></p>
-<h4 id="cases_9">Cases:<a class="headerlink" href="#cases_9" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">VMFMA_F32_16x16x32_F16</td>
-<td style="text-align: center;"><code>0</code></td>
-<td>VMFMA_F32_16x16x32_F16</td>
-</tr>
-<tr>
-<td style="text-align: center;">VMFMA_F32_32x32x16_F16</td>
-<td style="text-align: center;"><code>1</code></td>
-<td>VMFMA_F32_32x32x16_F16</td>
-</tr>
-<tr>
-<td style="text-align: center;">VMFMA_F32_16x16x32_F8E4M3FNUZ</td>
-<td style="text-align: center;"><code>2</code></td>
-<td>VMFMA_F32_16x16x32_F8E4M3FNUZ</td>
-</tr>
-<tr>
-<td style="text-align: center;">VMFMA_F32_32x32x16_F8E4M3FNUZ</td>
-<td style="text-align: center;"><code>3</code></td>
-<td>VMFMA_F32_32x32x16_F8E4M3FNUZ</td>
-</tr>
-</tbody>
-</table>
-<h3 id="iteratortype">IteratorType<a class="headerlink" href="#iteratortype" title="Permanent link">link</a></h3>
-<p><em>Iterator type</em></p>
-<h4 id="cases_10">Cases:<a class="headerlink" href="#cases_10" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">parallel</td>
-<td style="text-align: center;"><code>0</code></td>
-<td>parallel</td>
-</tr>
-<tr>
-<td style="text-align: center;">reduction</td>
-<td style="text-align: center;"><code>1</code></td>
-<td>reduction</td>
-</tr>
-</tbody>
-</table>
+<h3 id="-iree-llvmcpu-target-test-propagate-target-attrs"><code>-iree-llvmcpu-target-test-propagate-target-attrs</code><a class="headerlink" href="#-iree-llvmcpu-target-test-propagate-target-attrs" title="Permanent link">link</a></h3>
+<p><em>Test the utilities to propagate hal.target to individual functions</em></p>
 
 
 
 
 
 
-
-  
-  
 
 
 

@@ -4951,7 +4951,9 @@ on the operations and the target hardware.</p>
 <p>The layout changes can be propagated as far as possible across the workload, so
 the entire workload can use the updated layouts, as opposed to having to perform
 layout transformations at runtime. This may involve fusions or
-constant-evaluation that can amortize or remove layout-transformation overheads.</p>
+constant-evaluation that can amortize or remove layout-transformation overheads.
+See the <a href="https://iree.dev/community/blog/2025-08-25-data-tiling-walkthrough/">blog post</a>
+to learn more about details.</p>
 <p>Data-tiling is an optional optimization technique, and it is not supported by
 all backends. Any backend does not develop data-tiling may result in worse
 performance if it is enabled. The targets that support data-tiling are:</p>
@@ -4962,12 +4964,56 @@ performance if it is enabled. The targets that support data-tiling are:</p>
 <li>GPU (ROCm)</li>
 <li>VMVX</li>
 </ul>
-<p>See the <a href="https://iree.dev/community/blog/2025-08-25-data-tiling-walkthrough/">blog post</a>
-to learn more about details.</p>
+<p>There are two paths in data-tiling:</p>
+<ul>
+<li><code>--iree-global-opt-data-tiling</code> (off): Starts data-tiling from global
+  optimization phase. This is the current default path, if the flag is on. The
+  path will be deprecated in the future, because the other one has better
+  support for multi-device cases.</li>
+<li><code>--iree-dispatch-creation-data-tiling</code> (off): Starts data-tiling from dispatch
+  creation phase. This is still under development and some features are missing.
+  The main difference is that it enables more fusion opportunities.</li>
+</ul>
+<p>Note that the flag will override the other two flags if it is explicitly set,
+because it has higher priority. You have to disable the flag to use a specific
+path.</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>GlobalOptimization path</th>
+<th>DispatchCreation path</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ConstExpr Hoisting</td>
+<td>✔️</td>
+<td>✔️</td>
+</tr>
+<tr>
+<td>Constant Evaluation</td>
+<td>✔️</td>
+<td>❌</td>
+</tr>
+<tr>
+<td>Matmul Fusion</td>
+<td>❌</td>
+<td>✔️</td>
+</tr>
+<tr>
+<td>Multi-device</td>
+<td>❌</td>
+<td>✔️</td>
+</tr>
+</tbody>
+</table>
+<p>Note: Constant Evaluation is not yet implemented in the dispatch creation path.
+It is a planned feature.</p>
 <div class="admonition question -">
 <p class="admonition-title">Something missing or broken?</p>
-<p>Don't see the target here that you think should be? Reach out to <a href="https://discord.com/channels/689900678990135345/1254843174111678555">our
-data-tiling Discord channel</a>;
+<p>Don't see the target or the feature here that you think should be? Reach out
+to <a href="https://discord.com/channels/689900678990135345/1254843174111678555">our data-tiling Discord channel</a>;
 we welcome contributions on
 <a href="https://github.com/iree-org/iree">our GitHub page</a>!</p>
 </div>
