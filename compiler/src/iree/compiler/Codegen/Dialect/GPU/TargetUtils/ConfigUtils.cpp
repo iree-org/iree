@@ -767,15 +767,14 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
       kPackFactor = std::get<2>(mmaKind.getMNKShape());
     }
     paddingTileSizes[innerKDim] *= kPackFactor;
-    attrs.emplace_back(StringAttr::get(context, "padding"),
-                       b.getI64ArrayAttr(paddingTileSizes));
+    attrs.emplace_back("padding", b.getI64ArrayAttr(paddingTileSizes));
 
     // Create `padding_conv` attribute when padding convolutions before IGEMM
     // is possible.
     if (auto attr =
             getPaddingConvSizes(b, bounds, paddingTileSizes, workgroupTileSizes,
                                 reductionTileSizes, convToIgemmInfo)) {
-      attrs.emplace_back(StringAttr::get(context, "padding_conv"), *attr);
+      attrs.emplace_back("padding_conv", *attr);
     }
   }
   auto configDict = DictionaryAttr::get(context, attrs);
