@@ -9,14 +9,12 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/STLForwardCompat.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -76,8 +74,8 @@ getExpansionInfo(IREE::GPU::LoweringConfigAttr config) {
 }
 
 static LogicalResult expandIterationSpace(RewriterBase &rewriter,
-                                          linalg::LinalgOp genericOp) {
-  auto loweringConfig = getLoweringConfig(genericOp);
+                                          linalg::LinalgOp op) {
+  auto loweringConfig = getLoweringConfig(op);
   if (!loweringConfig)
     return success();
 
@@ -94,16 +92,13 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
 
   LLVM_DEBUG({
     llvm::dbgs() << "Expanding dimensions for op:\n";
-    genericOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    op->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n";
   });
 
-  // Expand operands
-  // expansionInfo maps iteration space dims → factor
-  // We need to translate to tensor dims for each operand based on indexing map
-  SmallVector<AffineMap> indexingMaps = genericOp.getIndexingMapsArray();
+  SmallVector<AffineMap> indexingMaps = op.getIndexingMapsArray();
 
-  for (OpOperand &operand : genericOp->getOpOperands()) {
+  for (OpOperand &operand : op->getOpOperands()) {
     if (operand.get().getDefiningOp<tensor::CollapseShapeOp>())
       continue;
     if (!isa<RankedTensorType>(operand.get().getType()))
@@ -114,7 +109,7 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
     DimensionExpansionInfo tensorExpansionInfo;
 
     for (auto [iterDim, factor] : expansionInfo) {
-      AffineExpr iterExpr = getAffineDimExpr(iterDim, genericOp.getContext());
+      AffineExpr iterExpr = getAffineDimExpr(iterDim, op.getContext());
       if (std::optional<unsigned> tensorDim =
               indexingMap.getResultPosition(iterExpr)) {
         tensorExpansionInfo[tensorDim.value()] = factor;
@@ -128,25 +123,24 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
         rewriter, tensorExpansionInfo, operand.get());
     if (reshapes) {
       rewriter.modifyOpInPlace(
-          genericOp, [&]() { operand.set(reshapes->collapseShapeOp); });
+          op, [&]() { operand.set(reshapes->collapseShapeOp); });
     }
   }
 
-  // Expand results.
   OpBuilder::InsertionGuard g(rewriter);
-  rewriter.setInsertionPointAfter(genericOp);
+  rewriter.setInsertionPointAfter(op);
 
-  for (OpResult result : genericOp->getResults()) {
+  for (OpResult result : op->getResults()) {
     if (!isa<RankedTensorType>(result.getType()))
       continue;
 
     unsigned resultMapIndex =
-        genericOp.getNumDpsInputs() + result.getResultNumber();
+        op.getNumDpsInputs() + result.getResultNumber();
     AffineMap indexingMap = indexingMaps[resultMapIndex];
     DimensionExpansionInfo tensorExpansionInfo;
 
     for (auto [iterDim, factor] : expansionInfo) {
-      AffineExpr iterExpr = getAffineDimExpr(iterDim, genericOp.getContext());
+      AffineExpr iterExpr = getAffineDimExpr(iterDim, op.getContext());
       if (std::optional<unsigned> tensorDim =
               indexingMap.getResultPosition(iterExpr)) {
         tensorExpansionInfo[tensorDim.value()] = factor;
@@ -159,9 +153,6 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
     std::optional<ReshapeOps> reshapes =
         createDimensionExpansionOps(rewriter, tensorExpansionInfo, result);
     if (reshapes) {
-      // Replace uses of the result with the collapse_shape, but exclude:
-      // - The expand_shape operation itself (it uses the result as input).
-      // - tensor.dim operations (they query the original dimensions).
       auto replaceIf = [&](OpOperand &use) {
         Operation *user = use.getOwner();
         if (user == reshapes->expandShapeOp) {
@@ -182,8 +173,8 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
 
 static LogicalResult expandIterationSpace(RewriterBase &rewriter,
                                           Operation *operation) {
-  if (auto genericOp = dyn_cast<linalg::LinalgOp>(operation))
-    return expandIterationSpace(rewriter, genericOp);
+  if (auto op = dyn_cast<linalg::LinalgOp>(operation))
+    return expandIterationSpace(rewriter, op);
   return success();
 }
 
