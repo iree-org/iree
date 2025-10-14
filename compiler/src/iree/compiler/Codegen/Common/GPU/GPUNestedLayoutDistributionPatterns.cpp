@@ -431,9 +431,7 @@ struct DistributeTransferWrite final
     // The number of threads in the workgroup is the product of the dimensions
     // of workgroupSize, unless workgroupSize is empty.
     if (!workgroupSize.empty()) {
-      numThreadsInWorkgroup =
-          std::accumulate(workgroupSize.begin(), workgroupSize.end(), 1,
-                          std::multiplies<int64_t>());
+      numThreadsInWorkgroup = llvm::product_of(workgroupSize);
     }
   }
 
@@ -483,11 +481,10 @@ struct DistributeTransferWrite final
     SmallVector<int64_t> basis(2 * rank + 1);
     ArrayRef<int64_t> subgroupTile = vectorLayout.getSubgroupTile();
     ArrayRef<int64_t> threadTile = vectorLayout.getThreadTile();
-    int64_t threadTileSize = std::accumulate(
-        threadTile.begin(), threadTile.end(), 1, std::multiplies<int64_t>());
-    int64_t laneOverlap = std::max<int64_t>(1, subgroupSize / threadTileSize);
+    int64_t threadTileSize = llvm::product_of(threadTile);
+    int64_t laneOverlap = std::max(int64_t(1), subgroupSize / threadTileSize);
     basis[rank] = laneOverlap;
-    for (unsigned i = 0; i < rank; ++i) {
+    for (int i = 0; i < rank; ++i) {
       basis[i] = subgroupTile[i];
       basis[rank + 1 + i] = threadTile[i];
     }
@@ -508,8 +505,7 @@ struct DistributeTransferWrite final
 
     // Is it maybe possible that threads with the same lane ID but different
     // subgroup IDs write to the same address? If so, guard on the subgroup.
-    int64_t basisSize = std::accumulate(basis.begin(), basis.end(), 1,
-                                        std::multiplies<int64_t>());
+    int64_t basisSize = llvm::product_of(basis);
     bool mightBeInterSubgroupOverlap = !numThreadsInWorkgroup.has_value() ||
                                        (basisSize < *numThreadsInWorkgroup);
     if (mightBeInterSubgroupOverlap) {
