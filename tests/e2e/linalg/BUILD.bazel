@@ -24,6 +24,7 @@ LLVM_SRCS = enforce_glob(
         "conv2d.mlir",
         "fp4_f32_conversion.mlir",
         "fp_to_subbyte.mlir",
+        "gather_like_ops.mlir",
         "narrow_n_matmuls.mlir",
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
@@ -35,7 +36,6 @@ LLVM_SRCS = enforce_glob(
     include = ["*.mlir"],
     exclude = [
         "argmax.mlir",
-        "gather_like_ops.mlir",
         "index.mlir",
         "large_linalg_matmul.mlir",
     ],
@@ -74,6 +74,7 @@ VMVX_SRCS = enforce_glob(
     # keep sorted
     [
         "conv2d.mlir",
+        "gather_like_ops.mlir",
         "narrow_n_matmuls.mlir",
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
@@ -85,7 +86,6 @@ VMVX_SRCS = enforce_glob(
     exclude = [
         "argmax.mlir",
         "fp_to_subbyte.mlir",
-        "gather_like_ops.mlir",
         "fp4_f32_conversion.mlir",
         "index.mlir",
         "large_linalg_matmul.mlir",
@@ -125,6 +125,7 @@ VULKAN_SRCS = enforce_glob(
     # keep sorted
     [
         "conv2d.mlir",
+        "gather_like_ops.mlir",
         "narrow_n_matmuls.mlir",
         "softmax.mlir",
         "subbyte_to_fp.mlir",
@@ -134,7 +135,6 @@ VULKAN_SRCS = enforce_glob(
         "argmax.mlir",
         "fp_to_subbyte.mlir",
         "fp4_f32_conversion.mlir",
-        "gather_like_ops.mlir",
         "index.mlir",
         "large_linalg_matmul.mlir",
         "pack.mlir",
