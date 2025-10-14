@@ -302,7 +302,7 @@ getBestKTileSizes(const GPUMatmulShapeType &problem,
   int64_t bestKTileCountPerSubgroup =
       seeds.bestKElementCountPerSubgroup
           ? llvm::divideCeil(seeds.bestKElementCountPerSubgroup,
-                             intrinsic.kSizes[0])
+                             prod(intrinsic.kSizes))
           : seeds.bestKTileCountPerSubgroup;
   SmallVector<int64_t> kTileSizes(problem.kSizes.size(), 0);
   // Start at the innermost K dim, and tile each dim to try to satisfy the ideal
