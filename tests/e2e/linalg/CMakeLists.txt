@@ -17,6 +17,7 @@ iree_check_single_backend_test_suite(
     "conv2d.mlir"
     "fp4_f32_conversion.mlir"
     "fp_to_subbyte.mlir"
+    "gather_like_ops.mlir"
     "narrow_n_matmuls.mlir"
     "pack.mlir"
     "pack_dynamic_inner_tiles.mlir"
@@ -55,6 +56,7 @@ iree_check_single_backend_test_suite(
     check_vmvx_local-task
   SRCS
     "conv2d.mlir"
+    "gather_like_ops.mlir"
     "narrow_n_matmuls.mlir"
     "pack.mlir"
     "pack_dynamic_inner_tiles.mlir"
@@ -88,6 +90,7 @@ iree_check_single_backend_test_suite(
     check_vulkan-spirv_vulkan
   SRCS
     "conv2d.mlir"
+    "gather_like_ops.mlir"
     "narrow_n_matmuls.mlir"
     "softmax.mlir"
     "subbyte_to_fp.mlir"
@@ -153,6 +156,7 @@ iree_check_single_backend_test_suite(
     check_rocm_hip
   SRCS
     "argmax.mlir"
+    "gather_like_ops.mlir"
     "pack_i8.mlir"
     "softmax.mlir"
     "unpack.mlir"
