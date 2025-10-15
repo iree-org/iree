@@ -143,6 +143,7 @@ iree_cc_library(
     "MaterializeTuningSpecsPass.cpp"
     "MathTransformPass.cpp"
     "MemrefCopyToLinalg.cpp"
+    "NDTo1DVectorUnrolling.cpp"
     "NormalizeLoopBounds.cpp"
     "OptimizeTensorInsertExtractSlices.cpp"
     "OptimizeVectorTransferPass.cpp"
