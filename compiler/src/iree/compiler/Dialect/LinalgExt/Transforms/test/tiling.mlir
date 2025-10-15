@@ -1030,9 +1030,9 @@ module attributes { transform.with_named_sequence } {
 func.func @exp_reduction_tile_tensor(
     %S: tensor<?x?xf32>,
     %M: tensor<?xf32>,
-    %out: tensor<?xi32>
-) -> (tensor<?xf32>, tensor<?xi32>) {
-  %max, %sum = iree_linalg_ext.exp_reduction {
+    %out: tensor<?xf32>
+) -> (tensor<?xf32>, tensor<?xf32>) {
+    %max, %sum = iree_linalg_ext.exp_reduction {
     indexing_maps = [
       affine_map<(M,N)->(M,N)>,
       affine_map<(M,N)->(M)>,
@@ -1042,26 +1042,51 @@ func.func @exp_reduction_tile_tensor(
       #iree_linalg_ext.iterator_type<parallel>,
       #iree_linalg_ext.iterator_type<reduction>
     ],
-    exp_reduced_operands = [0]
+    exp_reduced_operands = [1]
   } ins(%S: tensor<?x?xf32>)
     outs(%M, %out: tensor<?xf32>, tensor<?xf32>)
   {
   ^bb0(%s: f32, %m: f32, %o: f32):
     %add = arith.addf %s, %o: f32
-    linalg.yield %m, %add: f32, f32
+    iree_linalg_ext.yield %m, %add: f32, f32
   } -> tensor<?xf32>, tensor<?xf32>
-  return %sum : tensor<?xf32>
+  return %max, %sum : tensor<?xf32>, tensor<?xf32>
 }
 
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
-    %0 = transform.structured.match ops{["iree_linalg_ext.arg_compare"]} in %module_op
+    %0 = transform.structured.match ops{["iree_linalg_ext.exp_reduction"]} in %module_op
          : (!transform.any_op) -> !transform.any_op
     %1, %loops = transform.structured.tile_using_for %0 tile_sizes [10, 0]
          : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.yield
   }
 }
+
+// CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 10)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1) -> (d0)>
+// CHECK:       func.func @exp_reduction_tile_tensor
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9_]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[C10:.+]] = arith.constant 10 : index
+// CHECK:         %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+// CHECK:         %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+// CHECK:         %[[RESULT:.+]]:2 = scf.for %[[IV:.+]] = %[[C0]] to %[[D0]] step %[[C10]] iter_args(%[[V0:.+]] = %[[ARG1]], %[[V1:.+]] = %[[ARG2]])
+// CHECK:           %[[MIN:.+]] = affine.min #[[MAP0]](%[[IV]])[%[[D0]]]
+// CHECK:           %[[SLICE0:.+]] = tensor.extract_slice %[[ARG0]][%[[IV]], 0] [%[[MIN]], %[[D1]]] [1, 1]
+// CHECK:           %[[SLICE1:.+]] = tensor.extract_slice %[[V0]][%[[IV]]] [%[[MIN]]] [1]
+// CHECK:           %[[SLICE2:.+]] = tensor.extract_slice %[[V1]][%[[IV]]] [%[[MIN]]] [1]
+// CHECK:           %[[CMP:.+]]:2 = iree_linalg_ext.exp_reduction
+// CHECK-SAME:      ins(%[[SLICE0]]
+// CHECK-SAME:      outs(%[[SLICE1]], %[[SLICE2]]
+// CHECK:           %[[INS0:.+]] = tensor.insert_slice %[[CMP]]#0 into %[[V0]][%[[IV]]] [%[[MIN]]] [1]
+// CHECK:           %[[INS1:.+]] = tensor.insert_slice %[[CMP]]#1 into %[[V1]][%[[IV]]] [%[[MIN]]] [1]
+// CHECK:           scf.yield %[[INS0]], %[[INS1]]
+// CHECK:         return %[[RESULT]]#0, %[[RESULT]]#1
 
 // -----
 
