@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 #define DEBUG_TYPE "iree-codegen-reshape-patterns"
 
@@ -207,12 +208,22 @@ struct FoldExpandShapeIntoInterfaceTensorLoad
     auto currStaticDims = loadOp.getType().getShape();
     auto currOfrDynamicDims =
         mlir::getMixedValues(currStaticDims, currDynamicDims, rewriter);
+
+    // Try to infer the expanded shape. This only works if each reassociation
+    // has <=1 dyn dim.
     std::optional<SmallVector<OpFoldResult>> expandedDims =
         mlir::inferExpandShapeOutputShape(
             rewriter, subspanOp.getLoc(), reshapeOp.getType(),
             reshapeOp.getReassociationIndices(), currOfrDynamicDims);
     if (!expandedDims) {
-      return reshapeOp.emitOpError("failure in expanded shape");
+      // If inference fails, try to use the reshape's SSA values.
+      if (failed(mlir::moveValueDefinitions(
+              rewriter, reshapeOp.getOutputShape(), subspanOp))) {
+        return rewriter.notifyMatchFailure(reshapeOp,
+                                           "could not infer output shape or "
+                                           "move SSA values before subspan op");
+      }
+      expandedDims = reshapeOp.getMixedOutputShape();
     }
 
     auto tensorAccess =
