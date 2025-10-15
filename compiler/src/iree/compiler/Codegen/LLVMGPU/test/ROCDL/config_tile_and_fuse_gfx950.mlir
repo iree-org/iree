@@ -31,9 +31,9 @@ func.func @scaled_matmul(
 //  CHECK-SAME:     mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>
 //  CHECK-SAME:     promote_operands = [0, 1, 2, 3]
 //   CHECK-NOT:     promotion_types = [{{.*}}#iree_gpu.use_global_load_dma{{.*}}
-//  CHECK-SAME:     reduction = [0, 0, 32, 1]
-//  CHECK-SAME:     subgroup = [1, 1, 0, 0]
-//  CHECK-SAME:     workgroup = [32, 32, 0, 0]
+//  CHECK-SAME:     reduction = [0, 0, 4, 1]
+//  CHECK-SAME:     subgroup = [2, 4, 0, 0]
+//  CHECK-SAME:     workgroup = [64, 128, 0, 0]
 
 // -----
 
@@ -66,9 +66,9 @@ func.func @scaled_matmul_with_batch(
 //  CHECK-SAME:     mma_kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32>
 //  CHECK-SAME:     promote_operands = [0, 1, 2, 3]
 //   CHECK-NOT:     promotion_types = [{{.*}}#iree_gpu.use_global_load_dma{{.*}}
-//  CHECK-SAME:     reduction = [0, 0, 0, 32, 1]
-//  CHECK-SAME:     subgroup = [0, 1, 1, 0, 0]
-//  CHECK-SAME:     workgroup = [1, 32, 32, 0, 0]
+//  CHECK-SAME:     reduction = [0, 0, 0, 4, 1]
+//  CHECK-SAME:     subgroup = [0, 2, 4, 0, 0]
+//  CHECK-SAME:     workgroup = [1, 64, 128, 0, 0]
 
 // -----
 
