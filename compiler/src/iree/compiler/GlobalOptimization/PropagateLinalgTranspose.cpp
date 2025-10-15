@@ -87,6 +87,18 @@ static RankedTensorType getPermutedTensorType(RankedTensorType type,
   return RankedTensorType::get(permutedShape, type.getElementType());
 }
 
+static bool isReshapeBlockingFusion(Operation *producer, Operation *consumer) {
+  auto isFusableOp = [](Operation *op) {
+    if (!op) {
+      return false;
+    }
+    return isa_and_nonnull<linalg::LinalgDialect,
+                           IREE::LinalgExt::IREELinalgExtDialect,
+                           tensor::TensorDialect>(op->getDialect());
+  };
+  return isFusableOp(producer) && isFusableOp(consumer);
+}
+
 //===----------------------------------------------------------------------===//
 // Transpose specialization
 //===----------------------------------------------------------------------===//
@@ -324,6 +336,12 @@ public:
           transposeOp, "transpose input is not a single-use collapse shape");
     }
 
+    if (!isReshapeBlockingFusion(transposeOp,
+                                 collapseOp.getSrc().getDefiningOp())) {
+      return rewriter.notifyMatchFailure(transposeOp,
+                                         "transpose not blocking fusion");
+    }
+
     SmallVector<ReassociationIndices> reassociations =
         collapseOp.getReassociationIndices();
 
@@ -519,6 +537,13 @@ public:
     if (!transposeOp || !transposeOp->hasOneUse()) {
       return rewriter.notifyMatchFailure(
           expandOp, "expand shape input is not a single-use transpose");
+    }
+
+    if (llvm::none_of(expandOp->getUsers(), [&](Operation *consumer) {
+          return isReshapeBlockingFusion(transposeOp, consumer);
+        })) {
+      return rewriter.notifyMatchFailure(transposeOp,
+                                         "transpose not blocking fusion");
     }
 
     auto invPerm = invertPermutationVector(transposeOp.getPermutation());
@@ -1084,6 +1109,13 @@ void PropagateLinalgTransposePass::runOnOperation() {
           if (!isa<tensor::ExpandShapeOp>(consumer)) {
             return false;
           }
+
+          if (llvm::none_of(
+                  consumer->getUsers(), [&](Operation *expandConsumer) {
+                    return isReshapeBlockingFusion(producer, expandConsumer);
+                  })) {
+            return false;
+          }
           // Only propagate if the immediate consumer of the reshape is a
           // transpose.
           return consumer->hasOneUse() &&
@@ -1156,6 +1188,12 @@ void PropagateLinalgTransposePass::runOnOperation() {
           if (!isa<tensor::CollapseShapeOp>(producer)) {
             return false;
           }
+
+          if (!isReshapeBlockingFusion(producer->getOperand(0).getDefiningOp(),
+                                       consumer)) {
+            return false;
+          }
+
           // Require that the immediate producer of the reshape is a transpose.
           return isa_and_nonnull<linalg::TransposeOp>(
               producer->getOperand(0).getDefiningOp());
