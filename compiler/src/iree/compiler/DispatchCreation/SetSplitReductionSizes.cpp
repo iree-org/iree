@@ -170,8 +170,9 @@ private:
       return std::nullopt;
     }
 
-    if (convDims->inputChannel.empty()) {
-      LDBG() << "skipping op; has no input channel dimension";
+    if (convDims->inputChannel.empty() || convDims->outputChannel.empty() ||
+        convDims->batch.empty() || convDims->filterLoop.empty()) {
+      LDBG() << "skipping op; missing convolution dimensions";
       return std::nullopt;
     }
 
@@ -264,6 +265,10 @@ private:
     // TODO(vivian): split more reduction dimensions if needed.
     int64_t cDim = inputChannelDim.value();
     SmallVector<int64_t> tileSizes = std::move(*maybeSizes);
+    if (tileSizes[cDim] == 1) {
+      LDBG() << "skipping op; input channel size equals to 1";
+      return std::nullopt;
+    }
     tileSizes[cDim] = std::ceil(float(tileSizes[cDim]) / largeDimSize);
     return tileSizes;
   }
