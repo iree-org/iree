@@ -305,8 +305,10 @@ getBestKTileSizes(const GPUMatmulShapeType &problem,
   int64_t bestKTileCountPerSubgroup = seeds.bestKTileCountPerSubgroup;
   int64_t bestKElementCountPerSubgroup = seeds.bestKElementCountPerSubgroup;
   if (intrinsic.kSizes.size() > 1) {
-    bestKTileCountPerSubgroup /= intrinsic.kSizes[1];
-    bestKElementCountPerSubgroup /= intrinsic.kSizes[1];
+    bestKTileCountPerSubgroup =
+        llvm::divideCeil(bestKTileCountPerSubgroup, intrinsic.kSizes[1]);
+    bestKElementCountPerSubgroup =
+        llvm::divideCeil(bestKElementCountPerSubgroup, intrinsic.kSizes[1]);
   }
   // Compute the ideal number of intrinsics along K per subgroup based on the
   // seed.
@@ -705,8 +707,8 @@ getOptimalAttentionPVSchedule(const GPUMatmulShapeType &problem,
                               const GPUIntrinsicType &intrinsic,
                               const GPUMMAHeuristicSeeds &seeds) {
   assert(intrinsic.mSizes.size() == 1 && intrinsic.nSizes.size() == 1 &&
-         intrinsic.kSizes.size() == 1 &&
-         "expected intrinsic to have a single M, N, and K dimension");
+         intrinsic.kSizes.size() <= 2 &&
+         "expected intrinsic to have a single M, N, and K <= 2 dimensions");
   // mTotalTileCounts and nTotalTileCounts represent the total number of
   // intrinsics along the M or N dimensions needed to fill the problem size.
   // For example, if the problem is {M:[4, 16], N:[2, 32], K[3, 128]} for a
