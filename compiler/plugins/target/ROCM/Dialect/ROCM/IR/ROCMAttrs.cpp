@@ -81,18 +81,26 @@ static bool checkIterationSizeConstraints(ArrayRef<int64_t> iterationSizes,
     if (indexVal < 0 || indexVal >= iterationSizes.size()) {
       return false;
     }
+    // For now, assume a dynamic dimension is very large.
     if (IntegerAttr sizeMin = constraint.getSizeMin()) {
-      if (iterationSizes[indexVal] < sizeMin.getInt()) {
+      if (!ShapedType::isDynamic(iterationSizes[indexVal]) &&
+          iterationSizes[indexVal] < sizeMin.getInt()) {
         return false;
       }
     }
     if (IntegerAttr sizeMax = constraint.getSizeMax()) {
+      if (ShapedType::isDynamic(iterationSizes[indexVal])) {
+        return false;
+      }
       if (iterationSizes[indexVal] > sizeMax.getInt()) {
         return false;
       }
     }
     if (IntegerAttr sizeDiv = constraint.getSizeDiv()) {
       if (sizeDiv.getInt() <= 0) {
+        return false;
+      }
+      if (ShapedType::isDynamic(iterationSizes[indexVal])) {
         return false;
       }
       if (iterationSizes[indexVal] % sizeDiv.getInt()) {

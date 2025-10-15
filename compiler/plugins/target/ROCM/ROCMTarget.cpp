@@ -88,7 +88,9 @@ struct ROCMOptions {
   bool slpVectorization = true;
   bool globalISel = false;
   bool specializeDispatches = false;
-  bool enableTensorUKernels = false;
+  // The tensor ukernels are enabled by default as they provide the best
+  // performance.
+  bool enableTensorUKernels = true;
   IREE::Codegen::DenormalFpMath denormalFpMathF32 =
       IREE::Codegen::DenormalFpMath::None;
   bool enableRegSpillWarning = false;
@@ -369,11 +371,6 @@ public:
       }
     }
 
-    addConfig("ukernels", b.getStringAttr(options.enableROCMUkernels));
-    if (options.enableROCMUkernels != "none") {
-      addConfig("iree_codegen.ukernel_provider",
-                IREE::ROCM::UKernelProviderAttr::get(context));
-    }
     if (options.wavesPerEu > 0) {
       addConfigWavesPerEu(b.getContext(), options.wavesPerEu, configItems);
     }
@@ -382,7 +379,11 @@ public:
                                  configItems);
     }
 
-    if (options.enableTensorUKernels) {
+    addConfig("ukernels", b.getStringAttr(options.enableROCMUkernels));
+    if (options.enableROCMUkernels != "none") {
+      addConfig(kUKernelProviderName,
+                IREE::ROCM::UKernelProviderAttr::get(context));
+    } else if (options.enableTensorUKernels) {
       addConfig(kUKernelProviderName,
                 IREE::ROCM::TensorUKernelProviderAttr::get(context));
     }
