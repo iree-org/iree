@@ -2265,6 +2265,14 @@ void OnlineAttentionOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
 // ExpReductionOp
 //===----------------------------------------------------------------------===//
 
+bool ExpReductionOp::hasIndexSemantics() {
+  return !this->getBody()->getOps<linalg::IndexOp>().empty();
+}
+
+std::string ExpReductionOp::getLibraryCallName() {
+  return linalg::generateLibraryCallName(getOperation());
+}
+
 LogicalResult ExpReductionOp::verify() {
   Operation *op = getOperation();
 
