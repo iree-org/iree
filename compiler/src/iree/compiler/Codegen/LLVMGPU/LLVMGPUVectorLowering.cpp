@@ -205,11 +205,29 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
       return failure();
     }
 
-    Type elemTy = lhsVecType.getElementType();
-    if (!isa<FloatType>(elemTy)) {
+    if (!isa<FloatType>(lhsVecType.getElementType())) {
       return failure();
     }
 
+    Type accElemType = getElementTypeOrSelf(op.getAccType());
+
+    Location loc = op.getLoc();
+    Value lhs = op.getLhs();
+    Value rhs = op.getRhs();
+
+    if (lhsVecType.getElementType() != accElemType) {
+      Type promotedType = lhsVecType.clone(accElemType);
+      lhs = arith::ExtFOp::create(rewriter, loc, promotedType, lhs);
+      lhsVecType = cast<VectorType>(lhs.getType());
+    }
+
+    if (rhsVecType.getElementType() != accElemType) {
+      Type promotedType = rhsVecType.clone(accElemType);
+      rhs = arith::ExtFOp::create(rewriter, loc, promotedType, rhs);
+      rhsVecType = cast<VectorType>(rhs.getType());
+    }
+
+    Type elemTy = accElemType;
     SmallVector<int64_t> redDims, parDims;
     getReductionAndParallelLoopDims(op.getIteratorTypes(), redDims, parDims);
     if (redDims.empty()) {
@@ -222,37 +240,75 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
     llvm::append_range(indices, redDims);
     llvm::append_range(indices, parDims);
 
+    ArrayRef<int64_t> lhsShape = lhsVecType.getShape();
+    ArrayRef<int64_t> rhsShape = rhsVecType.getShape();
     SmallVector<AffineMap, 4> maps = op.getIndexingMapsArray();
+    AffineMap lhsMap = maps[0];
+    AffineMap rhsMap = maps[1];
+    AffineMap accMap = maps[2];
 
-    // We only lower contracts where both LHS and RHS carry the same set of
-    // parallel iterators. Order may differ, but no parallel dim
-    // may be dropped on either side. This excludes matmul-like cases and any
-    // contract where parallel sizes would differ between operands.
-    if (!verifyParallelDimsInMap(parDims, maps[0]) ||
-        !verifyParallelDimsInMap(parDims, maps[1])) {
-      return failure();
+    // Broadcast operands for missing parallel dimensions.
+    unsigned numParallelDims = accMap.getNumResults();
+    SmallVector<int64_t> lhsReductionDims =
+        getReductionIndex(lhsMap, op.getIteratorTypes());
+    SmallVector<int64_t> rhsReductionDims =
+        getReductionIndex(rhsMap, op.getIteratorTypes());
+
+    unsigned numLhsDimToBroadcast =
+        numParallelDims - (lhsMap.getNumResults() - lhsReductionDims.size());
+    unsigned numRhsDimToBroadcast =
+        numParallelDims - (rhsMap.getNumResults() - rhsReductionDims.size());
+
+    SmallVector<int64_t> lhsBroadcastDims;
+    SmallVector<int64_t> lhsTranspose;
+    SmallVector<int64_t> rhsBroadcastDims;
+    SmallVector<int64_t> rhsTranspose;
+
+    for (int64_t dim : lhsReductionDims)
+      lhsTranspose.push_back(numLhsDimToBroadcast + dim);
+    for (int64_t dim : rhsReductionDims)
+      rhsTranspose.push_back(numRhsDimToBroadcast + dim);
+
+    for (unsigned i = 0; i < numParallelDims; i++) {
+      unsigned iterDim = accMap.getDimPosition(i);
+
+      std::optional<unsigned> lhsDim = getDimPosition(lhsMap, iterDim);
+      if (lhsDim) {
+        lhsTranspose.push_back(numLhsDimToBroadcast + *lhsDim);
+      } else {
+        lhsBroadcastDims.push_back(
+            cast<VectorType>(op.getResultType()).getDimSize(i));
+        lhsTranspose.push_back(lhsBroadcastDims.size() - 1);
+      }
+
+      std::optional<unsigned> rhsDim = getDimPosition(rhsMap, iterDim);
+      if (rhsDim) {
+        rhsTranspose.push_back(numRhsDimToBroadcast + *rhsDim);
+      } else {
+        rhsBroadcastDims.push_back(
+            cast<VectorType>(op.getResultType()).getDimSize(i));
+        rhsTranspose.push_back(rhsBroadcastDims.size() - 1);
+      }
     }
 
-    SmallVector<int64_t> lhsPerm =
-        getPermutationFromIndexingMap(maps[0], indices);
-    SmallVector<int64_t> rhsPerm =
-        getPermutationFromIndexingMap(maps[1], indices);
+    if (!lhsBroadcastDims.empty()) {
+      lhsBroadcastDims.append(lhsShape.begin(), lhsShape.end());
+      auto expandedType = VectorType::get(lhsBroadcastDims, elemTy);
+      lhs = vector::BroadcastOp::create(rewriter, loc, expandedType, lhs);
+    }
+    if (!rhsBroadcastDims.empty()) {
+      rhsBroadcastDims.append(rhsShape.begin(), rhsShape.end());
+      auto expandedType = VectorType::get(rhsBroadcastDims, elemTy);
+      rhs = vector::BroadcastOp::create(rewriter, loc, expandedType, rhs);
+    }
+
+    // Apply transposes to get [reduction..., parallel...] layout.
+    lhs = vector::TransposeOp::create(rewriter, loc, lhs, lhsTranspose);
+    rhs = vector::TransposeOp::create(rewriter, loc, rhs, rhsTranspose);
+
     SmallVector<int64_t> accPerm;
     if (accVecType) {
       accPerm = getPermutationFromIndexingMap(maps[2], parDims);
-    }
-
-    Location loc = op.getLoc();
-
-    // Transpose operands to [red..., par...].
-    Value lhs = op.getLhs();
-    if (!isIdentityPermutation(lhsPerm)) {
-      lhs = vector::TransposeOp::create(rewriter, loc, lhs, lhsPerm);
-    }
-
-    Value rhs = op.getRhs();
-    if (!isIdentityPermutation(rhsPerm)) {
-      rhs = vector::TransposeOp::create(rewriter, loc, rhs, rhsPerm);
     }
 
     const size_t numRed = redDims.size();
@@ -314,18 +370,25 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
   }
 
 private:
-  static bool verifyParallelDimsInMap(ArrayRef<int64_t> parallelDims,
-                                      AffineMap map) {
-    llvm::SmallSetVector<int64_t, 8> usedDims;
-    map.walkExprs([&](AffineExpr expr) {
-      if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
-        usedDims.insert(dimExpr.getPosition());
-      }
-    });
+  /// Look for a given dimension in an affine map and return its position.
+  /// Return std::nullopt if the dimension is not in the map results.
+  static std::optional<unsigned> getDimPosition(AffineMap map, unsigned dim) {
+    for (unsigned i = 0, e = map.getNumResults(); i < e; i++) {
+      if (map.getDimPosition(i) == dim)
+        return i;
+    }
+    return std::nullopt;
+  }
 
-    return llvm::all_of(parallelDims, [&](int64_t parDim) {
-      return usedDims.contains(parDim);
-    });
+  /// Return the positions of the reductions in the given map.
+  static SmallVector<int64_t> getReductionIndex(AffineMap map,
+                                                ArrayAttr iteratorTypes) {
+    SmallVector<int64_t> dimsIdx;
+    for (unsigned i = 0, e = map.getNumResults(); i < e; i++) {
+      if (vector::isReductionIterator(iteratorTypes[map.getDimPosition(i)]))
+        dimsIdx.push_back(i);
+    }
+    return dimsIdx;
   }
 
   static SmallVector<int64_t> invert(ArrayRef<int64_t> perm) {
