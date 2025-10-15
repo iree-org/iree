@@ -387,12 +387,17 @@ static void iree_cpu_initialize_from_platform_x86_64(uint64_t* out_fields) {
 #endif
 #endif
 
-// If linux header is not available, define the required struct locally
+// If linux header is not available, define the required structs and constants
+// locally
 #ifndef RISCV_HWPROBE_KEY_MVENDORID
 struct riscv_hwprobe {
   signed long long int key;
   unsigned long long int value;
 };
+#endif
+
+#ifndef __NR_riscv_hwprobe
+#define __NR_riscv_hwprobe (__NR_arch_specific_syscall + 14)
 #endif
 
 // NOTE: not all kernel versions have all of the constants we need defined so as
