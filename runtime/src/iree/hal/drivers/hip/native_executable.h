@@ -30,6 +30,13 @@ typedef struct iree_hal_hip_kernel_debug_info_t {
   uint32_t source_line;
 } iree_hal_hip_kernel_debug_info_t;
 
+typedef struct iree_hal_hip_kernel_export_parameter_t {
+  // Type of the parameter.
+  iree_hal_executable_export_parameter_t export;
+  // Offset of the parameter in bytes or binding ordinal, depending on type.
+  uint16_t buffer_offset;
+} iree_hal_hip_kernel_export_parameter_t;
+
 typedef struct iree_hal_hip_kernel_params_t {
   hipFunction_t function;
 
@@ -37,6 +44,10 @@ typedef struct iree_hal_hip_kernel_params_t {
   uint32_t binding_count;
 
   uint32_t block_dims[3];
+
+  // Parameter layout information from kernel metadata
+  iree_host_size_t parameter_count;
+  iree_hal_hip_kernel_export_parameter_t* parameters;
 
   IREE_TRACE(iree_hal_hip_kernel_debug_info_t debug_info;)
 } iree_hal_hip_kernel_params_t;

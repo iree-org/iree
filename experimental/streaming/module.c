@@ -81,8 +81,10 @@ static iree_status_t iree_hal_streaming_module_extract_metadata(
         module->executable, (iree_hal_executable_export_ordinal_t)i,
         parameter_count, &parameters[parameter_base]);
     if (!iree_status_is_ok(status)) break;
-    uint32_t src_offset = 0;
-    int32_t last_constant_end = -1;
+    // TOOD re-enable coalescing, which doesn't work for
+    //      args arrays
+    // uint32_t src_offset = 0;
+    //  int32_t last_constant_end = -1;
     for (uint16_t j = 0; j < parameter_count; ++j) {
       const iree_hal_executable_export_parameter_t* parameter =
           &parameters[parameter_base + j];
@@ -90,18 +92,18 @@ static iree_status_t iree_hal_streaming_module_extract_metadata(
           IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_BINDING) {
         ++symbol_op_counts[i].resolve_count;
         ++total_ops;
-        src_offset += parameter->size;
-        last_constant_end = -1;  // break contiguity
+        // src_offset += parameter->size;
+        //  last_constant_end = -1;  // break contiguity
       } else {
-        // CONSTANT or BUFFER_PTR - check for contiguity.
-        // Calculate source offset based on parameter order and sizes.
-        if (src_offset != last_constant_end) {
-          // New copy operation needed.
-          ++symbol_op_counts[i].copy_count;
-          ++total_ops;
-        }
-        src_offset += parameter->size;
-        last_constant_end = src_offset;
+        //// CONSTANT or BUFFER_PTR - check for contiguity.
+        //// Calculate source offset based on parameter order and sizes.
+        // if (src_offset != last_constant_end) {
+        //  New copy operation needed.
+        ++symbol_op_counts[i].copy_count;
+        ++total_ops;
+        //}
+        // src_offset += parameter->size;
+        // last_constant_end = src_offset;
       }
     }
     parameter_base += parameter_count;
@@ -164,7 +166,6 @@ static iree_status_t iree_hal_streaming_module_extract_metadata(
         current_ops + symbol_op_counts[i].copy_count;
     uint16_t copy_count = 0;
     uint16_t resolve_count = 0;
-    iree_hal_streaming_parameter_copy_op_t* active_copy = NULL;
     for (uint16_t j = 0; j < parameter_count; ++j) {
       const iree_hal_executable_export_parameter_t* parameter =
           &parameters[parameter_base + j];
@@ -175,26 +176,31 @@ static iree_status_t iree_hal_streaming_module_extract_metadata(
             &resolve_ops_start[resolve_count].resolve;
         op->src_offset = src_offset;
         op->dst_ordinal = resolve_count;  // binding ordinal
+        op->src_ordinal = j;
         src_offset += parameter->size;
         buffer_size = src_offset;
         ++resolve_count;
-        active_copy = NULL;  // break any active copy operation
+        // active_copy = NULL;  // break any active copy operation
       } else {
-        // CONSTANT or BUFFER_PTR - try to coalesce and choose offsets.
-        if (active_copy &&
-            active_copy->src_offset + active_copy->size == src_offset) {
-          // Extend the current copy operation.
-          active_copy->size += parameter->size;
-        } else {
-          // Start a new copy operation.
-          iree_hal_streaming_parameter_copy_op_t* op =
-              &copy_ops_start[copy_count].copy;
-          op->size = parameter->size;
-          op->src_offset = src_offset;
-          op->dst_offset = parameter->offset;  // offset in constants
-          ++copy_count;
-          active_copy = op;
-        }
+        // TODO: fix coalescing. It does not work when we have
+        // parameter arrays because each constant comes in as a
+        // separate parameter with its own offset.
+        //// CONSTANT or BUFFER_PTR - try to coalesce and choose offsets.
+        // if (active_copy &&
+        //     active_copy->src_offset + active_copy->size == src_offset) {
+        //   // Extend the current copy operation.
+        //   active_copy->size += parameter->size;
+        // } else {
+        //  Start a new copy operation.
+        iree_hal_streaming_parameter_copy_op_t* op =
+            &copy_ops_start[copy_count].copy;
+        op->size = parameter->size;
+        op->src_offset = src_offset;
+        op->src_ordinal = j;
+        op->dst_offset = parameter->offset;  // offset in constants
+        ++copy_count;
+        // active_copy = op;
+        // }
         src_offset += parameter->size;
         buffer_size = src_offset;
       }
