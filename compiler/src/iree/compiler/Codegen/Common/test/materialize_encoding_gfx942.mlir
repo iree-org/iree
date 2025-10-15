@@ -468,6 +468,21 @@ func.func @unset_encoding_ACC_unroll8x8x2_MFMA_I32_16x16x32_I8(
 
 // -----
 
+#encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f16, f16, f32],
+                                    user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, [affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1) -> ()>]]>
+func.func @set_encoding_0D_tensor(
+    %arg0: tensor<f32>
+) -> tensor<f32, #encoding> {
+  %0 = iree_encoding.set_encoding %arg0 : tensor<f32> -> tensor<f32, #encoding>
+  return %0 : tensor<f32, #encoding>
+}
+
+// CHECK-LABEL: func.func @set_encoding_0D_tensor
+// CHECK-SAME:       %[[ARG0:[a-zA-Z0-9]+]]: tensor<f32>
+// CHECK:         return %[[ARG0]]
+
+// -----
+
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -900,60 +915,8 @@ func.func @batch_matmul_lowering_MFMA_F32_16x16x16_BF16(
 // -----
 
 //----------------------------------------------------------------------------//
-// Test suite for encodings with resolved layouts.
+// Test suite for linalg.generic ops.
 //----------------------------------------------------------------------------//
-
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip", iree.encoding.resolver = #iree_gpu.gpu_encoding_resolver<>}>
-#encoding = #iree_encoding.layout<[#iree_gpu.gpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [128, 16], outerDimsPerm = [0, 1]}}>]>
-func.func @set_encoding_with_layout(
-    %arg0: tensor<255x513xf32>
-) -> tensor<255x513xf32, #encoding> attributes {
-  hal.executable.target = #executable_target_rocm_hsaco_fb
-} {
-  %0 = iree_encoding.set_encoding %arg0 : tensor<255x513xf32> -> tensor<255x513xf32, #encoding>
-  return %0 : tensor<255x513xf32, #encoding>
-}
-
-// CHECK-LABEL: func.func @set_encoding_with_layout
-// CHECK-SAME:       %[[ARG0:[a-zA-Z0-9]+]]
-// CHECK:         %[[PACK:.*]] = linalg.pack %[[ARG0]]
-// CHECK-SAME:     outer_dims_perm = [0, 1]
-// CHECK-SAME:     inner_dims_pos = [0, 1]
-// CHECK-SAME:     inner_tiles = [128, 16]
-// CHECK-SAME:     tensor<255x513xf32> -> tensor<2x33x128x16xf32>
-// CHECK:         return %[[PACK]]
-
-// -----
-
-//------------------------------------------------------------------------------
-// Negative tests. The pass should do nothing for these cases.
-//------------------------------------------------------------------------------
-
-// This test ensures that no side-effects happen/errors are thrown in case of
-// missing encoding information like indexing maps.
-
-#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>
-#pipeline_layout = #hal.pipeline.layout<bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>
-]>
-func.func @missing_user_indexing_maps() {
-  %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<255x513xf32>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<255x513xf32, #encoding>>
-  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [255, 513], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<255x513xf32>> -> tensor<255x513xf32>
-  %3 = iree_encoding.set_encoding %2 : tensor<255x513xf32> -> tensor<255x513xf32, #encoding>
-  iree_tensor_ext.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [255, 513], strides = [1, 1] : tensor<255x513xf32, #encoding> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<255x513xf32,  #encoding>>
-  return
-}
-
-// CHECK-LABEL: func.func @missing_user_indexing_maps
-// CHECK-DAG:     %[[LOAD_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(0)
-// CHECK-DAG:     %[[STORE_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(1)
-// CHECK-DAG:     %[[LOAD:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LOAD_BINDING]]{{.+}} -> tensor<255x513xf32>
-// CHECK-DAG:     iree_tensor_ext.dispatch.tensor.store %[[LOAD]], %[[STORE_BINDING]]
-
-// -----
 
 #encoding = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]>
 #encoding_bcast = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [[affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>, affine_map<(d0, d1, d2) -> (d0, d2)>], affine_map<(d0, d1, d2, d3) -> (d0, d3, d1)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]>
@@ -991,21 +954,6 @@ func.func @dequantization(
 // CHECK:           arith.subf
 // CHECK:           arith.mulf
 // CHECK:         return %[[DEQUANT]]
-
-// -----
-
-#encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f16, f16, f32],
-                                    user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, [affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1) -> ()>]]>
-func.func @set_encoding_0D_tensor(
-    %arg0: tensor<f32>
-) -> tensor<f32, #encoding> {
-  %0 = iree_encoding.set_encoding %arg0 : tensor<f32> -> tensor<f32, #encoding>
-  return %0 : tensor<f32, #encoding>
-}
-
-// CHECK-LABEL: func.func @set_encoding_0D_tensor
-// CHECK-SAME:       %[[ARG0:[a-zA-Z0-9]+]]: tensor<f32>
-// CHECK:         return %[[ARG0]]
 
 // -----
 
@@ -1061,3 +1009,58 @@ func.func @interchange_generic(%3: tensor<2x128x64xf32, #encoding>) -> tensor<64
 //  CHECK-SAME:       ins(%[[ARG0]]
 //       CHECK:     arith.addf
 //       CHECK:     -> tensor<2x1x4x8x4x4x4x4xf32>
+// -----
+
+//----------------------------------------------------------------------------//
+// Test suite for encodings with resolved layouts.
+//----------------------------------------------------------------------------//
+
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {abi = "hip", iree.encoding.resolver = #iree_gpu.gpu_encoding_resolver<>}>
+#encoding = #iree_encoding.layout<[#iree_gpu.gpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [128, 16], outerDimsPerm = [0, 1]}}>]>
+func.func @set_encoding_with_layout(
+    %arg0: tensor<255x513xf32>
+) -> tensor<255x513xf32, #encoding> attributes {
+  hal.executable.target = #executable_target_rocm_hsaco_fb
+} {
+  %0 = iree_encoding.set_encoding %arg0 : tensor<255x513xf32> -> tensor<255x513xf32, #encoding>
+  return %0 : tensor<255x513xf32, #encoding>
+}
+
+// CHECK-LABEL: func.func @set_encoding_with_layout
+// CHECK-SAME:       %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK:         %[[PACK:.*]] = linalg.pack %[[ARG0]]
+// CHECK-SAME:     outer_dims_perm = [0, 1]
+// CHECK-SAME:     inner_dims_pos = [0, 1]
+// CHECK-SAME:     inner_tiles = [128, 16]
+// CHECK-SAME:     tensor<255x513xf32> -> tensor<2x33x128x16xf32>
+// CHECK:         return %[[PACK]]
+
+// -----
+
+//------------------------------------------------------------------------------
+// Negative tests. The pass should do nothing for these cases.
+//------------------------------------------------------------------------------
+
+// This test ensures that no side-effects happen/errors are thrown in case of
+// missing encoding information like indexing maps.
+
+#encoding = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @missing_user_indexing_maps() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<255x513xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<255x513xf32, #encoding>>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [255, 513], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<255x513xf32>> -> tensor<255x513xf32>
+  %3 = iree_encoding.set_encoding %2 : tensor<255x513xf32> -> tensor<255x513xf32, #encoding>
+  iree_tensor_ext.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [255, 513], strides = [1, 1] : tensor<255x513xf32, #encoding> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<255x513xf32,  #encoding>>
+  return
+}
+
+// CHECK-LABEL: func.func @missing_user_indexing_maps
+// CHECK-DAG:     %[[LOAD_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(0)
+// CHECK-DAG:     %[[STORE_BINDING:.+]] = hal.interface.binding.subspan {{.+}} binding(1)
+// CHECK-DAG:     %[[LOAD:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LOAD_BINDING]]{{.+}} -> tensor<255x513xf32>
+// CHECK-DAG:     iree_tensor_ext.dispatch.tensor.store %[[LOAD]], %[[STORE_BINDING]]
