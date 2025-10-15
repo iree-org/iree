@@ -726,10 +726,9 @@ pdl.pattern @annotate_inner_tiled_f8E4M3FNUZ_medium : benefit(1) {
   pdl.apply_native_constraint "matchCastCompatibleType"(%rhs, %rhs_cast_type : !pdl.value, !pdl.type)
 
   // Pingpong on outer K dim, this kernel has 2 pingpong stages.
-  %empty = pdl.attribute = {}
   %c1 = pdl.attribute = 1
   %c2 = pdl.attribute = 2
-  pdl.apply_native_constraint "dimIsBound"(%rhs, %c1, %c2, %empty : !pdl.value, !pdl.attribute, !pdl.attribute, !pdl.attribute)
+  pdl.apply_native_constraint "dimIsMultipleOf"(%rhs, %c1, %c2 : !pdl.value, !pdl.attribute, !pdl.attribute)
 
   pdl.rewrite {
     // Call the C++ "annotateOperation" utility to add the attributes to the matched linalg.generic op.
@@ -783,10 +782,9 @@ pdl.pattern @annotate_inner_tiled_f8E4M3FNUZ_large : benefit(2) {
   pdl.apply_native_constraint "matchCastCompatibleType"(%rhs, %rhs_cast_type : !pdl.value, !pdl.type)
 
   // Pingpong on outer K dim, this kernel has 4 pingpong stages.
-  %empty = pdl.attribute = {}
   %c1 = pdl.attribute = 1
   %c4 = pdl.attribute = 4
-  pdl.apply_native_constraint "dimIsBound"(%rhs, %c1, %c4, %empty : !pdl.value, !pdl.attribute, !pdl.attribute, !pdl.attribute)
+  pdl.apply_native_constraint "dimIsMultipleOf"(%rhs, %c1, %c4 : !pdl.value, !pdl.attribute, !pdl.attribute)
 
   pdl.rewrite {
     // Call the C++ "annotateOperation" utility to add the attributes to the matched linalg.generic op.
@@ -840,10 +838,9 @@ pdl.pattern @annotate_inner_tiled_f16_large : benefit(1) {
   pdl.apply_native_constraint "matchCastCompatibleType"(%rhs, %rhs_cast_type : !pdl.value, !pdl.type)
 
   // Pingpong on outer K dim, this kernel has 4 pingpong stages.
-  %empty = pdl.attribute = {}
   %c1 = pdl.attribute = 1
   %c4 = pdl.attribute = 4
-  pdl.apply_native_constraint "dimIsBound"(%rhs, %c1, %c4, %empty : !pdl.value, !pdl.attribute, !pdl.attribute, !pdl.attribute)
+  pdl.apply_native_constraint "dimIsMultipleOf"(%rhs, %c1, %c4 : !pdl.value, !pdl.attribute, !pdl.attribute)
 
   pdl.rewrite {
     // Call the C++ "annotateOperation" utility to add the attributes to the matched linalg.generic op.
