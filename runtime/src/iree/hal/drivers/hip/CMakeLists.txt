@@ -49,6 +49,8 @@ iree_cc_library(
     "memory_pools.h"
     "native_executable.c"
     "native_executable.h"
+    "native_executable_hipf.c"
+    "native_executable_hipf.h"
     "nop_executable_cache.c"
     "nop_executable_cache.h"
     "per_device_information.h"

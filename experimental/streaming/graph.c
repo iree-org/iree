@@ -282,6 +282,13 @@ iree_status_t iree_hal_streaming_graph_add_kernel_node(
                             "symbol is not a function (type=%d)", symbol->type);
   }
 
+  if (params->flags & IREE_HAL_STREAMING_DISPATCH_FLAG_ARGS_ARRAY) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "dispatch with args array not yet supported in graph nodes");
+  }
+
   // Allocate node with dependencies and params storage in a single allocation.
   iree_hal_streaming_graph_node_t* node = NULL;
   const iree_host_size_t constants_size =

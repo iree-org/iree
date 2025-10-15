@@ -563,20 +563,20 @@ static iree_status_t iree_hal_streaming_context_symbol_map_prepare_module(
   iree_const_byte_span_t module_data =
       iree_make_const_byte_span((const uint8_t*)registration->module_binary,
                                 /*infer*/ 0);
-  iree_hal_streaming_module_t* module = NULL;
   iree_status_t status = iree_hal_streaming_module_create_from_memory(
       map->context, caching_mode, module_data, map->host_allocator,
       &entry->module);
   if (iree_status_is_ok(status)) {
     // Insert all symbols from the module into the hash table.
     for (iree_host_size_t i = 0; i < registration->symbol_count; ++i) {
-      iree_string_view_t symbol_name = module->symbols[i].name;
+      iree_string_view_t symbol_name = entry->module->symbols[i].name;
       void* symbol_host_ptr = registration->symbols[i].host_pointer;
       // Find the corresponding compiled symbol in the module.
       iree_hal_streaming_symbol_t* symbol = NULL;
-      for (iree_host_size_t j = 0; j < module->symbol_count; ++j) {
-        if (iree_string_view_equal(symbol_name, module->symbols[j].name)) {
-          symbol = &module->symbols[j];
+      for (iree_host_size_t j = 0; j < entry->module->symbol_count; ++j) {
+        if (iree_string_view_equal(symbol_name,
+                                   entry->module->symbols[j].name)) {
+          symbol = &entry->module->symbols[j];
           break;
         }
       }
