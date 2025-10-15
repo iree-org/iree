@@ -661,3 +661,157 @@ def preprocessing_transform_match_contraction_in_named_sequence():
     assert "transform.iree.match.contraction %arg0" in module_str
     assert "lhs_type = f32, rhs_type = f32, output_type = f32" in module_str
     assert "indexing_maps = [#map, #map1, #map2]" in module_str
+
+
+@run
+def preprocessing_transform_match_convolution_in_named_sequence():
+    module_op = ir.Module.create()
+    module_op.operation.attributes["transform.with_named_sequence"] = ir.UnitAttr.get()
+
+    map_input = ir.AffineMap.get(
+        dim_count=7,
+        symbol_count=0,
+        exprs=[
+            ir.AffineExpr.get_dim(0),
+            ir.AffineExpr.get_dim(1) + ir.AffineExpr.get_dim(4),
+            ir.AffineExpr.get_dim(2) + ir.AffineExpr.get_dim(5),
+            ir.AffineExpr.get_dim(6),
+        ],
+    )
+    map_filter = ir.AffineMap.get(
+        dim_count=7,
+        symbol_count=0,
+        exprs=[
+            ir.AffineExpr.get_dim(4),
+            ir.AffineExpr.get_dim(5),
+            ir.AffineExpr.get_dim(6),
+            ir.AffineExpr.get_dim(3),
+        ],
+    )
+    map_output = ir.AffineMap.get(
+        dim_count=7,
+        symbol_count=0,
+        exprs=[
+            ir.AffineExpr.get_dim(0),
+            ir.AffineExpr.get_dim(1),
+            ir.AffineExpr.get_dim(2),
+            ir.AffineExpr.get_dim(3),
+        ],
+    )
+
+    with ir.InsertionPoint(module_op.body):
+        named_seq = transform.NamedSequenceOp(
+            "match_conv", [transform.AnyOpType.get()], [transform.AnyOpType.get()]
+        )
+        with ir.InsertionPoint(named_seq.body):
+            (
+                batch,
+                out_img,
+                out_ch,
+                filt,
+                in_ch,
+                depth,
+                strides,
+                dilations,
+            ) = preprocessing_transform.MatchConvolutionOp(
+                operand_handle=named_seq.bodyTarget,
+                lhs_type=ir.F32Type.get(),
+                rhs_type=ir.F32Type.get(),
+                output_type=ir.F32Type.get(),
+                indexing_maps=[map_input, map_filter, map_output],
+            )
+            transform.YieldOp([named_seq.bodyTarget])
+
+    module_str = str(module_op)
+    assert (
+        "affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>"
+        in module_str
+    )
+    assert "affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>" in module_str
+    assert "affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>" in module_str
+    assert "transform.with_named_sequence" in module_str
+    assert "transform.named_sequence @match_conv" in module_str
+    assert "transform.iree.match.convolution %arg0" in module_str
+    assert "lhs_type = f32, rhs_type = f32, output_type = f32" in module_str
+    assert "indexing_maps = [#map, #map1, #map2]" in module_str
+
+
+@run
+def preprocessing_transform_match_attention_in_named_sequence():
+    module_op = ir.Module.create()
+    module_op.operation.attributes["transform.with_named_sequence"] = ir.UnitAttr.get()
+    map_query = ir.AffineMap.get(
+        dim_count=6,
+        symbol_count=0,
+        exprs=[
+            ir.AffineExpr.get_dim(0),
+            ir.AffineExpr.get_dim(1),
+            ir.AffineExpr.get_dim(2),
+            ir.AffineExpr.get_dim(4),
+        ],
+    )
+    map_key = ir.AffineMap.get(
+        dim_count=6,
+        symbol_count=0,
+        exprs=[
+            ir.AffineExpr.get_dim(0),
+            ir.AffineExpr.get_dim(1),
+            ir.AffineExpr.get_dim(5),
+            ir.AffineExpr.get_dim(4),
+        ],
+    )
+    map_value = ir.AffineMap.get(
+        dim_count=6,
+        symbol_count=0,
+        exprs=[
+            ir.AffineExpr.get_dim(0),
+            ir.AffineExpr.get_dim(1),
+            ir.AffineExpr.get_dim(3),
+            ir.AffineExpr.get_dim(5),
+        ],
+    )
+    map_scale = ir.AffineMap.get(
+        dim_count=6,
+        symbol_count=0,
+        exprs=[],
+    )
+    map_output = ir.AffineMap.get(
+        dim_count=6,
+        symbol_count=0,
+        exprs=[
+            ir.AffineExpr.get_dim(0),
+            ir.AffineExpr.get_dim(1),
+            ir.AffineExpr.get_dim(2),
+            ir.AffineExpr.get_dim(3),
+        ],
+    )
+
+    with ir.InsertionPoint(module_op.body):
+        named_seq = transform.NamedSequenceOp(
+            "match_attention", [transform.AnyOpType.get()], [transform.AnyOpType.get()]
+        )
+        with ir.InsertionPoint(named_seq.body):
+            batch, m, n, k1, k2 = preprocessing_transform.MatchAttentionOp(
+                operand_handle=named_seq.bodyTarget,
+                query_type=ir.F16Type.get(),
+                key_type=ir.F16Type.get(),
+                value_type=ir.F16Type.get(),
+                output_type=ir.F16Type.get(),
+                indexing_maps=[map_query, map_key, map_value, map_scale, map_output],
+            )
+            transform.YieldOp([named_seq.bodyTarget])
+
+    module_str = str(module_op)
+    assert "affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>" in module_str
+    assert "affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>" in module_str
+    assert "affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d5)>" in module_str
+    assert "affine_map<(d0, d1, d2, d3, d4, d5) -> ()>" in module_str
+    assert "affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>" in module_str
+    assert "transform.with_named_sequence" in module_str
+    assert "transform.named_sequence @match_attention" in module_str
+    assert "transform.iree.match.attention %arg0" in module_str
+    assert (
+        "query_type = f16, key_type = f16, value_type = f16, output_type = f16"
+        in module_str
+    )
+    assert "indexing_maps = [#map, #map1, #map2, #map3, #map4]" in module_str
