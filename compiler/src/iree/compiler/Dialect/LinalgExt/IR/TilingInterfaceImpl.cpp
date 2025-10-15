@@ -1916,15 +1916,15 @@ SmallVector<Range> ExpReductionOp::getIterationDomain(OpBuilder &b) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(op);
   Location loc = getLoc();
-  auto allShapesSizes = createFlatListOfOperandDims(op, b, loc);
+  SmallVector<OpFoldResult> allShapesSizes =
+      createFlatListOfOperandDims(op, b, loc);
   AffineMap map = getShapesToLoopsMap();
 
-  return llvm::to_vector(
-      llvm::map_range(map.getResults(), [&](AffineExpr loopExpr) {
-        OpFoldResult ofr = affine::makeComposedFoldedAffineApply(
-            b, loc, loopExpr, allShapesSizes);
-        return Range{b.getIndexAttr(0), ofr, b.getIndexAttr(1)};
-      }));
+  return llvm::map_to_vector(map.getResults(), [&](AffineExpr loopExpr) {
+    OpFoldResult ofr =
+        affine::makeComposedFoldedAffineApply(b, loc, loopExpr, allShapesSizes);
+    return Range{b.getIndexAttr(0), ofr, b.getIndexAttr(1)};
+  });
 }
 
 FailureOr<TilingResult>
@@ -1956,7 +1956,6 @@ ExpReductionOp::getTiledImplementation(OpBuilder &b,
 
   return TilingResult{
       {tiledOp}, SmallVector<Value>(tiledOp->getResults()), generatedSlices};
-  return failure();
 }
 
 LogicalResult ExpReductionOp::getResultTilePosition(
@@ -1969,9 +1968,9 @@ LogicalResult ExpReductionOp::getResultTilePosition(
   AffineExpr d0;
   bindDims(b.getContext(), d0);
   SmallVector<OpFoldResult> subShapeSizes =
-      llvm::to_vector(llvm::map_range(sizes, [&](OpFoldResult ofr) {
+      llvm::map_to_vector(sizes, [&](OpFoldResult ofr) {
         return affine::makeComposedFoldedAffineApply(b, loc, d0 - 1, ofr);
-      }));
+      });
 
   OpOperand *outOperand = linalgOp.getDpsInitOperand(resultNumber);
   linalg::SliceParameters sliceParams = linalg::computeSliceParameters(
