@@ -42,13 +42,6 @@ namespace mlir::iree_compiler::GlobalOptimization {
 // Transpose permutation helpers
 //===----------------------------------------------------------------------===//
 
-static bool hasGatherSemantics(linalg::GenericOp genericOp) {
-  for (Operation &op : genericOp.getBody()->getOperations())
-    if (isa<tensor::ExtractOp, linalg::IndexOp>(op))
-      return true;
-  return false;
-}
-
 static bool isIdentityPermutation(ArrayRef<int64_t> perm) {
   for (auto [index, dim] : llvm::enumerate(perm)) {
     if (index != dim) {
@@ -768,9 +761,8 @@ public:
       return rewriter.notifyMatchFailure(genericOp, "non-elementwise generic");
     }
 
-    if (hasGatherSemantics(genericOp)) {
-      return rewriter.notifyMatchFailure(genericOp,
-                                         "unimplemented: gather like op");
+    if (genericOp.hasIndexSemantics()) {
+      return rewriter.notifyMatchFailure(genericOp, "has index semantics");
     }
 
     if (genericOp.getNumDpsInits() != 1) {
@@ -877,9 +869,8 @@ public:
       return rewriter.notifyMatchFailure(transposeOp, "not elementwise");
     }
 
-    if (hasGatherSemantics(genericOp)) {
-      return rewriter.notifyMatchFailure(genericOp,
-                                         "unimplemented: gather like op");
+    if (genericOp.hasIndexSemantics()) {
+      return rewriter.notifyMatchFailure(genericOp, "has index semantics");
     }
 
     if (!genericOp->hasOneUse()) {

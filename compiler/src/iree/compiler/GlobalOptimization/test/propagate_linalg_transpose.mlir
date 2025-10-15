@@ -273,24 +273,24 @@ util.func public @propagate_to_gather_like_ops(%arg0: tensor<2x3x4x5xf32>, %arg1
   util.return %transposed_0 : tensor<2x3x4x5xf32>
 }
 
-// CHECK-DAG: #[[$MAP_0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-// CHECK-DAG: #[[$MAP_1:.+]] = affine_map<(d0, d1, d2, d3) -> ()>
+//   CHECK-DAG: #[[$MAP_0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+//   CHECK-DAG: #[[$MAP_1:.+]] = affine_map<(d0, d1, d2, d3) -> ()>
 // CHECK-LABEL:   util.func public @propagate_to_gather_like_ops(
-// CHECK-SAME:      %[[ARG0:.*]]: tensor<2x3x4x5xf32>,
-// CHECK-SAME:      %[[ARG1:.*]]: tensor<1xi16>) -> tensor<2x3x4x5xf32> {
-// CHECK:           %[[VAL_0:.*]] = arith.constant 0xFF800000 : f32
-// CHECK:           %[[VAL_1:.*]] = tensor.collapse_shape %[[ARG1]] [] : tensor<1xi16> into tensor<i16>
-// CHECK:           %[[VAL_2:.*]] = tensor.empty() : tensor<2x3x4x5xf32>
-// CHECK:           %[[VAL_3:.*]] = linalg.generic {indexing_maps = [#[[$MAP_0]], #[[$MAP_1]], #[[$MAP_0]]], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%[[ARG0]], %[[VAL_1]] : tensor<2x3x4x5xf32>, tensor<i16>) outs(%[[VAL_2]] : tensor<2x3x4x5xf32>) {
-// CHECK:           ^bb0(%[[VAL_4:.*]]: f32, %[[VAL_5:.*]]: i16, %[[VAL_6:.*]]: f32):
-// CHECK:             %[[VAL_7:.*]] = linalg.index 1 : index
-// CHECK:             %[[VAL_8:.*]] = arith.index_cast %[[VAL_5]] : i16 to index
-// CHECK:             %[[VAL_9:.*]] = arith.cmpi ult, %[[VAL_7]], %[[VAL_8]] : index
-// CHECK:             %[[VAL_10:.*]] = arith.select %[[VAL_9]], %[[VAL_4]], %[[VAL_0]] : f32
-// CHECK:             linalg.yield %[[VAL_10]] : f32
-// CHECK:           } -> tensor<2x3x4x5xf32>
-// CHECK:           util.return %[[VAL_3]] : tensor<2x3x4x5xf32>
-// CHECK:         }
+//  CHECK-SAME:     %[[ARG0:.*]]: tensor<2x3x4x5xf32>,
+//  CHECK-SAME:     %[[ARG1:.*]]: tensor<1xi16>) -> tensor<2x3x4x5xf32> {
+//       CHECK:     %[[VAL_0:.*]] = arith.constant 0xFF800000 : f32
+//       CHECK:     %[[VAL_1:.*]] = tensor.collapse_shape %[[ARG1]] [] : tensor<1xi16> into tensor<i16>
+//       CHECK:     %[[VAL_2:.*]] = tensor.empty() : tensor<2x3x4x5xf32>
+//       CHECK:     %[[VAL_3:.*]] = linalg.generic {indexing_maps = [#[[$MAP_0]], #[[$MAP_1]], #[[$MAP_0]]], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%[[ARG0]], %[[VAL_1]] : tensor<2x3x4x5xf32>, tensor<i16>) outs(%[[VAL_2]] : tensor<2x3x4x5xf32>) {
+//       CHECK:     ^bb0(%[[VAL_4:.*]]: f32, %[[VAL_5:.*]]: i16, %[[VAL_6:.*]]: f32):
+//       CHECK:       %[[VAL_7:.*]] = linalg.index 1 : index
+//       CHECK:       %[[VAL_8:.*]] = arith.index_cast %[[VAL_5]] : i16 to index
+//       CHECK:       %[[VAL_9:.*]] = arith.cmpi ult, %[[VAL_7]], %[[VAL_8]] : index
+//       CHECK:       %[[VAL_10:.*]] = arith.select %[[VAL_9]], %[[VAL_4]], %[[VAL_0]] : f32
+//       CHECK:       linalg.yield %[[VAL_10]] : f32
+//       CHECK:     } -> tensor<2x3x4x5xf32>
+//       CHECK:     util.return %[[VAL_3]] : tensor<2x3x4x5xf32>
+//       CHECK:   }
 
 // -----
 
