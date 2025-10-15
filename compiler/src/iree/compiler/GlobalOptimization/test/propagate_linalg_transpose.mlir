@@ -768,14 +768,28 @@ util.func public @dont_reshape_reduction(%arg0: tensor<16x4x4xf32>, %arg1: tenso
 
 // -----
 
-util.func @dont_propagate_edge_unit_reshapes(%arg0: tensor<10x10x10xi32>) -> tensor<10x100xi32> {
+util.func @dont_propagate_edge_reshapes(%arg0: tensor<10x10x10xi32>) -> tensor<10x100xi32> {
   %collapsed = tensor.collapse_shape %arg0[[0, 1], [2]] : tensor<10x10x10xi32> into tensor<100x10xi32>
   %empty = tensor.empty() : tensor<10x100xi32>
   %transpose = linalg.transpose ins(%collapsed : tensor<100x10xi32>) outs(%empty : tensor<10x100xi32>) permutation = [1, 0]
   util.return %transpose : tensor<10x100xi32>
 }
-// CHECK-LABEL: util.func public @dont_propagate_edge_unit_reshapes
+// CHECK-LABEL: util.func public @dont_propagate_edge_reshapes
 //  CHECK-SAME:   %[[ARG0:[0-9a-zA-Z]+]]
 //       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]]
 //       CHECK:   %[[VAL:.+]] = linalg.transpose ins(%[[COLLAPSED]]
 //       CHECK:   util.return %[[VAL]]
+
+// -----
+
+util.func public @dont_sink_through_edge_expand_shape(%arg0 : tensor<2x3x4xf32>) -> tensor<1x3x4x2xf32> {
+  %empty = tensor.empty(): tensor<3x4x2xf32>
+  %transposed = linalg.transpose ins(%arg0 : tensor<2x3x4xf32>)
+      outs(%empty : tensor<3x4x2xf32>) permutation = [1, 2, 0]
+  %expanded = tensor.expand_shape %transposed [[0, 1], [2], [3]] output_shape [1, 3, 4, 2] : tensor<3x4x2xf32> into tensor<1x3x4x2xf32>
+  util.return %expanded : tensor<1x3x4x2xf32>
+}
+// SINK-LABEL: util.func public @dont_sink_through_edge_expand_shape
+//       SINK:   %[[TRANSPOSE:.+]] = linalg.transpose
+//       SINK:   %[[RES:.+]] = tensor.expand_shape %[[TRANSPOSE]]
+//       SINK:   util.return %[[RES]] : tensor<1x3x4x2xf32>
