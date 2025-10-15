@@ -1992,14 +1992,17 @@ ExpReductionOp::generateResultTileValue(OpBuilder &b, unsigned resultNumber,
           b, resultNumber, offsets, sizes, mappedOffsets, mappedSizes))) {
     return failure();
   }
+
   FailureOr<TilingResult> tilingResult =
       getTiledImplementation(b, mappedOffsets, mappedSizes);
 
-  if (failed(tilingResult))
+  if (failed(tilingResult)) {
     return failure();
+  }
 
-  if (tilingResult->tiledOps.size() != 1)
+  if (tilingResult->tiledOps.size() != 1) {
     return emitOpError("failed to generate tiled implementation");
+  }
 
   return TilingResult{
       tilingResult->tiledOps,
