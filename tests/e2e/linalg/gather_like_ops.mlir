@@ -8,7 +8,6 @@ func.func @gather_like_op() {
   // Indices :-
   //    0 1 0 1
   %indices = util.unfoldable_constant dense<[0, 1, 0, 1]> : tensor<4xi64>
-  // Empty tensor : 4x5 -> ALL ZEROES
   %empty = tensor.empty() : tensor<4x4xi64>
   // Gather-like op should result in:-
   //    1 2 3 4
