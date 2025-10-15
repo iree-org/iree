@@ -6041,7 +6041,7 @@ HIPAPI hipError_t hipLaunchKernel(const void* function_address, dim3 numBlocks,
       .block_dim = {dimBlocks.x, dimBlocks.y, dimBlocks.z},
       .shared_memory_bytes = sharedMemBytes,
       .buffer = args,  // args is already the kernelParams array
-      .flags = IREE_HAL_STREAMING_DISPATCH_FLAG_NONE,
+      .flags = IREE_HAL_STREAMING_DISPATCH_FLAG_ARGS_ARRAY,
   };
   iree_status_t status = iree_hal_streaming_launch_kernel(
       symbol, &params, (iree_hal_streaming_stream_t*)stream);
