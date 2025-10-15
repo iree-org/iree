@@ -139,9 +139,9 @@ func.func @matmul_lowering_MFMA_I32_16x16x64_I8(
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
 // CHECK:     func.func @matmul_lowering_MFMA_I32_16x16x64_I8(
-// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x8x4x4x4x16xi8>
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x4x2x4x16x16xi8>
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x4x8x2x4x16x4xi32>
 // CHECK-SAME:   ) -> tensor<?x?x4x8x2x4x16x4xi32>
 // CHECK:       %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[ARG0]], %[[ARG1]]) outs(%[[ARG2]])
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
@@ -178,9 +178,9 @@ func.func @batch_matmul_lowering_MFMA_F32_16x16x128_F8E4M3FN(
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK:     func.func @batch_matmul_lowering_MFMA_F32_16x16x128_F8E4M3FN(
-// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x8x4x4x4x32xf8E4M3FN>
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x4x2x4x16x32xf8E4M3FN>
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x4x8x2x4x16x4xf32>
 // CHECK-SAME:   ) -> tensor<?x?x?x4x8x2x4x16x4xf32>
 // CHECK:       %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[ARG0]], %[[ARG1]]) outs(%[[ARG2]])
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
@@ -213,9 +213,9 @@ func.func @batch_matmul_lowering_MFMA_F32_16x16x32_BF16(
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK:     func.func @batch_matmul_lowering_MFMA_F32_16x16x32_BF16(
-// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x8x4x4x4x8xbf16>
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x4x2x4x16x8xbf16>
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x4x8x2x4x16x4xf32>
 // CHECK-SAME:   ) -> tensor<?x?x?x4x8x2x4x16x4xf32>
 // CHECK:       %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[ARG0]], %[[ARG1]]) outs(%[[ARG2]])
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],

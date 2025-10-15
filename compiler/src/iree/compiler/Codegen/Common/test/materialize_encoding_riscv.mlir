@@ -57,10 +57,10 @@ func.func @matmul_lowering_i8i8i32_riscv32_ukernel(
   return %out : tensor<?x?xi32, #encoding_result>
 }
 // CHECK-LABEL: func @matmul_lowering_i8i8i32_riscv32_ukernel(
-// CHECK-SAME:    %[[LHS:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[RHS:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %[[OUTS:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x8x4xi8>
+// CHECK-SAME:    %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x8x4xi8>
+// CHECK-SAME:    %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x8x8xi32>
 // CHECK:         %[[MMT4D:.+]] = linalg.mmt4d
 // CHECK-SAME:      ins(%[[LHS]], %[[RHS]]
-// CHECK-SAME:      outs(%[[OUTS]]
+// CHECK-SAME:      outs(%[[ACC]]
 // CHECK:         return %[[MMT4D]]

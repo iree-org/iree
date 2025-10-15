@@ -23,9 +23,9 @@ func.func @matmul_lowering_WMMAR3_F32_16x16x16_F16(
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
 // CHECK:     func.func @matmul_lowering_WMMAR3_F32_16x16x16_F16(
-// CHECK-SAME:   %[[LHS:[a-zA-Z0-9]+]]
-// CHECK-SAME:   %[[RHS:[a-zA-Z0-9]+]]
-// CHECK-SAME:   %[[ACC:[a-zA-Z0-9]+]]
+// CHECK-SAME:   %[[LHS:.+]]: tensor<?x?x4x1x8x2x16xf16>
+// CHECK-SAME:   %[[RHS:.+]]: tensor<?x?x4x1x16x16xf16>
+// CHECK-SAME:   %[[ACC:.+]]: tensor<?x?x4x4x8x2x16xf32>
 // CHECK-SAME: ) -> tensor<?x?x4x4x8x2x16xf32>
 // CHECK:       %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]]) outs(%[[ACC]])
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
