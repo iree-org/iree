@@ -2668,6 +2668,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-stream-replicate-globals-per-affinity" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-stream-replicate-globals-per-affinity
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-stream-reuse-allocations" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-stream-reuse-allocations
@@ -5183,6 +5192,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-stream-replicate-globals-per-affinity" class="md-nav__link">
+    <span class="md-ellipsis">
+      -iree-stream-replicate-globals-per-affinity
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-stream-reuse-allocations" class="md-nav__link">
     <span class="md-ellipsis">
       -iree-stream-reuse-allocations
@@ -5559,6 +5577,12 @@ staging, constants, etc). Upon completion all resources have a fixed
 lifetime and any new resources introduced into the program with an
 unspecified lifetime (<code>!stream.resource&lt;*&gt;</code>) will require the pass to be
 run again prior to continued lowering.</p>
+<h3 id="-iree-stream-replicate-globals-per-affinity"><code>-iree-stream-replicate-globals-per-affinity</code><a class="headerlink" href="#-iree-stream-replicate-globals-per-affinity" title="Permanent link">link</a></h3>
+<p><em>Replicates globals for each unique affinity and rewires their uses.</em></p>
+<p>Replicates IREE::Util::GlobalOps that are used on multiple affinities
+and rewires their uses to the associated global. This allows for
+specialization of globals for each affinity instead of having unspecialized
+and a copy each use.</p>
 <h3 id="-iree-stream-reuse-allocations"><code>-iree-stream-reuse-allocations</code><a class="headerlink" href="#-iree-stream-reuse-allocations" title="Permanent link">link</a></h3>
 <p><em>Reuses transient allocations when doing so will not increase lifetime.</em></p>
 <p>Tries to reduce allocation overhead by reusing allocations from a
