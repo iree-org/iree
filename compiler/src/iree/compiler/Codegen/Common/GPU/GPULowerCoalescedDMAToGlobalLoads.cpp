@@ -39,67 +39,25 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_GPULOWERCOALESCEDDMATOGLOBALLOADSPASS
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
-// Verifies that the mapping attributes match the expected pattern:
-// Either [#gpu.thread<linear_dim_0>] for 1D mapping
-// or [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>] for 2D mapping.
 static LogicalResult verifyThreadMapping(scf::ForallOp forallOp) {
   std::optional<ArrayAttr> mappingAttr = forallOp.getMapping();
   if (!mappingAttr) {
-    LDBG() << "No mapping attribute found";
     return failure();
   }
 
-  size_t mappingSize = mappingAttr->size();
-
-  // Support both 1D and 2D thread mapping
-  if (mappingSize == 1) {
-    // 1D mapping: [#gpu.thread<linear_dim_0>]
-    LDBG() << "  - Mapping[0]: " << (*mappingAttr)[0];
-    auto thread0 = dyn_cast<gpu::GPUThreadMappingAttr>((*mappingAttr)[0]);
-    if (!thread0) {
-      LDBG() << "  - Mapping attribute is not GPUThreadMappingAttr";
+  // Verify that all mappings are thread mappings
+  for (Attribute attr : *mappingAttr) {
+    if (!isa<gpu::GPUThreadMappingAttr>(attr)) {
       return failure();
     }
-    if (thread0.getThread() != gpu::MappingId::LinearDim0) {
-      LDBG() << "  - Mapping mismatch (expected linear_dim_0)";
-      LDBG() << "    thread0: " << thread0.getThread();
-      return failure();
-    }
-    LDBG() << "  - 1D thread mapping verified successfully";
-    return success();
-  } else if (mappingSize == 2) {
-    // 2D mapping: [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
-    LDBG() << "  - Mapping[0]: " << (*mappingAttr)[0];
-    LDBG() << "  - Mapping[1]: " << (*mappingAttr)[1];
-    auto thread0 = dyn_cast<gpu::GPUThreadMappingAttr>((*mappingAttr)[0]);
-    auto thread1 = dyn_cast<gpu::GPUThreadMappingAttr>((*mappingAttr)[1]);
-    if (!thread0 || !thread1) {
-      LDBG() << "  - Mapping attributes are not GPUThreadMappingAttr";
-      return failure();
-    }
-    if (thread0.getThread() != gpu::MappingId::LinearDim1 ||
-        thread1.getThread() != gpu::MappingId::LinearDim0) {
-      LDBG() << "  - Mapping mismatch (expected linear_dim_1, linear_dim_0)";
-      LDBG() << "    thread0: " << thread0.getThread()
-             << " thread1: " << thread1.getThread();
-      return failure();
-    }
-    LDBG() << "  - 2D thread mapping verified successfully";
-    return success();
-  } else {
-    LDBG() << "Mapping attribute size is " << mappingSize
-           << ", expected 1 or 2";
-    return failure();
   }
+  return success();
 }
 
-// Verifies that destination memref is contiguous and source/target memory
-// address spaces are compatible.
 static LogicalResult verifyMemoryLayout(IREE::GPU::CoalescedGatherDMAOp dmaOp,
                                         PatternRewriter &rewriter) {
   // Check that destination memref is contiguous.
   auto destMemRefType = cast<MemRefType>(dmaOp.getInit().getType());
-  LDBG() << "  - Destination type: " << destMemRefType;
 
   if (!destMemRefType.areTrailingDimsContiguous(1)) {
     return rewriter.notifyMatchFailure(
@@ -107,7 +65,6 @@ static LogicalResult verifyMemoryLayout(IREE::GPU::CoalescedGatherDMAOp dmaOp,
         "destination memref does not have contiguous trailing dimension");
   }
 
-  // Check memory address spaces.
   auto sourceType = cast<MemRefType>(dmaOp.getSource().getType());
   auto targetType = cast<MemRefType>(dmaOp.getInit().getType());
 
@@ -122,11 +79,6 @@ static LogicalResult verifyMemoryLayout(IREE::GPU::CoalescedGatherDMAOp dmaOp,
   return success();
 }
 
-// Checks if a CoalescedGatherDMAOp is eligible for lowering to global loads:
-// * the surrounding scf.forall must have 1D or 2D GPU thread mapping
-// * The DMA op must be the only operation in the forall body
-// * Destination memref must be contiguous
-// * Source must be in global memory and destination in shared memory
 static LogicalResult
 isEligibleForGlobalDMA(IREE::GPU::CoalescedGatherDMAOp dmaOp,
                        PatternRewriter &rewriter) {
@@ -137,19 +89,6 @@ isEligibleForGlobalDMA(IREE::GPU::CoalescedGatherDMAOp dmaOp,
     return failure();
   }
 
-  Block &body = forallOp.getRegion().front();
-
-  // For now, the coalesced dma op must be the only op in the forall body
-  // (excluding the terminator).
-  if (body.getOperations().size() != 2) {
-    return rewriter.notifyMatchFailure(
-        dmaOp, "forall body must have exactly 2 operations (dma + terminator)");
-  }
-  if (!isa<IREE::GPU::CoalescedGatherDMAOp>(body.front())) {
-    return rewriter.notifyMatchFailure(
-        dmaOp, "first operation in forall body is not a CoalescedGatherDMAOp");
-  }
-
   if (failed(verifyMemoryLayout(dmaOp, rewriter))) {
     return failure();
   }
@@ -157,38 +96,19 @@ isEligibleForGlobalDMA(IREE::GPU::CoalescedGatherDMAOp dmaOp,
   return success();
 }
 
-// Compute the number of global loads per thread based on the target's
-// max load instruction size.
-static int64_t getNumOfGlobalLoadsPerThread(MemRefType destType,
-                                            int64_t subgroupSize,
-                                            int64_t maxLoadInstructionBits) {
-  // First, compute total number of bytes to load.
-  int64_t elementSize = destType.getElementTypeBitWidth();
-  int64_t totalBits = destType.getNumElements() * elementSize;
-
-  // Then, compute number of bytes each thread should load.
-  assert(totalBits % subgroupSize == 0 &&
-         "Total bits must be divisible by subgroup size");
-  int64_t bitsPerThread = totalBits / subgroupSize;
-
-  int64_t copiesPerThread = bitsPerThread / maxLoadInstructionBits;
-  return copiesPerThread;
-}
-
 // Lowers iree_gpu.coalesced_gather_dma operations within scf.forall loops
 // with thread mapping to amdgpu.gather_to_lds operations inside scf.for loops.
 //
 // In short, looks for patterns like this:
-//   scf.forall (...) in (32, 1) {
-//     %1 = iree_gpu.coalesced_gather_dma %indices, %source into %dest
+//   scf.forall (...) in (1, 32) {
+//     %1 = iree_gpu.coalesced_gather_dma %source into %dest
 //   } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
 //
-// And replaces the DMA op with:
-//   %lane_id = gpu.lane_id
-//   scf.for %iv = %c0 to %num_copies step %c1 {
-//     %thread_index = affine.delinearize_index(%subgroup_id, ...)
-//     %store_index = affine.delinearize_index(%lane_id, ...)
-//     amdgpu.gather_to_lds %source[%thread_index] into %dest[%store_index]
+// And replaces the DMA op with a loop that slices the source using the largest
+// DMA size from the target's dma_sizes attribute:
+//   scf.for %iv = %c0 to %num_dmas step %c1 {
+//     %offset = arith.muli %iv, %elements_per_dma
+//     amdgpu.gather_to_lds %source[0, %offset], %dest[0, 0]
 //   }
 struct LowerCoalescedGatherDMAPattern
     : public OpRewritePattern<IREE::GPU::CoalescedGatherDMAOp> {
@@ -197,177 +117,88 @@ struct LowerCoalescedGatherDMAPattern
   LowerCoalescedGatherDMAPattern(MLIRContext *context,
                                  ArrayRef<int64_t> workgroupSize,
                                  int64_t subgroupSize,
-                                 int64_t maxLoadInstructionBits)
+                                 ArrayRef<int64_t> targetDmaSizes)
       : OpRewritePattern<IREE::GPU::CoalescedGatherDMAOp>(context),
         workgroupSize(workgroupSize), subgroupSize(subgroupSize),
-        maxLoadInstructionBits(maxLoadInstructionBits) {}
+        targetDmaSizes(targetDmaSizes) {}
 
   LogicalResult matchAndRewrite(IREE::GPU::CoalescedGatherDMAOp dmaOp,
                                 PatternRewriter &rewriter) const override {
-    LDBG() << "Checking coalesced_gather_dma op: " << dmaOp;
-
-    // Find the parent forall op
     auto forallOp = dmaOp->getParentOfType<scf::ForallOp>();
     if (!forallOp) {
       return rewriter.notifyMatchFailure(
           dmaOp, "coalesced_gather_dma not inside scf.forall");
     }
 
-    // Verify that the forall has the required GPU thread mapping.
     if (failed(verifyThreadMapping(forallOp))) {
       return failure();
     }
 
-    // Ensure this is not nested inside another thread-mapped forall
-    if (forallOp->getParentOfType<scf::ForallOp>()) {
-      auto parentForall = forallOp->getParentOfType<scf::ForallOp>();
-      if (parentForall.getMapping()) {
-        auto parentMapping = *parentForall.getMapping();
-        if (!parentMapping.empty() &&
-            isa<gpu::GPUThreadMappingAttr>(parentMapping[0])) {
-          return rewriter.notifyMatchFailure(
-              forallOp, "nested thread-mapped forall not supported");
-        }
-      }
-    }
-
-    // Verify memory layout
     if (failed(verifyMemoryLayout(dmaOp, rewriter))) {
       LDBG() << "  - Memory layout verification failed";
       return failure();
     }
 
-    LDBG() << "  - Memory layout verified, starting transformation";
     Location loc = dmaOp.getLoc();
 
-    // Set insertion point at the dma op to create replacement ops
-    rewriter.setInsertionPoint(dmaOp);
-
-    auto destMemRefType = dyn_cast<MemRefType>(dmaOp.getInit().getType());
-    int64_t numCopiesPerThread = getNumOfGlobalLoadsPerThread(
-        destMemRefType, subgroupSize, maxLoadInstructionBits);
-
-    Value indices = dmaOp.getIndices();
-    Value dest = dmaOp.getInit();
     Value source = dmaOp.getSource();
-
-    if (!indices) {
-      // we are in copying mode, so assert here.
-      assert(false && "copying mode not supported");
-    }
-
-    auto indicesType = cast<MemRefType>(indices.getType());
-    auto destType = cast<MemRefType>(dest.getType());
+    Value dest = dmaOp.getInit();
 
     auto sourceType = cast<MemRefType>(source.getType());
-    if (!hasGlobalMemoryAddressSpace(sourceType)) {
-      return rewriter.notifyMatchFailure(
-          dmaOp, "source must have global memory address space for "
-                 "amdgpu.gather_to_lds");
+    Type transferType = sourceType.getElementType();
+    int64_t elementBits = sourceType.getElementTypeBitWidth();
+
+    ArrayRef<int64_t> dmaSizes = targetDmaSizes;
+    if (dmaSizes.empty()) {
+      return rewriter.notifyMatchFailure(dmaOp,
+                                         "target does not specify dma_sizes");
     }
 
-    int64_t numIndices = indicesType.getNumElements();
+    int64_t maxDmaSizeBits =
+        *std::max_element(dmaSizes.begin(), dmaSizes.end());
+    int64_t elementsPerDma = maxDmaSizeBits / elementBits;
+    int64_t totalElements = sourceType.getShape().back();
+    int64_t numDmas = (totalElements + elementsPerDma - 1) / elementsPerDma;
 
-    // Account for parallelism: multiply numIndices by the total number of
-    // parallel iterations in the forall loop.
-    auto staticUpperBound = forallOp.getStaticUpperBound();
-    int64_t parallelIterations = 1;
-    for (int64_t bound : staticUpperBound) {
-      parallelIterations *= bound;
+    rewriter.setInsertionPoint(dmaOp);
+
+    // Create the for loop
+    Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    Value c1 = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+    Value numDmasVal = rewriter.create<arith::ConstantIndexOp>(loc, numDmas);
+    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+
+    auto forOp = rewriter.create<scf::ForOp>(loc, c0, numDmasVal, c1);
+    rewriter.setInsertionPointToStart(forOp.getBody());
+
+    Value iv = forOp.getInductionVar();
+
+    Value offsetVal = rewriter.create<arith::MulIOp>(
+        loc, iv, rewriter.create<arith::ConstantIndexOp>(loc, elementsPerDma));
+
+    // For source, use the original source memref with offset indices
+    SmallVector<Value> srcIndices;
+    for (int64_t i = 0; i < sourceType.getRank() - 1; ++i) {
+      srcIndices.push_back(zero);
     }
-    numIndices *= parallelIterations;
+    srcIndices.push_back(offsetVal);
 
-    int64_t totalBytesOfCopy =
-        (destType.getNumElements() * destType.getElementTypeBitWidth()) / 8;
-    LDBG() << "  - numIndices: " << numIndices
-           << ", totalBytesOfCopy: " << totalBytesOfCopy;
-    if (totalBytesOfCopy % numIndices != 0) {
-      return rewriter.notifyMatchFailure(
-          dmaOp, "total bytes to copy is not divisible by number of indices");
-    }
+    // For destination, always use [0, 0, ...] indices
+    auto destType = cast<MemRefType>(dest.getType());
+    SmallVector<Value> dstIndices(destType.getRank(), zero);
 
-    int64_t bytesPerIndexCopy = totalBytesOfCopy / numIndices;
-    LDBG() << "  - bytesPerIndexCopy: " << bytesPerIndexCopy;
+    rewriter.create<amdgpu::GatherToLDSOp>(
+        loc, source, srcIndices, dest, dstIndices, TypeAttr::get(transferType));
 
-    numCopiesPerThread = numIndices / subgroupSize;
+    rewriter.replaceOp(dmaOp, dest);
 
-    // TODO: change this to a better query.
-    if (!dmaOp.isLegalLoadWidthInBytes(bytesPerIndexCopy)) {
-      return rewriter.notifyMatchFailure(
-          dmaOp,
-          "bytes per index copy does not match max load instruction bits");
-    }
-
-    Value laneId =
-        rewriter.create<gpu::LaneIdOp>(loc, rewriter.getIndexType(), nullptr);
-
-    // Use the subgroup size immediate value from the config.
-    Value subgroupSizeValue =
-        rewriter.create<arith::ConstantIndexOp>(loc, this->subgroupSize);
-
-    // Build a for loop skeleton.
-    Value lowerBound = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    Value upperBound =
-        rewriter.create<arith::ConstantIndexOp>(loc, numCopiesPerThread);
-    Value step = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-
-    scf::ForOp forOp =
-        rewriter.create<scf::ForOp>(loc, lowerBound, upperBound, step);
-
-    // helper functions
-    auto delinearizeIndex = [&](Value index, ArrayRef<int64_t> shape) {
-      return rewriter
-          .create<affine::AffineDelinearizeIndexOp>(loc, index, shape)
-          .getMultiIndex();
-    };
-
-    // Determine the transfer type based on the destination element type and
-    // the max load instruction size.
-    int64_t bytesPerElement = destType.getElementTypeBitWidth() / 8;
-    int64_t elementsPerTransfer = bytesPerIndexCopy / bytesPerElement;
-    Type transferType =
-        VectorType::get({elementsPerTransfer}, destType.getElementType());
-
-    // Build the loop body:
-    {
-      OpBuilder::InsertionGuard guard(rewriter);
-      rewriter.setInsertionPointToStart(forOp.getBody());
-      Value inductionVar = forOp.getInductionVar();
-
-      Value linearizedBaseIndex =
-          rewriter.create<arith::MulIOp>(loc, inductionVar, subgroupSizeValue);
-
-      // Compute the base index in dest memref.
-      ValueRange delinearizedBaseIndices =
-          delinearizeIndex(linearizedBaseIndex, destType.getShape());
-
-      // Compute load address from `indices`.
-      Value linearizedGatherIndex = rewriter.create<arith::AddIOp>(
-          loc, laneId,
-          linearizedBaseIndex); // copy_id * subgroup
-      ValueRange delinearizedGlobalIndices =
-          delinearizeIndex(linearizedGatherIndex, indicesType.getShape());
-
-      // Load the actual thread gather index from `indices` memref.
-      Value threadGatherIndex = rewriter.create<memref::LoadOp>(
-          loc, indices, delinearizedGlobalIndices);
-
-      // Create the amdgpu.gather_to_lds operation.
-      rewriter.create<amdgpu::GatherToLDSOp>(
-          loc, source, ValueRange{threadGatherIndex}, dest,
-          delinearizedBaseIndices, TypeAttr::get(transferType));
-    }
-
-    // Erase the DMA op since we've replaced it with the for loop
-    rewriter.eraseOp(dmaOp);
-    LDBG() << "  - Transformation completed successfully";
     return success();
   }
 
 private:
   ArrayRef<int64_t> workgroupSize;
   int64_t subgroupSize;
-  int64_t maxLoadInstructionBits;
+  ArrayRef<int64_t> targetDmaSizes;
 };
 
 namespace {
@@ -398,17 +229,20 @@ struct GPULowerCoalescedDMAToGlobalLoadsPass final
       return signalPassFailure();
     }
 
-    std::optional<int32_t> maxLoadBits =
-        target.getWgp().getMaxLoadInstructionBits();
-    if (!maxLoadBits) {
-      funcOp.emitOpError("Target does not specify max load instruction bits");
+    // Get dma_sizes from target attribute
+    ArrayRef<int64_t> dmaSizes;
+    if (auto dmaSizesAttr = target.getWgp().getDmaSizes()) {
+      dmaSizes = dmaSizesAttr.asArrayRef();
+    }
+    if (dmaSizes.empty()) {
+      funcOp.emitOpError("Target does not specify dma_sizes");
       return signalPassFailure();
     }
 
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
     patterns.add<LowerCoalescedGatherDMAPattern>(context, *workgroupSize,
-                                                 *subgroupSize, *maxLoadBits);
+                                                 *subgroupSize, dmaSizes);
 
     walkAndApplyPatterns(funcOp, std::move(patterns));
   }
