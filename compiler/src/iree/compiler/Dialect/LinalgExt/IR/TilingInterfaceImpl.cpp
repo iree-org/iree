@@ -1905,8 +1905,9 @@ static SmallVector<OpFoldResult>
 createFlatListOfOperandDims(ExpReductionOp op, OpBuilder &b, Location loc) {
   SmallVector<OpFoldResult> res;
   for (OpOperand &opOperand : op->getOpOperands()) {
-    for (int64_t i = 0, e = op.getRank(&opOperand); i < e; ++i)
+    for (int64_t i = 0, e = op.getRank(&opOperand); i < e; ++i) {
       res.push_back(linalg::createFoldedDimOp(b, loc, opOperand.get(), i));
+    }
   }
   return res;
 }
