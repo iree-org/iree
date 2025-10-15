@@ -194,21 +194,56 @@ InnerTiledOp::inferReturnTypes(MLIRContext *, std::optional<Location>,
   return success();
 }
 
-static bool countsMatchTileTypes(ArrayRef<int64_t> innerElemCounts,
-                                 ArrayRef<VectorType> tileTypes) {
-  return llvm::all_of_zip(
-      innerElemCounts, tileTypes,
-      [](int64_t ec, VectorType tt) { return ec == tt.getNumElements(); });
+// This helper struct captures the traits of a tile shape that are relevant to
+// matching an inner_tiled op as distributed or undistributed.
+struct TileMatchingTraits {
+  // Currently the only trait of a tile that is used in matching inner_tiled op
+  // semantics, is the element count. The reason why we don't simply match the
+  // full tile shape, or even just the rank, is that lots of tests rely on
+  // tolerating unit dimensions.
+  int64_t elemCount;
+};
+
+// This helper struct captures a diagnostic about a failure to match a
+// inner_tiled op's tiles as either distributed or undistributed.
+struct TileMismatchDiagnostic {
+  // Index of operand that the diagnostic refers to.
+  int index;
+  // An opaque score assigned to the diagnosed mismatch. A higher value means
+  // a larger mismatch. This is used to guess whether distributed or
+  // undistributed semantics were more likely intended, for the purpose of
+  // generating a more helpful diagnostic.
+  int magnitude;
+};
+
+static std::optional<TileMismatchDiagnostic>
+getFirstMismatch(ArrayRef<TileMatchingTraits> tileMatchingTraits,
+                 ArrayRef<VectorType> tileTypes) {
+  for (auto [i, mt, ty] : llvm::enumerate(tileMatchingTraits, tileTypes)) {
+    if (!(mt.elemCount == ty.getNumElements())) {
+      // Extremely crude additive-difference estimate. Obviously should be a
+      // multiplicative estimate, but maybe there's no need to overthink this.
+      // What likely matters is that this magnitude is 0 if and only if the
+      // elemCount is correct. This should suffice to determine whether to
+      // emit a diagnostic based or distributed or undistributed semantics.
+      int magnitude = std::abs(mt.elemCount - ty.getNumElements());
+      return TileMismatchDiagnostic{static_cast<int>(i), magnitude};
+    }
+  }
+  return {};
 }
 
-static SmallVector<int64_t> getInnerElemCounts(InnerTiledOp tiledOp) {
-  SmallVector<int64_t> result;
+static SmallVector<TileMatchingTraits>
+getTileMatchingTraits(InnerTiledOp tiledOp) {
+  SmallVector<TileMatchingTraits> result;
   result.reserve(tiledOp.getNumOperands());
   for (auto [opType, map] : llvm::zip_equal(
            tiledOp.getOperandTypes(),
            tiledOp.getIndexingMapsAttr().getAsValueRange<AffineMapAttr>())) {
     ArrayRef<int64_t> shape = cast<ShapedType>(opType).getShape();
-    result.push_back(llvm::product_of(shape.drop_front(map.getNumResults())));
+    ArrayRef<int64_t> innerShape = shape.drop_front(map.getNumResults());
+    int64_t innerElemsCount = llvm::product_of(innerShape);
+    result.push_back({innerElemsCount});
   }
   return result;
 }
@@ -293,7 +328,8 @@ LogicalResult InnerTiledOp::verify() {
   SmallVector<VectorType> threadTypes;
   getKind().getDistributedTileTypes(threadTypes);
 
-  SmallVector<int64_t> innerElemCounts = getInnerElemCounts(*this);
+  SmallVector<TileMatchingTraits> tileMatchingTraits =
+      getTileMatchingTraits(*this);
   for (auto [opNum, opType, tileType] :
        llvm::enumerate(opTypes, preThreadTypes)) {
     if (opType.getElementType() != tileType.getElementType()) {
@@ -303,13 +339,38 @@ LogicalResult InnerTiledOp::verify() {
     }
   }
 
-  bool hasUndistributedSemantics =
-      countsMatchTileTypes(innerElemCounts, preThreadTypes);
-  bool hasDistributedSemantics =
-      countsMatchTileTypes(innerElemCounts, threadTypes);
+  std::optional<TileMismatchDiagnostic> undistributedMismatch =
+      getFirstMismatch(tileMatchingTraits, preThreadTypes);
+  std::optional<TileMismatchDiagnostic> distributedMismatch =
+      getFirstMismatch(tileMatchingTraits, threadTypes);
+
+  bool hasUndistributedSemantics = !undistributedMismatch;
+  bool hasDistributedSemantics = !distributedMismatch;
   if (!hasUndistributedSemantics && !hasDistributedSemantics) {
-    return emitOpError("operation parallel semantics can't be inferred as "
-                       "either distributed or undistributed");
+    // When both semantics mismatch, we know we have an invalid op. We need
+    // to decide whether to emit an op based on an assumption of intended
+    // distributed or undistributed semantics. The small `magnitude` mismatch
+    // points to the more likely intended semantics. In case of equality,
+    // default to assuming undistributed semantics as that is how ops come in
+    // most of the time.
+    bool diagnoseAsDistributed =
+        undistributedMismatch->magnitude > distributedMismatch->magnitude;
+    StringRef semantics =
+        diagnoseAsDistributed ? "Distributed" : "Undistributed";
+    const TileMismatchDiagnostic &diag =
+        diagnoseAsDistributed ? *distributedMismatch : *undistributedMismatch;
+    Type operandType = getOperandTypes()[diag.index];
+    int elemCount = tileMatchingTraits[diag.index].elemCount;
+    VectorType tileType = diagnoseAsDistributed ? threadTypes[diag.index]
+                                                : preThreadTypes[diag.index];
+    return emitOpError(llvm::formatv(
+        "tile shapes do not match, regardless of semantics. The semantics "
+        "that this op comes closest to matching is: {}. "
+        "However, even under that assumption, there is still a mismatch in "
+        "operand {}, which has type {}, whose inner tile dimensions have an "
+        "element count of {}, which doesn't match the target "
+        "vector type {}.",
+        semantics, diag.index, operandType, elemCount, tileType));
   }
   if (hasDistributedSemantics) {
     if (getPermutations()) {
@@ -328,10 +389,11 @@ LogicalResult InnerTiledOp::verify() {
 }
 
 bool InnerTiledOp::hasThreadSemantics() {
-  SmallVector<int64_t> innerElemCounts = getInnerElemCounts(*this);
+  SmallVector<TileMatchingTraits> innerElemCountsAndRanks =
+      getTileMatchingTraits(*this);
   SmallVector<VectorType> preThreadTiles;
   getKind().getUndistributedTileTypes(preThreadTiles);
-  return !countsMatchTileTypes(innerElemCounts, preThreadTiles);
+  return !!getFirstMismatch(innerElemCountsAndRanks, preThreadTiles);
 }
 
 static int64_t getResultIndex(AffineMap map, AffineExpr targetExpr) {

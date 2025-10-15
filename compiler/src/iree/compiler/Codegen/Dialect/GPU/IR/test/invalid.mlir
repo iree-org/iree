@@ -109,7 +109,7 @@ func.func @mma_inner_tiled_invalid_element_type(%lhs: tensor<?x?x4xf32>, %rhs: t
 // -----
 
 func.func @mma_inner_tiled_invalid_inner_types(%lhs: tensor<?x?x3xf16>, %rhs: tensor<?x?x4xf16>, %acc: tensor<?x?x4xf32>) -> tensor<?x?x4xf32> {
-  // expected-error @+1 {{operation parallel semantics can't be inferred as either distributed or undistributed}}
+  // expected-error @+1 {{op tile shapes do not match, regardless of semantics. The semantics that this op comes closest to matching is: Distributed. However, even under that assumption, there is still a mismatch in operand 0, which has type tensor<?x?x3xf16>, whose inner tile dimensions have an element count of 3, which doesn't match the target vector type vector<4xf16>}}
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = [affine_map<(i, j, k) -> (i, k)>, affine_map<(i, j, k) -> (k, j)>, affine_map<(i, j, k) -> (i, j)>],
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
