@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -111,14 +112,23 @@ Value cacheSwizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
   }
 
   Location loc = promotedValue.getLoc();
-  // Use the size of the inner most dimension as the cache swizzle value.
-  // This is a very rudimentary choice, but functions well enough as a
+  // Use the size in bytes of the inner most dimension as the cache swizzle
+  // value. This is a very rudimentary choice, but functions well enough as a
   // default.
-  Value cacheSwizzleVal = getValueOrCreateConstantIndexOp(
-      builder, loc,
-      tensor::getMixedSize(builder, loc, bufferCastValue,
-                           tensorType.getRank() - 1));
+  AffineExpr s0, s1;
+  bindSymbols(builder.getContext(), s0, s1);
 
+  OpFoldResult cacheSwizzle = affine::makeComposedFoldedAffineApply(
+      builder, loc, s0 * s1,
+      {tensor::getMixedSize(builder, loc, bufferCastValue,
+                            tensorType.getRank() - 1),
+       arith::ConstantIndexOp::create(
+           builder, loc,
+           tensorType.getElementType().getIntOrFloatBitWidth() / 8)
+           ->getResult(0)});
+
+  Value cacheSwizzleVal =
+      getValueOrCreateConstantIndexOp(builder, loc, cacheSwizzle);
   // Insert the resource cast optimistically. If the input is not castable
   // (e.g. another producer) later patterns will drop it anyway as it is treated
   // like a hint.

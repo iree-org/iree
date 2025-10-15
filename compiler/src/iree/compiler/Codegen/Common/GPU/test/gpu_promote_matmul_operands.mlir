@@ -214,8 +214,8 @@ func.func @promote_with_cache_swizzle(%a: tensor<2x34x34x128xf32>, %b: tensor<2x
 // CHECK-LABEL: func.func @promote_with_cache_swizzle
 //  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: tensor<2x34x34x128xf32>
 //  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: tensor<2x8x256xf32>
-//   CHECK-DAG:   %[[SWIZZLE_A:.+]] = iree_gpu.buffer_resource_cast %[[A]] cacheSwizzleStride(%c128)
-//   CHECK-DAG:   %[[SWIZZLE_B:.+]] = iree_gpu.buffer_resource_cast %[[B]] cacheSwizzleStride(%c256)
+//   CHECK-DAG:   %[[SWIZZLE_A:.+]] = iree_gpu.buffer_resource_cast %[[A]] cacheSwizzleStride(%c512)
+//   CHECK-DAG:   %[[SWIZZLE_B:.+]] = iree_gpu.buffer_resource_cast %[[B]] cacheSwizzleStride(%c1024)
 //       CHECK:   %[[PA:.+]] = iree_linalg_ext.im2col
 //  CHECK-SAME:     lowering_config = #iree_gpu.derived_thread_config
 //  CHECK-SAME:     ins(%[[SWIZZLE_A]]
