@@ -269,11 +269,6 @@ static LogicalResult canTargetIntrinsic(const GPUMatmulShapeType &problem,
   const int64_t nSize =
       std::accumulate(problem.nSizes.begin(), problem.nSizes.end(), 1,
                       std::multiplies<int64_t>());
-  // TODO(jornt): Remove this check as batch size doesn't make a computation
-  // more compute bound, so it shouldn't be considered.
-  if (!problem.batchSizes.empty()) {
-    return success();
-  }
   if ((mSize <= kVerySkinnyDimThreshold && (nSize > preferredSubgroupSize)) ||
       (nSize <= kVerySkinnyDimThreshold && (mSize > preferredSubgroupSize))) {
     return failure();
