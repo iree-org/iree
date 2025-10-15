@@ -101,7 +101,36 @@ iree_select_compiler_opts(IREE_UK_COPTS_RISCV_64_ZVFHMIN
 )
 
 check_cxx_compiler_flag("${IREE_UK_COPTS_RISCV_64_V}" IREE_UK_BUILD_RISCV_64_V)
-check_cxx_compiler_flag("${IREE_UK_COPTS_RISCV_64_ZVFHMIN}" IREE_UK_BUILD_RISCV_64_ZVFHMIN)
+
+# CPU features that we will try checking compiler support for, unless
+# we set them to OFF below.
+
+set(IREE_UK_TRY_RISCV_64_ZVFHMIN_ZVFH ON)
+
+# Compiler emits '__extendhfsf2' call for the
+# C code below. So, the following test checks whether
+# compiler can link '__extendhfsf2' succesfully.
+# This is needed because riscv toolchain used by
+# 'Test RISC-V 64 CI job' fails to link '__extendhfsf2'
+# builtin. See: https://github.com/iree-org/iree/issues/22303.
+# Once this issue is resolved, we won't need this check.
+if(IREE_UK_TRY_RISCV_64_ZVFHMIN_ZVFH)
+  string(REPLACE ";" " " CMAKE_REQUIRED_FLAGS "${IREE_UK_COPTS_RISCV_64_ZVFHMIN}")
+  string(JOIN "\n" IREE_UK_BUILD_RISCV_64_ZVFHMIN_ZVFH_TEST
+"int main() {"
+"  _Float16 val_f16 = 100.0;"
+"  float val_f32 = (float)val_f16;"
+"  return 0;"
+"}"
+  )
+  check_c_source_compiles(
+    "${IREE_UK_BUILD_RISCV_64_ZVFHMIN_ZVFH_TEST}"
+    IREE_UK_BUILD_RISCV_64_ZVFHMIN
+  )
+  unset(CMAKE_REQUIRED_FLAGS)
+else()
+  set(IREE_UK_BUILD_RISCV_64_ZVFHMIN OFF)
+endif()
 
 configure_file("config_riscv_64.h.in" "config_riscv_64.h")
 
