@@ -80,7 +80,7 @@ def IREEGPU_MmaInterfaceAttr
 }
 
 def IREEGPU_AnyMmaAttr : Attr<Or<[
-  CPred<"isa<IREE::GPU::MmaInterfaceAttr>($_self)">,
+  CPred<"::llvm::isa<mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr>($_self)">,
 ]>, "buffer-like constant attribute values"> {
   let storageType = [{ IREE::GPU::MmaInterfaceAttr }];
   let returnType = [{ IREE::GPU::MmaInterfaceAttr }];
