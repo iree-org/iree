@@ -224,7 +224,7 @@ def IREECodegen_InnerTileDescAttrInterface :
 }
 
 def IREECodegen_AnyInnerTileDescAttr : Attr<Or<[
-  CPred<"::llvm::isa<mlir::iree_compiler::IREE::Codegen::InnerTileDescAttrInterface>($_self)">,
+  CPred<"::llvm::isa<::mlir::iree_compiler::IREE::Codegen::InnerTileDescAttrInterface>($_self)">,
 ]>, "buffer-like constant attribute values"> {
   let storageType = [{ IREE::Codegen::InnerTileDescAttrInterface }];
   let returnType = [{ IREE::Codegen::InnerTileDescAttrInterface }];
@@ -544,7 +544,7 @@ def IREECodegen_SwizzleAttrInterface :
 }
 
 def IREECodegen_AnySwizzleAttr : Attr<Or<[
-  CPred<"::llvm::isa<mlir::iree_compiler::IREE::Codegen::SwizzleAttrInterface>($_self)">,
+  CPred<"::llvm::isa<::mlir::iree_compiler::IREE::Codegen::SwizzleAttrInterface>($_self)">,
 ]>, "swizzling descriptor attributes"> {
   let storageType = [{ IREE::Codegen::SwizzleAttrInterface }];
   let returnType = [{ IREE::Codegen::SwizzleAttrInterface }];

@@ -131,8 +131,8 @@ def Util_AnyPtrType : TypeAlias<Util_PtrType>;
 
 class Util_PtrOf<Type type> :
     Type<And<[
-      CPred<"::llvm::isa<mlir::iree_compiler::IREE::Util::PtrType>($_self)">,
-      SubstLeaves<"$_self", "::llvm::cast<mlir::iree_compiler::IREE::Util::PtrType>($_self).getTargetType()",
+      CPred<"::llvm::isa<::mlir::iree_compiler::IREE::Util::PtrType>($_self)">,
+      SubstLeaves<"$_self", "::llvm::cast<::mlir::iree_compiler::IREE::Util::PtrType>($_self).getTargetType()",
                   type.predicate>
     ]>, "ptr<" # type.summary # ">"> {
   string builderCall = !if(!empty(type.builderCall),
@@ -141,11 +141,11 @@ class Util_PtrOf<Type type> :
 
 class Util_AnyPtrOf<list<Type> types> :
     Type<And<[
-      CPred<"::llvm::isa<mlir::iree_compiler::IREE::Util::PtrType>($_self)">,
+      CPred<"::llvm::isa<::mlir::iree_compiler::IREE::Util::PtrType>($_self)">,
       Or<!foreach(type, types,
           SubstLeaves<
               "$_self",
-              "::llvm::cast<mlir::iree_compiler::IREE::Util::PtrType>($_self).getTargetType()",
+              "::llvm::cast<::mlir::iree_compiler::IREE::Util::PtrType>($_self).getTargetType()",
               type.predicate>)>,
     ]>, !interleave(!foreach(type, types, type.summary), " or ")> {
   string builderCall = "";

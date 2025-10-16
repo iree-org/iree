@@ -474,7 +474,7 @@ def Stream_LifetimeAttr :
 }
 
 def Stream_AnyResource : Type<
-    CPred<"::llvm::isa<mlir::iree_compiler::IREE::Stream::ResourceType>($_self)">,
+    CPred<"::llvm::isa<::mlir::iree_compiler::IREE::Stream::ResourceType>($_self)">,
     "any stream-compatible type">;
 
 // TODO(benvanik): support other types; the interface may be enough.
@@ -552,32 +552,32 @@ def Stream_Resource : TypeDef<Stream_Dialect, "Resource", [
 }
 
 def Stream_ResourceLifetimeUnknown : CPred<[{
-  ::llvm::cast<mlir::iree_compiler::IREE::Stream::ResourceType>($_self).getLifetime() ==
-      mlir::iree_compiler::IREE::Stream::Lifetime::Unknown
+  ::llvm::cast<::mlir::iree_compiler::IREE::Stream::ResourceType>($_self).getLifetime() ==
+      ::mlir::iree_compiler::IREE::Stream::Lifetime::Unknown
 }]>;
 def Stream_ResourceLifetimeExternal : CPred<[{
-  ::llvm::cast<mlir::iree_compiler::IREE::Stream::ResourceType>($_self).getLifetime() ==
-      mlir::iree_compiler::IREE::Stream::Lifetime::External
+  ::llvm::cast<::mlir::iree_compiler::IREE::Stream::ResourceType>($_self).getLifetime() ==
+      ::mlir::iree_compiler::IREE::Stream::Lifetime::External
 }]>;
 def Stream_ResourceLifetimeStaging : CPred<[{
-  ::llvm::cast<mlir::iree_compiler::IREE::Stream::ResourceType>($_self).getLifetime() ==
-      mlir::iree_compiler::IREE::Stream::Lifetime::Staging
+  ::llvm::cast<::mlir::iree_compiler::IREE::Stream::ResourceType>($_self).getLifetime() ==
+      ::mlir::iree_compiler::IREE::Stream::Lifetime::Staging
 }]>;
 def Stream_ResourceLifetimeTransient : CPred<[{
-  ::llvm::cast<mlir::iree_compiler::IREE::Stream::ResourceType>($_self).getLifetime() ==
-      mlir::iree_compiler::IREE::Stream::Lifetime::Transient
+  ::llvm::cast<::mlir::iree_compiler::IREE::Stream::ResourceType>($_self).getLifetime() ==
+      ::mlir::iree_compiler::IREE::Stream::Lifetime::Transient
 }]>;
 def Stream_ResourceLifetimeVariable : CPred<[{
-  ::llvm::cast<mlir::iree_compiler::IREE::Stream::ResourceType>($_self).getLifetime() ==
-      mlir::iree_compiler::IREE::Stream::Lifetime::Variable
+  ::llvm::cast<::mlir::iree_compiler::IREE::Stream::ResourceType>($_self).getLifetime() ==
+      ::mlir::iree_compiler::IREE::Stream::Lifetime::Variable
 }]>;
 def Stream_ResourceLifetimeConstant : CPred<[{
-  ::llvm::cast<mlir::iree_compiler::IREE::Stream::ResourceType>($_self).getLifetime() ==
-      mlir::iree_compiler::IREE::Stream::Lifetime::Constant
+  ::llvm::cast<::mlir::iree_compiler::IREE::Stream::ResourceType>($_self).getLifetime() ==
+      ::mlir::iree_compiler::IREE::Stream::Lifetime::Constant
 }]>;
 
 def Stream_UnknownResource : DialectType<Stream_Dialect, And<[
-  CPred<"::llvm::isa<mlir::iree_compiler::IREE::Stream::ResourceType>($_self)">,
+  CPred<"::llvm::isa<::mlir::iree_compiler::IREE::Stream::ResourceType>($_self)">,
   Stream_ResourceLifetimeUnknown,
 ]>, "resource"> {
   let description = [{
@@ -586,7 +586,7 @@ def Stream_UnknownResource : DialectType<Stream_Dialect, And<[
 }
 
 def Stream_ExternalResource : DialectType<Stream_Dialect, And<[
-  CPred<"::llvm::isa<mlir::iree_compiler::IREE::Stream::ResourceType>($_self)">,
+  CPred<"::llvm::isa<::mlir::iree_compiler::IREE::Stream::ResourceType>($_self)">,
   Stream_ResourceLifetimeExternal,
 ]>, "external resource"> {
   let description = [{
@@ -603,7 +603,7 @@ def Stream_ExternalResource : DialectType<Stream_Dialect, And<[
 }
 
 def Stream_StagingResource : DialectType<Stream_Dialect, And<[
-  CPred<"::llvm::isa<mlir::iree_compiler::IREE::Stream::ResourceType>($_self)">,
+  CPred<"::llvm::isa<::mlir::iree_compiler::IREE::Stream::ResourceType>($_self)">,
   Stream_ResourceLifetimeStaging,
 ]>, "staging resource"> {
   let description = [{
@@ -615,7 +615,7 @@ def Stream_StagingResource : DialectType<Stream_Dialect, And<[
 }
 
 def Stream_TransientResource : DialectType<Stream_Dialect, And<[
-  CPred<"::llvm::isa<mlir::iree_compiler::IREE::Stream::ResourceType>($_self)">,
+  CPred<"::llvm::isa<::mlir::iree_compiler::IREE::Stream::ResourceType>($_self)">,
   Stream_ResourceLifetimeTransient,
 ]>, "transient resource"> {
   let description = [{
@@ -631,7 +631,7 @@ def Stream_TransientResource : DialectType<Stream_Dialect, And<[
 }
 
 def Stream_VariableResource : DialectType<Stream_Dialect, And<[
-  CPred<"::llvm::isa<mlir::iree_compiler::IREE::Stream::ResourceType>($_self)">,
+  CPred<"::llvm::isa<::mlir::iree_compiler::IREE::Stream::ResourceType>($_self)">,
   Stream_ResourceLifetimeVariable,
 ]>, "variable resource"> {
   let description = [{
