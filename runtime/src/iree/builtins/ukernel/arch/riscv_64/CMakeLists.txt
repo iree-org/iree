@@ -118,8 +118,8 @@ if(IREE_UK_TRY_RISCV_64_ZVFHMIN_ZVFH)
   string(REPLACE ";" " " CMAKE_REQUIRED_FLAGS "${IREE_UK_COPTS_RISCV_64_ZVFHMIN}")
   string(JOIN "\n" IREE_UK_BUILD_RISCV_64_ZVFHMIN_ZVFH_TEST
 "int main() {"
-"  _Float16 val_f16 = 100.0;"
-"  float val_f32 = (float)val_f16;"
+"  volatile _Float16 val_f16 = 100.0;"
+"  volatile float val_f32 = (float)val_f16;"
 "  return 0;"
 "}"
   )
