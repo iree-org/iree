@@ -117,18 +117,30 @@ Value cacheSwizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
   // default.
   AffineExpr s0, s1;
   bindSymbols(builder.getContext(), s0, s1);
+  Value dtype = getValueOrCreateConstantIntOp(
+      builder, loc,
+      arith::ConstantIndexOp::create(
+          builder, loc, tensorType.getElementType().getIntOrFloatBitWidth())
+          ->getResult(0));
 
-  OpFoldResult cacheSwizzle = affine::makeComposedFoldedAffineApply(
-      builder, loc, s0 * s1,
-      {tensor::getMixedSize(builder, loc, bufferCastValue,
-                            tensorType.getRank() - 1),
-       arith::ConstantIndexOp::create(
-           builder, loc,
-           tensorType.getElementType().getIntOrFloatBitWidth() / 8)
-           ->getResult(0)});
-
+  OpFoldResult dim = tensor::getMixedSize(builder, loc, bufferCastValue,
+                                          tensorType.getRank() - 1);
+  Value zero =
+      getValueOrCreateConstantIntOp(builder, loc, builder.getIndexAttr(0));
+  Value strideBytes = getValueOrCreateConstantIndexOp(
+      builder, loc,
+      affine::makeComposedFoldedAffineApply(builder, loc, (s0 * s1).ceilDiv(8),
+                                            {dim, dtype}));
+  Value strideBitsMod8 = getValueOrCreateConstantIntOp(
+      builder, loc,
+      affine::makeComposedFoldedAffineApply(builder, loc, (s0 * s1) % 8,
+                                            {dim, dtype}));
+  // If the stride in bits is not a multiple of 8, set the value to 0. This will
+  // be ignored by cacheSwizzleStride.
+  Value cmp = arith::CmpIOp::create(
+      builder, loc, mlir::arith::CmpIPredicate::eq, strideBitsMod8, zero);
   Value cacheSwizzleVal =
-      getValueOrCreateConstantIndexOp(builder, loc, cacheSwizzle);
+      arith::SelectOp::create(builder, loc, cmp, strideBytes, zero).getResult();
   // Insert the resource cast optimistically. If the input is not castable
   // (e.g. another producer) later patterns will drop it anyway as it is treated
   // like a hint.
