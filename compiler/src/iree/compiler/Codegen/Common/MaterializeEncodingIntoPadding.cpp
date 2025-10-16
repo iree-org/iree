@@ -8,7 +8,6 @@
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
@@ -280,7 +279,7 @@ struct MaterializeEncodingIntoPaddingPass final
           resolverAttr.cloneWithSimplifiedConfig(targetConfig));
     } else {
       layoutAttr = cast<IREE::Encoding::LayoutMaterializerAttr>(
-          IREE::Codegen::EncodingNopLayoutAttr::get(context));
+          IREE::Encoding::IdentityResolverAttr::get(context));
     }
 
     RewritePatternSet materializeEncodingPattern(context);
