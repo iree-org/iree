@@ -1057,7 +1057,8 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
 
 def IREELinalgExt_ExpReductionOp : IREELinalgExt_Op<"exp_reduction", [
   DeclareOpInterfaceMethods<LinalgStructuredInterface, [
-    "getLibraryCallName"
+    "getLibraryCallName",
+    "getIteratorTypesArray"
   ]>,
   DeclareOpInterfaceMethods<TilingInterface,
   [
