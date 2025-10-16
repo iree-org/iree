@@ -9,7 +9,8 @@ func.func @lower_multi_mma_mfma_16x16x16(%lhs: vector<4xf16>, %rhs: vector<4xf16
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
   } : vector<4xf16>, vector<4xf16> into vector<4xf32>
   return %0 : vector<4xf32>
 }
@@ -43,7 +44,8 @@ func.func @lower_multi_mma_mfma_32x32x8(%lhs: vector<4xf16>, %rhs: vector<4xf16>
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>
+    kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
   } : vector<4xf16>, vector<4xf16> into vector<16xf32>
   return %0 : vector<16xf32>
 }
@@ -77,7 +79,8 @@ func.func @lower_col_major_multi_mma_mfma_32x32x8(%lhs: vector<4xf16>, %rhs: vec
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16, col_major = true>
+    kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16, col_major = true>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
   } : vector<4xf16>, vector<4xf16> into vector<16xf32>
   return %0 : vector<16xf32>
 }
@@ -112,7 +115,8 @@ func.func @lower_col_major_inner_tiled_virtual_16x16x32(%lhs: vector<8xf16>, %rh
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.virtual_mma_layout<VMFMA_F32_16x16x32_F16, col_major = true>
+    kind = #iree_gpu.virtual_mma_layout<VMFMA_F32_16x16x32_F16, col_major = true>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
   } : vector<8xf16>, vector<8xf16> into vector<4xf32>
   return %0 : vector<4xf32>
 }
@@ -152,7 +156,8 @@ func.func @lower_multi_mma_wmmar3_16x16x16(%lhs: vector<16xf16>, %rhs: vector<16
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>
+    kind = #iree_gpu.mma_layout<WMMAR3_F32_16x16x16_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
   } : vector<16xf16>, vector<16xf16> into vector<8xf32>
   return %0 : vector<8xf32>
 }
@@ -185,7 +190,8 @@ func.func @lower_multi_mma_wmmar4_16x16x16(%lhs: vector<8xf16>, %rhs: vector<8xf
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.mma_layout<WMMAR4_F32_16x16x16_F16>
+    kind = #iree_gpu.mma_layout<WMMAR4_F32_16x16x16_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
   } : vector<8xf16>, vector<8xf16> into vector<8xf32>
   return %0 : vector<8xf32>
 }
@@ -218,7 +224,8 @@ func.func @lower_multi_mma_mfma_shape_cast_16x16x16(%lhs: vector<1x4xf16>, %rhs:
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
-    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
   } : vector<1x4xf16>, vector<4x1xf16> into vector<4x1xf32>
   return %0 : vector<4x1xf32>
 }
@@ -262,7 +269,8 @@ func.func @lower_inner_tiled_mfma_scale_f32_16x16x128_b32(
     indexing_maps = #contraction_accesses,
     iterator_types = [],
     kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32,
-      lhs_elem_type = f4E2M1FN, rhs_elem_type = f8E4M3FN, acc_elem_type = f32>
+      lhs_elem_type = f4E2M1FN, rhs_elem_type = f8E4M3FN, acc_elem_type = f32>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
   } : vector<32xf4E2M1FN>, vector<1xf8E8M0FNU>, vector<32xf8E4M3FN>, vector<1xf8E8M0FNU> into vector<4xf32>
   return %0 : vector<4xf32>
 }
@@ -309,7 +317,8 @@ func.func @lower_inner_tiled_mfma_scale_f32_32x32x64_b32(
     indexing_maps = #contraction_accesses,
     iterator_types = [],
     kind = #iree_gpu.scaled_mma_layout<intrinsic = MFMA_SCALE_F32_32x32x64_B32,
-      lhs_elem_type = f4E2M1FN, rhs_elem_type = f8E4M3FN, acc_elem_type = f32>
+      lhs_elem_type = f4E2M1FN, rhs_elem_type = f8E4M3FN, acc_elem_type = f32>,
+    semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
   } : vector<32xf4E2M1FN>, vector<1xf8E8M0FNU>, vector<32xf8E4M3FN>, vector<1xf8E8M0FNU> into vector<16xf32>
   return %0 : vector<16xf32>
 }

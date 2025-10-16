@@ -5,7 +5,8 @@ func.func @mma_inner_tiled_invalid_num_inputs(%lhs: tensor<?x?x4xf16>, %acc: ten
   %0 = iree_codegen.inner_tiled ins(%lhs) outs(%acc) {
     indexing_maps = [affine_map<(i, j, k) -> (i, k)>, affine_map<(i, j, k) -> (k, j)>],
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
   } : tensor<?x?x4xf16> into tensor<?x?x4xf32>
   return %0 : tensor<?x?x4xf32>
 }
@@ -17,7 +18,8 @@ func.func @mma_inner_tiled_invalid_num_outputs(%lhs: tensor<?x?x4xf16>, %rhs: te
   %0:2 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc, %acc) {
     indexing_maps = [affine_map<(i, j, k) -> (i, k)>, affine_map<(i, j, k) -> (k, j)>, affine_map<(i, j, k) -> (i, j)>, affine_map<(i, j, k) -> (i, j)>],
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
   } : tensor<?x?x4xf16>, tensor<?x?x4xf16> into tensor<?x?x4xf32>, tensor<?x?x4xf32>
   return %0#0, %0#1 : tensor<?x?x4xf32>, tensor<?x?x4xf32>
 }
@@ -29,7 +31,8 @@ func.func @mma_inner_tiled_invalid_num_indexing_maps(%lhs: tensor<?x?x4xf16>, %r
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = [affine_map<(i, j, k) -> (i, k)>, affine_map<(i, j, k) -> (k, j)>],
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
   } : tensor<?x?x4xf16>, tensor<?x?x4xf16> into tensor<?x?x4xf32>
   return %0 : tensor<?x?x4xf32>
 }
@@ -41,7 +44,8 @@ func.func @mma_inner_tiled_invalid_indexing_map_num_dims(%lhs: tensor<?x?x4xf16>
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = [affine_map<(i, j, k, x) -> (i, k)>, affine_map<(i, j, k) -> (k, j)>, affine_map<(i, j, k) -> (i, j)>],
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
   } : tensor<?x?x4xf16>, tensor<?x?x4xf16> into tensor<?x?x4xf32>
   return %0 : tensor<?x?x4xf32>
 }
@@ -53,7 +57,8 @@ func.func @mma_inner_tiled_invalid_indexing_map_num_results(%lhs: tensor<?x?x4xf
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = [affine_map<(i, j, k) -> (i, j, k)>, affine_map<(i, j, k) -> (k, j)>, affine_map<(i, j, k) -> (i, j)>],
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
   } : tensor<?x?x4xf16>, tensor<?x?x4xf16> into tensor<?x?x4xf32>
   return %0 : tensor<?x?x4xf32>
 }
@@ -65,7 +70,8 @@ func.func @mma_inner_tiled_invalid_indexing_map_non_permutation(%lhs: tensor<?x?
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = [affine_map<(i, j, k) -> (i, j + k)>, affine_map<(i, j, k) -> (k, j)>, affine_map<(i, j, k) -> (i, j)>],
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
   } : tensor<?x?x4xf16>, tensor<?x?x4xf16> into tensor<?x?x4xf32>
   return %0 : tensor<?x?x4xf32>
 }
@@ -77,7 +83,8 @@ func.func @mma_inner_tiled_invalid_outer_shape(%lhs: tensor<2x2x4xf16>, %rhs: te
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = [affine_map<(i, j, k) -> (i, k)>, affine_map<(i, j, k) -> (k, j)>, affine_map<(i, j, k) -> (i, j)>],
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
   } : tensor<2x2x4xf16>, tensor<2x3x4xf16> into tensor<2x2x4xf32>
   return %0 : tensor<2x2x4xf32>
 }
@@ -89,7 +96,8 @@ func.func @mma_inner_tiled_invalid_dynamic_inner_dim(%lhs: tensor<?x?x?xf16>, %r
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = [affine_map<(i, j, k) -> (i, k)>, affine_map<(i, j, k) -> (k, j)>, affine_map<(i, j, k) -> (i, j)>],
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
   } : tensor<?x?x?xf16>, tensor<?x?x4xf16> into tensor<?x?x4xf32>
   return %0 : tensor<?x?x4xf32>
 }
@@ -97,11 +105,12 @@ func.func @mma_inner_tiled_invalid_dynamic_inner_dim(%lhs: tensor<?x?x?xf16>, %r
 // -----
 
 func.func @mma_inner_tiled_invalid_element_type(%lhs: tensor<?x?x4xf32>, %rhs: tensor<?x?x4xf16>, %acc: tensor<?x?x4xf32>) -> tensor<?x?x4xf32> {
-  // expected-error @+1 {{iree_codegen.inner_tiled' op operand 0 element type 'f32' does not match expected tile type 'vector<16x16xf16>' for operator}}
+  // expected-error @+1 {{op operand element type f32 does not match expected MMA tile element type f16}}
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = [affine_map<(i, j, k) -> (i, k)>, affine_map<(i, j, k) -> (k, j)>, affine_map<(i, j, k) -> (i, j)>],
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
   } : tensor<?x?x4xf32>, tensor<?x?x4xf16> into tensor<?x?x4xf32>
   return %0 : tensor<?x?x4xf32>
 }
@@ -109,11 +118,12 @@ func.func @mma_inner_tiled_invalid_element_type(%lhs: tensor<?x?x4xf32>, %rhs: t
 // -----
 
 func.func @mma_inner_tiled_invalid_inner_types(%lhs: tensor<?x?x3xf16>, %rhs: tensor<?x?x4xf16>, %acc: tensor<?x?x4xf32>) -> tensor<?x?x4xf32> {
-  // expected-error @+1 {{operation parallel semantics can't be inferred as either distributed or undistributed}}
+  // expected-error @+1 {{op operand type tensor<?x?x3xf16>, implying tile type vector<3xf16>, is incompatible with permuted InnerTiledDescAttr tile type vector<16x16xf16> under semantics #iree_gpu.mma_semantics<distributed = false, opaque = true>}}
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = [affine_map<(i, j, k) -> (i, k)>, affine_map<(i, j, k) -> (k, j)>, affine_map<(i, j, k) -> (i, j)>],
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+    kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
   } : tensor<?x?x3xf16>, tensor<?x?x4xf16> into tensor<?x?x4xf32>
   return %0 : tensor<?x?x4xf32>
 }

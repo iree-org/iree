@@ -267,8 +267,6 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     outer loop iterator in the iterator type list, to each dimension of each
     operand.
 
-    The combiner type is defined by the intrinsic.
-
     Example:
 
     ```mlir
@@ -280,7 +278,9 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     #contraction_trait = {
       indexing_maps = #contraction_accesses,
       iterator_types = ["parallel", "parallel", "reduction"],
-      kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+      kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+      distributed = true,
+      opaque = false
     }
     %3 = iree_codegen.inner_tiled ins(%0, %1) outs(%2) #contraction_trait
       : vector<2x3x4xf16>, vector<3x5x4xf16> into vector<2x5x4xf32>
@@ -313,7 +313,7 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     }
     ```
 
-    Or alternatively unrolled to a single intrinsic when operation on vectors.
+    Or alternatively unrolled to a single intrinsic when operating on vectors.
     ```mlir
     #contraction_accesses = [
      affine_map<() -> ()>,
@@ -323,18 +323,36 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     #contraction_trait = {
       indexing_maps = #contraction_accesses,
       iterator_types = [],
-      kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
+      kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+      distributed = true,
+      opaque = false
     }
     %3 = iree_codegen.inner_tiled ins(%0, %1) outs(%2) #contraction_trait
       : vector<4xf16>, vector<4xf16> into vector<4xf32>
     ```
 
     This operation can represent an intrinsic both in undistributed
-    (workgroup/subgroup/warp) and distributed (thread) level. The descriptor
-    attribute specifies the inner tile sizes for both the undistributed form
-    (where the operands represent the data to be processed by an entire group of
-    parallel workers) and the distributed form (where the operands represent the
-    data processed by a single workitem/thread).
+    (workgroup/subgroup/warp) and distributed (thread) level. This is indicated
+    by the `distributed` boolean attribute. The same `kind` attribute may be
+    used in both cases.
+
+    The inner-tile shapes of tensor operands (defined as above as the trailing
+    dimensions not present in the indexing maps) must agree with the shapes of
+    the vector tiles implied by the intrinsic specified in `kind`. The exact
+    criterion depends on the `opaque` boolean attribute:
+    * When `opaque = true`, the only requirement is that they have the same
+      number of elements.
+    * When `opaque = false`, the shapes must match exactly after omitting any
+      unit-dimensions.
+
+    Note that different `kind` attributes may adopt different conventions as to
+    the intrinsic vector tile formats. Some may use only flattened 1-D vectors,
+    and it may be necessary to use `opaque = true` to accomodate them. Others
+    may use higher-rank vectors with shapes reflecting semantics, allowing to
+    use `opaque = false`, which is preferable when possible at all thanks to the
+    stricter semantics. However, that is not only a function of the `kind`
+    attribute: using `opaque = false` also requires the tensor operands to have
+    appropriate shapes.
 
     In some cases, variations on the inner tiled operations can be expressed
     with the permutations attribute. This attribute represents the permutation
@@ -342,13 +360,8 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     this is row-major storage of the inner tile) to the format of the inner tile
     in the arguments, with a permutation specified for each argument.
 
-    Since the canonical dimensionality of the inner dimensions are somewhat
-    intrinsic specific, verification of this op requires only that element
-    counts of the inner dimensions match the intrinsic.
-
     For example, an MMT product of inner dimensions with warp semantics can be
-    represented with the following. Permutations are only allowed for ops with
-    undistributed semantics and must be resolved before distribution.
+    represented with the following.
 
     ```mlir
     #contraction_accesses = [
@@ -383,22 +396,16 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     choice for a shared operation is intended to ease the lowering process and
     allow for different transformations at different stages of the pipeline
     without needing to essentially clone this op.
-
-    The choice to let the inner dimensions required to compute the intrinsic be
-    implicit based on the indexing maps was made to make this operation easier
-    to generate and to skip the need for type conversion ops. However this comes
-    at the expense of ease of verification for the operation. It is also
-    implicitly linked to a lane-level parent `scf.forall` operation.
   }];
 
-  let arguments = (ins
-    Variadic<AnyRankedTensorOrVector>:$inputs,
-    Variadic<AnyRankedTensorOrVector>:$outputs,
-    TypedArrayAttrBase<AffineMapAttr, "indxing affine maps">:$indexing_maps,
-    IteratorTypeArrayAttr:$iterator_types,
-    IREECodegen_AnyInnerTileDescAttr:$kind,
-    OptionalAttr<TypedArrayAttrBase<DenseI64ArrayAttr, "permutations">>:$permutations
-  );
+  let arguments = (ins Variadic<AnyRankedTensorOrVector>:$inputs,
+      Variadic<AnyRankedTensorOrVector>:$outputs,
+      TypedArrayAttrBase<AffineMapAttr, "indxing affine maps">:$indexing_maps,
+      IteratorTypeArrayAttr:$iterator_types,
+      IREECodegen_AnyInnerTileDescAttr:$kind,
+      IREECodegen_AnyInnerTiledSemanticscAttr:$semantics,
+      OptionalAttr<TypedArrayAttrBase<DenseI64ArrayAttr,
+                                      "permutations">>:$permutations);
   let results = (outs
     Variadic<AnyRankedTensorOrVector>:$results
   );
@@ -408,22 +415,26 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     `:` type($inputs) `into` type($outputs)
   }];
 
-  let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$inits,
-      "ArrayAttr":$indexingMaps, "ArrayAttr":$iteratorTypes,
-      "InnerTileDescAttrInterface":$intrinsic,
-      CArg<"std::optional<ArrayAttr>", "std::nullopt">:$permutations)>,
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$inits,
-      "ArrayRef<ArrayRef<AffineExpr>>":$indexingExprs,
-      "ArrayRef<utils::IteratorType>":$iteratorTypes,
-      "InnerTileDescAttrInterface":$intrinsic,
-      CArg<"std::optional<SmallVector<SmallVector<int64_t>>>", "std::nullopt">:$permutationss)>,
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$inits,
-      "ArrayRef<AffineMap>":$indexingMaps,
-      "ArrayRef<utils::IteratorType>":$iteratorTypes,
-      "InnerTileDescAttrInterface":$intrinsic,
-      CArg<"std::optional<SmallVector<SmallVector<int64_t>>>", "std::nullopt">:$permutationss)>
-  ];
+  let builders =
+      [OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$inits,
+           "ArrayAttr":$indexingMaps, "ArrayAttr":$iteratorTypes,
+           "InnerTileDescAttrInterface":$intrinsic,
+           "InnerTiledSemanticsAttrInterface":$semantics,
+           CArg<"std::optional<ArrayAttr>", "std::nullopt">:$permutations)>,
+       OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$inits,
+           "ArrayRef<ArrayRef<AffineExpr>>":$indexingExprs,
+           "ArrayRef<utils::IteratorType>":$iteratorTypes,
+           "InnerTileDescAttrInterface":$intrinsic,
+           "InnerTiledSemanticsAttrInterface":$semantics,
+           CArg<"std::optional<SmallVector<SmallVector<int64_t>>>",
+                "std::nullopt">:$permutationss)>,
+       OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$inits,
+           "ArrayRef<AffineMap>":$indexingMaps,
+           "ArrayRef<utils::IteratorType>":$iteratorTypes,
+           "InnerTileDescAttrInterface":$intrinsic,
+           "InnerTiledSemanticsAttrInterface":$semantics,
+           CArg<"std::optional<SmallVector<SmallVector<int64_t>>>",
+                "std::nullopt">:$permutationss)>];
   let extraClassDeclaration = [{
     ::llvm::SmallVector<::mlir::ShapedType> getOperandShapedTypes() {
       return ::llvm::map_to_vector(getOperandTypes(), [](auto t) {
@@ -442,8 +453,6 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     bool hasTensorSemantics() {
       return isa<RankedTensorType>(getOutputs().front().getType());
     }
-
-    bool hasThreadSemantics();
 
     llvm::SmallVector<::mlir::AffineMap, 4> getIndexingMapsArray() {
       return llvm::to_vector<4>(getIndexingMaps().getAsValueRange<::mlir::AffineMapAttr>());
