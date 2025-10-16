@@ -1912,6 +1912,10 @@ createFlatListOfOperandDims(ExpReductionOp op, OpBuilder &b, Location loc) {
   return res;
 }
 
+SmallVector<utils::IteratorType> ExpReductionOp::getIteratorTypesArray() {
+  return getLoopIteratorTypes();
+}
+
 SmallVector<Range> ExpReductionOp::getIterationDomain(OpBuilder &b) {
   ExpReductionOp op = *this;
   OpBuilder::InsertionGuard g(b);
