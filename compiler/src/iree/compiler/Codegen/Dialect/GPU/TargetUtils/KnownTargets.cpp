@@ -635,18 +635,18 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   return llvm::StringSwitch<std::optional<TargetDetails>>(target.lower())
       .Case("mi355x", TargetDetails{cdna4Wgp, &mi355xChip})
       .Case("mi350x", TargetDetails{cdna4Wgp, &mi350xChip})
-      .Cases("cdna4", "gfx950", TargetDetails{cdna4Wgp, nullptr})
+      .Cases({"cdna4", "gfx950"}, TargetDetails{cdna4Wgp, nullptr})
       .Case("mi325x", TargetDetails{cdna3Wgp, &mi325xChip})
       .Case("mi300x", TargetDetails{cdna3Wgp, &mi300xChip})
       .Case("mi300a", TargetDetails{cdna3Wgp, &mi300aChip})
       .Case("mi308x", TargetDetails{cdna3Wgp, &mi308xChip})
-      .Cases("cdna3", "gfx942", TargetDetails{cdna3Wgp, nullptr})
+      .Cases({"cdna3", "gfx942"}, TargetDetails{cdna3Wgp, nullptr})
       .Case("mi250x", TargetDetails{cdna2Wgp, &mi250xChip})
       .Case("mi250", TargetDetails{cdna2Wgp, &mi250Chip})
       .Case("mi210", TargetDetails{cdna2Wgp, &mi210Chip})
-      .Cases("cdna2", "gfx90a", TargetDetails{cdna2Wgp, nullptr})
+      .Cases({"cdna2", "gfx90a"}, TargetDetails{cdna2Wgp, nullptr})
       .Case("mi100", TargetDetails{cdna1Wgp, &mi100Chip})
-      .Cases("cdna1", "gfx908", TargetDetails{cdna1Wgp, nullptr})
+      .Cases({"cdna1", "gfx908"}, TargetDetails{cdna1Wgp, nullptr})
       // https://www.techpowerup.com/gpu-specs/radeon-rx-9070-xt.c4229
       .Case("rx9070xt", TargetDetails{rdna4Wgp, &rx9070xtChip})
       // https://www.techpowerup.com/gpu-specs/radeon-rx-9070.c4250
@@ -671,12 +671,14 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
       .Case("w7800", TargetDetails{rdna3Wgp, &w7800Chip})
       // https://www.techpowerup.com/gpu-specs/radeon-pro-w7700.c4184
       .Case("w7700", TargetDetails{rdna3Wgp, &w7700Chip})
-      .Cases("rdna4", "gfx1200", "gfx1201", TargetDetails{rdna4Wgp, nullptr})
-      .Cases("rdna3", "gfx1100", "gfx1101", "gfx1102", "gfx1103", "gfx1150",
-             "gfx1151", TargetDetails{rdna3Wgp, nullptr})
-      .Cases("rdna2", "gfx1030", "gfx1031", "gfx1032", "gfx1033", "gfx1034",
-             "gfx1035", "gfx1036", TargetDetails{rdna2Wgp, nullptr})
-      .Cases("rdna1", "gfx1010", "gfx1011", "gfx1012", "gfx1013",
+      .Cases({"rdna4", "gfx1200", "gfx1201"}, TargetDetails{rdna4Wgp, nullptr})
+      .Cases({"rdna3", "gfx1100", "gfx1101", "gfx1102", "gfx1103", "gfx1150",
+              "gfx1151"},
+             TargetDetails{rdna3Wgp, nullptr})
+      .Cases({"rdna2", "gfx1030", "gfx1031", "gfx1032", "gfx1033", "gfx1034",
+              "gfx1035", "gfx1036"},
+             TargetDetails{rdna2Wgp, nullptr})
+      .Cases({"rdna1", "gfx1010", "gfx1011", "gfx1012", "gfx1013"},
              TargetDetails{rdna1Wgp, nullptr})
       .Case("gfx1250", TargetDetails{gfx1250Wgp, nullptr})
       .Default(std::nullopt);
@@ -684,16 +686,17 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
 
 StringRef normalizeAMDGPUTarget(StringRef target) {
   return llvm::StringSwitch<StringRef>(target.lower())
-      .Cases("mi350x", "mi355x", "gfx950", /*Value=*/"gfx950")
-      .Cases("mi300a", "mi300x", "mi308x", "mi325x", "gfx942",
+      .Cases({"mi350x", "mi355x", "gfx950"}, /*Value=*/"gfx950")
+      .Cases({"mi300a", "mi300x", "mi308x", "mi325x", "gfx942"},
              /*Value=*/"gfx942")
-      .Cases("mi250x", "mi250", "mi210", "cdna2", "gfx90a", /*Value=*/"gfx90a")
-      .Cases("mi100", "cdna1", "gfx908", /*Value=*/"gfx908")
-      .Cases("rx9070xt", "rx9070", "r9700", "gfx1201", /*Value=*/"gfx1201")
-      .Cases("rx9060xt", "gfx1200", /*Value=*/"gfx1200")
-      .Cases("rx7900xtx", "rx7900xt", "w7900", "w7800", "gfx1100",
+      .Cases({"mi250x", "mi250", "mi210", "cdna2", "gfx90a"},
+             /*Value=*/"gfx90a")
+      .Cases({"mi100", "cdna1", "gfx908"}, /*Value=*/"gfx908")
+      .Cases({"rx9070xt", "rx9070", "r9700", "gfx1201"}, /*Value=*/"gfx1201")
+      .Cases({"rx9060xt", "gfx1200"}, /*Value=*/"gfx1200")
+      .Cases({"rx7900xtx", "rx7900xt", "w7900", "w7800", "gfx1100"},
              /*Value=*/"gfx1100")
-      .Cases("rx7800xt", "rx7700xt", "v710", "w7700", "gfx1101",
+      .Cases({"rx7800xt", "rx7700xt", "v710", "w7700", "gfx1101"},
              /*Value=*/"gfx1101")
       .Case("gfx1250", /*Value=*/"gfx1250")
       .Default("");
@@ -757,15 +760,15 @@ std::optional<TargetDetails> getARMGPUTargetDetails(StringRef target) {
 
   return llvm::StringSwitch<std::optional<TargetDetails>>(target.lower())
       // Mali-G715: https://vulkan.gpuinfo.org/displayreport.php?id=29754
-      .Cases("mali-g715", "mali-g615", "valhall4",
+      .Cases({"mali-g715", "mali-g615", "valhall4"},
              TargetDetails{valhallWgp, nullptr})
       // Mali-G710: https://vulkan.gpuinfo.org/displayreport.php?id=30471
-      .Cases("mali-g710", "mali-g510", "mali-g310", "valhall3",
+      .Cases({"mali-g710", "mali-g510", "mali-g310", "valhall3"},
              TargetDetails{valhallWgp, nullptr})
       // Mali-G78: https://vulkan.gpuinfo.org/displayreport.php?id=29994
-      .Cases("mali-g78", "valhall2", TargetDetails{valhallWgp, nullptr})
+      .Cases({"mali-g78", "valhall2"}, TargetDetails{valhallWgp, nullptr})
       // Mali-G57: https://vulkan.gpuinfo.org/displayreport.php?id=24636
-      .Cases("mali-g77", "mali-g57", "valhall1", "valhall",
+      .Cases({"mali-g77", "mali-g57", "valhall1", "valhall"},
              TargetDetails{valhallWgp, nullptr})
       .Default(std::nullopt);
 }
@@ -777,10 +780,10 @@ StringRef normalizeARMGPUTarget(StringRef target) {
     return target;
 
   return llvm::StringSwitch<StringRef>(target.lower())
-      .Cases("mali-g715", "mali-g615", "valhall4")
-      .Cases("mali-g710", "mali-g510", "mali-g310", "valhall3")
+      .Cases({"mali-g715", "mali-g615"}, "valhall4")
+      .Cases({"mali-g710", "mali-g510", "mali-g310"}, "valhall3")
       .Case("mali-78", "valhall2")
-      .Cases("mali-g77", "mali-g57", "valhall1")
+      .Cases({"mali-g77", "mali-g57"}, "valhall1")
       .Default("");
 }
 
@@ -901,11 +904,11 @@ std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
       .Case("rtx3070ti", TargetDetails{ampereWgp, &rtx3070tiChip})
       // https://www.techpowerup.com/gpu-specs/geforce-rtx-3070.c3674
       .Case("rtx3070", TargetDetails{ampereWgp, &rtx3070Chip})
-      .Cases("ampere", "sm_80", "sm_86", "sm_87",
+      .Cases({"ampere", "sm_80", "sm_86", "sm_87"},
              TargetDetails{ampereWgp, nullptr})
-      .Cases("turing", "sm_75", TargetDetails{turingWgp, nullptr})
-      .Cases("volta", "sm_70", "sm_72", TargetDetails{voltaWgp, nullptr})
-      .Cases("pascal", "sm_60", "sm_61", "sm_62",
+      .Cases({"turing", "sm_75"}, TargetDetails{turingWgp, nullptr})
+      .Cases({"volta", "sm_70", "sm_72"}, TargetDetails{voltaWgp, nullptr})
+      .Cases({"pascal", "sm_60", "sm_61", "sm_62"},
              TargetDetails{pascalWgp, nullptr})
       .Default(std::nullopt);
 }
