@@ -228,6 +228,7 @@ module {
       indexing_maps = #contraction_accesses,
       iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
       kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
+      semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>,
       lowering_config = #config
     } : tensor<?x?x4xf16>, tensor<?x?x4xf16> into tensor<?x?x4xf32>
     return %0 : tensor<?x?x4xf32>

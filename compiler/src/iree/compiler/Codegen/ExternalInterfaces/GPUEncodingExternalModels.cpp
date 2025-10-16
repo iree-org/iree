@@ -412,6 +412,8 @@ static Operation *lowerContractionOrScaledContractionOpToInnerTiledOp(
   Location loc = linalgOp.getLoc();
   SmallVector<utils::IteratorType> iteratorTypes =
       linalgOp.getIteratorTypesArray();
+  auto semantics = InnerTiledSemanticsAttr::get(
+      builder.getContext(), /*distributed=*/false, /*opaque=*/false);
   switch (resultEncoding.getOpType().getValue()) {
   case IREE::Encoding::EncodingOpType::matmul: {
     indexingMaps.push_back(AffineMap::get(numDims, 0, lhsExprs, ctx));
@@ -420,7 +422,7 @@ static Operation *lowerContractionOrScaledContractionOpToInnerTiledOp(
     return Codegen::InnerTiledOp::create(
         builder, loc, operands.take_front(inputs.size()),
         operands.take_back(outputs.size()), indexingMaps, iteratorTypes,
-        cast<IREE::GPU::DataTiledMMAAttr>(dataTiledAttr));
+        cast<IREE::GPU::DataTiledMMAAttr>(dataTiledAttr), semantics);
   }
   case IREE::Encoding::EncodingOpType::scaled_matmul: {
     SmallVector<AffineExpr> lhsScalesExprs, rhsScalesExprs;
@@ -441,7 +443,7 @@ static Operation *lowerContractionOrScaledContractionOpToInnerTiledOp(
     return Codegen::InnerTiledOp::create(
         builder, loc, operands.take_front(inputs.size()),
         operands.take_back(outputs.size()), indexingMaps, iteratorTypes,
-        cast<IREE::GPU::DataTiledScaledMMAAttr>(dataTiledAttr));
+        cast<IREE::GPU::DataTiledScaledMMAAttr>(dataTiledAttr), semantics);
   }
   default: {
     assert(false && "unexpected encoding op type");
