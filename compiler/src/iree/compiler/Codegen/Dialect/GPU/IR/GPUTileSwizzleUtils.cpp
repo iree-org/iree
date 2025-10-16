@@ -544,8 +544,8 @@ TileSwizzle getSwizzle(IREE::GPU::DataTiledMMAAttr mma,
 /// indices accordingly.
 static void remove(TileSwizzle &swizzle, size_t idx) {
   assert(idx < swizzle.expandShape.size() && "idx out of bounds");
-  const size_t startIdx = std::accumulate(
-      std::begin(swizzle.expandShape), std::begin(swizzle.expandShape) + idx, 0,
+  const size_t startIdx = llvm::accumulate(
+      ArrayRef(swizzle.expandShape).take_front(idx), size_t(0),
       [](size_t idx, const TileSwizzle::ExpandShapeDimVectorType &dims)
           -> size_t { return idx + dims.size(); });
   const size_t endIdx = startIdx + swizzle.expandShape[idx].size();
