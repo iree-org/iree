@@ -338,7 +338,7 @@ func.func @matmul_lowering_f32f32f32_gfx942() attributes {
 
 //----------------------------------------------------------------------------//
 // Test suite for encodings with resolved layouts.
-// All the implementation uses interfaces, so we only check with CPU encoding
+// All the implementations use interfaces, so we only check with CPU encoding
 // resolvers.
 //----------------------------------------------------------------------------//
 
