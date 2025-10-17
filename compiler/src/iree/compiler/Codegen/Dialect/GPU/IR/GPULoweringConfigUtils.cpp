@@ -34,7 +34,16 @@ void setMmaKind(MLIRContext *context, SmallVectorImpl<NamedAttribute> &attrs,
 // b.getI64ArrayAttr(...)}) support nested
 const StringLiteral kExpandDimsName = "expand_dims";
 
-FailureOr<DimensionExpansionFactor>
+static std::optional<ReassociationIndices>
+getReassociationIndices(ArrayAttr array) {
+  if (!array || !llvm::all_of(array, llvm::IsaPred<IntegerAttr>)) {
+    return std::nullopt;
+  }
+  return llvm::to_vector<2>(llvm::map_range(
+      array, [](Attribute a) { return cast<IntegerAttr>(a).getInt(); }));
+}
+
+FailureOr<DimensionExpansion>
 getDimensionExpansion(IREE::GPU::LoweringConfigAttr config) {
   auto expandDimsAttr =
       dyn_cast_or_null<ArrayAttr>(config.getAttributes().get(kExpandDimsName));
@@ -42,18 +51,18 @@ getDimensionExpansion(IREE::GPU::LoweringConfigAttr config) {
     return failure();
   }
 
-  SmallVector<std::optional<SmallVector<int64_t>>> maybeDimExpandFactor =
+  SmallVector<std::optional<ReassociationIndices>> maybeDimExpandInfo =
       llvm::to_vector(llvm::map_range(expandDimsAttr, [](Attribute attr) {
-        return getIntegerVector(dyn_cast_or_null<ArrayAttr>(attr));
+        return getReassociationIndices(cast<ArrayAttr>(attr));
       }));
 
-  if (llvm::any_of(maybeDimExpandFactor,
+  if (llvm::any_of(maybeDimExpandInfo,
                    [](auto dimFactor) { return !dimFactor.has_value(); })) {
     return failure();
   }
 
-  return DimensionExpansionFactor{llvm::to_vector(llvm::map_range(
-      maybeDimExpandFactor, [](auto dimFactor) { return dimFactor.value(); }))};
+  return llvm::to_vector(llvm::map_range(
+      maybeDimExpandInfo, [](auto expandInfo) { return expandInfo.value(); }));
 }
 
 const StringLiteral kSubgroupBasisName = "subgroup_basis";
