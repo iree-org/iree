@@ -139,7 +139,6 @@ Operation *lowerGenericOpWithResolvedLayouts(
     return nullptr;
   }
 
-  IRRewriter rewriter(builder);
   ValueRange convertedInputOperands =
       convertedOperands.drop_back(convertedResTypes.size());
   ValueRange convertedOutputOperands =
@@ -164,6 +163,8 @@ Operation *lowerGenericOpWithResolvedLayouts(
         outputMap.getResults(), [](AffineExpr expr) -> unsigned int {
           return cast<AffineDimExpr>(expr).getPosition();
         });
+    // The method requires `RewriterBase` because it modifies ops in place.
+    IRRewriter rewriter(builder);
     FailureOr<linalg::GenericOp> interchangedGenericOp =
         linalg::interchangeGenericOp(rewriter, genericOp, interchange);
     if (failed(interchangedGenericOp)) {
@@ -255,7 +256,7 @@ Operation *lowerGenericOpWithResolvedLayouts(
     if (inputMap.getNumResults() == 0) {
       auto packedInputMap = AffineMap::get(
           /*dimCount=*/iteratorTypes.size(), /*symbolCount=*/0, {},
-          rewriter.getContext());
+          builder.getContext());
       packedIndexingMaps.push_back(packedInputMap);
       continue;
     }
@@ -377,17 +378,17 @@ Operation *lowerGenericOpWithResolvedLayouts(
     // Create the packed indexing map.
     SmallVector<AffineExpr> packedResultExprs =
         llvm::map_to_vector(finalPackedResultDims, [&](int64_t dim) {
-          return rewriter.getAffineDimExpr(dim);
+          return builder.getAffineDimExpr(dim);
         });
     auto packedInputMap = AffineMap::get(
         /*dimCount=*/iteratorTypes.size(), /*symbolCount=*/0, packedResultExprs,
-        rewriter.getContext());
+        builder.getContext());
     packedIndexingMaps.push_back(packedInputMap);
   }
   // Create the new packed identity map for the output.
   packedIndexingMaps.append(
       genericOp.getNumDpsInits(),
-      rewriter.getMultiDimIdentityMap(convertedResultType.getRank()));
+      builder.getMultiDimIdentityMap(convertedResultType.getRank()));
   SmallVector<Type> convertedResultTypes =
       llvm::map_to_vector(genericOp.getResultTypes(), [&](Type t) -> Type {
         return RankedTensorType::get(
@@ -395,13 +396,11 @@ Operation *lowerGenericOpWithResolvedLayouts(
             cast<RankedTensorType>(t).getElementType());
       });
   auto materializedGenericOp = linalg::GenericOp::create(
-      rewriter, genericOp.getLoc(), convertedResultTypes,
-      convertedInputOperands, convertedOutputOperands, packedIndexingMaps,
-      iteratorTypes,
+      builder, genericOp.getLoc(), convertedResultTypes, convertedInputOperands,
+      convertedOutputOperands, packedIndexingMaps, iteratorTypes,
       /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(genericOp));
-  rewriter.inlineRegionBefore(genericOp.getRegion(),
-                              materializedGenericOp.getRegion(),
-                              materializedGenericOp.getRegion().begin());
+  IRMapping mapping;
+  genericOp.getRegion().cloneInto(&materializedGenericOp.getRegion(), mapping);
   return materializedGenericOp.getOperation();
 }
 
