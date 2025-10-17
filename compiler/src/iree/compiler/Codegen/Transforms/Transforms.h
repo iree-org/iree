@@ -25,6 +25,8 @@
 
 namespace mlir::iree_compiler {
 
+using ForControlFnRef = llvm::function_ref<bool(scf::ForOp)>;
+
 /// Get the `offsets`, `sizes` and `strides` for a `storeOp` (or `loadOp`). This
 /// method clones the operations that generate the `Value`s used for
 /// specifying the offsets, sizesm strides and dynamic dims of the
@@ -100,7 +102,8 @@ using GetMinMaxExprFn =
 
 /// Insert pattern to remove single iteration loop. The pattern will detect
 /// single iteration loops based on the range returned ValueBoundsOpInterface.
-void populateRemoveSingleIterationLoopPattern(RewritePatternSet &patterns);
+void populateRemoveSingleIterationLoopPattern(
+    RewritePatternSet &patterns, ForControlFnRef controlFn = nullptr);
 
 // Group of Alloc operations that have overlapping liveranges.
 using AliasGroup = SmallVector<Operation *>;
