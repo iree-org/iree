@@ -32,6 +32,18 @@ static bool hasAllOneValues(ArrayRef<int64_t> attr) {
   return llvm::all_of(attr, [](int64_t element) { return element == 1; });
 }
 
+OpFoldResult computeProductUsingAffine(OpBuilder &builder, Location loc,
+                                       ArrayRef<OpFoldResult> vals) {
+  auto mulMap = AffineMap::get(
+      2, 0, {builder.getAffineDimExpr(0) * builder.getAffineDimExpr(1)});
+  OpFoldResult product = builder.getIndexAttr(1);
+  for (OpFoldResult val : vals) {
+    product = affine::makeComposedFoldedAffineApply(builder, loc, mulMap,
+                                                    {product, val});
+  }
+  return product;
+}
+
 OpFoldResult addOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
                      OpFoldResult b) {
   AffineExpr d0, d1;
@@ -60,7 +72,7 @@ OpFoldResult mulAddOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
 Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim) {
   ShapedType type = cast<ShapedType>(v.getType());
   if (!type.isDynamicDim(dim)) {
-    return builder.create<arith::ConstantIndexOp>(loc, type.getDimSize(dim));
+    return arith::ConstantIndexOp::create(builder, loc, type.getDimSize(dim));
   }
   return TypeSwitch<Type, Value>(v.getType())
       .Case<RankedTensorType>([&](RankedTensorType t) -> Value {
@@ -101,11 +113,11 @@ Operation *getSlice(OpBuilder &b, Location loc, Value src,
                     ArrayRef<OpFoldResult> strides) {
   return TypeSwitch<Type, Operation *>(src.getType())
       .Case<RankedTensorType>([&](RankedTensorType t) -> Operation * {
-        return b.create<tensor::ExtractSliceOp>(loc, src, offsets, sizes,
-                                                strides);
+        return tensor::ExtractSliceOp::create(b, loc, src, offsets, sizes,
+                                              strides);
       })
       .Case<MemRefType>([&](MemRefType type) -> Operation * {
-        return b.create<memref::SubViewOp>(loc, src, offsets, sizes, strides);
+        return memref::SubViewOp::create(b, loc, src, offsets, sizes, strides);
       })
       .Default([&](Type t) -> Operation * {
         assert(false && "invalid type");
@@ -117,11 +129,11 @@ Value castValue(OpBuilder &b, Location loc, Value src, ShapedType type) {
   return TypeSwitch<Type, Value>(src.getType())
       .Case<RankedTensorType>([&](RankedTensorType t) -> Value {
         assert(isa<RankedTensorType>(type) && "expected compatible type");
-        return b.create<tensor::CastOp>(loc, type, src)->getResult(0);
+        return tensor::CastOp::create(b, loc, type, src)->getResult(0);
       })
       .Case<MemRefType>([&](MemRefType type) -> Value {
         assert(isa<MemRefType>(type) && "expected compatible type");
-        return b.create<memref::CastOp>(loc, type, src)->getResult(0);
+        return memref::CastOp::create(b, loc, type, src)->getResult(0);
       })
       .Default([&](Type t) {
         assert(false && "invalid type");
@@ -159,9 +171,10 @@ Value createValueFrom2DConstant(const float *val, int64_t rows, int64_t cols,
                                 Location loc, RewriterBase &rewriter) {
   ArrayRef<float> vector(val, rows * cols);
   SmallVector<int64_t> shape{rows, cols};
-  return rewriter.create<arith::ConstantOp>(
-      loc, DenseFPElementsAttr::get(
-               RankedTensorType::get(shape, rewriter.getF32Type()), vector));
+  return arith::ConstantOp::create(
+      rewriter, loc,
+      DenseFPElementsAttr::get(
+          RankedTensorType::get(shape, rewriter.getF32Type()), vector));
 }
 
 SmallVector<int64_t> asShapeWithAnyValueAsDynamic(ArrayRef<OpFoldResult> ofrs) {

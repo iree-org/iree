@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -16,6 +15,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 #define DEBUG_TYPE "iree-codegen-reshape-patterns"
 
@@ -31,10 +31,9 @@ namespace {
 //===---------------------------------------------------------------------===//
 
 static int64_t getProductExcludingDynamic(ArrayRef<int64_t> sizes) {
-  return std::accumulate(
-      sizes.begin(), sizes.end(), 1, [](int64_t res, int64_t size) {
-        return ShapedType::isDynamic(size) ? res : res * size;
-      });
+  return llvm::accumulate(sizes, int64_t(1), [](int64_t res, int64_t size) {
+    return ShapedType::isDynamic(size) ? res : res * size;
+  });
 }
 
 //===---------------------------------------------------------------------===//
@@ -90,7 +89,7 @@ inferCollapsedShape(RewriterBase &rewriter, Location loc,
 ///       tensor<864xf32>
 struct FoldCollapseShapeIntoInterfaceTensorLoad
     : OpRewritePattern<tensor::CollapseShapeOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::CollapseShapeOp reshapeOp,
                                 PatternRewriter &rewriter) const override {
@@ -166,7 +165,7 @@ struct FoldCollapseShapeIntoInterfaceTensorLoad
 ///       tensor<864xf32>
 struct FoldExpandShapeIntoInterfaceTensorLoad
     : OpRewritePattern<tensor::ExpandShapeOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExpandShapeOp reshapeOp,
                                 PatternRewriter &rewriter) const override {
@@ -209,12 +208,22 @@ struct FoldExpandShapeIntoInterfaceTensorLoad
     auto currStaticDims = loadOp.getType().getShape();
     auto currOfrDynamicDims =
         mlir::getMixedValues(currStaticDims, currDynamicDims, rewriter);
+
+    // Try to infer the expanded shape. This only works if each reassociation
+    // has <=1 dyn dim.
     std::optional<SmallVector<OpFoldResult>> expandedDims =
         mlir::inferExpandShapeOutputShape(
             rewriter, subspanOp.getLoc(), reshapeOp.getType(),
             reshapeOp.getReassociationIndices(), currOfrDynamicDims);
     if (!expandedDims) {
-      return reshapeOp.emitOpError("failure in expanded shape");
+      // If inference fails, try to use the reshape's SSA values.
+      if (failed(mlir::moveValueDefinitions(
+              rewriter, reshapeOp.getOutputShape(), subspanOp))) {
+        return rewriter.notifyMatchFailure(reshapeOp,
+                                           "could not infer output shape or "
+                                           "move SSA values before subspan op");
+      }
+      expandedDims = reshapeOp.getMixedOutputShape();
     }
 
     auto tensorAccess =
@@ -820,7 +829,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStore
 /// the source hal.interface.binding.subspan
 struct FoldInnerBitcastIntoInterfaceTensorLoad
     : OpRewritePattern<IREE::TensorExt::BitCastOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::TensorExt::BitCastOp bitcastOp,
                                 PatternRewriter &rewriter) const override {
@@ -1032,7 +1041,7 @@ expandMemrefOperand(RewriterBase &rewriter, OpTy tensorToMemrefOp,
 /// tensor operand with the source of the expand_shape.
 struct FoldExpandShapeIntoStoreToBuffer
     : OpRewritePattern<IREE::Codegen::StoreToBufferOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::Codegen::StoreToBufferOp storeOp,
                                 PatternRewriter &rewriter) const override {
@@ -1056,7 +1065,7 @@ struct FoldExpandShapeIntoStoreToBuffer
 /// tensor operand with the source of the collapse_shape.
 struct FoldCollapseShapeIntoStoreToBuffer
     : OpRewritePattern<IREE::Codegen::StoreToBufferOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::Codegen::StoreToBufferOp storeOp,
                                 PatternRewriter &rewriter) const override {
@@ -1084,7 +1093,7 @@ struct FoldCollapseShapeIntoStoreToBuffer
 /// the collapse_shape with the collapsed load_from_buffer op.
 struct FoldCollapseShapeIntoLoadFromBuffer
     : OpRewritePattern<IREE::Codegen::LoadFromBufferOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::Codegen::LoadFromBufferOp loadOp,
                                 PatternRewriter &rewriter) const override {
@@ -1113,7 +1122,7 @@ struct FoldCollapseShapeIntoLoadFromBuffer
 /// expand_shape with the expanded load_from_buffer op.
 struct FoldExpandShapeIntoLoadFromBuffer
     : OpRewritePattern<IREE::Codegen::LoadFromBufferOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::Codegen::LoadFromBufferOp loadOp,
                                 PatternRewriter &rewriter) const override {

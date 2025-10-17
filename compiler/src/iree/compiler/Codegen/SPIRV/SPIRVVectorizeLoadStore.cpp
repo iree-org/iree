@@ -798,7 +798,7 @@ static Value predicateMaybeMaskedScalarTransfer(
 /// if any of the memory access is not vector.
 struct ScalarizeVectorTransferRead final
     : public OpRewritePattern<vector::TransferReadOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::TransferReadOp readOp,
                                 PatternRewriter &rewriter) const override {
@@ -817,8 +817,8 @@ struct ScalarizeVectorTransferRead final
       }
 
       auto thenCond = [&](OpBuilder &b, Location loc) {
-        return b
-            .create<memref::LoadOp>(loc, readOp.getBase(), readOp.getIndices())
+        return memref::LoadOp::create(b, loc, readOp.getBase(),
+                                      readOp.getIndices())
             .getResult();
       };
       auto elseCond = [&](OpBuilder &b, Location loc) {
@@ -878,7 +878,7 @@ struct ScalarizeVectorTransferRead final
 };
 
 struct ScalarizeVectorLoad final : public OpRewritePattern<vector::LoadOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::LoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
@@ -923,7 +923,7 @@ struct ScalarizeVectorLoad final : public OpRewritePattern<vector::LoadOp> {
 
 struct ScalarizeVectorTransferWrite final
     : public OpRewritePattern<vector::TransferWriteOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::TransferWriteOp writeOp,
                                 PatternRewriter &rewriter) const override {
@@ -1007,7 +1007,7 @@ struct ScalarizeVectorTransferWrite final
 /// operations.
 struct ReifyExtractOfCreateMask final
     : public OpRewritePattern<vector::ExtractOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::ExtractOp extractOp,
                                 PatternRewriter &rewriter) const override {
@@ -1015,7 +1015,7 @@ struct ReifyExtractOfCreateMask final
     if (isa<VectorType>(extractOp.getResult().getType())) {
       return failure();
     }
-    auto maskOp = extractOp.getVector().getDefiningOp<vector::CreateMaskOp>();
+    auto maskOp = extractOp.getSource().getDefiningOp<vector::CreateMaskOp>();
     if (!maskOp) {
       return failure();
     }
@@ -1062,7 +1062,7 @@ private:
 void SPIRVVectorizeLoadStorePass::runOnOperation() {
   // Uses the signature conversion methodology of the dialect conversion
   // framework to implement the conversion.
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   MLIRContext *context = &getContext();
 
   // Prior pass should have unrolled and broken down vectors with rank > 1.

@@ -1020,7 +1020,7 @@ public:
 struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
     : public OpRewritePattern<vector::ContractionOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::ContractionOp contractionOp,
                                 PatternRewriter &rewriter) const override {
@@ -1129,7 +1129,7 @@ public:
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
     populateVectorContractCustomKernelsPatterns(target, patterns);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {

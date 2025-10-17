@@ -159,15 +159,14 @@ static Value createElementWiseExtUIOp(OpBuilder &builder, Value input,
       tensor::getMixedSizes(builder, loc, input);
   Value init =
       tensor::EmptyOp::create(builder, loc, inputMixedSizes, outElemType);
-  return builder
-      .create<linalg::GenericOp>(
-          loc, castedType, input, init, maps, iteratorTypes,
-          [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
-            Value castRes =
-                arith::ExtUIOp::create(b, nestedLoc, outElemType, args[0])
-                    ->getResult(0);
-            linalg::YieldOp::create(b, nestedLoc, castRes);
-          })
+  return linalg::GenericOp::create(
+             builder, loc, castedType, input, init, maps, iteratorTypes,
+             [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
+               Value castRes =
+                   arith::ExtUIOp::create(b, nestedLoc, outElemType, args[0])
+                       ->getResult(0);
+               linalg::YieldOp::create(b, nestedLoc, castRes);
+             })
       .getResult(0);
 }
 
@@ -761,6 +760,10 @@ struct CPULayoutResolverAttr final
 struct CPUSerializableAttr final
     : IREE::Encoding::SerializableAttr::ExternalModel<CPUSerializableAttr,
                                                       CPUEncodingResolverAttr> {
+  bool isSerialized(Attribute attr) const {
+    auto configuration = cast<CPUEncodingResolverAttr>(attr).getConfiguration();
+    return configuration && configuration.contains(kEncodingInfoAttrName);
+  }
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
@@ -896,6 +899,12 @@ struct VMVXLayoutResolverAttr final
 struct VMVXSerializableAttr final
     : IREE::Encoding::SerializableAttr::ExternalModel<
           VMVXSerializableAttr, VMVXEncodingResolverAttr> {
+  bool isSerialized(Attribute attr) const {
+    auto configuration =
+        cast<VMVXEncodingResolverAttr>(attr).getConfiguration();
+    return configuration && configuration.contains(kEncodingInfoAttrName);
+  }
+
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
                                     ValueRange dynamicDims) const {

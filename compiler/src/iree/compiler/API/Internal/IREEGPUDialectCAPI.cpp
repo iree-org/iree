@@ -121,8 +121,6 @@ MlirAttribute ireeGPUReorderWorkgroupsStrategyAttrGet(MlirContext mlirCtx,
 }
 
 uint32_t ireeGPUReorderWorkgroupsStrategyAttrGetValue(MlirAttribute attr) {
-  assert(ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr(attr) &&
-         "attr is not a GPUReorderWorkgroupsStrategyAttr");
   return static_cast<uint32_t>(
       llvm::cast<mlir::iree_compiler::IREE::GPU::ReorderWorkgroupsStrategyAttr>(
           unwrap(attr))
@@ -281,14 +279,12 @@ MlirAttribute ireeGPULoweringConfigAttrGet(MlirContext mlirCtx,
 }
 
 MlirAttribute ireeGPULoweringConfigAttrGetAttributes(MlirAttribute attr) {
-  assert(ireeAttributeIsAGPULoweringConfigAttr(attr));
   return wrap(llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
                   unwrap(attr))
                   .getAttributes());
 }
 
 ireeGPUTileSizes ireeGPULoweringConfigAttrGetTileSizes(MlirAttribute attr) {
-  assert(ireeAttributeIsAGPULoweringConfigAttr(attr));
   ireeGPUTileSizes tilesizes = {};
   mlir::DictionaryAttr dict =
       llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
@@ -310,32 +306,6 @@ ireeGPUTileSizes ireeGPULoweringConfigAttrGetTileSizes(MlirAttribute attr) {
     tilesizes.reductionAttr = wrap(reductionArray);
   }
   return tilesizes;
-}
-
-ireeGPUSubgroupCountInfo
-ireeGPULoweringConfigAttrGetSubgroupCount(MlirAttribute attr) {
-  auto loweringConfigAttr =
-      llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
-          unwrap(attr));
-  std::optional<int64_t> subgroupMCount =
-      mlir::iree_compiler::IREE::GPU::getSubgroupMCount(loweringConfigAttr);
-  std::optional<int64_t> subgroupNCount =
-      mlir::iree_compiler::IREE::GPU::getSubgroupNCount(loweringConfigAttr);
-
-  ireeGPUSubgroupCountInfo info = {};
-
-  if (subgroupMCount) {
-    info.subgroupMCountAttr = wrap(mlir::IntegerAttr::get(
-        mlir::IndexType::get(loweringConfigAttr.getContext()),
-        *subgroupMCount));
-  }
-
-  if (subgroupNCount) {
-    info.subgroupNCountAttr = wrap(mlir::IntegerAttr::get(
-        mlir::IndexType::get(loweringConfigAttr.getContext()),
-        *subgroupNCount));
-  }
-  return info;
 }
 
 MlirAttribute ireeGPULoweringConfigAttrGetMmaKind(MlirAttribute attr) {
@@ -384,6 +354,33 @@ ireeGPUGetSingleSubgroupLayout(MlirAttribute attr, uint32_t fragment) {
   result.tstrides = wrap(builder.getI64ArrayAttr(layout.tstrides));
   result.element = wrap(builder.getI64ArrayAttr(layout.element));
   return result;
+}
+
+ireeGPUSubgroupBasisInfo
+ireeGPULoweringConfigAttrGetSubgroupBasis(MlirAttribute attr) {
+  auto loweringConfigAttr =
+      llvm::cast<mlir::iree_compiler::IREE::GPU::LoweringConfigAttr>(
+          unwrap(attr));
+
+  mlir::FailureOr<mlir::iree_compiler::IREE::GPU::Basis> basisResult =
+      mlir::iree_compiler::IREE::GPU::getBasis(
+          loweringConfigAttr,
+          mlir::iree_compiler::IREE::GPU::TilingLevel::Subgroup);
+
+  ireeGPUSubgroupBasisInfo info = {};
+  if (failed(basisResult)) {
+    return info;
+  }
+
+  mlir::iree_compiler::IREE::GPU::Basis basis = *basisResult;
+  mlir::Builder builder(loweringConfigAttr.getContext());
+  mlir::ArrayAttr countsAttr = builder.getI64ArrayAttr(basis.counts);
+  mlir::ArrayAttr mappingAttr = builder.getI64ArrayAttr(basis.mapping);
+
+  info.countsAttr = wrap(countsAttr);
+  info.mappingAttr = wrap(mappingAttr);
+
+  return info;
 }
 
 ireeGPUTargetInfo

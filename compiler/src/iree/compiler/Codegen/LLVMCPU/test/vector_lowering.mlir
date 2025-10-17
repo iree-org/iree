@@ -211,3 +211,41 @@ func.func @scalable_transpose_store(%vec: vector<4x[4]xf32>, %dest: memref<?x?xf
 // CHECK-NOT: vector.transpose
 // CHECK: vector.store {{.*}} : memref<?x?xf32>, vector<4xf32>
 // CHECK-NOT: vector.transpose
+
+// -----
+
+// Make sure RISC-V by default (without V extension) lowers vector.gather into branches.
+
+module attributes {
+    hal.executable.target = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {target_triple="riscv64-unknown-elf"}>
+} {
+  func.func private @gather_lowering(%buffer : memref<32000x2048xf32>, %index : vector<2x64xindex>, %mask : vector<2x64xi1>) -> vector<2x64xf32> {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant dense<0.000000e+00> : vector<2x64xf32>
+    %r = vector.gather %buffer[%c0, %c0] [%index], %mask, %cst : memref<32000x2048xf32>, vector<2x64xindex>, vector<2x64xi1>, vector<2x64xf32> into vector<2x64xf32>
+    return %r : vector<2x64xf32>
+  }
+}
+
+// CHECK-LABEL:   func.func private @gather_lowering(
+// CHECK-NOT: vector.gather
+
+// -----
+
+// Make sure RISC-V with V extension (i.e. RVV) does not break vector.gather
+// into conditional branches (but still lower into 1-D vector.gather).
+
+module attributes {
+    hal.executable.target = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {target_triple="riscv64-unknown-elf", cpu_features ="+v"}>
+} {
+  func.func private @negative_no_gather_lowering(%buffer : memref<32000x2048xf32>, %index : vector<2x64xindex>, %mask : vector<2x64xi1>) -> vector<2x64xf32> {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant dense<0.000000e+00> : vector<2x64xf32>
+    %r = vector.gather %buffer[%c0, %c0] [%index], %mask, %cst : memref<32000x2048xf32>, vector<2x64xindex>, vector<2x64xi1>, vector<2x64xf32> into vector<2x64xf32>
+    return %r : vector<2x64xf32>
+  }
+}
+
+// CHECK-LABEL:   func.func private @negative_no_gather_lowering(
+// CHECK: vector.gather {{.+}} : memref<32000x2048xf32>, vector<64xindex>, vector<64xi1>, vector<64xf32> into vector<64xf32>
+// CHECK-NOT: scf.if

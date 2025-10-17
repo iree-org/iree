@@ -9,12 +9,12 @@
 //===---------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Utils/EncodingUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/SmallVectorExtras.h"
@@ -70,10 +70,9 @@ FailureOr<Value> lowerSetEncodingOpToPackOp(
       encodingInfo.outerDimsPerm);
   auto emptyOp = tensor::EmptyOp::create(rewriter, loc, resultDims,
                                          resultType.getElementType());
-  return rewriter
-      .create<linalg::PackOp>(loc, source, emptyOp, encodingInfo.innerDimsPos,
-                              *innerTileSizesOfr, paddingValue,
-                              encodingInfo.outerDimsPerm)
+  return linalg::PackOp::create(rewriter, loc, source, emptyOp,
+                                encodingInfo.innerDimsPos, *innerTileSizesOfr,
+                                paddingValue, encodingInfo.outerDimsPerm)
       .getResult();
 }
 
@@ -103,10 +102,9 @@ FailureOr<Value> lowerUnsetEncodingToUnpackOp(
     return rewriter.notifyMatchFailure(
         encodingOp, "failed to generate runtime tile size query");
   }
-  return rewriter
-      .create<linalg::UnPackOp>(loc, packedValue, emptyOp,
-                                encodingInfo.innerDimsPos, *innerTileSizesOfr,
-                                encodingInfo.outerDimsPerm)
+  return linalg::UnPackOp::create(rewriter, loc, packedValue, emptyOp,
+                                  encodingInfo.innerDimsPos, *innerTileSizesOfr,
+                                  encodingInfo.outerDimsPerm)
       .getResult();
 }
 
@@ -121,9 +119,8 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
       typeConverter.getEncodingInfo(emptyType);
   Location loc = emptyOp.getLoc();
   if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
-    return rewriter
-        .create<tensor::EmptyOp>(loc, emptyOp.getMixedSizes(),
-                                 emptyType.getElementType())
+    return tensor::EmptyOp::create(rewriter, loc, emptyOp.getMixedSizes(),
+                                   emptyType.getElementType())
         .getOperation();
   }
 
@@ -716,7 +713,7 @@ getReassociationIndices(int outerDims,
 /// expand_shape + linalg.transpose to represent a tile swizzling op.
 struct SetEncodingOpLoweringConversion
     : public OpConversionPattern<IREE::Encoding::SetEncodingOp> {
-  using OpConversionPattern<IREE::Encoding::SetEncodingOp>::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp, OpAdaptor adaptor,
@@ -882,6 +879,43 @@ public:
   }
 };
 
+/// Pattern to convert scaled contraction operations.
+class MaterializeScaledContractionOp
+    : public OpInterfaceConversionPattern<linalg::LinalgOp> {
+public:
+  MaterializeScaledContractionOp(
+      const MaterializeEncodingTypeConverter &typeConverter,
+      MLIRContext *context, PatternBenefit benefit = 1)
+      : OpInterfaceConversionPattern<linalg::LinalgOp>(typeConverter, context,
+                                                       benefit) {}
+
+  LogicalResult
+  matchAndRewrite(linalg::LinalgOp op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (!IREE::LinalgExt::isaScaledContractionOpInterface(op)) {
+      return rewriter.notifyMatchFailure(
+          op, "does not implement ScaledContractionOpInterface");
+    }
+
+    auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
+        this->getTypeConverter());
+
+    IREE::Encoding::LayoutMaterializerAttr layoutAttr =
+        converter->getLayoutAttr();
+    SmallVector<Type> convertedResTypes;
+    for (Value init : op.getDpsInits()) {
+      convertedResTypes.push_back(converter->convertType(init.getType()));
+    }
+    Operation *newOp =
+        layoutAttr.lowerOp(rewriter, op, convertedResTypes, operands);
+    if (!newOp) {
+      return failure();
+    }
+    rewriter.replaceOp(op, newOp->getResults());
+    return success();
+  }
+};
+
 static bool isRankedTensorTypeWithEncoding(Type type) {
   auto rankedTensorType = dyn_cast<RankedTensorType>(type);
   if (!rankedTensorType) {
@@ -892,7 +926,7 @@ static bool isRankedTensorTypeWithEncoding(Type type) {
 
 struct MaterializeFuncReturnOp final
     : public OpConversionPattern<func::ReturnOp> {
-  using OpConversionPattern<func::ReturnOp>::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(func::ReturnOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -941,15 +975,15 @@ void populateMaterializeEncodingPatterns(
                          isRankedTensorTypeWithEncoding);
   });
 
-  patterns.insert<MaterializeContractionOp, SetEncodingOpLoweringConversion,
-                  UnsetEncodingOpLoweringConversion,
-                  MaterializeDPSOperation<linalg::FillOp>,
-                  MaterializeDPSOperation<linalg::GenericOp>,
-                  MaterializeOperation<tensor::EmptyOp>,
-                  MaterializeOptimizationBarrierOp,
-                  MaterializeTensorExtDispatchTensorLoadOp,
-                  MaterializeTensorExtDispatchTensorStoreOp,
-                  MaterializeInterfaceBindingEncoding, MaterializeFuncReturnOp>(
+  patterns.insert<
+      MaterializeContractionOp, MaterializeScaledContractionOp,
+      SetEncodingOpLoweringConversion, UnsetEncodingOpLoweringConversion,
+      MaterializeDPSOperation<linalg::FillOp>,
+      MaterializeDPSOperation<linalg::GenericOp>,
+      MaterializeOperation<tensor::EmptyOp>, MaterializeOptimizationBarrierOp,
+      MaterializeTensorExtDispatchTensorLoadOp,
+      MaterializeTensorExtDispatchTensorStoreOp,
+      MaterializeInterfaceBindingEncoding, MaterializeFuncReturnOp>(
       typeConverter, context);
 };
 

@@ -229,8 +229,8 @@ inlineUniformConstants(mlir::FunctionOpInterface funcOp,
     unsigned argIdx = operandToArgMap[operandIdx];
     auto arg = entryBlock.getArgument(argIdx);
     deadArgMap.set(argIdx);
-    auto constantOp = builder.create<arith::ConstantOp>(
-        builder.getFusedLoc(operandLocs[operandIdx]),
+    auto constantOp = arith::ConstantOp::create(
+        builder, builder.getFusedLoc(operandLocs[operandIdx]),
         builder.getIntegerAttr(arg.getType(),
                                operandValues[operandIdx].value()));
     arg.replaceAllUsesWith(constantOp);

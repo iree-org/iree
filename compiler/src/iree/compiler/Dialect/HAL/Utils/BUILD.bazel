@@ -29,6 +29,24 @@ iree_compiler_cc_library(
 )
 
 iree_compiler_cc_library(
+    name = "LLVMCodeGenUtils",
+    srcs = [
+        "LLVMCodeGenUtils.cpp",
+    ],
+    hdrs = [
+        "LLVMCodeGenUtils.h",
+    ],
+    deps = [
+        "@llvm-project//llvm:Core",
+        "@llvm-project//llvm:MC",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:Target",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LLVMDialect",
+    ],
+)
+
+iree_compiler_cc_library(
     name = "LLVMLinkerUtils",
     srcs = [
         "LLVMLinkerUtils.cpp",

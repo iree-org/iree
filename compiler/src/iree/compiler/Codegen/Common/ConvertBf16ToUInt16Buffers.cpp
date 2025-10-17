@@ -11,11 +11,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Utils/ConversionUtils.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -31,9 +29,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-convert-bf16-to-uint16-buffers"
 
@@ -80,7 +76,7 @@ public:
 //===----------------------------------------------------------------------===//
 struct ConvertHalInterfaceBindingSubspan final
     : OpConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op, OpAdaptor adaptor,
@@ -103,7 +99,7 @@ struct ConvertHalInterfaceBindingSubspan final
 };
 
 struct ConvertMemRefAlloc final : OpConversionPattern<memref::AllocOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(memref::AllocOp op, OpAdaptor adaptor,
@@ -189,7 +185,7 @@ struct GenericTypeConversionPattern : public ConversionPattern {
 };
 
 struct ConvertMemRefLoad final : OpConversionPattern<memref::LoadOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(memref::LoadOp op, OpAdaptor adaptor,
@@ -208,7 +204,7 @@ struct ConvertMemRefLoad final : OpConversionPattern<memref::LoadOp> {
 };
 
 struct ConvertMemRefStore final : OpConversionPattern<memref::StoreOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(memref::StoreOp op, OpAdaptor adaptor,
@@ -228,7 +224,7 @@ struct ConvertMemRefStore final : OpConversionPattern<memref::StoreOp> {
 
 struct ConvertAmdgpuFatRawBufferCast final
     : OpConversionPattern<amdgpu::FatRawBufferCastOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(amdgpu::FatRawBufferCastOp op, OpAdaptor adaptor,

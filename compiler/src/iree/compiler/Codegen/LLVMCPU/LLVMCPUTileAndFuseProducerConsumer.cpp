@@ -166,7 +166,12 @@ tileRootAndFuseProducerConsumer(IRRewriter &rewriter, TilingInterface rootOp,
 
   // Perform the replacement of tiled and fused values.
   for (auto [origValue, replacement] : tiledResults->replacements) {
-    rewriter.replaceAllUsesWith(origValue, replacement);
+    Value replacementCopy = replacement;
+    rewriter.replaceUsesWithIf(origValue, replacement, [&](OpOperand &use) {
+      Operation *user = use.getOwner();
+      return !isa<tensor::DimOp>(user) &&
+             dominanceInfo.dominates(replacementCopy, user);
+    });
   }
 
   FailureOr<Operation *> rootTiledOp = tiledResults->tiledAndFusedOps.front();
@@ -223,7 +228,7 @@ struct LLVMCPUTileAndFuseProducerConsumer
 
 void LLVMCPUTileAndFuseProducerConsumer::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   IRRewriter rewriter(funcOp);
 
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);

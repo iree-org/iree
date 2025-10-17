@@ -635,3 +635,21 @@ func.func @no_swap_collapse_shape_with_extract_slice_2(%arg0: tensor<32x2x2x16xf
 //       NORM-REDUCTION:     tensor.extract_slice
 //   NORM-REDUCTION-NOT:     tensor.collapse_shape
 //       NORM-REDUCTION:     linalg.copy
+
+// -----
+
+#config = #iree_gpu.lowering_config<{reduction = [0, 30]}>
+func.func @no_swap_collapse_shape_with_extract_slice(%arg0: tensor<288x3x3x32xf32>) -> tensor<2592x32xf32> {
+  %collapsed = tensor.collapse_shape %arg0 [[0, 1, 2], [3]] : tensor<288x3x3x32xf32> into tensor<2592x32xf32>
+  %empty = tensor.empty() : tensor<2592x32xf32>
+  %0 = linalg.copy {lowering_config = #config} ins(%collapsed : tensor<2592x32xf32>) outs(%empty : tensor<2592x32xf32>) -> tensor<2592x32xf32>
+  return %0: tensor<2592x32xf32>
+}
+
+// No swap would happen when both the collapsed size and offset are dynamic after tiling.
+// NORM-REDUCTION-LABEL: func.func @no_swap_collapse_shape_with_extract_slice
+//       NORM-REDUCTION:   tensor.collapse_shape
+//       NORM-REDUCTION:   scf.for
+//       NORM-REDUCTION:     tensor.extract_slice {{.*}} tensor<2592x32xf32> to tensor<2592x?xf32>
+//   NORM-REDUCTION-NOT:     tensor.collapse_shape
+//       NORM-REDUCTION:     linalg.copy

@@ -582,3 +582,40 @@ util.func public @fuse_transpose_with_conv(%arg0 : tensor<100x32x32x3xbf16>, %ar
 //       CHECK:   %[[TRUNCF:.+]] = linalg.generic
 //  CHECK-SAME:     ins(%[[CONV]]
 //       CHECK:   return %[[TRUNCF]]
+
+// -----
+
+util.func public @dont_fuse_extract_into_matmul(
+  %arg0 : tensor<1024x1024xf32>,
+  %arg1 : tensor<1024x1024xf32>,
+  %arg2 : tensor<1024x1024xf32>)
+    -> tensor<1024x1024xf32>{
+  %15 = linalg.generic {
+    indexing_maps = [ affine_map<(d0, d1) -> (d0, d1)> ],
+    iterator_types = ["parallel", "parallel"]}
+    outs(%arg2 : tensor<1024x1024xf32>) {
+      ^bb0(%out: f32):
+        %index0 = linalg.index 0 : index
+        %index1 = linalg.index 1 : index
+        %extracted = tensor.extract %arg0[%index0, %index1] : tensor<1024x1024xf32>
+        linalg.yield %extracted : f32
+    } -> tensor<1024x1024xf32>
+  %16 = linalg.generic {
+    indexing_maps = [ affine_map<(d0, d1, d2) -> (d0, d2)>,
+                      affine_map<(d0, d1, d2) -> (d1, d2)>,
+                      affine_map<(d0, d1, d2) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel", "reduction"]}
+    ins(%15, %arg1 : tensor<1024x1024xf32>, tensor<1024x1024xf32>)
+    outs(%arg2 : tensor<1024x1024xf32>) {
+      ^bb0(%in: f32, %in0 : f32, %out: f32):
+        %result = arith.mulf %in, %in0: f32
+        %result0 = arith.addf %result, %out: f32
+        linalg.yield %result : f32
+      } -> tensor<1024x1024xf32>
+  util.return %16 : tensor<1024x1024xf32>
+}
+// CHECK-LABEL: util.func public @dont_fuse_extract_into_matmul(
+//       CHECK:   %[[EXTRACT:.+]] = linalg.generic
+//       CHECK:   %[[MATMUL:.+]] = linalg.generic
+//  CHECK-SAME:     ins(%[[EXTRACT]]
+//       CHECK:   return %[[MATMUL]]

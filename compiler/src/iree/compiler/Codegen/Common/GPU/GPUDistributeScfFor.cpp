@@ -30,7 +30,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 struct DistributeLoop final : OpRewritePattern<scf::ForOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   DistributeLoop(MLIRContext *context, bool useBD, PatternBenefit benefit = 1)
       : OpRewritePattern(context, benefit), useBlockDims(useBD) {}
@@ -67,9 +67,8 @@ struct DistributeLoop final : OpRewritePattern<scf::ForOp> {
     Value count =
         useBlockDims ? gpu::BlockDimOp::create(rewriter, loc, indexType, symDim)
                            .getResult()
-                     : rewriter
-                           .create<arith::ConstantIndexOp>(
-                               loc, workgroupSize[numDimAttr.getInt()])
+                     : arith::ConstantIndexOp::create(
+                           rewriter, loc, workgroupSize[numDimAttr.getInt()])
                            .getResult();
 
     MLIRContext *context = getContext();

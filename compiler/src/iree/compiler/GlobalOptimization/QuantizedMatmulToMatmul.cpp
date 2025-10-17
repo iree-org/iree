@@ -59,13 +59,11 @@ struct QuantizedMatmulToMatmul
     unsigned lhsRank = lhsTy.getRank();
     Value acc = op.getDpsInits()[0];
     // Compute the matmul part.
-    Value matmul = batch ? builder
-                               .create<linalg::BatchMatmulOp>(
-                                   ValueRange{lhs, rhs}, ValueRange{acc})
+    Value matmul = batch ? linalg::BatchMatmulOp::create(
+                               builder, ValueRange{lhs, rhs}, ValueRange{acc})
                                .getResult(0)
-                         : builder
-                               .create<linalg::MatmulOp>(ValueRange{lhs, rhs},
-                                                         ValueRange{acc})
+                         : linalg::MatmulOp::create(
+                               builder, ValueRange{lhs, rhs}, ValueRange{acc})
                                .getResult(0);
     bool lhsZpIsConstantZero = isConstantZero(lhsZp);
     bool rhsZpIsConstantZero = isConstantZero(rhsZp);

@@ -610,4 +610,38 @@ def IREECodegen_XORShuffleAttr  :
   let genVerifyDecl = 1;
 }
 
+//===---------------------------------------------------------------------===//
+// iree_codegen.denormal_mode
+//===---------------------------------------------------------------------===//
+
+// Do not add any denormal mode.
+def DenormalMode_None : I32EnumCase<"None", 0, "none">;
+// Convert denormals to zero while preserving sign.
+def DenormalMode_PreserveSign : I32EnumCase<"PreserveSign", 1, "preserve-sign">;
+// Convert denormals to positive zero.
+def DenormalMode_PositiveZero : I32EnumCase<"PositiveZero", 2, "positive-zero">;
+
+// Denormal fp mode.
+def DenormalFpMathEnum : I32Enum<
+  "DenormalFpMath",
+  "Denormal mode for fp math", [
+    DenormalMode_None,
+    DenormalMode_PreserveSign,
+    DenormalMode_PositiveZero
+  ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
+}
+
+def DenormalFpMathAttr :
+  EnumAttr<IREECodegen_Dialect, DenormalFpMathEnum, "denormal_fp_math"> {
+  let assemblyFormat = "`<` $value `>`";
+
+  let extraClassDeclaration = [{
+    /// Returns the key name for fp32 DenormalFpMathAttr in a DictionaryAttr.
+    static StringRef getFP32DictKeyName() {
+      return "iree_codegen.denormal_fp_math_f32";
+    }
+  }];
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS

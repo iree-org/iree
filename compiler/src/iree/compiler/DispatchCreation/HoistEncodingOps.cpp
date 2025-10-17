@@ -110,16 +110,16 @@ bubbleUpSetEncodingThroughGenericOp(RewriterBase &rewriter,
     auto operandType = cast<RankedTensorType>(operand->get().getType());
     auto resType = RankedTensorType::get(
         operandType.getShape(), operandType.getElementType(), newEncoding);
-    Value encodedInput = rewriter.create<IREE::Encoding::SetEncodingOp>(
-        loc, resType, operand->get());
+    Value encodedInput = IREE::Encoding::SetEncodingOp::create(
+        rewriter, loc, resType, operand->get());
     encodedOperands.push_back(encodedInput);
   }
 
   // Create encoded generic op.
   SmallVector<OpFoldResult> mixedSizes =
       tensor::getMixedSizes(rewriter, loc, encodingOp.getSource());
-  Value encodedInit = rewriter.create<tensor::EmptyOp>(
-      loc, mixedSizes, encodedType.getElementType(), encoding);
+  Value encodedInit = tensor::EmptyOp::create(
+      rewriter, loc, mixedSizes, encodedType.getElementType(), encoding);
   encodedOperands.push_back(encodedInit);
   auto encodedGenericOp =
       clone(rewriter, genericOp, encodingOp.getResultType(), encodedOperands);
@@ -176,7 +176,7 @@ struct HoistEncodingOpsPass
 /// of a dispatch.
 struct BubbleUpSetEncodingOp
     : public OpRewritePattern<IREE::Encoding::SetEncodingOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp,
                                 PatternRewriter &rewriter) const override {
@@ -202,7 +202,7 @@ struct BubbleUpSetEncodingOp
 /// Pattern to sink UnsetEncoding ops down through consumers.
 struct SinkUnsetEncodingOp
     : public OpRewritePattern<IREE::Encoding::UnsetEncodingOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::Encoding::UnsetEncodingOp encodingOp,
                                 PatternRewriter &rewriter) const override {
@@ -245,9 +245,8 @@ struct SinkUnsetEncodingOp
     // Propagate the set encoding and generate the new encoding operations.
     rewriter.setInsertionPointAfter(encodingOp);
     FailureOr<IREE::Encoding::PropagationResult> maybeResult =
-        propagationResult.propagateEncoding(
-            rewriter, *propagationEncodings,
-            cast<OpResult>(encodingOp.getResult()));
+        propagationResult.propagateEncoding(rewriter, *propagationEncodings,
+                                            consumerOperand);
     if (failed(maybeResult)) {
       return rewriter.notifyMatchFailure(
           encodingOp, "not able to propagate encodings and find replacement");

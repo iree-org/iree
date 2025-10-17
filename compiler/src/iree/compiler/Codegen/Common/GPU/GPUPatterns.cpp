@@ -44,7 +44,7 @@ namespace {
 ///      : vector<1x16x8xf32> to vector<16x1x8xf32>
 /// ```
 struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::TransferReadOp transferReadOp,
                                 PatternRewriter &rewriter) const override {
@@ -153,7 +153,7 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
 // MMA types but MMA load can transpose the matrix when loading.
 struct CombineTransferReadOpBroadcast final
     : public OpRewritePattern<vector::BroadcastOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::BroadcastOp op,
                                 PatternRewriter &rewriter) const override {
@@ -201,7 +201,7 @@ static LogicalResult contractOpFilter(Operation *op) {
 // The memref descriptor being an SSA value, there is no need to clean it up
 // in any way.
 struct DropSharedMemoryDeallocOp : public OpRewritePattern<memref::DeallocOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(memref::DeallocOp op,
                                 PatternRewriter &rewriter) const override {

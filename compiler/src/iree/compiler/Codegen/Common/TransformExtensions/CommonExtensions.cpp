@@ -11,7 +11,6 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
@@ -768,9 +767,8 @@ void transform_dialect::IREEBufferizeOp::build(OpBuilder &builder,
 static FailureOr<Value> cpuComprehensiveBufferizeAllocationFn(
     OpBuilder &builder, Location loc, MemRefType memRefType,
     ValueRange dynamicSizes, unsigned alignment) {
-  return builder
-      .create<memref::AllocaOp>(loc, memRefType, dynamicSizes,
-                                builder.getI64IntegerAttr(alignment))
+  return memref::AllocaOp::create(builder, loc, memRefType, dynamicSizes,
+                                  builder.getI64IntegerAttr(alignment))
       .getResult();
 }
 
@@ -795,9 +793,8 @@ static FailureOr<Value> gpuComprehensiveBufferizeAllocationFn(
   MemRefType allocType =
       MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
                       AffineMap(), addressSpaceAttr);
-  return builder
-      .create<memref::AllocOp>(loc, allocType, dynamicSizes,
-                               builder.getI64IntegerAttr(alignment))
+  return memref::AllocOp::create(builder, loc, allocType, dynamicSizes,
+                                 builder.getI64IntegerAttr(alignment))
       .getResult();
 }
 
@@ -854,7 +851,7 @@ static IREEOneShotBufferizationOptions getBufferizationOptions() {
 namespace {
 /// Pattern to rewrite tensor.empty to tensor.alloc.
 struct EmptyTensorLoweringPattern : public OpRewritePattern<tensor::EmptyOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::EmptyOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1083,9 +1080,11 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
   Value laneId =
       gpu::ThreadIdOp::create(rewriter, target.getLoc(), gpu::Dimension::x);
   int64_t subgroupSize = getSubgroupSize();
+  ArrayRef<int64_t> workgroupSize = getWorkgroupSize();
 
   populateGPUDistributionPatterns(patterns);
-  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize);
+  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize,
+                                                workgroupSize);
   populateGPUDistributeNestedLayoutContractAMDGPUPatterns(patterns);
   if (failed(distributeVectorOps(target, patterns, options))) {
     return emitDefaultDefiniteFailure(target);

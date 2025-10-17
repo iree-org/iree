@@ -253,8 +253,13 @@ function(iree_single_backend_e2e_runner_test)
     return()
   endif()
 
+  # The generator file might itself depend on other *.py files in the same dir.
+  # Just err on the side of more dependencies.
+  file(GLOB _LOCAL_PY_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.py")
+
   add_custom_command(
     COMMAND
+      "${CMAKE_COMMAND}" -E env "PYTHONPATH=${PROJECT_SOURCE_DIR}"
       "${Python3_EXECUTABLE}"
       "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_GENERATOR}"
       ${_GENERATOR_STANDARD_FLAGS}
@@ -264,6 +269,7 @@ function(iree_single_backend_e2e_runner_test)
       ${_CALLS_SRC}
     DEPENDS
       ${_RULE_GENERATOR}
+      ${_LOCAL_PY_FILES}
   )
 
   add_custom_target(

@@ -566,7 +566,7 @@ namespace {
 /// slice.
 struct SwapExtractSliceWithDispatchTensorLoad
     : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
@@ -597,7 +597,7 @@ struct SwapExtractSliceWithDispatchTensorLoad
 /// `empty` of the slice.
 struct SwapExtractSliceWithTensorEmpty
     : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {

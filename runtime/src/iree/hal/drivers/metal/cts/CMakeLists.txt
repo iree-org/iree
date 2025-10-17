@@ -20,6 +20,8 @@ iree_hal_cts_test_suite(
   EXCLUDED_TESTS
     # HAL event is unimplemented for Metal right now.
     "event"
+    # TODO: implement executable reflection.
+    "executable"
     # Disabled until fixing semaphore tests.
     # https://github.com/iree-org/iree/pull/17080#discussion_r1569867998
     "semaphore_submission"

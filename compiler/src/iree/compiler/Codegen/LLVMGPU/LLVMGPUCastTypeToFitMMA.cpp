@@ -28,7 +28,7 @@ namespace mlir::iree_compiler {
 namespace {
 
 struct UpcastContractOutput final : OpRewritePattern<vector::ContractionOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::ContractionOp contractOp,
                                 PatternRewriter &rewriter) const override {
@@ -119,16 +119,17 @@ struct LLVMGPUCastTypeToFitMMAPass final
   }
 
   void runOnOperation() override {
-    auto func = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
 
     // Set MMA type from config embedded in toLayoutOp of contraction.
-    func.walk([&](vector::ContractionOp contract) { inferMmaKind(contract); });
+    funcOp.walk(
+        [&](vector::ContractionOp contract) { inferMmaKind(contract); });
 
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
     patterns.add<UpcastContractOutput>(context);
 
-    if (failed(applyPatternsGreedily(func, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }

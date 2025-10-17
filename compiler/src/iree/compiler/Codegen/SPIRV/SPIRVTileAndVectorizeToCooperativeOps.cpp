@@ -279,7 +279,7 @@ void populateVectorUnrollPatterns(ArrayRef<int64_t> cooperativeOpSize,
 class CombineContractTranspose final
     : public OpRewritePattern<vector::ContractionOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::ContractionOp op,
                                 PatternRewriter &rewriter) const override {
@@ -335,7 +335,7 @@ public:
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
 
     // First we need to discover the CodeGen lowering configuration. It was
     // decided earlier and attached to a linalg op as an attribute.
@@ -402,7 +402,7 @@ public:
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
 
     // First discover the chosen cooperative matrix shape. It was decided
     // earlier and attached to the export op as an attribute.

@@ -55,8 +55,4 @@ struct DumpModulePass : public impl::DumpModulePassBase<DumpModulePass> {
 
 } // namespace
 
-std::unique_ptr<Pass> createDumpModulePass(std::string path) {
-  return createDumpModulePass(DumpModulePassOptions{std::move(path)});
-}
-
 } // namespace mlir::iree_compiler::IREE::Util

@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Utils/Permutation.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -423,9 +424,16 @@ struct DistributeTransferWrite final
   using OpDistributionPattern::OpDistributionPattern;
 
   DistributeTransferWrite(MLIRContext *context, Value threadId,
-                          int64_t subgroupSize)
+                          int64_t subgroupSize, ArrayRef<int64_t> workgroupSize)
       : OpDistributionPattern(context), threadId(threadId),
-        subgroupSize(subgroupSize) {}
+        subgroupSize(subgroupSize) {
+
+    // The number of threads in the workgroup is the product of the dimensions
+    // of workgroupSize, unless workgroupSize is empty.
+    if (!workgroupSize.empty()) {
+      numThreadsInWorkgroup = llvm::product_of(workgroupSize);
+    }
+  }
 
   LogicalResult matchAndRewrite(vector::TransferWriteOp writeOp,
                                 DistributionSignature &signature,
@@ -457,7 +465,6 @@ struct DistributeTransferWrite final
     SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
     SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
     int64_t rank = vectorLayout.getRank();
-
     SmallVector<Value> warpIndices, threadIndices;
     if (failed(populateWarpAndThreadIndices(rewriter, threadId, subgroupSize,
                                             vectorLayout, warpIndices,
@@ -465,6 +472,59 @@ struct DistributeTransferWrite final
       return rewriter.notifyMatchFailure(
           writeOp, "warp or thread tiles have overlapping strides");
     }
+
+    // If the distribution results in threads writing to the same address, guard
+    // with an scf.if to ensure only one thread writes per duplication group.
+
+    // Delinearize the thread id into
+    //   ('workgroup_overlap', *subgroup_tile, 'lane_overlap', *thread_tile)
+    SmallVector<int64_t> basis(2 * rank + 1);
+    ArrayRef<int64_t> subgroupTile = vectorLayout.getSubgroupTile();
+    ArrayRef<int64_t> threadTile = vectorLayout.getThreadTile();
+    int64_t threadTileSize = llvm::product_of(threadTile);
+    int64_t laneOverlap = std::max(int64_t(1), subgroupSize / threadTileSize);
+    basis[rank] = laneOverlap;
+    for (int i = 0; i < rank; ++i) {
+      basis[i] = subgroupTile[i];
+      basis[rank + 1 + i] = threadTile[i];
+    }
+
+    Location loc = writeOp.getLoc();
+    auto delinearizedOp = affine::AffineDelinearizeIndexOp::create(
+        rewriter, loc, threadId, basis, /* has outer-bound */ false);
+    ResultRange delinearized = delinearizedOp.getResults();
+    assert(delinearized.size() == 2 * rank + 2 &&
+           "but has outer-bound is false");
+
+    OpResult subgroupGroupId = delinearized[0];
+    OpResult threadGroupId = delinearized[rank + 1];
+    Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+
+    Value doWrite =
+        arith::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(true));
+
+    // Is it maybe possible that threads with the same lane ID but different
+    // subgroup IDs write to the same address? If so, guard on the subgroup.
+    int64_t basisSize = llvm::product_of(basis);
+    bool mightBeInterSubgroupOverlap = !numThreadsInWorkgroup.has_value() ||
+                                       (basisSize < *numThreadsInWorkgroup);
+    if (mightBeInterSubgroupOverlap) {
+      Value subgroupIsZero = arith::CmpIOp::create(
+          rewriter, loc, arith::CmpIPredicate::eq, subgroupGroupId, zero);
+      doWrite = arith::AndIOp::create(rewriter, loc, doWrite, subgroupIsZero);
+    }
+
+    // Do threads within the same subgroup write to the same address? If so,
+    // guard on the lane.
+    bool isIntraSubgroupOverlap = (laneOverlap > 1);
+    if (isIntraSubgroupOverlap) {
+      Value threadIsZero = arith::CmpIOp::create(
+          rewriter, loc, arith::CmpIPredicate::eq, threadGroupId, zero);
+      doWrite = arith::AndIOp::create(rewriter, loc, doWrite, threadIsZero);
+    }
+
+    auto ifOp = scf::IfOp::create(rewriter, loc, doWrite);
+    rewriter.setInsertionPoint(ifOp.thenYield());
 
     Value distributedVector =
         getDistributed(rewriter, writeOp.getValueToStore(), vectorLayout);
@@ -486,7 +546,6 @@ struct DistributeTransferWrite final
       SmallVector<Value> slicedIndices = getTransferIndicesFromNestedLayout(
           rewriter, indices, offsets, vectorLayout, permMap, warpIndices,
           threadIndices);
-
       // Extract the "element vector" from the inner most dimensions. All outer
       // dimensions are either unrolled or distributed such that this is a
       // contiguous slice.
@@ -517,6 +576,7 @@ struct DistributeTransferWrite final
 
   Value threadId;
   int64_t subgroupSize;
+  std::optional<int64_t> numThreadsInWorkgroup = std::nullopt;
 };
 
 /// Pattern to distribute `vector.transfer_gather` ops with nested layouts.
@@ -1405,16 +1465,14 @@ struct DistributeContract final
       VectorValue interleavedMaskRhs =
           getInterleavedPackedForm(rewriter, maskRhs, rhsLayout);
 
-      disLhs = cast<VectorValue>(
-          rewriter
-              .create<arith::SelectOp>(loc, interleavedMaskLhs, disLhs,
-                                       passThruLhs)
-              .getResult());
-      disRhs = cast<VectorValue>(
-          rewriter
-              .create<arith::SelectOp>(loc, interleavedMaskRhs, disRhs,
-                                       passThruRhs)
-              .getResult());
+      disLhs = cast<VectorValue>(arith::SelectOp::create(rewriter, loc,
+                                                         interleavedMaskLhs,
+                                                         disLhs, passThruLhs)
+                                     .getResult());
+      disRhs = cast<VectorValue>(arith::SelectOp::create(rewriter, loc,
+                                                         interleavedMaskRhs,
+                                                         disRhs, passThruRhs)
+                                     .getResult());
     }
 
     Value acc = contractOp.getAcc();
@@ -2130,13 +2188,14 @@ struct DistributeConstantMask final
 
 } // namespace
 
-void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
-                                                   Value threadId,
-                                                   int64_t subgroupSize,
-                                                   int64_t maxBitsPerShuffle) {
-  patterns.add<DistributeTransferRead, DistributeTransferWrite,
-               DistributeTransferGather, DistributeMapScatter>(
-      patterns.getContext(), threadId, subgroupSize);
+void populateGPUDistributeNestedLayoutAttrPatterns(
+    RewritePatternSet &patterns, Value threadId, int64_t subgroupSize,
+    ArrayRef<int64_t> workgroupSize, int64_t maxBitsPerShuffle) {
+  patterns.add<DistributeTransferRead, DistributeTransferGather,
+               DistributeMapScatter>(patterns.getContext(), threadId,
+                                     subgroupSize);
+  patterns.add<DistributeTransferWrite>(patterns.getContext(), threadId,
+                                        subgroupSize, workgroupSize);
   patterns.add<DistributeBroadcast, DistributeTranspose>(patterns.getContext());
   patterns.add<DistributeMultiReduction>(patterns.getContext(), subgroupSize,
                                          maxBitsPerShuffle);

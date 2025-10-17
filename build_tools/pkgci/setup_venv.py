@@ -67,8 +67,8 @@ There are several modes in which to use this script:
 
   (Note that these two modes are often combined to allow for workflow testing)
 
-You must have the `gh` command line tool installed and authenticated if you
-will be fetching artifacts.
+You must have a GitHub token with `repo` scope available as the `GH_TOKEN`
+environment variable if you will be fetching artifacts.
 """
 
 from glob import glob
@@ -83,6 +83,8 @@ import subprocess
 import sys
 import tempfile
 import zipfile
+import os
+import urllib.request
 
 THIS_DIR = Path(__file__).parent.resolve()
 REPO_ROOT = THIS_DIR.parent.parent
@@ -125,6 +127,29 @@ def parse_arguments(argv=None):
     return args
 
 
+def query_gh_api(api_path: str):
+    url = f"https://api.github.com{api_path}"
+    print(f"Querying GitHub API: {url}")
+    gh_token = os.environ.get("GH_TOKEN", "")
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Authorization": f"Bearer {gh_token}",
+    }
+    req = urllib.request.Request(url)
+    for k, v in headers.items():
+        # https://github.com/arduino/report-size-deltas/pull/83
+        req.add_unredirected_header(k, v)
+
+    with urllib.request.urlopen(req) as response:
+        if response.status != 200:
+            raise RuntimeError(
+                f"GitHub API request failed: {response.status} {response.reason}"
+            )
+        contents = response.read()
+        return contents
+
+
 def get_latest_workflow_run_id_for_main() -> int:
     print(f"Looking up latest workflow run for main branch")
     # Note: at a high level, we probably want to select one of these:
@@ -133,19 +158,9 @@ def get_latest_workflow_run_id_for_main() -> int:
     # Instead, we just check for the latest completed workflow. This can miss
     # runs that are still pending (especially if jobs are queued waiting for
     # runners) and can include jobs that failed tests (for better or worse).
-    workflow_run_args = [
-        "gh",
-        "api",
-        "-H",
-        "Accept: application/vnd.github+json",
-        "-H",
-        "X-GitHub-Api-Version: 2022-11-28",
-        f"{BASE_API_PATH}/actions/workflows/pkgci.yml/runs?branch=main&event=push&status=completed&per_page=1",
-    ]
-    print(
-        f"Running command to find latest completed workflow run:\n  {' '.join(workflow_run_args)}"
+    workflow_run_output = query_gh_api(
+        f"{BASE_API_PATH}/actions/workflows/pkgci.yml/runs?branch=main&event=push&status=completed&per_page=1"
     )
-    workflow_run_output = subprocess.check_output(workflow_run_args)
     workflow_run_json_output = json.loads(workflow_run_output)
     latest_run = workflow_run_json_output["workflow_runs"][0]
     print(f"\nFound workflow run: {latest_run['html_url']}")
@@ -161,17 +176,9 @@ def get_latest_workflow_run_id_for_ref(ref: str) -> int:
     )
 
     print(f"  Using normalized ref: {normalized_ref}")
-    workflow_run_args = [
-        "gh",
-        "api",
-        "-H",
-        "Accept: application/vnd.github+json",
-        "-H",
-        "X-GitHub-Api-Version: 2022-11-28",
-        f"{BASE_API_PATH}/actions/workflows/pkgci.yml/runs?head_sha={normalized_ref}",
-    ]
-    print(f"\nRunning command to list workflow runs:\n  {' '.join(workflow_run_args)}")
-    workflow_run_output = subprocess.check_output(workflow_run_args)
+    workflow_run_output = query_gh_api(
+        f"{BASE_API_PATH}/actions/workflows/pkgci.yml/runs?head_sha={normalized_ref}"
+    )
     workflow_run_json_output = json.loads(workflow_run_output)
     if workflow_run_json_output["total_count"] == 0:
         raise RuntimeError("Workflow did not run at this commit")
@@ -184,18 +191,7 @@ def get_latest_workflow_run_id_for_ref(ref: str) -> int:
 @functools.lru_cache
 def list_gh_artifacts(run_id: str) -> Dict[str, str]:
     print(f"Fetching artifacts for workflow run: {run_id}")
-
-    output = subprocess.check_output(
-        [
-            "gh",
-            "api",
-            "-H",
-            "Accept: application/vnd.github+json",
-            "-H",
-            "X-GitHub-Api-Version: 2022-11-28",
-            f"{BASE_API_PATH}/actions/runs/{run_id}/artifacts",
-        ]
-    )
+    output = query_gh_api(f"{BASE_API_PATH}/actions/runs/{run_id}/artifacts")
     data = json.loads(output)
     # Uncomment to debug:
     # print(json.dumps(data, indent=2))
@@ -211,17 +207,7 @@ def list_gh_artifacts(run_id: str) -> Dict[str, str]:
 
 def fetch_gh_artifact(api_path: str, file: Path):
     print(f"Downloading artifact {api_path}")
-    contents = subprocess.check_output(
-        [
-            "gh",
-            "api",
-            "-H",
-            "Accept: application/vnd.github+json",
-            "-H",
-            "X-GitHub-Api-Version: 2022-11-28",
-            api_path,
-        ]
-    )
+    contents = query_gh_api(api_path)
     file.write_bytes(contents)
 
 

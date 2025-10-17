@@ -296,7 +296,7 @@ struct FlattenVectorTransferWrite
 };
 
 struct FlattenSubview : public OpRewritePattern<memref::SubViewOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(memref::SubViewOp op,
                                 PatternRewriter &rewriter) const override {
@@ -342,8 +342,7 @@ struct FlattenSubview : public OpRewritePattern<memref::SubViewOp> {
 
 struct DecomposeMemrefsPass
     : public impl::DecomposeMemrefsPassBase<DecomposeMemrefsPass> {
-  using impl::DecomposeMemrefsPassBase<
-      DecomposeMemrefsPass>::DecomposeMemrefsPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, arith::ArithDialect,

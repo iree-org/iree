@@ -14,7 +14,6 @@
 #include <memory>
 #include <utility>
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Utils/ConversionUtils.h"
@@ -238,8 +237,7 @@ struct PromoteBF16ToF32Converter
 
 struct ConvertBf16ArithToF32Pass final
     : impl::ConvertBf16ArithToF32PassBase<ConvertBf16ArithToF32Pass> {
-  using impl::ConvertBf16ArithToF32PassBase<
-      ConvertBf16ArithToF32Pass>::ConvertBf16ArithToF32PassBase;
+  using Base::Base;
   void runOnOperation() override {
     MLIRContext *context = &this->getContext();
     RewritePatternSet patterns(context);

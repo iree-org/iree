@@ -21,7 +21,7 @@ namespace {
 // TODO(ataei): Upstream this pattern if needed ?
 class UnfusedFMAOpsPassConversion : public OpRewritePattern<LLVM::FMAOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(LLVM::FMAOp op,
                                 PatternRewriter &rewriter) const override {
@@ -53,7 +53,7 @@ void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
 }
 
 void LLVMCPUUnfuseFMAOpsPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   auto context = funcOp.getContext();
   RewritePatternSet patterns(&getContext());
   populateUnfusedFMAOpsPassPatterns(context, patterns);

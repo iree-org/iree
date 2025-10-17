@@ -5,18 +5,10 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Utils/EncodingUtils.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
-#include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
-
-#include <optional>
 
 #define DEBUG_TYPE "iree-codegen-encoding-utils"
 
@@ -124,24 +116,9 @@ LogicalResult MaterializeEncodingTypeConverter::getOffsetsSizesStrides(
     SmallVectorImpl<OpFoldResult> &newOffsets,
     SmallVectorImpl<OpFoldResult> &newSizes,
     SmallVectorImpl<OpFoldResult> &newStrides) const {
-  auto boundType = dyn_cast<RankedTensorType>(type.getBoundType());
-  if (!boundType || !boundType.getEncoding()) {
-    return failure();
-  }
-  // TODO(jornt): The isa<IREE::GPU::GPUPaddingResolverAttr> check is
-  // needed because PaddingAttr is a serializable attribute, but it
-  // relies on its own type conversion for now. Once GPUPaddingResolverAttr
-  // implements `getOffsetsSizesStrides`, this can be removed.
-  if (!isa<IREE::GPU::GPUPaddingResolverAttr>(getLayoutAttr())) {
-    return getLayoutAttr().getOffsetsSizesStrides(
-        builder, loc, type, dynamicDims, offsets, sizes, strides, newOffsets,
-        newSizes, newStrides);
-  }
-  auto boundTensorType = cast<RankedTensorType>(type.getBoundType());
-  newSizes = getMixedValues(boundTensorType.getShape(), dynamicDims, builder);
-  newOffsets.resize(newSizes.size(), builder.getIndexAttr(0));
-  newStrides.resize(newSizes.size(), builder.getIndexAttr(1));
-  return success();
+  return getLayoutAttr().getOffsetsSizesStrides(
+      builder, loc, type, dynamicDims, offsets, sizes, strides, newOffsets,
+      newSizes, newStrides);
 }
 
 } // namespace mlir::iree_compiler

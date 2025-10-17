@@ -127,9 +127,10 @@ static Value getDefaultChannel(Location loc, shard::GridOp grid,
                                bool useNamedDefaultChannels,
                                OpBuilder &builder) {
   if (useNamedDefaultChannels)
-    return builder.create<IREE::Flow::ChannelDefaultOp>(loc, grid.getSymName());
+    return IREE::Flow::ChannelDefaultOp::create(builder, loc,
+                                                grid.getSymName());
   else
-    return builder.create<IREE::Flow::ChannelDefaultOp>(loc);
+    return IREE::Flow::ChannelDefaultOp::create(builder, loc);
 }
 
 static Value buildCachedChannelLoading(Location loc, shard::GridOp grid,
@@ -141,8 +142,8 @@ static Value buildCachedChannelLoading(Location loc, shard::GridOp grid,
   }
   // TODO: lookup the shard name instead of generating it again - today this
   // will fail if there are any conflicting names during channel creation.
-  return builder.create<IREE::Util::GlobalLoadOp>(
-      loc, builder.getType<IREE::Flow::ChannelType>(),
+  return IREE::Util::GlobalLoadOp::create(
+      builder, loc, builder.getType<IREE::Flow::ChannelType>(),
       getGridChannelName(grid, gridAxes));
 }
 
@@ -166,9 +167,9 @@ static Value buildChannelCreation(shard::GridOp grid,
   Value shardChannel = getDefaultChannel(builder.getLoc(), grid,
                                          useNamedDefaultChannels, builder);
   SmallVector<Value> gridProcessMultiIndex =
-      builder.create<shard::ProcessMultiIndexOp>(grid).getResults();
+      shard::ProcessMultiIndexOp::create(builder, grid).getResults();
   SmallVector<Value> gridShape =
-      builder.create<shard::GridShapeOp>(grid).getResults();
+      shard::GridShapeOp::create(builder, grid).getResults();
   SmallVector<Value> reorderedGridIndex =
       permute(ArrayRef<Value>(gridProcessMultiIndex), gridAxes);
   SmallVector<Value> reorderedGridShape =
@@ -181,8 +182,8 @@ static Value buildChannelCreation(shard::GridOp grid,
                            toOpFoldResults(reorderedGridShape), builder);
   OpFoldResult color = linearIndexFromShape(
       toOpFoldResults(groupIndex), toOpFoldResults(groupsShape), builder);
-  return builder.create<IREE::Flow::ChannelSplitOp>(
-      shardChannel,
+  return IREE::Flow::ChannelSplitOp::create(
+      builder, shardChannel,
       getValueOrCreateConstantIndexOp(builder, builder.getLoc(), color),
       getValueOrCreateConstantIndexOp(builder, builder.getLoc(),
                                       reorderedProcessLinearIndex));
@@ -192,16 +193,15 @@ static void buildChannelInitializer(shard::GridOp grid,
                                     ArrayRef<shard::GridAxis> gridAxes,
                                     bool useNamedDefaultChannels,
                                     ImplicitLocOpBuilder &builder) {
-  IREE::Util::InitializerOp initOp =
-      builder.create<IREE::Util::InitializerOp>();
+  auto initOp = IREE::Util::InitializerOp::create(builder);
   Block *block = builder.createBlock(&initOp.getBody());
   ImplicitLocOpBuilder::InsertionGuard insertionGuard(builder);
   builder.setInsertionPointToStart(block);
   Value channel =
       buildChannelCreation(grid, gridAxes, useNamedDefaultChannels, builder);
-  builder.create<IREE::Util::GlobalStoreOp>(channel,
-                                            getGridChannelName(grid, gridAxes));
-  builder.create<IREE::Util::ReturnOp>();
+  IREE::Util::GlobalStoreOp::create(builder, channel,
+                                    getGridChannelName(grid, gridAxes));
+  IREE::Util::ReturnOp::create(builder);
 }
 
 // Construct a Flow channel inside `module` using
@@ -219,8 +219,8 @@ static void buildGlobalChannelCreation(shard::GridOp grid,
   builder.setInsertionPointToStart(&module.getBodyRegion().getBlocks().front());
 
   auto channelName = getGridChannelName(grid, gridAxes);
-  builder.create<IREE::Util::GlobalOp>(
-      builder.getStringAttr("private"), channelName,
+  IREE::Util::GlobalOp::create(
+      builder, builder.getStringAttr("private"), channelName,
       builder.getType<IREE::Flow::ChannelType>(), false, TypedAttr(),
       builder.getAttr<IREE::Util::InlineNeverAttr>());
   buildChannelInitializer(grid, gridAxes, useNamedDefaultChannels, builder);

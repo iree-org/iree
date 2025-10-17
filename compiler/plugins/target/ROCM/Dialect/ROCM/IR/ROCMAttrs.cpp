@@ -6,9 +6,13 @@
 
 #include "compiler/plugins/target/ROCM/Dialect/ROCM/IR/ROCMAttrs.h"
 #include "compiler/plugins/target/ROCM/Dialect/ROCM/IR/ROCMDialect.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
-#include "llvm/ADT/TypeSwitch.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "compiler/plugins/target/ROCM/Dialect/ROCM/IR/ROCMUkernelBitcodeSupport.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpDefinition.h"
@@ -33,63 +37,163 @@ BuiltinTuningModuleAttr::getModule(Operation * /*annotationSite*/) const {
 // UKernelProviderAttr
 //===----------------------------------------------------------------------===//
 
-/// Utility function to help create and replace argmax linalg with a ukernel.
-static LogicalResult handleArgmaxUkernel(
-    RewriterBase &rewriter, StringRef name, DictionaryAttr targetConfiguration,
-    Operation *contextualOp, SmallVectorImpl<Value> &inputs,
-    SmallVectorImpl<Value> &outputs, SmallVectorImpl<Value> &otherOperands) {
-  auto genericOp = dyn_cast<linalg::GenericOp>(contextualOp);
-  if (!genericOp) {
-    return rewriter.notifyMatchFailure(
-        genericOp, "expected a linalg.generic op for argmax");
-  }
-  // Currently only support 1D reduction, where reduction is on fastest dim.
-  // Tiling argmax ukernel is also set to enforce this structure.
-  const int kReductionDim = genericOp.getNumLoops() - 1;
-  Location loc = genericOp.getLoc();
-  Value reductionDimSize = rewriter.create<tensor::DimOp>(
-      loc, genericOp.getDpsInputOperand(0)->get(), kReductionDim);
-  // `returnsMaxValue` differentiates between the two argmax versions :-
-  // 1. Returns only the index of the max value (returnsMaxValue == true)
-  // 2. Returns both the max value as well as the corresponding index.
-  bool returnsMaxValue = genericOp.getResults()[0].use_empty();
-  Value writeMaxValueFlag = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getI1Type(), rewriter.getBoolAttr(!returnsMaxValue));
-  llvm::append_values(otherOperands, reductionDimSize, writeMaxValueFlag);
-  MLIRContext *context = rewriter.getContext();
-  auto fnDefAttrs = DictionaryAttr::get(
-      context, {{"vm.import.module", StringAttr::get(context, "rocm")}});
-  auto ukernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, contextualOp->getResultTypes(), name, inputs, outputs, otherOperands,
-      fnDefAttrs, /*num_strided_outer_dims=*/0);
-  if (returnsMaxValue) {
-    rewriter.replaceAllUsesWith(genericOp.getResults()[1],
-                                ukernelOp.getResults()[1]);
-    return success();
-  }
-  ResultRange origResults = genericOp.getResults();
-  ResultRange newResults = ukernelOp.getResults();
-  if (origResults.size() != newResults.size()) {
-    return rewriter.notifyMatchFailure(genericOp, "result count mismatch");
-  }
-  rewriter.replaceAllUsesWith(genericOp.getResults()[0],
-                              ukernelOp.getResults()[0]);
-  rewriter.replaceAllUsesWith(genericOp.getResults()[1],
-                              ukernelOp.getResults()[1]);
-  return success();
-}
-
 std::optional<LogicalResult> UKernelProviderAttr::createAndReplaceWithUkernelOp(
     RewriterBase &rewriter, StringRef name, DictionaryAttr targetConfiguration,
-    Operation *contextualOp, SmallVectorImpl<Value> &inputs,
-    SmallVectorImpl<Value> &outputs,
+    Operation *contextualOp, ArrayRef<Value> inputs, ArrayRef<Value> outputs,
     SmallVectorImpl<Value> &otherOperands) const {
   if (name.contains("argmax")) {
     return handleArgmaxUkernel(rewriter, name, targetConfiguration,
                                contextualOp, inputs, outputs, otherOperands);
+  } else if (name.contains("multi_mma_mfma")) {
+    return handleInnerTiledMmaUkernel(rewriter, name, targetConfiguration,
+                                      contextualOp, inputs, outputs,
+                                      otherOperands);
   }
-  // TODO(avarma): Add multi_mfma ukernel support via descriptors.
   return std::nullopt;
+}
+
+//===---------------------------------------------------------------------===//
+// rocm.tensor_ukernel_provider
+//===---------------------------------------------------------------------===//
+
+FailureOr<Operation *>
+TensorUKernelProviderAttr::getMLIRUKernel(StringRef name, DictionaryAttr,
+                                          Operation *annotationSite) const {
+  auto *symbolTableOp = SymbolTable::getNearestSymbolTable(annotationSite);
+  SymbolTable symbolTable(symbolTableOp);
+  return symbolTable.lookup(name);
+}
+
+// Helper for getDataLayoutForUKernel: returns true if the actual
+// `iterationSizes` satisfy any `iterationSizeConstraints`.
+static bool checkIterationSizeConstraints(ArrayRef<int64_t> iterationSizes,
+                                          ArrayAttr iterationSizeConstraints) {
+  for (Attribute c : iterationSizeConstraints) {
+    auto constraint = dyn_cast<UKernelIterationSizeConstraintAttr>(c);
+    if (!constraint) {
+      return false;
+    }
+    IntegerAttr index = constraint.getIndex();
+    if (!index) {
+      return false;
+    }
+    int64_t indexVal = index.getInt();
+    if (indexVal < 0 || indexVal >= iterationSizes.size()) {
+      return false;
+    }
+    if (IntegerAttr sizeMin = constraint.getSizeMin()) {
+      if (iterationSizes[indexVal] < sizeMin.getInt()) {
+        return false;
+      }
+    }
+    if (IntegerAttr sizeMax = constraint.getSizeMax()) {
+      if (iterationSizes[indexVal] > sizeMax.getInt()) {
+        return false;
+      }
+    }
+    if (IntegerAttr sizeDiv = constraint.getSizeDiv()) {
+      if (sizeDiv.getInt() <= 0) {
+        return false;
+      }
+      if (iterationSizes[indexVal] % sizeDiv.getInt()) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+Attribute TensorUKernelProviderAttr::getDataLayoutForUKernel(
+    Attribute encoding, DictionaryAttr targetConfiguration) const {
+  auto encodingAttr =
+      dyn_cast_if_present<IREE::Encoding::EncodingAttr>(encoding);
+  if (!encodingAttr) {
+    return {};
+  }
+  IREE::GPU::TargetAttr targetAttr = getGPUTargetAttr(targetConfiguration);
+  ArrayAttr indexingMapsAttr = encodingAttr.getUserIndexingMaps();
+  if (!indexingMapsAttr) {
+    return {};
+  }
+  if (failed(linalg::inferContractionDims(encodingAttr.getRootMaps()))) {
+    return {};
+  }
+  SmallVector<Type> types = encodingAttr.getElementTypesArray();
+  SmallVector<int64_t> iterationSizes = encodingAttr.getIterationSizesArray();
+  if (types.size() != 3 || iterationSizes.size() != 3) {
+    return {};
+  }
+  auto &rocmDialect = cast<ROCMDialect>(getDialect());
+  // Iterate over all MLIR ukernels and select the one with highest benefit.
+  Attribute selectedMma;          // Initial value means no match.
+  int64_t selectedMmaBenefit = 0; // Initial value not actually used.
+
+  for (Util::FuncOp funcOp : rocmDialect.getMlirUKernels()) {
+    // Require MLIR ukernels to have a ukernel_info attribute, otherwise we
+    // won't be able to know how to data-tile for them.
+    auto info =
+        dyn_cast_if_present<UKernelInfoAttr>(funcOp->getAttr(kUKernelInfoName));
+    if (!info) {
+      continue;
+    }
+    // If a previously selected mma has a larger or equal benefit, skip.
+    if (selectedMma && selectedMmaBenefit >= info.getBenefit()) {
+      continue;
+    }
+    // Match the element types.
+    auto matchTypes = dyn_cast_if_present<ArrayAttr>(
+        info.getMatch().get(kUKernelInfoTypesName));
+    auto actualTypes =
+        ArrayAttr::get(matchTypes.getContext(),
+                       llvm::map_to_vector(types, [](Type v) -> Attribute {
+                         return TypeAttr::get(v);
+                       }));
+    if (matchTypes != actualTypes) {
+      continue;
+    }
+    // Match any constraints on iteration sizes.
+    if (auto iterationSizeConstraints = dyn_cast_if_present<ArrayAttr>(
+            info.getMatch().get(kUKernelInfoIterationSizesConstraintsName))) {
+      if (!checkIterationSizeConstraints(iterationSizes,
+                                         iterationSizeConstraints)) {
+        continue;
+      }
+    }
+    // Read the data-tiled-layout attribute.
+    Attribute mma = info.getMma();
+    if (!mma) {
+      continue;
+    }
+    // Depending on the type of data-tiled layout attribute, read the
+    // appropriate kind of MMA-like intrinsic and check that it's supported by
+    // the target.
+    if (auto dtMma = dyn_cast<GPU::DataTiledMMAAttr>(mma)) {
+      // Regular MMA intrinsic.
+      auto intrinsicAttr =
+          GPU::MMAAttr::get(matchTypes.getContext(), dtMma.getIntrinsic());
+      if (!llvm::is_contained(targetAttr.getWgp().getMma(), intrinsicAttr)) {
+        continue;
+      }
+    } else if (auto dtScaledMma = dyn_cast<GPU::DataTiledScaledMMAAttr>(mma)) {
+      // Scaled MMA intrinsic.
+      auto intrinsicAttr = GPU::ScaledMMAAttr::get(
+          matchTypes.getContext(), dtScaledMma.getIntrinsic(),
+          /*lhs_elem_type=*/types[0], /*rhs_elem_type=*/types[1],
+          /*acc_elem_type=*/types[2], /*col_major=*/false);
+      if (!llvm::is_contained(targetAttr.getWgp().getScaledMma(),
+                              intrinsicAttr)) {
+        continue;
+      }
+    } else {
+      // Unhandled type of data-tiled-layout attr.
+      continue;
+    }
+    // Selected!
+    selectedMma = mma;
+    selectedMmaBenefit = info.getBenefit();
+  }
+
+  return selectedMma;
 }
 
 //===----------------------------------------------------------------------===//

@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -32,15 +33,16 @@ namespace mlir::iree_compiler {
 
 static bool accGemmToGemmPrecondition(Operation *op) {
   if (auto innerTiledOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op)) {
-    return isa<IREE::GPU::MmaInterfaceAttr, IREE::GPU::ScaledMMAAttr>(
-        innerTiledOp.getKind());
+    return isa<IREE::GPU::MmaInterfaceAttr, IREE::GPU::ScaledMMAAttr,
+               IREE::GPU::DataTiledMMAInterfaceAttr>(innerTiledOp.getKind());
   }
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp) {
     return false;
   }
   if (!linalg::isaContractionOpInterface(linalgOp) &&
-      !isa<linalg::ConvolutionOpInterface>(*linalgOp)) {
+      !isa<linalg::ConvolutionOpInterface>(*linalgOp) &&
+      !IREE::LinalgExt::isaScaledContractionOpInterface(linalgOp)) {
     return false;
   }
   if (!linalgOp.hasPureTensorSemantics()) {

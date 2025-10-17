@@ -321,7 +321,6 @@ void addSPIRVBaseVectorizePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCSEPass());
   {
     GenericVectorizationPassOptions options;
-    options.vectorizeGatherAccesses = true;
     funcPassManager.addPass(createGenericVectorizationPass(options));
   }
   addSPIRVVectorLoweringPasses(funcPassManager);
@@ -362,7 +361,6 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCSEPass());
   {
     GenericVectorizationPassOptions options;
-    options.vectorizeGatherAccesses = true;
     options.enableCleanup = true;
     funcPassManager.addPass(createGenericVectorizationPass(options));
   }
@@ -491,8 +489,6 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &funcPassManager,
   // unrolling or lowering, which is done later.
   {
     GenericVectorizationPassOptions options;
-    options.vectorizePadding = true;
-    options.vectorizeGatherAccesses = true;
     options.enableCleanup = false;
     options.maxVectorSize = 4096;
     funcPassManager.addPass(createGenericVectorizationPass(options));
@@ -574,8 +570,6 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &funcPassManager) {
     GenericVectorizationPassOptions options;
     options.enableVectorMasking = true;
     options.useConfiguredVectorSizes = false;
-    options.vectorizePadding = true;
-    options.vectorizeGatherAccesses = true;
     options.enableCleanup = false;
     options.generateContract = false;
     funcPassManager.addPass(createGenericVectorizationPass(options));

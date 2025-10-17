@@ -25,8 +25,7 @@ class LLVMGPUSelectLoweringStrategyPass final
     : public impl::LLVMGPUSelectLoweringStrategyPassBase<
           LLVMGPUSelectLoweringStrategyPass> {
 public:
-  using impl::LLVMGPUSelectLoweringStrategyPassBase<
-      LLVMGPUSelectLoweringStrategyPass>::LLVMGPUSelectLoweringStrategyPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
@@ -75,7 +74,7 @@ verifyEntryPoint(FunctionOpInterface funcOp,
 }
 
 void LLVMGPUSelectLoweringStrategyPass::runOnOperation() {
-  auto moduleOp = getOperation();
+  mlir::ModuleOp moduleOp = getOperation();
   for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
     if (failed(initGPULaunchConfig(funcOp))) {
       return signalPassFailure();

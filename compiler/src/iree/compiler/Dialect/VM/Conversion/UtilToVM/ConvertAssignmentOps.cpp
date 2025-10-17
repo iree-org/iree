@@ -23,7 +23,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 struct SwitchOpConversion : public OpConversionPattern<IREE::Util::SwitchOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::Util::SwitchOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {

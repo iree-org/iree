@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/TensorDynamicDimAnalysis.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -39,7 +38,7 @@ namespace {
 
 struct RemoveOptimizationBarrier final
     : public OpRewritePattern<IREE::Util::OptimizationBarrierOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::Util::OptimizationBarrierOp barrierOp,
                                 PatternRewriter &rewriter) const override {
@@ -169,27 +168,12 @@ blockDynamicDimensionsOfValue(RewriterBase &rewriter,
 
   auto expandShapeOp = tensor::ExpandShapeOp::create(
       rewriter, loc, outputType, v, reassociation, outputShape);
-  Value barrier = rewriter
-                      .create<IREE::Util::OptimizationBarrierOp>(
-                          loc, expandShapeOp.getResult())
+  Value barrier = IREE::Util::OptimizationBarrierOp::create(
+                      rewriter, loc, expandShapeOp.getResult())
                       .getResult(0);
   auto collapseShapeOp = tensor::CollapseShapeOp::create(
       rewriter, loc, tensorType, barrier, reassociation);
   return ReshapeOps{expandShapeOp, collapseShapeOp};
-}
-
-void moveUpMemrefReshapeOps(RewriterBase &rewriter, Operation *op) {
-  DominanceInfo domInfo(op);
-  SmallVector<Operation *> reshapeOps;
-  op->walk([&](Operation *nestedOp) {
-    if (isa<memref::ExpandShapeOp, memref::CollapseShapeOp>(nestedOp)) {
-      reshapeOps.push_back(nestedOp);
-    }
-  });
-
-  for (Operation *reshapeOp : reshapeOps) {
-    moveOpAfterLastOperand(rewriter, domInfo, reshapeOp);
-  }
 }
 
 //===---------------------------------------------------------------------===//

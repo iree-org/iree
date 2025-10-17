@@ -14,6 +14,23 @@ namespace mlir::iree_compiler {
 struct GlobalPipelineOptions {
   llvm::OptimizationLevel optLevel = llvm::OptimizationLevel::O0;
 
+  // Maximum byte size increase allowed for constant expr hoisting policy to
+  // allow hoisting. The threshold is 1MB by default.
+  int64_t constExprMaxSizeIncreaseThreshold = 1024 * 1024;
+
+  // Enables const-expr hoisting into globals.
+  bool constExprHoisting = true;
+
+  // Enables data tiling.
+  // There are two data-tiling paths. One starts from GlobalOptimization phase
+  // and the other starts from DispatchCreation phase. They are mutually
+  // exclusive. Only one of them can be enabled at a time. The default is using
+  // the GlobalOptimization data-tiling path, since the other path is still
+  // being developed. The main differnce is that the DispatchCreation
+  // data-tiling path enables more fusion opportunities. Any feature built on
+  // top of GlobalOptimization path will be deprecated eventually.
+  bool dataTiling = false;
+
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<GlobalPipelineOptions>;
 };
@@ -91,9 +108,6 @@ struct PreprocessingOptions {
 // Options controlling high level optimizations.
 struct GlobalOptimizationOptions {
   llvm::OptimizationLevel optLevel = llvm::OptimizationLevel::O0;
-  // Maximum byte size increase allowed for constant expr hoisting policy to
-  // allow hoisting. The threshold is 1MB by default.
-  int64_t constExprMaxSizeIncreaseThreshold = 1024 * 1024;
 
   // File paths to archives to import parameters from with an optional
   // `scope=` prefix.
@@ -121,13 +135,8 @@ struct GlobalOptimizationOptions {
   // Enables transposing all concatenations to the outer most dimension.
   bool outerDimConcat = false;
 
-  // Enables data tiling in global optimization phase. There are two data-tiling
-  // flags during the transition state. The other has to be off if this one is
-  // enabled. Any feature built on top of this path will be deprecated.
-  bool dataTiling = true;
-
-  // Enables const-expr hoisting into globals.
-  bool constExprHoisting = true;
+  // Enables data tiling in global optimization phase.
+  bool dataTiling = false;
 
   // Enables recursive evaluation of immutable globals using the compiler
   // and runtime.
@@ -221,11 +230,9 @@ struct DispatchCreationOptions {
 
   bool enableAggressiveFusion = false;
   bool enableFuseMultiUse = true;
+  bool enableSplitReduction = false;
 
-  // Enables data tiling in dispatch creation phase. There are two data-tiling
-  // flags during the transition state. The other has to be off if this one is
-  // enabled. The main difference is that this path enables the fusion for
-  // data-tiled ops.
+  // Enables data tiling in dispatch creation phase.
   bool dataTiling = false;
 
   void bindOptions(OptionsBinder &binder);

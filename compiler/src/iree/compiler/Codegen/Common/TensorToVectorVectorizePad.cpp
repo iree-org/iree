@@ -78,7 +78,7 @@ namespace {
 /// ```
 struct VectorizePadWithConditions final
     : public OpRewritePattern<tensor::PadOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::PadOp padOp,
                                 PatternRewriter &rewriter) const override {
@@ -234,8 +234,7 @@ struct VectorizePadWithConditions final
 
 struct TensorToVectorVectorizePadPass final
     : impl::TensorToVectorVectorizePadPassBase<TensorToVectorVectorizePadPass> {
-  using impl::TensorToVectorVectorizePadPassBase<
-      TensorToVectorVectorizePadPass>::TensorToVectorVectorizePadPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, arith::ArithDialect,

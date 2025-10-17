@@ -21,7 +21,7 @@ namespace {
 
 struct EinsumToDotGeneralPattern final
     : OpRewritePattern<mlir::stablehlo::EinsumOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::EinsumOp einsum,
                                 PatternRewriter &rewriter) const override {
@@ -138,9 +138,9 @@ struct EinsumToDotGeneralPattern final
     auto dimNumbers = mlir::stablehlo::DotDimensionNumbersAttr::get(
         rewriter.getContext(), lhsBatchingDims, rhsBatchingDims,
         lhsContractingDims, rhsContractingDims);
-    auto dotGeneralOp = rewriter.create<mlir::stablehlo::DotGeneralOp>(
-        einsum.getLoc(), dotGeneralResultType, einsum.getLhs(), einsum.getRhs(),
-        dimNumbers,
+    auto dotGeneralOp = mlir::stablehlo::DotGeneralOp::create(
+        rewriter, einsum.getLoc(), dotGeneralResultType, einsum.getLhs(),
+        einsum.getRhs(), dimNumbers,
         /*precision_config=*/ArrayAttr{}, mlir::stablehlo::DotAlgorithmAttr{});
 
     if (isNaturalOrder) {

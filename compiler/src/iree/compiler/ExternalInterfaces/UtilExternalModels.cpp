@@ -190,15 +190,14 @@ struct GlobalOpInterfaceExternalModel
     auto globalOp = cast<ml_program::GlobalOp>(op);
     if (globalOp.getIsMutable()) {
       return cast<IREE::Util::GlobalLoadOpInterface>(
-          builder
-              .create<ml_program::GlobalLoadOp>(
-                  loc, globalOp.getType(), FlatSymbolRefAttr::get(globalOp))
+          ml_program::GlobalLoadOp::create(builder, loc, globalOp.getType(),
+                                           FlatSymbolRefAttr::get(globalOp))
               .getOperation());
     } else {
       return cast<IREE::Util::GlobalLoadOpInterface>(
-          builder
-              .create<ml_program::GlobalLoadConstOp>(
-                  loc, globalOp.getType(), FlatSymbolRefAttr::get(globalOp))
+          ml_program::GlobalLoadConstOp::create(
+              builder, loc, globalOp.getType(),
+              FlatSymbolRefAttr::get(globalOp))
               .getOperation());
     }
   }
@@ -208,9 +207,8 @@ struct GlobalOpInterfaceExternalModel
                                                    OpBuilder &builder) const {
     auto globalOp = cast<ml_program::GlobalOp>(op);
     return cast<IREE::Util::GlobalStoreOpInterface>(
-        builder
-            .create<ml_program::GlobalStoreOp>(
-                loc, FlatSymbolRefAttr::get(globalOp), value)
+        ml_program::GlobalStoreOp ::create(
+            builder, loc, FlatSymbolRefAttr::get(globalOp), value)
             .getOperation());
   }
 };

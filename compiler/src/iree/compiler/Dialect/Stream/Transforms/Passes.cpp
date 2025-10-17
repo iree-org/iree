@@ -22,6 +22,12 @@ static llvm::cl::opt<bool> clAnnotateInputAffinities(
                    "the pipeline for debugging."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clReplicateGlobalsPerAffinity(
+    "iree-stream-experimental-replicate-globals-per-affinity",
+    llvm::cl::desc(
+        "Replicates globals for each unique affinity they are used with."),
+    llvm::cl::init(false));
+
 namespace mlir::iree_compiler::IREE::Stream {
 
 using FunctionLikeNest =
@@ -100,6 +106,10 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
     passManager.addPass(IREE::Stream::createAnnotateAffinitiesPass());
   }
 
+  if (clReplicateGlobalsPerAffinity) {
+    passManager.addPass(IREE::Stream::createReplicateGlobalsPerAffinityPass());
+  }
+
   // Converts from all input dialects into various levels of the stream dialect.
   // Tensor-like things go to stream.tensor.* ops while lower level buffer-like
   // things will go to stream.async.* ops.
@@ -121,6 +131,23 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
 
   // Bring all initializers together so that we can schedule them.
   passManager.addPass(IREE::Util::createCombineInitializersPass());
+
+  // After combining initializers we can end up with a lot of redundant code
+  // internally and may be able to eliminate some globals entirely (by either
+  // fusing globals always set to the same values or by eliminating globals
+  // used only during initialization). This requires a full global cleanup.
+  //
+  // We run this cleanup under a fixed-point iteration such that we can perform
+  // inter-procedural, intra-procedural, and canonicalization as separably
+  // verifiable/reusable passes alongside the custom stream ones. IPO will
+  // fold duplicate arguments/results and inline constants to allow the local
+  // optimizations to work more effectively.
+  {
+    OpPassManager ipoPipeline(mlir::ModuleOp::getOperationName());
+    buildStreamCleanupPassPipeline(ipoPipeline, transformOptions);
+    passManager.addPass(
+        IREE::Util::createFixedPointIteratorPass(std::move(ipoPipeline)));
+  }
 
   //----------------------------------------------------------------------------
   // Stream affinity/assignment
@@ -155,9 +182,15 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // Specialize the encodings before the lowering of stream tensor ops.
   passManager.addPass(IREE::Stream::createSpecializeEncodingsPass());
 
-  // Lower stream.tensor.* ops to stream.async.* ops based on
-  // affinity/configuration assigned during placement.
   FunctionLikeNest(passManager)
+      // Run canonicalization after specializing to clean up any
+      // duplicate/redundant IR and fold any duplicate encoding chains before we
+      // perform the encoding materialization.
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass)
+
+      // Lower stream.tensor.* ops to stream.async.* ops based on
+      // affinity/configuration assigned during placement.
       .addPass(IREE::Stream::createEncodeHostTensorsPass);
   passManager.addNestedPass<IREE::Stream::ExecutableOp>(
       IREE::Stream::createEncodeDeviceTensorsPass());
@@ -169,6 +202,9 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // lifetime assigned.
   passManager.addPass(IREE::Stream::createVerifyLoweringToAsyncResourcesPass());
 
+  // Elide transfers we can provably detect are not required due to the target
+  // topology. We do this prior to copy-on-write so that we are only providing
+  // real transfers to the analysis.
   passManager.addPass(IREE::Stream::createElideAsyncTransfersPass());
 
   // Materialize copy-on-write behavior with explicit stream.async.* ops.

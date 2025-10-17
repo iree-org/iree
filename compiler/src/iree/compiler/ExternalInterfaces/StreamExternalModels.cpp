@@ -76,6 +76,10 @@ struct OptionalOpAffinityAttrExternalModel
       op->removeAttr("stream.affinity");
     }
   }
+
+  IREE::Stream::AffinityAttr getResultAffinityAttr(Operation *op) const {
+    return getAffinityAttr(op);
+  }
 };
 
 struct FlowBarrierTargetAffinityAttrExternalModel
@@ -100,6 +104,10 @@ struct FlowBarrierTargetAffinityAttrExternalModel
   void setAffinityAttr(Operation *op, IREE::Stream::AffinityAttr value) const {
     op->setAttr("target", value);
   }
+
+  IREE::Stream::AffinityAttr getResultAffinityAttr(Operation *op) const {
+    return getAffinityAttr(op);
+  }
 };
 
 struct FlowTransferTargetAffinityAttrExternalModel
@@ -119,6 +127,10 @@ struct FlowTransferTargetAffinityAttrExternalModel
 
   void setAffinityAttr(Operation *op, IREE::Stream::AffinityAttr value) const {
     op->setAttr("target", value);
+  }
+
+  IREE::Stream::AffinityAttr getResultAffinityAttr(Operation *op) const {
+    return getAffinityAttr(op);
   }
 };
 
@@ -147,6 +159,10 @@ struct HALTensorAffinityAttrExternalModel
     } else {
       op->removeAttr("affinity");
     }
+  }
+
+  IREE::Stream::AffinityAttr getResultAffinityAttr(Operation *op) const {
+    return getAffinityAttr(op);
   }
 };
 
@@ -177,6 +193,10 @@ struct GlobalOpAffinityAttrExternalModel
       op->removeAttr("stream.affinity");
     }
   }
+
+  IREE::Stream::AffinityAttr getResultAffinityAttr(Operation *op) const {
+    return getAffinityAttr(op);
+  }
 };
 
 template <typename OpT, bool kRequiresAffinity = true>
@@ -202,6 +222,10 @@ struct AffinityOpAttrExternalModel
     } else {
       op->removeAttr("stream.affinity");
     }
+  }
+
+  IREE::Stream::AffinityAttr getResultAffinityAttr(Operation *op) const {
+    return getAffinityAttr(op);
   }
 };
 

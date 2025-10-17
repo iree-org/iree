@@ -74,10 +74,10 @@ static int64_t getSharedMemoryBytes(IREE::GPU::TargetAttr gpuTarget) {
   return wgp.getMaxWorkgroupMemoryBytes();
 }
 
-// Returns an initial UKernelConfigAttr containing the ukernel name and
-// def_attrs. Does not yet contain bitcode-dependent fields such as shared
-// memory size. Returns {} if no ukernel.
-static IREE::GPU::UKernelConfigAttr getInitialUKernelConfig(Operation *op) {
+// Returns an initial UKernelDescriptorAttr containing the ukernel name and
+// ukernel kind. Returns nullptr if no ukernel.
+static IREE::Codegen::UKernelDescriptorAttr
+getInitialUKernelConfig(Operation *op) {
   MLIRContext *context = op->getContext();
   auto [name, suffix] = getUKernelNameAndSuffix(op);
   if (name.empty()) {
@@ -90,11 +90,8 @@ static IREE::GPU::UKernelConfigAttr getInitialUKernelConfig(Operation *op) {
   if (isROCMBackend(execTarget)) {
     auto nameAttr = StringAttr::get(
         context, llvm::formatv("iree_uk_amdgpu_{}_{}", name, suffix));
-    auto defsAttr = DictionaryAttr::get(
-        context, {{StringAttr::get(context, "vm.import.module"),
-                   StringAttr::get(context, "rocm")}});
-    return IREE::GPU::UKernelConfigAttr::get(context, nameAttr, defsAttr,
-                                             /*shared_memory_bytes=*/0);
+    return IREE::Codegen::UKernelDescriptorAttr::get(
+        context, nameAttr, IREE::Codegen::UKernelArgumentKind::Bitcode);
   }
   return {};
 }
@@ -175,199 +172,20 @@ static std::string getBitcodeFilename(IREE::GPU::TargetAttr gpuTarget,
   return llvm::formatv("{}.{}.bc", name, gpuTarget.getArch());
 }
 
-// Helper for getSharedMemoryBytes. Typical latency: 2 ms.
-// Evaluates the shared memory size required by the multi_mma microkernel by
-// interpreting a bitcode function with a specific name.
-// On failure, an op warning is emitted and {} is returned.
-static std::optional<int> expensivelyEvaluateSharedMemoryBytes(
-    IREE::Codegen::InnerTiledOp op, IREE::GPU::UKernelConfigAttr ukernelConfig,
-    IREE::HAL::ExecutableObjectAttr bitcodeObject,
-    IREE::GPU::TargetAttr gpuTarget) {
-  auto mma = dyn_cast<IREE::GPU::DataTiledMMAAttr>(op.getKind());
-
-  auto bitcodeData = bitcodeObject.getData();
-  std::string buffer;
-  buffer.resize(bitcodeData.getStorageSize());
-  if (failed(bitcodeObject.getData().serializeToBuffer(
-          op->getLoc(), llvm::endianness::native,
-          ArrayRef<char>{buffer.data(), buffer.size()}))) {
-    op.emitWarning("Failed to serialize bitcode.");
-    return {};
-  }
-  llvm::LLVMContext llvmContext;
-  llvm::Expected<std::unique_ptr<llvm::Module>> module =
-      llvm::getLazyBitcodeModule(
-          llvm::MemoryBufferRef{buffer, ukernelConfig.getName()}, llvmContext,
-          /*ShouldLazyLoadMetadata=*/true);
-  if (!module) {
-    op.emitWarning("Failed to parse bitcode module.");
-    return {};
-  }
-  llvm::EngineBuilder builder(std::move(module.get()));
-  std::string builderError;
-  builder.setEngineKind(llvm::EngineKind::Interpreter)
-      .setErrorStr(&builderError);
-  std::unique_ptr<llvm::ExecutionEngine> interpreter{builder.create()};
-  if (!interpreter) {
-    op.emitWarning("Failed to create the interpreter.");
-    return {};
-  }
-  std::string queryFuncName =
-      llvm::formatv("{}_query_shared_memory_bytes", ukernelConfig.getName());
-  llvm::Function *func = interpreter->FindFunctionNamed(queryFuncName);
-  if (!func) {
-    op.emitWarning(llvm::formatv(
-        "Bitcode does not contain a function named {}.", queryFuncName));
-    return {};
-  }
-  auto constI32 = [](int32_t val) {
-    llvm::GenericValue v;
-    v.IntVal = APInt(32, val);
-    return v;
-  };
-  SmallVector<llvm::GenericValue> args{
-      constI32(mma.getIntrinsicsM()), constI32(mma.getSubgroupsM()),
-      constI32(mma.getIntrinsicsN()), constI32(mma.getSubgroupsN()),
-      constI32(mma.getIntrinsicsK())};
-  if (func->arg_size() != args.size()) {
-    op.emitWarning(
-        llvm::formatv("Bitcode function {} takes {} arguments. Expected {}.",
-                      queryFuncName, func->arg_size(), args.size()));
-    return {};
-  }
-  llvm::GenericValue interpreterResult = interpreter->runFunction(func, args);
-  if (interpreter->hasError()) {
-    op.emitWarning(llvm::formatv("Error while interpreting bitcode: {}.",
-                                 interpreter->getErrorMessage()));
-    return {};
-  }
-  int sharedMemoryBytes = interpreterResult.IntVal.getSExtValue();
-
-  // Reject a ukernel that would consume too much shared memory, which we need
-  // to save for other purposes. This threshold can always be adjusted but we
-  // default to a low threshold to get an early signal.
-  int maxSharedMemoryBytes = getSharedMemoryBytes(gpuTarget) / 4;
-  if (sharedMemoryBytes > maxSharedMemoryBytes) {
-    op.emitWarning(llvm::formatv("The shared memory size {} required by the "
-                                 "ukernel exceeds the maximum allowed size {}.",
-                                 sharedMemoryBytes, maxSharedMemoryBytes));
-    return {};
-  }
-  return sharedMemoryBytes;
-}
-
-// Returns the shared memory size required by the multi_mma ukernel.
-// On failure, an op warning is emitted and {} is returned.
-// Uses a static cache to avoid calling expensivelyEvaluateSharedMemoryBytes
-// more than once per DataTiledMMAAttr value.
-static std::optional<int>
-getSharedMemoryBytes(IREE::Codegen::InnerTiledOp op,
-                     IREE::GPU::UKernelConfigAttr ukernelConfig,
-                     IREE::HAL::ExecutableObjectAttr bitcodeObject,
-                     IREE::GPU::TargetAttr gpuTarget) {
-  auto mma = dyn_cast<IREE::GPU::DataTiledMMAAttr>(op.getKind());
-
-  // We use the stringification of the attributes, rather than the
-  // attributes themselves, as the key, to ensure it's self-contained and does
-  // not contain pointers to other objects, such as a `MLIRContext*`, which
-  // could go dangling.
-  std::string key = llvm::formatv("mma = {}, gpuTarget = {}", mma, gpuTarget);
-
-  struct CacheEntry {
-    std::optional<int> sharedMemoryBytes;
-    std::mutex mutex;
-    bool evaluated = false;
-  };
-
-  // The cache and the mutex guarding it.
-  // We store the CacheEntry's by pointers, so that we don't need to worry about
-  // entryPtr being invalidated.
-  static llvm::StringMap<std::unique_ptr<CacheEntry>> cache;
-  static std::mutex cacheMutex;
-
-  CacheEntry *entryPtr = nullptr;
-
-  {
-    // Critical section on `cacheMutex`. This is the only place where we
-    // access `cache`. When we will later update a cache entry, that will be
-    // through `entryPtr`, independently of `cache`.
-    std::lock_guard<std::mutex> lock(cacheMutex);
-    auto iter = cache.find(key);
-    if (iter != cache.end()) {
-      // Cache hit. Early return.
-      return iter->second->sharedMemoryBytes;
-    }
-    // Cache miss. Create a new cache entry and acquire its mutex.
-    entryPtr =
-        cache.insert({key, std::make_unique<CacheEntry>()}).first->second.get();
-    entryPtr->mutex.lock();
-  }
-
-  // If the entry still isn't evaluated after we have acquired its mutex,
-  // perform the evaluation now.
-  if (!entryPtr->evaluated) {
-    entryPtr->sharedMemoryBytes = expensivelyEvaluateSharedMemoryBytes(
-        op, ukernelConfig, bitcodeObject, gpuTarget);
-    entryPtr->evaluated = true;
-  }
-
-  entryPtr->mutex.unlock();
-  return entryPtr->sharedMemoryBytes;
-}
-
-// Returns the finalized UKernelConfigAttr to use for `op`, or {} if `op` should
-// not use a ukernel.
-static IREE::GPU::UKernelConfigAttr
-finalizeConfig(IREE::Codegen::InnerTiledOp op,
-               IREE::GPU::UKernelConfigAttr ukernelConfig,
-               IREE::HAL::ExecutableObjectAttr bitcodeObject,
-               IREE::GPU::TargetAttr gpuTarget) {
-  std::optional<int> sharedMemoryBytes =
-      getSharedMemoryBytes(op, ukernelConfig, bitcodeObject, gpuTarget);
-  if (!sharedMemoryBytes) {
-    // Could not evaluate sharedMemoryBytes. Prevent the ukernel selection.
-    return {};
-  }
-  return IREE::GPU::UKernelConfigAttr::get(
-      op->getContext(), ukernelConfig.getName(), ukernelConfig.getDefAttrs(),
-      *sharedMemoryBytes);
-}
-
-// Returns the finalized UKernelConfigAttr to use for `op`, or {} if `op` should
-// not use a ukernel.
-static IREE::GPU::UKernelConfigAttr
-finalizeConfig(Operation *op, IREE::GPU::UKernelConfigAttr ukernelConfig,
-               IREE::HAL::ExecutableObjectAttr bitcodeObject,
-               IREE::GPU::TargetAttr gpuTarget) {
-  if (auto innerTiledOp = dyn_cast<IREE::Codegen::InnerTiledOp>(op)) {
-    if (isa<IREE::Codegen::InnerTileDescAttrInterface>(
-            innerTiledOp.getKind())) {
-      return finalizeConfig(innerTiledOp, ukernelConfig, bitcodeObject,
-                            gpuTarget);
-    }
-  }
-  return ukernelConfig;
-}
-
-// Ensures that the op has ukernel bitcode as a hal.executable.object, stored
-// as a hal.executable.objects attribute on the op itself, ready to be hoisted
-// by the HoistExecutableObjects pass, and returns the finalized config attr
-// with the remaining bitcode-dependent fields populated.
-// Returns {} if no bitcode was found for the configured ukernel, of if an error
-// occurred trying to infer bitcode-dependent config fields (which may require
-// interpreting bitcode).
-static IREE::GPU::UKernelConfigAttr ensureUKernelBitcodeAndFinalizeConfig(
-    Operation *op, IREE::GPU::UKernelConfigAttr ukernelConfig) {
-  MLIRContext *context = op->getContext();
+static IREE::Codegen::UKernelDescriptorAttr
+ensureUKernelBitcodeAndFinalizeConfig(
+    Operation *op, IREE::Codegen::UKernelDescriptorAttr ukernelConfig) {
   if (!ukernelConfig) {
     return {};
   }
+  MLIRContext *context = op->getContext();
   auto target = IREE::HAL::ExecutableTargetAttr::lookup(op);
-  IREE::GPU::TargetAttr gpuTarget = getGPUTargetAttr(op->getContext(), target);
+  IREE::GPU::TargetAttr gpuTarget = getGPUTargetAttr(context, target);
   if (!gpuTarget) {
     return {};
   }
-  std::string filename = getBitcodeFilename(gpuTarget, ukernelConfig.getName());
+  std::string filename =
+      getBitcodeFilename(gpuTarget, ukernelConfig.getUkernelName());
 
   ArrayAttr sourceExecutableObjects = lookUpExecutableObjects(op);
   IREE::HAL::ExecutableObjectAttr bitcodeObject =
@@ -377,13 +195,14 @@ static IREE::GPU::UKernelConfigAttr ensureUKernelBitcodeAndFinalizeConfig(
   }
   op->setAttr(executableObjectsAttrName,
               ArrayAttr::get(context, bitcodeObject));
-  return finalizeConfig(op, ukernelConfig, bitcodeObject, gpuTarget);
+  return ukernelConfig;
 }
 
 } // namespace
 
-IREE::GPU::UKernelConfigAttr selectUKernel(Operation *op) {
-  IREE::GPU::UKernelConfigAttr initialConfig = getInitialUKernelConfig(op);
+IREE::Codegen::UKernelDescriptorAttr selectUKernel(Operation *op) {
+  IREE::Codegen::UKernelDescriptorAttr initialConfig =
+      getInitialUKernelConfig(op);
   return ensureUKernelBitcodeAndFinalizeConfig(op, initialConfig);
 }
 

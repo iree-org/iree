@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-dispatch-creation-hoist-encoding-ops --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(iree-dispatch-creation-hoist-encoding-ops,cse)" --split-input-file %s | FileCheck %s
 
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
@@ -321,9 +321,50 @@ util.func public @propagate_unset_encoding_through_generic(%arg0: tensor<?x4096x
 // CHECK:           %[[GENERIC:.+]] = linalg.generic
 // CHECK-SAME:        ins(%[[ARG0]], %[[SET_ENCODING]] :  tensor<?x4096xf32, #[[$ENCODING]]>, tensor<f32, #[[$ENCODING1]]>)
 // CHECK-SAME:        outs(%[[EMPTY]] :  tensor<4096x?xbf16, #[[$ENCODING2]]>)
-// CHECK:           %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[GENERIC]] : tensor<4096x?xbf16, #[[$ENCODING2]]> -> tensor<4096x?xbf16>{%[[ARG2]]}
+// CHECK:           %[[C0:.+]] = arith.constant 0 : index
+// CHECK:           %[[RESULT_DIM:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+// CHECK:           %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[GENERIC]] : tensor<4096x?xbf16, #[[$ENCODING2]]> -> tensor<4096x?xbf16>{%[[RESULT_DIM]]}
 // CHECK:           flow.return %[[UNSET_ENCODING:.+]] : tensor<4096x?xbf16>
 // CHECK:         }
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map3 = affine_map<(d0, d1) -> (d1, d0)>
+#map4 = affine_map<(d0, d1) -> (d0, d1)>
+#encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [f8E4M3FNUZ, f8E4M3FNUZ, f32], user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>]>
+util.func public @propagate_unset_encoding_transposed_result_dims(%arg0: tensor<?x?xf32, #encoding>) -> tensor<?x?xbf16> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32, #encoding>
+  %d1 = tensor.dim %arg0, %c1 : tensor<?x?xf32, #encoding>
+  %0 = flow.dispatch.region -> (tensor<?x?xbf16>{%d1, %d0}) {
+    %1 = iree_encoding.unset_encoding %arg0 : tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%d0, %d1}
+    %2 = tensor.empty(%d0, %d1) : tensor<?x?xbf16>
+    %3 = linalg.generic {indexing_maps = [#map3, #map4], iterator_types = ["parallel", "parallel"]} ins(%1 : tensor<?x?xf32>) outs(%2 : tensor<?x?xbf16>) {
+    ^bb0(%in: f32, %out: bf16):
+      %5 = arith.truncf %in : f32 to bf16
+      linalg.yield %5 : bf16
+    } -> tensor<?x?xbf16>
+    flow.return %3 : tensor<?x?xbf16>
+  }
+  util.return %0 : tensor<?x?xbf16>
+}
+// CHECK-LABEL: @propagate_unset_encoding_transposed_result_dims
+// CHECK-SAME:    %[[ARG0:.+]]: tensor<?x?xf32, #[[$ENCODING]]>
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+// CHECK:         flow.dispatch.region -> (tensor<?x?xbf16>{%[[D1]], %[[D0]]}) {
+// CHECK:           %[[GENERIC:.+]] = linalg.generic
+// CHECK:           %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[GENERIC]]
+// CHECK-SAME:        -> tensor<?x?xbf16>{%[[D1]], %[[D0]]}
+// CHECK:           flow.return %[[UNSET_ENCODING:.+]] : tensor<?x?xbf16>
+// CHECK:         }
+
 
 // -----
 
@@ -357,7 +398,9 @@ util.func public @propagate_unset_encoding_through_generic_with_scalar(%arg0: te
 // CHECK:         %{{.+}} = flow.dispatch.region -> (tensor<4096x?xf32>{%[[ARG2]]}
 // CHECK:           %[[GENERIC:.+]] = linalg.generic
 // CHECK-SAME:        ins(%[[ARG0]], %[[ARG1]]
-// CHECK:           %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[GENERIC]] : tensor<4096x?xf32, #[[$ENCODING]]> -> tensor<4096x?xf32>{%[[ARG2]]}
+// CHECK:           %[[C1:.+]] = arith.constant 1 : index
+// CHECK:           %[[RESULT_DIM:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+// CHECK:           %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[GENERIC]] : tensor<4096x?xf32, #[[$ENCODING]]> -> tensor<4096x?xf32>{%[[RESULT_DIM]]}
 // CHECK:           return %[[UNSET_ENCODING]]
 
 // -----

@@ -58,7 +58,7 @@ struct StripLinalgOpCompilationInfo final
 
 struct StripAttentionOpCompilationInfo final
     : OpRewritePattern<IREE::LinalgExt::AttentionOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::LinalgExt::AttentionOp attentionOp,
                                 PatternRewriter &rewriter) const override {
     if (getCompilationInfo(attentionOp)) {

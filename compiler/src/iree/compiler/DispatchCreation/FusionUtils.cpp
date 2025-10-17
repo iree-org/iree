@@ -40,14 +40,28 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
   Block &body = producerOp->getRegion(0).front();
   if (std::begin(body)->hasTrait<OpTrait::IsTerminator>())
     return true;
-  if (llvm::all_of(body.getArguments(),
+
+  auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp);
+  if (!linalgConsumerOp) {
+    return false;
+  }
+
+  // The operands aren't used, its just an `linalg.index` or `tensor.extract`
+  // op. Fuse with all non-reduction ops.
+  if (linalgConsumerOp.getNumParallelLoops() ==
+          linalgConsumerOp.getNumLoops() &&
+      llvm::all_of(body.getArguments(),
                    [](BlockArgument arg) { return arg.use_empty(); })) {
-    // The operands aren't used, its just an `linalg.index` op.
     return true;
   }
 
   // If producer does not have a single user, dont fuse.
   if (!producerOp->hasOneUse()) {
+    return false;
+  }
+
+  if (!options.fuseBroadcastConsumers &&
+      IREE::LinalgExt::isBroadcastingOp(linalgConsumerOp)) {
     return false;
   }
 
@@ -62,13 +76,13 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
     return false;
   }
 
-  auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp);
-  if (!linalgConsumerOp) {
-    return false;
-  }
-
   if (!options.fuseTruncateOps &&
       IREE::LinalgExt::isBitTruncateOp(producerOp)) {
+    // TODO(IanWood1): do this regardless of `options.fuseTruncateOps`.
+    // Never fuse truncate -> extend.
+    if (IREE::LinalgExt::isBitExtendOp(consumerOp)) {
+      return false;
+    }
     // Do not fuse with bit-truncate-like operations with their consumers
     // unless:
     //

@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/CombineLayoutTransformation.h"
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
@@ -219,9 +218,8 @@ foldExtractSliceIntoMapScatter(RewriterBase &rewriter,
   for (auto [bound, srcIdx] : llvm::zip_equal(bounds, srcIndices)) {
     Value boundValue = getValueOrCreateConstantIndexOp(rewriter, loc, bound);
     auto isOutOfBounds =
-        rewriter
-            .create<arith::CmpIOp>(loc, arith::CmpIPredicate::ult, srcIdx,
-                                   boundValue)
+        arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::ult, srcIdx,
+                              boundValue)
             ->getResult(0);
     mask = arith::AndIOp::create(rewriter, loc, mask, isOutOfBounds);
   }
@@ -557,8 +555,8 @@ combineLayoutTransformation(MLIRContext *ctx, FunctionOpInterface funcOp,
           return consumerOperand.getDefiningOp<tensor::EmptyOp>();
         });
   };
-  linalg::populateDataLayoutPropagationPatterns(propagationPatterns,
-                                                controlPropagationFn);
+  linalg::populateDataLayoutPropagationPatterns(
+      propagationPatterns, controlPropagationFn, /*PoisonPaddingOk=*/true);
   // TODO(Max191): The propagation patterns could be applied at the same time as
   // relayout ops are folded into the map_scatter, which may enable even more
   // folding. This requires the relayout op folding to be done as pattern
@@ -681,8 +679,7 @@ namespace {
 struct CombineLayoutTransformationPass final
     : impl::CombineLayoutTransformationPassBase<
           CombineLayoutTransformationPass> {
-  using impl::CombineLayoutTransformationPassBase<
-      CombineLayoutTransformationPass>::CombineLayoutTransformationPassBase;
+  using Base::Base;
 
   void runOnOperation() override {
     CombineRelayoutOpsControlFn controlFn =

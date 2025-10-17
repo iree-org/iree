@@ -549,16 +549,6 @@ collapseParallelInsertOp(RewriterBase &rewriter,
   Value loopInit = forallOp.getOutputs()[resultIdx];
   SmallVector<OpFoldResult> mixedInitSizes =
       tensor::getMixedSizes(rewriter, loc, loopInit);
-  auto prod = [&](ArrayRef<OpFoldResult> vals) -> OpFoldResult {
-    auto mulMap = AffineMap::get(
-        2, 0, {rewriter.getAffineDimExpr(0) * rewriter.getAffineDimExpr(1)});
-    OpFoldResult product = rewriter.getIndexAttr(1);
-    for (OpFoldResult val : vals) {
-      product = affine::makeComposedFoldedAffineApply(rewriter, loc, mulMap,
-                                                      {product, val});
-    }
-    return product;
-  };
   SmallVector<OpFoldResult> offsets = parallelInsertOp.getMixedOffsets();
   SmallVector<OpFoldResult> sizes = parallelInsertOp.getMixedSizes();
   SmallVector<OpFoldResult> newSizes, newOffsets;
@@ -577,13 +567,13 @@ collapseParallelInsertOp(RewriterBase &rewriter,
           return getValueOrCreateConstantIndexOp(rewriter, loc, ofr);
         });
     OpFoldResult collapsedOffset =
-        rewriter
-            .create<affine::AffineLinearizeIndexOp>(loc, offsetVals, basis,
-                                                    /*disjoint=*/true)
+        affine::AffineLinearizeIndexOp::create(rewriter, loc, offsetVals, basis,
+                                               /*disjoint=*/true)
             .getResult();
     ArrayRef<OpFoldResult> groupSizes(sizes.begin() + group.front(),
                                       sizes.begin() + group.back() + 1);
-    OpFoldResult collapsedSize = prod(groupSizes);
+    OpFoldResult collapsedSize =
+        IREE::LinalgExt::computeProductUsingAffine(rewriter, loc, groupSizes);
     newOffsets.push_back(collapsedOffset);
     newSizes.push_back(collapsedSize);
   }
@@ -960,7 +950,7 @@ fuseExtractSliceIntoProducerForall(RewriterBase &rewriter,
 namespace {
 struct LowerInnerTiledPattern
     : public OpRewritePattern<IREE::Codegen::InnerTiledOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
     if (tiledOp.hasTensorSemantics()) {
@@ -1090,7 +1080,7 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertScaledContractionToInnerTiledMma(
   SmallVector<int64_t> rhsInnerPerm = getNormalizedPermutation(
       rhsMap.getMinorSubMap(3), {kExpr, kBExpr, nExpr});
   SmallVector<int64_t> sc2InnerPerm =
-      getNormalizedPermutation(sc2Map.getMinorSubMap(2), {nExpr, kExpr});
+      getNormalizedPermutation(sc2Map.getMinorSubMap(2), {kExpr, nExpr});
   SmallVector<int64_t> accInnerPerm =
       getNormalizedPermutation(accMap.getMinorSubMap(2), {mExpr, nExpr});
   if (lhsInnerPerm.empty() || sc1InnerPerm.empty() || rhsInnerPerm.empty() ||
@@ -1435,7 +1425,7 @@ distributeInnerTiledOp(RewriterBase &rewriter,
 namespace {
 struct DropInnerTiledUnitDimsPattern
     : public OpRewritePattern<IREE::Codegen::InnerTiledOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
     if (tiledOp.hasTensorSemantics()) {
@@ -1795,7 +1785,7 @@ void mapLaneForalls(RewriterBase &rewriter, Operation *funcOp,
 namespace {
 struct LowerBarrierRegion
     : public OpRewritePattern<IREE::GPU::BarrierRegionOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::GPU::BarrierRegionOp barrierRegionOp,
                                 PatternRewriter &rewriter) const final {
     Location loc = barrierRegionOp.getLoc();
@@ -1886,7 +1876,7 @@ vectorizeStaticInnerTiledOp(RewriterBase &rewriter,
 namespace {
 struct VectorizeStaticInnerTiledOpPattern final
     : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
     return vectorizeStaticInnerTiledOp(rewriter, tiledOp);
@@ -1905,7 +1895,7 @@ void populateIREEGPUVectorizationPatterns(RewritePatternSet &patterns) {
 namespace {
 struct LowerValueBarrierPattern
     : public OpRewritePattern<IREE::GPU::ValueBarrierOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::GPU::ValueBarrierOp barrier,
                                 PatternRewriter &rewriter) const override {
     if (barrier.hasTensorSemantics()) {
@@ -1922,7 +1912,7 @@ struct LowerValueBarrierPattern
 
 struct LowerGlobalLoadDMAPattern
     : public OpRewritePattern<IREE::GPU::GlobalLoadDMAOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(IREE::GPU::GlobalLoadDMAOp dmaOp,
                                 PatternRewriter &rewriter) const override {
     Type transferType = rewriter.getI32Type();

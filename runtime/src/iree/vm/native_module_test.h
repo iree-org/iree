@@ -266,7 +266,7 @@ static_assert(IREE_ARRAYSIZE(((module_b_state_t*)NULL)->imports) ==
                   IREE_ARRAYSIZE(module_b_imports_),
               "import storage must be able to hold all imports");
 static const iree_string_pair_t module_b_entry_attrs_[] = {
-    {IREE_SV("key1"), IREE_SV("value1")},
+    {{IREE_SV("key1")}, {IREE_SV("value1")}},
 };
 static const iree_vm_native_export_descriptor_t module_b_exports_[] = {
     {IREE_SV("entry"), IREE_SV("0i_i"), IREE_ARRAYSIZE(module_b_entry_attrs_),

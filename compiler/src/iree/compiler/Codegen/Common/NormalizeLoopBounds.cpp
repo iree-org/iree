@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -169,8 +168,7 @@ LogicalResult normalizeLoopBounds(RewriterBase &rewriter,
 namespace {
 struct NormalizeLoopBoundsPass final
     : impl::NormalizeLoopBoundsPassBase<NormalizeLoopBoundsPass> {
-  using impl::NormalizeLoopBoundsPassBase<
-      NormalizeLoopBoundsPass>::NormalizeLoopBoundsPassBase;
+  using Base::Base;
 
   void runOnOperation() override {
     Operation *op = getOperation();

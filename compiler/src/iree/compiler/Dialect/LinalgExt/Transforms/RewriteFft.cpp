@@ -38,7 +38,7 @@ FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op, Value operand,
     SmallVector<OpFoldResult> mixedSizes =
         tensor::getMixedSizes(b, b.getLoc(), real);
     Value emptyTensor =
-        b.create<tensor::EmptyOp>(mixedSizes, realType.getElementType());
+        tensor::EmptyOp::create(b, mixedSizes, realType.getElementType());
 
     SmallVector<AffineMap> maps;
     maps.push_back(
@@ -59,25 +59,25 @@ FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op, Value operand,
         values.push_back(b.getI64IntegerAttr(r));
       }
       auto type = RankedTensorType::get({fftLength}, b.getI64Type());
-      return b.create<arith::ConstantOp>(
-          type, DenseIntElementsAttr::get(type, values));
+      return arith::ConstantOp::create(b, type,
+                                       DenseIntElementsAttr::get(type, values));
     };
     Value indices = getBitReversalBuffer(b, fftLength);
-    auto genericOp = b.create<linalg::GenericOp>(
-        TypeRange{realType}, indices, emptyTensor, maps, iterTypes,
+    auto genericOp = linalg::GenericOp::create(
+        b, TypeRange{realType}, indices, emptyTensor, maps, iterTypes,
         [&](OpBuilder &b, Location loc, ValueRange args) {
           SmallVector<Value> ivs;
           for (auto i : llvm::seq<uint64_t>(0, rank - 1)) {
-            ivs.push_back(b.create<linalg::IndexOp>(loc, i));
+            ivs.push_back(linalg::IndexOp::create(b, loc, i));
           }
           ivs.push_back(
-              b.create<arith::IndexCastOp>(loc, b.getIndexType(), args[0]));
-          b.create<linalg::YieldOp>(
-              loc, b.create<tensor::ExtractOp>(loc, real, ivs).getResult());
+              arith::IndexCastOp::create(b, loc, b.getIndexType(), args[0]));
+          linalg::YieldOp::create(
+              b, loc, tensor::ExtractOp::create(b, loc, real, ivs).getResult());
         });
     return {genericOp.getResult(0),
-            b.create<arith::ConstantOp>(
-                realType,
+            arith::ConstantOp::create(
+                b, realType,
                 DenseFPElementsAttr::get(
                     realType, llvm::cast<Attribute>(b.getF32FloatAttr(0.0))))};
   };
@@ -96,20 +96,20 @@ FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op, Value operand,
       imag.push_back(b.getF32FloatAttr(v.imag()));
     }
     auto type = RankedTensorType::get({mh}, b.getF32Type());
-    return {
-        b.create<arith::ConstantOp>(type, DenseFPElementsAttr::get(type, real)),
-        b.create<arith::ConstantOp>(type,
-                                    DenseFPElementsAttr::get(type, imag))};
+    return {arith::ConstantOp::create(b, type,
+                                      DenseFPElementsAttr::get(type, real)),
+            arith::ConstantOp::create(b, type,
+                                      DenseFPElementsAttr::get(type, imag))};
   };
 
   int64_t lognPlus1 = std::log(fftLength) / std::log<int64_t>(2) + 1;
   for (auto s : llvm::seq<uint64_t>(1, lognPlus1)) {
     SmallVector<Value> inputs;
-    inputs.push_back(b.create<arith::ConstantIndexOp>(s));
+    inputs.push_back(arith::ConstantIndexOp::create(b, s));
     inputs.append(getCoeffConstants(b, s));
-    results = b.create<IREE::LinalgExt::FftOp>(
-                   TypeRange{results[0].getType(), results[1].getType()},
-                   inputs, results)
+    results = IREE::LinalgExt::FftOp::create(
+                  b, TypeRange{results[0].getType(), results[1].getType()},
+                  inputs, results)
                   .getResults();
   }
 
@@ -122,10 +122,10 @@ FailureOr<std::pair<Value, Value>> rewriteFft(Operation *op, Value operand,
   SmallVector<OpFoldResult> sizes =
       tensor::getMixedSizes(b, b.getLoc(), operand);
   sizes.back() = b.getIndexAttr(shape.back());
-  Value real =
-      b.create<tensor::ExtractSliceOp>(ty, results[0], offsets, sizes, strides);
-  Value imag =
-      b.create<tensor::ExtractSliceOp>(ty, results[1], offsets, sizes, strides);
+  Value real = tensor::ExtractSliceOp::create(b, ty, results[0], offsets, sizes,
+                                              strides);
+  Value imag = tensor::ExtractSliceOp::create(b, ty, results[1], offsets, sizes,
+                                              strides);
 
   return std::make_pair(real, imag);
 }

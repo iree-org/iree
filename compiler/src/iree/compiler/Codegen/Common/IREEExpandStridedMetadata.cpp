@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
@@ -131,7 +130,7 @@ namespace {
 
 struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
     : public OpRewritePattern<memref::ExtractStridedMetadataOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(memref::ExtractStridedMetadataOp op,
                                 PatternRewriter &rewriter) const override {
     auto binding =
@@ -253,8 +252,7 @@ struct ConvertCodegenIREEExtractMetadataToMemRef
 
 struct IREEExpandStridedMetadataPass final
     : impl::IREEExpandStridedMetadataPassBase<IREEExpandStridedMetadataPass> {
-  using impl::IREEExpandStridedMetadataPassBase<
-      IREEExpandStridedMetadataPass>::IREEExpandStridedMetadataPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, arith::ArithDialect,

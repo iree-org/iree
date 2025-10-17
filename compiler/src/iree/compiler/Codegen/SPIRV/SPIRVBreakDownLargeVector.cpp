@@ -62,7 +62,7 @@ namespace {
 // stored in memory as [BA, DC, FE, HG], and read as an i32 HGFEDCBA. Therefore
 // the first i4 element is the lest significant 4 bits.
 struct BreakDownCastExtractExtend final : OpRewritePattern<arith::ExtUIOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(arith::ExtUIOp extOp,
                                 PatternRewriter &rewriter) const override {
     auto extractOp =
@@ -70,7 +70,7 @@ struct BreakDownCastExtractExtend final : OpRewritePattern<arith::ExtUIOp> {
     if (!extractOp)
       return failure();
 
-    auto bitCastOp = extractOp.getVector().getDefiningOp<vector::BitCastOp>();
+    auto bitCastOp = extractOp.getSource().getDefiningOp<vector::BitCastOp>();
     if (!bitCastOp)
       return failure();
 

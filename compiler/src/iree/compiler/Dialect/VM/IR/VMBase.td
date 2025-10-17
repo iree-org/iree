@@ -246,7 +246,7 @@ def VM_AnyRefObject : DialectType<
 
 def VM_AnyRef : DialectType<
     Util_Dialect,
-    CPred<"isa<IREE::VM::RefType>($_self)">,
+    CPred<"::llvm::isa<::mlir::iree_compiler::IREE::VM::RefType>($_self)">,
     "ref"> {
   let description = [{
     An iree_vm_ref_t/iree::vm::ref<T> of some type.
@@ -255,8 +255,9 @@ def VM_AnyRef : DialectType<
 
 class VM_RefOf<Type type> :
     Type<And<[
-      CPred<"isa<IREE::VM::RefType>($_self)">,
-      SubstLeaves<"$_self", "cast<IREE::VM::RefType>($_self).getObjectType()",
+      CPred<"::llvm::isa<::mlir::iree_compiler::IREE::VM::RefType>($_self)">,
+      SubstLeaves<"$_self",
+                  "::llvm::cast<::mlir::iree_compiler::IREE::VM::RefType>($_self).getObjectType()",
                   type.predicate>
     ]>, "ref<" # type.summary # ">"> {
   // Set the builder call if the base type has a builder call.
@@ -270,7 +271,7 @@ class VM_RefOf<Type type> :
 
 def VM_BufferType : DialectType<
     Util_Dialect,
-    CPred<"isa<IREE::VM::BufferType>($_self)">,
+    CPred<"::llvm::isa<mlir::iree_compiler::IREE::VM::BufferType>($_self)">,
     "buffer"> {
   let description = [{
     A byte buffer.
@@ -285,8 +286,8 @@ def VM_BufferType : DialectType<
 def VM_AnyList : DialectType<
     Util_Dialect,
     And<[
-      CPred<"isa<IREE::VM::RefType>($_self)">,
-      CPred<"isa<IREE::VM::ListType>(cast<IREE::VM::RefType>($_self).getObjectType())">,
+      CPred<"::llvm::isa<::mlir::iree_compiler::IREE::VM::RefType>($_self)">,
+      CPred<"::llvm::isa<::mlir::iree_compiler::IREE::VM::ListType>(::llvm::cast<::mlir::iree_compiler::IREE::VM::RefType>($_self).getObjectType())">,
     ]>,
     "list"> {
   let description = [{
@@ -296,11 +297,11 @@ def VM_AnyList : DialectType<
 
 class VM_ListOf<Type type> :
     Type<And<[
-      CPred<"isa<IREE::VM::ListType>(cast<IREE::VM::RefType>($_self).getObjectType())">,
+      CPred<"::llvm::isa<::mlir::iree_compiler::IREE::VM::ListType>(::llvm::cast<::mlir::iree_compiler::IREE::VM::RefType>($_self).getObjectType())">,
       Or<[
-        CPred<"isa<IREE::VM::OpaqueType>(cast<IREE::VM::ListType>(cast<IREE::VM::RefType>($_self).getObjectType()).getElementType())">,
+        CPred<"::llvm::isa<::mlir::iree_compiler::IREE::VM::OpaqueType>(::llvm::cast<::mlir::iree_compiler::IREE::VM::ListType>(::llvm::cast<::mlir::iree_compiler::IREE::VM::RefType>($_self).getObjectType()).getElementType())">,
         SubstLeaves<"$_self",
-                    "cast<IREE::VM::ListType>(cast<IREE::VM::RefType>($_self).getObjectType()).getElementType()",
+                    "::llvm::cast<::mlir::iree_compiler::IREE::VM::ListType>(::llvm::cast<::mlir::iree_compiler::IREE::VM::RefType>($_self).getObjectType()).getElementType()",
                     type.predicate>
       ]>,
     ]>, "list<" # type.summary # ">"> {

@@ -469,13 +469,21 @@ module {
     return
   }
 }
+// TODO(#21696): Respect the tile sizes for packed domain when we set the
+// lowering configs. The `alloca` op is generated because it performs additional
+// tiling on the generic op that targets vector sizes config. The `alloca` op is
+// not needed if we don't tile it at all, which means that it can be solved by
+// not setting the tile size for the packed dimensions.
+
 // CHECK-LABEL: func.func @mmt4d_bias_relu
-// CHECK-NOT:     memref.alloc
+// CHECK:         memref.alloca() {alignment = 64 : i64} : memref<1x1x2x16xf32
 // CHECK:         scf.forall
 // CHECK:           scf.for
 // CHECK:             vector.fma
-// CHECK:             vector.insert
+// CHECK:             vector.fma
+// CHECK:           }
 // CHECK:           arith.addf
+// CHECK:           arith.maximumf
 
 // -----
 
@@ -683,3 +691,65 @@ func.func @matmul_accumulate_from_readonly(%M: index, %N: index, %K: index) attr
 // CHECK-LABEL: func.func @matmul_accumulate_from_readonly(
 // CHECK-NOT:     memref.alloc
 // CHECK-NOT:     linalg.generic
+
+// -----
+
+// Verifies that the backend can handle broadcast/dequant op followed by a
+// matmul with encodings. We only check if the ukernel op is generated or not.
+// The test ensures that there are no big vectors and stack allocations when it
+// succeeds.
+
+#encoding = #iree_encoding.layout<[#iree_cpu.cpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [16, 2], outerDimsPerm = [0, 1]}}>]>
+#encoding1 = #iree_encoding.layout<[#iree_cpu.cpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0], innerTileSizes = [2], outerDimsPerm = [0]}}>]>
+#encoding2 = #iree_encoding.layout<[#iree_cpu.cpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [1, 0], innerTileSizes = [16, 2], outerDimsPerm = [1, 0]}}>]>
+#encoding3 = #iree_encoding.layout<[#iree_cpu.cpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [16, 16], outerDimsPerm = [0, 1]}}>]>
+#executable_target_embedded_elf_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "znver4", cpu_features = "+mmx,+popcnt,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+sse4a,+fma,+avx512f,+bmi,+bmi2,+aes,+pclmul,+avx512vl,+avx512bw,+avx512dq,+avx512cd,+avx512vbmi,+avx512ifma,+avx512vpopcntdq,+avx512vbmi2,+gfni,+vpclmulqdq,+avx512vnni,+avx512bitalg,+avx512bf16,+adx,+clflushopt,+clwb,+clzero,+cx16,+cx8,+f16c,+fsgsbase,+crc32,+invpcid,+rdpru,+sahf,+lzcnt,+movbe,+mwaitx,+x87,+pku,+prfchw,+rdpid,+rdrnd,+rdseed,+sha,+shstk,+vaes,+wbnoinvd,+xsave,+xsavec,+xsaveopt,+xsaves,+fxsr", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>, max_stack_allocation_size = 32768 : i64, native_vector_size = 64 : i64, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map3 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map4 = affine_map<(d0, d1) -> (d1)>
+#pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
+#encoding4 = #iree_encoding.encoding<operand_index = 1 : index, op_type =  matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map2, #map3], iteration_sizes = [123, 789, 456]>
+#encoding5 = #iree_encoding.encoding<operand_index = 2 : index, op_type =  matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map2, #map3], iteration_sizes = [123, 789, 456]>
+#encoding6 = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map2, #map3], iteration_sizes = [123, 789, 456]>
+#encoding7 = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [i8, i8, i32], user_indexing_maps = [[#map, #map1], #map2, #map3], iteration_sizes = [123, 789, 456]>
+#encoding8 = #iree_encoding.encoding<operand_index = 0 : index, op_type =  matmul, element_types = [i8, i8, i32], user_indexing_maps = [[#map, #map4], #map2, #map3], iteration_sizes = [123, 789, 456]>
+module {
+  func.func @dequant_lhs_matmul() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64} {
+    %c0 = arith.constant 0 : index
+    %c29184 = arith.constant 29184 : index
+    %c29440 = arith.constant 29440 : index
+    %c394240 = arith.constant 394240 : index
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<123x456xi4, #encoding>>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c29184) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<456xi4, #encoding1>>
+    %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c29440) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<456x789xi8, #encoding2>>
+    %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c394240) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<123x789xi32, #encoding3>>
+    %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<123x789xi32>>
+    %5 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [123, 456], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<123x456xi4, #encoding>> -> tensor<123x456xi4, #encoding7>
+    %6 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0], sizes = [456], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<456xi4, #encoding1>> -> tensor<456xi4, #encoding8>
+    %7 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0], sizes = [456, 789], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<456x789xi8, #encoding2>> -> tensor<456x789xi8, #encoding4>
+    %8 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0], sizes = [123, 789], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<123x789xi32, #encoding3>> -> tensor<123x789xi32, #encoding5>
+    %9 = tensor.empty() : tensor<123x456xi8, #encoding6>
+    %10 = linalg.generic {indexing_maps = [#map1, #map4, #map1], iterator_types = ["parallel", "parallel"]} ins(%5, %6 : tensor<123x456xi4, #encoding7>, tensor<456xi4, #encoding8>) outs(%9 : tensor<123x456xi8, #encoding6>) {
+    ^bb0(%in: i4, %in_0: i4, %out: i8):
+      %13 = arith.extui %in : i4 to i8
+      %14 = arith.extsi %in_0 : i4 to i8
+      %15 = arith.subi %13, %14 : i8
+      linalg.yield %15 : i8
+    } -> tensor<123x456xi8, #encoding6>
+    %11 = linalg.generic {indexing_maps = [#map, #map2, #map3], iterator_types = ["parallel", "parallel", "reduction"]} ins(%10, %7 : tensor<123x456xi8, #encoding6>, tensor<456x789xi8, #encoding4>) outs(%8 : tensor<123x789xi32, #encoding5>) {
+    ^bb0(%in: i8, %in_0: i8, %out: i32):
+      %13 = arith.extsi %in : i8 to i32
+      %14 = arith.extsi %in_0 : i8 to i32
+      %15 = arith.muli %13, %14 : i32
+      %16 = arith.addi %out, %15 : i32
+      linalg.yield %16 : i32
+    } -> tensor<123x789xi32, #encoding5>
+    %12 = iree_encoding.unset_encoding %11 : tensor<123x789xi32, #encoding5> -> tensor<123x789xi32>
+    iree_tensor_ext.dispatch.tensor.store %12, %4, offsets = [0, 0], sizes = [123, 789], strides = [1, 1] : tensor<123x789xi32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<123x789xi32>>
+    return
+  }
+}
+// CHECK-LABEL: func.func @dequant_lhs_matmul(
+// CHECK:         iree_codegen.ukernel.generic

@@ -29,6 +29,7 @@ iree_cc_library(
     "HoistIntoGlobals.cpp"
     "IPO.cpp"
     "ImportResources.cpp"
+    "LiftCFGToSCF.cpp"
     "OptimizeIntArithmetic.cpp"
     "Passes.cpp"
     "Patterns.cpp"
@@ -38,6 +39,7 @@ iree_cc_library(
     "StripDebugOps.cpp"
     "TestConversion.cpp"
     "TestFloatRangeAnalysis.cpp"
+    "VerifyStructuredControlFlow.cpp"
   DEPS
     ::PassesIncGen
     LLVMSupport
@@ -49,6 +51,7 @@ iree_cc_library(
     MLIRArithTransforms
     MLIRBytecodeWriter
     MLIRControlFlowDialect
+    MLIRControlFlowInterfaces
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
@@ -57,9 +60,11 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRPass
     MLIRSCFDialect
+    MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms
+    MLIRUBDialect
     MLIRVectorDialect
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Analysis::Attributes

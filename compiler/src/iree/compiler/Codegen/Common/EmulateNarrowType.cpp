@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/EmulateNarrowType.h"
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -37,7 +36,7 @@ namespace {
 
 struct ConvertHalInterfaceBindingSubspan final
     : OpConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op, OpAdaptor adaptor,
@@ -139,10 +138,8 @@ static Value staticallyExtractSubvector(OpBuilder &rewriter, Location loc,
 
   auto resultVectorType =
       VectorType::get({numElemsToExtract}, vectorType.getElementType());
-  return rewriter
-      .create<vector::ExtractStridedSliceOp>(loc, resultVectorType, src,
-                                             offsets, sizes, strides)
-      ->getResult(0);
+  return vector::ExtractStridedSliceOp::create(rewriter, loc, resultVectorType,
+                                               src, offsets, sizes, strides);
 }
 
 /// Inserts 1-D subvector into a 1-D vector.
@@ -334,7 +331,7 @@ static void nonAtomicRMW(OpBuilder &builder, Location loc,
 // NOTE: By default, all RMW sequences are atomic. Set `disableAtomicRMW` to
 // `false` to generate non-atomic RMW sequences.
 struct IREEConvertVectorStore final : OpConversionPattern<vector::StoreOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
 
   IREEConvertVectorStore(MLIRContext *context, bool disableAtomicRMW,
                          PatternBenefit benefit)
@@ -616,6 +613,11 @@ LogicalResult emulateNarrowType(
       affine::AffineDialect, IREE::HAL::HALDialect>(opLegalCallback);
 
   RewritePatternSet patterns(ctx);
+
+  // Try to flatten memrefs as a prerequiste for narrow type emulation,
+  // so we can have simplified checks in the emulation patterns.
+  memref::populateFlattenMemrefsPatterns(patterns);
+
   patterns.insert<IREEConvertVectorStore>(ctx, /*disableAtomicRMW=*/false,
                                           /*benefit=*/100);
   arith::populateArithNarrowTypeEmulationPatterns(typeConverter, patterns);

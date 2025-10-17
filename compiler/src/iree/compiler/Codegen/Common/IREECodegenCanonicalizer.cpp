@@ -77,7 +77,7 @@ static bool isTrivialSubViewOp(memref::SubViewOp subviewOp) {
 class DynamicTrivialSubViewOpFolder final
     : public OpRewritePattern<memref::SubViewOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(memref::SubViewOp subViewOp,
                                 PatternRewriter &rewriter) const override {
@@ -96,8 +96,7 @@ public:
 struct IREECodegenCanonicalizerPass final
     : impl::IREECodegenCanonicalizerPassBase<IREECodegenCanonicalizerPass> {
 public:
-  using impl::IREECodegenCanonicalizerPassBase<
-      IREECodegenCanonicalizerPass>::IREECodegenCanonicalizerPassBase;
+  using Base::Base;
   /// Initialize the canonicalizer by building the set of patterns used during
   /// execution.
   LogicalResult initialize(MLIRContext *context) override {

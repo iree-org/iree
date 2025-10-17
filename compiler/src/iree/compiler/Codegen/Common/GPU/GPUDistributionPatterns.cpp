@@ -341,7 +341,7 @@ struct DistributeTrivialExtract final
           extractOp, "Only 0-rank vector extractions supported");
     }
 
-    VectorValue source = extractOp.getVector();
+    VectorValue source = extractOp.getSource();
     VectorLayoutInterface sourceLayout = signature[source];
 
     Value distributed = vector::ExtractOp::create(

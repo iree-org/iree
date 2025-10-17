@@ -56,7 +56,7 @@ namespace {
 ///
 struct FoldAttentionAndTranspose
     : public OpRewritePattern<IREE::LinalgExt::AttentionOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::LinalgExt::AttentionOp attentionOp,
                                 PatternRewriter &rewriter) const override {
@@ -151,10 +151,8 @@ struct FoldAttentionAndTranspose
       dispatchIndexOpFoldResults(outputShape, dynamicShape, staticShape);
       Type resultType = RankedTensorType::get(
           staticShape, cast<RankedTensorType>(v.getType()).getElementType());
-      return rewriter
-          .create<tensor::ExpandShapeOp>(loc, resultType, v, reassociation,
-                                         outputShape)
-          .getResult();
+      return tensor::ExpandShapeOp::create(rewriter, loc, resultType, v,
+                                           reassociation, outputShape);
     };
 
     Value expandedQuery = getReshape(attentionOp.getQuery(), {{0, 1}, {2}, {3}},

@@ -74,7 +74,7 @@ struct InlineMemoizeRegionsPass
           memoizeOp.getResultTypes(), fusedResultLocs));
       rewriter.inlineRegionBefore(memoizeOp.getBody(), continueBlock);
       rewriter.setInsertionPointToEnd(initialBlock);
-      rewriter.create<mlir::cf::BranchOp>(memoizeOp.getLoc(), entryBlock);
+      mlir::cf::BranchOp::create(rewriter, memoizeOp.getLoc(), entryBlock);
       for (auto returnOp : returnOps) {
         rewriter.setInsertionPoint(returnOp);
         rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(returnOp, continueBlock,

@@ -89,8 +89,8 @@ static Value materializeOperandCOW(Location loc, OpOperand &operand,
   auto sizeAwareType =
       llvm::cast<IREE::Util::SizeAwareTypeInterface>(resourceType);
   auto size = sizeAwareType.queryValueSize(loc, operand.get(), builder);
-  return builder.create<IREE::Stream::AsyncCloneOp>(
-      loc, resourceType, operand.get(), size, size, affinity);
+  return IREE::Stream::AsyncCloneOp::create(
+      builder, loc, resourceType, operand.get(), size, size, affinity);
 }
 
 // Materializes a copy for each mutated operand on |tiedOp| as required.

@@ -79,6 +79,17 @@ def GPULowerToGlobalLoadsPass :
   ];
 }
 
+def GPUConvertToCoalescedDMAPass :
+    InterfacePass<"iree-codegen-gpu-convert-to-coalesced-dma", "mlir::FunctionOpInterface"> {
+  let summary = "Convert operations to coalesced DMA operations.";
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+    "::mlir::gpu::GPUDialect",
+    "::mlir::scf::SCFDialect",
+    "::mlir::tensor::TensorDialect"
+  ];
+}
+
 def GPUDistributeForallPass :
     InterfacePass<"iree-codegen-gpu-distribute-forall", "mlir::FunctionOpInterface"> {
   let summary = "Pass to distribute scf.forall ops.";
@@ -165,19 +176,6 @@ def GPUInferMemorySpacePass :
   let summary = "Pass to infer and set the memory space for all alloc_tensor ops.";
   let dependentDialects = [
     "::mlir::gpu::GPUDialect"
-  ];
-}
-
-def GPULowerToUKernelsPass :
-    Pass<"iree-codegen-gpu-lower-to-ukernels", ""> {
-  let summary = "Lower suitable ops to previously-selected microkernels";
-  let dependentDialects = [
-    "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
-    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
-    "::mlir::arith::ArithDialect",
-    "::mlir::bufferization::BufferizationDialect",
-    "::mlir::gpu::GPUDialect",
-    "::mlir::tensor::TensorDialect",
   ];
 }
 

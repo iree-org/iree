@@ -564,7 +564,7 @@ struct RemoveCstOutsDependency
 /// This is a workaround for #11273 while a proper fix lands.
 struct SwitchStoreOfIfResultValue
     : public OpRewritePattern<IREE::TensorExt::DispatchTensorStoreOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
@@ -599,7 +599,7 @@ struct SwitchStoreOfIfResultValue
 } // namespace
 
 void ConvertToDestinationPassingStylePass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   MLIRContext *context = &getContext();
 
   // Dont do anything for functions that have multiple blocks for now.

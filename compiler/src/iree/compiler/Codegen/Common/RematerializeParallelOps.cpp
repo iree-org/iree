@@ -36,7 +36,7 @@ static bool hasDirectWriteResult(Operation *op) {
 /// `flow.dispatch.region`.
 struct RematerializeParallelOpsPattern
     : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
@@ -80,7 +80,7 @@ struct RematerializeParallelOpsPattern
 struct RematerializeParallelOpsPass final
     : impl::RematerializeParallelOpsPassBase<RematerializeParallelOpsPass> {
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     RewritePatternSet fusionPatterns(funcOp.getContext());
     fusionPatterns.insert<RematerializeParallelOpsPattern>(funcOp.getContext());
     linalg::populateEraseUnusedOperandsAndResultsPatterns(fusionPatterns);

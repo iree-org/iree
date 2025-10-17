@@ -11,9 +11,14 @@ include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/DestinationStyleOpInterface.td"
+include "mlir/Interfaces/ParallelCombiningOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
+
+// Type constraint for operations that support both tensor and memref types
+def AnyRankedTensorOrMemRef : AnyTypeOf<[AnyRankedTensor, AnyMemRef]>;
 
 //===----------------------------------------------------------------------===//
 // BarrierRegionOp
@@ -247,6 +252,103 @@ def IREEGPU_GlobalLoadDMAOp : Op<IREEGPU_Dialect, "global_load_dma", [
   let assemblyFormat = [{
     $source`[` $sourceIndices `]` `->` $target `[` $targetIndices `]` attr-dict
       `:` type($source) `->` type($target)
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// CoalescedGatherDMAOp
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
+    DeclareOpInterfaceMethods<DestinationStyleOpInterface>,
+    DeclareOpInterfaceMethods<ParallelCombiningOpInterface,
+       ["getUpdatedDestinations", "getIteratingParent"]>]> {
+  let summary = "Coalesced gather DMA operation for efficient GPU memory access";
+  let description = [{
+    Performs a coalesced gather operation.
+    This operation can exist in two forms: a tensor-based (value-semantic) form
+    and a buffer-based (memref-semantic) form.
+
+    In both forms, it reads elements from a source operand based on indices.
+    * When the source is a tensor, the operation produces a new result tensor
+      containing the gathered data.
+    * When the source is a memref, the operation writes the gathered data into
+      a destination out memref operand.
+
+    The operation is specifically designed for subgroup-level parallelism, where
+    threads within a subgroup cooperatively gather data with coalesced memory
+    accesses. It implements ParallelCombiningOpInterface and must live inside an
+    op implementing `InParallelOpInterface`, such as `scf.forall.in_parallel`.
+
+    ## Lowering Paths
+
+    Two lowering strategies are supported:
+    1. Lowers to `amdgpu.gather_to_lds` operations when lowering requirements
+       are met.
+    2. Default lowering using `vector.gather` operations.
+
+    ## Operands and Results
+
+    * `$indices`: Tensor/memref of index type specifying gather locations in
+      the source tensor
+    * `$source`: Source tensor/memref containing the data to be gathered
+    * `$init`: Destination tensor/memref receiving the gathered data
+      (destination-passing style)
+    * `$result`: Output tensor/memref with gathered data (same type as `$init`)
+
+    ## Example
+
+    The following example shows how this op is designed to be used in a tiled
+    scenario, which sets up lowering path for efficient gathering.
+
+    1. Outer `scf.forall` represents workgroup-level parallelism.
+    2. Inner `scf.forall` represents subgroup-level parallelism.
+    3. Each thread in the subgroup coalesces its memory accesses when
+       gathering data and writes to its lane-offset in the destination tensor.
+
+    ```mlir
+    %result = scf.forall (%wg_i, %wg_j) in (16, 1) shared_outs(%wg_out = %dest) -> (tensor<128x16xf32>) {
+      %indices_wg_slice = tensor.extract_slice ...
+      %dest_wg_slice = tensor.extract_slice ...
+
+      %inner_result = scf.forall (%sg_i, %sg_j) in (32, 1) shared_outs(%sg_out = %dest_wg_slice) -> (tensor<8x16xf32>) {
+        scf.forall.in_parallel {
+          iree_gpu.coalesced_gather_dma %indices_wg_slice, %source into %sg_out : ...
+        }
+      } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+
+      scf.forall.in_parallel {
+        tensor.parallel_insert_slice %inner_result into %wg_out[...] : ...
+      }
+    } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
+    ```
+  }];
+
+  let arguments = (ins
+    AnyTypeOf<[RankedTensorOf<[Index]>, MemRefOf<[Index]>]>:$indices,
+    AnyRankedTensorOrMemRef:$source,
+    AnyRankedTensorOrMemRef:$init
+  );
+
+  let results = (outs AnyRankedTensorOrMemRef:$result);
+
+  let assemblyFormat = [{
+    $indices `,` $source `into` $init attr-dict
+    `:` type($indices) `,` type($source) `,` type($init) `->` type($result)
+  }];
+
+  let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    // Get the rank of the result tensor/memref
+    unsigned getResultRank() {
+      if (auto tensorType = ::llvm::dyn_cast<RankedTensorType>(getResult().getType()))
+        return tensorType.getRank();
+      if (auto memrefType = ::llvm::dyn_cast<MemRefType>(getResult().getType()))
+        return memrefType.getRank();
+      assert(false && "expected ranked tensor or memref type");
+      return 0;
+    }
   }];
 }
 

@@ -113,7 +113,7 @@ static TypedAttr foldBinaryOpIntOrFloat(TypedAttr lhs, TypedAttr rhs,
 }
 
 struct AddOpCanon final : OpRewritePattern<mlir::stablehlo::AddOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::AddOp op,
                                 PatternRewriter &rewriter) const override {
@@ -160,7 +160,7 @@ struct AddOpCanon final : OpRewritePattern<mlir::stablehlo::AddOp> {
 };
 
 struct SubtractOpCanon final : OpRewritePattern<mlir::stablehlo::SubtractOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::SubtractOp op,
                                 PatternRewriter &rewriter) const override {
@@ -202,7 +202,7 @@ struct SubtractOpCanon final : OpRewritePattern<mlir::stablehlo::SubtractOp> {
 };
 
 struct MulOpCanon final : OpRewritePattern<mlir::stablehlo::MulOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::MulOp op,
                                 PatternRewriter &rewriter) const override {
@@ -328,7 +328,7 @@ static APInt calculateComp(mlir::stablehlo::ComparisonType kind,
 }
 
 struct CompareOpCanon final : OpRewritePattern<mlir::stablehlo::CompareOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::CompareOp op,
                                 PatternRewriter &rewriter) const override {
@@ -404,7 +404,7 @@ struct CompareOpCanon final : OpRewritePattern<mlir::stablehlo::CompareOp> {
 };
 
 struct SelectOpCanon final : OpRewritePattern<mlir::stablehlo::SelectOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::SelectOp op,
                                 PatternRewriter &rewriter) const override {
@@ -463,7 +463,7 @@ struct SelectOpCanon final : OpRewritePattern<mlir::stablehlo::SelectOp> {
 
 struct BroadcastInDimOpCanon final
     : OpRewritePattern<mlir::stablehlo::BroadcastInDimOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::BroadcastInDimOp op,
                                 PatternRewriter &rewriter) const override {
@@ -528,7 +528,7 @@ struct BroadcastInDimOpCanon final
 
 struct ConcatenateOpCanon final
     : OpRewritePattern<mlir::stablehlo::ConcatenateOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ConcatenateOp op,
                                 PatternRewriter &rewriter) const override {
@@ -551,8 +551,7 @@ struct ConcatenateOpCanon final
 
     uint64_t axis = op.getDimension();
     ArrayRef<int64_t> shape = type.getShape();
-    int64_t topSize = std::accumulate(shape.begin(), shape.begin() + axis,
-                                      int64_t{1}, std::multiplies<>{});
+    int64_t topSize = llvm::product_of(shape.take_front(axis));
 
     SmallVector<Attribute> newElems;
     newElems.reserve(numElems);
@@ -573,7 +572,7 @@ struct ConcatenateOpCanon final
 };
 
 struct ConvertOpCanon final : OpRewritePattern<mlir::stablehlo::ConvertOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ConvertOp op,
                                 PatternRewriter &rewriter) const override {
@@ -599,7 +598,8 @@ struct ConvertOpCanon final : OpRewritePattern<mlir::stablehlo::ConvertOp> {
 template <typename OpTy, typename... Args>
 static OpTy refineOpWithNewOp(PatternRewriter &rewriter, Operation *op,
                               Args &&...args) {
-  auto newOp = rewriter.create<OpTy>(op->getLoc(), std::forward<Args>(args)...);
+  auto newOp =
+      OpTy::create(rewriter, op->getLoc(), std::forward<Args>(args)...);
 
   llvm::SmallVector<Value> replacementResults;
   assert(op->getNumResults() == newOp->getNumResults() &&
@@ -610,8 +610,8 @@ static OpTy refineOpWithNewOp(PatternRewriter &rewriter, Operation *op,
     if (llvm::any_of(opResult.getUsers(), [&](Operation *user) {
           return user->getDialect() != op->getDialect();
         })) {
-      replacementResult = rewriter.create<mlir::tensor::CastOp>(
-          op->getLoc(), opResult.getType(), newOpResult);
+      replacementResult = mlir::tensor::CastOp::create(
+          rewriter, op->getLoc(), opResult.getType(), newOpResult);
     }
     replacementResults.push_back(replacementResult);
   }
@@ -624,7 +624,7 @@ static OpTy refineOpWithNewOp(PatternRewriter &rewriter, Operation *op,
 /// BroadcastInDimOp.
 struct DynamicBroadcastInDimOpNotActuallyDynamic final
     : OpRewritePattern<mlir::stablehlo::DynamicBroadcastInDimOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::DynamicBroadcastInDimOp op,
                                 PatternRewriter &rewriter) const override {
@@ -665,7 +665,7 @@ struct DynamicBroadcastInDimOpNotActuallyDynamic final
 
 struct ChainedDynamicBroadcastInDimCanonicalization final
     : OpRewritePattern<mlir::stablehlo::DynamicBroadcastInDimOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::DynamicBroadcastInDimOp bcast,
                                 PatternRewriter &rewriter) const override {
@@ -693,7 +693,7 @@ struct ChainedDynamicBroadcastInDimCanonicalization final
 // the dynamic broadcast with a cast.
 struct DynamicBroadcastInDimAllDimsNonExpanding final
     : OpRewritePattern<mlir::stablehlo::DynamicBroadcastInDimOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::DynamicBroadcastInDimOp op,
                                 PatternRewriter &rewriter) const override {
@@ -716,7 +716,7 @@ struct DynamicBroadcastInDimAllDimsNonExpanding final
 };
 
 struct NoopReduceOpCanon final : OpRewritePattern<mlir::stablehlo::ReduceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ReduceOp op,
                                 PatternRewriter &rewriter) const override {
@@ -746,7 +746,7 @@ struct NoopReduceOpCanon final : OpRewritePattern<mlir::stablehlo::ReduceOp> {
 };
 
 struct EmptyReduceOpCanon final : OpRewritePattern<mlir::stablehlo::ReduceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ReduceOp op,
                                 PatternRewriter &rewriter) const override {
@@ -767,8 +767,8 @@ struct EmptyReduceOpCanon final : OpRewritePattern<mlir::stablehlo::ReduceOp> {
       SmallVector<Value> broadcasts(op.getNumResults());
       for (auto [bcast, init, outTy] : llvm::zip_equal(
                broadcasts, op.getInitValues(), op.getResultTypes())) {
-        bcast = rewriter.create<mlir::stablehlo::BroadcastInDimOp>(loc, outTy,
-                                                                   init, empty);
+        bcast = mlir::stablehlo::BroadcastInDimOp::create(rewriter, loc, outTy,
+                                                          init, empty);
       }
       rewriter.replaceOp(op, broadcasts);
       return success();
@@ -782,8 +782,8 @@ struct EmptyReduceOpCanon final : OpRewritePattern<mlir::stablehlo::ReduceOp> {
     SmallVector<Value> broadcasts(op.getNumResults());
     for (auto [bcast, init, shape, outTy] : llvm::zip_equal(
              broadcasts, op.getInitValues(), shapes, op.getResultTypes())) {
-      bcast = rewriter.create<mlir::stablehlo::DynamicBroadcastInDimOp>(
-          loc, outTy, init, shape, empty);
+      bcast = mlir::stablehlo::DynamicBroadcastInDimOp::create(
+          rewriter, loc, outTy, init, shape, empty);
     }
     rewriter.replaceOp(op, broadcasts);
     return success();
@@ -792,7 +792,7 @@ struct EmptyReduceOpCanon final : OpRewritePattern<mlir::stablehlo::ReduceOp> {
 
 struct DynamicReshapeOpCanon final
     : OpRewritePattern<mlir::stablehlo::DynamicReshapeOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::DynamicReshapeOp op,
                                 PatternRewriter &rewriter) const override {
@@ -809,7 +809,7 @@ struct DynamicReshapeOpCanon final
 
 struct GetTupleElementOpCanon final
     : OpRewritePattern<mlir::stablehlo::GetTupleElementOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::GetTupleElementOp op,
                                 PatternRewriter &rewriter) const override {
@@ -825,7 +825,7 @@ struct GetTupleElementOpCanon final
 };
 
 struct RealOpCanon final : OpRewritePattern<mlir::stablehlo::RealOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::RealOp op,
                                 PatternRewriter &rewriter) const override {
@@ -839,7 +839,7 @@ struct RealOpCanon final : OpRewritePattern<mlir::stablehlo::RealOp> {
 };
 
 struct ImagOpCanon final : OpRewritePattern<mlir::stablehlo::ImagOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ImagOp op,
                                 PatternRewriter &rewriter) const override {
@@ -854,7 +854,7 @@ struct ImagOpCanon final : OpRewritePattern<mlir::stablehlo::ImagOp> {
 
 struct GetDimensionSizeOpCanon final
     : OpRewritePattern<mlir::stablehlo::GetDimensionSizeOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::GetDimensionSizeOp op,
                                 PatternRewriter &rewriter) const override {
@@ -878,7 +878,7 @@ struct GetDimensionSizeOpCanon final
 /// Converts gather ops to slice ops in case we have a single set of constant
 /// indices.
 struct GatherOpCanon final : OpRewritePattern<mlir::stablehlo::GatherOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::GatherOp gather,
                                 PatternRewriter &rewriter) const override {
@@ -926,8 +926,8 @@ struct GatherOpCanon final : OpRewritePattern<mlir::stablehlo::GatherOp> {
 
     Type elementType = gather.getType().getElementType();
     auto sliceType = RankedTensorType::get(sliceShape, elementType);
-    Value result = rewriter.create<mlir::stablehlo::SliceOp>(
-        gather.getLoc(), sliceType, gather.getOperand(),
+    Value result = mlir::stablehlo::SliceOp::create(
+        rewriter, gather.getLoc(), sliceType, gather.getOperand(),
         rewriter.getDenseI64ArrayAttr(sliceStart),
         rewriter.getDenseI64ArrayAttr(sliceEnd),
         rewriter.getDenseI64ArrayAttr(sliceStride));
@@ -941,8 +941,8 @@ struct GatherOpCanon final : OpRewritePattern<mlir::stablehlo::GatherOp> {
         }
       }
       auto reshapeType = RankedTensorType::get(reshapeShape, elementType);
-      result = rewriter.create<mlir::stablehlo::ReshapeOp>(gather.getLoc(),
-                                                           reshapeType, result);
+      result = mlir::stablehlo::ReshapeOp::create(rewriter, gather.getLoc(),
+                                                  reshapeType, result);
     }
 
     result.setType(gather.getType());
@@ -952,7 +952,7 @@ struct GatherOpCanon final : OpRewritePattern<mlir::stablehlo::GatherOp> {
 };
 
 struct ReshapeOpCanon final : OpRewritePattern<mlir::stablehlo::ReshapeOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ReshapeOp op,
                                 PatternRewriter &rewriter) const override {
@@ -985,7 +985,7 @@ struct ReshapeOpCanon final : OpRewritePattern<mlir::stablehlo::ReshapeOp> {
 
 struct MergeConsecutiveReshapes final
     : OpRewritePattern<mlir::stablehlo::ReshapeOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ReshapeOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1010,7 +1010,7 @@ struct MergeConsecutiveReshapes final
 
 struct TransposeIsReshape final
     : OpRewritePattern<mlir::stablehlo::TransposeOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::TransposeOp op,
                                 PatternRewriter &rewriter) const override {
@@ -1081,9 +1081,9 @@ struct ZeroExtentTensorCanon final : RewritePattern {
       if (!resultType || result.use_empty()) {
         continue;
       }
-      rewriter.replaceAllUsesWith(result, rewriter.create<tensor::EmptyOp>(
-                                              loc, resultType->getShape(),
-                                              resultType->getElementType()));
+      rewriter.replaceAllUsesWith(
+          result, tensor::EmptyOp::create(rewriter, loc, resultType->getShape(),
+                                          resultType->getElementType()));
       didUpdate = true;
     }
 
@@ -1096,8 +1096,9 @@ struct ZeroExtentTensorCanon final : RewritePattern {
       }
       Operation *owner = operand.getOwner();
       int operandNum = operand.getOperandNumber();
-      auto emptyTensorOp = rewriter.create<tensor::EmptyOp>(
-          loc, operandType->getShape(), operandType->getElementType());
+      auto emptyTensorOp =
+          tensor::EmptyOp::create(rewriter, loc, operandType->getShape(),
+                                  operandType->getElementType());
       rewriter.modifyOpInPlace(
           owner, [&]() { owner->setOperand(operandNum, emptyTensorOp); });
       didUpdate = true;

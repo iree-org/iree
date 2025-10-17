@@ -81,8 +81,8 @@ public:
                             .str();
 
       // Placeholder ordinal that'll be updated during linking.
-      auto ordinalGlobalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
-          globalLoc, globalName + "_ordinal", /*isMutable=*/true,
+      auto ordinalGlobalOp = IREE::Util::GlobalOp::create(
+          moduleBuilder, globalLoc, globalName + "_ordinal", /*isMutable=*/true,
           moduleBuilder.getI32Type());
       ordinalGlobalOp.setPrivate();
       ordinalGlobalOp->setAttr(
@@ -90,8 +90,8 @@ public:
       ordinalGlobalOps.push_back(ordinalGlobalOp);
 
       // Value initialized in the constant setter built below.
-      auto valueGlobalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
-          globalLoc, globalName, /*isMutable=*/true, globalType);
+      auto valueGlobalOp = IREE::Util::GlobalOp::create(
+          moduleBuilder, globalLoc, globalName, /*isMutable=*/true, globalType);
       valueGlobalOp.setPrivate();
       valueGlobalOps.push_back(valueGlobalOp);
       for (auto loadOp : loadOps) {
@@ -104,35 +104,37 @@ public:
 
     // Create the setter function the runtime will use to push the constants.
     auto bufferType = IREE::Util::BufferType::get(context);
-    auto setterOp = moduleBuilder.create<func::FuncOp>(
-        FusedLoc::get(context, allLoadLocs), kConstantBlockSetterName,
-        moduleBuilder.getFunctionType({bufferType}, {}));
+    auto setterOp =
+        func::FuncOp::create(moduleBuilder, FusedLoc::get(context, allLoadLocs),
+                             kConstantBlockSetterName,
+                             moduleBuilder.getFunctionType({bufferType}, {}));
     setterOp.setPublic();
     auto setterBuilder = OpBuilder::atBlockBegin(setterOp.addEntryBlock());
     Value buffer = setterOp.getArgument(0);
-    Value bufferSize = setterBuilder.create<arith::ConstantIndexOp>(
-        buffer.getLoc(), allLoadOps.size() * sizeof(uint32_t));
-    Value elementSizeIndex = setterBuilder.create<arith::ConstantIndexOp>(
-        buffer.getLoc(), sizeof(uint32_t));
-    Value elementSizeI32 = setterBuilder.create<arith::ConstantIntOp>(
-        buffer.getLoc(), sizeof(uint32_t), 32);
+    Value bufferSize = arith::ConstantIndexOp::create(
+        setterBuilder, buffer.getLoc(), allLoadOps.size() * sizeof(uint32_t));
+    Value elementSizeIndex = arith::ConstantIndexOp::create(
+        setterBuilder, buffer.getLoc(), sizeof(uint32_t));
+    Value elementSizeI32 = arith::ConstantIntOp::create(
+        setterBuilder, buffer.getLoc(), sizeof(uint32_t), 32);
     for (auto [ordinalGlobalOp, valueGlobalOp] :
          llvm::zip_equal(ordinalGlobalOps, valueGlobalOps)) {
       Value loadedOrdinal =
           ordinalGlobalOp.createLoadOp(ordinalGlobalOp.getLoc(), setterBuilder)
               .getLoadedGlobalValue();
-      Value bufferOffset = setterBuilder.create<arith::MulIOp>(
-          loadedOrdinal.getLoc(), loadedOrdinal, elementSizeI32);
-      Value loadedValue = setterBuilder.create<IREE::Util::BufferLoadOp>(
-          valueGlobalOp.getLoc(), loadedOrdinal.getType(), buffer, bufferSize,
-          setterBuilder.create<arith::IndexCastOp>(bufferOffset.getLoc(),
-                                                   setterBuilder.getIndexType(),
-                                                   bufferOffset),
+      Value bufferOffset = arith::MulIOp::create(
+          setterBuilder, loadedOrdinal.getLoc(), loadedOrdinal, elementSizeI32);
+      Value loadedValue = IREE::Util::BufferLoadOp::create(
+          setterBuilder, valueGlobalOp.getLoc(), loadedOrdinal.getType(),
+          buffer, bufferSize,
+          arith::IndexCastOp::create(setterBuilder, bufferOffset.getLoc(),
+                                     setterBuilder.getIndexType(),
+                                     bufferOffset),
           elementSizeIndex);
       valueGlobalOp.createStoreOp(valueGlobalOp.getLoc(), loadedValue,
                                   setterBuilder);
     }
-    setterBuilder.create<func::ReturnOp>(setterOp.getLoc());
+    func::ReturnOp::create(setterBuilder, setterOp.getLoc());
   }
 };
 } // namespace

@@ -82,10 +82,9 @@ namedConvBuilderFn(OpBuilder &b, Location loc, linalg::LinalgOp srcConv,
                    SmallVector<unsigned> newDimOrder,
                    SmallVector<utils::IteratorType> newIteratorTypes) {
   sourceNamedConvTy namedConv = cast<sourceNamedConvTy>(srcConv);
-  return b
-      .create<targetNamedConvTy>(
-          loc, output.getType(), ValueRange{input, filter}, output,
-          namedConv.getStrides(), namedConv.getDilations())
+  return targetNamedConvTy::create(
+             b, loc, output.getType(), ValueRange{input, filter}, output,
+             namedConv.getStrides(), namedConv.getDilations())
       .getResult(0);
 }
 
@@ -227,10 +226,10 @@ createTransposeAsTensorPack(
     auto transposedInputShape =
         getPackedVector<int64_t>(llvm::to_vector(inputShape), targetIndices);
     packedOperand =
-        rewriter
-            .create<tensor::CollapseShapeOp>(
-                loc, RankedTensorType::get(transposedInputShape, elementType),
-                packedOperand, reassociationMap)
+        tensor::CollapseShapeOp::create(
+            rewriter, loc,
+            RankedTensorType::get(transposedInputShape, elementType),
+            packedOperand, reassociationMap)
             .getResult();
     transposedMap =
         AffineMap::get(inputMap.getNumDims(), inputMap.getNumSymbols(),
@@ -280,12 +279,11 @@ static Value createTransposeAsTensorUnPack(PatternRewriter &rewriter,
 
     auto reassociationMap =
         getUnitOuterDimPackReassociationMap(targetIndices, rank);
-    packedOutput =
-        rewriter
-            .create<tensor::ExpandShapeOp>(
-                loc, RankedTensorType::get(expandedOutputShape, elementType),
-                output, reassociationMap)
-            .getResult();
+    packedOutput = tensor::ExpandShapeOp::create(
+                       rewriter, loc,
+                       RankedTensorType::get(expandedOutputShape, elementType),
+                       output, reassociationMap)
+                       .getResult();
   }
 
   Value empty = linalg::UnPackOp::createDestinationTensor(
@@ -449,7 +447,7 @@ namespace {
 // Named op -> named op conversions if a default inner tile size is specified.
 
 struct ConvertLinalgConvNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   ConvertLinalgConvNchwFchw(MLIRContext *context, PatternBenefit benefit = 2)
       : OpRewritePattern<linalg::Conv2DNchwFchwOp>(context, benefit) {}
 
@@ -518,7 +516,7 @@ getTilingReassociationMap(const int64_t rank, SetTy innerDims) {
 class GeneralizeOuterUnitDimsPackOp final
     : public OpRewritePattern<linalg::PackOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   GeneralizeOuterUnitDimsPackOp(MLIRContext *context,
                                 PatternBenefit benefit = 2)
       : OpRewritePattern<linalg::PackOp>(context, benefit) {}
@@ -566,10 +564,9 @@ public:
     applyPermutationToVector(mixedSizes, perm);
     Value empty = tensor::EmptyOp::create(rewriter, loc, mixedSizes,
                                           destType.getElementType());
-    Value transposed =
-        rewriter
-            .create<linalg::TransposeOp>(loc, packOp.getSource(), empty, perm)
-            .getResult()[0];
+    Value transposed = linalg::TransposeOp::create(
+                           rewriter, loc, packOp.getSource(), empty, perm)
+                           .getResult()[0];
 
     // Expand the unit dimensions for the result of the pack.
     SmallVector<ReassociationIndices> reassocationIndices;
@@ -600,7 +597,7 @@ public:
 class GeneralizeOuterUnitDimsUnPackOp final
     : public OpRewritePattern<linalg::UnPackOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   GeneralizeOuterUnitDimsUnPackOp(MLIRContext *context,
                                   PatternBenefit benefit = 2)
       : OpRewritePattern<linalg::UnPackOp>(context, benefit) {}

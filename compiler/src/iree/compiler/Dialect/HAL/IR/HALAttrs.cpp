@@ -632,16 +632,17 @@ Value IREE::HAL::DeviceTargetAttr::buildDeviceEnumeration(
   // Enumerate all devices and match the first one found (if any).
   Type indexType = builder.getIndexType();
   Type deviceType = builder.getType<IREE::HAL::DeviceType>();
-  Value c0 = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value c1 = builder.create<arith::ConstantIndexOp>(loc, 1);
-  Value nullDevice = builder.create<IREE::Util::NullOp>(loc, deviceType);
+  Value c0 = arith::ConstantIndexOp::create(builder, loc, 0);
+  Value c1 = arith::ConstantIndexOp::create(builder, loc, 1);
+  Value nullDevice = IREE::Util::NullOp::create(builder, loc, deviceType);
   Value deviceOrdinal = deviceOrdinalAttr
-                            ? builder.create<arith::ConstantIndexOp>(
-                                  loc, deviceOrdinalAttr.getInt())
+                            ? arith::ConstantIndexOp::create(
+                                  builder, loc, deviceOrdinalAttr.getInt())
                             : c0;
-  Value deviceCount = builder.create<IREE::HAL::DevicesCountOp>(loc, indexType);
-  auto whileOp = builder.create<scf::WhileOp>(
-      loc,
+  Value deviceCount =
+      IREE::HAL::DevicesCountOp::create(builder, loc, indexType);
+  auto whileOp = scf::WhileOp::create(
+      builder, loc,
       TypeRange{
           /*i=*/indexType,
           /*match_ordinal=*/indexType,
@@ -653,43 +654,44 @@ Value IREE::HAL::DeviceTargetAttr::buildDeviceEnumeration(
           /*device=*/nullDevice,
       },
       [&](OpBuilder &beforeBuilder, Location loc, ValueRange operands) {
-        Value isNull = beforeBuilder.create<IREE::Util::CmpEQOp>(
-            loc, operands[/*device=*/2], nullDevice);
-        Value inBounds = beforeBuilder.create<arith::CmpIOp>(
-            loc, arith::CmpIPredicate::slt, operands[/*i=*/0], deviceCount);
+        Value isNull = IREE::Util::CmpEQOp::create(
+            beforeBuilder, loc, operands[/*device=*/2], nullDevice);
+        Value inBounds =
+            arith::CmpIOp::create(beforeBuilder, loc, arith::CmpIPredicate::slt,
+                                  operands[/*i=*/0], deviceCount);
         Value continueWhile =
-            beforeBuilder.create<arith::AndIOp>(loc, isNull, inBounds);
-        beforeBuilder.create<scf::ConditionOp>(loc, continueWhile, operands);
+            arith::AndIOp::create(beforeBuilder, loc, isNull, inBounds);
+        scf::ConditionOp::create(beforeBuilder, loc, continueWhile, operands);
       },
       [&](OpBuilder &afterBuilder, Location loc, ValueRange operands) {
         // Check whether the device is a match.
-        Value device = afterBuilder.create<IREE::HAL::DevicesGetOp>(
-            loc, deviceType, operands[/*i=*/0]);
+        Value device = IREE::HAL::DevicesGetOp::create(
+            afterBuilder, loc, deviceType, operands[/*i=*/0]);
         Value isDeviceMatch = buildDeviceMatch(loc, device, afterBuilder);
 
         // Check whether whether this matching device ordinal is the requested
         // ordinal out of all matching devices.
-        Value isOrdinalMatch = afterBuilder.create<arith::CmpIOp>(
-            loc, arith::CmpIPredicate::eq, operands[/*match_ordinal=*/1],
-            deviceOrdinal);
-        Value nextMatchOrdinal = afterBuilder.create<arith::AddIOp>(
-            loc, operands[/*match_ordinal=*/1],
-            afterBuilder.create<arith::SelectOp>(loc, isDeviceMatch, c1, c0));
+        Value isOrdinalMatch =
+            arith::CmpIOp::create(afterBuilder, loc, arith::CmpIPredicate::eq,
+                                  operands[/*match_ordinal=*/1], deviceOrdinal);
+        Value nextMatchOrdinal = arith::AddIOp::create(
+            afterBuilder, loc, operands[/*match_ordinal=*/1],
+            arith::SelectOp::create(afterBuilder, loc, isDeviceMatch, c1, c0));
 
         // Break if the device and ordinal match, otherwise continue with null.
-        Value isMatch = afterBuilder.create<arith::AndIOp>(loc, isDeviceMatch,
-                                                           isOrdinalMatch);
-        Value tryDevice = afterBuilder.create<arith::SelectOp>(
-            loc, isMatch, device, nullDevice);
+        Value isMatch = arith::AndIOp::create(afterBuilder, loc, isDeviceMatch,
+                                              isOrdinalMatch);
+        Value tryDevice = arith::SelectOp::create(afterBuilder, loc, isMatch,
+                                                  device, nullDevice);
 
         Value nextI =
-            afterBuilder.create<arith::AddIOp>(loc, operands[/*i=*/0], c1);
-        afterBuilder.create<scf::YieldOp>(
-            loc, ValueRange{
-                     /*i=*/nextI,
-                     /*match_ordinal=*/nextMatchOrdinal,
-                     /*device=*/tryDevice,
-                 });
+            arith::AddIOp::create(afterBuilder, loc, operands[/*i=*/0], c1);
+        scf::YieldOp::create(afterBuilder, loc,
+                             ValueRange{
+                                 /*i=*/nextI,
+                                 /*match_ordinal=*/nextMatchOrdinal,
+                                 /*device=*/tryDevice,
+                             });
       });
   return whileOp.getResult(/*device=*/2);
 }
@@ -708,15 +710,15 @@ Value DeviceTargetAttr::buildDeviceIDAndExecutableFormatsMatch(
   if (executableTargetAttrs.empty()) {
     return idMatch; // just device ID
   } else {
-    auto ifOp = builder.create<scf::IfOp>(loc, builder.getI1Type(), idMatch,
-                                          true, true);
+    auto ifOp = scf::IfOp::create(builder, loc, builder.getI1Type(), idMatch,
+                                  true, true);
     auto thenBuilder = ifOp.getThenBodyBuilder();
     Value anyFormatMatch = buildExecutableFormatMatch(
         loc, device, executableTargetAttrs, thenBuilder);
-    thenBuilder.create<scf::YieldOp>(loc, anyFormatMatch);
+    scf::YieldOp::create(thenBuilder, loc, anyFormatMatch);
     auto elseBuilder = ifOp.getElseBodyBuilder();
-    Value falseValue = elseBuilder.create<arith::ConstantIntOp>(loc, 0, 1);
-    elseBuilder.create<scf::YieldOp>(loc, falseValue);
+    Value falseValue = arith::ConstantIntOp::create(elseBuilder, loc, 0, 1);
+    scf::YieldOp::create(elseBuilder, loc, falseValue);
     return ifOp.getResult(0);
   }
 }
@@ -727,7 +729,7 @@ Value DeviceTargetAttr::buildExecutableFormatMatch(
     ArrayRef<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs,
     OpBuilder &builder) {
   if (executableTargetAttrs.empty()) {
-    return builder.create<arith::ConstantIntOp>(loc, 1, 1);
+    return arith::ConstantIntOp::create(builder, loc, 1, 1);
   }
   Value anyFormatMatch;
   for (auto executableTargetAttr : executableTargetAttrs) {
@@ -738,7 +740,7 @@ Value DeviceTargetAttr::buildExecutableFormatMatch(
       anyFormatMatch = formatMatch;
     } else {
       anyFormatMatch =
-          builder.create<arith::OrIOp>(loc, anyFormatMatch, formatMatch);
+          arith::OrIOp::create(builder, loc, anyFormatMatch, formatMatch);
     }
   }
   return anyFormatMatch;
@@ -756,9 +758,9 @@ void IREE::HAL::DeviceOrdinalAttr::printStatusDescription(
 Value IREE::HAL::DeviceOrdinalAttr::buildDeviceEnumeration(
     Location loc, IREE::HAL::BuildDeviceTargetMatchFn buildDeviceTargetMatch,
     OpBuilder &builder) const {
-  return builder.create<IREE::HAL::DevicesGetOp>(
-      loc, getType(),
-      builder.create<arith::ConstantIndexOp>(loc, getOrdinal()));
+  return IREE::HAL::DevicesGetOp::create(
+      builder, loc, getType(),
+      arith::ConstantIndexOp::create(builder, loc, getOrdinal()));
 }
 
 //===----------------------------------------------------------------------===//
@@ -776,8 +778,8 @@ Value IREE::HAL::DeviceFallbackAttr::buildDeviceEnumeration(
   // TODO(benvanik): hal.device.cast if needed - may need to look up the global
   // to do it as we don't encode what the device is here in a way that is
   // guaranteed to be consistent.
-  return builder.create<IREE::Util::GlobalLoadOp>(loc, getType(),
-                                                  getName().getValue());
+  return IREE::Util::GlobalLoadOp::create(builder, loc, getType(),
+                                          getName().getValue());
 }
 
 //===----------------------------------------------------------------------===//
@@ -823,7 +825,7 @@ Value IREE::HAL::DeviceSelectAttr::buildDeviceEnumeration(
     Location loc, IREE::HAL::BuildDeviceTargetMatchFn buildDeviceTargetMatch,
     OpBuilder &builder) const {
   Type deviceType = builder.getType<IREE::HAL::DeviceType>();
-  Value nullDevice = builder.create<IREE::Util::NullOp>(loc, deviceType);
+  Value nullDevice = IREE::Util::NullOp::create(builder, loc, deviceType);
   std::function<Value(ArrayRef<IREE::HAL::DeviceInitializationAttrInterface>,
                       OpBuilder &)>
       buildTry;
@@ -836,14 +838,14 @@ Value IREE::HAL::DeviceSelectAttr::buildDeviceEnumeration(
     if (deviceAttrs.size() == 1)
       return tryDevice; // termination case
     Value isNull =
-        tryBuilder.create<IREE::Util::CmpEQOp>(loc, tryDevice, nullDevice);
+        IREE::Util::CmpEQOp::create(tryBuilder, loc, tryDevice, nullDevice);
     auto ifOp =
-        tryBuilder.create<scf::IfOp>(loc, deviceType, isNull, true, true);
+        scf::IfOp::create(tryBuilder, loc, deviceType, isNull, true, true);
     auto thenBuilder = ifOp.getThenBodyBuilder();
     Value tryChainDevice = buildTry(deviceAttrs.drop_front(1), thenBuilder);
-    thenBuilder.create<scf::YieldOp>(loc, tryChainDevice);
+    scf::YieldOp::create(thenBuilder, loc, tryChainDevice);
     auto elseBuilder = ifOp.getElseBodyBuilder();
-    elseBuilder.create<scf::YieldOp>(loc, tryDevice);
+    scf::YieldOp::create(elseBuilder, loc, tryDevice);
     return ifOp.getResult(0);
   };
   SmallVector<IREE::HAL::DeviceInitializationAttrInterface> deviceAttrs(

@@ -28,7 +28,7 @@ static bool isScalarOrTensorOfSizeOne(Type t) {
 }
 
 struct FuseElementWiseGenericOps : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
@@ -118,8 +118,7 @@ static LogicalResult convertSoftmaxToGenerics(mlir::FunctionOpInterface funcOp,
 
 struct DecomposeSoftmaxPass
     : impl::DecomposeSoftmaxPassBase<DecomposeSoftmaxPass> {
-  using impl::DecomposeSoftmaxPassBase<
-      DecomposeSoftmaxPass>::DecomposeSoftmaxPassBase;
+  using Base::Base;
   explicit DecomposeSoftmaxPass(bool useFusion) { this->useFusion = useFusion; }
 
   void getDependentDialects(DialectRegistry &registry) const override {

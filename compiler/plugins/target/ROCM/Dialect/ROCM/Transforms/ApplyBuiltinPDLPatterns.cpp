@@ -92,6 +92,22 @@ static LogicalResult matchContraction(PatternRewriter &rewriter,
   return success();
 }
 
+/// Helper to check whether the given value is cast-compatible with the given
+/// type.
+static LogicalResult matchCastCompatibleType(PatternRewriter &rewriter,
+                                             Value value, Type type) {
+  if (auto targetTensorType = dyn_cast<RankedTensorType>(type)) {
+    if (!isCastableToTensorType(value.getType(), targetTensorType)) {
+      return failure();
+    }
+    return success();
+  }
+  if (value.getType() != type) {
+    return failure();
+  }
+  return success();
+}
+
 /// PDL utility that checks whether the size of the dimension of the provided
 /// value is a multiple of the divisor.
 static LogicalResult dimIsMultipleOf(PatternRewriter &rewriter, Value value,
@@ -196,6 +212,8 @@ populatePDLModuleFromBuiltin(MLIRContext *context, RewritePatternSet &patterns,
   pdlModule.registerConstraintFunction("hasAttr", hasAttr);
   pdlModule.registerConstraintFunction("dimIsBound", dimIsBound);
   pdlModule.registerConstraintFunction("dimIsMultipleOf", dimIsMultipleOf);
+  pdlModule.registerConstraintFunction("matchCastCompatibleType",
+                                       matchCastCompatibleType);
   pdlModule.registerConstraintFunction("matchContraction", matchContraction);
   pdlModule.registerRewriteFunction("annotateOperation", annotateOperation);
   patterns.insert(std::move(pdlModule));

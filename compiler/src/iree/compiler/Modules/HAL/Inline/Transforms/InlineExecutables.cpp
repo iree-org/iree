@@ -38,7 +38,7 @@ public:
   }
 
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     // Inline variants and produce a function map.
     DenseMap<Attribute, Attribute> exportToFuncMap;

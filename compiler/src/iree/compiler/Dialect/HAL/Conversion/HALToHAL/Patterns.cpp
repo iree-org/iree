@@ -17,7 +17,7 @@ namespace {
 
 struct ConvertDeviceResolveAnyOp
     : public OpConversionPattern<IREE::HAL::DeviceResolveOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::DeviceResolveOp resolveOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -30,9 +30,9 @@ struct ConvertDeviceResolveAnyOp
     Value device;
     auto resolveDevice = [&]() {
       if (!device) {
-        device = rewriter.create<IREE::HAL::DevicesGetOp>(
-            resolveOp.getLoc(), deviceType,
-            rewriter.create<arith::ConstantIndexOp>(resolveOp.getLoc(), 0));
+        device = IREE::HAL::DevicesGetOp::create(
+            rewriter, resolveOp.getLoc(), deviceType,
+            arith::ConstantIndexOp::create(rewriter, resolveOp.getLoc(), 0));
       }
       return device;
     };
@@ -42,11 +42,11 @@ struct ConvertDeviceResolveAnyOp
       if (isa<IREE::HAL::DeviceType>(resultType)) {
         results.push_back(resolveDevice());
       } else if (isa<IREE::HAL::AllocatorType>(resultType)) {
-        results.push_back(rewriter.create<IREE::HAL::DeviceAllocatorOp>(
-            resolveOp.getLoc(), resolveDevice()));
+        results.push_back(IREE::HAL::DeviceAllocatorOp::create(
+            rewriter, resolveOp.getLoc(), resolveDevice()));
       } else if (isa<IntegerType>(resultType)) {
-        results.push_back(rewriter.create<arith::ConstantIntOp>(
-            resolveOp.getLoc(), -1ll, 64));
+        results.push_back(arith::ConstantIntOp::create(
+            rewriter, resolveOp.getLoc(), -1ll, 64));
       }
     }
 
@@ -57,7 +57,7 @@ struct ConvertDeviceResolveAnyOp
 
 struct ConvertDeviceResolveAffinityOp
     : public OpConversionPattern<IREE::HAL::DeviceResolveOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::DeviceResolveOp resolveOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -76,8 +76,8 @@ struct ConvertDeviceResolveAffinityOp
     Value device;
     auto resolveDevice = [&]() {
       if (!device) {
-        device = rewriter.create<IREE::Util::GlobalLoadOp>(
-            resolveOp.getLoc(), deviceType, flatDeviceAttr.getValue(),
+        device = IREE::Util::GlobalLoadOp::create(
+            rewriter, resolveOp.getLoc(), deviceType, flatDeviceAttr.getValue(),
             /*is_immutable=*/true);
       }
       return device;
@@ -88,11 +88,11 @@ struct ConvertDeviceResolveAffinityOp
       if (isa<IREE::HAL::DeviceType>(resultType)) {
         results.push_back(resolveDevice());
       } else if (isa<IREE::HAL::AllocatorType>(resultType)) {
-        results.push_back(rewriter.create<IREE::HAL::DeviceAllocatorOp>(
-            resolveOp.getLoc(), resolveDevice()));
+        results.push_back(IREE::HAL::DeviceAllocatorOp::create(
+            rewriter, resolveOp.getLoc(), resolveDevice()));
       } else if (isa<IntegerType>(resultType)) {
-        results.push_back(rewriter.create<arith::ConstantIntOp>(
-            resolveOp.getLoc(), affinityAttr.getQueueMask(), 64));
+        results.push_back(arith::ConstantIntOp::create(
+            rewriter, resolveOp.getLoc(), affinityAttr.getQueueMask(), 64));
       }
     }
 
@@ -103,7 +103,7 @@ struct ConvertDeviceResolveAffinityOp
 
 struct ConvertExecutableCalculateWorkgroupsOp
     : public OpConversionPattern<IREE::HAL::ExecutableCalculateWorkgroupsOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::ExecutableCalculateWorkgroupsOp calculateOp,
                   OpAdaptor adaptor,

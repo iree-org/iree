@@ -784,7 +784,7 @@ struct FuseDequantizationMatmulPass
 
 void FuseDequantizationMatmulPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   int quantizeBitWidth = 16;
   SmallVector<std::pair<linalg::GenericOp, linalg::GenericOp>> candidates;

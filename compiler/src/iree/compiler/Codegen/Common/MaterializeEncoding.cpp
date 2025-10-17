@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
@@ -57,6 +56,9 @@ updateFuncSignature(FunctionOpInterface funcOp,
   SmallVector<Type> newResults =
       llvm::map_to_vector(funcOp.getResultTypes(), convertType);
   funcOp.setType(FunctionType::get(funcOp.getContext(), newInputs, newResults));
+  for (auto [arg, newType] : llvm::zip(funcOp.getArguments(), newInputs)) {
+    arg.setType(newType);
+  }
 }
 
 static LogicalResult
@@ -131,12 +133,31 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
     MaterializeEncodingConversionTarget target(*ctx);
     populateMaterializeEncodingPatterns(patterns, target, typeConverter);
 
+    // Replace any unrealized conversions to tensor.cast ops if they come from
+    // block arguments. The function signature is updated to match the converted
+    // types after the partial conversion. This is used in testing, where
+    // function arguments have encodings to reduce the amount of IR, but we do
+    // not expect function arguments to have encodings in practice.
+    auto castFnArguments = [](OpBuilder &builder, Type resultTy,
+                              ValueRange inputs, Location loc) -> Value {
+      if (inputs.size() != 1) {
+        return Value();
+      }
+      Value input = inputs[0];
+      if (!isa<BlockArgument>(input) ||
+          !isa<RankedTensorType>(input.getType())) {
+        return Value();
+      }
+      return tensor::CastOp::create(builder, loc, resultTy, input);
+    };
+    typeConverter.addTargetMaterialization(castFnArguments);
+    typeConverter.addSourceMaterialization(castFnArguments);
+
     if (failed(applyPartialConversion(funcOp, target, std::move(patterns)))) {
       return funcOp.emitOpError("materialization failed");
     }
 
-    // The update is required for testing purposes, which results in fewer IRs.
-    // We do not expect inputs and outputs from `funcOp` in practice.
+    // Update the function signature to match the converted types.
     updateFuncSignature(funcOp, typeConverter);
   }
 

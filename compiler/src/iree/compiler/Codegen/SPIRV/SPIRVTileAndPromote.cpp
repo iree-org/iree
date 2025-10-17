@@ -111,8 +111,7 @@ namespace {
 class SPIRVTileAndPromotePass final
     : public impl::SPIRVTileAndPromotePassBase<SPIRVTileAndPromotePass> {
 public:
-  using impl::SPIRVTileAndPromotePassBase<
-      SPIRVTileAndPromotePass>::SPIRVTileAndPromotePassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<gpu::GPUDialect, IREE::GPU::IREEGPUDialect>();
@@ -130,7 +129,7 @@ private:
 
 void SPIRVTileAndPromotePass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   auto threadTileComputeFn = getSPIRVTileSizeComputeFn(funcOp, 1);
   if (failed(threadTileComputeFn))

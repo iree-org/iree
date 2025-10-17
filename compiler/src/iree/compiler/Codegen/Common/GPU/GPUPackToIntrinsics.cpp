@@ -123,7 +123,7 @@ struct ConvertToMultiMma final : OpInterfaceRewritePattern<linalg::LinalgOp> {
 
 // This pattern hoists pack & unpack ops out of scf.for op.
 struct PackDestinationForOp final : OpRewritePattern<scf::YieldOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(scf::YieldOp yieldOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = yieldOp.getLoc();
@@ -244,7 +244,7 @@ struct PackDestinationForOp final : OpRewritePattern<scf::YieldOp> {
 
 void GPUPackToIntrinsicsPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   // Step 1. Pack candidate linalg ops to specified shapes.
   IRRewriter rewriter(funcOp);
@@ -314,7 +314,8 @@ void GPUPackToIntrinsicsPass::runOnOperation() {
            consumer->getBlock() == producer->getBlock();
   };
 
-  linalg::populateDataLayoutPropagationPatterns(patterns, control);
+  linalg::populateDataLayoutPropagationPatterns(patterns, control,
+                                                /*PoisonPaddingOk=*/true);
   linalg::populateExtractSliceSinkingPatterns(patterns, controlExtract);
   patterns.add<PackDestinationForOp>(context);
   linalg::UnPackOp::getCanonicalizationPatterns(patterns, context);

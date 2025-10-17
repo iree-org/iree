@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -20,7 +19,7 @@ struct FuseTensorPadWithConsumerPass final
     : impl::FuseTensorPadWithConsumerPassBase<FuseTensorPadWithConsumerPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    auto funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
 
     RewritePatternSet patterns(context);
     patterns.insert<linalg::ExtractSliceOfPadTensorSwapPattern>(

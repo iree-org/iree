@@ -660,6 +660,7 @@ def TestGpuVectorDistribution :
 
     let arguments = (ins TransformHandleTypeInterface:$target,
                          DefaultValuedOptionalAttr<BoolAttr, "false">:$experimental,
+                         DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$workgroup_size,
                          DefaultValuedOptionalAttr<I64Attr, "64">:$subgroup_size);
     let results = (outs);
 

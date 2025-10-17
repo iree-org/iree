@@ -1917,7 +1917,7 @@ def Stream_TensorTraceOp : Stream_Op<"tensor.trace", [
   let hasVerifier = 1;
 }
 
-def Stream_TensorDispatchOp : Stream_Op<"tensor.dispatch", [
+def Stream_TensorDispatchOp : Stream_PureOp<"tensor.dispatch", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<SymbolUserOpInterface>,
   Stream_AffinityOp,
@@ -2521,10 +2521,11 @@ def Stream_AsyncBarrierOp : Stream_Op<"async.barrier", [
   let hasCanonicalizer = 1;
 }
 
-def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
+def Stream_AsyncTransferOp : Stream_PureOp<"async.transfer", [
   DeclareOpInterfaceMethods<Stream_AffinityOp, [
     "getAffinityAttr",
     "setAffinityAttr",
+    "getResultAffinityAttr",
   ]>,
   Stream_AsyncPhaseOp,
   Stream_StreamableOp,
@@ -2549,7 +2550,7 @@ def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
     Stream_Size:$source_size,
     Stream_Size:$result_size,
     OptionalAttr<Stream_AffinityAttr>:$source_affinity,
-    OptionalAttr<Stream_AffinityAttr>:$result_affinity
+    OptionalAttr<Stream_AffinityAttr>:$target_affinity
   );
   let results = (outs
     AnyTypeOf<[
@@ -2563,7 +2564,7 @@ def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
     `` `{` $source_size `}`
     (`from` `(` $source_affinity^ `)`)?
     `->`
-    (`to` `(` $result_affinity^ `)`)?
+    (`to` `(` $target_affinity^ `)`)?
     type($result) `` `{` $result_size `}`
     attr-dict-with-keyword
   }];
@@ -2660,7 +2661,7 @@ def Stream_AsyncStoreOp : Stream_PureOp<"async.store", [
   let hasCanonicalizer = 1;
 }
 
-def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
+def Stream_AsyncDispatchOp : Stream_PureOp<"async.dispatch", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<SymbolUserOpInterface>,
   Stream_AffinityOp,

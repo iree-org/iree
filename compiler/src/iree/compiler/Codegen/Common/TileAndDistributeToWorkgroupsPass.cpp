@@ -15,7 +15,6 @@
 //===---------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
@@ -268,8 +267,7 @@ namespace {
 struct TileAndDistributeToWorkgroupsPass final
     : impl::TileAndDistributeToWorkgroupsPassBase<
           TileAndDistributeToWorkgroupsPass> {
-  using impl::TileAndDistributeToWorkgroupsPassBase<
-      TileAndDistributeToWorkgroupsPass>::TileAndDistributeToWorkgroupsPassBase;
+  using Base::Base;
 
   TileAndDistributeToWorkgroupsPass(
       int32_t maxWorkgroupParallelDims,
@@ -291,7 +289,7 @@ struct TileAndDistributeToWorkgroupsPass final
 void TileAndDistributeToWorkgroupsPass::runOnOperation() {
   MLIRContext *context = &getContext();
 
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   {
     RewritePatternSet patterns(context);

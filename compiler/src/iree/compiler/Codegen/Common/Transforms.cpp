@@ -16,6 +16,20 @@
 
 namespace mlir::iree_compiler {
 
+void moveUpMemrefReshapeOps(RewriterBase &rewriter, Operation *op) {
+  DominanceInfo domInfo(op);
+  SmallVector<Operation *> reshapeOps;
+  op->walk([&](Operation *nestedOp) {
+    if (isa<memref::ExpandShapeOp, memref::CollapseShapeOp>(nestedOp)) {
+      reshapeOps.push_back(nestedOp);
+    }
+  });
+
+  for (Operation *reshapeOp : reshapeOps) {
+    moveOpAfterLastOperand(rewriter, domInfo, reshapeOp);
+  }
+}
+
 /// Fuse consumers of forall ops into it after checking that they are tilable.
 
 namespace {
@@ -125,7 +139,7 @@ namespace {
 
 struct FoldRelayoutOpIntoMapScatterPattern
     : public OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::LinalgExt::MapScatterOp mapScatterOp,
                                 PatternRewriter &rewriter) const override {
@@ -146,7 +160,7 @@ struct FoldRelayoutOpIntoMapScatterPattern
 
 struct FoldPadOpIntoMapScatterPattern
     : public OpRewritePattern<IREE::LinalgExt::MapScatterOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   FoldPadOpIntoMapScatterPattern(MLIRContext *context,
                                  PadDistributionConfigFn configFn,
                                  PatternBenefit benefit = 1)
@@ -306,10 +320,10 @@ swapExpandShapeWithSlice(RewriterBase &rewriter,
         llvm::map_to_vector(delinOffsets, [&](OpFoldResult ofr) {
           return getValueOrCreateConstantIndexOp(rewriter, loc, ofr);
         });
-    OpFoldResult newOffset = rewriter
-                                 .create<affine::AffineLinearizeIndexOp>(
-                                     loc, offsetVals, basis, /*disjoint=*/true)
-                                 .getResult();
+    OpFoldResult newOffset =
+        affine::AffineLinearizeIndexOp::create(rewriter, loc, offsetVals, basis,
+                                               /*disjoint=*/true)
+            .getResult();
     newOffsets.push_back(newOffset);
     newLengths.push_back(newSize);
 
@@ -339,7 +353,7 @@ namespace {
 
 struct SwapExpandShapeWithSlicePattern
     : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
@@ -483,12 +497,17 @@ swapCollapseShapeWithSlice(RewriterBase &rewriter,
   for (auto [collapsedSize, collapsedOffset, reassocIndices] :
        llvm::zip_equal(collapsedSizes, collapsedOffsets,
                        collapseShapeOp.getReassociationIndices())) {
-    // CASE #1 - size and/or offset are dynamic.
-    if (isa<Value>(collapsedSize) || isa<Value>(collapsedOffset)) {
+    // Do not support cases where both the collapsed size and offset are
+    // dynamic, as this may cause failures when padding the operands.
+    if (isa<Value>(collapsedSize) && isa<Value>(collapsedOffset)) {
+      return rewriter.notifyMatchFailure(
+          sliceOp, "collapsed size and offset cannot be both dynamic");
+    }
+    // CASE #1 - size or offset is dynamic.
+    else if (isa<Value>(collapsedSize) || isa<Value>(collapsedOffset)) {
       // Special case especially for collapse shape of convolution filter in
       // IGEMM, while the offset is dynamic and the size is static.
-      if (isa<Attribute>(collapsedSize) && isa<Value>(collapsedOffset) &&
-          reassocIndices.size() != 1) {
+      if (isa<Attribute>(collapsedSize) && isa<Value>(collapsedOffset)) {
         auto maybeStaticSize = getConstantIntValue(collapsedSize);
         if (!maybeStaticSize) {
           return rewriter.notifyMatchFailure(sliceOp,
@@ -682,7 +701,7 @@ namespace {
 
 struct SwapCollapseShapeWithSlicePattern
     : public OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {

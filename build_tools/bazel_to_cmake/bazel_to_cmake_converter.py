@@ -288,6 +288,9 @@ class BuildFileFunctions(object):
     def py_binary(self, *args, **kwargs):
         pass
 
+    def py_library(self, *args, **kwargs):
+        pass
+
     def filegroup(self, name, srcs, **kwargs):
         if not srcs:
             return

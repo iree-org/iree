@@ -151,7 +151,7 @@ static void moveScalarAndBindingUniformCode(gpu::WarpExecuteOnLane0Op warpOp) {
 /// Pattern to convert single element vector.insert to broadcast, this is a
 /// workaround until MultiDimReduction distribution is supported.
 struct InsertToBroadcast final : OpRewritePattern<vector::InsertOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(vector::InsertOp insertOp,
                                 PatternRewriter &rewriter) const override {
@@ -165,7 +165,7 @@ struct InsertToBroadcast final : OpRewritePattern<vector::InsertOp> {
 
 /// Pattern to sink `gpu.barrier` ops out of a `warp_execute_on_lane_0` op.
 struct WarpOpBarrier final : OpRewritePattern<gpu::WarpExecuteOnLane0Op> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(gpu::WarpExecuteOnLane0Op warpOp,
                                 PatternRewriter &rewriter) const override {
@@ -192,9 +192,8 @@ static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
   Value srcIdxI32 = arith::IndexCastOp::create(builder, loc, i32Type, srcIdx);
   Value warpSzI32 = arith::ConstantOp::create(
       builder, loc, builder.getIntegerAttr(i32Type, warpSz));
-  Value result = builder
-                     .create<gpu::ShuffleOp>(loc, val, srcIdxI32, warpSzI32,
-                                             gpu::ShuffleMode::IDX)
+  Value result = gpu::ShuffleOp::create(builder, loc, val, srcIdxI32, warpSzI32,
+                                        gpu::ShuffleMode::IDX)
                      .getResult(0);
   return result;
 }

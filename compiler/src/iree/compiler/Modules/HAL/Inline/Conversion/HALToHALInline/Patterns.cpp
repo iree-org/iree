@@ -21,7 +21,7 @@ namespace {
 
 struct ElementTypeOpConversion
     : public OpConversionPattern<IREE::HAL::ElementTypeOp> {
-  using OpConversionPattern<IREE::HAL::ElementTypeOp>::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::ElementTypeOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -37,7 +37,7 @@ struct ElementTypeOpConversion
 
 struct EncodingTypeOpConversion
     : public OpConversionPattern<IREE::HAL::EncodingTypeOp> {
-  using OpConversionPattern<IREE::HAL::EncodingTypeOp>::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::EncodingTypeOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -52,7 +52,7 @@ struct EncodingTypeOpConversion
 
 struct MemoryTypeOpConversion
     : public OpConversionPattern<IREE::HAL::MemoryTypeOp> {
-  using OpConversionPattern<IREE::HAL::MemoryTypeOp>::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::MemoryTypeOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -64,7 +64,7 @@ struct MemoryTypeOpConversion
 
 struct BufferUsageOpConversion
     : public OpConversionPattern<IREE::HAL::BufferUsageOp> {
-  using OpConversionPattern<IREE::HAL::BufferUsageOp>::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::BufferUsageOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -76,7 +76,7 @@ struct BufferUsageOpConversion
 
 struct BufferSubspanOpPattern
     : public OpConversionPattern<IREE::HAL::BufferSubspanOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::BufferSubspanOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -90,7 +90,7 @@ struct BufferSubspanOpPattern
 
 struct BufferLengthOpPattern
     : public OpConversionPattern<IREE::HAL::BufferLengthOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::BufferLengthOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -103,7 +103,7 @@ struct BufferLengthOpPattern
 
 struct BufferLoadOpPattern
     : public OpConversionPattern<IREE::HAL::BufferLoadOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::BufferLoadOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -124,7 +124,7 @@ struct BufferLoadOpPattern
 
 struct BufferStoreOpPattern
     : public OpConversionPattern<IREE::HAL::BufferStoreOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::BufferStoreOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -144,7 +144,7 @@ struct BufferStoreOpPattern
 
 struct BufferViewCreateOpPattern
     : public OpConversionPattern<IREE::HAL::BufferViewCreateOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::BufferViewCreateOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -158,7 +158,7 @@ struct BufferViewCreateOpPattern
 
 struct BufferViewBufferOpPattern
     : public OpConversionPattern<IREE::HAL::BufferViewBufferOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::BufferViewBufferOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -170,7 +170,7 @@ struct BufferViewBufferOpPattern
 
 struct BufferViewAssertOpPattern
     : public OpConversionPattern<IREE::HAL::BufferViewAssertOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::BufferViewAssertOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -184,7 +184,7 @@ struct BufferViewAssertOpPattern
 
 struct BufferViewElementTypeOpPattern
     : public OpConversionPattern<IREE::HAL::BufferViewElementTypeOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::BufferViewElementTypeOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -196,7 +196,7 @@ struct BufferViewElementTypeOpPattern
 
 struct BufferViewEncodingTypeOpPattern
     : public OpConversionPattern<IREE::HAL::BufferViewEncodingTypeOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::BufferViewEncodingTypeOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -208,7 +208,7 @@ struct BufferViewEncodingTypeOpPattern
 
 struct BufferViewRankOpPattern
     : public OpConversionPattern<IREE::HAL::BufferViewRankOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::BufferViewRankOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -220,7 +220,7 @@ struct BufferViewRankOpPattern
 
 struct BufferViewDimOpPattern
     : public OpConversionPattern<IREE::HAL::BufferViewDimOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::BufferViewDimOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -233,7 +233,7 @@ struct BufferViewDimOpPattern
 
 struct BufferViewTraceOpPattern
     : public OpConversionPattern<IREE::HAL::BufferViewTraceOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(IREE::HAL::BufferViewTraceOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {

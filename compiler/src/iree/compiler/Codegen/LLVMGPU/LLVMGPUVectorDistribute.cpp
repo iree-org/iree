@@ -28,10 +28,12 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
 ContractionVectorLayoutOptions::ContractionVectorLayoutOptions(
-    Operation *root, Value laneId, int64_t subgroupSize)
+    Operation *root, Value laneId, int64_t subgroupSize,
+    ArrayRef<int64_t> workgroupSize)
     : VectorLayoutOptions(root), patterns(root->getContext()) {
   populateGPUDistributionPatterns(patterns);
-  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize);
+  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize,
+                                                workgroupSize);
   populateGPUDistributeNestedLayoutContractAMDGPUPatterns(patterns);
 }
 
@@ -58,23 +60,24 @@ struct LLVMGPUVectorDistributePass final
     registry.insert<affine::AffineDialect>();
     registry.insert<amdgpu::AMDGPUDialect>();
     registry.insert<gpu::GPUDialect>();
+    registry.insert<scf::SCFDialect>();
   }
 
   void runOnOperation() override {
-    auto func = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
 
     std::array<int64_t, 3> workgroupSize;
-    if (func->hasAttr("workgroup_size")) {
+    if (funcOp->hasAttr("workgroup_size")) {
       auto tmpSizes =
-          llvm::cast<ArrayAttr>(func->getAttr("workgroup_size")).getValue();
+          llvm::cast<ArrayAttr>(funcOp->getAttr("workgroup_size")).getValue();
       for (auto [i, size] : llvm::enumerate(tmpSizes)) {
         workgroupSize[i] = llvm::cast<IntegerAttr>(size).getInt();
       }
     } else {
       std::optional<SmallVector<int64_t>> maybeWorkgroupSize =
-          getWorkgroupSize(func);
+          getWorkgroupSize(funcOp);
       if (!maybeWorkgroupSize) {
-        func->emitOpError()
+        funcOp->emitOpError()
             << "unable to query workgroup_size information from entry point";
         return signalPassFailure();
       }
@@ -86,31 +89,32 @@ struct LLVMGPUVectorDistributePass final
       }
     }
 
-    IRRewriter rewriter(func);
-    rewriter.setInsertionPointToStart(&func.getFunctionBody().front());
+    IRRewriter rewriter(funcOp);
+    rewriter.setInsertionPointToStart(&funcOp.getFunctionBody().front());
     SmallVector<Value> threadGrid = {rewriter.createOrFold<gpu::ThreadIdOp>(
-                                         func.getLoc(), gpu::Dimension::z),
+                                         funcOp.getLoc(), gpu::Dimension::z),
                                      rewriter.createOrFold<gpu::ThreadIdOp>(
-                                         func.getLoc(), gpu::Dimension::y),
+                                         funcOp.getLoc(), gpu::Dimension::y),
                                      rewriter.createOrFold<gpu::ThreadIdOp>(
-                                         func.getLoc(), gpu::Dimension::x)};
+                                         funcOp.getLoc(), gpu::Dimension::x)};
     std::reverse(workgroupSize.begin(), workgroupSize.end());
 
     Value linearThreadIdVal = affine::AffineLinearizeIndexOp::create(
-        rewriter, func.getLoc(), threadGrid, workgroupSize, /*disjoint=*/true);
+        rewriter, funcOp.getLoc(), threadGrid, workgroupSize,
+        /*disjoint=*/true);
 
-    std::optional<int64_t> subgroupSize = getSubgroupSize(func);
+    std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
     if (!subgroupSize) {
-      func->emitOpError()
+      funcOp->emitOpError()
           << "unable to query subgroup size information from entry point";
       return signalPassFailure();
     }
 
-    ContractionVectorLayoutOptions options(func, linearThreadIdVal,
-                                           subgroupSize.value());
+    ContractionVectorLayoutOptions options(funcOp, linearThreadIdVal,
+                                           subgroupSize.value(), workgroupSize);
 
-    if (failed(distributeVectorOps(func, options.getPatterns(), options))) {
-      func->emitOpError() << "failed to distribute";
+    if (failed(distributeVectorOps(funcOp, options.getPatterns(), options))) {
+      funcOp->emitOpError() << "failed to distribute";
       return signalPassFailure();
     }
   }

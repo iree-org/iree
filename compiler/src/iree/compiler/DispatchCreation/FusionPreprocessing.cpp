@@ -46,7 +46,7 @@ namespace {
 // If possible, interchange indexing maps to make input maps all identity.
 struct ElementwiseOpInterchangePattern final
     : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
     if (!linalg::isElementwise(genericOp) || genericOp.getNumResults() != 1 ||
@@ -98,7 +98,7 @@ struct ElementwiseOpInterchangePattern final
 /// ```
 struct FoldSuccessiveTensorInsertSliceOps final
     : public OpRewritePattern<tensor::InsertSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(tensor::InsertSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
     auto sourceInsertSlice =

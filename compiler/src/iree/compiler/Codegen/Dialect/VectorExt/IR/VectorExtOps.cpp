@@ -591,7 +591,7 @@ OpFoldResult TransferGatherOp::fold(FoldAdaptor adaptor) {
 }
 
 struct FoldSingleElementIndexVec final : OpRewritePattern<TransferGatherOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(TransferGatherOp xferOp,
                                 PatternRewriter &rewriter) const override {
@@ -632,7 +632,7 @@ struct FoldSingleElementIndexVec final : OpRewritePattern<TransferGatherOp> {
 
 struct FoldContigousGatherToTransferRead final
     : OpRewritePattern<TransferGatherOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(TransferGatherOp xferOp,
                                 PatternRewriter &rewriter) const override {
