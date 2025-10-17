@@ -662,7 +662,7 @@ static iree_status_t iree_hal_hip_parse_amd_kernel_metadata(
     // Read key
     iree_string_view_t key;
     status = iree_hal_hip_msgpack_read_string(note_data, note_size, offset,
-                                               &key, &consumed);
+                                              &key, &consumed);
     if (!iree_status_is_ok(status)) {
       // Skip this key-value pair
       iree_host_size_t skip =
@@ -680,9 +680,8 @@ static iree_status_t iree_hal_hip_parse_amd_kernel_metadata(
     if (iree_string_view_equal(key, iree_make_cstring_view("amdhsa.kernels"))) {
       // Read the kernels array
       uint32_t kernels_count = 0;
-      status = iree_hal_hip_msgpack_read_array_size(note_data, note_size,
-                                                     offset, &kernels_count,
-                                                     &consumed);
+      status = iree_hal_hip_msgpack_read_array_size(
+          note_data, note_size, offset, &kernels_count, &consumed);
       if (!iree_status_is_ok(status)) break;
       offset += consumed;
 
@@ -690,9 +689,8 @@ static iree_status_t iree_hal_hip_parse_amd_kernel_metadata(
       for (uint32_t k = 0; k < kernels_count; ++k) {
         // Each kernel is a map
         uint32_t kernel_map_size = 0;
-        status = iree_hal_hip_msgpack_read_map_size(note_data, note_size,
-                                                     offset, &kernel_map_size,
-                                                     &consumed);
+        status = iree_hal_hip_msgpack_read_map_size(
+            note_data, note_size, offset, &kernel_map_size, &consumed);
         if (!iree_status_is_ok(status)) {
           // Skip this kernel
           iree_host_size_t skip =
@@ -739,8 +737,8 @@ static iree_status_t iree_hal_hip_parse_amd_kernel_metadata(
               name_matches = true;
             }
             offset += consumed;
-          } else if (iree_string_view_equal(
-                         kernel_key, iree_make_cstring_view(".args"))) {
+          } else if (iree_string_view_equal(kernel_key,
+                                            iree_make_cstring_view(".args"))) {
             // Remember args offset for later parsing
             args_offset = offset;
             // Skip for now
@@ -814,7 +812,8 @@ static iree_status_t iree_hal_hip_parse_amd_kernel_metadata(
             IREE_RETURN_IF_ERROR(iree_allocator_malloc(
                 allocator, args_array_size * sizeof(iree_hal_hip_parsed_arg_t),
                 (void**)&args));
-            memset(args, 0, args_array_size * sizeof(iree_hal_hip_parsed_arg_t));
+            memset(args, 0,
+                   args_array_size * sizeof(iree_hal_hip_parsed_arg_t));
 
             iree_host_size_t arg_offset = args_offset + consumed;
             iree_host_size_t explicit_count = 0;
@@ -892,8 +891,7 @@ static iree_status_t iree_hal_hip_parse_amd_kernel_metadata(
                                    iree_make_cstring_view("by_value"))) {
                       value_kind = IREE_HAL_HIP_ARG_KIND_BY_VALUE;
                     } else if (iree_string_view_starts_with(
-                                   vk_str,
-                                   iree_make_cstring_view("hidden_"))) {
+                                   vk_str, iree_make_cstring_view("hidden_"))) {
                       is_hidden = true;
                       value_kind = IREE_HAL_HIP_ARG_KIND_HIDDEN;
                     }
@@ -1261,11 +1259,10 @@ static iree_status_t iree_hal_hip_parse_elf_kernels(
           for (iree_host_size_t a = 0; a < arg_count; ++a) {
             params[a].offset = parsed_args[a].offset;
             params[a].size = parsed_args[a].size;
-            params[a].type =
-                (parsed_args[a].value_kind ==
-                 IREE_HAL_HIP_ARG_KIND_GLOBAL_BUFFER)
-                    ? 1
-                    : 0;  // 1=pointer, 0=value
+            params[a].type = (parsed_args[a].value_kind ==
+                              IREE_HAL_HIP_ARG_KIND_GLOBAL_BUFFER)
+                                 ? 1
+                                 : 0;  // 1=pointer, 0=value
           }
           kernels[k].parameters = params;
         }

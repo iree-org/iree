@@ -122,7 +122,7 @@ typedef struct iree_hal_hip_elf64_symbol_t {
 #define IREE_HAL_HIP_SHT_DYNSYM 11
 
 // Symbol type extraction macro
-#define IREE_HAL_HIP_ELF64_ST_TYPE(info) ((info)&0xf)
+#define IREE_HAL_HIP_ELF64_ST_TYPE(info) ((info) & 0xf)
 #define IREE_HAL_HIP_STT_FUNC 2
 
 // AMD Kernel Descriptor structure (AMDHSA ABI).

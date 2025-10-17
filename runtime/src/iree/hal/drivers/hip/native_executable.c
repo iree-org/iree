@@ -430,6 +430,7 @@ static iree_status_t iree_hal_hip_native_executable_create_fpih(
       // Store kernel info from parsed fat binary
       iree_hal_hip_kernel_params_t* kernel_info = &per_device_data->exports[i];
       kernel_info->function = function;
+      kernel_info->function_name = kernel_name;
       // Copy block dimensions from parsed kernel info
       kernel_info->block_dims[0] = fat_binary_info.kernels[i].block_dims[0];
       kernel_info->block_dims[1] = fat_binary_info.kernels[i].block_dims[1];
@@ -896,6 +897,7 @@ static iree_status_t iree_hal_hip_native_executable_export_info(
   const iree_hal_hip_kernel_params_t* export =
       &exe->per_device_data[0]->exports[export_ordinal];
   out_info->binding_count = export->binding_count;
+  out_info->name = export->function_name;
   out_info->constant_count = export->constant_count;
   out_info->workgroup_size[0] = export->block_dims[0];
   out_info->workgroup_size[1] = export->block_dims[1];
