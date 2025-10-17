@@ -183,7 +183,7 @@ void storeNamedAttrIfPresent(SmallVectorImpl<NamedAttribute> &config,
                              DictionaryAttr dictAttr, StringRef name);
 
 /// Returns a `linalg.fill` operation with provided operands, which are assumed
-/// being in types without encodings.
+/// to have types without encodings.
 Operation *lowerFillOpWithResolvedLayouts(OpBuilder &builder,
                                           linalg::FillOp fillOp,
                                           TypeRange convertedResTypes,

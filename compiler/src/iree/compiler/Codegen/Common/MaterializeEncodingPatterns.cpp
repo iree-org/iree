@@ -506,7 +506,8 @@ struct UnsetEncodingOpLoweringConversion
   }
 };
 
-/// Pattern to convert contraction operations.
+/// Pattern to rewrite linalg::LinalgOp by materializing its encoding using the
+/// provided LayoutMaterializerAttr.
 class MaterializeLinalgOp
     : public OpInterfaceConversionPattern<linalg::LinalgOp> {
 public:
