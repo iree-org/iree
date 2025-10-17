@@ -31,6 +31,10 @@ struct Basis {
   SmallVector<int64_t> mapping;
 };
 
+using DimensionExpansion = SmallVector<ReassociationIndices>;
+FailureOr<DimensionExpansion>
+getDimensionExpansion(IREE::GPU::LoweringConfigAttr config);
+
 // Helper to retrieve/set distribution basis.
 FailureOr<Basis> getBasis(IREE::GPU::LoweringConfigAttr config,
                           IREE::GPU::TilingLevel level);
