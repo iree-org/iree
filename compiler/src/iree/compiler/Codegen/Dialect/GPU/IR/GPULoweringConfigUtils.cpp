@@ -52,9 +52,10 @@ getDimensionExpansion(IREE::GPU::LoweringConfigAttr config) {
   }
 
   SmallVector<std::optional<ReassociationIndices>> maybeDimExpandInfo =
-      llvm::to_vector(llvm::map_range(expandDimsAttr, [](const Attribute &attr) {
-        return getReassociationIndices(cast<ArrayAttr>(attr));
-      }));
+      llvm::to_vector(
+          llvm::map_range(expandDimsAttr, [](const Attribute &attr) {
+            return getReassociationIndices(cast<ArrayAttr>(attr));
+          }));
 
   if (llvm::any_of(maybeDimExpandInfo,
                    [](auto &dimFactor) { return !dimFactor.has_value(); })) {
