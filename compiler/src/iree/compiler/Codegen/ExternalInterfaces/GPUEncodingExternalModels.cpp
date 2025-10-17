@@ -574,6 +574,24 @@ struct GPULayoutResolverAttr final
 struct GPUPadEncodingLayoutMaterializerAttr final
     : IREE::Encoding::LayoutMaterializerAttr::ExternalModel<
           GPUPadEncodingLayoutMaterializerAttr, GPUPaddingResolverAttr> {
+
+  LogicalResult getOffsetsSizesStrides(
+      Attribute attr, OpBuilder &builder, Location loc,
+      IREE::TensorExt::DispatchTensorType type, ValueRange dynamicDims,
+      ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
+      ArrayRef<OpFoldResult> strides, SmallVectorImpl<OpFoldResult> &newOffsets,
+      SmallVectorImpl<OpFoldResult> &newSizes,
+      SmallVectorImpl<OpFoldResult> &newStrides) const {
+    auto boundType = dyn_cast<RankedTensorType>(type.getBoundType());
+    if (!boundType || !boundType.getEncoding()) {
+      return failure();
+    }
+    newSizes = getMixedValues(boundType.getShape(), dynamicDims, builder);
+    newOffsets.resize(newSizes.size(), builder.getIndexAttr(0));
+    newStrides.resize(newSizes.size(), builder.getIndexAttr(1));
+    return success();
+  }
+
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
                      ValueRange convertedOperands) const {

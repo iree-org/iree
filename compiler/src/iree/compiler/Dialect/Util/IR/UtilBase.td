@@ -51,8 +51,8 @@ class Util_IndexAttrBase<string descr> :
     TypedAttrBase<
       Index, "IntegerAttr",
       And<[
-        CPred<"isa<IntegerAttr>($_self)">,
-        CPred<"cast<IntegerAttr>($_self).getType().isIndex()">,
+        CPred<"::llvm::isa<::mlir::IntegerAttr>($_self)">,
+        CPred<"::llvm::cast<::mlir::IntegerAttr>($_self).getType().isIndex()">,
       ]>,
       descr> {
   let returnType = [{ APInt }];
@@ -67,9 +67,9 @@ def Util_TiedOpStorageAttr :
 defvar Util_GlobalRefAttr = FlatSymbolRefAttr;
 
 def Util_AnySerializableAttr : Attr<Or<[
-  CPred<"isa<mlir::DenseElementsAttr>($_self)">,
-  CPred<"isa<mlir::DenseResourceElementsAttr>($_self)">,
-  CPred<"isa<IREE::Util::SerializableAttrInterface>($_self)">,
+  CPred<"::llvm::isa<::mlir::DenseElementsAttr>($_self)">,
+  CPred<"::llvm::isa<::mlir::DenseResourceElementsAttr>($_self)">,
+  CPred<"::llvm::isa<::mlir::iree_compiler::IREE::Util::SerializableAttrInterface>($_self)">,
 ]>, "buffer-like constant attribute values"> {
   let storageType = [{ ::mlir::Attribute }];
   let returnType = [{ ::mlir::Attribute }];
@@ -81,7 +81,7 @@ def Util_AnySerializableArrayAttr :
                      "array attribute of serializable attributes"
   >;
 
-class Util_AliasedSymbolRefAttr : Attr<CPred<"isa<FlatSymbolRefAttr>($_self)">,
+class Util_AliasedSymbolRefAttr : Attr<CPred<"::llvm::isa<::mlir::FlatSymbolRefAttr>($_self)">,
                                        "symbol reference attribute"> {
   let storageType = [{ FlatSymbolRefAttr }];
   let returnType = [{ StringRef }];
