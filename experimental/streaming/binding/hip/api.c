@@ -3493,14 +3493,17 @@ HIPAPI hipError_t hipMemcpy(void* dst, const void* src, size_t sizeBytes,
   iree_status_t status = iree_ok_status();
   switch (kind) {
     case hipMemcpyHostToDevice:
+      iree_hal_streaming_context_synchronize(context);
       status = iree_hal_streaming_memcpy_host_to_device(
           context, (iree_hal_streaming_deviceptr_t)dst, src, sizeBytes, NULL);
       break;
     case hipMemcpyDeviceToHost:
+      iree_hal_streaming_context_synchronize(context);
       status = iree_hal_streaming_memcpy_device_to_host(
           context, dst, (iree_hal_streaming_deviceptr_t)src, sizeBytes, NULL);
       break;
     case hipMemcpyDeviceToDevice:
+      iree_hal_streaming_context_synchronize(context);
       status = iree_hal_streaming_memcpy_device_to_device(
           context, (iree_hal_streaming_deviceptr_t)dst,
           (iree_hal_streaming_deviceptr_t)src, sizeBytes, NULL);
