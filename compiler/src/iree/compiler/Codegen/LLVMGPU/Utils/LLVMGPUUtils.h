@@ -56,7 +56,8 @@ void packSharedMemoryAlloc(mlir::FunctionOpInterface funcOp);
 // Prefetches data written to shared memory for the next iteration. Returns the
 // new loop on success or failure when the `forOp` is not supported.
 FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
-                                               scf::ForOp forOp);
+                                               scf::ForOp forOp,
+                                               unsigned numStages = 2);
 
 /// Insert barriers and wait operations if there are allocs of a different alias
 /// group before the given alloc.

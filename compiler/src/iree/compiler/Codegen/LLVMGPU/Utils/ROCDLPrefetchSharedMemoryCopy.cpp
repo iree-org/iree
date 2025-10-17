@@ -26,6 +26,8 @@
 #include "mlir/IR/Visitors.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
+#include "mlir/Dialect/SCF/Transforms/Transforms.h"
+
 #define DEBUG_TYPE "iree-codegen-llvmgpu-prefetch-shared-memory-copy"
 
 namespace mlir::iree_compiler {
@@ -132,6 +134,10 @@ public:
     emitBarrier(loc, rewriter);
     return emitCompute(mapping[0], rewriter, nMinusOne);
   }
+  // Ops in the original scf.for loop that belongs to different classes.
+  SmallVector<Operation *> readStage;
+  SmallVector<Operation *> writeStage;
+  SmallVector<Operation *> computeStage;
 
 private:
   LogicalResult initializeLoopInfo() {
@@ -375,31 +381,210 @@ private:
   scf::ForOp forOp;
   // Original static loop range and step.
   int64_t lb, ub, step;
-
-  // Ops in the original scf.for loop that belongs to different classes.
-  SmallVector<Operation *> readStage;
-  SmallVector<Operation *> writeStage;
-  SmallVector<Operation *> computeStage;
 };
 
 } // namespace
 
-FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
-                                               scf::ForOp forOp) {
-  rewriter.setInsertionPoint(forOp);
+// FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
+//                                                scf::ForOp forOp) {
+//   rewriter.setInsertionPoint(forOp);
+//
+//   auto prefetcherOr = LoopPrefetcher::get(forOp);
+//   if (failed(prefetcherOr))
+//     return failure();
+//   LoopPrefetcher &prefetcher = *prefetcherOr;
+//
+//   prefetcher.emitPrologue(rewriter);
+//   scf::ForOp newForOp = prefetcher.createKernelLoop(rewriter);
+//   prefetcher.createKernel(rewriter, newForOp);
+//
+//   SmallVector<Value> results = prefetcher.emitEpilogue(rewriter, newForOp);
+//   rewriter.replaceOp(forOp, results);
+//   return newForOp;
+// }
 
+// Insert/replace in the same file where the LoopPrefetcher and IREE pass live.
+// Assumes the same includes as in your file (gpu, amdgpu, scf, arith, etc).
+// Also assumes Triton's schedule attribute names are available:
+//   mlir::triton::kLoopStageAttrName
+//   mlir::triton::kLoopClusterAttrName
+//
+// This function replaces the old pattern-based prologue/kernel/epilogue
+// emission with a call to triton::pipelineForLoop while preserving the
+// loop-analysis and op grouping from LoopPrefetcher.
+
+FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
+                                               scf::ForOp forOp,
+                                               unsigned numStages) {
+  // 1) Analyze and classify ops into stages using the existing helper.
   auto prefetcherOr = LoopPrefetcher::get(forOp);
   if (failed(prefetcherOr))
     return failure();
   LoopPrefetcher &prefetcher = *prefetcherOr;
 
-  prefetcher.emitPrologue(rewriter);
-  scf::ForOp newForOp = prefetcher.createKernelLoop(rewriter);
-  prefetcher.createKernel(rewriter, newForOp);
+  // Build maps from original op -> stage
+  llvm::DenseMap<Operation *, unsigned> opToStage;
+  auto assignOp = [&](Operation *op, unsigned stage) {
+    if (!op)
+      return;
+    opToStage[op] = stage;
+  };
 
-  SmallVector<Value> results = prefetcher.emitEpilogue(rewriter, newForOp);
-  rewriter.replaceOp(forOp, results);
-  return newForOp;
+  // Assign stages based on prefetcher groups.
+  // Important: build the schedule grouped by stage (all readStage then
+  // computeStage then writeStage). This guides pipelineForLoop to emit the
+  // prologue/kernel/epilogue in the intended shape.
+  if (numStages == 1) {
+    // Single-stage pipelining: all ops in stage 0.
+    for (Operation &op : forOp.getBody()->without_terminator()) {
+      assignOp(&op, /*stage=*/0);
+    }
+  } else if (numStages == 2) {
+    // Two-stage pipelining: readStage in stage 0, compute+write in stage 1.
+    for (Operation *op : prefetcher.readStage)
+      assignOp(op, /*stage=*/0);
+    for (Operation *op : prefetcher.writeStage)
+      assignOp(op, /*stage=*/0);
+    for (Operation *op : prefetcher.computeStage)
+      assignOp(op, /*stage=*/1);
+  } else {
+    for (Operation *op : prefetcher.readStage)
+      assignOp(op, /*stage=*/0);
+    for (Operation *op : prefetcher.writeStage)
+      assignOp(op, /*stage=*/1);
+    for (Operation *op : prefetcher.computeStage)
+      assignOp(op, /*stage=*/2);
+  }
+
+  LDBG() << "Pipelining schedule for loop:\n";
+  for (Operation &op : forOp.getBody()->without_terminator()) {
+    if (opToStage.count(&op)) {
+      LDBG() << "  stage " << opToStage[&op] << " : " << op;
+    }
+  }
+
+  // Convenience references
+  auto &computeOps = prefetcher.computeStage;
+  auto &writeOps = prefetcher.writeStage;
+  SmallVector<Operation *> syntheticBarriers;
+  if (!computeOps.empty()) {
+    // barrierBeforeCompute: place right before the first compute op in the
+    // original body.
+    Operation *firstCompute = computeOps.front();
+    {
+      OpBuilder b(forOp.getContext());
+      auto loc = firstCompute->getLoc();
+      b.setInsertionPoint(firstCompute);
+      auto barrierBefore = gpu::BarrierOp::create(b, loc);
+      syntheticBarriers.push_back(barrierBefore);
+      // assign this barrier to the same stage as the write-stage or whichever
+      // you prefer since you asked: "for 2-stage kernel put barrier before and
+      // after compute" choose stage = (numStages == 2 ? 1 :  (numStages >=3 ? 1
+      // : 0))
+      unsigned stage = (numStages == 1 ? 0 : (numStages == 2 ? 1 : 2));
+      opToStage[barrierBefore] = stage;
+    }
+
+    // barrierAfterCompute: place right after last compute op
+    // Operation *lastCompute = computeOps.back();
+    //{
+    //  OpBuilder b(forOp.getContext());
+    //  if (lastCompute != lastCompute->getBlock()->getTerminator()){
+    //    b.setInsertionPointAfter(lastCompute);
+    //  } else {
+    //    // This means last compute is the terminator itself (scf.yield).
+    //    b.setInsertionPoint(lastCompute);
+    //  }
+    //
+    //  auto loc = lastCompute->getLoc();
+    //  auto barrierAfter =gpu::BarrierOp::create(b, loc);
+    //  syntheticBarriers.push_back(barrierAfter);
+    //  unsigned stage= (numStages == 1 ? 0 : (numStages == 2 ? 1 : 2));
+    //  opToStage[barrierAfter] = stage;
+    //}
+    Operation *firstWrite = writeOps.front();
+    {
+      OpBuilder b(forOp.getContext());
+      auto loc = firstWrite->getLoc();
+      b.setInsertionPoint(firstWrite);
+      auto barrierBefore = gpu::BarrierOp::create(b, loc);
+      syntheticBarriers.push_back(barrierBefore);
+      // assign this barrier to the same stage as the write-stage or whichever
+      // you prefer
+      unsigned stage = (numStages == 1 ? 0 : (numStages == 2 ? 0 : 1));
+      opToStage[barrierBefore] = stage;
+    }
+
+    //  // optionally add amdgpu.sched_barrier after compute (example)
+    //  //{
+    //  //  OpBuilder b(lastCompute->getNextNode());
+    //  //  auto loc = lastCompute->getLoc();
+    //  //  auto sched = b.create<amdgpu::SchedBarrierOp>(
+    //  //      loc, amdgpu::sched_barrier_opt_enumAttr::get(forOp.getContext(),
+    //  // amdgpu::sched_barrier_opt_enum::none));
+    //  //  syntheticBarriers.push_back(sched);
+    //  //  // typically scheduling barrier belongs to stage that sits between
+    //  load and local_load;
+    //  //  // choose stageAfter (above).
+    //  //  opToStage[sched] = (numStages == 1 ? 0 : 1);
+    //  //}
+  }
+
+  // 2) Build finalSchedule: a vector of (originalOp, stage) in *the* order
+  // we want pipelineForLoop to consider. We supply grouped-by-stage order,
+  // which mirrors the manual IREE flow (read->compute->write).
+  std::vector<std::pair<Operation *, unsigned>> finalSchedule;
+  finalSchedule.reserve(opToStage.size());
+  // append read stage ops in the original in-body order
+  for (Operation &op : forOp.getBody()->without_terminator()) {
+    if (opToStage.count(&op) && opToStage[&op] == 0)
+      finalSchedule.push_back({&op, 0});
+  }
+  // append compute stage
+  for (Operation &op : forOp.getBody()->without_terminator()) {
+    if (opToStage.count(&op) && opToStage[&op] == 2)
+      finalSchedule.push_back({&op, 2});
+  }
+  // append write stage
+  for (Operation &op : forOp.getBody()->without_terminator()) {
+    if (opToStage.count(&op) && opToStage[&op] == 1)
+      finalSchedule.push_back({&op, 1});
+  }
+  // for (Operation *b : syntheticBarriers) {
+  //   unsigned stage = opToStage.count(b) ? opToStage[b] : 0u;
+  //   finalSchedule.emplace_back(b, stage);
+  // }
+
+  if (finalSchedule.empty()) {
+    return failure();
+  }
+
+  // 3) Prepare the PipeliningOption
+  scf::PipeliningOption options;
+
+  // supply the schedule to the pipeliner
+  options.getScheduleFn =
+      [finalSchedule](scf::ForOp loop,
+                      std::vector<std::pair<Operation *, unsigned>> &outSched) {
+        outSched = finalSchedule;
+      };
+
+  options.annotateFn = nullptr;
+  options.peelEpilogue = true;
+  options.supportDynamicLoops = false;
+  options.predicateFn = nullptr;
+
+  // 4) Invoke the pipeliner
+  IRRewriter irRewriter(forOp);
+  bool modifiedIR = false;
+  FailureOr<scf::ForOp> newForOpOrFail =
+      scf::pipelineForLoop(irRewriter, forOp, options, &modifiedIR);
+
+  if (failed(newForOpOrFail)) {
+    return failure();
+  }
+
+  // Return the new loop generated by the pipeliner.
+  return *newForOpOrFail;
 }
-
 } // namespace mlir::iree_compiler
