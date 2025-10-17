@@ -7,13 +7,11 @@
 #include "iree/compiler/Codegen/ExternalInterfaces/Interfaces.h"
 
 #include "iree/compiler/Codegen/ExternalInterfaces/CPUEncodingExternalModels.h"
-#include "iree/compiler/Codegen/ExternalInterfaces/CodegenExternalModels.h"
 #include "iree/compiler/Codegen/ExternalInterfaces/GPUEncodingExternalModels.h"
 
 namespace mlir::iree_compiler {
 
 void registerCodegenExternalInterfaces(DialectRegistry &registry) {
-  IREE::Codegen::registerCodegenExternalModels(registry);
   IREE::CPU::registerCPUEncodingExternalModels(registry);
   IREE::GPU::registerGPUEncodingExternalModels(registry);
 }

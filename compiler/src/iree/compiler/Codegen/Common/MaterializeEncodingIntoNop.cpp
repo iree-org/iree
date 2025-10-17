@@ -7,7 +7,6 @@
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -38,7 +37,7 @@ struct MaterializeEncodingIntoNopPass final
 
     RewritePatternSet materializeEncodingPattern(context);
     auto layoutAttr = cast<IREE::Encoding::LayoutMaterializerAttr>(
-        IREE::Codegen::EncodingNopLayoutAttr::get(context));
+        IREE::Encoding::IdentityResolverAttr::get(context));
     MaterializeEncodingTypeConverter typeConverter(layoutAttr);
     MaterializeEncodingConversionTarget target(*context);
     populateMaterializeEncodingPatterns(materializeEncodingPattern, target,

@@ -7,12 +7,10 @@
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -98,10 +96,10 @@ materializeFuncOpEncodings(FunctionOpInterface funcOp,
             IREE::GPU::GPUEncodingResolverAttr::get(
                 ctx, DictionaryAttr::get(ctx, configItems)));
       }
-      LDBG() << "Select EncodingNopLayoutAttr attribute as the layout "
+      LDBG() << "Select IdentityResolverAttr attribute as the layout "
                 "attribute (Encoding resolver unknown or unsupported).";
       return cast<IREE::Encoding::LayoutMaterializerAttr>(
-          IREE::Codegen::EncodingNopLayoutAttr::get(ctx));
+          IREE::Encoding::IdentityResolverAttr::get(ctx));
     };
 
     // The layoutAttr should come in without any target info attached to it,
