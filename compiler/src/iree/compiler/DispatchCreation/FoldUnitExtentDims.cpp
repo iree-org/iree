@@ -26,6 +26,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -204,11 +205,57 @@ struct DropUnitDimsFromCollapseOfExpand
   }
 };
 
-} // namespace
+// Fold unit dims from `tensor.extract` ops.
+struct FoldUnitDimsFromExtractOp : OpRewritePattern<tensor::ExtractOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(tensor::ExtractOp extractOp,
+                                PatternRewriter &rewriter) const override {
+    RankedTensorType srcType = extractOp.getTensor().getType();
+    if (srcType.getShape().empty() ||
+        llvm::none_of(srcType.getShape(),
+                      [](int64_t size) { return size == 1; })) {
+      return failure();
+    }
+    SmallVector<Value> oldIndices = extractOp.getIndices();
 
-//===----------------------------------------------------------------------===//
-// Pass helpers
-//===----------------------------------------------------------------------===//
+    SmallVector<int64_t> newShape;
+    SmallVector<Value> newIndices;
+    SmallVector<ReassociationIndices> reassoc;
+    ReassociationIndices currReassoc;
+    auto pushBackAndClear = [&]() {
+      if (currReassoc.size()) {
+        reassoc.push_back(std::move(currReassoc));
+      }
+    };
+
+    bool isLeadingUnit = false;
+    for (auto [idx, size] : llvm::enumerate(srcType.getShape())) {
+      if (size == 1) {
+        isLeadingUnit = (idx == 0);
+        currReassoc.push_back(idx);
+      } else {
+        if (!isLeadingUnit) {
+          pushBackAndClear();
+        }
+        isLeadingUnit = false;
+        currReassoc.push_back(idx);
+        newShape.push_back(size);
+        newIndices.push_back(oldIndices[idx]);
+      }
+    }
+    pushBackAndClear();
+
+    auto collapseOp = tensor::CollapseShapeOp::create(
+        rewriter, extractOp.getLoc(), extractOp.getTensor(), reassoc);
+    auto newExtract = tensor::ExtractOp::create(
+        rewriter, extractOp.getLoc(), extractOp.getResult().getType(),
+        collapseOp.getResult(), newIndices);
+    rewriter.replaceOp(extractOp, newExtract);
+    return success();
+  }
+};
+
+} // namespace
 
 static void
 populatefoldUnitDimsPatterns(RewritePatternSet &foldUnitDimsPatterns) {
@@ -230,8 +277,9 @@ populatefoldUnitDimsPatterns(RewritePatternSet &foldUnitDimsPatterns) {
   IREE::LinalgExt::populateFoldUnitExtentDimsPatterns(foldUnitDimsPatterns,
                                                       options);
   linalg::populateMoveInitOperandsToInputPattern(foldUnitDimsPatterns);
-  foldUnitDimsPatterns.insert<DropUnitDimsFromCollapseOfExpand>(
-      foldUnitDimsPatterns.getContext());
+  foldUnitDimsPatterns
+      .insert<DropUnitDimsFromCollapseOfExpand, FoldUnitDimsFromExtractOp>(
+          foldUnitDimsPatterns.getContext());
 }
 
 static LogicalResult
