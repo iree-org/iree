@@ -590,7 +590,7 @@ struct GPUPadEncodingLayoutMaterializerAttr final
     newOffsets.resize(newSizes.size(), builder.getIndexAttr(0));
     newStrides.resize(newSizes.size(), builder.getIndexAttr(1));
     return success();
-    }
+  }
 
   Operation *lowerOp(Attribute attr, OpBuilder &b, Operation *op,
                      TypeRange convertedResTypes,
