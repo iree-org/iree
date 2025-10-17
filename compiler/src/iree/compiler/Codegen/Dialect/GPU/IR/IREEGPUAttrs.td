@@ -111,14 +111,14 @@ def IREEGPU_PromoteWithCacheSwizzle :
     swizzle inserted if possible. For example,
 
     ```
-    %0 = tensor_ext.dispatch.tensor.load : tensor<?x8192>
+    %0 = tensor_ext.dispatch.tensor.load : tensor<?x4096xf16>
     %1 = linalg.matmul ins(%0, ...)
     ```
 
     Becomes with `#iree_gpu.promote_with_cache_swizzle<#iree_gpu.derived_thread_config>`
 
     ```
-    %0 = tensor_ext.dispatch.tensor.load : tensor<?x8192>
+    %0 = tensor_ext.dispatch.tensor.load : tensor<?x4096xf16>
     %1 = iree_gpu.buffer_resource_cast cache_swizzle(8192)
     %2 = linalg.copy lowering_config = #iree_gpu.derived_thread_config
     %3 = linalg.matmul ins(%2, ...)
