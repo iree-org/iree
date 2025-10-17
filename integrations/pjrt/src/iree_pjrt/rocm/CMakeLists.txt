@@ -13,8 +13,7 @@ iree_cc_library(
     "client.cc"
   DEPS
     iree_pjrt::common
-    iree::experimental::rocm
-    iree::experimental::rocm::registration
+    iree::hal::drivers::hip
 )
 
 iree_cc_library(
