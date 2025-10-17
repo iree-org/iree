@@ -28,12 +28,10 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
 ContractionVectorLayoutOptions::ContractionVectorLayoutOptions(
-    Operation *root, Value laneId, int64_t subgroupSize,
-    ArrayRef<int64_t> workgroupSize)
+    Operation *root, Value laneId, int64_t subgroupSize)
     : VectorLayoutOptions(root), patterns(root->getContext()) {
   populateGPUDistributionPatterns(patterns);
-  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize,
-                                                workgroupSize);
+  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId, subgroupSize);
   populateGPUDistributeNestedLayoutContractAMDGPUPatterns(patterns);
 }
 
@@ -60,7 +58,6 @@ struct LLVMGPUVectorDistributePass final
     registry.insert<affine::AffineDialect>();
     registry.insert<amdgpu::AMDGPUDialect>();
     registry.insert<gpu::GPUDialect>();
-    registry.insert<scf::SCFDialect>();
   }
 
   void runOnOperation() override {
@@ -111,7 +108,7 @@ struct LLVMGPUVectorDistributePass final
     }
 
     ContractionVectorLayoutOptions options(funcOp, linearThreadIdVal,
-                                           subgroupSize.value(), workgroupSize);
+                                           subgroupSize.value());
 
     if (failed(distributeVectorOps(funcOp, options.getPatterns(), options))) {
       funcOp->emitOpError() << "failed to distribute";
