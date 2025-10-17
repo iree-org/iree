@@ -63,23 +63,23 @@ static iree_status_t iree_hal_hip_query_limits(
 
   IREE_HIP_RETURN_IF_ERROR(
       symbols,
-      hipDeviceGetAttribute(&out_limits->max_block_dims[0],
+      hipDeviceGetAttribute((int32_t*)&out_limits->max_block_dims[0],
                             hipDeviceAttributeMaxBlockDimX, device),
       "hipDeviceGetAttribute");
   IREE_HIP_RETURN_IF_ERROR(
       symbols,
-      hipDeviceGetAttribute(&out_limits->max_block_dims[1],
+      hipDeviceGetAttribute((int32_t*)&out_limits->max_block_dims[1],
                             hipDeviceAttributeMaxBlockDimY, device),
       "hipDeviceGetAttribute");
   IREE_HIP_RETURN_IF_ERROR(
       symbols,
-      hipDeviceGetAttribute(&out_limits->max_block_dims[2],
+      hipDeviceGetAttribute((int32_t*)&out_limits->max_block_dims[2],
                             hipDeviceAttributeMaxBlockDimZ, device),
       "hipDeviceGetAttribute");
 
   IREE_HIP_RETURN_IF_ERROR(
       symbols,
-      hipDeviceGetAttribute(&out_limits->max_block_shared_memory_size,
+      hipDeviceGetAttribute((int32_t*)&out_limits->max_block_shared_memory_size,
                             hipDeviceAttributeMaxSharedMemoryPerBlock, device),
       "hipDeviceGetAttribute");
 
