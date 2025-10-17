@@ -37,7 +37,7 @@ def BubbleUpExpandShapesPass :
   let summary = "Propagate expand_shapes up the program (and collapse_shapes down).";
   let options = [
     Option<"enableBubbleUpExpandShapesAcrossReductionOps", "enable-bubble-up-expand-shapes-across-reduction-ops", "bool",
-           /*default=*/"false", "Enables propagation of 'expand_shape's through 'linalg.generic's with reductions">
+           /*default=*/"true", "Enables propagation of 'expand_shape's through 'linalg.generic's with reductions">
   ];
   let dependentDialects = [
     "mlir::affine::AffineDialect",

@@ -474,13 +474,8 @@ void BubbleUpExpandShapesPass::runOnOperation() {
           return false;
         }
 
-        // Do not push expand shapes down across operations with reduction
-        // iterator types.
-        // TODO: This condition should be removed.
         if (auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer)) {
-          return isa<linalg::GenericOp>(consumerLinalgOp) &&
-                 llvm::all_of(consumerLinalgOp.getIteratorTypesArray(),
-                              linalg::isParallelIterator);
+          return isa<linalg::GenericOp>(consumerLinalgOp);
         }
         // Fuse in all other cases.
         return true;
