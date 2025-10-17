@@ -104,6 +104,12 @@ struct SetSplitReductionSizesPass final
         IREE::LinalgExt::setSplitReductionAttribute(tilingOp, *tileSizes);
         return;
       }
+
+      // --- Case 3: Matmul-like operations ---
+      if (auto tileSizes = getMatmulLikeReductionSizes(tilingOp)) {
+        IREE::LinalgExt::setSplitReductionAttribute(tilingOp, *tileSizes);
+        return;
+      }
     });
   }
 
@@ -269,7 +275,108 @@ private:
       LDBG() << "skipping op; input channel size equals to 1";
       return std::nullopt;
     }
-    tileSizes[cDim] = std::ceil(float(tileSizes[cDim]) / largeDimSize);
+
+    const int64_t limitParallelLoops = 512;
+    int64_t lowerBound = std::ceil(float(tileSizes[cDim]) / limitParallelLoops);
+    if (lowerBound > 1) {
+      std::optional<int64_t> maybeTileSize =
+          findSmallestFactorWithLowerBound(tileSizes[cDim], lowerBound);
+      if (!maybeTileSize) {
+        LDBG() << "skipping op; failed to find a split factor";
+        return std::nullopt;
+      }
+      tileSizes[0] = maybeTileSize.value();
+    } else {
+      tileSizes[0] = lowerBound;
+    }
+    return tileSizes;
+  }
+
+  /// Determines split reduction sizes for matmul-like operations where the K
+  /// dimension is significantly larger than the M or N dimensions. Currently,
+  /// splitting is only applied along the outermost reduction dimension. Note
+  /// that the constant threshold is empirically chosen based on limited data
+  /// and may not generalize to all cases.
+  std::optional<SmallVector<int64_t>>
+  getMatmulLikeReductionSizes(PartialReductionOpInterface op) const {
+    // Matmul-like op should have at least 1 reduction, which is checked by the
+    // contraction interface, and at least 2 parallel dimensions.
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(op.getOperation());
+    if (!linalgOp) {
+      LDBG() << "skipping op; not a linalg op";
+      return std::nullopt;
+    }
+
+    FailureOr<linalg::ContractionDimensions> maybeContractionDims =
+        linalg::inferContractionDims(linalgOp);
+    if (failed(maybeContractionDims)) {
+      LDBG() << "skipping op; failed to infer contraction dims";
+      return std::nullopt;
+    }
+
+    if (linalgOp.getNumParallelLoops() < 2) {
+      LDBG() << "skipping op; has less than 2 parallel dims";
+      return std::nullopt;
+    }
+
+    std::optional<SmallVector<int64_t>> maybeSizes =
+        getReductionDimSizes(op.getOperation());
+    if (!maybeSizes) {
+      LDBG() << "skipping op; failed to get reduction sizes";
+      return std::nullopt;
+    }
+
+    linalg::ContractionDimensions contractionDims = *maybeContractionDims;
+    auto batchDims = contractionDims.batch;
+    auto mDims = contractionDims.m;
+    auto nDims = contractionDims.n;
+    auto kDims = contractionDims.k;
+
+    SmallVector<int64_t> shapes = linalgOp.getStaticLoopRanges();
+    if (llvm::any_of(shapes, ShapedType::isDynamic)) {
+      LDBG() << "skipping op; has dynamic shape";
+      return std::nullopt;
+    }
+
+    // Compute the product of the specified dimensions. If any dimension list is
+    // empty, return 1.
+    auto getSizeAt = [&shapes](ArrayRef<unsigned> idx) {
+      int64_t totalSize = 1;
+      for (unsigned i : idx)
+        totalSize *= shapes[i];
+      return totalSize;
+    };
+
+    int64_t batchSize = getSizeAt(batchDims);
+    int64_t mSize = getSizeAt(mDims);
+    int64_t nSize = getSizeAt(nDims);
+    int64_t kSize = getSizeAt(kDims);
+
+    // The constants below are determined based on empirical data.
+    const int64_t ratioThreshold = 384;
+    const int64_t largeKSize = 24576;
+    int64_t ratio = kSize / std::sqrt(mSize * nSize) / batchSize;
+    if (ratio <= ratioThreshold && kSize < largeKSize) {
+      LDBG() << "skipping op; small reduction size";
+      return std::nullopt;
+    }
+
+    // Only split along the outermost reduction dimension.
+    // TODO(vivian): split more reduction dimensions if needed.
+    const int64_t limitParallelLoops = 128;
+    SmallVector<int64_t> tileSizes = std::move(*maybeSizes);
+    int64_t lowerBound = std::ceil(float(tileSizes[0]) / limitParallelLoops);
+    if (lowerBound > 1) {
+      std::optional<int64_t> maybeTileSize =
+          findSmallestFactorWithLowerBound(tileSizes[0], lowerBound);
+      if (!maybeTileSize) {
+        LDBG() << "skipping op; failed to find a split factor";
+        return std::nullopt;
+      }
+      tileSizes[0] = maybeTileSize.value();
+    } else {
+      tileSizes[0] = lowerBound;
+    }
     return tileSizes;
   }
 };

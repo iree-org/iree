@@ -96,29 +96,6 @@ util.func public @negative_outer_dynamic_reduction(%arg0: tensor<?x64xf32>, %d0:
 
 // -----
 
-// CHECK-LABEL: @negative_complex_reduction
-util.func public @negative_complex_reduction(%arg0: tensor<256x4096xf32>, %arg1: tensor<4096x256xf32>) -> tensor<256x256xf32> {
-  // More complex reductions (like matmul) shouldn't have split reduction applied.
-  // CHECK-NOT: iree_linalg_ext.split_reduction
-  %1 = arith.constant dense<0.0> : tensor<256x256xf32>
-  %2 = linalg.generic {
-      indexing_maps = [
-        affine_map<(m, n, k) -> (m, n)>,
-        affine_map<(m, n, k) -> (n, k)>,
-        affine_map<(m, n, k) -> (m, k)>
-      ],
-      iterator_types = ["parallel", "reduction", "parallel"]
-  } ins(%arg0, %arg1 : tensor<256x4096xf32>, tensor<4096x256xf32>) outs(%1 : tensor<256x256xf32>) {
-  ^bb0(%a: f32, %b: f32, %acc: f32):
-    %3 = arith.mulf %a, %b : f32
-    %4 = arith.addf %3, %acc : f32
-    linalg.yield %4 : f32
-  } -> tensor<256x256xf32>
-  util.return %2 : tensor<256x256xf32>
-}
-
-// -----
-
 // CHECK-LABEL: @arg_compare_basic
 util.func public @arg_compare_basic(%arg0: tensor<4096xf32>)
     -> (tensor<f32>, tensor<index>) {
