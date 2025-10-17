@@ -33,11 +33,9 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/ExternalInterfaces/Utils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
-#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
@@ -335,10 +333,6 @@ static Operation *lowerContractionOrScaledContractionOpToInnerTiledOp(
   if (!linalgOp.hasPureTensorSemantics()) {
     return nullptr;
   }
-  if (!linalg::isaContractionOpInterface(linalgOp) &&
-      !IREE::LinalgExt::isaScaledContractionOpInterface(linalgOp)) {
-    return nullptr;
-  }
 
   SmallVector<Value> inputs = linalgOp.getDpsInputs();
   SmallVector<Value> outputs = linalgOp.getDpsInits();
@@ -517,8 +511,21 @@ struct GPUEncodingResolverMaterializerAttr
     if (!linalgOp) {
       return nullptr;
     }
-    return lowerContractionOrScaledContractionOpToInnerTiledOp(
-        b, linalgOp, convertedOperands, resolverAttr);
+    if (auto fillOp = dyn_cast<linalg::FillOp>(op)) {
+      return lowerFillOpWithResolvedLayouts(b, fillOp, convertedResTypes,
+                                            convertedOperands);
+    }
+    if (linalg::isaContractionOpInterface(linalgOp) ||
+        IREE::LinalgExt::isaScaledContractionOpInterface(linalgOp)) {
+      return lowerContractionOrScaledContractionOpToInnerTiledOp(
+          b, linalgOp, convertedOperands, resolverAttr);
+    }
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+      return lowerGenericOpWithResolvedLayouts(
+          b, genericOp, convertedResTypes, convertedOperands,
+          cast<IREE::Encoding::LayoutMaterializerAttr>(attr));
+    }
+    return nullptr;
   }
 };
 

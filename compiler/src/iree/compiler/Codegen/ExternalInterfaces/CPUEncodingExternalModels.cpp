@@ -43,7 +43,6 @@
 #include "iree/compiler/Codegen/ExternalInterfaces/Utils.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "llvm/Support/DebugLog.h"
@@ -284,11 +283,11 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
   return bestRatedTile;
 }
 
-FailureOr<Operation *> lowerContractionOpWithEncoding(
+Operation *lowerContractionOpWithEncoding(
     OpBuilder &builder, linalg::LinalgOp linalgOp, ValueRange operands,
     IREE::Encoding::LayoutMaterializerAttr layoutAttr) {
   if (!linalgOp.hasPureTensorSemantics()) {
-    return failure();
+    return nullptr;
   }
 
   auto inputs = linalgOp.getDpsInputOperands();
@@ -301,14 +300,14 @@ FailureOr<Operation *> lowerContractionOpWithEncoding(
   auto rhsEncoding = IREE::Encoding::getEncodingAttr(rhsType);
   auto resultEncoding = IREE::Encoding::getEncodingAttr(resultType);
   if (!lhsEncoding || !rhsEncoding || !resultEncoding) {
-    return failure();
+    return nullptr;
   }
 
   if (lhsEncoding.getOperandIndex().getValue() != IREE::Encoding::MATMUL_LHS ||
       rhsEncoding.getOperandIndex().getValue() != IREE::Encoding::MATMUL_RHS ||
       resultEncoding.getOperandIndex().getValue() !=
           IREE::Encoding::MATMUL_RESULT) {
-    return failure();
+    return nullptr;
   }
 
   MaterializeEncodingInfo encodingInfo = {};
@@ -725,11 +724,21 @@ struct CPUEncodingResolverMaterializerAttr final
     if (!linalgOp) {
       return nullptr;
     }
-
-    FailureOr<Operation *> newOp = lowerContractionOpWithEncoding(
-        b, linalgOp, convertedOperands,
-        cast<IREE::Encoding::LayoutMaterializerAttr>(layoutAttr));
-    return newOp.value_or(nullptr);
+    if (auto fillOp = dyn_cast<linalg::FillOp>(op)) {
+      return lowerFillOpWithResolvedLayouts(b, fillOp, convertedResTypes,
+                                            convertedOperands);
+    }
+    if (linalg::isaContractionOpInterface(linalgOp)) {
+      return lowerContractionOpWithEncoding(
+          b, linalgOp, convertedOperands,
+          cast<IREE::Encoding::LayoutMaterializerAttr>(layoutAttr));
+    }
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+      return lowerGenericOpWithResolvedLayouts(
+          b, genericOp, convertedResTypes, convertedOperands,
+          cast<IREE::Encoding::LayoutMaterializerAttr>(attr));
+    }
+    return nullptr;
   }
 };
 
@@ -869,11 +878,21 @@ struct VMVXEncodingResolverMaterializerAttr final
     if (!linalgOp) {
       return nullptr;
     }
-
-    FailureOr<Operation *> newOp = lowerContractionOpWithEncoding(
-        b, linalgOp, convertedOperands,
-        cast<IREE::Encoding::LayoutMaterializerAttr>(layoutAttr));
-    return newOp.value_or(nullptr);
+    if (auto fillOp = dyn_cast<linalg::FillOp>(op)) {
+      return lowerFillOpWithResolvedLayouts(b, fillOp, convertedResTypes,
+                                            convertedOperands);
+    }
+    if (linalg::isaContractionOpInterface(linalgOp)) {
+      return lowerContractionOpWithEncoding(
+          b, linalgOp, convertedOperands,
+          cast<IREE::Encoding::LayoutMaterializerAttr>(layoutAttr));
+    }
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+      return lowerGenericOpWithResolvedLayouts(
+          b, genericOp, convertedResTypes, convertedOperands,
+          cast<IREE::Encoding::LayoutMaterializerAttr>(attr));
+    }
+    return nullptr;
   }
 };
 

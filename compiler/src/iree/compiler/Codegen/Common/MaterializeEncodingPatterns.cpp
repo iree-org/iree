@@ -11,12 +11,10 @@
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Utils/EncodingUtils.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
-#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -140,322 +138,6 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
   Operation *newEmptyOp = tensor::EmptyOp::create(rewriter, loc, newShape,
                                                   emptyType.getElementType());
   return newEmptyOp;
-}
-
-/// Converts a linalg::GenericOp with encoded inputs into the packed domain,
-/// with an optional swizzle expansion and permutation if applicable. The
-/// `genericOp` must have all parallel iterator types and a single output with
-/// an identity indexing map.
-static FailureOr<Operation *> lowerGenericOpWithEncoding(
-    RewriterBase &rewriter, linalg::GenericOp genericOp,
-    ValueRange convertedInputOperands, ValueRange convertedOutputOperands,
-    const MaterializeEncodingTypeConverter &typeConverter) {
-  if (genericOp.getNumResults() == 0) {
-    return rewriter.notifyMatchFailure(genericOp,
-                                       "Must have at least 1 result");
-  }
-  OpOperand *outputOperand = genericOp.getDpsInitOperand(0);
-  AffineMap outputMap = genericOp.getMatchingIndexingMap(outputOperand);
-  for (OpOperand &initOperand : genericOp.getDpsInitsMutable()) {
-    if (genericOp.getMatchingIndexingMap(&initOperand) != outputMap) {
-      return rewriter.notifyMatchFailure(genericOp,
-                                         "Output maps are not all equivalent");
-    }
-  }
-  // The pattern expects a generic op with an identity map for all outputs. If
-  // this is not the case, then interchange the generic op before converting.
-  if (!outputMap.isIdentity()) {
-    if (!outputMap.isPermutation()) {
-      return rewriter.notifyMatchFailure(genericOp,
-                                         "Output map is not a permutation");
-    }
-    SmallVector<unsigned int> interchange = llvm::map_to_vector(
-        outputMap.getResults(), [](AffineExpr expr) -> unsigned int {
-          return cast<AffineDimExpr>(expr).getPosition();
-        });
-    FailureOr<linalg::GenericOp> interchangedGenericOp =
-        linalg::interchangeGenericOp(rewriter, genericOp, interchange);
-    if (failed(interchangedGenericOp)) {
-      return rewriter.notifyMatchFailure(genericOp,
-                                         "Failed to interchange indexing maps");
-    }
-    genericOp = interchangedGenericOp.value();
-    outputOperand = genericOp.getDpsInitOperand(0);
-    outputMap = genericOp.getMatchingIndexingMap(outputOperand);
-  }
-  // Step 1: Retrieve the output encoding materialization information and
-  // compute the new indexing maps for the packed and potentially swizzled
-  // layout. This consists of an outer dimension and inner dimension permutation
-  // vectors for the packing and an expanded result dimension permutation vector
-  // for the optional swizzling. This assumes that the output map is identity,
-  // and that all iterator types are parallel.
-  //
-  // Running example:
-  //
-  // Given following output layout:
-  //
-  // outputType:              tensor<2x128x64xf32>
-  // outputPackInfo:          innerDimsPos = [1, 2],
-  //                          innerTileSizes = [128, 16]
-  //                          outerDimsPerm = [0, 1, 2]
-  // outputSwizzle:           expandShape = [[4, 8, 4], [4, 4]]
-  //                          permutation = [1, 4, 0, 2, 3]}
-  //
-  // Retrieve and compute the permutation vectors for the packing outer and
-  // inner dimension permutation and for the expanded swizzle permutation. Then,
-  // calculate the permutation that would transform the swizzled output
-  // dimension map into the identity dimension map. This is the inverse swizzle
-  // permutation.
-  //
-  // outInverseOuterDimsPerm: [0, 1, 2]
-  // outInnerDimsPos:         [1, 2]
-  // outSwizzlePerm:          [0, 1, 2, 4, 7, 3, 5, 6]
-  // invOutSwizzlePerm:       [0, 1, 2, 5, 3, 6, 7, 4]
-  MaterializeEncodingInfo outMaterializeEncodingInfo =
-      typeConverter.getEncodingInfo(
-          cast<RankedTensorType>(outputOperand->get().getType()));
-  if (IREE::Codegen::isIdentityLayout(outMaterializeEncodingInfo)) {
-    return dropEncodingAndCloneOp(rewriter, genericOp.getOperation(),
-                                  convertedInputOperands,
-                                  convertedOutputOperands);
-  }
-
-  auto convertedResultType =
-      cast<RankedTensorType>(convertedOutputOperands[0].getType());
-  SmallVector<utils::IteratorType> iteratorTypes(convertedResultType.getRank(),
-                                                 utils::IteratorType::parallel);
-
-  SmallVector<int64_t> outInverseOuterDimsPerm =
-      invertPermutationVector(outMaterializeEncodingInfo.outerDimsPerm);
-  ArrayRef<int64_t> outInnerDimsPos = outMaterializeEncodingInfo.innerDimsPos;
-  SmallVector<int64_t> outSwizzlePerm =
-      llvm::to_vector(llvm::seq<int64_t>(0, convertedResultType.getRank()));
-  if (outMaterializeEncodingInfo.swizzle.has_value()) {
-    const int outRank =
-        cast<RankedTensorType>(outputOperand->get().getType()).getRank();
-    SmallVector<int64_t> transposePerm =
-        llvm::to_vector(llvm::seq<int64_t>(0, outRank));
-    for (auto perm : outMaterializeEncodingInfo.swizzle->permutation) {
-      transposePerm.push_back(outRank + perm);
-    }
-    applyPermutationToVector(outSwizzlePerm, transposePerm);
-  }
-  SmallVector<int64_t> invOutSwizzlePerm =
-      invertPermutationVector(outSwizzlePerm);
-
-  // Calculate the running offset for every dimension position for easy lookup
-  // when calculating the packed result dimensions for every operand.
-  // Example:
-  //   expandShape == [[4, 8, 4], [4, 4]]
-  // In this case:
-  //   outOffsetForDimsPos == [0, 3]
-  // So that whenever we need the real dimension for an entry (`outerIndex`,
-  // `innerIndex`) in the 2D expanded shape vector, we can calculate it as:
-  //   dim(outerIndex, innerIndex) = outOffsetForDimsPos[outerIndex] +
-  //   innerIndex
-  SmallVector<int64_t> outOffsetForDimsPos(outInnerDimsPos.size(), 0);
-  if (outMaterializeEncodingInfo.swizzle.has_value()) {
-    int64_t runningSize = 0;
-    for (size_t i = 0; i < outInnerDimsPos.size(); i++) {
-      outOffsetForDimsPos[i] = runningSize;
-      runningSize += outMaterializeEncodingInfo.swizzle->expandShape[i].size();
-    }
-  }
-
-  SmallVector<AffineMap> packedIndexingMaps;
-  for (OpOperand *inputOperand : genericOp.getDpsInputOperands()) {
-    AffineMap inputMap = genericOp.getMatchingIndexingMap(inputOperand);
-    // Special case for 0D inputs. They will resolve to identity layout, so
-    // skip the logic to compute the packed indexing map.
-    if (inputMap.getNumResults() == 0) {
-      auto packedInputMap = AffineMap::get(
-          /*dimCount=*/iteratorTypes.size(), /*symbolCount=*/0, {},
-          rewriter.getContext());
-      packedIndexingMaps.push_back(packedInputMap);
-      continue;
-    }
-    // Step 2: Retrieve the encoding for every input operand and perform the
-    // outer dimension permutation, inner dimension expansion and permutation,
-    // swizzle expansion and swizzle permutation.
-    //
-    // Running example:
-    //
-    // Given the input layout and indexing maps:
-    //
-    // inputType:       tensor<2x64xf32>
-    // innerPackInfo:   innerDimsPos = [1]
-    //                  innerTileSizes = [16]
-    //                  outerDimsPerm = [0, 1]
-    // innerSwizzle:    expandShape = [[4, 4]]
-    //                  permutation = [1, 0]
-    // inputMap:        [affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
-    //                   affine_map<(d0, d1, d2) -> (d0, d2)>]
-    //
-    // 1. Calculate the result dimensions from the indexing maps and perform the
-    // outer dimension permutation:
-    //
-    // packedResultDims: [0, 2]
-    //
-    // 2. Perform inner dimension expansion, permutation and optional swizzle
-    // expansion in one go. In this example, the inner dimension (64) would be
-    // expanded into 4x16 based on `innerDimsPos` and `innerTileSizes` above,
-    // and then expanded to 4x4x4 based on the swizzle.
-    //
-    // packedResultDims: [0, 2, 6, 7]
-    //
-    // 3. Perform the swizzle permutation:
-    //
-    // packedResultDims: [0, 2, 7, 6]
-    MaterializeEncodingInfo materializeEncodingInfo =
-        typeConverter.getEncodingInfo(
-            cast<RankedTensorType>(inputOperand->get().getType()));
-    if (IREE::Codegen::isIdentityLayout(materializeEncodingInfo)) {
-      return rewriter.notifyMatchFailure(
-          genericOp, "MaterializeEncodingInfo failed for input");
-    }
-    ArrayRef<int64_t> innerDimsPos = materializeEncodingInfo.innerDimsPos;
-    ArrayRef<int64_t> outerDimsPerm = materializeEncodingInfo.outerDimsPerm;
-    // Permute result dims to the input packed domain, and map dims to the
-    // output packed domain.
-    SmallVector<int64_t> packedResultDims = llvm::map_to_vector(
-        applyPermutation(inputMap.getResults(), outerDimsPerm),
-        [&](AffineExpr expr) {
-          auto dimExpr = cast<AffineDimExpr>(expr);
-          return outInverseOuterDimsPerm[dimExpr.getPosition()];
-        });
-    // Add new dims for the inner tiles, taking the dim position from the
-    // corresponding inner tile of the init operand.
-    for (auto [idx, pos] : llvm::enumerate(innerDimsPos)) {
-      auto dimPos = cast<AffineDimExpr>(inputMap.getResult(pos)).getPosition();
-      for (auto [tileIdx, outDim] : llvm::enumerate(outInnerDimsPos)) {
-        if (dimPos != outDim) {
-          continue;
-        }
-        if (!materializeEncodingInfo.swizzle.has_value()) {
-          packedResultDims.push_back(outputMap.getNumDims() + tileIdx);
-          continue;
-        }
-        // In case of a layout with swizzle, an expanded set of dimensions
-        // needs to be appended as specified by the swizzle's `expandedShape`
-        // field. Note that the dimension index should be offset by the
-        // calculated output starting offset as every dimension is now
-        // transformed into an expanded sequence of indices and the correct
-        // dimension index is:
-        //   outOffsetForDimsPos[tileIdx] + innerIndex
-        assert(idx < materializeEncodingInfo.swizzle->expandShape.size() &&
-               "`innerDimsPos` index should not exceed the swizzle's "
-               "`expandShape` size");
-        const size_t dimSize =
-            materializeEncodingInfo.swizzle->expandShape[idx].size();
-        const int64_t outIdxOffset =
-            outputMap.getNumDims() + outOffsetForDimsPos[tileIdx];
-        for (size_t i = 0; i < dimSize; i++) {
-          packedResultDims.push_back(outIdxOffset + i);
-        }
-      }
-    }
-    // In case of a layout with swizzle, the packed result dimensions need
-    // to be transposed according to the swizzle's permutation vector.
-    if (materializeEncodingInfo.swizzle.has_value()) {
-      int inRank =
-          cast<RankedTensorType>(inputOperand->get().getType()).getRank();
-      SmallVector<int64_t> transposePerm =
-          llvm::to_vector(llvm::seq<int64_t>(0, inRank));
-      for (auto perm : materializeEncodingInfo.swizzle->permutation) {
-        transposePerm.push_back(inRank + perm);
-      }
-      applyPermutationToVector(packedResultDims, transposePerm);
-    }
-
-    // Step 3: Calculate the final packed result dimensions through the inverse
-    // result dimensions permutation map. This effectively linearizes the packed
-    // result dimensions with respect to the output dimensions. For example, if
-    // the permuted output dimensions are [D0, D2, D1], this will transform all
-    // packed operand result dimensions with the permutation map that would make
-    // the output dimensions the identity map [D0, D1, D2], i.e. {D0 -> D0, D1
-    // -> D2, D2 -> D1}. Suppose that the operand dimensions are [D0, D2], this
-    // operation would transform it into [D0, D1] to align with the output
-    // identity map.
-    //
-    // Running example:
-    //
-    // The packed and swizzled result dimensions for the input operand:
-    //
-    // packedResultDims:      [0, 2, 7, 6]
-    //
-    // Now we need to account for swizzled output result dimensions being
-    // linearized to the identity map. This can be achieved by applying
-    // `invOutSwizzlePerm` ([0, 1, 2, 5, 3, 6, 7, 4]):
-    //
-    // finalPackedResultDims: [0, 2, 4, 7]
-    SmallVector<int64_t> finalPackedResultDims = llvm::map_to_vector(
-        packedResultDims, [&](int64_t r) { return invOutSwizzlePerm[r]; });
-
-    // Create the packed indexing map.
-    SmallVector<AffineExpr> packedResultExprs =
-        llvm::map_to_vector(finalPackedResultDims, [&](int64_t dim) {
-          return rewriter.getAffineDimExpr(dim);
-        });
-    auto packedInputMap = AffineMap::get(
-        /*dimCount=*/iteratorTypes.size(), /*symbolCount=*/0, packedResultExprs,
-        rewriter.getContext());
-    packedIndexingMaps.push_back(packedInputMap);
-  }
-  // Create the new packed identity map for the output.
-  packedIndexingMaps.append(
-      genericOp.getNumDpsInits(),
-      rewriter.getMultiDimIdentityMap(convertedResultType.getRank()));
-  SmallVector<Type> convertedResultTypes =
-      llvm::map_to_vector(genericOp.getResultTypes(), [&](Type t) -> Type {
-        return RankedTensorType::get(
-            convertedResultType.getShape(),
-            cast<RankedTensorType>(t).getElementType());
-      });
-  auto materializedGenericOp = linalg::GenericOp::create(
-      rewriter, genericOp.getLoc(), convertedResultTypes,
-      convertedInputOperands, convertedOutputOperands, packedIndexingMaps,
-      iteratorTypes,
-      /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(genericOp));
-  rewriter.inlineRegionBefore(genericOp.getRegion(),
-                              materializedGenericOp.getRegion(),
-                              materializedGenericOp.getRegion().begin());
-  return materializedGenericOp.getOperation();
-}
-
-/// Utility method to convert from a linalg::LinalgOp on `tensor` types with
-/// encodings to a linalg::LinalgOp on the materialized type. The current
-/// supported op types are:
-///  - linalg::FillOp
-///  - linalg::GenericOp
-//   - All the iterators are parallel iterators.
-//   - The op has a single output.
-static FailureOr<Operation *>
-lowerOpWithEncoding(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
-                    ValueRange convertedInputOperands,
-                    ValueRange convertedOutputOperands,
-                    const MaterializeEncodingTypeConverter &typeConverter) {
-  if (!linalgOp.hasPureTensorSemantics()) {
-    return rewriter.notifyMatchFailure(linalgOp, "Not pure tensor semantics");
-  }
-  if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops()) {
-    return rewriter.notifyMatchFailure(linalgOp, "Loops are not all parallel");
-  }
-
-  return TypeSwitch<Operation *, FailureOr<Operation *>>(linalgOp)
-      .Case<linalg::FillOp>(
-          [&](linalg::FillOp fillOp) -> FailureOr<Operation *> {
-            Operation *materializedFillOp = linalg::FillOp::create(
-                rewriter, fillOp.getLoc(), convertedOutputOperands[0].getType(),
-                convertedInputOperands, convertedOutputOperands);
-            return materializedFillOp;
-          })
-      .Case<linalg::GenericOp>(
-          [&](linalg::GenericOp genericOp) -> FailureOr<Operation *> {
-            return lowerGenericOpWithEncoding(
-                rewriter, genericOp, convertedInputOperands,
-                convertedOutputOperands, typeConverter);
-          })
-      .Default([](Operation *op) { return failure(); });
 }
 
 /// For `dispatchTensorType` that bind a `RankedTensorType` with encoding,
@@ -629,26 +311,6 @@ struct MaterializeTensorExtDispatchTensorStoreOp
 // dialect conversion patterns for now. These are just drivers around
 // the core conversion utilities.
 //===---------------------------------------------------------------------===//
-
-/// Generic pattern to convert operation that is in Destination Passing Style.
-template <typename OpTy>
-struct MaterializeDPSOperation : public OpConversionPattern<OpTy> {
-  using OpConversionPattern<OpTy>::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(OpTy dpsOp, typename OpTy::Adaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
-        this->getTypeConverter());
-    FailureOr<Operation *> convertedOp = lowerOpWithEncoding(
-        rewriter, dpsOp, adaptor.getInputs(), adaptor.getOutputs(), *converter);
-    if (failed(convertedOp)) {
-      return failure();
-    }
-    rewriter.replaceOp(dpsOp, convertedOp.value()->getResults());
-    return success();
-  }
-};
 
 /// Generic pattern to convert an operation.
 template <typename OpTy>
@@ -844,28 +506,19 @@ struct UnsetEncodingOpLoweringConversion
   }
 };
 
-/// Pattern to convert contraction operations.
-class MaterializeContractionOp
+/// Pattern to rewrite linalg::LinalgOp by materializing its encoding using the
+/// provided LayoutMaterializerAttr.
+class MaterializeLinalgOp
     : public OpInterfaceConversionPattern<linalg::LinalgOp> {
 public:
-  MaterializeContractionOp(
-      const MaterializeEncodingTypeConverter &typeConverter,
-      MLIRContext *context, PatternBenefit benefit = 1)
+  MaterializeLinalgOp(const MaterializeEncodingTypeConverter &typeConverter,
+                      MLIRContext *context, PatternBenefit benefit = 1)
       : OpInterfaceConversionPattern<linalg::LinalgOp>(typeConverter, context,
                                                        benefit) {}
 
   LogicalResult
   matchAndRewrite(linalg::LinalgOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    // TODO(hanchung): Remove the check after moving other ops, e.g., fill,
-    // generic, etc, lowering patterns to interface implementation.
-    if (!linalg::isaContractionOpInterface(op) &&
-        !IREE::LinalgExt::isaScaledContractionOpInterface(op)) {
-      return rewriter.notifyMatchFailure(
-          op, "does not match linalg::isaContractionOpInterface and "
-              "LinalgExt::isaScaledContractionOpInterface");
-    }
-
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         this->getTypeConverter());
 
@@ -941,10 +594,8 @@ void populateMaterializeEncodingPatterns(
                          isRankedTensorTypeWithEncoding);
   });
 
-  patterns.insert<MaterializeContractionOp, SetEncodingOpLoweringConversion,
+  patterns.insert<MaterializeLinalgOp, SetEncodingOpLoweringConversion,
                   UnsetEncodingOpLoweringConversion,
-                  MaterializeDPSOperation<linalg::FillOp>,
-                  MaterializeDPSOperation<linalg::GenericOp>,
                   MaterializeOperation<tensor::EmptyOp>,
                   MaterializeOptimizationBarrierOp,
                   MaterializeTensorExtDispatchTensorLoadOp,
