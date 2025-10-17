@@ -245,9 +245,9 @@ static hipError_t iree_hip_thread_error_peek(void) {
 // Supports two forms:
 // - HIP_RETURN_STATUS(status)
 // - HIP_RETURN_STATUS(status, hipError_t) - fixed error
-#define HIP_RETURN_STATUS(...)                       \
-  _GET_ARG_COUNT_2(__VA_ARGS__, HIP_RETURN_STATUS_2, \
-                   HIP_RETURN_STATUS_1)(__VA_ARGS__)
+#define HIP_RETURN_STATUS(...)                                            \
+  _GET_ARG_COUNT_2(__VA_ARGS__, HIP_RETURN_STATUS_2, HIP_RETURN_STATUS_1) \
+  (__VA_ARGS__)
 
 #define HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR_2(zone, status) \
   do {                                                          \
@@ -276,7 +276,8 @@ static hipError_t iree_hip_thread_error_peek(void) {
 // - HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(zone, status, hipError_t)
 #define HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(...)                       \
   _GET_ARG_COUNT_3(__VA_ARGS__, HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR_3, \
-                   HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR_2)(__VA_ARGS__)
+                   HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR_2)              \
+  (__VA_ARGS__)
 
 //===----------------------------------------------------------------------===//
 // Status conversion

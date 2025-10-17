@@ -6,8 +6,6 @@
 **/__pycache__/**
 
 # Visual Studio files
-.vs/
-.vscode/
 *.sdf
 *.opensdf
 *.VC.opendb
@@ -104,3 +102,7 @@ artifacts/
 # Side effects of local patching/merging
 *.orig
 *.rej
+
+# root dot directories
+.*/
+!.github/

@@ -39,6 +39,7 @@ typedef struct iree_hal_hip_kernel_export_parameter_t {
 
 typedef struct iree_hal_hip_kernel_params_t {
   hipFunction_t function;
+  iree_string_view_t function_name;
 
   uint32_t constant_count;
   uint32_t binding_count;
