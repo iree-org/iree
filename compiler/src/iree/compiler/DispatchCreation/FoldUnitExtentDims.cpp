@@ -245,8 +245,11 @@ struct FoldUnitDimsFromExtractOp : OpRewritePattern<tensor::ExtractOp> {
     }
     pushBackAndClear();
 
+    rewriter.setInsertionPointAfterValue(extractOp.getTensor());
     auto collapseOp = tensor::CollapseShapeOp::create(
         rewriter, extractOp.getLoc(), extractOp.getTensor(), reassoc);
+
+    rewriter.setInsertionPointAfter(extractOp);
     auto newExtract = tensor::ExtractOp::create(
         rewriter, extractOp.getLoc(), extractOp.getResult().getType(),
         collapseOp.getResult(), newIndices);
