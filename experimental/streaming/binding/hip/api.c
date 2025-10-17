@@ -245,9 +245,9 @@ static hipError_t iree_hip_thread_error_peek(void) {
 // Supports two forms:
 // - HIP_RETURN_STATUS(status)
 // - HIP_RETURN_STATUS(status, hipError_t) - fixed error
-#define HIP_RETURN_STATUS(...)                       \
-  _GET_ARG_COUNT_2(__VA_ARGS__, HIP_RETURN_STATUS_2, \
-                   HIP_RETURN_STATUS_1)(__VA_ARGS__)
+#define HIP_RETURN_STATUS(...)                                            \
+  _GET_ARG_COUNT_2(__VA_ARGS__, HIP_RETURN_STATUS_2, HIP_RETURN_STATUS_1) \
+  (__VA_ARGS__)
 
 #define HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR_2(zone, status) \
   do {                                                          \
@@ -276,7 +276,8 @@ static hipError_t iree_hip_thread_error_peek(void) {
 // - HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(zone, status, hipError_t)
 #define HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR(...)                       \
   _GET_ARG_COUNT_3(__VA_ARGS__, HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR_3, \
-                   HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR_2)(__VA_ARGS__)
+                   HIP_RETURN_STATUS_AND_END_ZONE_IF_ERROR_2)              \
+  (__VA_ARGS__)
 
 //===----------------------------------------------------------------------===//
 // Status conversion
@@ -3492,14 +3493,17 @@ HIPAPI hipError_t hipMemcpy(void* dst, const void* src, size_t sizeBytes,
   iree_status_t status = iree_ok_status();
   switch (kind) {
     case hipMemcpyHostToDevice:
+      iree_hal_streaming_context_synchronize(context);
       status = iree_hal_streaming_memcpy_host_to_device(
           context, (iree_hal_streaming_deviceptr_t)dst, src, sizeBytes, NULL);
       break;
     case hipMemcpyDeviceToHost:
+      iree_hal_streaming_context_synchronize(context);
       status = iree_hal_streaming_memcpy_device_to_host(
           context, dst, (iree_hal_streaming_deviceptr_t)src, sizeBytes, NULL);
       break;
     case hipMemcpyDeviceToDevice:
+      iree_hal_streaming_context_synchronize(context);
       status = iree_hal_streaming_memcpy_device_to_device(
           context, (iree_hal_streaming_deviceptr_t)dst,
           (iree_hal_streaming_deviceptr_t)src, sizeBytes, NULL);
@@ -6041,7 +6045,7 @@ HIPAPI hipError_t hipLaunchKernel(const void* function_address, dim3 numBlocks,
       .block_dim = {dimBlocks.x, dimBlocks.y, dimBlocks.z},
       .shared_memory_bytes = sharedMemBytes,
       .buffer = args,  // args is already the kernelParams array
-      .flags = IREE_HAL_STREAMING_DISPATCH_FLAG_NONE,
+      .flags = IREE_HAL_STREAMING_DISPATCH_FLAG_ARGS_ARRAY,
   };
   iree_status_t status = iree_hal_streaming_launch_kernel(
       symbol, &params, (iree_hal_streaming_stream_t*)stream);
