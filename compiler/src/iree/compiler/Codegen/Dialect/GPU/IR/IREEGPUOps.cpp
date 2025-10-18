@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
@@ -237,19 +238,75 @@ LogicalResult CoalescedGatherDMAOp::verify() {
     return emitOpError("input type must either be a tensor or a memref");
   }
 
-  if (hasTensor) {
-    if (!isa<RankedTensorType>(getIndices().getType()) ||
-        !isa<RankedTensorType>(getSource().getType())) {
-      return emitOpError("all operands must be tensors when init is a tensor");
+  // Check indices if present
+  if (Value indices = getIndices()) {
+    if (hasTensor) {
+      if (!isa<RankedTensorType>(indices.getType())) {
+        return emitOpError("indices must be a tensor when init is a tensor");
+      }
+      if (!isa<RankedTensorType>(getSource().getType())) {
+        return emitOpError("source must be a tensor when init is a tensor");
+      }
+    } else if (hasMemRef) {
+      if (!isa<MemRefType>(indices.getType())) {
+        return emitOpError("indices must be a memref when init is a memref");
+      }
+      if (!isa<MemRefType>(getSource().getType())) {
+        return emitOpError("source must be a memref when init is a memref");
+      }
     }
-  } else if (hasMemRef) {
-    if (!isa<MemRefType>(getIndices().getType()) ||
-        !isa<MemRefType>(getSource().getType())) {
-      return emitOpError("all operands must be memrefs when init is a memref");
+  } else {
+    // Copy mode (no indices) - just verify source and init match tensor/memref
+    // type
+    if (hasTensor) {
+      if (!isa<RankedTensorType>(getSource().getType())) {
+        return emitOpError("source must be a tensor when init is a tensor");
+      }
+    } else if (hasMemRef) {
+      if (!isa<MemRefType>(getSource().getType())) {
+        return emitOpError("source must be a memref when init is a memref");
+      }
     }
   }
 
   return success();
+}
+
+void CoalescedGatherDMAOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results.add(+[](CoalescedGatherDMAOp op, PatternRewriter &rewriter) {
+    bool changed = false;
+    Value indices = op.getIndices();
+    Value source = op.getSource();
+    Value init = op.getInit();
+
+    if (auto castOp = source.getDefiningOp<memref::CastOp>()) {
+      source = castOp.getSource();
+      changed = true;
+    }
+
+    // Only fold indices if present
+    if (indices) {
+      if (auto castOp = indices.getDefiningOp<memref::CastOp>()) {
+        indices = castOp.getSource();
+        changed = true;
+      }
+    }
+
+    if (auto castOp = init.getDefiningOp<memref::CastOp>()) {
+      init = castOp.getSource();
+      changed = true;
+    }
+
+    if (!changed)
+      return failure();
+
+    // Create a new op with the folded operands
+    auto newOp = rewriter.create<CoalescedGatherDMAOp>(
+        op.getLoc(), init.getType(), indices, source, init);
+    rewriter.replaceOp(op, newOp.getResult());
+    return success();
+  });
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU

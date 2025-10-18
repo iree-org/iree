@@ -327,20 +327,43 @@ struct CoalescedGatherDMAOpBufferizationInterface
     return alist;
   }
 
+  FailureOr<BaseMemRefType>
+  getBufferType(Operation *op, Value value, const BufferizationOptions &options,
+                const bufferization::BufferizationState &state,
+                SmallVector<Value> &invocationStack) const {
+    auto gatherOp = cast<IREE::GPU::CoalescedGatherDMAOp>(op);
+    assert(value == gatherOp.getResult() && "invalid value");
+
+    // Get the buffer type for the init operand
+    auto initMemrefType = bufferization::getBufferType(
+        gatherOp.getInit(), options, state, invocationStack);
+    if (failed(initMemrefType))
+      return failure();
+
+    return cast<BaseMemRefType>(*initMemrefType);
+  }
+
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                           const BufferizationOptions &options,
                           bufferization::BufferizationState &state) const {
     auto gatherOp = cast<IREE::GPU::CoalescedGatherDMAOp>(op);
 
     // Get the bufferized operands.
-    FailureOr<Value> indicesBuffer =
-        getBuffer(rewriter, gatherOp.getIndices(), options, state);
+    // Indices is optional for copy-mode operations
+    FailureOr<Value> indicesBuffer = success(Value());
+    if (Value indices = gatherOp.getIndices()) {
+      indicesBuffer = getBuffer(rewriter, indices, options, state);
+      if (failed(indicesBuffer)) {
+        return failure();
+      }
+    }
+
     FailureOr<Value> sourceBuffer =
         getBuffer(rewriter, gatherOp.getSource(), options, state);
     FailureOr<Value> initBuffer =
         getBuffer(rewriter, gatherOp.getInit(), options, state);
 
-    if (failed(indicesBuffer) || failed(sourceBuffer) || failed(initBuffer)) {
+    if (failed(sourceBuffer) || failed(initBuffer)) {
       return failure();
     }
 
