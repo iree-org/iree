@@ -210,15 +210,15 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
   }
 
   // 4. Pad.
-  SmallVector<tensor::PadOp> padOps;
-  FailureOr<TilingInterface> maybePaddedOp =
-      linalg::rewriteAsPaddedOp(rewriter, tilingInterfaceOp, options, padOps);
-  if (failed(maybePaddedOp)) {
+  FailureOr<linalg::PadTilingInterfaceResult> maybePadResult =
+      linalg::rewriteAsPaddedOp(rewriter, tilingInterfaceOp, options);
+  if (failed(maybePadResult)) {
     tilingInterfaceOp.emitWarning("failed to pad op");
     return failure();
   }
-
-  TilingInterface paddedOp = *maybePaddedOp;
+  const auto &padResult = maybePadResult.value();
+  rewriter.replaceOp(tilingInterfaceOp, padResult.replacements);
+  TilingInterface paddedOp = padResult.paddedOp;
   Location loc = paddedOp.getLoc();
 
   if (auto paddedLinalgOp =
@@ -304,7 +304,7 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
   }
 
   // 5. For each PadOp, create a linalg::CopyOp to allow dim propagations.
-  for (tensor::PadOp padOp : padOps) {
+  for (tensor::PadOp padOp : padResult.padOps) {
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPointAfter(padOp);
 
