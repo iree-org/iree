@@ -33,12 +33,12 @@ static LogicalResult padToStaticSizes(RewriterBase &rewriter,
                      .setPaddingValues(paddingValues)
                      .setPadToMultipleOf(true);
 
-  SmallVector<tensor::PadOp> padOps;
-  FailureOr<TilingInterface> maybePaddedOp =
-      linalg::rewriteAsPaddedOp(rewriter, tilingInterfaceOp, options, padOps);
-  if (failed(maybePaddedOp)) {
+  FailureOr<linalg::PadTilingInterfaceResult> maybePadResult =
+      linalg::rewriteAsPaddedOp(rewriter, tilingInterfaceOp, options);
+  if (failed(maybePadResult)) {
     return tilingInterfaceOp->emitOpError("failed to pad op");
   }
+  rewriter.replaceOp(tilingInterfaceOp, maybePadResult->replacements);
 
   return success();
 }
