@@ -1,6 +1,6 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-linalg-ext-decompose-map-scatter,cse))" \
-// RUN:   --split-input-file %s | FileCheck --check-prefix=CHECK %s
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-linalg-ext-decompose-map-scatter{test-preprocessing-patterns=true},cse))" \
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-linalg-ext-decompose-map-scatter,canonicalize,cse))" \
+// RUN:   --split-input-file --verify-diagnostics %s | FileCheck --check-prefix=CHECK %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-linalg-ext-decompose-map-scatter{test-preprocessing-patterns=true},canonicalize,cse))" \
 // RUN:   --split-input-file %s | FileCheck --check-prefix=PREPROCESSING %s
 
 func.func @identity_map_scatter(
@@ -19,7 +19,7 @@ func.func @identity_map_scatter(
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[FLAT_OUTPUT:.+]] = memref.collapse_shape %[[OUTPUT]] {{.*}} memref<4x16xf32> into memref<64xf32>
 //   CHECK-DAG:   %[[FLAT_INDICES:.+]] = vector.shape_cast{{.*}} : vector<4x16xindex> to vector<64xindex>
-//   CHECK-DAG:   %[[FLAT_MASK:.+]] = vector.shape_cast{{.*}} : vector<4x16xi1> to vector<64xi1>
+//   CHECK-DAG:   %[[FLAT_MASK:.+]] = arith.constant dense<true> : vector<64xi1>
 //   CHECK-DAG:   %[[FLAT_INPUT:.+]] = vector.shape_cast %[[INPUT]] : vector<4x16xf32> to vector<64xf32>
 //       CHECK:   vector.scatter %[[FLAT_OUTPUT]][%[[C0]]]
 //  CHECK-SAME:     [%[[FLAT_INDICES]]], %[[FLAT_MASK]], %[[FLAT_INPUT]]
@@ -58,7 +58,7 @@ func.func @map_scatter_with_mask(
 }
 // CHECK-LABEL: func.func @map_scatter_with_mask(
 //   CHECK-NOT:   iree_linalg_ext.map_scatter
-//       CHECK:   vector.scatter
+//       CHECK:   vector.maskedstore
 
 // -----
 
@@ -80,7 +80,7 @@ func.func @map_scatter_into_subview(
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[FLAT_OUTPUT:.+]] = memref.collapse_shape %[[OUTPUT]] {{.*}} memref<8x32xf32> into memref<256xf32>
 //   CHECK-DAG:   %[[FLAT_INDICES:.+]] = vector.shape_cast{{.*}} : vector<4x16xindex> to vector<64xindex>
-//   CHECK-DAG:   %[[FLAT_MASK:.+]] = vector.shape_cast{{.*}} : vector<4x16xi1> to vector<64xi1>
+//   CHECK-DAG:   %[[FLAT_MASK:.+]] = arith.constant dense<true> : vector<64xi1>
 //   CHECK-DAG:   %[[FLAT_INPUT:.+]] = vector.shape_cast %[[INPUT]] : vector<4x16xf32> to vector<64xf32>
 //       CHECK:   vector.scatter %[[FLAT_OUTPUT]][%[[C0]]]
 //  CHECK-SAME:     [%[[FLAT_INDICES]]], %[[FLAT_MASK]], %[[FLAT_INPUT]]
@@ -118,7 +118,7 @@ func.func @map_scatter_into_collapsible_subview(
 //   CHECK-DAG:   %[[SUBVIEW:.+]] = memref.subview %[[OUTPUT]]
 //   CHECK-DAG:   %[[FLAT_OUTPUT:.+]] = memref.collapse_shape %[[SUBVIEW]] {{.*}} memref<4x32xf32{{.*}} into memref<128xf32
 //   CHECK-DAG:   %[[FLAT_INDICES:.+]] = vector.shape_cast{{.*}} : vector<4x16xindex> to vector<64xindex>
-//   CHECK-DAG:   %[[FLAT_MASK:.+]] = vector.shape_cast{{.*}} : vector<4x16xi1> to vector<64xi1>
+//   CHECK-DAG:   %[[FLAT_MASK:.+]] = arith.constant dense<true> : vector<64xi1>
 //   CHECK-DAG:   %[[FLAT_INPUT:.+]] = vector.shape_cast %[[INPUT]] : vector<4x16xf32> to vector<64xf32>
 //       CHECK:   vector.scatter %[[FLAT_OUTPUT]][%[[C0]]]
 //  CHECK-SAME:     [%[[FLAT_INDICES]]], %[[FLAT_MASK]], %[[FLAT_INPUT]]
@@ -144,6 +144,7 @@ func.func @map_scatter_into_strided_output(
 //  CHECK-SAME:     %[[OUTPUT:[a-zA-Z0-9_]+]]
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[FLAT_MASK:.+]] = arith.constant dense<true> : vector<64xi1>
 //   CHECK-DAG:   %[[D0:.+]] = memref.dim %[[OUTPUT]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = memref.dim %[[OUTPUT]], %[[C1]]
 //   CHECK-DAG:   %{{.*}}, %[[OFFSET:.+]], %{{.*}}:2, %{{.*}} = memref.extract_strided_metadata %[[OUTPUT]]
@@ -152,7 +153,49 @@ func.func @map_scatter_into_strided_output(
 //  CHECK-SAME:     to offset: [%[[OFFSET]]], sizes: [%[[FLAT_SIZE]]], strides: [1]
 //  CHECK-SAME:     : memref<?x?xf32, strided<[?, ?], offset: ?>> to memref<?xf32, strided<[1], offset: ?>>
 //   CHECK-DAG:   %[[FLAT_INDICES:.+]] = vector.shape_cast{{.*}} : vector<4x16xindex> to vector<64xindex>
-//   CHECK-DAG:   %[[FLAT_MASK:.+]] = vector.shape_cast{{.*}} : vector<4x16xi1> to vector<64xi1>
 //   CHECK-DAG:   %[[FLAT_INPUT:.+]] = vector.shape_cast %[[INPUT]] : vector<4x16xf32> to vector<64xf32>
 //       CHECK:   vector.scatter %[[FLAT_OUTPUT]][%[[C0]]]
 //  CHECK-SAME:     [%[[FLAT_INDICES]]], %[[FLAT_MASK]], %[[FLAT_INPUT]]
+
+// -----
+
+func.func @map_scatter_sub_byte(
+    %input: vector<4x16xf4E2M1FN>, %output: memref<4x16xf4E2M1FN, strided<[16, 1], offset: ?>>
+) {
+  iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index, %idx1: index):
+      %mask = arith.constant true
+      iree_linalg_ext.yield %idx0, %idx1, %mask : index, index, i1
+  } : vector<4x16xf4E2M1FN> into memref<4x16xf4E2M1FN, strided<[16, 1], offset: ?>>
+  return
+}
+// CHECK-LABEL: func.func @map_scatter_sub_byte
+//  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:     %[[OUTPUT:[a-zA-Z0-9_]+]]
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
+//   CHECK-DAG:   %[[C3:.+]] = arith.constant 3 : index
+//       CHECK:   %[[EXTRACT_0:.+]] = vector.extract %[[INPUT]][0] : vector<16xf4E2M1FN> from vector<4x16xf4E2M1FN>
+//       CHECK:   vector.store %[[EXTRACT_0]], %[[OUTPUT]][%[[C0]], %[[C0]]] : memref<4x16xf4E2M1FN, strided<[16, 1], offset: ?>>, vector<16xf4E2M1FN>
+//       CHECK:   %[[EXTRACT_1:.+]] = vector.extract %[[INPUT]][1] : vector<16xf4E2M1FN> from vector<4x16xf4E2M1FN>
+//       CHECK:   vector.store %[[EXTRACT_1]], %[[OUTPUT]][%[[C1]], %[[C0]]] : memref<4x16xf4E2M1FN, strided<[16, 1], offset: ?>>, vector<16xf4E2M1FN>
+//       CHECK:   %[[EXTRACT_2:.+]] = vector.extract %[[INPUT]][2] : vector<16xf4E2M1FN> from vector<4x16xf4E2M1FN>
+//       CHECK:   vector.store %[[EXTRACT_2]], %[[OUTPUT]][%[[C2]], %[[C0]]] : memref<4x16xf4E2M1FN, strided<[16, 1], offset: ?>>, vector<16xf4E2M1FN>
+//       CHECK:   %[[EXTRACT_3:.+]] = vector.extract %[[INPUT]][3] : vector<16xf4E2M1FN> from vector<4x16xf4E2M1FN>
+//       CHECK:   vector.store %[[EXTRACT_3]], %[[OUTPUT]][%[[C3]], %[[C0]]] : memref<4x16xf4E2M1FN, strided<[16, 1], offset: ?>>, vector<16xf4E2M1FN>
+
+// -----
+
+func.func @map_scatter_sub_byte_not_unit_stride(
+    %input: vector<2x2xf4E2M1FN>, %output: memref<2x4xf4E2M1FN>
+) {
+  // expected-error@+1 {{with an access on a sub-byte type that is not a multiple of the byte size can't be vectorized}}
+  iree_linalg_ext.map_scatter %input into %output {
+    ^bb0(%idx0: index, %idx1: index):
+      %mask = arith.constant true
+      %1 = affine.apply affine_map<(d0) -> (d0 * 2)>(%idx1)
+      iree_linalg_ext.yield %idx0, %1, %mask : index, index, i1
+  } : vector<2x2xf4E2M1FN> into memref<2x4xf4E2M1FN>
+  return
+}

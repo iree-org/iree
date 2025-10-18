@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Utils/Indexing.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -119,6 +120,48 @@ static Value createFlatOutputBuffer(RewriterBase &rewriter, Location loc,
                                            collapsedShape, collapsedStrides);
 }
 
+/// Decompose the `map_scatter` into a sequence of `vector.extract` and
+/// `vector.store` operations.
+static LogicalResult decomposeToLoadStore(MapScatterOp mapScatterOp,
+                                          RewriterBase &rewriter) {
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(mapScatterOp);
+  Location loc = mapScatterOp.getLoc();
+  auto inputType = cast<VectorType>(mapScatterOp.getInputType());
+  SmallVector<Value> ubs =
+      llvm::map_to_vector(inputType.getShape().drop_back(), [&](int64_t dim) {
+        return arith::ConstantIndexOp::create(rewriter, loc, dim).getResult();
+      });
+  Value one = arith::ConstantIndexOp::create(rewriter, loc, 1);
+  SmallVector<Value> steps(ubs.size(), one);
+  Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+  SmallVector<Value> lbs(ubs.size(), zero);
+  auto buildBody = [&](OpBuilder &builder, Location loc, ValueRange ivs) {
+    auto inlineBodyBuilder = [&](OpBuilder &inlineBuilder, Location inlineLoc,
+                                 ArrayRef<Value> yieldedValues) {
+      SmallVector<OpFoldResult> inputIndices = getAsOpFoldResult(ivs);
+      auto extractOp = vector::ExtractOp::create(
+          rewriter, inlineLoc, mapScatterOp.getInput(), inputIndices);
+      // Drop the mask (last element) from the yielded values to get the output
+      // indices.
+      vector::StoreOp::create(rewriter, inlineLoc, extractOp.getResult(),
+                              mapScatterOp.getOutput(),
+                              yieldedValues.drop_back());
+    };
+    SmallVector<Value> newArgs(ivs);
+    newArgs.push_back(zero);
+    mapScatterOp.inlineMapScatterBody(builder, loc, newArgs, inlineBodyBuilder);
+  };
+  scf::LoopNest loopNest =
+      scf::buildLoopNest(rewriter, loc, lbs, ubs, steps, buildBody);
+  for (scf::ForOp forOp : loopNest.loops) {
+    if (failed(loopUnrollFull(forOp))) {
+      return failure();
+    }
+  }
+  return success();
+}
+
 /// Decompose an iree_linalg_ext.map_scatter op with a vector input, and a
 /// memref output. The map_scatter op is lowered into a sequence of vector ops
 /// to compute a vector of indices for the elements of the map_scatter input,
@@ -131,6 +174,29 @@ static LogicalResult decomposeMapScatter(MapScatterOp mapScatterOp,
   Location loc = mapScatterOp.getLoc();
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(mapScatterOp);
+  const int64_t bitWidth = mapScatterOp.getInputType().getElementTypeBitWidth();
+  // In case of a sub-byte bitwidth, we check that there is a contiguous copy
+  // on the inner dimension that is a multiple of a byte size and decompose into
+  // a sequence of vector extract/stores operations if possible.
+  if (bitWidth < 8) {
+    Block &transformBody = mapScatterOp.getTransformationRegion().front();
+    SmallVector<Value> args(transformBody.getArguments());
+    Value innermostInputIdx = args[args.size() - 1];
+    auto bodyYield =
+        cast<IREE::LinalgExt::YieldOp>(transformBody.getTerminator());
+    Value innermostOutputIdx =
+        bodyYield.getOperand(bodyYield.getNumOperands() - 2);
+    if (isUnitFunctionOf(innermostOutputIdx, innermostInputIdx)) {
+      if (failed(decomposeToLoadStore(mapScatterOp, rewriter))) {
+        return failure();
+      }
+      rewriter.eraseOp(mapScatterOp);
+      return success();
+    }
+    return mapScatterOp.emitOpError() << "with an access on a sub-byte type "
+                                         "that is not a multiple of the byte "
+                                         "size can't be vectorized";
+  }
   SmallVector<OpFoldResult> outputSizes =
       memref::getMixedSizes(rewriter, loc, mapScatterOp.getOutput());
   SmallVector<Value> strides;
