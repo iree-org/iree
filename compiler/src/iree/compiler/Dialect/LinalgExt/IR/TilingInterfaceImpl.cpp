@@ -1951,8 +1951,12 @@ ExpReductionOp::getTiledImplementation(OpBuilder &b,
                 v.getDefiningOp());
           }),
       [](Value v) -> Operation * { return v.getDefiningOp(); });
-  SmallVector<Type> resultTensorTypes =
-      getTensorOutputTypes(linalgOp, tiledOperands);
+  SmallVector<Type, 4> resultTensorTypes;
+  if (getNumResults()) {
+    resultTensorTypes = llvm::map_to_vector<4>(
+        tiledOperands, [](Value v) { return v.getType(); });
+  }
+
   Operation *tiledOp = mlir::clone(b, *this, resultTensorTypes, tiledOperands);
   offsetIndices(b, cast<linalg::LinalgOp>(tiledOp), offsets);
   return TilingResult{
