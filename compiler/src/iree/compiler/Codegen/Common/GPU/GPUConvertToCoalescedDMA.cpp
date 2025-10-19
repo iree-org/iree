@@ -14,7 +14,9 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Builders.h"
@@ -33,235 +35,191 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-// Helper function to validate and extract constant tile sizes from
-// OpFoldResults
-static FailureOr<SmallVector<int64_t>>
-getConstantTileSizes(ArrayRef<OpFoldResult> tileSizes) {
-  SmallVector<int64_t> staticTileSizes;
-  for (OpFoldResult ofr : tileSizes) {
-    std::optional<int64_t> tileSize = getConstantIntValue(ofr);
-    if (!tileSize) {
-      return failure();
-    }
-    staticTileSizes.push_back(*tileSize);
+/// Get subgroup tile sizes from the lowering config.
+static SmallVector<OpFoldResult> getSubgroupTileSizes(OpBuilder &builder,
+                                                      Operation *op) {
+  auto loweringConfig = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
+  if (!loweringConfig) {
+    return {};
   }
-  return staticTileSizes;
+
+  SmallVector<OpFoldResult> tileSizes = loweringConfig.getTilingLevelSizes(
+      builder, llvm::to_underlying(IREE::GPU::TilingLevel::Subgroup), op);
+  return tileSizes;
 }
 
-// Helper function to create GPU mapping attributes for forall loops
-static SmallVector<Attribute>
-createGPUMappingAttrs(MLIRContext *ctx, int64_t rank, bool useWarpMapping) {
+/// Create GPU warp mapping attributes for the given rank.
+static SmallVector<Attribute> getWarpMapping(MLIRContext *ctx, int64_t rank) {
   SmallVector<Attribute> mapping;
   for (int64_t i = 0; i < rank; ++i) {
     auto mappingId = static_cast<gpu::MappingId>(
         static_cast<int>(gpu::MappingId::LinearDim0) + (rank - 1 - i));
-    if (useWarpMapping) {
-      mapping.push_back(gpu::GPUWarpMappingAttr::get(ctx, mappingId));
-    } else {
-      mapping.push_back(gpu::GPUThreadMappingAttr::get(ctx, mappingId));
-    }
+    mapping.push_back(gpu::GPUWarpMappingAttr::get(ctx, mappingId));
   }
   return mapping;
 }
 
-// Helper function to cast indices to index type if needed
-static Value castIndicesToIndexType(OpBuilder &rewriter, Location loc,
-                                    Value indices) {
-  auto indicesType = cast<RankedTensorType>(indices.getType());
-  if (indicesType.getElementType().isIndex()) {
-    return indices;
+/// Create GPU thread mapping attributes for the given rank.
+static SmallVector<Attribute> getThreadMapping(MLIRContext *ctx, int64_t rank) {
+  SmallVector<Attribute> mapping;
+  for (int64_t i = 0; i < rank; ++i) {
+    auto mappingId = static_cast<gpu::MappingId>(
+        static_cast<int>(gpu::MappingId::LinearDim0) + (rank - 1 - i));
+    mapping.push_back(gpu::GPUThreadMappingAttr::get(ctx, mappingId));
   }
-  auto indexIndicesType =
-      RankedTensorType::get(indicesType.getShape(), rewriter.getIndexType());
-  return rewriter.create<arith::IndexCastOp>(loc, indexIndicesType, indices);
+  return mapping;
 }
 
-// Tiles linalg_ext.gather ops with two-level nested scf.forall structure:
-// 1. Outer forall with warp-level (subgroup) mapping
-// 2. Inner forall with thread-level mapping containing coalesced_gather_dma
-//
-// Example transformation:
-//   %result = linalg_ext.gather
-//       ins(%source, %indices : tensor<1024xf32>, tensor<128x16xindex>)
-//       outs(%init : tensor<128x16xf32>)
-//
-// After (with subgroup tiles [8, 16] and thread tiles [32, 1]):
-//   %result = scf.forall (%wg_i, %wg_j) in (128, 16) step (8, 16)
-//       shared_outs(%wg_out = %init) -> (tensor<128x16xf32>) {
-//     %indices_wg_slice = tensor.extract_slice %indices[%wg_i, %wg_j] [8, 16]
-//     %dest_wg_slice = tensor.extract_slice %wg_out[%wg_i, %wg_j] [8, 16]
-//
-//     %inner_result = scf.forall (%sg_i, %sg_j) in (8, 16) step (32, 1)
-//         shared_outs(%sg_out = %dest_wg_slice) -> (tensor<8x16xf32>) {
-//       scf.forall.in_parallel {
-//         iree_gpu.coalesced_gather_dma %indices_wg_slice, %source into %sg_out
-//       }
-//     } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
-//
-//     scf.forall.in_parallel {
-//       tensor.parallel_insert_slice %inner_result into %wg_out[%wg_i, %wg_j]
-//     }
-//   } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
-//
-struct ConvertGatherOpToCoalescedDMA
-    : public OpRewritePattern<IREE::LinalgExt::GatherOp> {
-  using OpRewritePattern<IREE::LinalgExt::GatherOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(IREE::LinalgExt::GatherOp gatherOp,
-                                PatternRewriter &rewriter) const override {
-    Location loc = gatherOp.getLoc();
-
-    // Get lowering config
-    auto loweringConfig =
-        getLoweringConfig<IREE::GPU::LoweringConfigAttr>(gatherOp);
-    if (!loweringConfig) {
-      return rewriter.notifyMatchFailure(
-          gatherOp, "missing lowering config for gather op");
-    }
-
-    // Get and validate subgroup (warp-level) tile sizes for outer forall
-    auto subgroupTileSizes = loweringConfig.getTilingLevelSizes(
-        rewriter, llvm::to_underlying(IREE::GPU::TilingLevel::Subgroup),
-        gatherOp);
-    if (subgroupTileSizes.empty()) {
-      return rewriter.notifyMatchFailure(
-          gatherOp, "missing subgroup tile sizes in lowering config");
-    }
-
-    auto staticSubgroupTileSizes = getConstantTileSizes(subgroupTileSizes);
-    if (failed(staticSubgroupTileSizes)) {
-      return rewriter.notifyMatchFailure(
-          gatherOp, "subgroup tile sizes must be constant");
-    }
-
-    // Get and validate thread tile sizes for inner forall
-    auto threadTileSizes = loweringConfig.getTilingLevelSizes(
-        rewriter, llvm::to_underlying(IREE::GPU::TilingLevel::Thread),
-        gatherOp);
-    if (threadTileSizes.empty()) {
-      return rewriter.notifyMatchFailure(
-          gatherOp, "missing thread tile sizes in lowering config");
-    }
-
-    auto staticThreadTileSizes = getConstantTileSizes(threadTileSizes);
-    if (failed(staticThreadTileSizes)) {
-      return rewriter.notifyMatchFailure(gatherOp,
-                                         "thread tile sizes must be constant");
-    }
-
-    // Get operands and validate types
-    Value source = gatherOp.getSource();
-    Value indices = gatherOp.getIndices();
-    Value init = gatherOp.getOutput();
-
-    auto initType = cast<RankedTensorType>(init.getType());
-    int64_t rank = initType.getRank();
-
-    if (!initType.hasStaticShape()) {
-      return rewriter.notifyMatchFailure(
-          gatherOp, "init tensor must have static dimensions");
-    }
-
-    if (rank != staticSubgroupTileSizes->size() ||
-        rank != staticThreadTileSizes->size()) {
-      return rewriter.notifyMatchFailure(gatherOp,
-                                         "tile sizes must match tensor rank");
-    }
-
-    // Verify that subgroup tile sizes divide the dimensions evenly
-    for (int64_t i = 0; i < rank; ++i) {
-      if (initType.getDimSize(i) % (*staticSubgroupTileSizes)[i] != 0) {
-        return rewriter.notifyMatchFailure(
-            gatherOp, "subgroup tile size must divide dimension size evenly");
-      }
-    }
-
-    // Create outer forall with warp mapping
-    SmallVector<OpFoldResult> outerLowerBounds(rank, rewriter.getIndexAttr(0));
-    SmallVector<OpFoldResult> outerUpperBounds;
-    for (int64_t dimSize : initType.getShape()) {
-      outerUpperBounds.push_back(rewriter.getIndexAttr(dimSize));
-    }
-
-    SmallVector<Attribute> outerMapping =
-        createGPUMappingAttrs(rewriter.getContext(), rank,
-                              /*useWarpMapping=*/true);
-    auto outerForallOp = rewriter.create<scf::ForallOp>(
-        loc, outerLowerBounds, outerUpperBounds, subgroupTileSizes, init,
-        rewriter.getArrayAttr(outerMapping));
-
-    // Build the body of outer forall
-    OpBuilder::InsertionGuard guard(rewriter);
-    Block *outerBody = outerForallOp.getBody();
-    rewriter.setInsertionPointToStart(outerBody);
-
-    SmallVector<Value> outerIVs(outerBody->getArguments().begin(),
-                                outerBody->getArguments().begin() + rank);
-    Value outerSharedOut = outerBody->getArguments()[rank];
-
-    // Extract slices for the workgroup tile
-    SmallVector<OpFoldResult> outerOffsets(outerIVs.begin(), outerIVs.end());
-    SmallVector<OpFoldResult> strides(rank, rewriter.getIndexAttr(1));
-
-    auto indicesWgSlice = rewriter.create<tensor::ExtractSliceOp>(
-        loc, indices, outerOffsets, subgroupTileSizes, strides);
-
-    auto destWgSlice = rewriter.create<tensor::ExtractSliceOp>(
-        loc, outerSharedOut, outerOffsets, subgroupTileSizes, strides);
-
-    // Cast indices to index type if needed
-    Value indexIndices = castIndicesToIndexType(rewriter, loc, indicesWgSlice);
-
-    // Create inner forall with thread mapping
-    SmallVector<OpFoldResult> innerLowerBounds(rank, rewriter.getIndexAttr(0));
-    SmallVector<OpFoldResult> innerUpperBounds = subgroupTileSizes;
-
-    SmallVector<Attribute> innerMapping =
-        createGPUMappingAttrs(rewriter.getContext(), rank,
-                              /*useWarpMapping=*/false);
-    auto innerForallOp = rewriter.create<scf::ForallOp>(
-        loc, innerLowerBounds, innerUpperBounds, threadTileSizes,
-        destWgSlice.getResult(), rewriter.getArrayAttr(innerMapping));
-
-    // Build the body of inner forall with DMA op
-    Block *innerBody = innerForallOp.getBody();
-    rewriter.setInsertionPointToStart(innerBody);
-
-    Value innerSharedOut = innerBody->getArguments()[rank];
-    auto innerInParallelOp =
-        cast<scf::InParallelOp>(innerBody->getTerminator());
-    Block &innerInParallelBlock = innerInParallelOp.getRegion().front();
-    rewriter.setInsertionPointToStart(&innerInParallelBlock);
-
-    rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
-        loc, innerSharedOut.getType(), indexIndices, source, innerSharedOut);
-
-    // Insert the result of inner forall back into outer forall's output.
-    rewriter.setInsertionPointAfter(innerForallOp);
-    auto outerInParallelOp =
-        cast<scf::InParallelOp>(outerBody->getTerminator());
-    Block &outerInParallelBlock = outerInParallelOp.getRegion().front();
-    rewriter.setInsertionPointToStart(&outerInParallelBlock);
-
-    rewriter.create<tensor::ParallelInsertSliceOp>(
-        loc, innerForallOp.getResult(0), outerSharedOut, outerOffsets,
-        subgroupTileSizes, strides);
-
-    rewriter.replaceOp(gatherOp, outerForallOp.getResults());
-    return success();
+/// Get thread tile sizes from the lowering config.
+static SmallVector<OpFoldResult> getThreadTileSizes(OpBuilder &builder,
+                                                    Operation *op) {
+  auto loweringConfig = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
+  if (!loweringConfig) {
+    return {};
   }
-};
+
+  SmallVector<OpFoldResult> tileSizes = loweringConfig.getTilingLevelSizes(
+      builder, llvm::to_underlying(IREE::GPU::TilingLevel::Thread), op);
+  return tileSizes;
+}
+
+/// Callback for tiled loop generation with subgroup tiling.
+static scf::SCFTilingOptions getSubgroupTilingOptions(OpBuilder &builder,
+                                                      Operation *op) {
+  scf::SCFTilingOptions options;
+  options.setTileSizeComputationFunction(
+      [](OpBuilder &b, Operation *op) { return getSubgroupTileSizes(b, op); });
+
+  // Use forall loop type
+  options.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
+
+  // Set the mapping to warp-level
+  auto gatherOp = dyn_cast<IREE::LinalgExt::GatherOp>(op);
+  if (gatherOp) {
+    auto initType = cast<RankedTensorType>(gatherOp.getOutput().getType());
+    int64_t rank = initType.getRank();
+    options.setMapping(getWarpMapping(builder.getContext(), rank));
+  }
+
+  return options;
+}
 
 struct GPUConvertToCoalescedDMAPass final
     : impl::GPUConvertToCoalescedDMAPassBase<GPUConvertToCoalescedDMAPass> {
   using GPUConvertToCoalescedDMAPassBase::GPUConvertToCoalescedDMAPassBase;
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
-
     MLIRContext *context = &getContext();
-    RewritePatternSet patterns(context);
-    patterns.add<ConvertGatherOpToCoalescedDMA>(context);
-    walkAndApplyPatterns(funcOp, std::move(patterns));
+    IRRewriter rewriter(context);
+
+    // Tile linalg_ext.gather operations to subgroup level only
+    SmallVector<IREE::LinalgExt::GatherOp> gatherOps;
+    funcOp->walk([&](IREE::LinalgExt::GatherOp gatherOp) {
+      gatherOps.push_back(gatherOp);
+    });
+
+    for (auto gatherOp : gatherOps) {
+      scf::SCFTilingOptions options =
+          getSubgroupTilingOptions(rewriter, gatherOp);
+
+      rewriter.setInsertionPoint(gatherOp);
+      FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCF(
+          rewriter, cast<TilingInterface>(gatherOp.getOperation()), options);
+
+      if (failed(tilingResult)) {
+        continue;
+      }
+
+      // Replace the original operation with the tiled version
+      rewriter.replaceOp(gatherOp, tilingResult->replacements);
+    }
+
+    // Second pass: Tile inner gather ops to thread level using tiling framework
+    funcOp->walk([&](IREE::LinalgExt::GatherOp gatherOp) {
+      // Get thread tile sizes
+      SmallVector<OpFoldResult> threadTileSizes =
+          getThreadTileSizes(rewriter, gatherOp);
+      if (threadTileSizes.empty()) {
+        return WalkResult::advance();
+      }
+
+      auto initType = cast<RankedTensorType>(gatherOp.getOutput().getType());
+      int64_t rank = initType.getRank();
+
+      // Create thread-level tiling options
+      scf::SCFTilingOptions threadOptions;
+      threadOptions.setTileSizeComputationFunction(
+          [threadTileSizes](OpBuilder &b, Operation *op) {
+            return threadTileSizes;
+          });
+      threadOptions.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
+      threadOptions.setMapping(getThreadMapping(context, rank));
+
+      rewriter.setInsertionPoint(gatherOp);
+      FailureOr<scf::SCFTilingResult> threadTilingResult = scf::tileUsingSCF(
+          rewriter, cast<TilingInterface>(gatherOp.getOperation()),
+          threadOptions);
+
+      if (failed(threadTilingResult)) {
+        return WalkResult::advance();
+      }
+
+      // Find the forall op
+      scf::ForallOp forallOp = nullptr;
+      for (auto loop : threadTilingResult->loops) {
+        if (auto fop = dyn_cast<scf::ForallOp>(loop.getOperation())) {
+          forallOp = fop;
+          break;
+        }
+      }
+      if (!forallOp) {
+        return WalkResult::advance();
+      }
+
+      // Find the tiled gather inside the forall
+      IREE::LinalgExt::GatherOp innerGather = nullptr;
+      forallOp->walk([&](IREE::LinalgExt::GatherOp op) {
+        innerGather = op;
+        return WalkResult::interrupt();
+      });
+
+      if (innerGather) {
+        // Get the shared_outs block argument
+        Block *forallBody = forallOp.getBody();
+        Value sharedOut = forallBody->getArguments()[rank];
+
+        // Find and remove any existing parallel_insert_slice in the in_parallel
+        // region
+        auto inParallelOp =
+            cast<scf::InParallelOp>(forallBody->getTerminator());
+        Block &inParallelBlock = inParallelOp.getRegion().front();
+
+        SmallVector<tensor::ParallelInsertSliceOp> toErase;
+        for (auto &op : inParallelBlock) {
+          if (auto insertOp = dyn_cast<tensor::ParallelInsertSliceOp>(&op)) {
+            toErase.push_back(insertOp);
+          }
+        }
+
+        // Create the DMA op in the in_parallel region
+        rewriter.setInsertionPointToStart(&inParallelBlock);
+        auto dmaOp = rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
+            innerGather.getLoc(), sharedOut.getType(), innerGather.getIndices(),
+            innerGather.getSource(), sharedOut);
+
+        // Erase the parallel_insert_slice ops
+        for (auto insertOp : toErase) {
+          rewriter.eraseOp(insertOp);
+        }
+
+        // Replace the inner gather with the DMA result
+        rewriter.replaceOp(innerGather, dmaOp.getResult());
+      }
+
+      // Replace the original gather with the tiled version
+      rewriter.replaceOp(gatherOp, threadTilingResult->replacements);
+      return WalkResult::advance();
+    });
   }
 };
 
