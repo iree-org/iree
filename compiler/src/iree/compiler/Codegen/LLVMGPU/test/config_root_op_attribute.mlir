@@ -13,26 +13,16 @@ func.func @matmul(%lhs: tensor<4x4xf32>, %rhs: tensor<4x4xf32>) -> tensor<4x4xf3
 
 // -----
 
-#map = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
-#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-
-func.func @matvec_like(%lhs: tensor<1x4096xf16>, %rhs: tensor<32000x4096xf16>, %init: tensor<1x32000xf16>) {
-  %output = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer>]>) binding(0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x32000xf16>>
-  %result = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]}
-      ins(%lhs, %rhs : tensor<1x4096xf16>, tensor<32000x4096xf16>) outs(%init : tensor<1x32000xf16>) {
-  ^bb0(%in: f16, %in_0: f16, %out: f16):
-    %mul = arith.mulf %in, %in_0 : f16
-    %add = arith.addf %out, %mul : f16
-    linalg.yield %add : f16
-  } -> tensor<1x32000xf16>
-  iree_tensor_ext.dispatch.tensor.store %result, %output, offsets = [0, 0], sizes = [1, 32000], strides = [1, 1] : tensor<1x32000xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x32000xf16>>
+func.func @matvec(%matrix: tensor<32000x4096xf16>, %vector: tensor<4096xf16>, %init: tensor<32000xf16>) {
+  %output = hal.interface.binding.subspan layout(<bindings = [#hal.pipeline.binding<storage_buffer>]>) binding(0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32000xf16>>
+  %result = linalg.matvec ins(%matrix, %vector : tensor<32000x4096xf16>, tensor<4096xf16>) outs(%init : tensor<32000xf16>) -> tensor<32000xf16>
+  iree_tensor_ext.dispatch.tensor.store %result, %output, offsets = [0], sizes = [32000], strides = [1] : tensor<32000xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32000xf16>>
   return
 }
 
 // CHECK: #translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
-// CHECK-LABEL: func.func @matvec_like
-// CHECK: %{{.*}} = linalg.generic
+// CHECK-LABEL: func.func @matvec
+// CHECK: linalg.matvec
 // CHECK-SAME: lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME: root_op
 
