@@ -1418,10 +1418,7 @@ builtin.module attributes { transform.with_named_sequence } {
 func.func @undistributed_write(%out: memref<f32, #amdgpu.address_space<fat_raw_buffer>>, %v: vector<f32>) {
   //  CHECK-DAG: %[[ZERO:.*]] = arith.constant 0 : index
   //  CHECK-DAG: %[[TID:.*]] = gpu.thread_id  x
-  //      CHECK: %[[DELIN:.*]]:2 = affine.delinearize_index %[[TID]] into (64)
-  //  CHECK-DAG: %[[SUBGROUP_COND:.+]] = arith.cmpi eq, %[[DELIN]]#0, %[[ZERO]] : index
-  //  CHECK-DAG: %[[LANE_COND:.+]] = arith.cmpi eq, %[[DELIN]]#1, %[[ZERO]] : index
-  //      CHECK: %[[COND:.+]] = arith.andi %[[SUBGROUP_COND]], %[[LANE_COND]] : i1
+  //  CHECK-DAG: %[[COND:.+]] = arith.cmpi eq, %[[TID]], %[[ZERO]] : index
   // CHECK-NEXT: scf.if %[[COND]] {
   //      CHECK:   vector.transfer_write
   // CHECK-NEXT: }
@@ -1443,25 +1440,23 @@ builtin.module attributes { transform.with_named_sequence } {
   subgroup_tile    = [4, 1],
   batch_tile       = [1, 1],
   outer_tile       = [1, 1],
-  thread_tile      = [1, 8],
-  element_tile     = [2, 2],
+  thread_tile      = [2, 8],
+  element_tile     = [1, 2],
   subgroup_strides = [1, 1],
-  thread_strides   = [1, 1]
+  thread_strides   = [32, 1]
 >
 
-// (*subgroup_tile, 'lane_overlap', *thread_tile) is (4, 8, 8).
-//                 (4, 8, 8)
-// thread_id -> (a, b, c, d)
-// Effectively the logic we're checking for is `if (thread.a == 0 and thread.c == 0) { write }`
-// This is valid because the address written to for (a, b, c, d) is the same for all a and c, so
-// we only need to write for one pair, and we pick (a, b) = (0, 0).
-
+// subgroup_size = 64 (default for the transform test_gpu_vector_distribution)
+// A possible thread basis for this distribution would be:
+// thread_basis = [2, 4, 8] and the dimension with size "4" has data broadcasted
+// across all threads (note the thread strides). This test checks if we account
+// for such broadcasts when generating conditional writes.
 // CHECK-LABEL: @partially_distributed_write
 //   CHECK-DAG:    %[[TID:.+]] = gpu.thread_id  x
 //   CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
-//       CHECK:    %[[DELIN:.*]]:4 = affine.delinearize_index %[[TID:.+]] into (4, 8, 8)
+//       CHECK:    %[[DELIN:.*]]:5 = affine.delinearize_index %[[TID:.+]] into (4, 2, 4, 8)
 //   CHECK-DAG:    %[[SUBGROUP_COND:.+]] = arith.cmpi eq, %[[DELIN]]#0, %[[C0]] : index
-//   CHECK-DAG:    %[[LANE_COND:.+]] = arith.cmpi eq, %[[DELIN]]#2, %[[C0]] : index
+//   CHECK-DAG:    %[[LANE_COND:.+]] = arith.cmpi eq, %[[DELIN]]#3, %[[C0]] : index
 //       CHECK:    %[[COND:.+]] = arith.andi %[[SUBGROUP_COND]], %[[LANE_COND]]
 //       CHECK:    scf.if %[[COND]] {
 //       CHECK:        vector.transfer_write
@@ -1499,7 +1494,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: @lanes_fully_distributed
 //   CHECK-DAG:    %[[TID:.+]] = gpu.thread_id
 //   CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
-//       CHECK:    %[[DELIN:.*]]:2 = affine.delinearize_index %[[TID:.+]] into (64)
+//       CHECK:    %[[DELIN:.*]]:2 = affine.delinearize_index %[[TID:.+]] into (256, 64)
 //       CHECK:    %[[COND:.+]] = arith.cmpi eq, %[[DELIN]]#0, %[[C0]] : index
 //       CHECK:    scf.if %[[COND]] {
 //       CHECK:        vector.transfer_write
@@ -1534,8 +1529,14 @@ builtin.module attributes { transform.with_named_sequence } {
 >
 
 // CHECK-LABEL: @threads_fully_distributed
-//       CHECK: gpu.thread_id
-//   CHECK-NOT: scf.if
+//       CHECK-DAG: %[[C0:.+]] = arith.constant 0
+//       CHECK: %[[TID:.+]] = gpu.thread_id
+//       CHECK: %[[DELIN:.+]]:2 = affine.delinearize_index %[[TID]] into (64, 64)
+//       CHECK: %[[COND:.+]] = arith.cmpi eq, %[[DELIN]]#0, %[[C0]]
+//       Note that cond is always true here, but this gets resolved after arith
+//       int optimizations.
+//       TODO: Add a folder to affine.delinearize_index to fold it to zero.
+//       CHECK: scf.if %[[COND]]
 //       CHECK: return
 func.func @threads_fully_distributed(%out: memref<100x100xf32, #amdgpu.address_space<fat_raw_buffer>>, %v: vector<64x64xf32>) {
   %w = iree_vector_ext.to_layout %v to layout(#layout_row_major) : vector<64x64xf32>
