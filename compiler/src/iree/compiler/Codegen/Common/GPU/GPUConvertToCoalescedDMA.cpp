@@ -142,17 +142,12 @@ computeThreadNumThreadsImpl(OpBuilder &builder, OpTy op,
       return {};
     }
   } else if constexpr (std::is_same_v<OpTy, IREE::LinalgExt::GatherOp>) {
-    // For gather: currently limiting to 1 element (32-bit) per thread.
-    // Get subgroup size from translation info.
-    auto funcOp = op->template getParentOfType<FunctionOpInterface>();
-    std::optional<int64_t> maybeSubgroupSize;
-    if (auto translationInfo = getTranslationInfo(funcOp)) {
-      maybeSubgroupSize = translationInfo.getSubgroupSize();
-    }
-    if (!maybeSubgroupSize) {
+    // For gather: use the size of the innermost dimension.
+    int64_t innermostDimSize = outputType.getDimSize(rank - 1);
+    if (innermostDimSize == ShapedType::kDynamic || innermostDimSize <= 0) {
       return {};
     }
-    innermostStep = *maybeSubgroupSize;
+    innermostStep = innermostDimSize;
   }
 
   // Compute number of threads:
