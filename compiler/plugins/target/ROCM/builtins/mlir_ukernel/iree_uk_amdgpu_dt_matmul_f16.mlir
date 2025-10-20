@@ -1,7 +1,7 @@
 //  RUN: iree-opt %s
 
 !acc_base_ty = tensor<1x1x2x4x8x4x4x16x4xf32>
-!lhs_base_ty = tensor<1x?x2x8x4x4x4x4xf16>
+!lhs_base_ty = tensor<1x?x2x8x4x16x4xf16>
 !lhs_expand_ty = tensor<1x?x4x2x8x4x4x2x2x4xf16>
 !rhs_base_ty = tensor<1x?x4x4x4x16x4xf16>
 !rhs_expand_ty = tensor<1x?x4x4x4x4x8x2x4xf16>
@@ -44,7 +44,7 @@ util.func @pingpong_dt_large_f16(%lhs_base: !lhs_base_ty, %rhs_base: !rhs_base_t
   %dim = tensor.dim %rhs_base, %c1 : !rhs_base_ty
   %nDim =  arith.divui %dim, %c4 : index
 
-  %lhs_expand = tensor.expand_shape %lhs_base [[0], [1, 2], [3], [4], [5], [6], [7, 8], [9]] output_shape [1, %nDim, 2, 2, 8, 4, 4, 2, 2, 4] : !lhs_base_ty into !lhs_expand_ty
+  %lhs_expand = tensor.expand_shape %lhs_base [[0], [1, 2], [3], [4], [5], [6, 7, 8], [9]] output_shape [1, %nDim, 2, 2, 8, 4, 4, 2, 2, 4] : !lhs_base_ty into !lhs_expand_ty
   %rhs_expand = tensor.expand_shape %rhs_base [[0], [1, 2], [3], [4], [5], [6, 7], [8]] output_shape [1, %nDim, 2, 4, 4, 4, 8, 2, 4] : !rhs_base_ty into !rhs_expand_ty
 
   %lhs = tensor.collapse_shape %lhs_expand [[0, 1], [2], [3, 4], [5, 6, 7], [8, 9]] : !lhs_expand_ty into !in_ty

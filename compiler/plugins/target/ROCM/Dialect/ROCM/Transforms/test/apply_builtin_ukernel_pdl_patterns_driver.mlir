@@ -362,7 +362,7 @@ module attributes {
 module attributes {
   hal.executable.target = #executable_target_rocm_hsaco_fb
 } {
-  func.func @inner_tiled_f8_large(%arg0: tensor<1x128x2x8x4x4x4x8xf8E4M3FNUZ>, %arg1: tensor<16x128x4x4x4x16x8xf8E4M3FNUZ>) -> tensor<1x16x2x4x8x4x4x16x4xf32> {
+  func.func @inner_tiled_f8_large(%arg0: tensor<1x128x2x8x4x16x8xf8E4M3FNUZ>, %arg1: tensor<16x128x4x4x4x16x8xf8E4M3FNUZ>) -> tensor<1x16x2x4x8x4x4x16x4xf32> {
     %cst = arith.constant 0.000000e+00 : f32
     %0 = tensor.empty() : tensor<1x16x2x4x8x4x4x16x4xf32>
     %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<1x16x2x4x8x4x4x16x4xf32>) -> tensor<1x16x2x4x8x4x4x16x4xf32>
@@ -370,7 +370,7 @@ module attributes {
           indexing_maps = [#map1, #map2, #map3],
           iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
           kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x32_F8E4M3FNUZ, intrinsics_m = 8, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 4>
-        } : tensor<1x128x2x8x4x4x4x8xf8E4M3FNUZ>, tensor<16x128x4x4x4x16x8xf8E4M3FNUZ> into tensor<1x16x2x4x8x4x4x16x4xf32>
+        } : tensor<1x128x2x8x4x16x8xf8E4M3FNUZ>, tensor<16x128x4x4x4x16x8xf8E4M3FNUZ> into tensor<1x16x2x4x8x4x4x16x4xf32>
     return %2 : tensor<1x16x2x4x8x4x4x16x4xf32>
   }
 }
@@ -396,7 +396,7 @@ module attributes {
 module attributes {
   hal.executable.target = #executable_target_rocm_hsaco_fb
 } {
-  func.func @inner_tiled_f8_medium(%arg0: tensor<1x64x8x4x4x4x2x8xf8E4M3FNUZ>, %arg1: tensor<4x64x8x2x4x16x2x8xf8E4M3FNUZ>) -> tensor<1x4x8x8x2x4x16x4xf32> {
+  func.func @inner_tiled_f8_medium(%arg0: tensor<1x64x8x4x16x2x8xf8E4M3FNUZ>, %arg1: tensor<4x64x8x2x4x16x2x8xf8E4M3FNUZ>) -> tensor<1x4x8x8x2x4x16x4xf32> {
     %cst = arith.constant 0.000000e+00 : f32
     %0 = tensor.empty() : tensor<1x4x8x8x2x4x16x4xf32>
     %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<1x4x8x8x2x4x16x4xf32>) -> tensor<1x4x8x8x2x4x16x4xf32>
@@ -404,7 +404,7 @@ module attributes {
           indexing_maps = [#map1, #map2, #map3],
           iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
           kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x32_F8E4M3FNUZ,  intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 8, intrinsics_k = 2>
-        } : tensor<1x64x8x4x4x4x2x8xf8E4M3FNUZ>, tensor<4x64x8x2x4x16x2x8xf8E4M3FNUZ> into tensor<1x4x8x8x2x4x16x4xf32>
+        } : tensor<1x64x8x4x16x2x8xf8E4M3FNUZ>, tensor<4x64x8x2x4x16x2x8xf8E4M3FNUZ> into tensor<1x4x8x8x2x4x16x4xf32>
     return %2 : tensor<1x4x8x8x2x4x16x4xf32>
   }
 }
@@ -430,7 +430,7 @@ module attributes {
 module attributes {
   hal.executable.target = #executable_target_rocm_hsaco_fb
 } {
-  func.func @inner_tiled_f16_large(%arg0: tensor<1x256x2x8x4x4x4x4xf16>, %arg1: tensor<501x256x4x4x4x16x4xf16>) -> tensor<1x501x2x4x8x4x4x16x4xf32> {
+  func.func @inner_tiled_f16_large(%arg0: tensor<1x256x2x8x4x16x4xf16>, %arg1: tensor<501x256x4x4x4x16x4xf16>) -> tensor<1x501x2x4x8x4x4x16x4xf32> {
     %cst = arith.constant 0.000000e+00 : f32
     %0 = tensor.empty() : tensor<1x501x2x4x8x4x4x16x4xf32>
     %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<1x501x2x4x8x4x4x16x4xf32>) -> tensor<1x501x2x4x8x4x4x16x4xf32>
@@ -438,7 +438,7 @@ module attributes {
           indexing_maps = [#map1, #map2, #map3],
           iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
           kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x16_F16, intrinsics_m = 8, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 4>
-        } : tensor<1x256x2x8x4x4x4x4xf16>, tensor<501x256x4x4x4x16x4xf16> into tensor<1x501x2x4x8x4x4x16x4xf32>
+        } : tensor<1x256x2x8x4x16x4xf16>, tensor<501x256x4x4x4x16x4xf16> into tensor<1x501x2x4x8x4x4x16x4xf32>
     return %2 : tensor<1x501x2x4x8x4x4x16x4xf32>
   }
 }
