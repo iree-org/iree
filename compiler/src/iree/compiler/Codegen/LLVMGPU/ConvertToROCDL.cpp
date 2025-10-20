@@ -349,7 +349,7 @@ struct ConvertToROCDLPass final
       populateFuncToLLVMFuncOpConversionPattern(converter, llvmPatterns);
       configureGpuToROCDLConversionLegality(target);
       populateMathToROCDLConversionPatterns(converter, llvmPatterns,
-                                            /* chipset= */ std::nullopt);
+                                            /*chipset=*/*maybeChipset);
       ub::populateUBToLLVMConversionPatterns(converter, llvmPatterns);
 
       if (failed(applyPartialConversion(m, target, std::move(llvmPatterns)))) {

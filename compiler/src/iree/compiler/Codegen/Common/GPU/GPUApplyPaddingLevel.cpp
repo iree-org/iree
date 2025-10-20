@@ -216,7 +216,7 @@ static LogicalResult applyPaddingLevel(RewriterBase &rewriter,
     tilingInterfaceOp.emitWarning("failed to pad op");
     return failure();
   }
-  const auto &padResult = maybePadResult.value();
+  const linalg::PadTilingInterfaceResult &padResult = maybePadResult.value();
   rewriter.replaceOp(tilingInterfaceOp, padResult.replacements);
   TilingInterface paddedOp = padResult.paddedOp;
   Location loc = paddedOp.getLoc();
