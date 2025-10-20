@@ -345,11 +345,16 @@ public:
           rocmDialect->getBuiltin(builtinName.str());
       if (!maybeBuiltin) {
         moduleOp.emitOpError()
-            << "could not find builtin with name " << builtinName.str();
+            << "could not find builtin module with name " << builtinName.str();
         return WalkResult::interrupt();
       }
-      OwningOpRef<ModuleOp> builtinModule =
-          parseSourceString<ModuleOp>(*maybeBuiltin, ctx);
+      OwningOpRef<ModuleOp> builtinModule = parseSourceString<ModuleOp>(
+          *maybeBuiltin, ctx, /*sourceName=*/builtinName.str());
+      if (!builtinModule) {
+        moduleOp.emitOpError()
+            << "failed to parse builtin module with name " << builtinName.str();
+        return WalkResult::interrupt();
+      }
       Operation *symbolTableOp =
           SymbolTable::getNearestSymbolTable(builtinModule.get());
       SymbolTable symbolTable(symbolTableOp);
