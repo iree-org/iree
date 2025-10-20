@@ -252,15 +252,6 @@ LogicalResult CoalescedGatherDMAOp::verify() {
     // Gather mode:
     auto indicesValues = getIndices();
 
-    for (auto [idx, indicesValue] : llvm::enumerate(indicesValues)) {
-      auto shapedType = dyn_cast<ShapedType>(indicesValue.getType());
-      if (!shapedType || !shapedType.getElementType().isIndex() ||
-          shapedType.getRank() != 1) {
-        return emitOpError("indices[")
-               << idx << "] must be a 1D vector or tensor of index type";
-      }
-    }
-
     if (failed(checkSourceType()))
       return failure();
 

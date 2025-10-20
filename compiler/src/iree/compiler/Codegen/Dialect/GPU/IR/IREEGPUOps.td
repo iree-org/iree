@@ -275,9 +275,7 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     * When the source is a memref, the operation writes the gathered data into
       a destination out memref operand.
 
-    The `indices` operand is optional. When `indices` is not present (copy mode),
-    each thread in the subgroup loads a contiguous slice of data from `source` and
-    writes it to its lane-offset in `result`/`init`. The `source` represents the
+    The `indices` operand is optional. The `source` represents the
     data loaded by this thread, while `result`/`init` is the collective output for
     all threads in the subgroup. Therefore, `source` and `result`/`init` may have
     different shapes (typically source is smaller, representing one thread's portion).
