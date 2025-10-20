@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "llvm/Support/Casting.h"
@@ -205,7 +206,11 @@ Operation *lowerGenericOpWithResolvedLayouts(
   MaterializeEncodingInfo outMaterializeEncodingInfo =
       getEncodingInfoFromLayout(
           cast<RankedTensorType>(outputOperand->get().getType()), layoutAttr);
-
+  if (IREE::Codegen::isIdentityLayout(outMaterializeEncodingInfo)) {
+    return dropEncodingAndCloneOp(builder, genericOp.getOperation(),
+                                  convertedInputOperands,
+                                  convertedOutputOperands);
+  }
   auto convertedResultType =
       cast<RankedTensorType>(convertedOutputOperands[0].getType());
   SmallVector<utils::IteratorType> iteratorTypes(convertedResultType.getRank(),
