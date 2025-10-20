@@ -540,12 +540,6 @@ struct DistributeTransferWrite final
     }
 
     Location loc = writeOp.getLoc();
-    auto delinearizedOp = affine::AffineDelinearizeIndexOp::create(
-        rewriter, loc, threadId, basis, /* has outer-bound */ false);
-    ResultRange delinearized = delinearizedOp.getResults();
-    assert(delinearized.size() == 2 * rank + 2 &&
-           "but has outer-bound is false");
-
     FailureOr<Value> doWrite =
         getNoOverlapCondition(rewriter, loc, vectorLayout);
     if (failed(doWrite)) {
