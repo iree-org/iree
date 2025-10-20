@@ -51,8 +51,8 @@ struct ReplaceZeroExtentOperands : public RewritePattern {
       Operation *owner = operand.getOwner();
       int operandNum = operand.getOperandNumber();
       auto shape = tensor::getMixedSizes(rewriter, loc, operand.get());
-      auto emptyTensorOp = rewriter.create<tensor::EmptyOp>(
-          loc, shape, operandType->getElementType());
+      auto emptyTensorOp = tensor::EmptyOp::create(
+          rewriter, loc, shape, operandType->getElementType());
       rewriter.modifyOpInPlace(
           owner, [&]() { owner->setOperand(operandNum, emptyTensorOp); });
       didUpdate = true;
@@ -64,7 +64,7 @@ struct ReplaceZeroExtentOperands : public RewritePattern {
 /// Forward the destination of a `tensor.insert_slice` to its uses
 /// if the source is zero-extent.
 struct FoldZeroExtentInserts : public OpRewritePattern<tensor::InsertSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::InsertSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
@@ -89,7 +89,7 @@ struct RemoveZeroExtentTensorsPass
 } // namespace
 
 void RemoveZeroExtentTensorsPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   MLIRContext *context = &getContext();
   SmallVector<Operation *> opWithZeroExtentTensorOperands;
   SmallVector<tensor::InsertSliceOp> insertSliceOps;

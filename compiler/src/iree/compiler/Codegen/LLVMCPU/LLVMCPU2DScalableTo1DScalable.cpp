@@ -81,8 +81,7 @@ class LLVMCPU2DScalableTo1DScalablePass
     : public impl::LLVMCPU2DScalableTo1DScalablePassBase<
           LLVMCPU2DScalableTo1DScalablePass> {
 public:
-  using impl::LLVMCPU2DScalableTo1DScalablePassBase<
-      LLVMCPU2DScalableTo1DScalablePass>::LLVMCPU2DScalableTo1DScalablePassBase;
+  using Base::Base;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<arith::ArithDialect, linalg::LinalgDialect, scf::SCFDialect>();

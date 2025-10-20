@@ -22,7 +22,7 @@ struct LLVMCPUEmitVectorizationRemarksPass
 } // namespace
 
 void LLVMCPUEmitVectorizationRemarksPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   bool dump = false;
   funcOp.walk([&](linalg::LinalgOp op) {
     op.emitWarning("op is not vectorized");

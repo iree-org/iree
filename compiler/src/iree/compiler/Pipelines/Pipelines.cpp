@@ -74,8 +74,8 @@ IREEVMPipelineHooks::operator IREE::HAL::PipelineHooks() const {
 
 void buildIREEPrecompileTransformPassPipeline(
     const IREE::HAL::TargetRegistry &targetRegistry,
-    BindingOptions bindingOptions, InputDialectOptions inputOptions,
-    PreprocessingOptions preprocessingOptions,
+    GlobalPipelineOptions pipelineOptions, BindingOptions bindingOptions,
+    InputDialectOptions inputOptions, PreprocessingOptions preprocessingOptions,
     GlobalOptimizationOptions globalOptimizationOptions,
     DispatchCreationOptions dispatchCreationOptions,
     SchedulingOptions schedulingOptions,
@@ -175,7 +175,37 @@ void buildIREEPrecompileTransformPassPipeline(
                                                   halAssignmentOptions);
 
   GlobalOptimization::TransformOptions globalTransformOptions;
-  globalTransformOptions.options = globalOptimizationOptions;
+  globalTransformOptions.parameterImportPaths =
+      globalOptimizationOptions.parameterImportPaths;
+  globalTransformOptions.parameterImportKeys =
+      globalOptimizationOptions.parameterImportKeys;
+  globalTransformOptions.parameterImportMaximumSize =
+      globalOptimizationOptions.parameterImportMaximumSize;
+  globalTransformOptions.parameterExportPath =
+      globalOptimizationOptions.parameterExportPath;
+  globalTransformOptions.parameterExportMinimumSize =
+      globalOptimizationOptions.parameterExportMinimumSize;
+  globalTransformOptions.parameterSplatExportFile =
+      globalOptimizationOptions.parameterSplatExportFile;
+  globalTransformOptions.aggressiveTransposePropagation =
+      globalOptimizationOptions.aggressiveTransposePropagation;
+  globalTransformOptions.outerDimConcat =
+      globalOptimizationOptions.outerDimConcat;
+  // The pipeline option has higher priority.
+  globalTransformOptions.dataTiling = globalOptimizationOptions.dataTiling;
+  if (pipelineOptions.dataTiling) {
+    globalTransformOptions.dataTiling = true;
+  }
+  globalTransformOptions.constEval = globalOptimizationOptions.constEval;
+  globalTransformOptions.numericPrecisionReduction =
+      globalOptimizationOptions.numericPrecisionReduction;
+  globalTransformOptions.stripAssertions =
+      globalOptimizationOptions.stripAssertions;
+  globalTransformOptions.generalizeMatmul =
+      globalOptimizationOptions.generalizeMatmul;
+  globalTransformOptions.constExprHoisting = pipelineOptions.constExprHoisting;
+  globalTransformOptions.constExprMaxSizeIncreaseThreshold =
+      pipelineOptions.constExprMaxSizeIncreaseThreshold;
 
   // Enable const-eval via hook. For debug builds, we assert if enabled
   // without a hook. For release, we just silently skip enabling const-eval.
@@ -245,8 +275,8 @@ void buildIREEPrecompileTransformPassPipeline(
 
 void buildIREEVMTransformPassPipeline(
     const IREE::HAL::TargetRegistry &targetRegistry,
-    BindingOptions bindingOptions, InputDialectOptions inputOptions,
-    PreprocessingOptions preprocessingOptions,
+    GlobalPipelineOptions pipelineOptions, BindingOptions bindingOptions,
+    InputDialectOptions inputOptions, PreprocessingOptions preprocessingOptions,
     GlobalOptimizationOptions globalOptimizationOptions,
     DispatchCreationOptions dispatchCreationOptions,
     SchedulingOptions schedulingOptions,
@@ -255,9 +285,10 @@ void buildIREEVMTransformPassPipeline(
     OpPassManager &passManager, IREEVMPipelinePhase compileFrom,
     IREEVMPipelinePhase compileTo) {
   buildIREEPrecompileTransformPassPipeline(
-      targetRegistry, bindingOptions, inputOptions, preprocessingOptions,
-      globalOptimizationOptions, dispatchCreationOptions, schedulingOptions,
-      halTargetOptions, hooks, passManager, compileFrom, compileTo);
+      targetRegistry, pipelineOptions, bindingOptions, inputOptions,
+      preprocessingOptions, globalOptimizationOptions, dispatchCreationOptions,
+      schedulingOptions, halTargetOptions, hooks, passManager, compileFrom,
+      compileTo);
 
   if (compileTo <= IREEVMPipelinePhase::GlobalOptimization)
     return; // early-exit
@@ -277,7 +308,30 @@ void buildIREEVMTransformPassPipeline(
     break;
   default:
     DispatchCreation::TransformOptions dispatchTransformOptions;
-    dispatchTransformOptions.options = dispatchCreationOptions;
+    dispatchTransformOptions.enableAggressiveFusion =
+        dispatchCreationOptions.enableAggressiveFusion;
+    dispatchTransformOptions.enableFuseMultiUse =
+        dispatchCreationOptions.enableFuseMultiUse;
+    // The pipeline option has higher priority.
+    dispatchTransformOptions.dataTiling = dispatchCreationOptions.dataTiling;
+    if (pipelineOptions.dataTiling) {
+      dispatchTransformOptions.dataTiling = false;
+    }
+    if (dispatchTransformOptions.dataTiling &&
+        globalOptimizationOptions.dataTiling) {
+#ifndef NDEBUG
+      llvm::reportFatalUsageError(
+          "Invalid configuration: data-tiling cannot be enabled in both "
+          "global optimization phase and dispatch creation phase.");
+#endif
+      dispatchTransformOptions.dataTiling = false;
+    }
+    dispatchTransformOptions.enableSplitReduction =
+        dispatchCreationOptions.enableSplitReduction;
+    dispatchTransformOptions.constExprMaxSizeIncreaseThreshold =
+        pipelineOptions.constExprMaxSizeIncreaseThreshold;
+    dispatchTransformOptions.constExprHoisting =
+        pipelineOptions.constExprHoisting;
     if (compileFrom < IREEVMPipelinePhase::DispatchCreation) { // late-entry
       IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "DispatchCreation");
       if (hooks.beforePhase)
@@ -385,7 +439,8 @@ void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager) {
   highLevelOptimizations.constEval = false;
 
   buildIREEVMTransformPassPipeline(
-      IREE::HAL::TargetRegistry::getGlobal(), BindingOptions::FromFlags::get(),
+      IREE::HAL::TargetRegistry::getGlobal(),
+      GlobalPipelineOptions::FromFlags::get(), BindingOptions::FromFlags::get(),
       InputDialectOptions::FromFlags::get(),
       PreprocessingOptions::FromFlags::get(), highLevelOptimizations,
       DispatchCreationOptions::FromFlags::get(),

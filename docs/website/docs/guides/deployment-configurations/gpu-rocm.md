@@ -159,7 +159,7 @@ Then run the following command to compile with the `rocm` target backend:
 # You need to specify a HIP target for your GPU. For this example we extract
 # the architecture name for the first device using rocm_agent_enumerator.
 # See the section below for more context and alternatives.
-IREE_HIP_TARGET=$(rocm_agent_enumerator | sed -n '2 p')  # e.g. gfx1100
+IREE_HIP_TARGET=$(rocm_agent_enumerator | sed -n '1 p')  # e.g. gfx1100
 
 iree-compile \
     --iree-hal-target-device=hip \
@@ -250,8 +250,7 @@ is the most general.
 
         ```bash
         rocm_agent_enumerator
-
-        # gfx000
+        # gfx1100
         # gfx1100
         # gfx1100
         ```

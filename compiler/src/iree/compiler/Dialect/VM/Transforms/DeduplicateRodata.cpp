@@ -25,7 +25,7 @@ class DeduplicateRodataPass
     : public IREE::VM::impl::DeduplicateRodataPassBase<DeduplicateRodataPass> {
   using RodataKey = std::tuple<StringRef, Attribute>;
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    IREE::VM::ModuleOp moduleOp = getOperation();
 
     // Gather all rodata ops with the same value.
     DenseMap<RodataKey, SmallVector<IREE::VM::RodataOp>> bucketedOps;

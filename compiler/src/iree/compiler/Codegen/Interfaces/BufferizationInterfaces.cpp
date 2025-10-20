@@ -144,8 +144,8 @@ struct DispatchTensorStoreOpInterface
               cast<MemRefType>(target.getType()), storeOp.getMixedOffsets(),
               storeOp.getMixedSizes(), storeOp.getMixedStrides()));
 
-      target = rewriter.create<memref::SubViewOp>(
-          storeOp->getLoc(), subviewMemRefType, target,
+      target = memref::SubViewOp::create(
+          rewriter, storeOp->getLoc(), subviewMemRefType, target,
           storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
           storeOp.getMixedStrides());
     } // else: Writing the entire tensor, no subview required.
@@ -172,36 +172,20 @@ struct LoadFromBufferOpInterface
           LoadFromBufferOpInterface, IREE::Codegen::LoadFromBufferOp> {
   bool isWritable(Operation *op, Value value,
                   const AnalysisState &state) const {
-    // Walk memref Value producers until a hal.interface.binding.subspan op is
-    // found, and check if the subspan is read only.
-    Operation *currentOp = op;
-    while (currentOp) {
-      if (auto subspanOp =
-              dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(currentOp)) {
-        std::optional<IREE::HAL::DescriptorFlags> descriptorFlags =
-            subspanOp.getDescriptorFlags();
-        return !descriptorFlags.has_value() ||
-               descriptorFlags.value() != IREE::HAL::DescriptorFlags::ReadOnly;
-      }
-      // There is expected to be only a single memref source for a given memref
-      // OpResult, because producers of memref Values are expected to be
-      // view-like or cast-like operations. If multiple operands have a memref
-      // type, then conservatively return not writable.
-      if (llvm::count_if(currentOp->getOperandTypes(),
-                         llvm::IsaPred<MemRefType>) != 1) {
-        return false;
-      }
-      // Otherwise, follow the memref operand to find the source buffer.
-      for (Value operand : currentOp->getOperands()) {
-        if (isa<MemRefType>(operand.getType())) {
-          currentOp = operand.getDefiningOp();
-          break;
-        }
-      }
-    }
-    // Conservatively default to not writable if the source of the buffer is
-    // not found.
-    return false;
+    // Search for a hal.interface.binding.subspan op that is the source of the
+    // buffer, and check if the subspan is read only.
+    auto loadFromBufferOp = cast<IREE::Codegen::LoadFromBufferOp>(op);
+    std::optional<IREE::HAL::InterfaceBindingSubspanOp> subspanOp =
+        getSourceSubspanMemref(
+            cast<TypedValue<MemRefType>>(loadFromBufferOp.getBuffer()));
+    // Conservatively return false if the subspan is not found.
+    if (!subspanOp)
+      return false;
+    std::optional<IREE::HAL::DescriptorFlags> descriptorFlags =
+        subspanOp->getDescriptorFlags();
+    return !descriptorFlags.has_value() ||
+           !bitEnumContainsAll(*descriptorFlags,
+                               IREE::HAL::DescriptorFlags::ReadOnly);
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
@@ -390,9 +374,9 @@ static LogicalResult bufferizePackOp(RewriterBase &rewriter, linalg::PackOp op,
 
   // Set insertion point now that potential alloc/dealloc are introduced.
   rewriter.setInsertionPoint(op);
-  rewriter.create<IREE::LinalgExt::PackOp>(
-      op.getLoc(), source, dest, op.getInnerDimsPos(), op.getMixedTiles(),
-      op.getPaddingValue(), op.getOuterDimsPerm());
+  IREE::LinalgExt::PackOp::create(rewriter, op.getLoc(), source, dest,
+                                  op.getInnerDimsPos(), op.getMixedTiles(),
+                                  op.getPaddingValue(), op.getOuterDimsPerm());
 
   // Replace the results of the old op with the new output buffers.
   bufferization::replaceOpWithBufferizedValues(rewriter, op, dest);
@@ -416,9 +400,9 @@ static LogicalResult bufferizeUnPackOp(RewriterBase &rewriter,
 
   // Set insertion point now that potential alloc/dealloc are introduced.
   rewriter.setInsertionPoint(op);
-  rewriter.create<IREE::LinalgExt::UnPackOp>(
-      op.getLoc(), source, dest, op.getInnerDimsPos(), op.getMixedTiles(),
-      op.getOuterDimsPerm());
+  IREE::LinalgExt::UnPackOp::create(rewriter, op.getLoc(), source, dest,
+                                    op.getInnerDimsPos(), op.getMixedTiles(),
+                                    op.getOuterDimsPerm());
 
   // Replace the results of the old op with the new output buffers.
   bufferization::replaceOpWithBufferizedValues(rewriter, op, dest);
@@ -557,8 +541,9 @@ struct DispatchTensorStoreOpSubsetInsertionInterface
   Value buildSubsetExtraction(Operation *op, OpBuilder &builder,
                               Location loc) const {
     auto storeOp = cast<IREE::TensorExt::DispatchTensorStoreOp>(op);
-    auto loadOp = builder.create<IREE::TensorExt::DispatchTensorLoadOp>(
-        loc, llvm::cast<RankedTensorType>(storeOp.getValue().getType()),
+    auto loadOp = IREE::TensorExt::DispatchTensorLoadOp::create(
+        builder, loc,
+        llvm::cast<RankedTensorType>(storeOp.getValue().getType()),
         storeOp.getTarget(), storeOp.getTargetDims(), storeOp.getMixedOffsets(),
         storeOp.getMixedSizes(), storeOp.getMixedStrides());
     return loadOp.getResult();
@@ -650,8 +635,8 @@ struct StoreToBufferOpSubsetInsertionInterface
   Value buildSubsetExtraction(Operation *op, OpBuilder &builder,
                               Location loc) const {
     auto storeOp = cast<IREE::Codegen::StoreToBufferOp>(op);
-    auto loadOp = builder.create<IREE::Codegen::LoadFromBufferOp>(
-        loc, storeOp.getTensor().getType(), storeOp.getBuffer());
+    auto loadOp = IREE::Codegen::LoadFromBufferOp::create(
+        builder, loc, storeOp.getTensor().getType(), storeOp.getBuffer());
     return loadOp.getResult();
   }
 

@@ -56,6 +56,7 @@ struct WgpDetails {
   std::optional<int32_t> maxLoadInstructionBits;
   std::optional<int32_t> simdsPerWgp;
   std::optional<int32_t> vgprSpaceBits;
+  std::optional<ArrayRef<int64_t>> dmaSizes;
 };
 
 // Chip level feature/limit details
@@ -102,8 +103,6 @@ const SubgroupOps allSubgroupOps =
 
 const DotProductOps allDotProductOps = DotProductOps::DP4xI8ToI32;
 
-#define ARRAY_SIZE(array) (sizeof(array) / sizeof(array[0]))
-
 // Creates the corresponding TargetAttr from the given target |details|.
 TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
                             StringRef features, MLIRContext *context) {
@@ -133,6 +132,11 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
     subgroupSizes.push_back(wgp->subgroupSizeChoices.back());
   }
 
+  DenseI64ArrayAttr dmaSizesAttr;
+  if (wgp->dmaSizes.has_value()) {
+    dmaSizesAttr = DenseI64ArrayAttr::get(context, *wgp->dmaSizes);
+  }
+
   auto targetWgp = TargetWgpAttr::get(
       context, ComputeBitwidthsAttr::get(context, details.wgp->compute),
       StorageBitwidthsAttr::get(context, wgp->storage),
@@ -145,7 +149,7 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
       wgp->maxThreadSize, wgp->maxWorkgroupMemoryBytes,
       DenseI32ArrayAttr::get(context, wgp->maxWorkgroupCounts),
       wgp->maxLoadInstructionBits, wgp->simdsPerWgp, wgp->vgprSpaceBits,
-      DictionaryAttr{});
+      dmaSizesAttr, DictionaryAttr{});
 
   TargetChipAttr targetChip;
   if (details.chip) {
@@ -228,23 +232,26 @@ const WgpDetails *getCDNA4WgpDetails() {
       ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32,
       ScaledMMAIntrinsic::MFMA_SCALE_F32_32x32x64_B32,
   };
-  static const WgpDetails cdna4Wgp = {allComputeBits,
-                                      allStorageBits,
-                                      allSubgroupOps,
-                                      allDotProductOps,
-                                      ARRAY_SIZE(cdna4MMAOps),
-                                      cdna4MMAOps,
-                                      ARRAY_SIZE(cdna4ScaledMMAOps),
-                                      cdna4ScaledMMAOps,
-                                      {64, 64},
-                                      {1024, 1024, 1024},
-                                      1024,
-                                      // Note: upgraded from CDNA3
-                                      160 * 1024,
-                                      {0x7fffffff, 0x7fffffff, 0x7fffffff},
-                                      /*maxLoadInstructionBits=*/128,
-                                      /*simdsPerWgp=*/4,
-                                      /*vgprSpaceBits=*/512 * 32};
+  static const int64_t cdna4DMASizes[] = {32, 128};
+  static const WgpDetails cdna4Wgp = {
+      allComputeBits,
+      allStorageBits,
+      allSubgroupOps,
+      allDotProductOps,
+      std::size(cdna4MMAOps),
+      cdna4MMAOps,
+      std::size(cdna4ScaledMMAOps),
+      cdna4ScaledMMAOps,
+      {64, 64},
+      {1024, 1024, 1024},
+      1024,
+      // Note: upgraded from CDNA3
+      160 * 1024,
+      {0x7fffffff, 0x7fffffff, 0x7fffffff},
+      /*maxLoadInstructionBits=*/128,
+      /*simdsPerWgp=*/4,
+      /*vgprSpaceBits=*/512 * 32,
+      /*dmaSizes=*/ArrayRef<int64_t>(cdna4DMASizes)};
   return &cdna4Wgp;
 }
 
@@ -271,22 +278,25 @@ const WgpDetails *getCDNA3WgpDetails() {
       MMAIntrinsic::MFMA_F32_16x16x16_F16,
       MMAIntrinsic::MFMA_F32_32x32x8_F16,
   };
-  static const WgpDetails cdna3Wgp = {allComputeBits,
-                                      allStorageBits,
-                                      allSubgroupOps,
-                                      allDotProductOps,
-                                      ARRAY_SIZE(cdna3MMAOps),
-                                      cdna3MMAOps,
-                                      0,
-                                      nullptr,
-                                      {64, 64},
-                                      {1024, 1024, 1024},
-                                      1024,
-                                      64 * 1024,
-                                      {0x7fffffff, 0x7fffffff, 0x7fffffff},
-                                      /*maxLoadInstructionBits=*/128,
-                                      /*simdsPerWgp=*/4,
-                                      /*vgprSpaceBits=*/512 * 32};
+  static const int64_t cdna3DMASizes[] = {32};
+  static const WgpDetails cdna3Wgp = {
+      allComputeBits,
+      allStorageBits,
+      allSubgroupOps,
+      allDotProductOps,
+      std::size(cdna3MMAOps),
+      cdna3MMAOps,
+      0,
+      nullptr,
+      {64, 64},
+      {1024, 1024, 1024},
+      1024,
+      64 * 1024,
+      {0x7fffffff, 0x7fffffff, 0x7fffffff},
+      /*maxLoadInstructionBits=*/128,
+      /*simdsPerWgp=*/4,
+      /*vgprSpaceBits=*/512 * 32,
+      /*dmaSizes=*/ArrayRef<int64_t>(cdna3DMASizes)};
   return &cdna3Wgp;
 }
 
@@ -307,7 +317,7 @@ const WgpDetails *getCDNA2WgpDetails() {
                                       allStorageBits,
                                       allSubgroupOps,
                                       allDotProductOps,
-                                      ARRAY_SIZE(cdna2MMAOps),
+                                      std::size(cdna2MMAOps),
                                       cdna2MMAOps,
                                       0,
                                       nullptr,
@@ -332,7 +342,7 @@ const WgpDetails *getCDNA1WgpDetails() {
                                       allStorageBits,
                                       allSubgroupOps,
                                       allDotProductOps,
-                                      ARRAY_SIZE(cdna1MMAOps),
+                                      std::size(cdna1MMAOps),
                                       cdna1MMAOps,
                                       0,
                                       nullptr,
@@ -364,7 +374,7 @@ const WgpDetails *getRDNA4WgpDetails() {
                                       allStorageBits,
                                       allSubgroupOps,
                                       allDotProductOps,
-                                      ARRAY_SIZE(rdna4MMAOps),
+                                      std::size(rdna4MMAOps),
                                       rdna4MMAOps,
                                       0,
                                       nullptr,
@@ -392,7 +402,7 @@ const WgpDetails *getRDNA3WgpDetails() {
                                       allStorageBits,
                                       allSubgroupOps,
                                       allDotProductOps,
-                                      ARRAY_SIZE(rdna3MMAOps),
+                                      std::size(rdna3MMAOps),
                                       rdna3MMAOps,
                                       0,
                                       nullptr,
@@ -441,6 +451,27 @@ const WgpDetails *getRDNA1WgpDetails() {
   return &rdna1Wgp;
 }
 
+// Experimental gfx1250 WGP details. This uses placeholder values from RDNA4.
+const WgpDetails *getGfx1250WgpDetails() {
+  static const WgpDetails gfx1250Wgp = {allComputeBits,
+                                        allStorageBits,
+                                        allSubgroupOps,
+                                        DotProductOps::None,
+                                        /*mmaCount=*/0,
+                                        /*mmaOps=*/nullptr,
+                                        /*scaledMmaCount=*/0,
+                                        /*scaledMmaOps=*/nullptr,
+                                        {32, 32},
+                                        {1024, 1024, 1024},
+                                        1024,
+                                        64 * 1024,
+                                        {0x7fffffff, 0x7fffffff, 0x7fffffff},
+                                        /*maxLoadInstructionBits=*/128,
+                                        /*simdsPerWgp=*/4,
+                                        /*vgprSpaceBits=*/256 * 32};
+  return &gfx1250Wgp;
+}
+
 std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   const WgpDetails *cdna4Wgp = getCDNA4WgpDetails();
   const WgpDetails *cdna3Wgp = getCDNA3WgpDetails();
@@ -450,6 +481,7 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   const WgpDetails *rdna3Wgp = getRDNA3WgpDetails();
   const WgpDetails *rdna2Wgp = getRDNA2WgpDetails();
   const WgpDetails *rdna1Wgp = getRDNA1WgpDetails();
+  const WgpDetails *gfx1250Wgp = getGfx1250WgpDetails(); // Experimental.
 
   // --- CDNA --- //
   // "AMD Instinct MI350 Series Product Offerings" in Page 18 of
@@ -603,18 +635,18 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   return llvm::StringSwitch<std::optional<TargetDetails>>(target.lower())
       .Case("mi355x", TargetDetails{cdna4Wgp, &mi355xChip})
       .Case("mi350x", TargetDetails{cdna4Wgp, &mi350xChip})
-      .Cases("cdna4", "gfx950", TargetDetails{cdna4Wgp, nullptr})
+      .Cases({"cdna4", "gfx950"}, TargetDetails{cdna4Wgp, nullptr})
       .Case("mi325x", TargetDetails{cdna3Wgp, &mi325xChip})
       .Case("mi300x", TargetDetails{cdna3Wgp, &mi300xChip})
       .Case("mi300a", TargetDetails{cdna3Wgp, &mi300aChip})
       .Case("mi308x", TargetDetails{cdna3Wgp, &mi308xChip})
-      .Cases("cdna3", "gfx942", TargetDetails{cdna3Wgp, nullptr})
+      .Cases({"cdna3", "gfx942"}, TargetDetails{cdna3Wgp, nullptr})
       .Case("mi250x", TargetDetails{cdna2Wgp, &mi250xChip})
       .Case("mi250", TargetDetails{cdna2Wgp, &mi250Chip})
       .Case("mi210", TargetDetails{cdna2Wgp, &mi210Chip})
-      .Cases("cdna2", "gfx90a", TargetDetails{cdna2Wgp, nullptr})
+      .Cases({"cdna2", "gfx90a"}, TargetDetails{cdna2Wgp, nullptr})
       .Case("mi100", TargetDetails{cdna1Wgp, &mi100Chip})
-      .Cases("cdna1", "gfx908", TargetDetails{cdna1Wgp, nullptr})
+      .Cases({"cdna1", "gfx908"}, TargetDetails{cdna1Wgp, nullptr})
       // https://www.techpowerup.com/gpu-specs/radeon-rx-9070-xt.c4229
       .Case("rx9070xt", TargetDetails{rdna4Wgp, &rx9070xtChip})
       // https://www.techpowerup.com/gpu-specs/radeon-rx-9070.c4250
@@ -639,34 +671,34 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
       .Case("w7800", TargetDetails{rdna3Wgp, &w7800Chip})
       // https://www.techpowerup.com/gpu-specs/radeon-pro-w7700.c4184
       .Case("w7700", TargetDetails{rdna3Wgp, &w7700Chip})
-      .Cases("rdna4", "gfx1200", "gfx1201", TargetDetails{rdna4Wgp, nullptr})
-      .Cases("rdna3", "gfx1100", "gfx1101", "gfx1102", "gfx1103", "gfx1150",
-             "gfx1151", TargetDetails{rdna3Wgp, nullptr})
-      .Cases("rdna2", "gfx1030", "gfx1031", "gfx1032", "gfx1033", "gfx1034",
-             "gfx1035", "gfx1036", TargetDetails{rdna2Wgp, nullptr})
-      .Cases("rdna1", "gfx1010", "gfx1011", "gfx1012", "gfx1013",
+      .Cases({"rdna4", "gfx1200", "gfx1201"}, TargetDetails{rdna4Wgp, nullptr})
+      .Cases({"rdna3", "gfx1100", "gfx1101", "gfx1102", "gfx1103", "gfx1150",
+              "gfx1151"},
+             TargetDetails{rdna3Wgp, nullptr})
+      .Cases({"rdna2", "gfx1030", "gfx1031", "gfx1032", "gfx1033", "gfx1034",
+              "gfx1035", "gfx1036"},
+             TargetDetails{rdna2Wgp, nullptr})
+      .Cases({"rdna1", "gfx1010", "gfx1011", "gfx1012", "gfx1013"},
              TargetDetails{rdna1Wgp, nullptr})
+      .Case("gfx1250", TargetDetails{gfx1250Wgp, nullptr})
       .Default(std::nullopt);
 }
 
 StringRef normalizeAMDGPUTarget(StringRef target) {
-  if (target.starts_with("gfx"))
-    return target;
-
-  // We cannot accept rdnaN as a target for LLVM AMDGPU backend; so the
-  // following is only meant for Vulkan but not HIP.
-  if (target.starts_with("rdna"))
-    return target;
-
   return llvm::StringSwitch<StringRef>(target.lower())
-      .Cases("mi350x", "mi355x", "gfx950")
-      .Cases("mi300a", "mi300x", "mi308x", "mi325x", "gfx942")
-      .Cases("mi250x", "mi250", "mi210", "cdna2", "gfx90a")
-      .Cases("mi100", "cdna1", "gfx908")
-      .Cases("rx9070xt", "rx9070", "r9700", "gfx1201")
-      .Case("rx9060xt", "gfx1200")
-      .Cases("rx7900xtx", "rx7900xt", "w7900", "w7800", "gfx1100")
-      .Cases("rx7800xt", "rx7700xt", "v710", "w7700", "gfx1101")
+      .Cases({"mi350x", "mi355x", "gfx950"}, /*Value=*/"gfx950")
+      .Cases({"mi300a", "mi300x", "mi308x", "mi325x", "gfx942"},
+             /*Value=*/"gfx942")
+      .Cases({"mi250x", "mi250", "mi210", "cdna2", "gfx90a"},
+             /*Value=*/"gfx90a")
+      .Cases({"mi100", "cdna1", "gfx908"}, /*Value=*/"gfx908")
+      .Cases({"rx9070xt", "rx9070", "r9700", "gfx1201"}, /*Value=*/"gfx1201")
+      .Cases({"rx9060xt", "gfx1200"}, /*Value=*/"gfx1200")
+      .Cases({"rx7900xtx", "rx7900xt", "w7900", "w7800", "gfx1100"},
+             /*Value=*/"gfx1100")
+      .Cases({"rx7800xt", "rx7700xt", "v710", "w7700", "gfx1101"},
+             /*Value=*/"gfx1101")
+      .Case("gfx1250", /*Value=*/"gfx1250")
       .Default("");
 }
 
@@ -701,15 +733,21 @@ const WgpDetails *getValhallWgpDetails() {
   ComputeBitwidths computeBitwdiths =
       ComputeBitwidths::Int32 | ComputeBitwidths::Int16 |
       ComputeBitwidths::Int8 | ComputeBitwidths::FP32 | ComputeBitwidths::FP16;
-  // clang-format off
   static const WgpDetails valhallWgp = {
-      computeBitwdiths,   allStorageBits,     allSubgroupOps,  allDotProductOps,
-      /*mmaCount=*/0,     /*mmaOps=*/nullptr, /*scaledMmaCount=*/0,
-      /*scaledMmaOps=*/nullptr,               {16, 16},        {512, 512, 512},
-      512,                32 * 1024,
-      // Note: These values have not been checked and may be higher
+      computeBitwdiths,
+      allStorageBits,
+      allSubgroupOps,
+      allDotProductOps,
+      /*mmaCount=*/0,
+      /*mmaOps=*/nullptr,
+      /*scaledMmaCount=*/0,
+      /*scaledMmaOps=*/nullptr,
+      {16, 16},
+      {512, 512, 512},
+      512,
+      32 * 1024,
+      // Note: These values have not been checked and may be higher.
       {0xffff, 0xffff, 0xffff}};
-  // clang-format on
   return &valhallWgp;
 }
 
@@ -722,15 +760,15 @@ std::optional<TargetDetails> getARMGPUTargetDetails(StringRef target) {
 
   return llvm::StringSwitch<std::optional<TargetDetails>>(target.lower())
       // Mali-G715: https://vulkan.gpuinfo.org/displayreport.php?id=29754
-      .Cases("mali-g715", "mali-g615", "valhall4",
+      .Cases({"mali-g715", "mali-g615", "valhall4"},
              TargetDetails{valhallWgp, nullptr})
       // Mali-G710: https://vulkan.gpuinfo.org/displayreport.php?id=30471
-      .Cases("mali-g710", "mali-g510", "mali-g310", "valhall3",
+      .Cases({"mali-g710", "mali-g510", "mali-g310", "valhall3"},
              TargetDetails{valhallWgp, nullptr})
       // Mali-G78: https://vulkan.gpuinfo.org/displayreport.php?id=29994
-      .Cases("mali-g78", "valhall2", TargetDetails{valhallWgp, nullptr})
+      .Cases({"mali-g78", "valhall2"}, TargetDetails{valhallWgp, nullptr})
       // Mali-G57: https://vulkan.gpuinfo.org/displayreport.php?id=24636
-      .Cases("mali-g77", "mali-g57", "valhall1", "valhall",
+      .Cases({"mali-g77", "mali-g57", "valhall1", "valhall"},
              TargetDetails{valhallWgp, nullptr})
       .Default(std::nullopt);
 }
@@ -742,10 +780,10 @@ StringRef normalizeARMGPUTarget(StringRef target) {
     return target;
 
   return llvm::StringSwitch<StringRef>(target.lower())
-      .Cases("mali-g715", "mali-g615", "valhall4")
-      .Cases("mali-g710", "mali-g510", "mali-g310", "valhall3")
+      .Cases({"mali-g715", "mali-g615"}, "valhall4")
+      .Cases({"mali-g710", "mali-g510", "mali-g310"}, "valhall3")
       .Case("mali-78", "valhall2")
-      .Cases("mali-g77", "mali-g57", "valhall1")
+      .Cases({"mali-g77", "mali-g57"}, "valhall1")
       .Default("");
 }
 
@@ -768,7 +806,7 @@ const WgpDetails *getAmpereWgpDetails() {
                                        allStorageBits,
                                        allSubgroupOps,
                                        allDotProductOps,
-                                       ARRAY_SIZE(mmaOps),
+                                       std::size(mmaOps),
                                        mmaOps,
                                        0,
                                        nullptr,
@@ -789,7 +827,7 @@ const WgpDetails *getTuringWgpDetails() {
                                        allStorageBits,
                                        allSubgroupOps,
                                        allDotProductOps,
-                                       ARRAY_SIZE(mmaOps),
+                                       std::size(mmaOps),
                                        mmaOps,
                                        0,
                                        nullptr,
@@ -806,14 +844,19 @@ const WgpDetails *getVoltaWgpDetails() {
       MMAIntrinsic::NV_WMMA_F32_16x16x16_F16,
       MMAIntrinsic::NV_WMMA_F16_16x16x16_F16,
   };
-  // clang-format off
-  static const WgpDetails voltaWgp = {
-      allComputeBits,       allStorageBits,     allSubgroupOps,
-      DotProductOps::None,  ARRAY_SIZE(mmaOps), mmaOps,
-      0,                    nullptr,            {32, 32},
-      {1024, 1024, 1024},   1024,               96 * 1024,
-      {0x7fffffff, 0xffff, 0xffff}};
-  // clang-format on
+  static const WgpDetails voltaWgp = {allComputeBits,
+                                      allStorageBits,
+                                      allSubgroupOps,
+                                      DotProductOps::None,
+                                      std::size(mmaOps),
+                                      mmaOps,
+                                      0,
+                                      nullptr,
+                                      {32, 32},
+                                      {1024, 1024, 1024},
+                                      1024,
+                                      96 * 1024,
+                                      {0x7fffffff, 0xffff, 0xffff}};
   return &voltaWgp;
 }
 
@@ -861,11 +904,11 @@ std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
       .Case("rtx3070ti", TargetDetails{ampereWgp, &rtx3070tiChip})
       // https://www.techpowerup.com/gpu-specs/geforce-rtx-3070.c3674
       .Case("rtx3070", TargetDetails{ampereWgp, &rtx3070Chip})
-      .Cases("ampere", "sm_80", "sm_86", "sm_87",
+      .Cases({"ampere", "sm_80", "sm_86", "sm_87"},
              TargetDetails{ampereWgp, nullptr})
-      .Cases("turing", "sm_75", TargetDetails{turingWgp, nullptr})
-      .Cases("volta", "sm_70", "sm_72", TargetDetails{voltaWgp, nullptr})
-      .Cases("pascal", "sm_60", "sm_61", "sm_62",
+      .Cases({"turing", "sm_75"}, TargetDetails{turingWgp, nullptr})
+      .Cases({"volta", "sm_70", "sm_72"}, TargetDetails{voltaWgp, nullptr})
+      .Cases({"pascal", "sm_60", "sm_61", "sm_62"},
              TargetDetails{pascalWgp, nullptr})
       .Default(std::nullopt);
 }
@@ -883,10 +926,10 @@ StringRef normalizeNVIDIAGPUTarget(StringRef target) {
 
   return llvm::StringSwitch<StringRef>(target.lower())
       .Case("a100", "sm_80")
-      .Case("ampere", "sm_80") // Or sm_86/87; use smaller version
+      .Case("ampere", "sm_80") // Or sm_86/87; use smaller version.
       .Case("turing", "sm_75")
-      .Case("volta", "sm_70")  // Or sm_72; use smaller version
-      .Case("pascal", "sm_60") // Or sm_61/62; use smaller version
+      .Case("volta", "sm_70")  // Or sm_72; use smaller version.
+      .Case("pascal", "sm_60") // Or sm_61/62; use smaller version.
       .Default("");
 }
 
@@ -900,16 +943,21 @@ const WgpDetails *getAdrenoWgpDetails() {
                           ComputeBitwidths::FP16;
   auto storageBitwidths =
       StorageBitwidths::B64 | StorageBitwidths::B32 | StorageBitwidths::B16;
-  // clang-format off
   static const WgpDetails adrenoWgp = {
-      computeBitwdiths,   storageBitwidths,   allSubgroupOps,
-      allDotProductOps,   /*mmaCount=*/0,     /*mmaOps=*/nullptr,
-      /*scaledMmaCount=*/0,                   /*scaledMmaOps=*/nullptr,
-      {64, 64},           {1024, 1024, 1024}, 1024,
+      computeBitwdiths,
+      storageBitwidths,
+      allSubgroupOps,
+      allDotProductOps,
+      /*mmaCount=*/0,
+      /*mmaOps=*/nullptr,
+      /*scaledMmaCount=*/0,
+      /*scaledMmaOps=*/nullptr,
+      {64, 64},
+      {1024, 1024, 1024},
+      1024,
       32 * 1024,
       // Note: These values have not been checked and may be higher
       {0xffff, 0xffff, 0xffff}};
-  // clang-format on
   return &adrenoWgp;
 }
 
@@ -967,17 +1015,21 @@ const WgpDetails *getAndroidBaseline2022WgpDetails() {
   // FIXME: We cannot have a fixed subgroup size to target a profile; need to
   // have different targets for different subgroup sizes, or change CodeGen to
   // use symbolic subgroup size values, which can be hard for reduction.
-  // It's kinda fine now given we don't allow any subgroup ops anyway here..
+  // It's kinda fine now given we don't allow any subgroup ops anyway here.
 
-  // clang-format off
-  static const WgpDetails androidWgp = {
-      computeBitwdiths,    storageBitwidths,   SubgroupOps::None,
-      DotProductOps::None, /*mmaCount=*/0,     /*mmaOps=*/nullptr,
-      /*scaledMmaCount=*/0,                    /*scaledMmaOps=*/nullptr,
-      {64, 64},            {128, 128, 64},     128,
-      16 * 1024,
-      {0xffff, 0xffff, 0xffff}};
-  // clang-format on
+  static const WgpDetails androidWgp = {computeBitwdiths,
+                                        storageBitwidths,
+                                        SubgroupOps::None,
+                                        DotProductOps::None,
+                                        /*mmaCount=*/0,
+                                        /*mmaOps=*/nullptr,
+                                        /*scaledMmaCount=*/0,
+                                        /*scaledMmaOps=*/nullptr,
+                                        {64, 64},
+                                        {128, 128, 64},
+                                        128,
+                                        16 * 1024,
+                                        {0xffff, 0xffff, 0xffff}};
   return &androidWgp;
 }
 
@@ -997,7 +1049,8 @@ std::optional<TargetDetails> getAndroidProfileDetails(StringRef target) {
 
 std::optional<L1CacheInfo> getL1CacheInfo(TargetAttr target) {
   // TODO(kuhar): Add L1 cache query for other HIP targets.
-  if (!target || !llvm::is_contained({"gfx90a", "gfx942"}, target.getArch())) {
+  if (!target ||
+      !llvm::is_contained({"gfx90a", "gfx942", "gfx950"}, target.getArch())) {
     return std::nullopt;
   }
   return L1CacheInfo{/*cacheLineBytes=*/128, /*cacheSets=*/4};
@@ -1051,6 +1104,14 @@ StringRef normalizeHIPTarget(StringRef target) {
   return normalizeAMDGPUTarget(target);
 }
 
+StringRef normalizeVulkanAMDGPUTarget(StringRef target) {
+  // We cannot accept rdnaN as a target for LLVM AMDGPU backend; so the
+  // following is only meant for Vulkan but not HIP.
+  if (target.starts_with("rdna"))
+    return target;
+  return normalizeAMDGPUTarget(target);
+}
+
 TargetAttr getVulkanTargetDetails(llvm::StringRef target,
                                   MLIRContext *context) {
   // Go through each vendor's target details. This assumes we won't have
@@ -1060,7 +1121,7 @@ TargetAttr getVulkanTargetDetails(llvm::StringRef target,
   // TODO: Add feature bits for physical storage buffer.
 
   if (std::optional<TargetDetails> details = getAMDGPUTargetDetails(target)) {
-    return createTargetAttr(*details, normalizeAMDGPUTarget(target),
+    return createTargetAttr(*details, normalizeVulkanAMDGPUTarget(target),
                             /*features=*/"spirv:v1.6,cap:Shader", context);
   }
   if (std::optional<TargetDetails> details = getARMGPUTargetDetails(target)) {

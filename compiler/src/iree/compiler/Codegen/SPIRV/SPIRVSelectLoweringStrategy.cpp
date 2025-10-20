@@ -29,8 +29,7 @@ class SPIRVSelectLoweringStrategyPass final
     : public impl::SPIRVSelectLoweringStrategyPassBase<
           SPIRVSelectLoweringStrategyPass> {
 public:
-  using impl::SPIRVSelectLoweringStrategyPassBase<
-      SPIRVSelectLoweringStrategyPass>::SPIRVSelectLoweringStrategyPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Codegen::IREECodegenDialect,
@@ -88,7 +87,7 @@ verifyTranslationInfo(FunctionOpInterface funcOp,
 }
 
 void SPIRVSelectLoweringStrategyPass::runOnOperation() {
-  auto moduleOp = getOperation();
+  mlir::ModuleOp moduleOp = getOperation();
   for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
     if (failed(initSPIRVLaunchConfig(funcOp))) {
       funcOp.emitOpError("failed to set lowering configuration");

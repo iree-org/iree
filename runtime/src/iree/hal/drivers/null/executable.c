@@ -85,6 +85,55 @@ static void iree_hal_null_executable_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
+static iree_host_size_t iree_hal_null_executable_export_count(
+    iree_hal_executable_t* base_executable) {
+  iree_hal_null_executable_t* executable =
+      iree_hal_null_executable_cast(base_executable);
+  // TODO(null): return the total number of exports in the executable.
+  (void)executable;
+  return 0;
+}
+
+static iree_status_t iree_hal_null_executable_export_info(
+    iree_hal_executable_t* base_executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_export_info_t* out_info) {
+  iree_hal_null_executable_t* executable =
+      iree_hal_null_executable_cast(base_executable);
+  (void)executable;
+  // TODO(null): return export information.
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "reflection not implemented");
+}
+
+static iree_status_t iree_hal_null_executable_export_parameters(
+    iree_hal_executable_t* base_executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_host_size_t capacity,
+    iree_hal_executable_export_parameter_t* out_parameters) {
+  iree_hal_null_executable_t* executable =
+      iree_hal_null_executable_cast(base_executable);
+  (void)executable;
+  // TODO(null): return export parameter information.
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "parameter reflection not implemented");
+}
+
+static iree_status_t iree_hal_null_executable_lookup_export_by_name(
+    iree_hal_executable_t* base_executable, iree_string_view_t name,
+    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+  iree_hal_null_executable_t* executable =
+      iree_hal_null_executable_cast(base_executable);
+  (void)executable;
+  // TODO(null): lookup the export ordinal by name.
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "reflection not implemented");
+}
+
 static const iree_hal_executable_vtable_t iree_hal_null_executable_vtable = {
     .destroy = iree_hal_null_executable_destroy,
+    .export_count = iree_hal_null_executable_export_count,
+    .export_info = iree_hal_null_executable_export_info,
+    .export_parameters = iree_hal_null_executable_export_parameters,
+    .lookup_export_by_name = iree_hal_null_executable_lookup_export_by_name,
 };

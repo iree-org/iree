@@ -296,7 +296,8 @@ static iree_status_t iree_hal_task_device_create_command_buffer(
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
-  if (binding_capacity > 0) {
+  if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT) ||
+      binding_capacity > 0) {
     // TODO(indirect-cmd): natively support reusable task command buffers. For
     // now we emulate by recording into a deferred command buffer and
     // recording/issuing at submission time. The task system needs some

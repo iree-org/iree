@@ -38,7 +38,7 @@ util.func public @fold_add() -> (i32) {
 // -----
 
 util.func public @result_operand_count_mismatch(%arg0 : tensor<i32>, %arg1 : tensor<i32>) {
-  // expected-error@+1 {{must have same number of operands and results}}
+  // expected-error@+1 {{failed to verify that all of {operands, results} have same type}}
   %1 = "util.optimization_barrier"(%arg0, %arg1) : (tensor<i32>, tensor<i32>) -> tensor<i32>
   util.return
 }
@@ -46,7 +46,7 @@ util.func public @result_operand_count_mismatch(%arg0 : tensor<i32>, %arg1 : ten
 // -----
 
 util.func public @result_operand_type_mismatch(%arg0 : tensor<i32>, %arg1 : tensor<i32>) {
-  // expected-error@+1 {{must have same operand and result types, but they differ at index 1}}
+  // expected-error@+1 {{failed to verify that all of {operands, results} have same type}}
   %1:2 = "util.optimization_barrier"(%arg0, %arg1) : (tensor<i32>, tensor<i32>) -> (tensor<i32>, memref<i32>)
   util.return
 }

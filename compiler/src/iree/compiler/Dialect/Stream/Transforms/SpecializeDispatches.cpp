@@ -181,8 +181,8 @@ static void insertConstantTableLookup(mlir::FunctionOpInterface funcOp,
   SmallVector<Value> tableTensors;
   for (auto &set : constantTable.sets) {
     auto tableAttr = buildConstantSetAttr(set, builder);
-    auto tableTensor = builder.create<arith::ConstantOp>(
-        builder.getFusedLoc(set.locs.takeVector()), tableAttr);
+    auto tableTensor = arith::ConstantOp::create(
+        builder, builder.getFusedLoc(set.locs.takeVector()), tableAttr);
     tableTensors.push_back(tableTensor);
   }
 
@@ -195,17 +195,16 @@ static void insertConstantTableLookup(mlir::FunctionOpInterface funcOp,
       unsigned operandIdx = operandValues.value().first;
       unsigned argIdx = operandToArgMap[operandIdx];
       auto arg = entryBlock.getArgument(argIdx);
-      auto extractedValue = builder
-                                .create<tensor::ExtractOp>(
-                                    arg.getLoc(), tableTensor,
+      auto extractedValue =
+          tensor::ExtractOp::create(builder, arg.getLoc(), tableTensor,
                                     ValueRange{
                                         siteId,
                                         indexSet.get(operandValues.index()),
                                     })
-                                .getResult();
+              .getResult();
       if (extractedValue.getType() != arg.getType()) {
-        extractedValue = builder.create<arith::IndexCastOp>(
-            arg.getLoc(), arg.getType(), extractedValue);
+        extractedValue = arith::IndexCastOp::create(
+            builder, arg.getLoc(), arg.getType(), extractedValue);
       }
       arg.replaceAllUsesWith(extractedValue);
     }

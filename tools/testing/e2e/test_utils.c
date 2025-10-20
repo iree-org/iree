@@ -341,6 +341,9 @@ void iree_test_utils_write_element(iree_hal_element_type_t element_type,
     case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E4M3_FNUZ:
       *(uint8_t*)dst = iree_math_f32_to_f8e4m3fnuz((float)value);
       break;
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E8M0_FNU:
+      *(uint8_t*)dst = iree_math_f32_to_f8e8m0fnu((float)value);
+      break;
     WRITE_ELEMENT_CASE(FLOAT_32, float)
     WRITE_ELEMENT_CASE(FLOAT_64, double)
     // clang-format on
@@ -370,8 +373,11 @@ void iree_test_utils_get_min_max_for_element_type(
       *max = +2;
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_8:
+      // uint8 is special-cased as random bytes.  It's not used in practice for
+      // any other purpose. Random bytes are usefull to fill MX buffers where
+      // the element type is sub-byte and all representable values are small.
       *min = 0;
-      *max = +2;
+      *max = 255;
       break;
     case IREE_HAL_ELEMENT_TYPE_INT_16:
     case IREE_HAL_ELEMENT_TYPE_SINT_16:
@@ -410,6 +416,10 @@ void iree_test_utils_get_min_max_for_element_type(
     case IREE_HAL_ELEMENT_TYPE_UINT_64:
       *min = 0;
       *max = +16;
+      break;
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8_E8M0_FNU:
+      *min = 1;
+      *max = 8;
       break;
     default:
       IREE_ASSERT(false, "unhandled element type");

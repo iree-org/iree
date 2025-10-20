@@ -81,6 +81,19 @@ LogicalResult basisFromSizesStrides(ArrayRef<int64_t> sizes,
                                     SmallVectorImpl<int64_t> &basis,
                                     SmallVectorImpl<size_t> &dimToResult);
 
+/// Returns the coefficient for the dimension on `position` in the affine
+/// expression `expr`. If the dimension doesn't exist in the expression, `0` is
+/// returned. If the coefficient can't be calculated, for example in case of
+/// invalid expressions, `std::nullopt` is returned.
+/// Example:
+/// Expr: 5 * d0 + 2
+/// Position: 0
+/// Returns: 5
+std::optional<int64_t> getCoefficient(AffineExpr expr, unsigned position);
+
+/// Returns true if `a` is a function of `b` with coefficient equal to 1.
+bool isUnitFunctionOf(Value a, Value b);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_UTILS_INDEXING_H_

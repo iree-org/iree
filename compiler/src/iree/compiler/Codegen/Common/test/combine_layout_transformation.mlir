@@ -317,6 +317,9 @@ func.func @propagate_relayout_ops(%source : tensor<?x?x128x128xf32>,
 //       DISPATCH-SCOPE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_scatter %[[COMPUTE_OP]]
 //       DISPATCH-SCOPE:   iree_codegen.store_to_buffer %[[MAP_SCATTER]]
 
+// WORKGROUP-SCOPE-LABEL: @propagate_relayout_ops
+//       WORKGROUP-SCOPE: linalg.generic {{.*}} outs(%{{.*}} : tensor<?xf16>) {
+
 // -----
 
 func.func @insert_in_workgroup_forall(%2 : tensor<32xbf16>, %3 : tensor<32xbf16>, %9 : tensor<10xbf16>) -> (tensor<32xbf16>, tensor<32xbf16>) {

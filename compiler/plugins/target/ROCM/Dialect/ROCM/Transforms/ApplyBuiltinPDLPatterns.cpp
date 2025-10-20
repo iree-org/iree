@@ -16,8 +16,10 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Utils/ShapeUtils.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/Regex.h"
 #include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
@@ -61,7 +63,8 @@ static LogicalResult annotateOperation(PatternRewriter &rewriter,
     return rewriter.notifyMatchFailure(rootOp,
                                        "expected StringAttr for attr name.");
   }
-  rootOp->setAttr(strName.strref(), annotation);
+  rewriter.modifyOpInPlace(
+      rootOp, [&]() { rootOp->setAttr(strName.strref(), annotation); });
   return success();
 }
 
@@ -75,7 +78,6 @@ static LogicalResult matchContraction(PatternRewriter &rewriter,
     return rewriter.notifyMatchFailure(rootOp,
                                        "not a contraction like linalg op");
   }
-
   if (linalgOp.getIndexingMaps() != indexingMaps) {
     return rewriter.notifyMatchFailure(rootOp, "indexing maps mismatch");
   }
@@ -90,6 +92,22 @@ static LogicalResult matchContraction(PatternRewriter &rewriter,
   return success();
 }
 
+/// Helper to check whether the given value is cast-compatible with the given
+/// type.
+static LogicalResult matchCastCompatibleType(PatternRewriter &rewriter,
+                                             Value value, Type type) {
+  if (auto targetTensorType = dyn_cast<RankedTensorType>(type)) {
+    if (!isCastableToTensorType(value.getType(), targetTensorType)) {
+      return failure();
+    }
+    return success();
+  }
+  if (value.getType() != type) {
+    return failure();
+  }
+  return success();
+}
+
 /// PDL utility that checks whether the size of the dimension of the provided
 /// value is a multiple of the divisor.
 static LogicalResult dimIsMultipleOf(PatternRewriter &rewriter, Value value,
@@ -100,6 +118,9 @@ static LogicalResult dimIsMultipleOf(PatternRewriter &rewriter, Value value,
   }
   auto dimInt = dyn_cast<IntegerAttr>(dim);
   if (!dim) {
+    return failure();
+  }
+  if (dimInt.getInt() >= shapedType.getRank()) {
     return failure();
   }
   auto divisorInt = dyn_cast<IntegerAttr>(divisor);
@@ -138,6 +159,9 @@ static LogicalResult dimIsBound(PatternRewriter &rewriter, Value value,
   }
   auto dimInt = dyn_cast<IntegerAttr>(dim);
   if (!dimInt) {
+    return failure();
+  }
+  if (dimInt.getInt() >= shapedType.getRank()) {
     return failure();
   }
   if (auto lowerBoundInt = dyn_cast<IntegerAttr>(lowerBound)) {
@@ -188,6 +212,8 @@ populatePDLModuleFromBuiltin(MLIRContext *context, RewritePatternSet &patterns,
   pdlModule.registerConstraintFunction("hasAttr", hasAttr);
   pdlModule.registerConstraintFunction("dimIsBound", dimIsBound);
   pdlModule.registerConstraintFunction("dimIsMultipleOf", dimIsMultipleOf);
+  pdlModule.registerConstraintFunction("matchCastCompatibleType",
+                                       matchCastCompatibleType);
   pdlModule.registerConstraintFunction("matchContraction", matchContraction);
   pdlModule.registerRewriteFunction("annotateOperation", annotateOperation);
   patterns.insert(std::move(pdlModule));
@@ -196,6 +222,14 @@ populatePDLModuleFromBuiltin(MLIRContext *context, RewritePatternSet &patterns,
 
 namespace {
 
+SmallVector<StringRef> filterUkernelPatternsByTarget(ArrayRef<StringRef> names,
+                                                     StringRef target) {
+  std::string pattern =
+      "ukernel_patterns(_.*)*" + target.str() + "(_.*)*\\.mlir";
+  llvm::Regex regex(pattern);
+  return llvm::filter_to_vector(
+      names, [&regex](StringRef name) { return regex.match(name); });
+}
 class ApplyBuiltinPDLPatternsPass
     : public iree_compiler::IREE::ROCM::impl::ApplyBuiltinPDLPatternsPassBase<
           ApplyBuiltinPDLPatternsPass> {
@@ -225,17 +259,21 @@ public:
     }
     if (enableTensorUKernels) {
       for (std::string target : targets) {
-        std::string builtinName =
-            llvm::formatv("ukernel_patterns_{}.mlir", target);
-        std::optional<StringRef> maybeBuiltin =
-            rocmDialect->getBuiltin(builtinName);
-        if (!maybeBuiltin) {
-          // Skip when no patterns are present.
-          continue;
-        }
-        if (failed(populatePDLModuleFromBuiltin(context, tmpPatterns,
-                                                maybeBuiltin.value()))) {
-          return failure();
+        SmallVector<StringRef> allBuiltinNames = rocmDialect->getBuiltinNames();
+        SmallVector<StringRef> builtinNames =
+            filterUkernelPatternsByTarget(allBuiltinNames, target);
+        std::string builtinSrc;
+        for (StringRef builtinName : builtinNames) {
+          std::optional<StringRef> maybeBuiltin =
+              rocmDialect->getBuiltin(builtinName);
+          if (!maybeBuiltin) {
+            // Skip when no patterns are present.
+            continue;
+          }
+          if (failed(populatePDLModuleFromBuiltin(context, tmpPatterns,
+                                                  maybeBuiltin.value()))) {
+            return failure();
+          }
         }
       }
     }
@@ -292,6 +330,7 @@ public:
     MLIRContext *ctx = moduleOp.getContext();
     auto rocmDialect = ctx->getOrLoadDialect<IREE::ROCM::ROCMDialect>();
     SmallVector<FunctionOpInterface> ukernelFunctions;
+    llvm::SmallDenseSet<StringRef> ukernelSymbols;
     auto res = moduleOp.walk([&](Operation *op) {
       auto builtinName =
           dyn_cast_or_null<StringAttr>(op->getAttr(kBuiltinName));
@@ -299,8 +338,7 @@ public:
       if (!builtinName || !ukernelDesc) {
         return WalkResult::advance();
       }
-      if (moduleOp->hasAttr(ukernelDesc.getUkernelName())) {
-        // Avoid parsing and serializing the same ukernel again and again.
+      if (ukernelSymbols.contains(ukernelDesc.getUkernelName())) {
         return WalkResult::advance();
       }
       std::optional<StringRef> maybeBuiltin =
@@ -328,6 +366,7 @@ public:
       funcOp->remove();
       ukernelFunctions.push_back(funcOp);
       op->removeAttr(kBuiltinName);
+      ukernelSymbols.insert(ukernelDesc.getUkernelName());
       return WalkResult::advance();
     });
     if (res.wasInterrupted()) {

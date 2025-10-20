@@ -15,7 +15,6 @@ module {
 // RUN: iree-compile %s \
 // RUN:   --iree-hal-target-device=local \
 // RUN:   --iree-hal-local-target-device-backends=llvm-cpu \
-// RUN:   --iree-opt-data-tiling=false \
 // RUN:   --iree-codegen-transform-dialect-library=%p/transform_library.mlir@custom_matmul \
 // RUN:   --compile-to=executable-targets | \
 // RUN: FileCheck %s --check-prefixes=CODEGEN-DEFAULT
@@ -28,7 +27,6 @@ module {
 // RUN: iree-compile %s \
 // RUN:   --iree-hal-target-device=local \
 // RUN:   --iree-hal-local-target-device-backends=llvm-cpu \
-// RUN:   --iree-opt-data-tiling=false \
 // RUN:   --iree-codegen-transform-dialect-library=%p/transform_library.mlir@custom_matmul | \
 // RUN: iree-run-module --module=- --function=matmul_static \
 // RUN:   --input="3x5xf32=1" \

@@ -312,3 +312,35 @@ util.func @collapse_of_expand_to_scalar(%arg0: tensor<1x1xf16>, %arg1: index, %a
 //       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[ARG0]]
 //  CHECK-SAME:     tensor<1x1xf16> into tensor<f16>
 //       CHECK:   util.return %[[COLLAPSED]] : tensor<f16>
+
+// -----
+
+util.func @collapse_of_expand_trailing_unit_dims(%arg0: tensor<23040x1xbf16>) -> tensor<4x5760xbf16> {
+  %expanded = tensor.expand_shape %arg0 [[0, 1], [2, 3]] output_shape [4, 5760, 1, 1] : tensor<23040x1xbf16> into tensor<4x5760x1x1xbf16>
+  %collapsed = tensor.collapse_shape %expanded [[0], [1, 2, 3]] : tensor<4x5760x1x1xbf16> into tensor<4x5760xbf16>
+  util.return %collapsed : tensor<4x5760xbf16>
+}
+// CHECK-LABEL: util.func public @collapse_of_expand_trailing_unit_dims
+//  CHECK-SAME:   %[[ARG0:.+]]: tensor<23040x1xbf16>
+//       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[ARG0]]
+//  CHECK-SAME:     tensor<23040x1xbf16> into tensor<4x5760x1xbf16>
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[EXPAND]]
+//  CHECK-SAME:     tensor<4x5760x1xbf16> into tensor<4x5760xbf16>
+//       CHECK:   util.return %[[COLLAPSE]] : tensor<4x5760xbf16>
+
+// -----
+
+// This test considers the case where we have multiple trailing unit dims but must preserve one for the output,
+// as well as an isolated unit dim that must be preserved for the collapse's reassociation dims.
+util.func @collapse_of_expand_preserved_trailing_unit_dims(%arg0: tensor<1x23040xbf16>) -> tensor<4x5760x1xbf16> {
+  %expanded = tensor.expand_shape %arg0 [[0], [1, 2, 3, 4, 5]] output_shape [1, 4, 5760, 1, 1, 1] : tensor<1x23040xbf16> into tensor<1x4x5760x1x1x1xbf16>
+  %collapsed = tensor.collapse_shape %expanded [[0, 1], [2], [3, 4, 5]] : tensor<1x4x5760x1x1x1xbf16> into tensor<4x5760x1xbf16>
+  util.return %collapsed : tensor<4x5760x1xbf16>
+}
+// CHECK-LABEL: util.func public @collapse_of_expand_preserved_trailing_unit_dims
+//  CHECK-SAME:   %[[ARG0:.+]]: tensor<1x23040xbf16>
+//       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[ARG0]]
+//  CHECK-SAME:     tensor<1x23040xbf16> into tensor<1x4x5760x1xbf16>
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[EXPAND]]
+//  CHECK-SAME:     tensor<1x4x5760x1xbf16> into tensor<4x5760x1xbf16>
+//       CHECK:   util.return %[[COLLAPSE]] : tensor<4x5760x1xbf16>

@@ -4,7 +4,14 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_compiler_register_plugin", "platform_trampoline_deps")
+load(
+    "//build_tools/bazel:build_defs.oss.bzl",
+    "iree_compiler_cc_library",
+    "iree_compiler_register_plugin",
+    "iree_gentbl_cc_library",
+    "iree_tablegen_doc",
+    "platform_trampoline_deps",
+)
 
 package(
     default_visibility = ["//visibility:public"],
@@ -17,19 +24,56 @@ iree_compiler_register_plugin(
     target = ":LLVMCPU",
 )
 
+iree_gentbl_cc_library(
+    name = "PassesIncGen",
+    tbl_outs = [
+        (
+            ["--gen-pass-decls"],
+            "Passes.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    deps = [
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
+)
+
+iree_tablegen_doc(
+    name = "LLVMCPUTargetPassesDocGen",
+    category = "Passes",
+    tbl_outs = [
+        (
+            [
+                "--gen-pass-doc",
+            ],
+            "LLVMCPUTargetPasses.md",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    deps = [
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
+)
+
 iree_compiler_cc_library(
     name = "LLVMCPU",
     srcs = [
         "LLVMCPUTarget.cpp",
         "LibraryBuilder.cpp",
+        "Passes.cpp",
+        "TestPropagateTargetAttrs.cpp",
     ],
     hdrs = [
         "LibraryBuilder.h",
+        "Passes.h",
     ],
     deps = [
         ":LLVMIRPasses",
         ":LLVMTargetOptions",
         ":LinkerTool",
+        ":PassesIncGen",
         ":StaticLibraryGenerator",
         "//compiler/plugins/target/LLVMCPU/Builtins",
         "//compiler/src/iree/compiler/Codegen/Common",
@@ -39,8 +83,11 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/LLVMCPU",
         "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/Encoding/IR",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR:HALDialect",
         "//compiler/src/iree/compiler/Dialect/HAL/Target",
         "//compiler/src/iree/compiler/Dialect/HAL/Target/Devices",
+        "//compiler/src/iree/compiler/Dialect/HAL/Utils:LLVMCodeGenUtils",
         "//compiler/src/iree/compiler/Dialect/HAL/Utils:LLVMLinkerUtils",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
@@ -59,6 +106,7 @@ iree_compiler_cc_library(
         "@llvm-project//llvm:RISCVAsmParser",
         "@llvm-project//llvm:RISCVCodeGen",
         "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:Target",
         "@llvm-project//llvm:TargetParser",
         "@llvm-project//llvm:WebAssemblyAsmParser",
         "@llvm-project//llvm:WebAssemblyCodeGen",
@@ -75,6 +123,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:LLVMToLLVMIRTranslation",
         "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:PDLInterpDialect",
+        "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:ToLLVMIRTranslation",
         "@llvm-project//mlir:TransformDialect",

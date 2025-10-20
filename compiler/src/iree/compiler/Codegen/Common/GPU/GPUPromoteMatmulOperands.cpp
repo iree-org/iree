@@ -35,9 +35,9 @@ Value promoteValue(OpBuilder &builder, Location loc, Value v,
   auto tensorType = cast<RankedTensorType>(v.getType());
   SmallVector<OpFoldResult> mixedSizes = tensor::getMixedSizes(builder, loc, v);
 
-  Value empty = builder.create<tensor::EmptyOp>(loc, mixedSizes,
-                                                tensorType.getElementType());
-  auto copy = builder.create<linalg::CopyOp>(loc, v, empty);
+  Value empty = tensor::EmptyOp::create(builder, loc, mixedSizes,
+                                        tensorType.getElementType());
+  auto copy = linalg::CopyOp::create(builder, loc, v, empty);
 
   if (useDirectLoad) {
     setLoweringConfig(
@@ -85,16 +85,16 @@ void promoteResult(OpBuilder &builder, Operation *op, Value valToMakeShared) {
   for (auto [idx, size] : llvm::enumerate(tensorType.getShape())) {
     if (ShapedType::isDynamic(size)) {
       dynamicSizes.push_back(
-          rewriter.create<tensor::DimOp>(loc, valToMakeShared, idx));
+          tensor::DimOp::create(rewriter, loc, valToMakeShared, idx));
     }
   }
   Attribute addressSpace = gpu::AddressSpaceAttr::get(
       rewriter.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
-  auto alloc = rewriter.create<bufferization::AllocTensorOp>(loc, tensorType,
-                                                             dynamicSizes);
+  auto alloc = bufferization::AllocTensorOp::create(rewriter, loc, tensorType,
+                                                    dynamicSizes);
   alloc.setMemorySpaceAttr(addressSpace);
   auto copy =
-      rewriter.create<linalg::CopyOp>(loc, valToMakeShared, alloc.getResult());
+      linalg::CopyOp::create(rewriter, loc, valToMakeShared, alloc.getResult());
 
   Value replacement = copy.getResult(0);
   // If in extract slice is present we make it consume the new copy.

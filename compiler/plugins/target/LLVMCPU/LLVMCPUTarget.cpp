@@ -14,6 +14,7 @@
 #include "compiler/plugins/target/LLVMCPU/LLVMTargetOptions.h"
 #include "compiler/plugins/target/LLVMCPU/LibraryBuilder.h"
 #include "compiler/plugins/target/LLVMCPU/LinkerTool.h"
+#include "compiler/plugins/target/LLVMCPU/Passes.h"
 #include "compiler/plugins/target/LLVMCPU/StaticLibraryGenerator.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
@@ -25,6 +26,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/HAL/Target/Devices/LocalDevice.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
+#include "iree/compiler/Dialect/HAL/Utils/LLVMCodeGenUtils.h"
 #include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/PluginAPI/Client.h"
@@ -312,10 +314,14 @@ public:
         LLVM::LLVMDialect::getTargetTripleAttrName(),
         executableBuilder.getStringAttr(targetTriple.str()));
 
+    ModuleOp variantModOp = variantOp.getInnerModule();
+    // Propagate target features and cpu to function ops.
+    populateLLVMFuncTargetAttrs(variantModOp, *targetMachine);
+
     // At this moment we are leaving MLIR LLVM dialect land translating module
     // into target independent LLVMIR.
-    auto llvmModule = mlir::translateModuleToLLVMIR(variantOp.getInnerModule(),
-                                                    context, libraryName);
+    auto llvmModule =
+        mlir::translateModuleToLLVMIR(variantModOp, context, libraryName);
     if (!llvmModule) {
       return variantOp.emitError() << "failed to translate the MLIR LLVM "
                                       "dialect to the native llvm::Module";
@@ -397,7 +403,7 @@ public:
         llvmFunc->addParamAttr(i, align16);
       }
 
-      LibraryBuilder::DispatchAttrs dispatchAttrs = {0};
+      LibraryBuilder::DispatchAttrs dispatchAttrs = {};
 
       // Entry points may optionally specify that they require workgroup local
       // memory. We fetch that value here and plumb it through so the runtime
@@ -411,6 +417,17 @@ public:
       if (auto layoutAttr = exportOp.getLayout()) {
         dispatchAttrs.constantCount = layoutAttr.getConstants();
         dispatchAttrs.bindingCount = layoutAttr.getBindings().size();
+      }
+
+      // Extract workgroup size if specified at compile time.
+      if (auto workgroupSizeAttr = exportOp.getWorkgroupSize()) {
+        auto workgroupSizeValues = workgroupSizeAttr->getValue();
+        dispatchAttrs.workgroupSize[0] = static_cast<uint32_t>(
+            cast<IntegerAttr>(workgroupSizeValues[0]).getInt());
+        dispatchAttrs.workgroupSize[1] = static_cast<uint32_t>(
+            cast<IntegerAttr>(workgroupSizeValues[1]).getInt());
+        dispatchAttrs.workgroupSize[2] = static_cast<uint32_t>(
+            cast<IntegerAttr>(workgroupSizeValues[2]).getInt());
       }
 
       LibraryBuilder::SourceLocation sourceLocation;
@@ -721,9 +738,9 @@ public:
     // loader which static library to load for the target binary.
     std::vector<uint8_t> libraryNameVector(libraryName.begin(),
                                            libraryName.end());
-    executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        variantOp.getLoc(), variantOp.getSymName(), "static",
-        libraryNameVector);
+    IREE::HAL::ExecutableBinaryOp::create(executableBuilder, variantOp.getLoc(),
+                                          variantOp.getSymName(), "static",
+                                          libraryNameVector);
 
     return success();
   }
@@ -770,8 +787,8 @@ public:
           std::move(elfFile.value()));
 
       // Add the binary to the parent hal.executable.
-      auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-          variantOp.getLoc(), variantOp.getSymName(),
+      auto binaryOp = IREE::HAL::ExecutableBinaryOp::create(
+          executableBuilder, variantOp.getLoc(), variantOp.getSymName(),
           variantOp.getTarget().getFormat(), bufferAttr);
       binaryOp.setMimeTypeAttr(
           executableBuilder.getStringAttr("application/x-elf"));
@@ -827,8 +844,8 @@ public:
           std::move(libraryFile));
 
       // Add the binary to the parent hal.executable.
-      auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-          variantOp.getLoc(), variantOp.getSymName(),
+      auto binaryOp = IREE::HAL::ExecutableBinaryOp::create(
+          executableBuilder, variantOp.getLoc(), variantOp.getSymName(),
           variantOp.getTarget().getFormat(), bufferAttr);
       binaryOp.setMimeTypeAttr(executableBuilder.getStringAttr(mimeType));
     }
@@ -847,6 +864,7 @@ private:
 struct LLVMCPUSession
     : public PluginSession<LLVMCPUSession, LLVMCPUTargetCLOptions,
                            PluginActivationPolicy::DefaultActivated> {
+  static void registerPasses() { registerLLVMCPUTargetPasses(); }
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
     // #hal.executable.target<"llvm-cpu", ...
     targets.add("llvm-cpu", [=]() {

@@ -128,17 +128,22 @@ public:
       ArrayRef<OpFoldResult> strides, SmallVectorImpl<OpFoldResult> &newOffsets,
       SmallVectorImpl<OpFoldResult> &newSizes,
       SmallVectorImpl<OpFoldResult> &newStrides) const {
-    auto layoutAttr = cast<IREE::Encoding::LayoutMaterializerAttr>(attr);
+    auto boundType = dyn_cast<RankedTensorType>(type.getBoundType());
+    if (!boundType || !boundType.getEncoding()) {
+      return failure();
+    }
+
     // Only handle cases where the slice spans the whole
     // `!iree_tensor_ext.dispatch.tensor` type.
     // TODO(jornt): Enable partial slices.
     if (!type.doesSliceSpanWholeTensor(dynamicDims, offsets, sizes, strides)) {
       return failure();
     }
-    auto boundTensorType = cast<RankedTensorType>(type.getBoundType());
+
+    auto layoutAttr = cast<IREE::Encoding::LayoutMaterializerAttr>(attr);
     IREE::Codegen::MaterializeEncodingInfo encodingInfo =
-        getEncodingInfoFromLayout(boundTensorType, layoutAttr);
-    newSizes = getMixedValues(boundTensorType.getShape(), dynamicDims, builder);
+        getEncodingInfoFromLayout(boundType, layoutAttr);
+    newSizes = getMixedValues(boundType.getShape(), dynamicDims, builder);
     FailureOr<SmallVector<OpFoldResult>> convertedMixedSizes =
         getPackedDimsForDispatchTensorImpl(builder, loc, type, dynamicDims,
                                            layoutAttr, encodingInfo);

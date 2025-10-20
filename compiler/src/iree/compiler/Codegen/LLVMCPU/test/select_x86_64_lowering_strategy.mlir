@@ -1,5 +1,8 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy)' --split-input-file %s | FileCheck %s
 
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d1)>
+#map2 = affine_map<(d0, d1) -> (d0)>
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
@@ -16,7 +19,12 @@ func.func @matvec_static() attributes {hal.executable.target = #executable_targe
   %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0], sizes = [384], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<384xf32>> -> tensor<384xf32>
   %5 = tensor.empty() : tensor<128xf32>
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<128xf32>) -> tensor<128xf32>
-  %7 = linalg.matvec ins(%3, %4 : tensor<128x384xf32>, tensor<384xf32>) outs(%6 : tensor<128xf32>) -> tensor<128xf32>
+  %7 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "reduction"]} ins(%3, %4 : tensor<128x384xf32>, tensor<384xf32>) outs(%6 : tensor<128xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %8 = arith.mulf %in, %in_0 : f32
+      %9 = arith.addf %out, %8 : f32
+      linalg.yield %9 : f32
+    } -> tensor<128xf32>
   iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0], sizes = [128], strides = [1] : tensor<128xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<128xf32>>
   return
 }
@@ -24,7 +32,7 @@ func.func @matvec_static() attributes {hal.executable.target = #executable_targe
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //       CHECK: func.func @matvec_static()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//       CHECK: linalg.matvec
+//       CHECK: linalg.generic
 //  CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
@@ -2147,3 +2155,62 @@ func.func @attention_reshape_pack(%arg0: index, %arg1: tensor<4x2x?x32xf16>, %ar
 // CHECK-SAME:       lowering_config = #[[CONFIG0]]
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG1]]
+
+// -----
+
+#executable_target_embedded_elf_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", native_vector_size = 64 : i64, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+func.func @mmt4d_generic_unpack_pack(%arg0: tensor<5x4096x16x1xf16>, %arg1: tensor<640x4096x16x1xf16>) -> tensor<5x10240x16x1xf16> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64} {
+  %cst = arith.constant 0.000000e+00 : f16
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<5x640x16x16xf16>
+  %1 = tensor.empty() : tensor<5x640x16x16xf32>
+  %2 = linalg.fill ins(%cst_0 : f32) outs(%1 : tensor<5x640x16x16xf32>) -> tensor<5x640x16x16xf32>
+  %3 = linalg.mmt4d ins(%arg0, %arg1 : tensor<5x4096x16x1xf16>, tensor<640x4096x16x1xf16>) outs(%2 : tensor<5x640x16x16xf32>) -> tensor<5x640x16x16xf32>
+  %4 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%3 : tensor<5x640x16x16xf32>) outs(%0 : tensor<5x640x16x16xf16>) {
+  ^bb0(%in: f32, %out: f16):
+    %7 = arith.truncf %in : f32 to f16
+    linalg.yield %7 : f16
+  } -> tensor<5x640x16x16xf16>
+  %5 = tensor.empty() : tensor<77x10240xf16>
+  %unpack = linalg.unpack %4 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %5 : tensor<5x640x16x16xf16> -> tensor<77x10240xf16>
+  %6 = tensor.empty() : tensor<5x10240x16x1xf16>
+  %pack = linalg.pack %unpack padding_value(%cst : f16) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %6 : tensor<77x10240xf16> -> tensor<5x10240x16x1xf16>
+  return %pack : tensor<5x10240x16x1xf16>
+}
+// CHECK-DAG:   #[[$CONFIG0:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 0, 0], vector_inner_parallel = [0, 0, 16, 16]>
+// CHECK-DAG:   #[[$CONFIG1:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 0, 0, 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
+// CHECK-DAG:   #[[$CONFIG2:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1]>
+// CHECK-LABEL: func.func @mmt4d_generic_unpack_pack(
+// CHECK:         linalg.fill
+// CHECK-SAME:      {lowering_config = #[[$CONFIG0]]}
+// CHECK:         linalg.mmt4d
+// CHECK-SAME:      {lowering_config = #[[$CONFIG1]]}
+// CHECK:         linalg.generic
+// CHECK-SAME:      {lowering_config = #[[$CONFIG0]]}
+// CHECK:         linalg.unpack
+// CHECK-SAME:      {lowering_config = #[[$CONFIG2]]}
+// CHECK:         linalg.pack
+// CHECK-NOT:      lowering_config
+
+// -----
+
+#executable_target_embedded_elf_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", native_vector_size = 64 : i64, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d3, d4, d6)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d3, d5, d6)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4, d5)>
+func.func @batch_mmt4d_generic_form(%lhs: tensor<128x10x32x8x1xf32>, %rhs: tensor<128x80x32x4x1xf32>, %acc: tensor<128x10x80x8x4xf32>) -> tensor<128x10x80x8x4xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64} {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]}
+    ins(%lhs, %rhs : tensor<128x10x32x8x1xf32>, tensor<128x80x32x4x1xf32>)
+    outs(%acc : tensor<128x10x80x8x4xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %1 = arith.mulf %in, %in_0 : f32
+    %2 = arith.addf %out, %1 : f32
+    linalg.yield %2 : f32
+  } -> tensor<128x10x80x8x4xf32>
+  return %0 : tensor<128x10x80x8x4xf32>
+}
+// CHECK:       #[[$CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [32, 10, 20, 0, 8, 4, 0], vector_common_parallel = [1, 1, 1, 0, 1, 4, 0], vector_reduction = [0, 0, 0, 1, 0, 0, 0]>
+// CHECK-LABEL: func.func @batch_mmt4d_generic_form(
+// CHECK:         linalg.generic
+// CHECK-SAME:      {lowering_config = #[[$CONFIG]]}

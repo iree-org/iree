@@ -282,10 +282,10 @@ static NamedSequenceOp createKernelConfigOp(OpBuilder &builder, Location loc,
   //   transform.yield %arg0 : !transform.any_op
   // }
 
-  return builder.create<NamedSequenceOp>(loc, name, TypeAttr::get(specType),
-                                         /*sym_visibility=*/StringAttr{},
-                                         /*arg_attrs=*/ArrayAttr{},
-                                         /*res_attrs=*/ArrayAttr{});
+  return NamedSequenceOp::create(builder, loc, name, TypeAttr::get(specType),
+                                 /*sym_visibility=*/StringAttr{},
+                                 /*arg_attrs=*/ArrayAttr{},
+                                 /*res_attrs=*/ArrayAttr{});
 }
 
 static FailureOr<NamedSequenceOp>
@@ -354,16 +354,15 @@ emitLinkedTuningSpec(ModuleOp module, ArrayRef<NamedSequenceOp> specsToLink) {
 
     // Surpress silenceable errors so that failures to match in child tuning
     // specs can be ignored.
-    operand = builder
-                  .create<transform::IncludeOp>(
-                      loc, anyOpType, symbol,
-                      transform::FailurePropagationMode::Suppress, operand,
-                      /*arg_attrs=*/nullptr, /*res_attrs=*/nullptr)
+    operand = transform::IncludeOp::create(
+                  builder, loc, anyOpType, symbol,
+                  transform::FailurePropagationMode::Suppress, operand,
+                  /*arg_attrs=*/nullptr, /*res_attrs=*/nullptr)
                   .getResults()
                   .front();
   }
 
-  builder.create<transform::YieldOp>(loc, operand);
+  transform::YieldOp::create(builder, loc, operand);
 
   if (failed(mlir::verify(module))) {
     return module.emitError("Linked tuning spec failed to verify");
@@ -442,13 +441,13 @@ static FailureOr<NamedSequenceOp> emitLinkedDefaultTuningSpec(ModuleOp module) {
   Block *body = builder.createBlock(&region, region.begin(),
                                     newEntryPoint.getArgumentTypes(), loc);
   builder.setInsertionPointToStart(body);
-  auto mergedForeachMatch = builder.create<ForeachMatchOp>(
-      loc, resultTypes, newEntryPoint.getArgument(0),
+  auto mergedForeachMatch = ForeachMatchOp::create(
+      builder, loc, resultTypes, newEntryPoint.getArgument(0),
       /* forwarded_inputs = */ ValueRange(),
       /* restrictRoot = */ nullptr, /* flattenResults = */ nullptr,
       builder.getArrayAttr(mergedMatchers),
       builder.getArrayAttr(mergedActions));
-  builder.create<transform::YieldOp>(loc, mergedForeachMatch->getResult(0));
+  transform::YieldOp::create(builder, loc, mergedForeachMatch->getResult(0));
 
   // Step 3: Remove the original inner modules after merging.
   for (auto innerModule :

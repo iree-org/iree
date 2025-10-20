@@ -173,8 +173,8 @@ static void annotateExport(IREE::Stream::ExecutableOp executableOp,
 
   // Do the rewrite.
   OpBuilder builder = OpBuilder::atBlockBegin(&funcOp.front());
-  auto assumeOp = builder.create<IREE::Util::AssumeIntOp>(
-      funcOp.getLoc(), arguments, argumentAssumptions);
+  auto assumeOp = IREE::Util::AssumeIntOp::create(
+      builder, funcOp.getLoc(), arguments, argumentAssumptions);
   for (unsigned argIndex = 0; argIndex < arguments.size(); ++argIndex) {
     arguments[argIndex].replaceAllUsesExcept(assumeOp.getResult(argIndex),
                                              assumeOp);

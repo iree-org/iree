@@ -174,7 +174,7 @@ private:
   //   LoadGlobalOp.result -> GlobalOp
   //   ConstantOp.result -> ConstantOp
   // Entries can come from the whole program.
-  llvm::DenseMap<Value, Operation *> constantRoots;
+  llvm::MapVector<Value, Operation *> constantRoots;
 
   // Map of analyzed value to corresponding info struct.
   llvm::DenseMap<Value, ConstValueInfo *> constInfoMap;

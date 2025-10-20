@@ -525,7 +525,7 @@ def Util_AssumeIntOp : Util_PureOp<"assume.int", [
 }
 
 def Util_OptimizationBarrierOp : Util_Op<"optimization_barrier", [
-  SameOperandsAndResultType,
+  AllTypesMatch<["operands", "results"]>,
 ]> {
   let summary = [{Prevents compiler optimizations across a value.}];
   let description = [{
@@ -547,8 +547,6 @@ def Util_OptimizationBarrierOp : Util_Op<"optimization_barrier", [
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes
     )>,
   ];
-
-  let hasVerifier = 1;
 }
 
 def Util_UnfoldableConstantOp : Util_Op<"unfoldable_constant"> {
@@ -567,35 +565,6 @@ def Util_UnfoldableConstantOp : Util_Op<"unfoldable_constant"> {
     [{ build($_builder, $_state, value.getType(), value); }]>];
 
   let hasCanonicalizer = 1;
-}
-
-def Util_UnreachableOp : Util_Op<"unreachable", [
-  NoMemoryEffect,
-  ReturnLike,
-  Terminator
-]> {
-  let summary = [{Unreachable assertion op.}];
-  let description = [{
-    Signals to the compiler that the parent block should not be reachable.
-    This may be converted into a runtime assertion, though ideally they are
-    stripped during translation.
-
-    ```mlir
-    ^bb0:
-      %true = arith.constant true
-      cond_br %true, ^bb2, ^bb1
-    ^bb1:
-      // Indicates that this branch should never be taken.
-      util.unreachable "shouldn't be here"
-    ^bb2:
-      ...
-
-    ```
-  }];
-
-  let arguments = (ins StrAttr:$message);
-
-  let assemblyFormat = "$message attr-dict";
 }
 
 } // OpGroupCompilerHintOps
@@ -868,6 +837,115 @@ def Util_ReturnOp : Util_Op<"return", [
   let hasVerifier = 1;
 }
 
+def Util_UnreachableOp : Util_Op<"unreachable", [
+  NoMemoryEffect,
+  ReturnLike,
+  Terminator,
+  Util_UnreachableLike
+]> {
+  let summary = [{Unreachable assertion op.}];
+  let description = [{
+    Signals to the compiler that the parent block should not be reachable.
+    This may be converted into a runtime assertion, though ideally they are
+    stripped during translation.
+
+    ```mlir
+    ^bb0:
+      %true = arith.constant true
+      cond_br %true, ^bb2, ^bb1
+    ^bb1:
+      // Indicates that this branch should never be taken.
+      util.unreachable "shouldn't be here"
+    ^bb2:
+      ...
+
+    ```
+  }];
+
+  let arguments = (ins OptionalAttr<StrAttr>:$message);
+
+  let assemblyFormat = "($message^)? attr-dict";
+
+  let builders = [
+    OpBuilder<(ins CArg<"StringRef", [{""}]>:$message),
+    [{
+      build(
+        $_builder, $_state,
+        message.empty() ? StringAttr{} : $_builder.getStringAttr(message));
+    }]>,
+  ];
+}
+
+def Util_SCFUnreachableOp : Util_Op<"scf.unreachable", [
+  Util_UnreachableLike
+]> {
+  let summary = [{Non-terminator unreachable for use in SCF regions.}];
+  let description = [{
+    Marks a point as unreachable within SCF regions. Unlike `util.unreachable`
+    this is not a terminator and must be followed by appropriate region
+    terminators (e.g. `scf.yield`).
+
+    When not in an SCF region (e.g. `util.func`) this op canonicalizes to an
+    `util.unreachable` terminator that preserves the intended behavior.
+
+    Note that this op has side effects to prevent code motion: reaching this op
+    at runtime is observable indirectly (by way of what ops _don't_ execute). At
+    minimum presence of the op indicates all following ops in the same region
+    are unreachable and depending on the parent op may indicate the entire
+    parent op is unreachable. The behavior is roughly equivalent to having
+    lowered SCF to CFG and used `util.unreachable`.
+
+    Example:
+    ```mlir
+    scf.while (...) {
+      ...
+      scf.condition(%true) ...
+    } do {
+      ...
+      util.scf.unreachable "infinite loop body"
+      scf.yield  // Required terminator with poison values
+    }
+    ```
+  }];
+
+  let arguments = (ins OptionalAttr<StrAttr>:$message);
+
+  let assemblyFormat = "($message^)? attr-dict";
+
+  let builders = [
+    OpBuilder<(ins CArg<"StringRef", [{""}]>:$message),
+    [{
+      build(
+        $_builder, $_state,
+        message.empty() ? StringAttr{} : $_builder.getStringAttr(message));
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    // Creates one `ub.poison` for each type.
+    static SmallVector<Value> createPoisonValues(
+        OpBuilder &builder, Location loc, TypeRange resultTypes);
+
+    // Creates unreachable + poison yields + scf.yield for an SCF region.
+    // Returns the created scf.yield op.
+    static mlir::scf::YieldOp createRegionTerminator(
+        OpBuilder &builder, Location loc, TypeRange resultTypes,
+        StringAttr message = {});
+    static mlir::scf::YieldOp createRegionTerminator(
+        OpBuilder &builder, Location loc, TypeRange resultTypes,
+        StringRef message);
+
+    // Creates unreachable + poison yields + appropriate terminator if creating
+    // within an scf.region and otherwise creates an unreachable terminator.
+    // Returns the new terminator-like op.
+    static mlir::Operation *createWithTerminator(
+        OpBuilder &builder, Location loc, TypeRange resultTypes,
+        mlir::StringAttr message = {});
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
 } // OpGroupStructuralOps
 
 //===----------------------------------------------------------------------===//
@@ -1125,6 +1203,32 @@ def Util_ListCreateOp : Util_PureOp<"list.create", [
   );
 
   let assemblyFormat = "($initial_capacity^)? attr-dict `:` qualified(type($result))";
+}
+
+def Util_ListConstructOp : Util_PureOp<"list.construct", [
+  MemoryEffects<[MemAlloc]>,
+]> {
+  let summary = [{Constructs a list with the given initial values.}];
+  let description = [{
+    Creates a new list with the given values added in order. The list will be
+    allocated with an initial capacity equal to the number of values. This is a
+    pseudo-operation that expands to a list create, resize, and a series of
+    sets.
+  }];
+
+  let arguments = (ins
+    Variadic<AnyType>:$values
+  );
+  let results = (outs
+    Util_AnyListType:$result
+  );
+
+  let assemblyFormat = [{
+    custom<ValueTypeList>($values, type($values))
+    attr-dict `:` qualified(type($result))
+  }];
+
+  let hasVerifier = 1;
 }
 
 def Util_ListSizeOp : Util_Op<"list.size", [

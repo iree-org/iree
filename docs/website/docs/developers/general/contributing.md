@@ -56,7 +56,7 @@ The DCO check requires that all commits included in pull requests _either_
 are cryptographically signed by a member of the repository's organization _or_
 include a `Signed-off-by` message as a git trailer.
 
-#### Crypographically signing commits
+#### Cryptographically signing commits
 
 _This is the recommended approach for frequent contributors!_
 
@@ -152,10 +152,36 @@ documents official maintainers for project components.
 
 ### :octicons-pencil-16: Coding style guidelines
 
+Our formatting rules are enforced by language-specific formatters like
+`clang-format` for C++ and `black` for Python. In addition to formatting, we
+follow these coding standards:
+
+#### Compiler
+
+The C++ compiler portion of the project follows the
+[MLIR style guide](https://mlir.llvm.org/getting_started/DeveloperGuide/#style-guide)
+based on the [LLVM coding standards](https://llvm.org/docs/CodingStandards.html).
+We also follow the recommendations of the
+[LLVM Programmer's Manual](https://llvm.org/docs/ProgrammersManual.html).
+
+IREE deviates from the MLIR style guide in the following ways:
+
+* We use braces with single-line `if` statements and loops.
+* We allow for `static` functions in anonymous namespaces to avoid repeatedly
+  reopening/closing namespaces.
+
+#### Runtime
+
 Most of the code style is derived from the
 [Google Style Guides](http://google.github.io/styleguide/) for the appropriate
-language. The C++ compiler portion of the project follows the
-[MLIR/LLVM style guide](https://mlir.llvm.org/getting_started/DeveloperGuide/#style-guide).
+language.
+
+#### Other
+
+For code outside of the `compiler/` and `runtime/` subdirectories, follow the
+style used in existing files.
+
+#### Formatting and Linting
 
 We use [pre-commit](https://pre-commit.com/) to run assorted formatters and lint
 checks. The configuration file at

@@ -158,16 +158,15 @@ static Value createElementWiseExtUIOp(OpBuilder &builder, Value input,
   SmallVector<OpFoldResult> inputMixedSizes =
       tensor::getMixedSizes(builder, loc, input);
   Value init =
-      builder.create<tensor::EmptyOp>(loc, inputMixedSizes, outElemType);
-  return builder
-      .create<linalg::GenericOp>(
-          loc, castedType, input, init, maps, iteratorTypes,
-          [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
-            Value castRes =
-                b.create<arith::ExtUIOp>(nestedLoc, outElemType, args[0])
-                    ->getResult(0);
-            b.create<linalg::YieldOp>(nestedLoc, castRes);
-          })
+      tensor::EmptyOp::create(builder, loc, inputMixedSizes, outElemType);
+  return linalg::GenericOp::create(
+             builder, loc, castedType, input, init, maps, iteratorTypes,
+             [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
+               Value castRes =
+                   arith::ExtUIOp::create(b, nestedLoc, outElemType, args[0])
+                       ->getResult(0);
+               linalg::YieldOp::create(b, nestedLoc, castRes);
+             })
       .getResult(0);
 }
 
@@ -195,7 +194,7 @@ static Value getMmt4dOperand(Value value, linalg::LinalgOp linalgOp,
         type, /*isBatched=*/!cDims->batch.empty(),
         /*isTransposed=*/operandIdx == 2 && (transpose ^ cDims->n.empty()), ri);
     expandedValue =
-        builder.create<tensor::ExpandShapeOp>(loc, newType, value, ri);
+        tensor::ExpandShapeOp::create(builder, loc, newType, value, ri);
   }
   if (elemTypes[operandIdx].isUnsignedInteger()) {
     return createElementWiseExtUIOp(builder, expandedValue, loc,
@@ -341,17 +340,18 @@ FailureOr<Operation *> lowerContractionOpWithEncoding(
   auto cDims = IREE::Encoding::getEncodingContractionDims(lhsEncoding);
   Operation *result;
   if (cDims->batch.empty()) {
-    result = builder.create<linalg::Mmt4DOp>(linalgOp.getLoc(), newResultType,
-                                             ValueRange{newLhs, newRhs},
-                                             ValueRange{newResult});
+    result = linalg::Mmt4DOp::create(builder, linalgOp.getLoc(), newResultType,
+                                     ValueRange{newLhs, newRhs},
+                                     ValueRange{newResult});
   } else {
-    result = builder.create<linalg::BatchMmt4DOp>(
-        linalgOp.getLoc(), newResultType, ValueRange{newLhs, newRhs},
+    result = linalg::BatchMmt4DOp::create(
+        builder, linalgOp.getLoc(), newResultType, ValueRange{newLhs, newRhs},
         ValueRange{newResult});
   }
   if (!ri.empty()) {
-    result = builder.create<tensor::CollapseShapeOp>(
-        linalgOp->getLoc(), operands[2].getType(), result->getResult(0), ri);
+    result = tensor::CollapseShapeOp::create(builder, linalgOp->getLoc(),
+                                             operands[2].getType(),
+                                             result->getResult(0), ri);
   }
   return result;
 }
@@ -760,6 +760,10 @@ struct CPULayoutResolverAttr final
 struct CPUSerializableAttr final
     : IREE::Encoding::SerializableAttr::ExternalModel<CPUSerializableAttr,
                                                       CPUEncodingResolverAttr> {
+  bool isSerialized(Attribute attr) const {
+    auto configuration = cast<CPUEncodingResolverAttr>(attr).getConfiguration();
+    return configuration && configuration.contains(kEncodingInfoAttrName);
+  }
 
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
@@ -895,6 +899,12 @@ struct VMVXLayoutResolverAttr final
 struct VMVXSerializableAttr final
     : IREE::Encoding::SerializableAttr::ExternalModel<
           VMVXSerializableAttr, VMVXEncodingResolverAttr> {
+  bool isSerialized(Attribute attr) const {
+    auto configuration =
+        cast<VMVXEncodingResolverAttr>(attr).getConfiguration();
+    return configuration && configuration.contains(kEncodingInfoAttrName);
+  }
+
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
                                     ValueRange dynamicDims) const {

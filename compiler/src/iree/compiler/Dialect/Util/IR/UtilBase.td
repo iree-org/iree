@@ -51,8 +51,8 @@ class Util_IndexAttrBase<string descr> :
     TypedAttrBase<
       Index, "IntegerAttr",
       And<[
-        CPred<"isa<IntegerAttr>($_self)">,
-        CPred<"cast<IntegerAttr>($_self).getType().isIndex()">,
+        CPred<"::llvm::isa<::mlir::IntegerAttr>($_self)">,
+        CPred<"::llvm::cast<::mlir::IntegerAttr>($_self).getType().isIndex()">,
       ]>,
       descr> {
   let returnType = [{ APInt }];
@@ -67,9 +67,9 @@ def Util_TiedOpStorageAttr :
 defvar Util_GlobalRefAttr = FlatSymbolRefAttr;
 
 def Util_AnySerializableAttr : Attr<Or<[
-  CPred<"isa<mlir::DenseElementsAttr>($_self)">,
-  CPred<"isa<mlir::DenseResourceElementsAttr>($_self)">,
-  CPred<"isa<IREE::Util::SerializableAttrInterface>($_self)">,
+  CPred<"::llvm::isa<::mlir::DenseElementsAttr>($_self)">,
+  CPred<"::llvm::isa<::mlir::DenseResourceElementsAttr>($_self)">,
+  CPred<"::llvm::isa<::mlir::iree_compiler::IREE::Util::SerializableAttrInterface>($_self)">,
 ]>, "buffer-like constant attribute values"> {
   let storageType = [{ ::mlir::Attribute }];
   let returnType = [{ ::mlir::Attribute }];
@@ -81,7 +81,7 @@ def Util_AnySerializableArrayAttr :
                      "array attribute of serializable attributes"
   >;
 
-class Util_AliasedSymbolRefAttr : Attr<CPred<"isa<FlatSymbolRefAttr>($_self)">,
+class Util_AliasedSymbolRefAttr : Attr<CPred<"::llvm::isa<::mlir::FlatSymbolRefAttr>($_self)">,
                                        "symbol reference attribute"> {
   let storageType = [{ FlatSymbolRefAttr }];
   let returnType = [{ StringRef }];
@@ -112,5 +112,10 @@ def Util_DebugOnly : NativeOpTrait<"IREE::Util::DebugOnly">;
 // Must be a symbol table (containing members) and isolated from above
 // (instantiatable and only referenced by symbols instead of SSA values).
 def Util_ObjectLike : NativeOpTrait<"IREE::Util::ObjectLike">;
+
+// Denotes an op that marks unreachable code at runtime.
+// Used for both terminator (util.unreachable) and non-terminator
+// (util.scf.unreachable) unreachable operations.
+def Util_UnreachableLike : NativeOpTrait<"IREE::Util::UnreachableLike">;
 
 #endif  // IREE_DIALECT_UTIL_IR_UTIL_BASE

@@ -57,24 +57,24 @@ static iree_status_t iree_hal_cuda_query_limits(
 
   IREE_CUDA_RETURN_IF_ERROR(
       symbols,
-      cuDeviceGetAttribute(&out_limits->max_block_dims[0],
+      cuDeviceGetAttribute((int32_t*)&out_limits->max_block_dims[0],
                            CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_X, device),
       "cuDeviceGetAttribute");
   IREE_CUDA_RETURN_IF_ERROR(
       symbols,
-      cuDeviceGetAttribute(&out_limits->max_block_dims[1],
+      cuDeviceGetAttribute((int32_t*)&out_limits->max_block_dims[1],
                            CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_Y, device),
       "cuDeviceGetAttribute");
   IREE_CUDA_RETURN_IF_ERROR(
       symbols,
-      cuDeviceGetAttribute(&out_limits->max_block_dims[2],
+      cuDeviceGetAttribute((int32_t*)&out_limits->max_block_dims[2],
                            CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_Z, device),
       "cuDeviceGetAttribute");
 
   IREE_CUDA_RETURN_IF_ERROR(
       symbols,
       cuDeviceGetAttribute(
-          &out_limits->max_block_shared_memory_size,
+          (int32_t*)&out_limits->max_block_shared_memory_size,
           CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK_OPTIN, device),
       "cuDeviceGetAttribute");
 
@@ -415,7 +415,8 @@ static void iree_hal_cuda_native_executable_destroy(
 }
 
 iree_status_t iree_hal_cuda_native_executable_lookup_kernel_params(
-    iree_hal_executable_t* base_executable, int32_t ordinal,
+    iree_hal_executable_t* base_executable,
+    iree_hal_executable_export_ordinal_t ordinal,
     const iree_hal_cuda_kernel_params_t** out_params) {
   iree_hal_cuda_native_executable_t* executable =
       iree_hal_cuda_native_executable_cast(base_executable);
@@ -430,7 +431,57 @@ iree_status_t iree_hal_cuda_native_executable_lookup_kernel_params(
   return iree_ok_status();
 }
 
+static iree_host_size_t iree_hal_cuda_native_executable_export_count(
+    iree_hal_executable_t* base_executable) {
+  iree_hal_cuda_native_executable_t* executable =
+      iree_hal_cuda_native_executable_cast(base_executable);
+  // TODO(cuda): return the total number of exports in the executable.
+  (void)executable;
+  return 0;
+}
+
+static iree_status_t iree_hal_cuda_native_executable_export_info(
+    iree_hal_executable_t* base_executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_export_info_t* out_info) {
+  iree_hal_cuda_native_executable_t* executable =
+      iree_hal_cuda_native_executable_cast(base_executable);
+  (void)executable;
+  // TODO(cuda): return export information from kernel metadata.
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "reflection not implemented");
+}
+
+static iree_status_t iree_hal_cuda_native_executable_export_parameters(
+    iree_hal_executable_t* base_executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_host_size_t capacity,
+    iree_hal_executable_export_parameter_t* out_parameters) {
+  iree_hal_cuda_native_executable_t* executable =
+      iree_hal_cuda_native_executable_cast(base_executable);
+  (void)executable;
+  // TODO(cuda): return export parameter information from kernel metadata.
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "parameter reflection not implemented");
+}
+
+static iree_status_t iree_hal_cuda_native_executable_lookup_export_by_name(
+    iree_hal_executable_t* base_executable, iree_string_view_t name,
+    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+  iree_hal_cuda_native_executable_t* executable =
+      iree_hal_cuda_native_executable_cast(base_executable);
+  (void)executable;
+  // TODO(cuda): lookup the export ordinal by name.
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "reflection not implemented");
+}
+
 static const iree_hal_executable_vtable_t
     iree_hal_cuda_native_executable_vtable = {
         .destroy = iree_hal_cuda_native_executable_destroy,
+        .export_count = iree_hal_cuda_native_executable_export_count,
+        .export_info = iree_hal_cuda_native_executable_export_info,
+        .export_parameters = iree_hal_cuda_native_executable_export_parameters,
+        .lookup_export_by_name =
+            iree_hal_cuda_native_executable_lookup_export_by_name,
 };

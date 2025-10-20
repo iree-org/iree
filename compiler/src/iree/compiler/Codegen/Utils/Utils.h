@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 #define IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -184,9 +185,6 @@ void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface op,
                      ArrayRef<int64_t> tileSizes,
                      ArrayRef<bool> tileScalableFlags);
 
-Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
-                              ArrayRef<NamedAttribute> attributes = {});
-
 /// Returns the option that distributes the ops using the flow workgroup
 /// ID/Count operations.
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
@@ -215,6 +213,11 @@ int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp);
 //===---------------------------------------------------------------------===//
 // Bufferization utility functions
 //===---------------------------------------------------------------------===//
+
+/// Walks the memref producers and returns the source subspan memref for the
+/// given buffer, or std::nullopt if no subspan is found.
+std::optional<IREE::HAL::InterfaceBindingSubspanOp>
+getSourceSubspanMemref(TypedValue<MemRefType> buffer);
 
 /// Find the memref version of the given InterfaceBindingSubspanOp. If no such
 /// op exists in the same block (before the given op), create a new op.
@@ -299,6 +302,21 @@ bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
                  IREE::TensorExt::DispatchTensorType tensorType,
                  ValueRange dynamicDims);
 
+/// Retrieves the DenormalFpMathAttr for F32 values from the given target
+/// configuration. This attribute specifies how denormal floating-point values
+/// are handled in F32 operations.
+IREE::Codegen::DenormalFpMathAttr
+getConfigDenormalFpMathF32Attr(DictionaryAttr targetConfig);
+std::optional<IREE::Codegen::DenormalFpMath>
+getConfigDenormalFpMathF32(DictionaryAttr targetConfig);
+
+/// Adds a denormal floating-point math configuration for F32 values to the
+/// configuration list. This configures how denormal floating-point values are
+/// handled in F32 operations.
+void addConfigDenormalFpMathF32(MLIRContext *context,
+                                IREE::Codegen::DenormalFpMath mode,
+                                SmallVectorImpl<NamedAttribute> &config);
+
 //===----------------------------------------------------------------------===//
 // Utility functions for vector size inference for dynamic shapes
 //===----------------------------------------------------------------------===//
@@ -372,6 +390,22 @@ bool neverRunsSecondIteration(scf::ForOp op);
 ///  Here %4 is an external capture used via tensor.extract inside
 ///  linalg.generic hence the above `genericOp` has an external capture.
 bool hasExternalCapture(linalg::GenericOp genericOp);
+
+//===----------------------------------------------------------------------===//
+// Utility functions for copy operations
+//===----------------------------------------------------------------------===//
+
+/// Create a linalg::GenericOp version of an n-D copy that can further tile,
+/// lower to loops or vectorize, unlike the current implementation of
+/// memref::CopyOp.
+Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
+                              ArrayRef<NamedAttribute> attributes = {});
+
+/// Returns the tile sizes for tiling a `memref.copy` operation.
+SmallVector<OpFoldResult> getCopyTileSizes(OpBuilder &b, memref::CopyOp copy);
+
+/// Returns the tile sizes for tiling a `linalg.copy` operation.
+std::optional<SmallVector<int64_t>> getCopyTileSizes(linalg::CopyOp);
 
 } // namespace mlir::iree_compiler
 

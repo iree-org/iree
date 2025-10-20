@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/ADT/SmallVector.h"
@@ -186,10 +187,10 @@ static Value tryMaterializeConstant(Location loc, Type type, Attribute attr,
                                     OpBuilder &builder) {
   if (arith::ConstantOp::isBuildableWith(attr, type)) {
     // Common case fast-path.
-    return builder.create<arith::ConstantOp>(loc, type, cast<TypedAttr>(attr));
+    return arith::ConstantOp::create(builder, loc, type, cast<TypedAttr>(attr));
   } else if (mlir::func::ConstantOp::isBuildableWith(attr, type)) {
-    return builder.create<mlir::func::ConstantOp>(
-        loc, type, llvm::cast<FlatSymbolRefAttr>(attr));
+    return mlir::func::ConstantOp::create(builder, loc, type,
+                                          llvm::cast<FlatSymbolRefAttr>(attr));
   }
   // Fallback that asks a dialect to materialize things. This may fail!
   auto *op = attr.getDialect().materializeConstant(builder, attr, type, loc);
@@ -209,6 +210,19 @@ static bool inlineConstantGlobalLoads(GlobalTable &globalTable) {
     } else if (global.op.isGlobalMutable()) {
       return GlobalAction::PRESERVE;
     } else if (!global.op.getGlobalInitialValue()) {
+      return GlobalAction::PRESERVE;
+    }
+
+    // We currently don't support inlining globals with non-util dialect
+    // attributes as the constant materialization machinery in MLIR does not
+    // have a way to preserve them. We could add an attr interface that allows
+    // attrs to be carried along as a way around this but today don't need it.
+    const bool hasAnyNonUtilAttrs =
+        llvm::any_of(global.op->getDialectAttrs(), [](NamedAttribute attr) {
+          auto *dialect = attr.getNameDialect();
+          return !dialect || dialect->getNamespace() != "util";
+        });
+    if (hasAnyNonUtilAttrs) {
       return GlobalAction::PRESERVE;
     }
 
@@ -366,9 +380,10 @@ struct FoldGlobalsPass : public impl::FoldGlobalsPassBase<FoldGlobalsPass> {
     }
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
 
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     GlobalTable globalTable(moduleOp);
     beforeFoldingGlobals = globalTable.size();
+    bool didChangeAny = false;
     for (int i = 0; i < 10; ++i) {
       // TODO(benvanik): determine if we need this expensive folding.
       if (failed(applyPatternsGreedily(moduleOp, frozenPatterns))) {
@@ -421,10 +436,15 @@ struct FoldGlobalsPass : public impl::FoldGlobalsPassBase<FoldGlobalsPass> {
         // No changes; complete fixed-point iteration.
         break;
       }
+      didChangeAny = true;
     }
 
     afterFoldingGlobals =
         count(moduleOp.getOps<IREE::Util::GlobalOpInterface>());
+
+    if (didChangeAny) {
+      signalFixedPointModified(moduleOp);
+    }
   }
 };
 

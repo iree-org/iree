@@ -1,5 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-dispatch-creation-pipeline)" \
-// RUN:          --iree-dispatch-creation-experimental-data-tiling %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-dispatch-creation-pipeline{data-tiling})" %s | FileCheck %s
 
 // Tests to make sure that the set encoding pass work as in the dispatch
 // creation pipeline. For example, we expect dimension collapsing to happen

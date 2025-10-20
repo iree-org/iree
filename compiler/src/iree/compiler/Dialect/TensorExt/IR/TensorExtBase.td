@@ -44,22 +44,22 @@ def IREETensorExt_ShapeDynamicDims : Variadic<IREETensorExt_Dim>;
 //===----------------------------------------------------------------------===//
 
 def IREETensorExt_TensorAccessCanReadPred : CPred<[{
-  cast<IREE::TensorExt::DispatchTensorType>($_self).getAccess() ==
-      IREE::TensorExt::TensorAccess::ReadOnly ||
-  cast<IREE::TensorExt::DispatchTensorType>($_self).getAccess() ==
-      IREE::TensorExt::TensorAccess::ReadWrite
+  ::llvm::cast<::mlir::iree_compiler::IREE::TensorExt::DispatchTensorType>($_self).getAccess() ==
+      ::mlir::iree_compiler::IREE::TensorExt::TensorAccess::ReadOnly ||
+  ::llvm::cast<::mlir::iree_compiler::IREE::TensorExt::DispatchTensorType>($_self).getAccess() ==
+      ::mlir::iree_compiler::IREE::TensorExt::TensorAccess::ReadWrite
 }]>;
 
 def IREETensorExt_TensorAccessCanWritePred : CPred<[{
-  cast<IREE::TensorExt::DispatchTensorType>($_self).getAccess() ==
-      IREE::TensorExt::TensorAccess::WriteOnly ||
-  cast<IREE::TensorExt::DispatchTensorType>($_self).getAccess() ==
-      IREE::TensorExt::TensorAccess::ReadWrite
+  ::llvm::cast<::mlir::iree_compiler::IREE::TensorExt::DispatchTensorType>($_self).getAccess() ==
+      ::mlir::iree_compiler::IREE::TensorExt::TensorAccess::WriteOnly ||
+  ::llvm::cast<::mlir::iree_compiler::IREE::TensorExt::DispatchTensorType>($_self).getAccess() ==
+      ::mlir::iree_compiler::IREE::TensorExt::TensorAccess::ReadWrite
 }]>;
 
 def IREETensorExt_DispatchTensor : DialectType<
     IREETensorExt_Dialect,
-    CPred<"isa<IREE::TensorExt::DispatchTensorType>($_self)">,
+    CPred<"::llvm::isa<::mlir::iree_compiler::IREE::TensorExt::DispatchTensorType>($_self)">,
     "dispatch.tensor"> {
   let description = [{
     A placeholder for a dispatch region input/output operand. This can be used
@@ -71,7 +71,7 @@ def IREETensorExt_DispatchTensor : DialectType<
 def IREETensorExt_ReadableDispatchTensor : DialectType<
     IREETensorExt_Dialect,
     And<[
-      CPred<"isa<IREE::TensorExt::DispatchTensorType>($_self)">,
+      CPred<"::llvm::isa<::mlir::iree_compiler::IREE::TensorExt::DispatchTensorType>($_self)">,
       IREETensorExt_TensorAccessCanReadPred,
     ]>,
     "dispatch.tensor"> {
@@ -85,7 +85,7 @@ def IREETensorExt_ReadableDispatchTensor : DialectType<
 def IREETensorExt_WritableDispatchTensor : DialectType<
     IREETensorExt_Dialect,
     And<[
-      CPred<"isa<IREE::TensorExt::DispatchTensorType>($_self)">,
+      CPred<"::llvm::isa<::mlir::iree_compiler::IREE::TensorExt::DispatchTensorType>($_self)">,
       IREETensorExt_TensorAccessCanWritePred,
     ]>,
     "dispatch.tensor"> {

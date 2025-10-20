@@ -28,7 +28,8 @@ class VectorContractOpInfo;
 class ContractionVectorLayoutOptions : public VectorLayoutOptions {
 public:
   ContractionVectorLayoutOptions(Operation *root, Value laneId,
-                                 int64_t subgroupSize);
+                                 int64_t subgroupSize,
+                                 ArrayRef<int64_t> workgroupSize);
   RewritePatternSet &getPatterns();
   VectorLayoutInterface getDefaultLayout(VectorType type) const override;
 
@@ -62,24 +63,6 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
 void addBarrier(mlir::FunctionOpInterface funcOp, Operation *alloc,
                 ArrayRef<Operation *> aliasGroup, bool hasAsyncCopies = true);
 
-namespace IREE {
-namespace GPU {
-class MMAScheduleAttr;
-
-::llvm::FailureOr<::std::tuple<IREE::VectorExt::VectorLayoutInterface,
-                               IREE::VectorExt::VectorLayoutInterface,
-                               IREE::VectorExt::VectorLayoutInterface>>
-getContractionLayout(IREE::GPU::MMAScheduleAttr scheduleAttr,
-                     VectorContractOpInfo &opInfo, linalg::LinalgOp contractOp);
-
-::llvm::FailureOr<::std::tuple<IREE::VectorExt::VectorLayoutInterface,
-                               IREE::VectorExt::VectorLayoutInterface,
-                               IREE::VectorExt::VectorLayoutInterface>>
-getContractionLayout(IREE::GPU::MMAScheduleAttr scheduleAttr,
-                     VectorContractOpInfo &opInfo,
-                     vector::ContractionOp contractOp);
-} // namespace GPU
-} // namespace IREE
 } // namespace iree_compiler
 } // namespace mlir
 

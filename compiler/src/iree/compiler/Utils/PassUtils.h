@@ -30,20 +30,15 @@ public:
     addNest<0, OpTys...>();
   }
 
-  template <typename F>
+  // We give the template param a default to support passing overload
+  // constructors (i.e. createCanonicalizerPass).
+  template <typename F = std::unique_ptr<Pass> (*)()>
   MultiOpNest &addPass(F constructor) {
     addPassInternal(constructor);
     return *this;
   }
 
-  // We have an explicit overload for a concrete function to support
-  // passing overload constructors (i.e. createCanonicalizerPass).
-  MultiOpNest &addPass(std::unique_ptr<Pass> (*constructor)()) {
-    addPassInternal(constructor);
-    return *this;
-  }
-
-  template <typename F>
+  template <typename F = std::unique_ptr<Pass> (*)()>
   MultiOpNest &addPredicatedPass(bool enable, F constructor) {
     if (enable) {
       addPassInternal(constructor);

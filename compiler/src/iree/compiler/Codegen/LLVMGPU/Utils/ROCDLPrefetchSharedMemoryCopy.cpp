@@ -7,7 +7,6 @@
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -23,7 +22,6 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Location.h"
-#include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
@@ -65,7 +63,7 @@ public:
   // Emits the prologue before the main pipelined loop.
   void emitPrologue(RewriterBase &rewriter) {
     Location loc = forOp.getLoc();
-    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, lb);
+    Value zero = arith::ConstantIndexOp::create(rewriter, loc, lb);
     // Directly write in the prologue and use the shared memory to communicate
     // data instead of the loop carried values. Read (0)
     emitRead(mapping[0], rewriter, zero);
@@ -77,13 +75,13 @@ public:
   scf::ForOp createKernelLoop(RewriterBase &rewriter) {
     Location loc = forOp.getLoc();
     int64_t newUpperBound = ub - step;
-    auto newUb = rewriter.create<arith::ConstantIndexOp>(loc, newUpperBound);
+    auto newUb = arith::ConstantIndexOp::create(rewriter, loc, newUpperBound);
 
     // Keep original iter args and then add some for what's being loaded to
     // registers.
     auto iterArgs = llvm::to_vector_of<Value>(forOp.getInitArgs());
-    auto newForOp = rewriter.create<scf::ForOp>(
-        loc, forOp.getLowerBound(), newUb, forOp.getStep(), iterArgs);
+    auto newForOp = scf::ForOp::create(rewriter, loc, forOp.getLowerBound(),
+                                       newUb, forOp.getStep(), iterArgs);
 
     // When there are no iter args, the loop body terminator will be created.
     // Since we always create it below, remove the terminator if it was created.
@@ -98,9 +96,9 @@ public:
     rewriter.setInsertionPoint(newForOp.getBody(), newForOp.getBody()->begin());
     Location loc = forOp.getLoc();
     Value indVar = newForOp.getInductionVar();
-    Value increment = rewriter.create<arith::ConstantIndexOp>(loc, step);
-    Value iPlusOne = rewriter.create<arith::AddIOp>(
-        loc, indVar, increment, arith::IntegerOverflowFlags::nsw);
+    Value increment = arith::ConstantIndexOp::create(rewriter, loc, step);
+    Value iPlusOne = arith::AddIOp::create(rewriter, loc, indVar, increment,
+                                           arith::IntegerOverflowFlags::nsw);
 
     for (int i = 0; i < 3; ++i) {
       for (auto [idx, arg] : llvm::enumerate(forOp.getRegionIterArgs())) {
@@ -124,7 +122,7 @@ public:
     rewriter.setInsertionPointAfter(newForOp);
     Location loc = forOp.getLoc();
     Value nMinusOne =
-        rewriter.create<arith::ConstantIndexOp>(loc, ub - 1 * step);
+        arith::ConstantIndexOp::create(rewriter, loc, ub - 1 * step);
 
     // Map iter_args to results of newForOp.
     for (unsigned i = 0, e = forOp->getNumResults(); i != e; ++i) {
@@ -327,13 +325,14 @@ private:
 
   /// Creates a gpu.barrier op with |rewriter|.
   void emitBarrier(Location loc, RewriterBase &rewriter) {
-    rewriter.create<gpu::BarrierOp>(loc);
+    gpu::BarrierOp::create(rewriter, loc);
   }
 
   void emitSchedBarrier(Location loc, RewriterBase &rewriter) {
-    rewriter.create<amdgpu::SchedBarrierOp>(
-        loc, amdgpu::sched_barrier_opt_enumAttr::get(
-                 rewriter.getContext(), amdgpu::sched_barrier_opt_enum::none));
+    amdgpu::SchedBarrierOp::create(
+        rewriter, loc,
+        amdgpu::sched_barrier_opt_enumAttr::get(
+            rewriter.getContext(), amdgpu::sched_barrier_opt_enum::none));
   }
 
   /// Creates all compute stage ops for a loop iteration with |rewriter| and

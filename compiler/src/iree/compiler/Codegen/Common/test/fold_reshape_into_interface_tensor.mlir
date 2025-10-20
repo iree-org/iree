@@ -49,6 +49,54 @@ func.func @fold_expand_into_loads_dynamic() -> tensor<2x?x16x32xf32> {
 
 // -----
 
+#pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
+    #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">], flags = Indirect>
+func.func @fold_expand_into_loads_fully_dynamic() -> tensor<?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
+  %2 = hal.interface.constant.load layout(#pipeline_layout) ordinal(2) : index
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
+      flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf32>>{%0}
+  %4 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0], sizes = [%0], strides = [1]
+      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xf32>>{%0} -> tensor<?xf32>
+  %5 = tensor.expand_shape %4 [[0, 1]] output_shape [%1, %2] : tensor<?xf32> into tensor<?x?xf32>
+  return %5 : tensor<?x?xf32>
+}
+// CHECK-LABEL: func @fold_expand_into_loads_fully_dynamic()
+//   CHECK-DAG:   %[[CONST0:.+]] = hal.interface.constant.load {{.*}} ordinal(1)
+//   CHECK-DAG:   %[[CONST1:.+]] = hal.interface.constant.load {{.*}} ordinal(2)
+//       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%[[CONST0]], %[[CONST1]]}
+//       CHECK:   %[[LOAD:.+]] = iree_tensor_ext.dispatch.tensor.load %[[SUBSPAN]]
+//  CHECK-SAME:       offsets = [0, 0], sizes = [%[[CONST0]], %[[CONST1]]]
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%[[CONST0]], %[[CONST1]]}
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
+    #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">], flags = Indirect>
+func.func @no_fold_expand_into_loads_fully_dynamic() -> tensor<?x?xindex> {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : index
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
+      flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xindex>>{%0}
+  %3 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0], sizes = [%0], strides = [1]
+      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xindex>>{%0} -> tensor<?xindex>
+  %4 = tensor.extract %3[%c0] : tensor<?xindex>
+  %5 = tensor.expand_shape %3 [[0, 1]] output_shape [%1, %4] : tensor<?xindex> into tensor<?x?xindex>
+  return %5 : tensor<?x?xindex>
+}
+// This case cannot be folded because expanded sizes depend on the tensor itself.
+// So, the size cannot be known before the load.
+
+// CHECK-LABEL: func @no_fold_expand_into_loads_fully_dynamic()
+//       CHECK:   tensor.expand_shape
+
+
+// -----
+
 #pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
     #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 func.func @fold_collapse_into_stores_dynamic(%arg0 : tensor<2x?x32xf32>) {

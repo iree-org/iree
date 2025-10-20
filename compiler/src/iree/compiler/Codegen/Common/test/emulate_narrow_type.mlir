@@ -46,3 +46,24 @@ func.func @broadcast_extui() -> vector<1x1x64xi32> {
 // CHECK-LABEL: func @broadcast_extui()
 //   CHECK-NOT:   vector.bitcast
 //       CHECK:   vector.interleave
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @memref_load_2d_i4() -> i4 {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<16x32xi4>
+  %v = memref.load %0[%c1, %c0] : memref<16x32xi4>
+  return %v : i4
+}
+
+// CHECK-LABEL:   func.func @memref_load_2d_i4()
+//       CHECK:     %[[C16:.*]] = arith.constant 16 : index
+//       CHECK:     %[[C0:.*]] = arith.constant 0 : index
+//       CHECK:     %[[SUBSPAN:.*]] = hal.interface.binding.subspan {{.*}} : memref<256xi8>
+//       CHECK:     %[[LOAD:.*]] = memref.load %[[SUBSPAN]][%[[C16]]] : memref<256xi8>
+//       CHECK:     %[[TRUNC:.*]] = arith.trunci %[[LOAD]] : i8 to i4
+//       CHECK:     return %[[TRUNC]] : i4

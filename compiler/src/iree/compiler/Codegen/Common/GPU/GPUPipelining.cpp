@@ -80,20 +80,20 @@ static Operation *replaceOpWithPredicatedOp(RewriterBase &rewriter,
   // Create srcElement Value based on the pred.
   // The next few lins generate the below code:
   // srcElement = (pred) ?  prevSrcElements : 0;
-  Value dstElements =
-      rewriter.create<arith::ConstantOp>(loc, asyncCopyOp.getDstElementsAttr());
+  Value dstElements = arith::ConstantOp::create(
+      rewriter, loc, asyncCopyOp.getDstElementsAttr());
   Value originalSrcElement =
       asyncCopyOp.getSrcElements() ? asyncCopyOp.getSrcElements() : dstElements;
-  Value c0Index = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  Value c0Index = arith::ConstantIndexOp::create(rewriter, loc, 0);
   auto srcElements =
-      rewriter.create<arith::SelectOp>(loc, pred, originalSrcElement, c0Index);
+      arith::SelectOp::create(rewriter, loc, pred, originalSrcElement, c0Index);
   int64_t sizeInBytes =
       (asyncCopyOp.getDst().getType().getElementTypeBitWidth() *
        asyncCopyOp.getDstElements().getZExtValue()) /
       8;
   UnitAttr bypassL1 = sizeInBytes == 16 ? rewriter.getUnitAttr() : UnitAttr();
-  auto asyncCopyZfillOp = rewriter.create<nvgpu::DeviceAsyncCopyOp>(
-      loc, nvgpu::DeviceAsyncTokenType::get(asyncCopyOp.getContext()),
+  auto asyncCopyZfillOp = nvgpu::DeviceAsyncCopyOp::create(
+      rewriter, loc, nvgpu::DeviceAsyncTokenType::get(asyncCopyOp.getContext()),
       asyncCopyOp.getDst(), asyncCopyOp.getDstIndices(), asyncCopyOp.getSrc(),
       asyncCopyOp.getSrcIndices(), asyncCopyOp.getDstElements(), srcElements,
       bypassL1);

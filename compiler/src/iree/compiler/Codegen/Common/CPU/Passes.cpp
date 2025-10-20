@@ -32,9 +32,8 @@ static FailureOr<Value> cpuAllocationFn(OpBuilder &builder, Location loc,
       return hoistedAllocation.value();
     }
   }
-  return builder
-      .create<memref::AllocaOp>(loc, memRefType, dynamicSizes,
-                                builder.getI64IntegerAttr(alignment))
+  return memref::AllocaOp::create(builder, loc, memRefType, dynamicSizes,
+                                  builder.getI64IntegerAttr(alignment))
       .getResult();
 }
 

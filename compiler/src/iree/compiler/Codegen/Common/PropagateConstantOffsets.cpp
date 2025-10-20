@@ -56,7 +56,7 @@ static std::optional<int64_t> getValueConstantRhs(Value v, bool nsw) {
 ///   %x = arith.addi %apply, C overflow<nsw>
 struct ExtractConstantApplyOffset final
     : OpRewritePattern<affine::AffineApplyOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(affine::AffineApplyOp apply,
                                 PatternRewriter &rewriter) const override {
@@ -81,10 +81,10 @@ struct ExtractConstantApplyOffset final
 
     AffineMap newMap =
         AffineMap::get(map.getNumDims(), map.getNumSymbols(), addExpr.getLHS());
-    Value newApply = rewriter.create<affine::AffineApplyOp>(
-        apply.getLoc(), newMap, apply.getOperands());
-    Value offset =
-        rewriter.create<arith::ConstantIndexOp>(apply.getLoc(), constantOffset);
+    Value newApply = affine::AffineApplyOp::create(rewriter, apply.getLoc(),
+                                                   newMap, apply.getOperands());
+    Value offset = arith::ConstantIndexOp::create(rewriter, apply.getLoc(),
+                                                  constantOffset);
     rewriter.replaceOpWithNewOp<arith::AddIOp>(
         apply, newApply, offset, arith::IntegerOverflowFlags::nsw);
     return success();
@@ -97,7 +97,7 @@ struct ExtractConstantApplyOffset final
 /// to
 ///   %x = affine.apply affine_map<expr(d0 + C)>(%in)
 struct FoldApplySymbolOrDimSum final : OpRewritePattern<affine::AffineApplyOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(affine::AffineApplyOp apply,
                                 PatternRewriter &rewriter) const override {
     AffineMap map = apply.getMap();
@@ -148,7 +148,7 @@ struct FoldApplySymbolOrDimSum final : OpRewritePattern<affine::AffineApplyOp> {
 /// if the linearization basis is static.
 struct PropagateConstantAddsThroughLinearize final
     : OpRewritePattern<affine::AffineLinearizeIndexOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(affine::AffineLinearizeIndexOp op,
                                 PatternRewriter &rewriter) const override {
@@ -159,7 +159,7 @@ struct PropagateConstantAddsThroughLinearize final
     auto getZero = [&]() {
       if (zero)
         return zero;
-      zero = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
+      zero = arith::ConstantIndexOp::create(rewriter, op.getLoc(), 0);
       return zero;
     };
     bool didReplace = false;
@@ -220,9 +220,10 @@ struct PropagateConstantAddsThroughLinearize final
 
     rewriter.setInsertionPointAfter(op);
     Value offset =
-        rewriter.create<arith::ConstantIndexOp>(op.getLoc(), runningOffset);
-    auto addOp = rewriter.create<arith::AddIOp>(
-        op.getLoc(), op.getResult(), offset, arith::IntegerOverflowFlags::nsw);
+        arith::ConstantIndexOp::create(rewriter, op.getLoc(), runningOffset);
+    auto addOp =
+        arith::AddIOp::create(rewriter, op.getLoc(), op.getResult(), offset,
+                              arith::IntegerOverflowFlags::nsw);
     rewriter.replaceAllUsesExcept(op, addOp, addOp);
     return success();
   }
@@ -239,7 +240,7 @@ struct PropagateConstantAddsThroughLinearize final
 ///   %linearize = affine.linearize_index [..., %x, %c0, ...] (..., 4, 4, ...)
 struct FoldDivisibleConstantMulsIntoLinearize final
     : OpRewritePattern<affine::AffineLinearizeIndexOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(affine::AffineLinearizeIndexOp op,
                                 PatternRewriter &rewriter) const override {
@@ -253,7 +254,7 @@ struct FoldDivisibleConstantMulsIntoLinearize final
     auto getZero = [&]() {
       if (zero)
         return zero;
-      zero = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
+      zero = arith::ConstantIndexOp::create(rewriter, op.getLoc(), 0);
       return zero;
     };
 

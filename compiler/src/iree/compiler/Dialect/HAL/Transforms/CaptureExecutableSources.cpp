@@ -60,7 +60,7 @@ struct CaptureExecutableSourcesPass
   using IREE::HAL::impl::CaptureExecutableSourcesPassBase<
       CaptureExecutableSourcesPass>::CaptureExecutableSourcesPassBase;
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     auto moduleName = moduleOp.getName().value_or("module");
 
     for (auto executableOp : moduleOp.getOps<IREE::HAL::ExecutableOp>()) {
@@ -86,8 +86,8 @@ struct CaptureExecutableSourcesPass
             &clonedExecutableOp.getBody().emplaceBlock());
         auto clonedVariantOp = cast<IREE::HAL::ExecutableVariantOp>(
             clonedBuilder.clone(*variantOp));
-        clonedBuilder.create<IREE::HAL::ExecutableEndOp>(
-            clonedBuilder.getUnknownLoc());
+        IREE::HAL::ExecutableEndOp::create(clonedBuilder,
+                                           clonedBuilder.getUnknownLoc());
 
         // Capture the source contents and update the locations in the IR to
         // reference it.

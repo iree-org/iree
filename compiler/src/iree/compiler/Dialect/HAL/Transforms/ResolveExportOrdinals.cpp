@@ -25,7 +25,7 @@ struct ResolveExportOrdinalsPass
     : public IREE::HAL::impl::ResolveExportOrdinalsPassBase<
           ResolveExportOrdinalsPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
     SymbolTable symbolTable(moduleOp);
     for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
       funcOp.walk([&](IREE::HAL::ExecutableExportOrdinalOp ordinalOp) {

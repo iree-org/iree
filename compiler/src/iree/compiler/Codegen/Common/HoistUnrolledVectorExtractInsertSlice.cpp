@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
@@ -127,11 +126,11 @@ static scf::ForOp hoistVectorExtractInsertSlice(
   // BBArgs are updated.
   for (auto extractStridedSliceOp : extractOps) {
     extractStridedSliceOp->moveBefore(forOp);
-    if (!forOp.isDefinedOutsideOfLoop(extractStridedSliceOp.getVector())) {
-      assert(extractStridedSliceOp.getVector() == tensorBBArg &&
+    if (!forOp.isDefinedOutsideOfLoop(extractStridedSliceOp.getSource())) {
+      assert(extractStridedSliceOp.getSource() == tensorBBArg &&
              "extractSlice source not defined above must be the tracked bbArg");
       rewriter.startOpModification(extractStridedSliceOp);
-      extractStridedSliceOp.getVectorMutable().assign(
+      extractStridedSliceOp.getSourceMutable().assign(
           forOp.getInitArgs()[initArgNumber]);
       rewriter.finalizeOpModification(extractStridedSliceOp);
     }
@@ -216,7 +215,7 @@ public:
 };
 
 void HoistUnrolledVectorExtractInsertSlicePass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   IRRewriter rewriter(funcOp->getContext());
   funcOp.walk([&](scf::ForOp forOp) {
     hoistUnrolledVectorExtractInsert(rewriter, forOp);

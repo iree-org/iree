@@ -16,7 +16,7 @@ namespace mlir::iree_compiler::IREE::TensorExt {
 /// `tensor.extract_slice`.
 struct FoldTensorLoadWithExtractSlice
     : OpRewritePattern<tensor::ExtractSliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractSliceOp,
                                 PatternRewriter &rewriter) const override {

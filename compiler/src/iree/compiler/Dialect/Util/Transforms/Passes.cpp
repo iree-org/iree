@@ -13,7 +13,7 @@ namespace {
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc" // IWYU pragma: export
 } // namespace
 
-void registerTransformPasses() {
+void registerUtilPasses() {
   // Generated.
   registerPasses();
 }

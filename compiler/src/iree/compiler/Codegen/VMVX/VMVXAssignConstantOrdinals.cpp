@@ -19,7 +19,7 @@ struct VMVXAssignConstantOrdinalsPass
     : public impl::VMVXAssignConstantOrdinalsPassBase<
           VMVXAssignConstantOrdinalsPass> {
   void runOnOperation() override {
-    auto variantOp = getOperation();
+    IREE::HAL::ExecutableVariantOp variantOp = getOperation();
 
     // Ignore non-VMVX variants.
     // TODO(benvanik): a way to nest this in the pipeline via dynamic passes.

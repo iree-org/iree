@@ -22,6 +22,29 @@ func.func @simple_generic(%3: tensor<64x256xf32>, %4: tensor<64x256xf32>, %5: te
 
 // -----
 
+func.func @map_scatter(%arg0: tensor<2x32xf32>, %arg1: tensor<64x256xf32>) -> tensor<64x256xf32> {
+  %true = arith.constant true
+  %0 = iree_linalg_ext.map_scatter %arg0 into %arg1 {
+  ^bb0(%arg2: index, %arg3: index):
+    iree_linalg_ext.yield %arg2, %arg3, %true : index, index, i1
+  } : tensor<2x32xf32> into tensor<64x256xf32> -> tensor<64x256xf32>
+  return %0 : tensor<64x256xf32>
+}
+// map_scatter should use a quarter of the vector size.
+
+// CHECK-LABEL: func.func @map_scatter
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
+//   CHECK-DAG:   %[[C32:.+]] = arith.constant 32 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[C16:.+]] = arith.constant 16 : index
+//       CHECK:   scf.for %{{.*}} = %[[C0]] to %[[C2]] step %[[C1]]
+//       CHECK:     scf.for %{{.*}} = %[[C0]] to %[[C32]] step %[[C16]]
+//       CHECK:       iree_linalg_ext.map_scatter
+//       CHECK:         tensor<1x16xf32> into tensor<64x256xf32>
+
+// -----
+
 #map = affine_map<(d0, d1) -> (d0, d1)>
 func.func @fuse_destination(%3: tensor<64x64xf32>, %4: tensor<64x64xf32>) -> tensor<64x64xf32> {
   %empty = tensor.empty() : tensor<64x64xf32>

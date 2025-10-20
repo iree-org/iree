@@ -51,7 +51,7 @@ public:
 } // namespace
 
 void VMVXLowerExecutableTargetPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   auto translationInfo = getTranslationInfo(funcOp);
   if (!translationInfo)

@@ -19,6 +19,8 @@ re-running CI.
 Before updating golden outputs, first confirm your change maintains acceptable
 accuracy. Follow the steps
 [outlined](https://github.com/nod-ai/SHARK-MLPERF/blob/dev/code/stable-diffusion-xl/development.md#test-accuracy-only).
+Use the offline variant of the `precompile_model_shortfin.sh` script for your
+platform. On MI300X use the one for MI325X.
 
 A straightforward way to test your change is by editing
 `sdxl_harness_rocm_shortfin_from_source_iree.dockerfile` so that it builds your
@@ -31,9 +33,9 @@ IREE and exposes the right tooling:
 
 Run the accuracy script (`run_accuracy_mi325x.sh`) and be mindful of
 platform-specific settings. If you are running in SPX mode, update available
-device IDs accordingly. On MI300x, set `CPD=1` and use `BATCH_SIZE=32`. Accuracy
-is considered acceptable if FID and CLIP scores fall within the advertised
-ranges.
+device IDs accordingly (i.e., change to `DEVICES="0,1,2,3,4,5,6,7"`). On MI300x,
+set `CPD=1` and use `BATCH_SIZE=32`. Accuracy is considered acceptable if FID
+and CLIP scores fall within the advertised ranges.
 
 ## Generate new outputs with your IREE build
 

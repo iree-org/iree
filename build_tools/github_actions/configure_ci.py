@@ -120,6 +120,7 @@ DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
     [
         # None.
         "windows_x64_msvc",
+        "test_torch",
     ]
 )
 

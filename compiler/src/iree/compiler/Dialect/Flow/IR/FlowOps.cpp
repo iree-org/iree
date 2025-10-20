@@ -595,8 +595,9 @@ bool dropUnusedAndRedundantDispatchRegionResults(
     return false;
 
   // Create new region and move over the body.
-  auto newRegionOp = rewriter.create<Flow::DispatchRegionOp>(
-      regionOp.getLoc(), resultTypes, dynamicDims, regionOp.getWorkload());
+  auto newRegionOp =
+      Flow::DispatchRegionOp::create(rewriter, regionOp.getLoc(), resultTypes,
+                                     dynamicDims, regionOp.getWorkload());
   newRegionOp.getBody().takeBody(regionOp.getBody());
 
   // Update terminator.
@@ -628,7 +629,7 @@ bool dropUnusedAndRedundantDispatchRegionResults(
 
 struct DispatchRegionDropUnusedResults
     : public OpRewritePattern<DispatchRegionOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(DispatchRegionOp regionOp,
                                 PatternRewriter &rewriter) const final {
@@ -1049,9 +1050,10 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
   IREE::Util::excludeTiedOperandAndResultIndices(
       excludedOperandIndices, excludedResultIndices, newTiedOperandIndices);
 
-  auto newOp = rewriter.create<DispatchWorkgroupsOp>(
-      getLoc(), getWorkload(), newResultTypes, newResultDims, newArguments,
-      newArgumentDims, newTiedOperandIndices, getOperation()->getAttrs());
+  auto newOp = DispatchWorkgroupsOp::create(
+      rewriter, getLoc(), getWorkload(), newResultTypes, newResultDims,
+      newArguments, newArgumentDims, newTiedOperandIndices,
+      getOperation()->getAttrs());
   newOp->setDialectAttrs(getOperation()->getDialectAttrs());
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());

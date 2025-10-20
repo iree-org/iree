@@ -123,7 +123,7 @@ struct ConvertToMultiMma final : OpInterfaceRewritePattern<linalg::LinalgOp> {
 
 // This pattern hoists pack & unpack ops out of scf.for op.
 struct PackDestinationForOp final : OpRewritePattern<scf::YieldOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(scf::YieldOp yieldOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = yieldOp.getLoc();
@@ -191,26 +191,26 @@ struct PackDestinationForOp final : OpRewritePattern<scf::YieldOp> {
         packOp.getMixedTiles(), packOp.getInnerDimsPos(),
         packOp.getOuterDimsPerm());
 
-    auto packedDest = rewriter.create<linalg::PackOp>(
-        loc, forOp.getInitArgs()[tiedResultIdx], input,
+    auto packedDest = linalg::PackOp::create(
+        rewriter, loc, forOp.getInitArgs()[tiedResultIdx], input,
         packOp.getInnerDimsPos(), packOp.getMixedTiles(),
         packOp.getPaddingValue(), packOp.getOuterDimsPerm());
 
     auto packOpValues = llvm::to_vector_of<Value>(forOp.getInitArgs());
     packOpValues[tiedResultIdx] = packedDest.getResult();
-    scf::ForOp newForOp = rewriter.create<scf::ForOp>(
-        loc, forOp.getLowerBound(), forOp.getUpperBound(), forOp.getStep(),
-        packOpValues);
+    scf::ForOp newForOp = scf::ForOp::create(
+        rewriter, loc, forOp.getLowerBound(), forOp.getUpperBound(),
+        forOp.getStep(), packOpValues);
 
     // Destination tensor for the new unpackOp, based on the shape of the
     // original tensor that got packed, to help unpack into unaligned shapes and
     // drop padding added by the packOp.
-    Value empty = rewriter.create<tensor::EmptyOp>(
-        loc, packOp.getSourceType().getShape(),
+    Value empty = tensor::EmptyOp::create(
+        rewriter, loc, packOp.getSourceType().getShape(),
         packOp.getSourceType().getElementType());
 
-    auto unpackedOutput = rewriter.create<linalg::UnPackOp>(
-        loc, newForOp.getResults()[tiedResultIdx], empty,
+    auto unpackedOutput = linalg::UnPackOp::create(
+        rewriter, loc, newForOp.getResults()[tiedResultIdx], empty,
         unpackOp.getInnerDimsPos(), unpackOp.getMixedTiles(),
         unpackOp.getOuterDimsPerm());
 
@@ -244,7 +244,7 @@ struct PackDestinationForOp final : OpRewritePattern<scf::YieldOp> {
 
 void GPUPackToIntrinsicsPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   // Step 1. Pack candidate linalg ops to specified shapes.
   IRRewriter rewriter(funcOp);
@@ -289,7 +289,34 @@ void GPUPackToIntrinsicsPass::runOnOperation() {
     return !getLoweringConfig(producer) && !getLoweringConfig(consumer);
   };
 
-  linalg::populateDataLayoutPropagationPatterns(patterns, control);
+  // Additionally, we do not sink extract slice through generic if slice source
+  // is a block argument or if the source, slice or generic are in different
+  // blocks as this would affect how tiling uses extract slice ops.
+
+  linalg::ControlPropagationFn controlExtract =
+      [](OpOperand *opOperand) -> bool {
+    Operation *producer = opOperand->get().getDefiningOp();
+    Operation *consumer = opOperand->getOwner();
+    if (getLoweringConfig(producer) || getLoweringConfig(consumer)) {
+      return false;
+    }
+    auto sliceOp = dyn_cast<tensor::ExtractSliceOp>(producer);
+    if (!sliceOp) {
+      return false;
+    }
+    Operation *producerSrc = sliceOp.getSource().getDefiningOp();
+    // If source is not an op, e.g is a block argument then return false.
+    if (!producerSrc) {
+      return false;
+    }
+
+    return producerSrc->getBlock() == producer->getBlock() &&
+           consumer->getBlock() == producer->getBlock();
+  };
+
+  linalg::populateDataLayoutPropagationPatterns(patterns, control,
+                                                /*PoisonPaddingOk=*/true);
+  linalg::populateExtractSliceSinkingPatterns(patterns, controlExtract);
   patterns.add<PackDestinationForOp>(context);
   linalg::UnPackOp::getCanonicalizationPatterns(patterns, context);
   if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {

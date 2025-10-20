@@ -48,7 +48,7 @@ class ConfigureTargetExecutableVariantsPass
   }
 
   void runOnOperation() override {
-    auto variantOp = getOperation();
+    IREE::HAL::ExecutableVariantOp variantOp = getOperation();
     if (variantOp.getTarget().getBackend().getValue() != target)
       return;
 
@@ -97,7 +97,7 @@ struct ConfigureExecutablesPass
   }
 
   void runOnOperation() override {
-    auto executableOp = getOperation();
+    IREE::HAL::ExecutableOp executableOp = getOperation();
     OpPassManager passManager(executableOp.getOperationName());
     for (const auto &targetName : gatherExecutableTargetNames(executableOp)) {
       passManager.addNestedPass<IREE::HAL::ExecutableVariantOp>(

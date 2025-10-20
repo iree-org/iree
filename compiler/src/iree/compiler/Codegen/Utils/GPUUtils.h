@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_UTILS_GPUUTILS_H_
 #define IREE_COMPILER_CODEGEN_UTILS_GPUUTILS_H_
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -222,11 +223,6 @@ std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func);
 /// given `moduleOp`, ensuring they are returned in their original IR order.
 SmallVector<IREE::HAL::ExecutableVariantOp>
 getExecutableVariantOps(mlir::ModuleOp moduleOp);
-
-// Returns the MMA intrinsics associated with the given
-// `IREE::HAL::ExecutableVariantOp`.
-SmallVector<IREE::GPU::MMAIntrinsic>
-queryMMAIntrinsics(IREE::HAL::ExecutableVariantOp executableOp);
 
 // Returns all operations within the given module that are marked with the
 // tuner root op attribute (i.e., have the `root_op` UnitAttr).

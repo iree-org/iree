@@ -205,6 +205,19 @@ def Stream_AffinityOp : OpInterface<"AffinityOpInterface"> {
         else $_op->removeAttr("affinity");
       }]
     >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the affinity of results from this operation. For most this will
+        be the same as their execution affinity.
+      }],
+      /*retTy=*/"IREE::Stream::AffinityAttr",
+      /*methodName=*/"getResultAffinityAttr",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return $_op.getAffinityAttr();
+      }]
+    >,
   ];
 }
 

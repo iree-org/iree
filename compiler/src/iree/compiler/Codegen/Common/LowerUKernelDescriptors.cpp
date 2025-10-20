@@ -13,6 +13,8 @@
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -31,6 +33,9 @@ namespace mlir::iree_compiler {
 namespace {
 struct LowerBitcodeUKernelsPass final
     : impl::LowerBitcodeUKernelsPassBase<LowerBitcodeUKernelsPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<bufferization::BufferizationDialect, gpu::GPUDialect>();
+  }
   void runOnOperation() override;
 };
 struct LowerMemrefUKernelsPass final
@@ -56,7 +61,7 @@ static void populateCastConversions(TypeConverter &converter) {
     if (!inputTy || !CastOpTy::areCastCompatible(inputTy, resultType)) {
       return Value();
     }
-    return builder.create<CastOpTy>(loc, resultType, input).getResult();
+    return CastOpTy::create(builder, loc, resultType, input).getResult();
   });
   converter.addTargetMaterialization([](OpBuilder &builder, TargetTy resultType,
                                         ValueRange inputs,
@@ -69,7 +74,7 @@ static void populateCastConversions(TypeConverter &converter) {
     if (!inputTy || !CastOpTy::areCastCompatible(inputTy, resultType)) {
       return Value();
     }
-    return builder.create<CastOpTy>(loc, resultType, input).getResult();
+    return CastOpTy::create(builder, loc, resultType, input).getResult();
   });
 }
 
@@ -78,15 +83,10 @@ static void populateCastConversions(TypeConverter &converter) {
 //===----------------------------------------------------------------------===//
 
 /// Converts an operation to `iree_codegen.ukernel.generic`.
-///
-/// NOTE: This is primarily an example implementation with inherent limitations.
-/// The generic approach used here cannot fulfill the requirements of all
-/// ukernel implementations. Real ukernels often need additional
-/// context-specific operands (e.g., runtime shapes or algorithm-specific
-/// parameters) that cannot be generically inferred from the source operation
-/// alone.
-static LogicalResult convertToUKernelGeneric(RewriterBase &rewriter,
-                                             Operation *op, StringRef name) {
+static LogicalResult
+convertToUKernelGeneric(RewriterBase &rewriter, Operation *op, StringRef name,
+                        IREE::Codegen::UKernelProviderInterface &provider,
+                        DictionaryAttr targetConfiguration) {
   SmallVector<Value> tensorInputs;
   SmallVector<Value> tensorOutputs;
   SmallVector<Value> otherOperands;
@@ -113,7 +113,18 @@ static LogicalResult convertToUKernelGeneric(RewriterBase &rewriter,
       }
     }
   }
+
   rewriter.setInsertionPoint(op);
+  if (provider) {
+    std::optional<LogicalResult> retVal =
+        provider.createAndReplaceWithUkernelOp(
+            rewriter, name, targetConfiguration, op, tensorInputs,
+            tensorOutputs, otherOperands);
+    if (retVal)
+      return retVal.value();
+  }
+  // Default ukernel generic op is created when a provider doesn't exist or when
+  // the provider doesn't implement the replacement method.
   rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
       op, op->getResults().getTypes(), name, tensorInputs, tensorOutputs,
       otherOperands, DictionaryAttr(),
@@ -249,7 +260,8 @@ processUKernelKind(Operation *root, IREE::Codegen::UKernelArgumentKind kind) {
   for (auto [op, name] : opsToConvert) {
     switch (kind) {
     case IREE::Codegen::UKernelArgumentKind::Bitcode: {
-      if (failed(convertToUKernelGeneric(rewriter, op, name))) {
+      if (failed(convertToUKernelGeneric(rewriter, op, name, provider,
+                                         targetAttr.getConfiguration()))) {
         return op->emitOpError()
                << "failed to convert to ukernel.generic with name " << name;
       }

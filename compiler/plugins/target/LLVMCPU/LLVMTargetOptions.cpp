@@ -387,8 +387,8 @@ void LLVMTarget::populateDefaultsFromTargetMachine() {
 std::unique_ptr<llvm::TargetMachine>
 createTargetMachine(const LLVMTarget &target) {
   std::string errorMessage;
-  auto llvmTarget =
-      llvm::TargetRegistry::lookupTarget(target.getTriple(), errorMessage);
+  auto llvmTarget = llvm::TargetRegistry::lookupTarget(
+      llvm::Triple(target.getTriple()), errorMessage);
   if (!llvmTarget)
     return nullptr;
   llvm::Triple triple(target.getTriple());

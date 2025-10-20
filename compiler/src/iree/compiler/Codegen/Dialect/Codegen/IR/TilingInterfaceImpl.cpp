@@ -21,8 +21,8 @@ SmallVector<utils::IteratorType> InnerTiledOp::getLoopIteratorTypes() {
 
 SmallVector<Range> InnerTiledOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  Value zero = arith::ConstantIndexOp::create(builder, loc, 0);
+  Value one = arith::ConstantIndexOp::create(builder, loc, 1);
   SmallVector<Range> ranges;
   SmallVector<AffineMap> indexingMaps = getIndexingMapsArray();
   int64_t numInputs = getNumInputs();
@@ -102,8 +102,8 @@ static tensor::ExtractSliceOp extractSlice(OpBuilder &b, Location loc,
 
   OpFoldResult one = b.getIndexAttr(1);
   SmallVector<OpFoldResult> fullStrides(srcRank, one);
-  return b.create<tensor::ExtractSliceOp>(loc, src, fullOffsets, fullSizes,
-                                          fullStrides);
+  return tensor::ExtractSliceOp::create(b, loc, src, fullOffsets, fullSizes,
+                                        fullStrides);
 }
 
 FailureOr<TilingResult>

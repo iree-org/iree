@@ -126,8 +126,7 @@ static LogicalResult isWithinVectorSizeLimit(linalg::LinalgOp linalgOp,
 class GenericVectorizationPass final
     : public impl::GenericVectorizationPassBase<GenericVectorizationPass> {
 public:
-  using impl::GenericVectorizationPassBase<
-      GenericVectorizationPass>::GenericVectorizationPassBase;
+  using Base::Base;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
@@ -139,7 +138,7 @@ public:
 
 void GenericVectorizationPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
 
   IRRewriter rewriter(context);
   SmallVector<Operation *> candidates;
@@ -149,8 +148,7 @@ void GenericVectorizationPass::runOnOperation() {
         return;
       }
       candidates.push_back(op);
-    } else if (vectorizePadding && enableVectorMasking &&
-               isa<tensor::PadOp>(op)) {
+    } else if (enableVectorMasking && isa<tensor::PadOp>(op)) {
       candidates.push_back(op);
     } else if (enableVectorMasking &&
                isa<linalg::PackOp, linalg::UnPackOp>(op)) {
@@ -178,8 +176,7 @@ void GenericVectorizationPass::runOnOperation() {
       // Do not vectorize the op if the vector size is greater than or equal
       // to limit.
       if (enableVectorMasking) {
-        if (std::accumulate(vectorSizes.begin(), vectorSizes.end(), 1,
-                            std::multiplies<int64_t>()) >= maxVectorSize)
+        if (llvm::product_of(vectorSizes) >= maxVectorSize)
           continue;
       } else {
         if (failed(isWithinVectorSizeLimit(linalgOp, maxVectorSize)))
@@ -193,13 +190,14 @@ void GenericVectorizationPass::runOnOperation() {
     if (isa<linalg::GenericOp>(op) && vectorizeToTransferGather) {
       (void)IREE::VectorExt::vectorizeGatherLikeGenericToTransferGather(
           rewriter, cast<linalg::GenericOp>(op), vectorSizes, scalableVecDims,
-          vectorizeGatherAccesses);
+          /*vectorizeNDExtract=*/true);
     } else if (auto gatherOp = dyn_cast<IREE::LinalgExt::GatherOp>(op)) {
       (void)IREE::VectorExt::vectorizeLinalgExtGatherToTransferGather(
           rewriter, gatherOp, vectorSizes);
     } else {
-      FailureOr<linalg::VectorizationResult> result = linalg::vectorize(
-          rewriter, op, vectorSizes, scalableVecDims, vectorizeGatherAccesses);
+      FailureOr<linalg::VectorizationResult> result =
+          linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
+                            /*vectorizeNDExtract=*/true);
       if (succeeded(result)) {
         rewriter.replaceOp(op, result->replacements);
       }

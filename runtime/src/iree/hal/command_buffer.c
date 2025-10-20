@@ -116,6 +116,7 @@ iree_hal_command_buffer_mode_format(iree_hal_command_buffer_mode_t value,
       {IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION,
        IREE_SVL("ALLOW_INLINE_EXECUTION")},
       {IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED, IREE_SVL("UNVALIDATED")},
+      {IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED, IREE_SVL("UNRETAINED")},
   };
   return iree_bitfield_format_inline(value, IREE_ARRAYSIZE(mappings), mappings,
                                      out_temp);
@@ -518,7 +519,8 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_collective(
 
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     iree_hal_command_buffer_t* command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point,
+    iree_hal_executable_t* executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings,
     iree_hal_dispatch_flags_t flags) {
@@ -565,11 +567,11 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_command_buffer_dispatch_validation(
                 command_buffer, VALIDATION_STATE(command_buffer), executable,
-                entry_point, config, constants, bindings, flags));
+                export_ordinal, config, constants, bindings, flags));
   });
 
   iree_status_t status = _VTABLE_DISPATCH(command_buffer, dispatch)(
-      command_buffer, executable, entry_point, config, constants, bindings,
+      command_buffer, executable, export_ordinal, config, constants, bindings,
       flags);
 
   IREE_TRACE_ZONE_END(z0);

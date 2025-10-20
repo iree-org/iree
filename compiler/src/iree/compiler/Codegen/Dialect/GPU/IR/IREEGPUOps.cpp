@@ -5,19 +5,17 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
-#include <functional>
-#include <numeric>
 
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/Interfaces/DestinationStyleOpInterface.h"
+#include "mlir/Interfaces/ParallelCombiningOpInterface.h"
 #include "mlir/Support/LLVM.h"
 
 // clang-format off
@@ -146,7 +144,7 @@ static RankedTensorType getMaximumStaticType(tensor::CastOp castOp) {
 
 struct FoldBufferCastOfTensorCast final
     : OpRewritePattern<BufferResourceCastOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(BufferResourceCastOp castOp,
                                 PatternRewriter &rewriter) const override {
@@ -165,11 +163,11 @@ struct FoldBufferCastOfTensorCast final
     if (newSource.getType() != maxStaticType) {
       // Cast to the type with maximum static information if the input and
       // result types contain different static info.
-      newSource = rewriter.create<tensor::CastOp>(castOp.getLoc(),
-                                                  maxStaticType, newSource);
+      newSource = tensor::CastOp::create(rewriter, castOp.getLoc(),
+                                         maxStaticType, newSource);
     }
-    auto newBufferCast = rewriter.create<IREE::GPU::BufferResourceCastOp>(
-        castOp.getLoc(), maxStaticType, newSource,
+    auto newBufferCast = IREE::GPU::BufferResourceCastOp::create(
+        rewriter, castOp.getLoc(), maxStaticType, newSource,
         castOp.getCacheSwizzleStride());
     newBufferCast->setDiscardableAttrs(castOp->getDiscardableAttrDictionary());
 
@@ -183,6 +181,75 @@ struct FoldBufferCastOfTensorCast final
 void BufferResourceCastOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *ctx) {
   results.add<FoldBufferCastOfTensorCast>(ctx);
+}
+
+//===----------------------------------------------------------------------===//
+// CoalescedGatherDMAOp
+//===----------------------------------------------------------------------===//
+
+// DestinationStyleOpInterface implementation
+MutableOperandRange CoalescedGatherDMAOp::getDpsInitsMutable() {
+  return getInitMutable();
+}
+
+// ParallelCombiningOpInterface implementation
+MutableOperandRange CoalescedGatherDMAOp::getUpdatedDestinations() {
+  // Only relevant for tensor operands
+  if (!isa<RankedTensorType>(getInit().getType())) {
+    return MutableOperandRange(getOperation(), /*start=*/0, /*length=*/0);
+  }
+  // Return the init operand as the destination being updated
+  return getInitMutable();
+}
+
+Operation *CoalescedGatherDMAOp::getIteratingParent() {
+  // Only relevant for tensor operands
+  if (!isa<RankedTensorType>(getInit().getType())) {
+    return nullptr;
+  }
+  // Return the parent scf.forall operation
+  return getOperation()->getParentOfType<scf::ForallOp>();
+}
+
+LogicalResult CoalescedGatherDMAOp::verify() {
+  auto initType = getInit().getType();
+  auto resultType = getResult().getType();
+
+  // Verify that this op is nested within an InParallelOpInterface op
+  // Note: This constraint only applies when working with tensors
+  if (isa<RankedTensorType>(initType)) {
+    if (!isa_and_nonnull<InParallelOpInterface>(
+            getOperation()->getParentOp())) {
+      return emitOpError("must be nested within an operation implementing "
+                         "InParallelOpInterface when using tensor operands");
+    }
+  }
+
+  if (initType != resultType) {
+    return emitOpError("init and result must have the same type and shape");
+  }
+
+  // Ensure all operands are either all tensors or all memrefs
+  bool hasTensor = isa<RankedTensorType>(initType);
+  bool hasMemRef = isa<MemRefType>(initType);
+
+  if (!hasTensor && !hasMemRef) {
+    return emitOpError("input type must either be a tensor or a memref");
+  }
+
+  if (hasTensor) {
+    if (!isa<RankedTensorType>(getIndices().getType()) ||
+        !isa<RankedTensorType>(getSource().getType())) {
+      return emitOpError("all operands must be tensors when init is a tensor");
+    }
+  } else if (hasMemRef) {
+    if (!isa<MemRefType>(getIndices().getType()) ||
+        !isa<MemRefType>(getSource().getType())) {
+      return emitOpError("all operands must be memrefs when init is a memref");
+    }
+  }
+
+  return success();
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU

@@ -24,7 +24,7 @@ struct VerifyLinalgTransformLegalityPass
 } // namespace
 
 void VerifyLinalgTransformLegalityPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   // For now only check that there are no Linalg transform markers.
   auto walkResult = funcOp.walk([](linalg::LinalgOp op) -> WalkResult {
     if (op->hasAttr(LinalgTransforms::kLinalgTransformMarker)) {

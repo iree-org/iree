@@ -34,7 +34,7 @@ public:
 } // namespace
 
 void VMVXSelectLoweringStrategyPass::runOnOperation() {
-  auto moduleOp = getOperation();
+  mlir::ModuleOp moduleOp = getOperation();
   for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
     // Set the strategy with default heuristics.
     if (failed(initVMVXLaunchConfig(funcOp))) {

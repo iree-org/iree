@@ -8,16 +8,13 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/DialectImplementation.h"
 #include "mlir/Interfaces/TilingInterface.h"
 
 namespace mlir::iree_compiler::IREE::GPU {
@@ -27,9 +24,9 @@ Value promoteValue(OpBuilder &builder, Location loc, Value v, Attribute attr) {
   auto tensorType = cast<RankedTensorType>(v.getType());
   SmallVector<OpFoldResult> mixedSizes = tensor::getMixedSizes(builder, loc, v);
 
-  Value empty = builder.create<tensor::EmptyOp>(loc, mixedSizes,
-                                                tensorType.getElementType());
-  auto copy = builder.create<linalg::CopyOp>(loc, v, empty);
+  Value empty = tensor::EmptyOp::create(builder, loc, mixedSizes,
+                                        tensorType.getElementType());
+  auto copy = linalg::CopyOp::create(builder, loc, v, empty);
   setLoweringConfig(copy, attr);
   return copy.getResult(0);
 }
@@ -125,8 +122,8 @@ Value cacheSwizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
   // Insert the resource cast optimistically. If the input is not castable
   // (e.g. another producer) later patterns will drop it anyway as it is treated
   // like a hint.
-  auto resourceCast = builder.create<IREE::GPU::BufferResourceCastOp>(
-      loc, tensorType, bufferCastValue, cacheSwizzleVal);
+  auto resourceCast = IREE::GPU::BufferResourceCastOp::create(
+      builder, loc, tensorType, bufferCastValue, cacheSwizzleVal);
   bufferCastOperand->assign(resourceCast);
 
   return promotedValue;

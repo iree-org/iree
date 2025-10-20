@@ -2614,19 +2614,29 @@ def HAL_ExecutableOp : HAL_Op<"executable", [
   let summary = [{Target-specific executable module.}];
   let description = [{
     An executable module representing a target-specific compiled
-    kernel/shader/etc.
+    kernel/shader/etc. Executables are treated as independent compilation units
+    and may contain multiple exported entry points that are able to share code
+    internally. To support multi-targeting each executable may have one or more
+    target-specific variants that are lowered independently during compilation
+    while still appearing as one executable at runtime (ala fat binaries).
+
+    At runtime executables are loaded during module initialization and cached
+    for the lifetime of the module. If the `lazy` attribute is set the
+    executable _may_ have its loading deferred until first use.
   }];
 
   let arguments = (ins
     OptionalAttr<StrAttr>:$sym_visibility,
-    SymbolNameAttr:$sym_name
+    SymbolNameAttr:$sym_name,
     // TODO(benvanik): entry point types for verification.
+    UnitAttr:$lazy
   );
 
   let regions = (region SizedRegion<1>:$body);
 
   let assemblyFormat = [{
     custom<SymbolVisibility>($sym_visibility)
+    (`lazy` $lazy^)?
     $sym_name
     attr-dict-with-keyword
     regions

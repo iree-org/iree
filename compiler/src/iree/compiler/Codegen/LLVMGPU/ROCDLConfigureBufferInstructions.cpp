@@ -120,9 +120,9 @@ struct ROCDLConfigureBufferInstructionsPass final
   void runOnOperation() override {
     if (!clROCDLlEnableBufferInstructions)
       return;
-    FunctionOpInterface func = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     // Is this really he best way to skip this pass on non-rocdl targets?
-    IREE::GPU::TargetAttr target = getGPUTargetAttr(func);
+    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
     if (!target || !target.isAMD())
       return;
     auto *gpuDialect =
@@ -130,7 +130,7 @@ struct ROCDLConfigureBufferInstructionsPass final
     auto annotationHelper =
         gpuDialect->getUseRocdlBufferInstructionsAttrHelper();
     auto unitAttr = UnitAttr::get(&getContext());
-    func.walk([&](IREE::HAL::InterfaceBindingSubspanOp binding) {
+    funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp binding) {
       Value offset = binding.getByteOffset();
       if (offset && !isDefinitelyWorkgroupUniform(offset)) {
         LDBG() << "Binding offset " << offset

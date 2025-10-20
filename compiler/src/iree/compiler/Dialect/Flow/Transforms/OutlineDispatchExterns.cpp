@@ -40,8 +40,8 @@ convertDispatchExternToDispatchOp(IREE::HAL::DispatchExternOp dispatchExternOp,
   // Create the dispatch op to the executable function.
   // Note that we copy the tied operand indices from the workgroups op - it
   // lines up 1:1 with the dispatch once we've outlined things.
-  auto dispatchOp = builder.create<IREE::Flow::DispatchOp>(
-      dispatchExternOp.getLoc(), dispatchExternOp.getResultTypes(),
+  auto dispatchOp = IREE::Flow::DispatchOp::create(
+      builder, dispatchExternOp.getLoc(), dispatchExternOp.getResultTypes(),
       dispatchExternOp.getWorkload(), builder.getArrayAttr(exportRefs),
       dispatchExternOp.getArguments(), dispatchExternOp.getArgumentDims(),
       dispatchExternOp.getResultDims(), dispatchExternOp.getTiedOperandsAttr());
@@ -67,8 +67,8 @@ outlineDispatchExternOp(std::string name,
       dispatchExternOp->getParentOfType<mlir::FunctionOpInterface>();
   auto parentModuleOp = parentFuncOp->getParentOfType<mlir::ModuleOp>();
   OpBuilder parentModuleBuilder(&parentModuleOp.getBody()->back());
-  auto executableOp = parentModuleBuilder.create<IREE::HAL::ExecutableOp>(
-      dispatchExternOp.getLoc(), name);
+  auto executableOp = IREE::HAL::ExecutableOp::create(
+      parentModuleBuilder, dispatchExternOp.getLoc(), name);
   executableOp.getOperation()->moveBefore(parentFuncOp);
   executableOp.setPrivate();
   moduleSymbolTable.insert(executableOp);
@@ -88,26 +88,26 @@ outlineDispatchExternOp(std::string name,
     // Create the variant for the given target. Note that we may have multiple
     // variants that use the same base targetAttr but have unique condition
     // regions so we rely on the symbol table for uniquing names.
-    auto variantOp = executableBuilder.create<IREE::HAL::ExecutableVariantOp>(
-        dispatchExternOp.getLoc(), targetAttr.getSymbolNameFragment(),
-        targetAttr);
+    auto variantOp = IREE::HAL::ExecutableVariantOp::create(
+        executableBuilder, dispatchExternOp.getLoc(),
+        targetAttr.getSymbolNameFragment(), targetAttr);
     variantOp.setObjectsAttr(targetObjectsAttr);
     executableSymbolTable.insert(variantOp);
 
     // Move over optional target condition region to a condition op.
     OpBuilder variantBuilder(variantOp.getBody());
     if (!targetConditionRegion.empty()) {
-      auto conditionOp =
-          variantBuilder.create<IREE::HAL::ExecutableConditionOp>(
-              dispatchExternOp.getLoc());
+      auto conditionOp = IREE::HAL::ExecutableConditionOp::create(
+          variantBuilder, dispatchExternOp.getLoc());
       IRMapping mapper;
       targetConditionRegion.cloneInto(&conditionOp.getBody(), mapper);
     }
 
     // Add an export pointing at the entry point function.
-    auto exportOp = variantBuilder.create<IREE::HAL::ExecutableExportOp>(
-        dispatchExternOp.getLoc(), dispatchExternOp.getExportNameAttr(),
-        targetOrdinalAttr, dispatchExternOp.getLayoutAttr(),
+    auto exportOp = IREE::HAL::ExecutableExportOp::create(
+        variantBuilder, dispatchExternOp.getLoc(),
+        dispatchExternOp.getExportNameAttr(), targetOrdinalAttr,
+        dispatchExternOp.getLayoutAttr(),
         dispatchExternOp.getWorkgroupSizeAttr(),
         dispatchExternOp.getSubgroupSizeAttr(),
         dispatchExternOp.getWorkgroupLocalMemoryAttr());

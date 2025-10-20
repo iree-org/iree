@@ -8,6 +8,7 @@
 #define IREE_PLUGINS_TARGET_ROCM_DIALECT_ROCMATTRS
 
 include "ROCMDialect.td"
+include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/BuiltinTypeInterfaces.td"
@@ -36,6 +37,84 @@ def ROCM_BuiltinTuningModuleAttr :
     StringRefParameter<>:$builtin_filename
   );
   let assemblyFormat = "`<` $builtin_filename `>`";
+}
+
+def ROCM_UKernelProviderAttr  :
+    AttrDef<ROCM_Dialect, "UKernelProvider", [
+    DeclareAttrInterfaceMethods<IREECodegen_UKernelProviderInterface, [
+        "createAndReplaceWithUkernelOp"
+      ]>
+    ]> {
+  let mnemonic = "ukernel_provider";
+  let summary = [{
+    An attribute that provides context specific ukernel implementations for ROCM.
+  }];
+  let parameters = (ins);
+  let assemblyFormat = [{}];
+}
+
+//===---------------------------------------------------------------------===//
+// rocm.tensor_ukernel_provider
+//===---------------------------------------------------------------------===//
+
+def ROCM_TensorUKernelProviderAttr  :
+    AttrDef<ROCM_Dialect, "TensorUKernelProvider", [
+    DeclareAttrInterfaceMethods<IREECodegen_UKernelProviderInterface, [
+      "getDataLayoutForUKernel",
+      "getMLIRUKernel",
+      ]>
+    ]> {
+  let mnemonic = "tensor_ukernel_provider";
+  let summary = [{
+    An attribute that provides context specific tensor ukernel implementations for ROCM.
+  }];
+  let parameters = (ins);
+  let assemblyFormat = [{}];
+}
+
+//===---------------------------------------------------------------------===//
+// rocm.ukernel_info
+//===---------------------------------------------------------------------===//
+
+def ROCM_UKernelInfoAttr : AttrDef<ROCM_Dialect, "UKernelInfo", []> {
+  let mnemonic = "ukernel_info";
+  let summary = [{
+    An attribute that provides metadata around a ukernel, e.g. for matching.
+  }];
+  let parameters =
+      (ins AttrParameter<
+           "DictionaryAttr",
+           "Parameters controlling matching this ukernel, in addition to ISA "
+           "requirements from the mma attribute.">:$match,
+          DefaultValuedParameter<"int64_t", "0",
+                                 "Determines which ukernel is selected when "
+                                 "multiple ones are applicable.">:$benefit,
+          OptionalParameter<"Attribute",
+                            "MMAAttr-like attribute if applicable, dictates "
+                            "layout and/or ISA requirements">:$mma);
+  let assemblyFormat = "`<` struct(params) `>`";
+}
+
+//===---------------------------------------------------------------------===//
+// rocm.ukernel_interation_size_constraint
+//===---------------------------------------------------------------------===//
+
+def ROCM_UKernelIterationSizeConstraint
+    : AttrDef<ROCM_Dialect, "UKernelIterationSizeConstraint", []> {
+  let mnemonic = "ukernel_interation_size_constraint";
+  let summary = [{
+    An attribute that provides a matching constraint on an iteration size.
+  }];
+  let parameters = (ins OptionalParameter<
+                        "IntegerAttr",
+                        "Index of iteration dimension to match">:$index,
+      OptionalParameter<"IntegerAttr",
+                        "Minimum iteration dimension size to match">:$size_min,
+      OptionalParameter<"IntegerAttr",
+                        "Maximum iteration dimension size to match">:$size_max,
+      OptionalParameter<"IntegerAttr", "Divisor of iteration dimension size to "
+                                       "match">:$size_div);
+  let assemblyFormat = "`<` struct(params) `>`";
 }
 
 #endif // IREE_PLUGINS_TARGET_ROCM_DIALECT_ROCMATTRS

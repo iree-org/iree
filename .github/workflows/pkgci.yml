@@ -103,6 +103,12 @@ jobs:
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_sharktank')
     uses: ./.github/workflows/pkgci_test_sharktank.yml
 
+  test_torch:
+    name: Test Torch
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_torch')
+    uses: ./.github/workflows/pkgci_test_torch.yml
+
   test_tensorflow:
     name: Test TensorFlow
     needs: [setup, build_packages]

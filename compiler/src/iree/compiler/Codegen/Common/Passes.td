@@ -370,7 +370,8 @@ def FissionTransferOpsInControlFlowPass : InterfacePass<"iree-codegen-fission-tr
   let summary =
       "Fission transfer read and write ops in control flow to allow prefetching.";
   let dependentDialects = [
-      "memref::MemRefDialect"
+      "memref::MemRefDialect",
+      "affine::AffineDialect"
   ];
   let options = [
     Option<"FissionMultiTrip", "fission-multi-trip",
@@ -445,10 +446,6 @@ def GenericVectorizationPass :
       "Control whether the op lowering config represents a set of masked vector sizes">,
     Option<"vectorizeCopies", "vectorize-copies", "bool", /*default=*/"true",
       "Enable vectorization of linalg.copy operations.">,
-    Option<"vectorizePadding", "vectorize-padding", "bool", /*default=*/"false",
-      "Rewrite all tensor.pad ops in the function to vector form.">,
-    Option<"vectorizeGatherAccesses", "vectorize-gather-accesses", "bool", /*default=*/"false",
-      "Enable vectorizaiton of operations that may generate vector.gather operations.">,
     Option<"vectorizeToTransferGather", "vectorize-to-transfer-gather", "bool", /*default=*/"false",
       "Enables vectorization of gather-like operations that may generate iree_vector_ext.transfer_gather">,
     Option<"enableCleanup", "enable-cleanup", "bool",/*default=*/"true",

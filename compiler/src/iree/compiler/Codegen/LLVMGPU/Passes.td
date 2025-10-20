@@ -137,9 +137,4 @@ def TestLLVMGPUScalarizeMathOpPass :
   let summary = "Test pass for several legalization patterns.";
 }
 
-def TestLLVMGPUQueryMMAPass :
-    Pass<"iree-test-llvmgpu-query-mma", "ModuleOp"> {
-  let summary = "Test pass for querying the supported mma intrinsic instructions.";
-}
-
 #endif // IREE_CODEGEN_LLVMGPU_PASSES

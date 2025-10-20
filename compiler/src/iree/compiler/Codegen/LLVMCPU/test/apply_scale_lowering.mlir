@@ -27,7 +27,7 @@ hal.executable private @apply_scale_no_vector_feature {
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<2xi32>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
-        %3 = tosa.apply_scale %2, %cst, %cst_0 {rounding_mode = "SINGLE_ROUND"} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        %3 = tosa.apply_scale %2, %cst, %cst_0 {rounding_mode = SINGLE_ROUND} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
         return
       }
@@ -72,7 +72,7 @@ hal.executable private @apply_scale_v {
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<2xi32>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
-        %3 = tosa.apply_scale %2, %cst, %cst_0 {rounding_mode = "SINGLE_ROUND"} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        %3 = tosa.apply_scale %2, %cst, %cst_0 {rounding_mode = SINGLE_ROUND} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
         return
       }
@@ -115,7 +115,7 @@ hal.executable private @apply_scale_zve64x {
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<2xi32>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
-        %3 = tosa.apply_scale %2, %cst, %cst_0 {rounding_mode = "SINGLE_ROUND"} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        %3 = tosa.apply_scale %2, %cst, %cst_0 {rounding_mode = SINGLE_ROUND} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
         return
       }
@@ -158,7 +158,7 @@ hal.executable private @apply_scale_zve32x {
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<2xi32>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
-        %3 = tosa.apply_scale %2, %cst, %cst_0 {rounding_mode = "SINGLE_ROUND"} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        %3 = tosa.apply_scale %2, %cst, %cst_0 {rounding_mode = SINGLE_ROUND} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
         return
       }
@@ -208,7 +208,7 @@ hal.executable private @apply_scale_zve32f {
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<2xi32>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
-        %3 = tosa.apply_scale %2, %cst, %cst_0 {rounding_mode = "SINGLE_ROUND"} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        %3 = tosa.apply_scale %2, %cst, %cst_0 {rounding_mode = SINGLE_ROUND} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
         return
       }

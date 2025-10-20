@@ -1,6 +1,6 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-hip-target=gfx942 --iree-hip-encoding-layout-resolver=pad %s | FileCheck %s --check-prefix=PAD
-//
+
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-hip-target=gfx90a --iree-hip-encoding-layout-resolver=pad %s | FileCheck %s --check-prefix=PAD
 
@@ -10,11 +10,17 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-hip-target=gfx90a --iree-hip-encoding-layout-resolver=none %s | FileCheck %s --check-prefix=NONE
 
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-hip-target=gfx90a %s | FileCheck %s --check-prefix=DEFAULT
+
 // PAD:      #hal.executable.target<"rocm"
 // PAD-SAME:   iree.encoding.resolver = #iree_gpu.gpu_padding_resolver<>
 
 // DATA-TILING:      #hal.executable.target<"rocm"
 // DATA-TILING-SAME:   iree.encoding.resolver = #iree_gpu.gpu_encoding_resolver<>
+
+// DEFAULT:      #hal.executable.target<"rocm"
+// DEFAULT-SAME:   iree.encoding.resolver = #iree_gpu.gpu_encoding_resolver<>
 
 // NONE:      #hal.executable.target<"rocm"
 // NONE-NOT:    iree.encoding.resolver

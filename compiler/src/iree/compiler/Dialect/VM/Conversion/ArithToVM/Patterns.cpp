@@ -96,7 +96,7 @@ struct ConstantOpConversion : public OpConversionPattern<arith::ConstantOp> {
 };
 
 struct CmpI32OpConversion : public OpConversionPattern<arith::CmpIOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(arith::CmpIOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -151,7 +151,7 @@ struct CmpI32OpConversion : public OpConversionPattern<arith::CmpIOp> {
 };
 
 struct CmpI64OpConversion : public OpConversionPattern<arith::CmpIOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(arith::CmpIOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -206,7 +206,7 @@ struct CmpI64OpConversion : public OpConversionPattern<arith::CmpIOp> {
 };
 
 struct CmpF32OpConversion : public OpConversionPattern<arith::CmpFOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(arith::CmpFOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -296,7 +296,7 @@ struct CmpF32OpConversion : public OpConversionPattern<arith::CmpFOp> {
 };
 
 struct CmpF64OpConversion : public OpConversionPattern<arith::CmpFOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(arith::CmpFOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -483,7 +483,7 @@ struct IndexCastOpConversion : public OpConversionPattern<OpTy> {
 };
 
 struct ZeroExtendIOpConversion : public OpConversionPattern<arith::ExtUIOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(arith::ExtUIOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -527,7 +527,7 @@ struct ZeroExtendIOpConversion : public OpConversionPattern<arith::ExtUIOp> {
 };
 
 struct SignExtendIOpConversion : public OpConversionPattern<arith::ExtSIOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(arith::ExtSIOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -537,14 +537,14 @@ struct SignExtendIOpConversion : public OpConversionPattern<arith::ExtSIOp> {
       if (dstType.isInteger(32)) {
         rewriter.replaceOpWithNewOp<IREE::VM::SelectI32Op>(
             srcOp, dstType, adaptor.getIn(),
-            rewriter.create<IREE::VM::ConstI32Op>(srcOp.getLoc(), 0xFFFFFFFFu),
-            rewriter.create<IREE::VM::ConstI32ZeroOp>(srcOp.getLoc()));
+            IREE::VM::ConstI32Op::create(rewriter, srcOp.getLoc(), 0xFFFFFFFFu),
+            IREE::VM::ConstI32ZeroOp::create(rewriter, srcOp.getLoc()));
       } else if (dstType.isInteger(64)) {
         rewriter.replaceOpWithNewOp<IREE::VM::SelectI64Op>(
             srcOp, dstType, adaptor.getIn(),
-            rewriter.create<IREE::VM::ConstI64Op>(srcOp.getLoc(),
-                                                  0xFFFFFFFFFFFFFFFFull),
-            rewriter.create<IREE::VM::ConstI64ZeroOp>(srcOp.getLoc()));
+            IREE::VM::ConstI64Op::create(rewriter, srcOp.getLoc(),
+                                         0xFFFFFFFFFFFFFFFFull),
+            IREE::VM::ConstI64ZeroOp::create(rewriter, srcOp.getLoc()));
       } else {
         return rewriter.notifyMatchFailure(srcOp,
                                            "unsupported i1 sign extension");
@@ -572,7 +572,7 @@ struct SignExtendIOpConversion : public OpConversionPattern<arith::ExtSIOp> {
 };
 
 struct TruncateIOpConversion : public OpConversionPattern<arith::TruncIOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(arith::TruncIOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -617,7 +617,7 @@ struct TruncateIOpConversion : public OpConversionPattern<arith::TruncIOp> {
 };
 
 struct ExtendFOpConversion : public OpConversionPattern<arith::ExtFOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(arith::ExtFOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -637,7 +637,7 @@ struct ExtendFOpConversion : public OpConversionPattern<arith::ExtFOp> {
 };
 
 struct SIToFPOpConversion : public OpConversionPattern<arith::SIToFPOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(arith::SIToFPOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -672,8 +672,9 @@ struct SIToFPOpConversion : public OpConversionPattern<arith::SIToFPOp> {
     }
 
     if (srcType.getIntOrFloatBitWidth() < 32) {
-      input = rewriter.create<arith::ExtSIOp>(
-          srcOp.getLoc(), IntegerType::get(this->getContext(), 32), input);
+      input = arith::ExtSIOp::create(rewriter, srcOp.getLoc(),
+                                     IntegerType::get(this->getContext(), 32),
+                                     input);
     }
 
     rewriter.replaceOpWithNewOp<IREE::VM::CastSI32F32Op>(srcOp, resultType,
@@ -683,7 +684,7 @@ struct SIToFPOpConversion : public OpConversionPattern<arith::SIToFPOp> {
 };
 
 struct UIToFPOpConversion : public OpConversionPattern<arith::UIToFPOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(arith::UIToFPOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -719,8 +720,9 @@ struct UIToFPOpConversion : public OpConversionPattern<arith::UIToFPOp> {
     }
 
     if (srcType.getIntOrFloatBitWidth() < 32) {
-      input = rewriter.create<arith::ExtUIOp>(
-          srcOp.getLoc(), IntegerType::get(this->getContext(), 32), input);
+      input = arith::ExtUIOp::create(rewriter, srcOp.getLoc(),
+                                     IntegerType::get(this->getContext(), 32),
+                                     input);
     }
 
     rewriter.replaceOpWithNewOp<IREE::VM::CastUI32F32Op>(srcOp, resultType,
@@ -730,7 +732,7 @@ struct UIToFPOpConversion : public OpConversionPattern<arith::UIToFPOp> {
 };
 
 struct FPToSIOpConversion : public OpConversionPattern<arith::FPToSIOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(arith::FPToSIOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -756,7 +758,7 @@ struct FPToSIOpConversion : public OpConversionPattern<arith::FPToSIOp> {
 };
 
 struct FPToUIOpConversion : public OpConversionPattern<arith::FPToUIOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(arith::FPToUIOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -780,7 +782,7 @@ struct FPToUIOpConversion : public OpConversionPattern<arith::FPToUIOp> {
 };
 
 struct BitcastOpConversion : public OpConversionPattern<arith::BitcastOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(arith::BitcastOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -808,7 +810,7 @@ struct BitcastOpConversion : public OpConversionPattern<arith::BitcastOp> {
 };
 
 struct SelectOpConversion : public OpConversionPattern<arith::SelectOp> {
-  using OpConversionPattern::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(arith::SelectOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {

@@ -101,7 +101,8 @@ struct VMInlinerInterface : public DialectInlinerInterface {
 
     // Replace the return with a branch to the dest.
     OpBuilder builder(op);
-    builder.create<VM::BranchOp>(op->getLoc(), newDest, returnOp.getOperands());
+    VM::BranchOp::create(builder, op->getLoc(), newDest,
+                         returnOp.getOperands());
     op->erase();
   }
 
@@ -264,32 +265,32 @@ Operation *VMDialect::materializeConstant(OpBuilder &builder, Attribute value,
   if (ConstI32Op::isBuildableWith(typedValue, type)) {
     auto convertedValue = ConstI32Op::convertConstValue(typedValue);
     if (llvm::cast<IntegerAttr>(convertedValue).getValue() == 0) {
-      return builder.create<VM::ConstI32ZeroOp>(loc);
+      return VM::ConstI32ZeroOp::create(builder, loc);
     }
-    return builder.create<VM::ConstI32Op>(loc, convertedValue);
+    return VM::ConstI32Op::create(builder, loc, convertedValue);
   } else if (ConstI64Op::isBuildableWith(typedValue, type)) {
     auto convertedValue = ConstI64Op::convertConstValue(typedValue);
     if (llvm::cast<IntegerAttr>(convertedValue).getValue() == 0) {
-      return builder.create<VM::ConstI64ZeroOp>(loc);
+      return VM::ConstI64ZeroOp::create(builder, loc);
     }
-    return builder.create<VM::ConstI64Op>(loc, convertedValue);
+    return VM::ConstI64Op::create(builder, loc, convertedValue);
   } else if (ConstF32Op::isBuildableWith(typedValue, type)) {
     auto convertedValue = ConstF32Op::convertConstValue(typedValue);
     if (llvm::cast<FloatAttr>(convertedValue).getValue().isZero()) {
-      return builder.create<VM::ConstF32ZeroOp>(loc);
+      return VM::ConstF32ZeroOp::create(builder, loc);
     }
-    return builder.create<VM::ConstF32Op>(loc, convertedValue);
+    return VM::ConstF32Op::create(builder, loc, convertedValue);
   } else if (ConstF64Op::isBuildableWith(typedValue, type)) {
     auto convertedValue = ConstF64Op::convertConstValue(typedValue);
     if (llvm::cast<FloatAttr>(convertedValue).getValue().isZero()) {
-      return builder.create<VM::ConstF64ZeroOp>(loc);
+      return VM::ConstF64ZeroOp::create(builder, loc);
     }
-    return builder.create<VM::ConstF64Op>(loc, convertedValue);
+    return VM::ConstF64Op::create(builder, loc, convertedValue);
   } else if (llvm::isa<IREE::VM::RefType>(type)) {
     // The only constant type we support for refs is null so we can just
     // emit that here.
     // TODO(benvanik): relace unit attr with a proper null ref attr.
-    return builder.create<VM::ConstRefZeroOp>(loc, type);
+    return VM::ConstRefZeroOp::create(builder, loc, type);
   }
   // TODO(benvanik): handle other constant value types.
   return nullptr;

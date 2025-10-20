@@ -46,6 +46,8 @@ constexpr char kCpuFeaturesAttrName[] = "cpu_features";
 constexpr char kDataLayoutAttrName[] = "data_layout";
 constexpr char kTargetInfoAttrName[] = "iree_codegen.target_info";
 constexpr char kTargetTripleAttrName[] = "target_triple";
+// For optimal performance we always want to copy 128 bits
+constexpr int64_t kPreferredCopyNumBits = 128;
 
 namespace mlir::iree_compiler {
 
@@ -448,8 +450,8 @@ LogicalResult setDefaultCustomOpLoweringConfig(
       FunctionType::get(context, operandTypes, customOp->getResultTypes());
   std::string dummyFuncName =
       std::string("__") + funcOp.getName().str() + "_config_setting__";
-  auto dummyFuncOp = rewriter.create<func::FuncOp>(
-      customOp.getLoc(), dummyFuncName, dummyFuncType);
+  auto dummyFuncOp = func::FuncOp::create(rewriter, customOp.getLoc(),
+                                          dummyFuncName, dummyFuncType);
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
   if (targetAttr) {
     dummyFuncOp->setAttr(IREE::HAL::ExecutableTargetAttr::name, targetAttr);
@@ -475,8 +477,8 @@ LogicalResult setDefaultCustomOpLoweringConfig(
   }
   auto clonedCustomOp = cast<IREE::LinalgExt::CustomOp>(
       rewriter.clone(*customOp.getOperation(), map));
-  rewriter.create<func::ReturnOp>(customOp.getLoc(),
-                                  clonedCustomOp->getResults());
+  func::ReturnOp::create(rewriter, customOp.getLoc(),
+                         clonedCustomOp->getResults());
   CustomOpConfigListener customOpConfigListener(customOp, clonedCustomOp);
 
   // 4. Inline the cloned custom op.
@@ -963,10 +965,10 @@ void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface op,
               llvm::zip(fixedTileSizes, fixedTileScalableFlags),
               [&](auto pair) -> OpFoldResult {
                 auto [t, isScalable] = pair;
-                Value size = b.create<arith::ConstantIndexOp>(loc, t);
+                Value size = arith::ConstantIndexOp::create(b, loc, t);
                 if (isScalable) {
-                  Value vscale = b.create<vector::VectorScaleOp>(loc);
-                  size = b.create<arith::MulIOp>(loc, size, vscale);
+                  Value vscale = vector::VectorScaleOp::create(b, loc);
+                  size = arith::MulIOp::create(b, loc, size, vscale);
                 }
                 return size;
               });
@@ -974,39 +976,9 @@ void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface op,
   }
 }
 
-/// Create a linalg::GenericOp version of an n-D copy that can further tile,
-/// lower to loops or vectorize, unlike the current implementation of
-/// memref::CopyOp.
-Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
-                              ArrayRef<NamedAttribute> attributes) {
-  auto memrefTypeFrom = llvm::dyn_cast<MemRefType>(from.getType());
-  auto memrefTypeTo = llvm::dyn_cast<MemRefType>(to.getType());
-  if (!memrefTypeFrom || !memrefTypeTo ||
-      memrefTypeFrom.getRank() != memrefTypeTo.getRank()) {
-    mlir::emitError(
-        loc, "unable to generate copy op within bufferization from type ")
-        << memrefTypeFrom << " to " << memrefTypeTo;
-    return nullptr;
-  }
-  AffineMap id =
-      AffineMap::getMultiDimIdentityMap(memrefTypeTo.getRank(), b.getContext());
-  SmallVector<utils::IteratorType> iteratorTypes(memrefTypeTo.getRank(),
-                                                 utils::IteratorType::parallel);
-  return b.create<linalg::GenericOp>(
-      loc,
-      /*inputs=*/from,
-      /*outputs=*/to,
-      /*indexingMaps=*/llvm::ArrayRef({id, id}),
-      /*iteratorTypes=*/iteratorTypes,
-      [](OpBuilder &b, Location loc, ValueRange args) {
-        b.create<linalg::YieldOp>(loc, args.front());
-      },
-      attributes);
-}
-
 template <typename OpTy>
 static Value buildHALWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
-  return b.template create<OpTy>(b.getInsertionPoint()->getLoc(), dim);
+  return OpTy::create(b, b.getInsertionPoint()->getLoc(), dim);
 }
 
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
@@ -1048,8 +1020,8 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
     }
     if (splitDim) {
       std::reverse(splitNumTiles.begin(), splitNumTiles.end());
-      auto delinearized = builder.create<affine::AffineDelinearizeIndexOp>(
-          loc, *splitDim, splitNumTiles, /*hasOuterBound=*/true);
+      auto delinearized = affine::AffineDelinearizeIndexOp::create(
+          builder, loc, *splitDim, splitNumTiles, /*hasOuterBound=*/true);
       for (auto [i, id, numTiles] :
            llvm::enumerate(delinearized.getResults(), splitNumTiles)) {
         // We iterate the delinearize results from slowest up to fastest, and
@@ -1140,6 +1112,33 @@ int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp) {
 // Bufferization utility functions
 //===---------------------------------------------------------------------===//
 
+std::optional<IREE::HAL::InterfaceBindingSubspanOp>
+getSourceSubspanMemref(TypedValue<MemRefType> buffer) {
+  Operation *currentOp = buffer.getDefiningOp();
+  while (currentOp) {
+    if (auto subspanOp =
+            dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(currentOp)) {
+      return subspanOp;
+    }
+    // There is expected to be only a single memref source for a given memref
+    // OpResult, because producers of memref Values are expected to be
+    // view-like or cast-like operations. Bail if there are multiple memref
+    // operands, since we don't know which one to use as the source.
+    if (llvm::count_if(currentOp->getOperandTypes(),
+                       llvm::IsaPred<MemRefType>) != 1) {
+      return std::nullopt;
+    }
+    // Otherwise, follow the memref operand to find the source buffer.
+    for (Value operand : currentOp->getOperands()) {
+      if (isa<MemRefType>(operand.getType())) {
+        currentOp = operand.getDefiningOp();
+        break;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
 /// Get strides for row-major oredering of a tensor with the given `shape`.
 static SmallVector<int64_t> getStridesFromShape(ArrayRef<int64_t> shape) {
   if (shape.empty()) {
@@ -1225,14 +1224,14 @@ Value findOrCreateSubspanBuffer(
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(subspanOp);
   // Just change the result type of the InterfaceBindingSubspanOp.
-  Value buffer = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-      subspanOp->getLoc(), memRefType, subspanOp.getLayout(),
+  Value buffer = IREE::HAL::InterfaceBindingSubspanOp::create(
+      rewriter, subspanOp->getLoc(), memRefType, subspanOp.getLayout(),
       subspanOp.getBinding(), subspanOp.getByteOffset(),
       subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr(),
       subspanOp.getDescriptorFlagsAttr());
   if (useRocdlBuffers) {
-    buffer = rewriter.create<amdgpu::FatRawBufferCastOp>(
-        subspanOp->getLoc(), buffer, /*validBytes=*/Value{},
+    buffer = amdgpu::FatRawBufferCastOp::create(
+        rewriter, subspanOp->getLoc(), buffer, /*validBytes=*/Value{},
         /*cacheSwizzleStride=*/Value{}, /*boundsCheck=*/true,
         /*resetOffset=*/true);
   }
@@ -1333,7 +1332,7 @@ OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
         {byteOffset, rewriter.getIndexAttr(typeBitWidth)});
   } else {
     OpFoldResult elementByteSize =
-        rewriter.create<IREE::Util::SizeOfOp>(loc, elementType).getResult();
+        IREE::Util::SizeOfOp::create(rewriter, loc, elementType).getResult();
     AffineExpr s0, s1;
     bindSymbols(rewriter.getContext(), s0, s1);
     return affine::makeComposedFoldedAffineApply(rewriter, loc, s0.floorDiv(s1),
@@ -1353,6 +1352,31 @@ Operation *dropEncodingAndCloneOp(OpBuilder &builder, Operation *op,
       {cast<RankedTensorType>(convertedOutputOperands[0].getType())
            .dropEncoding()},
       operands);
+}
+
+IREE::Codegen::DenormalFpMathAttr
+getConfigDenormalFpMathF32Attr(DictionaryAttr targetConfig) {
+  if (!targetConfig) {
+    return {};
+  }
+
+  return targetConfig.getAs<IREE::Codegen::DenormalFpMathAttr>(
+      IREE::Codegen::DenormalFpMathAttr::getFP32DictKeyName());
+}
+std::optional<IREE::Codegen::DenormalFpMath>
+getConfigDenormalFpMathF32(DictionaryAttr targetConfig) {
+  IREE::Codegen::DenormalFpMathAttr attr =
+      getConfigDenormalFpMathF32Attr(targetConfig);
+  if (!attr) {
+    return std::nullopt;
+  }
+  return attr.getValue();
+}
+void addConfigDenormalFpMathF32(MLIRContext *context,
+                                IREE::Codegen::DenormalFpMath mode,
+                                SmallVectorImpl<NamedAttribute> &config) {
+  config.emplace_back(IREE::Codegen::DenormalFpMathAttr::getFP32DictKeyName(),
+                      IREE::Codegen::DenormalFpMathAttr::get(context, mode));
 }
 
 //===---------------------------------------------------------------------===//
@@ -1381,7 +1405,7 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
         currentResultType.getShape(), currentResultType.getElementType(),
         replacementType.getLayout(), replacementType.getMemorySpace());
     auto newCastOp =
-        rewriter.create<memref::CastOp>(loc, newResultType, replacement);
+        memref::CastOp::create(rewriter, loc, newResultType, replacement);
     LDBG() << "\t\tNew user : " << *newCastOp;
     return SmallVector<Value>(newCastOp->result_begin(),
                               newCastOp->result_end());
@@ -1400,8 +1424,8 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
                        currResultType.getShape(), newSourceType, offsets, sizes,
                        strides))
              : nullptr);
-    auto newSubviewOp = rewriter.create<memref::SubViewOp>(
-        loc, newResultType, replacement, offsets, sizes, strides);
+    auto newSubviewOp = memref::SubViewOp::create(
+        rewriter, loc, newResultType, replacement, offsets, sizes, strides);
 
     LDBG() << "\t\tNew user : " << *newSubviewOp;
     return llvm::to_vector_of<Value>(newSubviewOp->getResults());
@@ -1419,8 +1443,8 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
       return std::nullopt;
     }
 
-    auto newExpandOp = rewriter.create<memref::ExpandShapeOp>(
-        loc, *newResultType, replacement, expandOp.getReassociation(),
+    auto newExpandOp = memref::ExpandShapeOp::create(
+        rewriter, loc, *newResultType, replacement, expandOp.getReassociation(),
         expandOp.getOutputShape(), expandOp.getStaticOutputShape());
     LDBG() << "\t\tNew user : " << *newExpandOp;
     return llvm::to_vector_of<Value>(newExpandOp->getResults());
@@ -1434,8 +1458,9 @@ replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
       return std::nullopt;
     }
 
-    auto newCollapseOp = rewriter.create<memref::CollapseShapeOp>(
-        loc, *newResultType, replacement, collapseOp.getReassociation());
+    auto newCollapseOp = memref::CollapseShapeOp::create(
+        rewriter, loc, *newResultType, replacement,
+        collapseOp.getReassociation());
     LDBG() << "\t\tNew user : " << *newCollapseOp;
     return llvm::to_vector_of<Value>(newCollapseOp->getResults());
   }
@@ -1991,6 +2016,85 @@ bool hasExternalCapture(linalg::GenericOp genericOp) {
     }
   }
   return false; // All operands are locally defined or block arguments.
+}
+
+//===----------------------------------------------------------------------===//
+// Utility functions for copy operations
+//===----------------------------------------------------------------------===//
+
+Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
+                              ArrayRef<NamedAttribute> attributes) {
+  auto memrefTypeFrom = llvm::dyn_cast<MemRefType>(from.getType());
+  auto memrefTypeTo = llvm::dyn_cast<MemRefType>(to.getType());
+  if (!memrefTypeFrom || !memrefTypeTo ||
+      memrefTypeFrom.getRank() != memrefTypeTo.getRank()) {
+    mlir::emitError(
+        loc, "unable to generate copy op within bufferization from type ")
+        << memrefTypeFrom << " to " << memrefTypeTo;
+    return nullptr;
+  }
+  AffineMap id =
+      AffineMap::getMultiDimIdentityMap(memrefTypeTo.getRank(), b.getContext());
+  SmallVector<utils::IteratorType> iteratorTypes(memrefTypeTo.getRank(),
+                                                 utils::IteratorType::parallel);
+  return linalg::GenericOp::create(
+      b, loc,
+      /*inputs=*/from,
+      /*outputs=*/to,
+      /*indexingMaps=*/llvm::ArrayRef({id, id}),
+      /*iteratorTypes=*/iteratorTypes,
+      [](OpBuilder &b, Location loc, ValueRange args) {
+        linalg::YieldOp::create(b, loc, args.front());
+      },
+      attributes);
+}
+
+SmallVector<OpFoldResult> getCopyTileSizes(OpBuilder &b, memref::CopyOp copy) {
+  int64_t rank = copy.getTarget().getType().getRank();
+  if (rank == 0) {
+    return {};
+  }
+
+  SmallVector<OpFoldResult> tileSizes(rank - 1, b.getIndexAttr(1));
+  int64_t elementBitWidth = llvm::cast<MemRefType>(copy.getTarget().getType())
+                                .getElementTypeBitWidth();
+  tileSizes.push_back(b.getIndexAttr(kPreferredCopyNumBits / elementBitWidth));
+  return tileSizes;
+}
+
+std::optional<SmallVector<int64_t>> getCopyTileSizes(linalg::CopyOp copyOp) {
+  auto type =
+      llvm::dyn_cast<MemRefType>(copyOp.getDpsInputOperand(0)->get().getType());
+  if (!type) {
+    return std::nullopt;
+  }
+  SmallVector<int64_t> bounds = copyOp.getStaticLoopRanges();
+  int64_t elementBitWidth = type.getElementTypeBitWidth();
+  SmallVector<int64_t> tileSizes(bounds.size(), 1);
+  int64_t innerBound = bounds.back();
+  const int64_t preferredCopyNumElements =
+      kPreferredCopyNumBits / elementBitWidth;
+  if (ShapedType::isDynamic(innerBound) ||
+      innerBound >= preferredCopyNumElements) {
+    tileSizes[bounds.size() - 1] = preferredCopyNumElements;
+    return tileSizes;
+  }
+  // Distribute the preferred number of elements being copied across multiple
+  // dimensions if possible.
+  int64_t remPreferredCopyNumElementsDiv = preferredCopyNumElements;
+  for (auto [i, b] : llvm::enumerate(llvm::reverse(bounds))) {
+    size_t index = bounds.size() - i - 1;
+    if (remPreferredCopyNumElementsDiv < b) {
+      tileSizes[index] = remPreferredCopyNumElementsDiv;
+      break;
+    }
+    tileSizes[index] = b;
+    remPreferredCopyNumElementsDiv /= b;
+    if (remPreferredCopyNumElementsDiv == 0) {
+      break;
+    }
+  }
+  return tileSizes;
 }
 
 } // namespace mlir::iree_compiler

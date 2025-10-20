@@ -27,8 +27,7 @@ class TransformDialectInterpreterPass final
     : public impl::TransformDialectInterpreterPassBase<
           TransformDialectInterpreterPass> {
 public:
-  using impl::TransformDialectInterpreterPassBase<
-      TransformDialectInterpreterPass>::TransformDialectInterpreterPassBase;
+  using Base::Base;
 
   TransformDialectInterpreterPass(StringRef libraryFileName,
                                   StringRef entryPoint) {

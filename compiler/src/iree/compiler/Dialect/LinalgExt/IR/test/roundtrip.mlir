@@ -1420,6 +1420,49 @@ func.func @unpack(%arg0: memref<128x256xf32>, %arg1: memref<32x4x32x8xf32>) {
 
 // -----
 
+func.func @exp_reduction(%S: tensor<2x3xf32>) -> tensor<2xf32> {
+  %M = tensor.empty() : tensor<2xf32>
+  %out = tensor.empty() : tensor<2xf32>
+
+  %max, %sum = iree_linalg_ext.exp_reduction {
+    indexing_maps = [
+      affine_map<(M,N)->(M,N)>,
+      affine_map<(M,N)->(M)>,
+      affine_map<(M,N)->(M)>
+    ],
+    iterator_types = [
+      #iree_linalg_ext.iterator_type<parallel>,
+      #iree_linalg_ext.iterator_type<reduction>
+    ],
+    exp_reduced_operands = [1]
+  } ins(%S: tensor<2x3xf32>)
+    outs(%M, %out: tensor<2xf32>, tensor<2xf32>)
+  {
+  ^bb0(%s: f32, %m: f32, %o: f32):
+    %add = arith.addf %s, %o: f32
+    iree_linalg_ext.yield %m, %add: f32, f32
+  } -> tensor<2xf32>, tensor<2xf32>
+  return %sum : tensor<2xf32>
+}
+
+// CHECK-DAG: #[[$MAP_S:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-DAG: #[[$MAP_M:.+]] = affine_map<(d0, d1) -> (d0)>
+// CHECK-LABEL: func.func @exp_reduction(
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x3xf32>
+// CHECK:         %[[D0:.+]] = tensor.empty() : tensor<2xf32>
+// CHECK:         %[[D1:.+]] = tensor.empty() : tensor<2xf32>
+// CHECK:         %[[D2:.+]]:2 = iree_linalg_ext.exp_reduction{
+// CHECK-SAME:      indexing_maps = [#[[$MAP_S]],  #[[$MAP_M]], #[[$MAP_M]]
+// CHECK-SAME:      iterator_types = [
+// CHECK-SAME:          #iree_linalg_ext.iterator_type<parallel>
+// CHECK-SAME:          #iree_linalg_ext.iterator_type<reduction>
+// CHECK-SAME:      exp_reduced_operands = [1
+// CHECK-SAME:      ins(%[[ARG0]] : tensor<2x3xf32>)
+// CHECK-SAME:      outs(%[[D0]], %[[D1]] : tensor<2xf32>, tensor<2xf32>)
+// CHECK:         return %[[D2]]#1 : tensor<2xf32>
+
+// -----
+
 func.func @im2col(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]

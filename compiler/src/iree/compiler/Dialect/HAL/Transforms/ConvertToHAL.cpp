@@ -62,7 +62,7 @@ struct ConvertToHALPass
     : public IREE::HAL::impl::ConvertToHALPassBase<ConvertToHALPass> {
   void runOnOperation() override {
     auto *context = &getContext();
-    auto moduleOp = getOperation();
+    mlir::ModuleOp moduleOp = getOperation();
 
     // Gather all interfaces from registered dialects.
     // These will perform the tensor->buffer mapping for their ops.

@@ -78,7 +78,7 @@ getRootLoweringConfig(FunctionOpInterface funcOp) {
 }
 
 void LLVMCPULowerExecutableTargetPass::runOnOperation() {
-  auto funcOp = getOperation();
+  mlir::FunctionOpInterface funcOp = getOperation();
   auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
   if (!target) {
     // Do nothing without target

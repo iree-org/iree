@@ -8,7 +8,7 @@
 #define IREE_COMPILER_DIALECT_IREE_UTIL_ANALYSIS_CONSTANT_OP_ORACLE_H_
 
 #include "iree/compiler/Dialect/Util/Analysis/Constant/ConstExpr.h"
-#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SetVector.h"
 #include "mlir/IR/Operation.h"
 
 namespace mlir::iree_compiler::IREE::Util {
@@ -25,7 +25,7 @@ struct ConstExprOpInfo {
   // Producer values that must be const-expr for this op to be considered
   // const-expr. This minimally includes operands, and for region-based ops
   // may include implicit captures.
-  llvm::SmallPtrSet<Value, 8> producers;
+  llvm::SmallSetVector<Value, 8> producers;
 
   // Gets information for an op.
   // Whether an op can be considered a pure expression, producing a constant if

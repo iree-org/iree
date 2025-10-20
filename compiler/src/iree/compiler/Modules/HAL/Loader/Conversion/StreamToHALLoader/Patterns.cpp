@@ -71,8 +71,8 @@ struct CmdDispatchOpPattern
     }
 
     // Lookup executable reference.
-    auto lookupOp = rewriter.create<IREE::HAL::Loader::ExecutableLookupOp>(
-        loc, rewriter.getType<IREE::HAL::ExecutableType>(),
+    auto lookupOp = IREE::HAL::Loader::ExecutableLookupOp::create(
+        rewriter, loc, rewriter.getType<IREE::HAL::ExecutableType>(),
         executableOp.getName());
 
     // TODO(benvanik): use scf.index_switch as with the full HAL.
@@ -128,15 +128,14 @@ struct CmdDispatchOpPattern
         SymbolRefAttr::get(builder.getContext(), executableOp.getName(),
                            {SymbolRefAttr::get(exportOp->getParentOp()),
                             SymbolRefAttr::get(exportOp)});
-    Value ordinal =
-        builder.create<IREE::HAL::Loader::ExecutableExportOrdinalOp>(
-            loc, builder.getIndexType(), entryPointAttr);
+    Value ordinal = IREE::HAL::Loader::ExecutableExportOrdinalOp::create(
+        builder, loc, builder.getIndexType(), entryPointAttr);
 
     // Dispatch with a target-specific workgroup count.
     auto workgroupCount = exportOp.calculateWorkgroupCount(
         loc, /*device=*/nullptr, adaptor.getWorkload(), builder);
-    builder.create<IREE::HAL::Loader::ExecutableDispatchOp>(
-        loc, executable, ordinal, workgroupCount[0], workgroupCount[1],
+    IREE::HAL::Loader::ExecutableDispatchOp::create(
+        builder, loc, executable, ordinal, workgroupCount[0], workgroupCount[1],
         workgroupCount[2], pushConstants, bindingBuffers, bindingOffsets,
         bindingLengths);
   }

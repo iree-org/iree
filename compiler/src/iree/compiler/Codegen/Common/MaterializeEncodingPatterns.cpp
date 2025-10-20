@@ -9,12 +9,11 @@
 //===---------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Utils/EncodingUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
-#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/SmallVectorExtras.h"
@@ -61,19 +60,18 @@ FailureOr<Value> lowerSetEncodingOpToPackOp(
     return rewriter.notifyMatchFailure(
         encodingOp, "failed to generate runtime tile size query");
   }
-  Value paddingValue = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getZeroAttr(resultType.getElementType()));
+  Value paddingValue = arith::ConstantOp::create(
+      rewriter, loc, rewriter.getZeroAttr(resultType.getElementType()));
   SmallVector<OpFoldResult> sourceDims =
       tensor::getMixedSizes(rewriter, loc, source);
   SmallVector<OpFoldResult> resultDims = linalg::PackOp::getResultShape(
       rewriter, loc, sourceDims, *innerTileSizesOfr, encodingInfo.innerDimsPos,
       encodingInfo.outerDimsPerm);
-  auto emptyOp = rewriter.create<tensor::EmptyOp>(loc, resultDims,
-                                                  resultType.getElementType());
-  return rewriter
-      .create<linalg::PackOp>(loc, source, emptyOp, encodingInfo.innerDimsPos,
-                              *innerTileSizesOfr, paddingValue,
-                              encodingInfo.outerDimsPerm)
+  auto emptyOp = tensor::EmptyOp::create(rewriter, loc, resultDims,
+                                         resultType.getElementType());
+  return linalg::PackOp::create(rewriter, loc, source, emptyOp,
+                                encodingInfo.innerDimsPos, *innerTileSizesOfr,
+                                paddingValue, encodingInfo.outerDimsPerm)
       .getResult();
 }
 
@@ -94,8 +92,8 @@ FailureOr<Value> lowerUnsetEncodingToUnpackOp(
   SmallVector<OpFoldResult> resultDims =
       getMixedValues(encodingOp.getResultType().getShape(),
                      encodingOp.getResultDims(), rewriter);
-  auto emptyOp = rewriter.create<tensor::EmptyOp>(loc, resultDims,
-                                                  sourceType.getElementType());
+  auto emptyOp = tensor::EmptyOp::create(rewriter, loc, resultDims,
+                                         sourceType.getElementType());
   FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr =
       typeConverter.getInnerTileSizesOfr(rewriter, loc, sourceType,
                                          encodingInfo);
@@ -103,10 +101,9 @@ FailureOr<Value> lowerUnsetEncodingToUnpackOp(
     return rewriter.notifyMatchFailure(
         encodingOp, "failed to generate runtime tile size query");
   }
-  return rewriter
-      .create<linalg::UnPackOp>(loc, packedValue, emptyOp,
-                                encodingInfo.innerDimsPos, *innerTileSizesOfr,
-                                encodingInfo.outerDimsPerm)
+  return linalg::UnPackOp::create(rewriter, loc, packedValue, emptyOp,
+                                  encodingInfo.innerDimsPos, *innerTileSizesOfr,
+                                  encodingInfo.outerDimsPerm)
       .getResult();
 }
 
@@ -121,9 +118,8 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
       typeConverter.getEncodingInfo(emptyType);
   Location loc = emptyOp.getLoc();
   if (IREE::Codegen::isIdentityLayout(encodingInfo)) {
-    return rewriter
-        .create<tensor::EmptyOp>(loc, emptyOp.getMixedSizes(),
-                                 emptyType.getElementType())
+    return tensor::EmptyOp::create(rewriter, loc, emptyOp.getMixedSizes(),
+                                   emptyType.getElementType())
         .getOperation();
   }
 
@@ -141,8 +137,8 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
       rewriter, loc, sourceDims, *innerTileSizesOfr, encodingInfo.innerDimsPos,
       encodingInfo.outerDimsPerm);
   newShape = getSwizzledShape(newShape, encodingInfo);
-  Operation *newEmptyOp = rewriter.create<tensor::EmptyOp>(
-      loc, newShape, emptyType.getElementType());
+  Operation *newEmptyOp = tensor::EmptyOp::create(rewriter, loc, newShape,
+                                                  emptyType.getElementType());
   return newEmptyOp;
 }
 
@@ -415,9 +411,10 @@ static FailureOr<Operation *> lowerGenericOpWithEncoding(
             convertedResultType.getShape(),
             cast<RankedTensorType>(t).getElementType());
       });
-  auto materializedGenericOp = rewriter.create<linalg::GenericOp>(
-      genericOp.getLoc(), convertedResultTypes, convertedInputOperands,
-      convertedOutputOperands, packedIndexingMaps, iteratorTypes,
+  auto materializedGenericOp = linalg::GenericOp::create(
+      rewriter, genericOp.getLoc(), convertedResultTypes,
+      convertedInputOperands, convertedOutputOperands, packedIndexingMaps,
+      iteratorTypes,
       /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(genericOp));
   rewriter.inlineRegionBefore(genericOp.getRegion(),
                               materializedGenericOp.getRegion(),
@@ -447,8 +444,8 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
   return TypeSwitch<Operation *, FailureOr<Operation *>>(linalgOp)
       .Case<linalg::FillOp>(
           [&](linalg::FillOp fillOp) -> FailureOr<Operation *> {
-            Operation *materializedFillOp = rewriter.create<linalg::FillOp>(
-                fillOp.getLoc(), convertedOutputOperands[0].getType(),
+            Operation *materializedFillOp = linalg::FillOp::create(
+                rewriter, fillOp.getLoc(), convertedOutputOperands[0].getType(),
                 convertedInputOperands, convertedOutputOperands);
             return materializedFillOp;
           })
@@ -715,7 +712,7 @@ getReassociationIndices(int outerDims,
 /// expand_shape + linalg.transpose to represent a tile swizzling op.
 struct SetEncodingOpLoweringConversion
     : public OpConversionPattern<IREE::Encoding::SetEncodingOp> {
-  using OpConversionPattern<IREE::Encoding::SetEncodingOp>::OpConversionPattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp, OpAdaptor adaptor,
@@ -755,8 +752,8 @@ struct SetEncodingOpLoweringConversion
 
     SmallVector<ReassociationIndices> reassociation =
         getReassociationIndices(origRank, encodingInfo.swizzle->expandShape);
-    auto expandShapeOp = rewriter.create<tensor::ExpandShapeOp>(
-        loc, expandShapeType, packedValue.value(), reassociation);
+    auto expandShapeOp = tensor::ExpandShapeOp::create(
+        rewriter, loc, expandShapeType, packedValue.value(), reassociation);
 
     SmallVector<int64_t> transposePerm =
         llvm::to_vector(llvm::seq<int64_t>(0, origRank));
@@ -767,10 +764,11 @@ struct SetEncodingOpLoweringConversion
         tensor::getMixedSizes(rewriter, loc, expandShapeOp.getResult());
     applyPermutationToVector(transposeResultDims, transposePerm);
 
-    auto emptyTensor = rewriter.create<tensor::EmptyOp>(
-        loc, transposeResultDims, encodingOp.getSourceType().getElementType());
-    auto transposeOp = rewriter.create<linalg::TransposeOp>(
-        loc, expandShapeOp, emptyTensor, transposePerm);
+    auto emptyTensor =
+        tensor::EmptyOp::create(rewriter, loc, transposeResultDims,
+                                encodingOp.getSourceType().getElementType());
+    auto transposeOp = linalg::TransposeOp::create(rewriter, loc, expandShapeOp,
+                                                   emptyTensor, transposePerm);
     rewriter.replaceOp(encodingOp, transposeOp->getResult(0));
 
     return success();
@@ -808,8 +806,9 @@ struct UnsetEncodingOpLoweringConversion
       for (auto i : getExpandedTileShape(encodingInfo.swizzle->expandShape)) {
         emptyShape.push_back(rewriter.getIndexAttr(i));
       }
-      auto emptyTensor = rewriter.create<tensor::EmptyOp>(
-          loc, emptyShape, unsetEncodingOp.getSourceType().getElementType());
+      auto emptyTensor = tensor::EmptyOp::create(
+          rewriter, loc, emptyShape,
+          unsetEncodingOp.getSourceType().getElementType());
 
       SmallVector<int64_t> transposePerm =
           llvm::to_vector(llvm::seq<int64_t>(0, targetRank));
@@ -817,8 +816,9 @@ struct UnsetEncodingOpLoweringConversion
         transposePerm.push_back(targetRank + perm);
       }
       auto invertedTransposePerm = invertPermutationVector(transposePerm);
-      auto transposeOp = rewriter.create<linalg::TransposeOp>(
-          loc, adaptor.getSource(), emptyTensor, invertedTransposePerm);
+      auto transposeOp =
+          linalg::TransposeOp::create(rewriter, loc, adaptor.getSource(),
+                                      emptyTensor, invertedTransposePerm);
 
       SmallVector<ReassociationIndices> reassociation = getReassociationIndices(
           targetRank, encodingInfo.swizzle->expandShape);
@@ -828,8 +828,9 @@ struct UnsetEncodingOpLoweringConversion
                             encodingInfo.innerTileSizes.end());
       RankedTensorType unpackSrcType =
           unsetEncodingOp.getResultType().clone(unpackSrcShape);
-      unpackSrc = rewriter.create<tensor::CollapseShapeOp>(
-          loc, unpackSrcType, transposeOp->getResult(0), reassociation);
+      unpackSrc = tensor::CollapseShapeOp::create(rewriter, loc, unpackSrcType,
+                                                  transposeOp->getResult(0),
+                                                  reassociation);
     }
 
     auto unpackedValue = lowerUnsetEncodingToUnpackOp(rewriter, unsetEncodingOp,
@@ -856,9 +857,13 @@ public:
   LogicalResult
   matchAndRewrite(linalg::LinalgOp op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    if (!linalg::isaContractionOpInterface(op)) {
+    // TODO(hanchung): Remove the check after moving other ops, e.g., fill,
+    // generic, etc, lowering patterns to interface implementation.
+    if (!linalg::isaContractionOpInterface(op) &&
+        !IREE::LinalgExt::isaScaledContractionOpInterface(op)) {
       return rewriter.notifyMatchFailure(
-          op, "does not implement ContractionOpInterface");
+          op, "does not match linalg::isaContractionOpInterface and "
+              "LinalgExt::isaScaledContractionOpInterface");
     }
 
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
@@ -887,7 +892,7 @@ static bool isRankedTensorTypeWithEncoding(Type type) {
 
 struct MaterializeFuncReturnOp final
     : public OpConversionPattern<func::ReturnOp> {
-  using OpConversionPattern<func::ReturnOp>::OpConversionPattern;
+  using Base::Base;
   LogicalResult
   matchAndRewrite(func::ReturnOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {

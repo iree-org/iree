@@ -444,10 +444,10 @@ NestedLayoutAttr::computeThreadIds(Value threadId, int64_t subgroupSize,
   // Add the subgroup_size to the end of the subgroup delinearization basis.
   subgroupBasis.push_back(subgroupSize);
 
-  auto subgroupSplit = rewriter.create<affine::AffineDelinearizeIndexOp>(
-      loc, threadId, subgroupBasis, /*hasOuterBound=*/false);
-  auto threadSplit = rewriter.create<affine::AffineDelinearizeIndexOp>(
-      loc, threadId, threadBasis, /*hasOuterBound=*/false);
+  auto subgroupSplit = affine::AffineDelinearizeIndexOp::create(
+      rewriter, loc, threadId, subgroupBasis, /*hasOuterBound=*/false);
+  auto threadSplit = affine::AffineDelinearizeIndexOp::create(
+      rewriter, loc, threadId, threadBasis, /*hasOuterBound=*/false);
 
   llvm::transform(subgroupDimToResult, std::back_inserter(virtualTids),
                   [&](size_t idx) { return subgroupSplit.getResult(idx); });
