@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -245,15 +246,8 @@ struct ConvertGatherOpToCoalescedDMA
     // Compute the lane ID by linearizing the thread IVs
     SmallVector<Value> threadIVs(innerBody->getArguments().begin(),
                                  innerBody->getArguments().begin() + rank);
-    Value laneId = arith::ConstantIndexOp::create(rewriter, loc, 0);
-    Value stride = arith::ConstantIndexOp::create(rewriter, loc, 1);
-    for (int64_t i = rank - 1; i >= 0; --i) {
-      Value offset = arith::MulIOp::create(rewriter, loc, threadIVs[i], stride);
-      laneId = arith::AddIOp::create(rewriter, loc, laneId, offset);
-      Value dimSize = arith::ConstantIndexOp::create(
-          rewriter, loc, (*staticThreadTileSizes)[i]);
-      stride = arith::MulIOp::create(rewriter, loc, stride, dimSize);
-    }
+    Value laneId = affine::AffineLinearizeIndexOp::create(
+        rewriter, loc, threadIVs, *staticThreadTileSizes);
 
     Value innerSharedOut = innerBody->getArguments()[rank];
     auto innerInParallelOp =
