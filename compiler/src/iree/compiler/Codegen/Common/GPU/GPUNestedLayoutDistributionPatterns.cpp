@@ -436,6 +436,12 @@ struct DistributeTransferWrite final
     }
   }
 
+  /// Compute a boolean in SIMT semantics that is true for the first vtid and
+  /// stid carrying broadcasted data.
+  ///
+  /// We do this by computing a basis for vtid and stid computation, and adding
+  /// a check for basis elements that are not used (i.e. they are duplicated)
+  /// to be zero.
   FailureOr<Value> getNoOverlapCondition(OpBuilder &b, Location loc,
                                          NestedLayoutAttr layout) const {
     ArrayRef<int64_t> threadTile = layout.getThreadTile();
@@ -456,7 +462,6 @@ struct DistributeTransferWrite final
                                      dimToResult))) {
       return failure();
     }
-
     // Make the upper bound numThreadsInWorkgroup to remove redundant checks.
     if (numThreadsInWorkgroup.has_value()) {
       basis.insert(basis.begin(), numThreadsInWorkgroup.value());
