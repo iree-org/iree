@@ -2931,6 +2931,65 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
   return failure();
 }
 
+/// Transforms tiling sizes from the unpacked domain to the packed domain
+/// for a `PackOp` by scaling inner dimensions and applying outer dimension
+/// permutations.
+///
+/// Steps:
+/// 1. Divide the tile sizes of inner dimensions by the corresponding inner
+///    tile factors (ignores dynamic sizes).
+/// 2. Apply the outer dimension permutation, if present.
+static void scaleAndPermutateTilingForPackOp(linalg::PackOp packOp,
+                                             SmallVector<int64_t> &tileSizes,
+                                             SmallVector<bool> &scalableFlags) {
+  ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
+  ArrayRef<int64_t> innerDimPos = packOp.getInnerDimsPos();
+  ArrayRef<int64_t> outerDimsPerm = packOp.getOuterDimsPerm();
+  // First scale tile sizes by dividing by the inner tile sizes.
+  for (auto [pos, size] : llvm::zip_equal(innerDimPos, innerTiles)) {
+    if (ShapedType::isDynamic(size)) {
+      continue;
+    }
+    tileSizes[pos] /= size;
+  }
+  // Then apply dimension permutation if present.
+  if (!outerDimsPerm.empty()) {
+    applyPermutationToVector(tileSizes, outerDimsPerm);
+    applyPermutationToVector(scalableFlags, outerDimsPerm);
+  }
+}
+
+/// Transforms tiling sizes from the packed domain back to the unpacked
+/// domain for a `PackOp` by undoing the scaling of inner dimensions and
+/// reversing outer dimension permutations.
+///
+/// Steps:
+/// 1. Undo the outer dimension permutation, if present, by applying the
+///    inverted permutation.
+/// 2. Multiply the inner dimension tile sizes by the corresponding inner
+///    tile factors (ignores dynamic sizes).
+static void
+undoScaleAndPermutateTilingForPackOp(linalg::PackOp packOp,
+                                     SmallVector<int64_t> &tileSizes,
+                                     SmallVector<bool> &scalableFlags) {
+  ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
+  ArrayRef<int64_t> innerDimPos = packOp.getInnerDimsPos();
+  ArrayRef<int64_t> outerDimsPerm = packOp.getOuterDimsPerm();
+  // First undo dimension permutation if present.
+  if (!outerDimsPerm.empty()) {
+    auto invertedPerm = invertPermutationVector(outerDimsPerm);
+    applyPermutationToVector(tileSizes, invertedPerm);
+    applyPermutationToVector(scalableFlags, invertedPerm);
+  }
+  // Then unscale tile sizes by multiplying the inner tile sizes.
+  for (auto [pos, size] : llvm::zip_equal(innerDimPos, innerTiles)) {
+    if (ShapedType::isDynamic(size)) {
+      continue;
+    }
+    tileSizes[pos] *= size;
+  }
+}
+
 /// A helper class that propagates and sets lowering configurations for multiple
 /// compute operations.
 ///
@@ -2951,14 +3010,16 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
 ///     final tiling configuration to each compute operation.
 class MultiLoweringConfigGenerator {
 public:
-  explicit MultiLoweringConfigGenerator(Operation *rootOperation,
-                                        ArrayRef<Operation *> computeOps)
-      : rootOperation(rootOperation), computeOps(computeOps),
-        dimTracker(IterationDimTracker(computeOps)) {}
+  /// Factory method to creates and returns a MultiLoweringConfigGenerator. May
+  /// return null on failure.
+  static std::unique_ptr<MultiLoweringConfigGenerator>
+  create(Operation *rootOperation, ArrayRef<Operation *> computeOps);
+
+  MultiLoweringConfigGenerator() = delete;
 
   /// Load the root op lowering config, and store its tiling info using global
   /// dimension indices.
-  void loadRootLoweringConfig(IREE::CPU::LoweringConfigAttr rootLoweringConfig);
+  void loadRootLoweringConfig();
 
   /// Get the vector tile sizes favoured by non-root operations.
   void getVecTileSizesForNonRootOps(mlir::FunctionOpInterface entryPointFn);
@@ -2990,6 +3051,14 @@ public:
   void setNewTilingConfigs();
 
 private:
+  /// Initialize the MultiLoweringConfigGenerator with given attributes.
+  explicit MultiLoweringConfigGenerator(
+      Operation *rootOperation,
+      IREE::CPU::LoweringConfigAttr rootLoweringConfig,
+      ArrayRef<Operation *> computeOps)
+      : rootOperation(rootOperation), rootLoweringConfig(rootLoweringConfig),
+        computeOps(computeOps), dimTracker(IterationDimTracker(computeOps)) {}
+
   /// The Pack op requires special vector tile sizes, which are determined using
   /// getPackVectorTileSize to achieve optimal performance (e.g., a 16x16 tile
   /// size on AVX512 to generate efficient transpose code for the Pack op).
@@ -2998,7 +3067,7 @@ private:
   /// For a Matmul RHS Pack op with `outer_dims_perm = [1, 0]` and `inner_tiles
   /// = [16, 1]`, `getPackVectorTileSize` initially returns `[1, 1]`. Since the
   /// `MultiLoweringConfigGenerator` propagates tiling of the outer (unpacked)
-  /// dimensions, inversed `scaleAndPermutateTilingForPackOp` translates the
+  /// dimensions, `undoScaleAndPermutateTilingForPackOp` translates the
   /// tile sizes from `[1, 1]` to `[1, 16]`.
   ///
   /// As a result, the Pack op expects its producer (potentially the root op) to
@@ -3023,31 +3092,8 @@ private:
   getVecTileSizesForNonRootGenericOp(mlir::FunctionOpInterface entryPointFn,
                                      linalg::GenericOp genericOp);
 
-  /// Updates the tile sizes and scalable flags in the `tilingInfo` with given
-  /// `level`, if it is present. Otherwise, adds a new item to the vector.
-  void updateOrAddTilingLevelInfo(
-      SmallVectorImpl<IREE::CPU::LoweringConfigLevelInfo> &tilingInfo,
-      TilingLevel level, ArrayRef<int64_t> tileSizes,
-      ArrayRef<bool> scalableFlags);
-
-  /// Transforms tiling sizes between unpacked and packed domains for a
-  /// `PackOp`, by scaling inner dimensions and applying (or undoing) outer
-  /// dimension permutations.
-  ///
-  /// If `inverse` is true:
-  ///   - Undo the outer dimension permutation (if any).
-  ///   - Multiply inner dimension tile sizes by the corresponding inner tile
-  ///   factors.
-  ///
-  /// Otherwise (`inverse == false`):
-  ///   - Divide inner dimension tile sizes by the corresponding inner tile
-  ///   factors.
-  ///   - Apply the outer dimension permutation (if any).
-  void scaleAndPermutateTilingForPackOp(linalg::PackOp packOp,
-                                        SmallVector<int64_t> &tileSizes,
-                                        SmallVector<bool> &scalableFlags,
-                                        bool inverse);
   Operation *rootOperation;
+  IREE::CPU::LoweringConfigAttr rootLoweringConfig;
   SmallVector<Operation *> computeOps;
 
   IterationDimTracker dimTracker;
@@ -3061,8 +3107,35 @@ private:
   llvm::SmallDenseMap<Operation *, SmallVector<int64_t>> nonRootOpVecTileSizes;
 };
 
-void MultiLoweringConfigGenerator::loadRootLoweringConfig(
-    IREE::CPU::LoweringConfigAttr rootLoweringConfig) {
+std::unique_ptr<MultiLoweringConfigGenerator>
+MultiLoweringConfigGenerator::create(Operation *rootOperation,
+                                     ArrayRef<Operation *> computeOps) {
+
+  if (!llvm::is_contained(computeOps, rootOperation)) {
+    // Root operation may not be included in the compute ops, after
+    // `shouldSetLoweringConfig`.
+    return nullptr;
+  }
+
+  if (isa<linalg::ConvolutionOpInterface>(rootOperation)) {
+    // TODO(dcaballe): We don't know yet how to properly propagate the lowering
+    // config of a convolution.
+    return nullptr;
+  }
+
+  auto rootLoweringConfig =
+      getLoweringConfig<IREE::CPU::LoweringConfigAttr>(rootOperation);
+  if (!rootLoweringConfig) {
+    // Propagation is only available for IREE::CPU::LoweringConfigAttr.
+    return nullptr;
+  }
+
+  return std::unique_ptr<MultiLoweringConfigGenerator>(
+      new MultiLoweringConfigGenerator(rootOperation, rootLoweringConfig,
+                                       computeOps));
+}
+
+void MultiLoweringConfigGenerator::loadRootLoweringConfig() {
   const int64_t totalLoopNum = dimTracker.getTotalLoopNum();
 
   auto loadTilingLevel = [&](TilingLevel level) {
@@ -3092,13 +3165,12 @@ void MultiLoweringConfigGenerator::loadRootLoweringConfig(
 
     // `MultiLoweringConfigGenerator` propagates tiling on the unpacked
     // dimensions, while `rootLoweringConfig` defines tiling on the packed
-    // inner dimensions. Therefore, use inverse
-    // `scaleAndPermutateTilingForPackOp` to translate tiling information from
-    // the packed back to the unpacked dimensions.
+    // inner dimensions. Therefore, use
+    // `undoScaleAndPermutateTilingForPackOp` to translate tiling information
+    // from the packed back to the unpacked dimensions.
     if (auto packOp = dyn_cast<linalg::PackOp>(rootOperation);
         packOp && !sizes.empty()) {
-      scaleAndPermutateTilingForPackOp(packOp, sizes, flags,
-                                       /*inverse=*/true);
+      undoScaleAndPermutateTilingForPackOp(packOp, sizes, flags);
     }
 
     // Map the tiling information from the op-level local dimension indices
@@ -3134,6 +3206,8 @@ void MultiLoweringConfigGenerator::getVecTileSizesForNonRootOps(
     } else if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
       nonRootOpVecTileSizes[op] =
           getVecTileSizesForNonRootGenericOp(entryPointFn, genericOp);
+    } else {
+      LDBG() << "Ignoring unknown operation type for non-root op: " << op;
     }
   }
 }
@@ -3168,7 +3242,7 @@ void MultiLoweringConfigGenerator::adjustTileSizesForRootOp() {
     } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
       // For unpack op, just overwrite the vector parallel tile size.
       // However, dimension tracking is expected be broken in the case of
-      // `generic -> unpack`, since only the unpacked dimensions are propated.
+      // `generic -> unpack`, since only the unpacked dimensions are propagated.
       // To correct this, use the generic op result indexing map to update the
       // tracking.
       //
@@ -3204,7 +3278,7 @@ void MultiLoweringConfigGenerator::adjustTileSizesForRootOp() {
   // loads and stores will have a performance impact.
   auto resultTypes = rootOperation->getResultTypes();
   if (!resultTypes.empty()) {
-    Type elementType = cast<ShapedType>(resultTypes[0]).getElementType();
+    Type elementType = getElementTypeOrSelf(resultTypes[0]);
     unsigned int elementTypeSize;
     if (auto complexType = llvm::dyn_cast<ComplexType>(elementType)) {
       elementTypeSize =
@@ -3309,12 +3383,14 @@ void MultiLoweringConfigGenerator::setNewTilingConfigs() {
   for (const auto &entry : globalTileSizes) {
     tilingLevels.push_back(entry.first);
   }
+  std::sort(tilingLevels.begin(), tilingLevels.end());
 
   for (auto op : computeOps) {
     SmallVector<utils::IteratorType> iterTypes =
         cast<TilingInterface>(op).getLoopIteratorTypes();
     int numLoops = iterTypes.size();
     SmallVector<IREE::CPU::LoweringConfigLevelInfo> newTilingInfo;
+    // Collect new tiling info.
     for (TilingLevel level : tilingLevels) {
       SmallVector<int64_t> tileSizes(numLoops, 0);
       SmallVector<bool> scalableFlags(numLoops, false);
@@ -3340,22 +3416,17 @@ void MultiLoweringConfigGenerator::setNewTilingConfigs() {
         // defines tiling on the packed inner dimensions. Therefore, use
         // `scaleAndPermutateTilingForPackOp` to translate the tiling
         // information from the unpacked to the packed dimensions.
-        scaleAndPermutateTilingForPackOp(packOp, tileSizes, scalableFlags,
-                                         /*inverse=*/false);
+        scaleAndPermutateTilingForPackOp(packOp, tileSizes, scalableFlags);
       }
-      updateOrAddTilingLevelInfo(newTilingInfo, level, tileSizes,
-                                 scalableFlags);
 
-      std::sort(newTilingInfo.begin(), newTilingInfo.end(),
-                [](const IREE::CPU::LoweringConfigLevelInfo &lhs,
-                   const IREE::CPU::LoweringConfigLevelInfo &rhs) {
-                  return lhs.level < rhs.level;
-                });
-      IREE::Codegen::LoweringConfigAttrInterface config =
-          getNewLoweringConfig(rootOperation->getContext(), newTilingInfo,
-                               /*setDistributionConfig=*/op == rootOperation);
-      setLoweringConfig(op, config);
+      // Append tiling info.
+      newTilingInfo.push_back(
+          {level, std::move(tileSizes), std::move(scalableFlags)});
     }
+    IREE::Codegen::LoweringConfigAttrInterface config =
+        getNewLoweringConfig(rootOperation->getContext(), newTilingInfo,
+                             /*setDistributionConfig=*/op == rootOperation);
+    setLoweringConfig(op, config);
   }
 }
 
@@ -3368,8 +3439,7 @@ MultiLoweringConfigGenerator::getVecTileSizesForNonRootPackOp(
   // Invert the Pack op's `outer_dims_perm` on `vecTileSizes` and
   // `scalableFlags`, then multiply `vecTileSizes` by the Pack op's
   // `inner_tiles`.
-  scaleAndPermutateTilingForPackOp(packOp, vecTileSizes, scalableFlags,
-                                   /*inverse=*/true);
+  undoScaleAndPermutateTilingForPackOp(packOp, vecTileSizes, scalableFlags);
   return vecTileSizes;
 }
 
@@ -3404,62 +3474,6 @@ MultiLoweringConfigGenerator::getVecTileSizesForNonRootGenericOp(
   }
   limitVectorTileSizes(genericOp, vecTileSizes);
   return vecTileSizes;
-}
-
-void MultiLoweringConfigGenerator::updateOrAddTilingLevelInfo(
-    SmallVectorImpl<IREE::CPU::LoweringConfigLevelInfo> &tilingInfo,
-    TilingLevel level, ArrayRef<int64_t> tileSizes,
-    ArrayRef<bool> scalableFlags) {
-  for (IREE::CPU::LoweringConfigLevelInfo &info : tilingInfo) {
-    if (info.level == level) {
-      info.sizes.assign(tileSizes.begin(), tileSizes.end());
-      info.scalableFlags.assign(scalableFlags.begin(), scalableFlags.end());
-      return;
-    }
-  }
-  IREE::CPU::LoweringConfigLevelInfo newInfo;
-  newInfo.level = level;
-  newInfo.sizes.assign(tileSizes.begin(), tileSizes.end());
-  newInfo.scalableFlags.assign(scalableFlags.begin(), scalableFlags.end());
-  tilingInfo.push_back(newInfo);
-}
-
-void MultiLoweringConfigGenerator::scaleAndPermutateTilingForPackOp(
-    linalg::PackOp packOp, SmallVector<int64_t> &tileSizes,
-    SmallVector<bool> &scalableFlags, bool inverse) {
-  ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
-  ArrayRef<int64_t> innerDimPos = packOp.getInnerDimsPos();
-  ArrayRef<int64_t> outerDimsPerm = packOp.getOuterDimsPerm();
-  if (inverse) {
-    // First undo dimension permutation if present.
-    if (!outerDimsPerm.empty()) {
-      auto invertedPerm = invertPermutationVector(outerDimsPerm);
-      applyPermutationToVector(tileSizes, invertedPerm);
-      applyPermutationToVector(scalableFlags, invertedPerm);
-    }
-    // Then unscale tile sizes by multiplying the inner tile sizes.
-    for (auto &&[pos, size] : llvm::zip_equal(innerDimPos, innerTiles)) {
-      if (ShapedType::isDynamic(size)) {
-        continue;
-      }
-      tileSizes[pos] *= size;
-    }
-
-  } else {
-    // First scale tile sizes by dividing by the inner tile sizes.
-    for (auto &&[pos, size] : llvm::zip_equal(innerDimPos, innerTiles)) {
-      if (ShapedType::isDynamic(size)) {
-        continue;
-      }
-      tileSizes[pos] /= size;
-    }
-
-    // Then apply dimension permutation if present.
-    if (!outerDimsPerm.empty()) {
-      applyPermutationToVector(tileSizes, outerDimsPerm);
-      applyPermutationToVector(scalableFlags, outerDimsPerm);
-    }
-  }
 }
 
 /// Adjusts the tile sizes (carried by `rootOp`) to be aligned with
@@ -3599,45 +3613,33 @@ static LogicalResult
 setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
                                ArrayRef<Operation *> computeOps,
                                Operation *rootOperation) {
-
-  if (!llvm::is_contained(computeOps, rootOperation)) {
+  std::unique_ptr<MultiLoweringConfigGenerator> generator =
+      MultiLoweringConfigGenerator::create(rootOperation, computeOps);
+  if (!generator) {
     return success();
   }
 
-  if (isa<linalg::ConvolutionOpInterface>(rootOperation)) {
-    // TODO(dcaballe): We don't know yet how to properly propagate the lowering
-    // config of a convolution.
-    return success();
-  }
-
-  MultiLoweringConfigGenerator generator(rootOperation, computeOps);
   // Step 1: Load the root operation’s lowering config, and map its tile sizes
   // to global dimension indices using IterationDimTracker.
-  auto rootLoweringConfig =
-      getLoweringConfig<IREE::CPU::LoweringConfigAttr>(rootOperation);
-  if (!rootLoweringConfig) {
-    // Propagation is only available for IREE::CPU::LoweringConfigAttr.
-    return success();
-  }
-  generator.loadRootLoweringConfig(rootLoweringConfig);
+  generator->loadRootLoweringConfig();
 
   // Step 2: Collect tile sizes favored by non-root ops, and use them to adjust
   // the root operation’s tile sizes.
-  generator.getVecTileSizesForNonRootOps(entryPointFn);
-  generator.adjustTileSizesForRootOp();
+  generator->getVecTileSizesForNonRootOps(entryPointFn);
+  generator->adjustTileSizesForRootOp();
 
   // Step 3: Assign tile sizes for any remaining unspecified dimensions.
-  generator.fillTileSizesWithNonRootOps();
+  generator->fillTileSizesWithNonRootOps();
 
   // Step 4: Derive reduction-level tiling sizes for non-root operations.
-  generator.getGenericReductionTileSizes();
+  generator->getGenericReductionTileSizes();
 
   // Step 5: Split parallel vector tile sizes into common parts and op-specific
   // parts.
-  generator.splitCommonInnerVectorTiles();
+  generator->splitCommonInnerVectorTiles();
 
   // Step 6: Set the lowering configs with new tile sizes.
-  generator.setNewTilingConfigs();
+  generator->setNewTilingConfigs();
 
   return success();
 }
@@ -3660,7 +3662,7 @@ lowerUsingDefaultPipeline(mlir::FunctionOpInterface entryPointFn) {
 ///
 /// This predicate excludes:
 ///   - Ops inside a `CustomOp` that already have a lowering config.
-///   - Ops with no loops (e.g., a `linalg.generic` wit a scalar element type.
+///   - Ops with no loops (e.g., a `linalg.generic` with a scalar element type.
 ///   - `linalg.pack` ops whose producer is a `tensor.collapse_shape`,
 ///     as they will be lowered together into a `map_scatter` later in the
 ///     pipeline.
