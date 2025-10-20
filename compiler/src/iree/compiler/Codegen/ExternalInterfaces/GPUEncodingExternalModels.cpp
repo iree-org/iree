@@ -586,6 +586,14 @@ struct GPUPadEncodingLayoutMaterializerAttr final
     if (!boundType || !boundType.getEncoding()) {
       return failure();
     }
+    // Only handle cases where the slice spans the whole
+    // `!iree_tensor_ext.dispatch.tensor` type.
+    // TODO(hanchung): Enable partial slices. It was copied from pattern's
+    // implementaion, i.e., the users, and it can be dropped after we move the
+    // checks to the interface implementations.
+    if (!type.doesSliceSpanWholeTensor(dynamicDims, offsets, sizes, strides)) {
+      return failure();
+    }
     newSizes = getMixedValues(boundType.getShape(), dynamicDims, builder);
     newOffsets.resize(newSizes.size(), builder.getIndexAttr(0));
     newStrides.resize(newSizes.size(), builder.getIndexAttr(1));
