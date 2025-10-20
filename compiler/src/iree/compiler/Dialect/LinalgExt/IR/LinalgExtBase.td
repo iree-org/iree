@@ -37,13 +37,6 @@ def IREELinalgExt_Dialect : Dialect {
 // Type definitions
 //===----------------------------------------------------------------------===//
 
-class RankedTensorOrMemRefOf<list<Type> allowedTypes> :
-  ShapedContainerType<allowedTypes,
-      Or<[IsMemRefTypePred, And<[IsTensorTypePred, HasRankPred]>]>,
-  "ranked tensor or memref", "::mlir::ShapedType">;
-
-def AnyRankedTensorOrMemRefType : RankedTensorOrMemRefOf<[AnyType]>;
-
 class RankedTensorOrScalarType<list<Type> allowedTypes> :
   AnyTypeOf<[RankedTensorOf<allowedTypes>, AnyTypeOf<allowedTypes>]>;
 
