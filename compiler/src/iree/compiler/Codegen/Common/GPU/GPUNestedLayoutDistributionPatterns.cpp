@@ -436,10 +436,11 @@ struct DistributeTransferWrite final
     }
   }
 
-  /// Compute a boolean in SIMT semantics that is true for the first vtid and
-  /// stid carrying broadcasted data.
+  /// Compute a boolean in SIMT semantics that is true for the first virtual
+  /// lane(thread) id (vtid) and virtual subgroup id (vsid) carrying broadcasted
+  /// data.
   ///
-  /// We do this by computing a basis for vtid and stid computation, and adding
+  /// We do this by computing a basis for vtid and vsid computation, and adding
   /// a check for basis elements that are not used (i.e. they are duplicated)
   /// to be zero.
   FailureOr<Value> getNoOverlapCondition(OpBuilder &b, Location loc,
@@ -529,20 +530,6 @@ struct DistributeTransferWrite final
 
     // If the distribution results in threads writing to the same address, guard
     // with an scf.if to ensure only one thread writes per duplication group.
-
-    // Delinearize the thread id into
-    //   ('workgroup_overlap', *subgroup_tile, 'lane_overlap', *thread_tile)
-    SmallVector<int64_t> basis(2 * rank + 1);
-    ArrayRef<int64_t> subgroupTile = vectorLayout.getSubgroupTile();
-    ArrayRef<int64_t> threadTile = vectorLayout.getThreadTile();
-    int64_t threadTileSize = llvm::product_of(threadTile);
-    int64_t laneOverlap = std::max(int64_t(1), subgroupSize / threadTileSize);
-    basis[rank] = laneOverlap;
-    for (int i = 0; i < rank; ++i) {
-      basis[i] = subgroupTile[i];
-      basis[rank + 1 + i] = threadTile[i];
-    }
-
     Location loc = writeOp.getLoc();
     FailureOr<Value> doWrite =
         getNoOverlapCondition(rewriter, loc, vectorLayout);
