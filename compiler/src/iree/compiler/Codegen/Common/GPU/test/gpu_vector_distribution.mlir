@@ -168,7 +168,7 @@ func.func @reduction(%in: memref<2048xf32>, %out: memref<f32>) {
 
   // Guards on duplicated writes to LDS.
   // Only lane 0 within each subgroup writes.
-  //      CHECK: %[[DELIN:.*]]:4 = affine.delinearize_index %[[THREADIDX]] into (512, 8, 64, 1)
+  //      CHECK: %[[DELIN:.*]]:4 = affine.delinearize_index %[[THREADIDX]] into (1, 8, 64, 1)
   // This condition is redundant and will be cleaned up after int
   // optimizations. This can also be fixed with a fold pattern to
   // affine.delinearize_index.

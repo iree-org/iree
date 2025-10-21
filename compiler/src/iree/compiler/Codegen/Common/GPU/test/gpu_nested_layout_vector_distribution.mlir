@@ -1494,7 +1494,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: @lanes_fully_distributed
 //   CHECK-DAG:    %[[TID:.+]] = gpu.thread_id
 //   CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
-//       CHECK:    %[[DELIN:.*]]:2 = affine.delinearize_index %[[TID:.+]] into (256, 64)
+//       CHECK:    %[[DELIN:.*]]:2 = affine.delinearize_index %[[TID:.+]] into (4, 64)
 //       CHECK:    %[[COND:.+]] = arith.cmpi eq, %[[DELIN]]#0, %[[C0]] : index
 //       CHECK:    scf.if %[[COND]] {
 //       CHECK:        vector.transfer_write
@@ -1529,14 +1529,8 @@ builtin.module attributes { transform.with_named_sequence } {
 >
 
 // CHECK-LABEL: @threads_fully_distributed
-//       CHECK-DAG: %[[C0:.+]] = arith.constant 0
-//       CHECK: %[[TID:.+]] = gpu.thread_id
-//       CHECK: %[[DELIN:.+]]:2 = affine.delinearize_index %[[TID]] into (64, 64)
-//       CHECK: %[[COND:.+]] = arith.cmpi eq, %[[DELIN]]#0, %[[C0]]
-//       Note that cond is always true here, but this gets resolved after arith
-//       int optimizations.
-//       TODO: Add a folder to affine.delinearize_index to fold it to zero.
-//       CHECK: scf.if %[[COND]]
+//       CHECK-NOT: scf.if
+//       CHECK: transfer_write
 //       CHECK: return
 func.func @threads_fully_distributed(%out: memref<100x100xf32, #amdgpu.address_space<fat_raw_buffer>>, %v: vector<64x64xf32>) {
   %w = iree_vector_ext.to_layout %v to layout(#layout_row_major) : vector<64x64xf32>

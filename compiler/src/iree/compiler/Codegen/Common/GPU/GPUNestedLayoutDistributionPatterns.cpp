@@ -462,25 +462,29 @@ struct DistributeTransferWrite final
                                      dimToResult))) {
       return failure();
     }
-    // Make the upper bound numThreadsInWorkgroup to remove redundant checks.
+    // Make the outer bound numThreadsInWorkgroup / prod(basis) to remove
+    // redundant checks.
     if (numThreadsInWorkgroup.has_value()) {
-      basis.insert(basis.begin(), numThreadsInWorkgroup.value());
+      int64_t outerBound =
+          numThreadsInWorkgroup.value() / llvm::product_of(basis);
+      basis.insert(basis.begin(), outerBound);
     }
     // Create a delinearize operation and check that all results not present in
     // dimToResult are 0.
-    auto delinearize = affine::AffineDelinearizeIndexOp::create(
-        b, loc, threadId, basis,
+    SmallVector<Value> delinearized;
+    b.createOrFold<affine::AffineDelinearizeIndexOp>(
+        delinearized, loc, threadId, basis,
         /*hasOuterbound=*/numThreadsInWorkgroup.has_value());
     // Get all results which are not in dimToResult and check they are 0.
     Value condition = arith::ConstantOp::create(b, loc, b.getBoolAttr(true));
-    for (auto [idx, result] : llvm::enumerate(delinearize.getResults())) {
+    for (auto [idx, result] : llvm::enumerate(delinearized)) {
       if (llvm::is_contained(dimToResult, idx)) {
         continue;
       }
-      Value isZero =
-          arith::CmpIOp::create(b, loc, arith::CmpIPredicate::eq, result,
-                                arith::ConstantIndexOp::create(b, loc, 0));
-      condition = arith::AndIOp::create(b, loc, condition, isZero);
+      Value isZero = b.createOrFold<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::eq, result,
+          arith::ConstantIndexOp::create(b, loc, 0));
+      condition = b.createOrFold<arith::AndIOp>(loc, condition, isZero);
     }
     return condition;
   }
