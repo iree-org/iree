@@ -580,9 +580,80 @@ struct GPULayoutResolverAttr final
   }
 };
 
+// Returns the pad encoding layout, or nullptr if this is not the only layout or
+// if there's no encoding at all.
+static IREE::Encoding::PaddingAttr
+getPadLayout(IREE::Encoding::LayoutResolverAttr layoutAttr,
+             RankedTensorType type) {
+  if (!type.getEncoding()) {
+    return nullptr;
+  }
+  auto encoding =
+      dyn_cast_or_null<IREE::Encoding::LayoutAttr>(type.getEncoding());
+  if (encoding) {
+    ArrayAttr layouts = encoding.getLayouts();
+    if (layouts.size() != 1) {
+      return nullptr;
+    }
+    return dyn_cast<IREE::Encoding::PaddingAttr>(*layouts.begin());
+  }
+  Attribute resolvedEncoding = layoutAttr.getLayout(type);
+  LDBG() << "Unresolved type: " << type;
+  LDBG() << "layoutAttr: " << layoutAttr;
+  LDBG() << "Resolved into: " << resolvedEncoding;
+  return dyn_cast<IREE::Encoding::PaddingAttr>(resolvedEncoding);
+}
+
+// Returns a padded tensor type (without encoding) for tensor types with the pad
+// encoding layout, or the same type for all other tensors.
+static RankedTensorType
+getPaddedType(IREE::Encoding::LayoutResolverAttr layoutAttr,
+              RankedTensorType type) {
+  IREE::Encoding::PaddingAttr layout = getPadLayout(layoutAttr, type);
+  if (layout.isIdentityLayout()) {
+    return type.dropEncoding();
+  }
+
+  ArrayRef<int64_t> padding = layout.getPadding().asArrayRef();
+  auto newShape = llvm::to_vector_of<int64_t>(type.getShape());
+  for (auto [newDim, padValue] : llvm::zip_equal(newShape, padding)) {
+    assert((padValue == 0 || ShapedType::isStatic(newDim)) &&
+           "Padding dynamic dims not supported");
+    newDim += padValue;
+  }
+
+  return RankedTensorType::get(newShape, type.getElementType());
+}
+
 struct GPUPadEncodingLayoutMaterializerAttr final
     : IREE::Encoding::LayoutMaterializerAttr::ExternalModel<
           GPUPadEncodingLayoutMaterializerAttr, GPUPaddingResolverAttr> {
+
+  Type convertType(Attribute attr, Type type) const {
+    auto layoutAttr = cast<IREE::Encoding::LayoutResolverAttr>(attr);
+    return TypeSwitch<Type, Type>(type)
+        .Case<RankedTensorType>([&](auto type) {
+          // By the definition, the final converted type is the same tensor type
+          // without encodings.
+          return type.dropEncoding();
+        })
+        .Case<IREE::TensorExt::DispatchTensorType>(
+            [&](auto dispatchTensorType) {
+              auto type =
+                  dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
+              if (!type || !type.getEncoding()) {
+                return dispatchTensorType;
+              }
+              // The incoming bindings have the padded type, if `padding` is
+              // present.
+              if (getPadLayout(layoutAttr, type)) {
+                type = getPaddedType(layoutAttr, type);
+              }
+              return IREE::TensorExt::DispatchTensorType::get(
+                  dispatchTensorType.getAccess(), type);
+            })
+        .Default([&](Type type) { return type; });
+  }
 
   LogicalResult getOffsetsSizesStrides(
       Attribute attr, OpBuilder &builder, Location loc,
