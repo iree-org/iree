@@ -74,6 +74,7 @@ class TargetConverter:
                     "MLIRLinalgStructuredOpsIncGenLib"
                 ],
                 "@llvm-project//mlir:ShapeTransforms": ["MLIRShapeOpsTransforms"],
+                "@llvm-project//mlir:FromLLVMIRTranslation": ["MLIRTargetLLVMIRImport"],
                 "@llvm-project//mlir:ToLLVMIRTranslation": ["MLIRTargetLLVMIRExport"],
                 "@llvm-project//mlir:mlir-translate": ["mlir-translate"],
                 "@llvm-project//mlir:MlirLspServerLib": ["MLIRLspServerLib"],

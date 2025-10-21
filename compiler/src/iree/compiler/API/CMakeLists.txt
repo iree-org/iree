@@ -26,6 +26,7 @@ iree_cc_library(
     MLIRCAPITransformDialect
     MLIRCAPITransformDialectTransforms
     MLIRCAPITransforms
+    MLIRTargetLLVMIRImport
     iree::compiler::API::Internal::CompilerDriver
     iree::compiler::API::Internal::IREECodegenDialectCAPI
     iree::compiler::API::Internal::IREECompileToolEntryPoint
@@ -80,6 +81,7 @@ set(_EXPORT_OBJECT_LIBS
   obj.MLIRCAPITransforms
   obj.MLIRCAPITransformDialect
   obj.MLIRCAPITransformDialectTransforms
+  obj.MLIRTargetLLVMIRImport
   iree_compiler_API_Internal_CompilerDriver.objects
   iree_compiler_API_Internal_IREECompileToolEntryPoint.objects
   iree_compiler_API_Internal_IREECodegenDialectCAPI.objects
