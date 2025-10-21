@@ -22,6 +22,7 @@ iree_cc_library(
     MLIRCAPILLVM
     MLIRCAPILinalg
     MLIRCAPIPDL
+    MLIRCAPITarget
     MLIRCAPITransformDialect
     MLIRCAPITransformDialectTransforms
     MLIRCAPITransforms
@@ -75,6 +76,7 @@ set(_EXPORT_OBJECT_LIBS
   obj.MLIRCAPILLVM
   obj.MLIRCAPILinalg
   obj.MLIRCAPIPDL
+  obj.MLIRCAPITarget
   obj.MLIRCAPITransforms
   obj.MLIRCAPITransformDialect
   obj.MLIRCAPITransformDialectTransforms
