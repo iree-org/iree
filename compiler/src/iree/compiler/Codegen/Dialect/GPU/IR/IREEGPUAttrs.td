@@ -90,9 +90,14 @@ def IREEGPU_UseGlobalLoadDma :
     Lowering config for when using global load DMA is needed. This is intended for
     tagging operations that are known to be able to use global load DMA, which might
     also have its own cofiguration.
+
+    The optional |subgroup| parameter specifies tile sizes for subgroup-level tiling.
+    When set, these sizes will be used for tiling at the Subgroup tiling level.
   }];
-  let assemblyFormat = "";
-  let parameters = (ins);
+  let assemblyFormat = "(`<` `subgroup` `=` $subgroup^ `>`)?";
+  let parameters = (ins
+    OptionalParameter<"DenseI64ArrayAttr">:$subgroup
+  );
 }
 
 def IREEGPU_PromoteWithCacheSwizzle :
