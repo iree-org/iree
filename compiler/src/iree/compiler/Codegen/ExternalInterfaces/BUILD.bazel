@@ -16,14 +16,12 @@ iree_compiler_cc_library(
     name = "ExternalModels",
     srcs = [
         "CPUEncodingExternalModels.cpp",
-        "CodegenExternalModels.cpp",
         "GPUEncodingExternalModels.cpp",
         "Interfaces.cpp",
         "Utils.cpp",
     ],
     hdrs = [
         "CPUEncodingExternalModels.h",
-        "CodegenExternalModels.h",
         "GPUEncodingExternalModels.h",
         "Interfaces.h",
         "Utils.h",

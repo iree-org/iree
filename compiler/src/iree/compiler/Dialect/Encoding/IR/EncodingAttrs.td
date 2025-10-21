@@ -269,6 +269,11 @@ def IdentityResolverAttr :
       DeclareAttrInterfaceMethods<IREEEncoding_LayoutResolverAttr, [
         "cloneWithSimplifiedConfig",
         "getLayout",
+      ]>,
+      DeclareAttrInterfaceMethods<IREEEncoding_LayoutMaterializerAttr, [
+        "convertType",
+        "getOffsetsSizesStrides",
+        "lowerOp",
       ]>
     ]> {
   let mnemonic = "identity_resolver";
