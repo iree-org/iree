@@ -30,6 +30,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRIR
     MLIRLinalgDialect
+    MLIRLinalgTransforms
     MLIRTensorDialect
     iree::compiler::Codegen::Dialect::CPU::IR::IREECPUDialect
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
