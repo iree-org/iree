@@ -117,11 +117,10 @@ Value cacheSwizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
   // default.
   AffineExpr s0, s1;
   bindSymbols(builder.getContext(), s0, s1);
-  Value dtype = getValueOrCreateConstantIntOp(
-      builder, loc,
+  Value dtype =
       arith::ConstantIndexOp::create(
           builder, loc, tensorType.getElementType().getIntOrFloatBitWidth())
-          ->getResult(0));
+          ->getResult(0);
 
   OpFoldResult dim = tensor::getMixedSize(builder, loc, bufferCastValue,
                                           tensorType.getRank() - 1);
