@@ -413,11 +413,11 @@ private:
   FailureOr<scf::SCFTilingResult> tileAtSubgroupLevel(IRRewriter &rewriter,
                                                       OpTy op) {
     MLIRContext *context = &getContext();
-    auto gpuConfig = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
-    if (!gpuConfig)
+    auto dmaConfig = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op);
+    if (!dmaConfig)
       return failure();
 
-    SmallVector<OpFoldResult> tileSizes = gpuConfig.getTilingLevelSizes(
+    SmallVector<OpFoldResult> tileSizes = dmaConfig.getTilingLevelSizes(
         rewriter, llvm::to_underlying(IREE::GPU::TilingLevel::Subgroup), op);
 
     if (tileSizes.empty())
@@ -441,10 +441,11 @@ private:
     MLIRContext *context = &getContext();
     SmallVector<Operation *> opsToTile;
 
-    // Collect all ops with GPU lowering configs.
+    // Collect all ops with iree_gpu.use_global_load_dma lowering config.
     funcOp->walk([&](Operation *op) {
       if (isa<linalg::CopyOp, IREE::LinalgExt::GatherOp>(op)) {
-        if (getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op)) {
+        auto config = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op);
+        if (config) {
           opsToTile.push_back(op);
         }
       }

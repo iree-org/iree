@@ -16,7 +16,7 @@
 // CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<64x1024xf32>
 func.func @copy(%source: tensor<64x1024xf32>, %init: tensor<64x1024xf32>) -> tensor<64x1024xf32>
   attributes {hal.executable.target = #exec_target_copy, translation_info = #translation_copy} {
-  %result = linalg.copy {lowering_config = #iree_gpu.lowering_config<{subgroup = [4, 128]}>}
+  %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma<subgroup = [4, 128]>}
     ins(%source : tensor<64x1024xf32>)
     outs(%init : tensor<64x1024xf32>) -> tensor<64x1024xf32>
 
@@ -73,7 +73,7 @@ func.func @copy(%source: tensor<64x1024xf32>, %init: tensor<64x1024xf32>) -> ten
 // CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<4x256xf32>
 func.func @gather(%source: tensor<4x256xf32>, %indices: tensor<4x256xindex>, %init: tensor<4x256xf32>) -> tensor<4x256xf32>
   attributes {hal.executable.target = #exec_target_gather, translation_info = #translation_gather} {
-  %result = iree_linalg_ext.gather {lowering_config = #iree_gpu.lowering_config<{subgroup = [4, 256]}>}
+  %result = iree_linalg_ext.gather {lowering_config = #iree_gpu.use_global_load_dma<subgroup = [4, 256]>}
     dimension_map = [0]
     ins(%source, %indices : tensor<4x256xf32>, tensor<4x256xindex>)
     outs(%init : tensor<4x256xf32>) -> tensor<4x256xf32>

@@ -303,3 +303,51 @@ func.func @promote_with_cache_swizzle_f4_no_stride(%a: tensor<2x34x34x129xf4E2M1
 //  CHECK-SAME:     lowering_config = #iree_gpu.use_global_load_dma
 //  CHECK-SAME:     ins(%[[SWIZZLE_B]]
 //       CHECK:   linalg.batch_matmul {{.*}} ins(%[[PA]], %[[PB]]
+
+// -----
+
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<arch = "gfx942", features = "", wgp = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8, subgroup = shuffle|arithmetic, dot = dp4xi8toi32, mma = [], subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647], max_load_instruction_bits = 128, simds_per_wgp = 4, vgpr_space_bits = 16384>>}>
+
+#translation_info = #iree_codegen.translation_info<
+  pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1]
+  subgroup_size = 32, {
+    gpu_pipeline_options = #iree_gpu.pipeline_options<
+      prefetch_shared_memory = true,
+      no_reduce_shared_memory_bank_conflicts = false,
+      use_igemm_convolution = false>}>
+
+#lowering_config = #iree_gpu.lowering_config<{
+  promote_operands = [0, 1],
+  promotion_types = [#iree_gpu.use_global_load_dma<subgroup = [32, 32]>, #iree_gpu.use_global_load_dma<subgroup = [32, 32]>]}>
+
+module {
+  func.func @matmul_with_target_info(%a: tensor<32x1024xf32>, %b: tensor<1024x128xf32>) -> tensor<32x128xf32>
+    attributes {hal.executable.target = #executable_target_rocm_hsaco_fb, translation_info = #translation_info} {
+    %cst = arith.constant 0.000000e+00 : f32
+    %empty = tensor.empty() : tensor<32x128xf32>
+    %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<32x128xf32>) -> tensor<32x128xf32>
+    %mm = linalg.matmul {lowering_config = #lowering_config}
+      ins(%a, %b : tensor<32x1024xf32>, tensor<1024x128xf32>) outs(%fill : tensor<32x128xf32>) -> tensor<32x128xf32>
+    return %mm : tensor<32x128xf32>
+  }
+}
+
+// CHECK-LABEL: module
+//       CHECK:   func.func @matmul_with_target_info
+//  CHECK-SAME:     %[[A:[A-Za-z0-9]+]]: tensor<32x1024xf32>
+//  CHECK-SAME:     %[[B:[A-Za-z0-9]+]]: tensor<1024x128xf32>
+//   CHECK-DAG:     %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+//   CHECK-DAG:     %[[EMPTY_OUT:.+]] = tensor.empty() : tensor<32x128xf32>
+//       CHECK:     %[[FILL:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[EMPTY_OUT]] : tensor<32x128xf32>)
+//   CHECK-DAG:     %[[EMPTY_A:.+]] = tensor.empty() : tensor<32x1024xf32>
+//       CHECK:     %[[PA:.+]] = linalg.copy
+//  CHECK-SAME:       lowering_config = #iree_gpu.use_global_load_dma<subgroup = [32, 32]>
+//  CHECK-SAME:       ins(%[[A]] : tensor<32x1024xf32>) outs(%[[EMPTY_A]] : tensor<32x1024xf32>)
+//   CHECK-DAG:     %[[EMPTY_B:.+]] = tensor.empty() : tensor<1024x128xf32>
+//       CHECK:     %[[PB:.+]] = linalg.copy
+//  CHECK-SAME:       lowering_config = #iree_gpu.use_global_load_dma<subgroup = [32, 32]>
+//  CHECK-SAME:       ins(%[[B]] : tensor<1024x128xf32>) outs(%[[EMPTY_B]] : tensor<1024x128xf32>)
+//       CHECK:     %[[MATMUL:.+]] = linalg.matmul
+//  CHECK-SAME:       lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1], promotion_types = [#iree_gpu.use_global_load_dma<subgroup = [32, 32]>, #iree_gpu.use_global_load_dma<subgroup = [32, 32]>]}>
+//  CHECK-SAME:       ins(%[[PA]], %[[PB]] : tensor<32x1024xf32>, tensor<1024x128xf32>) outs(%[[FILL]] : tensor<32x128xf32>)
+//       CHECK:     return %[[MATMUL]]
