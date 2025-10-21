@@ -476,23 +476,23 @@ func.func @matmul_lowering_f32f32f32_gfx942() attributes {
 //   CHECK-DAG:   %[[TILED_M:.+]] = affine.apply #[[$MAP0]]()[%[[M]]]
 //   CHECK-DAG:   %[[TILED_K:.+]] = affine.apply #[[$MAP1]]()[%[[K]]]
 //       CHECK:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
-//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x8x4x16x4xf32>>{%[[TILED_M]], %[[TILED_K]]}
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x2x4x4x16x4xf32>>{%[[TILED_M]], %[[TILED_K]]}
 //       CHECK:   %[[TILED_N:.+]] = affine.apply #[[$MAP0]]()[%[[N]]]
 //       CHECK:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
-//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x4x2x4x16x4xf32>>{%[[TILED_N]], %[[TILED_K]]}
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x2x4x4x16x4xf32>>{%[[TILED_N]], %[[TILED_K]]}
 //       CHECK:   %[[OUTS_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
-//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x4x8x2x4x16x4xf32>>{%[[TILED_M]], %[[TILED_N]]}
+//  CHECK-SAME:       !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x2x2x4x4x4x16x4xf32>>{%[[TILED_M]], %[[TILED_N]]}
 //       CHECK:   %[[LHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[LHS_BINDING]]
-//  CHECK-SAME:       offsets = [0, 0, 0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_K]], 8, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1]
+//  CHECK-SAME:       offsets = [0, 0, 0, 0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_K]], 2, 4, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1]
 //       CHECK:   %[[RHS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[RHS_BINDING]]
-//  CHECK-SAME:       offsets = [0, 0, 0, 0, 0, 0, 0], sizes = [%[[TILED_N]], %[[TILED_K]], 4, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1]
+//  CHECK-SAME:       offsets = [0, 0, 0, 0, 0, 0, 0], sizes = [%[[TILED_N]], %[[TILED_K]], 2, 4, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1]
 //       CHECK:   %[[OUTS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[OUTS_BINDING]]
-//  CHECK-SAME:       offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 4, 8, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1]
+//  CHECK-SAME:       offsets = [0, 0, 0, 0, 0, 0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 2, 2, 4, 4, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
 //       CHECK:   %[[GEMM:.+]] = iree_codegen.inner_tiled
 //  CHECK-SAME:       ins(%[[LHS]], %[[RHS]])
 //  CHECK-SAME:       outs(%[[OUTS]])
 //       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[GEMM]], %[[OUTS_BINDING]]
-//  CHECK-SAME:       offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 4, 8, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1]
+//  CHECK-SAME:       offsets = [0, 0, 0, 0, 0, 0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 2, 2, 4, 4, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1, 1]
 
 // -----
 

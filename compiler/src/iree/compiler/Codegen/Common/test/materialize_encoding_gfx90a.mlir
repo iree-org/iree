@@ -57,11 +57,11 @@ func.func @matmul_lowering_MFMA_f64_16x16x4_f64(
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
 // CHECK:     func.func @matmul_lowering_MFMA_f64_16x16x4_f64(
-// CHECK-SAME:     %[[LHS:.+]]: tensor<?x?x4x4x16x2xf64>, %[[RHS:.+]]: tensor<?x?x4x4x16x2xf64>
-// CHECK-SAME:     %[[ACC:.+]]: tensor<?x?x4x4x4x4x16xf64>
-// CHECK-SAME:   ) -> tensor<?x?x4x4x4x4x16xf64>
+// CHECK-SAME:     %[[LHS:.+]]: tensor<?x?x2x2x4x16x2xf64>, %[[RHS:.+]]: tensor<?x?x2x2x4x16x2xf64>
+// CHECK-SAME:     %[[ACC:.+]]: tensor<?x?x2x2x2x2x4x4x16xf64>
+// CHECK-SAME:   ) -> tensor<?x?x2x2x2x2x4x4x16xf64>
 // CHECK:       %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]]) outs(%[[ACC]])
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
 // CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]
-// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F64_16x16x4_F64, intrinsics_m = 4, subgroups_n = 4, intrinsics_k = 2>
+// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F64_16x16x4_F64, intrinsics_m = 2, subgroups_m = 2, intrinsics_n = 2, subgroups_n = 2, intrinsics_k = 2>
 // CHECK:       return %[[MMA]]

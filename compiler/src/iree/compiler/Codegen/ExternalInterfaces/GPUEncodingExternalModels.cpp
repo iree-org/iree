@@ -217,69 +217,69 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   // subgroups, making it cancel out of the equation here.
   //
   // We need to find the optimal pair (totalUnrollM, totalUnrollN) by
-  // enumerating feasible (x, y) candidates. For each candidate, the constraint
-  // is that the A, B and C tiles must fit in VGPR space.
-  //     A-tile: x * intrinsicsK * intrinsicSizeBitsLHS
-  //     B-tile: y * intrinsicsK * intrinsicSizeBitsRHS
-  //     C-tile: x * y * intrinsicSizeBitsACC
+  // enumerating feasible (tm, tn) candidates. For each candidate, the
+  // constraint is that the A, B and C tiles must fit in VGPR space.
+  //     A-tile: tm * intrinsicsK * intrinsicSizeBitsLHS
+  //     B-tile: tn * intrinsicsK * intrinsicSizeBitsRHS
+  //     C-tile: tm * tn * intrinsicSizeBitsACC
   //     A-tile + B-tile + C-tile <= wgp.getVgprSpaceBits()
   //
-  // The goal is to maximize arithmetic intensity (x * y) while keeping x and y
-  // close (to balance LHS and RHS loads).
+  // The goal is to maximize arithmetic intensity (tm * tn) while keeping tm and
+  // tn close (to balance LHS and RHS loads).
   //
-  // We also self-impose the constraint that x and y are powers of 2 to
+  // We also self-impose the constraint that tm and tn are powers of 2 to
   // avoid prematurely entering excessing fine-tuning of unrolling factors.
   int64_t totalUnrollM = 1;
   int64_t totalUnrollN = 1;
-  // Upper bounds of x and y are decided by the matrix and intrinsic sizes.
-  int64_t maxX = INT64_MAX;
-  int64_t maxY = INT64_MAX;
+  // Upper bounds of tm and tn are decided by the matrix and intrinsic sizes.
+  int64_t maxTotalUnrollM = INT64_MAX;
+  int64_t maxTotalUnrollN = INT64_MAX;
   FailureOr<IREE::Encoding::BxMxNxK> matmulSizes = getMatmulSizes(encoding);
   if (succeeded(matmulSizes)) {
-    auto getMaxXY = [&](const IREE::Encoding::BxMxNxK &sizes) {
+    auto getTotalUnrollMN = [&](const IREE::Encoding::BxMxNxK &sizes) {
       if (!ShapedType::isDynamic(sizes.M)) {
         if (sizes.M < intrinsicMSize) {
           // M dimension is too small to benefit from increased unrolling.
-          maxX = 1;
-          maxY = 1;
+          maxTotalUnrollM = 1;
+          maxTotalUnrollN = 1;
           return;
         }
-        // Cap maxX to avoid padding.
-        maxX = llvm::divideCeil(sizes.M, intrinsicMSize);
+        // Cap maxTotalUnrollM to avoid excessive padding.
+        maxTotalUnrollM = llvm::divideCeil(sizes.M, intrinsicMSize);
       }
       if (!ShapedType::isDynamic(sizes.N)) {
         if (sizes.N < intrinsicNSize) {
           // N dimension is too small to benefit from increased unrolling.
-          maxX = 1;
-          maxY = 1;
+          maxTotalUnrollN = 1;
+          maxTotalUnrollM = 1;
           return;
         }
-        // Cap maxY to avoid padding.
-        maxY = llvm::divideCeil(sizes.N, intrinsicNSize);
+        // Cap maxTotalUnrollN to avoid excessive padding.
+        maxTotalUnrollN = llvm::divideCeil(sizes.N, intrinsicNSize);
       }
     };
-    getMaxXY(*matmulSizes);
+    getTotalUnrollMN(*matmulSizes);
   }
-  // Iterate over possible x.
-  for (int64_t x = 1; x <= maxX; x <<= 1) {
-    // Compute the maximum feasible y for this x.
-    int64_t y =
-        (*wgp.getVgprSpaceBits() - x * intrinsicsK * intrinsicSizeBitsLHS) /
-        (intrinsicsK * intrinsicSizeBitsRHS + x * intrinsicSizeBitsACC);
-    // No feasible y for this x. Stop the enumeration.
-    if (y <= 0) {
+  // Iterate over possible tm.
+  for (int64_t tm = 1; tm <= maxTotalUnrollM; tm <<= 1) {
+    // Compute the maximum feasible tn for this tm.
+    int64_t tn =
+        (*wgp.getVgprSpaceBits() - tm * intrinsicsK * intrinsicSizeBitsLHS) /
+        (intrinsicsK * intrinsicSizeBitsRHS + tm * intrinsicSizeBitsACC);
+    // No feasible tn for this tm. Stop the enumeration.
+    if (tn <= 0) {
       break;
     }
-    // Clamp y to maxY.
-    y = std::min(y, maxY);
-    // Round y down to nearest power of two.
-    y = 1 << (int64_t)std::floor(std::log2(y));
-    // Maximize x * y while keeping them close.
-    if ((x * y > totalUnrollM * totalUnrollN) ||
-        ((x * y == totalUnrollM * totalUnrollN) &&
-         std::abs(x - y) < std::abs(totalUnrollM - totalUnrollN))) {
-      totalUnrollM = x;
-      totalUnrollN = y;
+    // Clamp tn to maxTotalUnrollN.
+    tn = std::min(tn, maxTotalUnrollN);
+    // Round tn down to nearest power of two.
+    tn = 1 << (int64_t)std::floor(std::log2(tn));
+    // Maximize tm * tn while keeping them close.
+    if ((tm * tn > totalUnrollM * totalUnrollN) ||
+        ((tm * tn == totalUnrollM * totalUnrollN) &&
+         std::abs(tm - tn) < std::abs(totalUnrollM - totalUnrollN))) {
+      totalUnrollM = tm;
+      totalUnrollN = tn;
     }
   }
 
@@ -292,29 +292,32 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   // the number of registers available to each subgroups. In other words, the
   // overall tile size determined above only needed to be concerned with the
   // overall number of registers, not with how they are split between subgroups.
-  //
-  // For now for simplicity we put all the unroll-to-subgroups in the one of M
-  // or N dimension. TODO(#18851): revisit that.
   int64_t subgroupsM = 1;
-  int64_t subgroupsN = *wgp.getSimdsPerWgp();
+  int64_t subgroupsN = 1;
+  int64_t intrinsicsM = 1;
+  int64_t intrinsicsN = INT64_MAX;
+  int64_t simdsPerWgp = *wgp.getSimdsPerWgp();
+  // Enumerate possible unrolling-to-subgroups on M dimension.
+  for (int64_t sm = 1; sm <= std::min(simdsPerWgp, totalUnrollM); sm <<= 1) {
+    // Calculate the unrolling-to-subgroups on N dimension, given the current
+    // sm.
+    int64_t sn = std::min(simdsPerWgp / sm, totalUnrollN);
+    // Calculate the plain (intrinsic) unrolling factors on M and N dimensions.
+    int64_t im = totalUnrollM / sm;
+    int64_t in = totalUnrollN / sn;
+    // Minimize the difference between intrinsic unrolling factors.
+    if (std::abs(im - in) < std::abs(intrinsicsM - intrinsicsN)) {
+      subgroupsM = sm;
+      subgroupsN = sn;
+      intrinsicsM = im;
+      intrinsicsN = in;
+    }
+  }
+  assert(intrinsicsN != INT64_MAX);
   // We currently never generate subgroupsK != 1, as subgroupsK requires
   // specific partial-accumulator-reduction in the kernel, currently only done
   // in some microkernels that would provide their own DataTiledMMAAttr.
   int subgroupsK = 1;
-  IREE::Encoding::MatmulNarrowDim narrowDim =
-      IREE::Encoding::getPo2MatmulNarrowDim(encoding);
-  // In the case of narrow N dimension, put all unrolling-to-subgroups in M
-  // instead.
-  if (narrowDim.isN()) {
-    std::swap(subgroupsM, subgroupsN);
-  }
-  // Pad `totalUnrollM` and `totalUnrollN` to be at least
-  // unrolling-to-subgroups. This happens when both M and N are small values.
-  totalUnrollM = std::max(totalUnrollM, subgroupsM);
-  totalUnrollN = std::max(totalUnrollN, subgroupsN);
-  // Compute plain unrolling (instructions on each thread).
-  int64_t intrinsicsM = totalUnrollM / subgroupsM;
-  int64_t intrinsicsN = totalUnrollN / subgroupsN;
 
   // Returns the final choice of attributes.
   if (auto intrinsicMma = dyn_cast<MMAAttr>(intrinsicAttr)) {
