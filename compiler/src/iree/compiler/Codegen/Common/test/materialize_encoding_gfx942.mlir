@@ -17,7 +17,7 @@ func.func @empty_fill_encoding_unroll8x8x4_MFMA_F32_16x16x4_F32() -> tensor<255x
 }
 
 // CHECK-LABEL: func.func @empty_fill_encoding_unroll8x8x4_MFMA_F32_16x16x4_F32
-// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<2x33x8x4x16x4xf32>
+// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<2x33x2x4x4x16x4xf32>
 // CHECK:         %[[FILL:.+]] = linalg.fill ins({{.+}}) outs(%[[EMPTY]]
 // CHECK:         return %[[FILL]]
 
@@ -41,11 +41,11 @@ func.func @set_encoding_LHS_unroll8x8x4_MFMA_F32_16x16x4_F32(
 // CHECK-SAME:      inner_tiles = [128, 16]
 // CHECK-SAME:      : tensor<255x513xf32> -> tensor<2x33x128x16xf32>
 // CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME       : tensor<2x33x128x16xf32> into tensor<2x33x4x8x4x4x4xf32>
+// CHECK-SAME       : tensor<2x33x128x16xf32> into tensor<2x33x2x4x16x4x4xf32>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPAND]] : tensor<2x33x8x16x4x4xf32>)
-// CHECK-SAME:       outs({{.*}} : tensor<2x33x8x4x16x4xf32>)
-// CHECK-SAME:       permutation = [0, 1, 2, 5, 3, 4]
+// CHECK-SAME:       ins(%[[EXPAND]] : tensor<2x33x2x4x16x4x4xf32>)
+// CHECK-SAME:       outs({{.*}} : tensor<2x33x2x4x4x16x4xf32>)
+// CHECK-SAME:       permutation = [0, 1, 2, 3, 6, 4, 5]
 // CHECK:         return %[[TRANSPOSE]]
 
 // -----
@@ -68,11 +68,11 @@ func.func @set_encoding_LHS_narrow_unroll1x8x4_MFMA_F32_16x16x4_F32(
 // CHECK-SAME:      inner_tiles = [128, 16]
 // CHECK-SAME:      : tensor<255x513xf32> -> tensor<2x33x128x16xf32>
 // CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME       : tensor<2x33x128x16xf32> into tensor<2x33x4x8x4x4x4xf32>
+// CHECK-SAME       : tensor<2x33x128x16xf32> into tensor<2x33x2x4x16x4x4xf32>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPAND]] : tensor<2x33x8x16x4x4xf32>)
-// CHECK-SAME:       outs({{.*}} : tensor<2x33x8x4x16x4xf32>)
-// CHECK-SAME:       permutation = [0, 1, 2, 5, 3, 4]
+// CHECK-SAME:       ins(%[[EXPAND]] : tensor<2x33x2x4x16x4x4xf32>)
+// CHECK-SAME:       outs({{.*}} : tensor<2x33x2x4x4x16x4xf32>)
+// CHECK-SAME:       permutation = [0, 1, 2, 3, 6, 4, 5]
 // CHECK:         return %[[TRANSPOSE]]
 
 // -----
@@ -95,11 +95,11 @@ func.func @set_encoding_LHS_dynamic_unroll8x8x4_MFMA_F32_16x16x4_F32(
 // CHECK-SAME:      inner_tiles = [128, 16]
 // CHECK-SAME:      : tensor<?x?xf32> -> tensor<?x?x128x16xf32>
 // CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME       : tensor<?x?x128x16xf32> into tensor<?x?x4x8x4x4x4xf32>
+// CHECK-SAME       : tensor<?x?x128x16xf32> into tensor<?x?x2x4x16x4x4xf32>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPAND]] : tensor<?x?x8x16x4x4xf32>)
-// CHECK-SAME:       outs({{.*}} : tensor<?x?x8x4x16x4xf32>)
-// CHECK-SAME:       permutation = [0, 1, 2, 5, 3, 4]
+// CHECK-SAME:       ins(%[[EXPAND]] : tensor<?x?x2x4x16x4x4xf32>)
+// CHECK-SAME:       outs({{.*}} : tensor<?x?x2x4x4x16x4xf32>)
+// CHECK-SAME:       permutation = [0, 1, 2, 3, 6, 4, 5]
 // CHECK:         return %[[TRANSPOSE]]
 
 // -----
@@ -122,10 +122,10 @@ func.func @set_encoding_RHS_unroll8x8x4_MFMA_F32_16x16x4_F32(
 // CHECK-SAME:      inner_tiles = [128, 16]
 // CHECK-SAME:      : tensor<255x513xf32> -> tensor<5x16x128x16xf32>
 // CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME       : tensor<5x16x128x16xf32> into tensor<5x16x4x16x2x4x4xf32>
+// CHECK-SAME       : tensor<5x16x128x16xf32> into tensor<5x16x2x4x16x4x4xf32>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPAND]] : tensor<5x16x4x2x16x4x4xf32>)
-// CHECK-SAME:       outs({{.*}} : tensor<5x16x4x2x4x16x4xf32>)
+// CHECK-SAME:       ins(%[[EXPAND]] : tensor<5x16x2x4x16x4x4xf32>)
+// CHECK-SAME:       outs({{.*}} : tensor<5x16x2x4x4x16x4xf32>)
 // CHECK-SAME:       permutation = [0, 1, 2, 3, 6, 4, 5]
 // CHECK:         return %[[TRANSPOSE]]
 
@@ -149,10 +149,10 @@ func.func @set_encoding_RHS_narrow_unroll8x1x4_MFMA_F32_16x16x4_F32(
 // CHECK-SAME:      inner_tiles = [128, 16]
 // CHECK-SAME:      : tensor<255x513xf32> -> tensor<5x16x128x16xf32>
 // CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME       : tensor<5x16x128x16xf32> into tensor<5x16x4x16x2x4x4xf32>
+// CHECK-SAME       : tensor<5x16x128x16xf32> into tensor<5x16x2x4x16x4x4xf32>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPAND]] : tensor<5x16x4x2x16x4x4xf32>)
-// CHECK-SAME:       outs({{.*}} : tensor<5x16x4x2x4x16x4xf32>)
+// CHECK-SAME:       ins(%[[EXPAND]] : tensor<5x16x2x4x16x4x4xf32>)
+// CHECK-SAME:       outs({{.*}} : tensor<5x16x2x4x4x16x4xf32>)
 // CHECK-SAME:       permutation = [0, 1, 2, 3, 6, 4, 5]
 // CHECK:         return %[[TRANSPOSE]]
 
@@ -176,11 +176,11 @@ func.func @set_encoding_ACC_unroll8x8x4_MFMA_F32_16x16x4_F32(
 // CHECK-SAME:      inner_tiles = [128, 128]
 // CHECK-SAME:      : tensor<255x513xf32> -> tensor<2x5x128x128xf32>
 // CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME       : tensor<2x5x128x128xf32> into tensor<2x5x4x8x4x4x16x2xf32>
+// CHECK-SAME       : tensor<2x5x128x128xf32> into tensor<2x5x2x4x4x4x2x4x16xf32>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPAND]] : tensor<2x5x8x4x4x4x2x16xf32>)
-// CHECK-SAME:       outs({{.*}} : tensor<2x5x4x8x2x4x16x4xf32>)
-// CHECK-SAME:       permutation = [0, 1, 5, 2, 6, 3, 7, 4]
+// CHECK-SAME:       ins(%[[EXPAND]] : tensor<2x5x2x4x4x4x2x4x16xf32>)
+// CHECK-SAME:       outs({{.*}} : tensor<2x5x2x2x4x4x4x16x4xf32>)
+// CHECK-SAME:       permutation = [0, 1, 2, 6, 3, 7, 4, 8, 5]
 // CHECK:         return %[[TRANSPOSE]]
 
 // -----
@@ -199,11 +199,11 @@ func.func @set_encoding_ACC_dynamic_M_MFMA_F32_16x16x4_F32(%arg0 : tensor<?x513x
 // CHECK-SAME:      inner_tiles = [128, 128]
 // CHECK-SAME:      : tensor<?x513xf32> -> tensor<?x5x128x128xf32>
 // CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME       : tensor<?x5x128x128xf32> into tensor<?x5x4x4x2x4x16x8xf32>
+// CHECK-SAME       : tensor<?x5x128x128xf32> into tensor<?x5x2x4x4x4x2x4x16xf32>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPAND]] : tensor<?x5x4x2x4x4x8x16xf32>)
-// CHECK-SAME:       outs({{.*}} : tensor<?x5x4x2x8x4x16x4xf32>)
-// CHECK-SAME:       permutation = [0, 1, 2, 3, 6, 4, 7, 5]
+// CHECK-SAME:       ins(%[[EXPAND]] : tensor<?x5x2x4x4x4x2x4x16xf32>)
+// CHECK-SAME:       outs({{.*}} : tensor<?x5x2x2x4x4x4x16x4xf32>)
+// CHECK-SAME:       permutation = [0, 1, 2, 6, 3, 7, 4, 8, 5]
 // CHECK:         return %[[TRANSPOSE]]
 
 // -----
@@ -223,11 +223,11 @@ func.func @set_encoding_ACC_dynamic_N_MFMA_F32_16x16x4_F32(%arg0 : tensor<255x?x
 // CHECK-SAME:      inner_tiles = [128, 128]
 // CHECK-SAME:      : tensor<255x?xf32> -> tensor<2x?x128x128xf32>
 // CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME       : tensor<2x?x128x128xf32> into tensor<2x?x4x8x4x4x16x2xf32>
+// CHECK-SAME       : tensor<2x?x128x128xf32> into tensor<2x?x2x4x4x4x2x4x16xf32>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPAND]] : tensor<2x?x8x4x4x4x2x16xf32>)
-// CHECK-SAME:       outs({{.*}} : tensor<2x?x4x8x2x4x16x4xf32>)
-// CHECK-SAME:       permutation = [0, 1, 5, 2, 6, 3, 7, 4]
+// CHECK-SAME:       ins(%[[EXPAND]] : tensor<2x?x2x4x4x4x2x4x16xf32>)
+// CHECK-SAME:       outs({{.*}} : tensor<2x?x2x2x4x4x4x16x4xf32>)
+// CHECK-SAME:       permutation = [0, 1, 2, 6, 3, 7, 4, 8, 5]
 // CHECK:         return %[[TRANSPOSE]]
 
 // -----
@@ -245,11 +245,11 @@ func.func @unset_encoding_ACC_unroll8x8x4_MFMA_F32_16x16x4_F32(
 // CHECK-LABEL: func.func @unset_encoding_ACC_unroll8x8x4_MFMA_F32_16x16x4_F32
 // CHECK-SAME:       %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[ARG0]] : tensor<2x5x4x8x2x4x16x4xf32>)
-// CHECK-SAME:       outs({{.*}} : tensor<2x5x8x4x4x4x2x16xf32>)
-// CHECK-SAME:       permutation = [0, 1, 3, 5, 7, 2, 4, 6]
+// CHECK-SAME:       ins(%[[ARG0]] : tensor<2x5x2x2x4x4x4x16x4xf32>)
+// CHECK-SAME:       outs({{.*}} : tensor<2x5x2x4x4x4x2x4x16xf32>)
+// CHECK-SAME:       permutation = [0, 1, 2, 4, 6, 8, 3, 5, 7]
 // CHECK:         %[[COLLAPSE:.*]] = tensor.collapse_shape %[[TRANSPOSE]]
-// CHECK-SAME:      : tensor<2x5x8x4x4x4x2x16xf32> into tensor<2x5x128x128xf32>
+// CHECK-SAME:      : tensor<2x5x2x4x4x4x2x4x16xf32> into tensor<2x5x128x128xf32>
 // CHECK:         %[[UNPACK:.*]] = linalg.unpack %[[COLLAPSE]]
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
@@ -272,11 +272,11 @@ func.func @unset_encoding_ACC_dynamic_unroll8x8x4_MFMA_F32_16x16x4_F32(
 // CHECK-LABEL: func.func @unset_encoding_ACC_dynamic_unroll8x8x4_MFMA_F32_16x16x4_F32
 // CHECK-SAME:       %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[ARG0]] : tensor<?x?x4x8x2x4x16x4xf32>)
-// CHECK-SAME:       outs({{.*}} : tensor<?x?x8x4x4x4x2x16xf32>)
-// CHECK-SAME:       permutation = [0, 1, 3, 5, 7, 2, 4, 6]
+// CHECK-SAME:       ins(%[[ARG0]] : tensor<?x?x2x2x4x4x4x16x4xf32>)
+// CHECK-SAME:       outs({{.*}} : tensor<?x?x2x4x4x4x2x4x16xf32>)
+// CHECK-SAME:       permutation = [0, 1, 2, 4, 6, 8, 3, 5, 7]
 // CHECK:         %[[COLLAPSE:.*]] = tensor.collapse_shape %[[TRANSPOSE]]
-// CHECK-SAME:      : tensor<?x?x8x4x4x4x2x16xf32> into tensor<?x?x128x128xf32>
+// CHECK-SAME:      : tensor<?x?x2x4x4x4x2x4x16xf32> into tensor<?x?x128x128xf32>
 // CHECK:         %[[UNPACK:.*]] = linalg.unpack %[[COLLAPSE]]
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
@@ -309,13 +309,13 @@ func.func @matmul_lowering_MFMA_F32_16x16x4_F32(
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
 // CHECK:     func.func @matmul_lowering_MFMA_F32_16x16x4_F32(
-// CHECK-SAME:     %[[LHS:.+]]: tensor<?x?x8x4x16x4xf32>, %[[RHS:.+]]: tensor<?x?x4x2x4x16x4xf32>
-// CHECK-SAME:     %[[ACC:.+]]: tensor<?x?x4x8x2x4x16x4xf32>
-// CHECK-SAME:   ) -> tensor<?x?x4x8x2x4x16x4xf32>
+// CHECK-SAME:     %[[LHS:.+]]: tensor<?x?x2x4x4x16x4xf32>, %[[RHS:.+]]: tensor<?x?x2x4x4x16x4xf32>
+// CHECK-SAME:     %[[ACC:.+]]: tensor<?x?x2x2x4x4x4x16x4xf32>
+// CHECK-SAME:   ) -> tensor<?x?x2x2x4x4x4x16x4xf32>
 // CHECK:       %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]]) outs(%[[ACC]])
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
 // CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]
-// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32, intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 4>
+// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32, intrinsics_m = 4, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 2, intrinsics_k = 4>
 // CHECK:       return %[[MMA]]
 
 // -----
@@ -343,14 +343,13 @@ func.func @batch_matmul_lowering_MFMA_F32_16x16x4_F32(
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK:     func.func @batch_matmul_lowering_MFMA_F32_16x16x4_F32(
-// CHECK-SAME:     %[[LHS:.+]]: tensor<?x?x?x8x4x16x4xf32>
-// CHECK-SAME:     %[[RHS:.+]]: tensor<?x?x?x4x2x4x16x4xf32>
-// CHECK-SAME:     %[[ACC:.+]]: tensor<?x?x?x4x8x2x4x16x4xf32>
-// CHECK-SAME:   ) -> tensor<?x?x?x4x8x2x4x16x4xf32>
+// CHECK-SAME:     %[[LHS:.+]]: tensor<?x?x?x2x4x4x16x4xf32>, %[[RHS:.+]]: tensor<?x?x?x2x4x4x16x4xf32>
+// CHECK-SAME:     %[[ACC:.+]]: tensor<?x?x?x2x2x4x4x4x16x4xf32>
+// CHECK-SAME:   ) -> tensor<?x?x?x2x2x4x4x4x16x4xf32>
 // CHECK:       %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]]) outs(%[[ACC]])
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
 // CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]
-// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32, intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 4>
+// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x4_F32,  intrinsics_m = 4, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 2, intrinsics_k = 4>
 // CHECK:       return %[[MMA]]
 
 // -----
@@ -377,11 +376,11 @@ func.func @set_encoding_LHS_unroll8x8x2_MFMA_I32_16x16x32_I8(
 // CHECK-SAME:      inner_tiles = [128, 64]
 // CHECK-SAME:      : tensor<255x513xi8> -> tensor<2x9x128x64xi8>
 // CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME       : tensor<2x9x128x64xi8> into tensor<2x9x4x8x4x2x4x8xi8>
+// CHECK-SAME       : tensor<2x9x128x64xi8> into tensor<2x9x2x4x16x2x4x8xi8>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPAND]] : tensor<2x9x8x16x2x4x8xi8>)
-// CHECK-SAME:       outs({{.*}} : tensor<2x9x8x4x16x2x8xi8>)
-// CHECK-SAME:       permutation = [0, 1, 2, 5, 3, 4, 6]
+// CHECK-SAME:       ins(%[[EXPAND]] : tensor<2x9x2x4x16x2x4x8xi8>)
+// CHECK-SAME:       outs({{.*}} : tensor<2x9x2x4x4x16x2x8xi8>)
+// CHECK-SAME:       permutation = [0, 1, 2, 3, 6, 4, 5, 7]
 // CHECK:         return %[[TRANSPOSE]]
 
 // -----
@@ -406,8 +405,8 @@ func.func @set_encoding_RHS_unroll8x8x2_MFMA_I32_16x16x32_I8(
 // CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
 // CHECK-SAME       : tensor<5x4x128x64xi8> into tensor<5x4x4x16x2x2x4x8xi8>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPAND]] : tensor<5x4x4x2x16x2x4x8xi8>)
-// CHECK-SAME:       outs({{.*}} : tensor<5x4x4x2x4x16x2x8xi8>)
+// CHECK-SAME:       ins(%[[EXPAND]] : tensor<5x4x2x4x16x2x4x8xi8>)
+// CHECK-SAME:       outs({{.*}} : tensor<5x4x2x4x4x16x2x8xi8>)
 // CHECK-SAME:       permutation = [0, 1, 2, 3, 6, 4, 5, 7]
 // CHECK:         return %[[TRANSPOSE]]
 
@@ -431,11 +430,11 @@ func.func @set_encoding_ACC_unroll8x8x2_MFMA_I32_16x16x32_I8(
 // CHECK-SAME:      inner_tiles = [128, 128]
 // CHECK-SAME:      : tensor<255x513xi32> -> tensor<2x5x128x128xi32>
 // CHECK:         %[[EXPAND:.*]] = tensor.expand_shape %[[PACK]]
-// CHECK-SAME       : tensor<2x5x128x128xi32> into tensor<2x5x4x8x4x4x16x2xi32>
+// CHECK-SAME       : tensor<2x5x128x128xi32> into tensor<2x5x2x4x4x4x2x4x16xi32>
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[EXPAND]] : tensor<2x5x8x4x4x4x2x16xi32>)
-// CHECK-SAME:       outs({{.*}} : tensor<2x5x4x8x2x4x16x4xi32>)
-// CHECK-SAME:       permutation = [0, 1, 5, 2, 6, 3, 7, 4]
+// CHECK-SAME:       ins(%[[EXPAND]] : tensor<2x5x2x4x4x4x2x4x16xi32>)
+// CHECK-SAME:       outs({{.*}} : tensor<2x5x2x2x4x4x4x16x4xi32>)
+// CHECK-SAME:       permutation = [0, 1, 2, 6, 3, 7, 4, 8, 5]
 // CHECK:         return %[[TRANSPOSE]]
 
 // -----
@@ -453,11 +452,11 @@ func.func @unset_encoding_ACC_unroll8x8x2_MFMA_I32_16x16x32_I8(
 // CHECK-LABEL: func.func @unset_encoding_ACC_unroll8x8x2_MFMA_I32_16x16x32_I8
 // CHECK-SAME:       %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[TRANSPOSE:.*]] = linalg.transpose
-// CHECK-SAME:       ins(%[[ARG0]] : tensor<2x5x4x8x2x4x16x4xi32>)
-// CHECK-SAME:       outs({{.*}} : tensor<2x5x8x4x4x4x2x16xi32>)
-// CHECK-SAME:       permutation = [0, 1, 3, 5, 7, 2, 4, 6]
+// CHECK-SAME:       ins(%[[ARG0]] : tensor<2x5x2x2x4x4x4x16x4xi32>)
+// CHECK-SAME:       outs({{.*}} : tensor<2x5x2x4x4x4x2x4x16xi32>)
+// CHECK-SAME:       permutation = [0, 1, 2, 4, 6, 8, 3, 5, 7]
 // CHECK:         %[[COLLAPSE:.*]] = tensor.collapse_shape %[[TRANSPOSE]]
-// CHECK-SAME:      : tensor<2x5x8x4x4x4x2x16xi32> into tensor<2x5x128x128xi32>
+// CHECK-SAME:      : tensor<2x5x2x4x4x4x2x4x16xi32> into tensor<2x5x128x128xi32>
 // CHECK:         %[[UNPACK:.*]] = linalg.unpack %[[COLLAPSE]]
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
@@ -505,14 +504,13 @@ func.func @matmul_lowering_MFMA_I32_16x16x32_I8(
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
 // CHECK:     func.func @matmul_lowering_MFMA_I32_16x16x32_I8(
-// CHECK-SAME:     %[[LHS:.+]]: tensor<?x?x8x4x16x2x8xi8>
-// CHECK-SAME:     %[[RHS:.+]]: tensor<?x?x4x2x4x16x2x8xi8>
-// CHECK-SAME:     %[[ACC:.+]]: tensor<?x?x4x8x2x4x16x4xi32>
-// CHECK-SAME:   ) -> tensor<?x?x4x8x2x4x16x4xi32>
+// CHECK-SAME:     %[[LHS:.+]]: tensor<?x?x2x4x4x16x2x8xi8>, %[[RHS:.+]]: tensor<?x?x2x4x4x16x2x8xi8>
+// CHECK-SAME:     %[[ACC:.+]]: tensor<?x?x2x2x4x4x4x16x4xi32>
+// CHECK-SAME:   ) -> tensor<?x?x2x2x4x4x4x16x4xi32>
 // CHECK:       %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]]) outs(%[[ACC]])
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
 // CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]
-// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8, intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 2>
+// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8, intrinsics_m = 4, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 2, intrinsics_k = 2>
 // CHECK:       return %[[MMA]]
 
 // -----
@@ -570,7 +568,7 @@ func.func @matmul_lowering_MFMA_I32_16x16x32_I8_custom_max_load_instruction_bits
 // CHECK-SAME:    %[[ACC:[a-zA-Z0-9]+]]
 // CHECK:      iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]]) outs(%[[ACC]])
 // CHECK-SAME:     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]
-// CHECK-SAME:     kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8, intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 4>
+// CHECK-SAME:     kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8,  intrinsics_m = 4, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 2>
 
 // -----
 
@@ -623,7 +621,7 @@ func.func @matmul_lowering_MFMA_I32_16x16x32_I8_custom_max_load_instruction_bits
 // CHECK-SAME:     %[[ACC:[a-zA-Z0-9_]+]]
 // CHECK:      iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]]) outs(%[[ACC]])
 // CHECK-SAME:     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]
-// CHECK-SAME:     kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8, intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 4>
+// CHECK-SAME:     kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8,  intrinsics_m = 4, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 2, intrinsics_k = 4>
 
 // -----
 
@@ -777,11 +775,11 @@ func.func @matmul_lowering_MFMA_I32_16x16x32_I8_custom_vgpr_space_bits_4096(
 }
 
 // CHECK:      func.func @matmul_lowering_MFMA_I32_16x16x32_I8_custom_vgpr_space_bits_4096
-// CHECK-SAME:     %[[LHS:.+]]: tensor<?x?x4x4x16x2x8xi8>, %[[RHS:.+]]: tensor<?x?x4x4x16x2x8xi8>
-// CHECK-SAME:     %[[ACC:.+]]: tensor<?x?x4x4x4x16x4xi32>
+// CHECK-SAME:     %[[LHS:.+]]: tensor<?x?x2x2x4x16x2x8xi8>, %[[RHS:.+]]: tensor<?x?x2x2x4x16x2x8xi8>
+// CHECK-SAME:     %[[ACC:.+]]: tensor<?x?x2x2x2x2x4x16x4xi32>
 // CHECK:      iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]]) outs(%[[ACC]])
 // CHECK-SAME:     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]
-// CHECK-SAME:     kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8,  intrinsics_m = 4, subgroups_n = 4, intrinsics_k = 2>
+// CHECK-SAME:     kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8, intrinsics_m = 2, subgroups_m = 2, intrinsics_n = 2, subgroups_n = 2, intrinsics_k = 2>
 
 // -----
 
@@ -865,14 +863,13 @@ func.func @batch_matmul_lowering_MFMA_F32_16x16x32_F8E4M3FNUZ(
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK:     func.func @batch_matmul_lowering_MFMA_F32_16x16x32_F8E4M3FNUZ(
-// CHECK-SAME:     %[[LHS:[a-zA-Z0-9_]+]]: tensor<?x?x?x8x4x16x2x8xf8E4M3FNUZ>
-// CHECK-SAME:     %[[RHS:[a-zA-Z0-9_]+]]: tensor<?x?x?x4x2x4x16x2x8xf8E4M3FNUZ>
-// CHECK-SAME:     %[[ACC:[a-zA-Z0-9_]+]]: tensor<?x?x?x4x8x2x4x16x4xf32>
-// CHECK-SAME:   ) -> tensor<?x?x?x4x8x2x4x16x4xf32>
+// CHECK-SAME:     %[[LHS:[a-zA-Z0-9_]+]]: tensor<?x?x?x2x4x4x16x2x8xf8E4M3FNUZ>, %[[RHS:[a-zA-Z0-9_]+]]: tensor<?x?x?x2x4x4x16x2x8xf8E4M3FNUZ>
+// CHECK-SAME:     %[[ACC:[a-zA-Z0-9_]+]]: tensor<?x?x?x2x2x4x4x4x16x4xf32>
+// CHECK-SAME:   ) -> tensor<?x?x?x2x2x4x4x4x16x4xf32>
 // CHECK:       %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]]) outs(%[[ACC]])
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
 // CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]
-// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x32_F8E4M3FNUZ, intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 2>
+// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x32_F8E4M3FNUZ, intrinsics_m = 4, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 2, intrinsics_k = 2>
 // CHECK:       return %[[MMA]]
 
 // -----
@@ -900,14 +897,13 @@ func.func @batch_matmul_lowering_MFMA_F32_16x16x16_BF16(
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK:     func.func @batch_matmul_lowering_MFMA_F32_16x16x16_BF16(
-// CHECK-SAME:     %[[LHS:.+]]: tensor<?x?x?x8x4x16x2x4xbf16>
-// CHECK-SAME:     %[[RHS:.+]]: tensor<?x?x?x4x2x4x16x2x4xbf16>
-// CHECK-SAME:     %[[ACC:.+]]: tensor<?x?x?x4x8x2x4x16x4xf32>
-// CHECK-SAME:   ) -> tensor<?x?x?x4x8x2x4x16x4xf32>
+// CHECK-SAME:     %[[LHS:.+]]: tensor<?x?x?x2x4x4x16x2x4xbf16>, %[[RHS:.+]]: tensor<?x?x?x2x4x4x16x2x4xbf16>
+// CHECK-SAME:     %[[ACC:.+]]: tensor<?x?x?x2x2x4x4x4x16x4xf32>
+// CHECK-SAME:   ) -> tensor<?x?x?x2x2x4x4x4x16x4xf32>
 // CHECK:       %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]]) outs(%[[ACC]])
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]],
 // CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]
-// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x16_BF16, intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 2>
+// CHECK-SAME:    kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x16_BF16, intrinsics_m = 4, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 2, intrinsics_k = 2>
 // CHECK:       return %[[MMA]]
 
 // -----
@@ -935,16 +931,16 @@ func.func @dequantization(
   return %14 : tensor<2x128x64xf32, #encoding>
 }
 
-// CHECK-DAG:   #[[$MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d4, d5, d6)>
-// CHECK-DAG:   #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d4, d6)>
+// CHECK-DAG:   #[[$MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6, d7)>
+// CHECK-DAG:   #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d2, d5, d7)>
 // CHECK-LABEL: func.func @dequantization
-// CHECK-SAME:     %[[LHS:[a-zA-Z0-9]+]]: tensor<2x1x4x8x4x16x4xi8>
+// CHECK-SAME:     %[[LHS:[a-zA-Z0-9]+]]: tensor<2x1x4x2x4x4x16x4xi8>
 // CHECK-SAME:     %[[SCALES:[a-zA-Z0-9]+]]: tensor<2x4x4x4xf32>
 // CHECK-SAME:     %[[ZPS:[a-zA-Z0-9]+]]: tensor<2x4x4x4xf32>
-// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<2x1x4x8x4x16x4xf32>
+// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<2x1x4x2x4x4x16x4xf32>
 // CHECK:         %[[DEQUANT:.+]] = linalg.generic
 // CHECK-SAME:        indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP1]], #[[$MAP]]]
-// CHECK-SAME:        iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]
+// CHECK-SAME:        iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]
 // CHECK-SAME:        ins(%[[LHS]], %[[SCALES]], %[[ZPS]]
 // CHECK-SAME:        outs(%[[EMPTY]]
 // CHECK:           arith.extui
@@ -970,16 +966,16 @@ func.func @multi_result_generic(%3: tensor<2x128x64xf32, #encoding>) -> (tensor<
   } -> (tensor<2x128x64xf32, #encoding>, tensor<2x128x64xf16, #encoding>)
   return %15#0, %15#1 : tensor<2x128x64xf32, #encoding>, tensor<2x128x64xf16, #encoding>
 }
-//   CHECK-DAG: #[[$MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d4, d5, d6)>
+//   CHECK-DAG: #[[$MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6, d7)>
 // CHECK-LABEL: func.func @multi_result_generic(
-// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<2x1x4x8x4x16x4xf32>
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<2x1x4x2x4x4x16x4xf32>
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       indexing_maps = [#[[$MAP]], #[[$MAP]], #[[$MAP]]]
-//  CHECK-SAME:       iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]
+//  CHECK-SAME:       iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]
 //  CHECK-SAME:       ins(%[[ARG0]]
 //       CHECK:     arith.addf
 //       CHECK:     arith.truncf
-//       CHECK:     -> (tensor<2x1x4x8x4x16x4xf32>, tensor<2x1x4x8x4x16x4xf16>)
+//       CHECK:     -> (tensor<2x1x4x2x4x4x16x4xf32>, tensor<2x1x4x2x4x4x16x4xf16>)
 
 // -----
 
@@ -998,15 +994,15 @@ func.func @interchange_generic(%3: tensor<2x128x64xf32, #encoding>) -> tensor<64
   } -> tensor<64x2x128xf32, #output_encoding>
   return %15 : tensor<64x2x128xf32, #output_encoding>
 }
-//   CHECK-DAG: #[[$MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d4, d5, d6)>
+//   CHECK-DAG: #[[$MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6, d7)>
 // CHECK-LABEL: func.func @interchange_generic(
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<2x1x4x8x4x16x4xf32>
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<2x1x4x2x4x4x16x4xf32>
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       indexing_maps = [#[[$MAP]], #[[$MAP]]]
-//  CHECK-SAME:       iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]
+//  CHECK-SAME:       iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]
 //  CHECK-SAME:       ins(%[[ARG0]]
 //       CHECK:     arith.addf
-//       CHECK:     -> tensor<2x1x4x8x4x16x4xf32>
+//       CHECK:     -> tensor<2x1x4x2x4x4x16x4xf32>
 // -----
 
 //----------------------------------------------------------------------------//
