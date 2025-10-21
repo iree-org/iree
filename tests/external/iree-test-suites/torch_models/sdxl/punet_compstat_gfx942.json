@@ -3,9 +3,9 @@
   "markers" : [
     "hip",
     "gfx942",
-    "new"
+    "punet"
   ],
   "module": "sdxl/modules/punet_gfx942",
   "golden_dispatch_count" : 1482,
-  "golden_binary_size" : 1880000
+  "golden_binary_size" : 2000000
 }
