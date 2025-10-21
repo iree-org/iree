@@ -229,13 +229,6 @@ struct MaterializeTensorExtDispatchTensorLoadOp
   matchAndRewrite(IREE::TensorExt::DispatchTensorLoadOp loadOp,
                   OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // Only handle operations where the load covers the entire
-    // `!iree_tensor_ext.dispatch.tensor` type.
-    // TODO(ravishankarm): Relax this for partial loads.
-    if (!loadOp.isLoadOfWholeSource()) {
-      return rewriter.notifyMatchFailure(loadOp, "unhandled partial loads");
-    }
-
     auto sourceType = loadOp.getSourceType();
     auto boundTensorType = cast<RankedTensorType>(sourceType.getBoundType());
     auto *typeConverter = static_cast<const MaterializeEncodingTypeConverter *>(
@@ -272,13 +265,6 @@ struct MaterializeTensorExtDispatchTensorStoreOp
   matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp storeOp,
                   OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // Only handle operations where the store covers the entire
-    // `!iree_tensor_ext.dispatch.tensor` type.
-    // TODO(ravishankarm): Relax this for partial stores.
-    if (!storeOp.isStoreToWholeTarget()) {
-      return rewriter.notifyMatchFailure(storeOp, "unhandled partial stores");
-    }
-
     auto targetType = storeOp.getTargetType();
     auto boundTensorType = cast<RankedTensorType>(targetType.getBoundType());
     auto *typeConverter = static_cast<const MaterializeEncodingTypeConverter *>(
