@@ -53,18 +53,18 @@ getEncodingScaledContractionDims(EncodingAttr encoding) {
       ArrayRef<AffineMap>(indexingMaps));
 }
 
-MatmulNarrowDim getPo2MatmulNarrowDim(EncodingAttr encoding) {
+FailureOr<BxMxNxK> getMatmulSizes(EncodingAttr encoding) {
   if (encoding.getOpType().getValue() != EncodingOpType::matmul) {
-    return {};
+    return failure();
   }
   SmallVector<int64_t> iterationSizes = encoding.getIterationSizesArray();
   if (iterationSizes.empty()) {
-    return {};
+    return failure();
   }
   std::optional<linalg::ContractionDimensions> maybeCDims =
       getEncodingContractionDims(encoding);
   if (!maybeCDims) {
-    return {};
+    return failure();
   }
   linalg::ContractionDimensions cDims = maybeCDims.value();
   // The following expects M, N, K, and Batch sizes of at most 1 for now.
@@ -72,10 +72,24 @@ MatmulNarrowDim getPo2MatmulNarrowDim(EncodingAttr encoding) {
   assert(cDims.m.size() <= 1 && cDims.n.size() <= 1 && cDims.k.size() == 1 &&
          cDims.batch.size() <= 1 &&
          "Expected at most one M, N, K, and Batch dimension");
-  // M or N can be empty instead of having an explicit dim size of 1 for matvec
-  // and vecmat, so set to 1 if empty.
+  const int64_t k = iterationSizes[cDims.k[0]];
+  // M, N or Batch can be empty instead of having an explicit dim size of 1 for
+  // matvec and vecmat, so set to 1 if empty.
   const int64_t m = cDims.m.empty() ? 1 : iterationSizes[cDims.m[0]];
   const int64_t n = cDims.n.empty() ? 1 : iterationSizes[cDims.n[0]];
+  const int64_t batch =
+      cDims.batch.empty() ? 1 : iterationSizes[cDims.batch[0]];
+  return BxMxNxK{batch, m, n, k};
+}
+
+MatmulNarrowDim getPo2MatmulNarrowDim(EncodingAttr encoding) {
+  // Get the matmul sizes for the given encoding.
+  FailureOr<BxMxNxK> matmulSizes = getMatmulSizes(encoding);
+  if (failed(matmulSizes)) {
+    return {};
+  }
+  const int64_t m = matmulSizes->M;
+  const int64_t n = matmulSizes->N;
 
   // If both dimensions are dynamic, return empty.
   if (ShapedType::isDynamic(m) && ShapedType::isDynamic(n)) {

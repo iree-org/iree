@@ -185,8 +185,8 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   }
 
   //
-  // Step 2: Select the unrolling factors for the generic case where there is no
-  //         narrow dimension.
+  // Step 2: Select the total unrolling factors along the M, N, and K
+  // dimensions.
   //
   // The intrinsicsK factor serves to allow loads from the A and B matrices to
   // use the target ISA's vector loads. For instance, if the ISA has 128-bit
@@ -216,103 +216,107 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   // correspondingly divides the available register space between this many
   // subgroups, making it cancel out of the equation here.
   //
-  // We need to solve for two variables here, intrinsics_m and intrinsics_n,
-  // constrained by one quadratic equation expressing that the A, B and C tiles
-  // must fit in VGPR space. Since we have only 1 constraint for two variables,
-  // we self-impose a second constraint for now: that the unrolling shape should
-  // be square, i.e. intrinsicsM == intrinsicsN.
-  // TODO(#18850): that is suboptimal for narrow cases.
+  // We need to find the optimal pair (totalUnrollM, totalUnrollN) by
+  // enumerating feasible (x, y) candidates. For each candidate, the constraint
+  // is that the A, B and C tiles must fit in VGPR space.
+  //     A-tile: x * intrinsicsK * intrinsicSizeBitsLHS
+  //     B-tile: y * intrinsicsK * intrinsicSizeBitsRHS
+  //     C-tile: x * y * intrinsicSizeBitsACC
+  //     A-tile + B-tile + C-tile <= wgp.getVgprSpaceBits()
   //
-  // Now we have only one variable, call it x, to solve for.
-
-  // The register space taken is:
-  //     A-tile: x * intrinsicsK * sizeInBits(intrinsicA)
-  //     B-tile: x * intrinsicsK * sizeInBits(intrinsicB)
-  //     C-tile: x^2 * sizeInBits(intrinsicC)
-  // So the equation to solve is:
-  //       x^2 * sizeInBits(intrinsicC)
-  //     + x   * intrinsicsK * (sizeInBits(intrinsicA) + sizeInBits(intrinsicB))
-  //    == wgp.getVgprSpaceBits()
-  float c2 = intrinsicSizeBitsACC;
-  float c1 = intrinsicsK * (intrinsicSizeBitsLHS + intrinsicSizeBitsRHS);
-  float c0 = -*wgp.getVgprSpaceBits(); // negative by construction.
-  // Now the equation to solve is: c2 * x^2 + c1 * x + c0 == 0.
-  float discriminant = c1 * c1 - 4 * c0 * c2; // positive, because c0 < 0.
-  // x = unique positive solution.
-  float x = (-c1 + std::sqrt(discriminant)) / (2 * c2);
-
-#ifndef NDEBUG
-  // Self-check quadratic solver. 10 epsilon is just a crude upper bound;
-  // In practice, cancellation results in check == 0 in current cases.
-  float check = c2 * x * x + c1 * x + c0;
-  assert(std::abs(check) < 10 * FLT_EPSILON * std::abs(c0));
-#endif
-
-  // Now, looking geometrically at our unrolling space along the M and N
-  // dimensions, we solve the following problem in the (M,N)-plane: approximate
-  // a square of side length `x`, by a rectangle of side lengths `totalUnrollM`
-  // and `totalUnrollN`, under the constraints:
-  // 1. totalUnrollM * totalUnrollN <= x * x
-  //    * Reason: by construction of x, any larger area would exceed the
-  //      wgp.getVgprSpaceBits() budget.
-  // 2. totalUnrollM and totalUnrollN are powers of 2.
-  //    * Reason: that is a self-imposed constraint for now to avoid prematurely
-  //      entering excessing fine-tuning of unrolling factors. Also, since below
-  //      we will put all the unroll-to-subgroups in the N dimension, that
-  //      requires totalUnrollN to be a multiple of wgp.getSimdsPerWgp(),
-  //      which is typically a power of 2, specifically 4.
-  //      TODO(#18851): we will not always put all the unroll-to-subgroups on N.
-  // 3. totalUnrollN >= totalUnrollM.
-  //    * Reason: Just like the previous constraint, that is also motivated by
-  //      the code below currently putting all the unroll-to-subgroups in the N
-  //      dimension, which requires a sufficiently large totalUnrollN.
-  //      TODO(#18851): we will not always put all the unroll-to-subgroups on N.
+  // The goal is to maximize arithmetic intensity (x * y) while keeping x and y
+  // close (to balance LHS and RHS loads).
   //
-  // Set totalUnrollN = round x to nearest power of two, break ties away from 0
-  // per specification of std::round.
-  int totalUnrollN = std::exp2(std::round(std::log2(x)));
-  // Based on above constraint 1:
-  float unroundedMaxTotalUnrollM = x * x / totalUnrollN;
-  int totalUnrollM = std::exp2(std::floor(std::log2(unroundedMaxTotalUnrollM)));
+  // We also self-impose the constraint that x and y are powers of 2 to
+  // avoid prematurely entering excessing fine-tuning of unrolling factors.
+  int64_t totalUnrollM = 1;
+  int64_t totalUnrollN = 1;
+  // Upper bounds of x and y are decided by the matrix and intrinsic sizes.
+  int64_t maxX = INT64_MAX;
+  int64_t maxY = INT64_MAX;
+  FailureOr<IREE::Encoding::BxMxNxK> matmulSizes = getMatmulSizes(encoding);
+  if (succeeded(matmulSizes)) {
+    auto getMaxXY = [&](const IREE::Encoding::BxMxNxK &sizes) {
+      if (!ShapedType::isDynamic(sizes.M)) {
+        if (sizes.M < intrinsicMSize) {
+          // M dimension is too small to benefit from increased unrolling.
+          maxX = 1;
+          maxY = 1;
+          return;
+        }
+        // Cap maxX to avoid padding.
+        maxX = llvm::divideCeil(sizes.M, intrinsicMSize);
+      }
+      if (!ShapedType::isDynamic(sizes.N)) {
+        if (sizes.N < intrinsicNSize) {
+          // N dimension is too small to benefit from increased unrolling.
+          maxX = 1;
+          maxY = 1;
+          return;
+        }
+        // Cap maxY to avoid padding.
+        maxY = llvm::divideCeil(sizes.N, intrinsicNSize);
+      }
+    };
+    getMaxXY(*matmulSizes);
+  }
+  // Iterate over possible x.
+  for (int64_t x = 1; x <= maxX; x <<= 1) {
+    // Compute the maximum feasible y for this x.
+    int64_t y =
+        (*wgp.getVgprSpaceBits() - x * intrinsicsK * intrinsicSizeBitsLHS) /
+        (intrinsicsK * intrinsicSizeBitsRHS + x * intrinsicSizeBitsACC);
+    // No feasible y for this x. Stop the enumeration.
+    if (y <= 0) {
+      break;
+    }
+    // Clamp y to maxY.
+    y = std::min(y, maxY);
+    // Round y down to nearest power of two.
+    y = 1 << (int64_t)std::floor(std::log2(y));
+    // Maximize x * y while keeping them close.
+    if ((x * y > totalUnrollM * totalUnrollN) ||
+        ((x * y == totalUnrollM * totalUnrollN) &&
+         std::abs(x - y) < std::abs(totalUnrollM - totalUnrollN))) {
+      totalUnrollM = x;
+      totalUnrollN = y;
+    }
+  }
 
-  // Now we introduce unroll-to-subgroups. It doesn't change the overall tile
+  //
+  // Step 3: Split `totalUnrollM` and `totalUnrollN` into plain unrolling (more
+  // instructions on each thread) and unrolling-to-subgroups (more threads).
+  //
+  // Unrolling-to-subgroups doesn't change the overall tile
   // size, as it increases the number of subgroups but correspondingly decreases
   // the number of registers available to each subgroups. In other words, the
   // overall tile size determined above only needed to be concerned with the
   // overall number of registers, not with how they are split between subgroups.
   //
-  // For now for simplicity we put all the unroll-to-subgroups in the N
-  // dimension. TODO(#18851): revisit that.
-  //
-  // That does simplify the below adjustments for narrow M/N, as we don't need
-  // to think about unroll-to-subgroups when making the narrowing adjustment.
-  int subgroupsM = 1;
-  int subgroupsN = *wgp.getSimdsPerWgp();
-  int intrinsicsM = totalUnrollM / subgroupsM;
-  int intrinsicsN = totalUnrollN / subgroupsN;
+  // For now for simplicity we put all the unroll-to-subgroups in the one of M
+  // or N dimension. TODO(#18851): revisit that.
+  int64_t subgroupsM = 1;
+  int64_t subgroupsN = *wgp.getSimdsPerWgp();
   // We currently never generate subgroupsK != 1, as subgroupsK requires
   // specific partial-accumulator-reduction in the kernel, currently only done
   // in some microkernels that would provide their own DataTiledMMAAttr.
   int subgroupsK = 1;
-
-  //
-  // Step 3: Adjust the unrolling factors when there is a narrow dimension.
-  // TODO(#18850): dealing with narrow cases as a fix-up is suboptimal.
-  //
   IREE::Encoding::MatmulNarrowDim narrowDim =
       IREE::Encoding::getPo2MatmulNarrowDim(encoding);
-  if (narrowDim.isM()) {
-    intrinsicsM = std::min(intrinsicsM, static_cast<int>(llvm::divideCeil(
-                                            narrowDim.size, intrinsicMSize)));
-  }
+  // In the case of narrow N dimension, put all unrolling-to-subgroups in M
+  // instead.
   if (narrowDim.isN()) {
-    std::swap(intrinsicsM, intrinsicsN);
     std::swap(subgroupsM, subgroupsN);
-    assert(subgroupsN == 1);
-    intrinsicsN = std::min(intrinsicsN, static_cast<int>(llvm::divideCeil(
-                                            narrowDim.size, intrinsicNSize)));
   }
+  // Pad `totalUnrollM` and `totalUnrollN` to be at least
+  // unrolling-to-subgroups. This happens when both M and N are small values.
+  totalUnrollM = std::max(totalUnrollM, subgroupsM);
+  totalUnrollN = std::max(totalUnrollN, subgroupsN);
+  // Compute plain unrolling (instructions on each thread).
+  int64_t intrinsicsM = totalUnrollM / subgroupsM;
+  int64_t intrinsicsN = totalUnrollN / subgroupsN;
 
+  // Returns the final choice of attributes.
   if (auto intrinsicMma = dyn_cast<MMAAttr>(intrinsicAttr)) {
     return DataTiledMMAAttr::get(ctx, intrinsicMma.getIntrinsic(), intrinsicsM,
                                  subgroupsM, intrinsicsN, subgroupsN,
