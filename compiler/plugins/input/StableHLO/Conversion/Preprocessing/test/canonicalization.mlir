@@ -412,6 +412,26 @@ func.func @merge_consecutive_reshapes(%arg0: tensor<4x4xi32>) -> tensor<16xi32> 
 
 // -----
 
+// Test for reshape with dense_resource constants (regression test for crash)
+// CHECK-LABEL: func.func @reshape_dense_resource
+func.func @reshape_dense_resource() -> tensor<8x1x1xf32> {
+  %cst = stablehlo.constant dense_resource<torch_tensor_8_torch.float32> : tensor<8xf32>
+  %0 = stablehlo.reshape %cst : (tensor<8xf32>) -> tensor<8x1x1xf32>
+  // CHECK: %[[RESULT:.*]] = stablehlo.constant dense_resource<torch_tensor_8_torch.float32> : tensor<8x1x1xf32>
+  // CHECK: return %[[RESULT]]
+  return %0 : tensor<8x1x1xf32>
+}
+
+{-#
+  dialect_resources: {
+    builtin: {
+      torch_tensor_8_torch.float32: "0x0400000084B426BD82A6493D4434F93D0ADA423E4ADE5B3E05613FBE00F8723D30A1CFBD"
+    }
+  }
+#-}
+
+// -----
+
 // CHECK-LABEL: func.func @transpose
 // CHECK-SAME:   ([[ARG0:%.+]]: tensor<2xf32>, [[ARG1:%.+]]: tensor<3x2xf32>, [[ARG2:%.+]]: tensor<f32>)
 func.func @transpose(%arg0: tensor<2xf32>, %arg1: tensor<3x2xf32>, %arg2: tensor<f32>)
