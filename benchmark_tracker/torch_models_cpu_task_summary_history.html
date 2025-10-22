@@ -1,0 +1,57 @@
+
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Benchmark Tracker</title>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }
+            .chart-container { width: 80%; margin: 30px auto; }
+            canvas { width: 100%; height: auto; }
+        </style>
+    </head>
+    <body>
+        <h1>Benchmark Tracker</h1>
+    
+        <div class="chart-container">
+            <h2>sdxl_clip_benchmark_cpu</h2>
+            <canvas id="chart-sdxl_clip_benchmark_cpu"></canvas>
+        </div>
+        <script>
+            const ctx_sdxl_clip_benchmark_cpu = document.getElementById('chart-sdxl_clip_benchmark_cpu')
+            const chart_sdxl_clip_benchmark_cpu = new Chart(ctx_sdxl_clip_benchmark_cpu, {
+                type: 'line',
+                data: {
+                    labels: ['4811685'],  // Truncated commit hashes as X-axis labels
+                    datasets: [{
+                        label: 'Time (ms)',
+                        data: ['400.313'],   // Test time as Y-axis
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Commit Hash'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,  // Ensures the Y-axis starts at 0
+                            title: {
+                                display: true,
+                                text: 'Time (ms)'
+                            }
+                        }
+                    }
+                }
+            });
+        </script>
+        
+    </body>
+    </html>
+    
