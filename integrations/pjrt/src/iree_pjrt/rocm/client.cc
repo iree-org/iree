@@ -31,9 +31,9 @@ iree_status_t ROCMClientInstance::CreateDriver(iree_hal_driver_t** out_driver) {
   iree_hal_hip_driver_options_initialize(&driver_options);
   driver_options.default_device_index = 0;
 
-  IREE_RETURN_IF_ERROR(
-      iree_hal_hip_driver_create(driver_name, &driver_options, &default_params, 
-                                 host_allocator_, out_driver));
+  IREE_RETURN_IF_ERROR(iree_hal_hip_driver_create(driver_name, &driver_options,
+                                                  &default_params,
+                                                  host_allocator_, out_driver));
   logger().debug("HIP driver created");
 
   // Get available devices and filter into visible_devices_.
@@ -43,10 +43,10 @@ iree_status_t ROCMClientInstance::CreateDriver(iree_hal_driver_t** out_driver) {
       *out_driver, host_allocator_, &available_devices_count,
       &available_devices));
   for (iree_host_size_t i = 0; i < available_devices_count; ++i) {
-    iree_hal_device_info_t *info = &available_devices[i];
-    logger().debug("Enumerated available AMDGPU device:"+
-                    std::string(info->path.data, info->path.size)+" "+  
-                    std::string(info->name.data, info->name.size));
+    iree_hal_device_info_t* info = &available_devices[i];
+    logger().debug("Enumerated available AMDGPU device:" +
+                   std::string(info->path.data, info->path.size) + " " +
+                   std::string(info->name.data, info->name.size));
   }
   return iree_ok_status();
 }
