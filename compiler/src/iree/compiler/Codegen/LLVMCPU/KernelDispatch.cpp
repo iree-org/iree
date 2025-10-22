@@ -3110,7 +3110,6 @@ private:
 std::unique_ptr<MultiLoweringConfigGenerator>
 MultiLoweringConfigGenerator::create(Operation *rootOperation,
                                      ArrayRef<Operation *> computeOps) {
-
   if (!llvm::is_contained(computeOps, rootOperation)) {
     // Root operation may not be included in the compute ops, after
     // `shouldSetLoweringConfig`.
@@ -3207,7 +3206,7 @@ void MultiLoweringConfigGenerator::getVecTileSizesForNonRootOps(
       nonRootOpVecTileSizes[op] =
           getVecTileSizesForNonRootGenericOp(entryPointFn, genericOp);
     } else {
-      LDBG() << "Ignoring unknown operation type for non-root op: " << op;
+      LDBG() << "Ignoring unknown operation type for non-root op: " << *op;
     }
   }
 }
@@ -3299,7 +3298,11 @@ void MultiLoweringConfigGenerator::adjustTileSizesForRootOp() {
 void MultiLoweringConfigGenerator::fillTileSizesWithNonRootOps() {
   SmallVector<std::pair<Operation *, SmallVector<int64_t>>> opToVecTileSize(
       nonRootOpVecTileSizes.begin(), nonRootOpVecTileSizes.end());
-  // Sort to prioritize pack ops.
+  // Prioritize PackOps for performance on the data-tiling path starting from
+  // the global optimization phase. PackOps have transpose semantics, and
+  // prioritizing them helps optimize memory access patterns. In the path that
+  // starts from dispatch creation path, these ops are filtered out by
+  // shouldSetLoweringConfig.
   llvm::sort(opToVecTileSize, [](auto &a, auto &b) {
     return isa<linalg::PackOp>(a.first) > isa<linalg::PackOp>(b.first);
   });
