@@ -23,6 +23,7 @@
 #include "mlir/IR/BuiltinAttributeInterfaces.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/DialectResourceBlobManager.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -972,6 +973,13 @@ struct ReshapeOpCanon final : OpRewritePattern<mlir::stablehlo::ReshapeOp> {
       rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(
           op, SplatElementsAttr::get(op.getType(),
                                      splat.getSplatValue<Attribute>()));
+      return success();
+    }
+
+    if (auto denseResourceAttr = dyn_cast<DenseResourceElementsAttr>(cstAttr)) {
+      rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(
+          op, DenseResourceElementsAttr::get(op.getType(),
+                                             denseResourceAttr.getRawHandle()));
       return success();
     }
 
