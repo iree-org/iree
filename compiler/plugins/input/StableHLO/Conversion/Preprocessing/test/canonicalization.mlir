@@ -412,7 +412,8 @@ func.func @merge_consecutive_reshapes(%arg0: tensor<4x4xi32>) -> tensor<16xi32> 
 
 // -----
 
-// Test for reshape with dense_resource constants (regression test for crash)
+// Test for reshape with dense_resource constants (regression test for crash).
+
 // CHECK-LABEL: func.func @reshape_dense_resource
 func.func @reshape_dense_resource() -> tensor<8x1x1xf32> {
   %cst = stablehlo.constant dense_resource<torch_tensor_8_torch.float32> : tensor<8xf32>
