@@ -423,14 +423,6 @@ func.func @reshape_dense_resource() -> tensor<8x1x1xf32> {
   return %0 : tensor<8x1x1xf32>
 }
 
-{-#
-  dialect_resources: {
-    builtin: {
-      __elided__: "0x040000000000803F0000004000004040000080400000A0400000C0400000E0400000004100000041"
-    }
-  }
-#-}
-
 // -----
 
 // CHECK-LABEL: func.func @transpose
