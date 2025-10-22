@@ -416,9 +416,9 @@ func.func @merge_consecutive_reshapes(%arg0: tensor<4x4xi32>) -> tensor<16xi32> 
 
 // CHECK-LABEL: func.func @reshape_dense_resource
 func.func @reshape_dense_resource() -> tensor<8x1x1xf32> {
-  %cst = stablehlo.constant dense_resource<torch_tensor_8_torch.float32> : tensor<8xf32>
+  %cst = stablehlo.constant dense_resource<__elided__> : tensor<8xf32>
   %0 = stablehlo.reshape %cst : (tensor<8xf32>) -> tensor<8x1x1xf32>
-  // CHECK: %[[RESULT:.*]] = stablehlo.constant dense_resource<torch_tensor_8_torch.float32> : tensor<8x1x1xf32>
+  // CHECK: %[[RESULT:.*]] = stablehlo.constant dense_resource<__elided__> : tensor<8x1x1xf32>
   // CHECK: return %[[RESULT]]
   return %0 : tensor<8x1x1xf32>
 }
@@ -426,7 +426,7 @@ func.func @reshape_dense_resource() -> tensor<8x1x1xf32> {
 {-#
   dialect_resources: {
     builtin: {
-      torch_tensor_8_torch.float32: "0x0400000084B426BD82A6493D4434F93D0ADA423E4ADE5B3E05613FBE00F8723D30A1CFBD"
+      __elided__: "0x040000000000803F0000004000004040000080400000A0400000C0400000E0400000004100000041"
     }
   }
 #-}
