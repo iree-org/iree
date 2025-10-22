@@ -40,7 +40,7 @@ func.func @copy(%source: tensor<64x1024xf32>, %init: tensor<64x1024xf32>) -> ten
   // CHECK-SAME:       : tensor<4x4xf32>, tensor<4x128xf32>, index -> tensor<4x128xf32>
   // CHECK:     }
 
-  // CHECK:   } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+  // CHECK:   } {mapping = [#iree_gpu.lane_id<1>, #iree_gpu.lane_id<0>]}
 
   // CHECK:   scf.forall.in_parallel {
   // CHECK:     tensor.parallel_insert_slice %[[THREAD_RESULT]] into %[[INIT_TILE]][%[[IV0]], %[[IV1]]] [4, 128] [1, 1]
@@ -96,7 +96,7 @@ func.func @gather(%source: tensor<4x256xf32>, %indices: tensor<4x256xindex>, %in
   // CHECK:       %[[DMA:.+]] = iree_gpu.coalesced_gather_dma %[[ELEM_SLICE]][%[[INDICES_VEC]]] into %[[THREAD_INIT]] lane(%[[TIV1]])
   // CHECK-SAME:       : tensor<4x1xf32>, vector<4x1xindex>, tensor<4x256xf32>, index -> tensor<4x256xf32>
 
-  // CHECK:   {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+  // CHECK:   {mapping = [#iree_gpu.lane_id<1>, #iree_gpu.lane_id<0>]}
 
   // CHECK:   scf.forall.in_parallel
   // CHECK:     tensor.parallel_insert_slice %[[THREAD_RESULT]] into %[[INIT_TILE]][0, 0] [4, 256] [1, 1]

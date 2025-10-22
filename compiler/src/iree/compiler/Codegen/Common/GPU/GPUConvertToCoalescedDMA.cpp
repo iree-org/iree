@@ -54,9 +54,7 @@ static SmallVector<Attribute> getWarpMapping(MLIRContext *ctx, int64_t rank) {
 static SmallVector<Attribute> getThreadMapping(MLIRContext *ctx, int64_t rank) {
   SmallVector<Attribute> mapping;
   for (int64_t i = 0; i < rank; ++i) {
-    auto mappingId = static_cast<gpu::MappingId>(
-        static_cast<int>(gpu::MappingId::LinearDim0) + (rank - 1 - i));
-    mapping.push_back(gpu::GPUThreadMappingAttr::get(ctx, mappingId));
+    mapping.push_back(IREE::GPU::LaneIdAttr::get(ctx, rank - 1 - i));
   }
   return mapping;
 }
