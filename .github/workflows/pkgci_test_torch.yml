@@ -6,9 +6,6 @@
 
 name: PkgCI Torch Tests
 
-permissions:
-  contents: read
-
 on:
   workflow_call:
     inputs:
@@ -33,7 +30,7 @@ jobs:
           - name: cpu_task
             markers: "cpu"
             cache-dir: /home/nod/iree_tests_cache
-            summary-file: torch_models_cpu_task_summary.json
+            summary-file-name: torch_models_cpu_task_summary
             runs-on:
               - self-hosted # must come first
               - persistent-cache
@@ -43,7 +40,7 @@ jobs:
           - name: amdgpu_mi325_gfx942
             markers: "gfx942 or mi325"
             cache-dir: /shark-cache/data/iree-regression-cache
-            summary-file: torch_models_amdgpu_mi325_summary.json
+            summary-file-name: torch_models_amdgpu_mi325_summary
             runs-on: linux-mi325-1gpu-ossci-iree-org
     env:
       VENV_DIR: ${{ github.workspace }}/.venv
@@ -53,6 +50,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           submodules: false
+          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
 
       - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v5.4.0
         with:
@@ -111,5 +109,18 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ${{ matrix.summary-file }}
+          name: ${{ matrix.summary-file-name }}.json
           path: ${{ github.workspace }}/iree-test-suites/job_summary.json
+
+      - name: Generate Benchmark Graphs
+        # if: github.event_name == 'push' && github.ref_name == 'main'
+        run: |
+          cp ./build_tools/pkgci/generate_benchmark_graphs.py .
+          git fetch origin gh-pages-test
+          git checkout gh-pages-test
+          python generate_benchmark_graphs.py ${{ github.sha }} ${{ github.workspace }}/iree-test-suites/job_summary.json benchmark_tracker/${{ matrix.summary-file-name }}_history.json benchmark_tracker/${{ matrix.summary-file-name }}_history.html
+          git config --local user.email "iree-github-actions-bot@google.com"
+          git config --local user.name "Website Publish Action"
+          git add benchmark_tracker/${{ matrix.summary-file-name }}_history.json benchmark_tracker/${{ matrix.summary-file-name }}_history.html
+          git commit -m "Update benchmark graphs"
+          git push
