@@ -555,6 +555,8 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   // Step 7. Bufferize.
   addGPUBufferizePasses(funcPassManager);
 
+  funcPassManager.addPass(createGPULowerCoalescedDMAToGlobalLoadsPass());
+
   // Step 8. Resolve remaining parallel loops.
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeMapScatterPass());
   funcPassManager.addPass(createGPUDistributeCopyUsingForallPass());
@@ -856,11 +858,12 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
 
   // Tensor -> Memref
   addVectorBufferizePasses(funcPassManager);
+
+  funcPassManager.addPass(createGPULowerCoalescedDMAToGlobalLoadsPass());
+
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
-
-  // funcPassManager.addPass(createLowerCoalescedDMAOpsPass());
 
   // Preprocessing for vector distribution.
   funcPassManager.addPass(createLLVMGPUCastTypeToFitMMAPass());
