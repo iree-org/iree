@@ -974,15 +974,14 @@ struct ReshapeOpCanon final : OpRewritePattern<mlir::stablehlo::ReshapeOp> {
           op, SplatElementsAttr::get(op.getType(),
                                      splat.getSplatValue<Attribute>()));
       return success();
-    } 
-    
-    if (auto denseResourceAttr =
-                   dyn_cast<DenseResourceElementsAttr>(cstAttr)) {
+    }
+
+    if (auto denseResourceAttr = dyn_cast<DenseResourceElementsAttr>(cstAttr)) {
       rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(
-          op, DenseResourceElementsAttr::get(
-                  op.getType(), denseResourceAttr.getRawHandle()));
+          op, DenseResourceElementsAttr::get(op.getType(),
+                                             denseResourceAttr.getRawHandle()));
       return success();
-    } 
+    }
 
     auto elements =
         llvm::to_vector_of<Attribute>(cstAttr.getValues<Attribute>());
