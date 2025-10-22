@@ -318,12 +318,8 @@ struct CoalescedGatherDMAOpBufferizationInterface
   bufferization::AliasingValueList
   getAliasingValues(Operation *op, OpOperand &opOperand,
                     const AnalysisState &state) const {
-    auto gatherOp = cast<IREE::GPU::CoalescedGatherDMAOp>(op);
-    SmallVector<bufferization::AliasingValue> alist;
-    if (opOperand.get() == gatherOp.getInit() && gatherOp.getResult()) {
-      alist.push_back({gatherOp.getResult(), BufferRelation::Equivalent});
-    }
-    return alist;
+    // No result value, so no aliasing
+    return {};
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
@@ -348,10 +344,21 @@ struct CoalescedGatherDMAOpBufferizationInterface
       auto forallOp = parentOp->getParentOfType<scf::ForallOp>();
       if (forallOp) {
         rewriter.setInsertionPoint(parentOp);
+        // Create dest_indices as zeros for all dimensions
+        auto initType = cast<MemRefType>(initBuffer->getType());
+        SmallVector<Value> destIndices;
+        Value zero =
+            rewriter.create<arith::ConstantIndexOp>(gatherOp.getLoc(), 0);
+        for (int64_t i = 0; i < initType.getRank(); ++i) {
+          destIndices.push_back(zero);
+        }
+        // Create dest_size attribute from init memref dimensions
+        auto destSizeAttr = rewriter.getDenseI64ArrayAttr(initType.getShape());
         rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
             gatherOp.getLoc(), TypeRange{}, *sourceBuffer,
-            gatherOp.getIndices(), *initBuffer, gatherOp.getLane());
-        bufferization::replaceOpWithBufferizedValues(rewriter, op, *initBuffer);
+            gatherOp.getIndices(), *initBuffer, destIndices, gatherOp.getLane(),
+            destSizeAttr);
+        rewriter.eraseOp(op);
         return success();
       }
     }

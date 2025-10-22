@@ -24,7 +24,7 @@ func.func @lower_coalesced_gather_dma_multiple(
   // CHECK: scf.forall
   scf.forall (%arg5, %arg6) in (32, 1) {
     // CHECK: iree_gpu.coalesced_gather_dma
-    iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) :
+    iree_gpu.coalesced_gather_dma %source into %dest dest_size = [2, 8] lane(%arg6) :
       memref<512xf32, #amdgpu.address_space<fat_raw_buffer>>,
       memref<512xf32, #gpu.address_space<workgroup>>, index
   } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
@@ -61,7 +61,7 @@ func.func @lower_loop_nest(%arg0: memref<1x4xf32, #amdgpu.address_space<fat_raw_
       // CHECK: %[[C0:.*]] = arith.constant 0 : index
       // CHECK: %[[C0_0:.*]] = arith.constant 0 : index
       // CHECK: amdgpu.gather_to_lds %{{.*}}[%[[C0]], %[[C0_0]]], %[[SUBVIEW]][%[[C0]], %[[C0_0]]] : vector<4xf32>
-      iree_gpu.coalesced_gather_dma %arg0 into %subview_0 lane(%arg6) :
+      iree_gpu.coalesced_gather_dma %arg0 into %subview_0 dest_size = [2, 8] lane(%arg6) :
         memref<1x4xf32, #amdgpu.address_space<fat_raw_buffer>>,
         memref<1x4xf32, strided<[32, 1], offset: ?>, #gpu.address_space<workgroup>>, index
     } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
@@ -100,7 +100,7 @@ func.func @lower_coalesced_copy_dma_basic(
     // CHECK: %[[C1:.*]] = arith.constant 1 : index
     // CHECK: %[[C0_1:.*]] = arith.constant 0 : index
     // CHECK: amdgpu.gather_to_lds %{{.*}}[%[[C1]], %[[C0_1]]], %{{.*}}[%[[C1]], %[[C0_1]]] : vector<8xf16>
-    iree_gpu.coalesced_gather_dma %source into %dest lane(%arg6) : memref<2x8xf16>, memref<2x8xf16, #gpu.address_space<workgroup>>, index
+    iree_gpu.coalesced_gather_dma %source into %dest dest_size = [2, 8] lane(%arg6) : memref<2x8xf16>, memref<2x8xf16, #gpu.address_space<workgroup>>, index
   } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
   return
 }

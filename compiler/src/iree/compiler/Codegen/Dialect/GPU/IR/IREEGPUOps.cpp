@@ -187,11 +187,6 @@ void BufferResourceCastOp::getCanonicalizationPatterns(
 // CoalescedGatherDMAOp
 //===----------------------------------------------------------------------===//
 
-// DestinationStyleOpInterface implementation
-MutableOperandRange CoalescedGatherDMAOp::getDpsInitsMutable() {
-  return getInitMutable();
-}
-
 // ParallelCombiningOpInterface implementation
 MutableOperandRange CoalescedGatherDMAOp::getUpdatedDestinations() {
   // Only relevant for tensor operands
@@ -213,26 +208,12 @@ Operation *CoalescedGatherDMAOp::getIteratingParent() {
 
 LogicalResult CoalescedGatherDMAOp::verify() {
   auto initType = getInit().getType();
-  Value result = getResult();
 
   bool hasTensor = isa<RankedTensorType>(initType);
   bool hasMemRef = isa<MemRefType>(initType);
 
   if (!hasTensor && !hasMemRef) {
-    return emitOpError("input type must either be a tensor or a memref");
-  }
-
-  if (hasTensor) {
-    if (!result) {
-      return emitOpError("tensor semantics requires a result");
-    }
-    if (initType != result.getType()) {
-      return emitOpError("init and result must have the same type and shape");
-    }
-  }
-
-  if (hasMemRef && result) {
-    return emitOpError("memref semantics should not have a result");
+    return emitOpError("init type must either be a tensor or a memref");
   }
 
   auto initShape = cast<ShapedType>(initType).getShape();

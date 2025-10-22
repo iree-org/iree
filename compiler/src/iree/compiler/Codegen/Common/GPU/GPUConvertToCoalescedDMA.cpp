@@ -303,17 +303,29 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
     }
   }
 
+  // Create dest_indices as zeros, as we are writing full to the tile.
+  rewriter.setInsertionPoint(inParallelOp);
+  auto initType = cast<ShapedType>(sharedOut.getType());
+  int64_t initRank = initType.getRank();
+  SmallVector<Value> destIndices;
+  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  for (int64_t i = 0; i < initRank; ++i) {
+    destIndices.push_back(zero);
+  }
+
+  // Create dest_size attribute from init tensor dimensions
+  auto destSizeAttr = rewriter.getDenseI64ArrayAttr(initType.getShape());
+
   // Create the DMA op in the in_parallel region.
   rewriter.setInsertionPointToStart(&inParallelBlock);
-  SmallVector<Value> operands;
-  operands.push_back(source);
+  SmallVector<Value> indicesVec;
   if (indices) {
-    operands.push_back(indices);
+    indicesVec.push_back(indices);
   }
-  operands.push_back(sharedOut);
-  operands.push_back(laneId);
-  IREE::GPU::CoalescedGatherDMAOp::create(rewriter, loc, sharedOut.getType(),
-                                          operands);
+
+  rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
+      loc, TypeRange{}, source, indicesVec, sharedOut, destIndices, laneId,
+      destSizeAttr);
 
   // Erase the parallel_insert_slice ops and inner operation.
   for (auto insertOp : toErase) {
