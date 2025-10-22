@@ -6888,11 +6888,11 @@ column major. This is equivalent to instead computing:</p>
 <p>When promoting, this will create a <code>linalg.copy</code> on the input operand,
 and then the primary producing dispatch input has a buffer cast with cache
 swizzle inserted if possible. For example,</p>
-<div class="highlight"><pre><span></span><code>%0 = tensor_ext.dispatch.tensor.load : tensor&lt;?x4096xf16&gt;
+<div class="highlight"><pre><span></span><code>%0 = tensor_ext.dispatch.tensor.load : tensor&lt;?x8192&gt;
 %1 = linalg.matmul ins(%0, ...)
 </code></pre></div>
 <p>Becomes with <code>#iree_gpu.promote_with_cache_swizzle&lt;#iree_gpu.derived_thread_config&gt;</code></p>
-<div class="highlight"><pre><span></span><code>%0 = tensor_ext.dispatch.tensor.load : tensor&lt;?x4096xf16&gt;
+<div class="highlight"><pre><span></span><code>%0 = tensor_ext.dispatch.tensor.load : tensor&lt;?x8192&gt;
 %1 = iree_gpu.buffer_resource_cast cache_swizzle(8192)
 %2 = linalg.copy lowering_config = #iree_gpu.derived_thread_config
 %3 = linalg.matmul ins(%2, ...)
