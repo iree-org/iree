@@ -977,7 +977,7 @@ struct ReshapeOpCanon final : OpRewritePattern<mlir::stablehlo::ReshapeOp> {
     } 
     
     if (auto denseResourceAttr =
-                   llvm::dyn_cast<DenseResourceElementsAttr>(cstAttr)) {
+                   dyn_cast<DenseResourceElementsAttr>(cstAttr)) {
       rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(
           op, DenseResourceElementsAttr::get(
                   op.getType(), denseResourceAttr.getRawHandle()));
