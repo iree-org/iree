@@ -275,28 +275,16 @@ private:
       LDBG() << "skipping op; input channel size equals to 1";
       return std::nullopt;
     }
-
-    const int64_t limitParallelLoops = 512;
-    int64_t lowerBound = std::ceil(float(tileSizes[cDim]) / limitParallelLoops);
-    if (lowerBound > 1) {
-      std::optional<int64_t> maybeTileSize =
-          findSmallestFactorWithLowerBound(tileSizes[cDim], lowerBound);
-      if (!maybeTileSize) {
-        LDBG() << "skipping op; failed to find a split factor";
-        return std::nullopt;
-      }
-      tileSizes[0] = maybeTileSize.value();
-    } else {
-      tileSizes[0] = lowerBound;
-    }
+    tileSizes[cDim] = std::ceil(float(tileSizes[cDim]) / largeDimSize);
     return tileSizes;
   }
 
   /// Determines split reduction sizes for matmul-like operations where the K
-  /// dimension is significantly larger than the M or N dimensions. Currently,
-  /// splitting is only applied along the outermost reduction dimension. Note
-  /// that the constant threshold is empirically chosen based on limited data
-  /// and may not generalize to all cases.
+  /// dimension is significantly larger than the M or N dimensions. Splitting
+  /// can be applied across multiple reduction dimensions, with tile sizes
+  /// varying according to the output (parallel dimension) sizes. Note that the
+  /// constant thresholds are empirically derived from limited data and may not
+  /// generalize to all cases.
   std::optional<SmallVector<int64_t>>
   getMatmulLikeReductionSizes(PartialReductionOpInterface op) const {
     // Matmul-like op should have at least 1 reduction, which is checked by the
@@ -361,22 +349,44 @@ private:
       return std::nullopt;
     }
 
-    // Only split along the outermost reduction dimension.
-    // TODO(vivian): split more reduction dimensions if needed.
-    const int64_t limitParallelLoops = 128;
+    // Tile sizes are determined based on output (parallel dimension) sizes.
+    // For larger outputs, the workload tends to be distributed across more
+    // workgroups, thereby reducing the need for extensive splitting along the
+    // reduction dimensions.
     SmallVector<int64_t> tileSizes = std::move(*maybeSizes);
-    int64_t lowerBound = std::ceil(float(tileSizes[0]) / limitParallelLoops);
-    if (lowerBound > 1) {
+    int64_t outputSize = mSize * nSize * batchSize;
+    int64_t limitParallelLoops;
+    if (outputSize < 16 * 16) {
+      limitParallelLoops = 2048;
+    } else if (outputSize < 64 * 64) {
+      limitParallelLoops = 128;
+    } else if (outputSize < 128 * 128) {
+      limitParallelLoops = 64;
+    } else if (outputSize < 384 * 384) {
+      limitParallelLoops = 16;
+    } else {
+      limitParallelLoops = std::min<int64_t>(16, tileSizes[0]);
+    }
+
+    // Based on the limitParallelLoops, assign tile size from the outermost
+    // dimension to the innermost.
+    for (int64_t i = 0; i < tileSizes.size(); i++) {
+      int64_t lowerBound = llvm::divideCeil(tileSizes[i], limitParallelLoops);
       std::optional<int64_t> maybeTileSize =
-          findSmallestFactorWithLowerBound(tileSizes[0], lowerBound);
+          findSmallestFactorWithLowerBound(tileSizes[i], lowerBound);
       if (!maybeTileSize) {
         LDBG() << "skipping op; failed to find a split factor";
         return std::nullopt;
       }
-      tileSizes[0] = maybeTileSize.value();
-    } else {
-      tileSizes[0] = lowerBound;
+      limitParallelLoops /= (tileSizes[i] / maybeTileSize.value());
+      tileSizes[i] = maybeTileSize.value();
+      // If the outer tile size is larger than 1, inner dimensions cannot be
+      // split due to non-contiguous data.
+      if (tileSizes[i] > 1) {
+        break;
+      }
     }
+
     return tileSizes;
   }
 };
