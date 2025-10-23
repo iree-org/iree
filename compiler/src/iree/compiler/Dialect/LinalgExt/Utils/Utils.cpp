@@ -619,6 +619,45 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   auto filterMapGEMM =
       AffineMap::get(numParallelDims + numKDims, 0, filterDims, ctx);
 
+  // Compute the output permutation for the im2col tensor to match the
+  // dimension order of the input tensor.
+  auto inputMap = indexingMaps[0];
+  llvm::SetVector<int64_t> capturedDims;
+  SmallVector<int64_t> colTensorDimsInConvInputOrder;
+  for (int64_t dim = 0; dim < inputType.getRank(); ++dim) {
+    llvm::SetVector<int64_t> convDimsForInputDim;
+    AffineExpr dimExpr = inputMap.getResult(dim);
+    dimExpr.walk([&](AffineExpr expr) {
+      if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
+        convDimsForInputDim.insert(dimExpr.getPosition());
+      }
+    });
+    for (int64_t convDim : convDimsForInputDim) {
+      if (capturedDims.contains(convDim)) {
+        continue;
+      }
+      capturedDims.insert(convDim);
+      auto iGEMMDim = cast<AffineDimExpr>(convToIgemmDimMap[convDim]);
+      int64_t colTensorDim = inputMapGEMM.getResultPosition(iGEMMDim).value();
+      colTensorDimsInConvInputOrder.push_back(colTensorDim);
+    }
+  }
+  llvm::SetVector<int64_t> capturedOutputPermDims;
+  SmallVector<int64_t> im2colOutputPerm;
+  for (int64_t dim : llvm::reverse(colTensorDimsInConvInputOrder)) {
+    if (capturedOutputPermDims.contains(dim)) {
+      continue;
+    }
+    capturedOutputPermDims.insert(dim);
+    im2colOutputPerm.push_back(dim);
+  }
+  std::reverse(im2colOutputPerm.begin(), im2colOutputPerm.end());
+  SmallVector<AffineExpr> colTensorResultExprs(inputMapGEMM.getResults());
+  applyPermutationToVector(colTensorResultExprs, im2colOutputPerm);
+  inputMapGEMM =
+      AffineMap::get(inputMapGEMM.getNumDims(), 0, colTensorResultExprs,
+                     inputMapGEMM.getContext());
+
   SmallVector<AffineMap> indexingGEMMMaps;
   if (isOutputChannelFirst) {
     indexingGEMMMaps.push_back(filterMapGEMM);
@@ -629,6 +668,7 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   }
   indexingGEMMMaps.push_back(resultMap);
   IGEMMGenericConvDetails igemmDetails;
+  igemmDetails.im2colOutputPerm = im2colOutputPerm;
   igemmDetails.igemmContractionMaps = indexingGEMMMaps;
   igemmDetails.igemmOperands = isOutputChannelFirst
                                    ? SmallVector<Value>({filter, input})
