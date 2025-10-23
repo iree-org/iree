@@ -44,7 +44,8 @@ jobs:
           git config --local user.email "github-actions@github.com"
           git config --local user.name "github-actions"
           git add ${OUTPUT_DIR}
-          git commit -m "Update benchmark graphs"
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          git commit -m "Update benchmark graphs for ${SHORT_SHA}"
           git push
         # !!!!
         # Switch to gh-pages branch before merging to main.
