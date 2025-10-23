@@ -70,7 +70,7 @@ struct ReplaceGPUBarrierWithLDSBarrier
 };
 
 static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns) {
-  patterns.add<ReplaceGPUBarrierWithLDSBarrier>(patterns.getContext());
+  // patterns.add<ReplaceGPUBarrierWithLDSBarrier>(patterns.getContext());
 }
 
 /// Hacky pattern to swap `s_setprio` operations with `amdgpu.mfma` ops.
