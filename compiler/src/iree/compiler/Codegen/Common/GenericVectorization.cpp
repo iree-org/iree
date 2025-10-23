@@ -12,17 +12,13 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
-#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
-#include "mlir/Interfaces/ValueBoundsOpInterface.h"
-#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-generic-vectorization"
@@ -57,6 +53,17 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
           std::tie(vectorSizes, scalableFlags) = maybeInputVectorSizes.value();
         } else {
           LDBG() << "Failed to get input vector sizes for unpack op";
+          return std::nullopt;
+        }
+      }
+      if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
+        std::optional<SizesAndScalableFlags> maybeInputVectorSizes =
+            getVectorInputSizesFromUnpackedDomain(packOp, *vectorSizes,
+                                                  scalableFlags);
+        if (maybeInputVectorSizes) {
+          std::tie(vectorSizes, scalableFlags) = maybeInputVectorSizes.value();
+        } else {
+          LDBG() << "Failed to get input vector sizes for pack op";
           return std::nullopt;
         }
       }
