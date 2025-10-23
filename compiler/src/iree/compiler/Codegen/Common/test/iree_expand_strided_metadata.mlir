@@ -194,3 +194,79 @@ func.func @external_func_entry_point() -> (memref<bf16>, index) {
 // CHECK-LABEL: func.func @external_func_entry_point()
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan
 //       CHECK:   %{{.+}} = memref.reinterpret_cast %[[SUBSPAN]]
+
+// -----
+
+// Tests that memref.extract_strided_metadata on a HAL binding gets fully
+// resolved and does not remain as any extract op (neither memref nor
+// iree_codegen version). This test would fail if the fallback pattern handling
+// conversion of iree_codegen to memref fires before
+// ResolveExtractMetadataFromHalInterfaceBindingSubspan.
+#pipeline_layout_2 = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @must_resolve_hal_binding_extract(%dim: index) -> (memref<f32>, index) {
+  %c0 = arith.constant 0 : index
+  %binding = hal.interface.binding.subspan layout(#pipeline_layout_2) binding(0)
+      alignment(64) offset(%c0) : memref<?xf32>{%dim}
+  // This extract MUST be converted to iree_codegen then resolved to concrete
+  // values. Without the guard in the pattern this could be converted back to
+  // memref.extract_strided_metadata before the other pattern resolves it.
+  %base, %offset, %size, %stride = memref.extract_strided_metadata %binding
+      : memref<?xf32> -> memref<f32>, index, index, index
+  return %base, %offset : memref<f32>, index
+}
+// CHECK-LABEL: func.func @must_resolve_hal_binding_extract
+// CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+// CHECK:       %[[BINDING:.+]] = hal.interface.binding.subspan{{.*}}: memref<?xf32>
+// CHECK:       %[[CAST:.+]] = memref.reinterpret_cast %[[BINDING]]
+// CHECK:       return %[[CAST]], %[[C0]]
+// Verify no extract ops remain (would indicate the fallback fired too early).
+// CHECK-NOT:   memref.extract_strided_metadata
+// CHECK-NOT:   iree_codegen.extract_strided_metadata
+
+// -----
+
+// Tests that iree_codegen.extract_strided_metadata on a non-HAL source
+// correctly converts to memref.extract_strided_metadata (fallback should
+// fire). This ensures the guard in the fallback doesn't break non-HAL cases.
+func.func @must_convert_non_hal_iree_codegen_extract(%arg0: memref<?xf32>) -> (memref<f32>, index) {
+  // Directly use iree_codegen version on a non-HAL source.
+  // Fallback must convert this to memref version.
+  %base, %offset, %size, %stride = iree_codegen.extract_strided_metadata %arg0
+      : memref<?xf32> -> memref<f32>, index, index, index
+  return %base, %offset : memref<f32>, index
+}
+// CHECK-LABEL: func.func @must_convert_non_hal_iree_codegen_extract
+// CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+// CHECK:       %[[BASE:.+]], %{{.+}}, %{{.+}}, %{{.+}} = memref.extract_strided_metadata %arg0
+// CHECK:       return %[[BASE]], %[[C0]]
+// Verify iree_codegen version is gone (fallback should have converted it).
+// CHECK-NOT:   iree_codegen.extract_strided_metadata
+
+// -----
+
+// Tests that HAL binding extraction works even when the binding is wrapped
+// in transparent operations like memref.assume_alignment. This tests that
+// getSourceInterfaceBinding() correctly walks through wrappers.
+#pipeline_layout_3 = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @hal_binding_through_assume_alignment(%dim: index) -> (memref<f32>, index) {
+  %c0 = arith.constant 0 : index
+  %binding = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(0)
+      alignment(64) offset(%c0) : memref<?xf32>{%dim}
+  %aligned = memref.assume_alignment %binding, 64 : memref<?xf32>
+  // Extract on the assume_alignment result should still be resolved.
+  %base, %offset, %size, %stride = memref.extract_strided_metadata %aligned
+      : memref<?xf32> -> memref<f32>, index, index, index
+  return %base, %offset : memref<f32>, index
+}
+// CHECK-LABEL: func.func @hal_binding_through_assume_alignment
+// CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+// CHECK:       %[[BINDING:.+]] = hal.interface.binding.subspan{{.*}}: memref<?xf32>
+// CHECK:       %[[CAST:.+]] = memref.reinterpret_cast %[[BINDING]]
+// CHECK:       return %[[CAST]], %[[C0]]
+// Verify resolution happened despite assume_alignment wrapper.
+// CHECK-NOT:   memref.extract_strided_metadata
+// CHECK-NOT:   iree_codegen.extract_strided_metadata
