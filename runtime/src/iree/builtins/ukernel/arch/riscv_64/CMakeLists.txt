@@ -70,12 +70,32 @@ iree_bitcode_library(
     "-march=rv64gc_zvfhmin"
 )
 
+iree_bitcode_library(
+  NAME
+    ukernel_bitcode_arch_riscv_64_zvfh
+  ARCH
+    riscv_64
+  INTERNAL_HDRS
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "common_riscv_64.h"
+    "mmt4d_riscv_64_internal.h"
+    "mmt4d_riscv_64_tiles.inl"
+    "pack_riscv_64_internal.h"
+    "unpack_riscv_64_internal.h"
+  SRCS
+    "mmt4d_riscv_64_zvfh.c"
+  COPTS
+    "-march=rv64gc_zvfh"
+)
+
 iree_link_bitcode(
   NAME
     ukernel_bitcode_arch_riscv_64
   SRCS
     "ukernel_bitcode_arch_riscv_64_entry_points.bc"
     "ukernel_bitcode_arch_riscv_64_v.bc"
+    "ukernel_bitcode_arch_riscv_64_zvfh.bc"
     "ukernel_bitcode_arch_riscv_64_zvfhmin.bc"
 
 )
@@ -100,12 +120,18 @@ iree_select_compiler_opts(IREE_UK_COPTS_RISCV_64_ZVFHMIN
     "-march=rv64gc_zvfhmin"
 )
 
+iree_select_compiler_opts(IREE_UK_COPTS_RISCV_64_ZVFH
+  CLANG_OR_GCC
+    "-march=rv64gc_zvfh"
+)
+
 check_cxx_compiler_flag("${IREE_UK_COPTS_RISCV_64_V}" IREE_UK_BUILD_RISCV_64_V)
+check_cxx_compiler_flag("${IREE_UK_COPTS_RISCV_64_ZVFH}" IREE_UK_BUILD_RISCV_64_ZVFH)
 
 # CPU features that we will try checking compiler support for, unless
 # we set them to OFF below.
 
-set(IREE_UK_TRY_RISCV_64_ZVFHMIN_ZVFH ON)
+set(IREE_UK_TRY_RISCV_64_ZVFHMIN ON)
 
 # Compiler emits '__extendhfsf2' call for the
 # C code below. So, the following test checks whether
@@ -114,7 +140,7 @@ set(IREE_UK_TRY_RISCV_64_ZVFHMIN_ZVFH ON)
 # 'Test RISC-V 64 CI job' fails to link '__extendhfsf2'
 # builtin. See: https://github.com/iree-org/iree/issues/22303.
 # Once this issue is resolved, we won't need this check.
-if(IREE_UK_TRY_RISCV_64_ZVFHMIN_ZVFH)
+if(IREE_UK_TRY_RISCV_64_ZVFHMIN)
   string(REPLACE ";" " " CMAKE_REQUIRED_FLAGS "${IREE_UK_COPTS_RISCV_64_ZVFHMIN}")
   string(JOIN "\n" IREE_UK_BUILD_RISCV_64_ZVFHMIN_ZVFH_TEST
 "int main() {"
@@ -172,6 +198,20 @@ iree_cc_library(
 )
 list(APPEND IREE_UK_RISCV_64_DEPS "::riscv_64_zvfhmin")
 endif()  # IREE_UK_BUILD_RISCV_64_ZVFHMIN
+
+if(IREE_UK_BUILD_RISCV_64_ZVFH)
+iree_cc_library(
+  NAME
+    riscv_64_zvfh
+  SRCS
+    "mmt4d_riscv_64_zvfh.c"
+  COPTS
+    "${IREE_UK_COPTS_RISCV_64_ZVFH}"
+  DEPS
+    iree::builtins::ukernel::internal_headers
+)
+list(APPEND IREE_UK_RISCV_64_DEPS "::riscv_64_zvfh")
+endif()  # IREE_UK_BUILD_RISCV_64_ZVFH
 
 iree_cc_library(
   NAME
