@@ -140,3 +140,30 @@ util.func private @resourceSubview(%arg0: !stream.resource<*>, %arg1: index) -> 
   %0 = stream.resource.subview %arg0[%c128] : !stream.resource<*>{%arg1} -> !stream.resource<*>{%c256}
   util.return %0 : !stream.resource<*>
 }
+
+// -----
+
+// CHECK-LABEL: @resourceTransients
+util.func private @resourceTransients(%arg0: !stream.resource<*>, %arg1: index, %arg2: !util.buffer) -> !stream.resource<*> {
+  // CHECK: = stream.resource.transients %arg0 : !stream.resource<*>{%arg1} from %arg2 : !util.buffer
+  %0 = stream.resource.transients %arg0 : !stream.resource<*>{%arg1} from %arg2 : !util.buffer
+  util.return %0 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @resourceTransientsAffinity
+util.func private @resourceTransientsAffinity(%arg0: !stream.resource<*>, %arg1: index, %arg2: !util.buffer) -> !stream.resource<*> {
+  // CHECK: = stream.resource.transients on(#hal.device.affinity<@dev>) %arg0 : !stream.resource<*>{%arg1} from %arg2 : !util.buffer
+  %0 = stream.resource.transients on(#hal.device.affinity<@dev>) %arg0 : !stream.resource<*>{%arg1} from %arg2 : !util.buffer
+  util.return %0 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @resourceTransientsMultipleStorage
+util.func private @resourceTransientsMultipleStorage(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !util.buffer, %arg3: !util.buffer) -> !stream.resource<transient> {
+  // CHECK: = stream.resource.transients %arg0 : !stream.resource<transient>{%arg1} from %arg2, %arg3 : !util.buffer, !util.buffer
+  %0 = stream.resource.transients %arg0 : !stream.resource<transient>{%arg1} from %arg2, %arg3 : !util.buffer, !util.buffer
+  util.return %0 : !stream.resource<transient>
+}

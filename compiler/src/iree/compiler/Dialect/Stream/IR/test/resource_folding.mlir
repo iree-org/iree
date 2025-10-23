@@ -317,3 +317,42 @@ util.func private @unrealizedCastCleanup(%arg0: !stream.resource<transient>, %ar
   // CHECK-NEXT: util.return %[[ARG0]], %[[ARG1]]
   util.return %0, %1 : !stream.resource<transient>, index
 }
+
+// -----
+
+// CHECK-LABEL: @FoldConsecutiveResourceTransientsSameStorage
+// CHECK-SAME: (%[[RESOURCE:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index, %[[STORAGE:.+]]: !util.buffer)
+util.func private @FoldConsecutiveResourceTransientsSameStorage(%resource: !stream.resource<*>, %size: index, %storage: !util.buffer) -> !stream.resource<*> {
+  // CHECK-NOT: stream.resource.transients %[[RESOURCE]]
+  %0 = stream.resource.transients %resource : !stream.resource<*>{%size} from %storage : !util.buffer
+  // CHECK: %[[RESULT:.+]] = stream.resource.transients %[[RESOURCE]] : !stream.resource<*>{%[[SIZE]]} from %[[STORAGE]] : !util.buffer
+  %1 = stream.resource.transients %0 : !stream.resource<*>{%size} from %storage : !util.buffer
+  // CHECK: util.return %[[RESULT]]
+  util.return %1 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @FoldConsecutiveResourceTransientsDifferentStorage
+// CHECK-SAME: (%[[RESOURCE:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index, %[[STORAGE1:.+]]: !util.buffer, %[[STORAGE2:.+]]: !util.buffer)
+util.func private @FoldConsecutiveResourceTransientsDifferentStorage(%resource: !stream.resource<*>, %size: index, %storage1: !util.buffer, %storage2: !util.buffer) -> !stream.resource<*> {
+  // CHECK-NOT: stream.resource.transients %[[RESOURCE]] : !stream.resource<*>{%[[SIZE]]} from %[[STORAGE1]]
+  %0 = stream.resource.transients %resource : !stream.resource<*>{%size} from %storage1 : !util.buffer
+  // CHECK: %[[RESULT:.+]] = stream.resource.transients %[[RESOURCE]] : !stream.resource<*>{%[[SIZE]]} from %[[STORAGE2]] : !util.buffer
+  %1 = stream.resource.transients %0 : !stream.resource<*>{%size} from %storage2 : !util.buffer
+  // CHECK: util.return %[[RESULT]]
+  util.return %1 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @FoldConsecutiveResourceTransientsWithAffinity
+// CHECK-SAME: (%[[RESOURCE:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index, %[[STORAGE:.+]]: !util.buffer)
+util.func private @FoldConsecutiveResourceTransientsWithAffinity(%resource: !stream.resource<*>, %size: index, %storage: !util.buffer) -> !stream.resource<*> {
+  // CHECK-NOT: stream.resource.transients %[[RESOURCE]]
+  %0 = stream.resource.transients %resource : !stream.resource<*>{%size} from %storage : !util.buffer
+  // CHECK: %[[RESULT:.+]] = stream.resource.transients on(#hal.device.affinity<@dev>) %[[RESOURCE]] : !stream.resource<*>{%[[SIZE]]} from %[[STORAGE]] : !util.buffer
+  %1 = stream.resource.transients on(#hal.device.affinity<@dev>) %0 : !stream.resource<*>{%size} from %storage : !util.buffer
+  // CHECK: util.return %[[RESULT]]
+  util.return %1 : !stream.resource<*>
+}

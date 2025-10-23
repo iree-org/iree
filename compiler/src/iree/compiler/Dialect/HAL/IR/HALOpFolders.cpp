@@ -68,6 +68,45 @@ OpFoldResult TensorExportOp::fold(FoldAdaptor operands) {
 }
 
 //===----------------------------------------------------------------------===//
+// hal.tensor.transients
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Folds consecutive transients ops into one.
+// %1 = hal.tensor.transients %0 : tensor<?xf32>{%dim} from %storage1
+// %2 = hal.tensor.transients %1 : tensor<?xf32>{%dim} from %storage2
+// =>
+// %2 = hal.tensor.transients %0 : tensor<?xf32>{%dim} from %storage2
+struct FoldConsecutiveTransientsOps
+    : public OpRewritePattern<TensorTransientsOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(TensorTransientsOp op,
+                                PatternRewriter &rewriter) const override {
+    // Check if the source is another transients op.
+    auto sourceOp = op.getSource().getDefiningOp<TensorTransientsOp>();
+    if (!sourceOp) {
+      return failure();
+    }
+
+    // Fold by using the original source from the inner transients op,
+    // but keeping the outer storage (outer annotation wins).
+    rewriter.modifyOpInPlace(op, [&]() {
+      op.getSourceMutable().assign(sourceOp.getSource());
+      op.getSourceDimsMutable().assign(sourceOp.getSourceDims());
+    });
+    return success();
+  }
+};
+
+} // namespace
+
+void TensorTransientsOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                     MLIRContext *context) {
+  results.add<FoldConsecutiveTransientsOps>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // hal.tensor.barrier
 //===----------------------------------------------------------------------===//
 

@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "annotate_affinities.mlir"
+    "annotate_constant_transient_size.mlir"
     "annotate_dispatch_arguments.mlir"
     "annotate_dispatch_assumptions.mlir"
     "automatic_reference_counting.mlir"
@@ -31,6 +32,8 @@ iree_lit_test_suite(
     "elide_timepoints_immediate.mlir"
     "elide_timepoints_scf.mlir"
     "emplace_allocations.mlir"
+    "emplace_transients.mlir"
+    "emplace_transients_scf.mlir"
     "encode_device_tensors.mlir"
     "encode_device_tensors_packing.mlir"
     "encode_host_tensors.mlir"
@@ -46,6 +49,7 @@ iree_lit_test_suite(
     "materialize_builtins.mlir"
     "materialize_copy_on_write.mlir"
     "materialize_encodings.mlir"
+    "materialize_transient_size_queries.mlir"
     "pack_constants.mlir"
     "pack_dispatch_operands.mlir"
     "propagate_subviews.mlir"
