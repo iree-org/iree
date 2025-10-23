@@ -1,0 +1,11 @@
+[
+  {
+    "commit_hash": "ccc7cf9c9010e3aa4c0407e2f886360df5f91454",
+    "tests": [
+      {
+        "name": "sdxl_clip_benchmark_cpu",
+        "time": "400.315"
+      }
+    ]
+  }
+]

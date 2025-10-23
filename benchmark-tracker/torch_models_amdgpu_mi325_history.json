@@ -1,0 +1,47 @@
+[
+  {
+    "commit_hash": "ccc7cf9c9010e3aa4c0407e2f886360df5f91454",
+    "tests": [
+      {
+        "name": "llama_8b_fp16_decode_benchmark_seq128_mi325",
+        "time": "5.585"
+      },
+      {
+        "name": "llama_8b_fp16_decode_benchmark_seq2048_mi325",
+        "time": "6.997"
+      },
+      {
+        "name": "llama_8b_fp16_prefill_benchmark_seq128_mi325",
+        "time": "36.073"
+      },
+      {
+        "name": "llama_8b_fp16_prefill_benchmark_seq2048_mi325",
+        "time": "230.294"
+      },
+      {
+        "name": "llama_8b_fp8_decode_benchmark_seq128_mi325",
+        "time": "7.206"
+      },
+      {
+        "name": "llama_8b_fp8_decode_benchmark_seq2048_mi325",
+        "time": "9.864"
+      },
+      {
+        "name": "llama_8b_fp8_prefill_benchmark_seq128_mi325",
+        "time": "22.992"
+      },
+      {
+        "name": "llama_8b_fp8_prefill_benchmark_seq2048_mi325",
+        "time": "165.185"
+      },
+      {
+        "name": "sdxl_clip_benchmark_mi325",
+        "time": "7.262"
+      },
+      {
+        "name": "sdxl_punet_benchmark_mi325",
+        "time": "41.467"
+      }
+    ]
+  }
+]
