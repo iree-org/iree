@@ -752,7 +752,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
                                                     #hal.pipeline.binding<storage_buffer>,
                                                     #hal.pipeline.binding<storage_buffer>,
                                                     #hal.pipeline.binding<storage_buffer>]>
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64, {}>
+#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [128, 1, 1] subgroup_size = 64, {}>
 #config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, promote_operands = [0, 1], reduction = [0, 0, 64], subgroup_basis = [[2, 2, 1], [0, 1, 2]], workgroup = [64, 128, 0]}>
 
 hal.executable public @matmul_gather_rhs {

@@ -168,14 +168,9 @@ func.func @reduction(%in: memref<2048xf32>, %out: memref<f32>) {
 
   // Guards on duplicated writes to LDS.
   // Only lane 0 within each subgroup writes.
-  //      CHECK: %[[DELIN:.*]]:4 = affine.delinearize_index %[[THREADIDX]] into (1, 8, 64, 1)
-  // This condition is redundant and will be cleaned up after int
-  // optimizations. This can also be fixed with a fold pattern to
-  // affine.delinearize_index.
-  //  CHECK-DAG: %[[SUBGROUPCOND:.*]] = arith.cmpi eq, %[[DELIN]]#0, %[[ZERO]]
-  //  CHECK-DAG: %[[LANECOND:.*]] = arith.cmpi eq, %[[DELIN]]#2, %[[ZERO]]
-  //      CHECK: %[[COND:.*]] = arith.andi %[[SUBGROUPCOND]], %[[LANECOND]]
-  // CHECK-NEXT: scf.if %[[COND]] {
+  //      CHECK: %[[DELIN:.*]]:4 = affine.delinearize_index %[[THREADIDX]] into (8, 64, 1)
+  //  CHECK-DAG: %[[LANECOND:.*]] = arith.cmpi eq, %[[DELIN]]#2, %[[ZERO]] : index
+  // CHECK-NEXT: scf.if %[[LANECOND]] {
   // CHECK-NEXT: linearize_index
   // CHECK-NEXT: vector.transfer_write {{.*}} #gpu.address_space<workgroup>>
   // CHECK-NEXT: }
@@ -183,8 +178,11 @@ func.func @reduction(%in: memref<2048xf32>, %out: memref<f32>) {
   %11 = vector.broadcast %10 : f32 to vector<f32>
 
   // Guards on duplicated writes to global memory.
-  // Only thread 0 writes.
-  //  CHECK-DAG: %[[COND2:.*]] = arith.cmpi eq, %[[THREADIDX]], %[[ZERO]] : index
+  // Only thread 0 (lane 0 of subgroup 0) writes.
+  //      CHECK: %[[DELIN2:.*]]:2 = affine.delinearize_index %[[THREADIDX]] into (64)
+  //  CHECK-DAG: %[[WGCOND2:.*]] = arith.cmpi eq, %[[DELIN2]]#0, %[[ZERO]] : index
+  //  CHECK-DAG: %[[LANECOND2:.*]] = arith.cmpi eq, %[[DELIN2]]#1, %[[ZERO]] : index
+  //      CHECK: %[[COND2:.*]] = arith.andi %[[WGCOND2]], %[[LANECOND2]] : i1
   // CHECK-NEXT: scf.if %[[COND2]] {
   // CHECK-NEXT: vector.broadcast
   // CHECK-NEXT: vector.transfer_write {{.*}} #amdgpu.address_space<fat_raw_buffer>>

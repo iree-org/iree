@@ -380,7 +380,7 @@ hal.executable private @attention_20x1x64x4096x64 {
                                       lane_basis = [[1, 4, 16], [0, 1, 2]]}
 >
 #translation = #iree_codegen.translation_info< pipeline = LLVMGPUVectorDistribute
-                                               workgroup_size = [128, 1, 1]
+                                               workgroup_size = [64, 1, 1]
                                                subgroup_size = 64, {}>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
