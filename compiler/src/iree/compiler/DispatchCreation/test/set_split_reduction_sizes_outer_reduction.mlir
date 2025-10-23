@@ -1,5 +1,4 @@
-// RUN: iree-opt %s --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-set-split-reduction-sizes))" --split-input-file > %t
-// RUN: FileCheck %s < %t
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-set-split-reduction-sizes))" --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @basic
 util.func public @basic(%arg0: tensor<4096xf32>) -> tensor<1xf32> {

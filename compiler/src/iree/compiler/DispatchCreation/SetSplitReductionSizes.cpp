@@ -370,15 +370,15 @@ private:
 
     // Based on the limitParallelLoops, assign tile size from the outermost
     // dimension to the innermost.
-    for (int64_t i = 0; i < tileSizes.size(); i++) {
-      int64_t lowerBound = llvm::divideCeil(tileSizes[i], limitParallelLoops);
+    for (auto [i, tileSize] : llvm::enumerate(tileSizes)) {
+      int64_t lowerBound = llvm::divideCeil(tileSize, limitParallelLoops);
       std::optional<int64_t> maybeTileSize =
-          findSmallestFactorWithLowerBound(tileSizes[i], lowerBound);
+          findSmallestFactorWithLowerBound(tileSize, lowerBound);
       if (!maybeTileSize) {
         LDBG() << "skipping op; failed to find a split factor";
         return std::nullopt;
       }
-      limitParallelLoops /= (tileSizes[i] / maybeTileSize.value());
+      limitParallelLoops /= (tileSize / maybeTileSize.value());
       tileSizes[i] = maybeTileSize.value();
       // If the outer tile size is larger than 1, inner dimensions cannot be
       // split due to non-contiguous data.
