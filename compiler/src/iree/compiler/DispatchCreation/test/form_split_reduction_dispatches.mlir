@@ -202,15 +202,13 @@ util.func public @split_reduction_arg_compare(%arg0: tensor<4x1x128256xf16>) -> 
 //       CHECK:      %[[FORALL:.+]]:2 = scf.forall (%{{.+}}) = (0) to (128256) step (1336)
 //  CHECK-SAME:          shared_outs(%[[OUT0:.+]] = %[[EMPTY_F16]], %[[OUT1:.+]] = %[[EMPTY_I32]])
 //  CHECK-SAME:          -> (tensor<4x1x96xf16>, tensor<4x1x96xi32>) {
-//       CHECK:        %[[INPUT_SLICE:.+]] = tensor.extract_slice %[[ARG0]]
+//       CHECK:        tensor.extract_slice %[[ARG0]]
 //  CHECK-SAME:            [0, 0, %{{.+}}] [4, 1, 1336] [1, 1, 1]
 //  CHECK-SAME:            : tensor<4x1x128256xf16> to tensor<4x1x1336xf16>
-//   CHECK-NOT:        tensor.extract_slice %[[OUT0]]
-//   CHECK-NOT:        linalg.broadcast
+//       CHECK:        linalg.broadcast
+//       CHECK:        linalg.broadcast
 //       CHECK:        %[[ARG_COMPARE:.+]]:2 = iree_linalg_ext.arg_compare
 //  CHECK-SAME:            dimension(2)
-//  CHECK-SAME:            ins(%[[INPUT_SLICE]] : tensor<4x1x1336xf16>)
-//  CHECK-SAME:            outs(%[[FILL_F16]], %[[FILL_I32]] : tensor<4x1xf16>, tensor<4x1xi32>)
 //       CHECK:        scf.forall.in_parallel {
 //       CHECK:          tensor.parallel_insert_slice %[[ARG_COMPARE]]#0 into %[[OUT0]]
 //       CHECK:          tensor.parallel_insert_slice %[[ARG_COMPARE]]#1 into %[[OUT1]]
