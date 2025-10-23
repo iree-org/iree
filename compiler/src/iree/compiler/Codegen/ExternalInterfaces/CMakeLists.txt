@@ -17,11 +17,13 @@ iree_cc_library(
     "CPUEncodingExternalModels.h"
     "GPUEncodingExternalModels.h"
     "Interfaces.h"
+    "UtilExternalModels.h"
     "Utils.h"
   SRCS
     "CPUEncodingExternalModels.cpp"
     "GPUEncodingExternalModels.cpp"
     "Interfaces.cpp"
+    "UtilExternalModels.cpp"
     "Utils.cpp"
   DEPS
     LLVMSupport
@@ -30,6 +32,7 @@ iree_cc_library(
     MLIRLinalgDialect
     MLIRLinalgTransforms
     MLIRTensorDialect
+    MLIRValueBoundsOpInterface
     iree::compiler::Codegen::Dialect::CPU::IR::IREECPUDialect
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::Codegen::Utils
