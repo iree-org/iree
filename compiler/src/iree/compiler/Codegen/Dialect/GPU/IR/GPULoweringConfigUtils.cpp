@@ -30,8 +30,6 @@ void setMmaKind(MLIRContext *context, SmallVectorImpl<NamedAttribute> &attrs,
   attrs.emplace_back(kMmaKindName, kind);
 }
 
-// can build with b.getArrayAttr({b.getI64ArrayAttr(...),
-// b.getI64ArrayAttr(...)}) support nested
 const StringLiteral kExpandDimsName = "expand_dims";
 
 static std::optional<ReassociationIndices>

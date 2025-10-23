@@ -98,7 +98,6 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
     if (!isa<RankedTensorType>(operand.get().getType()))
       continue;
 
-    // Translate iteration space index to tensor dimension index.
     AffineMap indexingMap = indexingMaps[operand.getOperandNumber()];
     DimensionExpansionInfo tensorExpansionInfo;
 

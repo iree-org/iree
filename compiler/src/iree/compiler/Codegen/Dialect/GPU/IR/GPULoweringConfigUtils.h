@@ -31,16 +31,24 @@ struct Basis {
   SmallVector<int64_t> mapping;
 };
 
-// Dimension Expansion consists of a list of ReassociationIndices that will be
-// expanded by a factor of its corresponding thread level tiling sizes. For
-// example, given a DimensionExpansion of [[0], [1], [2, 3, 4]], the iteration
-// space corresponding to the first and second indices remain unchanged. The
-// iteration space of the second dimension is expanded into three. The factor of
-// expansion is based on the `thread` level tiling of the corresponding
-// dimension. The original dimension is split by the product of all sequences
-// that it is split into. For the above, if we have thread = [0, 0, 1, 4, 2],
-// the iteration space corresponding to d2 is split into d2/8, d3 = 4, d4 = 2
-// respectively.
+// Dimension Expansion consists of a list of ReassociationIndices that specifies
+// how each dimension in the original iteration space maps to the expanded
+// iteration space. Each dimension can either remain unchanged or be split.
+//
+// For example, given a DimensionExpansion of [[0], [1], [2, 3]], the iteration
+// space corresponding to the first and second dimensions remain unchanged. The
+// iteration space corresponding to the third dimension index is split into
+// two dimensions.
+//
+// The factor of expansion is determined by the `thread` level tiling sizes of
+// the corresponding dimensions in the expanded space. The iteration
+// space of the original dimension is split by the product of the thread tile
+// sizes for all dimensions it maps to. For the above example, if we have thread
+// = [0, 0, 1, 4], then:
+// - Original d2 is split such that: d2_outer = d2 / 4, d2_inner = 4.
+// - In the expanded space: thread[2] = 1, thread[3] = 4.
+// - The product (1 * 4 = 4) determines the split factor of the iteration space
+//   corresponding to partial_reduction[d2].
 using DimensionExpansion = SmallVector<ReassociationIndices>;
 FailureOr<DimensionExpansion>
 getDimensionExpansion(IREE::GPU::LoweringConfigAttr config);
