@@ -1,0 +1,54 @@
+# Copyright 2025 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: Benchmark Graphs
+
+permissions:
+  contents: write
+
+on:
+  workflow_call:
+
+jobs:
+  summary:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checking out IREE repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          submodules: false
+
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v5.4.0
+        with:
+          python-version: "3.11"
+
+      - name: Generate Benchmark Graphs
+        run: |
+          # Copy the benchmark generation script before switching branches.
+          cp ./build_tools/pkgci/generate_benchmark_graphs.py ./
+          cp ./build_tools/pkgci/gh_utils.py ./
+
+          # Fetch and check out the publish branch for historical data
+          git fetch origin ${PUBLISH_BRANCH}
+          git checkout ${PUBLISH_BRANCH}
+
+          # Generate graphs using artifacts from the current run and history data
+          python ./generate_benchmark_graphs.py \
+            --workflow-run-id ${{ github.run_id }} \
+            --output-dir ${OUTPUT_DIR}
+
+          # Push new graphs.
+          git config --local user.email "github-actions@github.com"
+          git config --local user.name "github-actions"
+          git add ${OUTPUT_DIR}
+          git commit -m "Update benchmark graphs"
+          git push
+        # !!!!
+        # Switch to gh-pages branch before merging to main.
+        env:
+          PUBLISH_BRANCH: "gh-pages-test"
+          OUTPUT_DIR: "./benchmark-tracker/"
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
