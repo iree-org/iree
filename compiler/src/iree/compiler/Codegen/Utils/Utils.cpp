@@ -1796,6 +1796,7 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::PackOp op) {
   if (!outerDimsPerm.empty()) {
     applyPermutationToVector(result.vectorSizes, outerDimsPerm);
   }
+  llvm::append_range(result.vectorSizes, op.getStaticInnerTiles());
 
   LLVM_DEBUG({
     LDBG() << "After adjustment with inner tiles and outer_dims_perm:";
@@ -1805,6 +1806,30 @@ std::optional<VectorizationTileSizes> inferSizesFromIR(linalg::PackOp op) {
   });
   result.destShape = result.vectorSizes;
 
+  return result;
+}
+
+std::optional<SizesAndScalableFlags>
+getVectorInputSizesFromUnpackedDomain(linalg::PackOp op,
+                                      ArrayRef<int64_t> readVectorSizes,
+                                      ArrayRef<bool> scalableFlags) {
+  assert(readVectorSizes.size() == op.getSourceRank());
+  if (llvm::any_of(scalableFlags, [](bool val) { return val == true; })) {
+    return std::nullopt;
+  }
+  // TODO: Infer scalable sizes.
+  if (llvm::any_of(op.getStaticInnerTiles(), ShapedType::isDynamic)) {
+    return std::nullopt;
+  }
+
+  SmallVector<int64_t> writeSizes(readVectorSizes);
+  SmallVector<bool> writeScalableFlags(scalableFlags);
+  for (auto innerTileSize : op.getStaticInnerTiles()) {
+    writeSizes.push_back(innerTileSize);
+    writeScalableFlags.push_back(false);
+  }
+
+  SizesAndScalableFlags result = {writeSizes, writeScalableFlags};
   return result;
 }
 
