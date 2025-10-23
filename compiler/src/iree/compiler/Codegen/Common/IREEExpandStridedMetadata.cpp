@@ -45,6 +45,27 @@ static AffineMap getMulMap(MLIRContext *context) {
   return AffineMap::get(0, 2, s0 * s1);
 }
 
+/// Walks up the def-use chain to find the HAL interface binding subspan
+/// that a memref value derives from, passing through transparent wrapper ops.
+static IREE::HAL::InterfaceBindingSubspanOp
+getSourceInterfaceBinding(Value memrefValue) {
+  Value source = memrefValue;
+  // Walk through transparent wrapper operations.
+  while (source) {
+    if (auto binding =
+            source.getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>()) {
+      return binding;
+    }
+    if (auto assumeAlign = source.getDefiningOp<memref::AssumeAlignmentOp>()) {
+      source = assumeAlign.getOperand();
+      continue;
+    }
+    // No more transparent ops to pass through.
+    break;
+  }
+  return nullptr;
+}
+
 /// Returns the strides based on the sizes assuming that the `memref`
 /// has default layout, i.e. it is not a result of a subview.
 static SmallVector<OpFoldResult>
@@ -128,14 +149,30 @@ replaceOffsetSizesAndStridesWith(RewriterBase &rewriter, OpTy op,
 
 namespace {
 
-struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
+// Converts memref.extract_strided_metadata to
+// iree_codegen.extract_strided_metadata when the source derives from a HAL
+// interface binding. This preserves SSA links through buffer binding
+// optimizations that update offsets.
+struct ConvertMemRefExtractMetadataToIREECodegen
     : public OpRewritePattern<memref::ExtractStridedMetadataOp> {
-  using Base::Base;
+  using OpRewritePattern<memref::ExtractStridedMetadataOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(memref::ExtractStridedMetadataOp op,
                                 PatternRewriter &rewriter) const override {
-    auto binding =
-        op.getSource()
-            .template getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+    if (!getSourceInterfaceBinding(op.getSource()))
+      return failure();
+    // Replace with iree_codegen version which doesn't fold.
+    rewriter.replaceOpWithNewOp<IREE::Codegen::ExtractStridedMetadataOp>(
+        op, op.getSource());
+    return success();
+  }
+};
+
+struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
+    : public OpRewritePattern<IREE::Codegen::ExtractStridedMetadataOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(IREE::Codegen::ExtractStridedMetadataOp op,
+                                PatternRewriter &rewriter) const override {
+    auto binding = getSourceInterfaceBinding(op.getSource());
     if (!binding)
       return failure();
     auto memRefType = llvm::cast<MemRefType>(binding.getResult().getType());
@@ -236,9 +273,10 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
   }
 };
 
-// Converts IREE::Codegen::ExtractStridedMetadataOp to
-// MemRef::ExtractStridedMetadataOp
-struct ConvertCodegenIREEExtractMetadataToMemRef
+// Converts iree_codegen.extract_strided_metadata to
+// memref.extract_strided_metadata. This runs after HAL bindings have been
+// resolved.
+struct ConvertIREECodegenExtractMetadataToMemRef
     : public OpRewritePattern<IREE::Codegen::ExtractStridedMetadataOp> {
   using OpRewritePattern<
       IREE::Codegen::ExtractStridedMetadataOp>::OpRewritePattern;
@@ -271,9 +309,15 @@ void populateIREEResolveExtractStridedMetadataPatterns(
     memref::populateResolveExtractStridedMetadataPatterns(patterns);
   }
   amdgpu::populateAmdgpuResolveStridedMetadataPatterns(patterns);
+  // Convert memref extract ops to iree_codegen version to preserve SSA links.
+  patterns.insert<ConvertMemRefExtractMetadataToIREECodegen>(
+      patterns.getContext());
+  // Resolve iree_codegen extract ops from HAL bindings to concrete values.
   patterns.insert<ResolveExtractMetadataFromHalInterfaceBindingSubspan>(
       patterns.getContext());
-  patterns.insert<ConvertCodegenIREEExtractMetadataToMemRef>(
+  // Convert remaining iree_codegen extract ops to memref for upstream
+  // resolution.
+  patterns.insert<ConvertIREECodegenExtractMetadataToMemRef>(
       patterns.getContext());
 }
 
@@ -289,7 +333,8 @@ void IREEExpandStridedMetadataPass::runOnOperation() {
   if (!allowUnresolved) {
     SmallVector<Operation *> remaining;
     getOperation()->walk([&](Operation *op) {
-      if (isa<memref::ExtractStridedMetadataOp>(op)) {
+      if (isa<memref::ExtractStridedMetadataOp,
+              IREE::Codegen::ExtractStridedMetadataOp>(op)) {
         remaining.push_back(op);
       }
     });

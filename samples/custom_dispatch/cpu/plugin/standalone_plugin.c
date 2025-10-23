@@ -67,7 +67,7 @@ static int simple_mul_workgroup(void* params_ptr, void* context,
     // where to read the data from for this invocation of the function.
     params->binding2[params->binding2_offset + i] =
         params->binding0[params->binding0_offset + i] *
-        params->binding1[params->binding2_offset + i];
+        params->binding1[params->binding1_offset + i];
   }
   return 0;
 }

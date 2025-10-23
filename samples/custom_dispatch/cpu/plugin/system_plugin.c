@@ -87,7 +87,7 @@ static int simple_mul_workgroup(void* params_ptr, void* context,
   for (size_t i = 0; i < params->size; ++i) {
     params->binding2[params->binding2_offset + i] =
         params->binding0[params->binding0_offset + i] *
-        params->binding1[params->binding2_offset + i];
+        params->binding1[params->binding1_offset + i];
     fprintf(plugin->file, "mul[%zu:%zu](%g * %g = %g)\n", params->tid, i,
             params->binding0[params->binding0_offset + i],
             params->binding1[params->binding1_offset + i],
