@@ -9,6 +9,7 @@
 
 include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtBase.td"
 include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.td"
+include "iree/compiler/Utils/CommonTypeConstraints.td"
 include "mlir/Dialect/Linalg/IR/LinalgInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
@@ -146,8 +147,8 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
       https://www.tensorflow.org/api_docs/python/tf/tensor_scatter_nd_update
   }];
   let arguments = (ins
-      Variadic<AnyRankedTensorOrMemRefType>:$inputs,
-      Variadic<AnyRankedTensorOrMemRefType>:$outputs,
+      Variadic<AnyRankedTensorOrMemRef>:$inputs,
+      Variadic<AnyRankedTensorOrMemRef>:$outputs,
       DenseI64ArrayAttr:$dimension_map,
       DefaultValuedAttr<BoolAttr, "true">:$unique_indices
   );
@@ -252,8 +253,8 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
     semantics.
   }];
   let arguments = (ins
-      Variadic<AnyRankedTensorOrMemRefType>:$inputs,
-      Variadic<AnyRankedTensorOrMemRefType>:$outputs,
+      Variadic<AnyRankedTensorOrMemRef>:$inputs,
+      Variadic<AnyRankedTensorOrMemRef>:$outputs,
       DenseI64ArrayAttr:$dimension_map
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
@@ -348,7 +349,7 @@ def IREELinalgExt_MapScatterOp : IREELinalgExt_PureOp<"map_scatter",
   }];
   let arguments = (ins
       AnyShaped:$input,
-      AnyRankedTensorOrMemRefType:$output
+      AnyRankedTensorOrMemRef:$output
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region AnyRegion:$transformation_region);

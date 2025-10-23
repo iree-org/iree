@@ -9,6 +9,7 @@
 
 include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.td"
 include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.td"
+include "iree/compiler/Utils/CommonTypeConstraints.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
@@ -62,7 +63,7 @@ def IREECodegen_UKernelGenericOp :
   let arguments = (ins
     StrAttr:$u_kernel_fn_name,
     Variadic<AnyType>:$inputs,
-    Variadic<AnyRankedTensorOrMemRefType>:$outputs,
+    Variadic<AnyRankedTensorOrMemRef>:$outputs,
     Variadic<AnyType>:$other_operands,
     OptionalAttr<DictionaryAttr>:$fn_def_attrs,
     OptionalAttr<IndexListArrayAttr>:$strided_dims);

@@ -10,6 +10,7 @@
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.td"
+include "iree/compiler/Utils/CommonTypeConstraints.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
 include "mlir/Interfaces/ParallelCombiningOpInterface.td"
@@ -17,8 +18,6 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
 
-// Type constraint for operations that support both tensor and memref types
-def AnyRankedTensorOrMemRef : AnyTypeOf<[AnyRankedTensor, AnyMemRef]>;
 
 //===----------------------------------------------------------------------===//
 // BarrierRegionOp
