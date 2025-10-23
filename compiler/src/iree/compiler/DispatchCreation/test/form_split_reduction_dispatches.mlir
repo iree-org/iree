@@ -163,6 +163,7 @@ util.func public @fuse_pad_with_conv(%arg0 : tensor<16x225x225x16xbf16>, %arg1 :
 // FUSE-PAD-LABEL:  @fuse_pad_with_conv(
 //       FUSE-PAD:    %[[DISPATCH:.+]] = flow.dispatch.region
 //       FUSE-PAD:      scf.forall
+//   FUSE-PAD-NOT:        scf.if
 //       FUSE-PAD:        tensor.pad
 //       FUSE-PAD:        linalg.generic
 //       FUSE-PAD:    linalg.reduce

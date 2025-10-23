@@ -99,6 +99,16 @@ tileOpAndWrapInDispatch(RewriterBase &rewriter, TilingInterface op,
   tileAndFuseOptions.setFusionControlFn(fusionControlFn);
   tileAndFuseOptions.setTilingOptions(std::move(options));
 
+  if (fusePad) {
+    MLIRContext *context = rewriter.getContext();
+    RewritePatternSet cleanupPatterns(context);
+    cleanupPatterns.insert<linalg::ExtractSliceOfPadTensorSwapPattern>(
+        context,
+        [](tensor::ExtractSliceOp) { return /*zeroSliceGuard=*/false; });
+    tileAndFuseOptions.cleanupPatterns =
+        FrozenRewritePatternSet(std::move(cleanupPatterns));
+  }
+
   FailureOr<scf::SCFTileAndFuseResult> result =
       scf::tileConsumerAndFuseProducersUsingSCF(rewriter, op,
                                                 tileAndFuseOptions);
