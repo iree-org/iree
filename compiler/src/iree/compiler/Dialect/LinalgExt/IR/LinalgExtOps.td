@@ -21,10 +21,6 @@ include "mlir/Interfaces/ViewLikeInterface.td"
 // Base class.
 //===----------------------------------------------------------------------===//
 
-class IREELinalgExt_PureOp<string mnemonic, list<Trait> traits = []> :
-    Op<IREELinalgExt_Dialect, mnemonic, traits> {
-}
-
 class IREELinalgExt_Op<string mnemonic, list<Trait> traits = []> :
     IREELinalgExt_PureOp<mnemonic, !listconcat(traits,
         [AttrSizedOperandSegments,
@@ -36,50 +32,6 @@ class IREELinalgExt_Op<string mnemonic, list<Trait> traits = []> :
   let hasCustomAssemblyFormat = 1;
   code extraLinalgExtOpClassDeclaration = "";
 }
-
-//===----------------------------------------------------------------------===//
-// Utility ops
-//===----------------------------------------------------------------------===//
-
-def OpGroupUtilityOps : OpDocGroup {
-  let summary = "Utility ops";
-  let description = "";
-}
-
-let opDocGroup = OpGroupUtilityOps in {
-
-def IREELinalgExt_IndexOp : IREELinalgExt_PureOp<"index", [Pure]>,
-    Arguments<(ins ConfinedAttr<I64Attr, [IntMinValue<0>]>:$dim)>,
-    Results<(outs Index:$result)> {
-  let summary = [{LinalgExt index operation.}];
-  let description = [{
-    This operation is a mirror of `linalg.index` operation and has the same
-    semantics, except that `linalg.index` enforces that the parent op is a
-    `LinalgOp`, and the `iree_linalg_ext.index` operation enforces that the
-    parent op is a `IREE::LinalgExt::CustomOp`.
-  }];
-
-  let assemblyFormat = [{ $dim attr-dict `:` type($result) }];
-  let hasVerifier = 1;
-}
-
-def IREELinalgExt_YieldOp : IREELinalgExt_PureOp<"yield", [Pure, ReturnLike, Terminator]> {
-  let summary = [{LinalgExt yield op.}];
-  let description = [{
-    `iree_linalg_ext.yield` is a special terminator operation for blocks inside
-    regions in `iree_linalg_ext` ops.
-  }];
-
-  let arguments = (ins Variadic<AnyType>:$operands);
-
-  let builders = [
-    OpBuilder<(ins), [{ /* nothing to do */ }]>,
-  ];
-
-  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
-}
-
-} // OpGroupUtilityOps
 
 //===----------------------------------------------------------------------===//
 // Non-structured ops
