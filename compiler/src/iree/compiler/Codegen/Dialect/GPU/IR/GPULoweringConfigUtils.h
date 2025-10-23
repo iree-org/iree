@@ -31,6 +31,16 @@ struct Basis {
   SmallVector<int64_t> mapping;
 };
 
+// Dimension Expansion consists of a list of ReassociationIndices that will be
+// expanded by a factor of its corresponding thread level tiling sizes. For
+// example, given a DimensionExpansion of [[0], [1], [2, 3, 4]], the iteration
+// space corresponding to the first and second indices remain unchanged. The
+// iteration space of the second dimension is expanded into three. The factor of
+// expansion is based on the `thread` level tiling of the corresponding
+// dimension. The original dimension is split by the product of all sequences
+// that it is split into. For the above, if we have thread = [0, 0, 1, 4, 2],
+// the iteration space corresponding to d2 is split into d2/8, d3 = 4, d4 = 2
+// respectively.
 using DimensionExpansion = SmallVector<ReassociationIndices>;
 FailureOr<DimensionExpansion>
 getDimensionExpansion(IREE::GPU::LoweringConfigAttr config);

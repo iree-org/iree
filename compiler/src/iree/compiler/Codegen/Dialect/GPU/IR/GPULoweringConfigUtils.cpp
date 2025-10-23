@@ -35,7 +35,7 @@ void setMmaKind(MLIRContext *context, SmallVectorImpl<NamedAttribute> &attrs,
 const StringLiteral kExpandDimsName = "expand_dims";
 
 static std::optional<ReassociationIndices>
-getReassociationIndices(ArrayAttr array) {
+getReassociationIndicesForDimExpansion(ArrayAttr array) {
   if (!array || !llvm::all_of(array, llvm::IsaPred<IntegerAttr>)) {
     return std::nullopt;
   }
@@ -54,7 +54,8 @@ getDimensionExpansion(IREE::GPU::LoweringConfigAttr config) {
   SmallVector<std::optional<ReassociationIndices>> maybeDimExpandInfo =
       llvm::to_vector(
           llvm::map_range(expandDimsAttr, [](const Attribute &attr) {
-            return getReassociationIndices(cast<ArrayAttr>(attr));
+            return getReassociationIndicesForDimExpansion(
+                cast<ArrayAttr>(attr));
           }));
 
   if (llvm::any_of(maybeDimExpandInfo,

@@ -37,11 +37,8 @@ struct GPUExpandDimensionsPass final
 // Map from tensor dimension index to thread level tile size.
 using DimensionExpansionInfo = llvm::SmallDenseMap<unsigned, int64_t>;
 
-/// Parse expand_dims config and thread level tiling to compute expansion
-/// information.
 static DimensionExpansionInfo
 getExpansionInfo(IREE::GPU::LoweringConfigAttr config) {
-  // Get expand_dims structure
   IREE::GPU::DimensionExpansion expansionFactors =
       IREE::GPU::getDimensionExpansion(config).value();
   SmallVector<int64_t> threadSizes = config.getStaticTilingLevelSizes(
@@ -101,7 +98,7 @@ static LogicalResult expandIterationSpace(RewriterBase &rewriter,
     if (!isa<RankedTensorType>(operand.get().getType()))
       continue;
 
-    // Translate iteration space expansion to tensor space expansion
+    // Translate iteration space index to tensor dimension index.
     AffineMap indexingMap = indexingMaps[operand.getOperandNumber()];
     DimensionExpansionInfo tensorExpansionInfo;
 
