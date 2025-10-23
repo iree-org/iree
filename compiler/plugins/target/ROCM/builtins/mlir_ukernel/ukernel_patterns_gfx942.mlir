@@ -314,10 +314,8 @@ pdl.pattern @annotate_matmul_like_f16_medium_expanded : benefit(1) {
   // M, N >= 1024, K >= 256
   %c1024 = pdl.attribute = 1024
 
-  // TODO: Kernel specialization is needed to apply this strategy selectively at
-  // runtime. Additionally model exports don't specify lower bounds so it is
-  // impossible to use this strategy with this check.
-  // pdl.apply_native_constraint "dimIsBound"(%lhs, %c0, %c4, %empty : !pdl.value, !pdl.attribute, !pdl.attribute, !pdl.attribute)
+  // From experimental results, see #22393, we should start using this ukernel if B * M >= 1024.
+  pdl.apply_native_constraint "dimsMultipliedIsBound"(%lhs, %c0, %c1, %c1024, %empty : !pdl.value, !pdl.attribute, !pdl.attribute, !pdl.attribute, !pdl.attribute)
 
   pdl.apply_native_constraint "dimIsBound"(%rhs, %c0, %c1024, %empty : !pdl.value, !pdl.attribute, !pdl.attribute, !pdl.attribute)
   pdl.apply_native_constraint "dimIsBound"(%lhs, %c2, %c256, %empty : !pdl.value, !pdl.attribute, !pdl.attribute, !pdl.attribute)

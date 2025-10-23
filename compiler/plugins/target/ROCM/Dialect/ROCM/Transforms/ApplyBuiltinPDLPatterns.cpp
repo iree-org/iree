@@ -45,7 +45,7 @@ namespace mlir::iree_compiler::IREE::ROCM {
 
 static const char kBuiltinName[] = "rocm.builtin_name";
 
-static LogicalResult hasAttr(PatternRewriter &rewriter, Operation *rootOp,
+static LogicalResult hasAttr(RewriterBase &rewriter, Operation *rootOp,
                              Attribute attrName) {
   auto strName = dyn_cast<StringAttr>(attrName);
   if (!strName) {
@@ -55,7 +55,7 @@ static LogicalResult hasAttr(PatternRewriter &rewriter, Operation *rootOp,
   return rootOp->hasAttr(strName.strref()) ? success() : failure();
 }
 
-static LogicalResult annotateOperation(PatternRewriter &rewriter,
+static LogicalResult annotateOperation(RewriterBase &rewriter,
                                        Operation *rootOp, Attribute attrName,
                                        Attribute annotation) {
   auto strName = dyn_cast<StringAttr>(attrName);
@@ -70,8 +70,8 @@ static LogicalResult annotateOperation(PatternRewriter &rewriter,
 
 /// Helper to match contraction-like linalg ops with specific element types and
 /// indexing maps.
-static LogicalResult matchContraction(PatternRewriter &rewriter,
-                                      Operation *rootOp, Attribute elementTypes,
+static LogicalResult matchContraction(RewriterBase &rewriter, Operation *rootOp,
+                                      Attribute elementTypes,
                                       Attribute indexingMaps) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
   if (!linalgOp || !linalg::isaContractionOpInterface(linalgOp)) {
@@ -94,7 +94,7 @@ static LogicalResult matchContraction(PatternRewriter &rewriter,
 
 /// Helper to check whether the given value is cast-compatible with the given
 /// type.
-static LogicalResult matchCastCompatibleType(PatternRewriter &rewriter,
+static LogicalResult matchCastCompatibleType(RewriterBase &rewriter,
                                              Value value, Type type) {
   if (auto targetTensorType = dyn_cast<RankedTensorType>(type)) {
     if (!isCastableToTensorType(value.getType(), targetTensorType)) {
@@ -110,9 +110,9 @@ static LogicalResult matchCastCompatibleType(PatternRewriter &rewriter,
 
 /// PDL utility that checks whether the size of the dimension of the provided
 /// value is a multiple of the divisor.
-static LogicalResult dimIsMultipleOf(PatternRewriter &rewriter, Value value,
+static LogicalResult dimIsMultipleOf(RewriterBase &rewriter, Value value,
                                      Attribute dim, Attribute divisor) {
-  auto shapedType = dyn_cast<mlir::ShapedType>(value.getType());
+  auto shapedType = dyn_cast<ShapedType>(value.getType());
   if (!shapedType) {
     return failure();
   }
@@ -150,10 +150,10 @@ static LogicalResult dimIsMultipleOf(PatternRewriter &rewriter, Value value,
 
 /// PDL utility that checks whether the size of the dimension of the provided
 /// value is within the specified range.
-static LogicalResult dimIsBound(PatternRewriter &rewriter, Value value,
+static LogicalResult dimIsBound(RewriterBase &rewriter, Value value,
                                 Attribute dim, Attribute lowerBound,
                                 Attribute upperBound) {
-  auto shapedType = dyn_cast<mlir::ShapedType>(value.getType());
+  auto shapedType = dyn_cast<ShapedType>(value.getType());
   if (!shapedType) {
     return failure();
   }
@@ -191,6 +191,62 @@ static LogicalResult dimIsBound(PatternRewriter &rewriter, Value value,
   return success();
 }
 
+/// PDL utility that checks if the product of two tensor dimensions
+/// falls within specified bounds.
+static LogicalResult dimsMultipliedIsBound(RewriterBase &rewriter, Value value,
+                                           Attribute dimA, Attribute dimB,
+                                           Attribute lowerBound,
+                                           Attribute upperBound) {
+  auto shapedType = dyn_cast<ShapedType>(value.getType());
+  if (!shapedType) {
+    return failure();
+  }
+  auto dimAInt = dyn_cast<IntegerAttr>(dimA);
+  auto dimBInt = dyn_cast<IntegerAttr>(dimB);
+  if (!dimAInt || !dimBInt) {
+    return failure();
+  }
+  if (dimAInt.getInt() >= shapedType.getRank()) {
+    return failure();
+  }
+  if (dimBInt.getInt() >= shapedType.getRank()) {
+    return failure();
+  }
+  if (auto lowerBoundInt = dyn_cast<IntegerAttr>(lowerBound)) {
+    FailureOr<int64_t> constantLbA =
+        ValueBoundsConstraintSet::computeConstantBound(
+            presburger::BoundType::LB, {value, /*dim=*/dimAInt.getInt()},
+            /*stopCondition=*/nullptr, /*closedLB=*/true);
+    FailureOr<int64_t> constantLbB =
+        ValueBoundsConstraintSet::computeConstantBound(
+            presburger::BoundType::LB, {value, /*dim=*/dimBInt.getInt()},
+            /*stopCondition=*/nullptr, /*closedLB=*/true);
+    if (failed(constantLbA) || failed(constantLbB)) {
+      return failure();
+    }
+    if (lowerBoundInt.getInt() > (constantLbA.value() * constantLbB.value())) {
+      return failure();
+    }
+  }
+  if (auto upperBoundInt = dyn_cast<IntegerAttr>(upperBound)) {
+    FailureOr<int64_t> constantUbA =
+        ValueBoundsConstraintSet::computeConstantBound(
+            presburger::BoundType::UB, {value, /*dim=*/dimAInt.getInt()},
+            /*stopCondition=*/nullptr, /*closedUB=*/true);
+    FailureOr<int64_t> constantUbB =
+        ValueBoundsConstraintSet::computeConstantBound(
+            presburger::BoundType::UB, {value, /*dim=*/dimBInt.getInt()},
+            /*stopCondition=*/nullptr, /*closedUB=*/true);
+    if (failed(constantUbA) || failed(constantUbB)) {
+      return failure();
+    }
+    if (upperBoundInt.getInt() < (constantUbA.value() * constantUbB.value())) {
+      return failure();
+    }
+  }
+  return success();
+}
+
 // Populate patterns from builtin.
 static LogicalResult
 populatePDLModuleFromBuiltin(MLIRContext *context, RewritePatternSet &patterns,
@@ -212,6 +268,8 @@ populatePDLModuleFromBuiltin(MLIRContext *context, RewritePatternSet &patterns,
   pdlModule.registerConstraintFunction("hasAttr", hasAttr);
   pdlModule.registerConstraintFunction("dimIsBound", dimIsBound);
   pdlModule.registerConstraintFunction("dimIsMultipleOf", dimIsMultipleOf);
+  pdlModule.registerConstraintFunction("dimsMultipliedIsBound",
+                                       dimsMultipliedIsBound);
   pdlModule.registerConstraintFunction("matchCastCompatibleType",
                                        matchCastCompatibleType);
   pdlModule.registerConstraintFunction("matchContraction", matchContraction);

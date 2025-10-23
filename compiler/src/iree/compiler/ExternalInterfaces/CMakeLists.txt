@@ -38,6 +38,7 @@ iree_cc_library(
     MLIRLinalgOpsIncGenLib
     MLIRLinalgStructuredOpsIncGenLib
     MLIRMLProgramDialect
+    MLIRMemRefDialect
     MLIRTensorDialect
     MLIRValueBoundsOpInterface
     iree::compiler::Dialect::Encoding::IR
