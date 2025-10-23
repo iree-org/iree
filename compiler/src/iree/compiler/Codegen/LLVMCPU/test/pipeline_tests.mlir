@@ -469,14 +469,8 @@ module {
     return
   }
 }
-// TODO(#21696): Respect the tile sizes for packed domain when we set the
-// lowering configs. The `alloca` op is generated because it performs additional
-// tiling on the generic op that targets vector sizes config. The `alloca` op is
-// not needed if we don't tile it at all, which means that it can be solved by
-// not setting the tile size for the packed dimensions.
-
 // CHECK-LABEL: func.func @mmt4d_bias_relu
-// CHECK:         memref.alloca() {alignment = 64 : i64} : memref<1x1x2x16xf32
+// CHECK-NOT:     memref.alloc
 // CHECK:         scf.forall
 // CHECK:           scf.for
 // CHECK:             vector.fma

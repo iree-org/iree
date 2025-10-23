@@ -341,15 +341,21 @@ public:
       if (ukernelSymbols.contains(ukernelDesc.getUkernelName())) {
         return WalkResult::advance();
       }
+      std::string builtinNameStr = builtinName.str();
       std::optional<StringRef> maybeBuiltin =
-          rocmDialect->getBuiltin(builtinName.str());
+          rocmDialect->getBuiltin(builtinNameStr);
       if (!maybeBuiltin) {
         moduleOp.emitOpError()
-            << "could not find builtin with name " << builtinName.str();
+            << "could not find builtin module with name " << builtinNameStr;
         return WalkResult::interrupt();
       }
-      OwningOpRef<ModuleOp> builtinModule =
-          parseSourceString<ModuleOp>(*maybeBuiltin, ctx);
+      OwningOpRef<ModuleOp> builtinModule = parseSourceString<ModuleOp>(
+          *maybeBuiltin, ctx, /*sourceName=*/builtinNameStr);
+      if (!builtinModule) {
+        moduleOp.emitOpError()
+            << "failed to parse builtin module with name " << builtinNameStr;
+        return WalkResult::interrupt();
+      }
       Operation *symbolTableOp =
           SymbolTable::getNearestSymbolTable(builtinModule.get());
       SymbolTable symbolTable(symbolTableOp);

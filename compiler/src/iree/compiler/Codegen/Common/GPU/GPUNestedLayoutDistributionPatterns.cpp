@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Utils/Indexing.h"
 #include "iree/compiler/Utils/Permutation.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
@@ -435,6 +436,60 @@ struct DistributeTransferWrite final
     }
   }
 
+  /// Compute a boolean in SIMT semantics that is true for the first virtual
+  /// lane(thread) id (vtid) and virtual subgroup id (vsid) carrying broadcasted
+  /// data.
+  ///
+  /// We do this by computing a basis for vtid and vsid computation, and adding
+  /// a check for basis elements that are not used (i.e. they are duplicated)
+  /// to be zero.
+  FailureOr<Value> getNoOverlapCondition(OpBuilder &b, Location loc,
+                                         NestedLayoutAttr layout) const {
+    ArrayRef<int64_t> threadTile = layout.getThreadTile();
+    ArrayRef<int64_t> threadStrides = layout.getThreadStrides();
+    ArrayRef<int64_t> subgroupTile = layout.getSubgroupTile();
+    // Multiply the subgroup strides by subgroup_size to reflect thread id
+    // relative strides.
+    auto subgroupStrides =
+        llvm::map_to_vector(layout.getSubgroupStrides(),
+                            [&](int64_t x) { return x * subgroupSize; });
+    auto concatTiles =
+        llvm::to_vector(llvm::concat<const int64_t>(subgroupTile, threadTile));
+    auto concatStrides = llvm::to_vector(
+        llvm::concat<const int64_t>(subgroupStrides, threadStrides));
+    SmallVector<int64_t> basis;
+    SmallVector<size_t> dimToResult;
+    if (failed(basisFromSizesStrides(concatTiles, concatStrides, basis,
+                                     dimToResult))) {
+      return failure();
+    }
+    // Make the outer bound numThreadsInWorkgroup / prod(basis) to remove
+    // redundant checks.
+    if (numThreadsInWorkgroup.has_value()) {
+      int64_t outerBound =
+          numThreadsInWorkgroup.value() / llvm::product_of(basis);
+      basis.insert(basis.begin(), outerBound);
+    }
+    // Create a delinearize operation and check that all results not present in
+    // dimToResult are 0.
+    SmallVector<Value> delinearized;
+    b.createOrFold<affine::AffineDelinearizeIndexOp>(
+        delinearized, loc, threadId, basis,
+        /*hasOuterbound=*/numThreadsInWorkgroup.has_value());
+    // Get all results which are not in dimToResult and check they are 0.
+    Value condition = arith::ConstantOp::create(b, loc, b.getBoolAttr(true));
+    for (auto [idx, result] : llvm::enumerate(delinearized)) {
+      if (llvm::is_contained(dimToResult, idx)) {
+        continue;
+      }
+      Value isZero = b.createOrFold<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::eq, result,
+          arith::ConstantIndexOp::create(b, loc, 0));
+      condition = b.createOrFold<arith::AndIOp>(loc, condition, isZero);
+    }
+    return condition;
+  }
+
   LogicalResult matchAndRewrite(vector::TransferWriteOp writeOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
@@ -475,55 +530,14 @@ struct DistributeTransferWrite final
 
     // If the distribution results in threads writing to the same address, guard
     // with an scf.if to ensure only one thread writes per duplication group.
-
-    // Delinearize the thread id into
-    //   ('workgroup_overlap', *subgroup_tile, 'lane_overlap', *thread_tile)
-    SmallVector<int64_t> basis(2 * rank + 1);
-    ArrayRef<int64_t> subgroupTile = vectorLayout.getSubgroupTile();
-    ArrayRef<int64_t> threadTile = vectorLayout.getThreadTile();
-    int64_t threadTileSize = llvm::product_of(threadTile);
-    int64_t laneOverlap = std::max(int64_t(1), subgroupSize / threadTileSize);
-    basis[rank] = laneOverlap;
-    for (int i = 0; i < rank; ++i) {
-      basis[i] = subgroupTile[i];
-      basis[rank + 1 + i] = threadTile[i];
-    }
-
     Location loc = writeOp.getLoc();
-    auto delinearizedOp = affine::AffineDelinearizeIndexOp::create(
-        rewriter, loc, threadId, basis, /* has outer-bound */ false);
-    ResultRange delinearized = delinearizedOp.getResults();
-    assert(delinearized.size() == 2 * rank + 2 &&
-           "but has outer-bound is false");
-
-    OpResult subgroupGroupId = delinearized[0];
-    OpResult threadGroupId = delinearized[rank + 1];
-    Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
-
-    Value doWrite =
-        arith::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(true));
-
-    // Is it maybe possible that threads with the same lane ID but different
-    // subgroup IDs write to the same address? If so, guard on the subgroup.
-    int64_t basisSize = llvm::product_of(basis);
-    bool mightBeInterSubgroupOverlap = !numThreadsInWorkgroup.has_value() ||
-                                       (basisSize < *numThreadsInWorkgroup);
-    if (mightBeInterSubgroupOverlap) {
-      Value subgroupIsZero = arith::CmpIOp::create(
-          rewriter, loc, arith::CmpIPredicate::eq, subgroupGroupId, zero);
-      doWrite = arith::AndIOp::create(rewriter, loc, doWrite, subgroupIsZero);
+    FailureOr<Value> doWrite =
+        getNoOverlapCondition(rewriter, loc, vectorLayout);
+    if (failed(doWrite)) {
+      return rewriter.notifyMatchFailure(
+          writeOp, "failed to compute no-overlap condition");
     }
-
-    // Do threads within the same subgroup write to the same address? If so,
-    // guard on the lane.
-    bool isIntraSubgroupOverlap = (laneOverlap > 1);
-    if (isIntraSubgroupOverlap) {
-      Value threadIsZero = arith::CmpIOp::create(
-          rewriter, loc, arith::CmpIPredicate::eq, threadGroupId, zero);
-      doWrite = arith::AndIOp::create(rewriter, loc, doWrite, threadIsZero);
-    }
-
-    auto ifOp = scf::IfOp::create(rewriter, loc, doWrite);
+    auto ifOp = scf::IfOp::create(rewriter, loc, doWrite.value());
     rewriter.setInsertionPoint(ifOp.thenYield());
 
     Value distributedVector =

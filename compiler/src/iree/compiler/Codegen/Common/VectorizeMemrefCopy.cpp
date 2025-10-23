@@ -5,9 +5,11 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -60,6 +62,11 @@ struct TileLinalgCopy final : OpRewritePattern<memref::CopyOp> {
     for (Operation *tiledOp : tilingResult->tiledOps) {
       tiledOp->setAttr(kIsTiled, mlir::UnitAttr::get(copyOp.getContext()));
     }
+    // Put an marker on the loop ops, so they can be targeted for
+    // simplification.
+    for (LoopLikeOpInterface loop : llvm::reverse(tilingResult->loops)) {
+      loop->setAttr(kIsTiled, mlir::UnitAttr::get(loop.getContext()));
+    }
     if (tilingInterfaceOp->use_empty()) {
       rewriter.eraseOp(tilingInterfaceOp);
     }
@@ -104,12 +111,18 @@ struct VectorizeMemrefCopyPass final
     patterns.add<TileLinalgCopy>(&getContext());
     patterns.add<linalg::CopyVectorizationPattern>(&getContext());
     patterns.add<ConvertLinalgCopyToMemrefCopy>(&getContext());
+    // Try to remove generated single iteration loops and canonicalize generated
+    // subview operations.
+    populateRemoveSingleIterationLoopPattern(
+        patterns,
+        [&](scf::ForOp forOp) -> bool { return forOp->hasAttr(kIsTiled); });
+    memref::SubViewOp::getCanonicalizationPatterns(patterns, ctx);
     (void)applyPatternsGreedily(funcOp, std::move(patterns));
 
     // Clean up the temporary isTiled markers.
-    funcOp->walk([](memref::CopyOp copyOp) {
-      if (copyOp->hasAttr(kIsTiled)) {
-        copyOp->removeAttr(kIsTiled);
+    funcOp->walk([](Operation *op) {
+      if (op->hasAttr(kIsTiled)) {
+        op->removeAttr(kIsTiled);
       }
     });
   }

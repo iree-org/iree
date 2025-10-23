@@ -35,8 +35,9 @@ util.func private @pingpong_large_f16(%lhs_base: !in_ty, %rhs_base: !in_ty, %unu
   %rhs_shared_base = memref.alloc() : !flat_shared
 
   %dim = tensor.dim %lhs_base, %c1 : !in_ty
-  %lhs = iree_gpu.buffer_resource_cast %lhs_base cacheSwizzleStride(%dim) : !in_ty
-  %rhs = iree_gpu.buffer_resource_cast %rhs_base cacheSwizzleStride(%dim) : !in_ty
+  %dim_bytes = arith.muli %dim, %c2 overflow<nsw, nuw>: index
+  %lhs = iree_gpu.buffer_resource_cast %lhs_base cacheSwizzleStride(%dim_bytes) : !in_ty
+  %rhs = iree_gpu.buffer_resource_cast %rhs_base cacheSwizzleStride(%dim_bytes) : !in_ty
 
   %lhs_shared_swizzle = iree_codegen.swizzle_hint %lhs_shared_base[#iree_codegen.rotate_rows<64, 4>] : !flat_shared
   %rhs_shared_swizzle = iree_codegen.swizzle_hint %rhs_shared_base[#iree_codegen.rotate_rows<64, 4>] : !flat_shared
@@ -256,8 +257,9 @@ util.func private @pingpong_medium_f16_expanded(%lhs_base: !mexp_in_ty, %rhs_bas
   %rhs_shared_base = memref.alloc() : !flat_shared
 
   %dim = tensor.dim %rhs_base, %c1 : !in_ty
-  %lhs = iree_gpu.buffer_resource_cast %lhs_base cacheSwizzleStride(%dim) : !mexp_in_ty
-  %rhs = iree_gpu.buffer_resource_cast %rhs_base cacheSwizzleStride(%dim) : !in_ty
+  %dim_bytes = arith.muli %dim, %c2 overflow<nsw, nuw>: index
+  %lhs = iree_gpu.buffer_resource_cast %lhs_base cacheSwizzleStride(%dim_bytes) : !mexp_in_ty
+  %rhs = iree_gpu.buffer_resource_cast %rhs_base cacheSwizzleStride(%dim_bytes) : !in_ty
 
   %lhs_shared_swizzle = iree_codegen.swizzle_hint %lhs_shared_base[#iree_codegen.rotate_rows<64, 4>] : !mflat_shared
   %rhs_shared_swizzle = iree_codegen.swizzle_hint %rhs_shared_base[#iree_codegen.rotate_rows<64, 4>] : !flat_shared
@@ -443,8 +445,9 @@ util.func private @pingpong_large_f16_expanded(%lhs_base: !exp_in_ty, %rhs_base:
   %rhs_shared_base = memref.alloc() : !flat_shared
 
   %dim = tensor.dim %rhs_base, %c1 : !in_ty
-  %lhs = iree_gpu.buffer_resource_cast %lhs_base cacheSwizzleStride(%dim) : !exp_in_ty
-  %rhs = iree_gpu.buffer_resource_cast %rhs_base cacheSwizzleStride(%dim) : !in_ty
+  %dim_bytes = arith.muli %dim, %c2 overflow<nsw, nuw>: index
+  %lhs = iree_gpu.buffer_resource_cast %lhs_base cacheSwizzleStride(%dim_bytes) : !exp_in_ty
+  %rhs = iree_gpu.buffer_resource_cast %rhs_base cacheSwizzleStride(%dim_bytes) : !in_ty
 
   %lhs_shared_swizzle = iree_codegen.swizzle_hint %lhs_shared_base[#iree_codegen.rotate_rows<64, 4>] : !flat_shared
   %rhs_shared_swizzle = iree_codegen.swizzle_hint %rhs_shared_base[#iree_codegen.rotate_rows<64, 4>] : !flat_shared

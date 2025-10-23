@@ -1,7 +1,7 @@
 //  RUN: iree-opt %s
 
 !acc_base_ty = tensor<1x1x2x4x8x4x4x16x4xf32>
-!lhs_base_ty = tensor<1x?x2x8x4x4x4x8xf8E4M3FNUZ>
+!lhs_base_ty = tensor<1x?x2x8x4x16x8xf8E4M3FNUZ>
 !lhs_expand_ty = tensor<1x?x4x2x8x4x4x2x2x8xf8E4M3FNUZ>
 !rhs_base_ty = tensor<1x?x4x4x4x16x8xf8E4M3FNUZ>
 !rhs_expand_ty = tensor<1x?x4x4x4x4x8x2x8xf8E4M3FNUZ>
@@ -9,7 +9,7 @@
 !shared_ty = memref<4x16x64x8xf8E4M3FNUZ, #gpu.address_space<workgroup>>
 
 !m_acc_base_ty = tensor<1x1x8x8x2x4x16x4xf32>
-!m_lhs_base_ty = tensor<1x?x8x4x4x4x2x8xf8E4M3FNUZ>
+!m_lhs_base_ty = tensor<1x?x8x4x16x2x8xf8E4M3FNUZ>
 !m_lhs_expand_ty = tensor<1x?x2x8x4x4x4x2x8xf8E4M3FNUZ>
 !m_rhs_base_ty = tensor<1x?x8x2x4x16x2x8xf8E4M3FNUZ>
 !m_rhs_expand_ty = tensor<1x?x2x8x2x4x16x2x8xf8E4M3FNUZ>
@@ -61,7 +61,7 @@ util.func @pingpong_dt_large_f8E4M3FNUZ(%lhs_base: !lhs_base_ty, %rhs_base: !rhs
   %dim = tensor.dim %rhs_base, %c1 : !rhs_base_ty
   %nDim = arith.divui %dim, %c4 : index
 
-  %lhs_expand = tensor.expand_shape %lhs_base [[0], [1, 2], [3], [4], [5], [6], [7, 8], [9]] output_shape [1, %nDim, 4, 2, 8, 4, 4, 2, 2, 8] : !lhs_base_ty into !lhs_expand_ty
+  %lhs_expand = tensor.expand_shape %lhs_base [[0], [1, 2], [3], [4], [5], [6, 7, 8], [9]] output_shape [1, %nDim, 4, 2, 8, 4, 4, 2, 2, 8] : !lhs_base_ty into !lhs_expand_ty
   %rhs_expand = tensor.expand_shape %rhs_base [[0], [1, 2], [3], [4], [5], [6, 7], [8]] output_shape [1, %nDim, 4, 4, 4, 4, 8, 2, 8] : !rhs_base_ty into !rhs_expand_ty
 
   %lhs = tensor.collapse_shape %lhs_expand [[0, 1], [2], [3, 4], [5, 6, 7], [8, 9]] : !lhs_expand_ty into !in_ty
@@ -319,7 +319,7 @@ util.func private @pingpong_dt_medium_f8E4M3FNUZ(%lhs_base: !m_lhs_base_ty, %rhs
   %dim = tensor.dim %rhs_base, %c1 : !m_rhs_base_ty
   %nDim = arith.divui %dim, %c2 : index
 
-  %lhs_expand = tensor.expand_shape %lhs_base [[0], [1, 2], [3], [4], [5], [6], [7], [8]] output_shape [1, %nDim, 2, 8, 4, 4, 4, 2, 8] : !m_lhs_base_ty into !m_lhs_expand_ty
+  %lhs_expand = tensor.expand_shape %lhs_base [[0], [1, 2], [3], [4], [5, 6], [7], [8]] output_shape [1, %nDim, 2, 8, 4, 4, 4, 2, 8] : !m_lhs_base_ty into !m_lhs_expand_ty
   %rhs_expand = tensor.expand_shape %rhs_base [[0], [1, 2], [3], [4], [5], [6], [7], [8]] output_shape [1, %nDim, 2, 8, 2, 4, 16, 2, 8] : !m_rhs_base_ty into !m_rhs_expand_ty
 
   %lhs = tensor.collapse_shape %lhs_expand [[0, 1], [2], [3], [4, 5, 6], [7, 8]] : !m_lhs_expand_ty into !m_lhs_ty

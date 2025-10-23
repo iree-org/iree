@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-promote-matmul-operands))" | FileCheck %s
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-promote-matmul-operands),canonicalize)" | FileCheck %s
 
 #lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1]}>
 
@@ -214,8 +214,88 @@ func.func @promote_with_cache_swizzle(%a: tensor<2x34x34x128xf32>, %b: tensor<2x
 // CHECK-LABEL: func.func @promote_with_cache_swizzle
 //  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: tensor<2x34x34x128xf32>
 //  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: tensor<2x8x256xf32>
-//   CHECK-DAG:   %[[SWIZZLE_A:.+]] = iree_gpu.buffer_resource_cast %[[A]] cacheSwizzleStride(%c128)
-//   CHECK-DAG:   %[[SWIZZLE_B:.+]] = iree_gpu.buffer_resource_cast %[[B]] cacheSwizzleStride(%c256)
+//   CHECK-DAG:   %[[SWIZZLE_A:.+]] = iree_gpu.buffer_resource_cast %[[A]] cacheSwizzleStride(%c512)
+//   CHECK-DAG:   %[[SWIZZLE_B:.+]] = iree_gpu.buffer_resource_cast %[[B]] cacheSwizzleStride(%c1024)
+//       CHECK:   %[[PA:.+]] = iree_linalg_ext.im2col
+//  CHECK-SAME:     lowering_config = #iree_gpu.derived_thread_config
+//  CHECK-SAME:     ins(%[[SWIZZLE_A]]
+//       CHECK:   %[[PB:.+]] = linalg.copy
+//  CHECK-SAME:     lowering_config = #iree_gpu.use_global_load_dma
+//  CHECK-SAME:     ins(%[[SWIZZLE_B]]
+//       CHECK:   linalg.batch_matmul {{.*}} ins(%[[PA]], %[[PB]]
+
+
+// -----
+
+#lowering_config = #iree_gpu.lowering_config<{
+  promote_operands = [0, 1],
+  promotion_types = [
+    #iree_gpu.promote_with_cache_swizzle<#iree_gpu.derived_thread_config>,
+    #iree_gpu.promote_with_cache_swizzle<#iree_gpu.use_global_load_dma>]}>
+
+func.func @promote_with_cache_swizzle_f4(%a: tensor<2x34x34x128xf4E2M1FN>, %b: tensor<2x8x256xf4E2M1FN>) -> tensor<2x128x256xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<2x128x256xf32>
+  %im2col_empty = tensor.empty() : tensor<2x128x8xf4E2M1FN>
+
+  %im2col = iree_linalg_ext.im2col
+    strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+    m_offset = [0] * [1] k_offset = [0] * [1]
+    batch_pos = [0] m_pos = [2, 3] k_pos = [1]
+    input_k_perm = [0, 1, 2]
+    ins(%a : tensor<2x34x34x128xf4E2M1FN>)
+    outs(%im2col_empty : tensor<2x128x8xf4E2M1FN>) -> tensor<2x128x8xf4E2M1FN>
+
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<2x128x256xf32>) -> tensor<2x128x256xf32>
+  %mm = linalg.batch_matmul {lowering_config = #lowering_config}
+    ins(%im2col, %b : tensor<2x128x8xf4E2M1FN>, tensor<2x8x256xf4E2M1FN>) outs(%fill : tensor<2x128x256xf32>) -> tensor<2x128x256xf32>
+  return %mm : tensor<2x128x256xf32>
+}
+
+// CHECK-LABEL: func.func @promote_with_cache_swizzle_f4
+//  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: tensor<2x34x34x128xf4E2M1FN>
+//  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: tensor<2x8x256xf4E2M1FN>
+//   CHECK-DAG:   %[[SWIZZLE_A:.+]] = iree_gpu.buffer_resource_cast %[[A]] cacheSwizzleStride(%c64)
+//   CHECK-DAG:   %[[SWIZZLE_B:.+]] = iree_gpu.buffer_resource_cast %[[B]] cacheSwizzleStride(%c128)
+//       CHECK:   %[[PA:.+]] = iree_linalg_ext.im2col
+//  CHECK-SAME:     lowering_config = #iree_gpu.derived_thread_config
+//  CHECK-SAME:     ins(%[[SWIZZLE_A]]
+//       CHECK:   %[[PB:.+]] = linalg.copy
+//  CHECK-SAME:     lowering_config = #iree_gpu.use_global_load_dma
+//  CHECK-SAME:     ins(%[[SWIZZLE_B]]
+//       CHECK:   linalg.batch_matmul {{.*}} ins(%[[PA]], %[[PB]]
+
+// -----
+#lowering_config = #iree_gpu.lowering_config<{
+  promote_operands = [0, 1],
+  promotion_types = [
+    #iree_gpu.promote_with_cache_swizzle<#iree_gpu.derived_thread_config>,
+    #iree_gpu.promote_with_cache_swizzle<#iree_gpu.use_global_load_dma>]}>
+
+func.func @promote_with_cache_swizzle_f4_no_stride(%a: tensor<2x34x34x129xf4E2M1FN>, %b: tensor<2x8x256xf4E2M1FN>) -> tensor<2x129x256xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<2x129x256xf32>
+  %im2col_empty = tensor.empty() : tensor<2x129x8xf4E2M1FN>
+
+  %im2col = iree_linalg_ext.im2col
+    strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+    m_offset = [0] * [1] k_offset = [0] * [1]
+    batch_pos = [0] m_pos = [2, 3] k_pos = [1]
+    input_k_perm = [0, 1, 2]
+    ins(%a : tensor<2x34x34x129xf4E2M1FN>)
+    outs(%im2col_empty : tensor<2x129x8xf4E2M1FN>) -> tensor<2x129x8xf4E2M1FN>
+
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<2x129x256xf32>) -> tensor<2x129x256xf32>
+  %mm = linalg.batch_matmul {lowering_config = #lowering_config}
+    ins(%im2col, %b : tensor<2x129x8xf4E2M1FN>, tensor<2x8x256xf4E2M1FN>) outs(%fill : tensor<2x129x256xf32>) -> tensor<2x129x256xf32>
+  return %mm : tensor<2x129x256xf32>
+}
+
+// CHECK-LABEL: func.func @promote_with_cache_swizzle_f4_no_stride
+//  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: tensor<2x34x34x129xf4E2M1FN>
+//  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: tensor<2x8x256xf4E2M1FN>
+//   CHECK-DAG:   %[[SWIZZLE_A:.+]] = iree_gpu.buffer_resource_cast %[[A]] cacheSwizzleStride(%c0)
+//   CHECK-DAG:   %[[SWIZZLE_B:.+]] = iree_gpu.buffer_resource_cast %[[B]] cacheSwizzleStride(%c128)
 //       CHECK:   %[[PA:.+]] = iree_linalg_ext.im2col
 //  CHECK-SAME:     lowering_config = #iree_gpu.derived_thread_config
 //  CHECK-SAME:     ins(%[[SWIZZLE_A]]

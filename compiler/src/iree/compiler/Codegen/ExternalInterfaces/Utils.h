@@ -182,6 +182,22 @@ DictionaryAttr getPackedLayoutImpl(Attribute attr, RankedTensorType type,
 void storeNamedAttrIfPresent(SmallVectorImpl<NamedAttribute> &config,
                              DictionaryAttr dictAttr, StringRef name);
 
+/// Returns a `linalg.fill` operation with provided operands, which are assumed
+/// to have types without encodings.
+Operation *lowerFillOpWithResolvedLayouts(OpBuilder &builder,
+                                          linalg::FillOp fillOp,
+                                          TypeRange convertedResTypes,
+                                          ValueRange convertedOperands);
+
+/// Converts a linalg::GenericOp with encoded inputs into the packed domain,
+/// with an optional swizzle expansion and permutation if applicable. The
+/// `genericOp` must have all parallel iterator types and a single output with
+/// an identity indexing map.
+Operation *lowerGenericOpWithResolvedLayouts(
+    OpBuilder &builder, linalg::GenericOp genericOp,
+    TypeRange convertedResTypes, ValueRange convertedOperands,
+    IREE::Encoding::LayoutMaterializerAttr layoutAttr);
+
 } // namespace mlir::iree_compiler::IREE
 
 #endif // IREE_COMPILER_CODEGEN_EXTERNALINTERFACES_UTILSS_H_

@@ -2,6 +2,7 @@
 
 ## Directory Structure
 
+```
 torch_models/
 ├── model1/
 │   ├── modules/
@@ -19,7 +20,7 @@ torch_models/
 │   ├── test1.json
 │   ├── test2.json
 │   └── ...
-
+```
 
 ## Markers
 

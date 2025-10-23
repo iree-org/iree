@@ -720,7 +720,7 @@ pdl.pattern @annotate_inner_tiled_f8E4M3FNUZ_medium : benefit(1) {
   %attr_name = pdl.attribute = "iree_codegen.ukernel"
   pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) {isNegated = true}
 
-  %lhs_cast_type = pdl.type : tensor<?x?x8x4x4x4x2x8xf8E4M3FNUZ>
+  %lhs_cast_type = pdl.type : tensor<?x?x8x4x16x2x8xf8E4M3FNUZ>
   pdl.apply_native_constraint "matchCastCompatibleType"(%lhs, %lhs_cast_type : !pdl.value, !pdl.type)
   %rhs_cast_type = pdl.type : tensor<?x?x8x2x4x16x2x8xf8E4M3FNUZ>
   pdl.apply_native_constraint "matchCastCompatibleType"(%rhs, %rhs_cast_type : !pdl.value, !pdl.type)
@@ -777,7 +777,7 @@ pdl.pattern @annotate_inner_tiled_f8E4M3FNUZ_large : benefit(2) {
   %attr_name = pdl.attribute = "iree_codegen.ukernel"
   pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) {isNegated = true}
 
-  %lhs_cast_type = pdl.type : tensor<?x?x2x8x4x4x4x8xf8E4M3FNUZ>
+  %lhs_cast_type = pdl.type : tensor<?x?x2x8x4x16x8xf8E4M3FNUZ>
   pdl.apply_native_constraint "matchCastCompatibleType"(%lhs, %lhs_cast_type : !pdl.value, !pdl.type)
   %rhs_cast_type = pdl.type : tensor<?x?x4x4x4x16x8xf8E4M3FNUZ>
   pdl.apply_native_constraint "matchCastCompatibleType"(%rhs, %rhs_cast_type : !pdl.value, !pdl.type)
@@ -834,7 +834,7 @@ pdl.pattern @annotate_inner_tiled_f16_large : benefit(1) {
   %attr_name = pdl.attribute = "iree_codegen.ukernel"
   pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) {isNegated = true}
 
-  %lhs_cast_type = pdl.type : tensor<?x?x2x8x4x4x4x4xf16>
+  %lhs_cast_type = pdl.type : tensor<?x?x2x8x4x16x4xf16>
   pdl.apply_native_constraint "matchCastCompatibleType"(%lhs, %lhs_cast_type : !pdl.value, !pdl.type)
   %rhs_cast_type = pdl.type : tensor<?x?x4x4x4x16x4xf16>
   pdl.apply_native_constraint "matchCastCompatibleType"(%rhs, %rhs_cast_type : !pdl.value, !pdl.type)

@@ -45,36 +45,12 @@
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-func.func @matmul_f16_f16_f32_large_lowering_ukernel_provider() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
-  %c0 = arith.constant 0 : index
-  // M, N, K are dynamic.
-  %M = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(0) : index
-  %N = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(1) : index
-  %K = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(2) : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(0) alignment(64) offset(%c0)
-      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf16, #encoding_lhs>>{%M, %K}
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(1) alignment(64) offset(%c0)
-      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf16, #encoding_rhs>>{%K, %N}
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(2) alignment(64) offset(%c0)
-      : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?xf32, #encoding_result>>{%M, %N}
-  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf16, #encoding_lhs>>{%M, %K}
-      -> tensor<?x?xf16, #encoding_lhs>
-  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf16, #encoding_rhs>>{%K, %N}
-      -> tensor<?x?xf16, #encoding_rhs>
-  %5 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?xf32, #encoding_result>>{%M, %N}
+func.func @matmul_f16_f16_f32_large_lowering_ukernel_provider(%arg0: tensor<?x?xf16, #encoding_lhs>, %arg1: tensor<?x?xf16, #encoding_rhs>, %arg2: tensor<?x?xf32, #encoding_result>) -> tensor<?x?xf32, #encoding_result> attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  %0 = linalg.matmul
+      ins(%arg0, %arg1 : tensor<?x?xf16, #encoding_lhs>, tensor<?x?xf16, #encoding_rhs>)
+      outs(%arg2 : tensor<?x?xf32, #encoding_result>)
       -> tensor<?x?xf32, #encoding_result>
-  %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xf16, #encoding_lhs>,
-                   tensor<?x?xf16, #encoding_rhs>)
-      outs(%5 : tensor<?x?xf32, #encoding_result>)
-      -> tensor<?x?xf32, #encoding_result>
-  iree_tensor_ext.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xf32, #encoding_result>
-      -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?xf32, #encoding_result>>{%M, %N}
-  return
+  return %0 : tensor<?x?xf32, #encoding_result>
 }
 // CHECK-LABEL: matmul_f16_f16_f32_large_lowering_ukernel_provider
 // CHECK:      iree_codegen.inner_tiled
@@ -126,36 +102,12 @@ func.func @matmul_f16_f16_f32_large_lowering_ukernel_provider() attributes {hal.
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-func.func @matmul_f8_f8_f32_medium_lowering_ukernel_provider() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
-  %c0 = arith.constant 0 : index
-  // M, N, K are dynamic.
-  %M = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(0) : index
-  %N = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(1) : index
-  %K = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(2) : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(0) alignment(64) offset(%c0)
-      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf8E4M3FNUZ, #encoding_lhs>>{%M, %K}
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(1) alignment(64) offset(%c0)
-      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf8E4M3FNUZ, #encoding_rhs>>{%K, %N}
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(2) alignment(64) offset(%c0)
-      : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?xf32, #encoding_result>>{%M, %N}
-  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf8E4M3FNUZ, #encoding_lhs>>{%M, %K}
-      -> tensor<?x?xf8E4M3FNUZ, #encoding_lhs>
-  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf8E4M3FNUZ, #encoding_rhs>>{%K, %N}
-      -> tensor<?x?xf8E4M3FNUZ, #encoding_rhs>
-  %5 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?xf32, #encoding_result>>{%M, %N}
+func.func @matmul_f8_f8_f32_medium_lowering_ukernel_provider(%arg0: tensor<?x?xf8E4M3FNUZ, #encoding_lhs>, %arg1: tensor<?x?xf8E4M3FNUZ, #encoding_rhs>, %arg2: tensor<?x?xf32, #encoding_result>) -> tensor<?x?xf32, #encoding_result> attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  %0 = linalg.matmul
+      ins(%arg0, %arg1 : tensor<?x?xf8E4M3FNUZ, #encoding_lhs>, tensor<?x?xf8E4M3FNUZ, #encoding_rhs>)
+      outs(%arg2 : tensor<?x?xf32, #encoding_result>)
       -> tensor<?x?xf32, #encoding_result>
-  %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xf8E4M3FNUZ, #encoding_lhs>,
-                   tensor<?x?xf8E4M3FNUZ, #encoding_rhs>)
-      outs(%5 : tensor<?x?xf32, #encoding_result>)
-      -> tensor<?x?xf32, #encoding_result>
-  iree_tensor_ext.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xf32, #encoding_result>
-      -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?xf32, #encoding_result>>{%M, %N}
-  return
+  return %0 : tensor<?x?xf32, #encoding_result>
 }
 // CHECK-LABEL: matmul_f8_f8_f32_medium_lowering_ukernel_provider
 // CHECK:      iree_codegen.inner_tiled
@@ -207,35 +159,12 @@ func.func @matmul_f8_f8_f32_medium_lowering_ukernel_provider() attributes {hal.e
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-func.func @matmul_f8_f8_f32_large_lowering_ukernel_provider() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
-  %c0 = arith.constant 0 : index
-  // M, K are dynamic, and N is static as 2048.
-  %M = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(0) : index
-  %K = hal.interface.constant.load layout(#pipeline_layout_3) ordinal(1) : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(0) alignment(64) offset(%c0)
-      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf8E4M3FNUZ, #encoding_lhs>>{%M, %K}
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(1) alignment(64) offset(%c0)
-      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x2048xf8E4M3FNUZ, #encoding_rhs>>{%K}
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout_3) binding(2) alignment(64) offset(%c0)
-      : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x2048xf32, #encoding_result>>{%M}
-  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf8E4M3FNUZ, #encoding_lhs>>{%M, %K}
-      -> tensor<?x?xf8E4M3FNUZ, #encoding_lhs>
-  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, 2048], strides = [1, 1]
-      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x2048xf8E4M3FNUZ, #encoding_rhs>>{%K}
-      -> tensor<?x2048xf8E4M3FNUZ, #encoding_rhs>
-  %5 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, 2048], strides = [1, 1]
-      : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x2048xf32, #encoding_result>>{%M}
+func.func @matmul_f8_f8_f32_large_lowering_ukernel_provider(%arg0: tensor<?x?xf8E4M3FNUZ, #encoding_lhs>, %arg1: tensor<?x2048xf8E4M3FNUZ, #encoding_rhs>, %arg2: tensor<?x2048xf32, #encoding_result>) -> tensor<?x2048xf32, #encoding_result> attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  %0 = linalg.matmul
+      ins(%arg0, %arg1 : tensor<?x?xf8E4M3FNUZ, #encoding_lhs>, tensor<?x2048xf8E4M3FNUZ, #encoding_rhs>)
+      outs(%arg2 : tensor<?x2048xf32, #encoding_result>)
       -> tensor<?x2048xf32, #encoding_result>
-  %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xf8E4M3FNUZ, #encoding_lhs>,
-                   tensor<?x2048xf8E4M3FNUZ, #encoding_rhs>)
-      outs(%5 : tensor<?x2048xf32, #encoding_result>)
-      -> tensor<?x2048xf32, #encoding_result>
-  iree_tensor_ext.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, 2048], strides = [1, 1]
-      : tensor<?x2048xf32, #encoding_result>
-      -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x2048xf32, #encoding_result>>{%M}
-  return
+  return %0 : tensor<?x2048xf32, #encoding_result>
 }
 // CHECK-LABEL: matmul_f8_f8_f32_large_lowering_ukernel_provider
 // CHECK:      iree_codegen.inner_tiled

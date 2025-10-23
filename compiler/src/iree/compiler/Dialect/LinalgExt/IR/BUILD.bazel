@@ -24,6 +24,7 @@ iree_td_library(
         include = ["*.td"],
     ),
     deps = [
+        "//compiler/src/iree/compiler/Utils:td_files",
         "@llvm-project//mlir:BuiltinDialectTdFiles",
         "@llvm-project//mlir:CallInterfacesTdFiles",
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",

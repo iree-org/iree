@@ -15,13 +15,11 @@ iree_cc_library(
     ExternalModels
   HDRS
     "CPUEncodingExternalModels.h"
-    "CodegenExternalModels.h"
     "GPUEncodingExternalModels.h"
     "Interfaces.h"
     "Utils.h"
   SRCS
     "CPUEncodingExternalModels.cpp"
-    "CodegenExternalModels.cpp"
     "GPUEncodingExternalModels.cpp"
     "Interfaces.cpp"
     "Utils.cpp"
@@ -30,6 +28,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRIR
     MLIRLinalgDialect
+    MLIRLinalgTransforms
     MLIRTensorDialect
     iree::compiler::Codegen::Dialect::CPU::IR::IREECPUDialect
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
