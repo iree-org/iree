@@ -50,12 +50,14 @@ static SmallVector<Attribute> getWarpMapping(MLIRContext *ctx, int64_t rank) {
   return mapping;
 }
 
-/// Create GPU thread mapping attributes for the given rank.
-static SmallVector<Attribute> getThreadMapping(MLIRContext *ctx, int64_t rank) {
+/// Create GPU thread mapping for lane mapping.
+/// Returns a single-element array with gpu.lane_id<0>.
+static SmallVector<Attribute> getThreadMapping(MLIRContext *ctx,
+                                               int64_t numLoops) {
   SmallVector<Attribute> mapping;
-  for (int64_t i = 0; i < rank; ++i) {
-    mapping.push_back(IREE::GPU::LaneIdAttr::get(ctx, rank - 1 - i));
-  }
+  // Since we only tile the innermost dimension, we only have one loop
+  // Map it to gpu.lane_id<0>
+  mapping.push_back(IREE::GPU::LaneIdAttr::get(ctx, 0));
   return mapping;
 }
 
@@ -101,64 +103,27 @@ template <typename OpTy>
 static SmallVector<OpFoldResult>
 computeThreadNumThreadsImpl(OpBuilder &builder, OpTy op,
                             RankedTensorType outputType) {
+  // Get the subgroup tile sizes from the lowering config.
+  auto dmaConfig = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(op);
+  if (!dmaConfig) {
+    return {};
+  }
+
+  ArrayRef<int64_t> subgroupTileSizes = dmaConfig.getSubgroup();
+  if (subgroupTileSizes.empty()) {
+    return {};
+  }
+
   int64_t rank = outputType.getRank();
-  int64_t innermostStep;
-
-  if constexpr (std::is_same_v<OpTy, linalg::CopyOp>) {
-    // For copy: use dma_sizes from target attributes.
-    IREE::GPU::TargetAttr targetAttr = getGPUTargetAttr(op);
-    if (!targetAttr) {
-      return {};
-    }
-
-    IREE::GPU::TargetWgpAttr wgp = targetAttr.getWgp();
-    if (!wgp) {
-      return {};
-    }
-
-    DenseI64ArrayAttr dmaSizesAttr = wgp.getDmaSizes();
-    if (!dmaSizesAttr || dmaSizesAttr.empty()) {
-      return {};
-    }
-
-    Type elementType = outputType.getElementType();
-    unsigned elementBitWidth = elementType.getIntOrFloatBitWidth();
-    if (elementBitWidth == 0) {
-      return {};
-    }
-
-    int64_t maxDmaSize = *std::max_element(dmaSizesAttr.asArrayRef().begin(),
-                                           dmaSizesAttr.asArrayRef().end());
-
-    // Compute the step for the innermost dimension:
-    // step = (trailing_dim_size * element_bit_width) / max_dma_size.
-    int64_t trailingDimSize = outputType.getDimSize(rank - 1);
-    int64_t trailingDimByteSize = trailingDimSize * elementBitWidth;
-    innermostStep = trailingDimByteSize / maxDmaSize;
-
-    if (innermostStep <= 0) {
-      return {};
-    }
-  } else if constexpr (std::is_same_v<OpTy, IREE::LinalgExt::GatherOp>) {
-    // For gather: use the size of the innermost dimension.
-    int64_t innermostDimSize = outputType.getDimSize(rank - 1);
-    if (innermostDimSize == ShapedType::kDynamic || innermostDimSize <= 0) {
-      return {};
-    }
-    innermostStep = innermostDimSize;
+  if (subgroupTileSizes.size() != rank) {
+    return {};
   }
 
-  // Compute number of threads:
-  // For 2D tensors, create 2D loops: [1, innermostStep].
+  // Only tile over the innermost dimension.
+  // Return a 1-element array with the innermost subgroup tile size.
+  // SCF tiling will tile the last (innermost) dimension.
   SmallVector<OpFoldResult> numThreads;
-  for (int64_t i = 0; i < rank; ++i) {
-    if (i == rank - 1) {
-      numThreads.push_back(builder.getIndexAttr(innermostStep));
-    } else {
-      // Create 2D loops by using 1 for non-innermost dimensions.
-      numThreads.push_back(builder.getIndexAttr(1));
-    }
-  }
+  numThreads.push_back(builder.getIndexAttr(subgroupTileSizes[rank - 1]));
   return numThreads;
 }
 
@@ -202,19 +167,45 @@ tileToThreadLevel(OpTy op, PatternRewriter &rewriter,
     return nullptr;
   }
 
-  // Configure tiling options using numThreads.
+  // Get the rank of the operation.
+  auto outputType = cast<RankedTensorType>(op.getOutputs()[0].getType());
+  int64_t rank = outputType.getRank();
+
+  // threadNumThreads contains only the innermost dimension's num threads.
+  // We need to create tile sizes for all dimensions, with 0 for dimensions
+  // we don't want to tile.
+  SmallVector<OpFoldResult> tileSizes;
+  for (int64_t i = 0; i < rank; ++i) {
+    if (i == rank - 1) {
+      // Innermost dimension: tile with the given num threads
+      tileSizes.push_back(rewriter.getIndexAttr(1));
+    } else {
+      // Other dimensions: don't tile (size = 0)
+      tileSizes.push_back(rewriter.getIndexAttr(0));
+    }
+  }
+
+  // Configure tiling options using tile sizes.
   scf::SCFTilingOptions threadOptions;
+  threadOptions.setTileSizeComputationFunction(
+      [tileSizes](OpBuilder &b, Operation *op) { return tileSizes; });
   threadOptions.setNumThreadsComputationFunction(
-      [threadNumThreads](OpBuilder &b, Operation *op) {
-        return threadNumThreads;
+      [threadNumThreads, rank](OpBuilder &b, Operation *op) {
+        // Create numThreads array with zeros for all dims except innermost
+        SmallVector<OpFoldResult> fullNumThreads;
+        for (int64_t i = 0; i < rank; ++i) {
+          if (i == rank - 1) {
+            fullNumThreads.push_back(threadNumThreads[0]);
+          } else {
+            fullNumThreads.push_back(b.getIndexAttr(0));
+          }
+        }
+        return fullNumThreads;
       });
   threadOptions.setLoopType(scf::SCFTilingOptions::LoopType::ForallOp);
 
-  // Set thread mapping if needed.
-  int64_t numLoops = countNonZeroThreads(threadNumThreads);
-  if (numLoops > 0) {
-    threadOptions.setMapping(getThreadMapping(rewriter.getContext(), numLoops));
-  }
+  // Set thread mapping for the single innermost dimension.
+  threadOptions.setMapping(getThreadMapping(rewriter.getContext(), 1));
 
   rewriter.setInsertionPoint(op);
   FailureOr<scf::SCFTilingResult> threadTilingResult = scf::tileUsingSCF(

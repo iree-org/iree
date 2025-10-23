@@ -317,8 +317,15 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
     * `$source`: Source tensor/memref containing the data to be gathered.
     * `$init`: Destination tensor/memref receiving the gathered data
       (destination-passing style).
+    * `$dest_indices`: Offsets into the destination tensor/memref where
+      the gathered data should be written.
+    * `$dest_size`: The full size of the destination tensor/memref, used to
+      compute the correct global memory offsets for coalesced writes. `$dest_size`
+      along with `$dest_indices` define the shape and location of the destination
+      to write into.
     * `lane`: The lane that specifies the coalescing store's offset within the
       workgroup/shared memory.
+
 
     ## Example of a single subgroup using coalesced_gather_dma in copy mode
        for transferring tensor<4x128xf32>, with an intended DMA width of 128 bits
@@ -332,6 +339,12 @@ def IREEGPU_CoalescedGatherDMAOp : Op<IREEGPU_Dialect, "coalesced_gather_dma", [
             : tensor<4x4xf32>, tensor<4x128xf32>, index, index, index
         }
       } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
+    ```
+
+    ## Example using $dest_indices and $dest_size
+    ```mlir
+    iree_gpu.coalesced_gather_dma %thread_slice into %dest_slice[%offset0, %offset1] dest_size = [4, 128] lane(%lane_id)
+      : tensor<4x4xf32>, tensor<4x128xf32>, index, index, index
     ```
   }];
 
