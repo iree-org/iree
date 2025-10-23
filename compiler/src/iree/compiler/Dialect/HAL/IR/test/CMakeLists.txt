@@ -32,10 +32,10 @@ iree_lit_test_suite(
     "experimental_ops.mlir"
     "fence_folding.mlir"
     "fence_ops.mlir"
+    "interface_folding.mlir"
     "interface_ops.mlir"
-    "interface_ops_folding.mlir"
     "invalid.mlir"
-    "tensor_op_folding.mlir"
+    "tensor_folding.mlir"
     "tensor_ops.mlir"
   TOOLS
     FileCheck

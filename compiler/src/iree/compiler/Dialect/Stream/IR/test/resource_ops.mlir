@@ -140,3 +140,21 @@ util.func private @resourceSubview(%arg0: !stream.resource<*>, %arg1: index) -> 
   %0 = stream.resource.subview %arg0[%c128] : !stream.resource<*>{%arg1} -> !stream.resource<*>{%c256}
   util.return %0 : !stream.resource<*>
 }
+
+// -----
+
+// CHECK-LABEL: @resourceTransients
+util.func private @resourceTransients(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.resource<transient>, %arg3: index) -> (!stream.resource<*>, !stream.timepoint) {
+  // CHECK: = stream.resource.transients %arg0 : !stream.resource<*>{%arg1} from %arg2 : !stream.resource<transient>{%arg3} => !stream.timepoint
+  %0, %1 = stream.resource.transients %arg0 : !stream.resource<*>{%arg1} from %arg2 : !stream.resource<transient>{%arg3} => !stream.timepoint
+  util.return %0, %1 : !stream.resource<*>, !stream.timepoint
+}
+
+// -----
+
+// CHECK-LABEL: @resourceTransientsAffinity
+util.func private @resourceTransientsAffinity(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.resource<transient>, %arg3: index) -> (!stream.resource<*>, !stream.timepoint) {
+  // CHECK: = stream.resource.transients on(#hal.device.affinity<@dev>) %arg0 : !stream.resource<*>{%arg1} from %arg2 : !stream.resource<transient>{%arg3} => !stream.timepoint
+  %0, %1 = stream.resource.transients on(#hal.device.affinity<@dev>) %arg0 : !stream.resource<*>{%arg1} from %arg2 : !stream.resource<transient>{%arg3} => !stream.timepoint
+  util.return %0, %1 : !stream.resource<*>, !stream.timepoint
+}

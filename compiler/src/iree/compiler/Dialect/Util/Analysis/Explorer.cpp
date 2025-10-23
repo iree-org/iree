@@ -857,6 +857,16 @@ TraversalResult Explorer::walkDefiningOps(Value value, ResultWalkFn fn,
                             << regionOp->getName().getStringRef() << "\n");
     return walkReturnOperands(
         regionOp.getOperation(), [&](OperandRange returnOperands) {
+          // Bounds check: not all region ops have return operands matching
+          // parent results. For example, stream.cmd.execute regions don't
+          // return values directly.
+          if (idx >= returnOperands.size()) {
+            LLVM_DEBUG(llvm::dbgs()
+                       << "  -- result index " << idx << " out of bounds for "
+                       << returnOperands.size()
+                       << " return operand(s), skipping\n");
+            return WalkResult::advance();
+          }
           auto returnOperand = returnOperands[idx];
           LLVM_DEBUG({
             llvm::dbgs() << "   + queuing ";

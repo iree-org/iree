@@ -276,6 +276,13 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
   // lifetime allocations.
   passManager.addPass(IREE::Stream::createScheduleAllocationPass());
 
+  // Tries to emplace transient allocations in user-provided storage, if any.
+  // This will find stream.resource.alloca (and matching dealloca) ops and try
+  // to remove them.
+  passManager.addPass(IREE::Stream::createEmplaceTransientsPass());
+  passManager.addPass(
+      IREE::Stream::createMaterializeTransientSizeQueriesPass());
+
   FunctionLikeNest(passManager)
       // Allocate backing storage for fused constant resources.
       // This expands packed constants into explicit forms with partitioned

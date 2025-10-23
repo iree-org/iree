@@ -52,7 +52,8 @@ static bool isABIAttr(NamedAttribute attr) {
   return attr.getName() == "iree.abi.affinity" ||
          attr.getName() == "iree.abi.encoding" ||
          attr.getName() == "iree.abi.model" ||
-         attr.getName() == "iree.abi.output";
+         attr.getName() == "iree.abi.output" ||
+         attr.getName() == "iree.abi.transients";
 }
 
 // Removes all ABI attrs handled by this pass from all dictionaries.
@@ -611,6 +612,27 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
     resultStorages[outputAttr.getInt()] = storageArg;
   }
 
+  // Find the transient storage buffer if provided.
+  Value transientStorage;
+  for (unsigned i = 0; i < exportOp.getNumArguments(); ++i) {
+    if (exportOp.getArgAttrOfType<UnitAttr>(i, "iree.abi.transients")) {
+      auto storageArg = entryBlock->getArgument(i);
+      if (!llvm::isa<IREE::HAL::BufferType>(storageArg.getType()) &&
+          !llvm::isa<IREE::HAL::BufferViewType>(storageArg.getType())) {
+        exportOp.emitError() << "transient storage argument " << i
+                             << " has an invalid type " << storageArg.getType()
+                             << "; must be a !hal.buffer or !hal.buffer_view";
+        return {};
+      }
+      if (transientStorage) {
+        exportOp.emitError()
+            << "only one argument may have the iree.abi.transients attribute";
+        return {};
+      }
+      transientStorage = storageArg;
+    }
+  }
+
   // Build a map of each I/O argument to the fence that covers them.
   // TODO(benvanik): actually support a map; for now we just handle the 1:M
   // coarse mode where all inputs are covered by a single wait fence and all
@@ -672,6 +694,23 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
         fallback(exportOp.getResultAttr(resultIndex, "iree.abi.affinity"),
                  defaultAffinityAttr));
     asyncResults[resultIndex] = cast<OpResult>(aliasOp.getResult());
+  }
+
+  // Annotate transient storage if provided.
+  // Create one transients op per tensor result.
+  if (transientStorage) {
+    for (auto [resultIndex, result] : llvm::enumerate(asyncResults)) {
+      if (llvm::isa<TensorType>(result.getType())) {
+        auto sourceDims = IREE::Util::buildDynamicDimsForValue(
+            exportOp.getLoc(), result, entryBuilder);
+        auto transientsOp = IREE::HAL::TensorTransientsOp::create(
+            entryBuilder, exportOp.getLoc(), result.getType(), result,
+            sourceDims, transientStorage,
+            fallback(exportOp.getResultAttr(resultIndex, "iree.abi.affinity"),
+                     defaultAffinityAttr));
+        asyncResults[resultIndex] = cast<OpResult>(transientsOp.getResult());
+      }
+    }
   }
 
   // Insert a barrier if requested - all tensors will be calculated and the
