@@ -43,5 +43,50 @@
         "time": "41.467"
       }
     ]
+  },
+  {
+    "commit_hash": "9689047aac31d8e0f469ce0451ae5e5ac6ff24f6",
+    "tests": [
+      {
+        "name": "llama_8b_fp16_decode_benchmark_seq128_mi325",
+        "time": "5.527"
+      },
+      {
+        "name": "llama_8b_fp16_decode_benchmark_seq2048_mi325",
+        "time": "6.900"
+      },
+      {
+        "name": "llama_8b_fp16_prefill_benchmark_seq128_mi325",
+        "time": "36.003"
+      },
+      {
+        "name": "llama_8b_fp16_prefill_benchmark_seq2048_mi325",
+        "time": "229.895"
+      },
+      {
+        "name": "llama_8b_fp8_decode_benchmark_seq128_mi325",
+        "time": "7.132"
+      },
+      {
+        "name": "llama_8b_fp8_decode_benchmark_seq2048_mi325",
+        "time": "9.890"
+      },
+      {
+        "name": "llama_8b_fp8_prefill_benchmark_seq128_mi325",
+        "time": "22.934"
+      },
+      {
+        "name": "llama_8b_fp8_prefill_benchmark_seq2048_mi325",
+        "time": "163.927"
+      },
+      {
+        "name": "sdxl_clip_benchmark_mi325",
+        "time": "7.329"
+      },
+      {
+        "name": "sdxl_punet_benchmark_mi325",
+        "time": "41.225"
+      }
+    ]
   }
 ]

@@ -7,5 +7,14 @@
         "time": "400.315"
       }
     ]
+  },
+  {
+    "commit_hash": "9689047aac31d8e0f469ce0451ae5e5ac6ff24f6",
+    "tests": [
+      {
+        "name": "sdxl_clip_benchmark_cpu",
+        "time": "399.897"
+      }
+    ]
   }
 ]
