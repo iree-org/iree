@@ -212,6 +212,8 @@ static iree_vm_AttrDef_vec_ref_t makeAttrDefs(DictionaryAttr attrs,
       SmallVector<char> str;
       integerAttr.getValue().toStringSigned(str);
       value.append(str.data(), str.size());
+    } else if (auto symbolAttr = dyn_cast<FlatSymbolRefAttr>(attr.getValue())) {
+      value = symbolAttr.getValue().str();
     } else {
       assert(false && "expected string or integer reflection attr");
       continue;
