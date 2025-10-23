@@ -625,9 +625,6 @@ def MaterializeDeviceEncodingPass :
 def MaterializeEncodingIntoNopPass :
     InterfacePass<"iree-codegen-materialize-encoding-into-nop", "mlir::FunctionOpInterface"> {
   let summary = "Drop the encodings from tensor types with encodings.";
-  let dependentDialects = [
-    "IREE::Encoding::IREEEncodingDialect",
-  ];
 }
 
 def MaterializeEncodingIntoPaddingPass :
