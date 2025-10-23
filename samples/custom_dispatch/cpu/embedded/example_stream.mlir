@@ -108,10 +108,15 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
 
     builtin.module {
       // External function declaration using a user-chosen calling convention.
-      func.func private @simple_mul_workgroup(%binding0: memref<?xf32>, %binding1: memref<?xf32>, %binding2: memref<?xf32>, %dim: index, %tid: index) attributes {
+      func.func private @simple_mul_workgroup(
+          %binding0: memref<f32>, %binding0_offset: index,
+          %binding1: memref<f32>, %binding1_offset: index,
+          %binding2: memref<f32>, %binding2_offset: index,
+          %dim: index, %tid: index) attributes {
         // Ensures that we try to statically link this external function and
         // pull it in from the object file.
-        hal.import.static
+        hal.import.static,
+        llvm.bareptr = true
       }
 
       // IREE exported function using stream bindings and operands.
@@ -137,6 +142,13 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
         %memref1 = stream.binding.subspan %binding1[%c0] : !stream.binding -> memref<?xf32>{%dim}
         %memref2 = stream.binding.subspan %binding2[%c0] : !stream.binding -> memref<?xf32>{%dim}
 
+        %base0, %offset0, %sizes0, %strides0 = iree_codegen.extract_strided_metadata %memref0
+            : memref<?xf32> -> memref<f32>, index, index, index
+        %base1, %offset1, %sizes1, %strides1 = iree_codegen.extract_strided_metadata %memref1
+            : memref<?xf32> -> memref<f32>, index, index, index
+        %base2, %offset2, %sizes2, %strides2 = iree_codegen.extract_strided_metadata %memref2
+            : memref<?xf32> -> memref<f32>, index, index, index
+
         // Call the externally defined C function with an (almost) plain C
         // calling convention (see above for details about the mess memrefs
         // turn into).
@@ -144,7 +156,8 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
         // TODO: there are ways of accessing CPU information here such as
         // active architecture and feature bits but it is not yet exposed to
         // the stream level.
-        func.call @simple_mul_workgroup(%memref0, %memref1, %memref2, %dim, %tid) : (memref<?xf32>, memref<?xf32>, memref<?xf32>, index, index) -> ()
+        func.call @simple_mul_workgroup(%base0, %offset0, %base1, %offset1, %base2, %offset2, %dim, %tid)
+            : (memref<f32>, index, memref<f32>, index, memref<f32>, index, index, index) -> ()
 
         // NOTE: this is code generated as normal - other MLIR ops can be used
         // here for looping/control flow, vector operations, linalg, etc.
@@ -154,8 +167,12 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
         return
       }
 
-      func.func private @simple_mul_inplace_workgroup(%binding0: memref<?xf32>, %binding1: memref<?xf32>, %dim: index, %tid: index) attributes {
-        hal.import.static
+      func.func private @simple_mul_inplace_workgroup(
+          %binding0: memref<f32>, %binding0_offset: index,
+          %binding1: memref<f32>, %binding1_offset: index,
+          %dim: index, %tid: index) attributes {
+        hal.import.static,
+        llvm.bareptr = true
       }
       func.func @simple_mul_inplace(
           %binding0: !stream.binding,
@@ -170,7 +187,13 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
         %memref0 = stream.binding.subspan %binding0[%c0] : !stream.binding -> memref<?xf32>{%dim}
         %memref1 = stream.binding.subspan %binding1[%c0] : !stream.binding -> memref<?xf32>{%dim}
 
-        func.call @simple_mul_inplace_workgroup(%memref0, %memref1, %dim, %tid) : (memref<?xf32>, memref<?xf32>, index, index) -> ()
+        %base0, %offset0, %sizes0, %strides0 = iree_codegen.extract_strided_metadata %memref0
+            : memref<?xf32> -> memref<f32>, index, index, index
+        %base1, %offset1, %sizes1, %strides1 = iree_codegen.extract_strided_metadata %memref1
+            : memref<?xf32> -> memref<f32>, index, index, index
+
+        func.call @simple_mul_inplace_workgroup(%base0, %offset0, %base1, %offset1, %dim, %tid)
+            : (memref<f32>, index, memref<f32>, index, index, index) -> ()
 
         return
       }
