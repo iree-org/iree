@@ -46,11 +46,12 @@ static SmallVector<int64_t> getVectorSizeTileSizes(int64_t rank,
 /// would give tile sizes of [1, 1, 4] no matter what because we won't be able
 /// to collapse the vector.transfer_read that results from this choice of tile
 /// size.
-static SmallVector<int64_t> getVectorTileSizesFromLoopRanges(
-    ArrayRef<int64_t> loopRanges, int64_t numThreads, int64_t vectorSize,
-    bool allowMultiDimCollapse = true, bool vectorizeOutermost = false) {
+static SmallVector<int64_t>
+getVectorTileSizesFromLoopRanges(ArrayRef<int64_t> loopRanges,
+                                 int64_t numThreads, int64_t vectorSize,
+                                 bool allowMultiDimCollapse = true) {
   int64_t rank = loopRanges.size();
-  int64_t targetDim = vectorizeOutermost ? 0 : rank - 1;
+  int64_t targetDim = rank - 1;
   int64_t targetRange = loopRanges[targetDim];
 
   // If any loop ranges are dynamic, default to a simple vector size based
@@ -80,12 +81,11 @@ static SmallVector<int64_t> getVectorTileSizesFromLoopRanges(
   }
 
   // Let the tile size for the target dim be the smaller of the vector size and
-  // the target loop range. Return here, if `allowMultiDimCollapse` is false, or
-  // `vectorizeOutermost` is true, because we don't expect consecutive
-  // dimensions to be vectorizable contiguously for these cases.
+  // the target loop range. Return here, if `allowMultiDimCollapse` is false,
+  // because we don't expect consecutive dimensions to be vectorizable
+  // contiguously for these cases.
   tileSizes[targetDim] = std::min(targetRange, maxVectorSize);
-  if (targetRange >= maxVectorSize || !allowMultiDimCollapse ||
-      vectorizeOutermost) {
+  if (targetRange >= maxVectorSize || !allowMultiDimCollapse) {
     return tileSizes;
   }
 
@@ -124,7 +124,7 @@ SmallVector<int64_t> deriveLinalgOpThreadTileSizes(linalg::LinalgOp linalgOp,
   return tileSizes;
 }
 
-SmallVector<int64_t>
+static SmallVector<int64_t>
 deriveIm2colOpThreadTileSizes(IREE::LinalgExt::Im2colOp im2colOp,
                               int64_t numThreads) {
   if (!im2colOp.hasPureTensorSemantics()) {
@@ -135,20 +135,10 @@ deriveIm2colOpThreadTileSizes(IREE::LinalgExt::Im2colOp im2colOp,
                        getElementTypeOrSelf(im2colOp->getResultTypes()[0])
                            .getIntOrFloatBitWidth();
 
-  // If the im2col input tensor has the batch dim at last, im2col output tensor
-  // has an implicit transpose to move the batch dim in front, and tiling should
-  // be along the batch dim. Currently only a single batch dim is supported for
-  // tiling along the batch dim.
-  unsigned innerDim = im2colOp.getInputRank() - 1;
-  bool singleBatchDimInnermost = im2colOp.getBatchPos().size() == 1 &&
-                                 im2colOp.getBatchPos().back() == innerDim;
-  bool vectorizeOutermost = singleBatchDimInnermost ? true : false;
-
   // Im2col cannot coalesce past the inner/outer most dim so always default to
   // only the inner/outer most tile size being the vector size (or smaller).
   return getVectorTileSizesFromLoopRanges(loopRanges, numThreads, vectorSize,
-                                          /*allowMultiDimCollapse=*/false,
-                                          vectorizeOutermost);
+                                          /*allowMultiDimCollapse=*/false);
 }
 
 SmallVector<int64_t> deriveThreadTileSizes(Operation *op) {
