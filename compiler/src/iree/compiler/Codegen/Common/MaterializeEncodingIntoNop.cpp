@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Pass/PassManager.h"
@@ -27,8 +28,8 @@ namespace {
 struct MaterializeEncodingIntoNopPass final
     : impl::MaterializeEncodingIntoNopPassBase<MaterializeEncodingIntoNopPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, tensor::TensorDialect,
-                    IREE::Codegen::IREECodegenDialect>();
+    registry.insert<IREE::Encoding::IREEEncodingDialect, linalg::LinalgDialect,
+                    tensor::TensorDialect, IREE::Codegen::IREECodegenDialect>();
   }
 
   void runOnOperation() override {
