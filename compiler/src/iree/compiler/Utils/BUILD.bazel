@@ -15,6 +15,20 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+iree_td_library(
+    name = "td_files",
+    srcs = enforce_glob(
+        [
+            "CommonTypeConstraints.td",
+        ],
+        include = ["*.td"],
+    ),
+    deps = [
+        "@llvm-project//mlir:BuiltinDialectTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
+    ],
+)
+
 iree_compiler_cc_library(
     name = "Utils",
     srcs = [
@@ -70,23 +84,5 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
-    ],
-)
-
-exports_files([
-    "CommonTypeConstraints.td",
-])
-
-iree_td_library(
-    name = "td_files",
-    srcs = enforce_glob(
-        [
-            "CommonTypeConstraints.td",
-        ],
-        include = ["*.td"],
-    ),
-    deps = [
-        "@llvm-project//mlir:BuiltinDialectTdFiles",
-        "@llvm-project//mlir:OpBaseTdFiles",
     ],
 )
