@@ -47,9 +47,7 @@ jobs:
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           git commit -m "Update benchmark graphs for ${SHORT_SHA}"
           git push
-        # !!!!
-        # Switch to gh-pages branch before merging to main.
         env:
-          PUBLISH_BRANCH: "gh-pages-test"
+          PUBLISH_BRANCH: "gh-pages"
           OUTPUT_DIR: "./benchmark-tracker/"
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

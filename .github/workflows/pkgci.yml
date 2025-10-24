@@ -129,9 +129,7 @@ jobs:
   benchmark_graphs:
     name: Benchmark Graphs
     needs: [setup, test_torch]
-    # if: ${{ github.repository_owner == 'iree-org' && github.event_name == 'push' && github.ref_name == 'main' }}
-    # !!!!
-    # Uncomment the above line before merging to main.
+    if: ${{ github.repository_owner == 'iree-org' && github.event_name == 'push' && github.ref_name == 'main' }}
     uses: ./.github/workflows/pkgci_benchmark_graphs.yml
 
   ##############################################################################

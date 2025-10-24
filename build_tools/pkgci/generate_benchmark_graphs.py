@@ -20,9 +20,11 @@ from gh_utils import (
     get_commit_from_run_id,
 )
 
+# Benchmark workflows to track. This needs to be consistent with
+# summary-name fields defined in pkgci_test_torch.yml.
 benchmark_workflows = ["torch_models_cpu_task", "torch_models_amdgpu_mi325"]
 
-max_history_length = 100
+max_history_length = 200
 
 
 def parse_arguments(argv=None):
@@ -43,6 +45,7 @@ def get_benchmark_artifacts_zip_links(run_id: int) -> Dict:
     artifacts = list_gh_artifacts(run_id)
     benchmark_artifacts = {}
     for workflow_name in benchmark_workflows:
+        # Each benchmark workflow uploads a JSON job summary as a zip artifact.
         artifact_name = f"{workflow_name}_summary.json"
         if artifact_name in artifacts:
             benchmark_artifacts[workflow_name] = artifacts[artifact_name]
