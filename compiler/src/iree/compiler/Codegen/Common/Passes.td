@@ -123,6 +123,14 @@ def ConvertToDestinationPassingStylePass :
   ];
 }
 
+def ConvertWorkgroupForallToPCFPass
+    : Pass<"iree-codegen-convert-workgroup-forall-to-pcf"> {
+  let summary = "Converts workgroup mapped scf.forall ops to pcf.loop";
+  let dependentDialects = [
+    "iree_compiler::IREE::PCF::PCFDialect"
+  ];
+}
+
 def CombineLayoutTransformationPass :
     InterfacePass<"iree-codegen-combine-layout-transformation", "mlir::FunctionOpInterface"> {
   let summary =
