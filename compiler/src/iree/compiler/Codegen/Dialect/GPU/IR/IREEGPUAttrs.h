@@ -81,10 +81,10 @@ namespace mlir::iree_compiler::IREE::GPU {
 // (this would happen for a vector operand in a matrix-vector multiplication),
 // say "M", the mapping is as follows:
 //
-// /* Here t == thread_id,  i == vector_element_index */
+// /* Here t == thread_id, i == vector_element_index */
 // int map_vector_elem_index_to_semantic_dim_index(int t, int i) {
 //   return (i % element[0]) + element[0] * (
-//            t % thread [0] + thread[0] * (
+//            (t % thread[0]) + thread[0] * (
 //              i / element[0]
 //            )
 //          );
