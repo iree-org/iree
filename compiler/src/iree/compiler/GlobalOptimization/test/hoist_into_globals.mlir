@@ -184,3 +184,30 @@ module @hoist_index {
     util.return %1 : index
   }
 }
+
+// -----
+
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.testing<>
+// CHECK-LABEL: @hoist_subbyte_with_encoding
+#encoding = #iree_encoding.testing<>
+module @hoist_subbyte_with_encoding {
+  // CHECK: util.global private @[[HOISTED:.*]] : tensor<32xi8, #[[$ENCODING]]>
+  // CHECK: util.initializer
+  // CHECK:   %[[CST:.*]] = arith.constant dense<3> : tensor<64xi4>
+  // CHECK:   %[[ENCODE:.*]] = flow.tensor.encode %[[CST]] : tensor<64xi4> -> tensor<64xi4, #[[$ENCODING]]>
+  // CHECK:   %[[CEXPR:.*]] = "iree_unregistered.const_expr"(%[[ENCODE]])
+  // CHECK:   %[[CAST:.*]] = iree_tensor_ext.bitcast %[[CEXPR]] : tensor<64xi4, #[[$ENCODING]]> -> tensor<32xi8, #[[$ENCODING]]>
+  // CHECK:   util.global.store %[[CAST]], @[[HOISTED]] : tensor<32xi8, #[[$ENCODING]]>
+  // CHECK:   util.return
+
+  // CHECK: util.func public @main() -> tensor<64xi4, #[[$ENCODING]]>
+  // CHECK:   %[[GLOBAL_LD:.*]] = util.global.load immutable @[[HOISTED]] : tensor<32xi8, #[[$ENCODING]]>
+  // CHECK:   %[[ORIG_VAL:.*]] = iree_tensor_ext.bitcast %[[GLOBAL_LD]] : tensor<32xi8, #[[$ENCODING]]> -> tensor<64xi4, #[[$ENCODING]]>
+  // CHECK:   util.return %[[ORIG_VAL]]
+  util.func public @main() -> tensor<64xi4, #encoding> {
+    %0 = arith.constant dense<3> : tensor<64xi4>
+    %1 = flow.tensor.encode %0 : tensor<64xi4> -> tensor<64xi4, #encoding>
+    %2 = "iree_unregistered.const_expr"(%1) : (tensor<64xi4, #encoding>) -> tensor<64xi4, #encoding>
+    util.return %2 : tensor<64xi4, #encoding>
+  }
+}
