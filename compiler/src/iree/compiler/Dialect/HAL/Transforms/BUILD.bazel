@@ -75,6 +75,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/HAL/Target/Devices",
         "//compiler/src/iree/compiler/Dialect/Stream/IR",
         "//compiler/src/iree/compiler/Dialect/Stream/Transforms",
+        "//compiler/src/iree/compiler/Dialect/TensorExt/IR:IR",
         "//compiler/src/iree/compiler/Dialect/Util/Conversion",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Dialect/Util/Transforms",
