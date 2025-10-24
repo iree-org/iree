@@ -71,17 +71,19 @@ private:
   DenseMap<OpAffinityPair, IREE::Util::GlobalOpInterface> cachedGlobals;
   DenseMap<ValueAffinityPair, Value> cachedValuePerAffinity;
 
-  // Cache the last initializer that references each global for performance.
-  DenseMap<Operation *, Operation *> cachedLastInitializer;
+  // Cache the insertion point (last initializer or the global itself) for each
+  // global for performance.
+  DenseMap<Operation *, Operation *> cachedInsertionPointForGlobal;
 };
 
 ValuePerAffinityHelper::ValuePerAffinityHelper(mlir::ModuleOp moduleOp)
     : builder(moduleOp), symbolTable(moduleOp) {
-  // Pre-compute the last initializer for each global for performance.
+  // Pre-compute the insertion point for each global for performance.
   // This avoids scanning all initializers multiple times during transformation.
   IREE::Util::GlobalTable globalTable(moduleOp);
   globalTable.forEach([&](IREE::Util::Global &global) {
-    Operation *lastInitializer = nullptr;
+    // Initialize with the global op itself as the default insertion point.
+    Operation *insertionPoint = global.op.getOperation();
 
     // Iterate through store operations to find initializers.
     for (auto storeOp : global.storeOps) {
@@ -92,16 +94,12 @@ ValuePerAffinityHelper::ValuePerAffinityHelper(mlir::ModuleOp moduleOp)
       }
 
       // Update the insertion point if this is the latest initializer.
-      if (!lastInitializer || lastInitializer->isBeforeInBlock(initOp)) {
-        lastInitializer = initOp;
+      if (insertionPoint->isBeforeInBlock(initOp)) {
+        insertionPoint = initOp;
       }
     }
 
-    // If no initializer was found, use the global op itself as insertion point.
-    if (!lastInitializer) {
-      lastInitializer = global.op.getOperation();
-    }
-    cachedLastInitializer[global.op.getOperation()] = lastInitializer;
+    cachedInsertionPointForGlobal[global.op.getOperation()] = insertionPoint;
     return IREE::Util::GlobalAction::PRESERVE;
   });
 }
@@ -163,11 +161,8 @@ ValuePerAffinityHelper::getOrCreateGlobalForAffinity(
   // Find the insertion point: after the last initializer that references this
   // global, or after the global itself if no initializers exist.
   // The cache was already populated in the constructor.
-  Operation *insertionPoint = globalOp.getOperation();
-  auto cachedIt = cachedLastInitializer.find(globalOp.getOperation());
-  if (cachedIt != cachedLastInitializer.end()) {
-    insertionPoint = cachedIt->second;
-  }
+  Operation *insertionPoint =
+      cachedInsertionPointForGlobal.lookup(globalOp.getOperation());
 
   // Create the new global and initializer after the insertion point.
   Location loc = globalOp.getLoc();
