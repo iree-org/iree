@@ -136,6 +136,8 @@ module attributes {
 
 // -----
 
+// Test that the no ukernel is selected if Batch * M is too small.
+
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d2, d3)>
 #map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
@@ -152,19 +154,59 @@ module attributes {
 module attributes {
   hal.executable.target = #executable_target_rocm_hsaco_fb
 } {
-  func.func @matmul_f16_medium_expanded(%arg0: tensor<1x128x4096xf16>, %arg1: tensor<1024x4096xf16>) -> tensor<1x128x1024xf32> {
+  func.func @negative_matmul_f16_medium_expanded(%arg0: tensor<7x128x4096xf16>, %arg1: tensor<1024x4096xf16>) -> tensor<7x128x1024xf32> {
     %cst = arith.constant 0.000000e+00 : f32
-    %0 = tensor.empty() : tensor<1x128x1024xf32>
-    %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<1x128x1024xf32>) -> tensor<1x128x1024xf32>
-    %2 = linalg.generic {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<1x128x4096xf16>, tensor<1024x4096xf16>) outs(%1 : tensor<1x128x1024xf32>) {
+    %0 = tensor.empty() : tensor<7x128x1024xf32>
+    %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<7x128x1024xf32>) -> tensor<7x128x1024xf32>
+    %2 = linalg.generic {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<7x128x4096xf16>, tensor<1024x4096xf16>) outs(%1 : tensor<7x128x1024xf32>) {
       ^bb0(%in: f16, %in_4: f16, %out: f32):
         %12 = arith.extf %in : f16 to f32
         %13 = arith.extf %in_4 : f16 to f32
         %14 = arith.mulf %12, %13 : f32
         %15 = arith.addf %out, %14 : f32
         linalg.yield %15 : f32
-      } -> tensor<1x128x1024xf32>
-    return %2 : tensor<1x128x1024xf32>
+      } -> tensor<7x128x1024xf32>
+    return %2 : tensor<7x128x1024xf32>
+  }
+}
+// CHECK-LABEL: @negative_matmul_f16_medium_expanded
+// CHECK-NOT:     compilation_info = #iree_codegen.compilation_info
+// CHECK-NOT:     iree_codegen.ukernel
+// CHECK-NOT:     iree_codegen.inner_tiled
+
+// -----
+
+// Test that the medium ukernel is selected once Batch * M becomes large enough.
+
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d2, d3)>
+#map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb",
+  {iree_codegen.target_info = #iree_gpu.target<arch = "gfx942", features = "",
+                                               wgp = <compute = fp16, storage =  b16,
+                                               subgroup =  none,
+                                               subgroup_size_choices = [64],
+                                               max_workgroup_sizes = [1024, 1024, 1024],
+                                               max_thread_count_per_workgroup = 1024,
+                                               max_workgroup_memory_bytes = 65536,
+                                               max_workgroup_counts = [2147483647, 2147483647, 2147483647]>>,
+   ukernels = "none"}>
+module attributes {
+  hal.executable.target = #executable_target_rocm_hsaco_fb
+} {
+  func.func @matmul_f16_medium_expanded(%arg0: tensor<8x128x4096xf16>, %arg1: tensor<1024x4096xf16>) -> tensor<8x128x1024xf32> {
+    %cst = arith.constant 0.000000e+00 : f32
+    %0 = tensor.empty() : tensor<8x128x1024xf32>
+    %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<8x128x1024xf32>) -> tensor<8x128x1024xf32>
+    %2 = linalg.generic {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<8x128x4096xf16>, tensor<1024x4096xf16>) outs(%1 : tensor<8x128x1024xf32>) {
+      ^bb0(%in: f16, %in_4: f16, %out: f32):
+        %12 = arith.extf %in : f16 to f32
+        %13 = arith.extf %in_4 : f16 to f32
+        %14 = arith.mulf %12, %13 : f32
+        %15 = arith.addf %out, %14 : f32
+        linalg.yield %15 : f32
+      } -> tensor<8x128x1024xf32>
+    return %2 : tensor<8x128x1024xf32>
   }
 }
 // CHECK-LABEL: @matmul_f16_medium_expanded
