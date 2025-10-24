@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --pass-pipeline="builtin.module(iree-pcf-lower-structural-pcf)" --split-input-file --verify-diagnostics | FileCheck %s
+// RUN: iree-opt %s --pass-pipeline="builtin.module(iree-pcf-lower-structural-pcf, cse)" --split-input-file --verify-diagnostics | FileCheck %s
 
 util.func private @generic() {
   pcf.generic scope(#pcf.sequential)
@@ -110,7 +110,7 @@ util.func private @lower_loop(%d0: index, %d1: index) {
 // CHECK-LABEL: @lower_loop
 //  CHECK-SAME:   %[[ARG0:[A-Za-z0-9_]+]]: index
 //  CHECK-SAME:   %[[ARG1:[A-Za-z0-9_]+]]: index
-//       CHECK:   scf.forall (%[[ID0:.+]], %[[ID1:.+]]) in (%[[ARG0]], %[[ARG1]])
+//       CHECK:   scf.forall (%[[ID1:.+]], %[[ID0:.+]]) in (%[[ARG1]], %[[ARG0]])
 //  CHECK-NEXT:     util.optimization_barrier %[[ID0]], %[[ID1]]
 
 // -----
@@ -131,5 +131,28 @@ util.func private @workgroup_ids(%d0: index, %d1: index) {
 //   CHECK-DAG:   %[[WGCY:.+]] = hal.interface.workgroup.count[1] : index
 //   CHECK-DAG:   %[[WGIX:.+]] = hal.interface.workgroup.id[0] : index
 //   CHECK-DAG:   %[[WGIY:.+]] = hal.interface.workgroup.id[1] : index
-//       CHECK:   scf.forall (%[[ID0:.+]], %[[ID1:.+]]) = (%[[WGIX]], %[[WGIY]]) to (%[[ARG0]], %[[ARG1]]) step (%[[WGCX]], %[[WGCY]])
-//  CHECK-NEXT:     util.optimization_barrier %[[ID0]], %[[ID1]]
+//       CHECK:   scf.forall (%[[ID0:.+]], %[[ID1:.+]]) = (%[[WGIY]], %[[WGIX]]) to (%[[ARG1]], %[[ARG0]]) step (%[[WGCY]], %[[WGCX]])
+//  CHECK-NEXT:     util.optimization_barrier %[[ID1]], %[[ID0]]
+
+// -----
+
+util.func private @linearize_workgroup_ids(%d0: index, %d1: index, %d2: index, %d3: index) {
+  pcf.loop scope(#iree_codegen.workgroup<linearize>) count(%d0, %d1, %d2, %d3)
+    execute[%n0: index, %n1: index, %n2: index, %n3: index] {
+    util.optimization_barrier %n0, %n1, %n2, %n3 : index, index, index, index
+    pcf.return
+  }
+  util.return
+}
+
+// CHECK-LABEL: @linearize_workgroup_ids
+//  CHECK-SAME:   %[[ARG0:[A-Za-z0-9_]+]]: index
+//  CHECK-SAME:   %[[ARG1:[A-Za-z0-9_]+]]: index
+//  CHECK-SAME:   %[[ARG2:[A-Za-z0-9_]+]]: index
+//  CHECK-SAME:   %[[ARG3:[A-Za-z0-9_]+]]: index
+//       CHECK:   %[[MUL0:.+]] = arith.muli %workgroup_count_x, %workgroup_count_y : index
+//       CHECK:   %[[MUL1:.+]] = arith.muli %[[MUL0]], %workgroup_count_z : index
+//       CHECK:   %[[LINEARIZE:.+]] = affine.linearize_index [%c0, %workgroup_id_z, %workgroup_id_y, %workgroup_id_x]
+//  CHECK-SAME:     by (1, %workgroup_count_z, %workgroup_count_y, %workgroup_count_x)
+//       CHECK:   scf.forall ({{.*}}) = (%c1, %c1, %c1, %[[LINEARIZE]])
+//  CHECK-SAME:     to (%[[ARG3]], %[[ARG2]], %[[ARG1]], %[[ARG0]]) step (%c1, %c1, %c1, %[[MUL1]])

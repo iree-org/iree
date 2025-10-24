@@ -41,10 +41,10 @@ def PCF_ScopeAttr : AttrInterface<"ScopeAttr"> {
         returned value. If `num_ids` is greater than the number of actual ids,
         this returns `1` for the slowest varying id counts.
 
-        Worker counts are ordered from slowest to fastest varying thread
+        Worker counts are ordered from fastest to slowest varying thread
         dimension. Concretely, `getWorkerCounts().front()` represents the
-        maximum value of the slowest varying ID, while `.back()` is the
-        fastest varying.
+        maximum value of the fastest varying ID, while `.back()` is the
+        slowest varying.
       }],
       /*retTy=*/"SmallVector<Value>",
       /*methodName=*/"getWorkerCounts",
@@ -62,6 +62,10 @@ def PCF_ScopeAttr : AttrInterface<"ScopeAttr"> {
         slowest varying worker ids are linearized into the slowest varying
         returned value. If `num_ids` is greater than the number of actual ids,
         this returns `0` for the slowest varying ids.
+
+        Worker ids are ordered from fastest to slowest varying thread
+        dimension. Concretely, `getWorkerIds().front()` represents the
+        the fastest varying ID, while `.back()` is the slowest varying.
       }],
       /*retTy=*/"SmallVector<Value>",
       /*methodName=*/"getWorkerIDs",

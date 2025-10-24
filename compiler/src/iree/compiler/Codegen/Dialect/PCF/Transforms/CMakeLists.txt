@@ -50,6 +50,7 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Codegen::Dialect::PCF::IR
     iree::compiler::Dialect::Util::IR
+    iree::compiler::Utils
   PUBLIC
 )
 
