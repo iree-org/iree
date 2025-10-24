@@ -630,7 +630,7 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   static const ChipDetails w7800Chip = {70 / 2, "w7800"};
   static const ChipDetails w7700Chip = {48 / 2, "w7700"};
   static const ChipDetails phoenixChip = {12 / 2, "phoenix"};
-  static const ChipDetails strixPointChip = {16 / 2, "strix"};
+  static const ChipDetails strixPointChip = {16 / 2, "strix-point"};
   static const ChipDetails strixHaloChip = {40 / 2, "strix-halo"};
 
   // See https://llvm.org/docs/AMDGPUUsage.html#processors for gfxN to
