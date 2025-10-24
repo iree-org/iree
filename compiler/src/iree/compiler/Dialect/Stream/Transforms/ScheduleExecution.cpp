@@ -224,6 +224,20 @@ static SmallVector<Block *, 8> sortBlocksInDominanceOrder(Region &region) {
   return orderedBlocks;
 }
 
+// Returns true if an operation can be placed into a partition (execute region).
+// Only streamable operations should be partitioned; all other operations stay
+// in the parent block and have their nested regions recursively processed.
+//
+// TODO(benvanik): allow limited scf ops inside the regions when we can ensure
+// they rely on only constant values (in the future we can do indirect stuff).
+static bool canPlaceInPartition(Operation *op) {
+  // Only StreamableOpInterface ops can be placed into partitions.
+  // This includes ops like stream.async.slice, stream.async.clone, etc.
+  // but excludes stream.async.execute (which is the partition container itself)
+  // and control flow ops like scf.for.
+  return isa<IREE::Stream::StreamableOpInterface>(op);
+}
+
 LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
                             const PartitioningConfigAttr &configAttr) {
   for (auto *block : sortBlocksInDominanceOrder(region)) {
@@ -290,7 +304,42 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
         deadOps.insert(oldResult.getDefiningOp());
       }
     }
+    // Before erasing preferCloneToConsumers ops, re-materialize them in nested
+    // regions that reference them.
+    DenseMap<Operation *, Operation *> rematerializedOps;
+    for (auto *deadOp : deadOps) {
+      auto streamableOp = dyn_cast<IREE::Stream::StreamableOpInterface>(deadOp);
+      if (!streamableOp || !streamableOp.preferCloneToConsumers()) {
+        continue;
+      }
+
+      // Find all uses in nested regions and re-materialize.
+      for (auto &use : llvm::make_early_inc_range(deadOp->getUses())) {
+        Operation *user = use.getOwner();
+        // Only look at users in other regions.
+        if (user->getBlock() == deadOp->getBlock()) {
+          continue;
+        }
+
+        // Re-materialize the op at the start of the user's block.
+        Block *nestedBlock = user->getBlock();
+        auto *clonedOp = deadOp->clone();
+        nestedBlock->getOperations().insert(nestedBlock->begin(), clonedOp);
+
+        // Replace this use with the cloned op's result.
+        Value oldValue = use.get();
+        auto resultValue = dyn_cast<OpResult>(oldValue);
+        unsigned resultIndex = resultValue.getResultNumber();
+        use.set(clonedOp->getResult(resultIndex));
+      }
+    }
+
     for (auto *deadOp : llvm::reverse(deadOps)) {
+      if (!deadOp->use_empty()) {
+        // Keep ops that are still used (shouldn't happen after
+        // re-materialization).
+        continue;
+      }
       deadOp->erase();
     }
 
@@ -304,9 +353,27 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
     });
   }
 
+  // Process nested regions AFTER partitioning the current block.
+  // This allows nested regions to use the remapped values from parent
+  // partitions. We only process operations that were NOT placed into
+  // partitions above (e.g., control flow operations like scf.for).
   for (auto *block : sortBlocksInDominanceOrder(region)) {
     for (auto &op : *block) {
-      if (isa<scf::SCFDialect>(op.getDialect())) {
+      // Skip ops that were placed into partitions (they're being moved).
+      if (canPlaceInPartition(&op)) {
+        continue;
+      }
+
+      // Process any op with regions that supports control flow, except for
+      // stream.async.execute and stream.async.concurrent which are the
+      // partition containers created by this pass.
+      if (isa<RegionBranchOpInterface>(op)) {
+        // Don't recurse into the partition containers we just created.
+        if (isa<IREE::Stream::AsyncExecuteOp>(op) ||
+            isa<IREE::Stream::AsyncConcurrentOp>(op)) {
+          continue;
+        }
+
         for (auto &subregion : op.getRegions()) {
           if (failed(processRegion(loc, context, subregion, configAttr)))
             return failure();
