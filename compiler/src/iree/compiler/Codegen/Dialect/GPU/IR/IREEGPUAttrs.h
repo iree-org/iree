@@ -104,22 +104,22 @@ namespace mlir::iree_compiler::IREE::GPU {
 // The general procedure is a generalization of the above rank-1 case:
 // 1. Delinearize the vector index modulo (element[0] * ... * element[rank - 1])
 //    into the grid of shape {element[0], ..., element[rank - 1]}.
-//    Thus, the element[] array describes the tile that are stored in contiguous
-//    elements of the intrinsics' vector operand. We will call these the
-//    "element tiles". The layout of element tiles is always "row-major" in the
-//    sense that the last-enumerated semantic dimension is the most-contiguous
-//    dimension.
+//    Thus, the element[] array describes the tile that is stored in contiguous
+//    elements of the intrinsics' vector operand. We will call it the
+//    "element tile". The layout within the element tile is always "row-major"
+//    in the sense that the last-enumerated semantic dimension is the
+//    most-contiguous dimension.
 // 2. Delinearize the thread-id modulo (thread[0] * ... * thread[rank - 1])
 //    into the grid of shape {thread[0], ..., thread[rank - 1]}.
 //    Thus, the different threads get different element tiles (from step 1)
-//    except in the rare case that (thread[0] * ... * thread[rank - 1]), where
-//    the threads wrap around and share tiles. Unlike the element tiles from
-//    step 1, the distribution of these tiles to threads is not necessarily
-//    following row-major order. The thread layout is described by the tstrides.
-//    The meaning of tstrides[i] is: "as we move down by one element tile along
-//    semantic dimension i, we add tstrides[i] to the thread_id". Note that in
-//    the rare case that multiple threads see the same element tile, we can have
-//    tstrides[i] == 0.
+//    except in the rare case that (thread[0] * ... * thread[rank - 1]) is less
+//    than subgroup size, in which case the threads wrap around and share tiles.
+//    * Unlike the element tiles from step 1, the distribution of these tiles to
+//      threads is not necessarily following row-major order. The thread layout
+//      is described by the tstrides. The meaning of tstrides[i] is: "as we move
+//      by one element tile along semantic dimension i, we add tstrides[i]
+//      to the thread_id". Note that in the rare case that multiple threads see
+//      the same element tile, we can have tstrides[i] == 0.
 // 3. Delinearize the "outer vector index", defined as the quotient
 //    vector_index / (element[0] * ... * element[rank - 1]),
 //    into the grid of shape {outer[0], ..., outer[rank - 1]}.
