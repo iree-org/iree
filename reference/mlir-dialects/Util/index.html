@@ -7335,50 +7335,6 @@ tables.</p>
 <p>Declares a global variable that maintains its value across invocations.
 The value is tied to the execution context of the module and different
 contexts will have different variable storage.</p>
-<p>Globals can be initialized with an <code>initial_value</code> attribute that specifies
-their value at module initialization time. This initial value is evaluated
-in module definition order: a global with an initial value is considered
-initialized at its definition point in the module, not when first accessed.</p>
-<p>During module initialization:
-* Globals with <code>initial_value</code> attributes conceptually have their value
-  materialized and stored before any subsequent initialization points
-* Initialization order follows module definition order exactly
-* Globals are visible to initializers but only after their definition point</p>
-<p>Example:
-<div class="highlight"><pre><span></span><code>// A is initialized to 1 at this point in module initialization.
-util.global @A = 1 : i32
-
-// This initializer can read A (it&#39;s defined above).
-util.initializer {
-  %a = util.global.load @A : i32  // Loads 1
-}
-
-// B is initialized to 2 here, after the above initializer runs.
-util.global @B = 2 : i32
-</code></pre></div></p>
-<p>Globals marked as mutable can be modified by stores anywhere in the program.
-Immutable globals have strict initialization rules:
-* Can only be initialized once - either by <code>initial_value</code> or by stores
-  in initializers, never both.
-* Stores to immutable globals are only allowed in:
-  - <code>util.initializer</code> ops directly
-  - Functions that are only called from initializers (initializer-only)
-* Stores from externally-reachable functions are forbidden.
-* Initialization must respect module order - initializers can only
-  access globals defined before them.</p>
-<p>Stores to immutable globals inside control flow regions (scf.if, scf.for,
-scf.while, etc) in initializer-only functions will generate warnings as
-they may indicate complex initialization patterns that could be fragile:
-<div class="highlight"><pre><span></span><code>util.func private @init_func() {
-  scf.if %cond {
-    // Warning: conditional store in initializer-only function
-    util.global.store %val, @immutable_global : i32
-  }
-}
-</code></pre></div>
-While such patterns are allowed they should be used with caution as the
-initialization behavior depends on runtime control flow and the compiler
-may disable optimizations on those globals.</p>
 <p>Interfaces: <code>Symbol</code>, <code>Util_GlobalOpInterface</code></p>
 <h5 id="attributes_10">Attributes:<a class="headerlink" href="#attributes_10" title="Permanent link">link</a></h5>
 <table>
@@ -7926,37 +7882,6 @@ in some other module) has no body.</p>
 <p>A function that is called in definition order upon module initialization.
 Must not load any globals that are defined or initialized after it in the
 module.</p>
-<p>Module initialization follows a strict execution order to ensure
-correctness:
-* Initialization points: two types of operations define initialization:
-  - <code>util.initializer</code> ops: explicit initialization functions
-  - <code>util.global</code> ops with initial values: implicit initialization via
-    attributes
-* Execution order: initialization proceeds in exact module definition order:
-  - Operations execute sequentially from top to bottom
-  - Each <code>util.global</code> with an initial value conceptually materializes its
-    value and stores it before the next initialization point
-  - Each <code>util.initializer</code> executes its entire body before proceeding
-* Dependency rules:
-  - Initializers may only access globals defined before them in module order
-  - Globals with initial values are considered "initialized" at their
-    definition point, not when first accessed
-  - Function calls within initializers observe the current initialization
-    state when the call is made
-* Transformation guarantees:
-  - Combining passes preserve exact initialization order
-  - Globals with initial values may be converted to explicit initialization
-    while maintaining their position in the initialization sequence
-  - The final initialization state must be identical to sequential execution</p>
-<p>Example execution:
-<div class="highlight"><pre><span></span><code>util.global @A = 1 : i32           // A = 1
-util.initializer { ... }           // Executes with A = 1
-util.global @B = 2 : i32           // B = 2
-util.initializer {
-  %a = util.global.load @A : i32   // Loads 1
-  %b = util.global.load @B : i32   // Loads 2
-}
-</code></pre></div></p>
 <p>Traits: <code>IsolatedFromAbove</code></p>
 <p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code>, <code>Util_InitializerOpInterface</code></p>
 <h5 id="attributes_15">Attributes:<a class="headerlink" href="#attributes_15" title="Permanent link">link</a></h5>
