@@ -9,7 +9,6 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
-#include "iree/compiler/Dialect/Util/Analysis/GlobalTable.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/STLExtras.h"
@@ -80,28 +79,29 @@ ValuePerAffinityHelper::ValuePerAffinityHelper(mlir::ModuleOp moduleOp)
     : builder(moduleOp), symbolTable(moduleOp) {
   // Pre-compute the insertion point for each global for performance.
   // This avoids scanning all initializers multiple times during transformation.
-  IREE::Util::GlobalTable globalTable(moduleOp);
-  globalTable.forEach([&](IREE::Util::Global &global) {
+  for (auto globalOp : moduleOp.getOps<IREE::Util::GlobalOpInterface>()) {
     // Initialize with the global op itself as the default insertion point.
-    Operation *insertionPoint = global.op.getOperation();
+    Operation *insertionPoint = globalOp.getOperation();
+    StringRef globalName = globalOp.getGlobalName();
 
-    // Iterate through store operations to find initializers.
-    for (auto storeOp : global.storeOps) {
-      // Get the parent initializer op if the store is within one.
-      auto initOp = storeOp->getParentOfType<IREE::Util::InitializerOp>();
-      if (!initOp) {
-        continue;
-      }
+    // Scan all initializers to find those that store to this global.
+    for (auto initOp : moduleOp.getOps<IREE::Util::InitializerOp>()) {
+      bool referencesGlobal = false;
+      initOp.walk([&](IREE::Util::GlobalStoreOpInterface storeOp) {
+        if (storeOp.getGlobalName() == globalName) {
+          referencesGlobal = true;
+        }
+      });
 
-      // Update the insertion point if this is the latest initializer.
-      if (insertionPoint->isBeforeInBlock(initOp)) {
+      // Update the insertion point if this initializer references the global
+      // and comes after the current insertion point.
+      if (referencesGlobal && insertionPoint->isBeforeInBlock(initOp)) {
         insertionPoint = initOp;
       }
     }
 
-    cachedInsertionPointForGlobal[global.op.getOperation()] = insertionPoint;
-    return IREE::Util::GlobalAction::PRESERVE;
-  });
+    cachedInsertionPointForGlobal[globalOp.getOperation()] = insertionPoint;
+  }
 }
 
 Value ValuePerAffinityHelper::getOrCreateValueForAffinity(
