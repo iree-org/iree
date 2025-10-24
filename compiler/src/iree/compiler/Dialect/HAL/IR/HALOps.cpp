@@ -1957,11 +1957,10 @@ Value ExecutableVariantOp::buildCondition(Value device, OpBuilder &builder) {
     IRMapping mapper;
     mapper.map(conditionOp.getRegion().getArgument(0), device);
     conditionOp.getRegion().cloneInto(&regionOp.getRegion(), mapper);
-
     for (auto returnOp :
          llvm::make_early_inc_range(regionOp.getOps<IREE::HAL::ReturnOp>())) {
-      OpBuilder(returnOp).create<scf::YieldOp>(returnOp.getLoc(),
-                                               returnOp.getOperands());
+      OpBuilder builder(returnOp);
+      scf::YieldOp::create(builder, returnOp.getLoc(), returnOp.getOperands());
       returnOp.erase();
     }
 

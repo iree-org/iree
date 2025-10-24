@@ -382,8 +382,8 @@ struct UnreachableOpConversion
   matchAndRewrite(IREE::Util::UnreachableOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Create INTERNAL status code (13) for unreachable code.
-    auto status = rewriter.create<IREE::VM::ConstI32Op>(
-        op.getLoc(), rewriter.getI32IntegerAttr(13));
+    auto status = IREE::VM::ConstI32Op::create(rewriter, op.getLoc(),
+                                               rewriter.getI32IntegerAttr(13));
     rewriter.replaceOpWithNewOp<IREE::VM::FailOp>(op, status.getResult(),
                                                   op.getMessageAttr());
     return success();

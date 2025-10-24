@@ -353,8 +353,8 @@ struct CoalescedGatherDMAOpBufferizationInterface
       if (forallOp) {
         // Insert the memref version before the in_parallel block.
         rewriter.setInsertionPoint(parentOp);
-        rewriter.create<IREE::GPU::CoalescedGatherDMAOp>(
-            gatherOp.getLoc(), initBuffer->getType(), *indicesBuffer,
+        IREE::GPU::CoalescedGatherDMAOp::create(
+            rewriter, gatherOp.getLoc(), initBuffer->getType(), *indicesBuffer,
             *sourceBuffer, *initBuffer);
         // The result is the same as the init buffer.
         bufferization::replaceOpWithBufferizedValues(rewriter, op, *initBuffer);
