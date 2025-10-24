@@ -429,30 +429,31 @@ NestedLayoutAttr::computeThreadIds(Value threadId, int64_t subgroupSize,
                                    RewriterBase &rewriter) const {
   SmallVector<Value> virtualTids;
 
-  Location loc = threadId.getLoc();
-
-  SmallVector<int64_t> subgroupBasis, threadBasis;
-  SmallVector<size_t> subgroupDimToResult, threadDimToResult;
-
-  if (failed(basisFromSizesStrides(getSubgroupTile(), getSubgroupStrides(),
-                                   subgroupBasis, subgroupDimToResult)))
+  ArrayRef<int64_t> threadTile = getThreadTile();
+  ArrayRef<int64_t> threadStrides = getThreadStrides();
+  ArrayRef<int64_t> subgroupTile = getSubgroupTile();
+  // Multiply the subgroup strides by subgroup_size to reflect thread id
+  // relative strides.
+  auto subgroupStrides = llvm::map_to_vector(
+      getSubgroupStrides(), [&](int64_t x) { return x * subgroupSize; });
+  auto concatTiles =
+      llvm::to_vector(llvm::concat<const int64_t>(subgroupTile, threadTile));
+  auto concatStrides = llvm::to_vector(
+      llvm::concat<const int64_t>(subgroupStrides, threadStrides));
+  SmallVector<int64_t> basis;
+  SmallVector<size_t> dimToResult;
+  if (failed(basisFromSizesStrides(concatTiles, concatStrides, basis,
+                                   dimToResult))) {
     return {};
-  if (failed(basisFromSizesStrides(getThreadTile(), getThreadStrides(),
-                                   threadBasis, threadDimToResult)))
-    return {};
+  }
 
-  // Add the subgroup_size to the end of the subgroup delinearization basis.
-  subgroupBasis.push_back(subgroupSize);
+  SmallVector<Value> delinearized;
+  rewriter.createOrFold<affine::AffineDelinearizeIndexOp>(
+      delinearized, threadId.getLoc(), threadId, basis,
+      /*hasOuterbound=*/false);
 
-  auto subgroupSplit = affine::AffineDelinearizeIndexOp::create(
-      rewriter, loc, threadId, subgroupBasis, /*hasOuterBound=*/false);
-  auto threadSplit = affine::AffineDelinearizeIndexOp::create(
-      rewriter, loc, threadId, threadBasis, /*hasOuterBound=*/false);
-
-  llvm::transform(subgroupDimToResult, std::back_inserter(virtualTids),
-                  [&](size_t idx) { return subgroupSplit.getResult(idx); });
-  llvm::transform(threadDimToResult, std::back_inserter(virtualTids),
-                  [&](size_t idx) { return threadSplit.getResult(idx); });
+  llvm::transform(dimToResult, std::back_inserter(virtualTids),
+                  [&](size_t idx) { return delinearized[idx]; });
 
   return virtualTids;
 }

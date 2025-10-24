@@ -696,6 +696,7 @@ def AMDGPUDistributeVectorsOp :
 
     let arguments = (ins TransformHandleTypeInterface:$target,
                          UnitAttr:$test_conversion,
+                         DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$workgroup_size,
                          DefaultValuedOptionalAttr<I64Attr, "64">:$subgroup_size);
     let results = (outs TransformHandleTypeInterface:$result);
 
