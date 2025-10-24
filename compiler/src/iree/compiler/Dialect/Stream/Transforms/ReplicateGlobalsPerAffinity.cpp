@@ -70,6 +70,8 @@ private:
   SymbolTable symbolTable;
   DenseMap<OpAffinityPair, IREE::Util::GlobalOpInterface> cachedGlobals;
   DenseMap<ValueAffinityPair, Value> cachedValuePerAffinity;
+  // Cache the last initializer that references each global for performance.
+  DenseMap<Operation *, Operation *> cachedLastInitializer;
 };
 
 Value ValuePerAffinityHelper::getOrCreateValueForAffinity(
@@ -129,24 +131,34 @@ ValuePerAffinityHelper::getOrCreateGlobalForAffinity(
   // Find the insertion point: after the last initializer that references this
   // global, or after the global itself if no initializers exist.
   Operation *insertionPoint = globalOp.getOperation();
-  auto moduleOp = globalOp->getParentOfType<mlir::ModuleOp>();
-  for (auto initOp : moduleOp.getOps<IREE::Util::InitializerOp>()) {
-    // Check if this initializer stores to the original global.
-    bool referencesGlobal = false;
-    initOp.walk([&](IREE::Util::GlobalStoreOpInterface storeOp) {
-      if (storeOp.getGlobalName() == globalName) {
-        referencesGlobal = true;
-      }
-    });
 
-    // If this initializer references the global and comes after the global op,
-    // update the insertion point if this is the latest one we've seen.
-    if (referencesGlobal && globalOp->isBeforeInBlock(initOp)) {
-      if (insertionPoint == globalOp.getOperation() ||
-          insertionPoint->isBeforeInBlock(initOp)) {
-        insertionPoint = initOp;
+  // Check if we've already cached the last initializer for this global.
+  auto cachedIt = cachedLastInitializer.find(globalOp.getOperation());
+  if (cachedIt != cachedLastInitializer.end()) {
+    insertionPoint = cachedIt->second;
+  } else {
+    // First time seeing this global, scan for its last initializer.
+    auto moduleOp = globalOp->getParentOfType<mlir::ModuleOp>();
+    for (auto initOp : moduleOp.getOps<IREE::Util::InitializerOp>()) {
+      // Check if this initializer stores to the original global.
+      bool referencesGlobal = false;
+      initOp.walk([&](IREE::Util::GlobalStoreOpInterface storeOp) {
+        if (storeOp.getGlobalName() == globalName) {
+          referencesGlobal = true;
+        }
+      });
+
+      // If this initializer references the global and comes after the global
+      // op, update the insertion point if this is the latest one we've seen.
+      if (referencesGlobal && globalOp->isBeforeInBlock(initOp)) {
+        if (insertionPoint == globalOp.getOperation() ||
+            insertionPoint->isBeforeInBlock(initOp)) {
+          insertionPoint = initOp;
+        }
       }
     }
+    // Cache the result for future calls.
+    cachedLastInitializer[globalOp.getOperation()] = insertionPoint;
   }
 
   // Create the new global and initializer after the insertion point.
