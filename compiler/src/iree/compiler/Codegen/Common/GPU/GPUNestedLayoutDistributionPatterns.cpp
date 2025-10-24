@@ -530,15 +530,15 @@ struct DistributeTransferWrite final
 
     // If the distribution results in threads writing to the same address, guard
     // with an scf.if to ensure only one thread writes per duplication group.
-    Location loc = writeOp.getLoc();
-    FailureOr<Value> doWrite =
-        getNoOverlapCondition(rewriter, loc, vectorLayout);
-    if (failed(doWrite)) {
-      return rewriter.notifyMatchFailure(
-          writeOp, "failed to compute no-overlap condition");
-    }
-    auto ifOp = scf::IfOp::create(rewriter, loc, doWrite.value());
-    rewriter.setInsertionPoint(ifOp.thenYield());
+    // Location loc = writeOp.getLoc();
+    // FailureOr<Value> doWrite =
+    //     getNoOverlapCondition(rewriter, loc, vectorLayout);
+    // if (failed(doWrite)) {
+    //   return rewriter.notifyMatchFailure(
+    //       writeOp, "failed to compute no-overlap condition");
+    // }
+    // auto ifOp = scf::IfOp::create(rewriter, loc, doWrite.value());
+    // rewriter.setInsertionPoint(ifOp.thenYield());
 
     Value distributedVector =
         getDistributed(rewriter, writeOp.getValueToStore(), vectorLayout);
