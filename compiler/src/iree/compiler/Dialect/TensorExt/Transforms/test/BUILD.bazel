@@ -16,12 +16,9 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "dispatch_tensor_folding.mlir",
-            "dispatch_workload_ordinal_folding.mlir",
-            "inline.mlir",
-            "invalid.mlir",
-            "roundtrip.mlir",
-            "tensor_ext_folding.mlir",
+            "sparse_interface_methods.mlir",
+            "sparse_interface_methods_estimated_loop_range_fail.mlir",
+            "sparse_interface_methods_lower_loop_range_fail.mlir",
         ],
         include = ["*.mlir"],
     ),
