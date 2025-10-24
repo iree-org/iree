@@ -27,6 +27,15 @@
 // RUN:   --iree-hip-target=w7700 %s | FileCheck %s --check-prefix=GFX1101
 //
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-hip-target=gfx1103 %s | FileCheck %s --check-prefix=GFX1103
+//
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-hip-target=gfx1150 %s | FileCheck %s --check-prefix=GFX1150
+//
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-hip-target=gfx1151 %s | FileCheck %s --check-prefix=GFX1151
+//
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-hip-target=gfx1200 %s | FileCheck %s --check-prefix=GFX1200
 //
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
@@ -74,6 +83,18 @@
 // GFX1101: target_info = #iree_gpu.target<arch = "gfx1101",
 // GFX1101-SAME:        mma = [<WMMAR3_F32_16x16x16_F16>, <WMMAR3_F16_16x16x16_F16>, <WMMAR3_F32_16x16x16_BF16>, <WMMAR3_BF16_16x16x16_BF16>, <WMMAR3_I32_16x16x16_I8>]
 // GFX1101-SAME:        subgroup_size_choices = [32, 64]
+
+// GFX1103: target_info = #iree_gpu.target<arch = "gfx1103",
+// GFX1103-SAME:        mma = [<WMMAR3_F32_16x16x16_F16>, <WMMAR3_F16_16x16x16_F16>, <WMMAR3_F32_16x16x16_BF16>, <WMMAR3_BF16_16x16x16_BF16>, <WMMAR3_I32_16x16x16_I8>]
+// GFX1103-SAME:        subgroup_size_choices = [32, 64]
+
+// GFX1150: target_info = #iree_gpu.target<arch = "gfx1150",
+// GFX1150-SAME:        mma = [<WMMAR3_F32_16x16x16_F16>, <WMMAR3_F16_16x16x16_F16>, <WMMAR3_F32_16x16x16_BF16>, <WMMAR3_BF16_16x16x16_BF16>, <WMMAR3_I32_16x16x16_I8>]
+// GFX1150-SAME:        subgroup_size_choices = [32, 64]
+
+// GFX1151: target_info = #iree_gpu.target<arch = "gfx1151",
+// GFX1151-SAME:        mma = [<WMMAR3_F32_16x16x16_F16>, <WMMAR3_F16_16x16x16_F16>, <WMMAR3_F32_16x16x16_BF16>, <WMMAR3_BF16_16x16x16_BF16>, <WMMAR3_I32_16x16x16_I8>]
+// GFX1151-SAME:        subgroup_size_choices = [32, 64]
 
 // GFX1200: target_info = #iree_gpu.target<arch = "gfx1200",
 // GFX1200-SAME:        mma = [<WMMAR4_F32_16x16x16_F16>, <WMMAR4_F16_16x16x16_F16>, <WMMAR4_F32_16x16x16_BF16>, <WMMAR4_BF16_16x16x16_BF16>, <WMMAR4_F32_16x16x16_F8E5M2>, <WMMAR4_F32_16x16x16_F8E5M2_F8E4M3FN>, <WMMAR4_F32_16x16x16_F8E4M3FN>, <WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2>,  <WMMAR4_I32_16x16x16_I8>]

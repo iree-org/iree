@@ -698,6 +698,9 @@ StringRef normalizeAMDGPUTarget(StringRef target) {
              /*Value=*/"gfx1100")
       .Cases({"rx7800xt", "rx7700xt", "v710", "w7700", "gfx1101"},
              /*Value=*/"gfx1101")
+      .Case("gfx1103", /*Value=*/"gfx1103")
+      .Case("gfx1150", /*Value=*/"gfx1150")
+      .Case("gfx1151", /*Value=*/"gfx1151")
       .Case("gfx1250", /*Value=*/"gfx1250")
       .Default("");
 }
