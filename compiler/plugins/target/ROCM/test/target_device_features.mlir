@@ -27,10 +27,19 @@
 // RUN:   --iree-hip-target=w7700 %s | FileCheck %s --check-prefix=GFX1101
 //
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-hip-target=phoenix %s | FileCheck %s --check-prefix=GFX1103
+//
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-hip-target=gfx1103 %s | FileCheck %s --check-prefix=GFX1103
 //
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-hip-target=strix-point %s | FileCheck %s --check-prefix=GFX1150
+//
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-hip-target=gfx1150 %s | FileCheck %s --check-prefix=GFX1150
+//
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-hip-target=strix-halo %s | FileCheck %s --check-prefix=GFX1151
 //
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-hip-target=gfx1151 %s | FileCheck %s --check-prefix=GFX1151
