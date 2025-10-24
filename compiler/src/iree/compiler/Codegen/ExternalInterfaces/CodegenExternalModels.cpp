@@ -94,27 +94,27 @@ struct WorkgroupScopeAttr final
   SmallVector<Value> getWorkerCounts(Attribute attr, OpBuilder &builder,
                                      Location loc, int64_t numIds) const {
     SmallVector<Value> counts;
-    if (numIds > 3) {
-      Value one = arith::ConstantIndexOp::create(builder, loc, 1);
-      counts.append(numIds - 3, one);
-    }
-    for (int64_t i = std::min<int64_t>(3, numIds) - 1; i >= 0; --i) {
+    for (int64_t i = 0, e = std::min<int64_t>(3, numIds); i < e; ++i) {
       counts.push_back(
           IREE::HAL::InterfaceWorkgroupCountOp::create(builder, loc, i)
               .getResult());
+    }
+    if (numIds > 3) {
+      Value one = arith::ConstantIndexOp::create(builder, loc, 1);
+      counts.append(numIds - 3, one);
     }
     return counts;
   }
   SmallVector<Value> getWorkerIDs(Attribute attr, OpBuilder &builder,
                                   Location loc, int64_t numIds) const {
     SmallVector<Value> ids;
+    for (int64_t i = 0, e = std::min<int64_t>(3, numIds); i < e; ++i) {
+      ids.push_back(IREE::HAL::InterfaceWorkgroupIDOp::create(builder, loc, i)
+                        .getResult());
+    }
     if (numIds > 3) {
       Value zero = arith::ConstantIndexOp::create(builder, loc, 0);
       ids.append(numIds - 3, zero);
-    }
-    for (int64_t i = std::min<int64_t>(3, numIds) - 1; i >= 0; --i) {
-      ids.push_back(IREE::HAL::InterfaceWorkgroupIDOp::create(builder, loc, i)
-                        .getResult());
     }
     return ids;
   }

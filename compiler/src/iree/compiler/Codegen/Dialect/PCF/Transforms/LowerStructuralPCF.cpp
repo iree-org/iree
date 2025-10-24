@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/PCF/IR/PCFOps.h"
 #include "iree/compiler/Codegen/Dialect/PCF/Transforms/ConversionDialectInterface.h"
 #include "iree/compiler/Codegen/Dialect/PCF/Transforms/Passes.h"
+#include "iree/compiler/Utils/RewriteUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
@@ -150,20 +151,30 @@ struct LowerLoopOp : public OpRewritePattern<IREE::PCF::LoopOp> {
 
     assert(workerCounts.size() == loopOp.getNumIdArgs() &&
            "expected worker count to match number of id args");
+    assert(ids.size() == loopOp.getNumIdArgs() &&
+           "expected worker id count to match number of id args");
 
     // Create an scf.forall op with no mapping. This is moderately more
     // expressive than scf.for because it indicates that loop iterations
     // are independent of one another.
-    SmallVector<OpFoldResult> lbs = llvm::map_to_vector(
-        llvm::reverse(ids), [](Value v) -> OpFoldResult { return v; });
+    //
+    // `scf.forall` orders its loop parameters from slowest to fasted varying,
+    // so reverse lbs/ubs/steps.
+    SmallVector<OpFoldResult> lbs(ids.rbegin(), ids.rend());
     SmallVector<OpFoldResult> steps(workerCounts.rbegin(), workerCounts.rend());
-    SmallVector<OpFoldResult> ubs(loopOp.getCount().begin(),
-                                  loopOp.getCount().end());
+    SmallVector<OpFoldResult> ubs(llvm::reverse(loopOp.getCount()));
     auto forallOp = scf::ForallOp::create(
         rewriter, loc, lbs, ubs, steps, ValueRange(), /*mapping=*/std::nullopt);
     // We can take the body of the loop op directly since the index body args
     // already represent the tile ids.
     forallOp.getRegion().takeBody(loopOp.getRegion());
+    Block *body = forallOp.getBody();
+
+    // Since forall loop ids are ordered from slowest to fastest varying we need
+    // to reverse the ordering of their uses.
+    SmallVector<int64_t> reversePerm = llvm::to_vector(
+        llvm::reverse(llvm::seq<int64_t>(body->getNumArguments())));
+    permuteValues(rewriter, loc, body->getArguments(), reversePerm);
 
     // Replace pcf.return terminator with scf.forall.in_parallel.
     rewriter.setInsertionPoint(pcfTerminator);

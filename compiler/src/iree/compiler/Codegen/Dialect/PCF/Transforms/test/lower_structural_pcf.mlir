@@ -110,7 +110,7 @@ util.func private @lower_loop(%d0: index, %d1: index) {
 // CHECK-LABEL: @lower_loop
 //  CHECK-SAME:   %[[ARG0:[A-Za-z0-9_]+]]: index
 //  CHECK-SAME:   %[[ARG1:[A-Za-z0-9_]+]]: index
-//       CHECK:   scf.forall (%[[ID0:.+]], %[[ID1:.+]]) in (%[[ARG0]], %[[ARG1]])
+//       CHECK:   scf.forall (%[[ID1:.+]], %[[ID0:.+]]) in (%[[ARG1]], %[[ARG0]])
 //  CHECK-NEXT:     util.optimization_barrier %[[ID0]], %[[ID1]]
 
 // -----
@@ -131,5 +131,5 @@ util.func private @workgroup_ids(%d0: index, %d1: index) {
 //   CHECK-DAG:   %[[WGCY:.+]] = hal.interface.workgroup.count[1] : index
 //   CHECK-DAG:   %[[WGIX:.+]] = hal.interface.workgroup.id[0] : index
 //   CHECK-DAG:   %[[WGIY:.+]] = hal.interface.workgroup.id[1] : index
-//       CHECK:   scf.forall (%[[ID0:.+]], %[[ID1:.+]]) = (%[[WGIX]], %[[WGIY]]) to (%[[ARG0]], %[[ARG1]]) step (%[[WGCX]], %[[WGCY]])
-//  CHECK-NEXT:     util.optimization_barrier %[[ID0]], %[[ID1]]
+//       CHECK:   scf.forall (%[[ID0:.+]], %[[ID1:.+]]) = (%[[WGIY]], %[[WGIX]]) to (%[[ARG1]], %[[ARG0]]) step (%[[WGCY]], %[[WGCX]])
+//  CHECK-NEXT:     util.optimization_barrier %[[ID1]], %[[ID0]]

@@ -26,10 +26,14 @@ class ForallOp;
 
 namespace mlir::iree_compiler::IREE::PCF {
 
-// Helper to convert scf.forall ops to pcf.loop.
+// Helper to convert scf.forall ops to pcf.loop by linearizing/delinearizing
+// ids beyond |numIds| into the slowest varying id. Uses
+// DeviceMappingAttrInterface to infer the order of ids from slowest to fastest
+// varying. If |numIds| <= 0, then no linearization/delinearization is done.
 FailureOr<PCF::LoopOp> convertForallToPCF(RewriterBase &rewriter,
                                           scf::ForallOp forallOp,
-                                          PCF::ScopeAttr scope);
+                                          PCF::ScopeAttr scope,
+                                          int64_t numIds = -1);
 
 struct ConsumerFusionParams {
   // List of operands in the consumer that are fused along.

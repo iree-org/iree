@@ -17,8 +17,8 @@ func.func @convert_forall(%arg0: tensor<?x?xi32>, %init: tensor<?x?xi32>, %d0: i
 //  CHECK-SAME:   %[[INIT:[A-Za-z0-9_]+]]: tensor<?x?xi32>
 //  CHECK-SAME:   %[[D0:[A-Za-z0-9_]+]]: index
 
-//       CHECK:   %[[LOOP:.+]] = pcf.loop scope(#pcf.sequential) count(%[[D0]], %c32)
-//       CHECK:     execute(%[[REF:.+]] = %[[INIT]])[%[[ID0:.+]]: index, %[[ID1:.+]]: index]
+//       CHECK:   %[[LOOP:.+]] = pcf.loop scope(#pcf.sequential) count(%c32, %[[D0]])
+//       CHECK:     execute(%[[REF:.+]] = %[[INIT]])[%[[ID1:.+]]: index, %[[ID0:.+]]: index]
 //       CHECK:          : (!pcf.sref<?x?xi32, sync(#pcf.sequential)>)
 //       CHECK:         -> (tensor<?x?xi32>) {
 //       CHECK:       %[[DEST_SLICE:.+]] = tensor.extract_slice %[[INIT]]
