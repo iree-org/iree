@@ -1,6 +1,5 @@
-// RUN: iree-opt --split-input-file --verify-diagnostics --iree-util-verify-initialization-order %s
+// RUN: iree-opt --split-input-file --verify-diagnostics --iree-util-verify-initialization-order %s | FileCheck %s
 
-// -----
 // Valid: Basic module with correct initialization order.
 
 util.global private @global1 = 1 : i32
@@ -12,11 +11,13 @@ util.initializer {
 }
 
 // -----
+
 // Valid: Immutable global initialized by initial value only.
 
 util.global private @immutable_with_value = 42 : i32
 
 // -----
+
 // Valid: Immutable global initialized by store in initializer only.
 
 util.global private @immutable_no_value : i32
@@ -27,6 +28,7 @@ util.initializer {
 }
 
 // -----
+
 // Valid: Mutable global can be stored from anywhere.
 
 util.global private mutable @mutable_global : i32
@@ -42,6 +44,7 @@ util.func public @store_mutable() {
 }
 
 // -----
+
 // Valid: Store to immutable global in initializer-only function.
 
 util.func private @init_only_func() {
@@ -57,6 +60,7 @@ util.initializer {
 }
 
 // -----
+
 // Valid: Complex transitive case through multiple functions.
 
 util.func private @leaf_func() {
@@ -79,6 +83,7 @@ util.initializer {
 }
 
 // -----
+
 // Valid: Multiple initializers in correct order.
 
 util.global private @g1 = 1 : i32
@@ -96,6 +101,7 @@ util.initializer {
 }
 
 // -----
+
 // Error: Forward reference in initializer.
 
 util.initializer {
@@ -106,6 +112,7 @@ util.initializer {
 util.global private @later_global = 42 : i32
 
 // -----
+
 // Error: Store to forward global in initializer.
 
 util.initializer {
@@ -117,6 +124,7 @@ util.initializer {
 util.global private @forward_store : i32
 
 // -----
+
 // Error: Double initialization of immutable global.
 
 util.global private @double_init = 10 : i32
@@ -128,6 +136,7 @@ util.initializer {
 }
 
 // -----
+
 // Error: Global with initial value modified by earlier initializer.
 
 util.initializer {
@@ -139,6 +148,7 @@ util.initializer {
 util.global private @modified_init_value = 42 : i32
 
 // -----
+
 // Error: Store to immutable global in externally reachable function.
 
 util.func public @public_func() {
@@ -150,6 +160,7 @@ util.func public @public_func() {
 util.global private @no_external_store : i32
 
 // -----
+
 // Warning: Conditional store to immutable global in initializer-only function.
 
 util.func private @conditional_store(%cond: i1) {
@@ -169,6 +180,7 @@ util.initializer {
 }
 
 // -----
+
 // Warning: Store in loop within initializer-only function.
 
 util.func private @loop_store() {
@@ -190,6 +202,7 @@ util.initializer {
 }
 
 // -----
+
 // Valid: Multiple stores in same initializer (last one wins).
 
 util.global private mutable @multi_store : i32
@@ -204,6 +217,7 @@ util.initializer {
 }
 
 // -----
+
 // Error: Store to immutable global in function called by both initializer and external.
 
 util.func public @external_entry() {
@@ -225,6 +239,7 @@ util.initializer {
 }
 
 // -----
+
 // Valid: Empty module with no initializers or globals.
 
 util.func public @empty_module() {
@@ -232,6 +247,7 @@ util.func public @empty_module() {
 }
 
 // -----
+
 // Valid: Module with only globals, no initializers.
 
 util.global private @only_global1 = 1 : i32
@@ -239,6 +255,7 @@ util.global private @only_global2 = 2 : i32
 util.global private mutable @only_global3 : i32
 
 // -----
+
 // Valid: Empty initializer.
 
 util.initializer {
@@ -246,6 +263,7 @@ util.initializer {
 }
 
 // -----
+
 // Valid: Nested function calls all initializer-only.
 
 util.func private @deep3() {
@@ -271,6 +289,7 @@ util.initializer {
 }
 
 // -----
+
 // Warning: Store in while loop in initializer-only function.
 
 util.func private @while_store() {
@@ -297,6 +316,7 @@ util.initializer {
 }
 
 // -----
+
 // Warning: Store in index_switch in initializer-only function.
 
 util.func private @switch_store(%idx: index) {
@@ -322,5 +342,148 @@ util.global private mutable @switch_global : i32
 util.initializer {
   %c0 = arith.constant 0 : index
   util.call @switch_store(%c0) : (index) -> ()
+  util.return
+}
+
+// -----
+
+// Error: Initializer calls function that accesses forward-referenced global.
+
+util.func private @access_forward_global() {
+  // expected-error @+1 {{initializer at position 2 transitively accesses global '@forward_global' defined at position 3 through function call}}
+  %val = util.global.load @forward_global : i32
+  util.return
+}
+
+util.global private @early_defined = 1 : i32
+util.initializer {
+  util.call @access_forward_global() : () -> ()
+  util.return
+}
+util.global private @forward_global : i32
+
+// -----
+
+// Error: Transitive forward reference through multiple function calls.
+
+util.func private @deep_access() {
+  // expected-error @+2 {{initializer at position 4 transitively stores to global '@deep_forward_global' defined at position 5 through function call}}
+  %c42 = arith.constant 42 : i32
+  util.global.store %c42, @deep_forward_global : i32
+  util.return
+}
+
+util.func private @middle_caller() {
+  util.call @deep_access() : () -> ()
+  util.return
+}
+
+util.global private @base_global = 1 : i32
+util.global private @another_global = 2 : i32
+util.initializer {
+  util.call @middle_caller() : () -> ()
+  util.return
+}
+util.global private @deep_forward_global : i32
+
+// -----
+
+// Valid: Recursive function calls (visited set prevents infinite loop).
+
+util.func private @recursive_func(%depth: i32) {
+  %c0 = arith.constant 0 : i32
+  %cmp = arith.cmpi sgt, %depth, %c0 : i32
+  scf.if %cmp {
+    %c1 = arith.constant 1 : i32
+    %new_depth = arith.subi %depth, %c1 : i32
+    util.call @recursive_func(%new_depth) : (i32) -> ()
+  }
+  // CHECK: util.global.store %{{.+}}, @recursive_global
+  util.global.store %depth, @recursive_global : i32
+  util.return
+}
+
+util.global private @recursive_global : i32
+util.initializer {
+  %c5 = arith.constant 5 : i32
+  util.call @recursive_func(%c5) : (i32) -> ()
+  util.return
+}
+
+// -----
+
+// Valid: Mutually recursive functions (visited set handles cycles).
+
+util.func private @func_a(%n: i32) {
+  %c0 = arith.constant 0 : i32
+  %cmp = arith.cmpi sgt, %n, %c0 : i32
+  scf.if %cmp {
+    %c1 = arith.constant 1 : i32
+    %new_n = arith.subi %n, %c1 : i32
+    util.call @func_b(%new_n) : (i32) -> ()
+  }
+  util.return
+}
+
+util.func private @func_b(%n: i32) {
+  // CHECK: util.global.load @cycle_global
+  %val = util.global.load @cycle_global : i32
+  %c0 = arith.constant 0 : i32
+  %cmp = arith.cmpi sgt, %n, %c0 : i32
+  scf.if %cmp {
+    util.call @func_a(%n) : (i32) -> ()
+  }
+  util.return
+}
+
+util.global private @cycle_global = 42 : i32
+util.initializer {
+  %c3 = arith.constant 3 : i32
+  util.call @func_a(%c3) : (i32) -> ()
+  util.return
+}
+
+// -----
+
+// Valid: Function called by multiple initializers at different positions.
+
+util.func private @shared_reader() {
+  // CHECK: util.global.load @early_shared
+  %val = util.global.load @early_shared : i32
+  util.return
+}
+
+util.global private @early_shared = 1 : i32
+util.initializer {
+  util.call @shared_reader() : () -> ()
+  util.return
+}
+
+util.global private @middle_global = 2 : i32
+util.initializer {
+  util.call @shared_reader() : () -> ()
+  util.return
+}
+
+// -----
+
+// Valid: Function accesses multiple globals, all defined before first initializer.
+
+util.func private @multi_access() {
+  // CHECK: util.global.load @first_global
+  %v1 = util.global.load @first_global : i32
+  // CHECK: util.global.load @second_global
+  %v2 = util.global.load @second_global : i32
+  %sum = arith.addi %v1, %v2 : i32
+  // CHECK: util.global.store %{{.+}}, @result_global
+  util.global.store %sum, @result_global : i32
+  util.return
+}
+
+util.global private @first_global = 1 : i32
+util.global private @second_global = 2 : i32
+util.global private @result_global : i32
+util.initializer {
+  util.call @multi_access() : () -> ()
   util.return
 }
