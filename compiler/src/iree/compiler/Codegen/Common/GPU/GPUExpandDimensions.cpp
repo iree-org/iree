@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/STLForwardCompat.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -30,6 +31,9 @@ namespace {
 struct GPUExpandDimensionsPass final
     : impl::GPUExpandDimensionsPassBase<GPUExpandDimensionsPass> {
   using Base::Base;
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::Util::UtilDialect>();
+  }
   void runOnOperation() override;
 };
 } // namespace
@@ -48,13 +52,17 @@ getExpansionInfo(IREE::GPU::LoweringConfigAttr config) {
 
   for (auto [origDimIdx, newDimIndices] : llvm::enumerate(expansionFactors)) {
     if (newDimIndices.size() > 1) {
+      int64_t expansionFactor = 1;
       for (unsigned newDimIdx : newDimIndices) {
         if (newDimIdx < threadSizes.size()) {
           int64_t factor = threadSizes[newDimIdx];
           if (factor > 1) {
-            expansionInfo[origDimIdx] = factor;
+            expansionFactor *= factor;
           }
         }
+      }
+      if (expansionFactor > 1) {
+        expansionInfo[origDimIdx] = expansionFactor;
       }
     }
   }
