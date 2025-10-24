@@ -70,6 +70,7 @@ private:
   SymbolTable symbolTable;
   DenseMap<OpAffinityPair, IREE::Util::GlobalOpInterface> cachedGlobals;
   DenseMap<ValueAffinityPair, Value> cachedValuePerAffinity;
+
   // Cache the last initializer that references each global for performance.
   DenseMap<Operation *, Operation *> cachedLastInitializer;
 };
@@ -80,25 +81,26 @@ ValuePerAffinityHelper::ValuePerAffinityHelper(mlir::ModuleOp moduleOp)
   // This avoids scanning all initializers multiple times during transformation.
   IREE::Util::GlobalTable globalTable(moduleOp);
   globalTable.forEach([&](IREE::Util::Global &global) {
-    Operation *lastInitializer = global.op.getOperation();
+    Operation *lastInitializer = nullptr;
 
     // Iterate through store operations to find initializers.
     for (auto storeOp : global.storeOps) {
       // Get the parent initializer op if the store is within one.
       auto initOp = storeOp->getParentOfType<IREE::Util::InitializerOp>();
-      if (!initOp)
+      if (!initOp) {
         continue;
+      }
 
-      // If this initializer comes after the global op, update the insertion
-      // point if this is the latest one we've seen.
-      if (global.op->isBeforeInBlock(initOp)) {
-        if (lastInitializer == global.op.getOperation() ||
-            lastInitializer->isBeforeInBlock(initOp)) {
-          lastInitializer = initOp;
-        }
+      // Update the insertion point if this is the latest initializer.
+      if (!lastInitializer || lastInitializer->isBeforeInBlock(initOp)) {
+        lastInitializer = initOp;
       }
     }
 
+    // If no initializer was found, use the global op itself as insertion point.
+    if (!lastInitializer) {
+      lastInitializer = global.op.getOperation();
+    }
     cachedLastInitializer[global.op.getOperation()] = lastInitializer;
     return IREE::Util::GlobalAction::PRESERVE;
   });
