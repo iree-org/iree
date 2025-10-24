@@ -86,12 +86,9 @@ tileOpAndWrapInDispatch(RewriterBase &rewriter, TilingInterface op,
   scf::SCFTileAndFuseOptions tileAndFuseOptions;
   // Only fuse along the dest operand.
   scf::SCFTileAndFuseOptions::ControlFnTy fusionControlFn =
-      [fusePad](tensor::ExtractSliceOp, OpResult result, bool isDestArg)
+      [](tensor::ExtractSliceOp, OpResult result, bool isDestArg)
       -> std::optional<scf::SCFTileAndFuseOptions::ControlFnResult> {
     if (isDestArg) {
-      return scf::SCFTileAndFuseOptions::ControlFnResult{false};
-    }
-    if (fusePad && isa<tensor::PadOp>(result.getOwner())) {
       return scf::SCFTileAndFuseOptions::ControlFnResult{false};
     }
     return std::nullopt;
@@ -102,6 +99,7 @@ tileOpAndWrapInDispatch(RewriterBase &rewriter, TilingInterface op,
   if (fusePad) {
     MLIRContext *context = rewriter.getContext();
     RewritePatternSet cleanupPatterns(context);
+    // When fusing pads we do not want to generate zeroSliceGuards.
     cleanupPatterns.insert<linalg::ExtractSliceOfPadTensorSwapPattern>(
         context,
         [](tensor::ExtractSliceOp) { return /*zeroSliceGuard=*/false; });
