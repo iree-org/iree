@@ -6,7 +6,7 @@
     ],
     "modules": [
         "llama_8b_fp16/modules/llama_gfx942",
-        "llama_8b_fp16/modules/scheduler"
+        "llama_8b_fp16/modules/scheduler_gfx942"
     ],
     "weights": [
         {
